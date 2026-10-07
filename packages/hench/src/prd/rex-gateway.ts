@@ -69,6 +69,9 @@
  * - Requirements validation (verify task acceptance criteria)
  * - Level helpers (isRootLevel, isWorkItem — classify items)
  * - Finding acknowledgment (load/save/acknowledge sourcevision findings)
+ * - Saved run settings (validateRunSettings — the task's own `run` block,
+ *   validated with the validator every writer gates on, so what `ndx work`
+ *   honours cannot drift from what the dashboard and MCP may save)
  * - PRD tree conformance (checkTreeConformance — refuse to start a run whose
  *   completion write would re-slug the whole tree)
  * - Actor identity (resolveActor — resolve the current user's identity for
@@ -178,8 +181,16 @@ export { isRootLevel, isWorkItem } from "@n-dx/rex";
 // ---- Finding acknowledgment -------------------------------------------------
 export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "@n-dx/rex";
 
+// ---- Saved run settings -----------------------------------------------------
+// The `run` block a task carries (`ndx work` honours it; the dashboard and the
+// rex MCP tools write it). Validated here with rex's own validator rather than
+// a hench-side shape check: a second definition of what a valid block is would
+// let `ndx work` silently ignore settings the dashboard had just accepted, or
+// act on ones it would refuse.
+export { validateRunSettings } from "@n-dx/rex";
+
 // ---- Type re-exports --------------------------------------------------------
 // All type imports from rex must flow through this gateway to prevent
 // type-import promotion erosion (a type import can be promoted to a
 // runtime import during refactoring, silently bypassing the gateway).
-export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason, SaveFileReport, TraversalBlock } from "@n-dx/rex";
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason, SaveFileReport, TraversalBlock, RunSettings } from "@n-dx/rex";

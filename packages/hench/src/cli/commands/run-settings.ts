@@ -7,14 +7,33 @@
  * reported (resolve).
  */
 
-import type { LLMVendor } from "../../prd/llm-gateway.js";
-import { LLM_VENDOR } from "../../prd/llm-gateway.js";
-import type { PermissionMode } from "../../schema/index.js";
+import type { LLMConfig, LLMVendor } from "../../prd/llm-gateway.js";
+import {
+  LLM_VENDOR,
+  REVIEW_MODELS,
+  isModelCompatibleWithVendor,
+  resolveModel,
+  resolveReviewModel,
+  resolveTaskModel,
+} from "../../prd/llm-gateway.js";
+import { validateRunSettings } from "../../prd/rex-gateway.js";
+import type { PRDItem, RunSettings } from "../../prd/rex-gateway.js";
+import type { HenchConfig, PermissionMode } from "../../schema/index.js";
 import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
+import { reviewModelSource } from "../../agent/analysis/adversarial-review.js";
 import { CLIError } from "../errors.js";
+import { checkAgentModel } from "./agent-model.js";
+import type { AgentModelSource } from "./agent-model.js";
 import { safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { isProviderSupported } from "./provider-support.js";
 import type { HenchProvider } from "./provider-support.js";
+
+/**
+ * The portable tier a saved `run` block may name. Derived from rex's own field
+ * rather than re-exported through the gateway, so it cannot drift from the
+ * validator's definition and costs the gateway no export.
+ */
+type RunSettingTier = NonNullable<RunSettings["tier"]>;
 
 /**
  * The two independent review controls, bundled so the run functions keep a
@@ -134,32 +153,36 @@ export function parseBudgetFlags(flags: Record<string, string>): {
 }
 
 /** Which input supplied the effective permission mode. */
-export type PermissionModeOrigin = "cli-flag" | "config" | "autonomous-default" | "built-in";
+export type PermissionModeOrigin = "cli-flag" | "task.run" | "config" | "autonomous-default" | "built-in";
 
 /**
  * The permission mode the spawned Claude session runs with.
  *
- * Precedence: `--permission-mode` > `hench.permissionMode` > the autonomous
- * default (`acceptEdits`, so an unattended run cannot stall in plan mode) >
- * undefined (the Claude CLI's own default). Other vendors have no such
- * setting, so the winning value is returned as `dropped` and `value` is
- * undefined — the caller says so.
+ * Precedence: `--permission-mode` > the task's saved `run.permissionMode` >
+ * `hench.permissionMode` > the autonomous default (`acceptEdits`, so an
+ * unattended run cannot stall in plan mode) > undefined (the Claude CLI's own
+ * default). Other vendors have no such setting, so the winning value is
+ * returned as `dropped` and `value` is undefined — the caller says so.
  */
 export function resolveRunPermissionMode(params: {
   flag: PermissionMode | undefined;
+  /** `run.permissionMode` from the selected task, when one is selected. */
+  saved?: PermissionMode | undefined;
   configured: PermissionMode | undefined;
   autonomous: boolean;
   vendor: LLMVendor;
 }): { value: PermissionMode | undefined; origin: PermissionModeOrigin; dropped?: PermissionMode } {
-  const { flag, configured, autonomous, vendor } = params;
+  const { flag, saved, configured, autonomous, vendor } = params;
   const chosen: { value: PermissionMode | undefined; origin: PermissionModeOrigin } =
     flag !== undefined
       ? { value: flag, origin: "cli-flag" }
-      : configured !== undefined
-        ? { value: configured, origin: "config" }
-        : autonomous
-          ? { value: "acceptEdits", origin: "autonomous-default" }
-          : { value: undefined, origin: "built-in" };
+      : saved !== undefined
+        ? { value: saved, origin: "task.run" }
+        : configured !== undefined
+          ? { value: configured, origin: "config" }
+          : autonomous
+            ? { value: "acceptEdits", origin: "autonomous-default" }
+            : { value: undefined, origin: "built-in" };
   if (chosen.value && vendor !== LLM_VENDOR.CLAUDE) {
     return { value: undefined, origin: chosen.origin, dropped: chosen.value };
   }
@@ -215,4 +238,362 @@ export function reviewProviderError(vendor: LLMVendor, provider: HenchProvider):
       `${vendor === LLM_VENDOR.GOOGLE || vendor === LLM_VENDOR.LOCAL ? ` (vendor="${vendor}" has no CLI binary)` : ""}.`,
     "Switch with 'ndx config hench.provider cli' on a vendor that has a CLI (claude, codex), or drop --review.",
   );
+}
+
+// ---------------------------------------------------------------------------
+// Per-task run settings
+// ---------------------------------------------------------------------------
+
+/** One resolved setting and the config key (or rule) that supplied it. */
+export interface Resolved<T> {
+  value: T;
+  /**
+   * `cli-flag`, `task.run` (or `task.run.tier` / `task.run.models` for the two
+   * model settings, where which saved key won is the thing worth knowing),
+   * `hench.<key>`, `hench.models.<vendor>`, an `llm.*` key, `vendor-default`,
+   * `autonomous-default`, `repository-trust` or `built-in`.
+   */
+  source: string;
+}
+
+/** The portable tiers a saved `run` block may name, heaviest last. */
+const TIER_ORDER = ["light", "standard", "heavy"] as const satisfies readonly RunSettingTier[];
+
+/**
+ * Weight recorded for a model that is in no tier this project can reach.
+ * Distinct from a tier name so a usage report never files an opus run under
+ * "standard" merely because that is the field's default.
+ */
+export const CUSTOM_WEIGHT = "custom";
+
+/** The task class the agent loop runs as; the tier it routes to is the run's weight. */
+const AGENT_TASK_CLASS = "agent.execute";
+
+/**
+ * The model `resolveTaskModel` picks for `vendor` at `tier`, resolved through
+ * the same function the run's own chain uses rather than read off
+ * `TIER_MODELS` directly — so a `llm.tiers.<vendor>.<tier>` override, and the
+ * vendor-specific normalization of whatever it names, apply here exactly as
+ * they do there. The route is forced to `tier`; nothing else is changed.
+ */
+function modelForTier(vendor: LLMVendor, llmConfig: LLMConfig | undefined, tier: RunSettingTier): string {
+  return resolveTaskModel(
+    AGENT_TASK_CLASS,
+    { ...llmConfig, routes: { ...llmConfig?.routes, [AGENT_TASK_CLASS]: tier } },
+    { vendor },
+  ).model;
+}
+
+/**
+ * The tier `model` belongs to for this project — the run record's `weight`.
+ *
+ * A model the route chain picked is recorded as the tier the route reached.
+ * Anything else (a `--model` flag, a `hench.models` pin, a task's saved
+ * `models` entry) is reverse-mapped through the vendor's tier table, which
+ * `modelForTier` reads with this project's own `llm.tiers` overrides applied.
+ * The standard tier's entry already resolves through `llm.model` /
+ * `llm.<vendor>.model`, so a pinned model maps to "standard" without a second
+ * rule for it.
+ *
+ * Several tiers can name the same model (on this repo `standard` and `heavy`
+ * are both opus): the routed tier wins when it is among them, else the
+ * heaviest, because overstating a cheap run is a smaller lie than filing an
+ * expensive one as cheap. A model in no tier is {@link CUSTOM_WEIGHT}.
+ */
+export function weightOfModel(params: {
+  vendor: LLMVendor;
+  model: string;
+  llmConfig: LLMConfig | undefined;
+  /** The tier `agent.execute` routes to for this project. */
+  routedTier: string;
+  /** True when `model` came from the `llm.*` route chain rather than an override. */
+  fromRouteChain: boolean;
+}): string {
+  const { vendor, model, llmConfig, routedTier, fromRouteChain } = params;
+  if (fromRouteChain) return routedTier;
+  const matches = TIER_ORDER.filter((tier) => modelForTier(vendor, llmConfig, tier) === model);
+  if (matches.length === 0) return CUSTOM_WEIGHT;
+  if (matches.some((tier) => tier === routedTier)) return routedTier;
+  return matches[matches.length - 1];
+}
+
+/** Model rungs that come from the `llm.*` route chain rather than from an override. */
+function isRouteChainRung(rung: string): boolean {
+  return rung !== "cli-flag" && !rung.startsWith("hench.models.");
+}
+
+export interface TaskRunSettings {
+  model: Resolved<string> & {
+    /** The tier of {@link Resolved.value} — what the run record's `weight` is. */
+    weight: string;
+    /**
+     * The coarser label the vendor/model header prints. A model saved on the
+     * task reads as "configured": it is configured, just on the item rather
+     * than in a config file, and the header's union has no finer word for it.
+     */
+    headerSource: AgentModelSource;
+    /** Set when the winning model cannot run on the active vendor; a run refuses on it. */
+    mismatch?: CLIError;
+  };
+  provider: Resolved<HenchProvider> & { switched: boolean; error?: CLIError };
+  permissionMode: Resolved<PermissionMode | null> & {
+    /** The mode a non-Claude vendor cannot honour; set when it was dropped. */
+    dropped?: PermissionMode;
+  };
+  review: Resolved<boolean>;
+  /** Always the reviewer a review would use; `review.value` says whether one runs. */
+  reviewModel: Resolved<string> & { vendorDefault: string };
+  reviewOptional: Resolved<boolean>;
+  skipTestGate: Resolved<boolean>;
+  maxTurns: Resolved<number>;
+  tokenBudget: Resolved<number>;
+  /** `--context-file` text, else the task's saved `contextNotes`. */
+  contextNotes: Resolved<string | null>;
+  /** The saved block that was honoured; undefined when absent or ignored. */
+  saved?: RunSettings;
+  /** Operator-facing notes about the saved block — an ignored or skipped value. */
+  warnings: string[];
+}
+
+export interface TaskRunSettingsInput {
+  flags: Record<string, string>;
+  config: HenchConfig;
+  /** Top-level keys actually present in hench's config files, for `hench.<key>` sources. */
+  configuredHenchKeys: ReadonlySet<string>;
+  llmConfig: LLMConfig | undefined;
+  vendor: LLMVendor;
+  autonomous: boolean;
+  /** The selected task. Omitted before selection, which resolves the invocation's defaults. */
+  item?: Pick<PRDItem, "id" | "title" | "run">;
+  /**
+   * Repository trust, applied as a run applies it: while the checkout's
+   * execution config is untrusted, `bypassPermissions` is lowered. Passed as a
+   * function because the clamp reads the trust store, which this module does not.
+   */
+  clampPermissionMode?: (mode: PermissionMode | undefined) => PermissionMode | undefined;
+  /** `--context-file` text, already read and trimmed by the caller. */
+  contextFileText?: string;
+}
+
+/**
+ * Every per-task setting a run uses, with the key that supplied it.
+ *
+ * One function, two callers: the run path (`cmdRun` for the invocation's
+ * defaults, `runOne` again once a task is selected) and `ndx work --resolve`.
+ * A second copy is how `--resolve` would come to report a model the run does
+ * not use, so the precedence lives here and nowhere else.
+ *
+ * Precedence for every setting: CLI flag > the task's saved `run` block >
+ * `hench.*` > `llm.*` > the built-in default. A saved block that fails rex's
+ * own validator is ignored whole, with one warning — a run must not stop
+ * because somebody hand-edited one field of one item's front matter.
+ */
+export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSettings {
+  const { flags, config, configuredHenchKeys, llmConfig, vendor, autonomous, item } = input;
+  const warnings: string[] = [];
+
+  const reviewOpts = parseReviewOptions(flags);
+  const permissionModeFlag = parsePermissionModeFlag(flags);
+  const budgets = parseBudgetFlags(flags);
+
+  // The saved block, or nothing. `validateRunSettings` is rex's — the same one
+  // every writer gates on — so "what hench honours" cannot drift from "what
+  // the dashboard and MCP are allowed to save".
+  let saved: RunSettings | undefined;
+  if (item?.run !== undefined) {
+    const check = validateRunSettings(item.run);
+    if (check.ok) {
+      saved = check.value;
+    } else {
+      warnings.push(
+        `Ignoring the run settings saved on "${item.title}" (${item.id}): ${check.error}. ` +
+          `Running with this project's configured settings instead.`,
+      );
+    }
+  }
+
+  const henchSource = (key: string): string => (configuredHenchKeys.has(key) ? `hench.${key}` : "built-in");
+
+  // -- Model ---------------------------------------------------------------
+  const routed = resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor });
+  const cliModel = selectCliModelOverride(flags, vendor).value;
+  const savedModel = saved?.models?.[vendor]?.trim();
+  // A pin saved under this vendor's name that this vendor cannot run is the
+  // one saved value that must never wedge a loop: warn, skip it, carry on down
+  // the chain. `local` serves whatever LM Studio has loaded, so every string
+  // is legitimate there and the check does not apply.
+  const savedModelUsable =
+    savedModel !== undefined
+    && savedModel.length > 0
+    && (vendor === LLM_VENDOR.LOCAL || isModelCompatibleWithVendor(vendor, savedModel));
+  if (savedModel !== undefined && savedModel.length > 0 && !savedModelUsable) {
+    warnings.push(
+      `The model "${savedModel}" saved on "${item?.title}" cannot run on vendor="${vendor}" — ` +
+        `falling back to this project's configured model.`,
+    );
+  }
+  // A saved tier is portable, so it resolves per vendor. `local` is excluded:
+  // LM Studio serves whichever model is loaded, so every tier there resolves to
+  // the same string and honouring the tier would only record a weight the run
+  // did not have. The chain continues instead, and the weight reverse-maps.
+  const savedTier = vendor === LLM_VENDOR.LOCAL ? undefined : saved?.tier;
+  const savedTierModel = savedTier ? modelForTier(vendor, llmConfig, savedTier) || undefined : undefined;
+
+  const agentModel = checkAgentModel({
+    vendor,
+    cliModelOverride: cliModel,
+    henchModels: config.models,
+    llmConfig,
+  });
+  const weightOf = (value: string, fromRouteChain: boolean): string =>
+    weightOfModel({ vendor, model: value, llmConfig, routedTier: routed.tier, fromRouteChain });
+
+  let model: TaskRunSettings["model"];
+  if (cliModel) {
+    model = {
+      value: agentModel.model,
+      source: agentModel.rung,
+      weight: weightOf(agentModel.model, false),
+      headerSource: agentModel.source,
+    };
+  } else if (savedModelUsable) {
+    const value = resolveModel(savedModel as string);
+    model = { value, source: "task.run.models", weight: weightOf(value, false), headerSource: "configured" };
+  } else if (savedTierModel) {
+    model = {
+      value: savedTierModel,
+      source: "task.run.tier",
+      weight: savedTier as string,
+      headerSource: "configured",
+    };
+  } else {
+    model = {
+      value: agentModel.model,
+      source: agentModel.rung,
+      weight: weightOf(agentModel.model, isRouteChainRung(agentModel.rung)),
+      headerSource: agentModel.source,
+      ...(agentModel.mismatch ? { mismatch: agentModel.mismatch } : {}),
+    };
+  }
+
+  // -- Provider ------------------------------------------------------------
+  const requestedProvider = flags.provider ?? saved?.provider ?? config.provider;
+  const providerSource =
+    flags.provider !== undefined ? "cli-flag" : saved?.provider ? "task.run" : henchSource("provider");
+  const resolvedProvider = resolveRunProvider(requestedProvider, vendor);
+
+  // -- Permission mode -----------------------------------------------------
+  const permission = resolveRunPermissionMode({
+    flag: permissionModeFlag,
+    saved: saved?.permissionMode,
+    configured: config.permissionMode,
+    autonomous,
+    vendor,
+  });
+  const clamped = input.clampPermissionMode ? input.clampPermissionMode(permission.value) : permission.value;
+
+  // -- Review --------------------------------------------------------------
+  const review: Resolved<boolean> = reviewOpts.reviewPass
+    ? { value: true, source: "cli-flag" }
+    : saved?.review !== undefined
+      ? { value: saved.review, source: "task.run" }
+      : { value: false, source: "built-in" };
+  const vendorDefault = REVIEW_MODELS[vendor] ?? "";
+  const savedReviewModel = saved?.reviewModels?.[vendor]?.trim();
+  const savedReviewTierModel = saved?.reviewTier
+    ? modelForTier(vendor, llmConfig, saved.reviewTier) || undefined
+    : undefined;
+  let reviewModel: TaskRunSettings["reviewModel"];
+  if (reviewOpts.reviewModel) {
+    reviewModel = {
+      value: resolveReviewModel(vendor, llmConfig, reviewOpts.reviewModel),
+      source: "cli-flag",
+      vendorDefault,
+    };
+  } else if (savedReviewModel) {
+    reviewModel = {
+      value: resolveReviewModel(vendor, llmConfig, savedReviewModel),
+      source: "task.run.reviewModels",
+      vendorDefault,
+    };
+  } else if (savedReviewTierModel) {
+    reviewModel = { value: savedReviewTierModel, source: "task.run.reviewTier", vendorDefault };
+  } else {
+    reviewModel = {
+      value: resolveReviewModel(vendor, llmConfig, undefined),
+      source: reviewModelKey(vendor, reviewModelSource(vendor, llmConfig, undefined)),
+      vendorDefault,
+    };
+  }
+
+  return {
+    model,
+    provider: {
+      value: resolvedProvider.provider,
+      source: resolvedProvider.switched ? "vendor-default" : providerSource,
+      switched: resolvedProvider.switched,
+      ...(resolvedProvider.error ? { error: resolvedProvider.error } : {}),
+    },
+    permissionMode: {
+      ...(permission.dropped !== undefined ? { dropped: permission.dropped } : {}),
+      value: clamped ?? null,
+      source:
+        clamped !== permission.value
+          ? "repository-trust"
+          : permission.dropped !== undefined || permission.value === undefined
+            ? "built-in"
+            : permission.origin === "config"
+              ? "hench.permissionMode"
+              : permission.origin,
+    },
+    review,
+    reviewModel,
+    reviewOptional: reviewOpts.reviewOptional
+      ? { value: true, source: "cli-flag" }
+      : saved?.reviewOptional !== undefined
+        ? { value: saved.reviewOptional, source: "task.run" }
+        : { value: false, source: "built-in" },
+    // `false` is a meaningful saved value: it re-enables a gate
+    // `hench.skipFullTestGate` turns off. Only the flag's `true` outranks it —
+    // there is no `--no-skip-test-gate`, so an absent flag says nothing.
+    skipTestGate:
+      flags["skip-test-gate"] === "true"
+        ? { value: true, source: "cli-flag" }
+        : saved?.skipTestGate !== undefined
+          ? { value: saved.skipTestGate, source: "task.run" }
+          : config.skipFullTestGate !== undefined
+            ? { value: config.skipFullTestGate, source: "hench.skipFullTestGate" }
+            : { value: false, source: "built-in" },
+    maxTurns:
+      budgets.maxTurns !== undefined
+        ? { value: budgets.maxTurns, source: "cli-flag" }
+        : saved?.maxTurns !== undefined
+          ? { value: saved.maxTurns, source: "task.run" }
+          : { value: config.maxTurns, source: henchSource("maxTurns") },
+    tokenBudget:
+      budgets.tokenBudget !== undefined
+        ? { value: budgets.tokenBudget, source: "cli-flag" }
+        : saved?.tokenBudget !== undefined
+          ? { value: saved.tokenBudget, source: "task.run" }
+          : { value: config.tokenBudget, source: henchSource("tokenBudget") },
+    // Saved notes reach the agent the way `--context-file` does. An explicit
+    // `--context-file` replaces them rather than appending: the flag is the
+    // operator saying what context this run gets.
+    contextNotes:
+      input.contextFileText !== undefined
+        ? { value: input.contextFileText, source: "cli-flag" }
+        : saved?.contextNotes
+          ? { value: saved.contextNotes, source: "task.run" }
+          : { value: null, source: "built-in" },
+    ...(saved ? { saved } : {}),
+    warnings,
+  };
+}
+
+/** The config key behind each `reviewModelSource` answer. */
+export function reviewModelKey(vendor: LLMVendor, source: ReturnType<typeof reviewModelSource>): string {
+  if (source === "flag") return "cli-flag";
+  if (source === "vendor-config") return `llm.${vendor}.reviewModel`;
+  if (source === "shared-config") return "llm.reviewModel";
+  return "vendor-default";
 }
