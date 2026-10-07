@@ -27,4 +27,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Declare the level-of-effort fields and reserve effort in the v2 schema](./declare-the-level-of-effort-fields-and.md) | pending |
 | [Give saved run settings a home in the v2 schema](./give-saved-run-settings-a-home-in-the.md) | pending |
 | [Record which task or run found a change (discoveredFrom)](./record-which-task-or-run-found-a.md) | pending |
-| [Rename the map layer to product in the v2 types](./rename-the-map-layer-to-product-in-the.md) | in_progress |
+| [Rename the map layer to product in the v2 types](./rename-the-map-layer-to-product-in-the.md) | completed |
