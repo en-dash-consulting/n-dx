@@ -1,0 +1,6 @@
+schema: "rex/v2"
+items:
+  "c0000000-0000-4000-8000-000000000001":
+    status: "in_progress"
+    startedAt: "2026-10-01T09:00:00.000Z"
+    prs: ["https://github.com/example/shop/pull/12"]
