@@ -223,11 +223,55 @@ describe("writePrdModel", () => {
     await expect(write(rexDir, model)).rejects.toThrow(/no usable slug/);
   });
 
-  it("refuses two siblings with one slug", async () => {
+  it.each(["wire-the-button", "Wire-The-Button"])("refuses a sibling with the slug %s", async (slug) => {
     const rexDir = await copyFixture();
     const model = await loadPrdModel(rexDir, quiet);
-    find(all(model), CHANGE).children!.push({ id: "t2", type: "task", title: "Other", slug: "wire-the-button" } as RuleNode);
-    await expect(write(rexDir, model)).rejects.toThrow(/share the slug "wire-the-button"/);
+    find(all(model), CHANGE).children!.push({ id: "t2", type: "task", title: "Other", slug } as RuleNode);
+    await expect(write(rexDir, model)).rejects.toThrow(new RegExp(`share the slug "${slug}"`));
+  });
+
+  it("refuses a leaf named Index, which is index.md on a case-insensitive disk", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    find(all(model), TASK).slug = "Index";
+    await expect(write(rexDir, model)).rejects.toThrow(/no usable slug/);
+  });
+
+  it("deletes only tree files from a stale folder, keeping anything else in it", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    const task = find(all(model), TASK);
+    task.children = [{ id: "s1", type: "subtask", title: "Hide on Chrome", slug: "hide-on-chrome", status: "completed" } as RuleNode];
+    await write(rexDir, model);
+    const folder = join(rexDir, "changes/add-apple-pay/wire-the-button");
+    await writeFile(join(folder, "diagram.png"), "not markdown");
+
+    task.children = [];
+    const result = await write(rexDir, model, { removed: new Set(["s1"]) });
+
+    expect(result.removed.sort()).toEqual([
+      "changes/add-apple-pay/wire-the-button/hide-on-chrome.md",
+      "changes/add-apple-pay/wire-the-button/index.md",
+      "changes/add-apple-pay/wire-the-button/state.yaml",
+    ]);
+    expect(await readFile(join(folder, "diagram.png"), "utf-8")).toBe("not markdown");
+    expect(Object.keys(await snapshot(rexDir))).toContain("changes/add-apple-pay/wire-the-button.md");
+  });
+
+  it("removes a stale folder that held only tree files", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    const task = find(all(model), TASK);
+    task.children = [{ id: "s1", type: "subtask", title: "Hide on Chrome", slug: "hide-on-chrome" } as RuleNode];
+    await write(rexDir, model);
+
+    task.children = [];
+    const result = await write(rexDir, model, { removed: new Set(["s1"]) });
+
+    expect(result.removed).toEqual(["changes/add-apple-pay/wire-the-button"]);
+    expect(Object.keys(await snapshot(rexDir)).filter((p) => p.includes("wire-the-button"))).toEqual([
+      "changes/add-apple-pay/wire-the-button.md",
+    ]);
   });
 
   it("refuses invalid intent before writing anything", async () => {

@@ -37,7 +37,7 @@
  * @module rex/store/prd-model-writer
  */
 
-import { mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, rmdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import {
   AreaIntentSchema,
@@ -152,9 +152,8 @@ export async function writePrdModel(
       result.written.push(rel(path));
     }
   }
-  for (const { path } of plan.stale) {
-    await rm(path, { recursive: true, force: true });
-    result.removed.push(rel(path));
+  for (const { path, isDir } of plan.stale) {
+    for (const removed of await removeStale(path, isDir)) result.removed.push(rel(removed));
   }
   return result;
 }
@@ -207,11 +206,13 @@ async function planFolder(
   for (const node of nodes) {
     const folder = isFolderNode(node);
     assertSlug(node, folder, dir);
-    const clash = seen.get(node.slug);
+    // Case-folded: on macOS and Windows "Foo" and "foo" are one path.
+    const key = node.slug.toLowerCase();
+    const clash = seen.get(key);
     if (clash !== undefined) {
-      throw new Error(`Two nodes in ${dir} share the slug "${node.slug}": ${clash} and ${node.id}`);
+      throw new Error(`Two nodes in ${dir} share the slug "${node.slug}" (ignoring case): ${clash} and ${node.id}`);
     }
-    seen.set(node.slug, node.id);
+    seen.set(key, node.id);
     if (folder) {
       expectedDirs.add(node.slug);
       await planFolder(join(dir, node.slug), node.children ?? [], node, stamp, plan);
@@ -254,7 +255,7 @@ function assertSlug(node: RuleNode, folder: boolean, dir: string): void {
     !slug.startsWith(".") &&
     !/[/\\\0]/.test(slug) &&
     // A leaf named "index" would overwrite its folder's index.md.
-    (folder || slug !== "index");
+    (folder || slug.toLowerCase() !== "index");
   if (!ok) {
     throw new Error(`Node ${node.id} in ${dir} has no usable slug (${JSON.stringify(slug)}); slugs are set once at creation`);
   }
@@ -324,6 +325,48 @@ async function assertStaleRemovable(
         );
       }
     }
+  }
+}
+
+/**
+ * Delete a stale entry. A folder loses only its tree files (`.md`, `state.yaml`)
+ * and is removed once empty, so anything else kept there survives and the
+ * folder stays. Returns the paths deleted: the folder itself when it went,
+ * else the files.
+ */
+async function removeStale(path: string, isDir: boolean): Promise<string[]> {
+  if (!isDir) {
+    await rm(path, { force: true });
+    return [path];
+  }
+  const files = await removeTreeFiles(path);
+  return (await removeIfEmpty(path)) ? [path] : files;
+}
+
+async function removeTreeFiles(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of (await listDir(dir)) ?? []) {
+    if (entry.name.startsWith(".")) continue;
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const files = await removeTreeFiles(path);
+      out.push(...((await removeIfEmpty(path)) ? [path] : files));
+    } else if (entry.name.endsWith(".md") || entry.name === STATE_FILE_NAME) {
+      await rm(path, { force: true });
+      out.push(path);
+    }
+  }
+  return out;
+}
+
+async function removeIfEmpty(dir: string): Promise<boolean> {
+  try {
+    await rmdir(dir);
+    return true;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOTEMPTY" || code === "EEXIST") return false;
+    throw err;
   }
 }
 
