@@ -153,6 +153,48 @@ describe("v2 trees", () => {
     expect(again.warnings.map((w) => w.message)).toContainEqual('State row "gone" matches no node in this folder');
   });
 
+  describe("a hand-edited run that is not an object", () => {
+    async function withTaskRun(runLines: string): Promise<string> {
+      const rexDir = await copyFixture();
+      const leaf = join(rexDir, "changes/add-apple-pay/wire-the-button.md");
+      await writeFile(leaf, (await readFile(leaf, "utf-8")).replace('slug: "wire-the-button"\n', `slug: "wire-the-button"\n${runLines}`));
+      return rexDir;
+    }
+
+    it("reads `run:` with no value as no run block, silently", async () => {
+      const model = await loadPrdModel(await withTaskRun("run:\n"), quiet);
+      expect(model.warnings).toEqual([]);
+      const task = find(model, TASK);
+      expect(task).toMatchObject({ title: "Wire the button", acceptanceCriteria: ["The button appears on Safari only"] });
+      expect(task).not.toHaveProperty("run");
+      expect(find(model, CAPABILITY).status).toBe("completed");
+    });
+
+    it.each([
+      ["a string", 'run: "heavy"\n'],
+      ["an array", 'run: ["heavy"]\n'],
+    ])("drops %s with a warning naming the item, keeping the node", async (_label, runLines) => {
+      const model = await loadPrdModel(await withTaskRun(runLines), quiet);
+      expect(model.warnings.map((w) => w.message)).toEqual([`Ignoring run on item id=${TASK}: expected an object`]);
+      const task = find(model, TASK);
+      expect(task).toMatchObject({ title: "Wire the button", status: "pending", acceptanceCriteria: ["The button appears on Safari only"] });
+      expect(task).not.toHaveProperty("run");
+    });
+
+    it("leaves the rest of the tree writable", async () => {
+      const rexDir = await withTaskRun('run: "heavy"\n');
+      const folder = join(rexDir, "changes/add-apple-pay");
+      const state = await loadStateFile(folder);
+      state.items[CHANGE] = { ...state.items[CHANGE], status: "completed" };
+      await withLock(prdLockPath(rexDir), () => saveStateFile(folder, state, { rexDir, specs: new Map() }));
+
+      const model = await loadPrdModel(rexDir, quiet);
+      expect(find(model, CHANGE).status).toBe("completed");
+      expect(find(model, TASK).title).toBe("Wire the button");
+      expect(() => assertPrdModelWritable(model)).not.toThrow();
+    });
+  });
+
   it("refuses a malformed state.yaml rather than reading its nodes as pending", async () => {
     const rexDir = await copyFixture();
     await writeFile(join(rexDir, "product/checkout/state.yaml"), `schema: "rex/v2"\nitems:\n  "x":\n    status: "nope"\n`);

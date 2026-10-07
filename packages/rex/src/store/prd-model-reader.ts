@@ -302,6 +302,7 @@ async function readNode(
   const text = (await readIfExists(path)) ?? "";
   const fm = parseFrontmatter(text, path, warnings);
   if (!fm) return null;
+  dropNonObjectRun(fm, path, warnings);
   const body = bodyOf(text);
   const intent = NodeIntentSchema.safeParse(body ? { ...fm, body } : fm);
   if (!intent.success) {
@@ -313,6 +314,20 @@ async function readNode(
   }
   // State is tool-written and authoritative for its fields; an absent row reads as pending.
   return { status: "pending", ...intent.data, ...state.items[intent.data.id] } as RuleNode;
+}
+
+/**
+ * Remove a `run` that is not a plain object before intent validation, as the
+ * v1 parser does: a hand-edited `run:` with no value (null) or `run: heavy`
+ * would otherwise fail the whole node and hide it with its subtree. Null is
+ * dropped silently; anything else warns. An object, even an invalid one, is
+ * kept for the `run-settings` rule to report.
+ */
+function dropNonObjectRun(fm: Record<string, unknown>, path: string, warnings: ParseWarning[]): void {
+  const run = fm.run;
+  if (run === undefined || (typeof run === "object" && run !== null && !Array.isArray(run))) return;
+  delete fm.run;
+  if (run !== null) warnings.push({ path, message: `Ignoring run on item id=${String(fm.id)}: expected an object` });
 }
 
 // ── Shared ───────────────────────────────────────────────────────
