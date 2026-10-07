@@ -97,6 +97,54 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toContain("widening is fine");
     });
 
+    // ── #546 finding F3 ──────────────────────────────────────────────────────
+    // Both bullets above are claims about a gate that `--skip-test-gate` /
+    // `hench.skipFullTestGate` removes. Left unguarded they told the agent not
+    // to run the suite *because* something else would, when nothing would: the
+    // run committed and completed the task with the suite never run. The
+    // reviewer brief already guards the same claims
+    // (cli-loop.ts passes `testGateFollows: config.skipFullTestGate !== true`).
+    // Do not drop the guard.
+    it("drops the gate-follows claims when the test gate is skipped", () => {
+      const config = {
+        ...DEFAULT_HENCH_CONFIG(),
+        provider: "cli" as const,
+        skipFullTestGate: true,
+      };
+      const prompt = buildSystemPrompt({ ...project, cliName: "widget" }, config);
+      expect(prompt).toContain("## Validation");
+      expect(prompt).not.toContain("Do not run the whole repository suite");
+      expect(prompt).not.toContain("the gate still runs");
+    });
+
+    it("tells the agent its own checks are the only ones when the gate is skipped", () => {
+      const config = {
+        ...DEFAULT_HENCH_CONFIG(),
+        provider: "cli" as const,
+        skipFullTestGate: true,
+      };
+      const prompt = buildSystemPrompt({ ...project, cliName: "widget" }, config);
+      // The scoped-first bullets survive — skipping the gate is not licence to
+      // run everything, it is a reason to make the scoped checks cover the change.
+      expect(prompt).toContain("Run the tests for the files you changed, or the one package suite that covers them.");
+      expect(prompt).toContain("Build only the package you changed.");
+      expect(prompt).toContain("No test gate runs after you finish on this run.");
+      expect(prompt).toContain("make them cover what you changed");
+      expect(prompt).toContain("widening is fine");
+    });
+
+    it("keeps the gate-follows claims when skipFullTestGate is explicitly false", () => {
+      const config = {
+        ...DEFAULT_HENCH_CONFIG(),
+        provider: "cli" as const,
+        skipFullTestGate: false,
+      };
+      const prompt = buildSystemPrompt({ ...project, cliName: "widget" }, config);
+      expect(prompt).toContain("Do not run the whole repository suite. widget runs its test gate after you finish, and CI runs everything.");
+      expect(prompt).toContain("Finishing is not skipping validation: the gate still runs");
+      expect(prompt).not.toContain("No test gate runs after you finish");
+    });
+
     it("api provider does not get the Validation section (pinned choice)", () => {
       const config = { ...DEFAULT_HENCH_CONFIG(), provider: "api" as const };
       expect(buildSystemPrompt(project, config)).not.toContain("## Validation");

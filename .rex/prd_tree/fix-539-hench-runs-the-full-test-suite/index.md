@@ -34,7 +34,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [affected mode never runs run-options-contract, catalog-runtime-contract or prd-slug-conformance for the package-source change they police](./affected-mode-never-runs-run-options.md) | pending |
 | [affected mode runs the root drift tests when a package source changes](./affected-mode-runs-the-root-drift.md) | completed |
 | [affected mode skips the 2-second root policy tests when a change stays inside one package's src or tests](./affected-mode-skips-the-2-second-root.md) | completed |
-| [agent brief stops forbidding the full suite when the test gate is skipped](./agent-brief-stops-forbidding-the-full.md) | pending |
+| [agent brief stops forbidding the full suite when the test gate is skipped](./agent-brief-stops-forbidding-the-full.md) | in_progress |
 | [agentLoop's gate-only retry wiring has no test](./agentloop-s-gate-only-retry-wiring-has.md) | completed |
 | [Gate-only retry: skip the agent when the previous run failed only at the gate with its work committed](./gate-only-retry-skip-the-agent-when.md) | completed |
 | [hench.testGate.command: a gate command template with {base}, recording the suites it selected](./hench-testgate-command-a-gate-command.md) | completed |

@@ -204,11 +204,29 @@ export function buildSystemPrompt(
     // its Workflow section. Must not spell the configured test/typecheck
     // commands (prompt-non-redundancy.test.ts). CLI provider only: the api
     // provider has no foreground-wait hazard and its loop is budgeted per turn.
+    //
+    // Both "don't run the suite" and "the gate still runs" are claims about a
+    // gate, so both are guarded by whether one follows (#546 finding F3).
+    // Under `--skip-test-gate` / `hench.skipFullTestGate` they were false in
+    // the direction that loses coverage: the agent ran scoped checks only, no
+    // gate ran, and the work was committed and the task completed with nothing
+    // having run the suite. Same guard, same expression, as the reviewer brief
+    // (cli-loop.ts: `testGateFollows: config.skipFullTestGate !== true`).
+    const testGateFollows = config.skipFullTestGate !== true;
+
     lines.push("## Validation");
     lines.push("- Run the tests for the files you changed, or the one package suite that covers them.");
     lines.push("- Build only the package you changed.");
-    lines.push(`- Do not run the whole repository suite. ${cliName} runs its test gate after you finish, and CI runs everything. A full pass of a large suite costs many minutes of the run's time per invocation.`);
-    lines.push("- Finishing is not skipping validation: the gate still runs, so your scoped checks need only show your change works.");
+    if (testGateFollows) {
+      lines.push(`- Do not run the whole repository suite. ${cliName} runs its test gate after you finish, and CI runs everything. A full pass of a large suite costs many minutes of the run's time per invocation.`);
+      lines.push("- Finishing is not skipping validation: the gate still runs, so your scoped checks need only show your change works.");
+    } else {
+      // Not an invitation to run everything — scoped-first still holds, and
+      // CI still runs the suite on the PR. What changes is who is accountable
+      // for this commit: with no gate behind it, the agent's own checks are
+      // the last ones the change gets before it lands.
+      lines.push("- No test gate runs after you finish on this run. Your own checks are the only ones this change gets before it is committed, so make them cover what you changed.");
+    }
     lines.push("- If a scoped run fails in a way that needs wider evidence, widening is fine.");
     lines.push("- The project's own commands and costs are in the Workflow section.\n");
   }
