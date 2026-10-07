@@ -9,6 +9,7 @@ import {
   parsePlacementSettings,
   PLACEMENT_JEV_MIN_CONFIDENCE,
   PLACEMENT_JUDGE_TASK_CLASS,
+  PLACEMENT_NONE_OF_THESE,
   type PlacementAutoAccept,
   type PlacementJudge,
   type PlacementModels,
@@ -101,6 +102,33 @@ describe("decidePlacement: models x autoAccept", () => {
       const d = await run("jev", "confident", { jev: ["cap-unknown", 0.99] });
       expect(d.accepted).toBeNull();
     });
+  });
+});
+
+describe("decidePlacement: Jev abstain and confidence validation", () => {
+  it.each(["jev", "both"] as const)("%s: none-of-these is never accepted in any mode and leaves needsPlacement set", async (models) => {
+    for (const autoAccept of ["none", "agree", "confident"] as const) {
+      const d = await run(models, autoAccept, { text: "cap-store", jev: [PLACEMENT_NONE_OF_THESE, 0.95] });
+      expect(d).toMatchObject({ accepted: null, needsPlacement: true });
+      expect(d.jev).toMatchObject({ abstained: true, pick: null });
+      expect(d.warnings.join()).toMatch(/Jev abstained/);
+    }
+  });
+  it("offers none-of-these as a choice option that no capability id can equal", async () => {
+    const judge = jev("cap-store", 0.9);
+    await decidePlacement(change, caps, { settings: { models: "jev", autoAccept: "none" }, judge });
+    const [request] = (judge as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(Object.keys(request.questions.place.criteria)).toContain(PLACEMENT_NONE_OF_THESE);
+  });
+  it.each([1.4, -0.1, NaN, Infinity])("rejects confidence %s with a warning", async (confidence) => {
+    const d = await run("jev", "confident", { jev: ["cap-store", confidence] });
+    expect(d).toMatchObject({ accepted: null, needsPlacement: true });
+    expect(d.warnings.join()).toMatch(/confidence/);
+  });
+  it.each(["jev", "both"] as const)("%s: still accepts a valid 0.85 on-shortlist pick", async (models) => {
+    const d = await run(models, "confident", { text: "cap-store", jev: ["cap-auth", 0.85] });
+    expect(d.accepted).toBe("cap-auth");
+    expect(d.warnings).toEqual([]);
   });
 });
 

@@ -37,6 +37,12 @@ export const PLACEMENT_JUDGE_TASK_CLASS = "prd.place.judge";
 /** `autoAccept: confident` accepts a Jev pick at or above this confidence. */
 export const PLACEMENT_JEV_MIN_CONFIDENCE = 0.8;
 
+/**
+ * Reserved choice key for "none of these". Capability ids are slugs or UUIDs
+ * and never start with underscores, so it cannot collide with one.
+ */
+export const PLACEMENT_NONE_OF_THESE = "__none_of_these__";
+
 /** Section of `.n-dx.json` that holds rex settings (`rex.placement.*`). */
 const REX_CONFIG_KEY = "rex";
 
@@ -80,6 +86,8 @@ export async function loadPlacementSettings(rexDir: string) {
 export interface JevPlacement {
   /** Highest-probability candidate, or null when Jev named none on the shortlist. */
   pick: string | null;
+  /** True when Jev chose none-of-these: never accepted, never counts as agreeing. */
+  abstained: boolean;
   confidence: number;
   /** Shortlist candidates by Jev probability, best first. */
   ranking: Array<{ id: string; probability: number }>;
@@ -120,6 +128,7 @@ function criteriaFor(
     const cap = byId.get(id);
     criteria[id] = cap?.statement?.trim() || cap?.title || id;
   }
+  criteria[PLACEMENT_NONE_OF_THESE] = "None of the listed capabilities fits this change.";
   return criteria;
 }
 
@@ -128,6 +137,7 @@ async function askJevPlacement(
   change: PlacementChange,
   shortlist: readonly PlacementCandidate[],
   capabilities: readonly PlacementCapability[],
+  warnings: string[],
 ): Promise<JevPlacement> {
   const response = await judge(
     {
@@ -152,8 +162,19 @@ async function askJevPlacement(
   const ranking = shortlist
     .map(({ id }) => ({ id, probability: answer.probabilities[id] ?? 0 }))
     .sort((a, b) => b.probability - a.probability || a.id.localeCompare(b.id));
+  const abstained = answer.choice === PLACEMENT_NONE_OF_THESE;
   const onShortlist = shortlist.some((c) => c.id === answer.choice);
-  return { pick: onShortlist ? answer.choice : null, confidence: answer.confidence, ranking };
+  // The shared parser accepts any number; a malformed confidence must not clear the band.
+  const validConfidence = Number.isFinite(answer.confidence) && answer.confidence >= 0 && answer.confidence <= 1;
+  if (!validConfidence) {
+    warnings.push(`Jev placement confidence ${String(answer.confidence)} is not a finite number in [0, 1]; ignoring its pick`);
+  }
+  return {
+    pick: onShortlist && validConfidence ? answer.choice : null,
+    abstained,
+    confidence: answer.confidence,
+    ranking,
+  };
 }
 
 /** Run the configured tiers over a change and decide whether to accept the placement. */
@@ -187,7 +208,7 @@ export async function decidePlacement(
   const { shortlist } = rules;
   const jev =
     useJev && options.judge && shortlist.length > 0
-      ? await askJevPlacement(options.judge, change, shortlist, capabilities)
+      ? await askJevPlacement(options.judge, change, shortlist, capabilities, warnings)
       : undefined;
 
   const top = shortlist[0];
@@ -207,6 +228,8 @@ export async function decidePlacement(
       accepted = jev.pick;
     }
   }
+
+  if (jev?.abstained) warnings.push("Jev abstained (none of the shortlisted capabilities fits); needs a human placement");
 
   return {
     shortlist,
