@@ -254,6 +254,75 @@ describe("a saved block that cannot be honoured never wedges a run", () => {
     expect(r.warnings).toEqual([]);
   });
 
+  it("skips a saved provider the active vendor has no loop for, and warns naming the task", () => {
+    // `api` on codex: there is no API loop, and `resolveRunProvider` offers no
+    // fallback. Refusing would end a whole --loop on one task's saved value.
+    const r = resolveFor({
+      vendor: "codex",
+      llm: { vendor: "codex" },
+      item: task({ provider: "api" }, "Mis-saved provider"),
+    });
+
+    expect(r.provider.value).toBe("cli");
+    expect(r.provider.source).not.toBe("task.run");
+    expect(r.provider.error).toBeUndefined();
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toContain("Mis-saved provider");
+  });
+
+  it("still switches a saved provider the vendor can only serve the other way, with no warning", () => {
+    // `cli` on google is not a refusal: there is no CLI binary, so the run
+    // switches to the api provider, which is what it has always done.
+    const r = resolveFor({
+      vendor: "google",
+      llm: { vendor: "google" },
+      item: task({ provider: "cli" }),
+    });
+
+    expect(r.provider.value).toBe("api");
+    expect(r.warnings).toEqual([]);
+  });
+
+  it("drops a saved review the resolved provider cannot run, instead of refusing", () => {
+    // google resolves to the api provider, which cannot spawn a reviewer. The
+    // task asked for an addition, not a precondition.
+    const r = resolveFor({
+      vendor: "google",
+      llm: { vendor: "google" },
+      item: task({ review: true }, "Review-on-google"),
+    });
+
+    expect(r.review).toEqual({ value: false, source: "vendor-unsupported" });
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toContain("Review-on-google");
+  });
+
+  it("lets --review outrank a saved provider that would make the review impossible", () => {
+    // The flag is an operator-typed gate that refuses rather than no-ops, so
+    // the saved provider loses — and loses with a warning, not a throw.
+    const r = resolveFor({
+      flags: { review: "true" },
+      item: task({ provider: "api" }, "Api-and-review"),
+    });
+
+    expect(r.provider.value).toBe("cli");
+    expect(r.review).toEqual({ value: true, source: "cli-flag" });
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toContain("Api-and-review");
+  });
+
+  it("says so when a saved permission mode cannot apply to the active vendor", () => {
+    const r = resolveFor({
+      vendor: "codex",
+      llm: { vendor: "codex" },
+      item: task({ permissionMode: "bypassPermissions" }, "Mode-on-codex"),
+    });
+
+    expect(r.permissionMode.value).toBeNull();
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toContain("Mode-on-codex");
+  });
+
   it("falls through a saved tier on local, which has no catalog to resolve it against", () => {
     const r = resolveFor({
       vendor: "local",

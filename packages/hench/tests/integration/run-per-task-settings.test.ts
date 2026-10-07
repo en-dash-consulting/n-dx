@@ -234,6 +234,25 @@ describe("each task in a loop runs with its own saved settings", () => {
     expect(warnings.join("\n")).toContain("gpt-5.6-terra");
   });
 
+  it("keeps the loop alive when a task saved a provider this vendor has no loop for", async () => {
+    // The whole point of a saved block being vendor-agnostic is that a task
+    // saved under one vendor runs under another. Refusing would strand every
+    // remaining task in the run over one task's saved value.
+    const warnings: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      warnings.push(args.map(String).join(" "));
+    });
+    await setup(doc({ provider: "api" }, null), { vendor: "codex", codex: { cli_path: process.execPath } });
+
+    await cmdRun(projectDir, { auto: "true", iterations: "2" });
+
+    expect(calls.map((c) => [c.taskId, c.loop])).toEqual([
+      ["t-one", "cli"],
+      ["t-two", "cli"],
+    ]);
+    expect(warnings.join(String.fromCharCode(10))).toContain("First");
+  });
+
   it("records the honest weight for a model an explicit --model pinned", async () => {
     await setup(doc(null, null));
 

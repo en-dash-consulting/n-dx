@@ -477,10 +477,43 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   }
 
   // -- Provider ------------------------------------------------------------
-  const requestedProvider = flags.provider ?? saved?.provider ?? config.provider;
+  // A saved provider the active vendor has no loop for (`api` on codex) is
+  // skipped like an incompatible saved model: warn, fall back to the project's
+  // provider, and carry on. Refusing instead would end a whole `--loop` on one
+  // task's saved value, and saved blocks are vendor-agnostic by design — a task
+  // saved under Claude is meant to run under Codex. A provider that only needs
+  // switching (`cli` on google, which has no CLI binary) is not this case:
+  // `resolveRunProvider` switches it silently and reports no error.
+  const savedProvider = saved?.provider;
+  const savedProviderCheck = savedProvider ? resolveRunProvider(savedProvider, vendor) : undefined;
+  // `--review` is an operator-typed gate that refuses rather than no-ops, so a
+  // saved provider that would make the review impossible loses to it — again a
+  // warning rather than a throw, for the same reason.
+  const savedProviderBlocksReview =
+    savedProviderCheck !== undefined
+    && reviewOpts.reviewPass
+    && reviewProviderError(vendor, savedProviderCheck.provider) !== undefined;
+  const savedProviderUsable =
+    savedProviderCheck !== undefined && savedProviderCheck.error === undefined && !savedProviderBlocksReview;
+  if (savedProviderCheck?.error) {
+    warnings.push(
+      `The provider "${savedProvider}" saved on "${item?.title}" is not available for ` +
+        `vendor="${vendor}" — running on this project's configured provider instead.`,
+    );
+  } else if (savedProviderBlocksReview) {
+    warnings.push(
+      `Ignoring the provider "${savedProvider}" saved on "${item?.title}": --review needs the ` +
+        `CLI provider, and the flag outranks a saved setting.`,
+    );
+  }
+  const requestedProvider = flags.provider ?? (savedProviderUsable ? savedProvider : config.provider);
   const providerSource =
-    flags.provider !== undefined ? "cli-flag" : saved?.provider ? "task.run" : henchSource("provider");
-  const resolvedProvider = resolveRunProvider(requestedProvider, vendor);
+    flags.provider !== undefined
+      ? "cli-flag"
+      : savedProviderUsable
+        ? "task.run"
+        : henchSource("provider");
+  const resolvedProvider = resolveRunProvider(requestedProvider as string, vendor);
 
   // -- Permission mode -----------------------------------------------------
   const permission = resolveRunPermissionMode({
@@ -491,13 +524,40 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     vendor,
   });
   const clamped = input.clampPermissionMode ? input.clampPermissionMode(permission.value) : permission.value;
+  // The mode exists only on Claude. `cmdRun` says so once for the invocation's
+  // own mode; a mode that came from the task has no other voice, so it would
+  // otherwise vanish without a word.
+  if (permission.dropped !== undefined && permission.origin === "task.run") {
+    warnings.push(
+      `The permission mode "${permission.dropped}" saved on "${item?.title}" is a Claude CLI ` +
+        `feature; ignoring it for vendor="${vendor}".`,
+    );
+  }
 
   // -- Review --------------------------------------------------------------
+  // The review pass spawns a second vendor CLI session, so it exists only on
+  // the CLI provider. `--review` still refuses on the API provider (the
+  // operator asked for a gate and must not be told it ran), but a task that
+  // merely *saved* `review: true` is asking for an addition, not stating a
+  // precondition — dropping it with a warning beats ending the loop. The
+  // caller refuses the flag case; this only decides the saved one.
+  const savedReviewUnsupported =
+    !reviewOpts.reviewPass
+    && saved?.review === true
+    && reviewProviderError(vendor, resolvedProvider.provider) !== undefined;
+  if (savedReviewUnsupported) {
+    warnings.push(
+      `The review pass saved on "${item?.title}" needs the CLI provider, but this task ` +
+        `resolved to provider="${resolvedProvider.provider}" — running it without a review.`,
+    );
+  }
   const review: Resolved<boolean> = reviewOpts.reviewPass
     ? { value: true, source: "cli-flag" }
-    : saved?.review !== undefined
-      ? { value: saved.review, source: "task.run" }
-      : { value: false, source: "built-in" };
+    : savedReviewUnsupported
+      ? { value: false, source: "vendor-unsupported" }
+      : saved?.review !== undefined
+        ? { value: saved.review, source: "task.run" }
+        : { value: false, source: "built-in" };
   const vendorDefault = REVIEW_MODELS[vendor] ?? "";
   const savedReviewModel = saved?.reviewModels?.[vendor]?.trim();
   const savedReviewTierModel = saved?.reviewTier
