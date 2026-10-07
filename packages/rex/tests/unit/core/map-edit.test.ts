@@ -200,6 +200,14 @@ describe("handleMapEdit: refusals", () => {
     expect(refusal(() => handleMapEdit(tree({ status: "deleted" }), CAP, BEFORE, OPTS)).message).toMatch(/not a live/);
   });
 
+  it("refuses an editorial edit to a node already revised, which would mark the unbuilt revision met", () => {
+    const revised = { statement: "A shopper can pay by card or wallet." };
+    const reworded = { statement: "A shopper can pay by card or by wallet." };
+    const input = tree(reworded);
+    expect(refusal(() => handleMapEdit(input, CAP, { ...BEFORE, ...revised }, { ...OPTS, editorial: true })).message).toMatch(/already revised/);
+    expect(cap(input).metAt).toBe(MET);
+  });
+
   it("refuses a taken id for the draft", () => {
     expect(refusal(() => handleMapEdit(tree({ statement: "x" }), CAP, BEFORE, { ...OPTS, newId: () => CON })).message).toMatch(/con-1 is already taken/);
   });

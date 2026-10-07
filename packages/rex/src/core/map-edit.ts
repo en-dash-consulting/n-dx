@@ -7,6 +7,7 @@
  *
  * - **editorial** (wording only, nothing to build): `metAt` is re-stamped to the
  *   new spec, so the node stays met, and a History line records the edit.
+ *   Refused when the node was already revised before this edit.
  * - **any other spec edit**: `metAt` is kept, so the node reads revised
  *   (`revisedAt` is stamped unless already set), and one change is drafted in
  *   the Inbox (`source: "map-edit"`, `needsPlacement: true`) from the diff.
@@ -81,6 +82,10 @@ export function handleMapEdit(tree: V2Tree, nodeRef: string, before: Spec, optio
   const summary = options.summary?.trim() || diff.summary;
 
   if (options.editorial) {
+    // Re-stamping over an unbuilt revision would mark that revision met.
+    if (specHash(specOf({ ...before, type: node.type })) !== node.metAt) {
+      throw new MapEditError(label, "it is already revised, so an editorial re-stamp would mark the unbuilt revision met");
+    }
     stampMet(node);
     node.body = appendHistory(node.body, `- ${options.now.toISOString().slice(0, 10)} editorial: ${summary}`);
     return { tree: next, outcome: "editorial" };
