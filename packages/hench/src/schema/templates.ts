@@ -9,6 +9,29 @@
 import type { HenchConfig } from "./v1.js";
 import { guardDefaultsForLanguage } from "./v1.js";
 
+/**
+ * What the strict-safety template blocks: the standard baseline, plus two
+ * directory names that are conventionally secret.
+ *
+ * It used to be a hand-written list, and a hand-written list of the strictest
+ * thing in the product drifted the wrong way twice over. It named `.hench/**`
+ * and `.rex/**` literally, so on a `.ndx/` project the template billed as
+ * "maximum guard rails" blocked nothing of n-dx's own state. And its
+ * credential patterns were a *subset* of the baseline every other template
+ * gets — root-only `*.pem` and `*.key` where the baseline has `**\/*.pem`,
+ * and no `.p12`, `.pfx`, `.keystore`, `id_rsa*`, `.npmrc`, `.netrc`, `.aws/`
+ * or `.ssh/` at all — so selecting it made a project *less* protected than
+ * leaving it alone.
+ *
+ * Deriving from the baseline is what stops both: the only thing this list
+ * says now is what strict adds.
+ */
+export const STRICT_BLOCKED_PATHS: string[] = [
+  ...guardDefaultsForLanguage().blockedPaths,
+  "**/secrets/**",
+  "**/credentials/**",
+];
+
 // ── Template types ────────────────────────────────────────────────────
 
 /**
@@ -160,17 +183,7 @@ export const BUILT_IN_TEMPLATES: WorkflowTemplate[] = [
       maxTurns: 30,
       maxFailedAttempts: 2,
       guard: {
-        blockedPaths: [
-          ".hench/**",
-          ".rex/**",
-          ".git/**",
-          "node_modules/**",
-          ".env*",
-          "*.pem",
-          "*.key",
-          "**/secrets/**",
-          "**/credentials/**",
-        ],
+        blockedPaths: STRICT_BLOCKED_PATHS,
         allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"],
         commandTimeout: 15000,
         maxFileSize: 524288,

@@ -23,7 +23,7 @@ import type { PRDItem } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
 import {
   FileStore,
-  PRD_MARKDOWN_FILENAME,
+  CANONICAL_MARKDOWN_SOURCE_PATH,
   toMarkdownSourcePath,
   discoverPRDFiles,
 } from "../../store/index.js";
@@ -348,7 +348,7 @@ export interface PerPRDStatusSection {
 export function splitItemsByFile(
   items: PRDItem[],
   fileMap: ReadonlyMap<string, string>,
-  defaultPath: string = `.rex/${PRD_MARKDOWN_FILENAME}`,
+  defaultPath: string = CANONICAL_MARKDOWN_SOURCE_PATH,
 ): Map<string, PRDItem[]> {
   const buckets = new Map<string, PRDItem[]>();
   for (const item of items) {
@@ -388,7 +388,7 @@ export async function buildPerPRDSections(
   const buckets = splitItemsByFile(visibleItems, fileMap);
 
   // Ensure canonical path is always present, plus any discovered branch files.
-  const canonicalPath = `.rex/${PRD_MARKDOWN_FILENAME}`;
+  const canonicalPath = CANONICAL_MARKDOWN_SOURCE_PATH;
   if (!buckets.has(canonicalPath)) buckets.set(canonicalPath, []);
 
   const branchFiles = await discoverPRDFiles(rexDir);

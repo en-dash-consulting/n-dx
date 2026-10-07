@@ -161,11 +161,14 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     usage: "sourcevision pr-markdown [dir]",
     description:
       "Generates PR-ready markdown from git diff metadata and writes it to\n" +
-      ".sourcevision/pr-markdown.md in the target directory.",
+      "pr-markdown.md in the target directory's analysis folder.",
     sections: [
       {
         title: "Output",
-        content: ".sourcevision/pr-markdown.md",
+        // Named relative to the analysis directory rather than spelled out:
+        // help text is a static table with no project root to resolve, and
+        // the folder is `.ndx/sourcevision` on the new layout.
+        content: "pr-markdown.md, in the project's analysis directory",
       },
     ],
     examples: [

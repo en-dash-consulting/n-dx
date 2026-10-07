@@ -1,7 +1,7 @@
 /**
  * Single writer behind every route to the execution log.
  *
- * `append_log` (rex MCP tool, see `cli/mcp-tools.ts#handleAppendLog`) and
+ * `append_log` (rex MCP tool, see `cli/mcp-tools/append-log.ts`) and
  * `rex log` / `ndx log` (CLI, see `cli/commands/log.ts#cmdLog`) both build
  * their entry here and feed it to `PRDStore#appendLog`, which is the layer
  * that stamps the actor, truncates `detail` to 2,000 characters, and rotates

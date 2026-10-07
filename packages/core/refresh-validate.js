@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, resolve } from "path";
 
+import { relativeToRoot, resolveLayout } from "./layout.js";
+
 /**
  * Sourcevision output files captured before a refresh for potential rollback.
  * These are the files written by the sourcevision-analyze and
@@ -42,7 +44,7 @@ const STEP_OUTPUT_FILES = {
  */
 export async function snapshotRefreshState(dir, plan) {
   const absDir = resolve(dir);
-  const svDir = join(absDir, ".sourcevision");
+  const svDir = resolveLayout(absDir).sourcevisionDir;
 
   const stepsToRun = new Set((plan.steps ?? []).map((s) => s.kind));
   const shouldSnapshot =
@@ -86,14 +88,16 @@ export async function snapshotRefreshState(dir, plan) {
  */
 export function validateRefreshStep(stepKind, dir) {
   const absDir = resolve(dir);
-  const svDir = join(absDir, ".sourcevision");
+  const layout = resolveLayout(absDir);
+  const svDir = layout.sourcevisionDir;
   const outputFiles = STEP_OUTPUT_FILES[stepKind] ?? [];
   const issues = [];
 
   for (const name of outputFiles) {
     const filePath = join(svDir, name);
+    const label = relativeToRoot(layout, filePath);
     if (!existsSync(filePath)) {
-      issues.push(`missing expected output: .sourcevision/${name}`);
+      issues.push(`missing expected output: ${label}`);
       continue;
     }
     // Validate JSON files can be parsed — a corrupt JSON file means the step
@@ -102,7 +106,7 @@ export function validateRefreshStep(stepKind, dir) {
       try {
         JSON.parse(readFileSync(filePath, "utf-8"));
       } catch {
-        issues.push(`.sourcevision/${name} exists but contains invalid JSON`);
+        issues.push(`${label} exists but contains invalid JSON`);
       }
     }
   }
@@ -156,7 +160,7 @@ export async function rollbackRefreshState(snapshot) {
     return {
       restored: 0,
       failed: count,
-      errors: [`Cannot recreate .sourcevision directory: ${err.message}`],
+      errors: [`Cannot recreate ${snapshot.svDir}: ${err.message}`],
     };
   }
 
