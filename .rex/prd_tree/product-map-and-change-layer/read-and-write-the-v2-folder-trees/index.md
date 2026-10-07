@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A null or non-object run in v2 frontmatter fails the whole node's intent parse](./a-null-or-non-object-run-in-v2.md) | completed |
 | [Keep a moved node's unknown state fields in state.yaml](./keep-a-moved-node-s-unknown-state.md) | completed |
-| [Make the v2 reader and writer tests pass on a Windows CRLF checkout](./make-the-v2-reader-and-writer-tests.md) | in_progress |
+| [Make the v2 reader and writer tests pass on a Windows CRLF checkout](./make-the-v2-reader-and-writer-tests.md) | completed |
 | [Parse the v1 tree and the v2 product and changes roots into one model](./parse-the-v1-tree-and-the-v2-product.md) | completed |
 | [Reject Windows-reserved and Windows-invalid slugs before the v2 writer writes anything](./reject-windows-reserved-and-windows.md) | pending |
 | [Schema-skew write refusal on v2 trees depends on writers calling assertPrdModelWritable](./schema-skew-write-refusal-on-v2-trees.md) | completed |
