@@ -212,6 +212,40 @@ describe("settings saved on the task", () => {
       expect(saveCount(prep, defaultsOf(prep), {})).toBe(2);
     });
 
+    it("keeps a pin for a vendor this project is not on", () => {
+      // The modal only ever resolves one vendor's model, so a block rebuilt
+      // from the resolved value alone dropped a codex pin the moment a claude
+      // session saved anything at all — silent loss in the one field whose
+      // purpose is to survive a change of vendor.
+      const prep = prepFixture({
+        saved: { models: { claude: "claude-opus", codex: "gpt-5.6-sol" }, review: true },
+      });
+      prep.resolved.model = {
+        value: "claude-opus",
+        source: "task.run.models",
+        fallback: { value: "claude-sonnet", source: "llm.claude.model" },
+      };
+      prep.resolved.review = { value: true, source: "task.run", fallback: { value: false, source: "built-in" } };
+      const d = defaultsOf(prep);
+
+      // Saving an unrelated setting must not disturb it.
+      const body = saveBodyOf(prep, d, setField(d, {}, "maxTurns", 9));
+      expect(body).toMatchObject({ models: { claude: "claude-opus", codex: "gpt-5.6-sol" }, maxTurns: 9 });
+
+      // Editing this vendor's model overrides only this vendor's entry.
+      const edited = saveBodyOf(prep, d, setField(d, {}, "model", "claude-haiku"));
+      expect(edited).toMatchObject({ models: { claude: "claude-haiku", codex: "gpt-5.6-sol" } });
+    });
+
+    it("keeps another vendor's pin even when this vendor is back at the project default", () => {
+      const prep = prepFixture({ saved: { models: { codex: "gpt-5.6-sol" } } });
+      const d = defaultsOf(prep);
+
+      // This project is on claude and its model is the project default, so the
+      // model field contributes nothing — the codex pin must survive anyway.
+      expect(saveBodyOf(prep, d, {})).toEqual({ models: { codex: "gpt-5.6-sol" } });
+    });
+
     it("writes an edit over the saved value", () => {
       const prep = savedFixture();
       const d = defaultsOf(prep);

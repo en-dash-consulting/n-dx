@@ -25,7 +25,7 @@ import type { Server } from "node:http";
 import { resolveStore } from "@n-dx/rex";
 import type { PRDDocument, PRDItem } from "../../src/server/rex-gateway.js";
 import type { ServerContext } from "../../src/server/types.js";
-import { handleHenchPrepRoute } from "../../src/server/routes-hench-prep.js";
+import { handleHenchPrepRoute, savedRunVersion } from "../../src/server/routes-hench-prep.js";
 import { startRouteTestServer, closeRouteTestServer } from "../helpers/server-route-test-support.js";
 
 interface Served {
@@ -177,6 +177,40 @@ describe("PUT /api/hench/prep/:taskId", () => {
     const b = await save(port, { run: { review: true, tier: "heavy" }, version: first });
     expect(b.status).toBe(200);
     expect((await b.json()).version).toBe(first);
+  });
+
+  it("gives a changed nested model pin a different version", () => {
+    // The fingerprint used `JSON.stringify`'s array replacer, which applies its
+    // whitelist at every nesting level: `{models:{claude}}` serialized as
+    // `{"models":{}}`, so every block with the same top-level keys shared a
+    // version. Two different pins were indistinguishable, and a stale save
+    // overwrote another writer's pin with no 409 -- the one thing the version
+    // exists to prevent.
+    const a = savedRunVersion({ models: { claude: "claude-opus-5-5" }, review: true } as never);
+    const b = savedRunVersion({ models: { claude: "claude-haiku-4-5" }, review: true } as never);
+    const c = savedRunVersion({ models: { claude: "claude-opus-5-5", codex: "gpt-5.6-sol" } } as never);
+
+    expect(a).not.toBe(b);
+    expect(a).not.toBe(c);
+    // Still canonical: key order is not a change, at any depth.
+    expect(savedRunVersion({ review: true, models: { claude: "claude-opus-5-5" } } as never)).toBe(a);
+    expect(savedRunVersion({ models: { codex: "gpt-5.6-sol", claude: "claude-opus-5-5" } } as never))
+      .toBe(savedRunVersion({ models: { claude: "claude-opus-5-5", codex: "gpt-5.6-sol" } } as never));
+  });
+
+  it("refuses a stale save that changes only a nested model pin", async () => {
+    const port = await open(ctx);
+    const first = await save(port, { run: { models: { claude: "claude-opus-5-5" } }, version: "none" });
+    expect(first.status).toBe(200);
+    const { version } = await first.json();
+
+    // A second writer changes the pin …
+    const second = await save(port, { run: { models: { claude: "claude-haiku-4-5" } }, version });
+    expect(second.status).toBe(200);
+
+    // … and the first client's stale version must no longer be accepted.
+    const stale = await save(port, { run: { models: { claude: "claude-sonnet-5" } }, version });
+    expect(stale.status).toBe(409);
   });
 
   describe("refusals", () => {

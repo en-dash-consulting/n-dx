@@ -283,8 +283,27 @@ const LAUNCH_ONLY_KEYS: ReadonlySet<string> = new Set(["fresh", "allowDirty", "r
  */
 export function savedRunVersion(run: RunSettings | undefined | null): string {
   if (run === undefined || run === null || Object.keys(run).length === 0) return "none";
-  const canonical = JSON.stringify(run, Object.keys(run).sort());
-  return createHash("sha256").update(canonical).digest("hex").slice(0, 12);
+  return createHash("sha256").update(canonicalJson(run)).digest("hex").slice(0, 12);
+}
+
+/**
+ * JSON with every object's keys sorted, at every depth.
+ *
+ * Written out rather than done with `JSON.stringify`'s array replacer, which
+ * applies its whitelist at EVERY nesting level: `JSON.stringify({models:
+ * {claude: "opus"}}, ["models"])` yields `{"models":{}}`, because `claude` is
+ * not in the list. Every block with the same top-level keys then shared a
+ * version, and two different model pins were indistinguishable — so a stale
+ * save could overwrite another writer's pin with no 409, which is the single
+ * thing this fingerprint exists to prevent.
+ */
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
 }
 
 /** The request's `run` value, checked against both allow-lists, or the 400 to answer with. */

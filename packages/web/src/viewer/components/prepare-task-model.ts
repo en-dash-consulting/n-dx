@@ -289,6 +289,26 @@ export function saveBodyOf(
   const vendor = prep.resolved.vendor.value;
   const block: Record<string, unknown> = {};
 
+  /**
+   * The saved model map for `key`, minus this vendor's entry — the pins for
+   * vendors this project is not on today.
+   *
+   * They have to be carried forward explicitly. The modal only ever resolves
+   * ONE vendor's model, so a block rebuilt from `effective` alone would drop a
+   * `models.codex` pin the moment a Claude session saved anything at all. That
+   * is silent data loss in a field whose entire purpose is to survive a change
+   * of vendor.
+   */
+  const otherVendorPins = (key: "models" | "reviewModels"): Record<string, unknown> => {
+    const saved = (prep.saved ?? {})[key];
+    if (saved === null || typeof saved !== "object" || Array.isArray(saved)) return {};
+    const kept: Record<string, unknown> = {};
+    for (const [v, model] of Object.entries(saved as Record<string, unknown>)) {
+      if (v !== vendor) kept[v] = model;
+    }
+    return kept;
+  };
+
   /** The value this field would have without the task's block, else its current default. */
   const projectValue = (key: RunOptionKey): unknown => {
     const fallback = fallbackOf(prep, key);
@@ -305,9 +325,18 @@ export function saveBodyOf(
     if (value === undefined || value === "") continue;
     if (value === projectValue(key)) continue;
 
-    if (key === "model") block["models"] = { [vendor]: value };
-    else if (key === "reviewModel") block["reviewModels"] = { [vendor]: value };
+    // The active vendor's pin overrides its own entry and leaves the rest.
+    if (key === "model") block["models"] = { ...otherVendorPins("models"), [vendor]: value };
+    else if (key === "reviewModel") block["reviewModels"] = { ...otherVendorPins("reviewModels"), [vendor]: value };
     else block[key] = value;
+  }
+
+  // A pin for another vendor survives even when this vendor's model is back at
+  // the project default and so contributed nothing above.
+  for (const key of ["models", "reviewModels"] as const) {
+    if (block[key] !== undefined) continue;
+    const others = otherVendorPins(key);
+    if (Object.keys(others).length > 0) block[key] = others;
   }
 
   // A reviewer pinned with no review to run is not a setting, it is a leftover.
