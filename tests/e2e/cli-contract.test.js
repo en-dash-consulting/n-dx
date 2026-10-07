@@ -70,7 +70,7 @@ const ORCHESTRATION_CONTRACTS = {
   rex: {
     pkgDir: "packages/rex",
     /** Subcommands invoked by cli.js and ci.js */
-    commands: ["init", "analyze", "status", "tree", "usage", "sync", "validate", "mcp"],
+    commands: ["init", "analyze", "status", "tree", "usage", "validate", "mcp"],
   },
   hench: {
     pkgDir: "packages/hench",

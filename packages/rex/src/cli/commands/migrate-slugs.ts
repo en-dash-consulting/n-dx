@@ -112,7 +112,7 @@ export async function cmdMigrateSlugs(
   if (!store.adoptSlugRule) {
     throw new CLIError(
       "This PRD backend cannot migrate slugs.",
-      `Slugs are a property of the local folder tree; the resolved store is a remote adapter with no paths to rename.`,
+      `Slugs are a property of the local folder tree; the resolved store does not implement slug adoption (adoptSlugRule).`,
     );
   }
   await store.adoptSlugRule();

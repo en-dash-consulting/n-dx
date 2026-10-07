@@ -78,6 +78,34 @@ export interface NarrationState {
   reason?: string;
 }
 
+/**
+ * Who a repository is, recorded on its analysis manifest.
+ *
+ * Read once by `util/git-remote.ts`; the iso export reads the same remote for
+ * its source links, so the two cannot disagree about what it says. Every
+ * remote field is nullable rather than optional: `null` says the analyser
+ * looked and there was no remote, which an absent key cannot say.
+ */
+export interface RepoIdentity {
+  /**
+   * The repository's name: the last segment of the remote path when there is
+   * a remote, and the analysed directory's own name when there is not.
+   */
+  name: string;
+  /** The `origin` remote as configured, or `null` when there is none. */
+  remoteUrl: string | null;
+  /** Host serving the remote (`github.com`, `bitbucket.org`), or `null`. */
+  remoteHost: string | null;
+  /** Path on that host (`owner/repo`), or `null`. */
+  remotePath: string | null;
+  /**
+   * Default branch, read locally from `origin/HEAD`. `null` when it is unset
+   * — a fresh or `--single-branch` clone — because a guessed default branch
+   * is worse than an absent one.
+   */
+  defaultBranch: string | null;
+}
+
 export interface Manifest {
   schemaVersion: string;
   toolVersion: string;
@@ -94,6 +122,18 @@ export interface Manifest {
    */
   analysisFingerprint?: string;
   targetPath: string;
+  /**
+   * Who this repository is, independent of where it happens to sit on disk.
+   *
+   * `targetPath` is a local path, so two analyses cannot be told apart or
+   * correlated once they leave their own directory — which is what cross-repo
+   * work needs. Optional, because an analysis produced before this field
+   * existed has none; `analyzers/manifest.ts` populates it on every run from
+   * then on, including for a directory with no git remote.
+   *
+   * @see util/git-remote.ts — the one reader of the remote
+   */
+  repo?: RepoIdentity;
   modules: Record<string, ModuleInfo>;
   /** Aggregate token usage from the most recent analyze run. */
   tokenUsage?: AnalyzeTokenUsage;
@@ -950,4 +990,313 @@ export interface ProjectSurface {
   path: string;
   /** What this surface is (free-form label, e.g. "Makefile", "GitHub Actions"). */
   kind: string;
+}
+
+// ── Infrastructure ──────────────────────────────────────────────────────────
+// What the import graph structurally cannot show: runtime infrastructure (a
+// queue, bucket, cache or database has no import signature) and injection
+// seams (where the import points one way and the runtime call points the
+// other). Discovered at analyze time by `analyzers/infrastructure.ts` and
+// written to `infrastructure.json`.
+
+/** A runtime control-flow edge that inverts, or has no, import. */
+export interface InfraSeam {
+  /** Zone id, or a file path that resolves to one. */
+  from: string;
+  /** Zone id, or a file path that resolves to one. */
+  to: string;
+  /** The callbacks or events crossing the seam. */
+  callbacks?: string[];
+  /** Why this seam exists. */
+  note?: string;
+}
+
+/** One piece of runtime infrastructure, declared or discovered from IaC. */
+export interface InfraResource {
+  id: string;
+  name: string;
+  /** Coarse category: bucket, queue, topic, database, cache, stream, scheduler, secrets, compute. */
+  kind: string;
+  /** `"config"` when a person declared it, otherwise the IaC file that did. */
+  origin: string;
+  note?: string;
+  /**
+   * Name literals to match against source when attributing the resource to
+   * zones — the IaC local name plus any `name`-ish attribute.
+   */
+  literals?: string[];
+}
+
+/**
+ * One attribution of a resource to code.
+ *
+ * Kept apart from the resource rather than stored on it: a use is a claim
+ * about the relationship, not a property of the thing, and `evidence` says
+ * how firmly it was established.
+ */
+export interface InfraLink {
+  resourceId: string;
+  /** A zone id or a project-relative path. Config declarations may use either. */
+  target: string;
+  /**
+   * `config` — a person declared this use.
+   * `name-literal` — source mentions the resource by name. A string match, not
+   * a resolution: weaker than an import edge, and consumers say so.
+   */
+  evidence: "config" | "name-literal";
+}
+
+/** `infrastructure.json` — the full discovery for one analysis. */
+export interface InfrastructureData {
+  resources: InfraResource[];
+  seams: InfraSeam[];
+  links: InfraLink[];
+  /** True when IaC files were found, whether or not anything was linked. */
+  sawIaC: boolean;
+}
+
+// ── SDLC readiness profile ──────────────────────────────────────────────────
+// Evidence-based CI/CD maturity: what this repository can actually do, each
+// claim tied to the file that proves it. Written to `sdlc-profile.json` by the
+// analyzer and read by the readiness scorecard.
+//
+// The load-bearing rule is that nothing is asserted without proof. Every
+// detection carries a non-empty `evidence` list, and `SdlcEvidenceList` is a
+// non-empty tuple type rather than a plain array, so an evidence-free
+// detection does not compile — the rule is enforced by the type, not by a
+// convention a later analyzer can forget.
+
+/**
+ * How firmly a detection is believed.
+ *
+ * `certain` — the artifact states it outright (a `test` script in
+ * `package.json`, a job named in a workflow file).
+ * `likely` — a strong conventional signal (a migrations directory beside a
+ * known ORM config).
+ * `inferred` — read from indirect evidence (a deploy step guessed from the
+ * arguments of a shell command).
+ */
+export type SdlcConfidence = "certain" | "likely" | "inferred";
+
+/** One artifact that proves a detection. */
+export interface SdlcEvidence {
+  /**
+   * What sort of proof this is — `manifest-script`, `workflow-job`,
+   * `file-present`, `dockerfile-stage`, `config-key`, and so on. Free-form so
+   * the analyzer can name the signal precisely; the scorecard reads
+   * `confidence`, not this.
+   */
+  kind: string;
+  /** Project-relative path to the file that carries the proof. */
+  path: string;
+  /** 1-indexed line within `path`, when the proof is a specific line. */
+  line?: number;
+  /** The proving text, trimmed. Kept short — a line, not a file. */
+  excerpt?: string;
+  confidence: SdlcConfidence;
+}
+
+/**
+ * A detection's proof: at least one piece of evidence.
+ *
+ * A tuple with a required first element, so `evidence: []` is a type error.
+ * This is the one place the "nothing without proof" rule is enforced; every
+ * detection below spells its evidence with this type.
+ */
+export type SdlcEvidenceList = [SdlcEvidence, ...SdlcEvidence[]];
+
+/** Everything in the profile is a claim with its proof attached. */
+export interface SdlcDetection {
+  evidence: SdlcEvidenceList;
+}
+
+/**
+ * The six command kinds modelled uniformly.
+ *
+ * Deliberately a closed set: the point of this section is that one consumer
+ * can ask "how do I run the tests here" and get an answer in a fixed shape.
+ */
+export type SdlcCommandKind = "test" | "lint" | "typecheck" | "build" | "deploy" | "migrate";
+
+/**
+ * One runnable command the repository declares.
+ *
+ * This section is the one with a life beyond readiness scoring.
+ * `analyzers/test-command-resolver.ts`, rex's `.rex/config.json` `test` key and
+ * `readme-generator.js`'s `detectCommands` each discover commands their own
+ * way today; this is the shape meant to replace all three later. It is not
+ * wired to them here — adopting it is its own change.
+ *
+ * The manifest or file a command came from is `evidence[0].path`; there is no
+ * second field holding it, so the two can never disagree.
+ */
+export interface SdlcCommand extends SdlcDetection {
+  kind: SdlcCommandKind;
+  /** The command line as declared, e.g. `pnpm test` or `make build`. */
+  command: string;
+  /**
+   * Directory the command must run in, project-relative, when it is not the
+   * project root. A workspace package's own test script sets this.
+   */
+  cwd?: string;
+  /**
+   * The runner the command goes through — `npm`, `pnpm`, `make`, `cargo`,
+   * `gradle`. Lets a consumer decide whether it can invoke the command without
+   * parsing it.
+   */
+  runner?: string;
+}
+
+/** A test framework in use, and how broadly. */
+export interface SdlcTestFramework extends SdlcDetection {
+  /** Lowercase framework name: `vitest`, `jest`, `pytest`, `go-test`, `xctest`. */
+  name: string;
+  /** Project-relative roots the tests of this framework live under. */
+  roots?: string[];
+}
+
+/** A category of test the repository runs. */
+export interface SdlcTestSuite extends SdlcDetection {
+  kind: "unit" | "integration" | "e2e" | "contract" | "performance" | "smoke";
+  /** Number of test files found for this suite, when counted. */
+  fileCount?: number;
+}
+
+/** Coverage measurement, if any is configured. */
+export interface SdlcCoverage extends SdlcDetection {
+  /** The tool producing coverage, e.g. `c8`, `istanbul`, `coverage.py`. */
+  tool: string;
+  /** A configured minimum, as a percentage, when one is enforced. */
+  threshold?: number;
+  /** Whether the threshold fails the build rather than only reporting. */
+  enforced: boolean;
+}
+
+/** A CI pipeline and the jobs it runs. */
+export interface SdlcCiPipeline extends SdlcDetection {
+  /** The CI system: `github-actions`, `gitlab-ci`, `bitbucket-pipelines`, `circleci`. */
+  provider: string;
+  /** Pipeline name as declared. */
+  name: string;
+  /** What triggers it: `push`, `pull_request`, `schedule`, `manual`, `tag`. */
+  triggers: string[];
+  /** Job names in declaration order. */
+  jobs: string[];
+}
+
+/** A deployment target the repository can reach. */
+export interface SdlcDeployment extends SdlcDetection {
+  /** Environment name as declared: `production`, `staging`, a preview slot. */
+  environment: string;
+  /** How it deploys: `github-actions`, `argocd`, `terraform`, `script`. */
+  mechanism: string;
+  /** Whether a human has to approve the deploy. */
+  requiresApproval?: boolean;
+  /** Whether it runs without a human starting it. */
+  automated: boolean;
+}
+
+/** A way to undo a deployment. */
+export interface SdlcRollback extends SdlcDetection {
+  /** `redeploy-previous`, `blue-green`, `feature-flag`, `db-down-migration`, `manual`. */
+  mechanism: string;
+  /** The environment it applies to, when it is environment-specific. */
+  environment?: string;
+}
+
+/** Database or data migrations. */
+export interface SdlcMigration extends SdlcDetection {
+  /** The migration tool: `prisma`, `knex`, `alembic`, `flyway`, `golang-migrate`. */
+  tool: string;
+  /** Project-relative directory holding the migration files. */
+  directory?: string;
+  /** Whether a reverse migration exists for the forward ones found. */
+  reversible?: boolean;
+  /** Whether migrations run as part of a deploy rather than by hand. */
+  automated?: boolean;
+}
+
+/** A feature-flag system. */
+export interface SdlcFeatureFlag extends SdlcDetection {
+  /** The provider: `launchdarkly`, `unleash`, `split`, or `in-house`. */
+  provider: string;
+  /** Flag keys found in code, when they are statically readable. */
+  flags?: string[];
+}
+
+/** A gate that can fail a change before it merges. */
+export interface SdlcQualityGate extends SdlcDetection {
+  kind:
+    | "required-review"
+    | "required-status-check"
+    | "branch-protection"
+    | "pre-commit-hook"
+    | "codeowners"
+    | "signed-commits";
+  /** Whether the gate blocks a merge rather than only warning. */
+  blocking: boolean;
+  /** What it guards, when scoped — a branch pattern or a path. */
+  appliesTo?: string;
+}
+
+/** Instrumentation the repository ships with. */
+export interface SdlcObservability extends SdlcDetection {
+  kind: "logging" | "metrics" | "tracing" | "error-reporting" | "health-check" | "alerting";
+  /** The library or service: `opentelemetry`, `sentry`, `prometheus`, `pino`. */
+  provider: string;
+}
+
+/** A container image the repository builds. */
+export interface SdlcContainer extends SdlcDetection {
+  /** Project-relative path to the Dockerfile or equivalent. */
+  path: string;
+  /** Base images referenced, in declaration order. */
+  baseImages: string[];
+  /** Whether the build is multi-stage. */
+  multiStage: boolean;
+  /** An orchestration manifest that runs it, when one is present. */
+  orchestration?: "compose" | "kubernetes" | "helm" | "ecs" | "nomad";
+}
+
+/** Infrastructure declared as code. */
+export interface SdlcIac extends SdlcDetection {
+  /** The tool: `terraform`, `cloudformation`, `pulumi`, `cdk`, `bicep`. */
+  tool: string;
+  /** Project-relative root of the IaC sources. */
+  root?: string;
+  /** Whether remote state is configured, where the tool has such a concept. */
+  remoteState?: boolean;
+}
+
+/**
+ * Evidence-based CI/CD maturity for one repository.
+ *
+ * Every section is present on a written profile, empty where nothing was
+ * found: an empty array says "the analyzer looked and found none", which a
+ * missing key cannot say. `tests.coverage` is the one optional member, because
+ * absent and "found none" mean the same thing for a single value.
+ */
+export interface SdlcProfile {
+  schemaVersion: string;
+  /**
+   * Absolute project root. Not persisted — stripped when the profile is
+   * serialized to `.sourcevision/sdlc-profile.json`, so the artifact stays
+   * portable across machines, exactly as `ProjectProfile.projectDir` is.
+   */
+  projectDir?: string;
+  commands: SdlcCommand[];
+  tests: {
+    frameworks: SdlcTestFramework[];
+    suites: SdlcTestSuite[];
+    coverage?: SdlcCoverage;
+  };
+  ci: SdlcCiPipeline[];
+  cd: SdlcDeployment[];
+  rollback: SdlcRollback[];
+  migrations: SdlcMigration[];
+  featureFlags: SdlcFeatureFlag[];
+  qualityGates: SdlcQualityGate[];
+  observability: SdlcObservability[];
+  containers: SdlcContainer[];
+  iac: SdlcIac[];
 }

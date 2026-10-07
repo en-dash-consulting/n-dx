@@ -146,6 +146,10 @@ describe("prompt census: scope boundaries", () => {
     )
       .split("\n")
       .filter((f) => /\.tsx?$/.test(f))
+      // `git ls-files` reads the index, so a file deleted in the working tree
+      // but not yet staged is still listed. Reading it would throw ENOENT and
+      // report as an unrelated crash rather than as the clean result it is.
+      .filter((f) => existsSync(join(ROOT, f)))
       .filter((f) => {
         const src = readFileSync(join(ROOT, f), "utf-8");
         return /\b(spawnClaude|callClaude)\s*\(/.test(src);

@@ -354,7 +354,6 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
         <div class="nav-item" data-page="s-general"><span class="glyph">🧠</span> General</div>
         <div class="nav-item" data-page="s-plan"><span class="glyph">▣</span> ndx analyze / plan</div>
         <div class="nav-item" data-page="s-work"><span class="glyph">▶</span> ndx work</div>
-        <div class="nav-item" data-page="s-sync"><span class="glyph">🔌</span> ndx sync</div>
         <div class="nav-item" data-page="s-export"><span class="glyph">📤</span> ndx export / refresh</div>
         <div class="nav-item" data-page="s-flags"><span class="glyph">📌</span> Feature Flags</div>
         <div class="nav-item" data-page="s-timeouts"><span class="glyph">⏱</span> CLI Timeouts</div>
@@ -489,7 +488,6 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
     ["work", "Execute the next task autonomously with hench agent", "work"],
     ["status", "Show PRD status tree with completion stats", "plan"],
     ["usage", "Token usage analytics and cost estimation", "work"],
-    ["sync", "Sync local PRD with remote adapter (e.g. Notion)", "plan"],
     ["start", "Start dashboard and MCP server", "setup"],
     ["dev", "Start dev server with live reload", "setup"],
     ["ci", "Run analysis pipeline and validate PRD health", "analysis"],
@@ -997,9 +995,8 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); font-size: 11
     "s-general": ["General", [["LLM vendor", "claude"], ["Model", "claude-opus-5"], ["Codex model", "—"], ["Web port", "3117"]]],
     "s-plan": ["ndx analyze / plan", [["Zone merge threshold", "5"], ["Pinned zones", "4"], ["Analysis depth", "--deep"], ["SourceVision", "auto"]]],
     "s-work": ["ndx work", [["Provider", HENCH.provider], ["Model", HENCH.model], ["Permission mode", HENCH.permissionMode], ["Max turns", String(HENCH.maxTurns)], ["Max tokens", String(HENCH.maxTokens)], ["Auto-commit", String(HENCH.autoCommit)], ["Livelock threshold", String(HENCH.livelockThreshold)], ["Allowed commands", HENCH.allowed.join(", ")], ["Blocked paths", HENCH.blocked.join(", ")]]],
-    "s-sync": ["ndx sync", [["Adapter", "file"], ["Notion", "disabled (rex.notionSync flag off)"]]],
     "s-export": ["ndx export / refresh", [["Export out-dir", "—"], ["Deploy target", "github"], ["Refresh", "--ui-only · --data-only · --no-build"]]],
-    "s-flags": ["Feature Flags", [["rex.notionSync", "off"], ["rex.integrations", "off"], ["sourcevision.prMarkdown", "off"], ["sourcevision.ask", "off"]]],
+    "s-flags": ["Feature Flags", [["sourcevision.prMarkdown", "off"], ["sourcevision.ask", "off"]]],
     "s-timeouts": ["CLI Timeouts", [["Command timeout", HENCH.commandTimeout + " ms"], ["Stop grace", "2000 ms"], ["Shutdown", "30000 ms"]]],
   };
   function settingsPage(id) {

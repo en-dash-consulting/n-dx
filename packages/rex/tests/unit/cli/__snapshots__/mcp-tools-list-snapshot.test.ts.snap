@@ -537,33 +537,6 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
     }
   },
   {
-    "name": "sync_with_remote",
-    "description": "Sync local PRD with a remote adapter (e.g. Notion)",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "direction": {
-          "type": "string",
-          "enum": [
-            "push",
-            "pull",
-            "sync"
-          ],
-          "description": "Sync direction (default: sync)"
-        },
-        "adapter": {
-          "type": "string",
-          "description": "Adapter name (default: notion)"
-        }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    },
-    "execution": {
-      "taskSupport": "forbidden"
-    }
-  },
-  {
     "name": "get_recommendations",
     "description": "Get SourceVision-based recommendations for PRD items. Use alongside get_findings for data-driven planning.",
     "inputSchema": {

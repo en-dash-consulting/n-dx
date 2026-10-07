@@ -20,7 +20,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Claude and Codex Config Validation in Gauntlet](./claude-and-codex-config-validation-in/index.md) | completed |
 | [Contributor Page Section Expansion](./contributor-page-section-expansion/index.md) | completed |
 | [Developer Environment Prerequisites Documentation](./developer-environment-prerequisites/index.md) | completed |
-| [Documentation improvements](./documentation-improvements/index.md) | completed |
+| [Documentation improvements](./documentation-improvements/index.md) | pending |
 | [End-User Platform Requirements](./end-user-platform-requirements/index.md) | completed |
 | [Fix MCP server re-registration during ndx init](./fix-mcp-server-re-registration-during/index.md) | completed |
 | [Fix move-file in web-server (1 finding)](./fix-move-file-in-web-server-1-finding/index.md) | completed |
@@ -52,3 +52,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-the.md) | completed |
 | [routes-commands ndx-ladder tests leak the ambient NDX_CLI_PATH env var](./routes-commands-ndx-ladder-tests-leak.md) | completed |
 | [Zone cohesion gate silently passes in CI instead of reporting it did not run](./zone-cohesion-gate-silently-passes-in.md) | completed |
+| [ZONES.md points at a "Confirmed zone-level cycles" section that exists in no file](./zones-md-points-at-a-confirmed-zone.md) | pending |

@@ -30,110 +30,21 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { checkArchitecturePolicy } from "../../packages/core/ci.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 
+/**
+ * The child_process policy — allowlist plus excluded directories — shared with
+ * `packages/core/ci.js` (the `ndx ci` architecture-policy step). One file, so
+ * the two enforcement points cannot keep separate lists that drift apart.
+ */
+const CHILD_PROCESS_POLICY = JSON.parse(
+  readFileSync(join(ROOT, "packages/core/child-process-allowlist.json"), "utf-8"),
+);
+
 /** Files that are allowed to import from node:child_process directly. */
-const ALLOWED = new Set([
-  // Foundation abstraction itself (llm-client is the canonical foundation)
-  "packages/llm-client/src/exec.ts",
-  // Tree termination — part of the same foundation abstraction. It needs raw
-  // spawn for `taskkill /T /F` (the Windows analogue of signalling a process
-  // group) and cannot route through exec.ts's spawnCli without creating an import
-  // cycle, since exec.ts consumes this module for its timeout kill.
-  "packages/llm-client/src/process-tree.ts",
-  // CLI streaming providers — need raw spawn for event-by-event parsing
-  "packages/llm-client/src/cli-provider.ts",
-  "packages/llm-client/src/codex-cli-provider.ts",
-  "packages/hench/src/agent/lifecycle/cli-loop.ts",
-  // Orchestration layer — spawns CLIs directly (no library imports)
-  "packages/core/bin/rex.js",
-  "packages/core/bin/hench.js",
-  "packages/core/bin/sourcevision.js",
-  "packages/core/cli.js",
-  "packages/core/cli-ink.js",
-  "packages/core/ci.js",
-  "packages/core/web.js",
-  // Spawns the sub-package's own stdio MCP server with `stdio: "inherit"`, so
-  // the editor's stdin and stdout reach it unmediated. Deliberately a direct
-  // spawn rather than win-spawn's spawnCli: that wraps in cmd.exe on Windows
-  // for `.cmd` shims, and an extra process between an editor and its MCP
-  // server is exactly what must not be in the way.
-  "packages/core/mcp-shim.js",
-  "packages/core/config.js",
-  "packages/core/export.js",
-  "packages/core/pair-programming.js",
-  "packages/core/win-spawn.js",
-  // `git ls-files` — whether a path is already tracked is what decides
-  // whether adding an ignore line for it is right, so the question lives
-  // beside the writer rather than in a caller.
-  "packages/core/gitignore.js",
-  "pr-check.js",
-  // Development scripts
-  "packages/web/dev.js",
-  "scripts/cli-smoke-parity.mjs",
-  "scripts/run-vitest-bind-aware.mjs",
-  // Needs `git status --porcelain` to refuse recording a prompt-token baseline
-  // from a dirty tree. Establishing that from `.git/` alone would mean
-  // reimplementing git's index and object store, and the mtime shortcut can
-  // report clean after a `touch` — a false clean being the exact bug it fixes.
-  "scripts/prompt-census.mjs",
-  // One-off release repair run by an operator, not by any package: drives the
-  // `git` and `gh` CLIs (tag, push, release create) and must not depend on
-  // llm-client being built, since it is used when the release pipeline itself
-  // is broken.
-  "scripts/backfill-release-tags.mjs",
-  // Process monitoring — needs raw execFile for system commands (vm_stat, sysctl)
-  "packages/hench/src/process/memory-monitor.ts",
-  // Git operations — need execFileSync/execFile for git CLI calls
-  "packages/rex/src/store/branch-naming.ts",
-  "packages/rex/src/cli/commands/backfill-commit-attribution.ts",
-  "packages/sourcevision/src/analyzers/branch-work-collector.ts",
-  "packages/sourcevision/src/analyzers/branch-work-filter.ts",
-  // detectSubAnalyses() is synchronous and must stay so — making it async would
-  // change a public analyzer signature and cascade to every caller. Its one
-  // best-effort `git worktree list --porcelain` call therefore needs
-  // execFileSync; llm-client's exec()/execStdout() helpers return Promises.
-  "packages/sourcevision/src/analyzers/workspace.ts",
-  "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
-  "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
-  // Iso map — reads the HEAD commit time and origin remote so the rendered page
-  // is reproducible (timestamp) and can link to source. Bundled verbatim into
-  // the generated skill script below.
-  "packages/sourcevision/src/export/iso-sources.ts",
-  // Generated artifact: the standalone iso-map skill, bundled from
-  // packages/sourcevision/src/export/ by scripts/build-iso-skill.mjs. It
-  // inherits the git usage above; edit the TypeScript, not this file.
-  ".claude/skills/iso-map/scripts/iso-map.mjs",
-  // Windows-safe CLI helper — wraps execFileSync with cmd.exe routing for .cmd shims
-  "packages/sourcevision/src/util/exec-cli.ts",
-  // Web server routes — spawn CLI subprocesses for domain tool execution
-  "packages/web/src/server/routes-hench.ts",
-  "packages/web/src/server/routes-sourcevision.ts",
-  // Merge-history pipeline — walks `git log --merges` via execFileSync for the
-  // PRD ↔ merge context graph endpoint (same pattern as branch-work-collector).
-  "packages/web/src/server/merge-history.ts",
-  // NOTE: packages/core/claude-integration.js used to be listed here for its
-  // `claude mcp add` execSync calls. It now routes through win-spawn.js and
-  // imports no child_process API directly, so the permission is no longer
-  // needed — removed rather than left as a permitted-but-unused entry.
-  // Git preflight — invokes `git init` when the user consents during `ndx init`
-  "packages/core/git-preflight.js",
-  // Install identity (`ndx which`) — reads the install checkout's branch and
-  // short SHA with `git rev-parse`. Orchestration tier, and it must answer even
-  // when nothing is initialized, so it cannot route through llm-client's exec
-  // helpers (a Foundation-tier dependency the report does not otherwise need).
-  "packages/core/install-identity.js",
-  // Codex integration — writes .codex/config.toml, .agents/skills, AGENTS.md
-  "packages/core/codex-integration.js",
-  // Assistant integration — runs `git check-ignore` to detect gitignored
-  // skill directories (the #284 skill-tracking hint)
-  "packages/core/assistant-integration.js",
-  // CI preflight script — runs build/test/check steps via child processes
-  "scripts/preflight.mjs",
-  // Performance profiling script — measures PRD write latency via pnpm exec
-  "scripts/profile-prd-tree-write.mjs",
-]);
+const ALLOWED = new Set(CHILD_PROCESS_POLICY.allowed.map((e) => e.path));
 
 /** Directories to skip entirely. */
 const SKIP_DIRS = new Set([
@@ -819,6 +730,46 @@ describe("architecture policy: intra-package layering staleness", () => {
   });
 });
 
+/**
+ * Production sources that import node:child_process outside the allowlist.
+ *
+ * Deliberately its own walk rather than `walk()`: that one skips `.claude`
+ * wholesale, which would leave the generated iso-map skill script — an
+ * allowlisted child_process user that ci.js does scan — unchecked here. Only
+ * the policy's `excludeDirs` (agent worktrees, local harness scratch) are
+ * left out, the same as ci.js.
+ */
+function childProcessViolations() {
+  const skipNames = new Set(["node_modules", "dist", ".git", ".rex", ".hench", ".sourcevision", ".ndx"]);
+  const excluded = new Set(Object.keys(CHILD_PROCESS_POLICY.excludeDirs));
+  const violations = [];
+
+  (function scan(dir) {
+    for (const entry of readdirSync(dir)) {
+      if (skipNames.has(entry)) continue;
+      const full = join(dir, entry);
+      const rel = relative(ROOT, full).replace(/\\/g, "/");
+      if (statSync(full).isDirectory()) {
+        if (!excluded.has(rel)) scan(full);
+        continue;
+      }
+      if (!/\.(ts|js|mjs)$/.test(entry) || entry.endsWith(".d.ts")) continue;
+      if (ALLOWED.has(rel)) continue;
+      if (/\.test\.(ts|js|mjs)$/.test(rel) || /(?:^|\/)tests?\//.test(rel)) continue;
+
+      const content = readFileSync(full, "utf-8");
+      if (
+        /from\s+["'](?:node:)?child_process["']/.test(content) ||
+        /require\(["'](?:node:)?child_process["']\)/.test(content)
+      ) {
+        violations.push(rel);
+      }
+    }
+  })(ROOT);
+
+  return violations;
+}
+
 describe("architecture policy: process execution", () => {
   it("ALLOWED list contains no stale entries (all files exist on disk)", () => {
     const stale = [];
@@ -841,29 +792,13 @@ describe("architecture policy: process execution", () => {
     }
   });
 
+  it("every allowlist entry gives a reason", () => {
+    const unexplained = CHILD_PROCESS_POLICY.allowed.filter((e) => !e.reason?.trim()).map((e) => e.path);
+    expect(unexplained, "child-process-allowlist.json entries without a reason").toEqual([]);
+  });
+
   it("no direct child_process imports outside allowed files", () => {
-    const files = walk(ROOT);
-    const violations = [];
-
-    for (const file of files) {
-      const rel = relative(ROOT, file).replace(/\\/g, "/");
-
-      // Skip allowed files
-      if (ALLOWED.has(rel)) continue;
-      // Skip test files
-      if (/\.test\.(ts|js|mjs)$/.test(rel) || /(?:^|[\/\\])tests?[\/\\]/.test(rel)) continue;
-
-      const content = readFileSync(file, "utf-8");
-
-      // Check for import/require of child_process
-      const hasImport =
-        /from\s+["'](?:node:)?child_process["']/.test(content) ||
-        /require\(["'](?:node:)?child_process["']\)/.test(content);
-
-      if (hasImport) {
-        violations.push(rel);
-      }
-    }
+    const violations = childProcessViolations();
 
     if (violations.length > 0) {
       const msg = [
@@ -873,12 +808,22 @@ describe("architecture policy: process execution", () => {
         "Violations:",
         ...violations.map((v) => `  - ${v}`),
         "",
-        "If this is a legitimate exception, add the file to ALLOWED in",
-        "tests/e2e/architecture-policy.test.js",
+        "If this is a legitimate exception, add the file, with a reason, to",
+        "packages/core/child-process-allowlist.json",
       ].join("\n");
 
       expect.fail(msg);
     }
+  });
+
+  // `ndx ci` enforces the same rule from ci.js with its own scanner. Both read
+  // the shared allowlist, but the walk, the test-file filter and the import
+  // pattern are still two implementations — this checks that they agree, so a
+  // file one enforcement point allows is never rejected by the other.
+  it("ndx ci's architecture-policy step reaches the same verdict as this test", () => {
+    const ci = checkArchitecturePolicy(ROOT);
+    expect([...ci.violations].sort()).toEqual(childProcessViolations().sort());
+    expect(ci.ok).toBe(true);
   });
 });
 
@@ -1332,8 +1277,6 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   // Init LLM selection — lazy-loads enquirer prompt library
   ["packages/core/init-llm.js", "Lazy-loads enquirer for interactive provider/model selection"],
   // Web server — lazy-loads route handlers
-  ["packages/web/src/server/routes-integrations.ts", "Lazy-loads integration handlers on demand"],
-  ["packages/web/src/server/routes-notion.ts", "Lazy-loads Notion integration on demand"],
   ["packages/web/src/server/routes-rex/health.ts", "Lazy-loads health check analysis on demand"],
   // Core orchestrator — dynamic import of rex public API for export pre-rendering
   ["packages/core/export.js", "Lazy-loads rex functions for static export pre-rendering"],

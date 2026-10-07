@@ -9,7 +9,7 @@ Which rules are enforced, where, and how. Prevents duplicate or conflicting enfo
 | Cross-package gateway imports | `ci.js` (step 3b) + `tests/e2e/domain-isolation.test.js` | Scans for runtime imports outside gateway files | CI failure |
 | Domain isolation (rex ↔ sourcevision) | `tests/e2e/domain-isolation.test.js` | Verifies domain packages have no cross-imports | Test failure |
 | Orchestration tier boundary (spawn-only) | `tests/e2e/domain-isolation.test.js` | Checks orchestration files have no runtime library imports | Test failure |
-| Direct `node:child_process` imports | `tests/e2e/architecture-policy.test.js` | Allowlist-based scan of all packages | Test failure |
+| Direct `node:child_process` imports | `ci.js` (step 3c) + `tests/e2e/architecture-policy.test.js` | Allowlist-based scan of all packages; a parity test fails if the two scanners disagree | CI failure / Test failure |
 | Hand-built shell command lines / DEP0190 | `tests/e2e/architecture-policy.test.js` | Tree scan for `exec`/`execSync` imports and `shell: true`+args, with a reasoned `SHELL_STRING_EXEMPT` allowlist | Test failure |
 | Direct POSIX-shell spawns (`sh -c`) | `tests/e2e/architecture-policy.test.js` | Tree scan for a shell name paired with a `-c` argv; only `execShellCmd`'s definition site is exempt, and the exemption is staleness-checked | Test failure |
 | Shell-spawning tests are inventoried | `tests/e2e/shell-spawn-inventory-policy.test.js` | Every test file that spawns a shell must have a row in `tests/shell-spawn-inventory.md` | Test failure |
@@ -33,9 +33,10 @@ Which rules are enforced, where, and how. Prevents duplicate or conflicting enfo
 
 ## Configuration
 
-Gateway and boundary rules are defined in a single source of truth:
+Rules enforced in two places are defined in a single source of truth:
 
 - **`gateway-rules.json`** — consumed by both `ci.js` and `domain-isolation.test.js`
+- **`child-process-allowlist.json`** — consumed by both `ci.js` and `architecture-policy.test.js`
 
 ## Adding New Rules
 

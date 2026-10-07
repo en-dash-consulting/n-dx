@@ -11,7 +11,6 @@ src/
   store/            Storage abstraction: PRDStore interface + adapters
                     FolderTreeStore (canonical) + FileStore (legacy migration path)
                     folder-tree-{store,serializer,parser,mutations,index-generator}.ts
-                    Remote adapters: notion, jira, asana, github-projects
                     Factory: createStore("file", rexDir)
   core/             Pure logic with no I/O
     tree.ts         Tree traversal, find, insert, update, remove, stats
@@ -26,7 +25,7 @@ src/
     propose.ts      Group scan results into epic/feature/task hierarchy
   cli/
     index.ts        Arg parser and command dispatch (switch + dynamic import)
-    mcp.ts          MCP server (19 tools, 3 resources, stdio + HTTP transport)
+    mcp.ts          MCP server (18 tools, 3 resources, stdio + HTTP transport)
     mcp-tools/      One module per tool, plus registry.ts listing them in
                     registration order; mcp.ts registers whatever it lists
     commands/       One file per command, each exports cmdX(dir, flags)

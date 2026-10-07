@@ -217,24 +217,6 @@ describe("orchestration script integration", () => {
     });
   });
 
-  // ── ndx sync ──────────────────────────────────────────────────────────────
-
-  describe("ndx sync", () => {
-    it("requires .rex directory", () => {
-      const { stderr, code } = runResult(["sync", tmpDir]);
-      expect(code).toBe(1);
-      expect(stderr).toContain(".rex");
-    });
-
-    it("delegates to rex sync (fails gracefully without adapter)", async () => {
-      await setupRexDir(tmpDir);
-      const { stderr, code } = runResult(["sync", tmpDir]);
-      // sync requires a remote adapter; with file adapter it should exit non-zero
-      expect(code).not.toBe(0);
-      expect(stderr).toContain("adapter");
-    });
-  });
-
   // ── ndx log ───────────────────────────────────────────────────────────────
 
   describe("ndx log", () => {
@@ -429,7 +411,7 @@ describe("orchestration script integration", () => {
   // ── Per-command --help ─────────────────────────────────────────────────────
 
   describe("per-command --help", () => {
-    const orchestratorCommands = ["plan", "status", "work", "usage", "sync", "ci", "init", "refresh", "start", "dev"];
+    const orchestratorCommands = ["plan", "status", "work", "usage", "ci", "init", "refresh", "start", "dev"];
 
     for (const cmd of orchestratorCommands) {
       it(`'ndx ${cmd} --help' shows command-specific help`, () => {

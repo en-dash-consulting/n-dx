@@ -42,7 +42,7 @@ The web package forms a hub topology with `web-viewer` at the centre:
 
 `web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `src/shared/`, while also receiving imports from sub-directories such as `crash/`. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `src/shared/` is the foundation layer with zero upward dependencies, enforced by `boundary-check.test.ts`.
 
-Measured zone metrics are not reproduced here — they change with every analysis. Run `ndx analyze --deep .` and read `.sourcevision/zones.json`; per-package policies live in `packages/*/CLAUDE.md`.
+Measured zone metrics are not reproduced here — they change with every analysis. Run `ndx analyze --deep .` and read `.sourcevision/zones.json`; per-package policies live in `packages/*/AGENTS.md`.
 
 ##### Monorepo-wide zone fragility governance
 
@@ -64,8 +64,6 @@ Then filter `.sourcevision/zones.json` on the threshold above. A zone named in a
 
 **Directory policies outlive zone detection.** Rules tied to a directory (barrel imports, framework-agnostic constraints, CLI-only content) stay in force whether or not Louvain currently emits a zone for it, because they are enforced by tests rather than by the analyser. Correct a stale metric; do not delete a policy just because its zone stopped appearing.
 
-Package-specific zone governance for `web`, `rex`, and `hench` now lives in each package's own `CLAUDE.md` (`packages/web/CLAUDE.md`, `packages/rex/CLAUDE.md`, `packages/hench/CLAUDE.md`), which loads only when working under that directory.
-
 > **Spawn-exempt exception:** `config.js` directly reads/writes package config files (`.rex/config.json`, `.hench/config.json`, `.sourcevision/manifest.json`, `.n-dx.json`) rather than delegating to spawned CLIs. This is intentional — config operations require cross-package reads, atomic merges, and validation logic that cannot be expressed as a single CLI spawn. It is the only orchestration-tier script that breaks the spawn-only rule.
 
 ### Gateway modules
@@ -84,10 +82,12 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 Rules:
 - **One gateway per source package** — all runtime imports from a given upstream package pass through a single gateway. A consumer may have multiple gateways (e.g. web has separate gateways for rex and sourcevision).
 - **Re-export only** — gateways re-export; they contain no logic. Enforced by `domain-isolation.test.js`.
-- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in path-scoped rules (e.g. `.claude/rules/web-gateway-boundary.md`).
+- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in the owning package's `AGENTS.md` (e.g. "Web viewer gateway boundary" in `packages/web/AGENTS.md`).
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
-See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are documented in `.claude/rules/web-gateway-boundary.md` and `.claude/rules/web-injection-seams.md`; core's injection-seam registry (the `cli.js` → `pair-programming.js` `registerChild` seam) is in `.claude/rules/core-injection-seams.md`.
+See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are in `packages/web/AGENTS.md`; core's injection-seam registry (the `cli.js` → `pair-programming.js` `registerChild` seam) is in `packages/core/AGENTS.md`; `@n-dx/llm-client`'s is in `packages/llm-client/AGENTS.md`.
+
+**Package-level guidance lives in `packages/<pkg>/AGENTS.md`.** Zone policies, seam registries and any other note that governs one package belong there, because every assistant reads a package's `AGENTS.md`. The `CLAUDE.md` beside it is a one-line `@AGENTS.md` import and holds nothing of its own; `tests/e2e/instruction-alignment.test.js` fails a package that breaks either half of that pair.
 
 ### Tier boundary crossing: spawn vs gateway
 
@@ -136,7 +136,11 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **Narrative carve-out.** `ndx prd export --format=narrative` writes prose Markdown to an operator-chosen path outside `.rex/`, under the same refusal. It is a *report*, not a transport artifact: deliberately lossy and one-way, with ids, folder slugs and status/priority values omitted by construction. Nothing imports it — the JSON bundle is the only round-trip surface. Do not add a narrative parser.
 
-HTTP-request concurrency notes for the web server live in `packages/web/CLAUDE.md`.
+### Claude-specific guidance files
+
+Claude Code loads a package's own `CLAUDE.md` when work happens under that directory — `packages/web/CLAUDE.md`, `packages/rex/CLAUDE.md`, `packages/hench/CLAUDE.md`, `packages/core/CLAUDE.md`, `packages/llm-client/CLAUDE.md`. Each is a one-line `@AGENTS.md` import; the guidance itself is in the sibling `AGENTS.md`, so edit it there.
+
+`.claude/rules/` narrows a package's guidance to the directory you are editing (`packages/core/**`, `packages/web/src/server/**`, `packages/web/src/viewer/**`). Only Claude Code reads it, so it is for pointers, not content: do not add a registry or a policy table here, because it would be invisible to every other assistant. Its three current files still carry a full copy of sections that also live in `packages/core/AGENTS.md` and `packages/web/AGENTS.md` — the AGENTS.md copy is the canonical one, so edit it first and then make the same edit in the rule file. `tests/e2e/instruction-alignment.test.js` fails when the two copies' table rows differ in either direction; it does not compare their prose.
 
 
 ### Package conventions
@@ -152,11 +156,13 @@ HTTP-request concurrency notes for the web server live in `packages/web/CLAUDE.m
 
 | File | Role | Generated from |
 |------|------|----------------|
-| `AGENTS.md` | **Canonical shared guidance surface.** Read by Codex and any future assistants. Contains project docs, workflow, skill inventory, and MCP tool reference derived from the asset manifest. | `project-guidance.md` (filtered) + manifest-derived sections + `codex-troubleshooting.md` |
-| `CLAUDE.md` | **Claude-facing bridge.** Read by Claude Code on startup. Imports the same shared guidance plus Claude-specific deep sections (zone governance, gateway details, concurrency contract). | `project-guidance.md` + `claude-addendum.md` |
+| `AGENTS.md` | **Canonical shared guidance surface.** Read by Codex and any future assistants. Contains project docs, zone governance, gateway rules, the concurrency contract, workflow, skill inventory, and MCP tool reference derived from the asset manifest. | `project-guidance.md` (filtered) + manifest-derived sections + `codex-troubleshooting.md` |
+| `CLAUDE.md` | **Claude-facing bridge.** Read by Claude Code on startup. Imports the same shared guidance plus the pointers to Claude's own per-directory instruction files. | `project-guidance.md` + `claude-addendum.md` |
 | `.codex/config.toml` | **Codex MCP configuration.** Auto-read by Codex — no manual registration required. | Manifest MCP server descriptors |
 
 **Design invariant:** Both `AGENTS.md` and `CLAUDE.md` derive their base project documentation (Packages, Architecture, Commands, Key Files) from `project-guidance.md`. Vendor-specific additions are layered on top — never inlined into the shared template. This prevents instruction drift between assistant surfaces.
+
+**What goes in `claude-addendum.md`:** only guidance about Claude Code's own behaviour — today, that it loads a package's `CLAUDE.md` when work happens under that directory. Anything describing the *codebase* (zone governance, gateway rules, the concurrency contract and PRD invariant) belongs in `project-guidance.md`, because a section placed in the addendum never reaches `AGENTS.md`. `tests/e2e/instruction-alignment.test.js` fails on an addendum heading that is not on its Claude-only allowlist.
 
 Re-run `ndx init` to regenerate all instruction files after changes to `packages/core/assistant-assets/`.
 
@@ -202,7 +208,6 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 - `health` — PRD structure health score
 - `facets` — list configured facets with distribution
 - `append_log` — write structured log entry
-- `sync_with_remote` — sync with remote adapter (e.g. Notion)
 - `get_token_usage` — roll up hench run token totals per PRD item (self/descendants/total) with orphans surfaced separately
 - `get_capabilities` — server capabilities and configuration, plus the `workspace` block (`projectDir`, `source`, `refused`) naming the tree this session writes
 
