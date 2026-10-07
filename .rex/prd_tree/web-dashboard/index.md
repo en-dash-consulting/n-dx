@@ -44,6 +44,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [findAvailablePort reports a requested port of 0 as "in use"](./findavailableport-reports-a-requested.md) | completed |
 | [Fix undefined design tokens and standardize buttons on General and analyze/plan settings pages](./fix-undefined-design-tokens-and.md) | completed |
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http.md) | completed |
+| [Make the Live route's run-liveness check correct on Windows](./make-the-live-route-s-run-liveness.md) | completed |
 | [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-to-the.md) | completed |
 | [Overview Next Steps panel: consistent formatting, copyable items, and capture-to-PRD action](./overview-next-steps-panel-consistent.md) | completed |
 | [PRD timeline view: time-ordered default with a tree toggle and recency desaturation](./prd-timeline-view-time-ordered-default.md) | pending |

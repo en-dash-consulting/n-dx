@@ -159,7 +159,7 @@ describe("GET /api/live", () => {
     writeRun(repo, { id: "old", status: "completed", startedAt: now - 3 * 60 * MINUTE, finishedAt: now - 2 * 60 * MINUTE });
     writePrd(repo, ["task-a"]);
     // Another worktree: one abandoned record (its pid is gone), and an analysis started from a terminal.
-    writeRun(linked, { id: "elsewhere", status: "running", startedAt: now - MINUTE, lastActivityAt: now - 5_000 });
+    writeRun(linked, { id: "elsewhere", status: "running", startedAt: now - MINUTE, lastActivityAt: now - 5_000, pid: DEAD_PID });
     const progressFile = analyzeProgressPath(join(linked, ".sourcevision"));
     mkdirSync(dirname(progressFile), { recursive: true });
     writeFileSync(progressFile, JSON.stringify({
