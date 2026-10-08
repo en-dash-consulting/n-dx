@@ -103,6 +103,27 @@ describe("java resolver", () => {
     }
   });
 
+  it("never reports a project package as external, even for a type not in the repository", async (ctx) => {
+    skipUnlessGrammar(ctx, JAVA_WASM);
+    // Proto is generated at build time into a package the repository declares.
+    const sources: Record<string, string> = {
+      "src/a/Service.java":
+        "package a;\nimport a.gen.Proto;\nimport static a.gen.Proto.parse;\nclass Service { a.gen.Other o; Proto p; }\n",
+      "src/a/gen/Helper.java": "package a.gen;\nclass Helper {}\n",
+    };
+    const runner = createTreeSitterRunner();
+    try {
+      const files: PackSourceFile[] = [];
+      for (const [path, source] of Object.entries(sources)) {
+        const result = await runner.parseSource({ pack: javaPack, grammarPath: JAVA_WASM }, path, source);
+        if (result.status === "parsed") files.push(result);
+      }
+      expect(javaPack.resolver!.prepare(files).resolve("src/a/Service.java")).toEqual({ files: [], external: [] });
+    } finally {
+      runner.dispose();
+    }
+  });
+
   it("gives nothing for a file it was not prepared with", async (ctx) => {
     const resolve = await resolveFixture(ctx);
     expect(resolve("src/Missing.java")).toEqual({ files: [], external: [] });
