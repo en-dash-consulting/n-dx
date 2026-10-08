@@ -27,12 +27,13 @@
  * | id, type, title, slug, displayId, aliases        | status, startedAt, completedAt, endedAt      |
  * | tags, source, blockedBy, body, hypotheses*       | activeIntervals                              |
  * | area: summary, stewards                          | failureReason, resolutionType/Detail         |
- * | capability: statement, criteria, requirements,   | metAt, revisedAt, specReviewed, checks       |
+ * | capability: statement, criteria, requirements,   | metAt, revisedAt, reviewedHash, checks       |
  * |   dependsOn                                      |   (product nodes)                            |
- * |                                                  | appliedIn, shippedIn, prs, issues (changes)  |
- * | constraint: statement, requirements, appliesTo   | commits, links*                              |
+ * |                                                  | appliedAt, appliedAmendsHash, shippedIn,     |
+ * | constraint: statement, requirements, appliesTo   |   prs, issues (changes)                      |
+ * |                                                  | commits, links*                              |
  * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
- * |   spike, priority, requirements, loe,            | lastModified, lastModifiedBy                 |
+ * |   spike, fix, priority, requirements, loe,       | lastModified, lastModifiedBy                 |
  * |   loeRationale, loeConfidence, effort*,          |                                              |
  * |   discoveredFrom { item?, run? }, run            |                                              |
  * | task/subtask: description, acceptanceCriteria;   |                                              |
@@ -46,7 +47,18 @@
  *
  * Derived values (capability health, openAmendments, "bound by" edges,
  * change kind) are computed and cached outside the tree; they have no field
- * here on purpose.
+ * here on purpose. So is the commit a change was applied in: it comes from the
+ * change's `N-DX-Item` trailer, as the change's other commits do.
+ *
+ * ## Spec hash
+ *
+ * `metAt`, `reviewedHash` and an amendment's `base` all hold a spec hash
+ * (`specHash` in `./v2-rules.ts`): the node's own statement and criteria, not
+ * the criteria it inherits from its parent. Inheritance needs no hash: a child
+ * reads as changing while an open change amends its parent.
+ *
+ * State keys an earlier draft declared and this schema dropped are listed in
+ * `RETIRED_STATE_FIELDS`.
  *
  * @module rex/schema/v2
  */
@@ -203,10 +215,14 @@ export interface CriteriaDelta {
   [key: string]: unknown;
 }
 
+/** Node types an `added` amendment can create. */
+export type AddedNodeType = "capability" | "constraint";
+export const ADDED_NODE_TYPES: ReadonlySet<AddedNodeType> = new Set<AddedNodeType>(["capability", "constraint"]);
+
 /**
  * One product-layer edit a change carries. `target` is the node id (or display id) it
- * edits; for `added` it names the node to create, placed `under` a parent
- * with `title`. Either `criteria` (deterministic delta) or `proposed`
+ * edits; for `added` it names the node to create, a `type` placed `under` a
+ * parent with `title`. Either `criteria` (deterministic delta) or `proposed`
  * (replacement text) describes the edit.
  */
 export interface Amendment {
@@ -217,6 +233,14 @@ export interface Amendment {
   proposed?: string;
   under?: string;
   title?: string;
+  /**
+   * `added` only (the `amendment-type` rule errors on another delta): the node
+   * type created, a capability when absent. A change adding a constraint
+   * derives kind "policy change", not "feature".
+   */
+  type?: AddedNodeType;
+  /** The target's spec hash when the amendment was drafted; apply refuses a mismatch. */
+  base?: string;
   [key: string]: unknown;
 }
 
@@ -236,6 +260,8 @@ export const AmendmentSchema = z
     proposed: z.string().optional(),
     under: z.string().optional(),
     title: z.string().optional(),
+    type: z.enum(["capability", "constraint"]).optional(),
+    base: z.string().optional(),
   })
   .passthrough();
 
@@ -316,6 +342,12 @@ export interface ChangeIntent extends BaseIntent, EffortIntent {
   touches?: string[];
   plannedRelease?: string;
   spike?: boolean;
+  /**
+   * The change repairs the nodes it touches without amending them. A product
+   * node reads defective while an open change with `fix: true` targets it.
+   * Never also a spike (`fix-not-spike`).
+   */
+  fix?: boolean;
   priority?: Priority;
   requirements?: Requirement[];
   discoveredFrom?: DiscoveredFrom;
@@ -392,6 +424,7 @@ export const ChangeIntentSchema = z
     touches: z.array(z.string()).optional(),
     plannedRelease: z.string().optional(),
     spike: z.boolean().optional(),
+    fix: z.boolean().optional(),
     priority: PrioritySchema.optional(),
     requirements: z.array(RequirementSchema).optional(),
     discoveredFrom: DiscoveredFromSchema.optional(),
@@ -443,6 +476,8 @@ export interface CheckResult {
   /** ISO timestamp of the run. */
   at: string;
   detail?: string;
+  /** The commit the check ran against. */
+  commit?: string;
   [key: string]: unknown;
 }
 
@@ -452,6 +487,7 @@ export const CheckResultSchema = z
     result: z.enum(["pass", "fail", "skipped"]),
     at: z.string(),
     detail: z.string().optional(),
+    commit: z.string().optional(),
   })
   .passthrough();
 
@@ -481,12 +517,21 @@ export interface ItemState {
    * `long-revised` measures age from it, not from `lastModified`.
    */
   revisedAt?: string;
-  /** Product nodes: a person reviewed the spec text. */
-  specReviewed?: boolean;
+  /**
+   * Product nodes: the spec hash a person reviewed. The spec is reviewed while
+   * this equals its current hash, so an edit after review reads unreviewed.
+   */
+  reviewedHash?: string;
   /** Product nodes: last result per requirement check. */
   checks?: CheckResult[];
-  /** Changes: commit in which the change's amendments were applied to the product layer. */
-  appliedIn?: string;
+  /**
+   * Changes: ISO timestamp of applying the change's amendments to the product
+   * layer. A change is applied when this is set. The apply commit is not
+   * stored; it comes from the change's `N-DX-Item` trailer.
+   */
+  appliedAt?: string;
+  /** Changes: hash of `amends` as applied, so an amendment edited after apply is detectable. */
+  appliedAmendsHash?: string;
   /** Changes: release version the change shipped in. */
   shippedIn?: string;
   /** Changes: PR references (full URLs or tracker keys). */
@@ -500,7 +545,11 @@ export interface ItemState {
   assignee?: string;
   /** Changes and tasks: informational readiness. */
   ready?: boolean;
-  /** Changes: placement on the product layer still needs a decision (blocks autonomous selection only). */
+  /**
+   * Changes: in the Inbox; a person must confirm the change's targets. Blocks
+   * autonomous selection, exempts the change from `change-has-target`, and
+   * must be cleared before the change completes (`change-placed-at-close`).
+   */
   needsPlacement?: boolean;
   lastModified?: string;
   lastModifiedBy?: string;
@@ -519,9 +568,10 @@ export const ItemStateSchema = z
     resolutionDetail: z.string().optional(),
     metAt: z.string().optional(),
     revisedAt: z.string().optional(),
-    specReviewed: z.boolean().optional(),
+    reviewedHash: z.string().optional(),
     checks: z.array(CheckResultSchema).optional(),
-    appliedIn: z.string().optional(),
+    appliedAt: z.string().optional(),
+    appliedAmendsHash: z.string().optional(),
     shippedIn: z.string().optional(),
     prs: z.array(WorkRefSchema).optional(),
     issues: z.array(WorkRefSchema).optional(),
@@ -534,6 +584,18 @@ export const ItemStateSchema = z
     lastModifiedBy: z.string().optional(),
   })
   .passthrough();
+
+/**
+ * State keys an earlier v2 draft declared and this schema dropped, each with
+ * the reason reported when one is found. Being undeclared, the state writer
+ * keeps them as unknown keys, so an old `state.yaml` still loads and
+ * round-trips; nothing reads them, and the `retired-state-field` rule warns.
+ * Their values are not converted: the migration stamps the replacements.
+ */
+export const RETIRED_STATE_FIELDS: Readonly<Record<string, string>> = {
+  appliedIn: "a change is applied when appliedAt is set, and its apply commit comes from its N-DX-Item trailer",
+  specReviewed: "review is recorded as reviewedHash, the spec hash a person reviewed, so an edit after review reads unreviewed",
+};
 
 // ── Stored files ─────────────────────────────────────────────────
 
