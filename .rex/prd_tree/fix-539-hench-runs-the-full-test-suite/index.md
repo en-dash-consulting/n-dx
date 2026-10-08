@@ -39,7 +39,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Gate-only retry: skip the agent when the previous run failed only at the gate with its work committed](./gate-only-retry-skip-the-agent-when.md) | completed |
 | [hench.testGate.command: a gate command template with {base}, recording the suites it selected](./hench-testgate-command-a-gate-command.md) | completed |
 | [isReadOnlyRefusal returns false when earlier attempts already committed the task's files](./isreadonlyrefusal-returns-false-when.md) | completed |
-| [Keep the build stamp out of the published npm packages](./keep-the-build-stamp-out-of-the.md) | in_progress |
+| [Keep the build stamp out of the published npm packages](./keep-the-build-stamp-out-of-the.md) | completed |
 | [Make the affected gate's stale-build check content-aware so partial and no-emit builds are judged correctly](./make-the-affected-gate-s-stale-build.md) | completed |
 | [Opt this repo into the scoped gate and flake re-run; document the test-gate templates; changeset](./opt-this-repo-into-the-scoped-gate-and.md) | completed |
 | [Read-only refusal is suppressed by other tasks' commits to files an earlier attempt only edited](./read-only-refusal-is-suppressed-by.md) | completed |
