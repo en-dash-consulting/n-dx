@@ -512,12 +512,16 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
     stack.push(node);
     for (const next of edges(node)) {
       if (state.get(next) === "open") {
-        const cycle = stack.slice(stack.indexOf(next));
-        const key = cycle.map((n) => n.id).sort().join(" ");
+        const members = stack.slice(stack.indexOf(next));
+        const key = members.map((n) => n.id).sort().join(" ");
         if (!seen.has(key)) {
           seen.add(key);
-          const path = [...cycle, next].map((n) => `"${n.title}"`).join(" → ");
-          findings.push(finding("depends-on-acyclic", next, `dependsOn cycle: ${path}`));
+          // Report on the smallest id, path rotated to start there, so the
+          // same cycle reads the same whichever capability the walk began at.
+          const start = members.reduce((lo, n, i) => (n.id < members[lo].id ? i : lo), 0);
+          const cycle = [...members.slice(start), ...members.slice(0, start)];
+          const path = [...cycle, cycle[0]].map((n) => `"${n.title}"`).join(" → ");
+          findings.push(finding("depends-on-acyclic", cycle[0], `dependsOn cycle: ${path}`));
         }
       } else if (!state.has(next)) {
         visit(next);

@@ -491,6 +491,18 @@ describe("depends-on-acyclic", () => {
     expect(findings[0].message).toBe('dependsOn cycle: "A" → "B" → "C" → "A"');
   });
 
+  it("reports a cycle on its smallest id, path rotated there, whichever node the walk starts at", () => {
+    const a = cap({ id: "a", title: "A", dependsOn: ["b"] });
+    const b = cap({ id: "b", title: "B", dependsOn: ["c"] });
+    const c = cap({ id: "c", title: "C", dependsOn: ["b"] });
+    const withA = check("depends-on-acyclic", { product: [node("area", {}, [a, c, b])] });
+    const withoutA = check("depends-on-acyclic", { product: [node("area", {}, [c, b])] });
+    expect(withA).toHaveLength(1);
+    expect(withA[0].nodeId).toBe("b");
+    expect(withA[0].message).toBe('dependsOn cycle: "B" → "C" → "B"');
+    expect(withoutA).toEqual(withA);
+  });
+
   it("fails a self-dependency", () => {
     const a = cap({ id: "a", dependsOn: ["a"] });
     expect(ids(check("depends-on-acyclic", { product: [a] }))).toEqual(["a"]);

@@ -245,6 +245,23 @@ describe("applyAmendments: removed", () => {
   });
 });
 
+describe("applyAmendments: pre-existing dependsOn cycle", () => {
+  const capNode = (id: string, dependsOn: string[]): RuleNode =>
+    ({ id, type: "capability", title: id.toUpperCase(), slug: id, statement: `${id} works.`, status: "pending", dependsOn }) as RuleNode;
+
+  function cyclic(amends: Amendment[]): V2Tree {
+    const t = tree(amends);
+    // Order matters: the walk starts at "a" before the removal, at "c" after.
+    get(t, AREA).children = [capNode("a", ["b"]), capNode("c", ["b"]), capNode("b", ["c"])];
+    return t;
+  }
+
+  it("applies a removal outside the cycle, though the walk then starts elsewhere", () => {
+    const { tree: out } = applyAmendments(cyclic([{ target: "a", delta: "removed", summary: "gone" }]), CHANGE, OPTS);
+    expect(get(out, "a").status).toBe("deleted");
+  });
+});
+
 describe("applyAmendments: the change", () => {
   it("leaves the input tree untouched, also when refused", () => {
     const input = tree([{ target: CAP, delta: "modified", summary: "s", proposed: "New" }]);
