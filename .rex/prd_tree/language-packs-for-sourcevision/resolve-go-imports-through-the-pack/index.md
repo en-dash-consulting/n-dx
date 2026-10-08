@@ -28,7 +28,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Consolidate the duplicate go.mod parser (rex parseGoMod and sourcevision go-build)](./consolidate-the-duplicate-go-mod.md) | pending |
 | [Go build reader throws when a project subdirectory is unreadable](./go-build-reader-throws-when-a-project.md) | pending |
 | [Read go.mod and go.work with versions](./read-go-mod-and-go-work-with-versions.md) | completed |
 | [Resolve Go import paths to package files](./resolve-go-import-paths-to-package-files.md) | pending |
