@@ -35,15 +35,12 @@
  */
 
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { TokenUsage } from "@n-dx/llm-client";
+import { resolveWebPaths } from "./paths.js";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-/** Ledger file name, relative to the project directory. */
-export const DASHBOARD_USAGE_FILE = ".n-dx-web-usage.jsonl";
 
 /** `command` value for a SourceVision Ask call. */
 export const ASK_COMMAND = "ask";
@@ -94,9 +91,13 @@ export interface DashboardUsageRecord {
 // Path
 // ---------------------------------------------------------------------------
 
-/** Absolute path of the ledger for a project. */
+/**
+ * Absolute path of the ledger for a project — `.n-dx-web-usage.jsonl` at the
+ * root on the legacy layout, `.ndx/web-usage.jsonl` on the `.ndx/` one. The
+ * layout resolver decides; nothing here spells the name.
+ */
 export function dashboardUsagePath(projectDir: string): string {
-  return join(projectDir, DASHBOARD_USAGE_FILE);
+  return resolveWebPaths(projectDir).usageFile;
 }
 
 // ---------------------------------------------------------------------------

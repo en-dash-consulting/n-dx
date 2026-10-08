@@ -11,7 +11,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 
@@ -29,6 +29,12 @@ export interface CliTimeoutsResponse {
   defaultTimeoutMs: number;
   /** Commands that receive no default timeout (servers / long-running watchers). */
   noDefaultTimeoutCommands: string[];
+  /**
+   * The file the overrides live in, relative to the project root —
+   * `.n-dx.json` or `.ndx/config.json`. For display: the viewer cannot ask
+   * the layout resolver itself.
+   */
+  configFile: string;
 }
 
 /** The shape expected by PUT /api/cli/timeouts. */
@@ -55,11 +61,9 @@ const COMMAND_TIMEOUT_DEFAULTS: Record<string, number> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const NDX_CONFIG = ".n-dx.json";
-
-/** Read .n-dx.json, returning empty object on failure. */
+/** Read the project config, returning empty object on failure. */
 function readNdxConfig(projectDir: string): Record<string, unknown> {
-  const configPath = join(projectDir, NDX_CONFIG);
+  const configPath = resolveLayout(projectDir).configFile;
   if (!existsSync(configPath)) return {};
   try {
     return JSON.parse(readFileSync(configPath, "utf-8"));
@@ -68,9 +72,9 @@ function readNdxConfig(projectDir: string): Record<string, unknown> {
   }
 }
 
-/** Write .n-dx.json preserving existing content. */
+/** Write the project config preserving existing content. */
 function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
-  const configPath = join(projectDir, NDX_CONFIG);
+  const configPath = resolveLayout(projectDir).configFile;
   writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
 }
 
@@ -91,11 +95,13 @@ function extractCliTimeouts(projectDir: string): CliTimeoutsResponse {
     }
   }
 
+  const layout = resolveLayout(projectDir);
   return {
     timeoutMs,
     timeouts,
     defaultTimeoutMs: DEFAULT_TIMEOUT_MS,
     noDefaultTimeoutCommands: NO_DEFAULT_TIMEOUT_COMMANDS,
+    configFile: relativeToRoot(layout, layout.configFile),
   };
 }
 

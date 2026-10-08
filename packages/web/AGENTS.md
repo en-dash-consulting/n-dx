@@ -114,7 +114,7 @@ When `ndx start` is running, the web server holds in-process caches (aggregation
 | MCP request during `ndx work` PRD update | Momentarily stale status — hench writes are small atomic updates | Acceptable — dashboard polls and self-corrects within seconds |
 | Concurrent dashboard API requests | Safe — Express serializes requests per-connection; no shared mutable state between request handlers | No action needed |
 
-**General rule for HTTP:** most routes treat disk files as read-only. The exception is the PRD: the routes that mutate `.rex/prd_tree/` (item CRUD, merge, prune, reorganize, restore, and the Ask panel's `apply-refinements`) go through `rex-gateway`'s `resolveStore` and hold the PRD file lock for the span of `withTransaction`. That makes the server a first-class PRD writer alongside `ndx work` and the MCP tools, and it is why those routes surface a lock-acquisition failure — which names the holder's PID — rather than retrying or writing anyway.
+**General rule for HTTP:** most routes treat disk files as read-only. The exception is the PRD: the routes that mutate `.rex/prd_tree/` (item CRUD, merge, prune, reorganize, restore, the Ask panel's `apply-refinements`, and `PUT /api/hench/prep/:taskId` — the Prepare task modal's Save) go through `rex-gateway`'s `resolveStore` and hold the PRD file lock for the span of `withTransaction`. That makes the server a first-class PRD writer alongside `ndx work` and the MCP tools, and it is why those routes surface a lock-acquisition failure — which names the holder's PID — rather than retrying or writing anyway.
 
 The folder tree watcher refreshes `.rex/.cache/prd.json` automatically for most PRD mutations; routes that write also call `refreshPRDCache` so their own change is visible to the next read without a restart. Any command that bulk-rewrites `.sourcevision/` (ci, refresh) should be followed by a server restart to flush stale caches.
 
@@ -123,8 +123,10 @@ The folder tree watcher refreshes `.rex/.cache/prd.json` automatically for most 
 Every PRD-writing route resolves its target from `ctx.rexDir` — through
 `resolveStore(ctx.rexDir)` in `routes-rex/items.ts`, `prune.ts`, `health.ts`,
 `refinements.ts` (which is where the Ask panel's accepted proposals land, via
-`POST /api/rex/apply-refinements`), `requirements.ts` and `routes-rex-analysis.ts`;
-and by path in `restore.ts`, which restores from that workspace's `.rex/.backups`.
+`POST /api/rex/apply-refinements`), `requirements.ts`, `routes-rex-analysis.ts`
+and `routes-hench-prep.ts` (`PUT /api/hench/prep/:taskId`, which saves a task's
+own run settings and is the one writer outside `routes-rex/`); and by path in
+`restore.ts`, which restores from that workspace's `.rex/.backups`.
 Since PR 12 that ctx is whichever workspace the request addressed —
 the `/w/<key>/` slot or `X-Ndx-Workspace` — so a write made while viewing a branch
 worktree rewrites **that worktree's** `.rex/prd_tree/` and leaves the anchor's
