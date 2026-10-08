@@ -50,3 +50,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Tell the agent and the in-hench reviewer to run scoped checks; the gate and CI run the rest](./tell-the-agent-and-the-in-hench.md) | completed |
 | [the affected gate passes a dist-reading drift test on a stale build, so a source-only change it selects still goes green](./the-affected-gate-passes-a-dist.md) | completed |
 | [The interactive test-gate prompt never appears: require() in an ESM module aborts it silently](./the-interactive-test-gate-prompt-never.md) | completed |
+| [Keep the build stamp out of the published npm packages](./keep-the-build-stamp-out-of-the.md) | pending |
