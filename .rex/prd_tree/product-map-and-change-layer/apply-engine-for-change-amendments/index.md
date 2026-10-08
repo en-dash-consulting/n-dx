@@ -38,3 +38,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Reverting a product edit to the met spec leaves its open draft proposing the abandoned edit](./reverting-a-product-edit-to-the-met.md) | completed |
 | [Stamp appliedAt, refuse stale amendments and check apply's own output](./stamp-appliedat-refuse-stale.md) | completed |
 | [Support the rex.applyOn setting: complete, review and release](./support-the-rex-applyon-setting.md) | completed |
+| [Find product-edit drafts anywhere in the change tree, and store applied amendment targets by node id](./find-product-edit-drafts-anywhere-in.md) | pending |
