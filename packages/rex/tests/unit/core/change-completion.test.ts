@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { addTask, ChangeCompletionError, completeChange, completeTask } from "../../../src/core/change-completion.js";
 import type { ApplyOn } from "../../../src/core/apply-policy.js";
-import { isOpenChange, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { isOpenChange, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import { ChangeIntentSchema, TaskIntentSchema } from "../../../src/schema/v2.js";
 
 const NOW = new Date("2026-10-08T12:00:00.000Z");
@@ -95,10 +95,11 @@ describe("completeChange", () => {
     expect(statement(result.tree)).toBe(NEW);
   });
 
-  it("applies the same product layer whether or not the change has acceptanceCriteria", () => {
+  it("applies the same product layer, spec hash included, whether or not the change has acceptanceCriteria", () => {
     const plain = completeChange(tree(change()), "ch", opts());
     const withDoneWhen = completeChange(tree(change({ acceptanceCriteria: ["Wallets pay"] })), "ch", opts());
     expect(withDoneWhen.apply?.applied).toBe(true);
+    expect(withDoneWhen.tree.product[0].children?.[0].metAt).toBe(specHash({ statement: NEW }));
     expect(withDoneWhen.tree.product).toEqual(plain.tree.product);
   });
 
