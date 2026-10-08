@@ -16,7 +16,7 @@
  * Needs `pnpm --filter @n-dx/sourcevision build` and `build-grammars.mjs`.
  */
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
@@ -43,8 +43,8 @@ function* walk(dir) {
   }
 }
 
-const firstLine = (text) => {
-  const line = text.split("\n", 1)[0].trim();
+const clip = (text) => {
+  const line = text.trim();
   return line.length > 100 ? `${line.slice(0, 100)}…` : line;
 };
 
@@ -95,12 +95,14 @@ try {
         stats.clean++;
         continue;
       }
+      // A MISSING node is zero-width, so its own text is empty: show the source line it sits on.
+      const lines = readFileSync(file, "utf8").split("\n");
       failing.push({
         file: relative(dir, file),
         constructs: result.captures.errors.map((c) => ({
-          kind: c.name === "missing" ? "MISSING" : "ERROR",
+          kind: c.name === "missing" ? `MISSING ${c.nodeType}` : "ERROR",
           line: c.start.line,
-          text: firstLine(c.text),
+          text: clip(lines[c.start.line - 1] ?? ""),
         })),
       });
     }
