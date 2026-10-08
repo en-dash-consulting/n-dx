@@ -12,9 +12,9 @@ tags:
 source: "ndx-adversarial-review"
 startedAt: "2026-10-08T07:43:20.197Z"
 completedAt: "2026-10-08T07:43:20.197Z"
+endedAt: "2026-10-08T07:43:20.197Z"
 resolutionType: "code-change"
 resolutionDetail: "Folded into ab5f9130 (run c5947006, commit f14eafb5d): pack-imports.test.ts covers an oversized-only Go package at the buildPackImportGraph level; that run's review confirmed the test fails if the wiring is reverted."
-endedAt: "2026-10-08T07:43:20.197Z"
 acceptanceCriteria:
   - "A test of buildPackImportGraph asserts that a pack file the runner did not parse (unreadable or oversized) reaches resolver.prepare as an unparsed path"
   - "That test fails when parsePackFiles stops collecting unparsed paths or buildPackImportGraph stops passing them"
