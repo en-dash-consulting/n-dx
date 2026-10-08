@@ -115,6 +115,7 @@ const REX_COMMANDS = [
   "migrate-folder-tree-filenames",
   "migrate-slugs",
   "merge-driver",
+  "merge-state",
   "backfill-commit-attribution",
   "mcp",
 ];

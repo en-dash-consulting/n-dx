@@ -26,6 +26,7 @@ export async function cmdAdd(
   dir: string,
   level: string | undefined,
   flags: Record<string, string>,
+  multiFlags: Record<string, string[]> = {},
 ): Promise<void> {
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before writing PRD
   const migrationResult = await ensureLegacyPrdMigrated(dir);
@@ -161,6 +162,10 @@ export async function cmdAdd(
 
   if (flags.description) item.description = flags.description;
   if (flags.priority) item.priority = flags.priority as Priority;
+  if (flags.source) item.source = flags.source;
+
+  const criteria = (multiFlags.criterion ?? []).map((c) => c.trim()).filter(Boolean);
+  if (criteria.length > 0) item.acceptanceCriteria = criteria;
 
   if (flags.blockedBy) {
     const deps = parseCsvList(flags.blockedBy);
@@ -220,7 +225,14 @@ export async function cmdAdd(
   if (flags.format === "json") {
     result(
       JSON.stringify(
-        { id, level: resolvedLevel, title, resetItems, ...(folderTreePath ? { folderTreePath } : {}) },
+        {
+          id,
+          level: resolvedLevel,
+          title,
+          resetItems,
+          ...(item.acceptanceCriteria ? { acceptanceCriteria: item.acceptanceCriteria } : {}),
+          ...(item.source ? { source: item.source } : {}),
+          ...(folderTreePath ? { folderTreePath } : {}) },
         null,
         2,
       ),

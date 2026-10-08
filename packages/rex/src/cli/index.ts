@@ -81,7 +81,7 @@ function readStdin(): Promise<string> {
 }
 
 /** Keys that accept multiple values (accumulated into arrays). */
-const MULTI_VALUE_KEYS = new Set(["file"]);
+const MULTI_VALUE_KEYS = new Set(["file", "criterion"]);
 /** Keys that expect a following value when provided as `--key value`. */
 const VALUE_KEYS = new Set([
   "model",
@@ -105,6 +105,7 @@ const VALUE_KEYS = new Set([
   "accept-llm",
   "detail",
   "run",
+  "source",
   ...MULTI_VALUE_KEYS,
 ]);
 
@@ -205,8 +206,17 @@ async function dispatchAdd(
         ? resolve(positional[positional.length - 1])
         : process.cwd();
     const { cmdAdd } = await import("./commands/add.js");
-    await cmdAdd(dir, level, flags);
+    await cmdAdd(dir, level, flags, multiFlags);
     return;
+  }
+
+  // Smart and file mode take neither flag. Reject before reading stdin so the
+  // misuse is an error rather than a wait on a description that never comes.
+  if (multiFlags.criterion?.length || flags.criterion !== undefined || flags.source !== undefined) {
+    throw new CLIError(
+      "--criterion and --source need manual mode (--title).",
+      'Usage: rex add <level> --title="..." --criterion="..." --source=<name>',
+    );
   }
 
   // Smart mode is the only consumer of piped input.
@@ -348,9 +358,9 @@ async function dispatchCommand(
   const SKIP_DIR_CHECK = new Set([
     "init", "analyze", "import", "update", "move", "add", "reshape", "remove",
     "log", "parse-md",
-    // Invoked by git with three temp-file paths (%O %A %B) from any cwd —
+    // Invoked by git with temp-file paths (%O %A %B) from any cwd —
     // there is no project dir to check.
-    "merge-driver",
+    "merge-driver", "merge-state",
   ]);
   if (!SKIP_DIR_CHECK.has(command)) {
     requireRexDir(resolveDir(positional));
@@ -393,7 +403,7 @@ async function dispatchCommand(
       const dir =
         positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
       const { cmdUpdate } = await import("./commands/update.js");
-      await cmdUpdate(dir, id, flags);
+      await cmdUpdate(dir, id, flags, multiFlags);
       break;
     }
     case "move": {
@@ -558,6 +568,11 @@ async function dispatchCommand(
       await cmdMergeDriver(positional);
       break;
     }
+    case "merge-state": {
+      const { cmdMergeState } = await import("./commands/merge-state.js");
+      await cmdMergeState(positional);
+      break;
+    }
     case "parse-md": {
       const { cmdParseMd } = await import("./commands/parse-md.js");
       const stdinInput = flags.stdin === "true" ? await readStdin() : "";
@@ -592,7 +607,7 @@ async function dispatchCommand(
         "prune", "restore", "validate", "fix", "usage", "report", "verify", "ready", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "codeowners",
         "reorganize", "health", "mcp",
-        "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "parse-md",
+        "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
         "backfill-commit-attribution",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");
