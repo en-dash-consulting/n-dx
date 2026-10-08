@@ -59,6 +59,11 @@ export const GRAMMARS = {
     version: "0.23.5",
     sha256: "cb199e0faae4b2c08425f88cbb51c1a9319612e7b96315a174a624db9bf3d9f0",
   },
+  "tree-sitter-go": {
+    repo: "tree-sitter/tree-sitter-go",
+    version: "0.25.0",
+    sha256: "2dc241b97872c53195e01b86542b411a3c1a6201d9c946c78d5c60c063bba1ef",
+  },
 };
 
 /** Absolute path of a built grammar, whether or not it exists yet. */
