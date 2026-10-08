@@ -39,7 +39,8 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Keep retired nodes visible to status, kind and edges](./keep-retired-nodes-visible-to-status.md) | completed |
 | [Match the computed edges to the design: touches, cancelled changes and inherited bindings](./match-the-computed-edges-to-the-design.md) | completed |
 | [Re-point recorded commit SHAs that a rebase or squash rewrote](./re-point-recorded-commit-shas-that-a.md) | completed |
-| [Register change-landing with the v2 isolation test, report open changes as not landed, and load landing inputs once](./register-change-landing-with-the-v2.md) | pending |
+| [Register change-landing with the v2 isolation test, report open changes as not landed, and load landing inputs once](./register-change-landing-with-the-v2.md) | completed |
+| [The exported computeLanding still reports an open change as landed, because it takes ids rather than the change](./the-exported-computelanding-still.md) | pending |
 | [Warn when a capability's criteria grow past a threshold](./warn-when-a-capability-s-criteria-grow.md) | completed |
 | [Work out a change's commits from its N-DX-Item trailers instead of storing them](./work-out-a-change-s-commits-from-its-n.md) | completed |
 | [Work out when a change landed from git history](./work-out-when-a-change-landed-from-git.md) | pending |
