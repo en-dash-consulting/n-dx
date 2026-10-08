@@ -3,6 +3,18 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runResult, createTmpDir, removeTmpDir, setupRexDir } from "./e2e-helpers.js";
 
+/**
+ * Entry for item `slug` (`<slug>.md` for a leaf, `<slug>/index.md` otherwise).
+ * readdir joins with the platform separator, so match on `/`-normalised paths.
+ */
+function findItemEntry(entries, slug) {
+  const re = new RegExp(`(^|/)${slug}(\\.md|/index\\.md)$`);
+  return entries.find((p) => re.test(p.replaceAll("\\", "/")));
+}
+
+/** CRLF to LF, so line-anchored assertions hold on Windows checkouts. */
+const lf = (text) => text.replaceAll("\r\n", "\n");
+
 describe("ndx update --criterion / --source", { timeout: 60_000 }, () => {
   let tmpDir;
 
@@ -19,10 +31,19 @@ describe("ndx update --criterion / --source", { timeout: 60_000 }, () => {
   async function readItem(slug) {
     const treeDir = join(tmpDir, ".rex", "prd_tree");
     const entries = await readdir(treeDir, { recursive: true });
-    const match = entries.find((p) => new RegExp(`(^|/)${slug}(\\.md|/index\\.md)$`).test(p));
+    const match = findItemEntry(entries, slug);
     expect(match, `no file for ${slug} among: ${entries.join(", ")}`).toBeDefined();
-    return readFile(join(treeDir, match), "utf-8");
+    return lf(await readFile(join(treeDir, match), "utf-8"));
   }
+
+  it("matches item entries written with either path separator", () => {
+    const slug = "another-task";
+    expect(findItemEntry(["test-epic", `test-epic\\${slug}.md`], slug)).toBe(`test-epic\\${slug}.md`);
+    expect(findItemEntry([`test-epic/${slug}/index.md`], slug)).toBe(`test-epic/${slug}/index.md`);
+    expect(findItemEntry([`test-epic\\${slug}\\index.md`], slug)).toBe(`test-epic\\${slug}\\index.md`);
+    expect(findItemEntry(["test-epic", "test-epic\\other.md"], slug)).toBeUndefined();
+    expect(lf("a\r\nb")).toBe("a\nb");
+  });
 
   it("replaces then clears acceptance criteria, reading the item back each time", async () => {
     const first = runResult(

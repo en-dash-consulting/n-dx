@@ -3,8 +3,29 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runResult, createTmpDir, removeTmpDir, setupRexDir } from "./e2e-helpers.js";
 
+/**
+ * Entry for item `slug` (`<slug>.md` for a leaf, `<slug>/index.md` otherwise).
+ * readdir joins with the platform separator, so match on `/`-normalised paths.
+ */
+function findItemEntry(entries, slug) {
+  const re = new RegExp(`(^|/)${slug}(\\.md|/index\\.md)$`);
+  return entries.find((p) => re.test(p.replaceAll("\\", "/")));
+}
+
+/** CRLF to LF, so line-anchored assertions hold on Windows checkouts. */
+const lf = (text) => text.replaceAll("\r\n", "\n");
+
 describe("ndx add CLI delegation", { timeout: 30_000 }, () => {
   let tmpDir;
+
+  it("matches item entries written with either path separator", () => {
+    const slug = "criteria-item";
+    expect(findItemEntry(["test-epic", `test-epic\\${slug}.md`], slug)).toBe(`test-epic\\${slug}.md`);
+    expect(findItemEntry([`test-epic/${slug}/index.md`], slug)).toBe(`test-epic/${slug}/index.md`);
+    expect(findItemEntry([`test-epic\\${slug}\\index.md`], slug)).toBe(`test-epic\\${slug}\\index.md`);
+    expect(findItemEntry(["test-epic", "test-epic\\other.md"], slug)).toBeUndefined();
+    expect(lf("a\r\nb")).toBe("a\nb");
+  });
 
   beforeEach(async () => {
     tmpDir = await createTmpDir("ndx-add-e2e-");
@@ -62,12 +83,9 @@ describe("ndx add CLI delegation", { timeout: 30_000 }, () => {
 
     const treeDir = join(tmpDir, ".rex", "prd_tree");
     const entries = await readdir(treeDir, { recursive: true });
-    let md;
-    // A leaf item is stored as `<slug>.md` (or `<slug>/index.md` once it has children).
-    for (const e of entries.filter((p) => /(^|\/)criteria-item(\.md|\/index\.md)$/.test(p))) {
-      md = await readFile(join(treeDir, e), "utf-8");
-    }
-    expect(md, `no file for the item among: ${entries.join(", ")}`).toBeDefined();
+    const entry = findItemEntry(entries, "criteria-item");
+    expect(entry, `no file for the item among: ${entries.join(", ")}`).toBeDefined();
+    const md = lf(await readFile(join(treeDir, entry), "utf-8"));
     expect(md).toMatch(/^source: "?ndx-capture"?$/m);
     expect(md).toMatch(/^acceptanceCriteria:\n\s+- "?Alpha"?\n\s+- "?Beta"?\n(?!\s+- )/m);
   });
