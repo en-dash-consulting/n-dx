@@ -18,7 +18,7 @@ acceptanceCriteria:
   - "Corpus parity is recorded in the rex log, with every difference explained"
   - "Incremental analysis of a Go repo keeps no stale edges, with a test"
   - "The six static root policy tests pass"
-description: "Route .go files through the pack in the imports phase instead of processGoFiles, keeping processGoFiles as the fallback when the Go grammar is not built (Go must never degrade to inventory-only). Run the Go corpus parity report: edges and externals must match the regex output or differ only in listed, explained improvements. Keep incremental analysis correct (the same changedFiles handling as Java)."
-lastModified: "2026-10-08T03:09:02.507Z"
+description: "Route .go files through the pack in the imports phase instead of processGoFiles, keeping processGoFiles as the fallback when the Go grammar is not built (Go must never degrade to inventory-only). Run the Go corpus parity report: edges and externals must match the regex output or differ only in listed, explained improvements. Keep incremental analysis correct (the same changedFiles handling as Java).\n\nKnown parity difference (42d5dba1, gitea @89ec271d): modules/charset/generate/generate.go, where the regex parser counts two import \"unicode\" lines inside a code-generation template string. The pack is right; list it as an improvement, not a regression."
+lastModified: "2026-10-08T05:43:28.370Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
