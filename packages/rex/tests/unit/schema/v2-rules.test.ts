@@ -39,7 +39,7 @@ describe("rule table", () => {
   it("errors precede warnings and every rule has a severity", () => {
     const severities = V2_RULE_IDS.map((id) => RULE_SEVERITY[id]);
     expect(severities.indexOf("warning")).toBe(severities.lastIndexOf("error") + 1);
-    expect(V2_RULE_IDS).toHaveLength(20);
+    expect(V2_RULE_IDS).toHaveLength(22);
   });
 
   it("a healthy tree has no findings", () => {
@@ -126,6 +126,37 @@ describe("fix-not-spike", () => {
     const findings = check("fix-not-spike", { changes: [both] });
     expect(ids(findings)).toEqual([both.id]);
     expect(findings[0].severity).toBe("error");
+  });
+});
+
+describe("fix-not-additive", () => {
+  const added = { target: "n", delta: "added", summary: "s", under: "area" };
+  const removed = { target: "r", delta: "removed", summary: "s" };
+  const modified = { target: "m", delta: "modified", summary: "s" };
+
+  it("passes a fix that modifies or touches, and a non-fix that adds or removes", () => {
+    const changes = [
+      node("change", { fix: true, amends: [modified], touches: ["x"] }),
+      node("change", { fix: true }),
+      node("change", { amends: [added, removed] }),
+      node("change", { fix: false, amends: [added] }),
+    ];
+    expect(check("fix-not-additive", { changes })).toEqual([]);
+  });
+
+  it("fails a fix with an added or a removed amendment", () => {
+    const withAdd = node("change", { fix: true, amends: [modified, added] });
+    const withRemove = node("change", { fix: true, amends: [removed] });
+    const findings = check("fix-not-additive", { changes: [withAdd, withRemove] });
+    expect(ids(findings)).toEqual([withAdd.id, withRemove.id]);
+    expect(findings[0].severity).toBe("error");
+    expect(findings[0].message).toContain("is a fix but has added amendments;");
+    expect(findings[1].message).toContain("is a fix but has removed amendments;");
+  });
+
+  it("names both deltas in a fixed order", () => {
+    const both = node("change", { fix: true, amends: [removed, added] });
+    expect(check("fix-not-additive", { changes: [both] })[0].message).toContain("has added and removed amendments;");
   });
 });
 
@@ -700,6 +731,37 @@ describe("specHash", () => {
   });
 });
 
+describe("criteria-growth", () => {
+  const criteria = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `k${i}`, text: `Criterion ${i}` }));
+  const run = (product: RuleNode[], maxCriteria?: number) =>
+    checkV2Rules({ product, changes: [] }, { now: NOW, maxCriteria }, ["criteria-growth"]);
+
+  it("passes a capability at the default threshold of 15", () => {
+    expect(run([cap({ criteria: criteria(15) })])).toEqual([]);
+  });
+
+  it("warns past the threshold and names the capability", () => {
+    const findings = run([cap({ id: "big", title: "Big one", criteria: criteria(16) })]);
+    expect(ids(findings)).toEqual(["big"]);
+    expect(findings[0].message).toContain("Big one");
+    expect(findings[0].message).toContain("16 criteria");
+    expect(findings[0].severity).toBe("warning");
+  });
+
+  it("counts criteria inherited from parent capabilities", () => {
+    const child = cap({ id: "child", criteria: criteria(6) });
+    const parent = cap({ id: "parent", criteria: criteria(10) }, [child]);
+    const findings = run([parent]);
+    expect(ids(findings)).toEqual(["child"]);
+    expect(findings[0].message).toContain("6 own + 10 inherited");
+  });
+
+  it("honours a configured threshold", () => {
+    expect(ids(run([cap({ id: "a", criteria: criteria(4) })], 3))).toEqual(["a"]);
+    expect(run([cap({ criteria: criteria(4) })], 4)).toEqual([]);
+  });
+});
+
 describe("long-revised", () => {
   const met = { statement: "Old", criteria: [{ id: "c1", text: "It works" }] };
   const revised = (fields: Record<string, unknown> = {}) =>
@@ -726,6 +788,19 @@ describe("long-revised", () => {
     const findings = check("long-revised", { product: [revised()], changes: [applied, cancelled] });
     expect(ids(findings)).toEqual(["r"]);
     expect(findings[0].message).toContain("35 days");
+  });
+
+  it("still warns while only an untouched Inbox draft amends the node", () => {
+    const draft = node("change", { needsPlacement: true, amends: [{ target: "r", delta: "modified", summary: "s" }] });
+    expect(ids(check("long-revised", { product: [revised()], changes: [draft] }))).toEqual(["r"]);
+    const started = node("change", { needsPlacement: true, status: "in_progress", amends: [{ target: "r", delta: "modified", summary: "s" }] });
+    expect(check("long-revised", { product: [revised()], changes: [started] })).toEqual([]);
+  });
+
+  it("passes a sub-capability whose parent a building change amends", () => {
+    const parent = cap({ id: "p" }, [revised()]);
+    const amending = node("change", { amends: [{ target: "p", delta: "modified", summary: "s" }] });
+    expect(check("long-revised", { product: [parent], changes: [amending] })).toEqual([]);
   });
 
   it("measures age from revisedAt, not a later state write's lastModified", () => {
@@ -801,6 +876,17 @@ describe("run-settings", () => {
     const findings = checkV2Rules({ product: [node("area", {}, [capability, cap()]), node("area", {}, [cap(), cap()])], changes: [node("change", { touches: ["x"] }, [node("task", {}, [subtask])])] }, { now: NOW }, ["run-settings"]);
     expect(ids(findings)).toEqual([capability.id, subtask.id]);
     expect(findings[1].message).toContain("only changes and tasks");
+  });
+});
+
+describe("retired-state-field", () => {
+  it("warns on a node that still carries stored commits, naming why they are ignored", () => {
+    const stale = node("task", { commits: [{ hash: "a".repeat(40), author: "R", authorEmail: "r@x", timestamp: "t" }] });
+    const tree: V2Tree = { product: [node("area", { id: "a" }, [cap({ id: "x" }), cap(), cap()])], changes: [node("change", { touches: ["x"] }, [stale, node("task")])] };
+    const findings = checkV2Rules(tree, { now: NOW });
+    expect(findings.map((f) => [f.rule, f.severity, f.nodeId])).toEqual([["retired-state-field", "warning", stale.id]]);
+    expect(findings[0].message).toContain('"commits"');
+    expect(findings[0].message).toContain("N-DX-Item");
   });
 });
 
