@@ -16,4 +16,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add the v2 schema fields decided before the freeze](./add-the-v2-schema-fields-decided.md) | completed |
 | [An amendment's type is accepted on any delta and may be missing on an added one](./an-amendment-s-type-is-accepted-on-any.md) | completed |
-| [Fix the v2 rules for applied changes, Inbox changes, fixes and reference integrity](./fix-the-v2-rules-for-applied-changes.md) | in_progress |
+| [Fix the v2 rules for applied changes, Inbox changes, fixes and reference integrity](./fix-the-v2-rules-for-applied-changes.md) | completed |
+| [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | pending |

@@ -2,11 +2,15 @@
 id: "ba39230d-a055-444c-8772-fb8c6fae1318"
 level: "task"
 title: "Fix the v2 rules for applied changes, Inbox changes, fixes and reference integrity"
-status: "in_progress"
+status: "completed"
 priority: "critical"
 startedAt: "2026-10-08T00:27:25.578Z"
+completedAt: "2026-10-08T00:38:03.336Z"
+endedAt: "2026-10-08T00:38:03.336Z"
+resolutionType: "code-change"
+resolutionDetail: "v2-rules.ts: exported isAppliedChange/isOpenChange (applied = appliedAt only; completed-unapplied stays open), exported indexTree with includeTombstones (retired flag, ids before aliases, live before tombstones). New rules: change-placed-at-close, fix-not-spike, amendment-type, ref-unique, ref-resolves (errors), check-unique (error), check-requirement (warning). change-has-target skips needsPlacement; removed-target-live leaves missing targets to ref-resolves. Fixture tests in v2-rules.test.ts; patch changeset."
 acceptanceCriteria: []
 description: "Rule changes in packages/rex/src/schema/v2-rules.ts on top of the schema fields from task 616f908a (run after it). Decided 2026-10-07 (Ryan) from the pre-freeze review. Each rule gets fixture tests in tests/unit/schema/v2-rules.test.ts.\n\n1. Applied and open. A change is applied when appliedAt is set, and nothing else (a completed status does not make it applied). isOpenChange: a change that is not applied and is not cancelled or deleted. A completed but unapplied change (rex.applyOn review or release) is still open, so its targets keep reading changing. Export the predicates so PRs 10, 11 and 12 share one definition.\n2. Inbox changes. change-has-target does not fire for a change with needsPlacement: true. needsPlacement means a person must confirm the change's targets. New error rule: a completed change cannot carry needsPlacement, and must amend or touch something unless it is a spike (placement is required before close).\n3. fix and spike are mutually exclusive (error).\n4. Check results: at most one CheckResult per requirementId on a node (error); a check whose requirementId is not one of the node's current requirements is reported (warning).\n5. Reference integrity: ids, display ids and aliases are unique across both layers (error, naming both nodes); indexTree resolves real ids and display ids before aliases, so an alias can never shadow a real id; dangling references are errors for touches, amends targets (modified, removed), an added amendment's under, appliesTo, dependsOn and blockedBy.\n6. Tombstones: indexTree takes an option { includeTombstones } that also indexes deleted (retired) nodes and marks them, so status, kind and edges in PR 11 can see a node an applied removed amendment retired. The default stays as today (rules ignore deleted nodes).\n7. Amendment type (capture 4fc2d793-dbd7-4544-acf7-44131221b26c, from the review of 616f908a): type is valid only on an added amendment (error on modified or removed); an added amendment without type creates a capability, which is the default and is not reported.\n\nKeep checkV2Rules a pure function over the tree. Do not change specHash. Do not edit core/, store/ or web. Patch changeset for @n-dx/rex."
-lastModified: "2026-10-08T00:27:26.270Z"
+lastModified: "2026-10-08T00:38:03.615Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
