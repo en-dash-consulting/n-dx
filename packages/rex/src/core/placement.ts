@@ -13,7 +13,7 @@
  * @module core/placement
  */
 
-import { ADDED_NODE_TYPES, type AddedNodeType, type Amendment } from "../schema/v2.js";
+import { ADDED_NODE_TYPES, AmendmentSchema, type AddedNodeType, type Amendment } from "../schema/v2.js";
 import { extractKeywords } from "./keywords.js";
 
 /** A product-layer node (capability or constraint) as the ranker sees it. */
@@ -219,19 +219,23 @@ export function rankPlacementCandidates(
     .slice(0, size);
 }
 
-/** Null when `value` is not a well-formed added amendment with a type, an area and a title. */
-function asProposal(value: unknown): PlacementProposal | null {
-  if (!value || typeof value !== "object") return null;
-  const p = value as Record<string, unknown>;
+/**
+ * The proposal when `value` is a valid amendment (shared schema) that is also an
+ * added one with a type, an area and a title; otherwise why it was refused.
+ */
+function asProposal(value: unknown): { proposal: PlacementProposal } | { reason: string } {
+  const parsed = AmendmentSchema.safeParse(value);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return { reason: `is not a valid amendment (${issue.path.join(".") || "value"}: ${issue.message})` };
+  }
+  const p = parsed.data;
   const nonEmpty = (v: unknown) => typeof v === "string" && v.trim() !== "";
   const ok =
-    p.delta === "added" &&
-    ADDED_NODE_TYPES.has(p.type as AddedNodeType) &&
-    nonEmpty(p.target) &&
-    nonEmpty(p.under) &&
-    nonEmpty(p.title) &&
-    typeof p.summary === "string";
-  return ok ? (p as PlacementProposal) : null;
+    p.delta === "added" && ADDED_NODE_TYPES.has(p.type as AddedNodeType) && nonEmpty(p.under) && nonEmpty(p.title);
+  return ok
+    ? { proposal: p as PlacementProposal }
+    : { reason: "is not an added amendment with type, under and title" };
 }
 
 /**
@@ -252,12 +256,14 @@ export async function placeChange(
   const areas = options.areas ?? [];
   const answer = await options.model({ change, shortlist, nodes, areas });
   if (answer !== null && typeof answer === "object") {
-    let proposal = asProposal(answer.propose);
-    if (!proposal) {
-      warnings.push("text model proposed a new node that is not an added amendment with type, under and title; ignoring it");
-    } else if (!areas.some((a) => a.id === proposal!.under)) {
-      warnings.push(`text model proposed a new node under "${proposal.under}", which is not a known area; ignoring it`);
-      proposal = null;
+    const checked = asProposal(answer.propose);
+    let proposal: PlacementProposal | null = null;
+    if ("reason" in checked) {
+      warnings.push(`text model proposed a new node that ${checked.reason}; ignoring it`);
+    } else if (!areas.some((a) => a.id === checked.proposal.under)) {
+      warnings.push(`text model proposed a new node under "${checked.proposal.under}", which is not a known area; ignoring it`);
+    } else {
+      proposal = checked.proposal;
     }
     return { shortlist, model: { pick: null, agrees: false, ...(proposal ? { proposal } : {}) }, warnings };
   }
