@@ -79,6 +79,18 @@ const TITLE_ID = "prepare-task-title";
 
 type Reply = { ok: boolean; status: number; data: Record<string, unknown> };
 
+/** A `run` block as a PUT carries it; `null` clears the task's settings. */
+type RunBlock = Record<string, unknown> | null;
+
+interface SaveConflict {
+  /** The block the server holds now. */
+  saved: RunBlock;
+  /** The version the refusal named; resending with it is the overwrite. */
+  version: string;
+  /** The write that was refused, to resend as it was. */
+  attempted: RunBlock;
+}
+
 const PERMISSION_MODES = RUN_OPTION_SPECS.find((s) => s.key === "permissionMode")?.values ?? [];
 
 /**
@@ -101,8 +113,13 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
   const [canMigrate, setCanMigrate] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  /** Set when a save lost a race: the block and version the server holds now. */
-  const [conflict, setConflict] = useState<{ saved: Record<string, unknown> | null; version: string } | null>(null);
+  /**
+   * Set when a save lost a race: the block and version the server holds now,
+   * and what this modal tried to write — `null` for a clear — so Overwrite
+   * resends that same write rather than one rebuilt from the form, which
+   * after a refused clear would put the old settings back instead.
+   */
+  const [conflict, setConflict] = useState<SaveConflict | null>(null);
   /** The inline confirm before clearing a task's saved settings. */
   const [confirmClear, setConfirmClear] = useState(false);
   const [queued, setQueued] = useState<QueuedReply | null>(null);
@@ -167,6 +184,14 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
 
   const defaults = useMemo(() => (prep ? defaultsOf(prep) : null), [prep]);
 
+  // An edit made after a refusal is a new intent. The conflict panel goes with
+  // it, since Overwrite resends the refused write as it was, and would drop
+  // what was typed since; saving again puts the new write up for the same check.
+  const edit = useCallback((next: PrepEdits) => {
+    setEdits(next);
+    setConflict(null);
+  }, []);
+
   /**
    * Write the task's run settings.
    *
@@ -175,7 +200,7 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
    * a 409 brings back the current block, which is what the conflict panel
    * offers to reload or overwrite.
    */
-  const saveSettings = useCallback(async (block: Record<string, unknown> | null, version: string) => {
+  const saveSettings = useCallback(async (block: RunBlock, version: string) => {
     setBusy(true);
     setSaveError(null);
     setConflict(null);
@@ -188,8 +213,9 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
       );
       if (reply.status === 409 && reply.data.conflict === true) {
         setConflict({
-          saved: (reply.data.saved ?? null) as Record<string, unknown> | null,
+          saved: (reply.data.saved ?? null) as RunBlock,
           version: String(reply.data.version ?? "none"),
+          attempted: block,
         });
         return false;
       }
@@ -240,11 +266,15 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
     void load();
   }, [load]);
 
-  /** Save again against the version the refusal named — which is the overwrite. */
+  /**
+   * Resend the refused write against the version the refusal named — which
+   * is the overwrite. The same write, a clear included: what the reader
+   * confirmed is what lands.
+   */
   const overwriteConflict = useCallback(() => {
-    if (!prep || !defaults || !conflict) return;
-    void saveSettings(saveBodyOf(prep, defaults, edits), conflict.version);
-  }, [prep, defaults, edits, conflict, saveSettings]);
+    if (!conflict) return;
+    void saveSettings(conflict.attempted, conflict.version);
+  }, [conflict, saveSettings]);
 
   const execute = useCallback(async () => {
     if (!defaults) return;
@@ -359,7 +389,7 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
     body = h(PreviewPanel, { preview, onBack: closePreview });
   } else {
     body = h(Form, {
-      prep, defaults, edits, setEdits, taskId, busy, execError, canMigrate, notice, queued, queueDropped, onQueueDropped,
+      prep, defaults, edits, setEdits: edit, taskId, busy, execError, canMigrate, notice, queued, queueDropped, onQueueDropped,
       saveError, conflict, confirmClear, setConfirmClear,
       onSave: save, onClearSaved: clearSaved,
       onReloadConflict: reloadFromConflict, onOverwriteConflict: overwriteConflict,
@@ -420,7 +450,7 @@ interface FormProps {
   queueDropped: boolean;
   onQueueDropped: () => void;
   saveError: string | null;
-  conflict: { saved: Record<string, unknown> | null; version: string } | null;
+  conflict: SaveConflict | null;
   confirmClear: boolean;
   setConfirmClear: (on: boolean) => void;
   onSave: () => void;
@@ -739,8 +769,9 @@ function ReadOnlyField({ id, label, source, children }: { id: string; label: str
 function Field({ id, label, source, saved, fallback, changed, onReset, note, children }: FieldProps) {
   // A saved field names the task rather than a config key: "from task.run.models"
   // would be true but says nothing a reader can act on, where "saved on task"
-  // plus the project default it displaced is the whole decision.
-  const sourceText = source === null ? null : saved ? "saved on task" : `from ${source}`;
+  // plus the project default it displaced is the whole decision. Notes have no
+  // config source at all, and still say so when the task carries them.
+  const sourceText = saved ? "saved on task" : source === null ? null : `from ${source}`;
   return h("div", { class: `prep-field${changed ? " prep-field--changed" : ""}${saved ? " prep-field--saved" : ""}` },
     h("label", { for: id, class: "prep-label" },
       changed ? h("span", { class: "prep-dot", "aria-hidden": "true" }, "●") : null,

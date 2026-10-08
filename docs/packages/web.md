@@ -72,10 +72,17 @@ A change can be for this run or for the task, and the two are separate buttons:
 **What Save writes.** The fields that differ from the project default. A field
 equal to the default is omitted rather than frozen, so a later change to
 `llm.*` or `hench.*` still reaches the task. Launch-time options (`fresh`,
-`allowDirty`) are never saved — they describe how one run starts. An exact
-model is written per vendor (`models: {"claude": "…"}`), because a saved block
-is vendor-agnostic and may later be run under another vendor; a pin for a
-vendor this project is not on today is carried through untouched.
+`allowDirty`) are never saved — they describe how one run starts. The two
+model fields are the exception to "rebuild from what is shown": a saved block
+is vendor-agnostic and may later be run under another vendor, so an untouched
+model keeps its saved `tier` and per-vendor `models` exactly as they were (the
+same for `reviewTier` / `reviewModels`), and only a model the reader chose is
+written as a pin for today's vendor (`models: {"claude": "…"}`), replacing the
+tier for that field; pins for other vendors are carried through untouched.
+Notes for the agent have no project default: the field starts on the task's
+saved notes, they are kept through any save, and emptying the field is what
+drops them. A chosen reviewer is saved whenever a review would run, whether
+the task or the config turns review on.
 
 **Sources.** A field the task supplies reads "saved on task", with the project
 default beside it ("project default: claude-sonnet from llm.claude.model"), so
@@ -88,8 +95,8 @@ task?"), because another session may be relying on it.
 **Conflicts.** Each save carries the version the modal loaded. A save made
 against a read someone else has overtaken is refused, and the modal shows
 "These settings were saved elsewhere since you opened this." with **Reload**
-(take the server's values, drop the edits) and **Overwrite** (resend against
-the version the refusal named).
+(take the server's values, drop the edits) and **Overwrite** (resend the same
+write — a clear included — against the version the refusal named).
 
 **Off the anchor** the footer says "Saved on branch `<name>`; lands when the
 branch merges" — saving from a branch worktree is allowed, and writes that
