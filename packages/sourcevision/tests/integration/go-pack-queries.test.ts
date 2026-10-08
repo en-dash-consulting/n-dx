@@ -3,7 +3,7 @@
  * is pinned independently of the regenerable goldens.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
@@ -11,6 +11,7 @@ import { goPack } from "../../src/language/go-pack.js";
 import { goResolver } from "../../src/language/go-resolver.js";
 import { createTreeSitterRunner, type Capture, type ParsedFile } from "../../src/language/runner.js";
 import { skipUnlessGrammar } from "../helpers/grammar.js";
+import { fixtureDirFor, goldenPathFor, type PackGolden } from "../helpers/pack-golden.js";
 
 const GO_WASM = grammarWasmPath("tree-sitter-go");
 const target = { pack: goPack, grammarPath: GO_WASM };
@@ -138,6 +139,55 @@ describe("go pack", () => {
       .filter((c) => c.start.column <= z.start.column && c.end.column >= z.end.column)
       .sort((p, q) => q.start.column - p.start.column)[0]!;
     expect(owner.text).toBe('("z")');
+  });
+
+  it("gives calls whose function is not a name an argument list of their own", async (ctx) => {
+    const { captures } = await parse(
+      ctx,
+      'package p\nfunc m() {\n\tlog(f()("z"))\n\tlog(h[k]("a"))\n\tlog((fn)("b"))\n\tlog(pkg.F[int]("c"))\n\tlog(func(s string) {}("d"))\n}\n',
+    );
+    const calls = captures.calls!;
+    const owner =(arg: string): string => {
+      const s = calls.find((c) => c.name === "call.string_argument" && c.text === arg)!;
+      const contains = (c: Capture): boolean =>
+        c.name === "call.arguments" &&
+        c.start.line === s.start.line &&
+        c.start.column <= s.start.column &&
+        c.end.column >= s.end.column;
+      return calls.filter(contains).sort((p, q) => q.start.column - p.start.column)[0]!.text;
+    };
+    expect(owner('"z"')).toBe('("z")');
+    // tree-sitter-go parses `h[k]("a")` and `pkg.F[int]("c")` as type
+    // conversions, not calls: no argument_list, so no string is captured and
+    // none can be handed to log.
+    expect(texts(calls, "call.string_argument")).not.toContain('"a"');
+    expect(texts(calls, "call.string_argument")).not.toContain('"c"');
+    expect(owner('"b"')).toBe('("b")');
+    expect(owner('"d"')).toBe('("d")');
+  });
+
+  it("golden: every string argument sits in the argument list of its own call", () => {
+    const golden = JSON.parse(readFileSync(goldenPathFor(fixtureDirFor(goPack)), "utf8")) as PackGolden;
+    type Pos = { line: number; column: number };
+    const before = (a: Pos, b: Pos): boolean => a.line < b.line || (a.line === b.line && a.column <= b.column);
+    let checked = 0;
+    for (const file of golden.files) {
+      const calls = (file.captures as Record<string, Capture[]> | undefined)?.calls ?? [];
+      const lists = calls.filter((c) => c.name === "call.arguments");
+      const invocations = calls.filter((c) => c.name === "call.invocation");
+      for (const s of calls.filter((c) => c.name === "call.string_argument")) {
+        const owner = lists
+          .filter((l) => before(l.start, s.start) && before(s.end, l.end))
+          .sort((p, q) => (before(p.start, q.start) ? 1 : -1))[0];
+        expect(owner, `${file.path}:${s.start.line} ${s.text}`).toBeDefined();
+        const call = invocations.find(
+          (i) => i.end.line === owner!.end.line && i.end.column === owner!.end.column && before(i.start, owner!.start),
+        );
+        expect(call, `${file.path}:${s.start.line} ${s.text} has no call of its own`).toBeDefined();
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
   });
 
   it("captures struct field tags as written, per name, skipping untagged fields", async (ctx) => {
