@@ -38,7 +38,8 @@ const FLYWAY_CONFIG = new Set(["flyway.conf", "flyway.toml"]);
 const LIQUIBASE_CONFIG = new Set(["liquibase.properties"]);
 const LIQUIBASE_CHANGELOG_EXT = /\.(xml|ya?ml|json)$/;
 const LIQUIBASE_CHANGELOG_FILE = /^(db\.)?changelog[\w.-]*\.(xml|ya?ml|json)$/;
-const LIQUIBASE_DIRECTORY = /(^|\/)db\/changelog\//;
+/** `db/changelog/` (Spring Boot default) or any `liquibase/` directory (JHipster's `config/liquibase/`). */
+const LIQUIBASE_DIRECTORY = /(^|\/)(db\/changelog|liquibase)\//;
 /** XML changelogs open with `<databaseChangeLog`; YAML and JSON ones use the key. */
 const LIQUIBASE_CHANGELOG_BODY = /\bdatabaseChangeLog\b/;
 const LIQUIBASE_SQL_MARKER = /^--\s*liquibase formatted sql/im;
@@ -146,6 +147,15 @@ export function detectMigrationTools(files: readonly string[], read: ReadProject
   for (const path of sorted) {
     for (const [tool, match] of Object.entries(classify(path, read)) as [MigrationTool, Match][]) {
       note(tool, path, match);
+    }
+  }
+
+  // Atlas keeps its migrations beside `atlas.sum`, the directory's checksum file.
+  const atlas = byTool.get("atlas");
+  if (atlas) {
+    const migrationDirs = [...atlas.files].filter((path) => basename(path) === "atlas.sum").map(dirname);
+    for (const path of sorted) {
+      if (isSql(path) && migrationDirs.includes(dirname(path))) note("atlas", path, { sql: true });
     }
   }
 
