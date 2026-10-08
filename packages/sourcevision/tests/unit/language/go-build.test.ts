@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,6 +70,24 @@ describe("go.mod build model", () => {
     const [unreadable, missing] = await readGoBuildModels(dir, ["svc", "missing"]);
     expect(unreadable.notices[0]).toMatch(/^svc\/go\.mod is unreadable/);
     expect(missing.notices).toEqual(["missing/go.mod not found"]);
+  });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)("skips a directory it cannot list and reports it as a notice", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "go-build-"));
+    cleanups.push(dir);
+    await writeFile(join(dir, "go.mod"), "module example.com/app\n");
+    await writeFile(join(dir, "go.work"), "go 1.21\n");
+    await mkdir(join(dir, "locked"));
+    await chmod(join(dir, "locked"), 0o000);
+    try {
+      const models = await readGoBuildModels(dir);
+      expect(models.map((m) => m.module)).toEqual(["example.com/app"]);
+      expect(models[0].notices).toEqual(["locked is unreadable (EACCES); skipped"]);
+      const [work] = await readGoWorkFiles(dir);
+      expect(work.notices).toEqual(["locked is unreadable (EACCES); skipped"]);
+    } finally {
+      await chmod(join(dir, "locked"), 0o755);
+    }
   });
 
   it("reads every module of a workspace", async () => {
