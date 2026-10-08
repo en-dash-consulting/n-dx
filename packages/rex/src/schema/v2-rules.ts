@@ -309,10 +309,10 @@ const fixNotSpike: Rule = ({ entries }) =>
 const fixNotAdditive: Rule = ({ entries }) =>
   entries.flatMap(({ node }) => {
     if (node.type !== "change" || !node.fix) return [];
-    const deltas = [...new Set((node.amends ?? []).map((a) => a.delta).filter((d) => d === "added" || d === "removed"))];
+    const deltas = (["added", "removed"] as const).filter((d) => (node.amends ?? []).some((a) => a.delta === d));
     return deltas.length === 0
       ? []
-      : [finding("fix-not-additive", node, `Change "${node.title}" is a fix but carries an ${deltas.join(" and a ")} amendment; a fix repairs existing nodes, so drop fix: true or the amendment`)];
+      : [finding("fix-not-additive", node, `Change "${node.title}" is a fix but has ${deltas.join(" and ")} amendments; a fix repairs existing nodes, so drop fix: true or those amendments`)];
   });
 
 /** `type` names what an `added` amendment creates (a capability when absent, unreported); it means nothing on another delta. */

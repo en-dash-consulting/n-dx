@@ -150,8 +150,13 @@ describe("fix-not-additive", () => {
     const findings = check("fix-not-additive", { changes: [withAdd, withRemove] });
     expect(ids(findings)).toEqual([withAdd.id, withRemove.id]);
     expect(findings[0].severity).toBe("error");
-    expect(findings[0].message).toContain("added");
-    expect(findings[1].message).toContain("removed");
+    expect(findings[0].message).toContain("is a fix but has added amendments;");
+    expect(findings[1].message).toContain("is a fix but has removed amendments;");
+  });
+
+  it("names both deltas in a fixed order", () => {
+    const both = node("change", { fix: true, amends: [removed, added] });
+    expect(check("fix-not-additive", { changes: [both] })[0].message).toContain("has added and removed amendments;");
   });
 });
 
