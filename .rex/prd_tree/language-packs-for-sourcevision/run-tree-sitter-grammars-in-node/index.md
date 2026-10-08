@@ -24,5 +24,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Build the Java grammar to WASM from a pinned release](./build-the-java-grammar-to-wasm-from-a.md) | pending |
+| [Build the Java grammar to WASM from a pinned release](./build-the-java-grammar-to-wasm-from-a.md) | in_progress |
 | [Measure Java parse throughput on large repositories](./measure-java-parse-throughput-on-large.md) | pending |
