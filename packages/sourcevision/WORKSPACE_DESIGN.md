@@ -71,7 +71,7 @@ This follows the existing pattern where sourcevision reads overrides from
   "sourcevision": {
     "workspace": {
       "members": [
-        { "path": "packages/api", "name": "api" },
+        { "path": "packages/api", "name": "api", "baseUrl": "https://api.internal:8443" },
         { "path": "packages/web", "name": "web" },
         { "path": "../external-lib", "name": "external-lib" }
       ]
@@ -89,6 +89,8 @@ export interface WorkspaceMember {
   path: string;
   /** Human-readable name (used as zone prefix). Defaults to directory basename. */
   name?: string;
+  /** Base URL this member serves on, as other members reach it. Optional. */
+  baseUrl?: string;
 }
 
 export interface WorkspaceConfig {
@@ -106,6 +108,26 @@ export interface WorkspaceConfig {
 - Each member must have a `.sourcevision/manifest.json` — the workspace command
   does not run analysis on members; they must be pre-analyzed.
 - Empty `members` array is valid (workspace with no repos yet).
+- `baseUrl` is optional and declared, never detected: nothing in a repository
+  states the address it is deployed at. Without it a member can still be reached
+  by an http crossing — through a host that names it and a route it serves — but
+  a call that reaches it through an environment variable cannot be resolved, and
+  is reported as withheld rather than guessed at.
+
+### Crossing sources
+
+Cross-repo crossings carry `source` and `evidence`; intra-repo crossings carry
+neither.
+
+| `source` | Derived from | `certain` | `likely` |
+|----------|--------------|-----------|----------|
+| `npm` | An external import naming a sibling's package | always | — |
+| `http` | `outbound.json` http/grpc calls vs. `baseUrl` and `components.json` server routes | declared host, and a served route or no path | declared host alone, or a host naming the member that serves the route, or an env name matching a declared `baseUrl` |
+| `infra` | `infrastructure.json` on both sides | same resource id | same name for a queue, topic, bucket or stream |
+
+Only `certain` and `likely` are drawn. An `inferred` candidate is withheld and
+printed with its reason — it rests on two names resembling each other and
+nothing else, and a name collision between repositories is ordinary.
 
 ### Auto-detection fallback
 

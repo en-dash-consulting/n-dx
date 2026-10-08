@@ -54,7 +54,9 @@ export {
   resolveMembers,
   writeWorkspaceOutput,
   getWorkspaceStatus,
+  getWorkspaceEdgeCounts,
 } from "../analyzers/workspace-aggregate.js";
+export type { WithheldCrossing } from "../analyzers/workspace-crossings.js";
 export { createSnapshot, computeDeltas, loadLatestReport, saveReport, formatDeltaReport } from "../analyzers/convergence.js";
 export type { ConvergenceReport } from "../analyzers/convergence.js";
 export { generateLlmsTxt } from "../analyzers/llms-txt.js";

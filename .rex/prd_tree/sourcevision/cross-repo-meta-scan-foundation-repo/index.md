@@ -32,7 +32,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Detect outbound dependencies for JS/TS and Go into outbound.json](./detect-outbound-dependencies-for-js-ts/index.md) | completed |
-| [Add http and infra edge sources to workspace crossings](./add-http-and-infra-edge-sources-to.md) | pending |
+| [Add http and infra edge sources to workspace crossings](./add-http-and-infra-edge-sources-to.md) | completed |
 | [Add repo identity to the analysis manifest](./add-repo-identity-to-the-analysis.md) | completed |
 | [Expose repo identity and scan counts through the child API and hub cards](./expose-repo-identity-and-scan-counts.md) | pending |
 | [Persist IaC discovery as infrastructure.json and have the iso export read it](./persist-iac-discovery-as.md) | completed |
