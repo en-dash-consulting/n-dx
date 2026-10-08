@@ -35,4 +35,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Measure Java resolver accuracy against scip-java](./measure-java-resolver-accuracy-against.md) | pending |
 | [Published sourcevision has no grammars, so every language pack degrades to inventory-only and the notice points at an unshipped script](./published-sourcevision-has-no-grammars.md) | pending |
 | [Resolve Java imports and same-package references](./resolve-java-imports-and-same-package.md) | completed |
-| [Resolve pack file paths without the global URL so jsdom tests can load sourcevision](./resolve-pack-file-paths-without-the.md) | pending |
+| [Resolve pack file paths without the global URL so jsdom tests can load sourcevision](./resolve-pack-file-paths-without-the.md) | completed |
