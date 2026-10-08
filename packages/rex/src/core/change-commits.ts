@@ -44,7 +44,7 @@ export const DEFAULT_MAIN_REFS = ["origin/HEAD", "origin/main", "main"] as const
 export const ITEM_TRAILER_KEY = "N-DX-Item";
 
 /** Bumped when the cached shape changes, so an older file is rebuilt rather than misread. */
-const CACHE_VERSION = 1;
+export const CACHE_VERSION = 1;
 const GIT_TIMEOUT_MS = 120_000;
 /** A full-history scan prints a line per commit; 1 MiB (the exec default) fits about 10k. */
 const GIT_MAX_BUFFER = 256 * 1024 * 1024;
@@ -266,7 +266,7 @@ function readCache(path: string): Promise<TrailerCommitCache | null> {
  * written in another format version, or failing `valid`. Any other read
  * error propagates.
  */
-async function readJsonCache<T extends { version: number }>(path: string, valid: (cache: T) => boolean): Promise<T | null> {
+export async function readJsonCache<T extends { version: number }>(path: string, valid: (cache: T) => boolean): Promise<T | null> {
   let text: string;
   try {
     text = await readFile(path, "utf-8");

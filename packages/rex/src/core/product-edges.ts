@@ -178,7 +178,7 @@ export interface RealizedByOptions extends ChangeCommitsOptions {
 }
 
 /** A node's own ids and aliases plus those of every descendant: the ids its commits' trailers may name. */
-function trailerIds(node: RuleNode): string[] {
+export function trailerIds(node: RuleNode): string[] {
   return [node.id, ...(node.aliases ?? []), ...(node.children ?? []).flatMap(trailerIds)];
 }
 
