@@ -55,6 +55,7 @@ import {
   TaskIntentSchema,
   isV2Schema,
   type ItemState,
+  type Layer,
   type NodeType,
   type StateFile,
 } from "../schema/v2.js";
@@ -64,8 +65,23 @@ import { isLockHeld } from "./file-lock.js";
 import { parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
 import { SLUG_RULE_VERSION, isWindowsSafeSegment } from "./folder-tree-serializer.js";
 import { prdLockPath } from "./paths.js";
-import { CHANGES_DIRNAME, PRODUCT_DIRNAME, assertPrdModelWritable, assertV2TreeWritable, type PrdModel } from "./prd-model-reader.js";
-import { STATE_FILE_NAME, emptyStateFile, loadStateFile, sameTextOnDisk, saveStateFile, type ProductSpec } from "./state-writer.js";
+import {
+  CHANGES_DIRNAME,
+  PRODUCT_DIRNAME,
+  assertPrdModelWritable,
+  assertV2TreeWritable,
+  type FolderStateKeys,
+  type PrdModel,
+} from "./prd-model-reader.js";
+import {
+  STATE_FILE_NAME,
+  emptyStateFile,
+  extraTopLevelKeys,
+  loadStateFile,
+  sameTextOnDisk,
+  saveStateFile,
+  type ProductSpec,
+} from "./state-writer.js";
 
 export interface WritePrdModelOptions {
   /**
@@ -74,6 +90,19 @@ export interface WritePrdModelOptions {
    * listed here.
    */
   removed?: ReadonlySet<string>;
+  /**
+   * Keys to store in `state.yaml` for a node, by id, beyond the declared
+   * state fields. For a node whose row is not on disk yet (an import into a
+   * fresh tree) this is the only way an undeclared state key stays state.
+   */
+  stateKeys?: ReadonlyMap<string, ReadonlySet<string>>;
+  /**
+   * Top-level `state.yaml` keys to set, beyond `schema` and `items`: a layer
+   * root's by layer, a folder node's by its id. Each overwrites the key in the
+   * folder's file; keys already there and not named here are kept. A node
+   * written as a leaf has no `state.yaml`, so its entry is ignored.
+   */
+  folderState?: FolderStateKeys;
   /** Clock for `revisedAt` stamps. */
   now?: () => Date;
 }
@@ -133,11 +162,15 @@ export async function writePrdModel(
 
   const productDir = join(rexDir, PRODUCT_DIRNAME);
   const changesDir = join(rexDir, CHANGES_DIRNAME);
-  const loaded = await loadAllStateFiles([productDir, changesDir]);
+  const loaded = await loadAllStateFiles(
+    [productDir, changesDir],
+    options.stateKeys ?? new Map(),
+    options.folderState ?? { layers: {}, nodes: new Map() },
+  );
   plan.files.set(join(productDir, INDEX_FILE), renderRootHeader(model, stamp));
-  await planFolder(productDir, model.tree.product, null, stamp, loaded, plan);
-  if (model.tree.changes.length > 0 || (await listDir(changesDir)) !== null) {
-    await planFolder(changesDir, model.tree.changes, null, stamp, loaded, plan);
+  await planFolder(productDir, model.tree.product, "product", stamp, loaded, plan);
+  if (model.tree.changes.length > 0 || loaded.folderState.layers.changes || (await listDir(changesDir)) !== null) {
+    await planFolder(changesDir, model.tree.changes, "changes", stamp, loaded, plan);
   }
   await assertStaleRemovable(plan.stale, collectIds(model), options.removed ?? new Set());
 
@@ -176,16 +209,27 @@ interface Plan {
   stale: Array<{ path: string; isDir: boolean }>;
 }
 
-/** Every `state.yaml` on disk, read before planning so a row can follow its node to another folder. */
+/**
+ * Every `state.yaml` on disk, read before planning so a row can follow its
+ * node to another folder, and the state keys the caller named.
+ */
 interface LoadedState {
   /** By folder path. */
   files: Map<string, StateFile>;
   /** Every row, by node id, whichever folder holds it; the first found wins. */
   rows: Map<string, ItemState>;
+  /** {@link WritePrdModelOptions.stateKeys}. */
+  stateKeys: ReadonlyMap<string, ReadonlySet<string>>;
+  /** {@link WritePrdModelOptions.folderState}. */
+  folderState: FolderStateKeys;
 }
 
-async function loadAllStateFiles(roots: readonly string[]): Promise<LoadedState> {
-  const loaded: LoadedState = { files: new Map(), rows: new Map() };
+async function loadAllStateFiles(
+  roots: readonly string[],
+  stateKeys: ReadonlyMap<string, ReadonlySet<string>>,
+  folderState: FolderStateKeys,
+): Promise<LoadedState> {
+  const loaded: LoadedState = { files: new Map(), rows: new Map(), stateKeys, folderState };
   const walk = async (dir: string): Promise<void> => {
     for (const entry of (await listDir(dir)) ?? []) {
       if (entry.name.startsWith(".")) continue;
@@ -203,13 +247,13 @@ async function loadAllStateFiles(roots: readonly string[]): Promise<LoadedState>
 }
 
 /**
- * Plan folder `dir`: `owner` (the folder node, or null for a layer root) and
- * `nodes`, its children. Everything is validated here, before any write.
+ * Plan folder `dir`: `owner` (the folder node, or the layer for a layer root)
+ * and `nodes`, its children. Everything is validated here, before any write.
  */
 async function planFolder(
   dir: string,
   nodes: readonly RuleNode[],
-  owner: RuleNode | null,
+  owner: RuleNode | Layer,
   stamp: string,
   loaded: LoadedState,
   plan: Plan,
@@ -217,17 +261,23 @@ async function planFolder(
   plan.dirs.add(dir);
   const entries = (await listDir(dir)) ?? [];
   const existing = loaded.files.get(dir) ?? { ...emptyStateFile(), schema: stamp };
+  const { layers, nodes: byOwner } = loaded.folderState;
+  Object.assign(existing, typeof owner === "string" ? layers[owner] : byOwner.get(owner.id));
   const rows: Record<string, ItemState> = {};
   const specs = new Map<string, ProductSpec>();
   const keep = (node: RuleNode, intent: Record<string, unknown>): void => {
     // A node that moved here (or flipped leaf to folder) has its row in another folder's file.
-    const row = splitState(node, existing.items[node.id] ?? loaded.rows.get(node.id), intent);
+    const previous = existing.items[node.id] ?? loaded.rows.get(node.id);
+    const named = loaded.stateKeys.get(node.id);
+    const alsoState = (key: string): boolean =>
+      (previous !== undefined && Object.hasOwn(previous, key)) || named?.has(key) === true;
+    const row = splitState(node, alsoState, intent);
     if (Object.keys(row).length > 0) rows[node.id] = row;
     const spec = productSpec(node);
     if (spec) specs.set(node.id, spec);
   };
 
-  if (owner) {
+  if (typeof owner !== "string") {
     const intent: Record<string, unknown> = {};
     keep(owner, intent);
     assertValidIntent(owner, intent, dir);
@@ -260,8 +310,7 @@ async function planFolder(
     }
   }
 
-  const extraTopKeys = Object.keys(existing).some((k) => k !== "schema" && k !== "items");
-  if (Object.keys(rows).length === 0 && !extraTopKeys) {
+  if (Object.keys(rows).length === 0 && !extraTopLevelKeys(existing)) {
     plan.states.push({ dir, file: null, specs });
   } else {
     // Reusing the loaded object keeps the original lines of keys this build does not know.
@@ -276,8 +325,12 @@ async function planFolder(
   }
 }
 
-/** A change is always a folder; other nodes only while they have children. */
-function isFolderNode(node: RuleNode): boolean {
+/**
+ * A change is always a folder; other nodes only while they have children.
+ * The one rule for which nodes keep a `state.yaml` of their own: the bundle's
+ * export and parse use it too, so they cannot disagree with the writer.
+ */
+export function isFolderNode(node: RuleNode): boolean {
   return node.type === "change" || (node.children?.length ?? 0) > 0;
 }
 
@@ -304,14 +357,15 @@ function assertSlug(node: RuleNode, folder: boolean, dir: string): void {
 
 /**
  * The row `node` stores in `state.yaml`: known state fields, plus any field
- * its row on disk already held, in whichever folder (a newer build's state stays state).
- * Everything else is copied to `intent`.
+ * `alsoState` names (its row on disk already held it, in whichever folder, or
+ * the caller said so), so a newer build's state stays state. Everything else
+ * is copied to `intent`.
  */
-function splitState(node: RuleNode, previous: ItemState | undefined, intent: Record<string, unknown>): ItemState {
+function splitState(node: RuleNode, alsoState: (key: string) => boolean, intent: Record<string, unknown>): ItemState {
   const row: ItemState = {};
   for (const [key, value] of Object.entries(node)) {
     if (value === undefined || key === "children") continue;
-    if (STATE_KEYS.has(key) || (previous !== undefined && Object.hasOwn(previous, key))) {
+    if (STATE_KEYS.has(key) || alsoState(key)) {
       if (key === "status" && value === "pending") continue;
       row[key] = value;
     } else {
