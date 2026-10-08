@@ -3,7 +3,7 @@
  * resolver) → zones, over a Spring Boot-style fixture written for this test.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -13,7 +13,9 @@ import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeZones } from "../../src/analyzers/zones.js";
 import { goConfig } from "../../src/language/go.js";
+import { detectLanguage, detectLanguages, mergeLanguageConfigs } from "../../src/language/detect.js";
 import { javaConfig } from "../../src/language/java.js";
+import { typescriptConfig } from "../../src/language/typescript.js";
 import type { Imports, Inventory } from "../../src/schema/v1.js";
 import { validate, ZonesSchema } from "../../src/schema/validate.js";
 import { skipUnlessGrammar } from "../helpers/grammar.js";
@@ -128,6 +130,34 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
       const { zones } = await analyzeZones(inventory, imports, { enrich: false });
       expect(validate(ZonesSchema, zones).ok).toBe(true);
     });
+  });
+});
+
+describe("Java beside a package.json (Spring Boot with a bundled frontend)", () => {
+  let dir: string;
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "sv-java-frontend-"));
+    cpSync(FIXTURE, dir, { recursive: true });
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "frontend" }));
+  });
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("keeps the primary language and adds Java to the detected set", async () => {
+    expect(await detectLanguage(dir)).toBe(typescriptConfig);
+    expect(await detectLanguages(dir)).toEqual([typescriptConfig, javaConfig]);
+  });
+
+  it("analyzes the .java files with the detected language set", async (ctx) => {
+    skipUnlessGrammar(ctx, JAVA_WASM);
+    const merged = mergeLanguageConfigs(await detectLanguages(dir));
+    const inventory = await analyzeInventory(dir, { languageConfig: merged });
+    const imports = await analyzeImports(dir, inventory);
+
+    expect(edgeKeys(imports)).toContain(
+      `${MAIN}/controller/OwnerController.java -> ${MAIN}/service/OwnerService.java`,
+    );
+    expect(imports.external.map((e) => e.package)).toContain("org.springframework.stereotype");
   });
 });
 
