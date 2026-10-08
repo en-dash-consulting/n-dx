@@ -31,7 +31,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Apply added, modified and removed amendments to the product layer](./apply-added-modified-and-removed.md) | completed |
 | [Apply refuses a change over a pre-existing dependsOn cycle whose report rotates after a removal](./apply-refuses-a-change-over-a-pre.md) | completed |
 | [Apply refuses a removal outside a pre-existing dependsOn knot because the DFS reports a different sub-cycle](./apply-refuses-a-removal-outside-a-pre.md) | completed |
-| [Apply refuses removing one member of a pre-existing dependsOn knot that stays cyclic](./apply-refuses-removing-one-member-of-a.md) | pending |
 | [Applying an older map-edit draft reverts a later direct edit to the same node](./applying-an-older-map-edit-draft.md) | completed |
 | [Handle direct map edits: editorial re-stamp or revised with a drafted change](./handle-direct-map-edits-editorial-re.md) | completed |
 | [Retiring an area or capability leaves its live descendants hidden from every v2 rule](./retiring-an-area-or-capability-leaves.md) | completed |
