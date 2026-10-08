@@ -457,7 +457,7 @@ describe("isolation", () => {
       ),
     );
     const v2Import =
-      /from\s+["'][^"']*(?:schema\/v2(?:-rules)?|\/state-writer|\/prd-model-(?:reader|writer))(?:\.js)?["']|from\s+["']\.\/v2(?:-rules)?(?:\.js)?["']/;
+      /from\s+["'][^"']*(?:schema\/v2(?:-rules)?|\/state-writer|\/prd-model-(?:reader|writer|transaction))(?:\.js)?["']|from\s+["']\.\/v2(?:-rules)?(?:\.js)?["']/;
     const offenders: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
