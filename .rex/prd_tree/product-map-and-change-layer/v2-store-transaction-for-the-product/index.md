@@ -24,4 +24,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add a v2 store transaction that loads and writes the product and change layers under the PRD lock](./add-a-v2-store-transaction-that-loads.md) | in_progress |
+| [Add a v2 store transaction that loads and writes the product and change layers under the PRD lock](./add-a-v2-store-transaction-that-loads.md) | pending |
