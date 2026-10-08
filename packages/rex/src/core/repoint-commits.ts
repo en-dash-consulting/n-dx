@@ -185,8 +185,6 @@ export async function repointCommits(shas: Iterable<string>, options: RepointOpt
   if (offMain.length > 0) {
     const oldFacts = new Map((await readFacts(repoDir, ["--no-walk=unsorted", ...offMain.map((o) => o.full)])).map((f) => [f.hash, f]));
     const index = indexMainCommits(await readFacts(repoDir, ["--no-merges", tip]));
-    const earliest = minDate([...oldFacts.values()].map((f) => f.authorDate));
-    let patchIds: { old: Map<string, string>; main: Map<string, string[]> } | undefined;
 
     for (const { sha, full } of offMain) {
       const facts = oldFacts.get(full);
@@ -201,8 +199,7 @@ export async function repointCommits(shas: Iterable<string>, options: RepointOpt
         return false;
       };
       if (tryRule("author-date-subject", findTwin(facts, index))) continue;
-      patchIds ??= await readPatchIds(repoDir, offMain.map((o) => o.full), tip, earliest);
-      if (tryRule("patch-id", findPatchTwin(patchIds.old.get(full), patchIds.main))) continue;
+      if (tryRule("patch-id", await findPatchTwinInGit(repoDir, full, facts.authorDate, tip))) continue;
       if (tryRule("trailer-subject", findTrailerSubject(facts, index))) continue;
       gitMiss.set(sha, [
         `no commit on ${ref} matches it by author date and subject, patch-id, or N-DX-Item trailer and subject`,
@@ -300,34 +297,40 @@ async function readFacts(repoDir: string, revs: string[]): Promise<CommitFacts[]
   return out;
 }
 
+/** Paths passed as a pathspec; bounds the command line (Windows caps it near 32k characters). */
+const PATHSPEC_CAP = 100;
+
 /**
- * `git patch-id --stable` for the recorded commits, and for main's non-merge
- * commits committed since the earliest recorded author date (a commit cannot
- * land before it was written, so older ones cannot match).
+ * Rule 3 read from git. Candidates are main's non-merge commits that touch
+ * the recorded commit's files and were committed since it was authored: a
+ * commit with the same patch changes the same files and cannot land before it
+ * was written. Scanning every commit instead would print the whole history's
+ * patches, which outgrows the output buffer on a repository of real age.
+ * Any subset of the files still admits every same-patch commit, so the cap
+ * only widens the candidate set, never drops a match.
  */
-async function readPatchIds(
-  repoDir: string,
-  olds: string[],
-  tip: string,
-  since: string,
-): Promise<{ old: Map<string, string>; main: Map<string, string[]> }> {
-  const old = new Map<string, string>();
-  for (const [patchId, hash] of await patchIdsOf(repoDir, ["--no-walk=unsorted", ...olds])) old.set(hash, patchId);
+async function findPatchTwinInGit(repoDir: string, old: string, authorDate: string, tip: string): Promise<RuleOutcome> {
+  const files = (await git(repoDir, ["diff-tree", "--root", "--no-commit-id", "--no-renames", "--name-only", "-r", "-z", old]))
+    .split("\0")
+    .filter(Boolean);
+  if (files.length === 0) return null; // An empty commit has no patch-id.
+  const [oldPatch] = await patchIdsOf(repoDir, ["--no-walk=unsorted", old]);
+  if (!oldPatch) return null;
+  const pathspec = files.slice(0, PATHSPEC_CAP).map((file) => `:(literal)${file}`);
   const main = new Map<string, string[]>();
-  for (const [patchId, hash] of await patchIdsOf(repoDir, ["--no-merges", `--since=${since}`, tip])) push(main, patchId, hash);
-  return { old, main };
+  for (const [patchId, hash] of await patchIdsOf(repoDir, ["--no-merges", "--full-diff", `--since=${authorDate}`, tip], pathspec)) {
+    push(main, patchId, hash);
+  }
+  return findPatchTwin(oldPatch[0], main);
 }
 
-async function patchIdsOf(repoDir: string, revs: string[]): Promise<[string, string][]> {
+/** `[patchId, commit]` per commit with a diff, from `git patch-id --stable`. */
+async function patchIdsOf(repoDir: string, revs: string[], pathspec: string[] = []): Promise<[string, string][]> {
   // --format=commit %H is the header patch-id splits on; the message is left out.
   const patches = await git(repoDir, [
-    "log", "--no-show-signature", "--no-color", "--no-ext-diff", "--no-textconv", "-p", "--format=commit %H", ...revs, "--",
+    "log", "--no-show-signature", "--no-color", "--no-ext-diff", "--no-textconv", "-p", "--format=commit %H", ...revs, "--", ...pathspec,
   ]);
   if (patches.trim() === "") return [];
   const out = await git(repoDir, ["patch-id", "--stable"], patches);
   return out.split("\n").filter(Boolean).map((line) => line.split(" ") as [string, string]);
-}
-
-function minDate(dates: string[]): string {
-  return dates.reduce((a, b) => (Date.parse(b) < Date.parse(a) ? b : a));
 }
