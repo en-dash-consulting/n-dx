@@ -43,3 +43,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Warn when a capability's criteria grow past a threshold](./warn-when-a-capability-s-criteria-grow.md) | completed |
 | [Work out a change's commits from its N-DX-Item trailers instead of storing them](./work-out-a-change-s-commits-from-its-n.md) | completed |
 | [Work out when a change landed from git history](./work-out-when-a-change-landed-from-git.md) | completed |
+| [Scan re-point history with --since-as-filter, and skip retired changes when computing building status](./scan-re-point-history-with-since-as.md) | pending |
