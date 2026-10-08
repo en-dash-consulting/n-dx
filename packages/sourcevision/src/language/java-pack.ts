@@ -5,18 +5,16 @@
  * @module sourcevision/language/java-pack
  */
 
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { javaConfig } from "./java.js";
 import { javaResolver } from "./java-resolver.js";
+import { queryDir } from "./package-paths.js";
 import type { LanguagePack, RuleProvenance } from "./pack.js";
 
-/**
- * Query files ship in the package's `src/language/queries`. Resolved
- * package-relative so it is the same from `src/language/` and `dist/language/`.
- */
-const QUERY_DIR = "../../src/language/queries/java";
+const QUERY_NAMES = ["packages", "imports", "declarations", "methods", "calls", "type-references"] as const;
 
-const queryPath = (file: string): string => fileURLToPath(new URL(`${QUERY_DIR}/${file}`, import.meta.url));
+/** Query files ship in `src/language/queries/java`; see `package-paths.ts`. */
+const queryPath = (file: string): string => join(queryDir("java"), file);
 
 /**
  * Grammar release the queries were written and checked against. Keep in step
@@ -34,14 +32,10 @@ export const javaPack: LanguagePack = {
   id: javaConfig.id,
   config: javaConfig,
   grammar: { name: "tree-sitter-java", version: GRAMMAR_VERSION },
-  queries: [
-    { name: "packages", path: queryPath("packages.scm") },
-    { name: "imports", path: queryPath("imports.scm") },
-    { name: "declarations", path: queryPath("declarations.scm") },
-    { name: "methods", path: queryPath("methods.scm") },
-    { name: "calls", path: queryPath("calls.scm") },
-    { name: "type-references", path: queryPath("type-references.scm") },
-  ],
+  // A getter, so the paths are computed on first use rather than at import.
+  get queries() {
+    return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
+  },
   resolver: javaResolver,
   provenance: {
     packages: VERIFIED,

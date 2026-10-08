@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   BUILTIN_PACKS,
-  DEFAULT_GRAMMAR_DIR,
   loadLanguagePacks,
   type LanguagePack,
 } from "../../../src/language/pack.js";
+import { grammarBuildDir } from "../../../src/language/package-paths.js";
 import { goConfig } from "../../../src/language/go.js";
 import { GRAMMAR_BUILD_DIR } from "../../../scripts/build-grammars.mjs";
 
@@ -72,7 +72,7 @@ describe("loadLanguagePacks", () => {
 
 describe("built-in packs", () => {
   it("default grammar dir is where build-grammars.mjs writes", () => {
-    expect(DEFAULT_GRAMMAR_DIR).toBe(GRAMMAR_BUILD_DIR);
+    expect(grammarBuildDir()).toBe(GRAMMAR_BUILD_DIR);
   });
 
   it("every built-in pack has provenance for each query and a matching id", () => {
