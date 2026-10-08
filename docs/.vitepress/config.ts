@@ -61,6 +61,16 @@ export default defineConfig({
             { text: "Troubleshooting", link: "/guide/troubleshooting" },
           ],
         },
+        {
+          text: "Concepts",
+          items: [
+            { text: "The PRD", link: "/guide/concepts/" },
+            { text: "Glossary", link: "/guide/concepts/glossary" },
+            { text: "Changes and Apply", link: "/guide/concepts/changes-and-apply" },
+            { text: "Bugs and Hotfixes", link: "/guide/concepts/bugs-and-hotfixes" },
+            { text: "Stewards", link: "/guide/concepts/stewards" },
+          ],
+        },
       ],
       "/architecture/": [
         {
