@@ -14,9 +14,9 @@ Each term is shown with an example from n-dx's own PRD.
 | **Constraint** | A rule that applies across capabilities, checked by a test | Architecture integrity (gateways, spawn-only), checked by `architecture-policy.test.js` |
 | **Change** | A bounded piece of work that adds, modifies, removes or fixes capabilities. Ticket-shaped; its release is a field, not a folder | "Forked sessions recover from a read-only refusal" (#473): touches Session strategy, planned for 1.0.1 |
 | **Task, subtask** | The steps of a change; what `ndx work` runs. A change with no tasks is itself the unit of work | "Tell the forked session that orientation is over" |
-| **Apply** | The step that writes a change's amendments into the product layer when it completes. Deterministic; no model is called | #473 merges, so Session strategy goes back to healthy and gains a History line |
+| **Apply** | The step that writes a change's amendments into the product layer when it completes. Deterministic; no model is called | A change that modifies a Session strategy criterion completes; apply rewrites the criterion, restamps the spec hash and adds a History line. (A touches-only fix such as #473 is never applied: its history and health are computed) |
 | **Evidence** | What machines record as work happens | Commits with `N-DX-Item` trailers, hench run records, test results |
-| **Status** | Where a capability stands against intent (see below). Computed | Session strategy reads *changing* while an open change amends it |
+| **Status** | Where a capability stands against intent (see below). Computed | Session strategy reads *changing* while an amendment to it is unapplied |
 | **Health** | Whether it is broken right now: *ok* or *defective*. Computed | Session strategy reads *defective* while #473 is open |
 
 ## Status and health
@@ -26,7 +26,7 @@ Nobody sets either by hand. Both are computed from files and state.
 | Axis | Value | Rule |
 |------|-------|------|
 | Intent | Proposed | Created by an open change; never built |
-| Intent | Changing | An open change amends it |
+| Intent | Changing | An amendment to it is unapplied: its change is open, or completed and awaiting review or release apply. Cancelled changes do not count |
 | Intent | Met | The spec hash equals the hash recorded when it was last built, and its checks pass |
 | Intent | Revised | The spec was edited after it was built, and no open change is building the edit |
 | Intent | Retired | A removed delta was applied |

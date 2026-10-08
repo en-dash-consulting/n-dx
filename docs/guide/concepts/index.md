@@ -10,7 +10,7 @@ From 1.0.0 the **PRD is the product's requirements plus the changes being made t
 |-------|-------|------------|----------|
 | **Product layer** | Areas, capabilities, constraints: the standing requirements, each with a computed build status | Stewards, and completed changes | `.ndx/rex/product/` |
 | **Change layer** | Changes, and their tasks and subtasks: bounded work that closes | Stewards, engineers, `ndx add`, `ndx plan`, agents | `.ndx/rex/changes/` |
-| **Evidence** | Commits with `N-DX-Item` trailers, hench run records, test results | Git, hench, CI | Git and `.hench/runs/` |
+| **Evidence** | Commits with `N-DX-Item` trailers, hench run records, test results | Git, hench, CI | Git and `.ndx/hench/runs/` |
 
 Every change names the parts of the product layer it affects. When the change completes, [apply](./changes-and-apply) updates the product layer to match.
 

@@ -20,7 +20,7 @@ For n-dx itself, Ryan is the root steward at the cut; per-area stewards are assi
 
 ## Enforcement
 
-Because [apply](./changes-and-apply) runs on the branch, every amendment appears in the PR as edits under `.ndx/rex/product/<area>/`. `ndx init` and `ndx migrate` can generate the host's code-owner file (`CODEOWNERS` on GitHub, `.bitbucket/CODEOWNERS` on Bitbucket); this is opt-in, and regenerated when the lists change.
+In the default `complete` [apply](./changes-and-apply) mode, apply runs on the branch, so every amendment appears in the PR as edits under `.ndx/rex/product/<area>/`. With `review` the apply may land in a later PR, and with `release` it waits for publication; the change PR then carries no product-layer edits and a `product/` code-owner rule does not gate it. Steward review happens in the PR that carries the apply. `ndx init` and `ndx migrate` can generate the host's code-owner file (`CODEOWNERS` on GitHub, `.bitbucket/CODEOWNERS` on Bitbucket); this is opt-in, and regenerated when the lists change.
 
 Where the host enforces code-owner approval (GitHub branch protection; Bitbucket Premium merge checks or a code-owners app), a steward must approve. Elsewhere, stewards are suggested reviewers.
 
