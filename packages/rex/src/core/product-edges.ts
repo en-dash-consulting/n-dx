@@ -16,9 +16,12 @@
  * Cancelled and deleted changes contribute no edge of any kind: a change that
  * will never land must not steer placement through `coChanges` or `realizedBy`.
  *
- * Every ref (`amends[].target`, `touches`, `appliesTo`) goes through the tree
- * index, so an alias of a folded id lands on the node it was folded into. A
- * ref that resolves to nothing is skipped here; the tree rules report it.
+ * Every ref (`amends[].target`, `touches`, `appliesTo`) goes through
+ * {@link productIndex}, so an alias of a folded id lands on the node it was
+ * folded into, and a ref to a retired (deleted) node still lands on it: a later
+ * retirement does not rewrite an earlier change's kind or erase the node's
+ * history. A retired node binds nothing and is bound by nothing. A ref that
+ * resolves to nothing is skipped here; the tree rules report it.
  *
  * ## Cache
  *
@@ -32,6 +35,16 @@
 import { indexTree, type RuleNode, type TreeIndex, type V2Tree } from "../schema/v2-rules.js";
 import type { ChangeNode, ConstraintNode } from "../schema/v2.js";
 import { loadCommitFiles, loadTrailerCommits, type ChangeCommitsOptions } from "./change-commits.js";
+
+// ── Index ────────────────────────────────────────────────────────
+
+/**
+ * The index every reader here resolves refs against: tombstones included, so
+ * retired nodes keep their history; live ids and aliases still win over them.
+ */
+export function productIndex(tree: V2Tree): TreeIndex {
+  return indexTree(tree, { includeTombstones: true });
+}
 
 // ── Kind ─────────────────────────────────────────────────────────
 
@@ -56,6 +69,9 @@ export type ChangeKind = (typeof CHANGE_KINDS)[number];
  * change (`fix: true`), not read from history, so an open change already has
  * its kind; adding or removing a node is never a fix. A change that relates to
  * the map in none of these ways (an inbox change) has no kind yet.
+ *
+ * Pass {@link productIndex}: an index without tombstones loses a since-retired
+ * target, turning an earlier policy change into an enhancement.
  */
 export function deriveChangeKind(change: ChangeNode, index: Pick<TreeIndex, "resolve">): ChangeKind | undefined {
   const amends = change.amends ?? [];
@@ -78,9 +94,9 @@ export interface CoChange {
 }
 
 export interface ProductEdges {
-  /** Product node id → ids of the live changes that amend or touch it, in tree order. */
+  /** Product node id (retired included) → ids of the live changes that amend or touch it, in tree order. */
   changedBy: Record<string, string[]>;
-  /** Product node id → ids of the constraints that bind it, in tree order. */
+  /** Live product node id → ids of the live constraints that bind it, in tree order. */
   boundBy: Record<string, string[]>;
   /** Product node id → nodes it shares changes with, most shared first, then by id. */
   coChanges: Record<string, CoChange[]>;
@@ -98,10 +114,11 @@ function push(map: Record<string, string[]>, key: string, value: string): void {
   if (!list.includes(value)) list.push(value);
 }
 
-/** Compute `changedBy`, `boundBy` and `coChanges` for every live product node. */
+/** Compute `changedBy`, `boundBy` and `coChanges` for every product node, retired ones included. */
 export function computeEdges(tree: V2Tree): ProductEdges {
-  const index = indexTree(tree);
-  const live = index.entries.filter((e) => e.root === "product");
+  const index = productIndex(tree);
+  const live = index.entries.filter((e) => e.root === "product" && !e.retired);
+  const liveNodes = new Set(live.map((e) => e.node));
   const edges: ProductEdges = { changedBy: {}, boundBy: {}, coChanges: {} };
 
   for (const { node } of live) {
@@ -112,14 +129,14 @@ export function computeEdges(tree: V2Tree): ProductEdges {
         ? live.map((e) => e.node).filter((n) => n.type === "capability")
         : (appliesTo ?? []).flatMap((ref) => {
             const target = index.resolve(ref);
-            return target ? [target, ...descendantCapabilities(target)] : [];
+            return target && liveNodes.has(target) ? [target, ...descendantCapabilities(target)] : [];
           });
-    for (const target of bound) if (target && target.id !== node.id) push(edges.boundBy, target.id, node.id);
+    for (const target of bound) if (target.id !== node.id) push(edges.boundBy, target.id, node.id);
   }
 
   const shared = new Map<string, Map<string, number>>();
-  for (const { node } of index.entries) {
-    if (node.type !== "change") continue;
+  for (const { node, retired } of index.entries) {
+    if (node.type !== "change" || retired) continue;
     if (node.status === "cancelled") continue;
     const change = node as ChangeNode;
     const resolved = (refs: readonly string[]) => refs.map((ref) => index.resolve(ref)).filter((n): n is RuleNode => n !== undefined);
@@ -174,7 +191,7 @@ export async function computeRealizedBy(
   edges: ProductEdges,
   options: RealizedByOptions,
 ): Promise<Record<string, Realization>> {
-  const index = indexTree(tree);
+  const index = productIndex(tree);
   const trailerCommits = await loadTrailerCommits(options);
   const out: Record<string, Realization> = {};
 
@@ -207,8 +224,9 @@ export async function computeRealizedBy(
 
 /**
  * The node a ref names: by id, display id, or an alias, so the id of a folded
- * item returns the node it was folded into. Deleted nodes do not resolve.
+ * item returns the node it was folded into. A retired node resolves too, after
+ * every live id and alias.
  */
 export function resolveNode(tree: V2Tree, ref: string): RuleNode | undefined {
-  return indexTree(tree).resolve(ref);
+  return productIndex(tree).resolve(ref);
 }

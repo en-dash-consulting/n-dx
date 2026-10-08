@@ -10,13 +10,18 @@
  *
  * | Status    | When                                                          |
  * |-----------|---------------------------------------------------------------|
- * | retired   | an applied change amends it with delta `removed`              |
+ * | retired   | deleted, and an applied change amends it with delta `removed` |
  * | changing  | an open change amends it                                      |
  * | proposed  | never met (`metAt` absent)                                    |
  * | revised   | the spec hash differs from `metAt`                            |
  * | met       | the hash equals `metAt`                                       |
  *
  * A failing check does not change the status; it shows on health only.
+ *
+ * Apply retires a node by setting it `deleted`, so refs resolve against the
+ * tombstone-aware {@link productIndex}. A deleted node is reported only when
+ * retired; one no applied change removed, and a node under a deleted parent,
+ * have no row.
  *
  * ## Health
  *
@@ -29,8 +34,9 @@
  * @module rex/core/product-status
  */
 
-import { indexTree, isAppliedChange, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { isAppliedChange, isOpenChange, nodeSpec, specHash, type V2Tree } from "../schema/v2-rules.js";
 import type { ChangeNode } from "../schema/v2.js";
+import { productIndex } from "./product-edges.js";
 
 export const INTENT_STATUSES = ["proposed", "changing", "met", "revised", "retired"] as const;
 export type IntentStatus = (typeof INTENT_STATUSES)[number];
@@ -43,15 +49,15 @@ export interface ProductStatus {
   health: Health;
 }
 
-/** Status and health of every live capability and constraint, keyed by id. */
+/** Status and health of every live or retired capability and constraint, keyed by id. */
 export function computeProductStatus(tree: V2Tree): Record<string, ProductStatus> {
-  const index = indexTree(tree);
+  const index = productIndex(tree);
   const amended = new Set<string>();
   const retired = new Set<string>();
   const fixing = new Set<string>();
 
-  for (const { node } of index.entries) {
-    if (node.type !== "change") continue;
+  for (const { node, retired: deleted } of index.entries) {
+    if (node.type !== "change" || deleted) continue;
     const change = node as ChangeNode;
     const open = isOpenChange(node);
     for (const a of change.amends ?? []) {
@@ -69,10 +75,12 @@ export function computeProductStatus(tree: V2Tree): Record<string, ProductStatus
   }
 
   const out: Record<string, ProductStatus> = {};
-  for (const { node, root } of index.entries) {
+  for (const { node, root, retired: tombstone } of index.entries) {
     if (root !== "product" || (node.type !== "capability" && node.type !== "constraint")) continue;
+    const isRetired = node.status === "deleted" && retired.has(node.id);
+    if (tombstone && !isRetired) continue;
     const checkFails = (node.checks ?? []).some((c) => c.result === "fail");
-    const status: IntentStatus = retired.has(node.id)
+    const status: IntentStatus = isRetired
       ? "retired"
       : amended.has(node.id)
         ? "changing"

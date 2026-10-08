@@ -29,7 +29,7 @@ const fixture = (): V2Tree => ({
         cap("changing"),
         cap("revised", { statement: "does another thing" }),
         cap("check-fails", { checks: [check("fail")] }),
-        cap("retired"),
+        cap("retired", { status: "deleted" }),
         cap("fixing", { checks: [check("pass")] }),
         cap("fix-amended"),
         cap("applied-fix"),
@@ -81,17 +81,71 @@ describe("computeProductStatus", () => {
     expect(result["open-amend"]).toBeUndefined();
   });
 
-  it("ranks retired over changing, and changing over proposed and revised", () => {
+  it("ranks changing over proposed and revised", () => {
     const tree: V2Tree = {
-      product: [cap("a", { metAt: undefined }), cap("b", { statement: "edited" }), cap("c")],
-      changes: [
-        change("x", { amends: [amend("a", "modified"), amend("b", "modified")] }),
-        change("y", { amends: [amend("c", "modified")] }),
-        change("z", { appliedAt: "2026-10-01T00:00:00.000Z", amends: [amend("c", "removed")] }),
-      ],
+      product: [cap("a", { metAt: undefined }), cap("b", { statement: "edited" })],
+      changes: [change("x", { amends: [amend("a", "modified"), amend("b", "modified")] })],
     };
     const out = computeProductStatus(tree);
-    expect([out.a.status, out.b.status, out.c.status]).toEqual(["changing", "changing", "retired"]);
+    expect([out.a.status, out.b.status]).toEqual(["changing", "changing"]);
+  });
+
+  describe("retired", () => {
+    const APPLIED = "2026-10-01T00:00:00.000Z";
+
+    it("reports a deleted node an applied change removed, as apply leaves it", () => {
+      const tree: V2Tree = {
+        product: [cap("gone", { status: "deleted" }), node({ id: "old-con", type: "constraint", statement, status: "deleted" })],
+        changes: [change("z", { appliedAt: APPLIED, amends: [amend("gone", "removed"), amend("old-con", "removed")] })],
+      };
+      const out = computeProductStatus(tree);
+      expect(out.gone).toEqual({ status: "retired", health: "ok" });
+      expect(out["old-con"]).toEqual({ status: "retired", health: "ok" });
+    });
+
+    it("resolves the removal through an alias of the deleted node", () => {
+      const tree: V2Tree = {
+        product: [cap("gone", { status: "deleted", aliases: ["was-gone"] })],
+        changes: [change("z", { appliedAt: APPLIED, amends: [amend("was-gone", "removed")] })],
+      };
+      expect(computeProductStatus(tree).gone.status).toBe("retired");
+    });
+
+    it("omits a deleted node no applied change removed", () => {
+      const tree: V2Tree = {
+        product: [cap("dropped", { status: "deleted" }), cap("pending-removal", { status: "deleted" })],
+        changes: [change("open", { amends: [amend("pending-removal", "removed")] })],
+      };
+      expect(computeProductStatus(tree)).toEqual({});
+    });
+
+    it("omits the descendants of a retired node", () => {
+      const tree: V2Tree = {
+        product: [node({ id: "area", type: "area", status: "deleted", children: [cap("child")] }), cap("kept")],
+        changes: [change("z", { appliedAt: APPLIED, amends: [amend("area", "removed")] })],
+      };
+      expect(Object.keys(computeProductStatus(tree))).toEqual(["kept"]);
+    });
+
+    it("lets a live id win over a retired node's alias", () => {
+      const tree: V2Tree = {
+        product: [cap("gone", { status: "deleted", aliases: ["live"] }), cap("live")],
+        changes: [
+          change("z", { appliedAt: APPLIED, amends: [amend("gone", "removed")] }),
+          change("y", { amends: [amend("live", "modified")] }),
+        ],
+      };
+      const out = computeProductStatus(tree);
+      expect([out.gone.status, out.live.status]).toEqual(["retired", "changing"]);
+    });
+
+    it("does not read a deleted change as applying its removal", () => {
+      const tree: V2Tree = {
+        product: [cap("gone", { status: "deleted" })],
+        changes: [change("z", { status: "deleted", appliedAt: APPLIED, amends: [amend("gone", "removed")] })],
+      };
+      expect(computeProductStatus(tree)).toEqual({});
+    });
   });
 
   it("does not read an open touching change as a fix without fix: true", () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { computeEdges, deriveChangeKind, resolveNode, type ChangeKind } from "../../../src/core/product-edges.js";
-import { indexTree, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { computeEdges, deriveChangeKind, productIndex, resolveNode, type ChangeKind } from "../../../src/core/product-edges.js";
+import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment, ChangeNode } from "../../../src/schema/v2.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ title: fields.id as string, slug: fields.id as string, ...fields }) as RuleNode;
@@ -15,7 +15,7 @@ describe("deriveChangeKind (design table)", () => {
     node({ id: "area", type: "area", children: [cap("cap-a"), cap("cap-b")] }),
     node({ id: "con", type: "constraint", appliesTo: "all" }),
   ];
-  const index = indexTree(tree(product, []));
+  const index = productIndex(tree(product, []));
   const kind = (c: RuleNode) => deriveChangeKind(c as ChangeNode, index);
 
   const rows: [string, RuleNode, ChangeKind | undefined][] = [
@@ -43,9 +43,60 @@ describe("deriveChangeKind (design table)", () => {
   });
 
   it("reads a target through an alias, and a refused ref as no relationship", () => {
-    const aliased = indexTree(tree([node({ id: "con", type: "constraint", aliases: ["old-con"] })], []));
+    const aliased = productIndex(tree([node({ id: "con", type: "constraint", aliases: ["old-con"] })], []));
     expect(deriveChangeKind(change("c", { amends: [amend("old-con", "modified")] }) as ChangeNode, aliased)).toBe("policy-change");
     expect(deriveChangeKind(change("c", { touches: ["nowhere"] }) as ChangeNode, aliased)).toBeUndefined();
+  });
+});
+
+describe("history after a retirement", () => {
+  const APPLIED = "2026-10-01T00:00:00.000Z";
+  /** As apply leaves it: `old-con` and `cap-old` are deleted, and the change that removed each is applied. */
+  const retired = tree(
+    [
+      node({ id: "area", type: "area", children: [cap("cap-live"), cap("cap-old", { status: "deleted", aliases: ["folded-old"] })] }),
+      node({ id: "old-con", type: "constraint", status: "deleted", aliases: ["con-alias"] }),
+    ],
+    [
+      change("tighten", { appliedAt: APPLIED, amends: [amend("con-alias", "modified")] }),
+      change("drop-con", { appliedAt: APPLIED, amends: [amend("old-con", "removed")] }),
+      change("improve", { appliedAt: APPLIED, amends: [amend("folded-old", "modified")], touches: ["cap-live"] }),
+      change("drop-cap", { appliedAt: APPLIED, amends: [amend("cap-old", "removed")] }),
+    ],
+  );
+
+  it("deriveChangeKind keeps an earlier change to a since-retired constraint a policy change", () => {
+    const kind = (id: string) => deriveChangeKind(retired.changes.find((c) => c.id === id) as ChangeNode, productIndex(retired));
+    expect(kind("tighten")).toBe("policy-change");
+    expect(kind("drop-con")).toBe("policy-change");
+    expect(kind("improve")).toBe("enhancement");
+  });
+
+  it("computeEdges keeps changedBy and coChanges on retired nodes", () => {
+    const edges = computeEdges(retired);
+    expect(edges.changedBy["old-con"]).toEqual(["tighten", "drop-con"]);
+    expect(edges.changedBy["cap-old"]).toEqual(["improve", "drop-cap"]);
+    expect(edges.coChanges["cap-live"]).toEqual([{ id: "cap-old", changes: 1 }]);
+  });
+
+  it("a retired constraint binds nothing, and a retired capability is bound by nothing", () => {
+    const edges = computeEdges(tree(
+      [
+        node({ id: "area", type: "area", children: [cap("cap-live"), cap("cap-old", { status: "deleted" })] }),
+        node({ id: "con-all", type: "constraint", appliesTo: "all" }),
+        node({ id: "con-area", type: "constraint", appliesTo: ["area"] }),
+        node({ id: "old-con", type: "constraint", status: "deleted", appliesTo: "all" }),
+      ],
+      [],
+    ));
+    expect(edges.boundBy).toEqual({ area: ["con-area"], "cap-live": ["con-all", "con-area"] });
+  });
+
+  it("resolveNode finds a retired node through its id or alias, live nodes first", () => {
+    expect(resolveNode(retired, "folded-old")?.id).toBe("cap-old");
+    expect(resolveNode(retired, "old-con")?.id).toBe("old-con");
+    const shadowed = tree([cap("gone", { status: "deleted", aliases: ["live"] }), cap("live")], []);
+    expect(resolveNode(shadowed, "live")?.status).toBeUndefined();
   });
 });
 
