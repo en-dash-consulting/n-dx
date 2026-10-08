@@ -30,6 +30,8 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Compute intent status and health for product nodes](./compute-intent-status-and-health-for.md) | completed |
 | [computeChangeCommits defaults to the local main branch, which a CI checkout lacks and a worktree may hold stale](./computechangecommits-defaults-to-the.md) | completed |
 | [computeChangeCommits returns a truncated commit list from a shallow clone without saying so](./computechangecommits-returns-a.md) | completed |
+| [computeLanding reports an open change as landed, so resolveShippedIn gives a release for unfinished work](./computelanding-reports-an-open-change.md) | pending |
+| [computeLandings re-resolves the ref, re-checks shallowness and re-reads both caches for every change](./computelandings-re-resolves-the-ref-re.md) | pending |
 | [computeProductStatus never marks a node defective for an open fix, because an open change cannot derive kind fix](./computeproductstatus-never-marks-a.md) | completed |
 | [computeProductStatus reports a retired node defective from its last failing check](./computeproductstatus-reports-a-retired.md) | completed |
 | [Count only started or placed changes as building, and let children follow an amended parent](./count-only-started-or-placed-changes.md) | completed |
