@@ -48,6 +48,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Fix hench task-completion commit gap + fullTestCommand schema drop (#302)](./fix-hench-task-completion-commit-gap.md) | completed |
 | [Hench task display branches on rex prose, so a reworded selection summary silently blanks the finalize label](./hench-task-display-branches-on-rex.md) | completed |
 | [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-uncommitted.md) | completed |
+| [Run records keep each commit's author date and subject, and re-point rewritten SHAs](./run-records-keep-each-commit-s-author.md) | pending |
 | [RunRecord fields testGate, dependencyAudit and cleanupTransformations are stripped by the run-record schema on load](./runrecord-fields-testgate.md) | completed |
 | [Skill runs attribute tokens from a code-written usage mark taken when the task starts, not from a model-typed --startedAt window](./skill-runs-attribute-tokens-from-a.md) | completed |
 | [Tell the agent to run git bare from the project root, never behind cd or git -C](./tell-the-agent-to-run-git-bare-from.md) | completed |
