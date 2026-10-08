@@ -37,6 +37,21 @@ const FILES: Record<string, string> = {
   // Role "test" in the inventory below — its call site is a fixture, not a
   // dependency this repository has.
   "src/orders.test.ts": `import axios from "axios";\naxios.get("https://fixture.example.com/x");\n`,
+  // The Go half of a mixed-language repository. Only `mixedInventory` names it,
+  // so the single-language expectations above stay exact.
+  "cmd/worker/main.go": [
+    `package main`,
+    ``,
+    `import (`,
+    `\t"database/sql"`,
+    `\t"os"`,
+    `)`,
+    ``,
+    `func main() {`,
+    `\tdb, _ := sql.Open("postgres", os.Getenv("DATABASE_URL"))`,
+    `\t_ = db`,
+    `}`,
+  ].join("\n"),
   "api/openapi.yaml": `openapi: 3.0.0\n`,
   "api/swagger.json": `{"swagger":"2.0"}\n`,
   "docs/openapi.v2.yml": `openapi: 3.1.0\n`,
@@ -89,6 +104,23 @@ const codeOnlyInventory: Inventory = {
     byRole: { source: 2, test: 1 },
     byCategory: { core: 3 },
   },
+};
+
+/** The same project, plus its Go worker — one repository, two languages. */
+const mixedInventory: Inventory = {
+  ...codeOnlyInventory,
+  files: [
+    ...codeOnlyInventory.files,
+    {
+      path: "cmd/worker/main.go",
+      size: 140,
+      language: "Go",
+      lineCount: 11,
+      hash: "h",
+      role: "source",
+      category: "core",
+    },
+  ],
 };
 
 beforeAll(() => {
@@ -201,6 +233,42 @@ describe("detectOutbound", () => {
   it("produces output the outbound schema accepts", async () => {
     const data = await detectOutbound(root, codeOnlyInventory);
     expect(validate(OutboundSchema, data).ok).toBe(true);
+  });
+
+  it("merges both languages into one canonically sorted artifact", async () => {
+    // The point of the two detectors producing the same record: a consumer of
+    // outbound.json reads one ordered list and never learns which half found
+    // what. `cmd/` sorts before `src/`, so the Go row leads on path order
+    // rather than on the order the inventory happened to list the files.
+    const data = await detectOutbound(root, mixedInventory);
+
+    expect(data.dependencies).toEqual([
+      {
+        file: "cmd/worker/main.go",
+        line: 9,
+        kind: "database",
+        target: "DATABASE_URL",
+        targetSource: "env",
+        client: "database/sql",
+        confidence: "certain",
+      },
+      {
+        file: "src/orders.ts",
+        line: 2,
+        kind: "http",
+        target: "ORDERS_URL",
+        targetSource: "env",
+        client: "axios",
+        confidence: "certain",
+      },
+    ]);
+    expect(validate(OutboundSchema, data).ok).toBe(true);
+  });
+
+  it("is byte-identical across runs over a mixed-language tree", async () => {
+    const first = toCanonicalJSON(await detectOutbound(root, mixedInventory));
+    const second = toCanonicalJSON(await detectOutbound(root, mixedInventory));
+    expect(second).toBe(first);
   });
 
   it("is byte-identical across runs over an unchanged tree", async () => {

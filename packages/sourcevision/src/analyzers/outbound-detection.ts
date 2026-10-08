@@ -13,10 +13,13 @@
  *
  * ## What is here today
  *
- * Declared contracts, and every JS/TS call site: HTTP, gRPC, queue, database
- * and cache. The remaining slice — Go — will arrive in a sibling module and be
- * dispatched to from here, exactly as `server-route-detection.ts` dispatches to
- * `go-route-detection.ts`.
+ * Declared contracts, and every call site in both languages: HTTP, gRPC, queue,
+ * database and cache. The JS/TS half is in this file; `.go` files are dispatched
+ * to `go-outbound-detection.ts`, exactly as `server-route-detection.ts`
+ * dispatches them to `go-route-detection.ts`. Both halves produce the same
+ * record under the same two-field rule, so one `outbound.json` describes a
+ * mixed-language repository without the consumer needing to know which detector
+ * found what.
  *
  * ## How JS/TS call sites are found
  *
@@ -63,6 +66,7 @@ import type {
   OutboundDependency,
 } from "../schema/index.js";
 import { sortOutbound } from "../util/sort.js";
+import { detectGoOutboundCalls } from "./go-outbound-detection.js";
 
 /**
  * An OpenAPI or Swagger document, by filename convention.
@@ -1012,7 +1016,9 @@ export async function detectOutbound(
 
   for (const file of inventory.files) {
     if (SKIP_ROLES.has(file.role)) continue;
-    if (!JS_EXTENSIONS.has(extname(file.path).toLowerCase())) continue;
+    const ext = extname(file.path).toLowerCase();
+    const isGo = ext === ".go";
+    if (!isGo && !JS_EXTENSIONS.has(ext)) continue;
     if (file.size > MAX_SOURCE_BYTES) continue;
 
     let sourceText: string;
@@ -1021,7 +1027,11 @@ export async function detectOutbound(
     } catch {
       continue;
     }
-    dependencies.push(...detectJsOutboundCalls(sourceText, file.path));
+    dependencies.push(
+      ...(isGo
+        ? detectGoOutboundCalls(sourceText, file.path)
+        : detectJsOutboundCalls(sourceText, file.path)),
+    );
   }
 
   const contracts = findDeclaredContracts(
