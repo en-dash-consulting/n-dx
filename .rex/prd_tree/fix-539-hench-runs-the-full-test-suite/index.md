@@ -39,6 +39,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Gate-only retry: skip the agent when the previous run failed only at the gate with its work committed](./gate-only-retry-skip-the-agent-when.md) | completed |
 | [hench.testGate.command: a gate command template with {base}, recording the suites it selected](./hench-testgate-command-a-gate-command.md) | completed |
 | [isReadOnlyRefusal returns false when earlier attempts already committed the task's files](./isreadonlyrefusal-returns-false-when.md) | completed |
+| [Make the affected gate's stale-build check content-aware so partial and no-emit builds are judged correctly](./make-the-affected-gate-s-stale-build.md) | completed |
 | [Opt this repo into the scoped gate and flake re-run; document the test-gate templates; changeset](./opt-this-repo-into-the-scoped-gate-and.md) | completed |
 | [Read-only refusal is suppressed by other tasks' commits to files an earlier attempt only edited](./read-only-refusal-is-suppressed-by.md) | completed |
 | [.rex/workflow.md: a pre-existing failure introduced on this branch is fixed here; one already on main becomes its own task](./rex-workflow-md-a-pre-existing-failure.md) | completed |
@@ -49,4 +50,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Tell the agent and the in-hench reviewer to run scoped checks; the gate and CI run the rest](./tell-the-agent-and-the-in-hench.md) | completed |
 | [the affected gate passes a dist-reading drift test on a stale build, so a source-only change it selects still goes green](./the-affected-gate-passes-a-dist.md) | completed |
 | [The interactive test-gate prompt never appears: require() in an ESM module aborts it silently](./the-interactive-test-gate-prompt-never.md) | completed |
-| [Make the affected gate's stale-build check content-aware so partial and no-emit builds are judged correctly](./make-the-affected-gate-s-stale-build.md) | pending |
