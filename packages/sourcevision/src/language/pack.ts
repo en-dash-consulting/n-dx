@@ -19,6 +19,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { javaPack } from "./java-pack.js";
 import type { LanguageConfig } from "./registry.js";
 
 // ── Pack contract ───────────────────────────────────────────────────────────
@@ -105,8 +106,8 @@ export interface LanguagePack {
 
 // ── Built-in packs and loader ───────────────────────────────────────────────
 
-/** Packs registered in sourcevision. Java joins when it is registered as a language. */
-export const BUILTIN_PACKS: readonly LanguagePack[] = [];
+/** Packs registered in sourcevision. */
+export const BUILTIN_PACKS: readonly LanguagePack[] = [javaPack];
 
 /**
  * Where `scripts/build-grammars.mjs` writes grammars: `<package>/build/grammars`.
