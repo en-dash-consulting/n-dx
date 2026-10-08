@@ -1,11 +1,13 @@
 /**
  * Import graph for languages analyzed through a language pack (tree-sitter
- * grammar, queries and resolver) — Java today.
+ * grammar, queries and resolver) — Java and Go.
  *
  * Resolution needs an index of the whole project, so every file of a pack's
- * language is parsed on each run, incremental or not. A pack whose grammar is
- * not built, or built but unloadable, leaves its language inventory-only: it is
- * reported once and no edges are produced.
+ * language is parsed on each run, incremental or not. A pack degrades when its
+ * grammar is not built or will not load, a query will not compile against it,
+ * or its resolver cannot read the project's build files. It is reported once,
+ * produces no edges, and is listed in {@link PackImportGraph.degraded} so a
+ * caller with another parser for the language (Go's regex parser) can run it.
  *
  * @module sourcevision/analyzers/pack-imports
  */
@@ -13,7 +15,14 @@
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import type { ExternalImport, ImportEdge, Inventory } from "../schema/index.js";
-import { BUILTIN_PACKS, loadLanguagePacks, type LanguagePack, type PackSourceFile } from "../language/pack.js";
+import {
+  BUILTIN_PACKS,
+  inventoryOnlyOutcome,
+  loadLanguagePacks,
+  type LanguagePack,
+  type PackResolver,
+  type PackSourceFile,
+} from "../language/pack.js";
 import { createTreeSitterRunner, loadGrammar, type RunnablePack } from "../language/runner.js";
 
 export interface PackImportsOptions {
@@ -21,20 +30,28 @@ export interface PackImportsOptions {
   readonly packs?: readonly LanguagePack[];
   /** Where built grammars are read from; defaults to the pack loader's directory. */
   readonly grammarDir?: string;
-  /** Receives the notice for a pack whose grammar is not built. Defaults to `console.warn`. */
+  /** Receives the notice for a pack that degrades. Defaults to `console.warn`. */
   readonly warn?: (message: string) => void;
+  /**
+   * Pack id → the parser the caller runs for that language when the pack
+   * degrades (e.g. "the regex import parser"); the notice names it instead of
+   * inventory-only.
+   */
+  readonly fallbacks?: ReadonlyMap<string, string>;
 }
 
 export interface PackImportGraph {
   readonly edges: ImportEdge[];
   readonly external: ExternalImport[];
+  /** Ids of packs that had files but degraded, so produced no edges. */
+  readonly degraded: string[];
 }
 
 /**
  * Packs whose files the imports phase analyzes, given the extensions it
  * parses. Only a pack with a resolver counts: one without produces no edges,
  * and counting it would make `analyzeImports` re-parse its files on every
- * incremental run. Go, for example, is structure-only and keeps its own parser.
+ * incremental run.
  */
 export function packsFor(parseableExtensions: ReadonlySet<string>, packs: readonly LanguagePack[] = BUILTIN_PACKS): LanguagePack[] {
   return packs.filter(
@@ -48,6 +65,11 @@ export function isPackFile(path: string, packs: readonly LanguagePack[]): boolea
   return packs.some((pack) => pack.config.parseableExtensions.has(ext));
 }
 
+const REBUILD_STEP =
+  "Rebuild it with `pnpm --filter @n-dx/sourcevision build:grammars` in the n-dx checkout, or reinstall n-dx.";
+
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
 /**
  * Parse every file of each pack's language and resolve its references into
  * file-to-file edges and external packages. Packs with no files in
@@ -60,46 +82,61 @@ export async function buildPackImportGraph(
 ): Promise<PackImportGraph> {
   const edges: ImportEdge[] = [];
   const external = new Map<string, ExternalImport>();
+  const degraded: string[] = [];
 
   const present = (options.packs ?? BUILTIN_PACKS).filter((pack) => pack.resolver !== undefined && files.some((f) => isPackFile(f.path, [pack])));
-  if (present.length === 0) return { edges, external: [] };
+  if (present.length === 0) return { edges, external: [], degraded };
 
-  const statuses = loadLanguagePacks({ packs: present, grammarDir: options.grammarDir, warn: options.warn });
+  const outcome = (pack: LanguagePack): string => {
+    const fallback = options.fallbacks?.get(pack.id);
+    return fallback ? `${pack.config.displayName} imports come from ${fallback}` : inventoryOnlyOutcome(pack);
+  };
+  const statuses = loadLanguagePacks({ packs: present, grammarDir: options.grammarDir, warn: options.warn, outcome });
   const warn = options.warn ?? ((message: string) => console.warn(message));
+  const degrade = (pack: LanguagePack, message: string): void => {
+    warn(message);
+    degraded.push(pack.id);
+  };
   const runner = createTreeSitterRunner();
   try {
     for (const status of statuses) {
-      if (status.mode !== "structure" || !status.pack.resolver) continue;
+      const pack = status.pack;
+      if (!pack.resolver) continue;
+      if (status.mode !== "structure") {
+        degraded.push(pack.id); // the loader has reported it
+        continue;
+      }
+      const name = pack.config.displayName;
       // A grammar can exist yet fail to load (ABI mismatch, truncated build).
-      // Degrade that language to inventory-only rather than failing the phase
-      // and with it every other language's edges.
+      // Degrade that language rather than failing the phase and with it every
+      // other language's edges.
       try {
         await loadGrammar(status.grammarPath);
       } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
-        const name = status.pack.config.displayName;
-        warn(
-          `${name}: grammar ${status.grammarPath} could not be loaded (${reason}); ${name} files get inventory only. ` +
-            "Rebuild it with `pnpm --filter @n-dx/sourcevision build:grammars` in the n-dx checkout, or reinstall n-dx.",
-        );
+        degrade(pack, `${name}: grammar ${status.grammarPath} could not be loaded (${errorText(error)}); ${outcome(pack)}. ${REBUILD_STEP}`);
         continue;
       }
-      const target: RunnablePack = { pack: status.pack, grammarPath: status.grammarPath };
+      const target: RunnablePack = { pack, grammarPath: status.grammarPath };
       // A loadable grammar can still reject a query (a stale build that predates
       // a query edit). Same degradation, one notice for the pack.
       try {
         await runner.prepare(target);
       } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
-        const name = status.pack.config.displayName;
-        warn(
-          `${name}: a query could not be compiled against grammar ${status.grammarPath} (${reason}); ${name} files get inventory only. ` +
-            "Rebuild it with `pnpm --filter @n-dx/sourcevision build:grammars` in the n-dx checkout, or reinstall n-dx.",
+        degrade(
+          pack,
+          `${name}: a query could not be compiled against grammar ${status.grammarPath} (${errorText(error)}); ${outcome(pack)}. ${REBUILD_STEP}`,
         );
         continue;
       }
+      // Reading the project's build files (go.mod, go.work) can fail too.
+      let resolver: PackResolver;
+      try {
+        resolver = (await pack.resolver.forProject?.(targetDir)) ?? pack.resolver;
+      } catch (error) {
+        degrade(pack, `${name}: the project's build files could not be read (${errorText(error)}); ${outcome(pack)}.`);
+        continue;
+      }
       const { parsed, unparsed } = await parsePackFiles(runner, target, files, targetDir);
-      const resolver = (await status.pack.resolver.forProject?.(targetDir)) ?? status.pack.resolver;
       const prepared = resolver.prepare(parsed, unparsed);
 
       for (const { path } of parsed) {
@@ -122,7 +159,7 @@ export async function buildPackImportGraph(
     runner.dispose();
   }
 
-  return { edges, external: [...external.values()] };
+  return { edges, external: [...external.values()], degraded };
 }
 
 async function parsePackFiles(

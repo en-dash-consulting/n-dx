@@ -133,6 +133,27 @@ describe("go resolver — root package", () => {
     expect(resolve("cmd/main.go").files).toEqual([]);
   });
 
+  it("attributes an import to a required module nested under the project's path, as Go's longest prefix does", async (ctx) => {
+    mkdirSync(join(dir, "models"));
+    writeFileSync(join(dir, "go.mod"), "module example.com/root\n\nrequire example.com/root/lib v1.3.0\n");
+    writeFileSync(join(dir, "models", "m.go"), 'package models\n\nimport "example.com/root/lib/runner/v1"\n');
+    const { resolve } = await resolveProject(ctx, dir);
+    expect(resolve("models/m.go")).toEqual({
+      files: [],
+      external: [{ package: "example.com/root/lib/runner/v1", symbols: ["*"], module: { path: "example.com/root/lib", version: "v1.3.0" } }],
+    });
+  });
+
+  it("keeps a nested required module internal when a local replace points it into the project", async (ctx) => {
+    mkdirSync(join(dir, "lib", "x"), { recursive: true });
+    mkdirSync(join(dir, "cmd"));
+    writeFileSync(join(dir, "go.mod"), "module example.com/root\n\nrequire example.com/root/lib v1.3.0\n\nreplace example.com/root/lib => ./lib\n");
+    writeFileSync(join(dir, "lib", "x", "x.go"), "package x\n");
+    writeFileSync(join(dir, "cmd", "main.go"), 'package main\n\nimport "example.com/root/lib/x"\n');
+    const { resolve } = await resolveProject(ctx, dir);
+    expect(resolve("cmd/main.go")).toEqual({ files: [{ to: "lib/x", symbols: ["*"] }], external: [] });
+  });
+
   it("knows no module before it is bound to a project", async (ctx) => {
     skipUnlessGrammar(ctx, GO_WASM);
     const runner = createTreeSitterRunner();

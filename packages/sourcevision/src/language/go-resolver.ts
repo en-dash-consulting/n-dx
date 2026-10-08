@@ -24,6 +24,10 @@
  *   without a dot (`module myapp`) is internal, not stdlib;
  * - `go.work` modules and local replaces are internal, not third-party;
  * - nested modules resolve against their own `go.mod`, not the root's;
+ * - a required module whose path extends a project module's (`require
+ *   gitea.dev/actionslib` in `module gitea.dev`) is third-party, as in Go's
+ *   longest-module-prefix rule, where the regex parser emits an edge to a
+ *   project directory that does not exist;
  * - an import inside a project module whose directory holds no .go file
  *   (parsed, or passed as unparsed: oversized, unreadable) is dropped, where
  *   the regex parser emits an edge to a node that does not exist;
@@ -303,7 +307,12 @@ function resolveFile(index: Index, file: PackSourceFile): FileReferences {
 
   for (const imp of readImports(file)) {
     const root = scope.roots.find((r) => imp.path === r.path || imp.path.startsWith(`${r.path}/`));
-    if (root) {
+    const module = attribute(scope, imp.path);
+    // Go picks the longest module path that prefixes the import, so a required
+    // module nested under the project's path (`gitea.dev/actionslib` beside
+    // `module gitea.dev`) supplies the package; a local replace of it is a root
+    // of the same length and stays internal.
+    if (root && !(module && module.path.length > root.path.length)) {
       const rest = imp.path.slice(root.path.length + 1);
       const dir = root.dir === "" ? rest : rest === "" ? root.dir : `${root.dir}/${rest}`;
       const members = index.packages.get(dir);
@@ -311,10 +320,10 @@ function resolveFile(index: Index, file: PackSourceFile): FileReferences {
       const symbol = imp.alias ?? "*";
       if (dir !== "") out.file(dir, symbol);
       else for (const member of members) if (!isTestFile(member)) out.file(member, symbol);
-    } else if (isGoStdlibPath(imp.path)) {
+    } else if (!module && isGoStdlibPath(imp.path)) {
       out.externalPackage(`stdlib:${imp.path}`, undefined);
     } else {
-      out.externalPackage(imp.path, attribute(scope, imp.path));
+      out.externalPackage(imp.path, module);
     }
   }
   return out.result();
