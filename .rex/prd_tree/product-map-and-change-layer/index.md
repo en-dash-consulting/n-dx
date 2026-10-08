@@ -31,7 +31,7 @@ plannedRelease: "1.0.0"
 | [Every n-dx commit carries an item trailer](./every-n-dx-commit-carries-an-item/index.md) | pending |
 | [Generate the migration plan](./generate-the-migration-plan/index.md) | pending |
 | [MCP tools for the product layer and changes](./mcp-tools-for-the-product-layer-and/index.md) | pending |
-| [Merge driver and bundle format for v2](./merge-driver-and-bundle-format-for-v2/index.md) | pending |
+| [Merge driver and bundle format for v2](./merge-driver-and-bundle-format-for-v2/index.md) | completed |
 | [Migrate this repository and cut 1.0.0](./migrate-this-repository-and-cut-1-0-0/index.md) | pending |
 | [Move the Jev client into llm-client and redact Bitbucket tokens](./move-the-jev-client-into-llm-client/index.md) | completed |
 | [Placement engine for changes](./placement-engine-for-changes/index.md) | pending |
