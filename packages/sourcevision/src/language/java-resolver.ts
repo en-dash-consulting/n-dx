@@ -66,6 +66,34 @@ function within(inner: Capture, outer: Capture): boolean {
   return !before(inner.start, outer.start) && !before(outer.end, inner.end);
 }
 
+/** Spans not contained in another span, in document order: one sweep over spans sorted by start, then widest first. */
+function outermostSpans(spans: readonly Capture[]): Capture[] {
+  const sorted = [...spans].sort((a, b) => {
+    if (before(a.start, b.start)) return -1;
+    if (before(b.start, a.start)) return 1;
+    if (before(b.end, a.end)) return -1;
+    return before(a.end, b.end) ? 1 : 0;
+  });
+  const result: Capture[] = [];
+  for (const span of sorted) {
+    const last = result[result.length - 1];
+    if (!last || !within(span, last)) result.push(span);
+  }
+  return result;
+}
+
+/** `c` lies within one of `outer` (disjoint, in document order): binary search for the last span starting at or before it. */
+function insideAny(c: Capture, outer: readonly Capture[]): boolean {
+  let lo = 0;
+  let hi = outer.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (before(c.start, outer[mid]!.start)) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo > 0 && within(c, outer[lo - 1]!);
+}
+
 const startsWithCapital = (segment: string): boolean => /^[A-Z]/.test(segment);
 
 /** `java.util.Map<K, V>.Entry` → `["java", "util", "Map", "Entry"]`; whitespace, comments and annotations dropped. */
@@ -125,13 +153,13 @@ function readFacts(file: PackSourceFile): JavaFileFacts {
 function readReferences(file: PackSourceFile): JavaReference[] {
   const typeRefs = file.captures["type-references"] ?? [];
   const qualified = typeRefs.filter((c) => c.name === "typeref.qualified");
-  const outermost = qualified.filter((q) => !qualified.some((o) => o !== q && within(q, o)));
+  const outermost = outermostSpans(qualified);
 
   const references: JavaReference[] = outermost.map((q) => ({ segments: dottedSegments(q.text) }));
   // Simple names inside a scoped name are its segments, already read above
   // (this also drops type arguments of a generic qualifier, `Outer<String>.Inner`).
   for (const c of typeRefs) {
-    if (c.name === "typeref.name" && !outermost.some((q) => within(c, q))) {
+    if (c.name === "typeref.name" && !insideAny(c, outermost)) {
       references.push({ segments: [c.text] });
     } else if (c.name === "typeref.annotation") {
       references.push({ segments: dottedSegments(c.text) });
