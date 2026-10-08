@@ -10,7 +10,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
-import { exec } from "@n-dx/llm-client";
+import { exec, parseGitRemoteUrl } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse } from "./response-utils.js";
@@ -92,23 +92,6 @@ async function gitCommand(projectDir: string, args: string[]): Promise<string | 
   return output || null;
 }
 
-/**
- * Extract repository name from a git remote URL.
- *
- * Handles common formats:
- *   - https://github.com/user/repo.git → repo
- *   - git@github.com:user/repo.git     → repo
- *   - https://github.com/user/repo     → repo
- */
-export function extractRepoName(remoteUrl: string): string | null {
-  if (!remoteUrl) return null;
-  // Remove trailing .git and slashes
-  const cleaned = remoteUrl.replace(/\.git\/?$/, "").replace(/\/+$/, "");
-  // Get the last path segment
-  const parts = cleaned.split(/[/:]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : null;
-}
-
 /** Extract git information from the project directory. */
 async function extractGitInfo(projectDir: string): Promise<GitInfo | null> {
   // Check if this is a git repo by trying rev-parse
@@ -120,7 +103,10 @@ async function extractGitInfo(projectDir: string): Promise<GitInfo | null> {
     gitCommand(projectDir, ["rev-parse", "--short", "HEAD"]),
     gitCommand(projectDir, ["config", "--get", "remote.origin.url"]),
   ]);
-  const repoName = remoteUrl ? extractRepoName(remoteUrl) : null;
+  // The same parser the analysis manifest's repository identity uses, so the
+  // dashboard header and `.sourcevision/manifest.json` cannot name the same
+  // repository differently.
+  const repoName = remoteUrl ? (parseGitRemoteUrl(remoteUrl)?.repo ?? null) : null;
 
   return { branch, sha, remoteUrl, repoName };
 }
