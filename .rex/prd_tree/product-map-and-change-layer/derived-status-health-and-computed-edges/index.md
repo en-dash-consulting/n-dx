@@ -24,7 +24,23 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Compute edges, derived kind and alias resolution](./compute-edges-derived-kind-and-alias.md) | pending |
-| [Compute intent status and health for product nodes](./compute-intent-status-and-health-for.md) | pending |
-| [Warn when a capability's criteria grow past a threshold](./warn-when-a-capability-s-criteria-grow.md) | pending |
-| [Work out when a change landed from git history](./work-out-when-a-change-landed-from-git.md) | pending |
+| [Adapt status, edges and the retired-commits tests to PR 30's schema and rules](./adapt-status-edges-and-the-retired.md) | completed |
+| [An open fix: true change that adds a capability marks the new capability defective while its kind is feature](./an-open-fix-true-change-that-adds-a.md) | pending |
+| [Compute edges, derived kind and alias resolution](./compute-edges-derived-kind-and-alias.md) | completed |
+| [Compute intent status and health for product nodes](./compute-intent-status-and-health-for.md) | completed |
+| [computeChangeCommits defaults to the local main branch, which a CI checkout lacks and a worktree may hold stale](./computechangecommits-defaults-to-the.md) | completed |
+| [computeChangeCommits returns a truncated commit list from a shallow clone without saying so](./computechangecommits-returns-a.md) | completed |
+| [computeLanding reports an open change as landed, so resolveShippedIn gives a release for unfinished work](./computelanding-reports-an-open-change.md) | pending |
+| [computeLandings re-resolves the ref, re-checks shallowness and re-reads both caches for every change](./computelandings-re-resolves-the-ref-re.md) | pending |
+| [computeProductStatus never marks a node defective for an open fix, because an open change cannot derive kind fix](./computeproductstatus-never-marks-a.md) | completed |
+| [computeProductStatus reports a retired node defective from its last failing check](./computeproductstatus-reports-a-retired.md) | completed |
+| [Count only started or placed changes as building, and let children follow an amended parent](./count-only-started-or-placed-changes.md) | completed |
+| [deriveChangeKind calls a change that adds a new constraint a feature, not a policy change](./derivechangekind-calls-a-change-that.md) | completed |
+| [Keep retired nodes visible to status, kind and edges](./keep-retired-nodes-visible-to-status.md) | completed |
+| [Match the computed edges to the design: touches, cancelled changes and inherited bindings](./match-the-computed-edges-to-the-design.md) | completed |
+| [Re-point recorded commit SHAs that a rebase or squash rewrote](./re-point-recorded-commit-shas-that-a.md) | completed |
+| [Register change-landing with the v2 isolation test, report open changes as not landed, and load landing inputs once](./register-change-landing-with-the-v2.md) | completed |
+| [Scan re-point history with --since-as-filter, and skip retired changes when computing building status](./scan-re-point-history-with-since-as.md) | completed |
+| [Warn when a capability's criteria grow past a threshold](./warn-when-a-capability-s-criteria-grow.md) | completed |
+| [Work out a change's commits from its N-DX-Item trailers instead of storing them](./work-out-a-change-s-commits-from-its-n.md) | completed |
+| [Work out when a change landed from git history](./work-out-when-a-change-landed-from-git.md) | completed |
