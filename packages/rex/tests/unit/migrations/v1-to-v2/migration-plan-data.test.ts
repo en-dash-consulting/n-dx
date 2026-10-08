@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
-import { specHash } from "../../../../src/schema/v2-rules.js";
+import { nodeSpec, specHash } from "../../../../src/schema/v2-rules.js";
 import type { CapabilitySpecDraft } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
 import { isWindowsSafeSegment } from "../../../../src/store/folder-tree-serializer.js";
 import { classifyV1Tree } from "../../../../src/migrations/v1-to-v2/migration-plan.js";
@@ -151,6 +151,18 @@ describe("appliedAt and reviewedHash", () => {
     const data = buildPlanData(items, plan, { cutAt: CUT, specs, reviewed: [first!.id] });
     expect(data.items[first!.id]!.reviewedHash).toBe(specHash({ statement: "It works.", criteria: [{ id: "c1", text: "When x, y." }] }));
     for (const c of rest) expect(data.items[c.id]?.reviewedHash).toBeUndefined();
+  });
+
+  it("takes a capability's criteria only from its draft, so a reviewed node hashes to reviewedHash", () => {
+    const { feature, items } = tree({});
+    feature.acceptanceCriteria = ["Add X"];
+    const plan = classifyV1Tree(items);
+    const cap = plan.entries.find((e) => e.target === "capability")!;
+    const draft = { capability: cap.id, statement: "It adds X.", criteria: [{ id: "c1", text: "When asked, X is added." }] } as unknown as CapabilitySpecDraft;
+    const data = buildPlanData(items, plan, { cutAt: CUT, specs: [draft], reviewed: [cap.id] });
+    expect(data.items[cap.id]!.criteria).toBeUndefined();
+    const node = { type: "capability" as const, statement: draft.statement, criteria: draft.criteria };
+    expect(data.items[cap.id]!.reviewedHash).toBe(specHash(nodeSpec(node as never)));
   });
 
   it("gives a reviewed capability without a draft no hash", () => {

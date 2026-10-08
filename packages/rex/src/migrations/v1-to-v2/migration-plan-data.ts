@@ -6,7 +6,10 @@
  * can be re-applied to a newer tree. Callers supply the outside facts (release
  * tags, PR merges); this module never shells out.
  *
- * - Criterion ids `c1…cn` in source order, from `acceptanceCriteria`.
+ * - Criterion ids `c1…cn` in source order, from `acceptanceCriteria`. Not for a
+ *   capability: its statement and criteria come only from its draft
+ *   (`draftCapabilitySpecs`), the source `reviewedHash` is hashed from, so the
+ *   plan never holds a second, differently worded list for it.
  * - Aliases: a release umbrella dissolves, so its id is aliased to its first
  *   child change and old references still resolve.
  * - `shippedIn` for completed items: a PR merge's release wins; otherwise the
@@ -75,6 +78,7 @@ export interface LegacyLoe {
 export interface ItemPlanData {
   /** v1 id. */
   id: string;
+  /** From `acceptanceCriteria`; never set for a capability, whose spec is its draft. */
   criteria?: Criterion[];
   aliases?: string[];
   /** Present when the v1 directory name (`from`) is not Windows-safe: the v2 slug to freeze instead (`to`). */
@@ -204,11 +208,12 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
         data.flags.push("unsafe-slug");
       }
 
-      if (item.acceptanceCriteria?.length) {
+      const entry = entryById.get(item.id);
+      // A capability's spec comes only from its draft, the source of reviewedHash.
+      if (item.acceptanceCriteria?.length && entry?.target !== "capability") {
         data.criteria = item.acceptanceCriteria.map((text, i) => ({ id: `c${i + 1}`, text }));
       }
 
-      const entry = entryById.get(item.id);
       if (entry?.target === "release") {
         const first = item.children?.[0];
         if (first) {

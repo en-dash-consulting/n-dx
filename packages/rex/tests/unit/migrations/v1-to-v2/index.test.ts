@@ -34,7 +34,8 @@ describe("v1-to-v2 migration", () => {
     const plan = await v1ToV2.plan(v1TreeSource(tree()), { cutAt: CUT, options });
     expect(Object.keys(plan.entries)).toEqual(["e1", "f1", "t1", "f2", "t2", "e2", "f3"]);
     expect(plan.header).toMatchObject({ migration: "v1-to-v2", from: "v1", to: "v2", source: { kind: V1_TREE_SOURCE_KIND } });
-    expect(plan.entries.f1).toMatchObject({ target: "capability", spec: { capability: "f1" }, data: { criteria: [{ id: "c1" }] } });
+    expect(plan.entries.f1).toMatchObject({ target: "capability", spec: { capability: "f1" } });
+    expect(plan.entries.f1?.data?.criteria).toBeUndefined();
     expect(plan.entries.t1?.data?.appliedAt).toBe("2026-09-01T00:00:00.000Z");
     expect(plan.entries.f3?.data?.legacyLoe?.bucket).toBe("m");
     expect(plan.entries.e2?.target).toBe("release");
