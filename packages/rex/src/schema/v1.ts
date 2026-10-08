@@ -536,6 +536,8 @@ export interface RexConfig {
    * Range: 0–1 (inclusive). Default: 0.5.
    */
   titleCollisionSimilarityThreshold?: number;
+  /** Opt in to `rex codeowners`: CODEOWNERS files generated from the product layer's stewards. Off unless true. */
+  codeOwners?: boolean;
   future?: Record<string, unknown>;
   [key: string]: unknown;
 }

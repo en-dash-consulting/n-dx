@@ -582,6 +582,30 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["export"],
   },
+  codeowners: {
+    tool: "rex",
+    command: "codeowners",
+    summary: "generate CODEOWNERS files from the product layer's stewards",
+    usage: "rex codeowners [--check] [dir]",
+    description:
+      "Writes CODEOWNERS (GitHub) and .bitbucket/CODEOWNERS (Bitbucket) from the\n" +
+      "stewards in the product layer: the root product/index.md list is the\n" +
+      "default and an area's own stewards replace it for that area's folder.\n" +
+      "One rule per area folder, so a change that only touches the root header\n" +
+      "or the change layer matches no rule.\n\n" +
+      "Opt-in: does nothing unless .rex/config.json sets \"codeOwners\": true.\n" +
+      "Re-run after editing stewards; unchanged files are left alone.\n\n" +
+      "Emails go in both files. A @org/team handle is GitHub syntax, so the\n" +
+      "Bitbucket file omits it and a warning names it.",
+    options: [
+      { flag: "--check", description: "Write nothing; exit non-zero when a file is missing or stale" },
+    ],
+    examples: [
+      { command: "rex codeowners", description: "Regenerate both files" },
+      { command: "rex codeowners --check", description: "Fail in CI when the files lag the stewards" },
+    ],
+    related: ["validate", "status"],
+  },
   "tree-diff": {
     tool: "rex",
     command: "tree-diff",
