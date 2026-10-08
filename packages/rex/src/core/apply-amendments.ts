@@ -24,8 +24,8 @@
  *
  * Every amended node gets a History line in its body. Added and modified nodes
  * get `metAt` = {@link specHash} of the new spec (statement and criteria, never
- * the body) and lose `revisedAt`. The change gets `appliedIn`. A change that
- * only touches nodes gets `appliedIn` and leaves the product layer untouched.
+ * the body) and lose `revisedAt`. The change gets `appliedAt`, the timestamp the
+ * caller passes. A change that only touches nodes gets `appliedAt` and leaves the product layer untouched.
  *
  * Any problem refuses the whole apply with {@link ApplyAmendmentsError},
  * listing every problem found.
@@ -36,12 +36,12 @@
 import { randomUUID } from "node:crypto";
 import type { ItemStatus } from "../schema/v1.js";
 import { isDisplayId, type Amendment, type Criterion } from "../schema/v2.js";
-import { specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { isAppliedChange, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { slugifyTitle } from "../store/folder-tree-serializer.js";
 
 export interface ApplyAmendmentsOptions {
-  /** Commit the amendments are applied in; stamped as the change's `appliedIn`. */
-  commit: string;
+  /** ISO timestamp stamped as the change's `appliedAt`. */
+  appliedAt: string;
   /** Date written on History lines. */
   now: Date;
   /** Id for a node added under a display id. Default `randomUUID`. */
@@ -85,7 +85,7 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   }
   const label = change.displayId ?? change.id;
   const problems: string[] = [];
-  if (change.appliedIn) problems.push(`already applied in ${change.appliedIn}`);
+  if (isAppliedChange(change)) problems.push(`already applied at ${change.appliedAt}`);
   if (UNAPPLIABLE_STATUSES.has(change.status ?? "pending")) problems.push(`it is ${change.status}`);
   if (problems.length > 0) throw new ApplyAmendmentsError(label, problems);
 
@@ -104,7 +104,7 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   }
   if (problems.length > 0) throw new ApplyAmendmentsError(label, problems);
 
-  change.appliedIn = options.commit;
+  change.appliedAt = options.appliedAt;
   return { tree: next, applied };
 }
 

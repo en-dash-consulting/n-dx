@@ -36,7 +36,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Amendment, ChangeNode, Criterion } from "../schema/v2.js";
-import { CLOSED_STATUSES, isOpenChange, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { isOpenChange, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { appendHistory, freeSlug, resolve, stampMet } from "./apply-amendments.js";
 
 /** The spec `metAt` hashes: statement and criteria (a constraint has a statement only). */
@@ -138,10 +138,14 @@ export function handleProductEdit(tree: V2Tree, nodeRef: string, before: Spec, o
   return { tree: next, outcome: "revised", change };
 }
 
+function isChangeNode(node: RuleNode): node is RuleNode & ChangeNode {
+  return node.type === "change";
+}
+
 /** The open, unapplied product-edit change whose modified amendment targets `nodeId`, and that amendment. */
 function openDraft(tree: V2Tree, nodeId: string): { change: RuleNode & ChangeNode; amendment: Amendment } | undefined {
   for (const change of tree.changes) {
-    if (!isOpenChange(change) || change.source !== PRODUCT_EDIT_SOURCE) continue;
+    if (!isChangeNode(change) || !isOpenChange(change) || change.source !== PRODUCT_EDIT_SOURCE) continue;
     const amendment = change.amends?.find((a) => a.delta === "modified" && resolve(tree.product, a.target)?.id === nodeId);
     if (amendment) return { change, amendment };
   }
@@ -163,9 +167,12 @@ function withdrawDraft(tree: V2Tree, node: RuleNode, label: string, now: Date): 
   return change;
 }
 
-/** Cancel `node` and every descendant not already closed. */
+/** A draft's tasks and subtasks in one of these statuses are left as they are when the draft is cancelled. */
+const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["completed", "cancelled", "deleted"]);
+
+/** Cancel `node` and every descendant not already terminal. */
 function cancelOpen(node: RuleNode): void {
-  if (!CLOSED_STATUSES.has(node.status ?? "pending")) node.status = "cancelled";
+  if (!TERMINAL_STATUSES.has(node.status ?? "pending")) node.status = "cancelled";
   for (const child of node.children ?? []) cancelOpen(child);
 }
 

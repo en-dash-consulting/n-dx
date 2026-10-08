@@ -1,6 +1,6 @@
 /**
  * The apply engine: added, modified and removed amendments, History lines,
- * metAt / appliedIn stamps, and refusals that leave the tree untouched.
+ * metAt / appliedAt stamps, and refusals that leave the tree untouched.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -17,7 +17,8 @@ import { prdLockPath } from "../../../src/store/paths.js";
 import { copyV2Fixture } from "../../helpers/v2-fixture.js";
 
 const NOW = new Date("2026-10-07T12:00:00.000Z");
-const OPTS = { commit: "abc1234", now: NOW, newId: () => "new-id" };
+const APPLIED_AT = NOW.toISOString();
+const OPTS = { appliedAt: APPLIED_AT, now: NOW, newId: () => "new-id" };
 
 const AREA = "area-1";
 const CAP = "cap-1";
@@ -109,7 +110,7 @@ describe("applyAmendments: added", () => {
       body: "## History\n\n- 2026-10-07 CH-1 added: Wallets",
     });
     expect(applied).toEqual([{ delta: "added", nodeId: "new-id", summary: "Wallets" }]);
-    expect(get(out, CHANGE).appliedIn).toBe("abc1234");
+    expect(get(out, CHANGE).appliedAt).toBe(APPLIED_AT);
   });
 
   it("uses a non-display target as the id and nests under a capability", () => {
@@ -250,7 +251,7 @@ describe("applyAmendments: the change", () => {
   });
 
   it("refuses an applied, cancelled or unknown change", () => {
-    expect(refusal(() => applyAmendments(tree([], { appliedIn: "old" }), CHANGE, OPTS)).message).toMatch(/already applied in old/);
+    expect(refusal(() => applyAmendments(tree([], { appliedAt: "2026-01-01T00:00:00.000Z" }), CHANGE, OPTS)).message).toMatch(/already applied at 2026-01-01/);
     expect(refusal(() => applyAmendments(tree([], { status: "cancelled" }), CHANGE, OPTS)).message).toMatch(/cancelled/);
     expect(refusal(() => applyAmendments(tree(), "CH-9", OPTS)).message).toMatch(/no live change/);
   });
@@ -268,12 +269,12 @@ describe("applyAmendments: the change", () => {
     expect(get(out, "cap-2").body).toBe("## History\n\n- 2026-10-07 CH-1 added: add\n- 2026-10-07 CH-1 modified: tighten");
   });
 
-  it("stamps only appliedIn for a touches-only change", () => {
+  it("stamps only appliedAt for a touches-only change", () => {
     const input = tree([], { amends: undefined, touches: [CAP] });
     const { tree: out, applied } = applyAmendments(input, CHANGE, OPTS);
     expect(applied).toEqual([]);
     expect(out.product).toEqual(input.product);
-    expect(get(out, CHANGE).appliedIn).toBe("abc1234");
+    expect(get(out, CHANGE).appliedAt).toBe(APPLIED_AT);
   });
 });
 
@@ -331,7 +332,7 @@ describe("applyAmendments on disk", () => {
 
     expect(await snapshot(join(rexDir, "product"))).toEqual(before);
     expect(result.written.filter((p) => p.startsWith("product/"))).toEqual([]);
-    expect(await readFile(join(rexDir, "changes/add-apple-pay/state.yaml"), "utf-8")).toMatch(/appliedIn: "abc1234"/);
+    expect(await readFile(join(rexDir, "changes/add-apple-pay/state.yaml"), "utf-8")).toMatch(/appliedAt: "?2026-10-07T12:00:00\.000Z"?/);
   });
 
   it("writes a modified capability that reads back met", async () => {
@@ -346,6 +347,6 @@ describe("applyAmendments on disk", () => {
     expect(cap.metAt).toBe(specHash({ statement: cap.statement, criteria: cap.criteria }));
     expect(cap.revisedAt).toBeUndefined();
     expect(cap.body).toBe("## History\n\n- 2026-10-07 CH-1 modified: Wallets count as cards");
-    expect(get(reread.tree, "c0000000-0000-4000-8000-000000000001").appliedIn).toBe("abc1234");
+    expect(get(reread.tree, "c0000000-0000-4000-8000-000000000001").appliedAt).toBe(APPLIED_AT);
   });
 });

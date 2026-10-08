@@ -153,7 +153,7 @@ describe("handleProductEdit: substantive", () => {
 
   it("drafts a change that, applied, makes the node met at the edited spec", () => {
     const { tree: drafted, change } = handleProductEdit(tree(edited), CAP, BEFORE, OPTS);
-    const { tree: out } = applyAmendments(drafted, change!.id, { commit: "abc1234", now: NOW });
+    const { tree: out } = applyAmendments(drafted, change!.id, { appliedAt: NOW.toISOString(), now: NOW });
     const node = cap(out);
     expect(node.criteria).toEqual(edited.criteria);
     expect(node.metAt).toBe(specHash(edited));
@@ -218,7 +218,7 @@ describe("handleProductEdit: a second edit refreshes the open draft", () => {
 
   it("applied after both edits, leaves the node met at the latest spec", () => {
     const { tree: drafted, change } = twoEdits();
-    const { tree: out } = applyAmendments(drafted, change!.id, { commit: "abc1234", now: NOW });
+    const { tree: out } = applyAmendments(drafted, change!.id, { appliedAt: NOW.toISOString(), now: NOW });
     const node = cap(out);
     expect(node.statement).toBe(C.statement);
     expect(node.criteria).toEqual(C.criteria);
@@ -227,7 +227,7 @@ describe("handleProductEdit: a second edit refreshes the open draft", () => {
   });
 
   it("drafts anew when the earlier draft is applied, closed or from another source", () => {
-    const closed: Partial<RuleNode>[] = [{ appliedIn: "abc1234" }, { status: "completed" }, { status: "cancelled" }, { source: "recommend" }];
+    const closed: Partial<RuleNode>[] = [{ appliedAt: NOW.toISOString() }, { status: "cancelled" }, { status: "deleted" }, { source: "recommend" }];
     for (const patch of closed) {
       const first = handleProductEdit(tree(B), CAP, BEFORE, OPTS).tree;
       Object.assign(first.changes[0], patch);
@@ -236,6 +236,15 @@ describe("handleProductEdit: a second edit refreshes the open draft", () => {
       expect(out.changes.map((c) => c.id)).toEqual(["draft-1", "draft-2"]);
       expect(change?.id).toBe("draft-2");
     }
+  });
+
+  it("refreshes a completed but unapplied draft: it is still open", () => {
+    const first = handleProductEdit(tree(B), CAP, BEFORE, OPTS).tree;
+    first.changes[0].status = "completed";
+    Object.assign(cap(first), structuredClone(C));
+    const { tree: out, change } = handleProductEdit(first, CAP, B, { ...OPTS, newId: () => "draft-2" });
+    expect(out.changes.map((c) => c.id)).toEqual(["draft-1"]);
+    expect(change?.id).toBe("draft-1");
   });
 });
 
@@ -257,7 +266,7 @@ describe("handleProductEdit: reverting to the met spec withdraws the open draft"
     expect(result.change?.status).toBe("cancelled");
     expect(result.change?.amends).toEqual([]);
     expect(result.change?.intent?.split("\n").at(-1)).toBe("Cancelled on 2026-10-08: A1.1 was reverted to its met spec.");
-    expect(() => applyAmendments(result.tree, "draft-1", { commit: "abc1234", now: NOW })).toThrow();
+    expect(() => applyAmendments(result.tree, "draft-1", { appliedAt: NOW.toISOString(), now: NOW })).toThrow();
   });
 
   it("clears revisedAt, so the node reads met at the reverted spec", () => {
