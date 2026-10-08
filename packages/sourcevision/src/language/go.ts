@@ -60,6 +60,18 @@ export const goConfig: LanguageConfig = {
     /_string\.go$/,
   ],
 
+  // protoc, sqlc, ent, stringer, mockgen and similar write this header on a
+  // line of its own before the package clause.
+  generatedHeaders: [
+    {
+      extensions: new Set([".go"]),
+      pattern: /^\/\/ Code generated .* DO NOT EDIT\.\r?$/m,
+      endOfHeader: /^package\s/m,
+      source: "https://go.dev/s/generatedcode",
+      verified: "2026-10-08",
+    },
+  ],
+
   entryPointPatterns: [
     /(?:^|\/)main\.go$/,
     /(?:^|\/)cmd\/[^/]+\/main\.go$/,
