@@ -67,3 +67,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Skill commit steps prescribe a POSIX-only heredoc, which fails in PowerShell and can drop the attribution trailer](./skill-commit-steps-prescribe-a-posix.md) | completed |
 | [Skills that call add_item describe item content in prose instead of naming its parameters](./skills-that-call-add-item-describe.md) | completed |
 | [Skills that record runs omit --startedAt, so each one's first record claims the whole session](./skills-that-record-runs-omit-startedat.md) | completed |
+| [Let a project opt in to restricted-import rules in ndx ci](./let-a-project-opt-in-to-restricted.md) | pending |
