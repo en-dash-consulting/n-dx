@@ -127,4 +127,14 @@ describe("java pack", () => {
     expect(by("new")).toEqual(["I<>"]);
     expect(by("name")).toContain("String");
   });
+
+  it("captures scoped type names and field-access qualifiers", async (ctx) => {
+    const { captures } = await parse(
+      ctx,
+      "class A {\n  java.util.List<Map.Entry<K, V>> f;\n  Object g = Status.OPEN;\n  int h = this.n;\n}\n",
+    );
+    const refs = captures["type-references"]!;
+    expect(texts(refs, "typeref.qualified")).toEqual(["java.util.List", "java.util", "Map.Entry"]);
+    expect(texts(refs, "typeref.qualifier")).toEqual(["Status"]);
+  });
 });

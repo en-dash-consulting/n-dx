@@ -1,12 +1,13 @@
 /**
  * Java language pack: the pinned tree-sitter grammar plus the structure
- * queries under `queries/java/`. No resolver yet.
+ * queries under `queries/java/`, and the reference resolver.
  *
  * @module sourcevision/language/java-pack
  */
 
 import { fileURLToPath } from "node:url";
 import { javaConfig } from "./java.js";
+import { javaResolver } from "./java-resolver.js";
 import type { LanguagePack, RuleProvenance } from "./pack.js";
 
 /**
@@ -41,6 +42,7 @@ export const javaPack: LanguagePack = {
     { name: "calls", path: queryPath("calls.scm") },
     { name: "type-references", path: queryPath("type-references.scm") },
   ],
+  resolver: javaResolver,
   provenance: {
     packages: VERIFIED,
     imports: VERIFIED,
@@ -48,5 +50,12 @@ export const javaPack: LanguagePack = {
     methods: VERIFIED,
     calls: VERIFIED,
     "type-references": VERIFIED,
+    // Lookup order of a simple type name: declared in the file, single-type
+    // import, same package, wildcard import.
+    resolver: {
+      verifiedAgainst: ["Java 21"],
+      verifiedOn: "2026-10-07",
+      source: "https://docs.oracle.com/javase/specs/jls/se21/html/jls-6.html#jls-6.4.1",
+    },
   },
 };
