@@ -37,6 +37,7 @@ import {
 } from "@n-dx/llm-client";
 
 import type { SdlcDetection, SdlcEvidence, SdlcProfile } from "../schema/v1.js";
+import { hasAutomaticTrigger } from "./sdlc-profile.js";
 
 // ── Weights ─────────────────────────────────────────────────────────────────
 
@@ -369,10 +370,13 @@ function scoreCi(profile: SdlcProfile): Scored {
       },
       {
         points: 20,
-        met: ci.some((p) => p.triggers.length > 0),
+        // The same rule the analyzer uses to call a deployment automated: a
+        // pipeline whose only trigger is `workflow_dispatch` is started by a
+        // person, so it proves nothing about what a merge sets in motion.
+        met: ci.some((p) => hasAutomaticTrigger(p.triggers)),
         gap: {
-          summary: "No pipeline declares a trigger, so CI may only run when started by hand.",
-          wouldRaiseScore: "A `push` or `pull_request` trigger on a pipeline.",
+          summary: "No pipeline runs on its own; the only triggers found are started by hand.",
+          wouldRaiseScore: "A `push` or `pull_request` trigger on a pipeline, beside any manual one.",
         },
       },
       {

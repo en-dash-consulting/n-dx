@@ -2847,8 +2847,11 @@ function parseCloudFormation(content, file) {
   flush();
   return found;
 }
-function discoverFromIaC(root) {
-  const { terraform, yaml } = findIaCFiles(root);
+function discoverFromIaC(root, options = {}) {
+  const found = findIaCFiles(root);
+  const accept = options.accept ?? (() => true);
+  const terraform = found.terraform.filter(accept);
+  const yaml = found.yaml.filter(accept);
   if (terraform.length === 0 && yaml.length === 0) {
     return { infrastructure: [], sawIaC: false };
   }

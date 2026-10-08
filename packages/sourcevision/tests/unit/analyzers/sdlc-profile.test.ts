@@ -724,7 +724,7 @@ describe("determinism", () => {
     expect(source).not.toMatch(/callClaude|askJev|https?:\/\//);
     // A raw control byte in the source makes grep and file call it binary,
     // which hides it from every text-based audit of the tree.
-    expect(source).not.toMatch(/[ -]/);
+    expect(source).not.toMatch(/[\u0000-\u0008]/);
     expect(source).not.toMatch(/\.localeCompare\(/);
   });
 });
@@ -742,5 +742,79 @@ describe("an empty project", () => {
     expect(profile.migrations).toEqual([]);
     expect(profile.parseFailures).toEqual([]);
     expect(validate(SdlcProfileSchema, profile).ok).toBe(true);
+  });
+});
+
+// ── Manual triggers, test assets, ignored IaC ───────────────────────────────
+
+describe("manual triggers, test assets and ignored IaC", () => {
+  const DISPATCH_DEPLOY =
+    "name: Deploy\non:\n  workflow_dispatch:\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./deploy.sh production\n";
+
+  it("does not call a deploy automated when its workflow can only be started by hand", async () => {
+    const root = project("dispatch-only", { ".github/workflows/deploy.yml": DISPATCH_DEPLOY });
+    const profile = await buildSdlcProfile(root);
+
+    expect(profile.ci[0].triggers).toEqual(["workflow_dispatch"]);
+    expect(profile.cd).toHaveLength(1);
+    expect(profile.cd[0].automated).toBe(false);
+  });
+
+  it("calls the same deploy automated once a push trigger sits beside the manual one", async () => {
+    const root = project("dispatch-and-push", {
+      ".github/workflows/deploy.yml": DISPATCH_DEPLOY.replace(
+        "  workflow_dispatch:\n",
+        "  workflow_dispatch:\n  push:\n    branches: [main]\n",
+      ),
+    });
+    const profile = await buildSdlcProfile(root);
+
+    expect(profile.cd[0].automated).toBe(true);
+  });
+
+  it("does not count a README under tests/ as a test suite", async () => {
+    const root = project("tests-readme", {
+      "tests/README.md": "# how to run the suite",
+      "tests/e2e/README.md": "# e2e notes",
+    });
+    const profile = await buildSdlcProfile(root);
+
+    expect(profile.tests.suites).toEqual([]);
+  });
+
+  it("counts only files a runner would execute, not fixtures, snapshots or setup", async () => {
+    const root = project("tests-assets", {
+      "tests/unit/a.test.ts": "1",
+      "tests/fixtures/data.json": "{}",
+      "tests/unit/__snapshots__/a.test.ts.snap": "",
+      "tests/setup.ts": "",
+      "tests/helpers/db.ts": "",
+    });
+    const profile = await buildSdlcProfile(root);
+
+    expect(profile.tests.suites).toHaveLength(1);
+    expect(profile.tests.suites[0]).toMatchObject({ kind: "unit", fileCount: 1 });
+    expect(profile.tests.suites[0].evidence[0].path).toBe("tests/unit/a.test.ts");
+  });
+
+  it("does not claim Terraform under an ignored directory as the project's own IaC", async () => {
+    const root = project("ignored-iac", {
+      ".sourcevisionignore": "fixtures/\n",
+      "fixtures/main.tf": 'resource "aws_sqs_queue" "orders" {\n  name = "orders-queue"\n}\n',
+    });
+    const profile = await buildSdlcProfile(root);
+
+    expect(profile.iac).toEqual([]);
+  });
+
+  it("still reports Terraform the walk accepted beside an ignored copy", async () => {
+    const root = project("kept-iac", {
+      ".sourcevisionignore": "fixtures/\n",
+      "fixtures/main.tf": 'resource "aws_sqs_queue" "ignored" {\n  name = "x"\n}\n',
+      "infra/main.tf": 'resource "aws_sqs_queue" "orders" {\n  name = "orders-queue"\n}\n',
+    });
+    const profile = await buildSdlcProfile(root);
+
+    expect(profile.iac.map((i) => i.root)).toEqual(["infra"]);
   });
 });
