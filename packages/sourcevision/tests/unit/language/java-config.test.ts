@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { detectLanguage, detectLanguages, getLanguageConfig, mergeLanguageConfigs } from "../../../src/language/detect.js";
-import { javaConfig } from "../../../src/language/java.js";
+import { javaConfig, javaSecondaryConfig } from "../../../src/language/java.js";
 import { goConfig } from "../../../src/language/go.js";
 import { typescriptConfig } from "../../../src/language/typescript.js";
 import { classifyRole } from "../../../src/analyzers/inventory.js";
@@ -50,7 +50,7 @@ describe("java language config", () => {
       await touch("pom.xml");
       await touch("package.json", "{}");
       expect(await detectLanguage(dir)).toBe(typescriptConfig);
-      expect(await detectLanguages(dir)).toEqual([typescriptConfig, javaConfig]);
+      expect(await detectLanguages(dir)).toEqual([typescriptConfig, javaSecondaryConfig]);
     });
 
     it.each(["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"])(
@@ -60,7 +60,7 @@ describe("java language config", () => {
         await touch("go.mod", "module x\n");
         await touch("package.json", "{}");
         const langs = await detectLanguages(dir);
-        expect(langs[langs.length - 1]).toBe(javaConfig);
+        expect(langs[langs.length - 1]).toBe(javaSecondaryConfig);
         expect(langs).toContain(goConfig);
         expect(langs).toContain(typescriptConfig);
         expect(langs[0]).toBe(await detectLanguage(dir));

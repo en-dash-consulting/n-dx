@@ -72,3 +72,17 @@ export const javaConfig: LanguageConfig = {
 
   moduleFile: "pom.xml",
 };
+
+/**
+ * Java config for a repo whose primary language is another one (a Spring Boot
+ * service bundling a TS frontend, say). Merging the full config would let
+ * `out/`, `build/`, `generated/` and `generated-sources/` hide the primary
+ * language's files (an OpenAPI-generated TS client under `generated/`), so
+ * only the unambiguous build output stays skipped and no generated-file
+ * patterns apply. A Java-primary repo keeps `javaConfig` unchanged.
+ */
+export const javaSecondaryConfig: LanguageConfig = {
+  ...javaConfig,
+  skipDirectories: new Set(["target", ".gradle"]),
+  generatedFilePatterns: [],
+};

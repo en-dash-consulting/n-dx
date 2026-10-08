@@ -23,7 +23,7 @@ import { buildSwiftImportGraph } from "./swift-imports.js";
 import { buildCSharpImportGraph } from "./csharp-imports.js";
 import { buildPackImportGraph, isPackFile, packsFor, type PackImportsOptions } from "./pack-imports.js";
 import { readManifest } from "./manifest.js";
-import { getLanguageConfig, detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
+import { getLanguageConfig, languageConfigsFromIds, detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
 import type { LanguageConfig } from "../language/registry.js";
 import { csharpConfig } from "../language/csharp.js";
 
@@ -356,9 +356,7 @@ async function resolveLanguageConfig(
   options?: ImportsOptions,
 ): Promise<LanguageConfig> {
   if (manifest.languages && manifest.languages.length > 0) {
-    const configs = manifest.languages
-      .map((id) => getLanguageConfig(id))
-      .filter((c): c is NonNullable<typeof c> => c != null);
+    const configs = languageConfigsFromIds(manifest.languages);
     if (configs.length > 0) return mergeLanguageConfigs(configs);
   }
   if (options?.language) {

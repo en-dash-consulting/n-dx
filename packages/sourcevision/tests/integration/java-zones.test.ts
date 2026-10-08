@@ -14,7 +14,7 @@ import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeZones } from "../../src/analyzers/zones.js";
 import { goConfig } from "../../src/language/go.js";
 import { detectLanguage, detectLanguages, mergeLanguageConfigs } from "../../src/language/detect.js";
-import { javaConfig } from "../../src/language/java.js";
+import { javaConfig, javaSecondaryConfig } from "../../src/language/java.js";
 import { typescriptConfig } from "../../src/language/typescript.js";
 import type { Imports, Inventory } from "../../src/schema/v1.js";
 import { validate, ZonesSchema } from "../../src/schema/validate.js";
@@ -145,7 +145,7 @@ describe("Java beside a package.json (Spring Boot with a bundled frontend)", () 
 
   it("keeps the primary language and adds Java to the detected set", async () => {
     expect(await detectLanguage(dir)).toBe(typescriptConfig);
-    expect(await detectLanguages(dir)).toEqual([typescriptConfig, javaConfig]);
+    expect(await detectLanguages(dir)).toEqual([typescriptConfig, javaSecondaryConfig]);
   });
 
   it("analyzes the .java files with the detected language set", async (ctx) => {
