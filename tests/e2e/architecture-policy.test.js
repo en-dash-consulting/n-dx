@@ -28,9 +28,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { checkArchitecturePolicy } from "../../packages/core/ci.js";
+import { checkArchitecturePolicy, isNdxMonorepo } from "../../packages/core/ci.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 
@@ -824,6 +825,30 @@ describe("architecture policy: process execution", () => {
     const ci = checkArchitecturePolicy(ROOT);
     expect([...ci.violations].sort()).toEqual(childProcessViolations().sort());
     expect(ci.ok).toBe(true);
+  });
+
+  // The allowlist names n-dx's own files, so the step must not apply elsewhere.
+  describe("scope: only the n-dx monorepo", () => {
+    it("the n-dx repo is recognised as the monorepo", () => {
+      expect(isNdxMonorepo(ROOT)).toBe(true);
+    });
+
+    it("a user project that imports child_process is not the monorepo", () => {
+      const dir = mkdtempSync(join(tmpdir(), "ndx-arch-scope-"));
+      try {
+        writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "my-app" }));
+        mkdirSync(join(dir, "scripts"));
+        writeFileSync(
+          join(dir, "scripts", "release.js"),
+          'import { execFileSync } from "node:child_process";\nexecFileSync("true");\n',
+        );
+        // The scanner alone would flag it; the scope check is what spares it.
+        expect(checkArchitecturePolicy(dir).violations).toEqual(["scripts/release.js"]);
+        expect(isNdxMonorepo(dir)).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
   });
 });
 
