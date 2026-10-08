@@ -4,7 +4,8 @@
  * Stewards are plain strings (`Steward` in `schema/v2.ts`): a git email, or a
  * GitHub-style handle (`@org/team`). The root product header's list is the
  * default; an area's own `stewards` replaces it for that area's folder. One
- * rule is written per area folder, so no rule matches the root header, the
+ * rule is written per area (its folder, or its `<slug>.md` while it has no
+ * children), so no rule matches the root header, the
  * root `state.yaml`, or anything under `changes/`: a change that only touches
  * those asks nobody for review.
  *
@@ -57,7 +58,7 @@ function stewardList(value: unknown): string[] | undefined {
 }
 
 interface AreaEntry {
-  /** Repository-relative folder, forward slashes. */
+  /** CODEOWNERS pattern: `/<folder>/` for an area with children, `/<file>.md` for a leaf area. */
   path: string;
   title: string;
   stewards: string[];
@@ -68,7 +69,9 @@ function collectAreas(nodes: readonly RuleNode[], dir: string, fallback: string[
     if (node.status === "deleted") continue;
     const path = dir + "/" + node.slug;
     if (node.type === "area") {
-      out.push({ path, title: node.title, stewards: stewardList(node.stewards) ?? fallback });
+      // The tree writer stores a node without children as `<slug>.md`, not a folder (prd-model-writer isFolderNode).
+      const pattern = "/" + path + ((node.children?.length ?? 0) > 0 ? "/" : ".md");
+      out.push({ path: pattern, title: node.title, stewards: stewardList(node.stewards) ?? fallback });
     }
     if (node.children?.length) collectAreas(node.children, path, fallback, out);
   }
@@ -98,10 +101,10 @@ function render(
         );
       }
     }
-    const rule = "/" + area.path + "/";
+    const rule = area.path;
     const unique = [...new Set(owners)];
     // An ownerless rule matters only where it cancels an enclosing area's rule.
-    if (unique.length === 0 && !emitted.some((p) => rule.startsWith(p))) continue;
+    if (unique.length === 0 && !emitted.some((p) => p.endsWith("/") && rule.startsWith(p))) continue;
     emitted.push(rule);
     lines.push(unique.length ? rule + " " + unique.join(" ") : rule);
   }

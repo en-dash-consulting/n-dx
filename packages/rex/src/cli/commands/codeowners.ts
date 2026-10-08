@@ -54,6 +54,8 @@ export async function cmdCodeOwners(dir: string, flags: Record<string, string>):
   }
 
   const model = await loadPrdModel(rexDir);
+  // An invalid header or area is skipped by the reader; its rules vanish, so say why.
+  for (const w of model.warnings) warn(w.path + ": " + w.message);
   if (model.layout !== "v2") {
     throw new CLIError(
       "Stewards live in the v2 product layer, and this project is on the v1 tree.",

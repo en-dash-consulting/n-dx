@@ -248,7 +248,7 @@ Finished and deleted work is left out by default; `--include-completed` keeps fi
 
 ### `rex codeowners [dir]`
 
-Generates `CODEOWNERS` (GitHub) and `.bitbucket/CODEOWNERS` (Bitbucket) from the product layer's stewards: the root `product/index.md` `stewards` list is the default, and an area's own `stewards` replace it for that area's folder. One rule per area folder, so nothing outside the area folders (the root header, the change layer) matches a rule.
+Generates `CODEOWNERS` (GitHub) and `.bitbucket/CODEOWNERS` (Bitbucket) from the product layer's stewards: the root `product/index.md` `stewards` list is the default, and an area's own `stewards` replace it for that area's folder. One rule per area (its folder, or its `<slug>.md` while it has no children), so nothing outside the area folders (the root header, the change layer) matches a rule.
 
 Opt-in: nothing happens unless `.rex/config.json` sets `"codeOwners": true`. Re-run after editing stewards; unchanged files are left alone. Emails go in both files; a `@org/team` handle is GitHub syntax, so the Bitbucket file omits it and a warning names it.
 

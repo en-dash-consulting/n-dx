@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import { planCodeOwners, CODE_OWNER_FILES } from "../../../src/codeowners/plan.js";
 import type { RuleNode } from "../../../src/schema/v2-rules.js";
 
-function area(slug: string, extra: Record<string, unknown> = {}, children: RuleNode[] = []): RuleNode {
+function capability(slug: string): RuleNode {
+  return { id: slug, type: "capability", title: slug, slug, status: "pending" } as unknown as RuleNode;
+}
+
+/** An area with children, so stored as a folder. Pass `[]` for a leaf area (`<slug>.md`). */
+function area(slug: string, extra: Record<string, unknown> = {}, children: RuleNode[] = [capability(slug + "-cap")]): RuleNode {
   return { id: slug, type: "area", title: slug, slug, status: "pending", children, ...extra } as unknown as RuleNode;
 }
 
@@ -91,6 +96,19 @@ describe("planCodeOwners", () => {
       "/.rex/product/a/ ann@example.com",
       "/.rex/product/a/b/",
       "/.rex/product/a/c/ cy@example.com",
+    ]);
+  });
+
+  it("matches a childless area's own file, since it is stored as <slug>.md rather than a folder", () => {
+    const plan = planCodeOwners({
+      defaultStewards: ["ann@example.com"],
+      product: [area("a", {}, [area("leaf", { stewards: [] }, [])]), area("solo", {}, [])],
+      productDir,
+    });
+    expect(rules(github(plan))).toEqual([
+      "/.rex/product/a/ ann@example.com",
+      "/.rex/product/a/leaf.md",
+      "/.rex/product/solo.md ann@example.com",
     ]);
   });
 

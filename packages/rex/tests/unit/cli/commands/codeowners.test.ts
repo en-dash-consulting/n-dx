@@ -56,6 +56,15 @@ describe("cmdCodeOwners", () => {
     expect(bitbucket).not.toContain("/.rex/product/checkout/");
   });
 
+  it("reports a stewards list the reader rejected instead of silently dropping its rules", async () => {
+    writeConfig({ codeOwners: true });
+    const root = join(repo, ".rex", "product", "index.md");
+    writeFileSync(root, readFileSync(root, "utf-8").replace('stewards:\n  - "@shop/core"', 'stewards: "ann@example.com"'));
+    await cmdCodeOwners(repo, {});
+    const errors = (spies[1].mock.calls as unknown[][]).map((c) => String(c[0]));
+    expect(errors.some((m) => m.includes("Invalid root header"))).toBe(true);
+  });
+
   it("regenerates when the stewards change, and --check reports a stale file", async () => {
     writeConfig({ codeOwners: true });
     await cmdCodeOwners(repo, {});
