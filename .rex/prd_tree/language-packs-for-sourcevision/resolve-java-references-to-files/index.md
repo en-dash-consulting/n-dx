@@ -29,11 +29,11 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A Java grammar that fails to load fails the whole imports phase, including JS/TS edges](./a-java-grammar-that-fails-to-load.md) | pending |
 | [Discover Java modules and source roots](./discover-java-modules-and-source-roots.md) | completed |
-| [Feed Java edges into the analyze pipeline](./feed-java-edges-into-the-analyze.md) | pending |
+| [Feed Java edges into the analyze pipeline](./feed-java-edges-into-the-analyze.md) | completed |
 | [Include Java in multi-language detection beside other build markers](./include-java-in-multi-language.md) | completed |
 | [Java resolver scans every qualified type span for each type name, quadratic on large generated files](./java-resolver-scans-every-qualified.md) | pending |
 | [Measure Java resolver accuracy against scip-java](./measure-java-resolver-accuracy-against.md) | pending |
-| [Published sourcevision has no grammars, so every language pack degrades to inventory-only and the notice points at an unshipped script](./published-sourcevision-has-no-grammars.md) | pending |
+| [Published sourcevision has no grammars, so every language pack degrades to inventory-only and the notice points at an unshipped script](./published-sourcevision-has-no-grammars.md) | completed |
 | [Resolve Java imports and same-package references](./resolve-java-imports-and-same-package.md) | completed |
 | [Resolve pack file paths without the global URL so jsdom tests can load sourcevision](./resolve-pack-file-paths-without-the.md) | completed |
 | [Secondary Java drops TS/Python/Go files under out/ and generated/ from a mixed repo's inventory](./secondary-java-drops-ts-python-go.md) | pending |
