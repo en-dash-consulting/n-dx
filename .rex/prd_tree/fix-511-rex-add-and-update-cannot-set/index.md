@@ -26,4 +26,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Document rex add/update --criterion and --source and add the @n-dx/rex changeset](./document-rex-add-update-criterion-and.md) | pending |
 | [rex add takes repeatable --criterion and --source in manual mode](./rex-add-takes-repeatable-criterion-and.md) | completed |
-| [rex update replaces or clears acceptance criteria with --criterion and sets --source](./rex-update-replaces-or-clears.md) | pending |
+| [rex update replaces or clears acceptance criteria with --criterion and sets --source](./rex-update-replaces-or-clears.md) | completed |
