@@ -142,10 +142,11 @@ export const VALIDATED_ARTIFACTS = {
     label: ROOT_POLICY_LABEL,
     test: "tests/e2e/wall-clock-inventory-policy.test.js",
   },
-  "tests/layout-literal-inventory.md": {
-    label: ROOT_POLICY_LABEL,
-    test: "tests/e2e/layout-literal-policy.test.js",
-  },
+  // `tests/layout-literal-inventory.md` was here while the `.n-dx*` half was a
+  // ratchet and the policy test parsed its rows for ceilings. That sweep
+  // landed, the rule became a wall, and the file is now prose beside the test
+  // rather than an input to it — so an edit to it selects nothing, like
+  // `tests/unit-test-constant-inventory.md`.
   "docs/analysis/prompt-token-baseline.md": {
     label: ROOT_DRIFT_LABEL,
     test: "tests/e2e/prompt-census.test.js",
