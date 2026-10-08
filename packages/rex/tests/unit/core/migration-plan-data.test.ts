@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
-import type { ItemLevel, ItemStatus, LogEntry, PRDItem } from "../../../src/schema/v1.js";
+import type { ItemLevel, ItemStatus, PRDItem } from "../../../src/schema/v1.js";
 import { classifyV1Tree } from "../../../src/core/migration-plan.js";
 import {
   buildPlanData,
-  cleanLogEntries,
   dropCorrupt,
   legacyLoeRationale,
 } from "../../../src/core/migration-plan-data.js";
@@ -103,23 +102,19 @@ describe("legacy loe", () => {
 });
 
 describe('"[object Object]" values', () => {
-  it("counts recommendationMeta and log values and drops them", () => {
+  it("counts recommendationMeta and item log values and drops them", () => {
     const t = item("task", "Rec", { recommendationMeta: "[object Object]" });
     const u = item("task", "Rec2", { recommendationMeta: { a: "[object Object]", b: "ok" } });
-    const log: LogEntry[] = [
-      { timestamp: "t", event: "e", detail: "[object Object]" },
-      { timestamp: "t", event: "e2" },
-    ];
-    const data = dataFor([t, u], { logEntries: log });
+    // The shape on disk: an item's front matter `log:` list holding the literal string.
+    const logged = item("task", "Logged", { log: ["[object Object]", "kept"] });
+    const data = dataFor([t, u, logged]);
     expect(data.corrupt).toEqual({ recommendationMeta: 2, logEntries: 1 });
     expect(data.items[t.id]!.droppedMeta).toBe(1);
+    expect(data.items[logged.id]!.droppedLog).toBe(1);
 
     expect(dropCorrupt(u.recommendationMeta)).toEqual({ b: "ok" });
     expect(dropCorrupt(t.recommendationMeta)).toBeUndefined();
-    const cleaned = cleanLogEntries(log);
-    expect(cleaned.dropped).toBe(1);
-    expect(cleaned.entries[0]).toEqual({ timestamp: "t", event: "e" });
-    expect(cleaned.entries[1]).toBe(log[1]);
+    expect(dropCorrupt(logged.log)).toEqual(["kept"]);
   });
 });
 

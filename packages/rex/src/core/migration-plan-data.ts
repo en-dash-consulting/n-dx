@@ -15,13 +15,13 @@
  *   titles, a legacy `parentId` field, a stale description.
  * - Legacy `loe` buckets (`xs|s|m|l|xl`): no numeric loe, the bucket kept as
  *   text at the start of `loeRationale`. Buckets are never mapped to weeks.
- * - The literal "[object Object]" in `recommendationMeta` or a log entry
+ * - The literal "[object Object]" in `recommendationMeta` or an item's `log`
  *   (written by a pre-squash build; unrecoverable) is dropped and counted.
  *
  * @module core/migration-plan-data
  */
 
-import type { LogEntry, PRDItem } from "../schema/v1.js";
+import type { PRDItem } from "../schema/v1.js";
 import type { Criterion } from "../schema/v2.js";
 import type { MigrationPlan } from "./migration-plan.js";
 
@@ -41,8 +41,6 @@ export interface PlanDataOptions {
   releases?: readonly ReleaseTag[];
   /** Release version of the merged PR that delivered an item (v1 id): beats the tag backfill. */
   prMerges?: Readonly<Record<string, string>>;
-  /** The execution log, to count corrupt values (see {@link cleanLogEntries} to drop them). */
-  logEntries?: readonly LogEntry[];
 }
 
 export interface LegacyLoe {
@@ -63,6 +61,8 @@ export interface ItemPlanData {
   legacyLoe?: LegacyLoe;
   /** `recommendationMeta` values dropped at conversion. */
   droppedMeta: number;
+  /** Values in the item's own `log` dropped at conversion. */
+  droppedLog: number;
 }
 
 export interface PlanData {
@@ -71,7 +71,7 @@ export interface PlanData {
   /** Items per flag. */
   flagCounts: Record<DataFlag, number>;
   legacyLoe: number;
-  /** Corrupt values dropped, by where they were found. */
+  /** Corrupt values dropped, by field: `recommendationMeta`, and item `log` entries. */
   corrupt: { recommendationMeta: number; logEntries: number };
 }
 
@@ -131,18 +131,6 @@ export function dropCorrupt<T>(value: T): T | undefined {
   return value;
 }
 
-/** Log entries with corrupt values removed, and how many values were. */
-export function cleanLogEntries(entries: readonly LogEntry[]): { entries: LogEntry[]; dropped: number } {
-  let dropped = 0;
-  const cleaned = entries.map((entry) => {
-    const n = countCorrupt(entry);
-    if (n === 0) return entry;
-    dropped += n;
-    return dropCorrupt(entry) as LogEntry;
-  });
-  return { entries: cleaned, dropped };
-}
-
 /** The first release tagged at or after `completedAt`. */
 function firstReleaseAfter(completedAt: string, releases: readonly ReleaseTag[]): string | undefined {
   const done = Date.parse(completedAt);
@@ -160,7 +148,7 @@ function firstReleaseAfter(completedAt: string, releases: readonly ReleaseTag[])
 
 /** Data for every item in the tree. Same tree, plan and options always give the same result. */
 export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, options: PlanDataOptions = {}): PlanData {
-  const { releases = [], prMerges = {}, logEntries = [] } = options;
+  const { releases = [], prMerges = {} } = options;
   const result: PlanData = {
     items: {},
     flagCounts: { "criteria-in-tags": 0, "duplicate-title": 0, "legacy-parent-id": 0, "stale-description": 0 },
@@ -176,7 +164,7 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
       titles.set(key, (titles.get(key) ?? 0) + 1);
     }
     for (const item of list) {
-      const data: ItemPlanData = { id: item.id, flags: [], droppedMeta: 0 };
+      const data: ItemPlanData = { id: item.id, flags: [], droppedMeta: 0, droppedLog: 0 };
 
       if (item.acceptanceCriteria?.length) {
         data.criteria = item.acceptanceCriteria.map((text, i) => ({ id: `c${i + 1}`, text }));
@@ -186,7 +174,7 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
       if (entry?.target === "release") {
         const first = item.children?.[0];
         if (first) {
-          const host = result.items[first.id] ?? { id: first.id, flags: [], droppedMeta: 0 };
+          const host = result.items[first.id] ?? { id: first.id, flags: [], droppedMeta: 0, droppedLog: 0 };
           host.aliases = [...(host.aliases ?? []), item.id];
           result.items[first.id] = host;
         }
@@ -214,12 +202,14 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
 
       data.droppedMeta = countCorrupt(item.recommendationMeta);
       result.corrupt.recommendationMeta += data.droppedMeta;
+      data.droppedLog = countCorrupt(item.log);
+      result.corrupt.logEntries += data.droppedLog;
       for (const flag of data.flags) result.flagCounts[flag] += 1;
 
       const existing = result.items[item.id];
       const merged = existing ? { ...data, aliases: existing.aliases } : data;
       const interesting =
-        merged.criteria || merged.aliases || merged.shippedIn || merged.flags.length || merged.legacyLoe || merged.droppedMeta;
+        merged.criteria || merged.aliases || merged.shippedIn || merged.flags.length || merged.legacyLoe || merged.droppedMeta || merged.droppedLog;
       if (interesting) result.items[item.id] = merged;
       else delete result.items[item.id];
 
@@ -227,6 +217,5 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
     }
   };
   visit(items);
-  result.corrupt.logEntries = cleanLogEntries(logEntries).dropped;
   return result;
 }
