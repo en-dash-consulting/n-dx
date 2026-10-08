@@ -21,6 +21,8 @@
  *       { "name": "rules" },
  *       { "name": "text", "model": "<model id>" },
  *       { "name": "jev", "model": "<model id>" }
+ *       // a pass whose seam failed carries "incomplete": { "error": "<message>" }; its answers so
+ *       // far are kept, later passes did not run, and the plan must not be applied
  *     ]
  *   },
  *   "summary": { … },                   // migration-defined, plan-wide (counts, proposed areas, …)
@@ -64,6 +66,8 @@ export interface PassRecord {
   name: PassName;
   /** Model id; model passes only. */
   model?: string;
+  /** Set when the pass stopped on a seam error: some items have no answer, and the plan must not be applied. */
+  incomplete?: { error: string };
 }
 
 export interface PlanHeader {
@@ -91,9 +95,14 @@ export interface PlanFile<TEntry = unknown, TSummary = unknown> {
 }
 
 const PassRecordSchema = z
-  .object({ name: z.enum(PASS_NAMES), model: z.string().min(1).optional() })
+  .object({
+    name: z.enum(PASS_NAMES),
+    model: z.string().min(1).optional(),
+    incomplete: z.object({ error: z.string() }).strict().optional(),
+  })
   .strict()
-  .refine((p) => (p.name === "rules") === (p.model === undefined), "a model pass names its model; the rules pass names none");
+  .refine((p) => (p.name === "rules") === (p.model === undefined), "a model pass names its model; the rules pass names none")
+  .refine((p) => p.name !== "rules" || p.incomplete === undefined, "the rules pass cannot be incomplete");
 
 const RecordedAnswerSchema = z
   .object({ hash: z.string().min(1), model: z.string().min(1), answer: z.unknown() })
@@ -137,7 +146,11 @@ export function formatPlanFile(plan: PlanFile): string {
       to: header.to,
       source: { kind: header.source.kind, digest: header.source.digest },
       cutAt: header.cutAt,
-      passes: header.passes.map((p) => (p.model === undefined ? { name: p.name } : { name: p.name, model: p.model })),
+      passes: header.passes.map((p) => ({
+        name: p.name,
+        ...(p.model === undefined ? {} : { model: p.model }),
+        ...(p.incomplete === undefined ? {} : { incomplete: { error: p.incomplete.error } }),
+      })),
     },
     summary: plan.summary,
     entries: plan.entries,

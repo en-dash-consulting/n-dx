@@ -126,6 +126,57 @@ describe("plan pipeline", () => {
     expect(formatPlanFile(second)).toBe(formatPlanFile(first));
   });
 
+  describe("a seam that fails mid-pass", () => {
+    const THREE = (): Route[] => [...ROUTES(), { path: "/teams", handler: "listTeams" }];
+    const failingOnThird = () => {
+      let calls = 0;
+      return seam("text-model", (q) => {
+        if (++calls === 3) throw new Error("rate limited");
+        return `Answers ${(q.question as { draft: string }).draft}.`;
+      });
+    };
+    const FOUR = (): Route[] => [...THREE(), { path: "/users", handler: "listUsers" }];
+
+    it("keeps the answers so far, marks the pass incomplete and skips later passes", async () => {
+      const jev = jevSeam();
+      const plan = await bootstrap.plan(routeSource(FOUR()), { cutAt: CUT, seams: { text: failingOnThird(), jev } });
+      expect(plan.header.passes).toEqual([{ name: "rules" }, { name: "text", model: "text-model", incomplete: { error: "rate limited" } }]);
+      expect(Object.keys(plan.answers.text ?? {})).toEqual(["/tasks", "/runs"]);
+      expect(plan.entries["/runs"]?.statement).toBe("Answers listRuns.");
+      expect(plan.entries["/teams"]?.statement).toBeUndefined();
+      expect(jev.ask).not.toHaveBeenCalled();
+    });
+
+    it("lets a re-plan with that output as previous skip the answered items", async () => {
+      const failed = await bootstrap.plan(routeSource(THREE()), { cutAt: CUT, seams: { text: failingOnThird() } });
+      const previous = parsePlanFile(formatPlanFile(failed));
+      const text = textSeam();
+      const retried = await bootstrap.plan(routeSource(THREE()), { cutAt: CUT, seams: { text }, previous });
+      expect(text.ask).toHaveBeenCalledTimes(1);
+      expect(text.ask).toHaveBeenCalledWith({ id: "/teams", question: { draft: "listTeams" } });
+      expect(retried.header.passes[1]).toEqual({ name: "text", model: "text-model" });
+    });
+
+    it("keeps earlier answers for items after the failure", async () => {
+      const first = await bootstrap.plan(routeSource(FOUR()), { cutAt: CUT, seams: { text: textSeam() } });
+      const changed = FOUR();
+      changed[0] = { path: "/tasks", handler: "listTasksV2" };
+      const failing = seam("text-model", () => {
+        throw new Error("down");
+      });
+      const plan = await bootstrap.plan(routeSource(changed), { cutAt: CUT, seams: { text: failing }, previous: first });
+      expect(failing.ask).toHaveBeenCalledTimes(1);
+      expect(Object.keys(plan.answers.text ?? {})).toEqual(["/runs", "/teams", "/users"]);
+    });
+
+    it("is distinguishable from a complete plan when read back", async () => {
+      const failed = await bootstrap.plan(routeSource(THREE()), { cutAt: CUT, seams: { text: failingOnThird() } });
+      expect(parsePlanFile(formatPlanFile(failed)).header.passes[1]?.incomplete).toEqual({ error: "rate limited" });
+      const done = await bootstrap.plan(routeSource(THREE()), { cutAt: CUT, seams: { text: textSeam() } });
+      expect(parsePlanFile(formatPlanFile(done)).header.passes.some((p) => p.incomplete)).toBe(false);
+    });
+  });
+
   it("asks again when the model changed", async () => {
     const first = await bootstrap.plan(routeSource(ROUTES()), { cutAt: CUT, seams: { text: textSeam("old-model") } });
     const text = textSeam("new-model");

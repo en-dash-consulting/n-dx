@@ -5,7 +5,9 @@
  * migration defines and the context supplies a seam for. A model pass asks one
  * question per item; an answer recorded in the earlier plan is reused when the
  * pass, the model and the hash of the item's content and question all match,
- * so only new or changed items reach the seam. Writes nothing: the caller
+ * so only new or changed items reach the seam. A seam error stops the asking,
+ * keeps the answers so far and marks the pass `incomplete` in the header; later
+ * passes do not run, and the plan must not be applied. Writes nothing: the caller
  * writes the returned plan with `writePlanFile`.
  *
  * @module migrations/pipeline
@@ -62,11 +64,14 @@ export async function runPlanPipeline<TData, TEntry, TSummary, TOptions>(
   const passes: PassRecord[] = [{ name: "rules" }];
   const answers: PlanFile<TEntry, TSummary>["answers"] = {};
 
+  let stopped = false;
   for (const name of MODEL_PASSES) {
+    if (stopped) break;
     const pass = migration.passes?.[name];
     const seam = context.seams?.[name];
     if (!pass || !seam) continue;
-    passes.push({ name, model: seam.model });
+    const record: PassRecord = { name, model: seam.model };
+    passes.push(record);
     const recorded: Record<string, RecordedAnswer> = {};
     const earlier = previous?.answers[name] ?? {};
     for (const q of pass.questions(entries, data)) {
@@ -77,7 +82,19 @@ export async function runPlanPipeline<TData, TEntry, TSummary, TOptions>(
       if (Object.hasOwn(recorded, q.id)) throw new Error(`${name} pass asked about ${q.id} twice`);
       const hash = answerHash(content, q.question);
       const prior = Object.hasOwn(earlier, q.id) ? earlier[q.id] : undefined;
-      const answer = prior && prior.hash === hash && prior.model === seam.model ? prior.answer : await seam.ask(q);
+      let answer: unknown;
+      if (prior && prior.hash === hash && prior.model === seam.model) answer = prior.answer;
+      else if (record.incomplete) continue; // the seam failed earlier in this pass: ask no more
+      else {
+        try {
+          answer = await seam.ask(q);
+        } catch (err) {
+          // Keep what was paid for; the caller writes the plan and the next run reuses it.
+          record.incomplete = { error: err instanceof Error ? err.message : String(err) };
+          stopped = true;
+          continue;
+        }
+      }
       recorded[q.id] = { hash, model: seam.model, answer };
       entries[q.id] = pass.merge(entry, answer);
     }
