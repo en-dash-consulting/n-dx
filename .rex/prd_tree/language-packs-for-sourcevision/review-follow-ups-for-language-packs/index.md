@@ -20,3 +20,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Java entry points are guessed from file names, not detected from public static void main](./java-entry-points-are-guessed-from.md) | pending |
 | [Java pack grammar version is not tied to the build pin](./java-pack-grammar-version-is-not-tied.md) | pending |
+| [scip-java comparison ignores constructor references and covers only PetClinic](./scip-java-comparison-ignores.md) | pending |
