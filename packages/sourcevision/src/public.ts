@@ -94,6 +94,20 @@ export type {
   PreviousAnalyzeRun,
 } from "./analyzers/analyze-progress.js";
 
+// ---- SDLC readiness -----------------------------------------------------------
+//
+// `analyze` writes the detected profile to `sdlc-profile.json` and the score
+// computed from it to `readiness.json`. The dashboard reads the latter from
+// disk for its status headline, so the type is what keeps that read honest
+// about the shape — the same arrangement as the analysis artifacts below.
+
+export type {
+  ReadinessScore,
+  ReadinessDimensionScore,
+  ReadinessDimensionName,
+  ReadinessGap,
+} from "./analyzers/readiness-score.js";
+
 // ---- Schema constants -------------------------------------------------------
 
 export { SCHEMA_VERSION as SV_SCHEMA_VERSION } from "./schema/v1.js";

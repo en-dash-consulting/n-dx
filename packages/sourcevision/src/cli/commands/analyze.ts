@@ -43,6 +43,7 @@ import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
 import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-profile.js";
+import { computeReadinessScore } from "../../analyzers/readiness-score.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
@@ -735,6 +736,18 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     writeFileSync(
       join(ctx.svDir, DATA_FILES.sdlcProfile),
       toCanonicalJSON(stripSdlcProfileForDisk(sdlcProfile)),
+    );
+
+    // The judgement computed from that profile, persisted so a reader that
+    // only wants the headline — the dashboard's status poll, the hub card —
+    // does not have to re-score. Computed from the unstripped profile, which
+    // still carries `projectDir`, so the agent-safety dimension reads this
+    // checkout's execution config rather than scoring zero for want of a root.
+    // `sourcevision readiness` recomputes instead of reading this file, so a
+    // weight change shows up without a re-analysis.
+    writeFileSync(
+      join(ctx.svDir, DATA_FILES.readiness),
+      toCanonicalJSON(computeReadinessScore(sdlcProfile)),
     );
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);

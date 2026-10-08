@@ -86,6 +86,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `ndx next` | nothing (read-only) | none | none | seconds |
 | `ndx tree` | nothing (read-only) | none | none | seconds |
 | `ndx tree-diff` | nothing (read-only) | none | none | seconds |
+| `ndx readiness` | nothing (read-only) | none | none | seconds |
 | `ndx reset` | `{sourcevision}/` | none | none | seconds |
 | `ndx show` | nothing (read-only) | none | none | seconds |
 | `ndx rex` | `{rex}/` (only for a subcommand that writes) | subcommand ~varies | llm-provider (only for a subcommand that calls a model) | depends on the subcommand |

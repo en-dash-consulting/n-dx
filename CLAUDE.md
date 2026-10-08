@@ -225,6 +225,7 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 - `get_classifications` — file archetype classifications
 - `set_file_archetype` — override archetype classification for a file
 - `get_route_tree` — route structure (pages, API routes, layouts)
+- `get_readiness` — SDLC readiness scorecard (tests, CI, CD, rollback, migrations, feature flags, quality gates, observability, agent safety), scored from `sdlc-profile.json`. Heuristic: it detects whether a practice exists and is wired up, not whether it is good
 
 ## Changeset Versioning
 

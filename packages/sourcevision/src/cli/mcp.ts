@@ -25,6 +25,7 @@ import {
   TOOL_VERSION,
 } from "./sourcevision-core.js";
 import { findZoneById } from "../analyzers/zone-identity.js";
+import { computeReadinessForProject, READINESS_CAVEAT } from "./commands/readiness.js";
 import { resolveSourcevisionPaths } from "../paths.js";
 import { WorkspaceBinding, type BoundWorkspace } from "./mcp-workspace.js";
 
@@ -608,12 +609,42 @@ function registerComponentTools(server: McpServer, context: McpContext): void {
   });
 }
 
+function registerReadinessTools(server: McpServer, context: McpContext): void {
+  registerTool(
+    server,
+    context,
+    "get_readiness",
+    "Get the SDLC readiness scorecard: how ready this repository is to be worked by an autonomous agent, scored across testing, CI, CD, rollback, migrations, feature flags, quality gates, observability and agent safety. Heuristic — it detects whether a practice exists, not whether it is good. Use when deciding what has to be in place before running agents here.",
+    {},
+    () => {
+      // Scored on demand from sdlc-profile.json rather than read from
+      // readiness.json, so this answers exactly what `sourcevision readiness`
+      // prints for the same directory — including after a weight change, which
+      // moves the score without rewriting the profile underneath it.
+      try {
+        const score = computeReadinessForProject(context.absDir);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ ...score, caveat: READINESS_CAVEAT }, null, 2),
+          }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+        };
+      }
+    },
+  );
+}
+
 function registerMcpTools(server: McpServer, context: McpContext): void {
   registerOverviewTools(server, context);
   registerZoneTools(server, context);
   registerFileTools(server, context);
   registerClassificationTools(server, context);
   registerComponentTools(server, context);
+  registerReadinessTools(server, context);
 }
 
 function registerMcpResources(server: McpServer, context: McpContext): void {
