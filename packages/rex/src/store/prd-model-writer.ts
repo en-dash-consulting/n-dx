@@ -35,8 +35,8 @@
  * Must run under the PRD lock, like every state write. Under it, the root
  * stamp is re-read from disk and a non-v2 tree is refused, so a caller holding
  * a model read before a newer ndx restamped the tree cannot write into it.
- * Wired to nothing yet:
- * the v2 store calls it when it lands.
+ * Callers write through `withPrdModelTransaction` (`prd-model-transaction.ts`),
+ * which holds the lock across the load, the mutation and this write.
  *
  * @module rex/store/prd-model-writer
  */
