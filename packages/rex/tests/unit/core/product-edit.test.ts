@@ -92,6 +92,12 @@ describe("handleProductEdit: editorial", () => {
     expect(out.changes).toEqual([]);
   });
 
+  it("writes one History line for a multi-line summary and adds no body heading", () => {
+    const { tree: out } = handleProductEdit(tree(edited), CAP, BEFORE, { ...OPTS, editorial: true, summary: "Typo\n\n## Notes" });
+    expect(cap(out).body).toBe("Card payments.\n\n## History\n\n- 2026-10-07 editorial: Typo ## Notes");
+    expect(cap(out).body?.split("\n").filter((l) => l.startsWith("## "))).toEqual(["## History"]);
+  });
+
   it("derives the History summary from the diff when none is given", () => {
     const { tree: out } = handleProductEdit(tree(edited), CAP, BEFORE, { ...OPTS, editorial: true });
     expect(cap(out).body).toMatch(/- 2026-10-07 editorial: statement edited$/);

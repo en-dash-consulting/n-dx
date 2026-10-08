@@ -119,9 +119,7 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
     if (amendment.base !== undefined && !checkBase(tree, next, amendment, options, fail)) continue;
     const node = APPLY[amendment.delta](next, amendment, context, fail);
     if (!node) continue;
-    // One line: a newline in the summary would let "## ..." become a body heading and split History.
-    const summary = amendment.summary.replace(/\s+/g, " ").trim();
-    node.body = appendHistory(node.body, `- ${date} ${label} ${amendment.delta}: ${summary}`);
+    node.body = appendHistory(node.body, `- ${date} ${label} ${amendment.delta}: ${amendment.summary}`);
     applied.push({ delta: amendment.delta, nodeId: node.id, summary: amendment.summary });
   }
   if (problems.length > 0) throw new ApplyAmendmentsError(label, problems);
@@ -439,8 +437,12 @@ function firstDuplicate(values: readonly string[]): string | undefined {
   return undefined;
 }
 
-/** `body` with `line` appended to its History section, which is created at the end when missing. */
-export function appendHistory(body: string | undefined, line: string): string {
+/**
+ * `body` with `line` appended to its History section, which is created at the end when missing.
+ * The line is collapsed to one: a newline would let "## ..." become a body heading and split History.
+ */
+export function appendHistory(body: string | undefined, rawLine: string): string {
+  const line = rawLine.replace(/\s+/g, " ").trim();
   const text = (body ?? "").trimEnd();
   const lines = text === "" ? [] : text.split("\n");
   const start = lines.findIndex((l) => l.trim() === HISTORY_HEADING);

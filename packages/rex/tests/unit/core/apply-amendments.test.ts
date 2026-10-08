@@ -477,6 +477,12 @@ describe("appendHistory", () => {
     expect(appendHistory("## History\n\n- a", "- b")).toBe("## History\n\n- a\n- b");
     expect(appendHistory(undefined, "- a")).toBe("## History\n\n- a");
   });
+
+  it("writes a multi-line line as one, so a heading in it cannot split History", () => {
+    const body = appendHistory("## History\n\n- a", "- b: Typo\n\n## Notes");
+    expect(body).toBe("## History\n\n- a\n- b: Typo ## Notes");
+    expect(appendHistory(body, "- c")).toBe("## History\n\n- a\n- b: Typo ## Notes\n- c");
+  });
 });
 
 describe("applyAmendments on disk", () => {
