@@ -325,6 +325,118 @@ describe("Status API routes", () => {
     });
   });
 
+  /**
+   * Repo identity and the cross-repo artifact counts.
+   *
+   * This is the only route by which any of it reaches the hub — the hub never
+   * opens `.sourcevision/` itself — so the contract that matters is that each
+   * field is *present* on every response, carrying null or zero when the
+   * project has not been analysed, rather than appearing only once it has.
+   */
+  describe("SourceVision repo identity and scan counts", () => {
+    const REPO = {
+      name: "acme-api",
+      remoteUrl: "git@github.com:acme/acme-api.git",
+      remoteHost: "github.com",
+      remotePath: "acme/acme-api",
+      defaultBranch: "main",
+    };
+
+    async function writeManifest(extra: Record<string, unknown> = {}): Promise<void> {
+      await writeFile(
+        join(ctx.svDir, "manifest.json"),
+        JSON.stringify({
+          schemaVersion: "1",
+          toolVersion: "0.1.0",
+          analyzedAt: new Date().toISOString(),
+          targetPath: tmpDir,
+          modules: { inventory: { status: "complete" } },
+          ...extra,
+        }),
+      );
+    }
+
+    async function status(): Promise<any> {
+      clearStatusCache();
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+      expect(res.status).toBe(200);
+      return res.json();
+    }
+
+    it("reports the manifest's repo identity", async () => {
+      await writeManifest({ repo: REPO });
+      expect((await status()).sv.repo).toEqual(REPO);
+    });
+
+    it("counts outbound dependencies and infrastructure resources", async () => {
+      await writeManifest({ repo: REPO });
+      await writeFile(
+        join(ctx.svDir, "outbound.json"),
+        JSON.stringify({
+          dependencies: [
+            { file: "a.ts", line: 1, kind: "http", target: "https://x", targetSource: "literal", client: "fetch", confidence: "certain" },
+            { file: "b.ts", line: 9, kind: "queue", target: "ORDERS_QUEUE", targetSource: "env", client: "sqs", confidence: "certain" },
+          ],
+          contracts: [],
+        }),
+      );
+      await writeFile(
+        join(ctx.svDir, "infrastructure.json"),
+        JSON.stringify({
+          resources: [
+            { id: "aws_sqs_queue.orders", kind: "queue", name: "orders", origin: "main.tf" },
+            { id: "aws_s3_bucket.assets", kind: "bucket", name: "assets", origin: "main.tf" },
+            { id: "aws_db_instance.primary", kind: "database", name: "primary", origin: "main.tf" },
+          ],
+          seams: [],
+          links: [],
+          sawIaC: true,
+        }),
+      );
+
+      const data = await status();
+      expect(data.sv.outbound).toBe(2);
+      expect(data.sv.infrastructure).toBe(3);
+    });
+
+    it("answers for a project analysed before any of these fields existed", async () => {
+      // An older manifest: no repo block, and none of the newer artifacts on
+      // disk. The route must answer, with nulls and zeros rather than a throw.
+      await writeManifest();
+      const data = await status();
+      expect(data.sv.freshness).toBe("fresh");
+      expect(data.sv.repo).toBeNull();
+      expect(data.sv.outbound).toBe(0);
+      expect(data.sv.infrastructure).toBe(0);
+      expect(data.sv.readiness).toBeNull();
+    });
+
+    it("answers with the new fields even when there is no manifest at all", async () => {
+      const data = await status();
+      expect(data.sv.freshness).toBe("unavailable");
+      expect(data.sv.repo).toBeNull();
+      expect(data.sv.outbound).toBe(0);
+      expect(data.sv.infrastructure).toBe(0);
+      expect(data.sv.readiness).toBeNull();
+    });
+
+    it("ignores a repo block with no usable name rather than rendering undefined", async () => {
+      await writeManifest({ repo: { remoteHost: "github.com" } });
+      expect((await status()).sv.repo).toBeNull();
+    });
+
+    it("survives unparseable outbound and infrastructure artifacts", async () => {
+      await writeManifest({ repo: REPO });
+      await writeFile(join(ctx.svDir, "outbound.json"), "{ this is not json");
+      await writeFile(join(ctx.svDir, "infrastructure.json"), "[]");
+
+      const data = await status();
+      expect(data.sv.repo).toEqual(REPO);
+      expect(data.sv.outbound).toBe(0);
+      expect(data.sv.infrastructure).toBe(0);
+    });
+  });
+
   describe("Rex status", () => {
     it("reports no PRD when prd.json does not exist", async () => {
       const res = await fetch(`http://127.0.0.1:${port}/api/status`);

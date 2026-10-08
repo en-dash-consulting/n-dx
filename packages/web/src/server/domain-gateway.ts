@@ -55,6 +55,18 @@ export type { Manifest, Inventory, Imports, Zones, Components } from "@n-dx/sour
 export type { ReadinessScore } from "@n-dx/sourcevision";
 
 /**
+ * Cross-repo analysis artifacts, read by `GET /api/status`.
+ *
+ * `RepoIdentity` is who the analysed repository is independently of where it
+ * sits on disk — the one field on the manifest that survives leaving its own
+ * directory, which is what lets the hub label a card with a repository rather
+ * than a path. `OutboundData` and `InfrastructureData` are the two artifacts
+ * the status route counts, so the card can say how much of each the last
+ * analysis found without the hub ever opening `.sourcevision/` itself.
+ */
+export type { RepoIdentity, OutboundData, InfrastructureData } from "@n-dx/sourcevision";
+
+/**
  * Live analyze progress (`.sourcevision/.cache/analyze-progress.json`).
  *
  * The one sourcevision file read through a loader rather than parsed at the
