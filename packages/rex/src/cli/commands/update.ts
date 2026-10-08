@@ -16,10 +16,19 @@ import { holdCompletionForRun, describeHeldCompletion } from "../completion-hold
 import { VALID_STATUSES, VALID_PRIORITIES, RUN_SETTING_KEYS, isItemStatus, isPriority } from "../../schema/index.js";
 import { validateRunSettings } from "../../schema/validate.js";
 import type {PRDItem, ItemStatus} from "../../schema/index.js";
+/** Summary rendering of one updated field; criteria show a count, not the array. */
+function describeUpdate(key: string, value: unknown): string {
+  if (key === "acceptanceCriteria" && Array.isArray(value)) {
+    return value.length === 0 ? "cleared" : `${value.length} ${value.length === 1 ? "criterion" : "criteria"}`;
+  }
+  return value === undefined ? "cleared" : String(value);
+}
+
 export async function cmdUpdate(
   dir: string,
   id: string,
   flags: Record<string, string>,
+  multiFlags: Record<string, string[]> = {},
 ): Promise<void> {
   if (!id) {
     throw new CLIError(
@@ -151,6 +160,17 @@ export async function cmdUpdate(
     }
   }
 
+  if (multiFlags.criterion?.length) {
+    // Replaces the whole list; all-empty values clear it. `[]` is what an item
+    // with no criteria already round-trips as (see folder-tree-parser).
+    updates.acceptanceCriteria = multiFlags.criterion.map((c) => c.trim()).filter(Boolean);
+  }
+
+  if (flags.source !== undefined) {
+    // Empty removes it (undefined is not serialized).
+    updates.source = flags.source.trim() || undefined;
+  }
+
   if (flags.run !== undefined) {
     // Replaces the whole block; empty or `null` removes it (undefined is not serialized).
     const raw = flags.run.trim();
@@ -187,7 +207,7 @@ export async function cmdUpdate(
   if (Object.keys(updates).length === 0) {
     throw new CLIError(
       "No updates specified.",
-      "Use --status, --priority, --title, --description, --blockedBy, --run, or --reason (with --status=failing).",
+      "Use --status, --priority, --title, --description, --blockedBy, --criterion, --source, --run, or --reason (with --status=failing).",
     );
   }
 
@@ -262,7 +282,7 @@ export async function cmdUpdate(
   } else {
     if (heldCompletion) info(heldCompletion);
     result(`Updated ${existing.level}: ${existing.title}`);
-    info(`  ${Object.entries(updates).map(([k, v]) => `${k}: ${v}`).join(", ")}`);
+    info(`  ${Object.entries(updates).map(([k, v]) => `${k}: ${describeUpdate(k, v)}`).join(", ")}`);
     for (const item of autoCompleted) {
       info(`  ✓ Auto-completed ${item.level}: ${item.title}`);
     }

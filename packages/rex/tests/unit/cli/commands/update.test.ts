@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, existsSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -481,6 +481,72 @@ describe("cmdUpdate", () => {
         (e) => e.endsWith(".md") && e !== "index.md",
       );
       expect(remaining.length).toBe(0);
+    });
+  });
+
+  describe("--criterion and --source", () => {
+    const item = () => readPRD(tmp).items[0] as { acceptanceCriteria?: string[]; source?: string };
+    const quiet = { quiet: "true" };
+
+    it("replaces the whole list in argv order, trimmed", async () => {
+      await cmdUpdate(tmp, itemId, { criterion: "old", ...quiet }, { criterion: ["old"] });
+      await cmdUpdate(tmp, itemId, { criterion: "D", ...quiet }, { criterion: [" C ", "D"] });
+      expect(item().acceptanceCriteria).toEqual(["C", "D"]);
+    });
+
+    it("clears the list when every value is empty, and round-trips", async () => {
+      await cmdUpdate(tmp, itemId, quiet, { criterion: ["C"] });
+      await cmdUpdate(tmp, itemId, quiet, { criterion: [""] });
+      expect(item().acceptanceCriteria ?? []).toEqual([]);
+      // A further update reads the cleared item back without error.
+      await expect(cmdUpdate(tmp, itemId, { priority: "high", ...quiet })).resolves.toBeUndefined();
+    });
+
+    it("drops empty values among non-empty ones", async () => {
+      await cmdUpdate(tmp, itemId, quiet, { criterion: ["A", "", "  ", "B"] });
+      expect(item().acceptanceCriteria).toEqual(["A", "B"]);
+    });
+
+    it("leaves criteria and source untouched without the flags", async () => {
+      await cmdUpdate(tmp, itemId, { source: "s", ...quiet }, { criterion: ["A"] });
+      await cmdUpdate(tmp, itemId, { priority: "high", ...quiet });
+      expect(item().acceptanceCriteria).toEqual(["A"]);
+      expect(item().source).toBe("s");
+    });
+
+    it("sets and removes source", async () => {
+      await cmdUpdate(tmp, itemId, { source: "ndx-capture", ...quiet });
+      expect(item().source).toBe("ndx-capture");
+      await cmdUpdate(tmp, itemId, { source: "", ...quiet });
+      expect(item().source).toBeUndefined();
+    });
+
+    it("counts --criterion or --source alone as an update", async () => {
+      await expect(cmdUpdate(tmp, itemId, quiet, { criterion: ["A"] })).resolves.toBeUndefined();
+      await expect(cmdUpdate(tmp, itemId, { source: "x", ...quiet })).resolves.toBeUndefined();
+    });
+
+    it("names --criterion and --source in the no-updates hint", async () => {
+      const err = await cmdUpdate(tmp, itemId, {}).catch((e) => e);
+      expect(err.suggestion).toContain("--criterion");
+      expect(err.suggestion).toContain("--source");
+    });
+
+    it("summarises criteria as a count or 'cleared', not the array", async () => {
+      const lines: string[] = [];
+      const spies = (["log", "error", "info"] as const).map((m) =>
+        vi.spyOn(console, m).mockImplementation((...a: unknown[]) => { lines.push(a.join(" ")); }),
+      );
+      try {
+        await cmdUpdate(tmp, itemId, {}, { criterion: ["A", "B"] });
+        await cmdUpdate(tmp, itemId, {}, { criterion: [""] });
+      } finally {
+        spies.forEach((s) => s.mockRestore());
+      }
+      const out = lines.join("\n");
+      expect(out).toContain("acceptanceCriteria: 2 criteria");
+      expect(out).toContain("acceptanceCriteria: cleared");
+      expect(out).not.toContain("A,B");
     });
   });
 
