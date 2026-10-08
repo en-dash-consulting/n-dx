@@ -1,18 +1,17 @@
 /**
  * The Java grammar built by scripts/build-grammars.mjs loads in Node through
  * web-tree-sitter and parses Java. The grammar is a local build artifact, so
- * the test skips (with the command to run) when it has not been built.
+ * the test skips (with the command to run) when it has not been built, unless
+ * SV_REQUIRE_GRAMMARS=1, which CI sets and which makes a missing grammar fail.
  */
 
-import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Language, Parser } from "web-tree-sitter";
 
 import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
+import { skipUnlessGrammar } from "../helpers/grammar.js";
 
 const JAVA_WASM = grammarWasmPath("tree-sitter-java");
-const NOT_BUILT =
-  "tree-sitter-java.wasm is not built — run `node packages/sourcevision/scripts/build-grammars.mjs`";
 
 const SOURCE = `package com.example.orders;
 
@@ -34,7 +33,7 @@ public class OrderService {
 
 describe("tree-sitter-java grammar (WASM)", () => {
   it("parses a Java class without ERROR nodes", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
 
     await Parser.init();
     const parser = new Parser();

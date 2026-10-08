@@ -1,10 +1,11 @@
 /**
  * The tree-sitter runner, against the Java grammar built by
  * scripts/build-grammars.mjs. Tests that need the grammar skip (with the
- * command to run) when it has not been built; size limits do not need it.
+ * command to run) when it has not been built, unless SV_REQUIRE_GRAMMARS=1
+ * (set by CI) makes that a failure; size limits do not need it.
  */
 
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,10 +15,9 @@ import { createTreeSitterRunner, type RunnablePack, type TreeSitterRunner } from
 import type { LanguagePack } from "../../../src/language/pack.js";
 import { goConfig } from "../../../src/language/go.js";
 import { grammarWasmPath } from "../../../scripts/build-grammars.mjs";
+import { skipUnlessGrammar } from "../../helpers/grammar.js";
 
 const JAVA_WASM = grammarWasmPath("tree-sitter-java");
-const NOT_BUILT =
-  "tree-sitter-java.wasm is not built — run `node packages/sourcevision/scripts/build-grammars.mjs`";
 
 // Counted before any runner call so the process-wide counts start at zero.
 // Plain wrappers, not vi.spyOn: vitest clears a spy's calls between tests, and
@@ -95,7 +95,7 @@ describe("tree-sitter runner", () => {
   afterEach(() => runner.dispose());
 
   it("returns captures with name, node type, text and positions per query", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     const result = await runner.parseSource(target, "OrderService.java", SOURCE);
 
     expect(result.status).toBe("parsed");
@@ -122,7 +122,7 @@ describe("tree-sitter runner", () => {
   });
 
   it("counts columns in UTF-16 code units, as JavaScript strings do", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     const pack = makePack([{ name: "fields", scm: "(variable_declarator name: (identifier) @field)" }]);
     const source = 'class A { String s = "é😀"; int x; }';
     const result = await runner.parseSource({ grammarPath: JAVA_WASM, pack }, "A.java", source);
@@ -133,21 +133,21 @@ describe("tree-sitter runner", () => {
   });
 
   it("reports ERROR nodes", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     const result = await runner.parseSource(target, "Broken.java", "class A { void f() { @@ ## } }");
 
     expect(result).toMatchObject({ status: "parsed", hasErrorNodes: true });
   });
 
   it("reports MISSING nodes", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     const result = await runner.parseSource(target, "Missing.java", "class A { void f() { int x = 1 } }");
 
     expect(result).toMatchObject({ status: "parsed", hasErrorNodes: false, hasMissingNodes: true });
   });
 
   it("parses files from disk", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     const path = join(dir, "OrderService.java");
     writeFileSync(path, SOURCE);
     const result = await runner.parseFile(target, path);
@@ -157,7 +157,7 @@ describe("tree-sitter runner", () => {
   });
 
   it("initialises web-tree-sitter once and loads each grammar once per process", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     const other = createTreeSitterRunner();
     try {
       await runner.parseSource(target, "a.java", SOURCE);
@@ -172,7 +172,7 @@ describe("tree-sitter runner", () => {
   });
 
   it("frees trees: parsing many files does not grow memory without bound", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     // About 15 KB of Java. Left unfreed, 1000 of its trees hold ~700 MB of
     // external memory until web-tree-sitter's GC finalizer happens to run.
     const big = Array.from({ length: 300 }, (_, i) => `class C${i} { int f(int x) { return x + ${i}; } }`).join("\n");
@@ -197,7 +197,7 @@ describe("tree-sitter runner", () => {
   });
 
   it("frees queries on dispose and refuses further use", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     const freed = vi.spyOn(Query.prototype, "delete");
     try {
       await runner.parseSource(target, "a.java", SOURCE);
@@ -211,7 +211,7 @@ describe("tree-sitter runner", () => {
   });
 
   it("rejects a parse still compiling its pack when dispose() runs", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     const freed = vi.spyOn(Query.prototype, "delete");
     try {
       const pending = runner.parseSource(target, "a.java", SOURCE);
@@ -226,7 +226,7 @@ describe("tree-sitter runner", () => {
   });
 
   it("rejects a parse in flight when dispose() frees the parser", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     await runner.parseSource(target, "a.java", SOURCE);
     const pending = runner.parseSource(target, "b.java", SOURCE);
     runner.dispose();
@@ -235,7 +235,7 @@ describe("tree-sitter runner", () => {
   });
 
   it("fails loudly on a query that does not compile", async (ctx) => {
-    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    skipUnlessGrammar(ctx, JAVA_WASM);
     const bad = { grammarPath: JAVA_WASM, pack: makePack([{ name: "bad", scm: "(no_such_node) @x" }]) };
 
     await expect(runner.parseSource(bad, "a.java", SOURCE)).rejects.toThrow();
