@@ -183,6 +183,10 @@ describe("rex cli/commands import surface", () => {
     "../../store/claims.js",
     "../../store/index.js",
     "../../store/markdown-parser.js",
+    // `rex codeowners` reads stewards from the v2 product layer, which only the
+    // dual-read loader parses, and plans its files in its own pure module.
+    "../../store/prd-model-reader.js",
+    "../../codeowners/plan.js",
     "../../store/project-config.js",
     // `rex merge-state` is the git merge driver for v2 state.yaml and the only
     // caller of the merge. Routing it through public.ts would hand hench and
