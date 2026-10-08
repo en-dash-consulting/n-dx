@@ -117,6 +117,39 @@ describe("cmdAdd", () => {
     expect(parsed.title).toBe("Json Epic");
   });
 
+  it("stores criteria in argv order, trimmed, dropping empties, plus source", async () => {
+    await cmdAdd(tmp, "epic", { title: "With criteria", source: "ndx-capture" }, {
+      criterion: ["  First ", "", "   ", "Second"],
+    });
+    const item = readPRD(tmp).items.find((i) => i.title === "With criteria")!;
+    expect(item.acceptanceCriteria).toEqual(["First", "Second"]);
+    expect(item.source).toBe("ndx-capture");
+  });
+
+  it("leaves criteria and source unset without the flags", async () => {
+    await cmdAdd(tmp, "epic", { title: "Plain" }, { criterion: ["", " "] });
+    const item = readPRD(tmp).items.find((i) => i.title === "Plain")!;
+    expect(item.acceptanceCriteria ?? []).toEqual([]);
+    expect(item.source).toBeUndefined();
+  });
+
+  it("includes acceptanceCriteria and source in JSON output only when set", async () => {
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]): void => { lines.push(args.join(" ")); };
+    try {
+      await cmdAdd(tmp, "epic", { title: "J1", format: "json", source: "s" }, { criterion: ["A"] });
+      await cmdAdd(tmp, "epic", { title: "J2", format: "json" });
+    } finally {
+      console.log = original;
+    }
+    const [first, second] = lines.join("\n").split(/\n(?=\{)/).map((s) => JSON.parse(s));
+    expect(first.acceptanceCriteria).toEqual(["A"]);
+    expect(first.source).toBe("s");
+    expect(second).not.toHaveProperty("acceptanceCriteria");
+    expect(second).not.toHaveProperty("source");
+  });
+
   // Branch and sourceFile are storage/routing metadata excluded from the
   // folder-tree frontmatter (see STORAGE_FIELDS in folder-tree-serializer.ts),
   // so they no longer round-trip through any read surface tests can observe.
