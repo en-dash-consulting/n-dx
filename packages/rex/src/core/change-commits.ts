@@ -105,9 +105,7 @@ export async function computeChangeCommits(
 
 /** Every trailer commit reachable from the ref, newest first, from the cache when it is current. */
 export async function loadTrailerCommits(options: ChangeCommitsOptions): Promise<TrailerCommit[]> {
-  const { ref, tip } = options.ref !== undefined
-    ? { ref: options.ref, tip: await resolveCommit(options.repoDir, options.ref) }
-    : await resolveDefaultRef(options.repoDir);
+  const { ref, tip } = await resolveMainRef(options.repoDir, options.ref);
   // Before the cache read: a cache built from a shallow history is truncated too.
   await assertFullHistory(options.repoDir);
   const path = join(options.cacheDir, CHANGE_COMMITS_CACHE_FILENAME);
@@ -210,6 +208,14 @@ async function scanCommitFiles(repoDir: string, hashes: string[]): Promise<Recor
   return out;
 }
 
+/**
+ * The main ref and its tip SHA: `ref` when given (never substituted), else the
+ * first of {@link DEFAULT_MAIN_REFS} that resolves. Throws when none does.
+ */
+export async function resolveMainRef(repoDir: string, ref?: string): Promise<{ ref: string; tip: string }> {
+  return ref !== undefined ? { ref, tip: await resolveCommit(repoDir, ref) } : resolveDefaultRef(repoDir);
+}
+
 async function resolveDefaultRef(repoDir: string): Promise<{ ref: string; tip: string }> {
   const reasons: string[] = [];
   for (const ref of DEFAULT_MAIN_REFS) {
@@ -227,21 +233,23 @@ async function resolveDefaultRef(repoDir: string): Promise<{ ref: string; tip: s
 }
 
 /** A shallow clone's log stops at the fetched depth, so older commits would silently read as absent. */
-async function assertFullHistory(repoDir: string): Promise<void> {
+export async function assertFullHistory(repoDir: string): Promise<void> {
   if ((await git(repoDir, ["rev-parse", "--is-shallow-repository"])).trim() === "true") {
     throw new Error(
-      `${repoDir} is a shallow clone, so its history is truncated and change commits cannot be worked out. ` +
+      `${repoDir} is a shallow clone, so its history is truncated and commits cannot be worked out from it. ` +
         "Deepen it with `git fetch --unshallow`, or set `fetch-depth: 0` on the CI checkout.",
     );
   }
 }
 
-async function resolveCommit(repoDir: string, ref: string): Promise<string> {
+/** The full SHA `ref` names; throws when it names no commit. */
+export async function resolveCommit(repoDir: string, ref: string): Promise<string> {
   return (await git(repoDir, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`])).trim();
 }
 
-async function git(repoDir: string, args: string[]): Promise<string> {
-  const result = await exec("git", args, { cwd: repoDir, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER });
+/** Run git in `repoDir` and return stdout; throws, naming the cause, on a non-zero exit. `input` is written to its stdin. */
+export async function git(repoDir: string, args: string[], input?: string): Promise<string> {
+  const result = await exec("git", args, { cwd: repoDir, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER, input });
   if (result.exitCode !== 0) {
     const reason = result.stderr.trim() || result.error?.message || `exit ${result.exitCode}`;
     throw new Error(`git ${args[0]} failed in ${repoDir}: ${reason}`);
