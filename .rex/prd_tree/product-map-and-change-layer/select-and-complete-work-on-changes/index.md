@@ -2,7 +2,7 @@
 id: "d3bfe8a4-c3d5-4aa4-893b-36fc58647dca"
 level: "feature"
 title: "Select and complete work on changes"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "product-map"
@@ -15,10 +15,13 @@ blockedBy:
   - "e779a36a-d012-4293-ad0a-fd23d5c1744b"
   - "4cd7c27a-13d3-4fd3-85b4-9f309a4237fd"
 source: "roadmap"
+startedAt: "2026-10-08T16:33:21.087Z"
+completedAt: "2026-10-08T16:33:21.087Z"
+endedAt: "2026-10-08T16:33:21.087Z"
 acceptanceCriteria: []
 description: "Critical path. Task selection and completion over the change layer. Run with the strongest model tier and --review.\n\nRoadmap PR 16 · wave 2 · lane rex-domain."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-06T15:51:27.964Z"
+lastModified: "2026-10-08T16:33:21.338Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -26,5 +29,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Complete changes, split task-less changes and trigger apply](./complete-changes-split-task-less.md) | pending |
+| [Complete changes, split task-less changes and trigger apply](./complete-changes-split-task-less.md) | completed |
 | [Select placed changes and tasks, including task-less changes](./select-placed-changes-and-tasks.md) | completed |

@@ -22,6 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | pending |
 | [Codex drops most of packages/web/AGENTS.md: root plus nested AGENTS.md exceeds its 32 KiB combined project-doc budget](./codex-drops-most-of-packages-web.md) | pending |
 | [Codex never sees the per-package governance or the path-scoped rules, because they live only in Claude-loaded files](./codex-never-sees-the-per-package.md) | cancelled |
+| [Decide before the schema freeze whether ChangeIntentSchema gets acceptanceCriteria](./decide-before-the-schema-freeze.md) | pending |
 | [Defer the PRD timeline view and re-scope it to the Changes view](./defer-the-prd-timeline-view-and-re.md) | completed |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
 | [Install the sv analyze stop handlers before the progress file says running](./install-the-sv-analyze-stop-handlers.md) | completed |
@@ -31,4 +32,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Stop the timed-out test gate test racing its fake gate startup](./stop-the-timed-out-test-gate-test.md) | completed |
 | [The exported computeLanding still reports an open change as landed, because it takes ids rather than the change](./the-exported-computelanding-still.md) | pending |
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | pending |
-| [Decide before the schema freeze whether ChangeIntentSchema gets acceptanceCriteria](./decide-before-the-schema-freeze.md) | pending |
+| [v2 split leaves an open activeIntervals entry on a change that returns to pending](./v2-split-leaves-an-open.md) | pending |
