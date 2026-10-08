@@ -31,7 +31,7 @@ import {
   type ReadinessDimensionName,
   type ReadinessScore,
 } from "../../../src/analyzers/readiness-score.js";
-import type { SdlcDeployment, SdlcProfile } from "../../../src/schema/v1.js";
+import type { SdlcCiPipeline, SdlcDeployment, SdlcProfile } from "../../../src/schema/v1.js";
 
 // ── Fixtures on disk ────────────────────────────────────────────────────────
 
@@ -504,5 +504,40 @@ describe("agentSafety dimension", () => {
     expect(result.dimensions.agentSafety.evidence).toEqual([
       { kind: "agent-config", path: ".mcp.json", confidence: "certain" },
     ]);
+  });
+});
+
+// ── Manual triggers ─────────────────────────────────────────────────────────
+
+describe("manual triggers", () => {
+  function pipeline(triggers: string[]): SdlcCiPipeline {
+    return {
+      evidence: [{ kind: "workflow-file", path: ".github/workflows/deploy.yml", confidence: "certain" }],
+      provider: "github-actions",
+      name: "Deploy",
+      triggers,
+      jobs: [{ name: "deploy", steps: [{ kind: "deploy", run: "./deploy.sh production" }] }],
+    };
+  }
+
+  function ciScore(triggers: string[]): number {
+    return computeReadinessScore({ ...emptyProfile(), ci: [pipeline(triggers)] }, NO_AGENT_SAFETY)
+      .dimensions.ci.score;
+  }
+
+  it("does not award the automatic-trigger points to a dispatch-only pipeline", () => {
+    expect(ciScore(["workflow_dispatch"])).toBe(ciScore(["push"]) - 20);
+  });
+
+  it("awards them once an automatic trigger sits beside the manual one", () => {
+    expect(ciScore(["workflow_dispatch", "push"])).toBe(ciScore(["push"]));
+  });
+
+  it("says the trigger is hand-started in the gap", () => {
+    const result = computeReadinessScore({ ...emptyProfile(), ci: [pipeline(["workflow_dispatch"])] }, NO_AGENT_SAFETY);
+
+    expect(result.dimensions.ci.gaps.map((g) => g.summary)).toContain(
+      "No pipeline runs on its own; the only triggers found are started by hand.",
+    );
   });
 });

@@ -96,6 +96,33 @@ const SKIP_DIRS: ReadonlySet<string> = new Set([
   "__pycache__", ".next", ".nuxt", ".cache", ".gradle", "Pods",
 ]);
 
+// ── Triggers ────────────────────────────────────────────────────────────────
+
+/**
+ * Triggers that only fire when a person, or an external API call, starts the
+ * pipeline. GitHub's `workflow_dispatch` and `repository_dispatch`, GitLab's
+ * web/API/trigger-token refs (recorded as `manual`), Bitbucket's `custom`
+ * pipelines. A pipeline whose only triggers are these never runs on a push or
+ * a merge, so it is not automation however many deploy steps it carries.
+ */
+const MANUAL_TRIGGERS: ReadonlySet<string> = new Set([
+  "workflow_dispatch", "repository_dispatch", "manual", "custom",
+]);
+
+/** A trigger that makes a pipeline callable from another, not one that starts it. */
+const PASSIVE_TRIGGERS: ReadonlySet<string> = new Set(["workflow_call"]);
+
+/**
+ * Whether any trigger in the list starts the pipeline without a human.
+ *
+ * Deployment derivation and the scorecard's "runs automatically" criterion
+ * both read this, so a dispatch-only workflow cannot earn automation points
+ * on one surface and lose them on the other.
+ */
+export function hasAutomaticTrigger(triggers: readonly string[]): boolean {
+  return triggers.some((t) => !MANUAL_TRIGGERS.has(t) && !PASSIVE_TRIGGERS.has(t));
+}
+
 // ── Evidence ────────────────────────────────────────────────────────────────
 
 function one(
@@ -724,6 +751,24 @@ const SUITE_HINTS: Array<[RegExp, SdlcTestSuite["kind"]]> = [
   [/(^|\/)(unit|tests?|__tests__|spec)(\/|$)|\.(test|spec)\./, "unit"],
 ];
 
+/**
+ * A file that can run as a test: a source file in a language a test runner
+ * executes. A README, a JSON fixture or a snapshot under `tests/` is not
+ * evidence that tests exist, however the directory is named.
+ */
+const TEST_SOURCE_EXT = /\.(?:[cm]?[jt]sx?|py|go|rb|java|kt|kts|rs|cs|php|swift|scala|exs?|clj|dart)$/;
+
+/**
+ * Support files that live beside tests but are not tests: fixtures, snapshot
+ * stores, mocks, helpers, setup files, runner configuration, declarations.
+ */
+const TEST_SUPPORT_PATH =
+  /(^|\/)(?:fixtures?|__snapshots__|snapshots?|testdata|__mocks__|mocks?|helpers?|utils?|support)(\/|$)|\.d\.ts$|\.snap$|(^|\/)(?:vitest|jest|playwright|cypress|karma|mocha)\.config\.[^/]+$|(^|\/)setup[^/]*\.[cm]?[jt]sx?$/;
+
+function isExecutableTestFile(path: string): boolean {
+  return TEST_SOURCE_EXT.test(path) && !TEST_SUPPORT_PATH.test(path);
+}
+
 const OBSERVABILITY_DEPS: Array<[string, SdlcObservability["kind"], string]> = [
   ["@opentelemetry/api", "tracing", "opentelemetry"],
   ["@sentry/node", "error-reporting", "sentry"],
@@ -1094,7 +1139,9 @@ export async function buildSdlcProfile(root: string): Promise<SdlcProfile> {
         // A condition on the job is a gate of some sort, but whether it means
         // "a human approves" is a judgement this does not make.
         ...(job.condition === undefined ? {} : { requiresApproval: false }),
-        automated: pipeline.triggers.length > 0,
+        // A deploy job in a workflow that only a person can start is a deploy
+        // button, not a deployment pipeline.
+        automated: hasAutomaticTrigger(pipeline.triggers),
       });
     }
   }
@@ -1118,7 +1165,12 @@ export async function buildSdlcProfile(root: string): Promise<SdlcProfile> {
   }
 
   // ── IaC — reusing the existing discovery, not a second parser ──
-  const discovered = discoverFromIaC(root);
+  // The discovery does its own walk, which knows nothing of .gitignore,
+  // .sourcevisionignore or this walk's bounds. Restricting it to the files
+  // this walk accepted keeps an ignored fixture's Terraform from being
+  // claimed as the project's own infrastructure practice.
+  const walked = new Set(walk.files.map((f) => f.path));
+  const discovered = discoverFromIaC(root, { accept: (path) => walked.has(path) });
   const iac: SdlcIac[] = [];
   const iacByTool = new Map<string, string>();
   for (const resource of discovered.infrastructure) {
@@ -1185,6 +1237,7 @@ export async function buildSdlcProfile(root: string): Promise<SdlcProfile> {
   // ── Test suites, from paths ──
   const suiteCounts = new Map<SdlcTestSuite["kind"], { count: number; first: string }>();
   for (const file of walk.files) {
+    if (!isExecutableTestFile(file.path)) continue;
     if (!/\.(test|spec)\.[jt]sx?$|_test\.go$|(^|\/)test_[^/]+\.py$|(^|\/)tests?\//.test(file.path)) continue;
     for (const [pattern, kind] of SUITE_HINTS) {
       if (!pattern.test(file.path)) continue;
