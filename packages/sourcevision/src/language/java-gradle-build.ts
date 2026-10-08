@@ -36,7 +36,9 @@ const NO_VERSION = "no version in the script; a plugin or platform may manage it
 /** Dependency-block statements that name no external coordinate. */
 const NON_COORDINATE = /^(?:project|files|fileTree|gradleApi|localGroovy|gradleTestKit|kotlin|testFixtures)\b/;
 /** Statement heads that are declarations or control flow, not configurations. */
-const LEVEL_WRAPPER = /^(?:JavaLanguageVersion\.of|JavaVersion\.toVersion)\(([\s\S]*)\)$/;
+/** A plugin declaration's trailing `apply false` / `.apply(false)`. */
+const APPLY_TAIL = /(?:\.\s*apply\s*\(\s*\w+\s*\)|\s+apply\s+\w+)\s*$/;
+const LEVEL_WRAPPER =/^(?:JavaLanguageVersion\.of|JavaVersion\.toVersion)\(([\s\S]*)\)$/;
 const NOT_A_CONFIGURATION =new Set(["val", "var", "def", "if", "else", "for", "while", "when", "try", "return"]);
 
 interface PluginUse {
@@ -165,7 +167,9 @@ class ScriptReader {
     return out;
   }
 
-  private plugin(text: string): PluginUse | undefined {
+  private plugin(statement: string): PluginUse | undefined {
+    // `apply false` only defers applying; the declaration (and its version) still counts.
+    const text = statement.replace(APPLY_TAIL, "").trim();
     const alias = /^alias\s*\(?\s*([\w.]+)\s*\)?$/.exec(text);
     if (alias) {
       const ref = resolveCatalogRef(this.catalogs, alias[1]);
@@ -181,7 +185,7 @@ class ScriptReader {
       return undefined;
     }
     const id = m[2] !== undefined ? `org.jetbrains.kotlin.${name.value}` : name.value;
-    const tail = m[3].replace(/(?:\.\s*apply\s*\(\s*\w+\s*\)|\s+apply\s+\w+)\s*$/, "").trim();
+    const tail = m[3].trim();
     const declared = /^\.?\s*version\s*([\s\S]+)$/.exec(tail)?.[1].trim();
     if (declared === undefined) return { id };
     const expr = declared.startsWith("(") && declared.endsWith(")") ? declared.slice(1, -1) : declared;
@@ -232,7 +236,11 @@ class ScriptReader {
     if (named !== undefined) return named;
 
     const quoted = leadingStringLiteral(text);
-    if (quoted) return this.stringCoordinate(config, quoted);
+    if (quoted) {
+      // Groovy takes several coordinates in one call (`implementation 'a:b:1', 'c:d:2'`); a trailing closure is skipped.
+      const rest = args.slice(1).map((a) => this.script.text(a)).filter((t) => leadingStringLiteral(t) === t);
+      return [quoted, ...rest].flatMap((q) => this.stringCoordinate(config, q));
+    }
 
     const wrapped = /^(?:platform|enforcedPlatform)\s*\(/.exec(text);
     if (wrapped) {
