@@ -32,7 +32,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Discover Java modules and source roots](./discover-java-modules-and-source-roots.md) | completed |
 | [Feed Java edges into the analyze pipeline](./feed-java-edges-into-the-analyze.md) | completed |
 | [Include Java in multi-language detection beside other build markers](./include-java-in-multi-language.md) | completed |
-| [Java resolver scans every qualified type span for each type name, quadratic on large generated files](./java-resolver-scans-every-qualified.md) | pending |
+| [Java resolver scans every qualified type span for each type name, quadratic on large generated files](./java-resolver-scans-every-qualified.md) | completed |
 | [Measure Java resolver accuracy against scip-java](./measure-java-resolver-accuracy-against.md) | pending |
 | [Published sourcevision has no grammars, so every language pack degrades to inventory-only and the notice points at an unshipped script](./published-sourcevision-has-no-grammars.md) | completed |
 | [Resolve Java imports and same-package references](./resolve-java-imports-and-same-package.md) | completed |
