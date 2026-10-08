@@ -95,7 +95,8 @@ async function hasPythonMarker(rootDir: string): Promise<boolean> {
 
 /**
  * Java marker present? A Maven `pom.xml` or a Gradle build/settings file at
- * the root. Only consulted when no other language marker matched.
+ * the root. `detectLanguage` consults it only when no other marker matched;
+ * `detectLanguages` adds Java whenever it is present.
  */
 async function hasJavaMarker(rootDir: string): Promise<boolean> {
   const markers = ["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"];
@@ -352,6 +353,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
     hasCSharpMarker(rootDir),
   ]);
 
+  const hasJava = await hasJavaMarker(rootDir);
   const present: Array<{ config: LanguageConfig; count: number }> = [];
 
   // When any markers are present, count source files so we can order by
@@ -367,8 +369,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
 
   // No markers → fallback to TypeScript/JS for backward compatibility.
   if (present.length === 0) {
-    if (await hasJavaMarker(rootDir)) return [javaConfig];
-    return [typescriptConfig];
+    return [hasJava ? javaConfig : typescriptConfig];
   }
 
   // Stable ordering by descending file count, ties broken by the same
@@ -377,7 +378,10 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
     if (a.count !== b.count) return b.count - a.count;
     return tiebreakRank(a.config) - tiebreakRank(b.config);
   });
-  return present.map((p) => p.config);
+  const configs = present.map((p) => p.config);
+  // Appended last so Java never displaces the primary language.
+  if (hasJava) configs.push(javaConfig);
+  return configs;
 }
 
 /**
