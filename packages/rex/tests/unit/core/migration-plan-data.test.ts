@@ -124,6 +124,16 @@ describe("appliedAt and reviewedHash", () => {
     }
   });
 
+  it("uses the cut time when completedAt is empty or unparsable", () => {
+    for (const completedAt of ["", "yesterday"]) {
+      const { task, items } = tree({ completedAt });
+      const plan = classifyV1Tree(items);
+      const applied = plan.entries.filter((e) => e.target === "change" && e.applied);
+      expect(applied.map((e) => e.id)).toContain(task.id);
+      expect(dataFor(items).items[task.id]!.appliedAt).toBe(CUT);
+    }
+  });
+
   it("does not stamp an unfinished change", () => {
     const { items } = tree({}, "pending");
     const data = dataFor(items);

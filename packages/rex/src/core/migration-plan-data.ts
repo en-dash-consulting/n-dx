@@ -210,7 +210,11 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
         data.shippedIn = { version: prMerges[item.id]!, source: "pr-merge" };
       }
 
-      if (entry?.target === "change" && entry.applied) data.appliedAt = item.completedAt ?? cutAt;
+      if (entry?.target === "change" && entry.applied) {
+        // An empty or unparsable completedAt would leave the change reading as changing.
+        const done = item.completedAt;
+        data.appliedAt = done !== undefined && !Number.isNaN(Date.parse(done)) ? done : cutAt;
+      }
       const draft = specById.get(item.id);
       if (entry?.target === "capability" && reviewed.has(item.id) && draft) data.reviewedHash = specHash(draft);
 
