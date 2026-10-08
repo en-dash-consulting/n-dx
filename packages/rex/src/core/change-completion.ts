@@ -126,11 +126,12 @@ export function addTask(tree: V2Tree, changeRef: string, task: RuleNode): Change
   added.status = "in_progress";
   if (change.startedAt !== undefined) added.startedAt = change.startedAt;
   change.status = "pending";
+  // A passthrough key with no schema: move only a list; any other value stays on the change rather than being lost.
   const movedCriteria = Array.isArray(change.acceptanceCriteria) ? (change.acceptanceCriteria as string[]) : [];
   if (movedCriteria.length > 0) {
     added.acceptanceCriteria = [...((added.acceptanceCriteria as string[] | undefined) ?? []), ...movedCriteria];
   }
-  delete change.acceptanceCriteria;
+  if (Array.isArray(change.acceptanceCriteria) || change.acceptanceCriteria === undefined) delete change.acceptanceCriteria;
   result.split = { changeId: change.id, taskId: added.id, movedCriteria };
   return result;
 }

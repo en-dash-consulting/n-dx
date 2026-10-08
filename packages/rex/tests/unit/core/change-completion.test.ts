@@ -119,6 +119,12 @@ describe("addTask split rule", () => {
     expect(theChange(result.tree).children?.[0]).not.toHaveProperty("acceptanceCriteria");
   });
 
+  it("keeps criteria that are not a list on the change rather than dropping them", () => {
+    const result = addTask(tree(inFlight({ acceptanceCriteria: "Wallets pay" })), "ch", task("t"));
+    expect(result.split?.movedCriteria).toEqual([]);
+    expect(theChange(result.tree).acceptanceCriteria).toBe("Wallets pay");
+  });
+
   it("treats a change whose only tasks are deleted as task-less", () => {
     expect(addTask(tree(inFlight({ children: [task("gone", { status: "deleted" })] })), "ch", task("t")).split).not.toBeNull();
   });
