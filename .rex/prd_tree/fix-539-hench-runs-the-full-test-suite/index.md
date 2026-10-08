@@ -37,6 +37,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [agent brief stops forbidding the full suite when the test gate is skipped](./agent-brief-stops-forbidding-the-full.md) | completed |
 | [agentLoop's gate-only retry wiring has no test](./agentloop-s-gate-only-retry-wiring-has.md) | completed |
 | [Gate-only retry: skip the agent when the previous run failed only at the gate with its work committed](./gate-only-retry-skip-the-agent-when.md) | completed |
+| [Hench rebuilds the packages a run changed before the affected test gate](./hench-rebuilds-the-packages-a-run.md) | pending |
 | [hench.testGate.command: a gate command template with {base}, recording the suites it selected](./hench-testgate-command-a-gate-command.md) | completed |
 | [isReadOnlyRefusal returns false when earlier attempts already committed the task's files](./isreadonlyrefusal-returns-false-when.md) | completed |
 | [Keep the build stamp out of the published npm packages](./keep-the-build-stamp-out-of-the.md) | completed |
@@ -51,4 +52,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Tell the agent and the in-hench reviewer to run scoped checks; the gate and CI run the rest](./tell-the-agent-and-the-in-hench.md) | completed |
 | [the affected gate passes a dist-reading drift test on a stale build, so a source-only change it selects still goes green](./the-affected-gate-passes-a-dist.md) | completed |
 | [The interactive test-gate prompt never appears: require() in an ESM module aborts it silently](./the-interactive-test-gate-prompt-never.md) | completed |
-| [Hench rebuilds the packages a run changed before the affected test gate](./hench-rebuilds-the-packages-a-run.md) | pending |

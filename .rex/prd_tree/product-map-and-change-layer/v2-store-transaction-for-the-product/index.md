@@ -24,6 +24,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add a v2 store transaction that loads and writes the product and change layers under the PRD lock](./add-a-v2-store-transaction-that-loads.md) | pending |
+| [Add a v2 store transaction that loads and writes the product and change layers under the PRD lock](./add-a-v2-store-transaction-that-loads.md) | completed |
 | [Add the v2 store transaction to the v2 isolation test's module set](./add-the-v2-store-transaction-to-the-v2.md) | completed |
-| [v2 isolation test does not detect imports of the store transaction from outside the v2 set](./v2-isolation-test-does-not-detect.md) | pending |
+| [v2 isolation test does not detect imports of the store transaction from outside the v2 set](./v2-isolation-test-does-not-detect.md) | in_progress |
