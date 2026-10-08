@@ -67,6 +67,9 @@ export async function readMavenBuildModels(
   modules: readonly JavaModule[],
 ): Promise<ModuleBuildModel[]> {
   const reader = new MavenReader(projectDir);
+  // Every module pom is loaded before any model is built: a BOM import is matched by
+  // coordinates among loaded poms, so a BOM listed after its importer would read as external.
+  for (const m of modules) await reader.load(m.dir);
   const models: ModuleBuildModel[] = [];
   for (const m of modules) models.push(await reader.model(m));
   return models;
@@ -127,7 +130,7 @@ class MavenReader {
 
   // ── Loading ────────────────────────────────────────────────────────────
 
-  private async load(dir: string): Promise<PomFile | string> {
+  async load(dir: string): Promise<PomFile | string> {
     const cached = this.poms.get(dir);
     if (cached !== undefined) return cached;
     const path = join(this.projectDir, dir, "pom.xml");
@@ -223,6 +226,7 @@ class MavenReader {
         eff.managed.set(key, { ...m, fixed: m.fixed ?? (m.raw !== undefined ? interpolate(m.raw, bomCtx) : undefined) });
       }
       eff.external.push(...imported.external.filter((e) => !eff.external.includes(e)));
+      if (!eff.springBoot && imported.springBoot) eff.springBoot = imported.springBoot;
     } else {
       eff.external.push(`${group}:${artifact}:${version.resolved ? version.value : "?"}`);
     }

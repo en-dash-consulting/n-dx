@@ -78,6 +78,37 @@ describe("Maven build model semantics", () => {
       dir = undefined;
     });
 
+    async function pom(rel: string, body: string): Promise<void> {
+      await mkdir(dirname(join(dir!, rel)), { recursive: true });
+      await writeFile(join(dir!, rel), body);
+    }
+    const parent = "<parent><groupId>g</groupId><artifactId>root</artifactId><version>1</version></parent>";
+
+    it("applies an in-repository BOM listed after the module that imports it, and its Spring Boot version", async () => {
+      dir = await mkdtemp(join(tmpdir(), "sv-maven-build-"));
+      await pom(
+        "pom.xml",
+        "<project><groupId>g</groupId><artifactId>root</artifactId><version>1</version><modules><module>app</module><module>bom</module></modules></project>",
+      );
+      await pom(
+        "app/pom.xml",
+        `<project>${parent}<artifactId>app</artifactId>
+           <dependencyManagement><dependencies><dependency><groupId>g</groupId><artifactId>bom</artifactId><version>1</version><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement>
+           <dependencies><dependency><groupId>x</groupId><artifactId>lib</artifactId></dependency></dependencies></project>`,
+      );
+      await pom(
+        "bom/pom.xml",
+        `<project>${parent}<artifactId>bom</artifactId>
+           <dependencyManagement><dependencies>
+             <dependency><groupId>x</groupId><artifactId>lib</artifactId><version>4.2</version></dependency>
+             <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-dependencies</artifactId><version>3.1.0</version><type>pom</type><scope>import</scope></dependency>
+           </dependencies></dependencyManagement></project>`,
+      );
+      const app = (await read(dir)).find((m) => m.module === "app");
+      expect(dep(app, "lib")?.version).toEqual({ resolved: true, value: "4.2" });
+      expect(app?.springBootVersion).toEqual({ resolved: true, value: "3.1.0" });
+    });
+
     it("reports a malformed pom as a notice and keeps the module", async () => {
       dir = await mkdtemp(join(tmpdir(), "sv-maven-build-"));
       await mkdir(dirname(join(dir, "pom.xml")), { recursive: true });
