@@ -35,6 +35,7 @@ const expectedAssets = BUILTIN_PACKS.flatMap((pack) => [
 ]);
 
 interface LoadReport {
+  ids: string[];
   modes: Record<string, string>;
   queriesPresent: boolean;
   missingNotice: string | undefined;
@@ -117,6 +118,7 @@ describe("packed @n-dx/sourcevision tarball", () => {
       const statuses = loadLanguagePacks({ warn: () => {} });
       const [missing] = loadLanguagePacks({ grammarDir: ${JSON.stringify(emptyGrammarDir)}, warn: () => {} });
       console.log(JSON.stringify({
+        ids: BUILTIN_PACKS.map((p) => p.id),
         modes: Object.fromEntries(statuses.map((s) => [s.pack.id, s.mode])),
         queriesPresent: BUILTIN_PACKS.every((p) => p.queries.every((q) => existsSync(q.path))),
         missingNotice: missing?.notice,
@@ -127,6 +129,15 @@ describe("packed @n-dx/sourcevision tarball", () => {
       encoding: "utf-8",
     });
     const report = JSON.parse(out) as LoadReport;
+
+    // A dist built before src/language/pack.ts registered a pack has every module file
+    // but the old registry; say so rather than report it as a mode mismatch.
+    const unregistered = BUILTIN_PACKS.map((p) => p.id).filter((id) => !report.ids.includes(id));
+    if (unregistered.length > 0) {
+      throw new Error(
+        `dist is older than src/language: dist's BUILTIN_PACKS lacks ${unregistered.join(", ")} — run \`pnpm --filter @n-dx/sourcevision build\``,
+      );
+    }
 
     expect(report.modes).toEqual(Object.fromEntries(BUILTIN_PACKS.map((p) => [p.id, "structure"])));
     expect(report.modes["java"]).toBe("structure");
