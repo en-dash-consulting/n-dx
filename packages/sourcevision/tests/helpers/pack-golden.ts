@@ -73,7 +73,8 @@ export async function runPackOverFixture(
     }
     if (!pack.resolver) return { pack: pack.id, grammar: pack.grammar, files };
     const parsed = files.filter((f): f is ParsedFile => f.status === "parsed");
-    const prepared = pack.resolver.prepare(parsed);
+    const resolver = (await pack.resolver.forProject?.(fixtureDir)) ?? pack.resolver;
+    const prepared = resolver.prepare(parsed);
     const references = Object.fromEntries(parsed.map((f) => [f.path, prepared.resolve(f.path)]));
     return { pack: pack.id, grammar: pack.grammar, files, references };
   } finally {

@@ -7,6 +7,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ImportEdge, ImportType, ExternalImport } from "../schema/index.js";
+import { isGoStdlibPath } from "../language/go.js";
 import { toPosix } from "../util/paths.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -25,19 +26,6 @@ export interface GoImportResult {
   edges: ImportEdge[];
   /** External imports (stdlib + third-party) */
   external: ExternalImport[];
-}
-
-// ── Go standard library detection ────────────────────────────────────────────
-
-/**
- * Go stdlib packages have no dot in the first path segment.
- * e.g. "fmt", "net/http", "encoding/json" → stdlib
- *      "github.com/foo/bar" → not stdlib (has dot)
- *      "golang.org/x/text" → not stdlib (has dot)
- */
-function isStdlib(importPath: string): boolean {
-  const firstSegment = importPath.split("/")[0];
-  return !firstSegment.includes(".");
 }
 
 // ── go.mod module path extraction ────────────────────────────────────────────
@@ -253,7 +241,7 @@ function classifyImport(
   importPath: string,
   modulePath: string | null,
 ): "stdlib" | "third-party" | "internal" {
-  if (isStdlib(importPath)) return "stdlib";
+  if (isGoStdlibPath(importPath)) return "stdlib";
   if (modulePath && (importPath === modulePath || importPath.startsWith(modulePath + "/"))) {
     return "internal";
   }

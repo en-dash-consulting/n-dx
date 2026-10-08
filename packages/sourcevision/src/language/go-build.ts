@@ -1,6 +1,7 @@
 /**
  * Go build model: module path, dependencies and versions from `go.mod`, and
- * the workspace directives of `go.work`. Files are parsed as text, never with
+ * the workspace directives of `go.work`, and the vendored modules listed in
+ * `vendor/modules.txt`. Files are parsed as text, never with
  * the `go` tool, and the result is held in memory only.
  *
  * Each `go.mod` becomes a {@link ModuleBuildModel} (`buildSystem: "go"`).
@@ -35,6 +36,8 @@ export interface GoReplace {
 }
 
 export interface GoModFacts {
+  /** The `module` directive's path; absent when the file has none (then `module` holds the directory). */
+  readonly module?: string;
   /** The `go` directive, e.g. `1.21`. */
   readonly go?: string;
   /** The `toolchain` directive, e.g. `go1.22.1`. */
@@ -154,6 +157,7 @@ export function parseGoMod(dir: string, file: string, text: string): GoModuleBui
     dependencies: deps.sort(compareDeps),
     notices,
     goMod: {
+      ...(modulePath !== undefined && { module: modulePath }),
       ...(go !== undefined && { go }),
       ...(toolchain !== undefined && { toolchain }),
       replaces,
@@ -214,6 +218,49 @@ export function parseGoWork(file: string, text: string): GoWorkFacts {
     }
   }
   return { file, ...(go !== undefined && { go }), ...(toolchain !== undefined && { toolchain }), use, replaces, notices };
+}
+
+// ── vendor/modules.txt ───────────────────────────────────────────────────
+
+/** One module in `vendor/modules.txt`, with the packages vendored from it. */
+export interface GoVendoredModule {
+  readonly path: string;
+  /** The version in use: the replacement's when the module is replaced by a version. */
+  readonly version?: string;
+  /** Import paths vendored from this module, as listed. */
+  readonly packages: readonly string[];
+}
+
+/** The modules vendored into a module's `vendor/` directory; empty when it has no `vendor/modules.txt`. */
+export async function readGoVendorModules(projectDir: string, moduleDir: string): Promise<GoVendoredModule[]> {
+  const file = posix.join(moduleDir, "vendor", "modules.txt");
+  const text = await readText(join(projectDir, file));
+  return typeof text === "string" ? parseGoVendorModules(text) : [];
+}
+
+/**
+ * Parse `vendor/modules.txt`: `# path version [=> new [version]]` opens a
+ * module, `## …` lines annotate it, and every other line is a package
+ * vendored from it. Exported for tests.
+ */
+export function parseGoVendorModules(text: string): GoVendoredModule[] {
+  const out: Array<{ path: string; version?: string; packages: string[] }> = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line === "" || line.startsWith("##")) continue;
+    if (line.startsWith("# ")) {
+      const fields = line.slice(2).trim().split(/\s+/);
+      const arrow = fields.indexOf("=>");
+      const left = arrow < 0 ? fields : fields.slice(0, arrow);
+      const right = arrow < 0 ? [] : fields.slice(arrow + 1);
+      // A replacement by version supplies the code; a local replacement has none.
+      const version = right.length === 2 ? right[1] : left[1];
+      out.push({ path: left[0], ...(version !== undefined && { version }), packages: [] });
+    } else if (out.length > 0) {
+      out[out.length - 1].packages.push(line);
+    }
+  }
+  return out;
 }
 
 // ── Shared line parsing ──────────────────────────────────────────────────

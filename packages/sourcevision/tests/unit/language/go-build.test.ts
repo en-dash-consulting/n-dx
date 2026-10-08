@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseGoMod, readGoBuildModels, readGoWorkFiles } from "../../../src/language/go-build.js";
+import { parseGoMod, parseGoVendorModules, readGoBuildModels, readGoWorkFiles } from "../../../src/language/go-build.js";
 
 const FIXTURES = fileURLToPath(new URL("../../fixtures/go-build", import.meta.url));
 const ver = (value: string) => ({ resolved: true, value });
@@ -92,5 +92,27 @@ describe("go.work", () => {
       ],
       notices: [],
     });
+  });
+});
+
+describe("vendor/modules.txt", () => {
+  it("lists each vendored module with its packages, taking a versioned replacement's version", () => {
+    const text = [
+      "# github.com/a/b v1.0.0",
+      "## explicit; go 1.20",
+      "github.com/a/b",
+      "github.com/a/b/c",
+      "# golang.org/x/text v0.14.0 => golang.org/x/text v0.15.0",
+      "golang.org/x/text/language",
+      "# example.com/local => ../local",
+      "## explicit",
+      "example.com/local",
+      "",
+    ].join("\n");
+    expect(parseGoVendorModules(text)).toEqual([
+      { path: "github.com/a/b", version: "v1.0.0", packages: ["github.com/a/b", "github.com/a/b/c"] },
+      { path: "golang.org/x/text", version: "v0.15.0", packages: ["golang.org/x/text/language"] },
+      { path: "example.com/local", packages: ["example.com/local"] },
+    ]);
   });
 });
