@@ -372,6 +372,7 @@ export {
   detectLayoutMode,
   resolveLayout,
   relativeToRoot,
+  projectRootOf,
   layoutStateNames,
   resolveNdxHome,
 } from "./layout.js";
