@@ -44,6 +44,7 @@ import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers
 import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
 import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-profile.js";
 import { computeReadinessScore } from "../../analyzers/readiness-score.js";
+import { detectOutbound } from "../../analyzers/outbound-detection.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
@@ -748,6 +749,16 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     writeFileSync(
       join(ctx.svDir, DATA_FILES.readiness),
       toCanonicalJSON(computeReadinessScore(sdlcProfile)),
+    );
+
+    // Outbound dependencies and declared contracts — the consumer half of the
+    // HTTP picture, mirroring the server routes the components phase records.
+    // Deterministic and LLM-free, so it runs on every analysis including
+    // `--fast`, and is written canonically for the same reason as the file
+    // above it.
+    writeFileSync(
+      join(ctx.svDir, DATA_FILES.outbound),
+      toCanonicalJSON(await detectOutbound(ctx.absDir, inventory)),
     );
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);
