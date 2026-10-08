@@ -546,6 +546,7 @@ const SdlcCiJobSchema = z.object({
   steps: z.array(SdlcCiStepSchema),
   needs: z.array(z.string()).optional(),
   condition: z.string().optional(),
+  environment: z.string().optional(),
 });
 
 const SdlcCiPipelineSchema = z.object({
@@ -574,6 +575,8 @@ const SdlcRollbackSchema = z.object({
   evidence: SdlcEvidenceListSchema,
   mechanism: z.string().min(1),
   environment: z.string().optional(),
+  tool: z.string().optional(),
+  versioning: z.enum(["semver", "calver"]).optional(),
 });
 
 const SdlcMigrationSchema = z.object({

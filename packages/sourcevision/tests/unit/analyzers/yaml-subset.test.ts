@@ -82,6 +82,33 @@ describe("sequences", () => {
   it("does not split a comma inside a quoted flow item", () => {
     expect(parseYamlSubset("a: ['x,y', z]\n")).toEqual({ a: ["x,y", "z"] });
   });
+
+  it("reads a sequence at the same indent as the key that owns it", () => {
+    // The GitLab CI docs and many workflows write `steps:` and its dashes at
+    // one column. Reading that as "no value" dropped every job after it.
+    const doc = parseYamlSubset(
+      "jobs:\n" +
+      "  test:\n" +
+      "    steps:\n" +
+      "    - run: npm test\n" +
+      "  deploy:\n" +
+      "    steps:\n" +
+      "      - run: ./deploy.sh\n",
+    );
+    expect(doc).toEqual({
+      jobs: {
+        test: { steps: [{ run: "npm test" }] },
+        deploy: { steps: [{ run: "./deploy.sh" }] },
+      },
+    });
+  });
+
+  it("reads a top-level sequence at the same indent as its key", () => {
+    expect(parseYamlSubset("on:\n- push\n- pull_request\njobs:\n  x: 1\n")).toEqual({
+      on: ["push", "pull_request"],
+      jobs: { x: 1 },
+    });
+  });
 });
 
 describe("block scalars", () => {
@@ -95,6 +122,15 @@ describe("block scalars", () => {
 
   it("accepts the chomping indicators", () => {
     expect(parseYamlSubset("a: |-\n  x\nb: >-\n  y\n")).toEqual({ a: "x", b: "y" });
+  });
+
+  it("keeps a tab inside a block scalar body", () => {
+    // A heredoc in a `run: |` script is content; only indentation refuses tabs.
+    expect(parseYamlSubset("run: |\n  cat <<EOF\n  \tx\n  EOF\n")).toEqual({ run: "cat <<EOF\n\tx\nEOF" });
+  });
+
+  it("keeps the relative indentation of a block scalar body", () => {
+    expect(parseYamlSubset("run: |\n  if x; then\n    y\n  fi\n")).toEqual({ run: "if x; then\n  y\nfi" });
   });
 });
 
@@ -133,6 +169,44 @@ describe("refuses rather than guesses", () => {
 
   it("throws on an unterminated quote in a flow collection", () => {
     expect(() => parseYamlSubset("a: ['x, y]\n")).toThrow(YamlSubsetError);
+  });
+
+  it("throws, naming the line, when a line is left unconsumed", () => {
+    // A stray line no container claims used to be dropped along with
+    // everything after it, returning a document that looked complete.
+    try {
+      parseYamlSubset("a:\n    b: 1\n  c: 2\nd: 3\n");
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(YamlSubsetError);
+      expect((error as YamlSubsetError).message).toMatch(/Unexpected content/);
+      expect((error as YamlSubsetError).line).toBe(3);
+    }
+  });
+
+  it("still refuses a tab that indents structure, even where no container claims the line", () => {
+    expect(() => parseYamlSubset("a: 1\n\tb: 2\n")).toThrow(/Tab/);
+  });
+});
+
+describe("encodings editors produce", () => {
+  it("ignores a leading byte-order mark", () => {
+    // Without this the BOM counted as indentation, the first line became a
+    // one-column block, and the rest of the workflow was silently discarded.
+    const bom = String.fromCharCode(0xfeff);
+    expect(parseYamlSubset(bom + "name: CI\non: push\njobs:\n  x:\n    steps:\n      - run: echo\n")).toEqual({
+      name: "CI",
+      on: "push",
+      jobs: { x: { steps: [{ run: "echo" }] } },
+    });
+  });
+
+  it("reads CRLF line endings", () => {
+    expect(parseYamlSubset("name: CI\r\non: push\r\njobs:\r\n  x:\r\n    steps:\r\n      - run: echo\r\n")).toEqual({
+      name: "CI",
+      on: "push",
+      jobs: { x: { steps: [{ run: "echo" }] } },
+    });
   });
 });
 

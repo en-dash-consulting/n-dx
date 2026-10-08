@@ -214,6 +214,50 @@ function distinct<T, K>(items: readonly T[], key: (item: T) => K): number {
   return new Set(items.map(key)).size;
 }
 
+/**
+ * The `parseFailures[].kind` values the analyzer records for a CI definition
+ * it recognised but could not read — the same ids it uses as
+ * `SdlcCiPipeline.provider`.
+ */
+const CI_FILE_KINDS: ReadonlySet<string> = new Set([
+  "github-actions",
+  "gitlab-ci",
+  "circleci",
+  "bitbucket-pipelines",
+  "jenkins",
+]);
+
+/** The CI files the analyzer found but could not parse. */
+function ciParseFailures(profile: SdlcProfile): SdlcProfile["parseFailures"] {
+  return profile.parseFailures.filter((failure) => CI_FILE_KINDS.has(failure.kind));
+}
+
+/** `path (reason); path (reason)` — one line naming every unreadable CI file. */
+function describeFailures(failures: SdlcProfile["parseFailures"]): string {
+  return failures.map((f) => `${f.path} (${f.reason})`).join("; ");
+}
+
+/**
+ * The gap for a dimension that found nothing, with one exception that matters:
+ * a CI file that is present but unparseable is the opposite of "no CI
+ * configured", and a scorecard that confused the two would tell a user to add
+ * the workflow they already have. When every pipeline is unreadable the
+ * dimension still scores zero — nothing was proven — but the gap names the
+ * file and the reason, and the remedy is to fix it rather than to add one.
+ */
+function unparsedCiGap(failures: SdlcProfile["parseFailures"], fallback: ReadinessGap, consequence: string): ReadinessGap {
+  if (failures.length === 0) return fallback;
+  const plural = failures.length > 1;
+  return {
+    summary: `${plural ? "CI files were" : "A CI file was"} found but could not be parsed: ${describeFailures(failures)}.${consequence}`,
+    wouldRaiseScore:
+      "Fix the file so it parses — the reason above names what the analyzer refused — then re-run `sourcevision analyze`.",
+  };
+}
+
+/** The environment name the analyzer records when a deploy job does not say where it deploys. */
+const UNKNOWN_ENVIRONMENT = "unknown";
+
 // ── Dimension scorers ───────────────────────────────────────────────────────
 
 /**
@@ -267,7 +311,12 @@ function scoreTesting(profile: SdlcProfile): Scored {
         points: 20,
         met: suites.some((s) => s.kind !== "unit"),
         gap: {
-          summary: "Unit tests are the only kind found; nothing exercises the system end to end.",
+          // "Unit tests are the only kind" is only true when some suite exists;
+          // with none at all the unit-test gap above already says so.
+          summary:
+            suites.length > 0
+              ? "Unit tests are the only kind found; nothing exercises the system end to end."
+              : "No integration or end-to-end tests were found.",
           wouldRaiseScore:
             "Tests under an `integration/`, `e2e/`, `contract/` or `smoke/` directory, which prove the pieces work together.",
         },
@@ -292,11 +341,15 @@ function scoreCi(profile: SdlcProfile): Scored {
 
   return fromCriteria(
     evidenceOf(ci),
-    {
-      summary: "No CI pipeline was detected.",
-      wouldRaiseScore:
-        "A workflow file for a supported provider — GitHub Actions, GitLab CI, CircleCI, Bitbucket Pipelines or a Jenkinsfile.",
-    },
+    unparsedCiGap(
+      ciParseFailures(profile),
+      {
+        summary: "No CI pipeline was detected.",
+        wouldRaiseScore:
+          "A workflow file for a supported provider — GitHub Actions, GitLab CI, CircleCI, Bitbucket Pipelines or a Jenkinsfile.",
+      },
+      " Until it parses, nothing in it counts as CI.",
+    ),
     [
       {
         points: 40,
@@ -340,11 +393,15 @@ function scoreCd(profile: SdlcProfile): Scored {
 
   return fromCriteria(
     evidenceOf(cd),
-    {
-      summary: "No deployment path was detected.",
-      wouldRaiseScore:
-        "A CI job with a deploy step — `kubectl apply`, `helm upgrade`, `terraform apply`, or a deploy script.",
-    },
+    unparsedCiGap(
+      ciParseFailures(profile),
+      {
+        summary: "No deployment path was detected.",
+        wouldRaiseScore:
+          "A CI job with a deploy step — `kubectl apply`, `helm upgrade`, `terraform apply`, or a deploy script.",
+      },
+      " Any deploy job in it is invisible until it parses.",
+    ),
     [
       {
         points: 50,
@@ -365,10 +422,18 @@ function scoreCd(profile: SdlcProfile): Scored {
       },
       {
         points: 20,
-        met: distinct(cd, (d) => d.environment) >= 2,
+        // Two deploy jobs that could not say where they deploy are not two
+        // environments; only named ones count, so the analyzer's "unknown"
+        // placeholder never earns the rehearsal credit.
+        met:
+          distinct(
+            cd.filter((d) => d.environment !== UNKNOWN_ENVIRONMENT),
+            (d) => d.environment,
+          ) >= 2,
         gap: {
           summary: "Only one environment is deployed to, so changes reach production unrehearsed.",
-          wouldRaiseScore: "A second deploy job for a staging or preview environment ahead of production.",
+          wouldRaiseScore:
+            "A second deploy job that names a staging or preview environment ahead of production.",
         },
       },
     ],
@@ -378,10 +443,9 @@ function scoreCd(profile: SdlcProfile): Scored {
 /**
  * Rollback: can a bad deploy be undone?
  *
- * The analyzer does not yet populate `profile.rollback`, so this reports zero
- * on every repository today. That is the honest reading of an empty section —
- * the gap says what evidence would move it — and scoring the dimension now
- * means teaching the detector to fill that section needs no change here.
+ * Fed by the analyzer's rollback detections — a Helm chart, an Argo Rollouts
+ * strategy, a CodeDeploy config, tagged releases, down-migrations. An empty
+ * section reads as zero with a gap naming the evidence that would move it.
  */
 function scoreRollback(profile: SdlcProfile): Scored {
   const { rollback } = profile;

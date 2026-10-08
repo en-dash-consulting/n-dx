@@ -103,13 +103,26 @@ describe("walkProject bounds", () => {
     expect(paths.some((p) => p.startsWith("secret/"))).toBe(false);
   });
 
-  it("stops at the depth cap and says so", async () => {
+  it("prunes only the subtree past the depth cap, and says so", async () => {
     const deep: Record<string, string> = {};
-    deep[`${"a/".repeat(WALK_BOUNDS.maxDepth + 3)}deep.ts`] = "export const d = 1;\n";
+    deep[`a/${"d/".repeat(WALK_BOUNDS.maxDepth + 2)}deep.java`] = "class Deep {}\n";
+    deep["package.json"] = JSON.stringify({ name: "x", scripts: { test: "vitest" } });
+    deep["zz/go.mod"] = "module example.com/zz\n\ngo 1.23\n";
     const root = project("depth", deep);
     const walk = walkProject(root, await loadIgnoreFilter(root));
+    const paths = walk.files.map((f) => f.path);
 
-    expect(walk.truncated).toBe(true);
+    expect(walk.depthPruned).toBe(true);
+    expect(walk.truncated).toBe(false);
+    // The overflow was under `a/`; its siblings before and after it are intact.
+    expect(paths).toContain("package.json");
+    expect(paths).toContain("zz/go.mod");
+    expect(paths.some((p) => p.endsWith("deep.java"))).toBe(false);
+
+    const profile = await buildSdlcProfile(root);
+    expect(profile.commands.map((c) => c.command)).toContain("npm run test");
+    expect(profile.commands.map((c) => c.command)).toContain("go test ./...");
+    expect(profile.parseFailures.some((f) => f.kind === "walk" && /deeper than/.test(f.reason))).toBe(true);
   });
 
   it("stops at the file cap and says so", async () => {
@@ -128,12 +141,15 @@ describe("walkProject bounds", () => {
     expect(walk.files.find((f) => f.path === "big.json")?.size).toBe(50);
   });
 
-  it("returns files in a stable order", async () => {
-    const root = project("order", { "b.ts": "1", "a.ts": "1", "c/d.ts": "1" });
+  it("returns files in codepoint order, not locale order", async () => {
+    // `localeCompare` puts `a.ts` before `B.ts` on every ICU locale; the
+    // codepoint order that util/sort.ts uses everywhere else puts `B` first.
+    const root = project("order", { "b.ts": "1", "a.ts": "1", "B.ts": "1", "c/d.ts": "1", "_e.ts": "1" });
     const first = walkProject(root, await loadIgnoreFilter(root)).files.map((f) => f.path);
     const second = walkProject(root, await loadIgnoreFilter(root)).files.map((f) => f.path);
     expect(second).toEqual(first);
     expect(first).toEqual([...first].sort());
+    expect(first.indexOf("B.ts")).toBeLessThan(first.indexOf("a.ts"));
   });
 });
 
@@ -174,6 +190,20 @@ describe("commands", () => {
     expect(profile.commands.some((c) => c.command.includes("start"))).toBe(false);
   });
 
+  it("prefers the script named exactly for its kind over the first in file order", async () => {
+    const root = project("exact-script", {
+      "package.json": JSON.stringify({
+        name: "x",
+        scripts: { "test:unit": "vitest unit", "test": "vitest", "build:docs": "typedoc" },
+      }),
+    });
+    const profile = await buildSdlcProfile(root);
+
+    expect(profile.commands.find((c) => c.kind === "test")?.command).toBe("npm run test");
+    // With no exact match the first classified script still counts.
+    expect(profile.commands.find((c) => c.kind === "build")?.command).toBe("npm run build:docs");
+  });
+
   it("reads Makefile targets", async () => {
     const root = project("make", { "Makefile": ".PHONY: test\ntest:\n\tgo test ./...\n\nbuild:\n\tgo build\n\nhelp:\n\techo hi\n" });
     const profile = await buildSdlcProfile(root);
@@ -191,6 +221,14 @@ describe("commands", () => {
     const profile = await buildSdlcProfile(root);
     expect(profile.commands.map((c) => c.kind)).toContain("test");
     expect(profile.commands.some((c) => c.command === "serve")).toBe(false);
+  });
+
+  it("reads PEP 621 [project.scripts] too", async () => {
+    const root = project("pep621", {
+      "pyproject.toml": "[project]\nname = \"x\"\nversion = \"1.2.3\"\n\n[project.scripts]\nlint = \"ruff:main\"\n\n[tool.other]\ntest = \"not a script table\"\n",
+    });
+    const profile = await buildSdlcProfile(root);
+    expect(profile.commands.map((c) => c.kind)).toEqual(["lint"]);
   });
 
   it("infers the toolchain commands from go.mod, marked likely not certain", async () => {
@@ -260,15 +298,47 @@ describe("CI parsing", () => {
     expect(profile.ci[0].jobs[0].steps[0].kind).toBe("test");
   });
 
-  it("reads CircleCI jobs", async () => {
+  it("treats a GitLab pipeline with no narrowing keys as push-triggered, so its deploy is automated", async () => {
+    const root = project("gitlab-default", {
+      ".gitlab-ci.yml": "deploy:\n  script:\n    - ./deploy.sh prod\n",
+    });
+    const profile = await buildSdlcProfile(root);
+
+    expect(profile.ci[0].triggers).toEqual(["push"]);
+    expect(profile.cd).toHaveLength(1);
+    expect(profile.cd[0].automated).toBe(true);
+  });
+
+  it("reads GitLab only:/rules: into triggers when they are present", async () => {
+    const root = project("gitlab-only", {
+      ".gitlab-ci.yml":
+        "release:\n  only:\n    - tags\n  script:\n    - ./deploy.sh\n" +
+        "review:\n  rules:\n    - if: $CI_MERGE_REQUEST_ID\n  script:\n    - npm test\n",
+    });
+    const profile = await buildSdlcProfile(root);
+    expect(profile.ci[0].triggers).toEqual(["rules", "tag"]);
+  });
+
+  it("reads CircleCI jobs, including the long-form run step", async () => {
     const root = project("circle", {
-      ".circleci/config.yml": "version: 2.1\nworkflows:\n  main:\n    jobs: [build]\njobs:\n  build:\n    steps:\n      - checkout\n      - run: npm test\n",
+      ".circleci/config.yml":
+        "version: 2.1\nworkflows:\n  main:\n    jobs: [build]\njobs:\n  build:\n    steps:\n      - checkout\n" +
+        "      - run:\n          name: Test\n          command: npm test\n",
     });
     const profile = await buildSdlcProfile(root);
 
     expect(profile.ci[0].provider).toBe("circleci");
     expect(profile.ci[0].jobs[0].name).toBe("build");
     expect(profile.ci[0].jobs[0].steps.map((s) => s.kind)).toEqual(["checkout", "test"]);
+    expect(profile.ci[0].jobs[0].steps[1]).toEqual({ name: "Test", run: "npm test", kind: "test" });
+  });
+
+  it("treats a CircleCI config with no workflows block as push-triggered", async () => {
+    const root = project("circle-default", {
+      ".circleci/config.yml": "version: 2\njobs:\n  build:\n    steps:\n      - run: npm test\n",
+    });
+    const profile = await buildSdlcProfile(root);
+    expect(profile.ci[0].triggers).toEqual(["push"]);
   });
 
   it("reads Bitbucket pipelines, including branch maps", async () => {
@@ -355,19 +425,44 @@ describe("a CI file present but unparseable", () => {
   });
 });
 
-// ── Other sections ──────────────────────────────────────────────────────────
+// ── Deployments ─────────────────────────────────────────────────────────────
 
-describe("deployment, containers, IaC and gates", () => {
-  it("derives a deployment from a job containing a deploy step", async () => {
+describe("deployments", () => {
+  it("derives a deployment from a job containing a deploy step, against environment unknown when none is named", async () => {
     const root = project("cd", { ".github/workflows/ci.yml": ACTIONS });
     const profile = await buildSdlcProfile(root);
 
     expect(profile.cd).toHaveLength(1);
-    expect(profile.cd[0].environment).toBe("release");
+    expect(profile.cd[0].environment).toBe("unknown");
     expect(profile.cd[0].mechanism).toBe("github-actions");
     expect(profile.cd[0].evidence[0].confidence).toBe("likely");
   });
 
+  it("reads a declared environment, then a job-name token, and never the job name itself", async () => {
+    const root = project("cd-env", {
+      ".github/workflows/deploy.yml":
+        "on: push\njobs:\n" +
+        "  deploy-api:\n    steps:\n      - run: helm upgrade api ./chart\n" +
+        "  deploy-worker:\n    steps:\n      - run: helm upgrade worker ./chart\n" +
+        "  deploy-staging:\n    steps:\n      - run: ./deploy.sh\n" +
+        "  ship:\n    environment: production\n    steps:\n      - run: ./deploy.sh\n" +
+        "  ship-named:\n    environment:\n      name: preview\n      url: https://x\n    steps:\n      - run: ./deploy.sh\n",
+    });
+    const profile = await buildSdlcProfile(root);
+    const byJob = Object.fromEntries(profile.cd.map((d) => [d.evidence[0].excerpt, d.environment]));
+
+    expect(byJob["deploy-api"]).toBe("unknown");
+    expect(byJob["deploy-worker"]).toBe("unknown");
+    expect(byJob["deploy-staging"]).toBe("staging");
+    expect(byJob["ship"]).toBe("production");
+    expect(byJob["ship-named"]).toBe("preview");
+    expect(profile.ci[0].jobs.find((j) => j.name === "ship")?.environment).toBe("production");
+  });
+});
+
+// ── Other sections ──────────────────────────────────────────────────────────
+
+describe("containers, IaC and gates", () => {
   it("reads a Dockerfile, its base images and whether it is multi-stage", async () => {
     const root = project("docker", {
       "Dockerfile": "FROM node:22-alpine AS build\nRUN npm ci\n\nFROM node:22-alpine\nCOPY --from=build /app /app\n",
@@ -431,16 +526,153 @@ describe("deployment, containers, IaC and gates", () => {
   });
 });
 
+// ── Feature flags ───────────────────────────────────────────────────────────
+
+describe("feature flags", () => {
+  it("detects OpenFeature, Statsig, GrowthBook and PostHog from npm dependencies", async () => {
+    const root = project("flags-npm", {
+      "package.json": JSON.stringify({
+        name: "x",
+        dependencies: { "@openfeature/server-sdk": "1", "statsig-node": "5", "@growthbook/growthbook": "1", "posthog-node": "4" },
+      }),
+    });
+    const profile = await buildSdlcProfile(root);
+    expect(profile.featureFlags.map((f) => f.provider)).toEqual(["growthbook", "openfeature", "posthog", "statsig"]);
+  });
+
+  it("detects flag SDKs from go.mod requires and Python dependency files", async () => {
+    const root = project("flags-go-py", {
+      "go.mod": "module x\n\nrequire (\n\tgithub.com/open-feature/go-sdk v1.10.0\n\tgithub.com/launchdarkly/go-server-sdk/v7 v7.0.0\n)\n",
+      "pyproject.toml": "[project]\nname = \"x\"\ndependencies = [\n  \"statsig>=0.30\",\n  \"requests\",\n]\n",
+      "requirements.txt": "posthog==3.5.0\ngrowthbook\n",
+    });
+    const profile = await buildSdlcProfile(root);
+    const providers = profile.featureFlags.map((f) => f.provider);
+
+    expect(providers).toEqual(["growthbook", "launchdarkly", "openfeature", "posthog", "statsig"]);
+    expect(profile.featureFlags.find((f) => f.provider === "openfeature")?.evidence[0].path).toBe("go.mod");
+    expect(profile.featureFlags.find((f) => f.provider === "statsig")?.evidence[0].line).toBe(4);
+  });
+
+  it("reads FEATURE_* and FF_* keys from dotenv files as an in-house convention", async () => {
+    const root = project("flags-env", {
+      ".env.example": "DATABASE_URL=postgres://x\nFEATURE_NEW_CHECKOUT=true\nexport FF_DARK_MODE=0\nFEATURE_NEW_CHECKOUT=false\n",
+    });
+    const profile = await buildSdlcProfile(root);
+
+    expect(profile.featureFlags).toHaveLength(1);
+    expect(profile.featureFlags[0].provider).toBe("in-house");
+    expect(profile.featureFlags[0].flags).toEqual(["FEATURE_NEW_CHECKOUT", "FF_DARK_MODE"]);
+    expect(profile.featureFlags[0].evidence[0].confidence).toBe("inferred");
+    expect(profile.featureFlags[0].evidence[0].line).toBe(2);
+  });
+});
+
+// ── Migrations ──────────────────────────────────────────────────────────────
+
+describe("migrations", () => {
+  it("names the tool from its own files and reads reversibility from a down step", async () => {
+    const root = project("migrations-tools", {
+      "prisma/migrations/20240101_init/migration.sql": "CREATE TABLE a (id int);\n",
+      "knexfile.js": "module.exports = {};\n",
+      "migrations/20240101_users.js": "exports.up = (knex) => knex.schema.createTable('u');\nexports.down = (knex) => knex.schema.dropTable('u');\n",
+      "db/migrate/20240101_create_users.rb": "class CreateUsers < ActiveRecord::Migration[7.0]\n  def change\n  end\nend\n",
+      "service/migrations/0001_init.up.sql": "CREATE TABLE b (id int);\n",
+      "service/migrations/0001_init.down.sql": "DROP TABLE b;\n",
+      "sql/migrations/V1__init.sql": "CREATE TABLE c (id int);\n",
+      "sql/migrations/U1__init.sql": "DROP TABLE c;\n",
+      "alembic.ini": "[alembic]\n",
+      "alembic/versions/abc_init.py": "def upgrade():\n    pass\n\ndef downgrade():\n    pass\n",
+      "liquibase/db.changelog-master.yaml": "databaseChangeLog: []\n",
+      "legacy/migrations/001.sql": "CREATE TABLE d (id int);\n",
+    });
+    const profile = await buildSdlcProfile(root);
+    const byDir = Object.fromEntries(profile.migrations.map((m) => [m.directory, m]));
+
+    expect(byDir["prisma/migrations/20240101_init"].tool).toBe("prisma");
+    expect(byDir["migrations"].tool).toBe("knex");
+    expect(byDir["migrations"].reversible).toBe(true);
+    expect(byDir["migrations"].evidence.map((e) => e.kind)).toContain("down-migration");
+    expect(byDir["db/migrate"].tool).toBe("rails");
+    expect(byDir["db/migrate"].reversible).toBe(true);
+    expect(byDir["service/migrations"].tool).toBe("golang-migrate");
+    expect(byDir["service/migrations"].reversible).toBe(true);
+    expect(byDir["sql/migrations"].tool).toBe("flyway");
+    expect(byDir["sql/migrations"].reversible).toBe(true);
+    expect(byDir["alembic/versions"].tool).toBe("alembic");
+    expect(byDir["alembic/versions"].reversible).toBe(true);
+    expect(byDir["liquibase"].tool).toBe("liquibase");
+    expect(byDir["legacy/migrations"].tool).toBe("raw-sql");
+    expect(byDir["legacy/migrations"].reversible).toBeUndefined();
+    for (const m of profile.migrations) expect(m.evidence.length).toBeGreaterThan(0);
+  });
+
+  it("marks a tool's migrations irreversible when no down step is found, and names a tool from its dependency", async () => {
+    const root = project("migrations-deps", {
+      "package.json": JSON.stringify({ name: "x", dependencies: { typeorm: "0.3", "drizzle-orm": "0.30" } }),
+      "src/migrations/1700000000-Init.ts": "export class Init implements MigrationInterface {\n  public async up(q) {}\n}\n",
+    });
+    const profile = await buildSdlcProfile(root);
+    const tools = profile.migrations.map((m) => m.tool).sort();
+
+    expect(tools).toEqual(["drizzle", "typeorm"]);
+    const typeorm = profile.migrations.find((m) => m.tool === "typeorm");
+    expect(typeorm?.directory).toBe("src/migrations");
+    expect(typeorm?.reversible).toBe(false);
+    expect(profile.migrations.find((m) => m.tool === "drizzle")?.directory).toBeUndefined();
+  });
+});
+
+// ── Rollback ────────────────────────────────────────────────────────────────
+
+describe("rollback levers", () => {
+  it("reads the version scheme from the root manifest", async () => {
+    const semver = await buildSdlcProfile(project("rb-semver", { "package.json": JSON.stringify({ name: "x", version: "1.4.0" }) }));
+    const calver = await buildSdlcProfile(project("rb-calver", { "Cargo.toml": "[package]\nname = \"x\"\nversion = \"2026.10.8\"\n\n[dependencies]\nserde = \"1\"\n" }));
+    const unversioned = await buildSdlcProfile(project("rb-none", { "package.json": JSON.stringify({ name: "x" }) }));
+
+    expect(semver.rollback).toEqual([expect.objectContaining({ mechanism: "tagged-release", versioning: "semver" })]);
+    expect(calver.rollback).toEqual([expect.objectContaining({ mechanism: "tagged-release", versioning: "calver" })]);
+    expect(unversioned.rollback).toEqual([]);
+  });
+
+  it("records release tooling, rollout history, down-migrations and flags as levers", async () => {
+    const root = project("rb-levers", {
+      ".changeset/config.json": "{}",
+      "k8s/web.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n",
+      "k8s/api.yaml": "apiVersion: argoproj.io/v1alpha1\nkind: Rollout\nspec:\n  strategy:\n    canary:\n      steps: []\n",
+      "appspec.yml": "version: 0.0\n",
+      "migrations/001.up.sql": "x", "migrations/001.down.sql": "y",
+      "package.json": JSON.stringify({ name: "x", dependencies: { "launchdarkly-node-server-sdk": "9" } }),
+    });
+    const profile = await buildSdlcProfile(root);
+    const levers = profile.rollback.map((r) => `${r.mechanism}/${r.tool}`).sort();
+
+    expect(levers).toEqual([
+      "canary/argo-rollouts",
+      "db-down-migration/golang-migrate",
+      "feature-flag/launchdarkly",
+      "redeploy-previous/codedeploy",
+      "redeploy-previous/kubernetes",
+      "tagged-release/changesets",
+    ]);
+    const rollout = profile.rollback.find((r) => r.tool === "argo-rollouts");
+    expect(rollout?.evidence[0].path).toBe("k8s/api.yaml");
+    expect(rollout?.evidence[0].line).toBe(2);
+  });
+});
+
 // ── Determinism and shape ───────────────────────────────────────────────────
 
 describe("determinism", () => {
   const FULL = {
-    "package.json": JSON.stringify({ name: "x", scripts: { test: "vitest", build: "vite build" }, devDependencies: { vitest: "^4" } }),
+    "package.json": JSON.stringify({ name: "x", version: "1.0.0", scripts: { test: "vitest", build: "vite build" }, devDependencies: { vitest: "^4" } }),
     ".github/workflows/ci.yml": ACTIONS,
     "Dockerfile": "FROM node:22\n",
     "infra/main.tf": 'resource "aws_s3_bucket" "assets" {\n  bucket = "assets-bucket"\n}\n',
     "CODEOWNERS": "* @team\n",
     "tests/unit/a.test.ts": "1",
+    "migrations/001.up.sql": "x", "migrations/001.down.sql": "y",
   };
 
   it("two runs over an unchanged tree produce byte-identical output", async () => {
@@ -449,6 +681,20 @@ describe("determinism", () => {
     const second = toCanonicalJSON(stripSdlcProfileForDisk(await buildSdlcProfile(root)));
 
     expect(second).toBe(first);
+  });
+
+  it("produces the same bytes with an LLM key in the environment as without one", async () => {
+    const root = project("keyed", FULL);
+    const previous = process.env.ANTHROPIC_API_KEY;
+    const keyless = toCanonicalJSON(stripSdlcProfileForDisk(await buildSdlcProfile(root)));
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test-not-a-real-key";
+    try {
+      const keyed = toCanonicalJSON(stripSdlcProfileForDisk(await buildSdlcProfile(root)));
+      expect(keyed).toBe(keyless);
+    } finally {
+      if (previous === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = previous;
+    }
   });
 
   it("produces a profile the validator accepts", async () => {
@@ -467,7 +713,7 @@ describe("determinism", () => {
     expect(stripSdlcProfileForDisk(profile)).not.toHaveProperty("projectDir");
   });
 
-  it("makes no network call and needs no LLM key", async () => {
+  it("makes no network call, needs no LLM key, and is plain text", async () => {
     // The deterministic path is the whole contract: nothing here reads an
     // API key, and there is no fetch to intercept. Asserted by construction —
     // the module imports only node:fs, node:path and sibling analyzers.
@@ -476,6 +722,10 @@ describe("determinism", () => {
 
     expect(source).not.toMatch(/\bfetch\s*\(/);
     expect(source).not.toMatch(/callClaude|askJev|https?:\/\//);
+    // A raw control byte in the source makes grep and file call it binary,
+    // which hides it from every text-based audit of the tree.
+    expect(source).not.toMatch(/[ -]/);
+    expect(source).not.toMatch(/\.localeCompare\(/);
   });
 });
 
@@ -488,6 +738,8 @@ describe("an empty project", () => {
     expect(profile.ci).toEqual([]);
     expect(profile.containers).toEqual([]);
     expect(profile.iac).toEqual([]);
+    expect(profile.rollback).toEqual([]);
+    expect(profile.migrations).toEqual([]);
     expect(profile.parseFailures).toEqual([]);
     expect(validate(SdlcProfileSchema, profile).ok).toBe(true);
   });
