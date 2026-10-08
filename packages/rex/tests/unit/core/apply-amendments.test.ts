@@ -134,6 +134,11 @@ describe("applyAmendments: added", () => {
     expect(slug).toBe(`${title.toLowerCase()}-abcdef`);
   });
 
+  it.each(["Index", "INDEX", "index"])("never gives a new node the slug index for %s", (title) => {
+    const { tree: out } = applyAmendments(tree([{ ...added, title, target: "abcdef99" }]), CHANGE, OPTS);
+    expect(get(out, "abcdef99").slug).toBe("index-abcdef");
+  });
+
   it("refuses a missing or non-container parent, a missing title and a taken id", () => {
     expect(refusal(() => applyAmendments(tree([{ ...added, under: undefined }]), CHANGE, OPTS)).problems[0]).toMatch(/needs under/);
     expect(refusal(() => applyAmendments(tree([{ ...added, under: CON }]), CHANGE, OPTS)).problems[0]).toMatch(/not a live area or capability/);

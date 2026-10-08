@@ -377,6 +377,17 @@ describe("writePrdModel", () => {
     await expect(write(rexDir, model)).rejects.toThrow(new RegExp(`share the slug "${slug}"`));
   });
 
+  it("accepts a migrated tree whose v1 subtask was titled Index", async () => {
+    const v1: PRDItem[] = [{ id: "item-index", level: "subtask", title: "Index", status: "pending" }];
+    const plan = buildPlanData(v1, classifyV1Tree(v1), { cutAt: "2026-10-08T00:00:00Z" });
+    const slug = plan.items["item-index"]!.slug!.to;
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    find(all(model), CHANGE).children!.push({ id: "item-index", type: "task", title: "Index", slug } as RuleNode);
+    await write(rexDir, model);
+    expect(find(all(await loadPrdModel(rexDir, quiet)), "item-index").slug).toBe(slug);
+  });
+
   it("refuses a leaf named Index, which is index.md on a case-insensitive disk", async () => {
     const rexDir = await copyFixture();
     const model = await loadPrdModel(rexDir, quiet);

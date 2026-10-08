@@ -202,6 +202,17 @@ describe("Windows-unsafe v1 slugs", () => {
     expect(data.flagCounts["unsafe-slug"]).toBe(1);
   });
 
+  it.each(["Index", "INDEX"])("gives a v1 item titled %s a non-index slug, flagged", (title) => {
+    const idx = item("subtask", title);
+    const data = dataFor([item("epic", "Area", {}, [item("feature", "Thing", {}, [item("task", "Parent", {}, [idx])])])]);
+    const planned = data.items[idx.id]!;
+    expect(planned.flags).toContain("unsafe-slug");
+    expect(planned.slug!.from).toBe("index");
+    expect(planned.slug!.to).not.toBe("index");
+    expect(planned.slug!.to.startsWith("index-")).toBe(true);
+    expect(data.flagCounts["unsafe-slug"]).toBe(1);
+  });
+
   it("leaves a safe slug alone, including a duplicate title the v1 rule already suffixed", () => {
     const [a, b, ok] = [item("task", "Con"), item("task", "con"), item("task", "Console")];
     const data = dataFor([item("epic", "Area", {}, [item("feature", "Thing", {}, [a, b, ok])])]);

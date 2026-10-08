@@ -42,7 +42,7 @@ import { specHash } from "../../schema/v2-rules.js";
 import type { CapabilitySpecDraft } from "./capability-spec.js";
 import type { MigrationPlan } from "./migration-plan.js";
 import { freeSlug } from "../../core/apply-amendments.js";
-import { isWindowsSafeSegment, resolveSiblingSlugs } from "../../store/folder-tree-serializer.js";
+import { isUsableFrozenSlug, resolveSiblingSlugs } from "../../store/folder-tree-serializer.js";
 
 export const CORRUPT_VALUE = "[object Object]";
 
@@ -203,7 +203,7 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
       const data: ItemPlanData = { id: item.id, flags: [], droppedMeta: 0, droppedLog: 0 };
 
       const v1Slug = v1Slugs.get(item.id)!;
-      if (!isWindowsSafeSegment(v1Slug)) {
+      if (!isUsableFrozenSlug(v1Slug)) {
         data.slug = { from: v1Slug, to: freeSlug(item.title, item.id, siblingSlugs) };
         data.flags.push("unsafe-slug");
       }

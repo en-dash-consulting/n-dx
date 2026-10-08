@@ -54,7 +54,7 @@ import type { Requirement } from "../schema/v1.js";
 import { RequirementSchema } from "../schema/validate.js";
 import { isDisplayId, type Amendment, type Criterion } from "../schema/v2.js";
 import { checkV2Rules, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { isWindowsSafeSegment, slugifyTitle } from "../store/folder-tree-serializer.js";
+import { isUsableFrozenSlug, slugifyTitle } from "../store/folder-tree-serializer.js";
 
 export interface ApplyAmendmentsOptions {
   /** ISO timestamp stamped as the change's `appliedAt`. */
@@ -410,14 +410,14 @@ export function resolve(
 /**
  * The slug for a new node: its title's slug, or that slug with the first six
  * id characters when a sibling holds it already (compared ignoring case, as
- * the writer does, which refuses any clash left) or Windows cannot create it
- * (`con`, `aux`, `nul`: the writer refuses those too). Existing siblings keep
+ * the writer does, which refuses any clash left) or it cannot be frozen
+ * (`con`, `aux`, `nul` on Windows, or `index`: the writer refuses those too). Existing siblings keep
  * their frozen slugs.
  */
 export function freeSlug(title: string, id: string, siblings: readonly { slug: string }[]): string {
   const taken = new Set(siblings.map((s) => s.slug.toLowerCase()));
   const base = slugifyTitle(title);
-  if (!taken.has(base) && isWindowsSafeSegment(base)) return base;
+  if (!taken.has(base) && isUsableFrozenSlug(base)) return base;
   return `${base}-${id.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "item"}`;
 }
 
