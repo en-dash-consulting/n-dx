@@ -71,20 +71,22 @@ describe("placementRelation (rules decide the relation)", () => {
     expect(placementRelation({ title: "Add the missing lock check", intent: amends, fix: true })).toBe("touches");
   });
 
-  it("amends needs an imperative leading verb in the title and the explicit marker in the intent", () => {
-    expect(placementRelation({ title: "Add token rotation to the dashboard", intent: `Rotate tokens.\n${amends}` })).toBe("amends");
-    expect(placementRelation({ title: "  allow token rotation", intent: `  relation : AMENDS` })).toBe("amends");
+  it("an amending title verb places as amends without a marker", () => {
+    expect(placementRelation({ title: "Add Jira import" })).toBe("amends");
+    expect(placementRelation({ title: "  allow token rotation", intent: "A new store layout" })).toBe("amends");
   });
 
-  it("a leading verb without the marker touches", () => {
-    expect(placementRelation({ title: "Add token rotation to the dashboard" })).toBe("touches");
-    expect(placementRelation({ title: "Add token rotation", intent: "A new store layout" })).toBe("touches");
-  });
-
-  it("the marker without a leading verb touches, and so does intent prose", () => {
-    expect(placementRelation({ title: "Token rotation", intent: amends })).toBe("touches");
+  it("a title without an amending verb touches, and intent prose never decides", () => {
+    expect(placementRelation({ title: "Token rotation" })).toBe("touches");
+    expect(placementRelation({ title: "Rename the lock helper", intent: "the new store layout makes the old name misleading" })).toBe("touches");
     expect(placementRelation({ title: "Rename the lock helper", intent: "Allow a new store layout; adds a support file" })).toBe("touches");
-    expect(placementRelation({ title: "Rename the store, adding a new layout", intent: amends })).toBe("touches");
+  });
+
+  it("an explicit Relation line wins in either direction", () => {
+    expect(placementRelation({ title: "Rename the lock helper", intent: amends })).toBe("amends");
+    expect(placementRelation({ title: "Token rotation", intent: `Rotate tokens.\n${amends}` })).toBe("amends");
+    expect(placementRelation({ title: "Add a retry", intent: "Relation: touches" })).toBe("touches");
+    expect(placementRelation({ title: "Add a retry", intent: "  relation : TOUCHES" })).toBe("touches");
   });
 
   it("a code-health finding touches", () => {

@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add Jev placement and the autoAccept setting](./add-jev-placement-and-the-autoaccept.md) | completed |
 | [Free-text intent prose flips a placement's relation to amends](./free-text-intent-prose-flips-a.md) | pending |
 | [Let Jev abstain and validate its confidence before confident placement](./let-jev-abstain-and-validate-its.md) | completed |
-| [Place as amends on an amending title verb or an explicit Relation marker](./place-as-amends-on-an-amending-title.md) | pending |
+| [Place as amends on an amending title verb or an explicit Relation marker](./place-as-amends-on-an-amending-title.md) | in_progress |
 | [Placement treats every sourcevision-sourced change as a code-health finding](./placement-treats-every-sourcevision.md) | completed |
 | [Rank placement candidates with rules and the text model](./rank-placement-candidates-with-rules.md) | completed |
 | [Register the placement modules with the v2 isolation test](./register-the-placement-modules-with.md) | completed |

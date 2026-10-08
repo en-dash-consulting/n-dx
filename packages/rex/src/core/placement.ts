@@ -122,8 +122,8 @@ const AMENDING_VERBS = new Set([
   "let", "extend", "change", "replace", "switch", "require",
 ]);
 
-/** An intent line that states the relation outright: `Relation: amends`. */
-const AMENDS_MARKER = /^\s*relation\s*:\s*amends\b/im;
+/** An intent line that states the relation outright: `Relation: amends` or `Relation: touches`. */
+const RELATION_MARKER = /^\s*relation\s*:\s*(amends|touches)\b/im;
 
 function normalizePath(p: string): string {
   return p.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "");
@@ -149,16 +149,18 @@ function isArchitectureConstraint(node: PlacementNode): boolean {
 }
 
 /**
- * Rules decide the relation: a fix or a code-health finding touches its
- * target. A change amends only when its title opens with an imperative verb
- * that asks for new or changed behaviour AND its intent carries an explicit
- * `Relation: amends` line. Prose in the intent never decides it alone.
+ * Rules decide the relation. A fix or a code-health finding always touches its
+ * target. Otherwise an intent line `Relation: amends` or `Relation: touches`
+ * decides outright, in either direction. Without one, a title that opens with
+ * an amending verb amends; anything else touches. Prose in the intent never
+ * decides it.
  */
 export function placementRelation(change: PlacementChange): PlacementRelation {
   if (change.fix === true || isCodeHealthChange(change)) return "touches";
+  const marked = RELATION_MARKER.exec(change.intent ?? "")?.[1]?.toLowerCase();
+  if (marked === "amends" || marked === "touches") return marked;
   const lead = /^\s*([a-z]+)/i.exec(change.title)?.[1]?.toLowerCase();
-  const asksForChange = lead !== undefined && AMENDING_VERBS.has(lead);
-  return asksForChange && AMENDS_MARKER.test(change.intent ?? "") ? "amends" : "touches";
+  return lead !== undefined && AMENDING_VERBS.has(lead) ? "amends" : "touches";
 }
 
 function scoreNode(change: PlacementChange, node: PlacementNode, relation: PlacementRelation): PlacementCandidate {
