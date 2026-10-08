@@ -93,6 +93,19 @@ describe("round-trip", () => {
     expect(lines).toContain(`    status: "completed"`);
   });
 
+  it("keeps retired keys from an older draft, unconverted, through a write", async () => {
+    const old = [`schema: "rex/v2"`, `items:`, `  "${ID_A}":`, `    specReviewed: true`, `  "${ID_B}":`, `    appliedIn: "e3d7052fe"`, ``].join("\n");
+    await writeFile(join(folder, STATE_FILE_NAME), old, "utf-8");
+    const file = await loadStateFile(folder);
+    file.items[ID_B].status = "completed";
+    await save(file);
+
+    const reloaded = await loadStateFile(folder);
+    expect(reloaded.items[ID_A]).toEqual({ specReviewed: true });
+    expect(reloaded.items[ID_B]).toMatchObject({ status: "completed", appliedIn: "e3d7052fe" });
+    expect(reloaded.items[ID_B].appliedAt).toBeUndefined();
+  });
+
   it("exposes unknown values to callers, parsed", () => {
     const file = parseStateYaml(WRITTEN_BY_NEWER);
     expect(file.items[ID_A].futureRow).toEqual({ z: 1, a: [2, 1] });
@@ -116,8 +129,10 @@ describe("round-trip", () => {
           completedAt: "2026-10-02T00:00:00.000Z",
           activeIntervals: [{ start: "2026-10-01T00:00:00.000Z", end: "2026-10-02T00:00:00.000Z" }],
           metAt: "abc",
-          specReviewed: true,
-          checks: [{ requirementId: "r1", result: "pass", at: "2026-10-02T00:00:00.000Z" }],
+          reviewedHash: "abc",
+          checks: [{ requirementId: "r1", result: "pass", at: "2026-10-02T00:00:00.000Z", commit: "deadbeef" }],
+          appliedAt: "2026-10-02T00:00:00.000Z",
+          appliedAmendsHash: "def",
           prs: ["https://github.com/o/r/pull/1"],
           ready: false,
           resolutionDetail: "line one\nline \"two\": # not a comment",
@@ -277,7 +292,7 @@ describe("revisedAt", () => {
     expect((await step(EDIT_1, 1)).items[ID_A].revisedAt).toBe(t(1).toISOString());
     expect((await step(EDIT_2, 2)).items[ID_A].revisedAt).toBe(t(1).toISOString());
     const after = await step(EDIT_2, 3, (file) => {
-      file.items[ID_A].specReviewed = true;
+      file.items[ID_A].reviewedHash = specHash(EDIT_2);
       file.items[ID_A].checks = [{ requirementId: "r1", result: "pass", at: t(3).toISOString() }];
     });
     expect(after.items[ID_A].revisedAt).toBe(t(1).toISOString());
@@ -301,7 +316,7 @@ describe("revisedAt", () => {
   it("is never set on a node that was never met", async () => {
     await locked(async () => {
       const file = await loadStateFile(folder);
-      file.items[ID_B] = { specReviewed: true };
+      file.items[ID_B] = { reviewedHash: specHash(EDIT_1) };
       await saveStateFile(folder, file, { rexDir, specs: new Map([[ID_B, EDIT_1]]), now: () => t(1) });
     });
     expect((await loadStateFile(folder)).items[ID_B].revisedAt).toBeUndefined();

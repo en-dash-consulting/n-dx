@@ -108,6 +108,31 @@ describe("hub reverse proxy", () => {
     expect((await fetch(`http://127.0.0.1:${hub.port}/p/nope/api/status`)).status).toBe(404);
   }, 60_000);
 
+  it("forwards a PUT under the prefix, body and all", async () => {
+    // The proxy is method-agnostic, but the only writes it used to carry were
+    // POSTs. `PUT /api/hench/prep/:taskId` saves a task's run settings, so a
+    // dashboard opened through the hub depends on this.
+    const res = await fetch(`http://127.0.0.1:${hub.port}/p/alpha/api/hench/prep/task-1`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run: { tier: "heavy" }, version: "none" }),
+    });
+
+    // The project server answered rather than the hub: a 404 for an id this
+    // fixture's PRD does not carry is the route's own reply, where an
+    // unproxied PUT would never have reached it.
+    expect([200, 404]).toContain(res.status);
+    expect(res.headers.get("content-type")).toContain("application/json");
+
+    // And an unknown project is still the hub's own 404.
+    const missing = await fetch(`http://127.0.0.1:${hub.port}/p/nope/api/hench/prep/task-1`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run: null, version: "none" }),
+    });
+    expect(missing.status).toBe(404);
+  }, 60_000);
+
   it("forwards a WebSocket upgrade under the prefix", async () => {
     expect(await wsHandshake("/p/alpha")).toMatch(/^HTTP\/1\.1 101/);
     expect(await wsHandshake("/p/alpha/")).toMatch(/^HTTP\/1\.1 101/);
