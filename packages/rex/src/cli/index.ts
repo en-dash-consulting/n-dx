@@ -81,7 +81,7 @@ function readStdin(): Promise<string> {
 }
 
 /** Keys that accept multiple values (accumulated into arrays). */
-const MULTI_VALUE_KEYS = new Set(["file"]);
+const MULTI_VALUE_KEYS = new Set(["file", "criterion"]);
 /** Keys that expect a following value when provided as `--key value`. */
 const VALUE_KEYS = new Set([
   "model",
@@ -105,6 +105,7 @@ const VALUE_KEYS = new Set([
   "accept-llm",
   "detail",
   "run",
+  "source",
   ...MULTI_VALUE_KEYS,
 ]);
 
@@ -205,8 +206,17 @@ async function dispatchAdd(
         ? resolve(positional[positional.length - 1])
         : process.cwd();
     const { cmdAdd } = await import("./commands/add.js");
-    await cmdAdd(dir, level, flags);
+    await cmdAdd(dir, level, flags, multiFlags);
     return;
+  }
+
+  // Smart and file mode take neither flag. Reject before reading stdin so the
+  // misuse is an error rather than a wait on a description that never comes.
+  if (multiFlags.criterion?.length || flags.criterion !== undefined || flags.source !== undefined) {
+    throw new CLIError(
+      "--criterion and --source need manual mode (--title).",
+      'Usage: rex add <level> --title="..." --criterion="..." --source=<name>',
+    );
   }
 
   // Smart mode is the only consumer of piped input.

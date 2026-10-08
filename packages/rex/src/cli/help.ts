@@ -120,6 +120,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--parent=<id>", description: "Parent item ID to nest under" },
       { flag: "--priority=<p>", description: "Priority: critical, high, medium, low" },
       { flag: "--description=\"...\"", description: "Item description" },
+      { flag: "--criterion=\"...\"", description: "Acceptance criterion, manual mode only (repeatable, one per flag)" },
+      { flag: "--source=\"...\"", description: "Item source, manual mode only (e.g. ndx-capture)" },
       { flag: "--file=<path>", description: "Import from a freeform text file (repeatable)" },
       { flag: "--accept", description: "Auto-accept LLM proposals without review" },
       { flag: "--model=<name>", description: "Override LLM model for smart mode" },
@@ -127,6 +129,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     examples: [
       { command: "rex add epic --title=\"User auth\"", description: "Add an epic manually" },
       { command: "rex add task --title=\"Login form\" --parent=abc", description: "Add a task under a parent" },
+      { command: "rex add task --title=\"Login form\" --parent=abc --criterion=\"Rejects an empty password\" --criterion=\"Locks after 5 failures\" --source=ndx-capture", description: "Add a task with acceptance criteria and a source" },
       { command: "rex add \"Add dark mode support\"", description: "Smart add from description" },
       { command: "rex add --file=ideas.txt --file=notes.md .", description: "Import from multiple files" },
     ],

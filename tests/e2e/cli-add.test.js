@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { runResult, createTmpDir, removeTmpDir, setupRexDir } from "./e2e-helpers.js";
 
 describe("ndx add CLI delegation", { timeout: 30_000 }, () => {
@@ -45,5 +47,37 @@ describe("ndx add CLI delegation", { timeout: 30_000 }, () => {
       { cwd: tmpDir },
     );
     expect(code).not.toBe(0);
+  });
+
+  it("writes repeated --criterion (both argv forms) and --source to the item's index.md", async () => {
+    const { code, stderr } = runResult(
+      [
+        "add", "task", "--title=Criteria item", "--parent=epic-1",
+        "--criterion=Alpha", "--criterion", "Beta", "--criterion=", "--source=ndx-capture",
+      ],
+      { cwd: tmpDir },
+    );
+    expect(stderr).not.toMatch(/Error/);
+    expect(code).toBe(0);
+
+    const treeDir = join(tmpDir, ".rex", "prd_tree");
+    const entries = await readdir(treeDir, { recursive: true });
+    let md;
+    // A leaf item is stored as `<slug>.md` (or `<slug>/index.md` once it has children).
+    for (const e of entries.filter((p) => /(^|\/)criteria-item(\.md|\/index\.md)$/.test(p))) {
+      md = await readFile(join(treeDir, e), "utf-8");
+    }
+    expect(md, `no file for the item among: ${entries.join(", ")}`).toBeDefined();
+    expect(md).toMatch(/^source: "?ndx-capture"?$/m);
+    expect(md).toMatch(/^acceptanceCriteria:\n\s+- "?Alpha"?\n\s+- "?Beta"?\n(?!\s+- )/m);
+  });
+
+  it("rejects --criterion in smart mode without waiting on stdin", () => {
+    const { code, stderr } = runResult(
+      ["add", "some description", "--criterion=A"],
+      { cwd: tmpDir, timeout: 15_000 },
+    );
+    expect(code).not.toBe(0);
+    expect(stderr).toContain("--title");
   });
 });
