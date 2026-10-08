@@ -11,7 +11,8 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { eolPatternsFor } from "../../packages/core/gitattributes-pins.js";
+import { eolPatternsFor, gitattributesMergeRules } from "../../packages/core/gitattributes-pins.js";
+import { resolveLayout } from "../../packages/core/layout.js";
 
 const REPO_ROOT = process.cwd();
 const PRD_ROOT = join(REPO_ROOT, ".rex", "prd_tree");
@@ -203,6 +204,28 @@ describe("the injected eol=lf pins stay in sync with n-dx's own .gitattributes",
       readFileSync(join(REPO_ROOT, ".gitattributes"), "utf-8"),
     );
     expect(repoPatterns.length).toBe(new Set(repoPatterns).size);
+  });
+});
+
+// ── Merge-driver pins: the injected merge rules must also route n-dx's own
+// tree. Without its pin a v2 state.yaml falls back to git's text merge, which
+// conflicts on adjacent rows (concurrent child adds in one folder).
+describe("the injected merge-driver pins are in n-dx's own .gitattributes", () => {
+  it.each(gitattributesMergeRules(resolveLayout(REPO_ROOT)))("%s", (rule) => {
+    const lines = readFileSync(join(REPO_ROOT, ".gitattributes"), "utf-8")
+      .split("\n")
+      .map((line) => line.trim().split(/\s+/).join(" "));
+    expect(lines).toContain(rule);
+  });
+
+  it.each([
+    [".rex/prd_tree/some-epic/index.md", "rex-prd"],
+    [".rex/product/state.yaml", "rex-state"],
+    [".rex/product/checkout/state.yaml", "rex-state"],
+    [".rex/changes/add-apple-pay/state.yaml", "rex-state"],
+  ])("git resolves the merge driver for %s", (path, driver) => {
+    const out = execFileSync("git", ["check-attr", "merge", "--", path], { encoding: "utf8", cwd: REPO_ROOT });
+    expect(out.trim()).toBe(`${path}: merge: ${driver}`);
   });
 });
 

@@ -82,7 +82,7 @@ import {
   formatOrchestratorCommandHelp,
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport, checkSkillTracking, formatSkillTrackingHints } from "./assistant-integration.js";
-import { ensureGitattributesRules, MERGE_DRIVER_CONFIG } from "./gitattributes-pins.js";
+import { ensureGitattributesRules, MERGE_DRIVERS } from "./gitattributes-pins.js";
 import { recordCliName } from "./cli-identity.js";
 import { generateTargetReadme } from "./readme-generator.js";
 import {
@@ -1034,12 +1034,12 @@ async function signalLiveReload(dir) {
 }
 
 /**
- * Register the rex-prd merge driver in the repository's git config, so the
- * `.rex/prd_tree/** merge=rex-prd` attribute (pinned by
- * `ensureGitattributesRules`) resolves to `rex merge-driver` — the three-way,
- * frontmatter-aware merge for PRD markdown.
+ * Register the merge drivers in the repository's git config, so the merge
+ * attributes pinned by `ensureGitattributesRules` resolve: `merge=rex-prd` to
+ * `rex merge-driver` (three-way, frontmatter-aware merge of PRD markdown) and
+ * `merge=rex-state` to `rex merge-state` (v2 `state.yaml`, rows by item id).
  *
- * Idempotent and respectful: an already-set `merge.rex-prd.driver` (including
+ * Idempotent and respectful: an already-set `merge.<name>.driver` (including
  * a user-customized command) is left untouched. Outside a git repository, or
  * with git unavailable, this is a silent no-op — init must not fail over an
  * optional registration.
@@ -1052,20 +1052,20 @@ function ensureMergeDriverRegistered(dir) {
     return; // not a git repo (or no git) — nothing to register
   }
 
-  try {
-    const existing = execFileSync("git", ["config", "--get", MERGE_DRIVER_CONFIG.driver.key], gitOpts)
-      .toString()
-      .trim();
-    if (existing) return; // already registered — a customized command wins
-  } catch {
-    // Unset — register below.
-  }
+  for (const { name, driver } of MERGE_DRIVERS) {
+    try {
+      const existing = execFileSync("git", ["config", "--get", driver.key], gitOpts).toString().trim();
+      if (existing) continue; // already registered — a customized command wins
+    } catch {
+      // Unset — register below.
+    }
 
-  try {
-    execFileSync("git", ["config", MERGE_DRIVER_CONFIG.name.key, MERGE_DRIVER_CONFIG.name.value], gitOpts);
-    execFileSync("git", ["config", MERGE_DRIVER_CONFIG.driver.key, MERGE_DRIVER_CONFIG.driver.value], gitOpts);
-  } catch {
-    // Best-effort: a failed git config write must not fail init.
+    try {
+      execFileSync("git", ["config", name.key, name.value], gitOpts);
+      execFileSync("git", ["config", driver.key, driver.value], gitOpts);
+    } catch {
+      // Best-effort: a failed git config write must not fail init.
+    }
   }
 }
 

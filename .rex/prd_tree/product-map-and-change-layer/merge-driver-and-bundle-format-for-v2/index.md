@@ -25,4 +25,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Bundle envelope v2 that still imports v1 bundles](./bundle-envelope-v2-that-still-imports.md) | pending |
-| [Merge state.yaml rows by id with a custom merge driver](./merge-state-yaml-rows-by-id-with-a.md) | pending |
+| [Merge state.yaml rows by id with a custom merge driver](./merge-state-yaml-rows-by-id-with-a.md) | in_progress |

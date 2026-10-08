@@ -184,6 +184,11 @@ describe("rex cli/commands import surface", () => {
     "../../store/index.js",
     "../../store/markdown-parser.js",
     "../../store/project-config.js",
+    // `rex merge-state` is the git merge driver for v2 state.yaml and the only
+    // caller of the merge. Routing it through public.ts would hand hench and
+    // web a v2 module before the v2 store is wired in (see the isolation test
+    // in tests/unit/schema/v2.test.ts).
+    "../../store/state-merge.js",
     "../../store/title-to-filename.js",
     "../../workflow/default.js",
   ]);

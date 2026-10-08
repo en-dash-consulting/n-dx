@@ -278,8 +278,8 @@ function keyLine(key: string, value: unknown, raw: Map<string, RawEntry> | undef
   return `${/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ? key : JSON.stringify(key)}: ${json}`;
 }
 
-/** Compact JSON with every object's keys sorted. */
-function canonicalJson(value: unknown): string {
+/** Compact JSON with every object's keys sorted: the form every value is written in. */
+export function canonicalJson(value: unknown): string {
   return JSON.stringify(value, (_key, v: unknown) =>
     v !== null && typeof v === "object" && !Array.isArray(v)
       ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, (v as Record<string, unknown>)[k]]))
