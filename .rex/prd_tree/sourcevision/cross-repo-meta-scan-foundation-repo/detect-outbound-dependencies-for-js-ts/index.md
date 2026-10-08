@@ -26,7 +26,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Declare OutboundDependency, register outbound.json and wire an empty detector with declared contracts](./declare-outbounddependency-register.md) | in_progress |
+| [Declare OutboundDependency, register outbound.json and wire an empty detector with declared contracts](./declare-outbounddependency-register.md) | completed |
 | [Detect Go outbound clients on the existing Go parser](./detect-go-outbound-clients-on-the.md) | pending |
 | [Detect JS/TS HTTP and gRPC clients through the TypeScript compiler API](./detect-js-ts-http-and-grpc-clients.md) | pending |
 | [Detect JS/TS queue, database and cache clients](./detect-js-ts-queue-database-and-cache.md) | pending |
