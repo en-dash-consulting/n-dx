@@ -123,6 +123,8 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   ".txt": "Text",
   ".rst": "reStructuredText",
   ".sql": "SQL",
+  ".tf": "Terraform",
+  ".tfvars": "Terraform",
   ".graphql": "GraphQL",
   ".gql": "GraphQL",
   ".proto": "Protobuf",
@@ -141,6 +143,7 @@ export function detectLanguage(filePath: string): string {
   if (name === "Makefile" || name === "GNUmakefile") return "Makefile";
   if (name === "Dockerfile" || name.startsWith("Dockerfile.")) return "Dockerfile";
   if (name === "Vagrantfile") return "Ruby";
+  if (name === "terragrunt.hcl" || name.endsWith(".tftest.hcl")) return "Terraform";
   if (name === "Rakefile" || name === "Gemfile") return "Ruby";
   if (name === "Justfile") return "Just";
   if (name === "CMakeLists.txt" || ext === ".cmake") return "CMake";
@@ -236,6 +239,7 @@ const PROGRAMMING_LANGUAGES = new Set([
   "Perl",
   "Shell",
   "SQL",
+  "Terraform",
   "Vue",
   "Svelte",
   "Astro",
@@ -752,6 +756,16 @@ export async function analyzeInventory(
   }
 
   return result;
+}
+
+/**
+ * Paths the infrastructure linker may read for name literals. Terraform files
+ * are inventoried for roles but excluded here: a resource's own `.tf` file
+ * would otherwise list itself as a user and change `infrastructure.json`,
+ * which Terraform support must not do.
+ */
+export function infrastructureLinkPaths(files: ReadonlyArray<{ path: string; language?: string }>): string[] {
+  return files.filter((f) => f.language !== "Terraform").map((f) => f.path);
 }
 
 export { toCanonicalJSON };
