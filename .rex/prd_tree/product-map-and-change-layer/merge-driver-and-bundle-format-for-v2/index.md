@@ -2,7 +2,7 @@
 id: "18fe9115-284b-4c29-910b-bd9049b8a428"
 level: "feature"
 title: "Merge driver and bundle format for v2"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "product-map"
@@ -14,11 +14,12 @@ blockedBy:
   - "30dbd22d-d325-4345-a66f-a1a8aa6a10f1"
 source: "roadmap"
 startedAt: "2026-10-08T07:23:15.353Z"
-endedAt: "2026-10-08T17:30:50.457Z"
+completedAt: "2026-10-08T19:55:40.295Z"
+endedAt: "2026-10-08T19:55:40.295Z"
 acceptanceCriteria: []
 description: "Parallel branches both write state.yaml; the bundle carries both layers.\n\nRoadmap PR 15 · wave 1 · lane rex-store."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-08T19:48:50.642Z"
+lastModified: "2026-10-08T19:55:41.942Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -31,4 +32,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Bundle v2 keeps unknown top-level state.yaml keys and validates the carried root header](./bundle-v2-keeps-unknown-top-level.md) | completed |
 | [Merge state.yaml rows by id with a custom merge driver](./merge-state-yaml-rows-by-id-with-a.md) | completed |
 | [Pin state.yaml to LF in the merge-state git test so it passes on Windows](./pin-state-yaml-to-lf-in-the-merge.md) | completed |
-| [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | pending |
