@@ -12,7 +12,6 @@ import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeZones } from "../../src/analyzers/zones.js";
-import { goConfig } from "../../src/language/go.js";
 import { detectLanguage, detectLanguages, mergeLanguageConfigs } from "../../src/language/detect.js";
 import { javaConfig, javaSecondaryConfig } from "../../src/language/java.js";
 import { typescriptConfig } from "../../src/language/typescript.js";
@@ -21,7 +20,7 @@ import { validate, ZonesSchema } from "../../src/schema/validate.js";
 import { skipUnlessGrammar } from "../helpers/grammar.js";
 
 const FIXTURE = join(import.meta.dirname, "../fixtures/java-spring-project");
-const GO_FIXTURE = join(import.meta.dirname, "../fixtures/go-project");
+const TS_FIXTURE = join(import.meta.dirname, "../fixtures/small-ts-project");
 const JAVA_WASM = grammarWasmPath("tree-sitter-java");
 const MAIN = "src/main/java/com/example/clinic";
 
@@ -161,12 +160,12 @@ describe("Java beside a package.json (Spring Boot with a bundled frontend)", () 
   });
 });
 
-describe("non-Java repositories", () => {
+describe("repositories with no pack language", () => {
   it("never load a language pack or report a missing grammar", async () => {
-    const goInventory = await analyzeInventory(GO_FIXTURE, { languageConfig: goConfig });
+    const tsInventory = await analyzeInventory(TS_FIXTURE, { languageConfig: typescriptConfig });
     const messages: string[] = [];
-    const imports = await analyzeImports(GO_FIXTURE, goInventory, {
-      language: "go",
+    const imports = await analyzeImports(TS_FIXTURE, tsInventory, {
+      language: "typescript",
       packs: { grammarDir: join(tmpdir(), "sv-no-such-grammar-dir"), warn: (m) => messages.push(m) },
     });
     expect(messages).toEqual([]);

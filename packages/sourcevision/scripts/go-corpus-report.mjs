@@ -9,7 +9,10 @@
  * MISSING nodes, capture counts per query, and import parity: for each file,
  * the import paths the pack's `imports` query captured against those the
  * regex parser (`analyzers/go-imports.ts`) extracted. Files that differ are
- * listed with the paths and a reason. Exits 1 when a repository is below the
+ * listed with the paths and a reason. Then edge parity: the imports phase run
+ * twice over the repository, once through the pack and once through the regex
+ * fallback (no grammar), with the edges and (importer, external package)
+ * pairs only one side produced. Exits 1 when a repository is below the
  * clean-parse gate (98%), 2 when the corpus, the build or the grammar is
  * missing. Never touches the network; clone with go-corpus-clone.mjs. Not
  * part of the test run.
@@ -18,6 +21,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 
@@ -88,6 +92,35 @@ if (!existsSync(distRunner)) {
 const { createTreeSitterRunner } = await import(distRunner.href);
 const { goPack } = await import(new URL("../dist/language/go-pack.js", import.meta.url).href);
 const { extractGoImports } = await import(new URL("../dist/analyzers/go-imports.js", import.meta.url).href);
+const { analyzeInventory } = await import(new URL("../dist/analyzers/inventory.js", import.meta.url).href);
+const { analyzeImports } = await import(new URL("../dist/analyzers/imports.js", import.meta.url).href);
+const { goConfig } = await import(new URL("../dist/language/go.js", import.meta.url).href);
+
+/** A grammar directory that does not exist, so the imports phase takes the regex fallback. */
+const NO_GRAMMAR_DIR = join(tmpdir(), `ndx-go-corpus-no-grammar-${process.pid}`);
+
+/** `a` minus `b` as sets. */
+const setMinus = (a, b) => [...a].filter((k) => !b.has(k)).sort();
+
+/** Imports-phase output through the pack and through the regex fallback, and what only one side has. */
+async function edgeParity(dir) {
+  const inventory = await analyzeInventory(dir, { languageConfig: goConfig });
+  const notices = [];
+  const pack = await analyzeImports(dir, inventory, { language: "go", packs: { warn: (m) => notices.push(m) } });
+  const regex = await analyzeImports(dir, inventory, { language: "go", packs: { grammarDir: NO_GRAMMAR_DIR, warn: () => undefined } });
+  const edges = (imports) => new Set(imports.edges.map((e) => `${e.from} -> ${e.to} [${[...e.symbols].sort().join(",")}]`));
+  const pairs = (imports) => new Set(imports.external.flatMap((x) => x.importedBy.map((f) => `${f} -> ${x.package}`)));
+  const [packEdges, regexEdges, packPairs, regexPairs] = [edges(pack), edges(regex), pairs(pack), pairs(regex)];
+  return {
+    notices,
+    pack: { edges: packEdges.size, external: packPairs.size },
+    regex: { edges: regexEdges.size, external: regexPairs.size },
+    edgesOnlyPack: setMinus(packEdges, regexEdges),
+    edgesOnlyRegex: setMinus(regexEdges, packEdges),
+    externalOnlyPack: setMinus(packPairs, regexPairs),
+    externalOnlyRegex: setMinus(regexPairs, packPairs),
+  };
+}
 
 const runner = createTreeSitterRunner({ maxFileBytes: MAX_FILE_BYTES });
 const target = { pack: goPack, grammarPath: wasm };
@@ -139,6 +172,7 @@ try {
       failing,
       compared,
       differing,
+      edgeParity: await edgeParity(dir),
     });
   }
 } finally {
@@ -169,6 +203,19 @@ if (json) {
       if (d.onlyRegex.length > 0) console.log(`                 regex only: ${d.onlyRegex.join(", ")}`);
     }
     if (r.differing.length > LISTED) console.log(`  ... and ${r.differing.length - LISTED} more differ`);
+    const p = r.edgeParity;
+    console.log(`  edge parity: pack ${p.pack.edges} edges, ${p.pack.external} external pairs; regex ${p.regex.edges} edges, ${p.regex.external} external pairs`);
+    for (const notice of p.notices) console.log(`    notice: ${notice}`);
+    for (const [label, list] of [
+      ["edges only from the pack", p.edgesOnlyPack],
+      ["edges only from the regex parser", p.edgesOnlyRegex],
+      ["external pairs only from the pack", p.externalOnlyPack],
+      ["external pairs only from the regex parser", p.externalOnlyRegex],
+    ]) {
+      console.log(`    ${label}: ${list.length}`);
+      for (const key of list.slice(0, LISTED)) console.log(`      ${key}`);
+      if (list.length > LISTED) console.log(`      ... and ${list.length - LISTED} more`);
+    }
   }
   const verdict = failedGate.length === 0 ? "met" : `NOT met by ${failedGate.map((r) => r.name).join(", ")}`;
   console.log(`\nClean-parse gate (>= ${CLEAN_SHARE_GATE * 100}%): ${verdict}`);

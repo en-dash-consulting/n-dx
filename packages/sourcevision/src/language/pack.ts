@@ -213,7 +213,16 @@ export interface LoadPacksOptions {
   readonly grammarDir?: string;
   /** Receives one message per degraded pack. Defaults to `console.warn`. */
   readonly warn?: (message: string) => void;
+  /**
+   * What a degraded pack's files get, for the notice. Defaults to
+   * {@link inventoryOnlyOutcome}; a caller with another parser for the
+   * language says so instead.
+   */
+  readonly outcome?: (pack: LanguagePack) => string;
 }
+
+/** The notice clause for a degraded pack whose files get no import edges. */
+export const inventoryOnlyOutcome = (pack: LanguagePack): string => `${pack.config.displayName} files get inventory only`;
 
 /**
  * The step that restores a missing grammar, for the install at hand. A source
@@ -235,6 +244,7 @@ export function loadLanguagePacks(options: LoadPacksOptions = {}): PackStatus[] 
   const packs = options.packs ?? BUILTIN_PACKS;
   const grammarDir = options.grammarDir ?? grammarBuildDir();
   const warn = options.warn ?? ((message: string) => console.warn(message));
+  const outcome = options.outcome ?? inventoryOnlyOutcome;
 
   return packs.map((pack) => {
     const grammarPath = join(grammarDir, `${pack.grammar.name}.wasm`);
@@ -243,7 +253,7 @@ export function loadLanguagePacks(options: LoadPacksOptions = {}): PackStatus[] 
     }
     const notice =
       `${pack.config.displayName}: grammar ${pack.grammar.name}@${pack.grammar.version} is not built ` +
-      `(expected ${grammarPath}); ${pack.config.displayName} files get inventory only. ` +
+      `(expected ${grammarPath}); ${outcome(pack)}. ` +
       missingGrammarStep();
     warn(notice);
     return { pack, grammarPath, grammarAvailable: false, mode: "inventory-only", notice };

@@ -34,11 +34,13 @@ Go projects skip `vendor/` (equivalent to `node_modules/`). Standard Go director
 
 ## Import Graph
 
-**File:** `packages/sourcevision/src/analyzers/go-imports.ts`
+**Files:** `packages/sourcevision/src/language/go-pack.ts` and `go-resolver.ts` (the Go language pack), `packages/sourcevision/src/analyzers/go-imports.ts` (the regex fallback)
 
 ### Parser Design
 
-The Go import parser is regex-based (no Go toolchain dependency). It handles all import syntax variants:
+Go imports come from the Go language pack: a tree-sitter grammar built to WASM, the queries under `src/language/queries/go/`, and a resolver that reads every `go.mod`, `go.work` and `vendor/modules.txt` in the project. Neither needs a Go toolchain. Where the pack's output differs from the regex parser's, the differences are deliberate and listed in the header of `go-resolver.ts`: nested modules resolve against their own `go.mod`, `go.work` modules and local replaces are internal, a required module nested under the project's path is third-party, and an import of a directory with no `.go` file produces no edge.
+
+When the pack cannot run — the grammar is not built or will not load, a query does not compile, or the build files cannot be read — the imports phase reports it once and takes Go edges from the regex parser instead, so a Go repository never drops to inventory-only. Both parsers handle all import syntax variants:
 
 | Variant | Syntax | Example |
 |---------|--------|---------|
@@ -48,11 +50,11 @@ The Go import parser is regex-based (no Go toolchain dependency). It handles all
 | Blank | `import _ "pkg"` | `import _ "github.com/lib/pq"` |
 | Dot | `import . "pkg"` | `import . "testing"` |
 
-The parser strips comments (`//` and `/* */`) before extraction and ignores import-like text inside string literals.
+The regex parser strips comments (`//` and `/* */`) before extraction and ignores import-like text inside string literals.
 
 ### Import Classification
 
-Every import is classified into one of three categories using the module path from `go.mod`:
+Every import is classified into one of three categories. The table gives the regex parser's rules, which use the root `go.mod` only; the pack applies the same categories per module, as described above.
 
 | Category | Rule | Edge Type | Example |
 |----------|------|-----------|---------|
