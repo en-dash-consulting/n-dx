@@ -4,8 +4,8 @@
  * Convention: a pack with id `<id>` keeps its fixture project in
  * `tests/fixtures/language-packs/<id>/` — source files under `src/`, the
  * committed result in `golden.json`. The harness runs the pack's queries over
- * every file whose extension the pack's config claims and compares the result
- * with the golden. Goldens are rewritten only when {@link UPDATE_ENV} is set,
+ * every file whose extension the pack's config claims, then the pack's
+ * resolver (if any) over those results, and compares both with the golden. Goldens are rewritten only when {@link UPDATE_ENV} is set,
  * which `pnpm --filter @n-dx/sourcevision test:update-goldens` does.
  */
 
@@ -13,10 +13,11 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { LanguagePack } from "../../src/language/pack.js";
+import type { FileReferences, LanguagePack } from "../../src/language/pack.js";
 import {
   createTreeSitterRunner,
   type FileResult,
+  type ParsedFile,
   type RunnablePack,
 } from "../../src/language/runner.js";
 
@@ -38,6 +39,8 @@ export interface PackGolden {
   readonly grammar: { readonly name: string; readonly version: string };
   /** Sorted by path. */
   readonly files: readonly FileResult[];
+  /** The pack resolver's output per parsed file, in path order; absent for a pack with no resolver. */
+  readonly references?: Readonly<Record<string, FileReferences>>;
 }
 
 /** Project-relative, forward-slash paths of the fixture's source files, sorted. */
@@ -56,7 +59,7 @@ export function listFixtureFiles(fixtureDir: string, extensions: readonly string
   return found.sort();
 }
 
-/** Run every query of the pack over the fixture's files. */
+/** Run every query of the pack over the fixture's files, then its resolver over the results. */
 export async function runPackOverFixture(
   target: RunnablePack,
   fixtureDir: string,
@@ -68,7 +71,11 @@ export async function runPackOverFixture(
     for (const path of listFixtureFiles(fixtureDir, [...pack.config.extensions])) {
       files.push(await runner.parseFile(target, join(fixtureDir, path)).then((r) => ({ ...r, path })));
     }
-    return { pack: pack.id, grammar: pack.grammar, files };
+    if (!pack.resolver) return { pack: pack.id, grammar: pack.grammar, files };
+    const parsed = files.filter((f): f is ParsedFile => f.status === "parsed");
+    const prepared = pack.resolver.prepare(parsed);
+    const references = Object.fromEntries(parsed.map((f) => [f.path, prepared.resolve(f.path)]));
+    return { pack: pack.id, grammar: pack.grammar, files, references };
   } finally {
     runner.dispose();
   }

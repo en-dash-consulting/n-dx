@@ -14,6 +14,12 @@
 ; @typeref.name is every simple type name, wherever it occurs: it also covers
 ; type arguments, bounds, throws clauses, casts, local variables and the
 ; qualifier of a scoped name.
+;
+; @typeref.qualified is every scoped type name (`java.util.List`, `Map.Entry`),
+; nested ones included, so the outermost one gives the name as written.
+;
+; @typeref.qualifier is the identifier before a field access (`Status` in
+; `Status.OPEN`). It may be a variable; consumers decide.
 (field_declaration
   type: [(type_identifier) (scoped_type_identifier) (generic_type)] @typeref.field)
 
@@ -43,3 +49,8 @@
   type: [(type_identifier) (scoped_type_identifier) (generic_type)] @typeref.new)
 
 (type_identifier) @typeref.name
+
+(scoped_type_identifier) @typeref.qualified
+
+(field_access
+  object: (identifier) @typeref.qualifier)

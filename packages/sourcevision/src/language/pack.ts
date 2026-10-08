@@ -50,14 +50,74 @@ export interface RuleProvenance {
   readonly source: string;
 }
 
-/** Resolves a reference in one source file to the project files it names. */
-export interface PackResolver {
+/** A position in a file. Matches the schema's call-graph positions. */
+export interface SourcePosition {
+  /** One-based line. */
+  readonly line: number;
   /**
-   * @param specifier The reference as written, e.g. an import name.
-   * @param fromFile  Project-relative path of the referencing file.
-   * @returns Project-relative paths of the target files; empty when external or unresolved.
+   * Zero-based column in UTF-16 code units — web-tree-sitter parses the
+   * JavaScript string, so this indexes the line as `String.prototype` does,
+   * not by UTF-8 byte.
    */
-  resolve(specifier: string, fromFile: string): readonly string[];
+  readonly column: number;
+}
+
+/** One node captured by a pack query. */
+export interface Capture {
+  /** Capture name as written in the query, without the `@`. */
+  readonly name: string;
+  /** Tree-sitter node type, e.g. `"class_declaration"`. */
+  readonly nodeType: string;
+  readonly text: string;
+  readonly start: SourcePosition;
+  readonly end: SourcePosition;
+}
+
+/** One project file's captures, as the runner produces them. */
+export interface PackSourceFile {
+  /** Project-relative, forward-slash path. */
+  readonly path: string;
+  /** Captures per query name, in document order. */
+  readonly captures: Readonly<Record<string, readonly Capture[]>>;
+}
+
+/** A project file one file refers to, with the names that led there. */
+export interface FileReference {
+  /** Project-relative path of the target file. */
+  readonly to: string;
+  /** Sorted, distinct; `*` for a wildcard import. */
+  readonly symbols: readonly string[];
+}
+
+/** A package outside the project that one file refers to. */
+export interface ExternalReference {
+  /** Package name, e.g. `java.util`. No version. */
+  readonly package: string;
+  /** Sorted, distinct; `*` for a wildcard import. */
+  readonly symbols: readonly string[];
+}
+
+/** Everything one file refers to. Both lists are sorted and deduplicated. */
+export interface FileReferences {
+  /** Never contains the file itself. */
+  readonly files: readonly FileReference[];
+  readonly external: readonly ExternalReference[];
+}
+
+/**
+ * Resolves references to files. Resolution needs an index of the whole
+ * project (same-package and wildcard lookups), so it is built once per
+ * analysis by {@link PackResolver.prepare}.
+ */
+export interface PackResolver {
+  /** Index every file of the project; call once per analysis. */
+  prepare(files: readonly PackSourceFile[]): PreparedResolver;
+}
+
+/** A resolver bound to one project's index. */
+export interface PreparedResolver {
+  /** References from a prepared file; empty for a path that was not prepared. */
+  resolve(fromFile: string): FileReferences;
 }
 
 /** A dependency declared in a build file. */
