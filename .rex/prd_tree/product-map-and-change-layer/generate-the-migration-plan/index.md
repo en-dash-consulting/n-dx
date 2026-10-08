@@ -32,10 +32,12 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Enriched placement in the migration plan: text by default, Jev when configured](./enriched-placement-in-the-migration.md) | pending |
 | [Give migrations a home: framework and the v1-to-v2 folder](./give-migrations-a-home-framework-and.md) | completed |
 | [Migration contract does not say a model question must carry every input its answer depends on, so a minimal question reuses a stale answer](./migration-contract-does-not-say-a.md) | pending |
+| [Migration plan and freeSlug can freeze the slug "index", which the v2 writer refuses on a leaf](./migration-plan-and-freeslug-can-freeze.md) | pending |
+| [Migration plan checks slugs against v1 siblings, so items that become v2 siblings can share a slug and the writer refuses the tree](./migration-plan-checks-slugs-against-v1.md) | pending |
 | [Migration plan emits two different criteria sets for a capability, so reviewedHash can mismatch the migrated spec](./migration-plan-emits-two-different.md) | pending |
 | [Migration plan makes cancelled or deleted v1 epics and features into standing areas and capabilities](./migration-plan-makes-cancelled-or.md) | pending |
 | [Migration plan turns a version-numbered epic that is not a release into a release umbrella (e.g. "Python 3.12 support")](./migration-plan-turns-a-version.md) | pending |
 | [Optional Jev judgments and confidence for the migration plan](./optional-jev-judgments-and-confidence.md) | pending |
 | [Plan ids, aliases, backfill and data fixes](./plan-ids-aliases-backfill-and-data-fixes.md) | completed |
 | [Stamp appliedAt and reviewedHash when migrating historical items](./stamp-appliedat-and-reviewedhash-when.md) | completed |
-| [The migration can freeze a Windows-unsafe v1 slug (con, aux, nul) into v2, leaving the tree permanently unwritable](./the-migration-can-freeze-a-windows.md) | pending |
+| [The migration can freeze a Windows-unsafe v1 slug (con, aux, nul) into v2, leaving the tree permanently unwritable](./the-migration-can-freeze-a-windows.md) | completed |
