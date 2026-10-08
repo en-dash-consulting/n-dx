@@ -36,4 +36,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Published sourcevision has no grammars, so every language pack degrades to inventory-only and the notice points at an unshipped script](./published-sourcevision-has-no-grammars.md) | completed |
 | [Resolve Java imports and same-package references](./resolve-java-imports-and-same-package.md) | completed |
 | [Resolve pack file paths without the global URL so jsdom tests can load sourcevision](./resolve-pack-file-paths-without-the.md) | completed |
-| [Secondary Java drops TS/Python/Go files under out/ and generated/ from a mixed repo's inventory](./secondary-java-drops-ts-python-go.md) | pending |
+| [Secondary Java drops TS/Python/Go files under out/ and generated/ from a mixed repo's inventory](./secondary-java-drops-ts-python-go.md) | completed |
+| [Runner memory test times out under the full test gate](./runner-memory-test-times-out-under-the.md) | pending |

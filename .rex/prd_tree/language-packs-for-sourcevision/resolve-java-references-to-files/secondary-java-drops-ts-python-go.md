@@ -2,7 +2,7 @@
 id: "9ac16e77-6429-4b27-b0f1-f0711f1783cf"
 level: "task"
 title: "Secondary Java drops TS/Python/Go files under out/ and generated/ from a mixed repo's inventory"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -11,12 +11,17 @@ tags:
   - "sourcevision"
   - "java"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-08T03:11:34.302Z"
+completedAt: "2026-10-08T03:23:59.925Z"
+resolutionType: "code-change"
+resolutionDetail: "javaSecondaryConfig (923b36b78, hench run 629c993a). The gate failed only on the load-sensitive runner memory test (captured separately); operator-verified with no other load: sourcevision 2523 tests and the six policy tests pass."
+endedAt: "2026-10-08T03:23:59.925Z"
 acceptanceCriteria:
   - "A repo with package.json + pom.xml and a TS file under generated/ or out/ keeps that file in the inventory with its normal role"
   - "TS import edges into and out of such files are unchanged versus the same repo without pom.xml"
   - "A unit or integration test covers the package.json + pom.xml + generated/*.ts case and fails on the current merge behaviour"
   - "Java-primary repos still skip target/, build/, out/, .gradle/, generated-sources/ and generated/"
 description: "Verdict: should-fix (medium). This was introduced by \"Include Java in multi-language detection beside other build markers\" (5ae23c3d).\n\nScenario: take a repo with package.json and pom.xml at the root and an OpenAPI-generated TS client at frontend/src/generated/api.ts (or TS under out/ or target/). detectLanguages now returns [typescript, java]. mergeLanguageConfigs unions skipDirectories, so Java's target/, out/, .gradle/, generated-sources/ and generated/ (packages/sourcevision/src/language/java.ts) now skip those TS files at inventory time. It also unions generatedFilePatterns, so any TS file under generated/ that is reached is classified as generated. Before this change those files were inventoried and their import edges were kept. The task's claim was that mixed repos change \"only by gaining Java\", and that claim does not hold.\n\nReachable: the analyze inventory phase (analyze-phases.ts calls detectLanguages, then mergeLanguageConfigs, then analyzeInventory) on a Spring Boot repo with a bundled frontend. That is exactly the shape the task targets. Repos without a Maven or Gradle file are unaffected.\n\nOptions:\n1. When Java is secondary, merge only its extensions, parseable, test, config and entry patterns, and not skipDirectories or generatedFilePatterns. This could be a flag on LanguageConfig (for example `primaryOnly` skip dirs), or detectLanguages could return a trimmed javaSecondaryConfig. Cheap. The risk is that Maven target/ output would no longer be skipped in mixed repos; .class files are not inventoried and target/ rarely holds .java, so the risk is low.\n2. Scope Java's skip and generated rules to .java files (per-extension skip). This is more invasive to the inventory walk.\n3. Accept the behaviour and document it, on the view that skipping generated code is desirable. That needs an explicit decision because it contradicts the epic rule that TS/JS output must not change.\nRecommendation: option 1, keeping `target` and `.gradle` in the secondary set because they are unambiguous build output."
-lastModified: "2026-10-08T02:46:44.822Z"
+lastModified: "2026-10-08T03:24:00.188Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
