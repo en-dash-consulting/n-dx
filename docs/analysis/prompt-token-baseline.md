@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-10-07T16:52:16.510Z
-- **Commit** — `5e5e7ff7bded`
-- **Content hash** — `64ae94f68e9714d8` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-10-08T23:42:55.980Z
+- **Commit** — `8c6112e3182b`
+- **Content hash** — `eb19b03709dc4569` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
-- **Surfaces** — 36
-- **Per-call total** — 22,753 tokens (what every surface costs, summed)
-- **Unique fixed text** — 14,250 tokens (distinct text a rewrite has to edit)
+- **Surfaces** — 37
+- **Per-call total** — 22,925 tokens (what every surface costs, summed)
+- **Unique fixed text** — 14,422 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -77,7 +77,7 @@ so a jump is never mistaken for a regression or a win.
   same prompt already gave elsewhere and resolving a task-size contradiction (hours vs
   engineer-weeks). No instruction was removed from a prompt that did not still state it.
 
-## rex — 15,217 per-call / 7,195 unique, 19 surfaces
+## rex — 15,389 per-call / 7,367 unique, 20 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
@@ -96,6 +96,7 @@ so a jump is never mistaken for a regression or a win.
 | `buildSpecEnvelope` | `packages/rex/src/analyze/guided.ts` | Turn guided answers into a structured spec. | 22 | 150 | 432 | 582 |
 | `buildModifyEnvelope` | `packages/rex/src/analyze/modify-reason.ts` | Apply a natural-language edit to an existing PRD item. | 29 | 295 | 492 | 787 |
 | `buildGroupRenameEnvelope` | `packages/rex/src/analyze/propose-group-renames.ts` | Rename a group of sibling items to a consistent scheme. | 27 | 214 | 29 | 243 |
+| `buildPlacementEnvelope` | `packages/rex/src/analyze/place-reason.ts` | Place a change on a shortlisted capability or constraint, or propose a new node. | 15 | 172 | — | 172 |
 | `buildRenameEnvelope` | `packages/rex/src/analyze/rename-resolve.ts` | Pick the better of two colliding item titles. | 23 | 204 | 29 | 233 |
 | `buildReshapeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Propose a restructure of the PRD hierarchy. | 7 | 18 | 1,402 | 1,420 |
 | `buildBodyMergeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Merge two item descriptions into one during a reshape. | 12 | 106 | — | 106 |
