@@ -25,6 +25,7 @@
   "files": [
     "dist",
     "!dist/**/*.map",
+    "!dist/.build-stamp.json",
     "build.js"
   ],
   "scripts": {

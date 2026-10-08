@@ -23,7 +23,8 @@
   },
   "files": [
     "dist",
-    "!dist/**/*.map"
+    "!dist/**/*.map",
+    "!dist/.build-stamp.json"
   ],
   "scripts": {
     "build": "tsc && node ../../scripts/write-build-stamp.mjs",
