@@ -17,7 +17,7 @@ Reference for skill authors: every skill is classified by mutation footprint. Fi
 | `ndx-feedback` | `skills/ndx-feedback.md` | read-only† | — | — | No |
 | `ndx-adversarial-review` | `skills/ndx-adversarial-review.md` | read-only until authorized¶ | `.rex/prd_tree/` (via `add_item`/`edit_item`/`update_task_status` MCP) | ✓ | No |
 | `no-plan-mode` | `skills/no-plan-mode.md` | read-only (rule) | — | — | ⚠ applies to hench |
-| `ndx-work` | `skills/ndx-work.md` | **out-of-scope** | via hench lifecycle | via hench | ⚠ IS the loop |
+| `ndx-work` | `skills/ndx-work.md` | **file-modifying** | source files + `.rex/prd_tree/` (the task's own work) | ✓‖ | No — assisted, see ‖ |
 | `dev-link` | `.claude/skills/dev-link/SKILL.md` | file-modifying‡ | global pnpm links | — | No |
 | `triage` | `.claude/skills/triage/SKILL.md` | read-only by default§ | — | — | No |
 
@@ -33,7 +33,9 @@ Reference for skill authors: every skill is classified by mutation footprint. Fi
 
 **no-plan-mode** — the rule text in `no-plan-mode.md` describes behavior enforced inside the hench system prompt (`packages/hench/src/agent/planning/prompt.ts`). The skill file exists as documentation for Claude Code users, not as a behavior injected at invocation time. Never add a commit step here.
 
-**ndx-work** — the hench agent run loop. Hench has its own commit lifecycle (`packages/hench/src/agent/shared.ts`). Adding a commit step to this skill would double-commit. Strictly out of scope for the auto-commit pattern.
+**‖ndx-work** — an *assisted* run: it drives the task directly through Claude Code and does **not** spawn the hench agent, so hench's commit lifecycle (`packages/hench/src/agent/lifecycle/shared.ts`) never runs and nothing else would commit the work. That is why it carries its own commit step rather than being out of scope — the double-commit this table once warned about cannot happen, because only one of the two paths executes per run. `ndx work` (the CLI) is the other path and keeps hench's lifecycle.
+
+Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-work:`**. The commit is the task's own work, so its subject follows whatever convention the project's `.rex/workflow.md` asks for (`feat(rex): …` here); `N-DX: skill/ndx-work` carries the attribution instead. `tests/e2e/skill-commit-isolation.test.js` encodes the deviation rather than exempting the skill.
 
 ---
 
@@ -59,6 +61,10 @@ Reference for skill authors: every skill is classified by mutation footprint. Fi
 
    Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
    ````
+
+   Add an `N-DX-Item: <id>` line between the two **when the skill's commit is
+   for exactly one PRD item** — see [the one-item rule](#the-one-item-rule).
+   Omit it when the commit spans a batch or is for no item at all.
 
    **Do not build the message with a heredoc or `$(...)`.** Both are POSIX-only.
    Git Bash is not part of Windows — it arrives with Git for Windows, whose
@@ -99,7 +105,7 @@ variants of one another and should not be unified:
 | Trailer | Answers | Example value | Emitted by |
 |---------|---------|---------------|------------|
 | `N-DX:` | What produced this commit | `skill/ndx-capture`, `claude/opus · run 1f3`, `pre-run commit gate` | skills, hench, `packages/core/commit-trailers.js` |
-| `N-DX-Item:` | Which PRD item it is for | `5ee70ad3-313d-46f0-b99c-592d5e49dc74` | hench run loop |
+| `N-DX-Item:` | Which PRD item it is for | `5ee70ad3-313d-46f0-b99c-592d5e49dc74` | hench run loop, hench's PRD-record commit, `ndx-work`, `ndx-capture` |
 | `N-DX-Status:` | What status changed | `<taskId> in_progress → completed` | hench run loop |
 
 `N-DX:` takes a free-form producer string, so a new commit source picks a value
@@ -110,6 +116,32 @@ rather than a new key. `N-DX-Status:` is consumed by
 wrote the author's host into permanent history; readers still accept that form
 (`itemIdFromTrailer` in `packages/rex/src/core/change-commits.ts`), but nothing
 should emit it.
+
+### The one-item rule
+
+**A commit emits `N-DX-Item` when it is for exactly one PRD item.** It is how
+rex's realized-by edge finds the commits that realize an item —
+`computeChangeCommits` reads the trailer and nothing else, never the subject —
+so an implementation commit without it is invisible to the evidence layer.
+
+A commit spanning several items emits none, because naming one of the N would
+attribute the whole commit to it. A commit for no item emits none either.
+
+| Emits it | Does not |
+|---|---|
+| hench's work commit (the task) | hench's `--reset-deferred` commit (N tasks) |
+| hench's `chore(prd):` record commit (the completed task) | hench's pre-run gate commit (no task yet) |
+| `ndx-work` (the task it implemented) | `ndx-plan`, `ndx-adversarial-review` (a batch of new items) |
+| `ndx-capture` (the one item it created) | `ndx-reshape` (a batch of restructured items) |
+| | `ndx-config` (config, no item) |
+| | every path in `packages/core/commit-trailers.js` (repository-level) |
+
+The rule is stated once, in `packages/core/commit-trailers.js`. It is enforced
+in three places, one per commit path: `tests/unit/commit-trailers.test.js`
+(core's builder and its call sites), `tests/e2e/skill-commit-isolation.test.js`
+(every skill, both directions), and
+`packages/hench/tests/integration/completion-metadata-commit.test.ts` (hench's
+PRD-record commit, against real git).
 
 **Commits created from source, not from a skill** — `packages/core/export.js`
 (dashboard deploy) and `packages/core/git-preflight.js` (the `ndx init` baseline

@@ -2291,6 +2291,11 @@ async function scopePrdPathsToReport(
  * The commit is scoped to those same paths, so it lands the PRD write and
  * nothing else — work the operator had already staged stays staged.
  *
+ * `itemId`, when the write is for one item, becomes an `N-DX-Item` trailer —
+ * the same trailer the work commit carries, read by rex's `computeChangeCommits`
+ * to tie a commit to the item it realizes. Callers whose write spans several
+ * items (`commitResetDeferredChanges`) pass none rather than picking one.
+ *
  * Returns `error` when Git cannot stage or commit the paths. A missing PRD
  * path or empty staged set remains a successful no-op.
  */
@@ -2309,6 +2314,7 @@ async function commitPrdTreeIfStaged(
   projectDir: string,
   message: string,
   report?: SaveFileReport | null,
+  itemId?: string,
 ): Promise<PrdTreeCommitResult> {
   const rootPaths = await prdPathsToStage(projectDir);
 
@@ -2352,9 +2358,15 @@ async function commitPrdTreeIfStaged(
     // catch below reports that and leaves the PRD write in the tree for the
     // gate to name, which is the right outcome: a run started mid-merge should
     // not be quietly extending the merge commit.
+    // One `-m` for the whole trailer block: a second `-m` inserts a blank line,
+    // which ends the block and leaves anything after it as body text git will
+    // not parse as a trailer.
+    const trailers = itemId
+      ? `N-DX-Item: ${itemId}\n${buildCoAuthoredByTrailerLine()}`
+      : buildCoAuthoredByTrailerLine();
     await execGitMutation(
       projectDir,
-      ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine(), "--", ...prdPaths],
+      ["commit", "-m", message, "-m", trailers, "--", ...prdPaths],
       30_000,
     );
     return { staged, paths: prdPaths };
@@ -2397,7 +2409,7 @@ async function commitCompletionMetadata(
   // whole `.rex/prd_tree/`, which under the no-concurrent-PRD-writers contract
   // is just this run's metadata. The message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
-  const result = await commitPrdTreeIfStaged(projectDir, message, report);
+  const result = await commitPrdTreeIfStaged(projectDir, message, report, taskId);
   if (result.error) {
     detail(`Warning: could not commit PRD tree changes: ${result.error.message}`);
   } else if (result.staged > 0) {
@@ -2457,6 +2469,8 @@ export async function commitResetDeferredChanges(
 ): Promise<PrdTreeCommitResult> {
   if (resetCount <= 0) return { staged: 0 };
   const message = `chore(prd): reset ${resetCount} deferred/failing task(s) to pending (--reset-deferred)`;
+  // No `N-DX-Item`: the reset spans every task it touched, so naming one of
+  // them would attribute the whole commit to it in rex's realized-by edge.
   const result = await commitPrdTreeIfStaged(projectDir, message, report);
   if (result.error) {
     detail(`Warning: could not commit --reset-deferred changes: ${result.error.message}`);

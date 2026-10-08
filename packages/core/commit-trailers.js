@@ -20,9 +20,8 @@
  * | `N-DX-Item:`    | which PRD item it is for | `5ee70ad3-313d-46f0-b99c-592d5e49dc74`   |
  * | `N-DX-Status:`  | what status changed      | `<taskId> in_progress → completed`       |
  *
- * `N-DX:` takes a free-form producer string. `N-DX-Item:` and `N-DX-Status:`
- * are emitted by the hench run loop; `N-DX-Status:` is consumed by
- * `rex backfill-commit-attribution`.
+ * `N-DX:` takes a free-form producer string. `N-DX-Status:` is emitted by the
+ * hench run loop and consumed by `rex backfill-commit-attribution`.
  *
  * `N-DX-Item:` carries the **item id**. It used to carry a dashboard permalink
  * (`<publicUrl>/#/rex/item/<id>`), which baked the writer's host — usually
@@ -30,6 +29,27 @@
  * any other machine. Readers accept both: `itemIdFromTrailer`
  * (`packages/rex/src/core/change-commits.ts`) unwraps a permalink to the same
  * id, so commits written before the change still attribute. Emit only the id.
+ *
+ * ## When to emit `N-DX-Item:` — the one-item rule
+ *
+ * **A commit emits `N-DX-Item` when it is for exactly one PRD item.** It is
+ * how rex's realized-by edge finds the commits that realize an item
+ * (`computeChangeCommits` reads the trailer and nothing else — not the subject,
+ * which no reader parses), so an implementation commit without it is invisible
+ * to the evidence layer.
+ *
+ * A commit that spans several items emits none: naming one of the N would
+ * attribute the whole commit to it. That rules out hench's `--reset-deferred`
+ * commit, and the `ndx-plan` / `ndx-reshape` / `ndx-adversarial-review` skills,
+ * each of which writes a batch. A commit for no item at all — hench's pre-run
+ * gate commit, and every path in this module — emits none either.
+ *
+ * Core's own three commit paths (`ndx init`'s baseline, `ndx export`'s
+ * dashboard deploy, `ndx migrate-layout`'s move) are repository-level: they
+ * exist before or outside any PRD item, so none passes an `itemId` today. The
+ * parameter exists so a core path that *is* for an item emits the trailer in
+ * the same shape as hench's and the skills' rather than inventing a third;
+ * `tests/unit/commit-trailers.test.js` pins both halves.
  *
  * ## Why this string is duplicated
  *
@@ -55,15 +75,22 @@ export const CO_AUTHORED_BY_TRAILER = "Co-Authored-By: En Dash's n-dx <n-dx@enda
 /**
  * Build the trailer block for a commit n-dx is about to create.
  *
- * Returns the `N-DX:` provenance line and the co-authorship line, separated by
- * a newline and with no trailing newline — callers join it to a subject with a
- * blank line, which is what git requires for trailers to be recognized.
+ * Returns the `N-DX:` provenance line, an `N-DX-Item:` line when the commit is
+ * for exactly one item, and the co-authorship line — separated by newlines and
+ * with no trailing newline, and with no blank line between them. Callers join
+ * the block to a subject with a blank line, which is what git requires for
+ * trailers to be recognized; a blank line *inside* the block would end it and
+ * leave the rest as body text.
  *
  * @param {string} producer  What produced the commit, e.g. `"export/dashboard"`.
+ * @param {string} [itemId]  The PRD item this commit is for, when it is for
+ *   exactly one. Omit for a repository-level commit or one spanning several
+ *   items — see the one-item rule in this module's header.
  * @returns {string}
  */
-export function buildTrailerBlock(producer) {
-  return `N-DX: ${producer}\n${CO_AUTHORED_BY_TRAILER}`;
+export function buildTrailerBlock(producer, itemId) {
+  const item = itemId ? `N-DX-Item: ${itemId}\n` : "";
+  return `N-DX: ${producer}\n${item}${CO_AUTHORED_BY_TRAILER}`;
 }
 
 /**
@@ -71,8 +98,10 @@ export function buildTrailerBlock(producer) {
  *
  * @param {string} subject   Commit subject line.
  * @param {string} producer  What produced the commit, e.g. `"init/baseline"`.
+ * @param {string} [itemId]  The PRD item this commit is for, when it is for
+ *   exactly one.
  * @returns {string}
  */
-export function buildCommitMessage(subject, producer) {
-  return `${subject}\n\n${buildTrailerBlock(producer)}`;
+export function buildCommitMessage(subject, producer, itemId) {
+  return `${subject}\n\n${buildTrailerBlock(producer, itemId)}`;
 }

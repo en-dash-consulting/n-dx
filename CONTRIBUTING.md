@@ -243,13 +243,30 @@ but knowing what they mean helps you navigate the project history:
 | `N-DX-Item: <item-id>` | The PRD item this commit is for. Older commits carry a dashboard permalink instead; readers accept both forms. |
 
 If you are closing a PRD task with a manual commit, add an `N-DX-Status`
-trailer so the dashboard picks up the transition:
+trailer so the dashboard picks up the transition, and an `N-DX-Item` trailer
+naming the item the commit realizes:
 
 ```
 feat(rex): fix duplicate detection edge case
 
 N-DX-Status: <item-id> in_progress → completed
+N-DX-Item: <item-id>
 ```
+
+**The one-item rule.** Emit `N-DX-Item` when the commit is for exactly one PRD
+item, using the bare id — never a dashboard URL, which bakes your host into
+permanent history. Omit it when the commit spans several items or none (a
+dependency bump, a docs fix): naming one of several would attribute the whole
+commit to it. `rex`'s realized-by edge reads this trailer and no other part of
+the message, so a commit without it is invisible to the evidence layer even
+when the subject names the item.
+
+Keep the trailers in one unbroken run of lines at the end of the message. Git
+stops parsing at the first blank line, so a trailer below one is body text.
+
+The same applies to pull requests: `.github/pull_request_template.md` ends in a
+trailer block, because GitHub copies the PR description into the squash-merge
+commit that lands on `main`.
 
 ---
 
