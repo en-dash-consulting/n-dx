@@ -96,7 +96,7 @@ describe("history after a retirement", () => {
     expect(resolveNode(retired, "folded-old")?.id).toBe("cap-old");
     expect(resolveNode(retired, "old-con")?.id).toBe("old-con");
     const shadowed = tree([cap("gone", { status: "deleted", aliases: ["live"] }), cap("live")], []);
-    expect(resolveNode(shadowed, "live")?.status).toBeUndefined();
+    expect(resolveNode(shadowed, "live")).toBe(shadowed.product[1]);
   });
 });
 
