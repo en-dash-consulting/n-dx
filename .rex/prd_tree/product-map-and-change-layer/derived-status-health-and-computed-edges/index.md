@@ -25,11 +25,12 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Adapt status, edges and the retired-commits tests to PR 30's schema and rules](./adapt-status-edges-and-the-retired.md) | completed |
+| [An open fix: true change that adds a capability marks the new capability defective while its kind is feature](./an-open-fix-true-change-that-adds-a.md) | pending |
 | [Compute edges, derived kind and alias resolution](./compute-edges-derived-kind-and-alias.md) | completed |
 | [Compute intent status and health for product nodes](./compute-intent-status-and-health-for.md) | completed |
 | [computeChangeCommits defaults to the local main branch, which a CI checkout lacks and a worktree may hold stale](./computechangecommits-defaults-to-the.md) | completed |
 | [computeChangeCommits returns a truncated commit list from a shallow clone without saying so](./computechangecommits-returns-a.md) | completed |
-| [computeProductStatus never marks a node defective for an open fix, because an open change cannot derive kind fix](./computeproductstatus-never-marks-a.md) | pending |
+| [computeProductStatus never marks a node defective for an open fix, because an open change cannot derive kind fix](./computeproductstatus-never-marks-a.md) | completed |
 | [Count only started or placed changes as building, and let children follow an amended parent](./count-only-started-or-placed-changes.md) | pending |
 | [deriveChangeKind calls a change that adds a new constraint a feature, not a policy change](./derivechangekind-calls-a-change-that.md) | pending |
 | [Keep retired nodes visible to status, kind and edges](./keep-retired-nodes-visible-to-status.md) | pending |
