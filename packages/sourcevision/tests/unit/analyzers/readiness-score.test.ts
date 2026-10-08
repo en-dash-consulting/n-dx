@@ -1,15 +1,17 @@
 /**
  * The readiness scorecard.
  *
- * Built on three repositories on disk and scored through the real analyzer, not
- * on hand-written `SdlcProfile` literals: the thing worth testing is the whole
- * path from "these files exist" to "this is the score", and a hand-built
- * profile would only confirm the arithmetic.
+ * Built on three repositories committed under `tests/fixtures/sdlc/` and
+ * scored through the real analyzer, not on hand-written `SdlcProfile`
+ * literals: the thing worth testing is the whole path from "these files
+ * exist" to "this is the score", and a hand-built profile would only confirm
+ * the arithmetic. Hand-built profiles appear only where a fixture cannot
+ * express the input — a parse failure, an unnamed deploy environment.
  *
  * **The exact scores are the point.** Every fixture asserts its overall and all
- * nine dimension scores, so changing a weight or a criterion fails here and has
- * to be done deliberately. No test restates a weight as a literal — they are
- * read from `READINESS_WEIGHTS`, which is the single source of truth.
+ * nine dimension scores, so changing a weight, a criterion or a detector fails
+ * here and has to be done deliberately. No test restates a weight as a literal —
+ * they are read from `READINESS_WEIGHTS`, which is the single source of truth.
  *
  * @see src/analyzers/readiness-score.ts
  */
@@ -17,6 +19,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { buildSdlcProfile } from "../../../src/analyzers/sdlc-profile.js";
 import {
@@ -28,10 +31,22 @@ import {
   type ReadinessDimensionName,
   type ReadinessScore,
 } from "../../../src/analyzers/readiness-score.js";
+import type { SdlcCiPipeline, SdlcDeployment, SdlcProfile } from "../../../src/schema/v1.js";
+
+// ── Fixtures on disk ────────────────────────────────────────────────────────
+
+const FIXTURES = fileURLToPath(new URL("../../fixtures/sdlc/", import.meta.url));
+
+/** A Node service with GitHub Actions deploying via Helm, Prisma migrations and LaunchDarkly. */
+const NODE_REPO = join(FIXTURES, "node-helm-prisma-launchdarkly");
+/** A Go service with GitLab CI and no tests. */
+const GO_REPO = join(FIXTURES, "go-gitlab-no-tests");
+/** Nothing at all — a `.gitkeep` so git keeps the directory, which no detector reads. */
+const EMPTY_REPO = join(FIXTURES, "empty");
 
 const roots: string[] = [];
 
-/** A project on disk, named so two tests never share a directory. */
+/** A throwaway project for inputs no committed fixture should carry. */
 function project(name: string, files: Record<string, string>): string {
   const root = join(tmpdir(), `sv-readiness-${name}`);
   rmSync(root, { recursive: true, force: true });
@@ -69,89 +84,43 @@ function weightedSum(result: ReadinessScore): number {
   return total;
 }
 
-// ── Fixture A: a Node service with the full pipeline ────────────────────────
-
-const NODE_PACKAGE_JSON = JSON.stringify(
-  {
-    name: "shop-api",
-    scripts: {
-      test: "vitest run",
-      lint: "eslint .",
-      build: "tsc",
-    },
-    dependencies: {
-      "launchdarkly-node-server-sdk": "^8.0.0",
-      pino: "^9.0.0",
-      "@sentry/node": "^8.0.0",
-    },
-    devDependencies: { vitest: "^4.0.0" },
-  },
-  null,
-  2,
-);
-
-const NODE_WORKFLOW = `
-name: CI
-on:
-  push:
-    branches: [main]
-  pull_request:
-jobs:
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Test
-        run: npm test
-  release:
-    needs: verify
-    steps:
-      - name: Deploy
-        run: helm upgrade shop-api ./chart --install
-`;
-
-/**
- * A Node repository with GitHub Actions deploying via Helm, Prisma migrations
- * and LaunchDarkly — the shape the task names as the well-equipped case.
- *
- * It carries a `.hench/config.json` with no `guard`, which is what leaving
- * hench's defaults in force looks like: repo-trust reports nothing wider than
- * the baseline, so agent safety is clean.
- */
-function nodeRepo(): string {
-  return project("node-full", {
-    "package.json": NODE_PACKAGE_JSON,
-    ".github/workflows/ci.yml": NODE_WORKFLOW,
-    "src/cart.ts": "export const cart = [];\n",
-    "src/cart.test.ts": "import { expect, it } from 'vitest';\nit('works', () => expect(1).toBe(1));\n",
-    "tests/e2e/checkout.e2e.test.ts": "it('checks out', () => {});\n",
-    "prisma/schema.prisma": "generator client {\n  provider = \"prisma-client-js\"\n}\n",
-    "prisma/migrations/0001_init/migration.sql": "CREATE TABLE cart (id INT);\n",
-    Dockerfile: "FROM node:22-alpine\nWORKDIR /app\n",
-    "chart/Chart.yaml": "apiVersion: v2\nname: shop-api\nversion: 0.1.0\n",
-    CODEOWNERS: "* @platform-team\n",
-    ".pre-commit-config.yaml": "repos: []\n",
-    ".hench/config.json": JSON.stringify({ language: "typescript" }),
-  });
+/** A profile that found nothing — every section present and empty. */
+function emptyProfile(): SdlcProfile {
+  return {
+    schemaVersion: "1.0.0",
+    commands: [],
+    tests: { frameworks: [], suites: [] },
+    ci: [],
+    cd: [],
+    rollback: [],
+    migrations: [],
+    featureFlags: [],
+    qualityGates: [],
+    observability: [],
+    containers: [],
+    iac: [],
+    parseFailures: [],
+  };
 }
+
+/** Scoring with no filesystem: agent safety is injected as "nothing found". */
+const NO_AGENT_SAFETY = { agentSafety: { sources: [], findings: [] } };
+
+// ── Fixture A: a Node service with the full pipeline ────────────────────────
 
 describe("readiness score: Node repo with Actions, Helm, Prisma and LaunchDarkly", () => {
   it("scores every dimension exactly", async () => {
-    const result = await score(nodeRepo());
+    const result = await score(NODE_REPO);
 
     expect(scoresOf(result)).toEqual({
       // A test command, vitest, unit tests and e2e tests; coverage is not configured.
       testing: 90,
       // A pipeline that tests, lints, and triggers on push and pull_request.
       ci: 100,
-      // One automated deployment, to a single environment.
+      // One automated deployment; the job does not name a second environment.
       cd: 80,
-      // The analyzer does not populate `rollback` yet.
-      rollback: 0,
+      // A Helm chart: `helm rollback` restores the previous release without a human.
+      rollback: 100,
       // Prisma migrations, not known to be automated or reversible.
       migrations: 75,
       // LaunchDarkly is configured; no flag keys were readable.
@@ -164,12 +133,11 @@ describe("readiness score: Node repo with Actions, Helm, Prisma and LaunchDarkly
       agentSafety: 100,
     });
 
-    expect(result.overall).toBe(81);
+    expect(result.overall).toBe(91);
   });
 
   it("draws its evidence from the profile's own detections", async () => {
-    const root = nodeRepo();
-    const profile = await buildSdlcProfile(root);
+    const profile = await buildSdlcProfile(NODE_REPO);
     const result = computeReadinessScore(profile);
 
     // Every path cited by a dimension is a path the analyzer recorded, not one
@@ -181,10 +149,13 @@ describe("readiness score: Node repo with Actions, Helm, Prisma and LaunchDarkly
       ...profile.tests.suites,
       ...profile.ci,
       ...profile.cd,
+      ...profile.rollback,
       ...profile.migrations,
       ...profile.featureFlags,
       ...profile.qualityGates,
       ...profile.observability,
+      ...profile.containers,
+      ...profile.iac,
     ]) {
       for (const e of detection.evidence) detected.add(e.path);
     }
@@ -203,11 +174,10 @@ describe("readiness score: Node repo with Actions, Helm, Prisma and LaunchDarkly
   });
 
   it("reads the agentSafety dimension from repo-trust", async () => {
-    const root = nodeRepo();
-    const result = computeReadinessScore(await buildSdlcProfile(root));
+    const result = computeReadinessScore(await buildSdlcProfile(NODE_REPO));
 
     // The same sources repo-trust reports, carried through as evidence.
-    expect(collectAgentSafety(root).sources).toEqual([".hench/config.json"]);
+    expect(collectAgentSafety(NODE_REPO).sources).toEqual([".hench/config.json"]);
     expect(result.dimensions.agentSafety.evidence).toEqual([
       { kind: "agent-config", path: ".hench/config.json", confidence: "certain" },
     ]);
@@ -217,39 +187,16 @@ describe("readiness score: Node repo with Actions, Helm, Prisma and LaunchDarkly
 
 // ── Fixture B: a Go service with GitLab CI and no tests ─────────────────────
 
-const GITLAB_CI = `
-stages:
-  - build
-compile:
-  stage: build
-  script:
-    - go build ./...
-`;
-
-/**
- * A Go repository with GitLab CI and no tests.
- *
- * The interesting case for the testing dimension: `go.mod` means the toolchain
- * offers `go test ./...`, so a test *command* exists while nothing proves a
- * single test does. The score credits the command and the gaps name the rest.
- */
-function goRepo(): string {
-  return project("go-no-tests", {
-    "go.mod": "module example.com/svc\n\ngo 1.23\n",
-    "main.go": "package main\n\nfunc main() {}\n",
-    ".gitlab-ci.yml": GITLAB_CI,
-  });
-}
-
 describe("readiness score: Go repo with GitLab CI and no tests", () => {
   it("scores every dimension exactly", async () => {
-    const result = await score(goRepo());
+    const result = await score(GO_REPO);
 
     expect(scoresOf(result)).toEqual({
       // `go test ./...` is offered by the toolchain; no framework, no test files.
       testing: 30,
-      // A GitLab pipeline that only builds, with no declared trigger.
-      ci: 40,
+      // A GitLab pipeline that only builds. GitLab runs every pipeline on push
+      // unless told otherwise, so the trigger is credited; the tests are not.
+      ci: 60,
       cd: 0,
       rollback: 0,
       migrations: 0,
@@ -259,24 +206,33 @@ describe("readiness score: Go repo with GitLab CI and no tests", () => {
       agentSafety: 0,
     });
 
-    expect(result.overall).toBe(12);
+    expect(result.overall).toBe(15);
   });
 
   it("says that the test command is not evidence of a test", async () => {
-    const result = await score(goRepo());
+    const result = await score(GO_REPO);
     const summaries = result.dimensions.testing.gaps.map((g) => g.summary);
 
     expect(summaries).toContain("No unit tests were found.");
     expect(summaries).not.toContain("No test command is declared.");
   });
 
+  it("does not call unit tests the only kind when there are none", async () => {
+    const result = await score(GO_REPO);
+    const summaries = result.dimensions.testing.gaps.map((g) => g.summary);
+
+    // With no suite at all, "unit tests are the only kind found" would
+    // contradict the gap beside it. The absence is stated as an absence.
+    expect(summaries).toContain("No integration or end-to-end tests were found.");
+    expect(summaries.join("\n")).not.toContain("Unit tests are the only kind found");
+  });
+
   it("reports a CI pipeline rather than silence when it only builds", async () => {
-    const result = await score(goRepo());
+    const result = await score(GO_REPO);
 
     expect(result.dimensions.ci.evidence.map((e) => e.path)).toEqual([".gitlab-ci.yml"]);
     expect(result.dimensions.ci.gaps.map((g) => g.summary)).toEqual([
       "No CI job runs the tests, so nothing stops a broken change merging.",
-      "No pipeline declares a trigger, so CI may only run when started by hand.",
       "CI does not lint or type-check.",
     ]);
   });
@@ -286,7 +242,7 @@ describe("readiness score: Go repo with GitLab CI and no tests", () => {
 
 describe("readiness score: empty repo", () => {
   it("scores zero across the board", async () => {
-    const result = await score(project("empty", {}));
+    const result = await score(EMPTY_REPO);
 
     expect(scoresOf(result)).toEqual({
       testing: 0,
@@ -304,7 +260,7 @@ describe("readiness score: empty repo", () => {
   });
 
   it("gives every dimension exactly one gap explaining the absence", async () => {
-    const result = await score(project("empty-gaps", {}));
+    const result = await score(EMPTY_REPO);
 
     for (const name of READINESS_DIMENSIONS) {
       const dimension = result.dimensions[name];
@@ -314,7 +270,7 @@ describe("readiness score: empty repo", () => {
   });
 
   it("aims its suggestions at the heaviest of the equally weak dimensions", async () => {
-    const result = await score(project("empty-suggest", {}));
+    const result = await score(EMPTY_REPO);
 
     // Everything scores zero, so the weight tie-break decides: testing (the
     // heaviest), then the two at the next weight down in declaration order.
@@ -339,21 +295,21 @@ describe("readiness score invariants", () => {
   });
 
   it("reports each dimension's weight from the weights constant", async () => {
-    const result = await score(nodeRepo());
+    const result = await score(NODE_REPO);
     for (const name of READINESS_DIMENSIONS) {
       expect(result.dimensions[name].weight, name).toBe(READINESS_WEIGHTS[name]);
     }
   });
 
   it("takes overall as the weighted sum of the dimension scores", async () => {
-    for (const root of [nodeRepo(), goRepo(), project("empty-sum", {})]) {
+    for (const root of [NODE_REPO, GO_REPO, EMPTY_REPO]) {
       const result = await score(root);
       expect(result.overall).toBe(Math.round(weightedSum(result)));
     }
   });
 
   it("keeps every score within 0-100", async () => {
-    for (const root of [nodeRepo(), goRepo(), project("empty-range", {})]) {
+    for (const root of [NODE_REPO, GO_REPO, EMPTY_REPO]) {
       const result = await score(root);
       expect(result.overall).toBeGreaterThanOrEqual(0);
       expect(result.overall).toBeLessThanOrEqual(100);
@@ -366,7 +322,7 @@ describe("readiness score invariants", () => {
   });
 
   it("gives every gap, on every fixture, the evidence that would raise the score", async () => {
-    for (const root of [nodeRepo(), goRepo(), project("empty-remedy", {})]) {
+    for (const root of [NODE_REPO, GO_REPO, EMPTY_REPO]) {
       const result = await score(root);
       for (const name of READINESS_DIMENSIONS) {
         for (const gap of result.dimensions[name].gaps) {
@@ -378,7 +334,7 @@ describe("readiness score invariants", () => {
   });
 
   it("scores a dimension zero whenever it has no evidence", async () => {
-    for (const root of [nodeRepo(), goRepo(), project("empty-zero", {})]) {
+    for (const root of [NODE_REPO, GO_REPO, EMPTY_REPO]) {
       const result = await score(root);
       for (const name of READINESS_DIMENSIONS) {
         const dimension = result.dimensions[name];
@@ -391,7 +347,7 @@ describe("readiness score invariants", () => {
   });
 
   it("scores a profile with no projectDir without reading the filesystem", async () => {
-    const profile = await buildSdlcProfile(nodeRepo());
+    const profile = await buildSdlcProfile(NODE_REPO);
     const { projectDir: _stripped, ...onDisk } = profile;
 
     // The written artifact has no `projectDir`, so there is no project to read
@@ -399,6 +355,102 @@ describe("readiness score invariants", () => {
     const result = computeReadinessScore(onDisk);
     expect(result.dimensions.agentSafety.score).toBe(0);
     expect(result.dimensions.agentSafety.gaps).toHaveLength(1);
+  });
+});
+
+// ── A CI file that was found but could not be parsed ────────────────────────
+
+/**
+ * "No CI is configured" and "CI is configured and could not be read" are
+ * opposite facts, and the analyzer records the second in `parseFailures`. The
+ * score is the same zero — nothing was proven — but the gap must name the file
+ * and tell the user to fix it, never to add the pipeline they already have.
+ */
+describe("readiness score: unparseable CI file", () => {
+  const failure = {
+    path: ".github/workflows/ci.yml",
+    kind: "github-actions",
+    reason: "YAML anchors are not supported",
+  };
+
+  it("scores CI zero but blames the file, not its absence", () => {
+    const result = computeReadinessScore({ ...emptyProfile(), parseFailures: [failure] }, NO_AGENT_SAFETY);
+    const ci = result.dimensions.ci;
+
+    expect(ci.score).toBe(0);
+    expect(ci.gaps).toHaveLength(1);
+    expect(ci.gaps[0].summary).toContain("could not be parsed");
+    expect(ci.gaps[0].summary).toContain(failure.path);
+    expect(ci.gaps[0].summary).toContain(failure.reason);
+    expect(ci.gaps[0].summary).not.toContain("No CI pipeline was detected");
+    expect(ci.gaps[0].wouldRaiseScore).toContain("Fix the file");
+  });
+
+  it("says the same for CD, whose deploy jobs live in the unreadable pipeline", () => {
+    const result = computeReadinessScore({ ...emptyProfile(), parseFailures: [failure] }, NO_AGENT_SAFETY);
+    const cd = result.dimensions.cd;
+
+    expect(cd.score).toBe(0);
+    expect(cd.gaps[0].summary).toContain(failure.path);
+    expect(cd.gaps[0].summary).not.toContain("No deployment path was detected");
+  });
+
+  it("names every unreadable CI file when there are several", () => {
+    const second = { path: ".gitlab-ci.yml", kind: "gitlab-ci", reason: "tab indentation" };
+    const result = computeReadinessScore(
+      { ...emptyProfile(), parseFailures: [failure, second] },
+      NO_AGENT_SAFETY,
+    );
+
+    expect(result.dimensions.ci.gaps[0].summary).toContain(failure.path);
+    expect(result.dimensions.ci.gaps[0].summary).toContain(second.path);
+  });
+
+  it("leaves the no-CI gap alone when the failure is not a CI file", () => {
+    const result = computeReadinessScore(
+      { ...emptyProfile(), parseFailures: [{ path: "package.json", kind: "package.json", reason: "invalid JSON" }] },
+      NO_AGENT_SAFETY,
+    );
+
+    expect(result.dimensions.ci.gaps[0].summary).toBe("No CI pipeline was detected.");
+    expect(result.dimensions.cd.gaps[0].summary).toBe("No deployment path was detected.");
+  });
+
+  it("surfaces the parse failure in the suggestions, where the user will read it", () => {
+    const result = computeReadinessScore({ ...emptyProfile(), parseFailures: [failure] }, NO_AGENT_SAFETY);
+    // CI is the second-heaviest dimension; with everything at zero it is the
+    // second suggestion, and its gap is the parse failure.
+    expect(result.suggestions.some((s) => s.includes(failure.path))).toBe(true);
+  });
+});
+
+// ── Deploy environments the analyzer could not name ─────────────────────────
+
+describe("readiness score: deploy environments", () => {
+  function deployment(environment: string): SdlcDeployment {
+    return {
+      evidence: [{ kind: "ci-step", path: ".github/workflows/ci.yml", confidence: "likely" }],
+      environment,
+      mechanism: "github-actions",
+      automated: true,
+    };
+  }
+
+  function cdScore(environments: string[]): number {
+    const profile = { ...emptyProfile(), cd: environments.map(deployment) };
+    return computeReadinessScore(profile, NO_AGENT_SAFETY).dimensions.cd.score;
+  }
+
+  it("does not count two unnamed deployments as two environments", () => {
+    // Two jobs that both deploy somewhere unnamed prove one path, not a
+    // rehearsal before production.
+    expect(cdScore(["unknown", "unknown"])).toBe(cdScore(["unknown"]));
+    expect(cdScore(["unknown", "unknown"])).toBeLessThan(100);
+  });
+
+  it("credits a second named environment", () => {
+    expect(cdScore(["staging", "production"])).toBe(100);
+    expect(cdScore(["production", "unknown"])).toBe(cdScore(["production"]));
   });
 });
 
@@ -434,23 +486,7 @@ describe("agentSafety dimension", () => {
   });
 
   it("takes an injected input so scoring needs no filesystem", () => {
-    const empty = {
-      schemaVersion: "1.0.0",
-      commands: [],
-      tests: { frameworks: [], suites: [] },
-      ci: [],
-      cd: [],
-      rollback: [],
-      migrations: [],
-      featureFlags: [],
-      qualityGates: [],
-      observability: [],
-      containers: [],
-      iac: [],
-      parseFailures: [],
-    };
-
-    const result = computeReadinessScore(empty, {
+    const result = computeReadinessScore(emptyProfile(), {
       agentSafety: {
         sources: [".mcp.json"],
         findings: [
@@ -468,5 +504,40 @@ describe("agentSafety dimension", () => {
     expect(result.dimensions.agentSafety.evidence).toEqual([
       { kind: "agent-config", path: ".mcp.json", confidence: "certain" },
     ]);
+  });
+});
+
+// ── Manual triggers ─────────────────────────────────────────────────────────
+
+describe("manual triggers", () => {
+  function pipeline(triggers: string[]): SdlcCiPipeline {
+    return {
+      evidence: [{ kind: "workflow-file", path: ".github/workflows/deploy.yml", confidence: "certain" }],
+      provider: "github-actions",
+      name: "Deploy",
+      triggers,
+      jobs: [{ name: "deploy", steps: [{ kind: "deploy", run: "./deploy.sh production" }] }],
+    };
+  }
+
+  function ciScore(triggers: string[]): number {
+    return computeReadinessScore({ ...emptyProfile(), ci: [pipeline(triggers)] }, NO_AGENT_SAFETY)
+      .dimensions.ci.score;
+  }
+
+  it("does not award the automatic-trigger points to a dispatch-only pipeline", () => {
+    expect(ciScore(["workflow_dispatch"])).toBe(ciScore(["push"]) - 20);
+  });
+
+  it("awards them once an automatic trigger sits beside the manual one", () => {
+    expect(ciScore(["workflow_dispatch", "push"])).toBe(ciScore(["push"]));
+  });
+
+  it("says the trigger is hand-started in the gap", () => {
+    const result = computeReadinessScore({ ...emptyProfile(), ci: [pipeline(["workflow_dispatch"])] }, NO_AGENT_SAFETY);
+
+    expect(result.dimensions.ci.gaps.map((g) => g.summary)).toContain(
+      "No pipeline runs on its own; the only triggers found are started by hand.",
+    );
   });
 });

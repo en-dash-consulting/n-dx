@@ -28,6 +28,7 @@ import {
   type ReadinessScore,
 } from "../../analyzers/readiness-score.js";
 import { resolveSourcevisionPaths } from "../../paths.js";
+import { SdlcProfileSchema, formatValidationErrors, validate } from "../../schema/validate.js";
 import { CLIError } from "../errors.js";
 import { DATA_FILES } from "../sourcevision-core.js";
 import { result } from "../output.js";
@@ -48,15 +49,25 @@ export const READINESS_CAVEAT =
   "Heuristic. Detects whether practices exist and are wired up — not whether they are good. " +
   "Reading infrastructure files is configuration review, not a pentest or a CVE scan.";
 
+/** The analyzed profile for a project, and the directory it was read for. */
+export interface LoadedSdlcProfile {
+  absDir: string;
+  profile: SdlcProfile;
+}
+
 /**
- * Score the project at `dir` from its analyzed SDLC profile.
+ * Read and validate the SDLC profile a prior analysis wrote for `dir`.
  *
- * Shared by the CLI command and the `get_readiness` MCP tool so the two cannot
- * answer differently for the same repository.
+ * Validated against the schema before anything scores it: the file is on
+ * disk, so it can be hand-edited, half-written, or left behind by an analyzer
+ * that wrote a different shape. The scorer indexes every section without
+ * guarding, so an unvalidated profile missing one would surface as a raw
+ * `TypeError` rather than the "re-run analyze" this command owes the user.
  *
- * @throws CLIError when no analysis, or no profile within it, exists.
+ * @throws CLIError when no analysis exists, or the profile cannot be read or
+ *   does not match the schema.
  */
-export function computeReadinessForProject(dir: string): ReadinessScore {
+export function loadSdlcProfile(dir: string): LoadedSdlcProfile {
   const absDir = resolve(dir);
   const svDir = resolveSourcevisionPaths(absDir).svDir;
   const profilePath = join(svDir, DATA_FILES.sdlcProfile);
@@ -68,9 +79,9 @@ export function computeReadinessForProject(dir: string): ReadinessScore {
     );
   }
 
-  let profile: SdlcProfile;
+  let parsed: unknown;
   try {
-    profile = JSON.parse(readFileSync(profilePath, "utf-8")) as SdlcProfile;
+    parsed = JSON.parse(readFileSync(profilePath, "utf-8"));
   } catch (err) {
     throw new CLIError(
       `Could not read ${DATA_FILES.sdlcProfile}: ${err instanceof Error ? err.message : String(err)}`,
@@ -78,6 +89,27 @@ export function computeReadinessForProject(dir: string): ReadinessScore {
     );
   }
 
+  const check = validate(SdlcProfileSchema, parsed);
+  if (!check.ok) {
+    throw new CLIError(
+      `${DATA_FILES.sdlcProfile} does not match the schema: ${formatValidationErrors(check.errors)[0]}`,
+      "Re-run 'sourcevision analyze' to rebuild it.",
+    );
+  }
+
+  return { absDir, profile: check.data };
+}
+
+/**
+ * Score the project at `dir` from its analyzed SDLC profile.
+ *
+ * Shared by the CLI command and the `get_readiness` MCP tool so the two cannot
+ * answer differently for the same repository.
+ *
+ * @throws CLIError when no analysis, or no valid profile within it, exists.
+ */
+export function computeReadinessForProject(dir: string): ReadinessScore {
+  const { absDir, profile } = loadSdlcProfile(dir);
   return computeReadinessScore(profile, { agentSafety: collectAgentSafety(absDir) });
 }
 
@@ -96,7 +128,8 @@ function bar(score: number): string {
 }
 
 export function cmdReadiness(dir: string, options: ReadinessOptions = {}): void {
-  const score = computeReadinessForProject(dir);
+  const { absDir, profile } = loadSdlcProfile(dir);
+  const score = computeReadinessScore(profile, { agentSafety: collectAgentSafety(absDir) });
 
   if (options.json) {
     // Printed through console.log rather than result(): --json output is the
@@ -117,6 +150,16 @@ export function cmdReadiness(dir: string, options: ReadinessOptions = {}): void 
   if (score.suggestions.length > 0) {
     result(`\n${bold("Next")}`);
     for (const suggestion of score.suggestions) result(`  • ${suggestion}`);
+  }
+
+  // A file the analyzer recognised but could not read is the opposite of an
+  // absent one, and a scorecard that hid it would read as "add CI" to someone
+  // who has it. Printed whenever there is one, whether or not a gap cites it.
+  if (profile.parseFailures.length > 0) {
+    result(`\n${bold("Could not parse")}`);
+    for (const failure of profile.parseFailures) {
+      result(`  ${failure.path} ${dim(`(${failure.kind}: ${failure.reason})`)}`);
+    }
   }
 
   result(`\n${dim(READINESS_CAVEAT)}`);
