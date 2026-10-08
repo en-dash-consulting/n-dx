@@ -19,7 +19,7 @@ plannedRelease: "1.0.0"
 | Title | Status |
 |-------|--------|
 | [Agent brief from the product layer](./agent-brief-from-the-product-layer/index.md) | pending |
-| [Apply engine for change amendments](./apply-engine-for-change-amendments/index.md) | pending |
+| [Apply engine for change amendments](./apply-engine-for-change-amendments/index.md) | completed |
 | [Apply the migration](./apply-the-migration/index.md) | pending |
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
 | [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | pending |
@@ -34,7 +34,7 @@ plannedRelease: "1.0.0"
 | [Merge driver and bundle format for v2](./merge-driver-and-bundle-format-for-v2/index.md) | completed |
 | [Migrate this repository and cut 1.0.0](./migrate-this-repository-and-cut-1-0-0/index.md) | pending |
 | [Move the Jev client into llm-client and redact Bitbucket tokens](./move-the-jev-client-into-llm-client/index.md) | completed |
-| [Placement engine for changes](./placement-engine-for-changes/index.md) | pending |
+| [Placement engine for changes](./placement-engine-for-changes/index.md) | completed |
 | [Product, Changes and capability views on fixtures](./product-changes-and-capability-views/index.md) | completed |
 | [Read and write the v2 folder trees](./read-and-write-the-v2-folder-trees/index.md) | completed |
 | [Recommendations become changes](./recommendations-become-changes/index.md) | pending |

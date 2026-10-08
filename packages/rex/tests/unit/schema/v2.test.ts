@@ -16,6 +16,7 @@ import {
   WorkRefSchema,
   NodeIntentSchema,
   ItemStateSchema,
+  RETIRED_STATE_FIELDS,
   StateFileSchema,
   RootHeaderSchema,
   AreaIntentSchema,
@@ -310,7 +311,6 @@ describe("state", () => {
       shippedIn: "1.0.0",
       prs: ["https://github.com/o/r/pull/1"],
       issues: ["WM-1"],
-      commits: [{ hash: "a".repeat(40), author: "R", authorEmail: "r@x", timestamp: "2026-10-06T01:00:00.000Z" }],
       links: [{ anything: "goes" }],
       assignee: "Ryan Keith <ryan.k@endash.us>",
       ready: true,
@@ -321,6 +321,15 @@ describe("state", () => {
     expect(r.success).toBe(true);
   });
 
+  it("declares no commits field: commits are computed from N-DX-Item trailers", () => {
+    expect(ItemStateSchema.shape).not.toHaveProperty("commits");
+    expect(RETIRED_STATE_FIELDS).toHaveProperty("commits");
+    // An old entry that still carries commits passes through untouched.
+    const commits = [{ hash: "a".repeat(40), author: "R", authorEmail: "r@x", timestamp: "2026-10-06T01:00:00.000Z" }];
+    const r = ItemStateSchema.safeParse({ status: "completed", commits });
+    expect(r.success && r.data.commits).toEqual(commits);
+  });
+
   it("records the commit a check ran against", () => {
     const check = { requirementId: "r1", result: "fail", at: "2026-10-06T01:00:00.000Z" };
     expect(CheckResultSchema.parse({ ...check, commit: "e3d7052fe" }).commit).toBe("e3d7052fe");
@@ -329,7 +338,7 @@ describe("state", () => {
   });
 
   it("loads a retired key and keeps its value unconverted", () => {
-    expect(Object.keys(RETIRED_STATE_FIELDS).sort()).toEqual(["appliedIn", "specReviewed"]);
+    expect(Object.keys(RETIRED_STATE_FIELDS).sort()).toEqual(["appliedIn", "commits", "specReviewed"]);
     const state = ItemStateSchema.parse({ status: "completed", appliedIn: "e3d7052fe", specReviewed: true });
     expect(state).toEqual({ status: "completed", appliedIn: "e3d7052fe", specReviewed: true });
     expect(state.appliedAt).toBeUndefined();
@@ -407,7 +416,7 @@ describe("field coverage (design intent/state tables)", () => {
       "status", "startedAt", "completedAt", "endedAt", "activeIntervals",
       "failureReason", "resolutionType", "resolutionDetail",
       "metAt", "revisedAt", "reviewedHash", "checks",
-      "appliedAt", "appliedAmendsHash", "shippedIn", "prs", "issues", "commits", "links",
+      "appliedAt", "appliedAmendsHash", "shippedIn", "prs", "issues", "links",
       "assignee", "ready", "needsPlacement",
       "lastModified", "lastModifiedBy",
     ];
@@ -418,13 +427,15 @@ describe("field coverage (design intent/state tables)", () => {
 describe("isolation", () => {
   it("no runtime module imports the v2 modules yet", () => {
     const srcRoot = join(import.meta.dirname, "../../../src");
-    // The v2 modules (schema, rules, state writer, state merge, dual-read
-    // loader, tree writer) may import each other; nothing else may import
-    // them until the v2 store wires them in. The one exception is the
-    // `rex merge-state` git driver, which imports state-merge: branches merge
-    // state.yaml before any rex command reads it. And `rex export` /
-    // `rex import-bundle`, which import prd-bundle-v2 to dispatch on the tree
-    // layout and the bundle envelope, so a v2 tree can be carried.
+    // The v2 modules (schema, rules, state writer, state merge, bundle v2,
+    // dual-read loader, tree writer, apply engine, apply policy, product-edit
+    // handler, computed edges, product status, change landing, placement and
+    // its policy) may import each other; nothing else may import them until
+    // the v2 store wires them in. The exceptions are the `rex merge-state` git
+    // driver, which imports state-merge (branches merge state.yaml before any
+    // rex command reads it), and `rex export` / `rex import-bundle`, which
+    // import prd-bundle-v2 to dispatch on the tree layout and the bundle
+    // envelope, so a v2 tree can be carried.
     const v2Files = new Set(
       [
         "schema/v2.ts",
@@ -434,6 +445,14 @@ describe("isolation", () => {
         "store/prd-bundle-v2.ts",
         "store/prd-model-reader.ts",
         "store/prd-model-writer.ts",
+        "core/apply-amendments.ts",
+        "core/apply-policy.ts",
+        "core/product-edit.ts",
+        "core/product-edges.ts",
+        "core/product-status.ts",
+        "core/change-landing.ts",
+        "core/placement.ts",
+        "core/placement-policy.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

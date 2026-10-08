@@ -88,6 +88,13 @@ export interface ExecOptions {
    */
   onData?: (stream: "stdout" | "stderr", chunk: string) => void;
   /**
+   * Text written to the child's stdin, which is then closed. Without it stdin
+   * is closed at once. A child that exits before reading all of it (EPIPE)
+   * reports through its own exit status; any other write error fails a
+   * command that exited 0.
+   */
+  input?: string;
+  /**
    * On timeout, terminate the command's whole process tree rather than only the
    * process that was spawned. Defaults to true.
    *
@@ -199,6 +206,7 @@ export function exec(
     maxBuffer = DEFAULT_MAX_BUFFER,
     env,
     onData,
+    input,
     treeKill = true,
     signal: abortSignal,
     freeze = isPosixFreezeKillEnabled(env ?? process.env),
@@ -220,6 +228,7 @@ export function exec(
     let timer: ReturnType<typeof setTimeout> | undefined;
     let releaseInterrupts: (() => void) | undefined;
     let detachAbort: (() => void) | undefined;
+    let stdinError: NodeJS.ErrnoException | undefined;
 
     const finish = (result: ExecResult): void => {
       if (timer) clearTimeout(timer);
@@ -379,9 +388,11 @@ export function exec(
         stderr,
         exitCode,
         error:
-          exitCode === 0
-            ? null
-            : Object.assign(new Error(`Command failed: ${display}\n${stderr}`), { code: exitCode }),
+          exitCode !== 0
+            ? Object.assign(new Error(`Command failed: ${display}\n${stderr}`), { code: exitCode })
+            : stdinError
+              ? Object.assign(new Error(`Writing stdin failed: ${display}: ${stdinError.message}`), { code: stdinError.code })
+              : null,
         launched: true,
       });
     });
@@ -435,7 +446,14 @@ export function exec(
     // output, but the parent never writes anything — leaving stdin open makes any
     // child that reads from stdin (e.g. `rex add` calling readStdin() in a
     // non-TTY) hang forever waiting for an EOF that will never arrive.
-    child.stdin?.end();
+    if (input === undefined) {
+      child.stdin?.end();
+    } else {
+      child.stdin?.on("error", (error: NodeJS.ErrnoException) => {
+        if (error.code !== "EPIPE") stdinError = error;
+      });
+      child.stdin?.end(input);
+    }
 
     if (onData) {
       child.stdout?.on("data", (chunk: Buffer) => onData("stdout", chunk.toString()));
