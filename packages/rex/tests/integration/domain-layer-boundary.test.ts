@@ -188,6 +188,15 @@ describe("rex cli/commands import surface", () => {
     "../../store/prd-model-reader.js",
     "../../codeowners/plan.js",
     "../../store/project-config.js",
+    // `rex merge-state` is the git merge driver for v2 state.yaml and the only
+    // caller of the merge. Routing it through public.ts would hand hench and
+    // web a v2 module before the v2 store is wired in (see the isolation test
+    // in tests/unit/schema/v2.test.ts).
+    "../../store/state-merge.js",
+    // `rex export` / `rex import-bundle` dispatch on the tree layout and the
+    // bundle envelope through prd-bundle-v2, the one caller of the v2 bundle.
+    // Not routed through public.ts for the same reason as state-merge above.
+    "../../store/prd-bundle-v2.js",
     "../../store/title-to-filename.js",
     "../../workflow/default.js",
   ]);

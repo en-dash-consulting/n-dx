@@ -69,26 +69,46 @@ export const GITATTRIBUTES_EOL_HEADER =
   "# (core.autocrlf=true) don't show line-ending-only churn on every tool write.\n";
 
 /**
- * Merge-driver pins: PRD tree files merge through the rex-prd driver — a
- * three-way, frontmatter-aware merge (`rex merge-driver`). The driver itself
- * is registered in git config by `ndx init` (see `ensureMergeDriverRegistered`
- * in cli.js); this attribute routes the paths to it.
+ * Merge-driver pins. PRD tree files merge through the rex-prd driver, a
+ * three-way frontmatter-aware merge (`rex merge-driver`). The v2 trees'
+ * per-folder `state.yaml` merges through the rex-state driver, rows by item id
+ * (`rex merge-state`). The drivers are registered in git config by `ndx init`
+ * (see `ensureMergeDriverRegistered` in cli.js); these attributes route the
+ * paths to them.
  *
- * @type {string[]}
+ * @param {import("./layout.js").Layout} layout
+ * @returns {string[]}
  */
 export function gitattributesMergeRules(layout) {
-  return [`${relativeToRoot(layout, layout.rexDir)}/prd_tree/** merge=rex-prd`];
+  const rex = relativeToRoot(layout, layout.rexDir);
+  return [
+    `${rex}/prd_tree/** merge=rex-prd`,
+    `${rex}/product/**/state.yaml merge=rex-state`,
+    `${rex}/changes/**/state.yaml merge=rex-state`,
+  ];
 }
 
 export const GITATTRIBUTES_MERGE_HEADER =
   "# PRD tree markdown merges through the rex-prd driver (three-way,\n" +
-  "# frontmatter-aware). The driver is registered in git config by 'ndx init'.\n";
+  "# frontmatter-aware); v2 state.yaml through rex-state (rows by item id).\n" +
+  "# The drivers are registered in git config by 'ndx init'.\n";
 
-/** git config values for the rex-prd merge driver, registered by `ndx init`. */
-export const MERGE_DRIVER_CONFIG = {
-  name: { key: "merge.rex-prd.name", value: "n-dx PRD tree merge" },
-  driver: { key: "merge.rex-prd.driver", value: "rex merge-driver %O %A %B" },
-};
+/**
+ * git config values for each merge driver the merge pins name, registered by
+ * `ndx init`.
+ *
+ * @type {ReadonlyArray<{ name: { key: string, value: string }, driver: { key: string, value: string } }>}
+ */
+export const MERGE_DRIVERS = [
+  {
+    name: { key: "merge.rex-prd.name", value: "n-dx PRD tree merge" },
+    driver: { key: "merge.rex-prd.driver", value: "rex merge-driver %O %A %B" },
+  },
+  {
+    name: { key: "merge.rex-state.name", value: "n-dx PRD state merge" },
+    driver: { key: "merge.rex-state.driver", value: "rex merge-state %O %A %B %P" },
+  },
+];
 
 /**
  * The glob pattern (first token) of each eol=lf rule `ndx init` would write
@@ -106,7 +126,7 @@ export function eolPatternsFor(dir) {
 }
 
 /**
- * Append missing n-dx rules (eol=lf pins and the rex-prd merge pin) to the
+ * Append missing n-dx rules (eol=lf pins and the merge-driver pins) to the
  * project's .gitattributes.
  * Creates the file if it doesn't exist. Idempotent: a rule is skipped when a
  * line for its pattern is already present (even with different attributes,

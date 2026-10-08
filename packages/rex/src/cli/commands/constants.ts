@@ -41,6 +41,7 @@ export function usage(): void {
           { name: "migrate-folder-tree-filenames [dir]", description: "Rename legacy index.md files to title-based filenames" },
           { name: "migrate-slugs [dir]", description: "Rename the PRD tree to id-qualified slugs (one-shot, idempotent)" },
           { name: "merge-driver <ancestor> <ours> <theirs>", description: "Git merge driver: three-way frontmatter-aware merge of PRD markdown" },
+          { name: "merge-state <ancestor> <ours> <theirs> [path]", description: "Git merge driver: merge v2 state.yaml rows by item id" },
           { name: "backfill-commit-attribution [dir]", description: "Populate commits array from git history N-DX-Status trailers" },
           { name: "claim <sub> [taskId]", description: "Inspect and free cross-worktree task claims (list|release)" },
           { name: "mcp [dir]", description: "Start MCP server" },

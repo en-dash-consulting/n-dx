@@ -590,33 +590,31 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
     }
   }, 120_000);
 
-  it("registers the rex-prd merge driver in a git repo, idempotently", async () => {
+  it("registers the rex-prd and rex-state merge drivers in a git repo, idempotently", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-mergedrv-"));
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-mergedrv-bin-"));
+    const gitConfig = (key) =>
+      execFileSync("git", ["config", "--get", key], { cwd: projectDir, encoding: "utf-8" }).trim();
     try {
       execFileSync("git", ["init", "-b", "main"], { cwd: projectDir, stdio: "pipe" });
 
       await initWithFakeCodex(projectDir, binDir);
 
-      // The attribute routes PRD tree paths to the driver...
+      // The attributes route PRD tree paths and v2 state files to the drivers...
       const attrs = await readFile(join(projectDir, ".gitattributes"), "utf-8");
       expect(attrs).toMatch(/^\.ndx\/rex\/prd_tree\/\*\*\s+merge=rex-prd$/m);
-      // ...and git config names the driver command.
-      const driver = execFileSync("git", ["config", "--get", "merge.rex-prd.driver"], {
-        cwd: projectDir,
-        encoding: "utf-8",
-      }).trim();
-      expect(driver).toBe("rex merge-driver %O %A %B");
+      expect(attrs).toMatch(/^\.ndx\/rex\/product\/\*\*\/state\.yaml\s+merge=rex-state$/m);
+      expect(attrs).toMatch(/^\.ndx\/rex\/changes\/\*\*\/state\.yaml\s+merge=rex-state$/m);
+      // ...and git config names the driver commands.
+      expect(gitConfig("merge.rex-prd.driver")).toBe("rex merge-driver %O %A %B");
+      expect(gitConfig("merge.rex-state.driver")).toBe("rex merge-state %O %A %B %P");
 
       // Re-init changes neither the attributes file nor the config.
       const firstAttrs = attrs;
       await initWithFakeCodex(projectDir, binDir);
       expect(await readFile(join(projectDir, ".gitattributes"), "utf-8")).toBe(firstAttrs);
-      const driverAgain = execFileSync("git", ["config", "--get", "merge.rex-prd.driver"], {
-        cwd: projectDir,
-        encoding: "utf-8",
-      }).trim();
-      expect(driverAgain).toBe(driver);
+      expect(gitConfig("merge.rex-prd.driver")).toBe("rex merge-driver %O %A %B");
+      expect(gitConfig("merge.rex-state.driver")).toBe("rex merge-state %O %A %B %P");
     } finally {
       await rm(binDir, { recursive: true, force: true });
       await rm(projectDir, { recursive: true, force: true });
