@@ -235,6 +235,23 @@ describe("classifyV1Tree", () => {
     expect(byTitle(plan.entries, "Build cache").target).toBe("task");
   });
 
+  it("does not make a pending feature a capability when its only completed work sits under a cancelled task", () => {
+    const abandoned = item("task", "Build cache", [item("subtask", "Write store", [], "completed")], "cancelled");
+    const feature = item("feature", "Offline cache", [abandoned], "pending");
+    const plan = classifyV1Tree([item("epic", "Storage", [feature], "pending")]);
+    expect(byTitle(plan.entries, "Offline cache").target).not.toBe("capability");
+    expect(plan.entries.some((e) => e.target === "capability")).toBe(false);
+  });
+
+  it("still makes a pending feature a capability when a completed task sits beside a cancelled one", () => {
+    const feature = item("feature", "Offline cache", [
+      item("task", "Build cache", [], "completed"),
+      item("task", "Sync cache", [item("subtask", "Write store", [], "completed")], "cancelled"),
+    ], "pending");
+    const plan = classifyV1Tree([item("epic", "Storage", [feature], "pending")]);
+    expect(byTitle(plan.entries, "Offline cache").target).toBe("capability");
+  });
+
   it("is deterministic", () => {
     const items = tree();
     expect(classifyV1Tree(items)).toEqual(classifyV1Tree(structuredClone(items)));

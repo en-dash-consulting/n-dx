@@ -192,14 +192,16 @@ export function isJobShaped(title: string): boolean {
   return lead !== undefined && (WORK_VERBS.has(lead) || (lead.length > 4 && lead.endsWith("ing")));
 }
 
-function hasCompletedWork(item: PRDItem): boolean {
-  if (item.status === "completed") return true;
-  return (item.children ?? []).some(hasCompletedWork);
-}
-
 /** Cancelled and deleted items were abandoned or removed: they never become standing product nodes. */
 function isAbandoned(item: PRDItem): boolean {
   return item.status === "cancelled" || item.status === "deleted";
+}
+
+/** Completed work that still stands: does not descend into abandoned items, whose finished parts were abandoned with them. */
+function hasCompletedWork(item: PRDItem): boolean {
+  if (isAbandoned(item)) return false;
+  if (item.status === "completed") return true;
+  return (item.children ?? []).some(hasCompletedWork);
 }
 
 // ── Classification ───────────────────────────────────────────────
