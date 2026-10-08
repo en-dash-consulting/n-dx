@@ -284,6 +284,12 @@ describe("dependencies", () => {
     expect(candidates[0]).toMatchObject({ engine: "h2", grade: "low" });
     expect(candidates[0].evidence[0].file).toBe("app/build.gradle");
   });
+
+  it("names a Kotlin DSL build script when the module has one", () => {
+    const model: ModuleBuildModel = { ...mavenModel("app", [dep("org.postgresql:postgresql", "implementation")]), buildSystem: "gradle" };
+    const { candidates } = detect({ "app/build.gradle.kts": "" }, [model]);
+    expect(candidates[0].evidence[0].file).toBe("app/build.gradle.kts");
+  });
 });
 
 describe("tables", () => {

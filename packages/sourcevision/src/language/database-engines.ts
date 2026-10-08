@@ -76,7 +76,7 @@ export interface ImageEntry {
 export interface EngineEvidence {
   readonly signal: DatabaseSignal;
   readonly grade: EvidenceGrade;
-  /** Build file directory (dependency) or file path, relative and POSIX. */
+  /** The declaring module's build file (dependency) or the file the hit is in; relative and POSIX. */
   readonly file: string;
   /** One-based line; absent for dependencies, which come from a build model. */
   readonly line?: number;
@@ -333,11 +333,19 @@ function isAroundCodeScope(scope: string): boolean {
   return scope === "indirect" || /^test|Test[A-Z]|test$/.test(scope);
 }
 
-function dependencyEvidence(models: readonly ModuleBuildModel[]): Array<[DatabaseEngine, EngineEvidence]> {
+/** The module's build file. A Gradle module's script is `build.gradle.kts` when the project has one, else `build.gradle`. */
+function buildFileOf(model: ModuleBuildModel, files: ReadonlySet<string>): string {
+  const at = (name: string): string => (model.dir === "" ? name : `${model.dir}/${name}`);
+  if (model.buildSystem === "go") return at("go.mod");
+  if (model.buildSystem === "maven") return at("pom.xml");
+  return files.has(at("build.gradle.kts")) ? at("build.gradle.kts") : at("build.gradle");
+}
+
+function dependencyEvidence(models: readonly ModuleBuildModel[], files: ReadonlySet<string>): Array<[DatabaseEngine, EngineEvidence]> {
   const out: Array<[DatabaseEngine, EngineEvidence]> = [];
   for (const model of models) {
     const ecosystem = model.buildSystem === "go" ? "go" : "maven";
-    const buildFile = model.buildSystem === "go" ? "go.mod" : model.buildSystem === "maven" ? "pom.xml" : "build.gradle";
+    const buildFile = buildFileOf(model, files);
     for (const dep of model.dependencies) {
       if (dep.type === "pom") continue; // A BOM import manages versions; it is not a dependency on the driver.
       const coordinate = coordinateOf(model, dep);
@@ -349,7 +357,7 @@ function dependencyEvidence(models: readonly ModuleBuildModel[]): Array<[Databas
         {
           signal: "dependency",
           grade: weak ? "weak" : "strong",
-          file: model.dir === "" ? buildFile : `${model.dir}/${buildFile}`,
+          file: buildFile,
           ruleId: `${entry.ecosystem}:${entry.coordinate}`,
           text: `${coordinate} (${dep.scope})`,
         },
@@ -556,7 +564,7 @@ export interface DatabaseEngineReport {
 
 /** Database-engine candidates for a project. */
 export function detectDatabaseEngines(input: DatabaseEngineInput): DatabaseEngineReport {
-  const found: Array<[DatabaseEngine, EngineEvidence]> = dependencyEvidence(input.buildModels);
+  const found: Array<[DatabaseEngine, EngineEvidence]> = dependencyEvidence(input.buildModels, new Set(input.files));
   const notices: string[] = [];
   for (const file of [...input.files].sort()) {
     const wanted = PACKAGE_JSON.test(file) || DOCKERFILE.test(file) || CONFIG_FILE.test(file);
