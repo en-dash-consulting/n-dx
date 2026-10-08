@@ -27,17 +27,20 @@ const GO_PROJECT = join(FIXTURES, "go-project");
 async function resolveProject(
   ctx: Parameters<typeof skipUnlessGrammar>[0],
   dir: string,
+  maxFileBytes?: number,
 ): Promise<{ paths: string[]; resolve: (path: string) => FileReferences }> {
   skipUnlessGrammar(ctx, GO_WASM);
   const paths = listFixtureFiles(dir, [".go"]).filter((p) => !p.split("/").includes("vendor"));
-  const runner = createTreeSitterRunner();
+  const runner = createTreeSitterRunner({ maxFileBytes });
   try {
     const files: PackSourceFile[] = [];
+    const unparsed: string[] = [];
     for (const path of paths) {
       const result = await runner.parseFile({ pack: goPack, grammarPath: GO_WASM }, join(dir, path));
       if (result.status === "parsed") files.push({ path, captures: result.captures });
+      else unparsed.push(path);
     }
-    const prepared = (await goResolver.forProject!(dir)).prepare(files);
+    const prepared = (await goResolver.forProject!(dir)).prepare(files, unparsed);
     return { paths, resolve: (path) => prepared.resolve(path) };
   } finally {
     runner.dispose();
@@ -108,6 +111,26 @@ describe("go resolver — root package", () => {
     writeFileSync(join(dir, "cmd", "main.go"), 'package main\n\nimport "example.com/root"\n');
     const { resolve } = await resolveProject(ctx, dir);
     expect(resolve("cmd/main.go").files).toEqual([{ to: "root.go", symbols: ["*"] }]);
+  });
+
+  it("keeps the edge to a package whose only file the runner skipped as oversized", async (ctx) => {
+    mkdirSync(join(dir, "api", "pb"), { recursive: true });
+    mkdirSync(join(dir, "cmd"));
+    writeFileSync(join(dir, "go.mod"), "module example.com/root\n");
+    writeFileSync(join(dir, "api", "pb", "api.pb.go"), `package pb\n\n// ${"x".repeat(2000)}\n`);
+    writeFileSync(join(dir, "cmd", "main.go"), 'package main\n\nimport "example.com/root/api/pb"\n');
+    const { resolve } = await resolveProject(ctx, dir, 1000);
+    expect(resolve("cmd/main.go").files).toEqual([{ to: "api/pb", symbols: ["*"] }]);
+  });
+
+  it("still drops an import of a directory with no .go files", async (ctx) => {
+    mkdirSync(join(dir, "api", "docs"), { recursive: true });
+    mkdirSync(join(dir, "cmd"));
+    writeFileSync(join(dir, "go.mod"), "module example.com/root\n");
+    writeFileSync(join(dir, "api", "docs", "README.md"), "docs\n");
+    writeFileSync(join(dir, "cmd", "main.go"), 'package main\n\nimport _ "example.com/root/api/docs"\n');
+    const { resolve } = await resolveProject(ctx, dir);
+    expect(resolve("cmd/main.go").files).toEqual([]);
   });
 
   it("knows no module before it is bound to a project", async (ctx) => {

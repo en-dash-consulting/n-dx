@@ -24,8 +24,9 @@
  *   without a dot (`module myapp`) is internal, not stdlib;
  * - `go.work` modules and local replaces are internal, not third-party;
  * - nested modules resolve against their own `go.mod`, not the root's;
- * - an import inside a project module whose directory holds no parsed file
- *   is dropped (the regex parser emits an edge to a node that does not exist);
+ * - an import inside a project module whose directory holds no .go file
+ *   (parsed, or passed as unparsed: oversized, unreadable) is dropped, where
+ *   the regex parser emits an edge to a node that does not exist;
  * - the module's root package (directory "") targets its non-test files,
  *   because an edge to "" matches no file downstream.
  *
@@ -259,9 +260,9 @@ interface Index {
   scopeFor(file: string): Scope;
 }
 
-function buildIndex(project: GoProject, files: readonly PackSourceFile[]): Index {
+function buildIndex(project: GoProject, paths: readonly string[]): Index {
   const packages = new Map<string, string[]>();
-  for (const { path } of files) {
+  for (const path of paths) {
     const dir = dirOf(path);
     const list = packages.get(dir);
     if (list) list.push(path);
@@ -306,7 +307,7 @@ function resolveFile(index: Index, file: PackSourceFile): FileReferences {
       const rest = imp.path.slice(root.path.length + 1);
       const dir = root.dir === "" ? rest : rest === "" ? root.dir : `${root.dir}/${rest}`;
       const members = index.packages.get(dir);
-      if (!members) continue; // nothing parsed there: no edge to a node that does not exist
+      if (!members) continue; // no .go file there: no edge to a node that does not exist
       const symbol = imp.alias ?? "*";
       if (dir !== "") out.file(dir, symbol);
       else for (const member of members) if (!isTestFile(member)) out.file(member, symbol);
@@ -324,8 +325,8 @@ function resolveFile(index: Index, file: PackSourceFile): FileReferences {
 function createGoResolver(project: GoProject): PackResolver {
   return {
     forProject: async (projectDir) => createGoResolver(await readGoProject(projectDir)),
-    prepare(files): PreparedResolver {
-      const index = buildIndex(project, files);
+    prepare(files, unparsed = []): PreparedResolver {
+      const index = buildIndex(project, [...files.map((f) => f.path), ...unparsed]);
       const byPath = new Map(files.map((f) => [f.path, f]));
       const cache = new Map<string, FileReferences>();
       return {

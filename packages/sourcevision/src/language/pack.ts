@@ -129,8 +129,13 @@ export interface PackResolver {
    * analysis, before {@link prepare}. Absent when sources are enough (Java).
    */
   forProject?(projectDir: string): Promise<PackResolver>;
-  /** Index every file of the project; call once per analysis. */
-  prepare(files: readonly PackSourceFile[]): PreparedResolver;
+  /**
+   * Index every file of the project; call once per analysis. `unparsed` lists
+   * the pack's files that produced no captures (over the size limit, unreadable):
+   * they exist, so a resolver that maps references to directories must still
+   * count them. They are never passed to {@link PreparedResolver.resolve}.
+   */
+  prepare(files: readonly PackSourceFile[], unparsed?: readonly string[]): PreparedResolver;
 }
 
 /** A resolver bound to one project's index. */

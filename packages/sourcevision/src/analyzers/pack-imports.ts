@@ -98,9 +98,9 @@ export async function buildPackImportGraph(
         );
         continue;
       }
-      const parsed = await parsePackFiles(runner, target, files, targetDir);
+      const { parsed, unparsed } = await parsePackFiles(runner, target, files, targetDir);
       const resolver = (await status.pack.resolver.forProject?.(targetDir)) ?? status.pack.resolver;
-      const prepared = resolver.prepare(parsed);
+      const prepared = resolver.prepare(parsed, unparsed);
 
       for (const { path } of parsed) {
         const refs = prepared.resolve(path);
@@ -130,19 +130,22 @@ async function parsePackFiles(
   target: RunnablePack,
   files: Inventory["files"],
   targetDir: string,
-): Promise<PackSourceFile[]> {
+): Promise<{ parsed: PackSourceFile[]; unparsed: string[] }> {
   const parsed: PackSourceFile[] = [];
+  const unparsed: string[] = [];
   for (const file of files) {
     if (!isPackFile(file.path, [target.pack])) continue;
     let source: string;
     try {
       source = await readFile(join(targetDir, file.path), "utf-8");
     } catch {
-      continue; // unreadable files are skipped, as for every other language
+      unparsed.push(file.path); // unreadable files are skipped, as for every other language
+      continue;
     }
     // Oversized files are skipped by the runner and contribute no references.
     const result = await runner.parseSource(target, file.path, source);
     if (result.status === "parsed") parsed.push({ path: file.path, captures: result.captures });
+    else unparsed.push(file.path);
   }
-  return parsed;
+  return { parsed, unparsed };
 }
