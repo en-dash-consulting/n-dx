@@ -18,7 +18,7 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { grammarBuildDir } from "./package-paths.js";
+import { buildGrammarsScript, grammarBuildDir } from "./package-paths.js";
 import { javaPack } from "./java-pack.js";
 import type { LanguageConfig } from "./registry.js";
 
@@ -192,6 +192,17 @@ export interface LoadPacksOptions {
 }
 
 /**
+ * The step that restores a missing grammar, for the install at hand. A source
+ * checkout has the build script; a published install ships every built-in
+ * grammar, so a missing one means the install is incomplete.
+ */
+function missingGrammarStep(): string {
+  return existsSync(buildGrammarsScript())
+    ? "Build it with `pnpm --filter @n-dx/sourcevision build:grammars` in the n-dx checkout."
+    : "Published @n-dx/sourcevision ships this grammar, so this install is incomplete: reinstall n-dx with `npm install -g @n-dx/core@latest`.";
+}
+
+/**
  * List the packs and whether each grammar is available. A missing grammar
  * degrades that language to inventory-only and is reported once through
  * `warn`; it never throws. Call once per analysis.
@@ -209,7 +220,7 @@ export function loadLanguagePacks(options: LoadPacksOptions = {}): PackStatus[] 
     const notice =
       `${pack.config.displayName}: grammar ${pack.grammar.name}@${pack.grammar.version} is not built ` +
       `(expected ${grammarPath}); ${pack.config.displayName} files get inventory only. ` +
-      `Build it with sourcevision's scripts/build-grammars.mjs.`;
+      missingGrammarStep();
     warn(notice);
     return { pack, grammarPath, grammarAvailable: false, mode: "inventory-only", notice };
   });

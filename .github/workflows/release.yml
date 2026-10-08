@@ -182,6 +182,30 @@ jobs:
         if: github.event_name == 'push' || inputs.mode == 'publish'
         run: pnpm build
 
+      # @n-dx/sourcevision ships build/grammars/*.wasm (package.json "files").
+      # Grammars are never committed, so they must be built here or the
+      # published package degrades every language pack to inventory-only.
+      # SV_REQUIRE_GRAMMARS=1 makes the tests below — including
+      # tests/e2e/packed-tarball.test.ts, which packs the tarball and loads
+      # the packs from it — fail rather than skip when a grammar is missing.
+      # Same cache as ci.yml.
+      - name: Cache grammar build downloads
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/sourcevision/build/cache
+            ~/.cache/tree-sitter
+          key: grammars-${{ runner.os }}-${{ hashFiles('packages/sourcevision/scripts/build-grammars.mjs') }}
+
+      - name: Build tree-sitter grammars
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        run: node packages/sourcevision/scripts/build-grammars.mjs
+
+      - name: Require built grammars in tests
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        run: echo "SV_REQUIRE_GRAMMARS=1" >> "$GITHUB_ENV"
+
       - name: Run unit tests
         if: github.event_name == 'push' || inputs.mode == 'publish'
         run: pnpm -r run test

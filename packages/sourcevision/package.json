@@ -26,6 +26,7 @@
   "files": [
     "dist",
     "src/language/queries",
+    "build/grammars/*.wasm",
     "!dist/**/*.map",
     "!dist/.build-stamp.json"
   ],
