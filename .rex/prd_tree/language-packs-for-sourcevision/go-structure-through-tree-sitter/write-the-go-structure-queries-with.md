@@ -14,9 +14,9 @@ blockedBy:
 source: "roadmap"
 startedAt: "2026-10-08T04:18:53.527Z"
 completedAt: "2026-10-08T04:39:26.866Z"
+endedAt: "2026-10-08T04:39:26.866Z"
 resolutionType: "code-change"
 resolutionDetail: "Code from hench run bd67e84c, committed by the operator session with the generated Go golden after the gate failed on the missing golden and a stale-dist packed-tarball check (c3d4a3ef). Verified 2026-10-08: 197 sourcevision tests (SV_REQUIRE_GRAMMARS=1) and the six root policy tests pass."
-endedAt: "2026-10-08T04:39:26.866Z"
 acceptanceCriteria:
   - "Query files exist for packages, imports, types, functions and methods, calls and struct tags"
   - "Goldens cover grouped, aliased, dot and blank imports, methods with pointer and value receivers, generics, and struct tags"
