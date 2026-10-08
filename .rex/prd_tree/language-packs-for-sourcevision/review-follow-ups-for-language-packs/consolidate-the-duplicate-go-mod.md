@@ -10,11 +10,12 @@ tags:
   - "sourcevision"
   - "rex"
   - "follow-up"
+  - "lang-kit"
 acceptanceCriteria:
   - "One go.mod parser remains; rex and sourcevision both use it without a domain-to-domain import"
   - "rex analyze and sourcevision go-build tests pass unchanged"
   - "The six static root policy tests pass"
-description: "rex/src/analyze/scanners.ts parseGoMod and sourcevision/src/language/go-build.ts parseGoMod both parse go.mod. Domain packages may not import each other, so the parser is duplicated. Consolidate into one implementation and delete one copy. Needs a decision on where shared parsing belongs."
-lastModified: "2026-10-08T06:20:13.985Z"
+description: "rex/src/analyze/scanners.ts parseGoMod and sourcevision/src/language/go-build.ts parseGoMod both parse go.mod. Domain packages may not import each other, so the parser is duplicated. Consolidate into one implementation and delete one copy. Needs a decision on where shared parsing belongs.\n\nBlocked on LS7: domain packages may not import each other, and a go.mod parser does not belong in @n-dx/llm-client. Lands with the @n-dx/lang-kit extraction after roadmap PR 24, which will also merge the other duplicated build-file and language-identity code (see the hub's lang-kit preparation plan). Until then both copies stay, and any change to one copy's extracted fields is made in both."
+lastModified: "2026-10-08T06:48:15.306Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
