@@ -25,6 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Add a v2 store transaction that loads and writes the product and change layers under the PRD lock](./add-a-v2-store-transaction-that-loads.md) | pending |
 | [Add get_product, get_capability, place_change and apply_change](./add-get-product-get-capability-place.md) | pending |
 | [add_item takes a type and defaults to a change in the Inbox](./add-item-takes-a-type-and-defaults-to.md) | pending |
 | [Read tools default to open and recent changes, with paging](./read-tools-default-to-open-and-recent.md) | pending |
