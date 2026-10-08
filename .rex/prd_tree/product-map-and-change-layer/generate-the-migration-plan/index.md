@@ -25,11 +25,13 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A seam failure mid-pass discards every model answer the plan already paid for](./a-seam-failure-mid-pass-discards-every.md) | pending |
 | [Classify the v1 tree and propose areas and constraints](./classify-the-v1-tree-and-propose-areas.md) | completed |
 | [Draft capability specs with a text model by default](./draft-capability-specs-with-a-text.md) | pending |
 | [Draft present-tense capability specs grounded in code and tests](./draft-present-tense-capability-specs.md) | completed |
 | [Enriched placement in the migration plan: text by default, Jev when configured](./enriched-placement-in-the-migration.md) | pending |
-| [Give migrations a home: framework and the v1-to-v2 folder](./give-migrations-a-home-framework-and.md) | pending |
+| [Give migrations a home: framework and the v1-to-v2 folder](./give-migrations-a-home-framework-and.md) | completed |
+| [Migration contract does not say a model question must carry every input its answer depends on, so a minimal question reuses a stale answer](./migration-contract-does-not-say-a.md) | pending |
 | [Migration plan emits two different criteria sets for a capability, so reviewedHash can mismatch the migrated spec](./migration-plan-emits-two-different.md) | pending |
 | [Migration plan makes cancelled or deleted v1 epics and features into standing areas and capabilities](./migration-plan-makes-cancelled-or.md) | pending |
 | [Migration plan turns a version-numbered epic that is not a release into a release umbrella (e.g. "Python 3.12 support")](./migration-plan-turns-a-version.md) | pending |
