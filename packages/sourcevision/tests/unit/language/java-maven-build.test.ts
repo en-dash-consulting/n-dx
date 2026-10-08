@@ -109,6 +109,47 @@ describe("Maven build model semantics", () => {
       expect(app?.springBootVersion).toEqual({ resolved: true, value: "3.1.0" });
     });
 
+    it("keeps dependencies that differ only by type or classifier, each with its own scope", async () => {
+      dir = await mkdtemp(join(tmpdir(), "sv-maven-build-"));
+      await pom(
+        "pom.xml",
+        `<project><groupId>g</groupId><artifactId>app</artifactId><version>1</version>
+           <dependencies>
+             <dependency><groupId>com.acme</groupId><artifactId>core</artifactId><version>1.0</version></dependency>
+             <dependency><groupId>com.acme</groupId><artifactId>core</artifactId><version>1.0</version><classifier>tests</classifier><scope>test</scope></dependency>
+             <dependency><groupId>com.acme</groupId><artifactId>util</artifactId><version>1.0</version><type>test-jar</type><scope>test</scope></dependency>
+           </dependencies></project>`,
+      );
+      const [model] = await read(dir);
+      expect(model?.dependencies.map((d) => [d.artifact, d.type, d.classifier, d.scope])).toEqual([
+        ["core", undefined, undefined, "compile"],
+        ["core", undefined, "tests", "test"],
+        ["util", "test-jar", "tests", "test"],
+      ]);
+    });
+
+    it("applies managed entries only to the dependency with the same type and classifier", async () => {
+      dir = await mkdtemp(join(tmpdir(), "sv-maven-build-"));
+      await pom(
+        "pom.xml",
+        `<project><groupId>g</groupId><artifactId>app</artifactId><version>1</version>
+           <dependencyManagement><dependencies>
+             <dependency><groupId>com.acme</groupId><artifactId>core</artifactId><version>1.0</version></dependency>
+             <dependency><groupId>com.acme</groupId><artifactId>core</artifactId><version>2.0</version><type>test-jar</type><scope>test</scope></dependency>
+           </dependencies></dependencyManagement>
+           <dependencies>
+             <dependency><groupId>com.acme</groupId><artifactId>core</artifactId></dependency>
+             <dependency><groupId>com.acme</groupId><artifactId>core</artifactId><classifier>tests</classifier><type>test-jar</type></dependency>
+             <dependency><groupId>com.acme</groupId><artifactId>core</artifactId><classifier>sources</classifier></dependency>
+           </dependencies></project>`,
+      );
+      const [model] = await read(dir);
+      const by = (classifier: string | undefined) => model?.dependencies.find((d) => d.classifier === classifier);
+      expect(by(undefined)).toMatchObject({ version: { resolved: true, value: "1.0" }, scope: "compile" });
+      expect(by("tests")).toMatchObject({ version: { resolved: true, value: "2.0" }, scope: "test" });
+      expect(by("sources")?.version).toMatchObject({ resolved: false }); // no managed entry for this classifier
+    });
+
     it("reports a malformed pom as a notice and keeps the module", async () => {
       dir = await mkdtemp(join(tmpdir(), "sv-maven-build-"));
       await mkdir(dirname(join(dir, "pom.xml")), { recursive: true });

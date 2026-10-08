@@ -31,6 +31,7 @@ interface RawDep {
   version?: string;
   scope?: string;
   type?: string;
+  classifier?: string;
 }
 
 interface PomFile {
@@ -109,15 +110,19 @@ class MavenReader {
     for (const dep of eff.deps.values()) {
       const group = textOf(interpolate(dep.group, ctx), dep.group);
       const artifact = textOf(interpolate(dep.artifact, ctx), dep.artifact);
-      const managed = eff.managed.get(`${group}:${artifact}`);
+      const type = dep.type ?? "jar";
+      const classifier = effectiveClassifier(type, dep.classifier);
+      const managed = eff.managed.get(mavenKey(group, artifact, type, classifier));
       out.push({
         group,
         artifact,
+        ...(type !== "jar" && { type }),
+        ...(classifier !== undefined && { classifier }),
         version: dep.version !== undefined ? interpolate(dep.version, ctx) : this.managedVersion(managed, eff, ctx),
         scope: dep.scope ?? managed?.scope ?? "compile",
       });
     }
-    return out.sort((a, b) => `${a.group}:${a.artifact}`.localeCompare(`${b.group}:${b.artifact}`));
+    return out.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
   }
 
   private managedVersion(managed: Managed | undefined, eff: Effective, ctx: Context): BuildValue {
@@ -192,10 +197,10 @@ class MavenReader {
       eff.springBoot = interpolate(pom.parent.version ?? "", ctx);
     }
     for (const m of pom.managed) {
-      if (!isBomImport(m)) eff.managed.set(managedKey(m, ctx), managedEntry(m));
+      if (!isBomImport(m)) eff.managed.set(depKey(m, ctx), managedEntry(m));
     }
     for (const bom of pom.managed.filter(isBomImport)) await this.importBom(bom, eff, ctx);
-    for (const d of pom.deps) eff.deps.set(`${d.group}:${d.artifact}`, d);
+    for (const d of pom.deps) eff.deps.set(depKey(d, ctx), d);
 
     this.visiting.delete(pom.dir);
     this.effectives.set(pom.dir, eff);
@@ -286,6 +291,7 @@ function rawDep(el: XmlElement): RawDep {
     version: childText(el, "version"),
     scope: childText(el, "scope"),
     type: childText(el, "type"),
+    classifier: childText(el, "classifier"),
   };
 }
 
@@ -313,8 +319,29 @@ function coordinates(d: RawDep): string {
   return `${d.group}:${d.artifact}:${d.version ?? "?"}`;
 }
 
-function managedKey(d: RawDep, ctx: Context): string {
-  return `${textOf(interpolate(d.group, ctx), d.group)}:${textOf(interpolate(d.artifact, ctx), d.artifact)}`;
+/** Maven's management key: `group:artifact:type:classifier`, with no classifier as the empty string. */
+function mavenKey(group: string, artifact: string, type: string, classifier: string | undefined): string {
+  return `${group}:${artifact}:${type}:${classifier ?? ""}`;
+}
+
+/** A `test-jar` is the `tests` classifier unless one is declared. */
+function effectiveClassifier(type: string, declared: string | undefined): string | undefined {
+  return declared ?? (type === "test-jar" ? "tests" : undefined);
+}
+
+/** The management key of a declared dependency or managed entry. */
+function depKey(d: RawDep, ctx: Context): string {
+  const type = d.type ?? "jar";
+  return mavenKey(
+    textOf(interpolate(d.group, ctx), d.group),
+    textOf(interpolate(d.artifact, ctx), d.artifact),
+    type,
+    effectiveClassifier(type, d.classifier),
+  );
+}
+
+function sortKey(d: BuildDependency): string {
+  return `${d.group}:${d.artifact}:${d.type ?? "jar"}:${d.classifier ?? ""}`;
 }
 
 function managedEntry(d: RawDep): Managed {
