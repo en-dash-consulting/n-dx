@@ -29,3 +29,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Draft present-tense capability specs grounded in code and tests](./draft-present-tense-capability-specs.md) | pending |
 | [Plan ids, aliases, backfill and data fixes](./plan-ids-aliases-backfill-and-data-fixes.md) | pending |
 | [The migration can freeze a Windows-unsafe v1 slug (con, aux, nul) into v2, leaving the tree permanently unwritable](./the-migration-can-freeze-a-windows.md) | pending |
+| [Stamp appliedAt and reviewedHash when migrating historical items](./stamp-appliedat-and-reviewedhash-when.md) | pending |
