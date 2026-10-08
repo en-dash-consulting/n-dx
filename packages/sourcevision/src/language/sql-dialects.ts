@@ -72,7 +72,7 @@ const JDBC_CONVENTION: Provenance = {
 export const SYNTAX_RULES: readonly DialectRule[] = [
   { id: "pg-serial", dialect: "postgresql", source: "syntax", weight: 1, pattern: /\b(?:big|small)?serial\b/i, provenance: docs(`${PG}/datatype-numeric.html`) },
   { id: "pg-returning", dialect: "postgresql", source: "syntax", weight: 1, pattern: /\breturning\b/i, provenance: docs(`${PG}/dml-returning.html`) },
-  { id: "pg-dollar-quote", dialect: "postgresql", source: "syntax", weight: 2, pattern: /\$(?:[A-Za-z_]\w*)?\$/, provenance: docs(`${PG}/sql-syntax-lexical.html`) },
+  { id: "pg-dollar-quote", dialect: "postgresql", source: "syntax", weight: 2, pattern: /\b(?:as|do)\s+\$(?:[A-Za-z_]\w*)?\$/i, provenance: docs(`${PG}/sql-syntax-lexical.html`) },
   { id: "mysql-auto-increment", dialect: "mysql", source: "syntax", weight: 2, pattern: /\bauto_increment\b/i, provenance: docs(`${MYSQL}/example-auto-increment.html`) },
   { id: "mysql-backtick", dialect: "mysql", source: "syntax", weight: 2, pattern: /`[^`\n]+`/, provenance: docs(`${MYSQL}/identifiers.html`) },
   { id: "mysql-engine", dialect: "mysql", source: "syntax", weight: 2, pattern: /\bengine\s*=\s*\w+/i, provenance: docs(`${MYSQL}/innodb-introduction.html`) },
@@ -117,11 +117,43 @@ export const CONFIG_RULES: readonly DialectRule[] = [
   { id: "config-h2", dialect: "h2", source: "config", weight: 1, pattern: /\bjdbc:(?:h2|hsqldb):/i, provenance: JDBC_CONVENTION },
 ];
 
-/** Strip `--` line comments and block comments, keeping line breaks so line numbers hold. */
-function stripComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, " "))
-    .replace(/--[^\n]*/g, "");
+/**
+ * Blank `--` and block comments and the contents of single-quoted strings, in
+ * one pass so a `--` inside a string or a quote inside a comment is read
+ * correctly. Line breaks are kept so line numbers hold.
+ */
+function stripCommentsAndStrings(source: string): string {
+  let out = "";
+  let i = 0;
+  const blank = (text: string): string => text.replace(/[^\n]/g, " ");
+  while (i < source.length) {
+    const ch = source[i];
+    const next = source[i + 1];
+    let end: number;
+    if (ch === "-" && next === "-") {
+      end = source.indexOf("\n", i);
+      if (end === -1) end = source.length;
+      out += blank(source.slice(i, end));
+    } else if (ch === "/" && next === "*") {
+      end = source.indexOf("*/", i + 2);
+      end = end === -1 ? source.length : end + 2;
+      out += blank(source.slice(i, end));
+    } else if (ch === "'") {
+      // `''` is an escaped quote inside the literal.
+      end = i + 1;
+      while (end < source.length && !(source[end] === "'" && source[end + 1] !== "'")) {
+        end += source[end] === "'" ? 2 : 1;
+      }
+      end = Math.min(end + 1, source.length);
+      out += `'${blank(source.slice(i + 1, end - 1))}'`.slice(0, end - i);
+    } else {
+      out += ch;
+      i++;
+      continue;
+    }
+    i = end;
+  }
+  return out;
 }
 
 const lineOf = (text: string, index: number): number => {
@@ -159,7 +191,7 @@ export function classifySqlDialect(
   source: string,
   configEvidence: readonly DialectEvidence[] = [],
 ): SqlDialectResult {
-  const text = stripComments(source);
+  const text = stripCommentsAndStrings(source);
   const evidence: DialectEvidence[] = [];
   for (const rule of SYNTAX_RULES) {
     const hit = rule.pattern.exec(text);
