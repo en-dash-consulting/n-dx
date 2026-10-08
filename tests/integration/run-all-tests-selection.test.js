@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
 const SCRIPT = join(import.meta.dirname, "../../scripts/run-all-tests.mjs");
 
@@ -68,5 +70,72 @@ describe("run-all-tests.mjs suite selection", () => {
 
   it("requires a base ref for affected", () => {
     expect(run("affected").status).toBe(2);
+  });
+});
+
+describe("run-all-tests.mjs affected gate on a stale build", () => {
+  const REPO = join(import.meta.dirname, "../..");
+  /** The runner and everything it imports, copied into a throwaway repository. */
+  const RUNNER_FILES = [
+    "scripts/run-all-tests.mjs",
+    "scripts/lib/select-suites.mjs",
+    "scripts/lib/stale-dist.mjs",
+    "packages/core/win-spawn.js",
+    "packages/core/cli-log.js",
+  ];
+  let root;
+
+  const write = (rel, content, secondsAgo) => {
+    const full = join(root, rel);
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, content);
+    const t = new Date(Date.now() - secondsAgo * 1000);
+    utimesSync(full, t, t);
+  };
+  const git = (...args) => execFileSync("git", args, { cwd: root, stdio: "ignore" });
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "stale-gate-"));
+    for (const rel of RUNNER_FILES) write(rel, readFileSync(join(REPO, rel), "utf-8"), 0);
+    write(
+      "packages/llm-client/package.json",
+      JSON.stringify({ name: "@n-dx/llm-client", scripts: { test: "vitest run" } }),
+      0,
+    );
+    write("packages/llm-client/src/config.ts", "export const MODEL = 'old';\n", 200);
+    write("packages/llm-client/dist/config.js", "export const MODEL = 'old';\n", 100);
+    git("init", "-q");
+    git("add", "-A");
+    git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base");
+  });
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  const gate = () =>
+    spawnSync(process.execPath, [join(root, "scripts/run-all-tests.mjs"), "affected", "HEAD"], {
+      cwd: root,
+      encoding: "utf-8",
+    });
+
+  it("fails before running any suite, naming the package and its build command", () => {
+    write("packages/llm-client/src/config.ts", "export const MODEL = 'new';\n", 0);
+    const result = gate();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("@n-dx/llm-client");
+    expect(result.stderr).toContain("pnpm --filter @n-dx/llm-client build");
+    expect(result.stdout).toContain("test-gate: stale-dist=llm-client");
+    expect(result.stdout).not.toContain("────────");
+  });
+
+  it("lists the selection without the stale check", () => {
+    write("packages/llm-client/src/config.ts", "export const MODEL = 'new';\n", 0);
+    const result = spawnSync(
+      process.execPath,
+      [join(root, "scripts/run-all-tests.mjs"), "affected", "HEAD", "--list"],
+      { cwd: root, encoding: "utf-8" },
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("test-gate: selected-suites=");
   });
 });
