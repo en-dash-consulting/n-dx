@@ -29,7 +29,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [CI never builds the Java grammar, so every grammar-dependent runner and grammar test skips there and the runner's acceptance criteria are unverified in CI](./ci-never-builds-the-java-grammar-so.md) | completed |
 | [Java entry points are guessed from file names, not detected from public static void main](./java-entry-points-are-guessed-from.md) | pending |
+| [Java pack grammar version is not tied to the build pin](./java-pack-grammar-version-is-not-tied.md) | pending |
 | [Language-pack fixtures and goldens are not pinned to LF, so a Windows CRLF checkout fails the golden comparison](./language-pack-fixtures-and-goldens-are.md) | completed |
 | [Register Java as a language with inventory roles](./register-java-as-a-language-with.md) | completed |
 | [Seed the Java drift corpus and measure the parse rate](./seed-the-java-drift-corpus-and-measure.md) | pending |
-| [Write the Java structure queries with goldens](./write-the-java-structure-queries-with.md) | pending |
+| [Write the Java structure queries with goldens](./write-the-java-structure-queries-with.md) | completed |
