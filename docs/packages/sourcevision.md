@@ -107,25 +107,29 @@ status poll, and the hub card.
 
 A detection that is absent means the analyzer looked and found nothing. A file it
 recognised but could not read is reported in `parseFailures` with its path — never
-silently as absence.
+silently as absence. The scorecard keeps that distinction: when every CI file is
+unparseable, CI and CD still score zero, but their gap names the file and the
+reason and tells you to fix it rather than to add a pipeline, and
+`sourcevision readiness` lists every parse failure under "Could not parse".
 
 ### Dimensions and weights
 
-| Dimension | Weight | What raises it |
-|---|---|---|
-| Testing | 20% | A test command, a known framework, and test suites on disk |
-| CI | 15% | A parsed pipeline, jobs that run the tests, triggers on push/PR |
-| CD | 15% | A deploy job in a pipeline, triggered automatically |
-| Rollback | 10% | A rollback job, blue-green or canary deployment, or a down-migration path |
-| Migrations | 10% | A migrations directory for a recognised tool |
-| Feature flags | 5% | A feature-flag SDK dependency |
-| Quality gates | 10% | `CODEOWNERS`, pre-commit hooks, merge-blocking checks |
-| Observability | 5% | Logging, metrics, tracing or error-reporting dependencies |
-| Agent safety | 10% | A reviewed execution config — subtractive, penalised per repo-trust finding |
+| Dimension | What raises it |
+|---|---|
+| Testing | A test command, a known framework, and test suites on disk |
+| CI | A parsed pipeline, jobs that run the tests, triggers on push/PR |
+| CD | A deploy job in a pipeline, triggered automatically, to more than one named environment |
+| Rollback | A rollback job, blue-green or canary deployment, or a down-migration path |
+| Migrations | A migrations directory for a recognised tool |
+| Feature flags | A feature-flag SDK dependency |
+| Quality gates | `CODEOWNERS`, pre-commit hooks, merge-blocking checks |
+| Observability | Logging, metrics, tracing or error-reporting dependencies |
+| Agent safety | A reviewed execution config — subtractive, penalised per repo-trust finding |
 
 Weights live in one exported constant (`READINESS_WEIGHTS` in
-`analyzers/readiness-score.ts`) and are not restated anywhere, including in this
-table's percentages — read the constant if you need the authoritative values.
+`analyzers/readiness-score.ts`) and are not restated anywhere, this table
+included. `sourcevision readiness` prints each dimension's weight beside its
+score, so the command is the place to read the current values.
 
 Every gap names the evidence that would raise the score, so the output reads as a
 next step rather than a complaint.

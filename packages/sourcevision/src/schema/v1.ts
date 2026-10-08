@@ -1216,6 +1216,14 @@ export interface SdlcCiJob {
    * condition means "only on main" is a judgement, not a parse.
    */
   condition?: string;
+  /**
+   * The deployment environment the job declares (`environment:` on Actions,
+   * `environment.name` on GitLab), when it declares one. A deploy job without
+   * it is reported against the environment `unknown` rather than its own
+   * name, so two jobs deploying to production are not counted as two
+   * environments.
+   */
+  environment?: string;
 }
 
 export interface SdlcCiPipeline extends SdlcDetection {
@@ -1258,12 +1266,31 @@ export interface SdlcDeployment extends SdlcDetection {
   automated: boolean;
 }
 
-/** A way to undo a deployment. */
+/**
+ * A way to undo a deployment.
+ *
+ * Each entry is one lever the repository has for going back: a release that
+ * can be redeployed by tag, a rollout history to undo, a down-migration, a
+ * flag to flip. Detection is by configuration present, not by proof that
+ * anyone has ever rolled back.
+ */
 export interface SdlcRollback extends SdlcDetection {
-  /** `redeploy-previous`, `blue-green`, `feature-flag`, `db-down-migration`, `manual`. */
+  /**
+   * `tagged-release` (versioned releases exist to redeploy), `redeploy-previous`
+   * (a rollout history: `helm rollback`, `kubectl rollout undo`, CodeDeploy),
+   * `blue-green`, `canary`, `feature-flag`, `db-down-migration`, `manual`.
+   */
   mechanism: string;
   /** The environment it applies to, when it is environment-specific. */
   environment?: string;
+  /**
+   * The tool that provides the lever: `changesets`, `semantic-release`,
+   * `release-please`, `goreleaser`, `helm`, `kubernetes`, `argo-rollouts`,
+   * `codedeploy`, or the migration or flag provider.
+   */
+  tool?: string;
+  /** For `tagged-release`: the version scheme read from the manifest — `semver` or `calver`. */
+  versioning?: "semver" | "calver";
 }
 
 /** Database or data migrations. */
