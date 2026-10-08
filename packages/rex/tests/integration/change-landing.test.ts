@@ -204,6 +204,15 @@ describe("computeLandings", () => {
     expect(await resolveShippedIn({}, landing, repo)).toBeUndefined();
   });
 
+  it("needs no git when no change is finished: an empty tree or open changes on a ref that does not resolve", async () => {
+    const open = { id: MERGED, type: "change", title: "t", slug: "t", status: "in_progress" };
+    const missingRef = { repoDir: repo, cacheDir, ref: "no-such-ref" };
+    expect(await computeLandings({ product: [], changes: [] } as unknown as V2Tree, missingRef)).toEqual({});
+    expect(await computeLandings({ product: [], changes: [open] } as unknown as V2Tree, missingRef)).toEqual({
+      [MERGED]: { landed: false, reason: "change still open" },
+    });
+  });
+
   it("lands an open change that was applied", async () => {
     git("checkout", "-q", "-b", "feature");
     await commit("a.txt", `Add a${trailer(MERGED)}`);

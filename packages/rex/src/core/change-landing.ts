@@ -171,15 +171,21 @@ const OPEN_CHANGE: ChangeLanding = { landed: false, reason: "change still open" 
  * land), by change id. A change's commits are those naming it, its tasks or
  * subtasks, or an alias of any. A change that is neither completed nor applied
  * is still open and has not landed, whatever its commits show: half-merged work
- * has not shipped. The ref, shallow check and both caches load once per call.
+ * has not shipped. The ref, shallow check and both caches load once per call,
+ * and only when some change is finished: a tree with none touches no git.
  */
 export async function computeLandings(tree: V2Tree, options: ChangeCommitsOptions): Promise<Record<string, ChangeLanding>> {
-  const inputs = await loadLandingInputs(options);
+  let inputs: LandingInputs | undefined;
   const out: Record<string, ChangeLanding> = {};
   for (const { node, retired } of indexTree(tree, { includeTombstones: true }).entries) {
     if (node.type !== "change" || retired || node.status === "cancelled") continue;
     const finished = node.status === "completed" || node.appliedAt !== undefined;
-    out[node.id] = finished ? landingFrom(trailerIds(node), inputs) : OPEN_CHANGE;
+    if (!finished) {
+      out[node.id] = OPEN_CHANGE;
+      continue;
+    }
+    inputs ??= await loadLandingInputs(options);
+    out[node.id] = landingFrom(trailerIds(node), inputs);
   }
   return out;
 }
