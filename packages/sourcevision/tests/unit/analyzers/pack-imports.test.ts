@@ -4,13 +4,14 @@
  * tests/integration/java-zones.test.ts.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { buildPackImportGraph, isPackFile, packsFor } from "../../../src/analyzers/pack-imports.js";
 import { javaPack } from "../../../src/language/java-pack.js";
+import { grammarBuildDir } from "../../../src/language/package-paths.js";
 import type { Inventory } from "../../../src/schema/v1.js";
 
 const file = (path: string): Inventory["files"][number] =>
@@ -79,4 +80,27 @@ describe("buildPackImportGraph", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it.skipIf(!existsSync(join(grammarBuildDir(), `${javaPack.grammar.name}.wasm`)))(
+    "degrades a pack whose query the loaded grammar rejects, with one notice naming the pack and the error",
+    async () => {
+      const dir = mkdtempSync(join(tmpdir(), "sv-pack-imports-query-"));
+      try {
+        const queryPath = join(dir, "bad.scm");
+        writeFileSync(queryPath, "(no_such_node_type) @x");
+        const pack = { ...javaPack, queries: [{ name: "bad", path: queryPath }] };
+        const messages: string[] = [];
+        const graph = await buildPackImportGraph([file("src/A.java"), file("src/B.java")], dir, {
+          packs: [pack],
+          warn: (m) => messages.push(m),
+        });
+        expect(graph).toEqual({ edges: [], external: [] });
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toContain("Java");
+        expect(messages[0]).toContain("no_such_node_type");
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
 });

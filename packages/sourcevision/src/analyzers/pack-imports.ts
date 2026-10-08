@@ -78,6 +78,19 @@ export async function buildPackImportGraph(
         continue;
       }
       const target: RunnablePack = { pack: status.pack, grammarPath: status.grammarPath };
+      // A loadable grammar can still reject a query (a stale build that predates
+      // a query edit). Same degradation, one notice for the pack.
+      try {
+        await runner.prepare(target);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        const name = status.pack.config.displayName;
+        warn(
+          `${name}: a query could not be compiled against grammar ${status.grammarPath} (${reason}); ${name} files get inventory only. ` +
+            "Rebuild it with `pnpm --filter @n-dx/sourcevision build:grammars` in the n-dx checkout, or reinstall n-dx.",
+        );
+        continue;
+      }
       const parsed = await parsePackFiles(runner, target, files, targetDir);
       const prepared = status.pack.resolver.prepare(parsed);
 
