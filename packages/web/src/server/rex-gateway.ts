@@ -137,6 +137,16 @@ export { handleEditItem } from "@n-dx/rex";
 export { getAvailableBackups, restoreFromBackup, isValidSnapshotId } from "@n-dx/rex";
 export type { BackupSnapshot } from "@n-dx/rex";
 
+// ---- Saved run settings -----------------------------------------------------
+// The `run` block a task carries. `PUT /api/hench/prep/:taskId` saves it, and
+// what makes a block valid is rex's to say — the same validator the MCP write
+// tools, `rex update --run` and `ndx work` all gate on. A web-local shape check
+// would be a second definition, free to drift from the one the store enforces,
+// and the dashboard would then accept a block hench refuses (or refuse one it
+// would honour).
+export { validateRunSettings } from "@n-dx/rex";
+export type { RunSettings } from "@n-dx/rex";
+
 // ---- Rex proposal types (consumed by viewer analyze-panel) ------------------
 export type { Proposal, ProposalFeature, ProposalTask } from "@n-dx/rex";
 
