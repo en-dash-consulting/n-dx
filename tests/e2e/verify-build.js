@@ -21,8 +21,9 @@
  * @see https://vitest.dev/config/#globalsetup
  */
 
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { staleSeconds } from "../../scripts/lib/stale-dist.mjs";
 
 const ROOT = join(import.meta.dirname, "../..");
 
@@ -39,47 +40,6 @@ const REQUIRED_ARTIFACTS = [
   ["packages/web/dist/server/start.js", "@n-dx/web", "packages/web/src", "packages/web/dist"],
   ["packages/llm-client/dist/public.js", "@n-dx/llm-client", "packages/llm-client/src", "packages/llm-client/dist"],
 ];
-
-/** Source extensions that a build turns into dist/ output. */
-const SOURCE_EXTENSIONS = /\.(ts|tsx|js|jsx|mts|cts)$/;
-
-/**
- * Newest mtime (ms) among files under `dir` matching `matches`, or 0 if the
- * directory is absent. Skips nested node_modules (and, when walking a source
- * tree, nested dist) so vendored or generated files never masquerade as edited
- * sources.
- */
-function newestMtime(dir, matches, skipDist) {
-  let newest = 0;
-
-  const walk = (current) => {
-    let entries;
-    try {
-      entries = readdirSync(current, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    for (const entry of entries) {
-      if (entry.name === "node_modules") continue;
-      if (skipDist && entry.name === "dist") continue;
-      const full = join(current, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (matches(entry.name)) {
-        try {
-          const { mtimeMs } = statSync(full);
-          if (mtimeMs > newest) newest = mtimeMs;
-        } catch {
-          // Race with a concurrent edit/delete — ignore this file.
-        }
-      }
-    }
-  };
-
-  if (existsSync(dir)) walk(dir);
-  return newest;
-}
 
 export function setup() {
   const missing = REQUIRED_ARTIFACTS.filter(
@@ -103,11 +63,8 @@ export function setup() {
   // against that one file reports a fresh build as stale forever.
   const stale = [];
   for (const [, name, srcDir, distDir] of REQUIRED_ARTIFACTS) {
-    const builtAt = newestMtime(join(ROOT, distDir), () => true, false);
-    const editedAt = newestMtime(join(ROOT, srcDir), (f) => SOURCE_EXTENSIONS.test(f), true);
-    if (editedAt > builtAt) {
-      stale.push([name, Math.round((editedAt - builtAt) / 1000)]);
-    }
+    const ageSeconds = staleSeconds(join(ROOT, srcDir), join(ROOT, distDir));
+    if (ageSeconds > 0) stale.push([name, ageSeconds]);
   }
 
   if (stale.length > 0) {

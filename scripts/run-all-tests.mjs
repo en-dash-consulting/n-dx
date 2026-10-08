@@ -45,6 +45,8 @@ import { fileURLToPath } from "node:url";
 import { execFileSyncCli, spawnCli } from "../packages/core/win-spawn.js";
 import { ROOT_LABEL, ROOT_SUBSET_LABELS, ROOT_SUBSET_TEST_FILES, parsePorcelainZ, resolveLabels, selectAffected, validLabels } from "./lib/select-suites.mjs";
 
+import { staleChangedPackages, staleDistMessage } from "./lib/stale-dist.mjs";
+
 /** Human-readable name for each root-subset suite, shown in the per-suite summary. */
 const ROOT_SUBSET_NAMES = {
   "root-policy": "root policy (static)",
@@ -224,6 +226,14 @@ if (positional[0] === "affected") {
     labels = validLabels(manifests).filter((l) => !ROOT_SUBSET_LABELS.includes(l));
   } else {
     ({ suites: labels, reasons } = selectAffected(changed, manifests));
+    // Root tests read packages through dist/. Against a stale build they pass on
+    // a change they should fail, so refuse to run them. (--list runs nothing.)
+    const stale = listOnly ? [] : staleChangedPackages(ROOT, changed, manifests);
+    if (stale.length > 0) {
+      console.error(staleDistMessage(stale));
+      console.log(`test-gate: stale-dist=${stale.map((s) => s.dir).join(",")}`);
+      process.exit(1);
+    }
   }
 } else {
   const resolved = resolveLabels(positional.length > 0 ? positional : ["all"], manifests);
