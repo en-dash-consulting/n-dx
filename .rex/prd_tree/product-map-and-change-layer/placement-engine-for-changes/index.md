@@ -30,4 +30,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add Jev placement and the autoAccept setting](./add-jev-placement-and-the-autoaccept.md) | completed |
 | [Let Jev abstain and validate its confidence before confident placement](./let-jev-abstain-and-validate-its.md) | completed |
 | [Rank placement candidates with rules and the text model](./rank-placement-candidates-with-rules.md) | completed |
-| [Return a placement as a target and a relation, and place on constraints](./return-a-placement-as-a-target-and-a.md) | pending |
+| [Return a placement as a target and a relation, and place on constraints](./return-a-placement-as-a-target-and-a.md) | in_progress |

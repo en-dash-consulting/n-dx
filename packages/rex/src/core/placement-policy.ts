@@ -15,10 +15,14 @@ import { loadProjectOverrides } from "@n-dx/llm-client";
 import type { JevRequest, JevResponse } from "@n-dx/llm-client";
 import {
   placeChange,
+  placementRelation,
   type PlacementCandidate,
-  type PlacementCapability,
   type PlacementChange,
   type PlacementModel,
+  type PlacementNode,
+  type PlacementProposal,
+  type PlacementRelation,
+  type PlacementTarget,
 } from "./placement.js";
 
 export type PlacementModels = "text" | "jev" | "both";
@@ -38,7 +42,7 @@ export const PLACEMENT_JUDGE_TASK_CLASS = "prd.place.judge";
 export const PLACEMENT_JEV_MIN_CONFIDENCE = 0.8;
 
 /**
- * Reserved choice key for "none of these". Capability ids are slugs or UUIDs
+ * Reserved choice key for "none of these". Node ids are slugs or UUIDs
  * and never start with underscores, so it cannot collide with one.
  */
 export const PLACEMENT_NONE_OF_THESE = "__none_of_these__";
@@ -84,13 +88,13 @@ export async function loadPlacementSettings(rexDir: string) {
 }
 
 export interface JevPlacement {
-  /** Highest-probability candidate, or null when Jev named none on the shortlist. */
+  /** Jev's chosen target, or null when it named none on the shortlist. Jev picks the target, never the relation. */
   pick: string | null;
   /** True when Jev chose none-of-these: never accepted, never counts as agreeing. */
   abstained: boolean;
   confidence: number;
-  /** Shortlist candidates by Jev probability, best first. */
-  ranking: Array<{ id: string; probability: number }>;
+  /** Shortlist candidates by Jev probability, best first; the relation is the rules'. */
+  ranking: Array<PlacementTarget & { probability: number }>;
 }
 
 export interface PlacementDecision {
@@ -100,8 +104,12 @@ export interface PlacementDecision {
   used: PlacementModels | "rules";
   text?: { pick: string | null };
   jev?: JevPlacement;
-  /** The capability accepted without a human, or null. */
-  accepted: string | null;
+  /** The rules' relation for this change; every candidate and the accepted placement carry it. */
+  relation: PlacementRelation;
+  /** The placement accepted without a human, or null. */
+  accepted: PlacementTarget | null;
+  /** A new node the text model proposed. Never auto-accepted: it always leaves needsPlacement set. */
+  proposal?: PlacementProposal;
   /** True whenever no placement was accepted; the change waits for a decision. */
   needsPlacement: boolean;
   warnings: string[];
@@ -120,15 +128,15 @@ export interface DecidePlacementOptions {
 
 function criteriaFor(
   shortlist: readonly PlacementCandidate[],
-  capabilities: readonly PlacementCapability[],
+  nodes: readonly PlacementNode[],
 ): Record<string, string> {
-  const byId = new Map(capabilities.map((c) => [c.id, c]));
+  const byId = new Map(nodes.map((n) => [n.id, n]));
   const criteria: Record<string, string> = {};
-  for (const { id } of shortlist) {
-    const cap = byId.get(id);
-    criteria[id] = cap?.statement?.trim() || cap?.title || id;
+  for (const { target } of shortlist) {
+    const node = byId.get(target);
+    criteria[target] = node?.statement?.trim() || node?.title || target;
   }
-  criteria[PLACEMENT_NONE_OF_THESE] = "None of the listed capabilities fits this change.";
+  criteria[PLACEMENT_NONE_OF_THESE] = "None of the listed capabilities or constraints fits this change.";
   return criteria;
 }
 
@@ -136,20 +144,21 @@ async function askJevPlacement(
   judge: PlacementJudge,
   change: PlacementChange,
   shortlist: readonly PlacementCandidate[],
-  capabilities: readonly PlacementCapability[],
+  nodes: readonly PlacementNode[],
   warnings: string[],
 ): Promise<JevPlacement> {
   const response = await judge(
     {
       state: {
         change: { title: change.title, intent: change.intent ?? null, files: change.files ?? [] },
-        shortlist: shortlist.map((c) => ({ id: c.id, score: c.score, reasons: c.reasons })),
+        shortlist: shortlist.map((c) => ({ id: c.target, score: c.score, reasons: c.reasons })),
       },
       questions: {
         place: {
           type: "choice",
-          instructions: "Which capability does `change` amend or touch? The candidates are the rules `shortlist`.",
-          criteria: criteriaFor(shortlist, capabilities),
+          instructions:
+            "Which capability or constraint does `change` amend or touch? The candidates are the rules `shortlist`.",
+          criteria: criteriaFor(shortlist, nodes),
         },
       },
     },
@@ -160,10 +169,10 @@ async function askJevPlacement(
     throw new Error("Jev placement answer is missing or not a choice");
   }
   const ranking = shortlist
-    .map(({ id }) => ({ id, probability: answer.probabilities[id] ?? 0 }))
-    .sort((a, b) => b.probability - a.probability || a.id.localeCompare(b.id));
+    .map(({ target, relation }) => ({ target, relation, probability: answer.probabilities[target] ?? 0 }))
+    .sort((a, b) => b.probability - a.probability || a.target.localeCompare(b.target));
   const abstained = answer.choice === PLACEMENT_NONE_OF_THESE;
-  const onShortlist = shortlist.some((c) => c.id === answer.choice);
+  const onShortlist = shortlist.some((c) => c.target === answer.choice);
   // The shared parser accepts any number; a malformed confidence must not clear the band.
   const validConfidence = Number.isFinite(answer.confidence) && answer.confidence >= 0 && answer.confidence <= 1;
   if (!validConfidence) {
@@ -180,7 +189,7 @@ async function askJevPlacement(
 /** Run the configured tiers over a change and decide whether to accept the placement. */
 export async function decidePlacement(
   change: PlacementChange,
-  capabilities: readonly PlacementCapability[],
+  nodes: readonly PlacementNode[],
   options: DecidePlacementOptions = {},
 ): Promise<PlacementDecision> {
   const settings = options.settings ?? DEFAULT_PLACEMENT_SETTINGS;
@@ -201,42 +210,53 @@ export async function decidePlacement(
   const useJev = used === "jev" || used === "both";
   if (useText && !options.model) warnings.push("no text model supplied; the text tier did not run");
 
-  const rules = await placeChange(change, capabilities, {
+  const rules = await placeChange(change, nodes, {
     model: useText ? options.model : undefined,
     shortlistSize: options.shortlistSize,
   });
+  warnings.push(...rules.warnings);
   const { shortlist } = rules;
+  const relation = placementRelation(change);
   const jev =
     useJev && options.judge && shortlist.length > 0
-      ? await askJevPlacement(options.judge, change, shortlist, capabilities, warnings)
+      ? await askJevPlacement(options.judge, change, shortlist, nodes, warnings)
       : undefined;
 
   const top = shortlist[0];
   // A tied top score names no single rules leader, so nothing "agrees" with it.
   const clearLeader = top !== undefined && (shortlist[1] === undefined || shortlist[1].score < top.score);
   const textAgrees = rules.model?.agrees === true;
-  const jevAgrees = clearLeader && jev?.pick === top?.id;
+  const jevAgrees = clearLeader && jev?.pick === top?.target;
+  const proposal = rules.model?.proposal;
 
-  let accepted: string | null = null;
+  let acceptedTarget: string | null = null;
   if (top && settings.autoAccept === "agree") {
     const ok = used !== "rules" && (!useText || textAgrees) && (!useJev || jevAgrees);
-    if (ok) accepted = top.id;
+    if (ok) acceptedTarget = top.target;
   } else if (settings.autoAccept === "confident") {
     if (!useJev) {
       warnings.push('rex.placement.autoAccept "confident" needs Jev; nothing is auto-accepted');
     } else if (jev?.pick && jev.confidence >= PLACEMENT_JEV_MIN_CONFIDENCE) {
-      accepted = jev.pick;
+      acceptedTarget = jev.pick;
     }
   }
+  // A proposed new node is a product decision: no autoAccept mode takes it, or anything else, past a person.
+  if (proposal) {
+    acceptedTarget = null;
+    warnings.push(`text model proposed a new ${proposal.type} "${proposal.title}" under "${proposal.under}"; needs a human placement`);
+  }
 
-  if (jev?.abstained) warnings.push("Jev abstained (none of the shortlisted capabilities fits); needs a human placement");
+  if (jev?.abstained) warnings.push("Jev abstained (none of the shortlisted capabilities or constraints fits); needs a human placement");
 
+  const accepted = acceptedTarget === null ? null : { target: acceptedTarget, relation };
   return {
     shortlist,
     used,
     ...(rules.model ? { text: { pick: rules.model.pick } } : {}),
     ...(jev ? { jev } : {}),
+    relation,
     accepted,
+    ...(proposal ? { proposal } : {}),
     needsPlacement: accepted === null,
     warnings,
   };

@@ -14,14 +14,16 @@ import {
   type PlacementJudge,
   type PlacementModels,
 } from "../../../src/core/placement-policy.js";
-import type { PlacementCapability, PlacementModel } from "../../../src/core/placement.js";
+import type { PlacementModel, PlacementNode, PlacementProposal } from "../../../src/core/placement.js";
 
-const caps: PlacementCapability[] = [
+const caps: PlacementNode[] = [
   { id: "cap-store", title: "Folder tree storage", statement: "PRD items persist as folders", packages: ["rex"], realizedBy: ["packages/rex/src/store"] },
   { id: "cap-auth", title: "Token authentication", statement: "Requests present a token", packages: ["web"] },
 ];
 // Rules: cap-store clearly leads (file evidence); cap-auth is on the shortlist via a package mention.
-const change = { title: "Fix lock in rex for web token", files: ["packages/rex/src/store/lock.ts"] };
+const change = { title: "Fix lock in rex for web token", files: ["packages/rex/src/store/lock.ts"], fix: true };
+/** The rules make every placement of `change` (a fix) a touch. */
+const at = (target: string) => ({ target, relation: "touches" });
 
 const text = (pick: string | null): PlacementModel => vi.fn(async () => pick);
 const jev = (pick: string, confidence: number): PlacementJudge =>
@@ -47,7 +49,7 @@ const run = (models: PlacementModels, autoAccept: PlacementAutoAccept, o: { text
 describe("decidePlacement: models x autoAccept", () => {
   it("rules rank cap-store first", async () => {
     const d = await run("text", "none", { text: "cap-store" });
-    expect(d.shortlist.map((c) => c.id)).toEqual(["cap-store", "cap-auth"]);
+    expect(d.shortlist.map((c) => c.target)).toEqual(["cap-store", "cap-auth"]);
   });
 
   describe.each(["text", "jev", "both"] as const)("models=%s", (models) => {
@@ -61,7 +63,7 @@ describe("decidePlacement: models x autoAccept", () => {
   describe("agree", () => {
     it("text: accepts when the text model picks the rules top", async () => {
       const d = await run("text", "agree", { text: "cap-store" });
-      expect(d).toMatchObject({ accepted: "cap-store", needsPlacement: false });
+      expect(d).toMatchObject({ accepted: at("cap-store"), needsPlacement: false });
     });
     it("text: leaves it open when the model disagrees", async () => {
       const d = await run("text", "agree", { text: "cap-auth" });
@@ -70,7 +72,7 @@ describe("decidePlacement: models x autoAccept", () => {
     it("jev: accepts when Jev picks the rules top, without calling the text model", async () => {
       const model = text("cap-store");
       const d = await decidePlacement(change, caps, { settings: { models: "jev", autoAccept: "agree" }, model, judge: jev("cap-store", 0.1) });
-      expect(d.accepted).toBe("cap-store");
+      expect(d.accepted).toEqual(at("cap-store"));
       expect(model).not.toHaveBeenCalled();
     });
     it("jev: leaves it open when Jev disagrees", async () => {
@@ -78,7 +80,7 @@ describe("decidePlacement: models x autoAccept", () => {
       expect(d.needsPlacement).toBe(true);
     });
     it("both: needs rules top, text model and Jev to all agree", async () => {
-      expect((await run("both", "agree", { text: "cap-store", jev: ["cap-store", 0.1] })).accepted).toBe("cap-store");
+      expect((await run("both", "agree", { text: "cap-store", jev: ["cap-store", 0.1] })).accepted).toEqual(at("cap-store"));
       expect((await run("both", "agree", { text: "cap-auth", jev: ["cap-store", 0.1] })).accepted).toBeNull();
       expect((await run("both", "agree", { text: "cap-store", jev: ["cap-auth", 0.1] })).accepted).toBeNull();
     });
@@ -92,7 +94,7 @@ describe("decidePlacement: models x autoAccept", () => {
     });
     it.each(["jev", "both"] as const)("%s: accepts a Jev pick at the confidence threshold, even off the rules top", async (models) => {
       const d = await run(models, "confident", { text: "cap-store", jev: ["cap-auth", PLACEMENT_JEV_MIN_CONFIDENCE] });
-      expect(d.accepted).toBe("cap-auth");
+      expect(d.accepted).toEqual(at("cap-auth"));
     });
     it.each(["jev", "both"] as const)("%s: leaves a low-confidence Jev pick open", async (models) => {
       const d = await run(models, "confident", { text: "cap-store", jev: ["cap-store", PLACEMENT_JEV_MIN_CONFIDENCE - 0.01] });
@@ -127,7 +129,7 @@ describe("decidePlacement: Jev abstain and confidence validation", () => {
   });
   it.each(["jev", "both"] as const)("%s: still accepts a valid 0.85 on-shortlist pick", async (models) => {
     const d = await run(models, "confident", { text: "cap-store", jev: ["cap-auth", 0.85] });
-    expect(d.accepted).toBe("cap-auth");
+    expect(d.accepted).toEqual(at("cap-auth"));
     expect(d.warnings).toEqual([]);
   });
 });
@@ -144,7 +146,10 @@ describe("decidePlacement: Jev request and ranking", () => {
       criteria: { "cap-store": "PRD items persist as folders", "cap-auth": "Requests present a token" },
     });
     expect(request.state.change.title).toBe(change.title);
-    expect(d.jev?.ranking.map((r) => r.id)).toEqual(["cap-auth", "cap-store"]);
+    expect(d.jev?.ranking).toEqual([
+      { ...at("cap-auth"), probability: 0.9 },
+      { ...at("cap-store"), probability: 0.1 },
+    ]);
   });
 });
 
@@ -155,7 +160,7 @@ describe("decidePlacement: degradation", () => {
   ])("both degrades to text with a warning (%s)", async (_n, extra) => {
     const model = text("cap-store");
     const d = await decidePlacement(change, caps, { settings: { models: "both", autoAccept: "agree" }, model, ...extra });
-    expect(d).toMatchObject({ used: "text", accepted: "cap-store" });
+    expect(d).toMatchObject({ used: "text", accepted: at("cap-store") });
     expect(d.warnings.join()).toMatch(/Jev is unavailable/);
     expect(model).toHaveBeenCalledOnce();
   });
@@ -177,7 +182,61 @@ describe("decidePlacement: degradation", () => {
 
   it("defaults are text + agree", async () => {
     const d = await decidePlacement(change, caps, { model: text("cap-store") });
-    expect(d.accepted).toBe("cap-store");
+    expect(d.accepted).toEqual(at("cap-store"));
+  });
+});
+
+describe("decidePlacement: target and relation", () => {
+  const feature = { title: "Add folder export to rex", files: ["packages/rex/src/store/export.ts"] };
+
+  it("accepts { target, relation } with the rules' relation: a new-behaviour change amends", async () => {
+    const d = await decidePlacement(feature, caps, { settings: { models: "both", autoAccept: "agree" }, model: text("cap-store"), judge: jev("cap-store", 0.9) });
+    expect(d.relation).toBe("amends");
+    expect(d.accepted).toEqual({ target: "cap-store", relation: "amends" });
+    expect(d.shortlist.every((c) => c.relation === "amends")).toBe(true);
+    expect(d.jev?.ranking.every((r) => r.relation === "amends")).toBe(true);
+  });
+
+  it("a fix touches; a confident Jev pick takes the rules' relation, not its own", async () => {
+    const d = await run("jev", "confident", { jev: ["cap-auth", 0.95] });
+    expect(d.relation).toBe("touches");
+    expect(d.accepted).toEqual({ target: "cap-auth", relation: "touches" });
+  });
+
+  it("places a code-health finding on the architecture constraint as touches", async () => {
+    const nodes: PlacementNode[] = [...caps, { id: "k-arch", type: "constraint", title: "Architecture integrity" }];
+    const finding = { title: "Fix cycle between viewer and server", source: "sourcevision" };
+    const d = await decidePlacement(finding, nodes, { settings: { models: "text", autoAccept: "agree" }, model: text("k-arch") });
+    expect(d.shortlist[0].target).toBe("k-arch");
+    expect(d.accepted).toEqual({ target: "k-arch", relation: "touches" });
+  });
+});
+
+describe("decidePlacement: a proposed new node is never auto-accepted", () => {
+  const proposal: PlacementProposal = {
+    target: "cap-lock-audit",
+    delta: "added",
+    type: "capability",
+    under: "area-storage",
+    title: "Lock audit",
+    summary: "Record who holds the PRD lock",
+  };
+  const proposer: PlacementModel = vi.fn(async () => ({ propose: proposal }));
+
+  it.each(["text", "both"] as const)("%s: in every autoAccept mode, even with a confident Jev pick", async (models) => {
+    for (const autoAccept of ["none", "agree", "confident"] as const) {
+      const d = await decidePlacement(change, caps, { settings: { models, autoAccept }, model: proposer, judge: jev("cap-store", 0.99) });
+      expect(d).toMatchObject({ accepted: null, needsPlacement: true, proposal });
+      expect(d.warnings.join()).toMatch(/proposed a new capability "Lock audit" under "area-storage"/);
+    }
+  });
+
+  it("surfaces a malformed proposal as a warning and no proposal", async () => {
+    const bad: PlacementModel = async () => ({ propose: { ...proposal, type: undefined } as unknown as PlacementProposal });
+    const d = await decidePlacement(change, caps, { settings: { models: "text", autoAccept: "agree" }, model: bad });
+    expect(d.proposal).toBeUndefined();
+    expect(d).toMatchObject({ accepted: null, needsPlacement: true });
+    expect(d.warnings.join()).toMatch(/not an added amendment/);
   });
 });
 
