@@ -2,11 +2,12 @@
 id: "e6649d84-5c5d-4e48-8a83-7ea8a37dc110"
 level: "task"
 title: "Build the readiness scorecard with weights in one exported constant"
-status: "pending"
+status: "in_progress"
 priority: "high"
 blockedBy:
   - "19910eb0-3773-48ef-8243-dc790402ce5e"
 source: "ndx-capture"
+startedAt: "2026-10-08T13:27:29.066Z"
 acceptanceCriteria:
   - "`analyzers/readiness-score.ts` exports `ReadinessScore { overall, dimensions: Record<name, { score, weight, evidence[], gaps[] }>, suggestions[] }` matching the weighted shape of `packages/rex/src/core/health.ts`."
   - "The nine dimension weights live in a single exported constant and are referenced from there everywhere — including by tests and by the docs generation — with no literal duplicates."
@@ -19,6 +20,6 @@ acceptanceCriteria:
   - "Unit tests assert the exact overall and per-dimension scores for all three fixtures."
 description: "`analyzers/readiness-score.ts` turns the detected profile into a score. Copy the shape of `packages/rex/src/core/health.ts` — weighted dimensions scored 0-100, overall as the weighted sum, suggestions aimed at the weakest dimension — so the dashboard can render PRD health and repo readiness identically.\n\n`ReadinessScore { overall, dimensions: Record<name, { score, weight, evidence[], gaps[] }>, suggestions[] }`.\n\nStarting weights: testing 0.20, ci 0.15, cd 0.15, rollback 0.10, migrations 0.10, featureFlags 0.05, qualityGates 0.10, observability 0.05, agentSafety 0.10. They live in **one** exported constant — not inlined at the call sites, not mirrored in tests, not restated in the docs table as literals.\n\n`agentSafety` is fed by `packages/llm-client/src/repo-trust.ts` findings, referenced in place; that module is not moved or modified.\n\nThe scorecard is heuristic and the gaps are the useful output: each one must say what evidence would raise the score, so it is actionable rather than a complaint. Fixtures assert exact scores precisely so that any later weight change has to be made on purpose."
 assignee: "Sterling H <sterling.h@endash.us>"
-lastModified: "2026-10-06T22:01:02.234Z"
+lastModified: "2026-10-08T13:27:29.576Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

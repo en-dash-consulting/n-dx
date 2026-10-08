@@ -45,7 +45,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Build the readiness scorecard with weights in one exported constant](./build-the-readiness-scorecard-with.md) | pending |
+| [Build the readiness scorecard with weights in one exported constant](./build-the-readiness-scorecard-with.md) | in_progress |
 | [Build the sdlc-profile analyzer with its own bounded walk and CI parsing](./build-the-sdlc-profile-analyzer-with.md) | completed |
 | [Declare the SdlcProfile schema and register sdlc-profile.json](./declare-the-sdlcprofile-schema-and.md) | completed |
 | [Surface readiness through the sv CLI, ndx passthrough, MCP and the sv status](./surface-readiness-through-the-sv-cli.md) | pending |
