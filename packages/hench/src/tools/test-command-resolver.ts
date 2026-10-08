@@ -12,6 +12,7 @@
 
 import { access, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { resolveLayout } from "../prd/llm-gateway.js";
 import { applyGateTemplate } from "./test-gate-template.js";
 
 // ---------------------------------------------------------------------------
@@ -50,11 +51,11 @@ export interface TestCommandResolveResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Load .n-dx.json project config and extract hench.fullTestCommand if present.
+ * Load the project config and extract hench.fullTestCommand if present.
  */
 async function loadProjectConfig(projectDir: string): Promise<string | undefined> {
   try {
-    const configPath = join(projectDir, ".n-dx.json");
+    const configPath = resolveLayout(projectDir).configFile;
     const content = await readFile(configPath, "utf-8");
     const config = JSON.parse(content) as Record<string, unknown>;
     const hench = config.hench as Record<string, unknown> | undefined;

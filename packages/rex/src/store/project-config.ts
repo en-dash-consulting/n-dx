@@ -7,10 +7,10 @@
  * expect.
  */
 
-import { dirname } from "node:path";
 import {
   loadClaudeConfig as loadClaudeConfigFromDir,
   loadLLMConfig as loadLLMConfigFromDir,
+  projectRootOf,
   resolveApiKey as sharedResolveApiKey,
   resolveCliPath as sharedResolveCliPath,
 } from "@n-dx/llm-client";
@@ -27,16 +27,16 @@ export { loadProjectOverrides, mergeWithOverrides } from "@n-dx/llm-client";
  * Returns an empty object if the file doesn't exist, is invalid, or has no claude section.
  *
  * Delegates to @n-dx/llm-client's loadClaudeConfig, adapting the rex
- * convention of passing a configDir (e.g., /project/.rex) instead of the
- * project root directory.
+ * convention of passing a configDir (`/project/.rex` or `/project/.ndx/rex`)
+ * instead of the project root directory. The root is recovered by the
+ * resolver, which knows to step over the `.ndx/` container.
  *
  * @param configDir The package config directory (e.g., /project/.rex)
  */
 export async function loadClaudeConfig(
   configDir: string,
 ): Promise<ClaudeConfig> {
-  const projectDir = dirname(configDir);
-  return loadClaudeConfigFromDir(projectDir);
+  return loadClaudeConfigFromDir(projectRootOf(configDir));
 }
 
 /**
@@ -47,8 +47,7 @@ export async function loadClaudeConfig(
 export async function loadLLMConfig(
   configDir: string,
 ): Promise<LLMConfig> {
-  const projectDir = dirname(configDir);
-  return loadLLMConfigFromDir(projectDir);
+  return loadLLMConfigFromDir(projectRootOf(configDir));
 }
 
 /**

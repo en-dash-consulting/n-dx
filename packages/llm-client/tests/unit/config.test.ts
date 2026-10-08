@@ -637,3 +637,26 @@ describe("resolveVendorModel", () => {
     });
   });
 });
+
+describe("loadClaudeConfig on the .ndx/ layout", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "claude-client-config-ndx-"));
+    await mkdir(join(tmpDir, ".ndx"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("reads .ndx/config.json and its local overlay, not a root .n-dx.json", async () => {
+    await writeFile(join(tmpDir, ".ndx", "config.json"), JSON.stringify({ claude: { model: "claude-sonnet-5" } }));
+    await writeFile(join(tmpDir, ".ndx", "config.local.json"), JSON.stringify({ claude: { api_key: "sk-ant-local" } }));
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ claude: { model: "claude-legacy" } }));
+
+    const config = await loadClaudeConfig(tmpDir);
+    expect(config.model).toBe("claude-sonnet-5");
+    expect(config.api_key).toBe("sk-ant-local");
+  });
+});

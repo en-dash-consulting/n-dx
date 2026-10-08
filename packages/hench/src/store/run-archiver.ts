@@ -21,6 +21,7 @@
 
 import { join } from "node:path";
 import { readFile, writeFile, readdir, stat, unlink } from "node:fs/promises";
+import { resolveLayout } from "../prd/llm-gateway.js";
 import { gzip, gunzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -88,7 +89,7 @@ export async function loadArchivalConfig(
   projectDir: string,
 ): Promise<ArchivalConfig> {
   try {
-    const raw = await readFile(join(projectDir, ".n-dx.json"), "utf-8");
+    const raw = await readFile(resolveLayout(projectDir).configFile, "utf-8");
     const data = JSON.parse(raw) as Record<string, unknown>;
     const section = data.archival as Record<string, unknown> | undefined;
     if (!section || typeof section !== "object") {
