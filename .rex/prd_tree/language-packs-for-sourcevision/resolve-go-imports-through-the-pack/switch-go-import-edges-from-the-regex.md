@@ -11,6 +11,7 @@ tags:
   - "pr-7"
 blockedBy:
   - "ac26cb7d-b471-45c9-849b-1423d936d015"
+  - "e6ce4e7e-10ec-4a5c-b9aa-a2ba08cbbd1c"
 source: "roadmap"
 acceptanceCriteria:
   - "Go import edges come from the pack when the grammar is built"
