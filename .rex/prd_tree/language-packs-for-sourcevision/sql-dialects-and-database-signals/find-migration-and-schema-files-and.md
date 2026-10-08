@@ -15,7 +15,7 @@ acceptanceCriteria:
   - "Table names are extracted from CREATE and ALTER statements"
   - "Parse rate per file on the corpus is recorded in the rex log"
   - "The six static root policy tests pass"
-description: "Pin tree-sitter-sql v0.3.11 (github.com/DerekStride/tree-sitter-sql) additively. Detect migration tools by layout: Flyway (db/migration/V*__*.sql), Liquibase changelogs, golang-migrate (*.up.sql/*.down.sql), goose (-- +goose Up), Atlas, Prisma (schema.prisma), sqlc (sqlc.yaml with queries). Parse .sql files for CREATE/ALTER TABLE names. The grammar is generic, so report the parse rate per dialect rather than assuming every file parses. Corpus: PetClinic's schemas and ThingsBoard's .sql files in ~/.cache/ndx-java-corpus/."
-lastModified: "2026-10-08T03:09:21.056Z"
+description: "Pin tree-sitter-sql v0.3.11 (github.com/DerekStride/tree-sitter-sql) additively. Detect migration tools by layout: Flyway (db/migration/V*__*.sql), Liquibase changelogs, golang-migrate (*.up.sql/*.down.sql), goose (-- +goose Up), Atlas, Prisma (schema.prisma), sqlc (sqlc.yaml with queries). Parse .sql files for CREATE/ALTER TABLE names. The grammar is generic, so report the parse rate per dialect rather than assuming every file parses. Corpus: PetClinic's schemas and ThingsBoard's .sql files in ~/.cache/ndx-java-corpus/.\n\nSterling H gate (LS12, LS13, C1, C2): results stay in memory. Write nothing new to analysis artifacts (no infrastructure.json, no outbound.json), and do not edit analyzers/infrastructure.ts or IAC_KINDS."
+lastModified: "2026-10-08T08:05:56.780Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

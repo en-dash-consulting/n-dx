@@ -34,3 +34,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Detect database engines from dependencies, images and config](./detect-database-engines-from.md) | pending |
 | [Extract table names from embedded SQL in Java and Go](./extract-table-names-from-embedded-sql.md) | pending |
 | [Find migration and schema files and extract tables with tree-sitter-sql](./find-migration-and-schema-files-and.md) | pending |
+| [Go calls query leaves string arguments of unnamed calls without an owning argument list](./go-calls-query-leaves-string-arguments.md) | pending |
+| [Add the Terraform model as a database-engine source](./add-the-terraform-model-as-a-database.md) | pending |
