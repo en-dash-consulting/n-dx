@@ -35,6 +35,22 @@ describe("title tokens", () => {
     expect(releaseToken("Wave 1 of 2")).toBeUndefined();
   });
 
+  it("does not read a dependency or runtime version as a release", () => {
+    expect(releaseToken("Python 3.12 support")).toBeUndefined();
+    expect(releaseToken("Upgrade to Vitest 4.1")).toBeUndefined();
+    expect(releaseToken("Node 22.1 runtime")).toBeUndefined();
+    expect(releaseToken("n-dx 1.0 · Launch")).toBe("1.0");
+  });
+
+  it("classifies a version-numbered epic that is not a release as an area", () => {
+    for (const title of ["Python 3.12 support", "Upgrade to Vitest 4.1"]) {
+      expect(isDeliveryEpic(title)).toBe(false);
+      const plan = classifyV1Tree([item("epic", title, [item("feature", "Something", [item("task", "Do it")])])]);
+      expect(plan.entries.find((e) => e.title === title)?.target).toBe("area");
+      expect(plan.entries.some((e) => e.plannedRelease !== undefined)).toBe(false);
+    }
+  });
+
   it("reads a PR or issue token", () => {
     expect(hasWorkToken("0.8.0 / PR 15 · Hub admission gate")).toBe(true);
     expect(hasWorkToken("Hotfix · #499 MCP servers")).toBe(true);

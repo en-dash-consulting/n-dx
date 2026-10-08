@@ -88,8 +88,13 @@ export interface MigrationPlan {
 
 // ── Title signals ────────────────────────────────────────────────
 
-/** A release version: `0.9.0`, `v1.2`. */
-const RELEASE_TOKEN = /(?:^|[^\w.])v?(\d+\.\d+(?:\.\d+)?)(?![\w.])/i;
+/**
+ * A release version: `0.9.0`, `v1.2`. A dotted number counts only when the title
+ * opens with it (`0.6.0 / PR 4`), or it follows `v`, `release` or the product name
+ * (`ndx 0.9.0`, `n-dx 1.0`). Any other version names a dependency or runtime
+ * (`Python 3.12 support`, `Upgrade to Vitest 4.1`), not a release.
+ */
+const RELEASE_TOKEN = /(?:^\s*v?|(?<![\w.])v|\b(?:n-?dx|releases?)\s+v?)(\d+\.\d+(?:\.\d+)?)(?![\w.])/i;
 /** A unit of delivered work: `PR 4`, `PR #12`, `#499`. */
 const WORK_TOKEN = /\bPR\s*#?\d+\b|(?:^|\s)#\d+\b/i;
 
