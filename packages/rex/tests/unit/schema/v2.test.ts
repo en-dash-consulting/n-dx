@@ -430,7 +430,7 @@ describe("isolation", () => {
     // The v2 modules (schema, rules, state writer, dual-read loader, tree
     // writer, apply engine, apply policy, product-edit handler, computed edges,
     // product status, change landing, placement and its policy, change selection,
-    // change completion) may import each other; nothing else may import them
+    // change completion, store transaction) may import each other; nothing else may import them
     // until the v2 store wires them in.
     const v2Files = new Set(
       [
@@ -439,6 +439,7 @@ describe("isolation", () => {
         "store/state-writer.ts",
         "store/prd-model-reader.ts",
         "store/prd-model-writer.ts",
+        "store/prd-model-transaction.ts",
         "core/apply-amendments.ts",
         "core/apply-policy.ts",
         "core/product-edit.ts",
