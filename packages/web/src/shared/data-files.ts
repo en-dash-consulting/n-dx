@@ -31,6 +31,7 @@ export const DATA_FILES = {
   callGraph: "callgraph.json",
   projectProfile: "project-profile.json",
   sdlcProfile: "sdlc-profile.json",
+  readiness: "readiness.json",
   infrastructure: "infrastructure.json",
 } as const;
 

@@ -531,12 +531,35 @@ const SdlcCoverageSchema = z.object({
   enforced: z.boolean(),
 });
 
+const SdlcCiStepSchema = z.object({
+  name: z.string().optional(),
+  run: z.string().optional(),
+  uses: z.string().optional(),
+  kind: z.enum([
+    "checkout", "setup", "install", "build", "test",
+    "lint", "typecheck", "migrate", "deploy", "publish", "other",
+  ]),
+});
+
+const SdlcCiJobSchema = z.object({
+  name: z.string().min(1),
+  steps: z.array(SdlcCiStepSchema),
+  needs: z.array(z.string()).optional(),
+  condition: z.string().optional(),
+});
+
 const SdlcCiPipelineSchema = z.object({
   evidence: SdlcEvidenceListSchema,
   provider: z.string().min(1),
   name: z.string(),
   triggers: z.array(z.string()),
-  jobs: z.array(z.string()),
+  jobs: z.array(SdlcCiJobSchema),
+});
+
+const SdlcParseFailureSchema = z.object({
+  path: z.string().min(1),
+  kind: z.string().min(1),
+  reason: z.string().min(1),
 });
 
 const SdlcDeploymentSchema = z.object({
@@ -620,6 +643,7 @@ export const SdlcProfileSchema = z.object({
   observability: z.array(SdlcObservabilitySchema),
   containers: z.array(SdlcContainerSchema),
   iac: z.array(SdlcIacSchema),
+  parseFailures: z.array(SdlcParseFailureSchema),
 });
 
 // ── Validation helpers ──────────────────────────────────────────────────────
