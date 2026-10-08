@@ -73,6 +73,7 @@ if (!bindAvailable) {
 const result = spawnSync(process.execPath, [VITEST_BIN, ...vitestArgs], {
   cwd: process.cwd(),
   stdio: "inherit",
+  windowsHide: true,
   env: process.env,
 });
 

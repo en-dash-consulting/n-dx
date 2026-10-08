@@ -230,10 +230,11 @@ If a spec item changed and an existing task needs updating:
 rex update <task-id> --title="New title"
 ```
 
-For acceptance criteria changes, use the MCP tools (if the server is running) or edit `.rex/prd.json` directly:
+For acceptance criteria changes, use the CLI, MCP tools (if the server is running), or the dashboard:
 
 ```sh
-rex update <task-id> --criteria="New criterion 1; New criterion 2"
+rex update <task-id> --criterion="Criterion 1" --criterion="Criterion 2"  # replace all criteria
+rex update <task-id> --criterion=                                       # clear all criteria
 ```
 
 Or use the dashboard task editor — click any task to open its detail panel and edit in-place.

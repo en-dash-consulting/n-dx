@@ -8,6 +8,7 @@ export {
   FindingSchema,
   ComponentsSchema,
   CallGraphSchema,
+  OutboundSchema,
   BranchWorkRecordSchema,
   validate,
   validateModule,

@@ -9,6 +9,12 @@
  * importer carries its own. The symmetric operator-facing pair lives one tier
  * up as `ndx prd export` / `ndx prd import`.
  *
+ * ## Envelopes
+ *
+ * Both bundle envelopes are accepted. Into a v1 tree only envelope v1 goes;
+ * into a v2 tree both do, envelope v1 landing in the change layer. See
+ * `../../store/prd-bundle-v2.ts`.
+ *
  * ## Write discipline
  *
  * The bundle is parsed and version-gated *before* the store is touched, so a
@@ -30,8 +36,11 @@
 import { join, resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
-import { parseBundle, mergeBundle, countItems, BundleError } from "../../core/prd-bundle.js";
-import type { ImportMode, MergeOutcome, PRDBundle } from "../../core/prd-bundle.js";
+import type { PRDStore } from "../../store/index.js";
+import { mergeBundle, countItems, BundleError } from "../../core/prd-bundle.js";
+import type { BundleCollision, BundleProvenance, ImportMode } from "../../core/prd-bundle.js";
+import { countReplaceable, hasV2Tree, importBundleIntoV2, parseAnyBundle } from "../../store/prd-bundle-v2.js";
+import type { ParsedBundle } from "../../store/prd-bundle-v2.js";
 import type { PRDItem } from "../../schema/index.js";
 import { appendArchiveBatch } from "../../core/archive.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
@@ -63,7 +72,7 @@ async function confirmReplace(itemCount: number): Promise<boolean> {
   }
 }
 
-async function readBundleFile(path: string): Promise<PRDBundle> {
+async function readBundleFile(path: string): Promise<ParsedBundle> {
   let raw: string;
   try {
     raw = await readFile(path, "utf-8");
@@ -85,7 +94,7 @@ async function readBundleFile(path: string): Promise<PRDBundle> {
   }
 
   try {
-    return parseBundle(parsed);
+    return parseAnyBundle(parsed);
   } catch (err) {
     if (err instanceof BundleError) {
       throw new CLIError(err.message, "Nothing was written to the PRD.");
@@ -94,9 +103,23 @@ async function readBundleFile(path: string): Promise<PRDBundle> {
   }
 }
 
+/** What the report reads from either envelope's merge outcome. */
+interface ImportOutcome {
+  collisions: BundleCollision[];
+  added: number;
+  replaced: number;
+}
+
+/** What the report and the log read from either envelope. */
+interface BundleSource {
+  schema: string;
+  exportedAt: string;
+  exportedFrom?: BundleProvenance;
+}
+
 function reportOutcome(
-  outcome: MergeOutcome,
-  bundle: PRDBundle,
+  outcome: ImportOutcome,
+  bundle: BundleSource,
   mode: ImportMode,
   isJson: boolean,
 ): void {
@@ -161,7 +184,7 @@ export async function cmdImportBundle(dir: string, flags: Record<string, string>
   }
 
   // Resolved against the caller's cwd — see the note in export.ts.
-  const bundle = await readBundleFile(resolve(input));
+  const parsed = await readBundleFile(resolve(input));
 
   const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
@@ -169,6 +192,19 @@ export async function cmdImportBundle(dir: string, flags: Record<string, string>
   // Confirmation happens before the transaction so the lock is not held while
   // waiting on a human. Help documents `--yes, -y`; honour both.
   const autoConfirm = flags.yes === "true" || flags.y === "true";
+
+  if (hasV2Tree(rexDir)) {
+    await importIntoV2(store, rexDir, parsed, mode, flags, input, autoConfirm);
+    return;
+  }
+  if (parsed.version !== 1) {
+    throw new CLIError(
+      "This is a v2 bundle, and this project's PRD is a v1 tree: v1 has no product layer to put it in.",
+      "Migrate the PRD to v2 first. Nothing was written.",
+    );
+  }
+  const bundle = parsed.bundle;
+
   if (mode === "replace" && !autoConfirm) {
     const existing = await store.loadDocument();
     // The whole tree, not `existing.items.length`. This prompt is the operator's
@@ -220,12 +256,66 @@ export async function cmdImportBundle(dir: string, flags: Record<string, string>
     });
   }
 
-  // Recorded after the write, so a rejected bundle or a declined replace —
-  // both of which throw above — leaves the log as silent as it left the tree.
-  // `appendLog` stamps the actor, which supplies the "who" half; the rest is
-  // what an operator reading the log afterwards cannot reconstruct from the
-  // tree alone: which direction the import ran, how much it moved, and which
-  // project and commit the items came from.
+  await logImport(store, outcome, bundle, mode, input);
+  reportOutcome(outcome, bundle, mode, flags.format === "json");
+}
+
+/**
+ * Import into a v2 tree (see `../../store/prd-bundle-v2.ts`). Either envelope
+ * is accepted; a v1 bundle lands in the change layer.
+ *
+ * `rex restore` snapshots the v1 `prd_tree/` only, so a v2 replace has no
+ * rollback point. Like {@link ensureSnapshot}, that fails closed: a replace
+ * runs only with `--no-snapshot`. A merge discards nothing and needs none.
+ */
+async function importIntoV2(
+  store: PRDStore,
+  rexDir: string,
+  parsed: ParsedBundle,
+  mode: ImportMode,
+  flags: Record<string, string>,
+  input: string,
+  autoConfirm: boolean,
+): Promise<void> {
+  if (mode === "replace") {
+    if (flags["no-snapshot"] !== "true") {
+      throw new CLIError(
+        "Cannot snapshot a v2 tree before 'import-bundle --replace': 'rex restore' covers the v1 prd_tree only.",
+        "Commit the tree first, then re-run with --no-snapshot to replace it without a rollback point. Nothing was written.",
+      );
+    }
+    if (!autoConfirm && !(await confirmReplace(await countReplaceable(rexDir, parsed)))) {
+      throw new CLIError("Replace declined — nothing was written.", "Pass --yes to replace the PRD non-interactively.");
+    }
+  }
+
+  let outcome;
+  try {
+    outcome = await importBundleIntoV2(rexDir, parsed, mode);
+  } catch (err) {
+    if (err instanceof BundleError) throw new CLIError(err.message, "Nothing was written to the PRD.");
+    throw err;
+  }
+
+  await logImport(store, outcome, parsed.bundle, mode, input);
+  reportOutcome(outcome, parsed.bundle, mode, flags.format === "json");
+}
+
+/**
+ * Recorded after the write, so a rejected bundle or a declined replace — both
+ * of which throw before it — leaves the log as silent as it left the tree.
+ * `appendLog` stamps the actor, which supplies the "who" half; the rest is
+ * what an operator reading the log afterwards cannot reconstruct from the
+ * tree alone: which direction the import ran, how much it moved, and which
+ * project and commit the items came from.
+ */
+async function logImport(
+  store: PRDStore,
+  outcome: ImportOutcome,
+  bundle: BundleSource,
+  mode: ImportMode,
+  input: string,
+): Promise<void> {
   await store.appendLog({
     timestamp: new Date().toISOString(),
     event: "bundle_imported",
@@ -241,6 +331,4 @@ export async function cmdImportBundle(dir: string, flags: Record<string, string>
     bundleExportedAt: bundle.exportedAt,
     ...(bundle.exportedFrom ? { exportedFrom: bundle.exportedFrom } : {}),
   });
-
-  reportOutcome(outcome, bundle, mode, flags.format === "json");
 }
