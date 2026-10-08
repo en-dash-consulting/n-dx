@@ -25,6 +25,8 @@ acceptanceCriteria:
   - "Colour is not the only signal distinguishing error from success state"
   - "Tests cover the view's states and the route's contract, and run in the existing web unit suite without a live server or real LLM"
 description: "Bring the panel to the accessibility bar the other SourceVision subviews already meet (see the Web Dashboard Accessibility epic, which covered the PR Markdown tab, file search, and route tree).\n\nAn async text exchange has one a11y requirement the other views do not: the answer arrives after an indeterminate delay, so a screen reader user must be told it arrived without losing their place. That means a live region, not just a rendered result."
+commits:
+  - {"hash":"d21d0ab9d291fe444726d038415d8cddd5fc8e8e","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-08T13:03:14-07:00"}
 lastModified: "2026-09-04T15:04:11.961Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

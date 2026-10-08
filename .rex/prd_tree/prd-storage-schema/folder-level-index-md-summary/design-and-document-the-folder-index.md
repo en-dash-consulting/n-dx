@@ -22,4 +22,6 @@ acceptanceCriteria:
   - "Schema reviewed against existing PRDStore data model — every field has a backing source"
   - "Linked from CLAUDE.md and AGENTS.md sections that describe folder-tree storage"
 description: "Specify the exact sections, headings, and ordering for the new `index.md` summary file: header block with item identity, completion table (child slug, title, status, last-updated), per-task commit list, prose summary block (sourced from the item description or hench-generated), change list (recent edits), and basic info (priority, tags, branch attribution, dates). Document the schema in `docs/architecture/prd-folder-tree-schema.md` with an annotated example. Decide whether the prose summary is human-edited or fully regenerated."
+commits:
+  - {"hash":"015b06ad9fde134cee0f9a45e4fb310fa7a5fddd","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-05-03T23:05:45-04:00"}
 ---

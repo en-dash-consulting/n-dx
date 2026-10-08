@@ -22,6 +22,8 @@ acceptanceCriteria:
   - "Unit tests assert the exact overall and per-dimension scores for all three fixtures."
 description: "`analyzers/readiness-score.ts` turns the detected profile into a score. Copy the shape of `packages/rex/src/core/health.ts` — weighted dimensions scored 0-100, overall as the weighted sum, suggestions aimed at the weakest dimension — so the dashboard can render PRD health and repo readiness identically.\n\n`ReadinessScore { overall, dimensions: Record<name, { score, weight, evidence[], gaps[] }>, suggestions[] }`.\n\nStarting weights: testing 0.20, ci 0.15, cd 0.15, rollback 0.10, migrations 0.10, featureFlags 0.05, qualityGates 0.10, observability 0.05, agentSafety 0.10. They live in **one** exported constant — not inlined at the call sites, not mirrored in tests, not restated in the docs table as literals.\n\n`agentSafety` is fed by `packages/llm-client/src/repo-trust.ts` findings, referenced in place; that module is not moved or modified.\n\nThe scorecard is heuristic and the gaps are the useful output: each one must say what evidence would raise the score, so it is actionable rather than a complaint. Fixtures assert exact scores precisely so that any later weight change has to be made on purpose."
 assignee: "Sterling H <sterling.h@endash.us>"
+commits:
+  - {"hash":"38482da8766cc6b164ac08b47a8d082960ca9ff0","author":"Sterling H","authorEmail":"sterling.h@endash.us","timestamp":"2026-10-08T11:11:32-07:00"}
 lastModified: "2026-10-08T13:48:17.413Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

@@ -25,5 +25,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add the item trailer to skill, PRD-write and operator commits](./add-the-item-trailer-to-skill-prd.md) | completed |
-| [Backfill commit attribution from existing trailers](./backfill-commit-attribution-from.md) | pending |
+| [Backfill commit attribution from existing trailers](./backfill-commit-attribution-from.md) | in_progress |
 | [Write the item id as the N-DX-Item trailer value](./write-the-item-id-as-the-n-dx-item.md) | completed |

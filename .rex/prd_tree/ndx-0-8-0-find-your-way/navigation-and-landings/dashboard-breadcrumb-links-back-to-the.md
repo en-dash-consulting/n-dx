@@ -22,6 +22,8 @@ acceptanceCriteria:
   - "The menu is keyboard operable: Arrow keys, Home/End, Enter/Space to choose, Escape to close."
   - "Unit tests cover the menu, the Hub link's presence and absence, and the URL and current-project helpers."
 description: "Behind the hub there is no easy way back to the hub's project home page or across to another project. The breadcrumb should start with a \"Hub\" link to /hub, and the project name should open a menu of every registered project; picking one opens the same view under /p/<id>/. With one project or no hub, the name stays plain text and no Hub link appears."
+commits:
+  - {"hash":"d339e94af0d2e1be02c66305bf5e473633d53e6d","author":"Ryan Keith","authorEmail":"109387558+ryrykeith@users.noreply.github.com","timestamp":"2026-10-01T11:23:24-04:00"}
 lastModified: "2026-10-01T01:37:49.457Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

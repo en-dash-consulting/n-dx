@@ -21,6 +21,8 @@ acceptanceCriteria:
   - "Regression test covers the inversion case and the both-absent case."
   - "GitHub issue #375 is closed with a comment naming the fixing commit and test."
 description: "applyTimestampFixes in packages/rex/src/fix/index.ts stamps startedAt = now on a completed item whose completedAt is the real, earlier time, yielding startedAt > completedAt — the repair manufactures data it cannot know. When both timestamps are absent, both become now, fabricating a zero-length interval. The true start time is unrecoverable, so the fix must stop inventing it: a completed item missing startedAt should either derive a non-inverting value (e.g. clamp to completedAt) or leave the field absent and report it, never backfill with the current clock."
+commits:
+  - {"hash":"bb4f829b0d676024fce715ee5da4db0ed2a429b5","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-22T17:21:14-04:00"}
 lastModified: "2026-09-22T16:11:58.812Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

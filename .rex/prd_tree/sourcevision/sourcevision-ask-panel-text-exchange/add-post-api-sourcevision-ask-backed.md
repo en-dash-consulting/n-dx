@@ -23,6 +23,8 @@ acceptanceCriteria:
   - "The answer is grounded in .sourcevision/ data: a unit test with fixture analysis data asserts the assembled context reaches the LLM call"
   - "A unit test covers the route's success path and each error path"
 description: "Add the server endpoint that answers a question about the analyzed project. Request carries the prompt plus optional seed context (see the explain-a-finding task); response carries the answer text, the vendor/model actually used, and token counts.\n\nContext assembly reads the already-written .sourcevision/ artifacts through packages/web/src/server/domain-gateway.ts -- adding re-exports there rather than importing @n-dx/sourcevision in the route file. The LLM call goes through @n-dx/llm-client (createLLMClient / provider factories), with vendor and model resolved from existing config the same way routes-llm.ts and routes-config.ts already do.\n\nOpen design decision left to implementation: either a small in-process tool-use loop that queries sourcevision lookups on demand, or a single non-agentic call over a pre-assembled context bundle. The bundle approach is cheaper and more predictable; the loop answers a wider range of questions. Whichever is chosen, the endpoint must stay within the sourcevision analysis as its ground truth."
+commits:
+  - {"hash":"d21d0ab9d291fe444726d038415d8cddd5fc8e8e","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-08T13:03:14-07:00"}
 lastModified: "2026-09-04T13:51:20.427Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

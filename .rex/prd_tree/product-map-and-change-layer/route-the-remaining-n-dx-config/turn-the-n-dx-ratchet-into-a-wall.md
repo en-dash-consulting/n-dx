@@ -17,6 +17,8 @@ acceptanceCriteria:
   - "A new .n-dx* literal anywhere outside ALLOWED fails the policy test with file and line (test)"
   - "The inventory file no longer carries a ratchet count"
 description: "Once the inventory is empty, make tests/e2e/layout-literal-policy.test.js treat .n-dx* literals the way it already treats .rex/, .hench/ and .sourcevision/: any site outside ALLOWED fails with its file and line. Retire tests/layout-literal-inventory.md's ratchet table (or reduce it to the ALLOWED explanation)."
+commits:
+  - {"hash":"af8f2f734547e813cc9dcff6635f8a5f57ad66b1","author":"Sterling H","authorEmail":"sterling.h@endash.us","timestamp":"2026-10-08T08:56:27-07:00"}
 lastModified: "2026-10-08T15:56:05.732Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

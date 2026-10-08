@@ -24,6 +24,8 @@ acceptanceCriteria:
   - "A failed or timed-out ask records whatever tokens were actually consumed rather than silently dropping them"
   - "A unit test asserts an ask's usage reaches the rollup with the correct vendor/model attribution"
 description: "Each ask spends real tokens from an interactive surface that currently has no accounting path -- unlike hench runs, which are recorded under .hench/runs/ and rolled up per PRD item by rex's aggregateItemTokenUsage (exported via rex-gateway.ts:77). Without this task the dashboard's own LLM spend is invisible in the very view that reports token usage.\n\nRecord vendor, model, input/output tokens, and cache tokens per ask, and surface the total in the token-usage view. Follow the cache-token reporting decision already made for hench and rex (report cache tokens rather than hiding them). Whether asks are attributed to a PRD item or reported as a separate dashboard-spend bucket is an open call -- asks are not task-scoped, so a separate bucket is the likely answer."
+commits:
+  - {"hash":"d21d0ab9d291fe444726d038415d8cddd5fc8e8e","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-08T13:03:14-07:00"}
 lastModified: "2026-09-04T15:40:18.824Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

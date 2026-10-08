@@ -19,6 +19,8 @@ acceptanceCriteria:
   - "The /hub path is defined once in src/shared/base-path.ts and used by both the hub and the viewer."
   - "tests/integration/hub-proxy.test.ts covers /hub with one and with two projects, and the hub API under a worktree slot."
 description: "`/` is the hub's project chooser only while two or more projects are registered. With one, it opens that project's dashboard, so the dashboard has no stable link back to the hub. Separately, a branch worktree's dashboard sends `/p/<id>/w/<key>/api/hub/*` (and `/w/<key>/api/hub/*` on the single-project root alias) to the project server, which answers 404 — so the run-queue strip silently shows nothing on worktree pages."
+commits:
+  - {"hash":"d339e94af0d2e1be02c66305bf5e473633d53e6d","author":"Ryan Keith","authorEmail":"109387558+ryrykeith@users.noreply.github.com","timestamp":"2026-10-01T11:23:24-04:00"}
 lastModified: "2026-10-01T00:55:47.894Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

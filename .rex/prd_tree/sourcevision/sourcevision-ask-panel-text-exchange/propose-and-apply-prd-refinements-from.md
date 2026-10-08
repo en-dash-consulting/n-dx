@@ -30,6 +30,8 @@ acceptanceCriteria:
   - "An applied refinement is reflected in the PRD views without a server restart"
   - "Integration coverage asserts the accept path writes through the lock and the reject path writes nothing"
 description: "Let the exchange act on the user's feedback and recommendations about the PRD itself, not only capture new items. The user says what is wrong or missing in an existing item; the answer proposes concrete mutations -- rewrite a description, add or replace acceptance criteria, change priority, reparent, or merge an obvious duplicate sibling -- and the user reviews each one before anything is written.\n\nTwo constraints make this safe rather than dangerous:\n\nReview before write. An edit can destroy existing content in a way a capture cannot: an LLM rewriting acceptance criteria unreviewed is how a PRD quietly loses its history. Every proposal is rendered as a before/after diff of the affected fields, accepted or rejected individually, with nothing written on a bare \"looks good\".\n\nWrite under the lock. This makes the web server another PRD writer alongside ndx work and the MCP tools. Accepted mutations must go through the gateway's store path (rex-gateway.ts resolveStore) inside withTransaction, so a concurrent writer causes a loud failure naming the holder PID rather than a silent clobber -- exactly the guarantee described in the concurrency contract in CLAUDE.md."
+commits:
+  - {"hash":"d21d0ab9d291fe444726d038415d8cddd5fc8e8e","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-08T13:03:14-07:00"}
 lastModified: "2026-09-04T20:07:22.525Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

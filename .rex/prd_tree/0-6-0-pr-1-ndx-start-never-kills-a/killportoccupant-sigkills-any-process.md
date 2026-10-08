@@ -9,6 +9,11 @@ completedAt: "2026-09-11T02:24:47.096Z"
 endedAt: "2026-09-11T02:24:47.096Z"
 acceptanceCriteria: []
 description: "Found while writing tests/e2e/cli-start-two-projects.test.js. killPortOccupant (packages/core/web.js) selects its victim with `lsof -ti tcp:<port>` and takes the FIRST pid. That query lists every process holding a socket on the port — CLIENTS included, not just the LISTEN socket. Any local process with a live or CLOSE_WAIT connection to the dashboard can therefore be SIGKILLed in place of the squatter.\n\nObserved: a vitest worker polling /api/status had a CLOSE_WAIT socket to the port 50ms after its last request; lsof listed the worker ABOVE the listener, and the kill path killed the test runner instead of the server. The suite reported 'Worker exited unexpectedly' — no assertion, no attribution — and left four orphaned dashboards behind. Same shape applies outside tests: a browser tab, a curl, or another CLI connected to the dashboard is a candidate victim.\n\nFix: restrict the query to listeners — `lsof -ti tcp:<port> -sTCP:LISTEN` on POSIX. The win32 netstat branch already matches on LISTENING and is correct. Consider also failing loudly rather than killing when more than one pid comes back.\n\nThis is adjacent to, but distinct from, the peer-probe work in this epic: the probe decides WHETHER to kill, this decides WHOM to kill. The probe does not protect a client, because a client is not what /api/status describes."
+commits:
+  - {"hash":"2a3028b436d836839c148a85a71819cf00fd925d","author":"ryrykeith","authorEmail":"109387558+ryrykeith@users.noreply.github.com","timestamp":"2026-09-11T11:02:46-07:00"}
+  - {"hash":"94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9","author":"ryrykeith","authorEmail":"109387558+ryrykeith@users.noreply.github.com","timestamp":"2026-09-11T17:27:39-04:00"}
+  - {"hash":"ab8dccd9fadf527a84085f079b245dbdb2dc8ce2","author":"ryrykeith","authorEmail":"109387558+ryrykeith@users.noreply.github.com","timestamp":"2026-09-11T15:13:33-07:00"}
+  - {"hash":"25d7aa662c414e831fc41dbfc259db94782e0bda","author":"ryrykeith","authorEmail":"109387558+ryrykeith@users.noreply.github.com","timestamp":"2026-09-11T23:59:49-04:00"}
 lastModified: "2026-09-11T02:24:47.103Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

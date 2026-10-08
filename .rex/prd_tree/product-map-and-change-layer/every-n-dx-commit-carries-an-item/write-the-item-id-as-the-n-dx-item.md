@@ -19,6 +19,8 @@ acceptanceCriteria:
   - "New hench commits carry N-DX-Item: <item id>"
   - "Parsers accept both the id and the legacy URL form (tests)"
 description: "Change hench/src/agent/lifecycle/shared.ts (the trailer append near the publicUrl build) and core/commit-trailers.js so N-DX-Item carries the item id. Readers (backfill-commit-attribution and any parser) accept both the new id form and the old URL form."
+commits:
+  - {"hash":"cc050408bc1a173b5091ad9b0eecf72ffeb3c121","author":"Sterling H","authorEmail":"sterling.h@endash.us","timestamp":"2026-10-08T12:23:03-07:00"}
 lastModified: "2026-10-08T19:30:01.911Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

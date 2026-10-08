@@ -19,6 +19,9 @@ resolutionDetail: "hench's CONFIG_FIELDS is now the source list and covers every
 acceptanceCriteria:
   - "Every key ndx config accepts for hench appears on the Workflow page and in hench config (test compares the lists)."
 description: "hench config's curated key list is missing about 14 keys that ndx config accepts, promptCacheTtl among them. The Workflow page and hench config should list the same keys.\n\nImplementation notes: Compare the key list in packages/hench/src/cli/commands/config.ts with packages/core/config.js and packages/web/src/server/hench-config-fields.ts; derive them from one source if practical. Constraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR."
+commits:
+  - {"hash":"25ad2a75b26970c713d7d5d99f01210ce937eb55","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-30T15:21:26-04:00"}
+  - {"hash":"0c362d78837139f79bef62aa08de01e2ea749abd","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-30T12:56:32-07:00"}
 lastModified: "2026-09-29T17:34:41.771Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

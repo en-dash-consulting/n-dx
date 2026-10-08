@@ -26,6 +26,8 @@ acceptanceCriteria:
   - "Copy/Capture feedback clears itself and does not persist across a new question"
   - "Unit tests cover copy success, copy fallback, permission denial, and capture confirm/cancel"
 description: "Add the two response actions. Copy reuses the clipboard workflow already proven in the PR Markdown view (pr-markdown.ts:91 fallbackCopyText, :308 handleCopyRawMarkdown) -- navigator.clipboard with an execCommand fallback, permission-denied distinguished from generic failure, and transient success/error feedback -- rather than reimplementing it.\n\nCapture-to-PRD follows the confirm-guarded pattern from the Overview Next Steps panel (overview.ts:204 -> POST /api/rex/capture-next-steps): the user confirms before anything is written, and the result reports what was created and where it landed.\n\nThe shared clipboard logic should be lifted to a reusable helper if that can be done without a new single-consumer module -- see the two-consumer rule in CLAUDE.md."
+commits:
+  - {"hash":"8a117e930e44eec6ff73f7844fc32c05e999cb13","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-10T11:18:57-07:00"}
 lastModified: "2026-09-04T14:46:28.488Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

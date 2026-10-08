@@ -28,6 +28,8 @@ acceptanceCriteria:
   - "Explain works for every finding type and severity present in the fixture data, including findings with no severity set"
   - "A unit test asserts the seed context reaches the endpoint with the finding's zone and files intact"
 description: "Findings today are presented as classified rows (type, severity, zone, message) via FindingsList in the Problems and Suggestions views. A row tells the user that something is wrong but not what it means for this codebase or what fixing it involves.\n\nAdd an Explain action per finding that opens the Ask panel pre-seeded with that finding as structured seed context -- id, type, severity, zone, message, and the files involved -- and returns a plain-language explanation. The answer should cover what the finding means, why it matters in this specific repository (naming the zone and files, not generic advice), and what a fix would touch.\n\nThe explanation must be grounded in the finding and the analysis data. An explanation that could have been written without reading this repo is a failed explanation, and the acceptance criteria are written to make that testable."
+commits:
+  - {"hash":"d21d0ab9d291fe444726d038415d8cddd5fc8e8e","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-08T13:03:14-07:00"}
 lastModified: "2026-09-04T16:03:47.816Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
