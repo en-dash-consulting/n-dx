@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
-import { detectLanguage, detectLanguages, getLanguageConfig } from "../../../src/language/detect.js";
+import { detectLanguage, detectLanguages, getLanguageConfig, mergeLanguageConfigs } from "../../../src/language/detect.js";
 import { javaConfig } from "../../../src/language/java.js";
 import { goConfig } from "../../../src/language/go.js";
 import { typescriptConfig } from "../../../src/language/typescript.js";
@@ -117,6 +117,12 @@ describe("java language config", () => {
       expect(role("deploy/application.txt")).not.toBe("config");
       expect(role("other/libs.versions.toml")).not.toBe("config");
     });
+  });
+
+  it("keeps configFilePatterns through mergeLanguageConfigs", () => {
+    const merged = mergeLanguageConfigs([typescriptConfig, javaConfig]);
+    expect(classifyRole("src/main/resources/application-prod.yml", "YAML", merged)).toBe("config");
+    expect(mergeLanguageConfigs([typescriptConfig, goConfig]).configFilePatterns).toBeUndefined();
   });
 
   it("skips build output and generated directories", () => {
