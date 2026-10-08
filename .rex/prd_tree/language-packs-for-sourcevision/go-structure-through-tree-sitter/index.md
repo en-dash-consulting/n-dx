@@ -30,4 +30,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Build the Go grammar to WASM from a pinned release](./build-the-go-grammar-to-wasm-from-a.md) | completed |
 | [Detect Go generated files from the Code generated header](./detect-go-generated-files-from-the.md) | completed |
 | [Seed the Go drift corpus and measure parse rate and import parity](./seed-the-go-drift-corpus-and-measure.md) | pending |
-| [Write the Go structure queries with goldens](./write-the-go-structure-queries-with.md) | pending |
+| [Write the Go structure queries with goldens](./write-the-go-structure-queries-with.md) | completed |
