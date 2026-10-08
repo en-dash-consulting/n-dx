@@ -441,3 +441,312 @@ describe("PrepareTaskModal", () => {
     expect(document.activeElement).toBe(focusables[0]);
   });
 });
+
+/**
+ * A prep answer whose task carries saved settings: `task.run*` sources with the
+ * project default as `fallback`, which is what hench's `--resolve` reports.
+ */
+function savedPrep(over: Record<string, unknown> = {}): PrepResponse {
+  const prep = prepFixture({
+    saved: { models: { claude: "claude-opus" }, maxTurns: 7 },
+    savedVersion: "v1",
+    ...over,
+  });
+  prep.resolved.model = {
+    value: "claude-opus",
+    source: "task.run.models",
+    fallback: { value: "claude-sonnet", source: "llm.claude.model" },
+  };
+  prep.resolved.maxTurns = {
+    value: 7,
+    source: "task.run",
+    fallback: { value: 50, source: "hench.maxTurns" },
+  };
+  return prep;
+}
+
+/** The PUTs a run of the modal made, newest last. */
+function puts(): Call[] {
+  return calls.filter((c) => c.method === "PUT");
+}
+
+describe("PrepareTaskModal — settings saved on the task", () => {
+  it("labels a saved field and names the project default it displaced", async () => {
+    await open(savedPrep());
+
+    const model = fieldOf("prep-model");
+    expect(model.querySelector(".prep-source")!.textContent).toBe("saved on task");
+    expect(model.querySelector(".prep-fallback")!.textContent)
+      .toBe("project default: claude-sonnet from llm.claude.model");
+
+    // A field the project supplied still names its config key.
+    expect(fieldOf("prep-provider").querySelector(".prep-source")!.textContent).toMatch(/^from /);
+    expect(fieldOf("prep-provider").querySelector(".prep-fallback")).toBeNull();
+  });
+
+  it("counts saved settings separately from this run's changes", async () => {
+    await open(savedPrep());
+    const footer = $(".prep-change-count").textContent ?? "";
+
+    // Two different facts, both true at once.
+    expect(footer).toContain("0 changes apply to this run only");
+    expect(footer).toContain("2 saved, applies from the terminal too");
+  });
+
+  it("says nothing about saved settings for a task that carries none", async () => {
+    await open();
+    expect($(".prep-change-count").textContent).not.toContain("saved");
+  });
+
+  describe("Save", () => {
+    it("PUTs the block with the version the GET reported, then reloads", async () => {
+      let saved = false;
+      await open(savedPrep(), (call) => {
+        if (call.method !== "PUT") return undefined;
+        saved = true;
+        return { status: 200, body: { saved: call.body!.run, version: "v2", workspace: { isAnchor: true } } };
+      });
+
+      await change("prep-maxTurns", "9");
+      await click(button("Save"));
+
+      expect(saved).toBe(true);
+      const put = puts()[0]!;
+      expect(put.url).toBe("/api/hench/prep/task-1");
+      expect(put.body).toMatchObject({ version: "v1" });
+      // The saved pin travels with the edit rather than being dropped.
+      expect(put.body!.run).toMatchObject({ models: { claude: "claude-opus" }, maxTurns: 9 });
+
+      // Reloaded, so the sources and the version are the server's again.
+      expect(calls.filter((c) => c.method === "GET").length).toBeGreaterThan(1);
+      expect($(".prep-notice").textContent).toBe("Saved");
+    });
+
+    it("never writes a launch-time field", async () => {
+      await open(savedPrep(), (call) =>
+        call.method === "PUT" ? { status: 200, body: { saved: null, version: "v2", workspace: { isAnchor: true } } } : undefined);
+
+      await change("prep-fresh", true);
+      await click(button("Save"));
+
+      expect(puts()[0]!.body!.run).not.toHaveProperty("fresh");
+    });
+
+    it("is disabled when there is nothing to write", async () => {
+      await open();
+      expect(button("Save").disabled).toBe(true);
+    });
+
+    it("says where a save off the anchor lands", async () => {
+      const prep = savedPrep();
+      prep.workspace = { ...prep.workspace, isAnchor: false, branch: "feat/x" };
+      await open(prep);
+
+      expect($(".prep-off-anchor").textContent)
+        .toBe("Saved on branch feat/x; lands when the branch merges");
+    });
+
+    it("shows saved notes and keeps them through an unrelated Save", async () => {
+      // The notes field started empty and the block was rebuilt from the form,
+      // so changing only the token budget deleted the task's notes.
+      const prep = prepFixture({ saved: { contextNotes: "Do not migrate production data" }, savedVersion: "v1" });
+      await open(prep, (call) =>
+        call.method === "PUT" ? { status: 200, body: { saved: call.body!.run, version: "v2", workspace: { isAnchor: true } } } : undefined);
+
+      expect($<HTMLTextAreaElement>("#prep-contextNotes").value).toBe("Do not migrate production data");
+      expect(fieldOf("prep-contextNotes").querySelector(".prep-source")!.textContent).toBe("saved on task");
+
+      await change("prep-tokenBudget", "1000");
+      await click(button("Save"));
+
+      expect(puts()[0]!.body!.run).toEqual({ contextNotes: "Do not migrate production data", tokenBudget: 1000 });
+    });
+
+    it("keeps a portable tier through an unrelated Save", async () => {
+      // Saved as a tier, resolved to an id: the block was rebuilt from the id,
+      // so an unrelated Save turned the tier into a pin for today's vendor.
+      const prep = prepFixture({ saved: { tier: "heavy" }, savedVersion: "v1" });
+      prep.resolved.model = {
+        value: "claude-opus",
+        source: "task.run.tier",
+        fallback: { value: "claude-sonnet", source: "llm.claude.model" },
+      };
+      await open(prep, (call) =>
+        call.method === "PUT" ? { status: 200, body: { saved: call.body!.run, version: "v2", workspace: { isAnchor: true } } } : undefined);
+
+      await change("prep-tokenBudget", "1000");
+      await click(button("Save"));
+
+      expect(puts()[0]!.body!.run).toEqual({ tier: "heavy", tokenBudget: 1000 });
+    });
+
+    it("saves a chosen reviewer when the config turns review on", async () => {
+      // `review: true` from the config is the project default and so omitted
+      // from the block, which the leftover check read as "no review runs":
+      // choosing a reviewer and saving sent `run: null` and reported Saved.
+      const prep = prepFixture({ savedVersion: "none" });
+      prep.resolved.review = { value: true, source: "hench.review" };
+      await open(prep, (call) =>
+        call.method === "PUT" ? { status: 200, body: { saved: call.body!.run, version: "v2", workspace: { isAnchor: true } } } : undefined);
+
+      await change("prep-reviewModel", "claude-opus");
+      await click(button("Save"));
+
+      expect(puts()[0]!.body!.run).toEqual({ reviewModels: { claude: "claude-opus" } });
+    });
+  });
+
+  describe("Reset to defaults", () => {
+    it("clears edits first, without touching what is saved", async () => {
+      await open(savedPrep());
+      await change("prep-maxTurns", "9");
+
+      await click(button("Reset to defaults"));
+
+      expect(puts()).toHaveLength(0);
+      expect($(".prep-change-count").textContent).toContain("0 changes");
+    });
+
+    it("asks before clearing the saved block, then PUTs null", async () => {
+      await open(savedPrep(), (call) =>
+        call.method === "PUT" ? { status: 200, body: { saved: null, version: "none", workspace: { isAnchor: true } } } : undefined);
+
+      // With no edits left, Reset offers to clear what the task carries.
+      await click(button("Reset to defaults"));
+      expect($(".prep-confirm-text").textContent).toBe("Clear 2 saved settings for this task?");
+      expect(puts()).toHaveLength(0);
+
+      await click(button("Clear"));
+      expect(puts()[0]!.body).toEqual({ run: null, version: "v1" });
+    });
+
+    it("keeps the saved block when the confirm is declined", async () => {
+      await open(savedPrep());
+      await click(button("Reset to defaults"));
+      await click(button("Keep"));
+
+      expect(puts()).toHaveLength(0);
+      expect(document.querySelector(".prep-confirm-text")).toBeNull();
+    });
+  });
+
+  describe("a save that lost a race", () => {
+    const conflictAnswer = {
+      status: 409,
+      body: { error: "changed", conflict: true, saved: { maxTurns: 99 }, version: "v9" },
+    };
+
+    it("offers Reload and Overwrite", async () => {
+      await open(savedPrep(), (call) => (call.method === "PUT" ? conflictAnswer : undefined));
+      await change("prep-maxTurns", "9");
+      await click(button("Save"));
+
+      expect($(".prep-conflict-text").textContent)
+        .toBe("These settings were saved elsewhere since you opened this.");
+      expect(button("Reload")).toBeTruthy();
+      expect(button("Overwrite")).toBeTruthy();
+    });
+
+    it("Reload drops the edits and re-reads", async () => {
+      await open(savedPrep(), (call) => (call.method === "PUT" ? conflictAnswer : undefined));
+      await change("prep-maxTurns", "9");
+      await click(button("Save"));
+      const before = calls.filter((c) => c.method === "GET").length;
+
+      await click(button("Reload"));
+
+      expect(calls.filter((c) => c.method === "GET").length).toBeGreaterThan(before);
+      expect($(".prep-change-count").textContent).toContain("0 changes");
+      expect(document.querySelector(".prep-conflict")).toBeNull();
+    });
+
+    it("Overwrite resends against the version the refusal named", async () => {
+      let answers = 0;
+      await open(savedPrep(), (call) => {
+        if (call.method !== "PUT") return undefined;
+        answers++;
+        return answers === 1
+          ? conflictAnswer
+          : { status: 200, body: { saved: call.body!.run, version: "v10", workspace: { isAnchor: true } } };
+      });
+      await change("prep-maxTurns", "9");
+      await click(button("Save"));
+      await click(button("Overwrite"));
+
+      expect(puts()).toHaveLength(2);
+      expect(puts()[0]!.body).toMatchObject({ version: "v1" });
+      // The second carries the server's version, which is what makes it an
+      // overwrite rather than another refusal.
+      expect(puts()[1]!.body).toMatchObject({ version: "v9" });
+      // And it is the same write, not one rebuilt from the form.
+      expect(puts()[1]!.body!.run).toEqual(puts()[0]!.body!.run);
+    });
+
+    it("Overwrite after a refused clear clears, rather than putting the old settings back", async () => {
+      // Overwrite used to rebuild a block from the form, so a clear that lost
+      // a race was overwritten with the settings the reader had just asked to
+      // remove — on top of the other session's work.
+      let answers = 0;
+      await open(savedPrep(), (call) => {
+        if (call.method !== "PUT") return undefined;
+        answers++;
+        return answers === 1
+          ? conflictAnswer
+          : { status: 200, body: { saved: null, version: "none", workspace: { isAnchor: true } } };
+      });
+      await click(button("Reset to defaults"));
+      await click(button("Clear"));
+      expect(puts()[0]!.body).toEqual({ run: null, version: "v1" });
+      expect(button("Overwrite")).toBeTruthy();
+
+      await click(button("Overwrite"));
+
+      expect(puts()).toHaveLength(2);
+      expect(puts()[1]!.body).toEqual({ run: null, version: "v9" });
+      expect($(".prep-notice").textContent).toBe("Cleared the settings saved on this task");
+    });
+
+    it("withdraws Overwrite when the reader edits after the refusal", async () => {
+      // Overwrite resends the refused write as it was; an edit typed after it
+      // would be dropped on the floor. The panel goes, and Save puts the new
+      // write up for the same check.
+      await open(savedPrep(), (call) => (call.method === "PUT" ? conflictAnswer : undefined));
+      await change("prep-maxTurns", "9");
+      await click(button("Save"));
+      expect(button("Overwrite")).toBeTruthy();
+
+      await change("prep-tokenBudget", "1000");
+
+      expect(document.querySelector(".prep-conflict")).toBeNull();
+      await click(button("Save"));
+      expect(puts()).toHaveLength(2);
+      expect(puts()[1]!.body!.run).toMatchObject({ maxTurns: 9, tokenBudget: 1000 });
+    });
+  });
+
+  describe("Execute alongside saved settings", () => {
+    it("sends only the edits, never the saved values", async () => {
+      await open(savedPrep(), (call) =>
+        call.url === "/api/hench/execute" ? { status: 200, body: { ok: true } } : undefined);
+
+      await change("prep-maxTurns", "9");
+      await click(button("Execute"));
+
+      const exec = calls.find((c) => c.url === "/api/hench/execute")!;
+      expect(exec.body!.options).toEqual({ maxTurns: 9 });
+    });
+
+    it("sends false for a saved boolean switched off, so the run gets the negation", async () => {
+      const prep = savedPrep({ saved: { review: true } });
+      prep.resolved.review = { value: true, source: "task.run", fallback: { value: false, source: "built-in" } };
+      await open(prep, (call) =>
+        call.url === "/api/hench/execute" ? { status: 200, body: { ok: true } } : undefined);
+
+      await change("prep-review", "off");
+      await click(button("Execute"));
+
+      const exec = calls.find((c) => c.url === "/api/hench/execute")!;
+      expect(exec.body!.options).toMatchObject({ review: false });
+    });
+  });
+});
