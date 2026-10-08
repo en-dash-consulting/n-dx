@@ -167,7 +167,19 @@ describe("handleProductEdit: substantive", () => {
     con.statement = "No card data stored.";
     const { outcome, change } = handleProductEdit(t, CON, before, OPTS);
     expect(outcome).toBe("revised");
-    expect(change?.amends).toEqual([{ target: CON, delta: "modified", summary: "statement edited", proposed: "No card data stored." }]);
+    expect(change?.amends).toEqual([
+      { target: CON, delta: "modified", summary: "statement edited", proposed: "No card data stored.", base: specHash({ statement: "No card data stored." }) },
+    ]);
+  });
+
+  it("records the edited spec as base, so apply refuses the draft after another change edits the node", () => {
+    const { tree: drafted, change } = handleProductEdit(tree(edited), CAP, BEFORE, OPTS);
+    expect(change?.amends?.[0].base).toBe(specHash(edited));
+    const other = { id: "other", type: "change", title: "Other", slug: "other", status: "pending" } as RuleNode;
+    drafted.changes.push({ ...other, amends: [{ target: CAP, delta: "modified", summary: "s", proposed: "Something else." }] } as RuleNode);
+    const applyOpts = { appliedAt: NOW.toISOString(), now: NOW };
+    const { tree: afterOther } = applyAmendments(drafted, "other", applyOpts);
+    expect(() => applyAmendments(afterOther, change!.id, applyOpts)).toThrow(/no longer matches the target's spec/);
   });
 
   it("suffixes the draft's slug when another change holds it", () => {
@@ -200,7 +212,7 @@ describe("handleProductEdit: a second edit refreshes the open draft", () => {
   it("proposes the latest statement and lists both diffs in its intent", () => {
     const { change } = twoEdits();
     expect(change?.amends).toEqual([
-      { target: "A1.1", delta: "modified", summary: "statement edited; criteria c3 added", proposed: C.statement },
+      { target: "A1.1", delta: "modified", summary: "statement edited; criteria c3 added", proposed: C.statement, base: specHash(C) },
     ]);
     expect(change?.intent).toBe(
       [

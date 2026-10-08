@@ -12,7 +12,8 @@
  *   (`revisedAt` is stamped unless already set), and the node gets one drafted
  *   change in the Inbox (`source: "product-edit"`, `needsPlacement: true`).
  *   Its amendment carries the edited statement as `proposed`, so applying the
- *   change stamps `metAt` at the edited spec. The criteria diff, which the
+ *   change stamps `metAt` at the edited spec, and the edited spec's hash as
+ *   `base`, so apply refuses the draft once another change has edited the node. The criteria diff, which the
  *   product layer already holds, is described in the change's `intent`.
  *   When an open, unapplied product-edit change already amends the node, that
  *   draft is refreshed instead: its `proposed` becomes the latest statement and
@@ -37,7 +38,7 @@
 import { randomUUID } from "node:crypto";
 import type { Amendment, ChangeNode, Criterion } from "../schema/v2.js";
 import { isOpenChange, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { appendHistory, freeSlug, resolve, stampMet } from "./apply-amendments.js";
+import { appendHistory, freeSlug, nodeSpecHash, resolve, stampMet } from "./apply-amendments.js";
 
 /** The spec `metAt` hashes: statement and criteria (a constraint has a statement only). */
 export interface Spec {
@@ -112,6 +113,7 @@ export function handleProductEdit(tree: V2Tree, nodeRef: string, before: Spec, o
   if (open) {
     const { change, amendment } = open;
     amendment.proposed = after.statement ?? "";
+    amendment.base = nodeSpecHash(node);
     amendment.summary = options.summary?.trim() || mergeSummaries(amendment.summary, diff.summary);
     change.intent = [change.intent ?? "", "", `Edited again on ${options.now.toISOString().slice(0, 10)}:`, "", ...diff.lines].join("\n");
     return { tree: next, outcome: "revised", change };
@@ -122,7 +124,7 @@ export function handleProductEdit(tree: V2Tree, nodeRef: string, before: Spec, o
     throw new ProductEditError(label, `the new id ${id} is already taken`);
   }
   const title = `Build the revised ${node.title}`;
-  const amendment: Amendment = { target: label, delta: "modified", summary, proposed: after.statement ?? "" };
+  const amendment: Amendment = { target: label, delta: "modified", summary, proposed: after.statement ?? "", base: nodeSpecHash(node) };
   const change = {
     id,
     type: "change",

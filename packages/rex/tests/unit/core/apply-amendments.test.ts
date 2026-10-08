@@ -1,13 +1,15 @@
 /**
- * The apply engine: added, modified and removed amendments, History lines,
- * metAt / appliedAt stamps, and refusals that leave the tree untouched.
+ * The apply engine: added (capability or constraint), modified and removed
+ * amendments, History lines, metAt / appliedAt / appliedAmendsHash stamps,
+ * stale-base refusals, the rules run on the result, and refusals that leave
+ * the tree untouched.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { ApplyAmendmentsError, appendHistory, applyAmendments } from "../../../src/core/apply-amendments.js";
+import { ApplyAmendmentsError, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments } from "../../../src/core/apply-amendments.js";
 import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
@@ -275,6 +277,160 @@ describe("applyAmendments: the change", () => {
     expect(applied).toEqual([]);
     expect(out.product).toEqual(input.product);
     expect(get(out, CHANGE).appliedAt).toBe(APPLIED_AT);
+  });
+});
+
+describe("applyAmendments: added constraints", () => {
+  const requirement = { id: "r1", title: "No PAN in logs", category: "security", validationType: "automated", acceptanceCriteria: ["log scan is clean"] };
+  const constraint: Amendment = {
+    target: "con-2",
+    delta: "added",
+    type: "constraint",
+    summary: "Keep PAN out of logs",
+    under: CAP,
+    title: "No card numbers in logs",
+    proposed: "Card numbers never appear in logs.",
+    requirements: [requirement],
+    appliesTo: [CAP],
+  };
+
+  it("creates a constraint with statement, requirements, appliesTo and metAt", () => {
+    const { tree: out } = applyAmendments(tree([constraint]), CHANGE, OPTS);
+    expect(get(out, "con-2")).toMatchObject({
+      type: "constraint",
+      title: "No card numbers in logs",
+      statement: "Card numbers never appear in logs.",
+      requirements: [requirement],
+      appliesTo: [CAP],
+      metAt: specHash({ statement: "Card numbers never appear in logs." }),
+      body: "## History\n\n- 2026-10-07 CH-1 added: Keep PAN out of logs",
+    });
+    expect(get(out, "con-2").criteria).toBeUndefined();
+  });
+
+  it("places a constraint under any live product node and accepts appliesTo all", () => {
+    const { tree: out } = applyAmendments(tree([{ ...constraint, under: CON, appliesTo: "all", requirements: undefined }]), CHANGE, OPTS);
+    expect(get(out, CON).children?.map((c) => c.id)).toEqual(["con-2"]);
+    expect(get(out, "con-2")).toMatchObject({ type: "constraint", appliesTo: "all" });
+  });
+
+  it("refuses criteria, malformed requirements or appliesTo, and a missing parent", () => {
+    const problems = refusal(() =>
+      applyAmendments(tree([{ ...constraint, criteria: { add: [{ id: "c1", text: "x" }] }, requirements: [{ id: "r1" }], appliesTo: "some" }]), CHANGE, OPTS),
+    ).problems;
+    expect(problems).toEqual([
+      "amendment 1 (added con-2): a constraint has no criteria; state it in proposed and list its requirements",
+      "amendment 1 (added con-2): requirements must be a list of requirements",
+      'amendment 1 (added con-2): appliesTo must be "all" or a list of product node references',
+    ]);
+    expect(refusal(() => applyAmendments(tree([{ ...constraint, under: "nope" }]), CHANGE, OPTS)).problems[0]).toMatch(/not a live product node/);
+  });
+
+  it("still creates a capability when type is absent", () => {
+    const { type: _type, requirements: _r, appliesTo: _a, ...capability } = constraint;
+    expect(get(applyAmendments(tree([capability]), CHANGE, OPTS).tree, "con-2").type).toBe("capability");
+  });
+});
+
+describe("applyAmendments: stamps on the change", () => {
+  const modify: Amendment = { target: CAP, delta: "modified", summary: "s", proposed: "New" };
+
+  it("stamps appliedAmendsHash, independent of key order", () => {
+    const { tree: out } = applyAmendments(tree([modify]), CHANGE, OPTS);
+    const reordered: Amendment = { proposed: "New", summary: "s", delta: "modified", target: CAP };
+    expect(get(out, CHANGE).appliedAmendsHash).toBe(amendsHash([reordered]));
+    expect(amendsHash([{ ...modify, proposed: "Other" }])).not.toBe(amendsHash([modify]));
+  });
+
+  it("clears needsPlacement, since applying confirms the targets", () => {
+    const { tree: out } = applyAmendments(tree([modify], { needsPlacement: true }), CHANGE, OPTS);
+    expect(get(out, CHANGE).needsPlacement).toBeUndefined();
+  });
+
+  it("reports an applied change whose amends were edited after apply", () => {
+    const { tree: out } = applyAmendments(tree([modify]), CHANGE, OPTS);
+    expect(amendsEditedAfterApply(out)).toEqual([]);
+    get(out, CHANGE).amends!.push({ target: CON, delta: "modified", summary: "late", proposed: "Later" });
+    expect(amendsEditedAfterApply(out)).toEqual([
+      { changeId: CHANGE, message: expect.stringMatching(/^Change "Wallets" had its amends edited after it was applied .*never applied/) },
+    ]);
+    expect(refusal(() => applyAmendments(out, CHANGE, OPTS)).problems).toEqual([
+      `already applied at ${APPLIED_AT}`,
+      expect.stringMatching(/amends edited after it was applied/),
+    ]);
+  });
+
+  it("does not report an applied change without the stamp", () => {
+    expect(amendsEditedAfterApply(tree([modify], { appliedAt: APPLIED_AT }))).toEqual([]);
+  });
+});
+
+describe("applyAmendments: base", () => {
+  const met = specHash({ statement: "A shopper can pay by card.", criteria: [{ id: "c1", text: "Charged once" }, { id: "c2", text: "Declines show why" }] });
+  const modify = (patch: Partial<Amendment> = {}): Amendment => ({ target: "A1.1", delta: "modified", summary: "s", proposed: "New", base: met, ...patch });
+
+  it("applies when base matches the target's spec", () => {
+    expect(get(applyAmendments(tree([modify()]), CHANGE, OPTS).tree, CAP).statement).toBe("New");
+  });
+
+  it("refuses a stale base, naming the change, the target and both hashes, and applies it with force", () => {
+    const stale = "0".repeat(64);
+    const err = refusal(() => applyAmendments(tree([modify({ base: stale })]), CHANGE, OPTS));
+    expect(err.message).toMatch(/^Cannot apply change CH-1: amendment 1 \(modified A1\.1\)/);
+    expect(err.message).toContain(`base ${stale} no longer matches the target's spec ${met}`);
+    expect(get(applyAmendments(tree([modify({ base: stale })]), CHANGE, { ...OPTS, force: true }).tree, CAP).statement).toBe("New");
+  });
+
+  it("refuses the second of two changes drafted against the same spec", () => {
+    const input = tree([modify({ proposed: "First" })]);
+    input.changes.push({ id: "change-2", type: "change", title: "Other", slug: "other", status: "pending", amends: [modify({ proposed: "Second" })] } as RuleNode);
+    const { tree: first } = applyAmendments(input, CHANGE, OPTS);
+    expect(refusal(() => applyAmendments(first, "change-2", OPTS)).problems[0]).toMatch(/no longer matches/);
+  });
+
+  it("compares against the spec before this change, so two amendments of one node share a base", () => {
+    const { tree: out } = applyAmendments(tree([modify({ proposed: "One" }), modify({ proposed: undefined, criteria: { remove: ["c2"] } })]), CHANGE, OPTS);
+    expect(get(out, CAP)).toMatchObject({ statement: "One", criteria: [{ id: "c1", text: "Charged once" }] });
+  });
+
+  it("checks a removed amendment's base, and refuses a base on an added one", () => {
+    expect(refusal(() => applyAmendments(tree([{ target: CON, delta: "removed", summary: "go", base: met }]), CHANGE, OPTS)).problems[0]).toMatch(/no longer matches/);
+    const added: Amendment = { target: "cap-2", delta: "added", summary: "a", under: AREA, title: "Refunds", proposed: "Refunds work.", base: met };
+    expect(refusal(() => applyAmendments(tree([added]), CHANGE, OPTS)).problems[0]).toMatch(/added amendment has no base/);
+  });
+});
+
+describe("applyAmendments: rules on the result", () => {
+  const add = (patch: Partial<Amendment>): Amendment => ({ target: "cap-2", delta: "added", summary: "a", under: CAP, title: "Nested", proposed: "Nested works.", ...patch });
+
+  it("refuses a capability nested past the depth limit, returning the findings and leaving the input untouched", () => {
+    const input = tree([add({}), add({ target: "cap-3", under: "cap-2", title: "Too deep" })]);
+    const before = structuredClone(input);
+    const err = refusal(() => applyAmendments(input, CHANGE, OPTS));
+    expect(err.findings.map((f) => [f.rule, f.nodeId])).toEqual([["capability-depth", "cap-3"]]);
+    expect(err.problems[0]).toMatch(/^the result breaks capability-depth: /);
+    expect(input).toEqual(before);
+  });
+
+  it("refuses an added capability with no statement", () => {
+    expect(refusal(() => applyAmendments(tree([add({ proposed: undefined })]), CHANGE, OPTS)).findings.map((f) => f.rule)).toEqual(["capability-statement"]);
+  });
+
+  it("refuses retiring a node another open change still amends", () => {
+    const input = tree([{ target: CON, delta: "removed", summary: "go" }]);
+    input.changes.push({ id: "change-2", type: "change", title: "Other", slug: "other", status: "pending", amends: [{ target: CON, delta: "modified", summary: "s", proposed: "x" }] } as RuleNode);
+    expect(refusal(() => applyAmendments(input, CHANGE, OPTS)).findings.map((f) => [f.rule, f.nodeId])).toEqual([["open-change-refs-live", "change-2"]]);
+  });
+
+  it("refuses a constraint whose appliesTo names no node", () => {
+    const constraint = add({ target: "con-2", type: "constraint", title: "C", appliesTo: ["missing"] });
+    expect(refusal(() => applyAmendments(tree([constraint]), CHANGE, OPTS)).findings.map((f) => f.rule)).toEqual(["ref-resolves"]);
+  });
+
+  it("tolerates an error the input already had", () => {
+    const input = tree([{ target: CON, delta: "modified", summary: "s", proposed: "x" }]);
+    delete get(input, CAP).statement;
+    expect(get(applyAmendments(input, CHANGE, OPTS).tree, CON).statement).toBe("x");
   });
 });
 

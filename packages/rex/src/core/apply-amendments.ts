@@ -11,7 +11,10 @@
  *
  * - **added** creates a capability `under` an area or capability, titled
  *   `title`, with `proposed` as its statement and `criteria.add` as its
- *   criteria. `target` names the new node: a display id (`A4.9`) becomes its
+ *   criteria. With `type: "constraint"` it creates a constraint `under` any
+ *   live product node instead, with `proposed` as its statement and the
+ *   amendment's `requirements` and `appliesTo`; a constraint has no criteria.
+ *   `target` names the new node: a display id (`A4.9`) becomes its
  *   `displayId` and the id comes from `newId`; anything else is the id.
  * - **modified** edits a live capability or constraint: `proposed`, when
  *   present, replaces the statement (it is the reviewed text by the time a
@@ -25,27 +28,41 @@
  * Every amended node gets a History line in its body. Added and modified nodes
  * get `metAt` = {@link specHash} of the new spec (statement and criteria, never
  * the body) and lose `revisedAt`. The change gets `appliedAt`, the timestamp the
- * caller passes. A change that only touches nodes gets `appliedAt` and leaves the product layer untouched.
+ * caller passes, and `appliedAmendsHash` ({@link amendsHash} of its amends), so
+ * an amendment edited after apply is reported ({@link amendsEditedAfterApply}),
+ * not silently ignored. Applying confirms the change's targets, so its
+ * `needsPlacement` is cleared. A change that only touches nodes gets these
+ * stamps and leaves the product layer untouched.
+ *
+ * A modified or removed amendment with `base` (the target's spec hash when it
+ * was drafted) is refused when the target's spec before this change no longer
+ * hashes to it, unless the caller passes `force`: another edit changed the
+ * node since, and applying would silently revert it.
  *
  * Any problem refuses the whole apply with {@link ApplyAmendmentsError},
- * listing every problem found.
+ * listing every problem found. Last, the v2 rules run on the result: an error
+ * finding the input tree did not have refuses the apply too, with the findings.
  *
  * @module rex/core/apply-amendments
  */
 
-import { randomUUID } from "node:crypto";
-import type { ItemStatus } from "../schema/v1.js";
+import { createHash, randomUUID } from "node:crypto";
+import { z } from "zod";
+import type { Requirement } from "../schema/v1.js";
+import { RequirementSchema } from "../schema/validate.js";
 import { isDisplayId, type Amendment, type Criterion } from "../schema/v2.js";
-import { isAppliedChange, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { checkV2Rules, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { slugifyTitle } from "../store/folder-tree-serializer.js";
 
 export interface ApplyAmendmentsOptions {
   /** ISO timestamp stamped as the change's `appliedAt`. */
   appliedAt: string;
-  /** Date written on History lines. */
+  /** Date written on History lines, and the reference time for the rules run on the result. */
   now: Date;
   /** Id for a node added under a display id. Default `randomUUID`. */
   newId?: () => string;
+  /** Apply amendments whose `base` no longer matches their target's spec. */
+  force?: boolean;
 }
 
 export interface AppliedAmendment {
@@ -63,16 +80,16 @@ export interface ApplyAmendmentsResult {
 
 export class ApplyAmendmentsError extends Error {
   readonly problems: readonly string[];
+  /** The rule findings the result introduced, when that is why apply refused. */
+  readonly findings: readonly RuleFinding[];
 
-  constructor(change: string, problems: readonly string[]) {
+  constructor(change: string, problems: readonly string[], findings: readonly RuleFinding[] = []) {
     super(`Cannot apply change ${change}: ${problems.join("; ")}`);
     this.name = "ApplyAmendmentsError";
     this.problems = problems;
+    this.findings = findings;
   }
 }
-
-/** A change in one of these statuses no longer acts on the product layer. */
-const UNAPPLIABLE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["cancelled", "deleted"]);
 
 const HISTORY_HEADING = "## History";
 
@@ -84,19 +101,22 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
     throw new ApplyAmendmentsError(changeRef, [`no live change "${changeRef}"`]);
   }
   const label = change.displayId ?? change.id;
-  const problems: string[] = [];
-  if (isAppliedChange(change)) problems.push(`already applied at ${change.appliedAt}`);
-  if (UNAPPLIABLE_STATUSES.has(change.status ?? "pending")) problems.push(`it is ${change.status}`);
-  if (problems.length > 0) throw new ApplyAmendmentsError(label, problems);
+  if (!isOpenChange(change)) {
+    const edited = editedAfterApply(change);
+    const problems = isAppliedChange(change) ? [`already applied at ${change.appliedAt}`, ...(edited ? [edited] : [])] : [`it is ${change.status}`];
+    throw new ApplyAmendmentsError(label, problems);
+  }
 
   const amends = change.amends ?? [];
   const context: ApplyContext = { options, removing: removedIds(next.product, amends) };
   const date = options.now.toISOString().slice(0, 10);
+  const problems: string[] = [];
   const applied: AppliedAmendment[] = [];
   for (const [i, amendment] of amends.entries()) {
     const fail = (message: string): void => {
       problems.push(`amendment ${i + 1} (${amendment.delta} ${amendment.target}): ${message}`);
     };
+    if (amendment.base !== undefined && !checkBase(tree, next, amendment, options, fail)) continue;
     const node = APPLY[amendment.delta](next, amendment, context, fail);
     if (!node) continue;
     node.body = appendHistory(node.body, `- ${date} ${label} ${amendment.delta}: ${amendment.summary}`);
@@ -105,7 +125,92 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   if (problems.length > 0) throw new ApplyAmendmentsError(label, problems);
 
   change.appliedAt = options.appliedAt;
+  change.appliedAmendsHash = amendsHash(amends);
+  delete change.needsPlacement;
+
+  const introduced = newErrors(tree, next, options.now);
+  if (introduced.length > 0) {
+    throw new ApplyAmendmentsError(label, introduced.map((f) => `the result breaks ${f.rule}: ${f.message}`), introduced);
+  }
   return { tree: next, applied };
+}
+
+// ── Applied amends ───────────────────────────────────────────────
+
+/**
+ * The hash `appliedAmendsHash` records: SHA-256 hex of the amends as JSON with
+ * object keys sorted, so key order never reads as an edit.
+ */
+export function amendsHash(amends: readonly Amendment[]): string {
+  return createHash("sha256").update(canonicalJson(amends)).digest("hex");
+}
+
+export interface AmendsEditedAfterApply {
+  /** Id of the applied change. */
+  changeId: string;
+  message: string;
+}
+
+/**
+ * Applied changes whose amends no longer hash to their `appliedAmendsHash`:
+ * an amendment edited or added after apply was never applied. A change applied
+ * without the stamp cannot be checked and is not reported.
+ */
+export function amendsEditedAfterApply(tree: V2Tree): AmendsEditedAfterApply[] {
+  const found: AmendsEditedAfterApply[] = [];
+  const visit = (node: RuleNode): void => {
+    const message = editedAfterApply(node);
+    if (message) found.push({ changeId: node.id, message: `Change "${node.title}" ${message}` });
+    for (const child of node.children ?? []) visit(child);
+  };
+  for (const node of tree.changes) visit(node);
+  return found;
+}
+
+function editedAfterApply(change: RuleNode): string | undefined {
+  if (change.type !== "change" || !isAppliedChange(change) || !change.appliedAmendsHash) return undefined;
+  if (amendsHash(change.amends ?? []) === change.appliedAmendsHash) return undefined;
+  return `had its amends edited after it was applied (appliedAmendsHash ${change.appliedAmendsHash}); the edits were never applied, so draft a new change for them`;
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+// ── Stale amendments and the result's rules ──────────────────────
+
+/**
+ * Whether `amendment`'s `base` still matches its target's spec before this
+ * change (in `before`), or `force` is set; reports through `fail` when not.
+ */
+function checkBase(before: V2Tree, after: V2Tree, amendment: Amendment, { force }: ApplyAmendmentsOptions, fail: (message: string) => void): boolean {
+  if (amendment.delta === "added") {
+    fail("an added amendment has no base; its target does not exist until apply");
+    return false;
+  }
+  const target = resolve(before.product, amendment.target, { throughDeleted: true });
+  if (!target) {
+    // Missing from the layer altogether: the delta reports it. Present only in `after`: an earlier amendment added it.
+    if (resolve(after.product, amendment.target, { throughDeleted: true })) fail(`base is set, but ${amendment.target} did not exist before this change`);
+    return true;
+  }
+  const current = nodeSpecHash(target);
+  if (current === amendment.base || force) return true;
+  fail(`base ${amendment.base} no longer matches the target's spec ${current}; another edit changed it since this amendment was drafted (pass force to apply anyway)`);
+  return false;
+}
+
+/** Error findings in `after` that `before` did not have, compared by rule, node and message. */
+function newErrors(before: V2Tree, after: V2Tree, now: Date): RuleFinding[] {
+  const key = (f: RuleFinding): string => `${f.rule}\0${f.nodeId}\0${f.message}`;
+  const errors = (t: V2Tree): RuleFinding[] => checkV2Rules(t, { now }).filter((f) => f.severity === "error");
+  const had = new Set(errors(before).map(key));
+  return errors(after).filter((f) => !had.has(key(f)));
 }
 
 // ── Deltas ───────────────────────────────────────────────────────
@@ -129,19 +234,19 @@ const applyAdded: DeltaApply = ({ product, changes }, amendment, { options }, fa
   if (resolve([...product, ...changes], amendment.target, { includeDeleted: true })) {
     return void fail("a node in either layer, retired ones included, already has this id");
   }
-  if (!amendment.under) return void fail("an added capability needs under (its parent area or capability)");
+  const type = amendment.type ?? "capability";
+  const constraint = type === "constraint";
+  if (!amendment.under) {
+    return void fail(`an added ${type} needs under (its parent ${constraint ? "product node" : "area or capability"})`);
+  }
   const parent = resolve(product, amendment.under);
-  if (!parent || (parent.type !== "area" && parent.type !== "capability")) {
-    return void fail(`under "${amendment.under}" is not a live area or capability`);
+  if (!parent || (!constraint && parent.type !== "area" && parent.type !== "capability")) {
+    return void fail(`under "${amendment.under}" is not a live ${constraint ? "product node" : "area or capability"}`);
   }
   const title = amendment.title?.trim();
-  if (!title) return void fail("an added capability needs a title");
-  if (amendment.criteria?.replace?.length || amendment.criteria?.remove?.length) {
-    return void fail("a new capability has no criteria to replace or remove; use criteria.add");
-  }
-  const criteria = amendment.criteria?.add ?? [];
-  const duplicate = firstDuplicate(criteria.map((c) => c.id));
-  if (duplicate) return void fail(`criterion ${duplicate} is added twice`);
+  if (!title) return void fail(`an added ${type} needs a title`);
+  const fields = constraint ? constraintFields(amendment, fail) : capabilityFields(amendment, fail);
+  if (!fields) return undefined;
 
   const display = isDisplayId(amendment.target);
   const id = display ? (options.newId ?? randomUUID)() : amendment.target;
@@ -150,18 +255,56 @@ const applyAdded: DeltaApply = ({ product, changes }, amendment, { options }, fa
   }
   const node = {
     id,
-    type: "capability",
+    type,
     title,
     slug: freeSlug(title, id, parent.children ?? []),
     ...(display ? { displayId: amendment.target } : {}),
     ...(amendment.proposed !== undefined ? { statement: amendment.proposed } : {}),
-    ...(criteria.length ? { criteria: criteria.map((c) => ({ ...c })) } : {}),
+    ...fields,
     status: "pending",
   } as RuleNode;
   stampMet(node);
   parent.children = [...(parent.children ?? []), node];
   return node;
 };
+
+/** A new capability's criteria, from `criteria.add`; undefined after reporting a problem. */
+function capabilityFields(amendment: Amendment, fail: (message: string) => void): { criteria?: Criterion[] } | undefined {
+  if (amendment.criteria?.replace?.length || amendment.criteria?.remove?.length) {
+    return void fail("a new capability has no criteria to replace or remove; use criteria.add");
+  }
+  const criteria = amendment.criteria?.add ?? [];
+  const duplicate = firstDuplicate(criteria.map((c) => c.id));
+  if (duplicate) return void fail(`criterion ${duplicate} is added twice`);
+  return criteria.length ? { criteria: criteria.map((c) => ({ ...c })) } : {};
+}
+
+const AppliesToSchema = z.union([z.literal("all"), z.array(z.string())]);
+
+/** A new constraint's `requirements` and `appliesTo`, from the amendment; undefined after reporting a problem. */
+function constraintFields(amendment: Amendment, fail: (message: string) => void): { requirements?: Requirement[]; appliesTo?: "all" | string[] } | undefined {
+  const { criteria, requirements, appliesTo } = amendment;
+  let ok = true;
+  if (criteria?.add?.length || criteria?.replace?.length || criteria?.remove?.length) {
+    ok = false;
+    fail("a constraint has no criteria; state it in proposed and list its requirements");
+  }
+  const parsedRequirements = z.array(RequirementSchema).optional().safeParse(requirements);
+  if (!parsedRequirements.success) {
+    ok = false;
+    fail("requirements must be a list of requirements");
+  }
+  const parsedAppliesTo = AppliesToSchema.optional().safeParse(appliesTo);
+  if (!parsedAppliesTo.success) {
+    ok = false;
+    fail('appliesTo must be "all" or a list of product node references');
+  }
+  if (!ok) return undefined;
+  return {
+    ...(parsedRequirements.data?.length ? { requirements: parsedRequirements.data as Requirement[] } : {}),
+    ...(parsedAppliesTo.data !== undefined ? { appliesTo: parsedAppliesTo.data } : {}),
+  };
+}
 
 const applyModified: DeltaApply = ({ product }, amendment, _options, fail) => {
   const node = resolve(product, amendment.target);
@@ -226,9 +369,14 @@ const APPLY: Readonly<Record<Amendment["delta"], DeltaApply>> = {
 
 /** Record that the node's current spec is met: `metAt` is its hash, and it is no longer revised. */
 export function stampMet(node: RuleNode): void {
-  if (node.type === "capability") node.metAt = specHash({ statement: node.statement, criteria: node.criteria });
-  else if (node.type === "constraint") node.metAt = specHash({ statement: node.statement });
+  if (node.type === "capability" || node.type === "constraint") node.metAt = nodeSpecHash(node);
   delete node.revisedAt;
+}
+
+/** {@link specHash} of the node's spec: a capability's statement and criteria, a constraint's statement, nothing for an area. */
+export function nodeSpecHash(node: RuleNode): string {
+  if (node.type === "capability") return specHash({ statement: node.statement, criteria: node.criteria });
+  return specHash({ statement: node.type === "constraint" ? node.statement : undefined });
 }
 
 /**
