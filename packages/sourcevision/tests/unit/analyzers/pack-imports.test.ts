@@ -4,7 +4,7 @@
  * tests/integration/java-zones.test.ts.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -59,5 +59,24 @@ describe("buildPackImportGraph", () => {
     expect(graph).toEqual({ edges: [], external: [] });
     expect(messages).toHaveLength(1);
     expect(messages[0]).toContain("Java files get inventory only");
+  });
+
+  it("reports an unloadable grammar once, names its path, and produces no edges", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sv-pack-imports-bad-"));
+    try {
+      const grammarPath = join(dir, `${javaPack.grammar.name}.wasm`);
+      writeFileSync(grammarPath, "not a wasm module");
+      const messages: string[] = [];
+      const graph = await buildPackImportGraph([file("src/A.java"), file("src/B.java")], dir, {
+        grammarDir: dir,
+        warn: (m) => messages.push(m),
+      });
+      expect(graph).toEqual({ edges: [], external: [] });
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toContain(grammarPath);
+      expect(messages[0]).toContain("could not be loaded");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
