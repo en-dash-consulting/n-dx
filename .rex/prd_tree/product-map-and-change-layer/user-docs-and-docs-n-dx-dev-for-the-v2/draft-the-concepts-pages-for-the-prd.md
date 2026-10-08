@@ -11,9 +11,9 @@ tags:
 source: "roadmap"
 startedAt: "2026-10-08T07:26:22.353Z"
 completedAt: "2026-10-08T07:30:29.824Z"
+endedAt: "2026-10-08T07:30:29.824Z"
 resolutionType: "code-change"
 resolutionDetail: "Five concepts pages under docs/guide/concepts/ plus a Concepts sidebar group, written and reviewed by hench run 56139eb6-ae65-450e-be65-1db53119577e. The run left them uncommitted because its sandbox refused pnpm docs:build; pnpm docs:build verified by hand and the pages committed unchanged in 2d38ade41."
-endedAt: "2026-10-08T07:30:29.824Z"
 acceptanceCriteria:
   - "A concepts section defines the PRD as the product layer plus the change layer, with the glossary and at least one worked example"
   - "No page uses \"map\" for the product layer"

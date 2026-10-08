@@ -25,3 +25,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Draft the concepts pages for the PRD as product layer plus change layer](./draft-the-concepts-pages-for-the-prd.md) | completed |
 | [Rewrite the guides, package pages and examples for the v2 model](./rewrite-the-guides-package-pages-and.md) | pending |
 | [Update the docs.n-dx.dev homepage, navigation and the 1.0.0 release note](./update-the-docs-n-dx-dev-homepage.md) | pending |
+| [Correct the concepts pages on apply, Changing, steward enforcement and the evidence path](./correct-the-concepts-pages-on-apply.md) | pending |
