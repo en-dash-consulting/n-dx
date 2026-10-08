@@ -41,8 +41,8 @@ plannedRelease: "1.0.0"
 | [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | completed |
 | [Review follow-ups for the product layer work](./review-follow-ups-for-the-product/index.md) | pending |
 | [Route remaining state paths through the layout resolver](./route-remaining-state-paths-through/index.md) | completed |
-| [Route the remaining .n-dx config readers through the resolver](./route-the-remaining-n-dx-config/index.md) | pending |
-| [Select and complete work on changes](./select-and-complete-work-on-changes/index.md) | pending |
+| [Route the remaining .n-dx config readers through the resolver](./route-the-remaining-n-dx-config/index.md) | completed |
+| [Select and complete work on changes](./select-and-complete-work-on-changes/index.md) | completed |
 | [Shared assistant guidance for every vendor](./shared-assistant-guidance-for-every/index.md) | pending |
 | [Single state writer for state.yaml](./single-state-writer-for-state-yaml/index.md) | completed |
 | [Split the rex MCP tools into one module per tool](./split-the-rex-mcp-tools-into-one/index.md) | completed |
@@ -50,4 +50,5 @@ plannedRelease: "1.0.0"
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | pending |
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
 | [v2 schema and rules before the freeze](./v2-schema-and-rules-before-the-freeze/index.md) | completed |
+| [v2 store transaction for the product and change layers](./v2-store-transaction-for-the-product/index.md) | pending |
 | [Bootstrap the product layer from an established codebase](./bootstrap-the-product-layer-from-an.md) | pending |

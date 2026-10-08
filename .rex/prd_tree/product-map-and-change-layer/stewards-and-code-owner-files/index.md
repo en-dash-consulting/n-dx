@@ -24,4 +24,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Read stewards from the product layer and generate code-owner files per host](./read-stewards-from-the-product-layer.md) | pending |
+| [Read stewards from the product layer and generate code-owner files per host](./read-stewards-from-the-product-layer.md) | completed |

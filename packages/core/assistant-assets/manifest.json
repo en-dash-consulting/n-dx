@@ -91,7 +91,8 @@
           "search_files",
           "get_imports",
           "get_classifications",
-          "get_route_tree"
+          "get_route_tree",
+          "get_readiness"
         ],
         "write": [
           "set_file_archetype"

@@ -265,6 +265,7 @@ export const RexConfigSchema = z
       maxCriteriaPerCapability: z.number().int().positive().optional(),
     }).optional(),
     titleCollisionSimilarityThreshold: z.number().min(0).max(1).optional(),
+    codeOwners: z.boolean().optional(),
     future: z.record(z.unknown()).optional(),
   })
   .passthrough();

@@ -58,6 +58,7 @@ import {
   isHubMarker,
   removePidFile,
   removePortFile,
+  readAuthTokenFile,
 } from "./web.js";
 import { buildRefreshPlan, RefreshPlanError } from "./refresh-plan.js";
 import { refreshSourcevisionDashboardArtifacts } from "./refresh-artifacts.js";
@@ -976,9 +977,12 @@ async function signalLiveReload(dir) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2000);
   try {
+    // The hub and a project server both answer 401 without the per-user token
+    // unless auth is off; sending it when the file exists costs nothing otherwise.
+    const token = readAuthTokenFile();
     const res = await fetch(`http://127.0.0.1:${port}/api/reload`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(token ? { "X-Ndx-Token": token } : {}) },
       // `dir` lets the hub, which serves several projects on one port, forward
       // the signal to the server for this directory. A single-project server
       // ignores it.
@@ -2957,6 +2961,20 @@ async function handleReset(rest) {
 }
 
 /**
+ * Print the SDLC readiness scorecard.
+ *
+ * Flags are forwarded so `--json` reaches the delegate; the scorecard is
+ * sourcevision's to compute and format, and this only spawns it.
+ */
+async function handleReadiness(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, ["sourcevision"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.sourcevision, ["readiness", ...flags, dir]);
+  exitWithCleanup(0);
+}
+
+/**
  * Render the isometric architecture map.
  *
  * Unlike the other delegated sourcevision commands this does not require
@@ -3289,6 +3307,7 @@ const COMMAND_DISPATCH = new Map([
   ["prd",               handlePrd],
   // ── Delegated sourcevision commands ──
   ["reset",             handleReset],
+  ["readiness",         handleReadiness],
   ["iso",               handleIso],
   // ── Delegated hench commands ──
   ["show",              handleShow],

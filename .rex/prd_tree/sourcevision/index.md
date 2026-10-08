@@ -39,7 +39,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [PR Markdown View Toggle and Copy UX](./pr-markdown-view-toggle-and-copy-ux/index.md) | completed |
 | [Recursive zone architecture](./recursive-zone-architecture/index.md) | completed |
 | [Resolve critical SourceVision architectural findings](./resolve-critical-sourcevision/index.md) | completed |
-| [SDLC readiness profile and scorecard: evidence-based CI/CD maturity for agent readiness](./sdlc-readiness-profile-and-scorecard/index.md) | pending |
+| [SDLC readiness profile and scorecard: evidence-based CI/CD maturity for agent readiness](./sdlc-readiness-profile-and-scorecard/index.md) | completed |
 | [SourceVision Ask Panel (text exchange: explain findings, refine the PRD)](./sourcevision-ask-panel-text-exchange/index.md) | completed |
 | [SourceVision Findings Remediation](./sourcevision-findings-remediation/index.md) | completed |
 | [SourceVision Import Graph Visualization Enhancement](./sourcevision-import-graph/index.md) | completed |
