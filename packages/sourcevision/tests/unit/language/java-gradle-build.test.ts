@@ -162,6 +162,22 @@ describe("Gradle build model: edge cases", () => {
     expect(m?.notices[0]).toContain("libs.versions.toml is not valid TOML");
   });
 
+  it("reads every coordinate of a Groovy multi-coordinate declaration", async () => {
+    const [m] = await files({ "build.gradle": "dependencies {\n  implementation 'g:a:1', 'g:b:2', {\n    transitive = false\n  }\n}\n" });
+    expect(m?.dependencies.map((d) => `${d.artifact}:${d.version.resolved ? d.version.value : "?"}`)).toEqual(["a:1", "b:2"]);
+  });
+
+  it("reads a catalog plugin alias declared with apply false, and a child inherits its version", async () => {
+    const models = await files({
+      "settings.gradle.kts": `include("app")\n`,
+      "gradle/libs.versions.toml": `[plugins]\nboot = { id = "org.springframework.boot", version = "3.3.0" }\n`,
+      "build.gradle.kts": "plugins {\n  alias(libs.plugins.boot) apply false\n}\n",
+      "app/build.gradle.kts": `plugins {\n  id("org.springframework.boot")\n}\n`,
+    });
+    expect(module(models, ":")?.springBootVersion).toEqual({ resolved: true, value: "3.3.0" });
+    expect(module(models, ":app")?.springBootVersion).toEqual({ resolved: true, value: "3.3.0" });
+  });
+
   it("returns an empty model for a module with no build script", async () => {
     const models = await files({ "settings.gradle": "include 'x'\n", "x/src/main/java/A.java": "class A {}\n" });
     expect(module(models, ":x")).toMatchObject({ dependencies: [], notices: [] });
@@ -187,6 +203,15 @@ describe("parseToml", () => {
     expect(
       parseToml(`# c\n[a]\nx.y = "1" # tail\n'q-r' = { m = "g:a", v.ref = "z" }\nb = [\n "p", # one\n "q",\n]\nn = 3\nt = true\n`),
     ).toEqual({ a: { x: { y: "1" }, "q-r": { m: "g:a", v: { ref: "z" } }, b: ["p", "q"], n: 3, t: true } });
+  });
+
+  it("keeps __proto__ and constructor keys as own data, never touching a prototype", () => {
+    const doc = parseToml(`[__proto__]\npolluted = "yes"\n[a]\nconstructor = "c"\n__proto__ = { x = "1" }\n`);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.getPrototypeOf(doc.a)).toBe(Object.prototype);
+    expect(Object.keys(doc)).toEqual(["__proto__", "a"]);
+    expect(doc.a).toMatchObject({ constructor: "c" });
+    expect(Object.getOwnPropertyDescriptor(doc.a, "__proto__")?.value).toEqual({ x: "1" });
   });
 
   it.each(["[a\nx=1", "x = ", "x = 'open", "x = 1 2", "[[a]]", 'x = """m"""', "x = 1\nx = 2", "x = bare"])("rejects %s", (src) => {

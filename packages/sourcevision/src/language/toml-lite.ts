@@ -27,6 +27,10 @@ export function parseToml(src: string): TomlTable {
   return new Reader(src).document();
 }
 
+function setOwn(table: TomlTable, key: string, value: TomlValue): void {
+  Object.defineProperty(table, key, { value, enumerable: true, writable: true, configurable: true });
+}
+
 class Reader {
   private i = 0;
   private line = 1;
@@ -153,10 +157,14 @@ class Reader {
     }
   }
 
+  // Keys come from untrusted files: read with Object.hasOwn and write with
+  // defineProperty, so `__proto__` or `constructor` stay plain data instead of
+  // reaching (and polluting) a prototype.
   private descend(table: TomlTable, path: string[]): TomlTable {
     let current = table;
     for (const key of path) {
-      const next = current[key] ?? (current[key] = {});
+      if (!Object.hasOwn(current, key)) setOwn(current, key, {});
+      const next = current[key];
       if (typeof next !== "object" || Array.isArray(next)) this.fail(`'${key}' is not a table`);
       current = next;
     }
@@ -166,8 +174,8 @@ class Reader {
   private assign(table: TomlTable, path: string[], value: TomlValue): void {
     const parent = this.descend(table, path.slice(0, -1));
     const key = path[path.length - 1];
-    if (key in parent) this.fail(`duplicate key '${path.join(".")}'`);
-    parent[key] = value;
+    if (Object.hasOwn(parent, key)) this.fail(`duplicate key '${path.join(".")}'`);
+    setOwn(parent, key, value);
   }
 
   // ── Lexing ─────────────────────────────────────────────────────────────
