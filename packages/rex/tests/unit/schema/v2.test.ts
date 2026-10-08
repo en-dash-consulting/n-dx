@@ -449,6 +449,8 @@ describe("isolation", () => {
         "core/placement-policy.ts",
         "core/change-selection.ts",
         "core/change-completion.ts",
+        "codeowners/plan.ts",
+        "cli/commands/codeowners.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

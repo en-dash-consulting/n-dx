@@ -20,6 +20,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Apply refuses removing one member of a pre-existing dependsOn knot that stays cyclic](./apply-refuses-removing-one-member-of-a.md) | pending |
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | pending |
+| [Code-owner files go stale after a stewards edit until someone re-runs rex codeowners](./code-owner-files-go-stale-after-a.md) | pending |
 | [Codex drops most of packages/web/AGENTS.md: root plus nested AGENTS.md exceeds its 32 KiB combined project-doc budget](./codex-drops-most-of-packages-web.md) | pending |
 | [Codex never sees the per-package governance or the path-scoped rules, because they live only in Claude-loaded files](./codex-never-sees-the-per-package.md) | cancelled |
 | [Decide before the schema freeze whether ChangeIntentSchema gets acceptanceCriteria](./decide-before-the-schema-freeze.md) | pending |
