@@ -220,3 +220,30 @@
   .prep-field { grid-template-columns: minmax(0, 1fr); }
   .prep-field-meta { grid-column: 1; }
 }
+
+/* ── Saved on the task ────────────────────────────────────────────────── */
+/* Only tokens this sheet already uses: a previous run shipped undefined ones
+   and failed the style-token check in light theme. */
+
+.prep-source--saved { font-family: var(--font-base); color: var(--accent); }
+.prep-fallback { color: var(--text-dim); }
+.prep-field--saved .prep-label { font-weight: 600; }
+
+.prep-off-anchor { color: var(--orange); font-size: var(--font-sm); }
+.prep-confirm-text { color: var(--text-muted); font-size: var(--font-sm); }
+
+.prep-conflict {
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--orange);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+.prep-conflict-text { margin: 0 0 var(--space-2); color: var(--text-muted); }
+.prep-conflict-actions { display: flex; gap: var(--space-2); }
+
+.ready-saved-dot {
+  margin-left: var(--space-1);
+  color: var(--accent);
+  font-size: var(--font-xs);
+}

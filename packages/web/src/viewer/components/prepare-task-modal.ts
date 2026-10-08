@@ -3,10 +3,21 @@
  *
  * Fed by `GET /api/hench/prep/:taskId`: hench's resolved settings with the
  * source of each, the refusals a run would hit, the vendor's model catalog,
- * the workspace and the hub's admission state. The reader changes fields for
- * this run only (there is no Save in this phase); the modal shows which fields
+ * the workspace and the hub's admission state. The modal shows which fields
  * changed, the preflight list, the equivalent terminal command, and a brief
  * preview, and Execute posts `{taskId, options}` with the changed fields alone.
+ *
+ * A change can be for this run or for the task. Execute carries the edits and
+ * nothing else; Save writes them onto the PRD item through
+ * `PUT /api/hench/prep/:taskId`, where `ndx work` reads them from a terminal
+ * too. Two buttons on purpose: "run it differently once" and "this is how this
+ * task should be run" are different intentions, and conflating them would make
+ * every experiment permanent.
+ *
+ * A save carries the version the GET reported, so one made against a read
+ * someone else has overtaken is refused rather than silently winning; the 409
+ * brings back the current block, and the conflict panel offers Reload or
+ * Overwrite.
  *
  * Start lives here and Stop lives in Live: a started run hands off to
  * `/live/task/:taskId`. A run the hub queues stays here, showing its position.
@@ -40,6 +51,11 @@ import {
   runOptionsOf,
   setField,
   sourceOf,
+  isSavedOnTask,
+  fallbackOf,
+  saveBodyOf,
+  saveCount,
+  savedCount,
   standingRefusals,
   workspaceWarnings,
 } from "./prepare-task-model.js";
@@ -84,6 +100,11 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
   const [execError, setExecError] = useState<string | null>(null);
   const [canMigrate, setCanMigrate] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  /** Set when a save lost a race: the block and version the server holds now. */
+  const [conflict, setConflict] = useState<{ saved: Record<string, unknown> | null; version: string } | null>(null);
+  /** The inline confirm before clearing a task's saved settings. */
+  const [confirmClear, setConfirmClear] = useState(false);
   const [queued, setQueued] = useState<QueuedReply | null>(null);
   // The hub dropped the queued run at its turn; Execute is offered again.
   const [queueDropped, setQueueDropped] = useState(false);
@@ -113,12 +134,15 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
     return () => document.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
-  const request = useCallback(async (path: string, body?: unknown): Promise<Reply> => {
+  // GET with no body, POST with one, and PUT when the caller says so (saving
+  // run settings). The workspace header travels on all three: a modal opened
+  // for another worktree must read AND write that worktree.
+  const request = useCallback(async (path: string, body?: unknown, method?: "PUT"): Promise<Reply> => {
     const headers: Record<string, string> = {};
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (workspace) headers["X-Ndx-Workspace"] = workspace;
     const res = await fetch(path, {
-      method: body === undefined ? "GET" : "POST",
+      method: method ?? (body === undefined ? "GET" : "POST"),
       headers,
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
@@ -142,6 +166,85 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
   useEffect(() => { void load(); }, [load]);
 
   const defaults = useMemo(() => (prep ? defaultsOf(prep) : null), [prep]);
+
+  /**
+   * Write the task's run settings.
+   *
+   * `block` is what to save; `null` clears. The version travels so the server
+   * can refuse a save made against a read someone else has since overtaken —
+   * a 409 brings back the current block, which is what the conflict panel
+   * offers to reload or overwrite.
+   */
+  const saveSettings = useCallback(async (block: Record<string, unknown> | null, version: string) => {
+    setBusy(true);
+    setSaveError(null);
+    setConflict(null);
+    setNotice(null);
+    try {
+      const reply = await request(
+        `/api/hench/prep/${encodeURIComponent(taskId)}`,
+        { run: block, version },
+        "PUT",
+      );
+      if (reply.status === 409 && reply.data.conflict === true) {
+        setConflict({
+          saved: (reply.data.saved ?? null) as Record<string, unknown> | null,
+          version: String(reply.data.version ?? "none"),
+        });
+        return false;
+      }
+      if (!reply.ok) {
+        setSaveError((reply.data.error as string) || `Could not save (${reply.status})`);
+        return false;
+      }
+      // Reload rather than patch local state: the sources, the fallbacks and
+      // the version all move with a save, and the server is the one that knows
+      // what they became.
+      await load();
+      setEdits({});
+      const workspaceInfo = reply.data.workspace as { branch?: string; isAnchor?: boolean } | undefined;
+      setNotice(
+        block === null
+          ? "Cleared the settings saved on this task"
+          : workspaceInfo && workspaceInfo.isAnchor === false
+            ? `Saved on branch ${workspaceInfo.branch ?? "this worktree"}; lands when the branch merges`
+            : "Saved",
+      );
+      return true;
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save the run settings");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [request, taskId, load]);
+
+  /** Save what the modal shows now. */
+  const save = useCallback(() => {
+    if (!prep || !defaults) return;
+    setConfirmClear(false);
+    void saveSettings(saveBodyOf(prep, defaults, edits), prep.savedVersion ?? "none");
+  }, [prep, defaults, edits, saveSettings]);
+
+  /** Clear the task's saved settings outright. */
+  const clearSaved = useCallback(() => {
+    if (!prep) return;
+    setConfirmClear(false);
+    void saveSettings(null, prep.savedVersion ?? "none");
+  }, [prep, saveSettings]);
+
+  /** Take the server's version of the settings and drop the local edits. */
+  const reloadFromConflict = useCallback(() => {
+    setConflict(null);
+    setEdits({});
+    void load();
+  }, [load]);
+
+  /** Save again against the version the refusal named — which is the overwrite. */
+  const overwriteConflict = useCallback(() => {
+    if (!prep || !defaults || !conflict) return;
+    void saveSettings(saveBodyOf(prep, defaults, edits), conflict.version);
+  }, [prep, defaults, edits, conflict, saveSettings]);
 
   const execute = useCallback(async () => {
     if (!defaults) return;
@@ -257,6 +360,9 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
   } else {
     body = h(Form, {
       prep, defaults, edits, setEdits, taskId, busy, execError, canMigrate, notice, queued, queueDropped, onQueueDropped,
+      saveError, conflict, confirmClear, setConfirmClear,
+      onSave: save, onClearSaved: clearSaved,
+      onReloadConflict: reloadFromConflict, onOverwriteConflict: overwriteConflict,
       onExecute: execute, onMigrate: migrate, onPreview: showPreview, onOpenLive, liveHref,
     });
   }
@@ -313,6 +419,14 @@ interface FormProps {
   queued: QueuedReply | null;
   queueDropped: boolean;
   onQueueDropped: () => void;
+  saveError: string | null;
+  conflict: { saved: Record<string, unknown> | null; version: string } | null;
+  confirmClear: boolean;
+  setConfirmClear: (on: boolean) => void;
+  onSave: () => void;
+  onClearSaved: () => void;
+  onReloadConflict: () => void;
+  onOverwriteConflict: () => void;
   onExecute: () => void;
   onMigrate: () => void;
   onPreview: () => void;
@@ -322,6 +436,7 @@ interface FormProps {
 
 function Form(props: FormProps) {
   const { prep, defaults, edits, setEdits, taskId, busy, execError, canMigrate, notice, queued } = props;
+  const { saveError, conflict, confirmClear, setConfirmClear } = props;
   const set = (key: RunOptionKey, value: unknown) => {
     let next = setField(defaults, edits, key, value);
     // Turning review off drops its model, so the field does not linger as a change.
@@ -332,6 +447,8 @@ function Form(props: FormProps) {
   const field = (key: RunOptionKey) => ({
     id: `prep-${key}`,
     source: sourceOf(prep, key),
+    saved: isSavedOnTask(prep, key),
+    fallback: fallbackOf(prep, key),
     changed: isChanged(edits, key),
     onReset: () => reset(key),
   });
@@ -343,6 +460,9 @@ function Form(props: FormProps) {
   const admission = admissionLine(prep.admission);
   const problem = optionsProblem(defaults, edits);
   const changes = changeCount(defaults, edits);
+  const alreadySaved = savedCount(prep);
+  const hasEdits = Object.keys(edits).length > 0;
+  const offAnchor = prep.workspace.isAnchor === false;
   const resume = prep.task?.status === "in_progress";
   const blocked = refusals.length > 0 || problem !== null;
   const command = commandLine(prep, taskId, defaults, edits);
@@ -383,10 +503,12 @@ function Form(props: FormProps) {
 
       h(Section, { title: "Behaviour" },
         h(Field, { label: "Adversarial review", ...field("review") },
+          // Switchable both ways since `--no-review` exists: it was locked on
+          // while a review turned on by config could not be turned off for one
+          // run, which is no longer true.
           h("select", {
             id: "prep-review",
             value: reviewOn ? "on" : "off",
-            disabled: defaults.review,
             onChange: (e: Event) => set("review", (e.target as HTMLSelectElement).value === "on"),
           }, h("option", { value: "off" }, "Off"), h("option", { value: "on" }, "On"))),
         h(Field, {
@@ -411,12 +533,12 @@ function Form(props: FormProps) {
           }, permissionModes.map((m) => h("option", { key: m, value: m }, m || "Not set")))),
         h(Field, {
           label: "Full test gate", ...field("skipTestGate"),
-          note: defaults.skipTestGate ? "Skipped by config; no flag turns it back on for one run" : null,
         },
+          // `--no-skip-test-gate` puts the gate back for one run, so a gate the
+          // config or the task skips is no longer a one-way door.
           h("select", {
             id: "prep-skipTestGate",
             value: effective(defaults, edits, "skipTestGate") ? "skip" : "run",
-            disabled: defaults.skipTestGate,
             onChange: (e: Event) => set("skipTestGate", (e.target as HTMLSelectElement).value === "skip"),
           }, h("option", { value: "run" }, "Run"), h("option", { value: "skip" }, "Skip"))),
         h(Field, { label: "Session", ...field("fresh") },
@@ -498,6 +620,21 @@ function Form(props: FormProps) {
         ? h("button", { type: "button", class: "prep-btn", onClick: props.onMigrate, disabled: busy }, "Migrate the PRD tree")
         : null,
       notice ? h("p", { class: "prep-notice", role: "status" }, notice) : null,
+      saveError ? h("p", { class: "prep-error", role: "alert" }, saveError) : null,
+      conflict
+        ? h("div", { class: "prep-conflict", role: "alert" },
+          h("p", { class: "prep-conflict-text" },
+            "These settings were saved elsewhere since you opened this."),
+          h("div", { class: "prep-conflict-actions" },
+            h("button", {
+              type: "button", class: "prep-btn", onClick: props.onReloadConflict, disabled: busy,
+            }, "Reload"),
+            h("button", {
+              type: "button", class: "prep-btn", onClick: props.onOverwriteConflict, disabled: busy,
+            }, "Overwrite"),
+          ),
+        )
+        : null,
       queued
         ? h(QueuedNotice, {
           reply: queued, taskId, onOpenLive: props.onOpenLive, liveHref: props.liveHref, onDropped: props.onQueueDropped,
@@ -507,14 +644,47 @@ function Form(props: FormProps) {
 
     h("footer", { class: "prep-footer" },
       h("span", { class: "prep-change-count", role: "status" },
-        `${changes} ${changes === 1 ? "change applies" : "changes apply"} to this run only`),
+        // Two different facts: what this run does differently, and what the
+        // task carries for every run including a terminal one.
+        [
+          `${changes} ${changes === 1 ? "change applies" : "changes apply"} to this run only`,
+          ...(alreadySaved > 0
+            ? [`${alreadySaved} saved, applies from the terminal too`]
+            : []),
+        ].join(" · "),
+      ),
+      offAnchor
+        ? h("span", { class: "prep-off-anchor" },
+          `Saved on branch ${prep.workspace.branch ?? "this worktree"}; lands when the branch merges`)
+        : null,
       h("button", { type: "button", class: "prep-btn prep-preview-btn", onClick: props.onPreview }, "Preview brief"),
+      confirmClear
+        ? h(Fragment, null,
+          h("span", { class: "prep-confirm-text", role: "status" },
+            `Clear ${alreadySaved} saved ${alreadySaved === 1 ? "setting" : "settings"} for this task?`),
+          h("button", {
+            type: "button", class: "prep-btn", onClick: props.onClearSaved, disabled: busy,
+          }, "Clear"),
+          h("button", {
+            type: "button", class: "prep-btn", onClick: () => setConfirmClear(false),
+          }, "Keep"),
+        )
+        : h("button", {
+          type: "button",
+          class: "prep-btn",
+          // With edits it clears them; with nothing but saved settings it asks
+          // before touching what another session may rely on.
+          onClick: () => (hasEdits ? setEdits({}) : setConfirmClear(true)),
+          disabled: !hasEdits && alreadySaved === 0,
+        }, "Reset to defaults"),
       h("button", {
         type: "button",
         class: "prep-btn",
-        onClick: () => setEdits({}),
-        disabled: Object.keys(edits).length === 0,
-      }, "Reset to defaults"),
+        onClick: props.onSave,
+        // Nothing to write when the block would come out identical to what is
+        // stored: no edits, and nothing saved to clear.
+        disabled: busy || (!hasEdits && alreadySaved === 0),
+      }, busy ? "Saving…" : "Save"),
       h("button", {
         type: "button",
         class: "prep-btn prep-btn-primary",
@@ -541,10 +711,20 @@ interface FieldProps {
   label: string;
   /** The resolve JSON's source for the default; null for a field with no default. */
   source: string | null;
+  /** The value came from the task's own saved block, not the project's config. */
+  saved?: boolean;
+  /** What the project would have used instead; shown beside a saved value. */
+  fallback?: { value: unknown; source: string } | null;
   changed: boolean;
   onReset: () => void;
   note?: string | null;
   children?: ComponentChildren;
+}
+
+/** A fallback value as the meta row prints it; `""` stands for "not set". */
+function fallbackText(fallback: { value: unknown; source: string }): string {
+  const shown = fallback.value === "" || fallback.value === null ? "not set" : String(fallback.value);
+  return `project default: ${shown} from ${fallback.source}`;
 }
 
 /** A setting shown with its source but not editable per run (the vendor). */
@@ -556,15 +736,22 @@ function ReadOnlyField({ id, label, source, children }: { id: string; label: str
   );
 }
 
-function Field({ id, label, source, changed, onReset, note, children }: FieldProps) {
-  return h("div", { class: `prep-field${changed ? " prep-field--changed" : ""}` },
+function Field({ id, label, source, saved, fallback, changed, onReset, note, children }: FieldProps) {
+  // A saved field names the task rather than a config key: "from task.run.models"
+  // would be true but says nothing a reader can act on, where "saved on task"
+  // plus the project default it displaced is the whole decision.
+  const sourceText = source === null ? null : saved ? "saved on task" : `from ${source}`;
+  return h("div", { class: `prep-field${changed ? " prep-field--changed" : ""}${saved ? " prep-field--saved" : ""}` },
     h("label", { for: id, class: "prep-label" },
       changed ? h("span", { class: "prep-dot", "aria-hidden": "true" }, "●") : null,
       label,
     ),
     h("div", { class: "prep-control" }, children),
     h("div", { class: "prep-field-meta" },
-      source ? h("span", { class: "prep-source" }, `from ${source}`) : null,
+      sourceText
+        ? h("span", { class: `prep-source${saved ? " prep-source--saved" : ""}` }, sourceText)
+        : null,
+      saved && fallback ? h("span", { class: "prep-fallback" }, fallbackText(fallback)) : null,
       changed ? h("span", { class: "prep-changed" }, "changed for this run") : null,
       changed
         ? h("button", { type: "button", class: "prep-reset", onClick: onReset, "aria-label": `Reset ${label}` }, "Reset")

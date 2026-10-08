@@ -165,7 +165,15 @@ export function ReadyToRun({ onPrepare, onOpenLive, onOpenPrd }: ReadyToRunProps
           return h("li", { key: task.id, class: "ready-row", "data-task-id": task.id },
             h("span", { class: `prd-status-icon prd-status-${task.status}`, title: status.label, "aria-label": status.label }, status.icon),
             h("div", { class: "ready-main" },
-              h("button", { type: "button", class: "ready-title", onClick: () => onPrepare(task.id) }, task.title),
+              h("button", { type: "button", class: "ready-title", onClick: () => onPrepare(task.id) },
+                task.title,
+                // A task that will not run on the project defaults says so
+                // before the modal is opened. The label carries the meaning:
+                // the dot alone is decoration to a screen reader.
+                task.saved
+                  ? h("span", { class: "ready-saved-dot", role: "img", "aria-label": "Saved run settings", title: "Saved run settings" }, "●")
+                  : null,
+              ),
               h("div", { class: "ready-meta" },
                 task.parentChain.length ? h("span", { class: "ready-chain" }, task.parentChain.join(" › ")) : null,
                 task.priority ? h("span", { class: `prd-priority-badge prd-priority-${task.priority}` }, task.priority) : null,
