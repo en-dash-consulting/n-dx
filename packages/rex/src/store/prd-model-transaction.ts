@@ -15,7 +15,8 @@
  *
  * A v1 tree is refused before the mutation runs: it is written by
  * `store.withTransaction`. A tree past a schema refusal is never read for a
- * write: the skew override is ignored here, so loading it throws.
+ * write: the skew override is ignored here, so loading it throws. Parse
+ * warnings are on the model's `warnings`, for the mutation to report.
  *
  * @module rex/store/prd-model-transaction
  */
@@ -39,8 +40,6 @@ export interface PrdModelTransactionOptions {
   now?: () => Date;
   /** Lock acquisition timeout and retry delay. */
   lock?: LockOptions;
-  /** Where load warnings go. Defaults to stderr. */
-  warn?: (message: string) => void;
 }
 
 export interface PrdModelTransactionResult<T> {
@@ -68,7 +67,7 @@ export async function withPrdModelTransaction<T>(
   return withLock(
     prdLockPath(rexDir),
     async () => {
-      const model = await loadPrdModel(rexDir, { ignoreSchemaSkew: false, warn: options.warn });
+      const model = await loadPrdModel(rexDir, { ignoreSchemaSkew: false });
       if (model.layout !== "v2") throw new PrdLayoutError(rexDir, model.layout);
       const edit = await mutate(model);
       const written = await writePrdModel(rexDir, { ...model, tree: edit.tree }, { removed: edit.removed, now: options.now });
