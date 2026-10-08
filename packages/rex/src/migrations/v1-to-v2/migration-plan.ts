@@ -165,6 +165,11 @@ function hasCompletedWork(item: PRDItem): boolean {
   return (item.children ?? []).some(hasCompletedWork);
 }
 
+/** Cancelled and deleted items were abandoned or removed: they never become standing product nodes. */
+function isAbandoned(item: PRDItem): boolean {
+  return item.status === "cancelled" || item.status === "deleted";
+}
+
 // ── Classification ───────────────────────────────────────────────
 
 interface Pending {
@@ -228,6 +233,16 @@ function classifyEpic(epic: PRDItem, plan: PlanBuilder): void {
     return;
   }
 
+  if (isAbandoned(epic)) {
+    plan.add(epic, "change", {
+      applied: false,
+      needsPlacement: true,
+      reasons: [`${epic.status} epic: never a standing area, held as an unapplied change for review`],
+    });
+    plan.workUnder(epic.children, epic.id);
+    return;
+  }
+
   plan.add(epic, "area", { reasons: ["epic with no release or PR token: an area"] });
   if (isConstraintShaped(epic.title)) {
     plan.constraints.push({ source: epic.id, title: epic.title, appliesTo: "all" });
@@ -246,6 +261,16 @@ function classifyUnderArea(item: PRDItem, area: string, plan: PlanBuilder): void
   const work = isWorkShaped(item);
   if (fix || work) {
     plan.change(item, { reasons: [fix ? "fix-shaped feature: a change" : "work-shaped feature: a change"] }, area);
+    plan.workUnder(item.children, item.id);
+    return;
+  }
+
+  if (isAbandoned(item)) {
+    plan.add(item, "change", {
+      applied: false,
+      needsPlacement: true,
+      reasons: [`${item.status} feature: never a standing capability or constraint, held as an unapplied change for review`],
+    });
     plan.workUnder(item.children, item.id);
     return;
   }

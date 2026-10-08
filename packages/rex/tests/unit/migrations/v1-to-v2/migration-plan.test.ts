@@ -185,6 +185,22 @@ describe("classifyV1Tree", () => {
     expect(defects.notes.join(" ")).toMatch(/no capability or constraint/);
   });
 
+  it("does not make a cancelled epic with no release token an area", () => {
+    const epic = item("epic", "Legacy importer", [item("task", "Write importer")], "cancelled");
+    const plan = classifyV1Tree([epic]);
+    expect(byTitle(plan.entries, "Legacy importer")).toMatchObject({ target: "change", applied: false, needsPlacement: true });
+    expect(plan.areas).toEqual([]);
+    expect(byTitle(plan.entries, "Write importer").target).toBe("task");
+  });
+
+  it("does not make a deleted feature with a completed child a capability", () => {
+    const feature = item("feature", "Offline cache", [item("task", "Build cache", [], "completed")], "deleted");
+    const plan = classifyV1Tree([item("epic", "Storage", [feature])]);
+    expect(byTitle(plan.entries, "Offline cache")).toMatchObject({ target: "change", applied: false, needsPlacement: true });
+    expect(plan.entries.some((e) => e.target === "capability")).toBe(false);
+    expect(byTitle(plan.entries, "Build cache").target).toBe("task");
+  });
+
   it("is deterministic", () => {
     const items = tree();
     expect(classifyV1Tree(items)).toEqual(classifyV1Tree(structuredClone(items)));
