@@ -93,7 +93,7 @@ export function writeCleanupLog(logPath: string, entry: CleanupLogEntry): void {
 }
 
 /**
- * Load cleanup configuration from `.n-dx.json`.
+ * Load cleanup configuration from the project config.
  *
  * Reads the `cleanup.intervalMs` key. Returns defaults for missing,
  * malformed, or invalid configuration.
@@ -101,7 +101,7 @@ export function writeCleanupLog(logPath: string, entry: CleanupLogEntry): void {
 export function loadCleanupConfig(projectDir: string): CleanupConfig {
   const defaults: CleanupConfig = { intervalMs: DEFAULT_CLEANUP_INTERVAL_MS };
 
-  const configPath = join(projectDir, ".n-dx.json");
+  const configPath = resolveLayout(projectDir).configFile;
   if (!existsSync(configPath)) return defaults;
 
   try {

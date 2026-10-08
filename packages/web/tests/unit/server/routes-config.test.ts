@@ -295,3 +295,27 @@ describe("Config API routes", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("GET /api/ndx-config on the .ndx/ layout", () => {
+  it("reads .ndx/config.json and .ndx/config.local.json, not a root .n-dx.json", async () => {
+    clearConfigCaches();
+    const tmpDir = await mkdtemp(join(tmpdir(), "config-api-ndx-"));
+    const svDir = join(tmpDir, ".ndx", "sourcevision");
+    const rexDir = join(tmpDir, ".ndx", "rex");
+    await mkdir(svDir, { recursive: true });
+    await mkdir(rexDir, { recursive: true });
+    const { server, port } = await startTestServer({ projectDir: tmpDir, svDir, rexDir, dev: false });
+    try {
+      await writeFile(join(tmpDir, ".ndx", "config.json"), JSON.stringify({ claude: { model: "claude-sonnet-5" } }));
+      await writeFile(join(tmpDir, ".ndx", "config.local.json"), JSON.stringify({ llm: { claude: { api_key: "sk-ant-local" } } }));
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ claude: { model: "claude-legacy" } }));
+
+      const data = await (await fetch(`http://127.0.0.1:${port}/api/ndx-config`)).json();
+      expect(data.model).toBe("claude-sonnet-5");
+      expect(data.authMethod).toBe("api-key");
+    } finally {
+      await closeRouteTestServer(server);
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+});

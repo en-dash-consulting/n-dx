@@ -34,6 +34,7 @@
 
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
+import { resolveLayout } from "../prd/llm-gateway.js";
 import { resolveHenchPaths } from "./paths.js";
 import {
   enforceRetentionPolicy,
@@ -86,7 +87,7 @@ export async function loadRetentionIntervalMs(
   projectDir: string,
 ): Promise<number> {
   try {
-    const raw = await readFile(join(projectDir, ".n-dx.json"), "utf-8");
+    const raw = await readFile(resolveLayout(projectDir).configFile, "utf-8");
     const data = JSON.parse(raw) as Record<string, unknown>;
     const section = data.retention as Record<string, unknown> | undefined;
     if (

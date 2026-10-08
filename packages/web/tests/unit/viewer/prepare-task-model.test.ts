@@ -302,6 +302,116 @@ describe("settings saved on the task", () => {
       expect(saveBodyOf(prep, d, setField(d, {}, "contextNotes", "mind the lock")))
         .toEqual({ contextNotes: "mind the lock" });
     });
+
+    it("keeps saved notes through an unrelated save, and starts the field on them", () => {
+      // Notes have no project default, so they were starting empty — and an
+      // unrelated Save, rebuilding the block from what the form showed, deleted
+      // them. They are the starting value now, and the saved block answers for
+      // "saved on task".
+      const prep = prepFixture({ saved: { contextNotes: "Do not migrate production data" } });
+      const d = defaultsOf(prep);
+
+      expect(d.contextNotes).toBe("Do not migrate production data");
+      expect(isSavedOnTask(prep, "contextNotes")).toBe(true);
+      expect(saveBodyOf(prep, d, {})).toEqual({ contextNotes: "Do not migrate production data" });
+      expect(saveBodyOf(prep, d, setField(d, {}, "tokenBudget", 1000)))
+        .toEqual({ contextNotes: "Do not migrate production data", tokenBudget: 1000 });
+    });
+
+    it("drops the notes only when the reader empties them", () => {
+      const prep = prepFixture({ saved: { contextNotes: "mind the lock", maxTurns: 7 } });
+      prep.resolved.maxTurns = { value: 7, source: "task.run", fallback: { value: 50, source: "hench.maxTurns" } };
+      const d = defaultsOf(prep);
+      const cleared = setField(d, {}, "contextNotes", "");
+
+      // Emptying saved notes is an edit — the one field where "" is a choice.
+      expect(isChanged(cleared, "contextNotes")).toBe(true);
+      expect(saveBodyOf(prep, d, cleared)).toEqual({ maxTurns: 7 });
+      // … but there is no "no notes" a run can be told, so Execute sends nothing for it.
+      expect(runOptionsOf(d, cleared)).toEqual({});
+      // Retyped, it is an ordinary change.
+      expect(saveBodyOf(prep, d, setField(d, {}, "contextNotes", "mind the lock and the cache")))
+        .toEqual({ contextNotes: "mind the lock and the cache", maxTurns: 7 });
+    });
+
+    it("keeps a portable tier through an unrelated save", () => {
+      // A `tier: "heavy"` resolves to an id on this vendor, and the block was
+      // rebuilt from that id — so an unrelated Save rewrote the tier as an
+      // exact pin for today's vendor: no longer following the project's tier
+      // table, and no longer saying anything on codex.
+      const prep = prepFixture({ saved: { tier: "heavy", reviewTier: "light", review: true } });
+      prep.resolved.model = {
+        value: "claude-opus",
+        source: "task.run.tier",
+        fallback: { value: "claude-sonnet", source: "llm.claude.model" },
+      };
+      prep.resolved.review = { value: true, source: "task.run", fallback: { value: false, source: "built-in" } };
+      prep.resolved.reviewModel = {
+        value: "claude-haiku",
+        source: "task.run.reviewTier",
+        fallback: { value: "claude-sonnet", source: "llm.claude.reviewModel" },
+        vendorDefault: "claude-opus",
+      };
+      const d = defaultsOf(prep);
+
+      expect(saveBodyOf(prep, d, setField(d, {}, "tokenBudget", 1000)))
+        .toEqual({ tier: "heavy", reviewTier: "light", review: true, tokenBudget: 1000 });
+
+      // Choosing a model is the one thing that turns the tier into a pin, and
+      // only the tier of the field that was chosen.
+      expect(saveBodyOf(prep, d, setField(d, {}, "model", "claude-sonnet-4")))
+        .toEqual({ models: { claude: "claude-sonnet-4" }, reviewTier: "light", review: true });
+      expect(saveBodyOf(prep, d, setField(d, {}, "reviewModel", "claude-opus")))
+        .toEqual({ tier: "heavy", reviewModels: { claude: "claude-opus" }, review: true });
+
+      // Back at the project default means "stop overriding this vendor" — no
+      // pin, and no tier left behind to override it anyway.
+      expect(saveBodyOf(prep, d, setField(d, {}, "model", "claude-sonnet"))).toEqual({ reviewTier: "light", review: true });
+    });
+
+    it("keeps the other vendors' pins when a tier becomes a pin", () => {
+      const prep = prepFixture({ saved: { tier: "heavy", models: { codex: "gpt-5.6-sol" } } });
+      prep.resolved.model = {
+        value: "claude-opus",
+        source: "task.run.tier",
+        fallback: { value: "claude-sonnet", source: "llm.claude.model" },
+      };
+      const d = defaultsOf(prep);
+
+      expect(saveBodyOf(prep, d, {})).toEqual({ tier: "heavy", models: { codex: "gpt-5.6-sol" } });
+      expect(saveBodyOf(prep, d, setField(d, {}, "model", "claude-haiku")))
+        .toEqual({ models: { claude: "claude-haiku", codex: "gpt-5.6-sol" } });
+    });
+
+    it("saves the reviewer when the config, not the task, turns review on", () => {
+      // `review: true` from `hench.review` is the project default, so it is
+      // omitted from the block — and the leftover check used to read that
+      // omission as "no review runs" and drop the reviewer the reader had just
+      // chosen. Whether a review runs is the effective value, not the block.
+      const prep = prepFixture();
+      prep.resolved.review = { value: true, source: "hench.review" };
+      const d = defaultsOf(prep);
+
+      expect(saveBodyOf(prep, d, setField(d, {}, "reviewModel", "claude-opus")))
+        .toEqual({ reviewModels: { claude: "claude-opus" } });
+
+      // An existing reviewer pin survives an unrelated save under the same config.
+      const pinned = prepFixture({ saved: { reviewModels: { claude: "claude-opus" } } });
+      pinned.resolved.review = { value: true, source: "hench.review" };
+      pinned.resolved.reviewModel = {
+        value: "claude-opus",
+        source: "task.run.reviewModels",
+        fallback: { value: "claude-sonnet", source: "llm.claude.reviewModel" },
+        vendorDefault: "claude-opus",
+      };
+      const pd = defaultsOf(pinned);
+      expect(saveBodyOf(pinned, pd, setField(pd, {}, "maxTurns", 9)))
+        .toEqual({ reviewModels: { claude: "claude-opus" }, maxTurns: 9 });
+
+      // Switched off for the task, the reviewer goes with it: `review: false`
+      // is now the setting, since the project would have reviewed.
+      expect(saveBodyOf(pinned, pd, setField(pd, {}, "review", false))).toEqual({ review: false });
+    });
   });
 
   describe("switching off a setting the task or the config turned on", () => {

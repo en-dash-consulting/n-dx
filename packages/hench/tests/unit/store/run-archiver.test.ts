@@ -363,3 +363,17 @@ describe("RunArchiver", () => {
     });
   });
 });
+
+describe("loadArchivalConfig on the .ndx/ layout", () => {
+  it("reads the archival section from .ndx/config.json", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hench-archiver-ndx-"));
+    try {
+      await mkdir(join(dir, ".ndx"));
+      await writeFile(join(dir, ".ndx", "config.json"), JSON.stringify({ archival: { maxAgeDays: 3 } }), "utf-8");
+      await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ archival: { maxAgeDays: 99 } }), "utf-8");
+      expect((await loadArchivalConfig(dir)).maxAgeDays).toBe(3);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
