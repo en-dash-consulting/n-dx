@@ -12,11 +12,12 @@ tags:
   - "core"
 blockedBy:
   - "d3bfe8a4-c3d5-4aa4-893b-36fc58647dca"
+  - "abd05895-1b96-4798-bfb8-8e4b66fca049"
 source: "roadmap"
 acceptanceCriteria: []
 description: "New verbs and layer-aware restructuring.\n\nRoadmap PR 18 · wave 2 · lane rex-surface."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-06T16:54:29.871Z"
+lastModified: "2026-10-08T18:56:24.097Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
