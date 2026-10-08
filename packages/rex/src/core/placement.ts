@@ -40,8 +40,7 @@ export interface PlacementChange {
   files?: string[];
   /** The change repairs what it touches without amending it. */
   fix?: boolean;
-  /** Where the change came from; `sourcevision` marks a code-health finding. */
-  source?: string;
+  /** The tag `code-health` marks a finding-derived change. Where a change came from says nothing about its kind. */
   tags?: string[];
 }
 
@@ -60,6 +59,13 @@ export interface PlacementCandidate extends PlacementTarget {
   reasons: string[];
 }
 
+/** An area a proposal can be placed under. Areas are not placement targets. */
+export interface PlacementArea {
+  id: string;
+  title: string;
+  statement?: string;
+}
+
 /**
  * A new product node a placement proposes instead of an existing target: an
  * `added` amendment with a type, placed under an area. Never auto-accepted.
@@ -74,12 +80,14 @@ export type PlacementModel = (input: {
   change: PlacementChange;
   shortlist: readonly PlacementCandidate[];
   nodes: readonly PlacementNode[];
+  /** Every area a proposal's `under` may name; any other id is dropped. */
+  areas: readonly PlacementArea[];
 }) => Promise<string | null | { propose: PlacementProposal }>;
 
 export interface PlacementResult {
   /** Rules ranking, best first. Empty when no rule fired. */
   shortlist: PlacementCandidate[];
-  /** Present only when a model was supplied and the shortlist was non-empty. */
+  /** Present only when a model was supplied; it runs on an empty shortlist too, to propose a new node. */
   model?: {
     /** The target the model picked; null when it declined or proposed. */
     pick: string | null;
@@ -96,8 +104,6 @@ export interface PlacementResult {
 
 export const PLACEMENT_SHORTLIST_SIZE = 5;
 
-/** Source of changes created from sourcevision findings (code health). */
-export const CODE_HEALTH_SOURCE = "sourcevision";
 const CODE_HEALTH_TAG = "code-health";
 const ARCHITECTURE = "architecture";
 
@@ -110,9 +116,14 @@ const WEIGHT_PATH_MENTION = 3;
 const WEIGHT_PACKAGE_MENTION = 2;
 const WEIGHT_TOKEN = 1;
 
-/** Words in a title or intent that ask for behaviour the product does not have yet. */
-const NEW_BEHAVIOUR =
-  /\b(add|adds|adding|introduce|introduces|support|supports|allow|allows|enable|enables|implement|implements|new|expose|exposes|offer|offers|provide|provides)\b/i;
+/** Leading verbs of a title that ask for behaviour the product does not have yet, or a different one. */
+const AMENDING_VERBS = new Set([
+  "add", "introduce", "support", "allow", "enable", "implement", "expose", "offer", "provide",
+  "let", "extend", "change", "replace", "switch", "require",
+]);
+
+/** An intent line that states the relation outright: `Relation: amends`. */
+const AMENDS_MARKER = /^\s*relation\s*:\s*amends\b/im;
 
 function normalizePath(p: string): string {
   return p.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "");
@@ -130,7 +141,7 @@ function mentions(text: string, needle: string): boolean {
 
 /** The change came from a code-health finding. */
 export function isCodeHealthChange(change: PlacementChange): boolean {
-  return change.source === CODE_HEALTH_SOURCE || (change.tags ?? []).includes(CODE_HEALTH_TAG);
+  return (change.tags ?? []).includes(CODE_HEALTH_TAG);
 }
 
 function isArchitectureConstraint(node: PlacementNode): boolean {
@@ -139,12 +150,15 @@ function isArchitectureConstraint(node: PlacementNode): boolean {
 
 /**
  * Rules decide the relation: a fix or a code-health finding touches its
- * target; a change that asks for new behaviour amends it; anything else
- * touches, since amending a requirement needs that evidence.
+ * target. A change amends only when its title opens with an imperative verb
+ * that asks for new or changed behaviour AND its intent carries an explicit
+ * `Relation: amends` line. Prose in the intent never decides it alone.
  */
 export function placementRelation(change: PlacementChange): PlacementRelation {
   if (change.fix === true || isCodeHealthChange(change)) return "touches";
-  return NEW_BEHAVIOUR.test(`${change.title}\n${change.intent ?? ""}`) ? "amends" : "touches";
+  const lead = /^\s*([a-z]+)/i.exec(change.title)?.[1]?.toLowerCase();
+  const asksForChange = lead !== undefined && AMENDING_VERBS.has(lead);
+  return asksForChange && AMENDS_MARKER.test(change.intent ?? "") ? "amends" : "touches";
 }
 
 function scoreNode(change: PlacementChange, node: PlacementNode, relation: PlacementRelation): PlacementCandidate {
@@ -219,25 +233,33 @@ function asProposal(value: unknown): PlacementProposal | null {
 }
 
 /**
- * Rank with rules, then ask the text model when one is supplied. A model error
+ * Rank with rules, then ask the text model when one is supplied, even on an
+ * empty shortlist: with nothing to pick it may still propose a new node under
+ * one of `areas`. A proposal under an unknown area is dropped. A model error
  * propagates; with no model the shortlist is returned alone.
  */
 export async function placeChange(
   change: PlacementChange,
   nodes: readonly PlacementNode[],
-  options: { model?: PlacementModel; shortlistSize?: number } = {},
+  options: { model?: PlacementModel; shortlistSize?: number; areas?: readonly PlacementArea[] } = {},
 ): Promise<PlacementResult> {
   const warnings: string[] = [];
   const shortlist = rankPlacementCandidates(change, nodes, options.shortlistSize);
-  if (!options.model || shortlist.length === 0) return { shortlist, warnings };
+  if (!options.model) return { shortlist, warnings };
 
-  const answer = await options.model({ change, shortlist, nodes });
+  const areas = options.areas ?? [];
+  const answer = await options.model({ change, shortlist, nodes, areas });
   if (answer !== null && typeof answer === "object") {
-    const proposal = asProposal(answer.propose);
-    if (!proposal) warnings.push("text model proposed a new node that is not an added amendment with type, under and title; ignoring it");
+    let proposal = asProposal(answer.propose);
+    if (!proposal) {
+      warnings.push("text model proposed a new node that is not an added amendment with type, under and title; ignoring it");
+    } else if (!areas.some((a) => a.id === proposal!.under)) {
+      warnings.push(`text model proposed a new node under "${proposal.under}", which is not a known area; ignoring it`);
+      proposal = null;
+    }
     return { shortlist, model: { pick: null, agrees: false, ...(proposal ? { proposal } : {}) }, warnings };
   }
   const [top, runnerUp] = shortlist;
-  const clearLeader = runnerUp === undefined || runnerUp.score < top.score;
+  const clearLeader = top !== undefined && (runnerUp === undefined || runnerUp.score < top.score);
   return { shortlist, model: { pick: answer, agrees: clearLeader && answer === top.target }, warnings };
 }

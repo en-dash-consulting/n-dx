@@ -16,6 +16,7 @@ import type { JevRequest, JevResponse } from "@n-dx/llm-client";
 import {
   placeChange,
   placementRelation,
+  type PlacementArea,
   type PlacementCandidate,
   type PlacementChange,
   type PlacementModel,
@@ -124,6 +125,8 @@ export interface DecidePlacementOptions {
   /** False when there is no TYPESAFE_API_KEY; the caller decides, this module never reads env. */
   jevAvailable?: boolean;
   shortlistSize?: number;
+  /** Areas a new-node proposal may sit under. The text model is told them; a proposal under any other id is dropped. */
+  areas?: readonly PlacementArea[];
 }
 
 function criteriaFor(
@@ -213,6 +216,7 @@ export async function decidePlacement(
   const rules = await placeChange(change, nodes, {
     model: useText ? options.model : undefined,
     shortlistSize: options.shortlistSize,
+    areas: options.areas,
   });
   warnings.push(...rules.warnings);
   const { shortlist } = rules;

@@ -173,11 +173,11 @@ describe("decidePlacement: degradation", () => {
     expect(model).not.toHaveBeenCalled();
   });
 
-  it("a change nothing matches carries needsPlacement and calls no model", async () => {
+  it("a change nothing matches carries needsPlacement; a pick outside the empty shortlist is not accepted", async () => {
     const model = text("cap-store");
     const d = await decidePlacement({ title: "Unrelated" }, caps, { model });
     expect(d).toMatchObject({ shortlist: [], accepted: null, needsPlacement: true });
-    expect(model).not.toHaveBeenCalled();
+    expect(model).toHaveBeenCalledTimes(1);
   });
 
   it("defaults are text + agree", async () => {
@@ -190,7 +190,8 @@ describe("decidePlacement: target and relation", () => {
   const feature = { title: "Add folder export to rex", files: ["packages/rex/src/store/export.ts"] };
 
   it("accepts { target, relation } with the rules' relation: a new-behaviour change amends", async () => {
-    const d = await decidePlacement(feature, caps, { settings: { models: "both", autoAccept: "agree" }, model: text("cap-store"), judge: jev("cap-store", 0.9) });
+    const marked = { ...feature, intent: "Relation: amends" };
+    const d = await decidePlacement(marked, caps, { settings: { models: "both", autoAccept: "agree" }, model: text("cap-store"), judge: jev("cap-store", 0.9) });
     expect(d.relation).toBe("amends");
     expect(d.accepted).toEqual({ target: "cap-store", relation: "amends" });
     expect(d.shortlist.every((c) => c.relation === "amends")).toBe(true);
@@ -205,7 +206,7 @@ describe("decidePlacement: target and relation", () => {
 
   it("places a code-health finding on the architecture constraint as touches", async () => {
     const nodes: PlacementNode[] = [...caps, { id: "k-arch", type: "constraint", title: "Architecture integrity" }];
-    const finding = { title: "Fix cycle between viewer and server", source: "sourcevision" };
+    const finding = { title: "Fix cycle between viewer and server", tags: ["code-health"] };
     const d = await decidePlacement(finding, nodes, { settings: { models: "text", autoAccept: "agree" }, model: text("k-arch") });
     expect(d.shortlist[0].target).toBe("k-arch");
     expect(d.accepted).toEqual({ target: "k-arch", relation: "touches" });
@@ -222,10 +223,41 @@ describe("decidePlacement: a proposed new node is never auto-accepted", () => {
     summary: "Record who holds the PRD lock",
   };
   const proposer: PlacementModel = vi.fn(async () => ({ propose: proposal }));
+  const areas = [{ id: "area-storage", title: "Storage" }];
+  const unmatched = { title: "Unrelated zebra" };
+
+  it("an unmatched change still asks the text model, tells it the areas, and keeps a proposal for review", async () => {
+    const model = vi.fn(async () => ({ propose: proposal }));
+    const judge = jev("cap-store", 0.99);
+    for (const autoAccept of ["none", "agree", "confident"] as const) {
+      const d = await decidePlacement(unmatched, caps, { settings: { models: "both", autoAccept }, model, judge, areas });
+      expect(d).toMatchObject({ shortlist: [], accepted: null, needsPlacement: true, proposal });
+    }
+    expect(model).toHaveBeenCalledTimes(3);
+    expect(model.mock.calls[0][0]).toMatchObject({ shortlist: [], areas });
+    expect(judge).not.toHaveBeenCalled();
+  });
+
+  it("drops a proposal under an unknown area and still needs a placement", async () => {
+    const d = await decidePlacement(unmatched, caps, {
+      settings: { models: "text", autoAccept: "agree" },
+      model: async () => ({ propose: { ...proposal, under: "area-nowhere" } }),
+      areas,
+    });
+    expect(d.proposal).toBeUndefined();
+    expect(d).toMatchObject({ accepted: null, needsPlacement: true });
+    expect(d.warnings.join()).toMatch(/not a known area/);
+  });
+
+  it("makes no model call for an unmatched change when text is not configured", async () => {
+    const model = vi.fn(async () => null);
+    await decidePlacement(unmatched, caps, { settings: { models: "jev", autoAccept: "agree" }, model, judge: jev("cap-store", 0.9), areas });
+    expect(model).not.toHaveBeenCalled();
+  });
 
   it.each(["text", "both"] as const)("%s: in every autoAccept mode, even with a confident Jev pick", async (models) => {
     for (const autoAccept of ["none", "agree", "confident"] as const) {
-      const d = await decidePlacement(change, caps, { settings: { models, autoAccept }, model: proposer, judge: jev("cap-store", 0.99) });
+      const d = await decidePlacement(change, caps, { settings: { models, autoAccept }, model: proposer, judge: jev("cap-store", 0.99), areas });
       expect(d).toMatchObject({ accepted: null, needsPlacement: true, proposal });
       expect(d.warnings.join()).toMatch(/proposed a new capability "Lock audit" under "area-storage"/);
     }
@@ -233,7 +265,7 @@ describe("decidePlacement: a proposed new node is never auto-accepted", () => {
 
   it("surfaces a malformed proposal as a warning and no proposal", async () => {
     const bad: PlacementModel = async () => ({ propose: { ...proposal, type: undefined } as unknown as PlacementProposal });
-    const d = await decidePlacement(change, caps, { settings: { models: "text", autoAccept: "agree" }, model: bad });
+    const d = await decidePlacement(change, caps, { settings: { models: "text", autoAccept: "agree" }, model: bad, areas });
     expect(d.proposal).toBeUndefined();
     expect(d).toMatchObject({ accepted: null, needsPlacement: true });
     expect(d.warnings.join()).toMatch(/not an added amendment/);

@@ -3,6 +3,7 @@ import {
   placeChange,
   placementRelation,
   rankPlacementCandidates,
+  type PlacementChange,
   type PlacementNode,
   type PlacementProposal,
 } from "../../../src/core/placement.js";
@@ -64,26 +65,37 @@ describe("rankPlacementCandidates (rules)", () => {
 });
 
 describe("placementRelation (rules decide the relation)", () => {
-  it("a fix touches, even when its title asks for something new", () => {
-    expect(placementRelation({ title: "Add the missing lock check", fix: true })).toBe("touches");
+  const amends = "Relation: amends";
+
+  it("a fix touches, even when its title and intent ask for something new", () => {
+    expect(placementRelation({ title: "Add the missing lock check", intent: amends, fix: true })).toBe("touches");
   });
 
-  it("a change asking for new behaviour amends, in its title or its intent", () => {
-    expect(placementRelation({ title: "Add token rotation to the dashboard" })).toBe("amends");
-    expect(placementRelation({ title: "Token rotation", intent: "Allow a user to rotate their token" })).toBe("amends");
+  it("amends needs an imperative leading verb in the title and the explicit marker in the intent", () => {
+    expect(placementRelation({ title: "Add token rotation to the dashboard", intent: `Rotate tokens.\n${amends}` })).toBe("amends");
+    expect(placementRelation({ title: "  allow token rotation", intent: `  relation : AMENDS` })).toBe("amends");
+  });
+
+  it("a leading verb without the marker touches", () => {
+    expect(placementRelation({ title: "Add token rotation to the dashboard" })).toBe("touches");
+    expect(placementRelation({ title: "Add token rotation", intent: "A new store layout" })).toBe("touches");
+  });
+
+  it("the marker without a leading verb touches, and so does intent prose", () => {
+    expect(placementRelation({ title: "Token rotation", intent: amends })).toBe("touches");
+    expect(placementRelation({ title: "Rename the lock helper", intent: "Allow a new store layout; adds a support file" })).toBe("touches");
+    expect(placementRelation({ title: "Rename the store, adding a new layout", intent: amends })).toBe("touches");
   });
 
   it("a code-health finding touches", () => {
-    expect(placementRelation({ title: "Add a gateway for web imports", source: "sourcevision" })).toBe("touches");
-    expect(placementRelation({ title: "Add a gateway for web imports", tags: ["code-health"] })).toBe("touches");
-  });
-
-  it("anything else touches", () => {
-    expect(placementRelation({ title: "Rename the lock helper" })).toBe("touches");
+    expect(placementRelation({ title: "Add a gateway for web imports", intent: amends, tags: ["code-health"] })).toBe("touches");
   });
 
   it("every ranked candidate carries the rules' relation", () => {
-    const ranked = rankPlacementCandidates({ title: "Add rex folder storage export", files: ["packages/rex/src/store/x.ts"] }, caps);
+    const ranked = rankPlacementCandidates(
+      { title: "Add rex folder storage export", intent: amends, files: ["packages/rex/src/store/x.ts"] },
+      caps,
+    );
     expect(ranked.length).toBeGreaterThan(0);
     expect(ranked.every((c) => c.relation === "amends")).toBe(true);
   });
@@ -102,7 +114,7 @@ describe("constraints as placement candidates", () => {
   });
 
   it("puts a code-health finding on the architecture constraint, as touches", () => {
-    const finding = { title: "Fix coupling in web-viewer zone", source: "sourcevision" };
+    const finding = { title: "Fix coupling in web-viewer zone", tags: ["code-health"] };
     const [top] = rankPlacementCandidates(finding, nodes);
     expect(top).toMatchObject({ target: "k-arch", relation: "touches" });
     expect(top.reasons).toContain("code-health finding: architecture constraint");
@@ -115,8 +127,13 @@ describe("constraints as placement candidates", () => {
 
   it("does not give a capability named architecture, or a non-finding change, the code-health boost", () => {
     const capNamed: PlacementNode[] = [{ id: "cap-arch", title: "Architecture map" }];
-    expect(rankPlacementCandidates({ title: "Fix cycle", source: "sourcevision" }, capNamed)).toEqual([]);
+    expect(rankPlacementCandidates({ title: "Fix cycle", tags: ["code-health"] }, capNamed)).toEqual([]);
     expect(rankPlacementCandidates({ title: "Fix cycle" }, nodes)).toEqual([]);
+  });
+
+  it("ignores where a change came from: only the code-health tag boosts the architecture constraint", () => {
+    const fromSourcevision = { title: "Fix cycle", source: "sourcevision" } as PlacementChange;
+    expect(rankPlacementCandidates(fromSourcevision, nodes)).toEqual([]);
   });
 });
 
@@ -142,11 +159,21 @@ describe("placeChange (rules + text model)", () => {
     }
   });
 
-  it("does not call the model when the rules found nothing", async () => {
-    const model = vi.fn();
-    const result = await placeChange({ title: "Unrelated zebra" }, caps, { model });
-    expect(model).not.toHaveBeenCalled();
-    expect(result).toEqual({ shortlist: [], warnings: [] });
+  const areas = [{ id: "area-dashboard", title: "Dashboard" }];
+
+  it("asks the model when the rules found nothing, passing the areas; a pick is never agreement", async () => {
+    const model = vi.fn().mockResolvedValue("cap-auth");
+    const result = await placeChange({ title: "Unrelated zebra" }, caps, { model, areas });
+    expect(model).toHaveBeenCalledTimes(1);
+    expect(model.mock.calls[0][0]).toMatchObject({ shortlist: [], areas });
+    expect(result.model).toEqual({ pick: "cap-auth", agrees: false });
+  });
+
+  it("passes no areas as an empty list and never calls without a model", async () => {
+    const model = vi.fn().mockResolvedValue(null);
+    await placeChange({ title: "Unrelated zebra" }, caps, { model });
+    expect(model.mock.calls[0][0].areas).toEqual([]);
+    expect(await placeChange({ title: "Unrelated zebra" }, caps)).toEqual({ shortlist: [], warnings: [] });
   });
 
   const proposal: PlacementProposal = {
@@ -159,9 +186,21 @@ describe("placeChange (rules + text model)", () => {
   };
 
   it("reports a well-formed new-node proposal as no pick and no agreement", async () => {
-    const result = await placeChange(change, caps, { model: async () => ({ propose: proposal }) });
+    const result = await placeChange(change, caps, { model: async () => ({ propose: proposal }), areas });
     expect(result.model).toEqual({ pick: null, agrees: false, proposal });
     expect(result.warnings).toEqual([]);
+  });
+
+  it("keeps a proposal for an unmatched change, and drops one whose area is unknown", async () => {
+    const unmatched = { title: "Unrelated zebra" };
+    const kept = await placeChange(unmatched, caps, { model: async () => ({ propose: proposal }), areas });
+    expect(kept.shortlist).toEqual([]);
+    expect(kept.model).toEqual({ pick: null, agrees: false, proposal });
+    const dropped = await placeChange(unmatched, caps, { model: async () => ({ propose: { ...proposal, under: "area-nowhere" } }), areas });
+    expect(dropped.model).toEqual({ pick: null, agrees: false });
+    expect(dropped.warnings.join()).toMatch(/"area-nowhere", which is not a known area/);
+    const noAreas = await placeChange(unmatched, caps, { model: async () => ({ propose: proposal }) });
+    expect(noAreas.model).toEqual({ pick: null, agrees: false });
   });
 
   it.each([
@@ -171,7 +210,7 @@ describe("placeChange (rules + text model)", () => {
     ["no area", { ...proposal, under: " " }],
     ["no title", { ...proposal, title: "" }],
   ])("drops a proposal with %s, with a warning", async (_n, bad) => {
-    const result = await placeChange(change, caps, { model: async () => ({ propose: bad as PlacementProposal }) });
+    const result = await placeChange(change, caps, { model: async () => ({ propose: bad as PlacementProposal }), areas });
     expect(result.model).toEqual({ pick: null, agrees: false });
     expect(result.warnings.join()).toMatch(/proposed a new node/);
   });
