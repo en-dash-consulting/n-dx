@@ -24,7 +24,13 @@ import type {
   CallGraph,
 } from "../schema/index.js";
 
-function cmp(a: string, b: string): number {
+/**
+ * Codepoint string order — the one comparator every canonical sort uses.
+ * Exported so other writers of deterministic artifacts (the SDLC profile)
+ * order by the same rule rather than by `localeCompare`, which depends on
+ * the ICU locale of the machine running the analysis.
+ */
+export function cmp(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 

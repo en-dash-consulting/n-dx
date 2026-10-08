@@ -1173,15 +1173,85 @@ export interface SdlcCoverage extends SdlcDetection {
 }
 
 /** A CI pipeline and the jobs it runs. */
+/**
+ * What a CI step does, classified from the command it runs.
+ *
+ * A closed set so a consumer can ask "does this pipeline test" without
+ * pattern-matching shell. `other` is honest rather than a dustbin: a step
+ * whose command is not recognised is not evidence of anything.
+ */
+export type SdlcStepKind =
+  | "checkout"
+  | "setup"
+  | "install"
+  | "build"
+  | "test"
+  | "lint"
+  | "typecheck"
+  | "migrate"
+  | "deploy"
+  | "publish"
+  | "other";
+
+/** One step in a CI job. */
+export interface SdlcCiStep {
+  /** Step name as declared, when it has one. */
+  name?: string;
+  /** The shell command, when the step runs one. */
+  run?: string;
+  /** The action, orb or image the step invokes, when it does. */
+  uses?: string;
+  kind: SdlcStepKind;
+}
+
+/** One job in a CI pipeline. */
+export interface SdlcCiJob {
+  name: string;
+  steps: SdlcCiStep[];
+  /** Jobs this one waits for, as declared. */
+  needs?: string[];
+  /**
+   * A guard on when the job runs, verbatim and unparsed — `if:` on Actions,
+   * `rules:`/`only:` elsewhere. Kept as text because deciding whether a
+   * condition means "only on main" is a judgement, not a parse.
+   */
+  condition?: string;
+  /**
+   * The deployment environment the job declares (`environment:` on Actions,
+   * `environment.name` on GitLab), when it declares one. A deploy job without
+   * it is reported against the environment `unknown` rather than its own
+   * name, so two jobs deploying to production are not counted as two
+   * environments.
+   */
+  environment?: string;
+}
+
 export interface SdlcCiPipeline extends SdlcDetection {
-  /** The CI system: `github-actions`, `gitlab-ci`, `bitbucket-pipelines`, `circleci`. */
+  /** The CI system: `github-actions`, `gitlab-ci`, `bitbucket-pipelines`, `circleci`, `jenkins`. */
   provider: string;
-  /** Pipeline name as declared. */
+  /** Pipeline name as declared, or the file name when it declares none. */
   name: string;
   /** What triggers it: `push`, `pull_request`, `schedule`, `manual`, `tag`. */
   triggers: string[];
-  /** Job names in declaration order. */
-  jobs: string[];
+  /** Jobs in declaration order, each with its steps. */
+  jobs: SdlcCiJob[];
+}
+
+/**
+ * An artifact that was found and recognised but could not be read.
+ *
+ * The distinction this exists for: "no CI is configured" and "CI is
+ * configured and the analyser could not parse it" are opposite facts about a
+ * repository, and an empty `ci` array says the first. A scorecard that
+ * confused them would mark a well-tested project as having no pipeline.
+ */
+export interface SdlcParseFailure {
+  /** Project-relative path of the file. */
+  path: string;
+  /** What it was recognised as — `github-actions`, `package.json`, `dockerfile`. */
+  kind: string;
+  /** Why it could not be read, in one line. */
+  reason: string;
 }
 
 /** A deployment target the repository can reach. */
@@ -1196,12 +1266,31 @@ export interface SdlcDeployment extends SdlcDetection {
   automated: boolean;
 }
 
-/** A way to undo a deployment. */
+/**
+ * A way to undo a deployment.
+ *
+ * Each entry is one lever the repository has for going back: a release that
+ * can be redeployed by tag, a rollout history to undo, a down-migration, a
+ * flag to flip. Detection is by configuration present, not by proof that
+ * anyone has ever rolled back.
+ */
 export interface SdlcRollback extends SdlcDetection {
-  /** `redeploy-previous`, `blue-green`, `feature-flag`, `db-down-migration`, `manual`. */
+  /**
+   * `tagged-release` (versioned releases exist to redeploy), `redeploy-previous`
+   * (a rollout history: `helm rollback`, `kubectl rollout undo`, CodeDeploy),
+   * `blue-green`, `canary`, `feature-flag`, `db-down-migration`, `manual`.
+   */
   mechanism: string;
   /** The environment it applies to, when it is environment-specific. */
   environment?: string;
+  /**
+   * The tool that provides the lever: `changesets`, `semantic-release`,
+   * `release-please`, `goreleaser`, `helm`, `kubernetes`, `argo-rollouts`,
+   * `codedeploy`, or the migration or flag provider.
+   */
+  tool?: string;
+  /** For `tagged-release`: the version scheme read from the manifest — `semver` or `calver`. */
+  versioning?: "semver" | "calver";
 }
 
 /** Database or data migrations. */
@@ -1299,4 +1388,12 @@ export interface SdlcProfile {
   observability: SdlcObservability[];
   containers: SdlcContainer[];
   iac: SdlcIac[];
+  /**
+   * Files that were recognised but could not be read.
+   *
+   * Empty means every artifact found was parsed. It is not the same as a
+   * section being empty, which means the analyser looked and found none — see
+   * `SdlcParseFailure`.
+   */
+  parseFailures: SdlcParseFailure[];
 }

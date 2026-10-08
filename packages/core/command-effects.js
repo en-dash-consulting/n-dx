@@ -622,6 +622,17 @@ export const COMMAND_EFFECTS = {
   tree: prdReader("tree", "Print the PRD hierarchy.", "ndx next"),
   "tree-diff": prdReader("tree-diff", "Compare the PRD tree between two git refs or directories.", "ndx status", ["git history"]),
 
+  readiness: {
+    command: "readiness",
+    summary: "Score how ready this repository is to be worked by an agent.",
+    reads: ["{sourcevision}/sdlc-profile.json", "{config}", "{hench}/config.json", ".mcp.json"],
+    writes: [],
+    llm: [],
+    network: [],
+    duration: "seconds",
+    next: "ndx work",
+  },
+
   reset: {
     command: "reset",
     summary: "Delete the SourceVision analysis so the next analyze starts fresh.",

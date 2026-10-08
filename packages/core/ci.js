@@ -288,17 +288,23 @@ async function runBoundaryPhase(dir, info, isJSON) {
 
   // Step 3c: architecture policy
   info("── architecture policy ──");
-  const archResult = checkArchitecturePolicy(dir);
+  // The spawn rule is n-dx's own architecture; user projects never opted in.
+  const archApplies = isNdxMonorepo(dir);
+  const archResult = archApplies ? checkArchitecturePolicy(dir) : { ok: true, checked: 0, violations: [] };
   if (!archResult.ok) allOk = false;
   steps.push({
     name: "architecture-policy",
     ok: archResult.ok,
-    detail: archResult.ok
-      ? `${archResult.checked} files checked, no unauthorized child_process imports`
+    detail: !archApplies
+      ? "skipped (not the n-dx monorepo)"
+      : archResult.ok
+      ?`${archResult.checked} files checked, no unauthorized child_process imports`
       : `${archResult.violations.length} unauthorized child_process import(s) found`,
     ...(archResult.violations.length > 0 ? { violations: archResult.violations } : {}),
   });
-  if (archResult.ok) {
+  if (!archApplies) {
+    info("  ✓ architecture policy (skipped: not the n-dx monorepo)");
+  } else if (archResult.ok) {
     info(`  ✓ architecture policy (${archResult.checked} files checked)`);
   } else {
     info(`  ✗ architecture policy`);
@@ -973,6 +979,19 @@ function checkGatewayImports(dir) {
 const _childProcessPolicy = JSON.parse(readFileSync(join(__dir, "child-process-allowlist.json"), "utf-8"));
 const CHILD_PROCESS_ALLOWED = new Set(_childProcessPolicy.allowed.map((e) => e.path));
 const CHILD_PROCESS_EXCLUDED_DIRS = new Set(Object.keys(_childProcessPolicy.excludeDirs));
+
+/**
+ * True when `dir` is the n-dx monorepo root, the only project the
+ * child_process allowlist describes. Exported for tests.
+ */
+export function isNdxMonorepo(dir) {
+  try {
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
+    return pkg.name === "n-dx" && existsSync(join(dir, "packages", "core", "child-process-allowlist.json"));
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Check that no source files import from node:child_process outside the

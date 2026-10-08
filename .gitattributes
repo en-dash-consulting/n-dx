@@ -73,3 +73,7 @@ packages/core/export.js     text eol=lf
 .ndx/rex/changes/**/*.md    text eol=lf
 .ndx/rex/changes/**/*.yaml  text eol=lf
 packages/rex/tests/fixtures/v2-tree/** text eol=lf
+
+# sdlc readiness fixtures are parsed byte-for-byte by tests that assert exact
+# scores; pin them to LF so a CRLF checkout reads the same bytes CI does.
+packages/sourcevision/tests/fixtures/sdlc/** text eol=lf

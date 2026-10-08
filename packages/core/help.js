@@ -373,6 +373,13 @@ const COMMAND_REGISTRY = [
   },
   // ── Delegated sourcevision commands ──
   {
+    name: "readiness",
+    category: "Manage",
+    summary: "Score how ready this repo is to be worked by an agent",
+    keywords: ["readiness", "sdlc", "maturity", "ci", "cd", "tests", "rollback", "migrations", "observability", "scorecard"],
+    related: ["analyze", "status"],
+  },
+  {
     name: "reset",
     category: "Manage",
     summary: "Remove .sourcevision/ and start fresh",
@@ -1536,6 +1543,26 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["status", "work", "update"],
   },
+  readiness: {
+    summary: "score how ready this repo is to be worked by an agent",
+    description:
+      "Scores the SDLC profile the last analysis detected across nine weighted\n" +
+      "dimensions — testing, CI, CD, rollback, migrations, feature flags,\n" +
+      "quality gates, observability and agent safety — and names the gap that\n" +
+      "would raise each one. Delegates to 'sourcevision readiness'.\n" +
+      "\n" +
+      "Heuristic: it detects whether a practice exists and is wired up, not\n" +
+      "whether it is good. Requires a prior 'ndx analyze' run.",
+    usage: "ndx readiness [--json] [dir]",
+    options: [
+      { flag: "--json", description: "Print the machine-readable score instead of the scorecard" },
+    ],
+    examples: [
+      { command: "ndx readiness .", description: "Print the scorecard" },
+      { command: "ndx readiness --json .", description: "Machine-readable score, evidence and gaps" },
+    ],
+    related: ["analyze", "status"],
+  },
   reset: {
     summary: "remove .sourcevision/ and start fresh",
     description: "Deletes the .sourcevision/ directory so analysis can start from\nscratch. Delegates to 'sourcevision reset'.",
@@ -1839,6 +1866,7 @@ export function formatMainHelp() {
     ["reorganize [dir]", "Reorganize PRD structure"],
     ["prune [dir]", "Remove completed subtrees"],
     ["show <run-id>", "Show details of a hench run"],
+    ["readiness [dir]", "Score SDLC readiness for agent work (--json)"],
     ["reset [dir]", "Remove .sourcevision/ and start fresh"],
   ], pad);
 

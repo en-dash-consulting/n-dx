@@ -500,6 +500,11 @@ async function dispatchCommand(
       await cmdExport(resolveDir(positional), flags);
       break;
     }
+    case "codeowners": {
+      const { cmdCodeOwners } = await import("./commands/codeowners.js");
+      await cmdCodeOwners(resolveDir(positional), flags);
+      break;
+    }
     case "tree-diff": {
       const { cmdTreeDiff } = await import("./commands/tree-diff.js");
       await cmdTreeDiff(resolveDir(positional), flags);
@@ -595,7 +600,7 @@ async function dispatchCommand(
       const REX_COMMANDS = [
         "init", "status", "tree", "tree-diff", "next", "add", "update", "move", "remove", "reshape",
         "prune", "restore", "validate", "fix", "usage", "report", "verify", "ready", "log",
-        "recommend", "analyze", "import", "export", "import-bundle",
+        "recommend", "analyze", "import", "export", "import-bundle", "codeowners",
         "reorganize", "health", "mcp",
         "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "parse-md",
         "backfill-commit-attribution",

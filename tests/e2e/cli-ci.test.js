@@ -70,6 +70,20 @@ describe("n-dx ci", () => {
     });
   });
 
+  describe("architecture policy scope", () => {
+    it("does not fail a user project that imports child_process", async () => {
+      await mkdir(join(tmpDir, "scripts"), { recursive: true });
+      await writeFile(
+        join(tmpDir, "scripts", "release.js"),
+        'import { execFileSync } from "node:child_process";\nexecFileSync("true");\n',
+      );
+      const { stdout } = runResult(["--format=json", "--quiet", tmpDir]);
+      const arch = JSON.parse(stdout).steps.find((s) => s.name === "architecture-policy");
+      expect(arch.ok).toBe(true);
+      expect(arch.violations).toBeUndefined();
+    });
+  });
+
   // ── JSON output ────────────────────────────────────────────────────────────
 
   describe("--format=json", () => {

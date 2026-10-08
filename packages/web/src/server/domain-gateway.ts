@@ -44,6 +44,17 @@ export type { NextStep, IsoModel, IsoModelInput, IsoSourceMode } from "@n-dx/sou
 export type { Manifest, Inventory, Imports, Zones, Components } from "@n-dx/sourcevision";
 
 /**
+ * SDLC readiness (`.sourcevision/readiness.json`).
+ *
+ * `analyze` scores the detected SDLC profile and writes the result beside it;
+ * the status route reads that file so the sidebar and, later, the hub card can
+ * show the headline without re-scoring on a polling path. Type-only, like the
+ * artifact types above — the scorer itself stays in sourcevision, so nothing
+ * here can recompute a score the CLI would disagree with.
+ */
+export type { ReadinessScore } from "@n-dx/sourcevision";
+
+/**
  * Live analyze progress (`.sourcevision/.cache/analyze-progress.json`).
  *
  * The one sourcevision file read through a loader rather than parsed at the

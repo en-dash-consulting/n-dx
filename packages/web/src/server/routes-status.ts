@@ -18,6 +18,7 @@ import { jsonResponse } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
 import { computeStats, collectCompletedIds, findNextTask, walkTree } from "./rex-gateway.js";
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
+import type { ReadinessScore } from "./domain-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
 import { isProjectInitialized } from "./routes-static.js";
 import { isRunStale } from "./run-staleness.js";
@@ -28,6 +29,25 @@ import { isRunStale } from "./run-staleness.js";
 
 /** SourceVision analysis freshness status. */
 export type AnalysisFreshness = "fresh" | "stale" | "unavailable";
+
+/**
+ * The SDLC readiness headline, when an analysis has produced one.
+ *
+ * Just the overall score and when it was computed — enough for a sidebar
+ * indicator or a hub card, and deliberately not the per-dimension detail,
+ * which belongs to a view that asks for it rather than to a status poll.
+ */
+export interface ReadinessSummary {
+  /** Weighted 0-100 readiness score. Heuristic — see sourcevision's scorer. */
+  overall: number;
+  /**
+   * When the analysis that produced it ran, from the manifest.
+   *
+   * `readiness.json` is written by the same `analyze` pass as the manifest, so
+   * the manifest's timestamp dates the score without the artifact carrying one.
+   */
+  analyzedAt: string | null;
+}
 
 export interface SourceVisionStatus {
   /** Whether analysis data exists and how fresh it is. */
@@ -40,6 +60,14 @@ export interface SourceVisionStatus {
   modulesComplete: number;
   /** Total number of analysis modules. */
   modulesTotal: number;
+  /**
+   * SDLC readiness, or null when this analysis produced no readiness artifact.
+   *
+   * Null rather than absent, and null rather than a throw: an analysis from
+   * before readiness existed simply has no `readiness.json`, and so does a
+   * project that has never been analysed. Neither is an error.
+   */
+  readiness: ReadinessSummary | null;
 }
 
 /** Per-item branch and source-file attribution, serialized from PRDItem fields. */
@@ -167,6 +195,28 @@ export function clearStatusCache(): void {
 
 const ANALYSIS_MODULES = ["inventory", "imports", "zones", "components", "callgraph"];
 
+/**
+ * Read the readiness headline from `readiness.json`, or null.
+ *
+ * Every failure mode collapses to null on purpose — the file is absent before
+ * the first analysis and on any analysis predating readiness, and a truncated
+ * or hand-edited one is not worth failing the whole status poll over. Only a
+ * numeric `overall` is accepted, so a malformed file reads as "no readiness"
+ * rather than putting `undefined` on the wire.
+ */
+function readReadiness(svDir: string, analyzedAt: string | null): ReadinessSummary | null {
+  const path = join(svDir, DATA_FILES.readiness);
+  if (!existsSync(path)) return null;
+
+  try {
+    const score = JSON.parse(readFileSync(path, "utf-8")) as Partial<ReadinessScore>;
+    if (typeof score.overall !== "number" || !Number.isFinite(score.overall)) return null;
+    return { overall: score.overall, analyzedAt };
+  } catch {
+    return null;
+  }
+}
+
 function extractSvStatus(ctx: ServerContext): SourceVisionStatus {
   const manifestPath = join(ctx.svDir, DATA_FILES.manifest);
   if (!existsSync(manifestPath)) {
@@ -176,6 +226,7 @@ function extractSvStatus(ctx: ServerContext): SourceVisionStatus {
       minutesAgo: null,
       modulesComplete: 0,
       modulesTotal: ANALYSIS_MODULES.length,
+      readiness: null,
     };
   }
 
@@ -202,6 +253,7 @@ function extractSvStatus(ctx: ServerContext): SourceVisionStatus {
       minutesAgo,
       modulesComplete,
       modulesTotal: ANALYSIS_MODULES.length,
+      readiness: readReadiness(ctx.svDir, analyzedAt),
     };
   } catch {
     return {
@@ -210,6 +262,7 @@ function extractSvStatus(ctx: ServerContext): SourceVisionStatus {
       minutesAgo: null,
       modulesComplete: 0,
       modulesTotal: ANALYSIS_MODULES.length,
+      readiness: null,
     };
   }
 }

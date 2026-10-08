@@ -340,9 +340,20 @@ function parseCloudFormation(content: string, file: string): DeclaredInfra[] {
  * deployed stacks, so it finds what a reader would see scanning the files
  * themselves. Terraform and CloudFormation both feed the same classification
  * table, so a resource means the same thing whichever dialect declared it.
+ *
+ * `accept` lets a caller that has already decided which files belong to the
+ * project — one honouring `.gitignore`, `.sourcevisionignore` and its own
+ * walk bounds — restrict discovery to those files, by root-relative POSIX
+ * path. Without it, every candidate the shallow walk finds is read.
  */
-export function discoverFromIaC(root: string): { infrastructure: DeclaredInfra[]; sawIaC: boolean } {
-  const { terraform, yaml } = findIaCFiles(root);
+export function discoverFromIaC(
+  root: string,
+  options: { accept?: (relPath: string) => boolean } = {},
+): { infrastructure: DeclaredInfra[]; sawIaC: boolean } {
+  const found = findIaCFiles(root);
+  const accept = options.accept ?? (() => true);
+  const terraform = found.terraform.filter(accept);
+  const yaml = found.yaml.filter(accept);
   if (terraform.length === 0 && yaml.length === 0) {
     return { infrastructure: [], sawIaC: false };
   }

@@ -2961,6 +2961,20 @@ async function handleReset(rest) {
 }
 
 /**
+ * Print the SDLC readiness scorecard.
+ *
+ * Flags are forwarded so `--json` reaches the delegate; the scorecard is
+ * sourcevision's to compute and format, and this only spawns it.
+ */
+async function handleReadiness(rest) {
+  const dir = resolveDir(rest);
+  requireInit(dir, ["sourcevision"]);
+  const flags = extractFlags(rest);
+  await runOrDie(tools.sourcevision, ["readiness", ...flags, dir]);
+  exitWithCleanup(0);
+}
+
+/**
  * Render the isometric architecture map.
  *
  * Unlike the other delegated sourcevision commands this does not require
@@ -3293,6 +3307,7 @@ const COMMAND_DISPATCH = new Map([
   ["prd",               handlePrd],
   // ── Delegated sourcevision commands ──
   ["reset",             handleReset],
+  ["readiness",         handleReadiness],
   ["iso",               handleIso],
   // ── Delegated hench commands ──
   ["show",              handleShow],

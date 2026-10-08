@@ -28,9 +28,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { checkArchitecturePolicy } from "../../packages/core/ci.js";
+import { checkArchitecturePolicy, isNdxMonorepo } from "../../packages/core/ci.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 
@@ -825,6 +826,30 @@ describe("architecture policy: process execution", () => {
     expect([...ci.violations].sort()).toEqual(childProcessViolations().sort());
     expect(ci.ok).toBe(true);
   });
+
+  // The allowlist names n-dx's own files, so the step must not apply elsewhere.
+  describe("scope: only the n-dx monorepo", () => {
+    it("the n-dx repo is recognised as the monorepo", () => {
+      expect(isNdxMonorepo(ROOT)).toBe(true);
+    });
+
+    it("a user project that imports child_process is not the monorepo", () => {
+      const dir = mkdtempSync(join(tmpdir(), "ndx-arch-scope-"));
+      try {
+        writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "my-app" }));
+        mkdirSync(join(dir, "scripts"));
+        writeFileSync(
+          join(dir, "scripts", "release.js"),
+          'import { execFileSync } from "node:child_process";\nexecFileSync("true");\n',
+        );
+        // The scanner alone would flag it; the scope check is what spares it.
+        expect(checkArchitecturePolicy(dir).violations).toEqual(["scripts/release.js"]);
+        expect(isNdxMonorepo(dir)).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -997,8 +1022,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/web/src/server/domain-gateway.ts",
-    maxExports: 21,
-    description: "web→sourcevision gateway (MCP server factory, domain types, iso-map builder, analysis-output schema types, live analyze progress reader, analyze command-line check). Raised from 19 to 21 for confirmAnalyzeProcess and its ProcessCommandLine type: Stop on /live/analyze signals the pid a progress file records, and after a hard kill that pid may belong to another program, so the route must confirm the process is an analyze first — the same check the reader applies before calling a file running. What an analyze's command line looks like is sourcevision's to define; a web-side pattern would be a second definition, free to drift from the reader's and so to signal a process the page no longer shows as running. Raised from 16 to 19 for readAnalyzeProgress, analyzeProgressPath and the AnalyzeProgressReport type: the dashboard reports a running analysis whether it was started from a terminal or from the dashboard, which means reading the progress file the analyzing process writes — and whether that file's 'running' is still true depends on its pid, and its 'last time' timings come from analyses.jsonl. Those rules are the writer's; a server-side parser would be a second definition of when an analysis counts as running, free to drift from the one that writes it. Raised from 15 to carry the five artifact schema types (Manifest, Inventory, Imports, Zones, Components) that the Ask endpoint's context assembler parses .sourcevision/*.json against — sourcevision exposes no loader, so the types are the only thing keeping those disk reads honest about the schema, and importing them from @n-dx/sourcevision at the read site would bypass the gateway.",
+    maxExports: 22,
+    description: "web→sourcevision gateway (MCP server factory, domain types, iso-map builder, analysis-output schema types, live analyze progress reader, analyze command-line check, readiness score type). Raised from 21 to 22 for the ReadinessScore type: analyze writes the SDLC readiness score to readiness.json and the status route reads it for the sidebar headline, so the type is what keeps that disk read honest about the shape it is parsing. Type-only on purpose: the scorer itself stays in sourcevision, so the dashboard cannot compute a score the CLI would disagree with, and a readiness surface that needs the per-dimension types raises this again rather than reaching past the gateway. Raised from 19 to 21 for confirmAnalyzeProcess and its ProcessCommandLine type: Stop on /live/analyze signals the pid a progress file records, and after a hard kill that pid may belong to another program, so the route must confirm the process is an analyze first — the same check the reader applies before calling a file running. What an analyze's command line looks like is sourcevision's to define; a web-side pattern would be a second definition, free to drift from the reader's and so to signal a process the page no longer shows as running. Raised from 16 to 19 for readAnalyzeProgress, analyzeProgressPath and the AnalyzeProgressReport type: the dashboard reports a running analysis whether it was started from a terminal or from the dashboard, which means reading the progress file the analyzing process writes — and whether that file's 'running' is still true depends on its pid, and its 'last time' timings come from analyses.jsonl. Those rules are the writer's; a server-side parser would be a second definition of when an analysis counts as running, free to drift from the one that writes it. Raised from 15 to carry the five artifact schema types (Manifest, Inventory, Imports, Zones, Components) that the Ask endpoint's context assembler parses .sourcevision/*.json against — sourcevision exposes no loader, so the types are the only thing keeping those disk reads honest about the schema, and importing them from @n-dx/sourcevision at the read site would bypass the gateway.",
   },
   {
     file: "packages/hench/src/prd/rex-gateway.ts",
