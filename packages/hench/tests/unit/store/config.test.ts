@@ -284,3 +284,19 @@ describe("loadConfig", () => {
     });
   });
 });
+
+describe("loadConfig on the .ndx/ layout", () => {
+  it("applies the hench section of .ndx/config.json, not a root .n-dx.json", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hench-loadcfg-ndx-"));
+    try {
+      const henchDir = join(dir, ".ndx", "hench");
+      await initConfig(henchDir);
+      await writeFile(join(dir, ".ndx", "config.json"), JSON.stringify({ hench: { maxTurns: 7 } }), "utf-8");
+      await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ hench: { maxTurns: 99 } }), "utf-8");
+
+      expect((await loadConfig(henchDir)).maxTurns).toBe(7);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
