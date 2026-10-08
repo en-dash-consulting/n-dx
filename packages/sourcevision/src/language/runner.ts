@@ -87,6 +87,8 @@ export interface TreeSitterRunner {
   parseFile(target: RunnablePack, path: string): Promise<FileResult>;
   /** Parse source already in memory; `path` labels the result. */
   parseSource(target: RunnablePack, path: string, source: string): Promise<FileResult>;
+  /** Load the grammar and compile the pack's queries without parsing; rejects when either fails. */
+  prepare(target: RunnablePack): Promise<void>;
   stats(): RunnerStats;
   /** Free the parser and every compiled query. The runner is unusable afterwards. */
   dispose(): void;
@@ -171,6 +173,10 @@ export function createTreeSitterRunner(options: RunnerOptions = {}): TreeSitterR
 
   return {
     parseSource,
+    async prepare(target) {
+      assertLive();
+      await compile(target);
+    },
     async parseFile(target, path) {
       const sizeBytes = statSync(path).size;
       if (sizeBytes > maxFileBytes) return skip(path, sizeBytes);
