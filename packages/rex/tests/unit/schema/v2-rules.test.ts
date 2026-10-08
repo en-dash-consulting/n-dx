@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   checkV2Rules,
+  indexTree,
+  isAppliedChange,
+  isOpenChange,
   specHash,
   titleReleaseToken,
   RULE_SEVERITY,
@@ -36,13 +39,13 @@ describe("rule table", () => {
   it("errors precede warnings and every rule has a severity", () => {
     const severities = V2_RULE_IDS.map((id) => RULE_SEVERITY[id]);
     expect(severities.indexOf("warning")).toBe(severities.lastIndexOf("error") + 1);
-    expect(V2_RULE_IDS).toHaveLength(13);
+    expect(V2_RULE_IDS).toHaveLength(20);
   });
 
   it("a healthy tree has no findings", () => {
     const area = (n: number) => node("area", {}, Array.from({ length: n }, () => cap()));
     const tree: V2Tree = {
-      product: [area(2), area(2), area(2)],
+      product: [area(2), area(2), node("area", {}, [cap({ id: "x" }), cap()])],
       changes: [node("change", { touches: ["x"] }, [node("task", {}, [node("subtask")])])],
     };
     expect(checkV2Rules(tree, { now: NOW })).toEqual([]);
@@ -69,6 +72,162 @@ describe("change-has-target", () => {
     const findings = check("change-has-target", { changes: [bare] });
     expect(ids(findings)).toEqual([bare.id]);
     expect(findings[0].severity).toBe("error");
+  });
+
+  it("passes an Inbox change, whose targets a person has yet to confirm", () => {
+    expect(check("change-has-target", { changes: [node("change", { needsPlacement: true })] })).toEqual([]);
+  });
+});
+
+describe("change-placed-at-close", () => {
+  it("passes an open Inbox change and a completed placed change", () => {
+    const changes = [
+      node("change", { needsPlacement: true, status: "in_progress" }),
+      node("change", { status: "completed", touches: ["a"] }),
+      node("change", { status: "completed", needsPlacement: false, touches: ["a"] }),
+    ];
+    expect(check("change-placed-at-close", { changes })).toEqual([]);
+  });
+
+  it("fails a completed change still needing placement, and says when it also has no target", () => {
+    const placedTargets = node("change", { status: "completed", needsPlacement: true, touches: ["a"] });
+    const spike = node("change", { status: "completed", needsPlacement: true, spike: true });
+    const untargeted = node("change", { status: "completed", needsPlacement: true });
+    const findings = check("change-placed-at-close", { changes: [placedTargets, spike, untargeted] });
+    expect(ids(findings)).toEqual([placedTargets.id, spike.id, untargeted.id]);
+    expect(findings[0].severity).toBe("error");
+    expect(findings[0].message).not.toContain("must also amend or touch");
+    expect(findings[1].message).not.toContain("must also amend or touch");
+    expect(findings[2].message).toContain("must also amend or touch");
+  });
+
+  it("leaves a completed untargeted change that needs no placement to change-has-target", () => {
+    const bare = node("change", { status: "completed" });
+    const tree: V2Tree = { product: [], changes: [bare] };
+    const findings = checkV2Rules(tree, { now: NOW }, ["change-has-target", "change-placed-at-close"]);
+    expect(findings.map((f) => [f.rule, f.nodeId])).toEqual([["change-has-target", bare.id]]);
+  });
+});
+
+describe("fix-not-spike", () => {
+  it("passes a fix or a spike alone", () => {
+    expect(check("fix-not-spike", { changes: [node("change", { fix: true }), node("change", { spike: true }), node("change", { fix: false, spike: true })] })).toEqual([]);
+  });
+
+  it("fails a change that is both", () => {
+    const both = node("change", { fix: true, spike: true });
+    const findings = check("fix-not-spike", { changes: [both] });
+    expect(ids(findings)).toEqual([both.id]);
+    expect(findings[0].severity).toBe("error");
+  });
+});
+
+describe("amendment-type", () => {
+  it("passes an added amendment with or without a type (absent means capability)", () => {
+    const change = node("change", {
+      amends: [
+        { target: "new-a", delta: "added", summary: "s", under: "area", type: "constraint" },
+        { target: "new-b", delta: "added", summary: "s", under: "area" },
+      ],
+    });
+    expect(check("amendment-type", { changes: [change] })).toEqual([]);
+  });
+
+  it("fails a type on a modified or removed amendment, once per amendment", () => {
+    const change = node("change", {
+      amends: [
+        { target: "a", delta: "modified", summary: "s", type: "capability" },
+        { target: "b", delta: "removed", summary: "s", type: "constraint" },
+        { target: "c", delta: "modified", summary: "s" },
+      ],
+    });
+    const findings = check("amendment-type", { changes: [change] });
+    expect(ids(findings)).toEqual([change.id, change.id]);
+    expect(findings[0].severity).toBe("error");
+    expect(findings[0].message).toContain('modified amendment of "a"');
+    expect(findings[1].message).toContain('removed amendment of "b"');
+  });
+});
+
+describe("ref-unique", () => {
+  it("passes distinct refs, and a node repeating its own id as an alias", () => {
+    const product = [cap({ id: "a", displayId: "A1.1", aliases: ["a", "old-a"] }), cap({ id: "b", displayId: "A1.2" })];
+    expect(check("ref-unique", { product, changes: [node("change", { id: "c", displayId: "CH-1" })] })).toEqual([]);
+  });
+
+  it("fails an id, display id or alias claimed twice across layers, naming both nodes", () => {
+    const first = cap({ id: "a", title: "First", displayId: "A1.1" });
+    const sameId = node("change", { id: "a", title: "Second" });
+    const sameDisplay = cap({ id: "b", displayId: "A1.1" });
+    const aliasShadow = node("change", { id: "c", aliases: ["a"] });
+    const findings = check("ref-unique", { product: [first, sameDisplay], changes: [sameId, aliasShadow] });
+    expect(ids(findings)).toEqual([sameDisplay.id, sameId.id, aliasShadow.id]);
+    expect(findings[0].severity).toBe("error");
+    expect(findings[1].message).toBe('"a" names both capability "First" (a) and change "Second" (a)');
+  });
+
+  it("ignores a tombstone whose id a live node keeps as an alias", () => {
+    const folded = cap({ id: "folded", status: "deleted" });
+    const survivor = cap({ id: "survivor", aliases: ["folded"] });
+    expect(check("ref-unique", { product: [folded, survivor] })).toEqual([]);
+  });
+});
+
+describe("ref-resolves", () => {
+  it("passes references to live nodes, by id, display id or alias, and to tombstones", () => {
+    const product = [
+      node("area", { id: "area" }, [
+        cap({ id: "a", displayId: "A1.1", aliases: ["old-a"] }),
+        cap({ id: "b", dependsOn: ["A1.1", "old-a"] }),
+        cap({ id: "gone", status: "deleted" }),
+      ]),
+      node("constraint", { id: "k", appliesTo: ["a"] }),
+      node("constraint", { id: "everything", appliesTo: "all" }),
+    ];
+    const changes = [
+      node("change", {
+        touches: ["a"],
+        blockedBy: ["CH-2"],
+        amends: [
+          { target: "b", delta: "modified", summary: "s" },
+          { target: "gone", delta: "removed", summary: "s" },
+          { target: "new", delta: "added", summary: "s", under: "area" },
+          { target: "new-child", delta: "added", summary: "s", under: "new" },
+        ],
+        appliedAt: "2026-10-05T00:00:00.000Z",
+      }),
+      node("change", { id: "c2", displayId: "CH-2", touches: ["a"] }),
+    ];
+    expect(check("ref-resolves", { product, changes })).toEqual([]);
+  });
+
+  it("fails each dangling reference, once per field and ref", () => {
+    const capability = cap({ id: "a", dependsOn: ["missing-dep"], blockedBy: ["missing-blocker"] });
+    const constraint = node("constraint", { appliesTo: ["missing-scope"] });
+    const change = node("change", {
+      touches: ["missing-touch"],
+      amends: [
+        { target: "missing-modified", delta: "modified", summary: "s" },
+        { target: "missing-removed", delta: "removed", summary: "s" },
+        { target: "new", delta: "added", summary: "s", under: "missing-parent" },
+      ],
+    });
+    const findings = check("ref-resolves", { product: [capability, constraint], changes: [change] });
+    expect(findings.map((f) => [f.nodeId, f.message.match(/"([^"]+)" names no node/)?.[1]])).toEqual([
+      ["a", "missing-blocker"],
+      ["a", "missing-dep"],
+      [constraint.id, "missing-scope"],
+      [change.id, "missing-touch"],
+      [change.id, "missing-modified"],
+      [change.id, "missing-removed"],
+      [change.id, "missing-parent"],
+    ]);
+    expect(findings[0].severity).toBe("error");
+  });
+
+  it("does not check an added amendment's target, which exists only after apply", () => {
+    const change = node("change", { amends: [{ target: "not-yet", delta: "added", summary: "s" }] });
+    expect(check("ref-resolves", { changes: [change] })).toEqual([]);
   });
 });
 
@@ -184,21 +343,93 @@ describe("removed-target-live", () => {
     expect(check("removed-target-live", { product: [cap({ id: "a" })], changes: [removes("a")] })).toEqual([]);
   });
 
-  it("fails a removal of a missing, deleted or change-layer node", () => {
-    const missing = removes("nope");
+  it("fails a removal of a retired or change-layer node, and a completed but unapplied change's", () => {
     const gone = removes("gone");
     const task = node("task", { id: "t" });
     const wrongLayer = removes("t");
+    const completedUnapplied = removes("gone", { status: "completed" });
     const findings = check("removed-target-live", {
       product: [cap({ id: "gone", status: "deleted" })],
-      changes: [missing, gone, wrongLayer, node("change", {}, [task])],
+      changes: [gone, wrongLayer, node("change", {}, [task]), completedUnapplied],
     });
-    expect(ids(findings)).toEqual([missing.id, gone.id, wrongLayer.id]);
+    expect(ids(findings)).toEqual([gone.id, wrongLayer.id, completedUnapplied.id]);
   });
 
-  it("does not judge applied or closed changes, whose removals already happened", () => {
-    const changes = [removes("gone", { appliedAt: "2026-10-05T00:00:00.000Z" }), removes("gone", { status: "completed" }), removes("gone", { status: "cancelled" })];
-    expect(check("removed-target-live", { changes })).toEqual([]);
+  it("leaves a target that names no node to ref-resolves", () => {
+    const missing = removes("nope");
+    const tree: V2Tree = { product: [], changes: [missing] };
+    const findings = checkV2Rules(tree, { now: NOW }, ["ref-resolves", "removed-target-live"]);
+    expect(findings.map((f) => [f.rule, f.nodeId])).toEqual([["ref-resolves", missing.id]]);
+  });
+
+  it("does not judge applied or abandoned changes", () => {
+    const product = [cap({ id: "gone", status: "deleted" })];
+    const changes = [removes("gone", { appliedAt: "2026-10-05T00:00:00.000Z", status: "completed" }), removes("gone", { status: "cancelled" }), removes("gone", { status: "deleted" })];
+    expect(check("removed-target-live", { product, changes })).toEqual([]);
+  });
+});
+
+describe("change predicates", () => {
+  const change = (fields: Record<string, unknown>) => node("change", fields);
+  const APPLIED = "2026-10-05T00:00:00.000Z";
+
+  it("a change is applied when appliedAt is set, and by nothing else", () => {
+    expect(isAppliedChange(change({ appliedAt: APPLIED }))).toBe(true);
+    expect(isAppliedChange(change({ status: "completed" }))).toBe(false);
+    expect(isAppliedChange(node("task", { appliedAt: APPLIED }))).toBe(false);
+  });
+
+  it.each([
+    [{}, true],
+    [{ status: "in_progress" }, true],
+    [{ status: "completed" }, true],
+    [{ status: "blocked" }, true],
+    [{ status: "completed", appliedAt: APPLIED }, false],
+    [{ appliedAt: APPLIED }, false],
+    [{ status: "cancelled" }, false],
+    [{ status: "deleted" }, false],
+  ])("isOpenChange(%j) is %s", (fields, open) => {
+    expect(isOpenChange(change(fields))).toBe(open);
+  });
+
+  it("only changes are open", () => {
+    expect(isOpenChange(node("task"))).toBe(false);
+    expect(isOpenChange(cap())).toBe(false);
+  });
+});
+
+describe("indexTree", () => {
+  it("resolves ids and display ids before aliases, whatever the order", () => {
+    const shadow = cap({ id: "shadow", aliases: ["real", "A1.9"] });
+    const real = cap({ id: "real" });
+    const display = cap({ id: "d", displayId: "A1.9" });
+    const { resolve } = indexTree({ product: [shadow, real, display], changes: [] });
+    expect(resolve("real")).toBe(real);
+    expect(resolve("A1.9")).toBe(display);
+    expect(resolve("shadow")).toBe(shadow);
+  });
+
+  it("skips tombstones and their descendants by default", () => {
+    const child = cap({ id: "child" });
+    const gone = cap({ id: "gone", status: "deleted" }, [child]);
+    const index = indexTree({ product: [gone], changes: [] });
+    expect(index.entries).toEqual([]);
+    expect(index.resolve("gone")).toBeUndefined();
+  });
+
+  it("with includeTombstones, indexes and marks retired nodes, after every live ref", () => {
+    const child = cap({ id: "child" });
+    const gone = cap({ id: "gone", displayId: "A1.1", status: "deleted" }, [child]);
+    const survivor = cap({ id: "survivor", aliases: ["A1.1"] });
+    const index = indexTree({ product: [gone, survivor], changes: [] }, { includeTombstones: true });
+    expect(index.entries.map((e) => [e.node.id, e.retired])).toEqual([
+      ["gone", true],
+      ["child", true],
+      ["survivor", undefined],
+    ]);
+    expect(index.resolve("gone")).toBe(gone);
+    expect(index.resolve("child")).toBe(child);
+    expect(index.resolve("A1.1")).toBe(survivor);
   });
 });
 
@@ -254,11 +485,14 @@ describe("long-revised", () => {
     expect(check("long-revised", { product })).toEqual([]);
     const amending = node("change", { amends: [{ target: "r", delta: "modified", summary: "s" }] });
     expect(check("long-revised", { product: [revised()], changes: [amending] })).toEqual([]);
+    const completedUnapplied = node("change", { status: "completed", amends: [{ target: "r", delta: "modified", summary: "s" }] });
+    expect(check("long-revised", { product: [revised()], changes: [completedUnapplied] })).toEqual([]);
   });
 
   it("warns on a node revised past the threshold with no open change", () => {
-    const closed = node("change", { status: "completed", amends: [{ target: "r", delta: "modified", summary: "s" }] });
-    const findings = check("long-revised", { product: [revised()], changes: [closed] });
+    const applied = node("change", { status: "completed", appliedAt: "2026-09-02T00:00:00Z", amends: [{ target: "r", delta: "modified", summary: "s" }] });
+    const cancelled = node("change", { status: "cancelled", amends: [{ target: "r", delta: "modified", summary: "s" }] });
+    const findings = check("long-revised", { product: [revised()], changes: [applied, cancelled] });
     expect(ids(findings)).toEqual(["r"]);
     expect(findings[0].message).toContain("35 days");
   });
@@ -320,7 +554,7 @@ describe("run-settings", () => {
     const bad = node("task", { run: { tier: "gigantic" } });
     const newer = node("task", { run: { tier: "heavy", futureKey: 1 } });
     const healthy = node("task", { run: { tier: "heavy" } });
-    const tree: V2Tree = { product: [], changes: [node("change", { touches: ["x"] }, [bad, newer, healthy])] };
+    const tree: V2Tree = { product: [], changes: [node("change", { spike: true }, [bad, newer, healthy])] };
     const findings = checkV2Rules(tree, { now: NOW });
     expect(findings.map((f) => [f.rule, f.severity, f.nodeId])).toEqual([
       ["run-settings", "warning", bad.id],
@@ -362,6 +596,36 @@ describe("unreviewed-spec", () => {
   it("ignores the retired specReviewed flag", () => {
     const capability = cap({ reviewedHash: undefined, specReviewed: true });
     expect(ids(check("unreviewed-spec", { product: [capability] }))).toEqual([capability.id]);
+  });
+});
+
+describe("check-unique and check-requirement", () => {
+  const requirement = (id: string) => ({ id, title: id, category: "technical", validationType: "automated", acceptanceCriteria: [] });
+  const result = (requirementId: string, at = "2026-10-05T00:00:00Z") => ({ requirementId, result: "pass", at });
+
+  it("pass one result per current requirement", () => {
+    const capability = cap({ requirements: [requirement("r1"), requirement("r2")], checks: [result("r1"), result("r2")] });
+    const constraint = node("constraint", { requirements: [requirement("r3")], checks: [result("r3")] });
+    expect(checkV2Rules({ product: [capability, constraint], changes: [] }, { now: NOW }, ["check-unique", "check-requirement"])).toEqual([]);
+  });
+
+  it("check-unique fails two results for one requirement, once per requirement", () => {
+    const capability = cap({ requirements: [requirement("r1")], checks: [result("r1"), result("r1", "2026-10-06T00:00:00Z"), result("r1")] });
+    const findings = check("check-unique", { product: [capability] });
+    expect(ids(findings)).toEqual([capability.id]);
+    expect(findings[0].severity).toBe("error");
+    expect(findings[0].message).toContain('3 check results for requirement "r1"');
+  });
+
+  it("check-requirement warns once per result whose requirement the node no longer has", () => {
+    const capability = cap({ requirements: [requirement("r1")], checks: [result("r1"), result("dropped")] });
+    const bare = node("area", { checks: [result("r9")] });
+    const findings = check("check-requirement", { product: [capability, bare] });
+    expect(findings.map((f) => [f.nodeId, f.severity])).toEqual([
+      [capability.id, "warning"],
+      [bare.id, "warning"],
+    ]);
+    expect(findings[0].message).toContain('"dropped"');
   });
 });
 

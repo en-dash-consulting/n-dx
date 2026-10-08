@@ -8,7 +8,9 @@
  * Errors make a tree invalid. Warnings are health signals for stewards.
  *
  * Every rule ignores `deleted` nodes: they are tombstones kept for history,
- * not part of the product layer or the plan.
+ * not part of the product layer or the plan. The one exception is
+ * `ref-resolves`: a reference to a tombstone (a node an applied `removed`
+ * amendment retired) is history, not a dangling reference.
  *
  * @module rex/schema/v2-rules
  */
@@ -46,18 +48,25 @@ export type RuleSeverity = "error" | "warning";
 
 export type V2RuleId =
   | "change-has-target"
+  | "change-placed-at-close"
+  | "fix-not-spike"
+  | "amendment-type"
+  | "ref-unique"
+  | "ref-resolves"
   | "title-release-token"
   | "layer-nesting"
   | "capability-depth"
   | "depends-on-acyclic"
   | "removed-target-live"
   | "capability-statement"
+  | "check-unique"
   | "capability-criteria"
   | "long-revised"
   | "area-balance"
   | "unreviewed-spec"
   | "run-settings"
-  | "retired-state-field";
+  | "retired-state-field"
+  | "check-requirement";
 
 export interface RuleFinding {
   rule: V2RuleId;
@@ -75,55 +84,116 @@ export const AREA_MIN_CAPABILITIES = 2;
 
 // ── Tree index ───────────────────────────────────────────────────
 
-interface Entry {
+export interface TreeEntry {
   node: RuleNode;
   parent?: RuleNode;
   /** The layer root the node was loaded under. */
   root: Layer;
+  /**
+   * Set on a tombstone: a `deleted` node, or a node under one. Only an index
+   * built with `includeTombstones` holds these.
+   */
+  retired?: true;
 }
 
-interface TreeIndex {
-  /** Every non-deleted node, depth first, product layer first. */
-  entries: Entry[];
-  /** Resolves an id, display id or alias to its node. */
+export interface TreeIndex {
+  /** Indexed nodes, depth first, product layer first. Live only unless built with `includeTombstones`. */
+  entries: TreeEntry[];
+  /**
+   * Resolves an id, display id or alias to its node. Ids and display ids win
+   * over aliases, so an alias never shadows a real id; live nodes win over
+   * tombstones, so a folded id kept as an alias resolves to the live node.
+   */
   resolve(ref: string): RuleNode | undefined;
+}
+
+export interface IndexOptions {
+  /**
+   * Also index `deleted` nodes and their descendants, marked `retired`, so a
+   * reader can see a node an applied `removed` amendment retired. Default
+   * false: rules see live nodes only.
+   */
+  includeTombstones?: boolean;
 }
 
 function isDeleted(node: RuleNode): boolean {
   return node.status === "deleted";
 }
 
-function indexTree(tree: V2Tree): TreeIndex {
-  const entries: Entry[] = [];
-  const byRef = new Map<string, RuleNode>();
-  const visit = (node: RuleNode, parent: RuleNode | undefined, root: Layer): void => {
-    if (isDeleted(node)) return;
-    entries.push({ node, parent, root });
-    for (const ref of [node.id, node.displayId, ...(node.aliases ?? [])]) {
-      if (ref && !byRef.has(ref)) byRef.set(ref, node);
-    }
-    for (const child of node.children ?? []) visit(child, node, root);
+/** A node's id and display id. */
+function primaryRefs(node: RuleNode): string[] {
+  return node.displayId ? [node.id, node.displayId] : [node.id];
+}
+
+export function indexTree(tree: V2Tree, { includeTombstones = false }: IndexOptions = {}): TreeIndex {
+  const entries: TreeEntry[] = [];
+  const visit = (node: RuleNode, parent: RuleNode | undefined, root: Layer, underTombstone: boolean): void => {
+    const retired = underTombstone || isDeleted(node);
+    if (retired && !includeTombstones) return;
+    entries.push(retired ? { node, parent, root, retired } : { node, parent, root });
+    for (const child of node.children ?? []) visit(child, node, root, retired);
   };
-  for (const node of tree.product) visit(node, undefined, "product");
-  for (const node of tree.changes) visit(node, undefined, "changes");
+  for (const node of tree.product) visit(node, undefined, "product", false);
+  for (const node of tree.changes) visit(node, undefined, "changes", false);
+
+  // Precedence: live ids, live aliases, retired ids, retired aliases. Within a tier the first claim wins.
+  const byRef = new Map<string, RuleNode>();
+  const claim = (node: RuleNode, refs: readonly string[]): void => {
+    for (const ref of refs) if (ref && !byRef.has(ref)) byRef.set(ref, node);
+  };
+  for (const retired of [false, true]) {
+    const tier = entries.filter((e) => !!e.retired === retired);
+    for (const { node } of tier) claim(node, primaryRefs(node));
+    for (const { node } of tier) claim(node, node.aliases ?? []);
+  }
   return { entries, resolve: (ref) => byRef.get(ref) };
+}
+
+// ── Change predicates ────────────────────────────────────────────
+
+/**
+ * A change is applied when `appliedAt` is set, and by nothing else: a
+ * completed status does not apply a change (`rex.applyOn` may defer apply to
+ * review or release).
+ */
+export function isAppliedChange(node: RuleNode): boolean {
+  return node.type === "change" && !!node.appliedAt;
+}
+
+/** Statuses after which a change never acts on the product layer. */
+const ABANDONED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["cancelled", "deleted"]);
+
+/**
+ * A change still acting on the product layer: not applied, and not cancelled
+ * or deleted. A completed but unapplied change is open, so its targets keep
+ * reading changing.
+ */
+export function isOpenChange(node: RuleNode): boolean {
+  return node.type === "change" && !isAppliedChange(node) && !ABANDONED_CHANGE_STATUSES.has(node.status ?? "pending");
 }
 
 /** Each rule's fixed severity. */
 export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "change-has-target": "error",
+  "change-placed-at-close": "error",
+  "fix-not-spike": "error",
+  "amendment-type": "error",
+  "ref-unique": "error",
+  "ref-resolves": "error",
   "title-release-token": "error",
   "layer-nesting": "error",
   "capability-depth": "error",
   "depends-on-acyclic": "error",
   "removed-target-live": "error",
   "capability-statement": "error",
+  "check-unique": "error",
   "capability-criteria": "warning",
   "long-revised": "warning",
   "area-balance": "warning",
   "unreviewed-spec": "warning",
   "run-settings": "warning",
   "retired-state-field": "warning",
+  "check-requirement": "warning",
 };
 
 function finding(rule: V2RuleId, node: RuleNode, message: string): RuleFinding {
@@ -188,12 +258,86 @@ function nodeSpec(node: RuleNode): { statement?: string; criteria?: Criterion[] 
 
 // ── Rules ────────────────────────────────────────────────────────
 
-type Rule = (index: TreeIndex, options: RuleOptions) => RuleFinding[];
+/** `withTombstones` is the same tree indexed with `includeTombstones`, for the rules that must see retired nodes. */
+type Rule = (index: TreeIndex, options: RuleOptions, withTombstones: TreeIndex) => RuleFinding[];
 
+const hasTarget = (node: RuleNode): boolean => node.type === "change" && !!(node.amends?.length || node.touches?.length);
+
+/** An Inbox change (`needsPlacement`) waits for a person to confirm its targets, so it may have none yet. */
 const changeHasTarget: Rule = ({ entries }) =>
   entries.flatMap(({ node }) => {
-    if (node.type !== "change" || node.spike || node.amends?.length || node.touches?.length) return [];
+    if (node.type !== "change" || node.spike || node.needsPlacement || hasTarget(node)) return [];
     return [finding("change-has-target", node, `Change "${node.title}" neither amends nor touches a product node; mark it a spike or name its target`)];
+  });
+
+/**
+ * Placement is required before close: a completed change cannot carry
+ * `needsPlacement`. A placed change with no target is `change-has-target`'s,
+ * so together they hold every completed change to a target unless it is a spike.
+ */
+const changePlacedAtClose: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) => {
+    if (node.type !== "change" || node.status !== "completed" || !node.needsPlacement) return [];
+    const untargeted = node.spike || hasTarget(node) ? "" : "; it must also amend or touch a product node, or be a spike";
+    return [finding("change-placed-at-close", node, `Change "${node.title}" is completed but still needs placement; a person must confirm its targets before it closes${untargeted}`)];
+  });
+
+const fixNotSpike: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) =>
+    node.type === "change" && node.fix && node.spike
+      ? [finding("fix-not-spike", node, `Change "${node.title}" is both a fix and a spike; a fix repairs product nodes, a spike changes none`)]
+      : [],
+  );
+
+/** `type` names what an `added` amendment creates (a capability when absent, unreported); it means nothing on another delta. */
+const amendmentType: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) =>
+    (node.type === "change" ? (node.amends ?? []) : [])
+      .filter((a) => a.delta !== "added" && a.type !== undefined)
+      .map((a) =>
+        finding("amendment-type", node, `Change "${node.title}" gives its ${a.delta} amendment of "${a.target}" a type; only an added amendment has one`),
+      ),
+  );
+
+const named = (node: RuleNode): string => `${node.type} "${node.title}" (${node.id})`;
+
+/** An id, display id or alias names one live node across both layers. Reported on the later node. */
+const refUnique: Rule = ({ entries }) => {
+  const owner = new Map<string, RuleNode>();
+  const findings: RuleFinding[] = [];
+  for (const { node } of entries) {
+    for (const ref of new Set([...primaryRefs(node), ...(node.aliases ?? [])])) {
+      const first = owner.get(ref);
+      if (!first) owner.set(ref, node);
+      else findings.push(finding("ref-unique", node, `"${ref}" names both ${named(first)} and ${named(node)}`));
+    }
+  }
+  return findings;
+};
+
+/**
+ * Every reference names a node, live or retired: a reference to a tombstone is
+ * history, not dangling. Checked: touches, a modified or removed amendment's
+ * target, an added amendment's `under` (or a node the same change adds),
+ * appliesTo, dependsOn and blockedBy. An added amendment's target does not
+ * exist until apply, so it is not checked.
+ */
+const refResolves: Rule = ({ entries }, _options, { resolve }) =>
+  entries.flatMap(({ node }) => {
+    const refs: [field: string, ref: string][] = (node.blockedBy ?? []).map((ref) => ["blockedBy", ref]);
+    if (node.type === "change") {
+      const added = new Set((node.amends ?? []).filter((a) => a.delta === "added").map((a) => a.target));
+      for (const ref of node.touches ?? []) refs.push(["touches", ref]);
+      for (const a of node.amends ?? []) {
+        if (a.delta !== "added") refs.push([`${a.delta} amendment target`, a.target]);
+        else if (a.under && !added.has(a.under)) refs.push(["added amendment under", a.under]);
+      }
+    }
+    if (node.type === "capability") for (const ref of node.dependsOn ?? []) refs.push(["dependsOn", ref]);
+    if (node.type === "constraint" && Array.isArray(node.appliesTo)) for (const ref of node.appliesTo) refs.push(["appliesTo", ref]);
+    return refs
+      .filter(([, ref]) => !resolve(ref))
+      .map(([field, ref]) => finding("ref-resolves", node, `${node.type} "${node.title}" ${field} "${ref}" names no node`));
   });
 
 const titleReleaseTokenRule: Rule = ({ entries }, { releases }) =>
@@ -254,19 +398,17 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
   return findings;
 };
 
-/** Statuses after which a change no longer acts on the product layer. */
-const CLOSED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["completed", "cancelled", "deleted"]);
-
-function isOpenChange(node: RuleNode): boolean {
-  return node.type === "change" && !node.appliedAt && !CLOSED_CHANGE_STATUSES.has(node.status ?? "pending");
-}
-
-const removedTargetLive: Rule = ({ entries, resolve }) =>
+/**
+ * An open change removes only a live product node. A target that names no
+ * node at all is `ref-resolves`'s; this rule reports one that is retired or
+ * in the change layer.
+ */
+const removedTargetLive: Rule = ({ entries, resolve }, _options, withTombstones) =>
   entries
     .filter(({ node }) => isOpenChange(node))
     .flatMap(({ node }) =>
       (node.type === "change" ? (node.amends ?? []) : [])
-        .filter((a) => a.delta === "removed")
+        .filter((a) => a.delta === "removed" && withTombstones.resolve(a.target))
         .filter((a) => {
           const target = resolve(a.target);
           return !target || layerOf(target.type) !== "product";
@@ -285,6 +427,27 @@ const capabilityCriteria: Rule = ({ entries }) =>
   entries
     .filter(({ node }) => node.type === "capability" && !node.criteria?.length)
     .map(({ node }) => finding("capability-criteria", node, `Capability "${node.title}" has no criteria`));
+
+/** A node keeps one result per requirement: the last run's. */
+const checkUnique: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) => {
+    const counts = new Map<string, number>();
+    for (const c of node.checks ?? []) counts.set(c.requirementId, (counts.get(c.requirementId) ?? 0) + 1);
+    return [...counts]
+      .filter(([, count]) => count > 1)
+      .map(([id, count]) => finding("check-unique", node, `${node.type} "${node.title}" holds ${count} check results for requirement "${id}"; keep only the last`));
+  });
+
+/** A check result for a requirement the node no longer has. */
+const checkRequirement: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) => {
+    const requirements = node.type === "area" || node.type === "subtask" ? [] : (node.requirements ?? []);
+    const current = new Set(requirements.map((r) => r.id));
+    const stale = new Set((node.checks ?? []).map((c) => c.requirementId).filter((id) => !current.has(id)));
+    return [...stale].map((id) =>
+      finding("check-requirement", node, `${node.type} "${node.title}" holds a check result for "${id}", which is not one of its requirements`),
+    );
+  });
 
 const DAY_MS = 86_400_000;
 
@@ -382,18 +545,25 @@ const retiredStateField: Rule = ({ entries }) =>
 /** Every rule, errors first, in the order findings are reported. */
 const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "change-has-target": changeHasTarget,
+  "change-placed-at-close": changePlacedAtClose,
+  "fix-not-spike": fixNotSpike,
+  "amendment-type": amendmentType,
+  "ref-unique": refUnique,
+  "ref-resolves": refResolves,
   "title-release-token": titleReleaseTokenRule,
   "layer-nesting": layerNesting,
   "capability-depth": capabilityDepth,
   "depends-on-acyclic": dependsOnAcyclic,
   "removed-target-live": removedTargetLive,
   "capability-statement": capabilityStatement,
+  "check-unique": checkUnique,
   "capability-criteria": capabilityCriteria,
   "long-revised": longRevised,
   "area-balance": areaBalance,
   "unreviewed-spec": unreviewedSpec,
   "run-settings": runSettings,
   "retired-state-field": retiredStateField,
+  "check-requirement": checkRequirement,
 };
 
 export const V2_RULE_IDS = Object.keys(RULES) as V2RuleId[];
@@ -401,5 +571,6 @@ export const V2_RULE_IDS = Object.keys(RULES) as V2RuleId[];
 /** Run every rule (or the named subset) over a tree. */
 export function checkV2Rules(tree: V2Tree, options: RuleOptions, only: ReadonlyArray<V2RuleId> = V2_RULE_IDS): RuleFinding[] {
   const index = indexTree(tree);
-  return V2_RULE_IDS.filter((id) => only.includes(id)).flatMap((id) => RULES[id](index, options));
+  const withTombstones = indexTree(tree, { includeTombstones: true });
+  return V2_RULE_IDS.filter((id) => only.includes(id)).flatMap((id) => RULES[id](index, options, withTombstones));
 }

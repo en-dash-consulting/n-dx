@@ -234,8 +234,9 @@ export interface Amendment {
   under?: string;
   title?: string;
   /**
-   * `added` only: the node type created. A change adding a constraint derives
-   * kind "policy change", not "feature".
+   * `added` only (the `amendment-type` rule errors on another delta): the node
+   * type created, a capability when absent. A change adding a constraint
+   * derives kind "policy change", not "feature".
    */
   type?: AddedNodeType;
   /** The target's spec hash when the amendment was drafted; apply refuses a mismatch. */
@@ -344,6 +345,7 @@ export interface ChangeIntent extends BaseIntent, EffortIntent {
   /**
    * The change repairs the nodes it touches without amending them. A product
    * node reads defective while an open change with `fix: true` targets it.
+   * Never also a spike (`fix-not-spike`).
    */
   fix?: boolean;
   priority?: Priority;
@@ -543,7 +545,11 @@ export interface ItemState {
   assignee?: string;
   /** Changes and tasks: informational readiness. */
   ready?: boolean;
-  /** Changes: placement on the product layer still needs a decision (blocks autonomous selection only). */
+  /**
+   * Changes: in the Inbox; a person must confirm the change's targets. Blocks
+   * autonomous selection, exempts the change from `change-has-target`, and
+   * must be cleared before the change completes (`change-placed-at-close`).
+   */
   needsPlacement?: boolean;
   lastModified?: string;
   lastModifiedBy?: string;
