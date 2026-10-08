@@ -1,7 +1,8 @@
 /**
  * Deterministic import graph analyzer.
- * Uses the TypeScript compiler API for JS/TS AST parsing and the Go import
- * parser for .go files — no Claude invocation.
+ * Uses the TypeScript compiler API for JS/TS AST parsing, the Go import
+ * parser for .go files and language packs (tree-sitter) for Java — no Claude
+ * invocation.
  */
 
 import { readFile } from "node:fs/promises";
@@ -20,6 +21,7 @@ import { toPosix } from "../util/paths.js";
 import { extractGoImports, readGoModulePath } from "./go-imports.js";
 import { buildSwiftImportGraph } from "./swift-imports.js";
 import { buildCSharpImportGraph } from "./csharp-imports.js";
+import { buildPackImportGraph, isPackFile, packsFor, type PackImportsOptions } from "./pack-imports.js";
 import { readManifest } from "./manifest.js";
 import { getLanguageConfig, detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
 import type { LanguageConfig } from "../language/registry.js";
@@ -341,6 +343,8 @@ export interface ImportsOptions {
   fileSetChanged?: boolean;
   /** Primary language id (e.g. "go", "typescript"). Reads manifest.language / detectLanguage when omitted. */
   language?: string;
+  /** Grammar location and notice sink for language-pack (Java) files. */
+  packs?: PackImportsOptions;
 }
 
 // ── analyzeImports helpers ───────────────────────────────────────────────────
@@ -574,53 +578,30 @@ async function processGoFiles(
       continue;
     }
 
-    const goResult = extractGoImports(sourceText, file.path, goModulePath);
-
-    for (const edge of goResult.edges) {
-      const key = `${edge.from}\0${edge.to}\0${edge.type}`;
-      const existing = edgeMap.get(key);
-      if (existing) {
-        edgeMap.set(key, { ...existing, symbols: Array.from(new Set([...existing.symbols, ...edge.symbols])) });
-      } else {
-        edgeMap.set(key, edge);
-      }
-    }
-
-    for (const goExt of goResult.external) {
-      const existing = externalMap.get(goExt.package);
-      if (existing) {
-        externalMap.set(goExt.package, {
-          package: goExt.package,
-          importedBy: Array.from(new Set([...existing.importedBy, ...goExt.importedBy])),
-          symbols: Array.from(new Set([...existing.symbols, ...goExt.symbols])),
-        });
-      } else {
-        externalMap.set(goExt.package, { ...goExt });
-      }
-    }
+    mergeGraph(extractGoImports(sourceText, file.path, goModulePath), edgeMap, externalMap);
   }
 }
 
-/** Merge a symbol-based resolver's edges and externals into the shared maps. */
-function mergeResolverResult(
-  result: { edges: ImportEdge[]; external: ExternalImport[] },
+/**
+ * Add edges and external packages to the maps, unioning symbols (and
+ * importers) with entries already there.
+ */
+function mergeGraph(
+  graph: { readonly edges: readonly ImportEdge[]; readonly external: readonly ExternalImport[] },
   edgeMap: Map<string, ImportEdge>,
   externalMap: Map<string, ExternalImport>,
 ): void {
-  for (const edge of result.edges) {
+  for (const edge of graph.edges) {
     const key = `${edge.from}\0${edge.to}\0${edge.type}`;
     const existing = edgeMap.get(key);
     if (existing) {
-      edgeMap.set(key, {
-        ...existing,
-        symbols: Array.from(new Set([...existing.symbols, ...edge.symbols])),
-      });
+      edgeMap.set(key, { ...existing, symbols: Array.from(new Set([...existing.symbols, ...edge.symbols])) });
     } else {
       edgeMap.set(key, edge);
     }
   }
 
-  for (const ext of result.external) {
+  for (const ext of graph.external) {
     const existing = externalMap.get(ext.package);
     if (existing) {
       externalMap.set(ext.package, {
@@ -650,7 +631,7 @@ async function processCSharpFiles(
   if (files.length === 0) return;
   const allCSharp = inventory.files.filter((f) => csharpConfig.parseableExtensions.has(extname(f.path).toLowerCase()));
   const result = await buildCSharpImportGraph(allCSharp, targetDir, new Set(files.map((f) => f.path)));
-  mergeResolverResult(result, edgeMap, externalMap);
+  mergeGraph(result, edgeMap, externalMap);
 }
 
 /**
@@ -667,7 +648,7 @@ async function processSwiftFiles(
   externalMap: Map<string, ExternalImport>,
 ): Promise<void> {
   if (files.length === 0) return;
-  mergeResolverResult(await buildSwiftImportGraph(files, targetDir), edgeMap, externalMap);
+  mergeGraph(await buildSwiftImportGraph(files, targetDir), edgeMap, externalMap);
 }
 
 /** Compute ImportsSummary statistics from collected edges and external packages. */
@@ -724,8 +705,16 @@ export async function analyzeImports(
   const hasGoFiles = inventory.files.some((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
   const goModulePath = hasGoFiles ? await readGoModulePath(targetDir) : null;
 
+  // Pack languages resolve against a whole-project index, so their files are
+  // re-parsed on every run: the incremental path treats them as changed.
+  const packs = packsFor(parseableExts, options?.packs?.packs);
+  const packFiles = inventory.files.filter((f) => isPackFile(f.path, packs));
+
   const prev = options?.previousImports;
-  const changedFiles = options?.changedFiles;
+  const changedFiles =
+    options?.changedFiles && packFiles.length > 0
+      ? new Set([...options.changedFiles, ...packFiles.map((f) => f.path)])
+      : options?.changedFiles;
   const fileSetChanged = options?.fileSetChanged ?? true;
   // Opt-in guard (NDX_SV_SAFE_INCREMENTAL=1): fall back to a full re-analysis when a
   // legacy/partial imports.json has non-array edges/external, instead of throwing
@@ -754,7 +743,7 @@ export async function analyzeImports(
     return true;
   });
 
-  // Partition into JS/TS, Go, Swift and C# to prevent cross-language contamination
+  // Partition into JS/TS, Go, Swift, C# and pack languages to prevent cross-language contamination
   const jsTsFiles = parseable.filter((f) => JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase()));
   const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
   const swiftParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === SWIFT_EXTENSION);
@@ -764,6 +753,9 @@ export async function analyzeImports(
   await processGoFiles(goParseableFiles, targetDir, goModulePath, edgeMap, externalMap);
   await processSwiftFiles(swiftParseableFiles, targetDir, edgeMap, externalMap);
   await processCSharpFiles(csharpParseableFiles, inventory, targetDir, edgeMap, externalMap);
+  if (packFiles.length > 0) {
+    mergeGraph(await buildPackImportGraph(packFiles, targetDir, { ...options?.packs, packs }), edgeMap, externalMap);
+  }
 
   // Incremental cleanup: remove packages whose importers were all changed
   if (canIncremental) {
