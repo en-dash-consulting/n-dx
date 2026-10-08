@@ -63,31 +63,44 @@ export interface GoWorkFacts {
   readonly notices: readonly string[];
 }
 
-/** Directories (relative, POSIX; "" is the root) holding a `go.mod`, sorted. */
+/** Directories (relative, POSIX; "" is the root) holding a `go.mod`, sorted. Directories that cannot be listed are skipped. */
 export async function findGoModuleDirs(projectDir: string): Promise<string[]> {
-  return findDirsWith(projectDir, "go.mod");
+  return (await findDirsWith(projectDir, "go.mod")).dirs;
 }
 
-/** Build models for the `go.mod` files of a project, one per directory in `dirs` (default: every `go.mod` found). */
+/**
+ * Build models for the `go.mod` files of a project, one per directory in `dirs`
+ * (default: every `go.mod` found). Directories the search could not list are
+ * reported as notices on the first model; with no model there is nowhere to
+ * attach them.
+ */
 export async function readGoBuildModels(
   projectDir: string,
   dirs?: readonly string[],
 ): Promise<GoModuleBuild[]> {
+  const found = dirs ? { dirs, notices: [] as string[] } : await findDirsWith(projectDir, "go.mod");
   const out: GoModuleBuild[] = [];
-  for (const dir of dirs ?? (await findGoModuleDirs(projectDir))) {
+  for (const dir of found.dirs) {
     out.push(await readModule(projectDir, dir));
   }
+  if (out.length > 0) out[0] = { ...out[0], notices: [...out[0].notices, ...found.notices] };
   return out;
 }
 
-/** The `go.work` files of a project, one per directory that has one, sorted by path. */
+/**
+ * The `go.work` files of a project, one per directory that has one, sorted by
+ * path. Directories the search could not list are reported as notices on the
+ * first file.
+ */
 export async function readGoWorkFiles(projectDir: string): Promise<GoWorkFacts[]> {
   const out: GoWorkFacts[] = [];
-  for (const dir of await findDirsWith(projectDir, "go.work")) {
+  const found = await findDirsWith(projectDir, "go.work");
+  for (const dir of found.dirs) {
     const file = posix.join(dir, "go.work");
     const text = await readText(join(projectDir, file));
     out.push(typeof text === "string" ? parseGoWork(file, text) : { file, use: [], replaces: [], notices: [`${file} ${text.reason}`] });
   }
+  if (out.length > 0) out[0] = { ...out[0], notices: [...out[0].notices, ...found.notices] };
   return out;
 }
 
@@ -357,19 +370,29 @@ async function readText(path: string): Promise<string | { reason: string }> {
   }
 }
 
-async function findDirsWith(projectDir: string, filename: string): Promise<string[]> {
-  const found: string[] = [];
+/** Walk the project for directories holding `filename`; a directory that cannot be listed becomes a notice. */
+async function findDirsWith(projectDir: string, filename: string): Promise<{ dirs: string[]; notices: string[] }> {
+  const dirs: string[] = [];
+  const notices: string[] = [];
   async function walk(rel: string): Promise<void> {
-    const entries = await readdir(join(projectDir, rel), { withFileTypes: true });
+    let entries;
+    try {
+      entries = await readdir(join(projectDir, rel), { withFileTypes: true });
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "EACCES" && code !== "EPERM" && code !== "ENOENT" && code !== "ENOTDIR") throw err;
+      notices.push(`${rel === "" ? "." : rel} is unreadable (${code}); skipped`);
+      return;
+    }
     for (const e of entries) {
       if (e.isDirectory()) {
         if (e.name.startsWith(".") || e.name === "node_modules" || goConfig.skipDirectories.has(e.name)) continue;
         await walk(posix.join(rel, e.name));
       } else if (e.name === filename) {
-        found.push(rel);
+        dirs.push(rel);
       }
     }
   }
   await walk("");
-  return found.sort();
+  return { dirs: dirs.sort(), notices };
 }
