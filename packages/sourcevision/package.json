@@ -35,6 +35,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node ../../scripts/run-vitest-bind-aware.mjs sourcevision",
     "test:watch": "vitest",
+    "test:update-goldens": "node scripts/update-pack-goldens.mjs",
     "validate": "tsc --noEmit && vitest run",
     "prepare": "pnpm run build"
   },
