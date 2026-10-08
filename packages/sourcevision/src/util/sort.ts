@@ -22,6 +22,9 @@ import type {
   FunctionNode,
   CallEdge,
   CallGraph,
+  OutboundDependency,
+  DeclaredContract,
+  OutboundData,
 } from "../schema/index.js";
 
 /**
@@ -229,6 +232,43 @@ export function sortCallGraph(data: CallGraph): CallGraph {
         (a, b) => b.calleeCount - a.calleeCount || cmp(a.qualifiedName, b.qualifiedName)
       ),
     },
+  };
+}
+
+// ── Outbound sorting ─────────────────────────────────────────────────────────
+
+/**
+ * Sort by call site first, then by what the call says.
+ *
+ * `file` then `line` puts a file's calls in source order, which is how anyone
+ * reading the file will look for them. The remaining keys only break ties
+ * between two detections on one line — two clients on a chained expression —
+ * and exist so the order is total, not because it carries meaning.
+ */
+export function sortOutboundDependencies(
+  dependencies: OutboundDependency[],
+): OutboundDependency[] {
+  return [...dependencies].sort(
+    (a, b) =>
+      cmp(a.file, b.file) ||
+      a.line - b.line ||
+      cmp(a.kind, b.kind) ||
+      cmp(a.client, b.client) ||
+      cmp(a.target, b.target)
+  );
+}
+
+export function sortDeclaredContracts(
+  contracts: DeclaredContract[],
+): DeclaredContract[] {
+  return [...contracts].sort((a, b) => cmp(a.file, b.file) || cmp(a.kind, b.kind));
+}
+
+/** Sort all arrays in an OutboundData for canonical output */
+export function sortOutbound(data: OutboundData): OutboundData {
+  return {
+    dependencies: sortOutboundDependencies(data.dependencies),
+    contracts: sortDeclaredContracts(data.contracts),
   };
 }
 
