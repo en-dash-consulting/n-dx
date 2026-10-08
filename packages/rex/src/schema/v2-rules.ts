@@ -8,9 +8,10 @@
  * Errors make a tree invalid. Warnings are health signals for stewards.
  *
  * Every rule ignores `deleted` nodes: they are tombstones kept for history,
- * not part of the product layer or the plan. The one exception is
- * `ref-resolves`: a reference to a tombstone (a node an applied `removed`
- * amendment retired) is history, not a dangling reference.
+ * not part of the product layer or the plan. Two rules also read tombstones
+ * (a node an applied `removed` amendment retired): `ref-resolves`, for which
+ * a reference to one is history, not dangling; and `removed-target-live`,
+ * which reports an open change removing one.
  *
  * @module rex/schema/v2-rules
  */
