@@ -86,12 +86,19 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
     }
   });
 
-  it("re-resolves Java files on an incremental run, matching a full run", async (ctx) => {
+  it("re-resolves unchanged Java files on an incremental run, dropping their stale edges", async (ctx) => {
     skipUnlessGrammar(ctx, JAVA_WASM);
     const full = await analyzeImports(FIXTURE, inventory, { language: "java" });
+    // PetType references nothing: an edge or external from it can only be stale.
+    const petType = `${MAIN}/entity/PetType.java`;
     const incremental = await analyzeImports(FIXTURE, inventory, {
       language: "java",
-      previousImports: { ...full, edges: [], external: [] },
+      previousImports: {
+        ...full,
+        edges: [...full.edges, { from: petType, to: `${MAIN}/entity/Owner.java`, type: "static", symbols: ["Owner"] }],
+        external: [...full.external, { package: "org.stale", importedBy: [petType], symbols: ["Gone"] }],
+      },
+      // Nothing changed on disk; Java files are re-resolved regardless.
       changedFiles: new Set(),
       fileSetChanged: false,
     });
