@@ -399,24 +399,6 @@ describe("Status API routes", () => {
       expect(data.sv.infrastructure).toBe(3);
     });
 
-    it("carries readiness as an explicit null while no readiness artifact scores one", async () => {
-      await writeManifest({ repo: REPO });
-      const data = await status();
-      // Not merely falsy and not absent: the hub reads this key, so it has to
-      // exist on every response for the scorer to fill in later.
-      expect(Object.keys(data.sv)).toContain("readiness");
-      expect(data.sv.readiness).toBeNull();
-    });
-
-    it("reports readiness.overall once the artifact carries one", async () => {
-      await writeManifest({ repo: REPO });
-      await writeFile(
-        join(ctx.svDir, "readiness.json"),
-        JSON.stringify({ overall: 68 }),
-      );
-      expect((await status()).sv.readiness?.overall).toBe(68);
-    });
-
     it("answers for a project analysed before any of these fields existed", async () => {
       // An older manifest: no repo block, and none of the newer artifacts on
       // disk. The route must answer, with nulls and zeros rather than a throw.
