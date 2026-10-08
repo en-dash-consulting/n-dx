@@ -810,7 +810,7 @@ describe("run-settings", () => {
 describe("retired-state-field", () => {
   it("warns on a node that still carries stored commits, naming why they are ignored", () => {
     const stale = node("task", { commits: [{ hash: "a".repeat(40), author: "R", authorEmail: "r@x", timestamp: "t" }] });
-    const tree: V2Tree = { product: [], changes: [node("change", { touches: ["x"] }, [stale, node("task")])] };
+    const tree: V2Tree = { product: [node("area", { id: "a" }, [cap({ id: "x" }), cap(), cap()])], changes: [node("change", { touches: ["x"] }, [stale, node("task")])] };
     const findings = checkV2Rules(tree, { now: NOW });
     expect(findings.map((f) => [f.rule, f.severity, f.nodeId])).toEqual([["retired-state-field", "warning", stale.id]]);
     expect(findings[0].message).toContain('"commits"');

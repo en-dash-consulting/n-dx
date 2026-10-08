@@ -30,7 +30,7 @@
  * @module rex/core/product-status
  */
 
-import { indexTree, isOpenChange, specHash, specOf, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { indexTree, isAppliedChange, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import type { ChangeNode } from "../schema/v2.js";
 import { deriveChangeKind, type ChangeKindOptions } from "./product-edges.js";
 
@@ -43,11 +43,6 @@ export type Health = (typeof HEALTH_VALUES)[number];
 export interface ProductStatus {
   status: IntentStatus;
   health: Health;
-}
-
-/** A change whose amendments reached the product layer. */
-function isAppliedChange(node: RuleNode): boolean {
-  return node.type === "change" && (node.appliedIn !== undefined || node.status === "completed");
 }
 
 /** Status and health of every live capability and constraint, keyed by id. */
@@ -85,7 +80,7 @@ export function computeProductStatus(tree: V2Tree, options: ChangeKindOptions = 
         ? "changing"
         : !node.metAt
           ? "proposed"
-          : specHash(specOf(node)) !== node.metAt
+          : specHash(nodeSpec(node)) !== node.metAt
             ? "revised"
             : checkFails
               ? "failing"

@@ -142,6 +142,12 @@ describe("round-trip", () => {
     expect(parseStateYaml(serializeStateYaml(file))).toEqual(file);
   });
 
+  /** A capability that trips no rule, so a tree of them reports only what a test adds. */
+  const cleanCapability = (id: string): RuleNode => {
+    const spec = { statement: "Users can do a thing", criteria: [{ id: "c1", text: "It works" }] };
+    return { id, type: "capability", title: id, slug: id, reviewedHash: specHash(spec), ...spec } as RuleNode;
+  };
+
   it("loads a state.yaml that still carries retired commits, keeps the line, and reports it", async () => {
     const commitsLine = `    commits: [{"hash": "deadbeef", "author": "A", "authorEmail": "a@x", "timestamp": "2026-10-02T00:00:00.000Z"}]`;
     await writeFile(join(folder, STATE_FILE_NAME), [`schema: "rex/v2"`, `items:`, `  "${ID_A}":`, commitsLine, `    status: "in_progress"`, ``].join("\n"), "utf-8");
@@ -151,7 +157,7 @@ describe("round-trip", () => {
     expect((await readState()).split("\n")).toContain(commitsLine);
 
     const task = { id: ID_A, type: "task", title: "T", slug: "t", ...file.items[ID_A] } as RuleNode;
-    const findings = checkV2Rules({ product: [], changes: [{ id: "c", type: "change", title: "C", slug: "c", touches: ["x"], children: [task] } as RuleNode] }, { now: new Date() });
+    const findings = checkV2Rules({ product: [{ id: "a", type: "area", title: "A", slug: "a", children: ["x", "y"].map(cleanCapability) } as RuleNode], changes: [{ id: "c", type: "change", title: "C", slug: "c", touches: ["x"], children: [task] } as RuleNode] }, { now: new Date() });
     expect(findings.map((f) => [f.rule, f.nodeId])).toEqual([["retired-state-field", ID_A]]);
   });
 

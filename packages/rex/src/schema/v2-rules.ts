@@ -263,7 +263,7 @@ export function specHash(spec: { statement?: string; criteria?: Criterion[] }): 
 }
 
 /** A product node's spec as `specHash` reads it: its own statement and criteria (a constraint has none). */
-function nodeSpec(node: RuleNode): { statement?: string; criteria?: Criterion[] } {
+export function nodeSpec(node: RuleNode): { statement?: string; criteria?: Criterion[] } {
   return node.type === "capability" ? node : { statement: node.type === "constraint" ? node.statement : undefined };
 }
 

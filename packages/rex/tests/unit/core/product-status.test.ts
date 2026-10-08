@@ -39,7 +39,7 @@ const fixture = (): V2Tree => ({
   ],
   changes: [
     change("open-amend", { amends: [amend("changing", "modified")] }),
-    change("applied-removal", { status: "completed", appliedIn: "abc123", amends: [amend("retired", "removed")] }),
+    change("applied-removal", { status: "completed", appliedAt: "2026-10-01T00:00:00.000Z", amends: [amend("retired", "removed")] }),
     change("open-fix", { touches: ["fixing"] }),
     change("cancelled", { status: "cancelled", amends: [amend("cancelled-amend", "modified")] }),
   ],
@@ -81,7 +81,7 @@ describe("computeProductStatus", () => {
       changes: [
         change("x", { amends: [amend("a", "modified"), amend("b", "modified")] }),
         change("y", { amends: [amend("c", "modified")] }),
-        change("z", { appliedIn: "abc123", amends: [amend("c", "removed")] }),
+        change("z", { appliedAt: "2026-10-01T00:00:00.000Z", amends: [amend("c", "removed")] }),
       ],
     };
     const out = computeProductStatus(tree);
