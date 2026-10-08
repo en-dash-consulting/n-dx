@@ -34,7 +34,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Migration contract does not say a model question must carry every input its answer depends on, so a minimal question reuses a stale answer](./migration-contract-does-not-say-a.md) | pending |
 | [Migration plan and freeSlug can freeze the slug "index", which the v2 writer refuses on a leaf](./migration-plan-and-freeslug-can-freeze.md) | completed |
 | [Migration plan checks slugs against v1 siblings, so items that become v2 siblings can share a slug and the writer refuses the tree](./migration-plan-checks-slugs-against-v1.md) | completed |
-| [Migration plan counts completed work under cancelled or deleted descendants, so a live feature built only from abandoned work becomes a capability](./migration-plan-counts-completed-work.md) | pending |
+| [Migration plan counts completed work under cancelled or deleted descendants, so a live feature built only from abandoned work becomes a capability](./migration-plan-counts-completed-work.md) | completed |
 | [Migration plan emits two different criteria sets for a capability, so reviewedHash can mismatch the migrated spec](./migration-plan-emits-two-different.md) | completed |
 | [Migration plan makes cancelled or deleted v1 epics and features into standing areas and capabilities](./migration-plan-makes-cancelled-or.md) | completed |
 | [Migration plan recognises only "ndx"/"n-dx" as a product name, so another repository's "Acme 2.0" release epic becomes an area](./migration-plan-recognises-only-ndx-n.md) | completed |
