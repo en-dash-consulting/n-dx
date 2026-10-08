@@ -19,7 +19,7 @@ plannedRelease: "1.0.0"
 | Title | Status |
 |-------|--------|
 | [Agent brief from the product layer](./agent-brief-from-the-product-layer/index.md) | pending |
-| [Apply engine for change amendments](./apply-engine-for-change-amendments/index.md) | pending |
+| [Apply engine for change amendments](./apply-engine-for-change-amendments/index.md) | completed |
 | [Apply the migration](./apply-the-migration/index.md) | pending |
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
 | [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | pending |
