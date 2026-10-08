@@ -1,0 +1,17 @@
+{
+  "comment": "Go drift corpus: public repositories pinned by commit SHA. Cloned by go-corpus-clone.mjs, measured by go-corpus-report.mjs. Neither runs in the test suite.",
+  "repositories": [
+    {
+      "name": "gitea",
+      "url": "https://github.com/go-gitea/gitea.git",
+      "sha": "89ec271d9c5bfd15bbf1a4780b96993296439ab0",
+      "shape": "single module, 3131 .go files"
+    },
+    {
+      "name": "microservices-demo",
+      "url": "https://github.com/GoogleCloudPlatform/microservices-demo.git",
+      "sha": "38e7348eb289eb5b87c0c6e8cb19ced0449dc389",
+      "shape": "four Go modules"
+    }
+  ]
+}
