@@ -13,10 +13,9 @@
  *
  * ## What is here today
  *
- * Declared contracts, and JS/TS HTTP and gRPC call sites. The remaining slices
- * — JS/TS queue/database/cache, and Go — add detections to a file consumers
- * already read. Go will arrive in a sibling module and be dispatched to from
- * here, exactly as `server-route-detection.ts` dispatches to
+ * Declared contracts, and every JS/TS call site: HTTP, gRPC, queue, database
+ * and cache. The remaining slice — Go — will arrive in a sibling module and be
+ * dispatched to from here, exactly as `server-route-detection.ts` dispatches to
  * `go-route-detection.ts`.
  *
  * ## How JS/TS call sites are found
@@ -171,6 +170,16 @@ interface ClientSpec {
   readonly factories: ReadonlySet<string>;
   /** Constructors producing a configured client: `new Pool(origin)`. */
   readonly constructors: ReadonlySet<string>;
+  /** The module's default export is itself a constructor: `new Redis(url)`. */
+  readonly constructibleDefault: boolean;
+  /**
+   * A call's own target may be a fragment of the one its client was configured
+   * with — `api.get("/orders")` on an `axios` instance names no host, so the
+   * instance's base is the better answer. False everywhere else: a queue name
+   * or a topic is a whole target, and letting the connection string displace it
+   * would report the broker where the destination was asked for.
+   */
+  readonly relativeToBase: boolean;
   /** Keys under which an options object carries the target. */
   readonly urlKeys: readonly string[];
 }
@@ -186,6 +195,8 @@ function defineClient(s: {
   methods?: string[];
   factories?: string[];
   constructors?: string[];
+  constructibleDefault?: boolean;
+  relativeToBase?: boolean;
   urlKeys?: string[];
 }): ClientSpec {
   return {
@@ -197,20 +208,24 @@ function defineClient(s: {
     methods: s.methods ? new Set(s.methods) : NO_NAMES,
     factories: s.factories ? new Set(s.factories) : NO_NAMES,
     constructors: s.constructors ? new Set(s.constructors) : NO_NAMES,
+    constructibleDefault: s.constructibleDefault ?? false,
+    relativeToBase: s.relativeToBase ?? false,
     urlKeys: s.urlKeys ?? ["url"],
   };
 }
 
 const VERB_METHODS = ["get", "post", "put", "patch", "delete", "head", "options"];
 
-/** The HTTP client families this slice covers. */
+/** The client families this file covers, by `kind`. */
 const CLIENT_SPECS: readonly ClientSpec[] = [
+  // ── http ──
   defineClient({
     client: "axios",
     modules: ["axios"],
     callableDefault: true,
     methods: [...VERB_METHODS, "request", "postForm", "putForm", "patchForm"],
     factories: ["create"],
+    relativeToBase: true,
     urlKeys: ["baseURL", "url"],
   }),
   defineClient({
@@ -219,6 +234,7 @@ const CLIENT_SPECS: readonly ClientSpec[] = [
     callableDefault: true,
     methods: [...VERB_METHODS, "stream", "paginate"],
     factories: ["extend"],
+    relativeToBase: true,
     urlKeys: ["prefixUrl", "url"],
   }),
   defineClient({
@@ -227,6 +243,7 @@ const CLIENT_SPECS: readonly ClientSpec[] = [
     callableDefault: true,
     methods: VERB_METHODS,
     factories: ["create", "extend"],
+    relativeToBase: true,
     urlKeys: ["prefixUrl", "url"],
   }),
   defineClient({
@@ -240,7 +257,117 @@ const CLIENT_SPECS: readonly ClientSpec[] = [
     callableNamed: ["request", "fetch", "stream", "pipeline", "upgrade", "connect"],
     methods: ["request", "stream", "dispatch"],
     constructors: ["Client", "Pool", "Agent", "ProxyAgent", "BalancedPool"],
+    relativeToBase: true,
     urlKeys: ["origin", "url"],
+  }),
+
+  // ── queue ──
+  // The AWS SDK v2 reaches SQS and SNS through service constructors hung off
+  // the one module object; the target rides on the request, not the client.
+  defineClient({
+    client: "aws-sdk",
+    kind: "queue",
+    modules: ["aws-sdk"],
+    methods: [
+      "sendMessage", "sendMessageBatch", "receiveMessage", "deleteMessage",
+      "publish", "publishBatch",
+    ],
+    constructors: ["SQS", "SNS"],
+    urlKeys: ["QueueUrl", "TopicArn", "endpoint"],
+  }),
+  // v3 splits one module per service and wraps each request in a Command
+  // object. `extractTarget` reads the constructed command's options, so the
+  // row lands on the `send` that issues it rather than on the command literal.
+  defineClient({
+    client: "@aws-sdk/client-sqs",
+    kind: "queue",
+    modules: ["@aws-sdk/client-sqs"],
+    methods: ["send"],
+    constructors: ["SQSClient", "SQS"],
+    urlKeys: ["QueueUrl", "endpoint"],
+  }),
+  defineClient({
+    client: "@aws-sdk/client-sns",
+    kind: "queue",
+    modules: ["@aws-sdk/client-sns"],
+    methods: ["send"],
+    constructors: ["SNSClient", "SNS"],
+    urlKeys: ["TopicArn", "TargetArn", "endpoint"],
+  }),
+  defineClient({
+    client: "kafkajs",
+    kind: "queue",
+    modules: ["kafkajs"],
+    methods: ["send", "sendBatch", "subscribe"],
+    factories: ["producer", "consumer", "admin"],
+    constructors: ["Kafka"],
+    urlKeys: ["brokers", "topic", "topics"],
+  }),
+  // `connect` sits in both tables: it states the broker URL on its own line and
+  // hands back the connection whose channels carry the queue names.
+  defineClient({
+    client: "amqplib",
+    kind: "queue",
+    modules: ["amqplib", "amqplib/callback_api"],
+    methods: ["sendToQueue", "publish"],
+    factories: ["connect", "createChannel", "createConfirmChannel"],
+    urlKeys: ["hostname", "queue", "exchange"],
+  }),
+
+  // ── database ──
+  defineClient({
+    client: "pg",
+    kind: "database",
+    modules: ["pg"],
+    constructors: ["Client", "Pool"],
+    urlKeys: ["connectionString", "host", "database"],
+  }),
+  defineClient({
+    client: "mysql",
+    kind: "database",
+    modules: ["mysql"],
+    factories: ["createConnection", "createPool", "createPoolCluster"],
+    urlKeys: ["uri", "connectionString", "host"],
+  }),
+  defineClient({
+    client: "mysql2",
+    kind: "database",
+    modules: ["mysql2", "mysql2/promise"],
+    factories: ["createConnection", "createPool", "createPoolCluster"],
+    urlKeys: ["uri", "connectionString", "host"],
+  }),
+  defineClient({
+    client: "mongodb",
+    kind: "database",
+    modules: ["mongodb"],
+    methods: ["connect"],
+    constructors: ["MongoClient"],
+    urlKeys: ["url", "uri", "hosts"],
+  }),
+  defineClient({
+    client: "mongoose",
+    kind: "database",
+    modules: ["mongoose"],
+    methods: ["connect", "createConnection"],
+    urlKeys: ["uri", "host"],
+  }),
+
+  // ── cache ──
+  defineClient({
+    client: "redis",
+    kind: "cache",
+    modules: ["redis"],
+    callableNamed: ["createClient", "createCluster"],
+    factories: ["createClient", "createCluster"],
+    urlKeys: ["url", "host"],
+  }),
+  defineClient({
+    client: "ioredis",
+    kind: "cache",
+    modules: ["ioredis"],
+    constructors: ["Redis", "Cluster"],
+    constructibleDefault: true,
+    urlKeys: ["host", "url", "path"],
   }),
 ];
 
@@ -268,6 +395,19 @@ interface LocalBinding {
   member?: string;
   /** The base target a factory or constructor was configured with. */
   base?: TargetInfo;
+}
+
+/**
+ * Is `new <localName>(…)` on this binding a client constructor?
+ *
+ * A named export is looked up under the name it was exported as, so an alias
+ * still resolves. A module whose default export *is* the constructor —
+ * `ioredis` — cannot be: the local name is whatever the importer chose, so the
+ * spec says so once and the name is not consulted.
+ */
+function isConstructorName(binding: LocalBinding, localName: string): boolean {
+  if (binding.spec.constructibleDefault && !binding.member) return true;
+  return binding.spec.constructors.has(binding.member ?? localName);
 }
 
 /** Everything the declaration pass learned about one source file. */
@@ -391,14 +531,34 @@ function extractTarget(
       : NO_TARGET;
   }
 
-  // `new URL("/orders", base)` — the URL is in the arguments, not the call.
+  // `brokers: ["kafka-1:9092", "kafka-2:9092"]` — one broker names the cluster.
+  if (ts.isArrayLiteralExpression(node)) {
+    for (const el of node.elements) {
+      const inner = extractTarget(el, bindings, urlKeys, hops + 1);
+      if (inner.targetSource !== "unknown") return inner;
+    }
+    return NO_TARGET;
+  }
+
   if (ts.isNewExpression(node) || ts.isCallExpression(node)) {
-    const callee = ts.isNewExpression(node) ? node.expression : node.expression;
-    if (ts.isIdentifier(callee) && callee.text === "URL") {
+    const callee = node.expression;
+    // A constructed object carries the target it was constructed with:
+    // `new URL("/orders", base)`, and the AWS SDK v3 shape
+    // `send(new SendMessageCommand({ QueueUrl }))`, where the destination is
+    // stated on the command rather than on the client or the call.
+    if (ts.isNewExpression(node) || (ts.isIdentifier(callee) && callee.text === "URL")) {
       for (const arg of node.arguments ?? []) {
         const inner = extractTarget(arg, bindings, urlKeys, hops + 1);
         if (inner.targetSource !== "unknown") return inner;
       }
+      return NO_TARGET;
+    }
+    // `process.env.KAFKA_BROKERS.split(",")` — the variable survives a method
+    // called on it. Only `env` is read back this way; a config path reached
+    // through an unknown call is a guess, and this file does not guess.
+    if (ts.isPropertyAccessExpression(callee)) {
+      const calleeEnv = envVariableName(callee.expression);
+      if (calleeEnv) return { target: calleeEnv, targetSource: "env" };
     }
     return NO_TARGET;
   }
@@ -496,11 +656,16 @@ function collectBindings(sf: ts.SourceFile): FileBindings {
 /** One `const x = …` — a require, an alias, a factory result, or a plain value. */
 function collectFromDeclaration(
   decl: ts.VariableDeclaration,
-  init: ts.Expression,
+  initializer: ts.Expression,
   bindings: FileBindings,
   bindModuleObject: (module: string, localName: string) => void,
   bindModuleMember: (module: string, exported: string, localName: string) => void,
 ): void {
+  // `const conn = await amqp.connect(url)` — the await is not a hop, and every
+  // database and queue client's connect returns a promise.
+  let init = initializer;
+  while (ts.isAwaitExpression(init)) init = init.expression;
+
   const module = requiredModule(init);
   if (module) {
     if (ts.isIdentifier(decl.name)) bindModuleObject(module, decl.name.text);
@@ -551,10 +716,14 @@ function collectFromDeclaration(
     if (objectName) {
       const source = bindings.locals.get(objectName);
       if (source?.spec.factories.has(method) && ts.isIdentifier(decl.name)) {
+        // `kafka.producer()` and `conn.createChannel()` take no target of their
+        // own; inheriting keeps the broker reachable from a send that does not
+        // name one, rather than losing it at the second hop.
+        const own = extractTarget(init.arguments[0], bindings, source.spec.urlKeys);
         bindings.locals.set(decl.name.text, {
           spec: source.spec,
           reach: "instance",
-          base: extractTarget(init.arguments[0], bindings, source.spec.urlKeys),
+          base: own.targetSource === "unknown" ? source.base : own,
         });
         return;
       }
@@ -571,10 +740,29 @@ function collectFromDeclaration(
   }
 
   // `const pool = new Pool(origin)` — a configured instance.
-  if (ts.isNewExpression(init) && ts.isIdentifier(init.expression)) {
+  if (ts.isNewExpression(init) && ts.isIdentifier(init.expression) && ts.isIdentifier(decl.name)) {
     const source = bindings.locals.get(init.expression.text);
-    if (source?.spec.constructors.has(source.member ?? init.expression.text) &&
-        ts.isIdentifier(decl.name)) {
+    if (source && isConstructorName(source, init.expression.text)) {
+      bindings.locals.set(decl.name.text, {
+        spec: source.spec,
+        reach: "instance",
+        base: extractTarget(init.arguments?.[0], bindings, source.spec.urlKeys),
+      });
+      return;
+    }
+  }
+
+  // `const sqs = new AWS.SQS({ region })` — the AWS SDK v2 shape, where the
+  // service constructor hangs off the module object rather than being imported.
+  if (
+    ts.isNewExpression(init) &&
+    ts.isPropertyAccessExpression(init.expression) &&
+    ts.isIdentifier(decl.name)
+  ) {
+    let root: ts.Expression = init.expression.expression;
+    while (ts.isPropertyAccessExpression(root)) root = root.expression;
+    const source = ts.isIdentifier(root) ? bindings.locals.get(root.text) : undefined;
+    if (source?.spec.constructors.has(init.expression.name.text)) {
       bindings.locals.set(decl.name.text, {
         spec: source.spec,
         reach: "instance",
@@ -652,11 +840,6 @@ export function detectJsOutboundCalls(
   ): void => {
     const args = node.arguments ?? [];
     let info = extractTarget(args[0], bindings, binding.spec.urlKeys);
-    // `api.get("/orders")` on an instance configured with a baseURL: the host
-    // is the fact a cross-repo matcher needs, and the path is not it.
-    if (binding.base && binding.base.targetSource !== "unknown" && !isAbsoluteTarget(info)) {
-      info = binding.base;
-    }
     if (info.targetSource === "unknown" && args.length > 1) {
       // `fetch(url, { … })` puts the target first, but `request({ url })`
       // and `axios({ url })` put it in an options object.
@@ -667,6 +850,14 @@ export function detectJsOutboundCalls(
           break;
         }
       }
+    }
+    // Fall back to what the client was configured with — always when the call
+    // names nothing, and for an HTTP client also when it names only a path:
+    // `api.get("/orders")` matches no producer, and the host it was built with
+    // does. A queue's own target is never a fragment, so it is never displaced.
+    if (binding.base && binding.base.targetSource !== "unknown") {
+      const incomplete = binding.spec.relativeToBase && !isAbsoluteTarget(info);
+      if (info.targetSource === "unknown" || incomplete) info = binding.base;
     }
     record(node, binding.spec.kind, binding.spec.client, info,
       confidenceFor(binding.reach, dynamic));
@@ -764,9 +955,9 @@ export function detectJsOutboundCalls(
 
     if (!ts.isIdentifier(callee)) return;
 
-    // `new Pool(origin)` — an undici connection pool.
+    // `new Pool(origin)`, `new MongoClient(uri)`, `new Redis(url)`.
     const binding = bindings.locals.get(callee.text);
-    if (binding?.spec.constructors.has(binding.member ?? callee.text)) {
+    if (binding && isConstructorName(binding, callee.text)) {
       recordClientCall(node, binding, false);
       return;
     }
