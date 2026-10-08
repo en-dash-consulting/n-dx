@@ -27,6 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add a golden-file fixture harness for language packs](./add-a-golden-file-fixture-harness-for.md) | pending |
-| [Add a tree-sitter runner that executes pack queries](./add-a-tree-sitter-runner-that-executes.md) | in_progress |
+| [Add a tree-sitter runner that executes pack queries](./add-a-tree-sitter-runner-that-executes.md) | completed |
+| [CI never builds the Java grammar, so every grammar-dependent runner and grammar test skips there and the runner's acceptance criteria are unverified in CI](./ci-never-builds-the-java-grammar-so.md) | pending |
 | [Define the language pack type and built-in pack loader](./define-the-language-pack-type-and.md) | completed |
 | [Published sourcevision has no grammars, so every language pack degrades to inventory-only and the notice points at an unshipped script](./published-sourcevision-has-no-grammars.md) | pending |
