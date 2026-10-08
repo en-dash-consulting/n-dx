@@ -1,0 +1,20 @@
+---
+id: "69ec8bf2-b1c6-480d-8060-df5a3bc680ba"
+level: "task"
+title: "Java packageDeclarationRoots throws when a project subdirectory cannot be listed"
+status: "pending"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "language-packs"
+  - "java"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "Java module discovery on a build-file-less project containing an unlistable subdirectory resolves instead of rejecting"
+  - "The skipped directory is reported as a notice"
+  - "A unit test covers the unreadable-directory case (skipped on Windows and as root)"
+description: "Verdict: out-of-scope (pre-existing), medium. packages/sourcevision/src/language/java-modules.ts:203 packageDeclarationRoots' walk calls readdir with no error handling. Scenario: a Java project with no Maven/Gradle build file containing a chmod 000 directory (or one deleted mid-walk) → readdir rejects with EACCES/ENOENT and Java module discovery fails instead of skipping that directory. Same shape as the Go walk fixed in task e6ce4e7e (go-build.ts findDirsWith). Reachability: Java edges are fed into analyze (completed feature 'Resolve Java references to files'); whether analyze catches the rejection upstream was not verified. Fix: mirror the Go change - catch EACCES/EPERM/ENOENT/ENOTDIR, skip the directory, record a notice; rethrow anything else."
+lastModified: "2026-10-08T07:09:56.296Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
