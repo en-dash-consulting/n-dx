@@ -16,27 +16,30 @@ describe("deriveChangeKind (design table)", () => {
     node({ id: "con", type: "constraint", appliesTo: "all" }),
   ];
   const index = indexTree(tree(product, []));
-  const kind = (c: RuleNode, fixed?: string[]) => deriveChangeKind(c as ChangeNode, index, { fixed: new Set(fixed) });
+  const kind = (c: RuleNode) => deriveChangeKind(c as ChangeNode, index);
 
-  const rows: [string, RuleNode, ChangeKind | undefined, string[]?][] = [
+  const rows: [string, RuleNode, ChangeKind | undefined][] = [
     ["amends · added", change("c", { amends: [amend("cap-a", "added")] }), "feature"],
     ["amends · modified", change("c", { amends: [amend("cap-a", "modified")] }), "enhancement"],
     ["amends · removed", change("c", { amends: [amend("cap-a", "removed")] }), "retirement"],
-    ["touches, capability went failing to met", change("c", { touches: ["cap-a"] }), "fix", ["cap-a"]],
-    ["touches, no status change", change("c", { touches: ["cap-a"] }), "refactor"],
-    ["touches a capability another change fixed", change("c", { touches: ["cap-a"] }), "refactor", ["cap-b"]],
+    ["fix: true, touches", change("c", { fix: true, touches: ["cap-a"] }), "fix"],
+    ["fix: true, amends · modified", change("c", { fix: true, amends: [amend("cap-a", "modified")] }), "fix"],
+    ["fix: true, amends a constraint · modified", change("c", { fix: true, amends: [amend("con", "modified")] }), "fix"],
+    ["fix: true, amends · added", change("c", { fix: true, amends: [amend("cap-a", "added")] }), "feature"],
+    ["fix: true, amends · removed", change("c", { fix: true, amends: [amend("cap-a", "removed")] }), "retirement"],
+    ["touches", change("c", { touches: ["cap-a"] }), "refactor"],
     ["amends a constraint", change("c", { amends: [amend("con", "modified")] }), "policy-change"],
     ["neither, spike", change("c", { spike: true }), "spike"],
     ["neither, not a spike", change("c", {}), undefined],
   ];
-  it.each(rows)("%s", (_name, c, expected, fixed) => {
-    expect(kind(c, fixed)).toBe(expected);
+  it.each(rows)("%s", (_name, c, expected) => {
+    expect(kind(c)).toBe(expected);
   });
 
   it("ranks a constraint above other amendments, and amendments above touches", () => {
     expect(kind(change("c", { amends: [amend("cap-a", "added"), amend("con", "modified")] }))).toBe("policy-change");
     expect(kind(change("c", { amends: [amend("cap-a", "removed"), amend("cap-b", "added")] }))).toBe("feature");
-    expect(kind(change("c", { amends: [amend("cap-a", "modified")], touches: ["cap-b"] }), ["cap-b"])).toBe("enhancement");
+    expect(kind(change("c", { amends: [amend("cap-a", "modified")], touches: ["cap-b"] }))).toBe("enhancement");
   });
 
   it("reads a target through an alias, and a refused ref as no relationship", () => {

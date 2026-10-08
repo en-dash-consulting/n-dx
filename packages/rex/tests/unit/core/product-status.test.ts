@@ -28,9 +28,11 @@ const fixture = (): V2Tree => ({
         cap("proposed", { metAt: undefined }),
         cap("changing"),
         cap("revised", { statement: "does another thing" }),
-        cap("failing", { checks: [check("fail")] }),
+        cap("check-fails", { checks: [check("fail")] }),
         cap("retired"),
-        cap("fixing"),
+        cap("fixing", { checks: [check("pass")] }),
+        cap("fix-amended"),
+        cap("applied-fix"),
         cap("cancelled-amend"),
       ],
     }),
@@ -40,25 +42,29 @@ const fixture = (): V2Tree => ({
   changes: [
     change("open-amend", { amends: [amend("changing", "modified")] }),
     change("applied-removal", { status: "completed", appliedAt: "2026-10-01T00:00:00.000Z", amends: [amend("retired", "removed")] }),
-    change("open-fix", { touches: ["fixing"] }),
+    change("open-fix", { fix: true, touches: ["fixing"] }),
+    change("open-fix-amend", { fix: true, amends: [amend("fix-amended", "modified")] }),
+    change("applied-fix", { fix: true, status: "completed", appliedAt: "2026-10-01T00:00:00.000Z", touches: ["applied-fix"] }),
     change("cancelled", { status: "cancelled", amends: [amend("cancelled-amend", "modified")] }),
   ],
 });
 
 describe("computeProductStatus", () => {
-  const result = computeProductStatus(fixture(), { fixed: new Set(["fixing"]) });
+  const result = computeProductStatus(fixture());
 
   const rows: [string, ProductStatus][] = [
     ["met", { status: "met", health: "ok" }],
     ["proposed", { status: "proposed", health: "ok" }],
     ["changing", { status: "changing", health: "ok" }],
     ["revised", { status: "revised", health: "ok" }],
-    ["failing", { status: "failing", health: "defective" }],
+    ["check-fails", { status: "met", health: "defective" }],
     ["retired", { status: "retired", health: "ok" }],
     ["fixing", { status: "met", health: "defective" }],
+    ["fix-amended", { status: "changing", health: "defective" }],
+    ["applied-fix", { status: "met", health: "ok" }],
     ["cancelled-amend", { status: "met", health: "ok" }],
     ["con-met", { status: "met", health: "ok" }],
-    ["con-defective", { status: "failing", health: "defective" }],
+    ["con-defective", { status: "met", health: "defective" }],
   ];
   it.each(rows)("%s", (id, expected) => {
     expect(result[id]).toEqual(expected);
@@ -88,8 +94,11 @@ describe("computeProductStatus", () => {
     expect([out.a.status, out.b.status, out.c.status]).toEqual(["changing", "changing", "retired"]);
   });
 
-  it("does not read a touching change as a fix without the fixed ids", () => {
-    expect(computeProductStatus(fixture()).fixing).toEqual({ status: "met", health: "ok" });
+  it("does not read an open touching change as a fix without fix: true", () => {
+    const tree = fixture();
+    const openFix = tree.changes.find((c) => c.id === "open-fix") as RuleNode & { fix?: boolean };
+    delete openFix.fix;
+    expect(computeProductStatus(tree).fixing).toEqual({ status: "met", health: "ok" });
   });
 
   it("resolves aliases on amendment targets", () => {
@@ -100,7 +109,7 @@ describe("computeProductStatus", () => {
   it("does not mutate the tree", () => {
     const tree = fixture();
     const before = structuredClone(tree);
-    computeProductStatus(tree, { fixed: new Set(["fixing"]) });
+    computeProductStatus(tree);
     expect(tree).toEqual(before);
   });
 });

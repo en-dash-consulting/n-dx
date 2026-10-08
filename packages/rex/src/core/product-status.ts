@@ -14,27 +14,25 @@
  * | changing  | an open change amends it                                      |
  * | proposed  | never met (`metAt` absent)                                    |
  * | revised   | the spec hash differs from `metAt`                            |
- * | failing   | the hash equals `metAt` but a check fails                     |
- * | met       | the hash equals `metAt` and no check fails                    |
+ * | met       | the hash equals `metAt`                                       |
  *
- * `failing` covers the case "met" (hash equal, checks pass) and "revised"
- * (hash differs) leave open; it is the "failing" a `fix` change takes back to
- * met (see {@link deriveChangeKind}). A `skipped` check does not fail.
+ * A failing check does not change the status; it shows on health only.
  *
  * ## Health
  *
- * `defective` when a check fails or an open change of kind `fix` touches the
- * node, otherwise `ok`. A change's kind comes from {@link deriveChangeKind}, so
- * a touching change reads as a fix only for the ids in `options.fixed`.
+ * `defective` when one of the node's checks fails (`skipped` does not), or
+ * while an open change marked `fix: true` targets the node through `amends`
+ * or `touches`; otherwise `ok`. The `fix` field on the change is the only way
+ * an open change is identified as a fix: no history is read, so a bug no check
+ * catches still shows once someone opens a change to repair it.
  *
  * @module rex/core/product-status
  */
 
 import { indexTree, isAppliedChange, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import type { ChangeNode } from "../schema/v2.js";
-import { deriveChangeKind, type ChangeKindOptions } from "./product-edges.js";
 
-export const INTENT_STATUSES = ["proposed", "changing", "met", "failing", "revised", "retired"] as const;
+export const INTENT_STATUSES = ["proposed", "changing", "met", "revised", "retired"] as const;
 export type IntentStatus = (typeof INTENT_STATUSES)[number];
 
 export const HEALTH_VALUES = ["ok", "defective"] as const;
@@ -46,7 +44,7 @@ export interface ProductStatus {
 }
 
 /** Status and health of every live capability and constraint, keyed by id. */
-export function computeProductStatus(tree: V2Tree, options: ChangeKindOptions = {}): Record<string, ProductStatus> {
+export function computeProductStatus(tree: V2Tree): Record<string, ProductStatus> {
   const index = indexTree(tree);
   const amended = new Set<string>();
   const retired = new Set<string>();
@@ -62,8 +60,8 @@ export function computeProductStatus(tree: V2Tree, options: ChangeKindOptions = 
       if (open) amended.add(target.id);
       else if (a.delta === "removed" && isAppliedChange(node)) retired.add(target.id);
     }
-    if (open && deriveChangeKind(change, index, options) === "fix") {
-      for (const ref of change.touches ?? []) {
+    if (open && change.fix === true) {
+      for (const ref of [...(change.amends ?? []).map((a) => a.target), ...(change.touches ?? [])]) {
         const target = index.resolve(ref);
         if (target) fixing.add(target.id);
       }
@@ -82,9 +80,7 @@ export function computeProductStatus(tree: V2Tree, options: ChangeKindOptions = 
           ? "proposed"
           : specHash(nodeSpec(node)) !== node.metAt
             ? "revised"
-            : checkFails
-              ? "failing"
-              : "met";
+            : "met";
     out[node.id] = { status, health: checkFails || fixing.has(node.id) ? "defective" : "ok" };
   }
   return out;

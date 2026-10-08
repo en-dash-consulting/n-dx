@@ -344,8 +344,12 @@ export interface ChangeIntent extends BaseIntent, EffortIntent {
   plannedRelease?: string;
   spike?: boolean;
   /**
-   * The change repairs the nodes it touches without amending them. A product
-   * node reads defective while an open change with `fix: true` targets it.
+   * Marks the change as a fix: it repairs the nodes it targets rather than
+   * adding or removing any. This field is how an open change is identified as
+   * a fix; nothing is inferred from checks or history. While the change is
+   * open, every product node it amends or touches reads health `defective`
+   * (`core/product-status.ts`), and its kind is `fix` unless it has an
+   * `added` or `removed` amendment (`core/product-edges.ts`).
    * Never also a spike (`fix-not-spike`).
    */
   fix?: boolean;

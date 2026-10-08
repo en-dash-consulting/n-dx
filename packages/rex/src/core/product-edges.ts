@@ -38,44 +38,33 @@ import { loadCommitFiles, loadTrailerCommits, type ChangeCommitsOptions } from "
 export const CHANGE_KINDS = ["feature", "enhancement", "retirement", "fix", "refactor", "policy-change", "spike"] as const;
 export type ChangeKind = (typeof CHANGE_KINDS)[number];
 
-export interface ChangeKindOptions {
-  /**
-   * Ids of capabilities that went from failing to met. Passing the ids a
-   * touching change fixed is the caller's job: that needs status history this
-   * module does not read. A touch of any of them makes the change a fix.
-   */
-  fixed?: ReadonlySet<string>;
-}
-
 /**
  * A change's kind, from its relationship to the map (the design's table):
  *
- * | Relationship                              | Kind          |
- * |-------------------------------------------|---------------|
- * | amends a constraint                       | policy-change |
- * | amends, delta `added`                     | feature       |
- * | amends, delta `modified`                  | enhancement   |
- * | amends, delta `removed`                   | retirement    |
- * | touches, a capability went failing → met  | fix           |
- * | touches, no status change                 | refactor      |
- * | neither, `spike: true`                    | spike         |
+ * | Relationship                                          | Kind          |
+ * |-------------------------------------------------------|---------------|
+ * | `fix: true`, no amendment `added` or `removed`        | fix           |
+ * | amends a constraint                                   | policy-change |
+ * | amends, delta `added`                                 | feature       |
+ * | amends, delta `modified`                              | enhancement   |
+ * | amends, delta `removed`                               | retirement    |
+ * | touches                                               | refactor      |
+ * | neither, `spike: true`                                | spike         |
  *
  * When one change carries several, the first row above wins: amendments
- * outrank touches, and a constraint outranks the rest. A change that relates to
+ * outrank touches, and a constraint outranks the rest. A fix is marked on the
+ * change (`fix: true`), not read from history, so an open change already has
+ * its kind; adding or removing a node is never a fix. A change that relates to
  * the map in none of these ways (an inbox change) has no kind yet.
  */
-export function deriveChangeKind(
-  change: ChangeNode,
-  index: Pick<TreeIndex, "resolve">,
-  options: ChangeKindOptions = {},
-): ChangeKind | undefined {
+export function deriveChangeKind(change: ChangeNode, index: Pick<TreeIndex, "resolve">): ChangeKind | undefined {
   const amends = change.amends ?? [];
+  if (change.fix === true && !amends.some((a) => a.delta === "added" || a.delta === "removed")) return "fix";
   if (amends.some((a) => index.resolve(a.target)?.type === "constraint")) return "policy-change";
   for (const [delta, kind] of [["added", "feature"], ["modified", "enhancement"], ["removed", "retirement"]] as const) {
     if (amends.some((a) => a.delta === delta)) return kind;
   }
-  const touched = (change.touches ?? []).map((ref) => index.resolve(ref)).filter((n): n is RuleNode => n !== undefined);
-  if (touched.length > 0) return touched.some((n) => options.fixed?.has(n.id)) ? "fix" : "refactor";
+  if ((change.touches ?? []).some((ref) => index.resolve(ref) !== undefined)) return "refactor";
   return change.spike === true ? "spike" : undefined;
 }
 
