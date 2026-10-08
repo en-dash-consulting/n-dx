@@ -86,6 +86,20 @@ describe("syntax markers", () => {
     expect(result.evidence).toEqual([]);
   });
 
+  it("ignores markers inside string literals, and a -- inside a string", () => {
+    const result = classify(
+      "CREATE TABLE t (code text CHECK (code ~ '^[A-Z]'), note text DEFAULT 'it''s -- AUTO_INCREMENT');\nPRAGMA x;",
+    );
+    expect(result.evidence.map((item) => item.ruleId)).toEqual(["sqlite-pragma"]);
+    expect(result.evidence[0]?.line).toBe(2);
+  });
+
+  it("does not read a MySQL DELIMITER $$ procedure as PostgreSQL", () => {
+    const result = classify("DELIMITER $$\nCREATE PROCEDURE p() BEGIN SELECT 1; END$$\nDELIMITER ;", "db/mysql/procs.sql");
+    expect(result.dialect).toBe("mysql");
+    expect(result.evidence.map((item) => item.ruleId)).toEqual(["path-mysql"]);
+  });
+
   it("reports unknown on a tie rather than picking by name", () => {
     expect(classify("CREATE TABLE t (id int AUTO_INCREMENT);", "db/h2/x.sql").dialect).toBe("unknown");
   });
