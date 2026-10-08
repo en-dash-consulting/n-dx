@@ -30,9 +30,16 @@ export interface PackImportGraph {
   readonly external: ExternalImport[];
 }
 
-/** Packs whose files are analyzed, given the extensions the imports phase parses. */
+/**
+ * Packs whose files the imports phase analyzes, given the extensions it
+ * parses. Only a pack with a resolver counts: one without produces no edges,
+ * and counting it would make `analyzeImports` re-parse its files on every
+ * incremental run. Go, for example, is structure-only and keeps its own parser.
+ */
 export function packsFor(parseableExtensions: ReadonlySet<string>, packs: readonly LanguagePack[] = BUILTIN_PACKS): LanguagePack[] {
-  return packs.filter((pack) => [...pack.config.parseableExtensions].some((ext) => parseableExtensions.has(ext)));
+  return packs.filter(
+    (pack) => pack.resolver !== undefined && [...pack.config.parseableExtensions].some((ext) => parseableExtensions.has(ext)),
+  );
 }
 
 /** True when `path` belongs to one of `packs`. */
@@ -54,7 +61,7 @@ export async function buildPackImportGraph(
   const edges: ImportEdge[] = [];
   const external = new Map<string, ExternalImport>();
 
-  const present = (options.packs ?? BUILTIN_PACKS).filter((pack) => files.some((f) => isPackFile(f.path, [pack])));
+  const present = (options.packs ?? BUILTIN_PACKS).filter((pack) => pack.resolver !== undefined && files.some((f) => isPackFile(f.path, [pack])));
   if (present.length === 0) return { edges, external: [] };
 
   const statuses = loadLanguagePacks({ packs: present, grammarDir: options.grammarDir, warn: options.warn });

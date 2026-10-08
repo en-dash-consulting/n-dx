@@ -19,6 +19,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { buildGrammarsScript, grammarBuildDir } from "./package-paths.js";
+import { goPack } from "./go-pack.js";
 import { javaPack } from "./java-pack.js";
 import type { LanguageConfig } from "./registry.js";
 
@@ -167,7 +168,7 @@ export interface LanguagePack {
 // ── Built-in packs and loader ───────────────────────────────────────────────
 
 /** Packs registered in sourcevision. */
-export const BUILTIN_PACKS: readonly LanguagePack[] = [javaPack];
+export const BUILTIN_PACKS: readonly LanguagePack[] = [javaPack, goPack];
 
 /** How a pack's language will be analyzed. */
 export type PackMode = "structure" | "inventory-only";
