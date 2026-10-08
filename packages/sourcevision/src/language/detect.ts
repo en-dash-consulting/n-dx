@@ -30,7 +30,7 @@ import { goConfig } from "./go.js";
 import { swiftConfig } from "./swift.js";
 import { pythonConfig } from "./python.js";
 import { csharpConfig } from "./csharp.js";
-import { javaConfig } from "./java.js";
+import { javaConfig, javaSecondaryConfig } from "./java.js";
 
 // ── Config registry ─────────────────────────────────────────────────────────
 
@@ -43,6 +43,20 @@ const LANGUAGE_CONFIGS: ReadonlyMap<string, LanguageConfig> = new Map([
   ["typescript", typescriptConfig],
   ["javascript", typescriptConfig],
 ]);
+
+/**
+ * Rebuild the configs `detectLanguages` returned from the ids persisted in
+ * `manifest.languages` (primary first). Java after the first id gets the
+ * secondary variant, as it did at detection. Unknown ids are dropped.
+ */
+export function languageConfigsFromIds(ids: readonly string[]): LanguageConfig[] {
+  const configs: LanguageConfig[] = [];
+  ids.forEach((id, i) => {
+    const config = i > 0 && id === "java" ? javaSecondaryConfig : getLanguageConfig(id);
+    if (config) configs.push(config);
+  });
+  return configs;
+}
 
 /**
  * Valid language identifiers accepted by the `.n-dx.json` `language` field.
@@ -379,8 +393,10 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
     return tiebreakRank(a.config) - tiebreakRank(b.config);
   });
   const configs = present.map((p) => p.config);
-  // Appended last so Java never displaces the primary language.
-  if (hasJava) configs.push(javaConfig);
+  // Appended last so Java never displaces the primary language. The
+  // secondary variant keeps Java from skipping or flagging the primary
+  // language's `out/` and `generated/` files.
+  if (hasJava) configs.push(javaSecondaryConfig);
   return configs;
 }
 
