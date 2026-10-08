@@ -29,3 +29,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Handle direct map edits: editorial re-stamp or revised with a drafted change](./handle-direct-map-edits-editorial-re.md) | completed |
 | [Retiring an area or capability leaves its live descendants hidden from every v2 rule](./retiring-an-area-or-capability-leaves.md) | completed |
 | [Support the rex.applyOn setting: complete, review and release](./support-the-rex-applyon-setting.md) | pending |
+| [Stamp appliedAt, refuse stale amendments and check apply's own output](./stamp-appliedat-refuse-stale.md) | pending |
