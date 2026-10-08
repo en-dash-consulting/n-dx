@@ -163,11 +163,13 @@ function postExecute(
   path: string,
   entry: Omit<QueueEntry, "enqueuedAt">,
   timeoutMs: number,
+  token: string | null,
 ): Promise<Response> {
   return fetch(`http://127.0.0.1:${port}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { "X-Ndx-Token": token } : {}),
       ...(entry.workspace ? { "x-ndx-workspace": entry.workspace } : {}),
     },
     body: JSON.stringify({
@@ -285,7 +287,7 @@ export class Hub {
     const ports = this.listProjects()
       .map((project) => project.status.port ?? project.port)
       .filter((port): port is number => typeof port === "number");
-    const counts = await Promise.all(ports.map((port) => countProjectExecutions(port)));
+    const counts = await Promise.all(ports.map((port) => countProjectExecutions(port, this.token)));
     return counts.reduce((total, n) => total + n, 0);
   }
 
@@ -299,7 +301,7 @@ export class Hub {
     const port = this.projectPort(entry.projectId);
     if (port === null) return { started: false, status: null, error: "Its project is no longer served by the hub." };
     try {
-      const res = await postExecute(port, "/api/hench/execute", entry, 30_000);
+      const res = await postExecute(port, "/api/hench/execute", entry, 30_000, this.token);
       if (!res.ok) {
         const body = await readJsonObject(res);
         const error = typeof body?.error === "string" && body.error ? body.error : `HTTP ${res.status}`;
@@ -325,7 +327,7 @@ export class Hub {
     const port = this.projectPort(request.projectId);
     if (port === null) return null;
     try {
-      const res = await postExecute(port, "/api/hench/execute/check", request, 10_000);
+      const res = await postExecute(port, "/api/hench/execute/check", request, 10_000, this.token);
       if (res.status !== 200) return null;
       const verdict = await readJsonObject(res);
       if (verdict?.ok !== false || typeof verdict.status !== "number") return null;

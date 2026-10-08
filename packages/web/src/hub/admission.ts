@@ -506,10 +506,15 @@ export class AdmissionGate {
   }
 }
 
-/** One child's in-flight dashboard executions. Unreachable children count zero. */
-export async function countProjectExecutions(port: number, timeoutMs = 2_000): Promise<number> {
+/**
+ * One child's in-flight dashboard executions. Unreachable children count zero.
+ * `token` is the hub's per-user token: with auth on, a child answers 401
+ * without it and the count would silently read 0, so the cap would never hold.
+ */
+export async function countProjectExecutions(port: number, token: string | null = null, timeoutMs = 2_000): Promise<number> {
   try {
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute/status`, {
+      headers: token ? { "X-Ndx-Token": token } : {},
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return 0;
