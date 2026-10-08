@@ -8,6 +8,7 @@
  *   analyze [dir]      - Run analysis pipeline
  *   serve [dir]        - Start local viewer server
  *   validate [dir]     - Validate .sourcevision/ output files
+ *   readiness [dir]    - Print the SDLC readiness scorecard
  *   export-pdf [dir]   - Export analysis as a PDF report
  *   iso [dir]          - Render a standalone isometric architecture map
  *   pr-markdown [dir]  - Regenerate PR markdown in .sourcevision/
@@ -22,6 +23,7 @@ import { cmdReset } from "./commands/reset.js";
 import { cmdAnalyze, narrateDeps } from "./commands/analyze.js";
 import { cmdNarrate } from "./commands/narrate.js";
 import { cmdValidate } from "./commands/validate.js";
+import { cmdReadiness } from "./commands/readiness.js";
 import { cmdExportPdf } from "./commands/export-pdf.js";
 import { cmdIso, parseIsoArgs } from "./commands/iso.js";
 import { cmdGitCredentialHelper } from "./commands/git-credential-helper.js";
@@ -43,6 +45,7 @@ let quiet = false;
 let verboseMode = false;
 let debugMode = false;
 let help = false;
+let json = false;
 let outputPath: string | undefined;
 const passthrough: string[] = [];
 
@@ -51,6 +54,8 @@ for (const a of args.slice(1)) {
     port = parseInt(a.split("=")[1], 10);
   } else if (a.startsWith("--output=") || a.startsWith("-o=")) {
     outputPath = a.split("=").slice(1).join("=");
+  } else if (a === "--json") {
+    json = true;
   } else if (a === "--quiet" || a === "-q") {
     quiet = true;
   } else if (a === "--verbose") {
@@ -89,7 +94,7 @@ async function cmdMcp(dir: string): Promise<void> {
 // Commands that require .sourcevision/ to exist
 // `iso` is absent deliberately: --source=scan derives zones from the file tree
 // and must work on a project that has never been analyzed. cmdIso gates itself.
-const NEEDS_SV_DIR = new Set(["serve", "validate", "reset", "pr-markdown", "mcp", "narrate"]);
+const NEEDS_SV_DIR = new Set(["serve", "validate", "reset", "pr-markdown", "mcp", "narrate", "readiness"]);
 
 try {
   // Show help: per-command help when --help/-h is given with a command,
@@ -120,6 +125,9 @@ try {
       break;
     case "validate":
       cmdValidate(targetArg || ".");
+      break;
+    case "readiness":
+      cmdReadiness(targetArg || ".", { json });
       break;
     case "reset":
       cmdReset(targetArg || ".");
@@ -167,7 +175,7 @@ try {
         );
       }
 
-      const SV_COMMANDS = ["init", "analyze", "serve", "validate", "reset", "export-pdf", "iso", "pr-markdown", "git-credential-helper", "mcp", "workspace"];
+      const SV_COMMANDS = ["init", "analyze", "serve", "validate", "readiness", "reset", "export-pdf", "iso", "pr-markdown", "git-credential-helper", "mcp", "workspace"];
       const typoHint = formatTypoSuggestion(command, SV_COMMANDS, "sourcevision ");
       throw new CLIError(
         `Unknown command: ${command}`,

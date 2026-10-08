@@ -247,6 +247,82 @@ describe("Status API routes", () => {
       expect(data.sv.minutesAgo).toBeGreaterThan(24 * 60);
       expect(data.sv.modulesComplete).toBe(5);
     });
+
+    /**
+     * The readiness headline is a field the hub card will read. It has to be
+     * present and null — not absent, and not a throw — on every analysis that
+     * predates readiness, which is every analysis already on disk.
+     */
+    describe("readiness", () => {
+      /** A fresh manifest, so the readiness branch is reached at all. */
+      async function writeManifest(): Promise<void> {
+        await writeFile(
+          join(ctx.svDir, "manifest.json"),
+          JSON.stringify({
+            schemaVersion: "1",
+            toolVersion: "0.1.0",
+            analyzedAt: new Date().toISOString(),
+            targetPath: tmpDir,
+            modules: {},
+          }),
+        );
+      }
+
+      it("is null when no analysis exists at all", async () => {
+        const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+        const data = await res.json();
+        expect(data.sv).toHaveProperty("readiness");
+        expect(data.sv.readiness).toBeNull();
+      });
+
+      it("is null for an analysis that produced no readiness artifact", async () => {
+        await writeManifest();
+        clearStatusCache();
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+        const data = await res.json();
+        expect(res.status).toBe(200);
+        expect(data.sv.readiness).toBeNull();
+      });
+
+      it("carries the overall score and the analysis timestamp", async () => {
+        await writeManifest();
+        await writeFile(
+          join(ctx.svDir, "readiness.json"),
+          JSON.stringify({ overall: 62, dimensions: {}, suggestions: [] }),
+        );
+        clearStatusCache();
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+        const data = await res.json();
+        expect(data.sv.readiness.overall).toBe(62);
+        expect(data.sv.readiness.analyzedAt).toBe(data.sv.analyzedAt);
+      });
+
+      it("reads a malformed artifact as no readiness rather than failing the poll", async () => {
+        await writeManifest();
+        await writeFile(join(ctx.svDir, "readiness.json"), "{ truncated");
+        clearStatusCache();
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+        const data = await res.json();
+        expect(res.status).toBe(200);
+        expect(data.sv.readiness).toBeNull();
+      });
+
+      it("rejects an artifact with no numeric overall rather than serving undefined", async () => {
+        await writeManifest();
+        await writeFile(
+          join(ctx.svDir, "readiness.json"),
+          JSON.stringify({ dimensions: {}, suggestions: [] }),
+        );
+        clearStatusCache();
+
+        const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+        const data = await res.json();
+        expect(data.sv.readiness).toBeNull();
+      });
+    });
   });
 
   describe("Rex status", () => {

@@ -121,6 +121,37 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["analyze"],
   },
+  readiness: {
+    tool: "sourcevision",
+    command: "readiness",
+    summary: "score how ready this repo is to be worked by an agent",
+    usage: "sourcevision readiness [--json] [dir]",
+    description:
+      "Scores the SDLC profile a prior analysis detected — tests, CI, CD,\n" +
+      "rollback, migrations, feature flags, quality gates, observability and\n" +
+      "agent safety — into a weighted 0-100 readiness score with the evidence\n" +
+      "behind each dimension and the gap that would raise it.\n" +
+      "\n" +
+      "Heuristic: it detects whether a practice exists and is wired up, not\n" +
+      "whether it is good. Requires a prior 'analyze' run.",
+    sections: [
+      {
+        title: "Artifacts",
+        content:
+          "sdlc-profile.json  What was detected, each claim tied to the file proving it\n" +
+          "readiness.json     The score analyze computed from that profile",
+      },
+    ],
+    options: [
+      { flag: "--json", description: "Print the machine-readable score instead of the scorecard" },
+    ],
+    examples: [
+      { command: "sourcevision readiness .", description: "Print the scorecard" },
+      { command: "sourcevision readiness --json .", description: "Machine-readable score, evidence and gaps" },
+      { command: "sv readiness .", description: "Using the 'sv' alias" },
+    ],
+    related: ["analyze", "validate"],
+  },
   reset: {
     tool: "sourcevision",
     command: "reset",
@@ -266,6 +297,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   analyze: ["validate", "serve"],
   serve: ["analyze"],
   validate: ["analyze"],
+  readiness: ["analyze", "validate"],
   reset: ["init"],
   "export-pdf": ["analyze"],
   iso: ["analyze", "export-pdf"],
@@ -311,6 +343,7 @@ export function usage(): void {
           { name: "sourcevision narrate [dir]", description: "Narrate zones a cascade analysis left pending" },
           { name: "sourcevision serve [dir]", description: "Start local viewer (default: .)" },
           { name: "sourcevision validate [dir]", description: "Validate .sourcevision/ output files" },
+          { name: "sourcevision readiness [dir]", description: "Score SDLC readiness for autonomous agent work" },
           { name: "sourcevision export-pdf [dir]", description: "Export analysis as a PDF report" },
           { name: "sourcevision iso [dir]", description: "Render a standalone isometric architecture map" },
           { name: "sourcevision pr-markdown [dir]", description: "Regenerate PR markdown at .sourcevision/pr-markdown.md" },

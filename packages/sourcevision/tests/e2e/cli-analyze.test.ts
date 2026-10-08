@@ -4,8 +4,10 @@ import { mkdtemp, cp, rm } from "node:fs/promises";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { validate, InventorySchema, ImportsSchema, ClassificationsSchema, ZonesSchema, ComponentsSchema } from "../../src/schema/validate.js";
+import { validate, InventorySchema, ImportsSchema, ClassificationsSchema, ZonesSchema, ComponentsSchema, SdlcProfileSchema } from "../../src/schema/validate.js";
 import { readAnalyzeProgress } from "../../src/analyzers/analyze-progress.js";
+import { DATA_FILES } from "../../src/schema/data-files.js";
+import { READINESS_DIMENSIONS } from "../../src/analyzers/readiness-score.js";
 
 const validateInventory = (data: unknown) => validate(InventorySchema, data);
 const validateImports = (data: unknown) => validate(ImportsSchema, data);
@@ -61,6 +63,45 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
 
     const components = JSON.parse(readFileSync(join(svDir, "components.json"), "utf-8"));
     expect(validateComponents(components).ok).toBe(true);
+  });
+
+  /**
+   * The SDLC profile is built from its own bounded walk rather than from the
+   * inventory, whose `codeOnly` filter drops the YAML, TOML and Dockerfiles it
+   * reads. That makes it the one artifact an inventory-shaped smoke test would
+   * not notice going missing — so the e2e asserts the file lands, parses
+   * against its schema, and has been stripped of the absolute `projectDir`
+   * that would otherwise make the artifact machine-specific.
+   *
+   * `readiness.json` is written from the same profile in the same pass and is
+   * checked here too: the dashboard's status reads it, so an analysis that
+   * produced a profile but no score is a half-written surface.
+   */
+  it("writes sdlc-profile.json, and the readiness score computed from it", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
+    await cp(FIXTURE_DIR, tmpDir, { recursive: true });
+
+    execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
+      encoding: "utf-8",
+      timeout: 30000,
+    });
+
+    const svDir = join(tmpDir, ".sourcevision");
+    const profilePath = join(svDir, DATA_FILES.sdlcProfile);
+    expect(existsSync(profilePath)).toBe(true);
+
+    const profile = JSON.parse(readFileSync(profilePath, "utf-8"));
+    expect(validate(SdlcProfileSchema, profile).ok).toBe(true);
+    // Stripped before writing, so the artifact is portable across machines.
+    expect(profile.projectDir).toBeUndefined();
+
+    const readinessPath = join(svDir, DATA_FILES.readiness);
+    expect(existsSync(readinessPath)).toBe(true);
+
+    const readiness = JSON.parse(readFileSync(readinessPath, "utf-8"));
+    expect(readiness.overall).toBeGreaterThanOrEqual(0);
+    expect(readiness.overall).toBeLessThanOrEqual(100);
+    expect(Object.keys(readiness.dimensions).sort()).toEqual([...READINESS_DIMENSIONS].sort());
   });
 
   it("publishes progress while it runs and leaves it finished, with the previous same-mode run attached", async () => {
