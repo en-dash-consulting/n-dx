@@ -35,6 +35,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Detect database engines from dependencies, images and config](./detect-database-engines-from.md) | completed |
 | [Extract table names from embedded SQL in Java and Go](./extract-table-names-from-embedded-sql.md) | pending |
 | [Find migration and schema files and extract tables with tree-sitter-sql](./find-migration-and-schema-files-and.md) | completed |
-| [Go calls query leaves string arguments of unnamed calls without an owning argument list](./go-calls-query-leaves-string-arguments.md) | pending |
+| [Go calls query leaves string arguments of unnamed calls without an owning argument list](./go-calls-query-leaves-string-arguments.md) | completed |
 | [SQL dialect goldens are inline PetClinic-shaped snippets, never checked against PetClinic's real schema files](./sql-dialect-goldens-are-inline.md) | pending |
 | [sqlc detection omits the schema files named by sqlc.yaml's schema: key](./sqlc-detection-omits-the-schema-files.md) | pending |
