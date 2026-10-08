@@ -23,7 +23,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A multi-line amendment summary breaks the History section the apply engine writes](./a-multi-line-amendment-summary-breaks.md) | pending |
+| [A multi-line amendment summary breaks the History section the apply engine writes](./a-multi-line-amendment-summary-breaks.md) | completed |
+| [A multi-line editorial summary breaks the History section a product edit writes](./a-multi-line-editorial-summary-breaks.md) | pending |
 | [A revert withdraws only the first of several open product-edit drafts for the same node](./a-revert-withdraws-only-the-first-of.md) | completed |
 | [A second product edit rewrites the proposal of a completed but unapplied draft](./a-second-product-edit-rewrites-the.md) | completed |
 | [Adapt the apply engine and product-edit handler to PR 30's schema and rules](./adapt-the-apply-engine-and-product.md) | completed |
