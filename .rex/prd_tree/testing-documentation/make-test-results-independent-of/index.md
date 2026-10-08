@@ -45,3 +45,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Triage the 39 hench/web failures now that the run no longer hides them](./triage-the-39-hench-web-failures-now.md) | completed |
 | [Unmount preact harnesses so the frame-fallback timer cannot outlive jsdom](./unmount-preact-harnesses-so-the-frame.md) | completed |
 | [vi.stubEnv in child-lifecycle.test.js leaks NDX_DEBUG_LIFECYCLE into sibling e2e children](./vi-stubenv-in-child-lifecycle-test-js.md) | completed |
+| [web's assertFreshServerBuild still judges freshness by mtime, so a partial build masks a stale server and an identical rewrite fails forever](./web-s-assertfreshserverbuild-still.md) | pending |
