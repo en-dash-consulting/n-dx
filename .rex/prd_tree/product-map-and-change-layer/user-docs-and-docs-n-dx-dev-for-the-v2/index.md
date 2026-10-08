@@ -22,6 +22,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [change-management guide tells users to run commands that do not exist and diff a PRD file that is never written](./change-management-guide-tells-users-to.md) | pending |
-| [Draft the concepts pages for the PRD as product layer plus change layer](./draft-the-concepts-pages-for-the-prd.md) | pending |
+| [Draft the concepts pages for the PRD as product layer plus change layer](./draft-the-concepts-pages-for-the-prd.md) | completed |
 | [Rewrite the guides, package pages and examples for the v2 model](./rewrite-the-guides-package-pages-and.md) | pending |
 | [Update the docs.n-dx.dev homepage, navigation and the 1.0.0 release note](./update-the-docs-n-dx-dev-homepage.md) | pending |
