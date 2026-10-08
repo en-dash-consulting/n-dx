@@ -550,6 +550,8 @@ export interface StructureHealthThresholds {
   maxChildrenPerContainer?: number;
   /** Minimum children per container before warning (default: 2). */
   minChildrenPerContainer?: number;
+  /** Maximum criteria per capability, own plus inherited, before warning (default: 15). */
+  maxCriteriaPerCapability?: number;
 }
 
 export interface LogEntry {
