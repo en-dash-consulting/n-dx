@@ -141,13 +141,15 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "update an existing PRD item",
     usage: "rex update <id> [options] [dir]",
     description:
-      "Modify the status, priority, title, or description of a PRD item.\n" +
+      "Modify the status, priority, title, description, acceptance criteria, or source of a PRD item.\n" +
       "Status transitions are validated (e.g. completed → pending requires --force).",
     options: [
       { flag: "--status=<s>", description: "New status: pending, in_progress, completed, failing, deferred, blocked, deleted" },
       { flag: "--priority=<p>", description: "New priority: critical, high, medium, low" },
       { flag: "--title=\"...\"", description: "New title" },
       { flag: "--description=\"...\"", description: "New description" },
+      { flag: "--criterion=\"...\"", description: "Acceptance criterion; repeat per criterion. Replaces the whole list; --criterion= on its own clears it" },
+      { flag: "--source=\"...\"", description: "Where the item came from; --source= removes it" },
       { flag: "--reason=\"...\"", description: "Failure reason (when setting status to failing)" },
       { flag: "--run='<json>'", description: "Saved run settings (replaces the whole block): tier (light|standard|heavy), models (per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes. --run= or --run=null clears it" },
       { flag: "--force", description: "Override status transition rules" },
@@ -155,6 +157,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     examples: [
       { command: "rex update abc123 --run='{\"tier\":\"heavy\",\"review\":true}'", description: "Save a portable model tier and review on a task" },
       { command: "rex update abc123 --run='{\"tier\":\"heavy\",\"models\":{\"claude\":\"claude-opus-5-5\",\"codex\":\"gpt-5.6-sol\"}}'", description: "Also pin an exact model per vendor" },
+      { command: "rex update abc123 --criterion=\"Rejects an empty password\" --criterion=\"Locks after 5 failures\"", description: "Replace a task's acceptance criteria" },
       { command: "rex update abc123 --run=null", description: "Remove a task's saved run settings" },
       { command: "rex update abc123 --status=completed", description: "Mark a task as done" },
       { command: "rex update abc123 --status=in_progress", description: "Start working on a task" },

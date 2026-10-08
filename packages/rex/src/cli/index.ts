@@ -403,7 +403,7 @@ async function dispatchCommand(
       const dir =
         positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
       const { cmdUpdate } = await import("./commands/update.js");
-      await cmdUpdate(dir, id, flags);
+      await cmdUpdate(dir, id, flags, multiFlags);
       break;
     }
     case "move": {
