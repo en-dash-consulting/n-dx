@@ -30,7 +30,9 @@
  *   its folder's index.md once the item is a leaf): v2 freezes slugs and the
  *   writer refuses such a name, so the plan assigns a replacement (`con-<id6>`, from
  *   `freeSlug`), records the v1 name in `slug.from`, and flags `unsafe-slug`.
- *   Safe names are not listed: the v1 name is the v2 slug.
+ *   Safe names are not listed: the v1 name is the v2 slug. A name that clashes
+ *   (ignoring case) with another item's in its v2 sibling set (`planSlugs`) is
+ *   replaced the same way and flagged `slug-clash`.
  * - The literal "[object Object]" in `recommendationMeta` or an item's `log`
  *   (written by a pre-squash build; unrecoverable) is dropped and counted.
  *
@@ -47,7 +49,7 @@ import { isUsableFrozenSlug, resolveSiblingSlugs } from "../../store/folder-tree
 
 export const CORRUPT_VALUE = "[object Object]";
 
-export const DATA_FLAGS = ["criteria-in-tags", "duplicate-title", "legacy-parent-id", "stale-description", "unsafe-slug"] as const;
+export const DATA_FLAGS = ["criteria-in-tags", "duplicate-title", "legacy-parent-id", "slug-clash", "stale-description", "unsafe-slug"] as const;
 export type DataFlag = (typeof DATA_FLAGS)[number];
 
 export interface ReleaseTag {
@@ -177,6 +179,52 @@ function firstReleaseAfter(completedAt: string, releases: readonly ReleaseTag[])
   return best?.version;
 }
 
+// ── Slugs ────────────────────────────────────────────────────────
+
+const PRODUCT_TARGETS = new Set<string>(["area", "capability", "constraint"]);
+
+interface FrozenSlug {
+  slug: { from: string; to: string };
+  flag: "slug-clash" | "unsafe-slug";
+}
+
+/**
+ * The slug each item freezes when it is not its v1 directory name. v1 names are
+ * unique among v1 siblings only, but v2 reparents (a release umbrella's children
+ * become root changes, deep items become subtasks), so every slug is resolved
+ * against its v2 sibling set: same layer (product or changes), same plan parent.
+ * In tree order the first holder keeps a name; a later item that clashes
+ * (ignoring case) or cannot be frozen gets `freeSlug`'s `-<id6>` form.
+ */
+function planSlugs(items: readonly PRDItem[], plan: MigrationPlan): Map<string, FrozenSlug> {
+  const v1Slugs = new Map<string, string>();
+  const collect = (list: readonly PRDItem[]): void => {
+    for (const [id, slug] of resolveSiblingSlugs([...list])) v1Slugs.set(id, slug);
+    for (const item of list) collect(item.children ?? []);
+  };
+  collect(items);
+
+  const taken = new Map<string, { slug: string }[]>();
+  const out = new Map<string, FrozenSlug>();
+  for (const entry of plan.entries) {
+    const from = v1Slugs.get(entry.id);
+    if (entry.target === "release" || from === undefined) continue;
+    const key = `${PRODUCT_TARGETS.has(entry.target) ? "product" : "changes"}:${entry.parent ?? ""}`;
+    const siblings = taken.get(key) ?? [];
+    taken.set(key, siblings);
+    const usable = isUsableFrozenSlug(from);
+    const clash = siblings.some((s) => s.slug.toLowerCase() === from.toLowerCase());
+    if (usable && !clash) {
+      siblings.push({ slug: from });
+      continue;
+    }
+    const to = freeSlug(entry.title, entry.id, [...siblings, { slug: from }]);
+    siblings.push({ slug: to });
+    out.set(entry.id, { slug: { from, to }, flag: usable ? "slug-clash" : "unsafe-slug" });
+  }
+  return out;
+}
+
 // ── Build ────────────────────────────────────────────────────────
 
 /** Data for every item in the tree. Same tree, plan and options always give the same result. */
@@ -186,11 +234,12 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
   const specById = new Map((options.specs ?? []).map((d) => [d.capability, d]));
   const result: PlanData = {
     items: {},
-    flagCounts: { "criteria-in-tags": 0, "duplicate-title": 0, "legacy-parent-id": 0, "stale-description": 0, "unsafe-slug": 0 },
+    flagCounts: { "criteria-in-tags": 0, "duplicate-title": 0, "legacy-parent-id": 0, "slug-clash": 0, "stale-description": 0, "unsafe-slug": 0 },
     legacyLoe: 0,
     corrupt: { recommendationMeta: 0, logEntries: 0 },
   };
   const entryById = new Map(plan.entries.map((e) => [e.id, e]));
+  const slugs = planSlugs(items, plan);
 
   const visit = (list: readonly PRDItem[]): void => {
     const titles = new Map<string, number>();
@@ -198,15 +247,13 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
       const key = item.title.trim().toLowerCase();
       titles.set(key, (titles.get(key) ?? 0) + 1);
     }
-    const v1Slugs = resolveSiblingSlugs([...list]);
-    const siblingSlugs = [...v1Slugs.values()].map((slug) => ({ slug }));
     for (const item of list) {
       const data: ItemPlanData = { id: item.id, flags: [], droppedMeta: 0, droppedLog: 0 };
 
-      const v1Slug = v1Slugs.get(item.id)!;
-      if (!isUsableFrozenSlug(v1Slug)) {
-        data.slug = { from: v1Slug, to: freeSlug(item.title, item.id, siblingSlugs) };
-        data.flags.push("unsafe-slug");
+      const frozen = slugs.get(item.id);
+      if (frozen) {
+        data.slug = frozen.slug;
+        data.flags.push(frozen.flag);
       }
 
       const entry = entryById.get(item.id);

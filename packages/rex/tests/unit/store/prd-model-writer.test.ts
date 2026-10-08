@@ -14,7 +14,7 @@ import { prdLockPath } from "../../../src/store/paths.js";
 import { buildPlanData } from "../../../src/migrations/v1-to-v2/migration-plan-data.js";
 import { classifyV1Tree } from "../../../src/migrations/v1-to-v2/migration-plan.js";
 import type { PRDItem } from "../../../src/schema/v1.js";
-import { SLUG_RULE_VERSION } from "../../../src/store/folder-tree-serializer.js";
+import { SLUG_RULE_VERSION, resolveSiblingSlugs } from "../../../src/store/folder-tree-serializer.js";
 import type { RuleNode } from "../../../src/schema/v2-rules.js";
 import { EOLS, copyV2Fixture, type Eol } from "../../helpers/v2-fixture.js";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
@@ -386,6 +386,41 @@ describe("writePrdModel", () => {
     find(all(model), CHANGE).children!.push({ id: "item-index", type: "task", title: "Index", slug } as RuleNode);
     await write(rexDir, model);
     expect(find(all(await loadPrdModel(rexDir, quiet)), "item-index").slug).toBe(slug);
+  });
+
+  it("accepts a tree built from a plan whose reparented v1 items shared a slug", async () => {
+    const mk = (level: PRDItem["level"], id: string, title: string, children: PRDItem[] = []): PRDItem => ({ id, level, title, status: "pending", children });
+    const v1 = [
+      mk("epic", "e-090", "ndx 0.9.0", [mk("feature", "f-docs-a", "Docs", [mk("task", "t-a", "Write")])]),
+      mk("epic", "e-0100", "ndx 0.10.0", [mk("feature", "f-docs-b", "Docs", [mk("task", "t-b", "Write")])]),
+    ];
+    const migration = classifyV1Tree(v1);
+    const data = buildPlanData(v1, migration, { cutAt: "2026-10-08T00:00:00Z" });
+    const slugOf = new Map<string, string>();
+    const walk = (list: PRDItem[]): void => {
+      for (const [id, slug] of resolveSiblingSlugs(list)) slugOf.set(id, slug);
+      for (const i of list) walk(i.children ?? []);
+    };
+    walk(v1);
+
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    model.tree.changes = [];
+    const nodes = new Map<string, RuleNode>();
+    for (const e of migration.entries.filter((x) => x.target !== "release")) {
+      const node = { id: e.id, type: e.target, title: e.title, slug: data.items[e.id]?.slug?.to ?? slugOf.get(e.id)! } as RuleNode;
+      nodes.set(e.id, node);
+      const parent = e.parent === undefined ? undefined : nodes.get(e.parent);
+      if (parent) (parent.children ??= []).push(node);
+      else model.tree.changes.push(node);
+    }
+    expect(model.tree.changes.map((n) => n.slug)).toEqual(["docs", "docs-fdocsb"]);
+
+    const fresh = join(tmp, "fresh");
+    await mkdir(fresh);
+    await write(fresh, model);
+    const reread = await loadPrdModel(fresh, quiet);
+    expect(reread.tree.changes.map((n) => n.id)).toEqual(["f-docs-a", "f-docs-b"]);
   });
 
   it("refuses a leaf named Index, which is index.md on a case-insensitive disk", async () => {

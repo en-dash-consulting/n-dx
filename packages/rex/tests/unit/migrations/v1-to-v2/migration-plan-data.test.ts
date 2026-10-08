@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
 import { nodeSpec, specHash } from "../../../../src/schema/v2-rules.js";
 import type { CapabilitySpecDraft } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
-import { isWindowsSafeSegment } from "../../../../src/store/folder-tree-serializer.js";
+import { isWindowsSafeSegment, resolveSiblingSlugs } from "../../../../src/store/folder-tree-serializer.js";
 import { classifyV1Tree } from "../../../../src/migrations/v1-to-v2/migration-plan.js";
 import {
   buildPlanData,
@@ -75,7 +75,7 @@ describe("data problem flags", () => {
     expect(data.items[dupB.id]!.flags).toContain("duplicate-title");
     expect(data.items[parent.id]!.flags).toContain("legacy-parent-id");
     expect(data.items[stale.id]!.flags).toContain("stale-description");
-    expect(data.flagCounts).toEqual({ "criteria-in-tags": 1, "duplicate-title": 2, "legacy-parent-id": 1, "stale-description": 1, "unsafe-slug": 0 });
+    expect(data.flagCounts).toEqual({ "criteria-in-tags": 1, "duplicate-title": 2, "legacy-parent-id": 1, "slug-clash": 0, "stale-description": 1, "unsafe-slug": 0 });
   });
 
   it("does not flag an unrelated item", () => {
@@ -230,5 +230,47 @@ describe("determinism", () => {
     ];
     const opts = { releases: [{ version: "0.9.0", date: "2026-10-01T00:00:00Z" }] };
     expect(JSON.stringify(dataFor(tree, opts))).toBe(JSON.stringify(dataFor(tree, opts)));
+  });
+});
+
+describe("slugs against the v2 sibling set", () => {
+  const releaseTree = () => [
+    item("epic", "ndx 0.9.0", {}, [item("feature", "Docs", {}, [item("task", "Write")]), item("feature", "Fixes")]),
+    item("epic", "ndx 0.10.0", {}, [item("feature", "DOCS", {}, [item("task", "Write")]), item("feature", "Fixes")]),
+  ];
+
+  it("gives same-titled features under different release epics distinct slugs, flagged", () => {
+    const tree = releaseTree();
+    const [first, second] = [tree[0]!.children![0]!, tree[1]!.children![0]!];
+    const data = dataFor(tree);
+    expect(data.items[first.id]?.slug).toBeUndefined();
+    expect(data.items[second.id]!.slug).toEqual({ from: "docs", to: `docs-${second.id.slice(0, 6)}` });
+    expect(data.items[second.id]!.flags).toContain("slug-clash");
+    expect(data.flagCounts["slug-clash"]).toBe(2);
+    expect(data.flagCounts["unsafe-slug"]).toBe(0);
+  });
+
+  it("freezes a slug unique, ignoring case, within every v2 sibling set", () => {
+    const deep = item("epic", "PR 7 rework", {}, [
+      item("feature", "Docs", {}, [item("task", "Notes", {}, [item("subtask", "Check")]), item("task", "Check")]),
+    ]);
+    const tree = [...releaseTree(), deep, item("task", "Docs")];
+    const plan = classifyV1Tree(tree);
+    const data = buildPlanData(tree, plan, { cutAt: CUT });
+    const v1 = new Map<string, string>();
+    const walk = (list: PRDItem[]): void => {
+      for (const [id, slug] of resolveSiblingSlugs(list)) v1.set(id, slug);
+      for (const i of list) walk(i.children ?? []);
+    };
+    walk(tree);
+
+    const sets = new Map<string, string[]>();
+    for (const e of plan.entries.filter((x) => x.target !== "release")) {
+      const layer = ["area", "capability", "constraint"].includes(e.target) ? "product" : "changes";
+      const key = `${layer}:${e.parent ?? ""}`;
+      sets.set(key, [...(sets.get(key) ?? []), (data.items[e.id]?.slug?.to ?? v1.get(e.id)!).toLowerCase()]);
+    }
+    expect(sets.size).toBeGreaterThan(2);
+    for (const slugs of sets.values()) expect(new Set(slugs).size).toBe(slugs.length);
   });
 });
