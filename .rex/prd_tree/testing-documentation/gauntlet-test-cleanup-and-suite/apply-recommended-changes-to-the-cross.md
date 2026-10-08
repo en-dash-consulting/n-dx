@@ -22,8 +22,6 @@ acceptanceCriteria:
   - "CI passes on a branch with the updated pipeline on both a Linux runner and at least one historically-failing platform"
   - "README and .local_testing documentation is updated to reflect the new CI structure"
 description: "Implement the pipeline changes decided in the evaluation task — whether that means tightening assertions, narrowing the OS matrix to what provides unique signal, gating the cross-OS stage behind a label or path filter, or removing the stage and folding its meaningful checks into existing CI steps. Ensure the resulting pipeline still catches the class of regressions the gauntlet was designed to catch, as evidenced by any known historical failures."
-commits:
-  - {"hash":"d21d0ab9d291fe444726d038415d8cddd5fc8e8e","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-08T13:03:14-07:00"}
 lastModified: "2026-09-03T13:10:38.159Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

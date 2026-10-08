@@ -19,8 +19,6 @@ acceptanceCriteria:
   - "A run that crashes mid-way leaves a readable partial log rather than none."
   - "Changeset for @n-dx/hench (patch)."
 description: "Today `packages/hench/src/store/run-log.ts` writes the whole `.run-logs/<ts>-<runId>.log` once, when the run ends (`agent/lifecycle/shared.ts`). Open the file when the run starts and append each output line as it is produced, so a reader can tail it while the run is in progress. Record the log path on the run record (optional field in `schema/v1.ts` and its zod schema in `validate.ts`) so readers do not have to guess the timestamped filename. The final file must have the same content and format as the one written today, including the review pass output when `--review` is on. Flush often enough that a tail sees new lines within a second; never block the agent loop on disk writes."
-commits:
-  - {"hash":"6a07165eb8bdc87e2cf28a7c657a04905faa0918","author":"Ryan Keith","authorEmail":"109387558+ryrykeith@users.noreply.github.com","timestamp":"2026-10-01T23:14:59-04:00"}
 lastModified: "2026-10-01T01:03:37.516Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

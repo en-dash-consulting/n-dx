@@ -20,9 +20,6 @@ acceptanceCriteria:
   - "discoveredFrom is an optional field on change intent with optional item and run ids"
   - "The v2 schema tests cover a change with and without it"
 description: "Follow-ups land in the Inbox or the review follow-ups feature, but nothing records which task or run found them. Beads models this as a discovered-from link. Add an optional discoveredFrom field to change intent: { item?: <change or task id>, run?: <hench run id> }. Schema only in this task; the writers that fill it (an agent's add_item during a run, the review pass's captures, rex add --discovered-from) come with the MCP, CLI and hench brief PRs."
-commits:
-  - {"hash":"6e93093020dccc3b6a312312b216cf190c8ceb61","author":"Ryan Keith","authorEmail":"ryan.k@endash.us","timestamp":"2026-10-07T12:10:41-04:00"}
-  - {"hash":"cfaef5fe6a54e2687eb12526e6aa5313bcd82681","author":"Ryan Keith","authorEmail":"ryan.k@endash.us","timestamp":"2026-10-07T14:19:46-04:00"}
 lastModified: "2026-10-07T16:14:04.450Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

@@ -27,7 +27,4 @@ acceptanceCriteria:
   - "Timer duration is configurable via hench config with a 5-minute default"
   - "Integration test simulates an idle agent and verifies the auto-commit fires at the configured timeout"
 description: "When the commit message file is first written during a hench run, start a 5-minute timer. On expiry, if the file has non-empty contents, finalize the commit using the current file contents and then remove the file. The timer must be cancelled if the agent commits or removes the file on its own before expiry, and must not fire after the run has otherwise terminated."
-commits:
-  - {"hash":"d278f0506c94ae8bce068f770caa450e07a3330e","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-05-19T06:17:30-07:00"}
-  - {"hash":"d85139fab48b4ad66d5b6b1619243b505b96f0fc","author":"nick daniel","authorEmail":"nick@endash.us","timestamp":"2026-05-19T15:47:08-04:00"}
 ---

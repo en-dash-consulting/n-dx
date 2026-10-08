@@ -19,8 +19,6 @@ acceptanceCriteria:
   - "An unsafe chain never reaches the spawned command (test)."
   - "The contract tests run in CI without credentials."
 description: "Prove that an eligible chain resumes exactly once with the expected arguments and an unsafe chain never reaches the spawned command.\n\nImplementation notes: Use a fake codex binary fixture in packages/hench/tests to capture spawn arguments; no network or credentials. Constraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR."
-commits:
-  - {"hash":"66705e69a1d66651644ef9a5f5ff684669ebf2e9","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-29T12:07:20-04:00"}
 lastModified: "2026-09-29T15:16:12.693Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

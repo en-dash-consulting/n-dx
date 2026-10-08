@@ -24,8 +24,6 @@ acceptanceCriteria:
   - "The prompt text survives every failure so the user never has to retype the question"
   - "No degraded path renders a bare generic error string; a unit test asserts this for all three modes"
 description: "The panel has three distinct ways to be unusable, and they need three distinct messages -- at parity with the degraded-mode hardening already done for PR Markdown refresh (see the SourceVision PR Markdown Refresh Degraded-Mode Hardening feature and pr-markdown-refresh-diagnostics.ts).\n\n1. No analysis data: .sourcevision/ is missing or empty -- the panel cannot ground an answer. Tell the user to run analyze, and offer the existing refresh/analyze action rather than only naming the command.\n2. Missing or invalid LLM credentials: reuse llm-client's existing authFailureGuidance / VERIFY_CREDENTIALS_STEP rather than inventing new wording.\n3. LLM failure at request time: timeout, rate limit, or provider error, each named as itself, with retry offered where retrying is sensible.\n\nA bare \"request failed\" for any of these is the specific outcome this task exists to prevent."
-commits:
-  - {"hash":"d21d0ab9d291fe444726d038415d8cddd5fc8e8e","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-08T13:03:14-07:00"}
 lastModified: "2026-09-04T19:23:53.001Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

@@ -20,8 +20,6 @@ acceptanceCriteria:
   - "Every token-spending dashboard route enforces its feature gate server-side, not only in the nav (tests per route)."
   - "A disabled feature returns a clear error naming the flag."
 description: "Some token-spending dashboard routes are gated only in the navigation. Enforce each gate on the server.\n\nImplementation notes: Use the manifest's LLM declarations to enumerate token-spending routes in packages/web/src/server (routes-commands.ts, routes-sourcevision-ask.ts, routes-rex-analysis.ts and others) and check flags from server/routes-features.ts / shared/features.ts. Constraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR."
-commits:
-  - {"hash":"2b144b897262afc597ab9e964febb6cd6c7d9f91","author":"endash-shal","authorEmail":"162359954+endash-shal@users.noreply.github.com","timestamp":"2026-09-30T11:02:30-04:00"}
 lastModified: "2026-09-29T15:16:15.943Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

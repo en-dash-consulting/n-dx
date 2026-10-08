@@ -21,8 +21,6 @@ acceptanceCriteria:
   - "Completed runs and runs recorded before this change return their full log."
   - "Route and path-confinement tests cover both."
 description: "Serve the incremental run log and the progress event stream to the viewer. Add `GET /api/hench/runs/:id/log?from=<byte offset>` and `GET /api/hench/runs/:id/events?after=<seq>` in `packages/web/src/server/routes-hench.ts`, each returning the new content plus the next cursor, and a WebSocket frame announcing appended content for runs that a client is watching. Resolve the files from the run record's recorded paths and its `worktreeRoot`, so a run in another worktree of the same repository can be tailed; refuse any path outside `.run-logs/` and `.hench/runs/` of a registered worktree. Frames carry the workspace so clients filter them the same way as other workspace-tagged frames. Fall back to the end-of-run log for runs written before the incremental log existed."
-commits:
-  - {"hash":"6a07165eb8bdc87e2cf28a7c657a04905faa0918","author":"Ryan Keith","authorEmail":"109387558+ryrykeith@users.noreply.github.com","timestamp":"2026-10-01T23:14:59-04:00"}
 lastModified: "2026-10-01T03:55:08.256Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

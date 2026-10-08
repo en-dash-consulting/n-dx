@@ -22,8 +22,6 @@ acceptanceCriteria:
   - "A changeset exists with patch bumps for `@n-dx/sourcevision`, `@n-dx/core` and `@n-dx/web`."
 description: "Four surfaces, each following its tier's existing pattern:\n\n- `sourcevision readiness [--json]` as a CLI command under `cli/commands/`, with help registered in `cli/help.ts`.\n- `ndx readiness` in `COMMAND_DISPATCH` in `packages/core/cli.js`, following the existing delegate pattern — orchestration spawns, it never imports.\n- `get_readiness` as an MCP tool in `cli/mcp.ts`, returning the same artifact the CLI prints.\n- Types re-exported through `packages/web/src/server/domain-gateway.ts` only, with no logic there, plus `readiness: { overall, analyzedAt }` on the sv status in `packages/web/src/server/routes-status.ts` so the hub card can show it later.\n\nA dashboard view is out of scope — the status field exists so the view can be built later without touching this work again. Docs for the command and the artifacts go in `docs/packages/sourcevision.md` and `docs/guide/commands.md`, marking the scorecard as heuristic and listing every detector in a table."
 assignee: "Sterling H <sterling.h@endash.us>"
-commits:
-  - {"hash":"64f79842130f7b47601b28de9a70a09aaca1358c","author":"Sterling H","authorEmail":"sterling.h@endash.us","timestamp":"2026-10-08T11:11:32-07:00"}
 lastModified: "2026-10-08T14:17:55.431Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
