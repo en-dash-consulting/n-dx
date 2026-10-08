@@ -2,7 +2,7 @@
 id: "0307f4fb-36f5-4770-8701-75bb42ac3726"
 level: "task"
 title: "Go resolver drops the edge to a package whose files were all skipped by the parser"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -10,11 +10,16 @@ tags:
   - "language-packs"
   - "go"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-08T07:23:36.580Z"
+completedAt: "2026-10-08T07:27:31.549Z"
+endedAt: "2026-10-08T07:27:31.549Z"
+resolutionType: "code-change"
+resolutionDetail: "PackResolver.prepare takes optional `unparsed` paths; Go indexes them; pack-imports passes oversized/unreadable files."
 acceptanceCriteria:
   - "A Go package whose only file exceeds the runner's size limit still receives the import edge from its importer"
   - "A test in tests/integration/go-resolver.test.ts (or a unit test with a small maxFileBytes) covers the oversized-only package and fails on the current code"
   - "An import of a directory that has no .go files in the inventory is still dropped"
 description: "Verdict: should-fix (medium). packages/sourcevision/src/language/go-resolver.ts resolveFile drops an internal import when `index.packages.get(dir)` is undefined. The index is built only from files the runner parsed, and the runner skips files over 1 MB (DEFAULT_MAX_FILE_BYTES); parsePackFiles also skips unreadable files. Scenario: a package `api/pb` whose only file is a 1.5 MB generated `api.pb.go`, imported from `cmd/server/main.go`. The regex parser emits `cmd/server/main.go -> api/pb`, and the zones phase expands that to the inventory's files. The resolver emits nothing, so the edge disappears once the switch task routes Go through the pack. Large protobuf and other generated files make this realistic. Reachability: the resolver is not attached to goPack yet, so the bug is unreachable today. It becomes reachable with 'Switch Go import edges from the regex parser to the pack' (ab5f9130), and the corpus parity run there may surface it as an unexplained difference. Options: (1) build the package-directory index from every inventory .go path, not only the parsed ones. For example, the caller passes skipped paths, or prepare receives the full path list (PackSourceFile with empty captures for skipped files). Cheap, and recommended. (2) Stop dropping when a module path matches but no files are known, and emit the directory edge as the regex parser does. Simpler, but it brings back phantom edges for packages that do not exist. (3) Keep dropping and document it as a known difference. That loses real edges."
-lastModified: "2026-10-08T06:40:05.512Z"
+lastModified: "2026-10-08T07:27:31.800Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
