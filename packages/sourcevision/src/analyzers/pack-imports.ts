@@ -4,8 +4,8 @@
  *
  * Resolution needs an index of the whole project, so every file of a pack's
  * language is parsed on each run, incremental or not. A pack whose grammar is
- * not built leaves its language inventory-only: `loadLanguagePacks` reports it
- * once and no edges are produced.
+ * not built, or built but unloadable, leaves its language inventory-only: it is
+ * reported once and no edges are produced.
  *
  * @module sourcevision/analyzers/pack-imports
  */
@@ -14,7 +14,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import type { ExternalImport, ImportEdge, Inventory } from "../schema/index.js";
 import { BUILTIN_PACKS, loadLanguagePacks, type LanguagePack, type PackSourceFile } from "../language/pack.js";
-import { createTreeSitterRunner, type RunnablePack } from "../language/runner.js";
+import { createTreeSitterRunner, loadGrammar, type RunnablePack } from "../language/runner.js";
 
 export interface PackImportsOptions {
   /** Defaults to {@link BUILTIN_PACKS}. */
@@ -58,10 +58,25 @@ export async function buildPackImportGraph(
   if (present.length === 0) return { edges, external: [] };
 
   const statuses = loadLanguagePacks({ packs: present, grammarDir: options.grammarDir, warn: options.warn });
+  const warn = options.warn ?? ((message: string) => console.warn(message));
   const runner = createTreeSitterRunner();
   try {
     for (const status of statuses) {
       if (status.mode !== "structure" || !status.pack.resolver) continue;
+      // A grammar can exist yet fail to load (ABI mismatch, truncated build).
+      // Degrade that language to inventory-only rather than failing the phase
+      // and with it every other language's edges.
+      try {
+        await loadGrammar(status.grammarPath);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        const name = status.pack.config.displayName;
+        warn(
+          `${name}: grammar ${status.grammarPath} could not be loaded (${reason}); ${name} files get inventory only. ` +
+            "Rebuild it with `pnpm --filter @n-dx/sourcevision build:grammars` in the n-dx checkout, or reinstall n-dx.",
+        );
+        continue;
+      }
       const target: RunnablePack = { pack: status.pack, grammarPath: status.grammarPath };
       const parsed = await parsePackFiles(runner, target, files, targetDir);
       const prepared = status.pack.resolver.prepare(parsed);
