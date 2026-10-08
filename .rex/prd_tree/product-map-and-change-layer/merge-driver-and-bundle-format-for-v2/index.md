@@ -30,4 +30,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Bundle v2 export of a childless non-change folder with extra state.yaml keys produces a bundle import refuses](./bundle-v2-export-of-a-childless-non.md) | completed |
 | [Bundle v2 keeps unknown top-level state.yaml keys and validates the carried root header](./bundle-v2-keeps-unknown-top-level.md) | completed |
 | [Merge state.yaml rows by id with a custom merge driver](./merge-state-yaml-rows-by-id-with-a.md) | completed |
-| [Pin state.yaml to LF in the merge-state git test so it passes on Windows](./pin-state-yaml-to-lf-in-the-merge.md) | pending |
+| [Pin state.yaml to LF in the merge-state git test so it passes on Windows](./pin-state-yaml-to-lf-in-the-merge.md) | completed |
+| [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | pending |
