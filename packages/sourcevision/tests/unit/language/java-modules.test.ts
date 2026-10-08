@@ -73,6 +73,20 @@ describe("discoverJavaModules", () => {
     expect(get("web")?.dir).toBe("services/web");
   });
 
+  it("ignores sourceDirectory set in plugin configuration", async () => {
+    await file(
+      "pom.xml",
+      `<project><artifactId>g</artifactId><build><plugins><plugin><artifactId>antlr4-maven-plugin</artifactId>
+         <configuration><sourceDirectory>src/main/antlr4</sourceDirectory></configuration></plugin></plugins></build></project>`,
+    );
+    await dirs("src/main/java", "src/main/antlr4");
+    expect((await discoverJavaModules(dir)).modules[0]).toEqual({
+      name: "g",
+      dir: "",
+      sourceRoots: ["src/main/java"],
+    });
+  });
+
   it("does not loop on cyclic module references", async () => {
     await file(
       "pom.xml",
