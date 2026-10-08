@@ -23,6 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Go resolver lets a go.mod versioned replace beat the go.work replace for the same module](./go-resolver-lets-a-go-mod-versioned.md) | pending |
 | [Java entry points are guessed from file names, not detected from public static void main](./java-entry-points-are-guessed-from.md) | pending |
 | [Java pack grammar version is not tied to the build pin](./java-pack-grammar-version-is-not-tied.md) | pending |
+| [Java packageDeclarationRoots throws when a project subdirectory cannot be listed](./java-packagedeclarationroots-throws.md) | pending |
 | [Maven build model collapses dependencies that differ only by type or classifier](./maven-build-model-collapses.md) | completed |
 | [Packed-tarball test reads a stale dist, so a newly registered pack fails the gate](./packed-tarball-test-reads-a-stale-dist.md) | pending |
 | [scip-java comparison ignores constructor references and covers only PetClinic](./scip-java-comparison-ignores.md) | pending |

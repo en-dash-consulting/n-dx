@@ -28,7 +28,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Go build reader throws when a project subdirectory is unreadable](./go-build-reader-throws-when-a-project.md) | pending |
+| [Go build reader drops the unlistable-directory notice when no go.mod or go.work is found](./go-build-reader-drops-the-unlistable.md) | pending |
+| [Go build reader throws when a project subdirectory is unreadable](./go-build-reader-throws-when-a-project.md) | completed |
 | [Go resolver drops the edge to a package whose files were all skipped by the parser](./go-resolver-drops-the-edge-to-a.md) | pending |
 | [Read go.mod and go.work with versions](./read-go-mod-and-go-work-with-versions.md) | completed |
 | [Resolve Go import paths to package files](./resolve-go-import-paths-to-package-files.md) | completed |
