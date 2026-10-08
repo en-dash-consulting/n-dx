@@ -27,7 +27,10 @@ rex status .                         # PRD tree with completion stats
 rex next .                           # next actionable task
 rex add "description" .              # smart add via LLM
 rex add --file=ideas.txt .           # import from file
+rex add task --title="..." --criterion="..." --criterion="..." --source="..." .  # add with criteria and source
 rex update <id> --status=completed . # update item
+rex update <id> --criterion="..." --criterion="..." .  # replace acceptance criteria
+rex update <id> --criterion= .       # clear acceptance criteria
 rex update <id> --run='{"tier":"heavy","models":{"claude":"claude-opus-5-5"},"review":true}' .  # save run settings (replaces the whole block)
 rex update <id> --run=null .         # clear saved run settings (--run= does the same)
 rex move <id> --parent=<parent-id> . # reparent item
