@@ -63,7 +63,6 @@ describe("selectAffected", () => {
   it.each([
     ["tests/shell-spawn-inventory.md", "root-policy"],
     ["tests/wall-clock-assertion-inventory.md", "root-policy"],
-    ["tests/layout-literal-inventory.md", "root-policy"],
     ["docs/analysis/prompt-token-baseline.md", "root-drift"],
     ["docs/analysis/prompt-token-baseline.json", "root-drift"],
   ])("selects the subset that validates %s, and only that subset", (file, label) => {
@@ -75,8 +74,11 @@ describe("selectAffected", () => {
   it("still selects nothing for a plain docs or prose edit with no validated artifact", () => {
     expect(select("docs/guide/skills.md").suites).toEqual([]);
     expect(select("docs/analysis/AUDIT-2026-09.md").suites).toEqual([]);
-    // Lives beside the policed inventories but no test reads it.
+    // Live beside the policed inventories but no test reads either: the
+    // layout-literal one stopped being an input when its ratchet became a wall
+    // and the policy test stopped parsing it for ceilings.
     expect(select("tests/unit-test-constant-inventory.md").suites).toEqual([]);
+    expect(select("tests/layout-literal-inventory.md").suites).toEqual([]);
   });
 
   it("keeps a validated artifact under tests/ off the full root suite", () => {

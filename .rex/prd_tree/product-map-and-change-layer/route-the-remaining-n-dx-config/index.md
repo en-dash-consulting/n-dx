@@ -27,4 +27,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Replace every .n-dx* literal with the resolved config path](./replace-every-n-dx-literal-with-the.md) | completed |
-| [Turn the .n-dx* ratchet into a wall](./turn-the-n-dx-ratchet-into-a-wall.md) | pending |
+| [Turn the .n-dx* ratchet into a wall](./turn-the-n-dx-ratchet-into-a-wall.md) | in_progress |
