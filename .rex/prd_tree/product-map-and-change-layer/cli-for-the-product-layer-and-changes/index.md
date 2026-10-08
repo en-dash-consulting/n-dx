@@ -26,4 +26,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add rex product and rex change commands; ndx add creates a change](./add-rex-product-and-rex-change.md) | pending |
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | pending |
+| [Run the v2 tree rules from rex health and pass structureHealth.maxCriteriaPerCapability to criteria-growth](./run-the-v2-tree-rules-from-rex-health.md) | pending |
 | [Show the product layer delta in tree-diff and emit the PR comment as Markdown](./show-the-product-layer-delta-in-tree.md) | pending |
