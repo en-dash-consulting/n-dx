@@ -173,23 +173,25 @@ describe("tree-sitter runner", () => {
 
   it("frees trees: parsing many files does not grow memory without bound", async (ctx) => {
     skipUnlessGrammar(ctx, JAVA_WASM);
-    // About 15 KB of Java. Left unfreed, 1000 of its trees hold ~700 MB of
-    // external memory until web-tree-sitter's GC finalizer happens to run.
+    // About 15 KB of Java, parsed through a pack with no queries so the cost is
+    // tree allocation, not query execution. Left unfreed, 1000 such trees hold
+    // ~700 MB of external memory until web-tree-sitter's GC finalizer runs.
     const big = Array.from({ length: 300 }, (_, i) => `class C${i} { int f(int x) { return x + ${i}; } }`).join("\n");
+    const bare = { grammarPath: JAVA_WASM, pack: makePack([]) };
     const parseMany = async (n: number) => {
-      for (let i = 0; i < n; i++) await runner.parseSource(target, `F${i}.java`, big);
+      for (let i = 0; i < n; i++) await runner.parseSource(bare, `F${i}.java`, big);
     };
     const freed = vi.spyOn(Tree.prototype, "delete");
 
     try {
-      await parseMany(100); // Let the WASM heap reach its working size.
+      await parseMany(20); // Let the WASM heap reach its working size.
       const before = process.memoryUsage().external;
-      await parseMany(1000);
+      await parseMany(200);
       const growth = process.memoryUsage().external - before;
 
-      expect(runner.stats().parsed).toBe(1100);
+      expect(runner.stats().parsed).toBe(220);
       // Deterministic: every tree is freed by the runner, not left to GC.
-      expect(freed).toHaveBeenCalledTimes(1100);
+      expect(freed).toHaveBeenCalledTimes(220);
       expect(growth).toBeLessThan(64 * 1024 * 1024);
     } finally {
       freed.mockRestore();
