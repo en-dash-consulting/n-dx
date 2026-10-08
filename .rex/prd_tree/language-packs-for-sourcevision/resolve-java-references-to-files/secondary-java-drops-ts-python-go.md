@@ -13,9 +13,9 @@ tags:
 source: "ndx-adversarial-review"
 startedAt: "2026-10-08T03:11:34.302Z"
 completedAt: "2026-10-08T03:23:59.925Z"
+endedAt: "2026-10-08T03:23:59.925Z"
 resolutionType: "code-change"
 resolutionDetail: "javaSecondaryConfig (923b36b78, hench run 629c993a). The gate failed only on the load-sensitive runner memory test (captured separately); operator-verified with no other load: sourcevision 2523 tests and the six policy tests pass."
-endedAt: "2026-10-08T03:23:59.925Z"
 acceptanceCriteria:
   - "A repo with package.json + pom.xml and a TS file under generated/ or out/ keeps that file in the inventory with its normal role"
   - "TS import edges into and out of such files are unchanged versus the same repo without pom.xml"
