@@ -29,6 +29,10 @@ export interface BuildDependency {
   readonly version: BuildValue;
   /** Maven scope (`compile` when none is declared) or the Gradle configuration name (`implementation`, `testImplementation`, …). */
   readonly scope: string;
+  /** Maven packaging type (`test-jar`, `pom`, …); absent for the default `jar`. */
+  readonly type?: string;
+  /** Maven classifier (`tests`, `sources`, …); absent when none. */
+  readonly classifier?: string;
 }
 
 export interface ModuleBuildModel {
@@ -40,7 +44,7 @@ export interface ModuleBuildModel {
   /** The module's own coordinates, when it declares them. */
   readonly group?: BuildValue;
   readonly version?: BuildValue;
-  /** Direct and inherited dependencies, sorted by `group:artifact`. */
+  /** Direct and inherited dependencies, sorted by `group:artifact`, then type and classifier. */
   readonly dependencies: readonly BuildDependency[];
   /** Language level, e.g. `17`. Present only when declared. */
   readonly javaVersion?: BuildValue;
