@@ -10,7 +10,7 @@
  * Every rule ignores `deleted` nodes: they are tombstones kept for history,
  * not part of the product layer or the plan. Two rules also read tombstones
  * (a node an applied `removed` amendment retired): `ref-resolves`, for which
- * a reference to one is history, not dangling; and `removed-target-live`,
+ * a reference to one is history, not dangling; and `open-change-refs-live`,
  * which reports an open change touching, amending or adding under one.
  *
  * @module rex/schema/v2-rules
@@ -58,7 +58,7 @@ export type V2RuleId =
   | "layer-nesting"
   | "capability-depth"
   | "depends-on-acyclic"
-  | "removed-target-live"
+  | "open-change-refs-live"
   | "capability-statement"
   | "check-unique"
   | "capability-criteria"
@@ -185,7 +185,7 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "layer-nesting": "error",
   "capability-depth": "error",
   "depends-on-acyclic": "error",
-  "removed-target-live": "error",
+  "open-change-refs-live": "error",
   "capability-statement": "error",
   "check-unique": "error",
   "capability-criteria": "warning",
@@ -517,7 +517,7 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
  * reference that names no node, or a change-layer node, is `ref-resolves`'s;
  * this rule reports a retired product node.
  */
-const removedTargetLive: Rule = ({ entries, resolve }, _options, withTombstones) =>
+const openChangeRefsLive: Rule = ({ entries, resolve }, _options, withTombstones) =>
   entries
     .filter(({ node }) => isOpenChange(node))
     .flatMap(({ node }) => {
@@ -540,7 +540,7 @@ const removedTargetLive: Rule = ({ entries, resolve }, _options, withTombstones)
           return !!retired && layerOf(retired.type) === "product";
         })
         .map(([field, ref]) =>
-          finding("removed-target-live", node, `Change "${node.title}" ${field} "${ref}" names a retired node; an open change cannot plan against one`),
+          finding("open-change-refs-live", node, `Change "${node.title}" ${field} "${ref}" names a retired node; an open change cannot plan against one`),
         );
     });
 
@@ -680,7 +680,7 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "layer-nesting": layerNesting,
   "capability-depth": capabilityDepth,
   "depends-on-acyclic": dependsOnAcyclic,
-  "removed-target-live": removedTargetLive,
+  "open-change-refs-live": openChangeRefsLive,
   "capability-statement": capabilityStatement,
   "check-unique": checkUnique,
   "capability-criteria": capabilityCriteria,

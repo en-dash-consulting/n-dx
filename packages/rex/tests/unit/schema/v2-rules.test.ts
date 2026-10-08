@@ -454,18 +454,18 @@ describe("depends-on-acyclic", () => {
   });
 });
 
-describe("removed-target-live", () => {
+describe("open-change-refs-live", () => {
   const removes = (target: string, fields: Record<string, unknown> = {}) =>
     node("change", { amends: [{ target, delta: "removed", summary: "retire" }], ...fields });
 
   it("passes a removal of a live product node", () => {
-    expect(check("removed-target-live", { product: [cap({ id: "a" })], changes: [removes("a")] })).toEqual([]);
+    expect(check("open-change-refs-live", { product: [cap({ id: "a" })], changes: [removes("a")] })).toEqual([]);
   });
 
   it("fails a removal of a retired node, and a completed but unapplied change's", () => {
     const gone = removes("gone");
     const completedUnapplied = removes("gone", { status: "completed" });
-    const findings = check("removed-target-live", {
+    const findings = check("open-change-refs-live", {
       product: [cap({ id: "gone", status: "deleted" })],
       changes: [gone, completedUnapplied],
     });
@@ -484,20 +484,20 @@ describe("removed-target-live", () => {
 
     it.each(cases)("fails %s naming a retired node", (_name, make) => {
       const change = make();
-      const findings = check("removed-target-live", { product: [gone()], changes: [change] });
+      const findings = check("open-change-refs-live", { product: [gone()], changes: [change] });
       expect(ids(findings)).toEqual([change.id]);
       expect(findings[0].message).toContain('"gone"');
     });
 
     it.each(cases)("passes %s naming a live node", (_name, make) => {
       const live = cap({ id: "gone" });
-      expect(check("removed-target-live", { product: [live], changes: [make()] })).toEqual([]);
+      expect(check("open-change-refs-live", { product: [live], changes: [make()] })).toEqual([]);
     });
 
     it.each(cases)("does not judge an applied change's %s", (_name, make) => {
       const applied = make();
       Object.assign(applied, { appliedAt: "2026-10-05T00:00:00.000Z", status: "completed" });
-      expect(check("removed-target-live", { product: [gone()], changes: [applied] })).toEqual([]);
+      expect(check("open-change-refs-live", { product: [gone()], changes: [applied] })).toEqual([]);
     });
 
     it("lets an added amendment sit under a node the same change adds", () => {
@@ -507,7 +507,7 @@ describe("removed-target-live", () => {
           { target: "m", delta: "added", summary: "s", under: "n" },
         ],
       });
-      expect(ids(check("removed-target-live", { product: [gone()], changes: [change] }))).toEqual([change.id]);
+      expect(ids(check("open-change-refs-live", { product: [gone()], changes: [change] }))).toEqual([change.id]);
     });
   });
 
@@ -515,7 +515,7 @@ describe("removed-target-live", () => {
     const missing = removes("nope");
     const wrongLayer = removes("t");
     const tree: V2Tree = { product: [], changes: [missing, wrongLayer, node("change", { spike: true }, [node("task", { id: "t" })])] };
-    const findings = checkV2Rules(tree, { now: NOW }, ["ref-resolves", "removed-target-live"]);
+    const findings = checkV2Rules(tree, { now: NOW }, ["ref-resolves", "open-change-refs-live"]);
     expect(findings.map((f) => [f.rule, f.nodeId])).toEqual([
       ["ref-resolves", missing.id],
       ["ref-resolves", wrongLayer.id],
@@ -525,7 +525,7 @@ describe("removed-target-live", () => {
   it("does not judge applied or abandoned changes", () => {
     const product = [cap({ id: "gone", status: "deleted" })];
     const changes = [removes("gone", { appliedAt: "2026-10-05T00:00:00.000Z", status: "completed" }), removes("gone", { status: "cancelled" }), removes("gone", { status: "deleted" })];
-    expect(check("removed-target-live", { product, changes })).toEqual([]);
+    expect(check("open-change-refs-live", { product, changes })).toEqual([]);
   });
 });
 
