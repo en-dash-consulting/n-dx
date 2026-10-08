@@ -503,35 +503,42 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
     node.type === "capability"
       ? (node.dependsOn ?? []).map(resolve).filter((n): n is RuleNode => n?.type === "capability")
       : [];
-  const state = new Map<RuleNode, "open" | "done">();
+  // Tarjan: one finding per strongly connected component that holds a cycle,
+  // so which elementary cycles a DFS happens to walk cannot change the report.
+  const order = new Map<RuleNode, number>();
+  const low = new Map<RuleNode, number>();
+  const onStack = new Set<RuleNode>();
   const stack: RuleNode[] = [];
-  const seen = new Set<string>();
   const findings: RuleFinding[] = [];
+  const byId = (x: RuleNode, y: RuleNode) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0);
   const visit = (node: RuleNode): void => {
-    state.set(node, "open");
+    order.set(node, order.size);
+    low.set(node, order.get(node)!);
     stack.push(node);
+    onStack.add(node);
     for (const next of edges(node)) {
-      if (state.get(next) === "open") {
-        const members = stack.slice(stack.indexOf(next));
-        const key = members.map((n) => n.id).sort().join(" ");
-        if (!seen.has(key)) {
-          seen.add(key);
-          // Report on the smallest id, path rotated to start there, so the
-          // same cycle reads the same whichever capability the walk began at.
-          const start = members.reduce((lo, n, i) => (n.id < members[lo].id ? i : lo), 0);
-          const cycle = [...members.slice(start), ...members.slice(0, start)];
-          const path = [...cycle, cycle[0]].map((n) => `"${n.title}"`).join(" → ");
-          findings.push(finding("depends-on-acyclic", cycle[0], `dependsOn cycle: ${path}`));
-        }
-      } else if (!state.has(next)) {
+      if (!order.has(next)) {
         visit(next);
+        low.set(node, Math.min(low.get(node)!, low.get(next)!));
+      } else if (onStack.has(next)) {
+        low.set(node, Math.min(low.get(node)!, order.get(next)!));
       }
     }
-    stack.pop();
-    state.set(node, "done");
+    if (low.get(node) !== order.get(node)) return;
+    const members: RuleNode[] = [];
+    let member: RuleNode;
+    do {
+      member = stack.pop()!;
+      onStack.delete(member);
+      members.push(member);
+    } while (member !== node);
+    if (members.length === 1 && !edges(node).includes(node)) return;
+    members.sort(byId);
+    const names = members.map((n) => `"${n.title}"`).join(", ");
+    findings.push(finding("depends-on-acyclic", members[0], `dependsOn cycle among ${names}`));
   };
-  for (const node of capabilities) if (!state.has(node)) visit(node);
-  return findings;
+  for (const node of capabilities) if (!order.has(node)) visit(node);
+  return findings.sort((x, y) => (x.nodeId < y.nodeId ? -1 : x.nodeId > y.nodeId ? 1 : 0));
 };
 
 /**

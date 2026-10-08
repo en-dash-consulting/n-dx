@@ -260,6 +260,13 @@ describe("applyAmendments: pre-existing dependsOn cycle", () => {
     const { tree: out } = applyAmendments(cyclic([{ target: "a", delta: "removed", summary: "gone" }]), CHANGE, OPTS);
     expect(get(out, "a").status).toBe("deleted");
   });
+
+  it("applies a removal outside a knot of several cycles, though the walk then enters it elsewhere", () => {
+    const t = tree([{ target: "d", delta: "removed", summary: "gone" }]);
+    get(t, AREA).children = [capNode("d", ["a"]), capNode("c", ["a"]), capNode("a", ["b", "c"]), capNode("b", ["c"])];
+    const { tree: out } = applyAmendments(t, CHANGE, OPTS);
+    expect(get(out, "d").status).toBe("deleted");
+  });
 });
 
 describe("applyAmendments: the change", () => {
