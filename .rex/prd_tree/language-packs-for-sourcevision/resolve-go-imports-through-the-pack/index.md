@@ -31,3 +31,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Read go.mod and go.work with versions](./read-go-mod-and-go-work-with-versions.md) | in_progress |
 | [Resolve Go import paths to package files](./resolve-go-import-paths-to-package-files.md) | pending |
 | [Switch Go import edges from the regex parser to the pack](./switch-go-import-edges-from-the-regex.md) | pending |
+| [Consolidate the duplicate go.mod parser (rex parseGoMod and sourcevision go-build)](./consolidate-the-duplicate-go-mod.md) | pending |
