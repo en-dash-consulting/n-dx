@@ -304,7 +304,9 @@ const PATHSPEC_CAP = 100;
  * Rule 3 read from git. Candidates are main's non-merge commits that touch
  * the recorded commit's files and were committed since it was authored: a
  * commit with the same patch changes the same files and cannot land before it
- * was written. Scanning every commit instead would print the whole history's
+ * was written. The date is `--since-as-filter`, not `--since`: `--since` stops
+ * walking a path at the first commit older than the cutoff, so a backdated
+ * commit would hide a later squash. Scanning every commit instead would print the whole history's
  * patches, which outgrows the output buffer on a repository of real age.
  * Any subset of the files still admits every same-patch commit, so the cap
  * only widens the candidate set, never drops a match.
@@ -318,7 +320,7 @@ async function findPatchTwinInGit(repoDir: string, old: string, authorDate: stri
   if (!oldPatch) return null;
   const pathspec = files.slice(0, PATHSPEC_CAP).map((file) => `:(literal)${file}`);
   const main = new Map<string, string[]>();
-  for (const [patchId, hash] of await patchIdsOf(repoDir, ["--no-merges", "--full-diff", `--since=${authorDate}`, tip], pathspec)) {
+  for (const [patchId, hash] of await patchIdsOf(repoDir, ["--no-merges", "--full-diff", `--since-as-filter=${authorDate}`, tip], pathspec)) {
     push(main, patchId, hash);
   }
   return findPatchTwin(oldPatch[0], main);

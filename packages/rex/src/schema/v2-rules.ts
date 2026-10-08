@@ -205,8 +205,9 @@ export function isBuildingChange(node: RuleNode): boolean {
  */
 export function changingNodes({ entries, resolve }: TreeIndex): Set<RuleNode> {
   const changing = new Set<RuleNode>();
-  for (const { node } of entries) {
-    if (!isBuildingChange(node)) continue;
+  for (const { node, retired } of entries) {
+    // A change under a deleted ancestor is retired with it, whatever its own status.
+    if (retired || !isBuildingChange(node)) continue;
     for (const a of node.type === "change" ? (node.amends ?? []) : []) {
       const target = resolve(a.target);
       if (target) changing.add(target);

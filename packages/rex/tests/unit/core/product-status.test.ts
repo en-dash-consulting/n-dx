@@ -171,6 +171,14 @@ describe("computeProductStatus", () => {
     });
   });
 
+  it("does not count a pending change under a deleted umbrella change", () => {
+    const tree: V2Tree = {
+      product: [cap("r")],
+      changes: [change("umbrella", { status: "deleted", children: [change("inner", { amends: [amend("r", "modified")] })] })],
+    };
+    expect(computeProductStatus(tree).r.status).toBe("met");
+  });
+
   describe("children follow an amended parent", () => {
     const tree = (c: RuleNode): V2Tree => ({
       product: [cap("parent", { children: [cap("child", { children: [cap("grandchild", { metAt: undefined })] })] }), cap("sibling")],

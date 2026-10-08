@@ -113,6 +113,40 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
+describe("repointCommits patch-id scan over a backdated commit", () => {
+  it("finds a squash that a commit older than the cutoff sits above", async () => {
+    const dir = join(root, "backdated");
+    const run = (args: string[], date?: string): string => {
+      const env: NodeJS.ProcessEnv = { ...process.env };
+      if (date) Object.assign(env, { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date });
+      return execFileSync("git", args, { cwd: dir, encoding: "utf-8", env, stdio: ["ignore", "pipe", "pipe"] }).trim();
+    };
+    const write = async (content: string, message: string, date: string): Promise<string> => {
+      await writeFile(join(dir, "f.txt"), content, "utf-8");
+      run(["add", "f.txt"]);
+      run(["commit", "-q", "-m", message], date);
+      return run(["rev-parse", "HEAD"]);
+    };
+    execFileSync("git", ["init", "-q", "-b", "main", dir]);
+    for (const [k, v] of [["user.email", "dev@example.com"], ["user.name", "Dev"], ["commit.gpgsign", "false"]]) run(["config", k, v]);
+    const base = await write("base\n", "Initial commit", "2026-09-30T00:00:00Z");
+
+    // Authored Oct 3 on a branch; squashed onto main Oct 4 under another subject.
+    run(["checkout", "-q", "-b", "feature", base]);
+    const original = await write("base\nfeature\n", "Original work", "2026-10-03T00:00:00Z");
+    run(["checkout", "-q", "main"]);
+    run(["merge", "-q", "--squash", "feature"]);
+    run(["commit", "-q", "-m", "Shipped (#1)"], "2026-10-04T00:00:00Z");
+    const squash = run(["rev-parse", "HEAD"]);
+    // A backdated commit, then the tip, all touching the same file.
+    await write("base\nfeature\nbackdated\n", "Backdated", "2026-10-02T00:00:00Z");
+    await write("base\nfeature\nbackdated\ntip\n", "Tip", "2026-10-05T00:00:00Z");
+
+    const result = await repointCommits([original], { repoDir: dir, ref: "main" });
+    expect(result.matched).toEqual([{ old: original, new: squash, rule: "patch-id" }]);
+  });
+});
+
 function fakeHost(table: Record<string, string[]>): CommitHost & { calls: string[] } {
   const calls: string[] = [];
   return {
