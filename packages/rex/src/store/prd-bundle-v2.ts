@@ -168,6 +168,13 @@ export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {
 /** Loaded nodes as envelope nodes: a field is state when it is declared state or its row holds it. */
 function toBundleNodes(nodes: readonly RuleNode[], rows: ReadonlyMap<string, ItemState>): BundleNodeV2[] {
   return nodes.map((node) => {
+    // The envelope's `state` block would overwrite it, losing the value without a word.
+    if (Object.hasOwn(node, "state")) {
+      throw new BundleError(
+        `Node "${node.title}" (${node.id}) has a field named "state", which bundle envelope v2 reserves for the node's state.yaml row. ` +
+          `Rename or remove the field, then export again. Nothing was written.`,
+      );
+    }
     const row = rows.get(node.id);
     const out: Record<string, unknown> = {};
     const state: Record<string, unknown> = {};

@@ -192,6 +192,14 @@ describe("envelope v2 round trip", () => {
     expect(files).toEqual(await snapshot(src));
   });
 
+  it("refuses to export a node whose own field is named state, which the envelope reserves", async () => {
+    const src = await copyV2Fixture(join(tmp, "src"), "lf");
+    await editText(join(src, "changes", "add-apple-pay", "index.md"), (text) =>
+      text.replace('priority: "high"\n', 'priority: "high"\nstate: "draft"\n'),
+    );
+    await expect(exportV2Bundle(src)).rejects.toThrow(/"state".*reserve/);
+  });
+
   it("re-importing reports identical collisions and writes nothing new", async () => {
     const src = await copyV2Fixture(join(tmp, "src"), "lf");
     const before = await snapshot(src);
