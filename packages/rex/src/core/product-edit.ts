@@ -167,20 +167,24 @@ interface Draft {
 }
 
 /**
- * Every open product-edit change with a modified amendment of `nodeId`, in tree
- * order: `pending` (not completed, so handling an edit may refresh or withdraw
- * it) and `stale` (completed but unapplied, never modified here).
+ * Every open product-edit change with a modified amendment of `nodeId`, at any
+ * depth of the change layer (outside deleted subtrees), in tree order:
+ * `pending` (not completed, so handling an edit may refresh or withdraw it) and
+ * `stale` (completed but unapplied, never modified here).
  */
 function drafts(tree: V2Tree, nodeId: string): { pending: Draft[]; stale: RuleNode[] } {
   const pending: Draft[] = [];
   const stale: RuleNode[] = [];
-  for (const change of tree.changes) {
-    if (!isChangeNode(change) || !isOpenChange(change) || change.source !== PRODUCT_EDIT_SOURCE) continue;
-    const amendment = change.amends?.find((a) => a.delta === "modified" && resolve(tree.product, a.target)?.id === nodeId);
-    if (!amendment) continue;
-    if (change.status === "completed") stale.push(change);
-    else pending.push({ change, amendment });
-  }
+  const visit = (node: RuleNode): void => {
+    if (node.status === "deleted") return;
+    if (isChangeNode(node) && isOpenChange(node) && node.source === PRODUCT_EDIT_SOURCE) {
+      const amendment = node.amends?.find((a) => a.delta === "modified" && resolve(tree.product, a.target)?.id === nodeId);
+      if (amendment && node.status === "completed") stale.push(node);
+      else if (amendment) pending.push({ change: node, amendment });
+    }
+    for (const child of node.children ?? []) visit(child);
+  };
+  for (const node of tree.changes) visit(node);
   return { pending, stale };
 }
 

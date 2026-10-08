@@ -32,10 +32,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Apply refuses a change over a pre-existing dependsOn cycle whose report rotates after a removal](./apply-refuses-a-change-over-a-pre.md) | completed |
 | [Apply refuses a removal outside a pre-existing dependsOn knot because the DFS reports a different sub-cycle](./apply-refuses-a-removal-outside-a-pre.md) | completed |
 | [Applying an older map-edit draft reverts a later direct edit to the same node](./applying-an-older-map-edit-draft.md) | completed |
+| [Find product-edit drafts anywhere in the change tree, and store applied amendment targets by node id](./find-product-edit-drafts-anywhere-in.md) | in_progress |
 | [Handle direct map edits: editorial re-stamp or revised with a drafted change](./handle-direct-map-edits-editorial-re.md) | completed |
 | [Retiring an area or capability leaves its live descendants hidden from every v2 rule](./retiring-an-area-or-capability-leaves.md) | completed |
 | [Reverting a product edit leaves a completed but unapplied draft able to write the abandoned spec](./reverting-a-product-edit-leaves-a.md) | completed |
 | [Reverting a product edit to the met spec leaves its open draft proposing the abandoned edit](./reverting-a-product-edit-to-the-met.md) | completed |
 | [Stamp appliedAt, refuse stale amendments and check apply's own output](./stamp-appliedat-refuse-stale.md) | completed |
 | [Support the rex.applyOn setting: complete, review and release](./support-the-rex-applyon-setting.md) | completed |
-| [Find product-edit drafts anywhere in the change tree, and store applied amendment targets by node id](./find-product-edit-drafts-anywhere-in.md) | pending |

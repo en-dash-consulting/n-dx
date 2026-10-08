@@ -28,7 +28,9 @@
  * Every amended node gets a History line in its body. Added and modified nodes
  * get `metAt` = {@link specHash} of the new spec (statement and criteria, never
  * the body) and lose `revisedAt`. The change gets `appliedAt`, the timestamp the
- * caller passes, and `appliedAmendsHash` ({@link amendsHash} of its amends), so
+ * caller passes, and each amendment's `target` (and an added one's `under`) is
+ * rewritten to the node id it resolved to, since a display id may later name
+ * another node. Then `appliedAmendsHash` ({@link amendsHash} of the rewritten amends), so
  * an amendment edited after apply is reported ({@link amendsEditedAfterApply}),
  * not silently ignored. Applying confirms the change's targets, so its
  * `needsPlacement` is cleared. A change that only touches nodes gets these
@@ -112,6 +114,8 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   const date = options.now.toISOString().slice(0, 10);
   const problems: string[] = [];
   const applied: AppliedAmendment[] = [];
+  /** Per amendment index, its target (and an added one's under) as node ids. */
+  const stableRefs = new Map<number, { target: string; under?: string }>();
   for (const [i, amendment] of amends.entries()) {
     const fail = (message: string): void => {
       problems.push(`amendment ${i + 1} (${amendment.delta} ${amendment.target}): ${message}`);
@@ -121,9 +125,13 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
     if (!node) continue;
     node.body = appendHistory(node.body, `- ${date} ${label} ${amendment.delta}: ${amendment.summary}`);
     applied.push({ delta: amendment.delta, nodeId: node.id, summary: amendment.summary });
+    const under = amendment.delta === "added" && amendment.under !== undefined ? resolve(next.product, amendment.under)?.id : undefined;
+    stableRefs.set(i, { target: node.id, ...(under !== undefined ? { under } : {}) });
   }
   if (problems.length > 0) throw new ApplyAmendmentsError(label, problems);
 
+  // Stored by id: a display id can later name another node, which would rewrite this change's history.
+  for (const [i, refs] of stableRefs) Object.assign(amends[i], refs);
   change.appliedAt = options.appliedAt;
   change.appliedAmendsHash = amendsHash(amends);
   delete change.needsPlacement;

@@ -420,6 +420,54 @@ describe("handleProductEdit: reverting to the met spec withdraws pending drafts"
   });
 });
 
+describe("handleProductEdit: drafts nested under another change", () => {
+  const B = { statement: "A shopper can pay by card or wallet.", criteria: CRITERIA };
+  const C = { statement: "A shopper can pay by card, wallet or bank.", criteria: CRITERIA };
+
+  /** Move every root change under one umbrella change, with `status`. */
+  function nest(t: V2Tree, status = "pending"): void {
+    t.changes = [{ id: "umbrella", type: "change", title: "Payments", slug: "payments", status, touches: [CAP], children: t.changes } as RuleNode];
+  }
+  const nested = (t: V2Tree): RuleNode => t.changes[0].children![0];
+
+  /** Edit A → B, nest the draft (and patch it), then edit B → `to`. */
+  function editNested(to: typeof BEFORE, patch: (t: V2Tree) => void = () => {}): ReturnType<typeof handleProductEdit> {
+    const input = handleProductEdit(tree(B), CAP, BEFORE, OPTS).tree;
+    nest(input);
+    patch(input);
+    Object.assign(cap(input), structuredClone(to));
+    return handleProductEdit(input, CAP, B, { ...OPTS, now: new Date("2026-10-08T09:00:00.000Z"), newId: () => "draft-2" });
+  }
+
+  it("withdraws a nested draft on revert", () => {
+    const result = editNested(BEFORE);
+    expect(result.outcome).toBe("reverted");
+    expect(result.drafts.map((c) => c.id)).toEqual(["draft-1"]);
+    expect(nested(result.tree)).toMatchObject({ status: "cancelled", amends: [] });
+    expect(result.tree.changes[0].status).toBe("pending");
+  });
+
+  it("refreshes a nested draft on a second edit instead of drafting another", () => {
+    const result = editNested(C);
+    expect(result.outcome).toBe("revised");
+    expect(result.drafts.map((c) => c.id)).toEqual(["draft-1"]);
+    expect(result.tree.changes).toHaveLength(1);
+    expect(nested(result.tree).amends).toMatchObject([{ proposed: C.statement, base: specHash(C) }]);
+  });
+
+  it("reports a completed but unapplied nested draft as stale", () => {
+    const result = editNested(C, (t) => Object.assign(nested(t), { status: "completed" }));
+    expect(result.stale.map((c) => c.id)).toEqual(["draft-1"]);
+    expect(result.drafts.map((c) => c.id)).toEqual(["draft-2"]);
+  });
+
+  it("skips a draft under a deleted change", () => {
+    const result = editNested(C, (t) => Object.assign(t.changes[0], { status: "deleted" }));
+    expect(result.drafts.map((c) => c.id)).toEqual(["draft-2"]);
+    expect(nested(result.tree).amends).toMatchObject([{ proposed: B.statement }]);
+  });
+});
+
 function specOfCap(node: RuleNode): { statement?: string; criteria?: Criterion[] } {
   return { statement: node.statement, criteria: node.criteria };
 }

@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { ApplyAmendmentsError, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments } from "../../../src/core/apply-amendments.js";
+import { ApplyAmendmentsError, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, resolve } from "../../../src/core/apply-amendments.js";
 import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
@@ -394,6 +394,35 @@ describe("applyAmendments: stamps on the change", () => {
 
   it("does not report an applied change without the stamp", () => {
     expect(amendsEditedAfterApply(tree([modify], { appliedAt: APPLIED_AT }))).toEqual([]);
+  });
+});
+
+describe("applyAmendments: stored targets are node ids", () => {
+  it("still names the retired node after another node is renumbered to its display id", () => {
+    const { tree: out } = applyAmendments(tree([{ target: "A1.1", delta: "removed", summary: "Cards go" }]), CHANGE, OPTS);
+    get(out, CON).displayId = "A1.1";
+    const [stored] = get(out, CHANGE).amends!;
+    expect(stored.target).toBe(CAP);
+    expect(resolve(out.product, stored.target, { includeDeleted: true })?.id).toBe(CAP);
+    expect(amendsEditedAfterApply(out)).toEqual([]);
+  });
+
+  it("rewrites a modified target and an added target and under, and hashes the rewritten amends", () => {
+    const amends: Amendment[] = [
+      { target: "A1.1", delta: "modified", summary: "s", proposed: "New" },
+      { target: "A1.2", delta: "added", summary: "a", under: "A1", title: "Refunds", proposed: "Refunds work." },
+      { target: "cap-3", delta: "added", summary: "b", under: "A1.2", title: "Partial refunds", proposed: "Partial refunds work." },
+    ];
+    const { tree: out, applied } = applyAmendments(tree(amends), CHANGE, OPTS);
+    const stored = get(out, CHANGE).amends!;
+    expect(stored.map((a) => [a.target, a.under])).toEqual([
+      [CAP, undefined],
+      ["new-id", AREA],
+      ["cap-3", "new-id"],
+    ]);
+    expect(stored.map((a) => a.target)).toEqual(applied.map((a) => a.nodeId));
+    expect(get(out, CHANGE).appliedAmendsHash).toBe(amendsHash(stored));
+    expect(get(out, "new-id").displayId).toBe("A1.2");
   });
 });
 
