@@ -1,0 +1,26 @@
+{
+  "comment": "Terraform drift corpus: public repositories pinned by commit SHA. `corpus` names the directory family holding the clone: \"iac\" is ~/.cache/ndx-iac-corpus, \"go\" is the Go corpus (microservices-demo is shared with it). Measured by tf-corpus-report.mjs, which never clones. Not part of the test run.",
+  "repositories": [
+    {
+      "name": "cloud-foundation-fabric",
+      "corpus": "iac",
+      "url": "https://github.com/GoogleCloudPlatform/cloud-foundation-fabric.git",
+      "sha": "67afe70eee502129368f5c370d6e7222f2e60ab0",
+      "shape": "GCP modules, 832 .tf files at pin time"
+    },
+    {
+      "name": "terraform-aws-rds",
+      "corpus": "iac",
+      "url": "https://github.com/terraform-aws-modules/terraform-aws-rds.git",
+      "sha": "175da043429cbbe41c512f976105719f6d0e538c",
+      "shape": "AWS modules, 104 .tf files at pin time"
+    },
+    {
+      "name": "microservices-demo",
+      "corpus": "go",
+      "url": "https://github.com/GoogleCloudPlatform/microservices-demo.git",
+      "sha": "38e7348eb289eb5b87c0c6e8cb19ced0449dc389",
+      "shape": "GCP deploy scripts, 8 .tf files at pin time; shared with the Go corpus"
+    }
+  ]
+}
