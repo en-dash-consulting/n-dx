@@ -18,6 +18,9 @@
  * toolchain into the user cache on first use, so no Docker, emscripten or
  * native compiler is needed on the developer machine.
  *
+ * A grammar whose tag omits `src/parser.c` is generated first with
+ * `tree-sitter generate`, which evaluates the pinned `grammar.js`.
+ *
  * Re-running is cheap: verified downloads are cached under `build/cache/`.
  */
 
@@ -68,6 +71,11 @@ export const GRAMMARS = {
     repo: "tree-sitter-grammars/tree-sitter-hcl",
     version: "1.2.0",
     sha256: "a95bc6b00271e08dee9e63b895b2563dac802db0015fdf5a24a1b0244f2cb560",
+  },
+  "tree-sitter-sql": {
+    repo: "DerekStride/tree-sitter-sql",
+    version: "0.3.11",
+    sha256: "1fe13cb1e50dd9da9f22aed3cb9430fc9dae05a734a6049926fc12f6d8ecd3ae",
   },
 };
 
@@ -179,6 +187,13 @@ async function buildGrammar(cli, name, { repo, version, sha256: expected }) {
   const source = join(BUILD_ROOT, "src", `${name}-${version}`);
   rmSync(source, { recursive: true, force: true });
   extractTarGz(archive, source);
+
+  // Some grammars (tree-sitter-sql) keep the generated parser out of their tags.
+  if (!existsSync(join(source, "src", "parser.c"))) {
+    const generated = spawnSync(cli, ["generate"], { cwd: source, stdio: "inherit" });
+    if (generated.error) throw generated.error;
+    if (generated.status !== 0) throw new Error(`tree-sitter generate failed for ${name} (exit ${generated.status})`);
+  }
 
   mkdirSync(GRAMMAR_BUILD_DIR, { recursive: true });
   const output = grammarWasmPath(name);
