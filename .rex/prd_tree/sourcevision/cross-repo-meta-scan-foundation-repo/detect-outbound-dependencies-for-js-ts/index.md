@@ -21,3 +21,12 @@ assignee: "Sterling H <sterling.h@endash.us>"
 lastModified: "2026-10-07T16:13:17.023Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Declare OutboundDependency, register outbound.json and wire an empty detector with declared contracts](./declare-outbounddependency-register.md) | pending |
+| [Detect JS/TS HTTP and gRPC clients through the TypeScript compiler API](./detect-js-ts-http-and-grpc-clients.md) | pending |
+| [Detect JS/TS queue, database and cache clients](./detect-js-ts-queue-database-and-cache.md) | pending |
+| [Detect Go outbound clients on the existing Go parser](./detect-go-outbound-clients-on-the.md) | pending |
