@@ -429,7 +429,7 @@ describe("isolation", () => {
     const srcRoot = join(import.meta.dirname, "../../../src");
     // The v2 modules (schema, rules, state writer, dual-read loader, tree
     // writer, apply engine, apply policy, product-edit handler, computed edges,
-    // product status, change landing, placement and its policy, migration plan) may import each
+    // product status, change landing, placement and its policy, migration plan and its specs) may import each
     // other; nothing else may import them until the v2 store wires them in.
     const v2Files = new Set(
       [
@@ -447,6 +447,7 @@ describe("isolation", () => {
         "core/placement.ts",
         "core/placement-policy.ts",
         "core/migration-plan.ts",
+        "core/capability-spec.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

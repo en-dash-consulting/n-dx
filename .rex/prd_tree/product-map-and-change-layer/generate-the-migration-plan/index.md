@@ -26,7 +26,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Classify the v1 tree and propose areas and constraints](./classify-the-v1-tree-and-propose-areas.md) | completed |
-| [Draft present-tense capability specs grounded in code and tests](./draft-present-tense-capability-specs.md) | pending |
+| [Draft present-tense capability specs grounded in code and tests](./draft-present-tense-capability-specs.md) | in_progress |
 | [Migration plan makes cancelled or deleted v1 epics and features into standing areas and capabilities](./migration-plan-makes-cancelled-or.md) | pending |
 | [Migration plan turns a version-numbered epic that is not a release into a release umbrella (e.g. "Python 3.12 support")](./migration-plan-turns-a-version.md) | pending |
 | [Plan ids, aliases, backfill and data fixes](./plan-ids-aliases-backfill-and-data-fixes.md) | pending |

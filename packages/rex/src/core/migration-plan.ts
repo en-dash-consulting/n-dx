@@ -139,6 +139,12 @@ function isFixShaped(item: PRDItem): boolean {
   return DEFECT_WORDS.test(item.title);
 }
 
+/** The text opens with an imperative work verb ("Add …", "Fix …"): it describes work, not the product. */
+export function opensWithWorkVerb(text: string): boolean {
+  const lead = leadWord(text);
+  return lead !== undefined && (WORK_VERBS.has(lead) || FIX_WORDS.has(lead));
+}
+
 function isWorkShaped(item: PRDItem): boolean {
   const lead = leadWord(item.title);
   return (lead !== undefined && WORK_VERBS.has(lead)) || WORK_NOUNS.test(item.title) || isDeliveryEpic(item.title);
