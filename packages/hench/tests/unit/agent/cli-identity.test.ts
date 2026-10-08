@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveProjectCliName } from "../../../src/agent/planning/cli-identity.js";
@@ -34,5 +34,24 @@ describe("resolveProjectCliName", () => {
   it("defaults to 'n-dx' when .n-dx.json is malformed", () => {
     writeFileSync(join(dir, ".n-dx.json"), "{not json");
     expect(resolveProjectCliName(dir)).toBe("n-dx");
+  });
+});
+
+describe("resolveProjectCliName on the .ndx/ layout", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "hench-cli-identity-ndx-"));
+    mkdirSync(join(dir, ".ndx"));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("reads cli.name from .ndx/config.json, not from a root .n-dx.json", () => {
+    writeFileSync(join(dir, ".ndx", "config.json"), JSON.stringify({ cli: { name: "ndxapp" } }));
+    writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ cli: { name: "legacy" } }));
+    expect(resolveProjectCliName(dir)).toBe("ndxapp");
   });
 });

@@ -21,6 +21,8 @@ interface CliTimeoutsResponse {
   timeouts: Record<string, number>;
   defaultTimeoutMs: number;
   noDefaultTimeoutCommands: string[];
+  /** The file the overrides live in, relative to the project root; the server resolves it. */
+  configFile: string;
 }
 
 // ── Known commands with metadata ──────────────────────────────────────
@@ -487,7 +489,7 @@ export function CliTimeoutsSection({ form }: { form: CliTimeoutsForm }) {
     h("p", { class: "ct-header-subtitle" },
       "How long each CLI command may run before being cancelled. " +
       "Settings are persisted to ",
-      h("code", null, ".n-dx.json"),
+      h("code", null, data.configFile),
       ".",
     ),
 
@@ -588,7 +590,7 @@ export function CliTimeoutsSection({ form }: { form: CliTimeoutsForm }) {
             h("span", { class: "ct-section-icon" }, "▦"),
             h("div", null,
               h("h3", { class: "ct-section-title" }, "Custom Overrides"),
-              h("p", { class: "ct-section-desc" }, "Per-command overrides set manually in .n-dx.json"),
+              h("p", { class: "ct-section-desc" }, `Per-command overrides set manually in ${data.configFile}`),
             ),
           ),
           h("div", { class: "ct-field-list" },

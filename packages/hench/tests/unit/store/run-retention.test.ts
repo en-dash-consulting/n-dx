@@ -626,3 +626,17 @@ describe("RunRetention", () => {
     });
   });
 });
+
+describe("loadRetentionConfig on the .ndx/ layout", () => {
+  it("reads the retention section from .ndx/config.json", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hench-retention-ndx-"));
+    try {
+      await mkdir(join(dir, ".ndx"));
+      await writeFile(join(dir, ".ndx", "config.json"), JSON.stringify({ retention: { maxAgeDays: 5 } }), "utf-8");
+      await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ retention: { maxAgeDays: 99 } }), "utf-8");
+      expect((await loadRetentionConfig(dir)).maxAgeDays).toBe(5);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

@@ -29,7 +29,7 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { LLM_VENDOR } from "../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveLayout } from "../prd/llm-gateway.js";
 import { resolveHenchPaths } from "../store/paths.js";
 import type { QuotaRemaining } from "./types.js";
 
@@ -175,9 +175,9 @@ function computeWeeklySpend(henchDir: string, now: Date): number {
   return total;
 }
 
-/** Load and return the `weeklyBudget` object from `.n-dx.json`, or null. */
+/** Load and return the `weeklyBudget` object from the project config, or null. */
 function loadWeeklyBudgetConfig(projectDir: string): WeeklyBudgetConfig | null {
-  const ndxPath = join(projectDir, ".n-dx.json");
+  const ndxPath = resolveLayout(projectDir).configFile;
   if (!existsSync(ndxPath)) return null;
 
   try {

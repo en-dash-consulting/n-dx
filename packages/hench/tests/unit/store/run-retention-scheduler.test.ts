@@ -266,3 +266,17 @@ describe("RunRetentionScheduler", () => {
     });
   });
 });
+
+describe("loadRetentionIntervalMs on the .ndx/ layout", () => {
+  it("reads retention.intervalMs from .ndx/config.json", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hench-retention-sched-ndx-"));
+    try {
+      await mkdir(join(dir, ".ndx"));
+      await writeFile(join(dir, ".ndx", "config.json"), JSON.stringify({ retention: { intervalMs: 1234 } }), "utf-8");
+      await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ retention: { intervalMs: 99 } }), "utf-8");
+      expect(await loadRetentionIntervalMs(dir)).toBe(1234);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

@@ -480,3 +480,23 @@ describe("checkQuotaRemaining — Claude integration", () => {
     }
   });
 });
+
+describe("fetchClaudeQuota on the .ndx/ layout", () => {
+  it("reads tokenUsage.weeklyBudget from .ndx/config.json", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "hench-claude-quota-ndx-"));
+    try {
+      await mkdir(join(dir, ".ndx", "hench", "runs"), { recursive: true });
+      await writeFile(
+        join(dir, ".ndx", "config.json"),
+        JSON.stringify({ tokenUsage: { weeklyBudget: { globalDefault: 100_000 } } }),
+        "utf-8",
+      );
+      const result = fetchClaudeQuota(makeOpts(dir));
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected ok:true");
+      expect(result.quota.percentRemaining).toBe(100);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

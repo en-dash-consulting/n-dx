@@ -44,7 +44,7 @@
 
 import { statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, relative, sep } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 
 import { PROJECT_DIRS } from "./project-dirs.js";
 
@@ -200,6 +200,24 @@ export function resolveLayout(
  */
 export function relativeToRoot(layout: Layout, path: string): string {
   return relative(layout.root, path).split(sep).join("/");
+}
+
+/**
+ * The project root a resolved state directory belongs to.
+ *
+ * Packages pass their own state directory around (`/project/.rex`,
+ * `/project/.ndx/hench`) and used to recover the project root as its parent.
+ * On the `.ndx/` layout the parent is the container, and resolving a layout
+ * *there* finds no `.ndx/` inside it, selects legacy, and reads
+ * `/project/.ndx/.n-dx.json` — a file nothing writes — so every project
+ * override was silently ignored on a migrated project. Stepping over the
+ * container is this module's knowledge, not the caller's: every state
+ * directory it resolves sits either at the root or one level inside the
+ * container, and nowhere else.
+ */
+export function projectRootOf(stateDir: string): string {
+  const parent = dirname(stateDir);
+  return basename(parent) === NDX_CONTAINER_DIRNAME ? dirname(parent) : parent;
 }
 
 /** What {@link layoutStateNames} answers with. */

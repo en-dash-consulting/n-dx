@@ -258,3 +258,19 @@ describe("Claude config inheritance (rex)", () => {
     });
   });
 });
+
+describe("loadClaudeConfig on the .ndx/ layout", () => {
+  it("reads .ndx/config.json for a rexDir inside the container, not a root .n-dx.json", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "rex-claude-cfg-ndx-"));
+    try {
+      const ndxRexDir = join(dir, ".ndx", "rex");
+      await mkdir(ndxRexDir, { recursive: true });
+      await writeFile(join(dir, ".ndx", "config.json"), JSON.stringify({ claude: { cli_path: "/opt/claude" } }));
+      await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ claude: { cli_path: "/legacy/claude" } }));
+
+      expect((await loadClaudeConfig(ndxRexDir)).cli_path).toBe("/opt/claude");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

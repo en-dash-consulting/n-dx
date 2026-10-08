@@ -106,9 +106,10 @@ function mergeConfigLayers(
 
 /** Extract configuration summary from project files. */
 async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
-  const henchConfigPath = join(resolveLayout(ctx.projectDir).henchDir, "config.json");
-  const ndxConfigPath = join(ctx.projectDir, ".n-dx.json");
-  const ndxLocalConfigPath = join(ctx.projectDir, ".n-dx.local.json");
+  const layout = resolveLayout(ctx.projectDir);
+  const henchConfigPath = join(layout.henchDir, "config.json");
+  const ndxConfigPath = layout.configFile;
+  const ndxLocalConfigPath = layout.localConfigFile;
   const pkgPath = join(ctx.projectDir, "package.json");
 
   const henchConfig = readJSON(henchConfigPath);

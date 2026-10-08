@@ -29,6 +29,7 @@ import {
   isModelCompatibleWithVendor,
   resolveClaudeConfig,
   loadLLMConfig,
+  resolveLayout,
 } from "@n-dx/llm-client";
 import type { LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
 import { VENDOR_PROVIDERS, validateProviderForVendor } from "./hench-config-fields.js";
@@ -136,8 +137,6 @@ interface LlmConfigPutBody {
 // Constants
 // ---------------------------------------------------------------------------
 
-const NDX_CONFIG = ".n-dx.json";
-const NDX_LOCAL_CONFIG = ".n-dx.local.json";
 const VALID_VENDORS: ReadonlySet<string> = new Set([
   LLM_VENDOR.CLAUDE,
   LLM_VENDOR.CODEX,
@@ -340,9 +339,9 @@ function readJsonFile(path: string): Record<string, unknown> {
   }
 }
 
-/** Read the shared, git-tracked `.n-dx.json` only. Writes always target this file. */
+/** Read the shared, git-tracked project config only. Writes always target this file. */
 function readNdxConfig(projectDir: string): Record<string, unknown> {
-  return readJsonFile(join(projectDir, NDX_CONFIG));
+  return readJsonFile(resolveLayout(projectDir).configFile);
 }
 
 /**
@@ -355,13 +354,13 @@ function readNdxConfig(projectDir: string): Record<string, unknown> {
  */
 function readEffectiveNdxConfig(projectDir: string): Record<string, unknown> {
   const shared = readNdxConfig(projectDir);
-  const local = readJsonFile(join(projectDir, NDX_LOCAL_CONFIG));
+  const local = readJsonFile(resolveLayout(projectDir).localConfigFile);
   if (Object.keys(local).length === 0) return shared;
   return deepMerge(shared, local);
 }
 
 function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
-  const configPath = join(projectDir, NDX_CONFIG);
+  const configPath = resolveLayout(projectDir).configFile;
   writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
 }
 

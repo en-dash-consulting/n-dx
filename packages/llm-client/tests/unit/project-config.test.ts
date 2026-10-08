@@ -6,6 +6,8 @@ import {
   deepMerge,
   loadProjectOverrides,
   loadProjectOverrideSources,
+  LOCAL_CONFIG_FILE,
+  PROJECT_CONFIG_FILE,
   mergeWithOverrides,
 } from "../../src/project-config.js";
 
@@ -200,5 +202,38 @@ describe("mergeWithOverrides", () => {
     const config = { model: "sonnet", maxTurns: 10 };
     const result = mergeWithOverrides(config, { model: "opus" });
     expect(result).toEqual({ model: "opus", maxTurns: 10 });
+  });
+});
+
+describe("project overrides on the .ndx/ layout", () => {
+  let tmpDir: string;
+  let configDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "claude-client-pc-ndx-"));
+    configDir = join(tmpDir, ".ndx", "rex");
+    await mkdir(configDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("reads .ndx/config.json and .ndx/config.local.json and labels each source by its root-relative path", async () => {
+    await writeFile(join(tmpDir, ".ndx", "config.json"), JSON.stringify({ rex: { model: "opus" } }));
+    await writeFile(join(tmpDir, ".ndx", "config.local.json"), JSON.stringify({ rex: { model: "haiku" } }));
+    // Not this project's config on the new layout.
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ rex: { model: "legacy" } }));
+
+    expect(await loadProjectOverrideSources(configDir, "rex")).toEqual([
+      { file: ".ndx/config.json", data: { model: "opus" } },
+      { file: ".ndx/config.local.json", data: { model: "haiku" } },
+    ]);
+    expect(await loadProjectOverrides(configDir, "rex")).toEqual({ model: "haiku" });
+  });
+
+  it("keeps the legacy names as the exported constants, for labels only", () => {
+    expect(PROJECT_CONFIG_FILE).toBe(".n-dx.json");
+    expect(LOCAL_CONFIG_FILE).toBe(".n-dx.local.json");
   });
 });

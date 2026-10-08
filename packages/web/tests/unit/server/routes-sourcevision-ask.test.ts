@@ -20,6 +20,7 @@ import { REFINEMENT_FENCE_TAG } from "../../../src/server/prd-refinement.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import {
   handleSourcevisionAskRoute,
+  resolveAskTimeoutMs,
   type HandleSourcevisionAskOptions,
 } from "../../../src/server/routes-sourcevision-ask.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -900,5 +901,22 @@ describe("POST /api/sourcevision/ask", () => {
       expect(res.status).toBe(400);
       expect((await res.json()).kind).toBe("invalid_request");
     });
+  });
+});
+
+describe("resolveAskTimeoutMs on the .ndx/ layout", () => {
+  it("reads sourcevision.ask.timeoutMs from .ndx/config.json with the local overlay winning", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sv-ask-ndx-"));
+    try {
+      await mkdir(join(dir, ".ndx"));
+      await writeFile(join(dir, ".ndx", "config.json"), JSON.stringify({ sourcevision: { ask: { timeoutMs: 5_000 } } }));
+      await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ sourcevision: { ask: { timeoutMs: 1 } } }));
+      expect(resolveAskTimeoutMs(dir)).toBe(5_000);
+
+      await writeFile(join(dir, ".ndx", "config.local.json"), JSON.stringify({ sourcevision: { ask: { timeoutMs: 7_000 } } }));
+      expect(resolveAskTimeoutMs(dir)).toBe(7_000);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

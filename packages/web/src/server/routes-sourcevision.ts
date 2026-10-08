@@ -18,6 +18,7 @@ import { readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
@@ -28,11 +29,9 @@ import {
 } from "./pr-markdown-refresh-diagnostics.js";
 
 const SV_PREFIX = "/api/sv/";
-const NDX_CONFIG = ".n-dx.json";
-
-/** Load zone pins from .n-dx.json → sourcevision.zones.pins */
+/** Load zone pins from the project config → sourcevision.zones.pins */
 function loadZonePins(ctx: ServerContext): Record<string, string> | null {
-  const configPath = join(ctx.projectDir, NDX_CONFIG);
+  const configPath = resolveLayout(ctx.projectDir).configFile;
   if (!existsSync(configPath)) return null;
   try {
     const config = JSON.parse(readFileSync(configPath, "utf-8"));

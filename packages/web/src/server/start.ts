@@ -66,9 +66,11 @@ import { handleRequestSecurity } from "./request-security.js";
  * Kept as public API, but no longer where the server writes: the marker
  * moved into `.ndx/` with the rest of the layout, so the write site asks
  * `resolveWebPaths` (`./paths.ts`), which answers this name on a legacy
- * project and `.ndx/web.port` on a migrated one.
+ * project and `.ndx/web.port` on a migrated one. The name itself comes from
+ * the resolver too, asked for the legacy layout by name (no detection, no
+ * disk access), so there is one spelling of it in the repository.
  */
-export const PORT_FILE = ".n-dx-web.port";
+export const PORT_FILE = basename(resolveLayout(".", { mode: "legacy" }).webPortFile);
 const LOOPBACK_HOST = "127.0.0.1";
 
 // ── Shutdown handler ──────────────────────────────────────────────────────

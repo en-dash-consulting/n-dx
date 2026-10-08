@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, rm, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
@@ -241,5 +242,61 @@ describe("CLI timeout API routes", () => {
       const readData = await readRes.json();
       expect(readData.timeoutMs).toBe(0);
     });
+  });
+});
+
+describe("CLI timeout API routes on the .ndx/ layout", () => {
+  let tmpDir: string;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "cli-timeout-api-ndx-"));
+    const svDir = join(tmpDir, ".ndx", "sourcevision");
+    const rexDir = join(tmpDir, ".ndx", "rex");
+    await mkdir(svDir, { recursive: true });
+    await mkdir(rexDir, { recursive: true });
+    ({ server, port } = await startTestServer({ projectDir: tmpDir, svDir, rexDir, dev: false }));
+  });
+
+  afterEach(async () => {
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("reads overrides from .ndx/config.json and names that file in the response", async () => {
+    await writeFile(join(tmpDir, ".ndx", "config.json"), JSON.stringify({ cli: { timeoutMs: 45_000 } }), "utf-8");
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ cli: { timeoutMs: 1 } }), "utf-8");
+
+    const data = await (await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`)).json();
+    expect(data.timeoutMs).toBe(45_000);
+    expect(data.configFile).toBe(".ndx/config.json");
+  });
+
+  it("writes overrides to .ndx/config.json and never creates a root .n-dx.json", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timeoutMs: 90_000 }),
+    });
+    expect(res.status).toBe(200);
+
+    const written = JSON.parse(await readFile(join(tmpDir, ".ndx", "config.json"), "utf-8"));
+    expect(written.cli.timeoutMs).toBe(90_000);
+    expect(existsSync(join(tmpDir, ".n-dx.json"))).toBe(false);
+  });
+});
+
+describe("CLI timeout API routes on the legacy layout name the root file", () => {
+  it("reports .n-dx.json as the config file", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "cli-timeout-api-legacy-"));
+    const { server, port } = await startTestServer({ projectDir: tmpDir, svDir: join(tmpDir, ".sourcevision"), rexDir: join(tmpDir, ".rex"), dev: false });
+    try {
+      const data = await (await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`)).json();
+      expect(data.configFile).toBe(".n-dx.json");
+    } finally {
+      await closeRouteTestServer(server);
+      await rm(tmpDir, { recursive: true, force: true });
+    }
   });
 });

@@ -474,3 +474,21 @@ describe("resolveTestCommand", () => {
     });
   });
 });
+
+describe("resolveTestCommand on the .ndx/ layout", () => {
+  it("reads hench.fullTestCommand from .ndx/config.json", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "test-resolver-ndx-"));
+    try {
+      const ndxHenchDir = join(dir, ".ndx", "hench");
+      await mkdir(ndxHenchDir, { recursive: true });
+      await writeFile(join(dir, ".ndx", "config.json"), JSON.stringify({ hench: { fullTestCommand: "pnpm test:all" } }));
+      await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ hench: { fullTestCommand: "npm run legacy" } }));
+
+      const result = await resolveTestCommand({ projectDir: dir, henchDir: ndxHenchDir, config: {} });
+      expect(result.command).toBe("pnpm test:all");
+      expect(result.source).toBe("project-config");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

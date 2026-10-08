@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadLLMConfig } from "../../src/llm-config.js";
@@ -358,5 +358,40 @@ describe("loadLLMConfig", () => {
     const cfg = await loadLLMConfig(tmpDir);
     expect(cfg.reviewModel).toBeUndefined();
     expect(cfg.claude).toBeUndefined();
+  });
+});
+
+describe("loadLLMConfig on the .ndx/ layout", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "llm-client-config-ndx-"));
+    await mkdir(join(tmpDir, ".ndx"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("reads .ndx/config.json with .ndx/config.local.json winning, not a root .n-dx.json", async () => {
+    // A `.ndx/` directory selects the new layout, where the resolver places
+    // both config files inside the container; a root-level .n-dx.json is
+    // not this project's config any more and must not be read.
+    await writeFile(
+      join(tmpDir, ".ndx", "config.json"),
+      JSON.stringify({ llm: { vendor: "codex", codex: { cli_path: "/opt/codex-shared" }, claude: { cli_path: "/opt/claude" } } }),
+      "utf-8",
+    );
+    await writeFile(
+      join(tmpDir, ".ndx", "config.local.json"),
+      JSON.stringify({ llm: { codex: { cli_path: "/opt/codex" } } }),
+      "utf-8",
+    );
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }), "utf-8");
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.vendor).toBe("codex");
+    expect(cfg.codex?.cli_path).toBe("/opt/codex");
+    expect(cfg.claude?.cli_path).toBe("/opt/claude");
   });
 });

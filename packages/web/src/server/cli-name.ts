@@ -8,15 +8,15 @@
  */
 
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { resolveLayout } from "@n-dx/llm-client";
 
 /** Fallback command name when no cli.name is configured. */
 export const DEFAULT_CLI_NAME = "n-dx";
 
-/** Read the resolved CLI command name (cli.name in .n-dx.json, default n-dx). */
+/** Read the resolved CLI command name (`cli.name` in the project config, default n-dx). */
 export function readCliName(projectDir: string): string {
   try {
-    const raw = readFileSync(join(projectDir, ".n-dx.json"), "utf-8");
+    const raw = readFileSync(resolveLayout(projectDir).configFile, "utf-8");
     const config = JSON.parse(raw) as { cli?: { name?: unknown } };
     const name = config.cli?.name;
     return typeof name === "string" && name.length > 0 ? name : DEFAULT_CLI_NAME;

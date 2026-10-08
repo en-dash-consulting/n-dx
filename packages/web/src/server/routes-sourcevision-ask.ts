@@ -84,6 +84,7 @@ import {
   deepMerge,
   loadLLMConfig,
   resolveTaskModel,
+  resolveLayout,
 } from "@n-dx/llm-client";
 import type {
   CompletionRequest,
@@ -139,8 +140,6 @@ const MAX_SEED_TEXT_CHARS = 8_000;
  */
 const MAX_SEED_FILES = 100;
 
-const NDX_CONFIG = ".n-dx.json";
-const NDX_LOCAL_CONFIG = ".n-dx.local.json";
 
 /**
  * How the PRD is named in `contextSources`.
@@ -298,8 +297,9 @@ function readJsonFile(path: string): Record<string, unknown> {
  * so a per-machine override behaves here the way it does everywhere else.
  */
 export function resolveAskTimeoutMs(projectDir: string): number {
-  const shared = readJsonFile(join(projectDir, NDX_CONFIG));
-  const local = readJsonFile(join(projectDir, NDX_LOCAL_CONFIG));
+  const { configFile, localConfigFile } = resolveLayout(projectDir);
+  const shared = readJsonFile(configFile);
+  const local = readJsonFile(localConfigFile);
   const merged = Object.keys(local).length > 0 ? deepMerge(shared, local) : shared;
 
   const sourcevision = merged["sourcevision"];

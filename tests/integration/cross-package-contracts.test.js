@@ -842,7 +842,10 @@ describe("gateway export auto-detection", () => {
         // `relativeToRoot` comes with it because hench init writes `.gitignore`
         // lines naming its own directory, and a name spelled by hand is the
         // same copy by another route.
-        "resolveLayout", "detectLayoutMode", "relativeToRoot",
+        // `projectRootOf` recovers the project root from a state directory
+        // (`.ndx/hench` → the project, not the container), which is the
+        // resolver's knowledge of its own layout.
+        "resolveLayout", "detectLayoutMode", "relativeToRoot", "projectRootOf",
         // Available-memory reading. One reading for hench, the dashboard and
         // the hub admission floor, so they cannot disagree about the machine.
         "readAvailableMemory", "getAvailableMemory", "createAvailableMemoryReader"],
