@@ -2,8 +2,8 @@
  * Rex schema v2 — the product layer and the change layer.
  *
  * Types and Zod schemas for every v2 node, field and stored file. Wired to
- * nothing yet: only `store/state-writer.ts` (itself unwired) imports this
- * file until the v2 store lands (enforced by tests/unit/schema/v2.test.ts). Validation *rules*
+ * nothing yet: only the other unwired v2 modules import this file until the
+ * v2 store lands (enforced by tests/unit/schema/v2.test.ts). Validation *rules*
  * (cross-node checks such as "every change amends or touches something")
  * are pure functions in `./v2-rules.ts`; this file only fixes shapes.
  *
@@ -31,7 +31,7 @@
  * |   dependsOn                                      |   (product nodes)                            |
  * |                                                  | appliedAt, appliedAmendsHash, shippedIn,     |
  * | constraint: statement, requirements, appliesTo   |   prs, issues (changes)                      |
- * |                                                  | commits, links*                              |
+ * |                                                  | links*                                       |
  * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
  * |   spike, fix, priority, requirements, loe,       | lastModified, lastModifiedBy                 |
  * |   loeRationale, loeConfidence, effort*,          |                                              |
@@ -46,9 +46,11 @@
  * writer's fields survive an older reader's save.
  *
  * Derived values (capability health, openAmendments, "bound by" edges,
- * change kind) are computed and cached outside the tree; they have no field
- * here on purpose. So is the commit a change was applied in: it comes from the
- * change's `N-DX-Item` trailer, as the change's other commits do.
+ * change kind, a change's commits) are computed and cached outside the tree;
+ * they have no field here on purpose. Intent status and health of product
+ * nodes are computed by `core/product-status.ts`. A change's commits come from its
+ * `N-DX-Item` trailers (`core/change-commits.ts`): a rebase or squash rewrites
+ * a SHA but keeps the trailer. So does the commit a change was applied in.
  *
  * ## Spec hash
  *
@@ -73,9 +75,8 @@ import {
   type Requirement,
   type ResolutionType,
   type ActiveInterval,
-  type CommitAttribution,
 } from "./v1.js";
-import { RequirementSchema, CommitAttributionSchema } from "./validate.js";
+import { RequirementSchema } from "./validate.js";
 
 // ── Schema stamp ─────────────────────────────────────────────────
 
@@ -343,9 +344,14 @@ export interface ChangeIntent extends BaseIntent, EffortIntent {
   plannedRelease?: string;
   spike?: boolean;
   /**
-   * The change repairs the nodes it touches without amending them. A product
-   * node reads defective while an open change with `fix: true` targets it.
-   * Never also a spike (`fix-not-spike`).
+   * Marks the change as a fix: it repairs the nodes it targets rather than
+   * adding or removing any. This field is how an open change is identified as
+   * a fix; nothing is inferred from checks or history. While the change is
+   * open, every product node it amends or touches reads health `defective`
+   * (`core/product-status.ts`), and its kind is `fix` unless it has an
+   * `added` or `removed` amendment (`core/product-edges.ts`).
+   * Never also a spike (`fix-not-spike`), and never carries an `added` or
+   * `removed` amendment (`fix-not-additive`).
    */
   fix?: boolean;
   priority?: Priority;
@@ -538,7 +544,6 @@ export interface ItemState {
   prs?: string[];
   /** Changes: issue references (full URLs or tracker keys). */
   issues?: string[];
-  commits?: CommitAttribution[];
   /** Reserved for the tracker bridge; no shape yet. */
   links?: unknown;
   /** Changes and tasks. "Name <email>" identity. */
@@ -575,7 +580,6 @@ export const ItemStateSchema = z
     shippedIn: z.string().optional(),
     prs: z.array(WorkRefSchema).optional(),
     issues: z.array(WorkRefSchema).optional(),
-    commits: z.array(CommitAttributionSchema).optional(),
     links: ReservedSchema,
     assignee: z.string().optional(),
     ready: z.boolean().optional(),
@@ -595,6 +599,7 @@ export const ItemStateSchema = z
 export const RETIRED_STATE_FIELDS: Readonly<Record<string, string>> = {
   appliedIn: "a change is applied when appliedAt is set, and its apply commit comes from its N-DX-Item trailer",
   specReviewed: "review is recorded as reviewedHash, the spec hash a person reviewed, so an edit after review reads unreviewed",
+  commits: "a change's commits are computed from its N-DX-Item trailers, because a rebase or squash rewrites stored SHAs",
 };
 
 // ── Stored files ─────────────────────────────────────────────────
