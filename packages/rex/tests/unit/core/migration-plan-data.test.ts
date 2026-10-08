@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../src/schema/v1.js";
+import { specHash } from "../../../src/schema/v2-rules.js";
+import type { CapabilitySpecDraft } from "../../../src/core/capability-spec.js";
 import { classifyV1Tree } from "../../../src/core/migration-plan.js";
 import {
   buildPlanData,
+  type PlanDataOptions,
   dropCorrupt,
   legacyLoeRationale,
 } from "../../../src/core/migration-plan-data.js";
@@ -13,7 +16,8 @@ function item(level: ItemLevel, title: string, extra: Partial<PRDItem> = {}, chi
   return { id: `${level}-${seq}`, level, title, status, children, ...extra };
 }
 
-const dataFor = (tree: PRDItem[], options = {}) => buildPlanData(tree, classifyV1Tree(tree), options);
+const CUT = "2026-10-08T00:00:00Z";
+const dataFor = (tree: PRDItem[], options: Partial<PlanDataOptions> = {}) => buildPlanData(tree, classifyV1Tree(tree), { cutAt: CUT, ...options });
 
 describe("criteria ids and aliases", () => {
   it("numbers criteria c1..cn in source order", () => {
@@ -53,7 +57,7 @@ describe("shippedIn backfill", () => {
 
   it("leaves an item completed after the last tag unshipped", () => {
     const t = item("task", "Late", { completedAt: "2026-10-01T00:00:00Z" });
-    expect(dataFor([t], { releases }).items[t.id]).toBeUndefined();
+    expect(dataFor([t], { releases }).items[t.id]!.shippedIn).toBeUndefined();
   });
 });
 
@@ -75,7 +79,7 @@ describe("data problem flags", () => {
 
   it("does not flag an unrelated item", () => {
     const t = item("task", "Clean", { tags: ["web"], description: "Does a thing." });
-    expect(dataFor([t]).items[t.id]).toBeUndefined();
+    expect(dataFor([t]).items[t.id]!.flags).toEqual([]);
   });
 });
 
@@ -97,7 +101,52 @@ describe("legacy loe", () => {
 
   it("ignores a numeric loe", () => {
     const t = item("task", "Sized", { loe: 2 });
-    expect(dataFor([t]).items[t.id]).toBeUndefined();
+    expect(dataFor([t]).items[t.id]!.legacyLoe).toBeUndefined();
+  });
+});
+
+describe("appliedAt and reviewedHash", () => {
+  const tree = (extra: Partial<PRDItem>, status: ItemStatus = "completed") => {
+    const task = item("task", "Do it", extra, [], status);
+    const feature = item("feature", "Capability", {}, [task], status);
+    return { task, feature, items: [item("epic", "Area", {}, [feature])] };
+  };
+
+  it("stamps an applied change with its completion time", () => {
+    const { feature, items } = tree({ completedAt: "2026-09-01T00:00:00Z" });
+    const plan = classifyV1Tree(items);
+    const applied = plan.entries.filter((e) => e.target === "change" && e.applied);
+    expect(applied.length).toBeGreaterThan(0);
+    const data = buildPlanData(items, plan, { cutAt: CUT });
+    for (const e of applied) {
+      const expected = e.id === feature.id ? CUT : "2026-09-01T00:00:00Z";
+      expect(data.items[e.id]!.appliedAt).toBe(expected);
+    }
+  });
+
+  it("does not stamp an unfinished change", () => {
+    const { items } = tree({}, "pending");
+    const data = dataFor(items);
+    expect(Object.values(data.items).some((d) => d.appliedAt !== undefined)).toBe(false);
+  });
+
+  it("stamps reviewedHash only on listed capabilities, from the drafted spec", () => {
+    const { items } = tree({});
+    const plan = classifyV1Tree(items);
+    const caps = plan.entries.filter((e) => e.target === "capability");
+    expect(caps.length).toBeGreaterThan(0);
+    const specs = caps.map((c) => ({ capability: c.id, statement: "It works.", criteria: [{ id: "c1", text: "When x, y." }] }) as unknown as CapabilitySpecDraft);
+    const [first, ...rest] = caps;
+    const data = buildPlanData(items, plan, { cutAt: CUT, specs, reviewed: [first!.id] });
+    expect(data.items[first!.id]!.reviewedHash).toBe(specHash({ statement: "It works.", criteria: [{ id: "c1", text: "When x, y." }] }));
+    for (const c of rest) expect(data.items[c.id]?.reviewedHash).toBeUndefined();
+  });
+
+  it("gives a reviewed capability without a draft no hash", () => {
+    const { items } = tree({});
+    const plan = classifyV1Tree(items);
+    const cap = plan.entries.find((e) => e.target === "capability")!;
+    expect(buildPlanData(items, plan, { cutAt: CUT, reviewed: [cap.id] }).items[cap.id]?.reviewedHash).toBeUndefined();
   });
 });
 

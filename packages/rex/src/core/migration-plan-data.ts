@@ -15,6 +15,13 @@
  *   titles, a legacy `parentId` field, a stale description.
  * - Legacy `loe` buckets (`xs|s|m|l|xl`): no numeric loe, the bucket kept as
  *   text at the start of `loeRationale`. Buckets are never mapped to weeks.
+ * - `appliedAt` on each change the plan marks applied (completed in v1): its
+ *   `completedAt`, else the plan's cut time. Without it the change would read
+ *   as changing forever. `appliedIn` and `specReviewed` are retired and never
+ *   written.
+ * - `reviewedHash` on each capability the caller lists as reviewed: the
+ *   `specHash` of its drafted spec, so it reads reviewed until the spec is
+ *   edited. Unlisted nodes stay unreviewed.
  * - The literal "[object Object]" in `recommendationMeta` or an item's `log`
  *   (written by a pre-squash build; unrecoverable) is dropped and counted.
  *
@@ -23,6 +30,8 @@
 
 import type { PRDItem } from "../schema/v1.js";
 import type { Criterion } from "../schema/v2.js";
+import { specHash } from "../schema/v2-rules.js";
+import type { CapabilitySpecDraft } from "./capability-spec.js";
 import type { MigrationPlan } from "./migration-plan.js";
 
 export const CORRUPT_VALUE = "[object Object]";
@@ -37,6 +46,12 @@ export interface ReleaseTag {
 }
 
 export interface PlanDataOptions {
+  /** ISO time the plan is cut: the `appliedAt` of an applied change with no `completedAt`. Required, so the plan stays deterministic. */
+  cutAt: string;
+  /** Drafted specs (`draftCapabilitySpecs`), the source of each `reviewedHash`. */
+  specs?: readonly CapabilitySpecDraft[];
+  /** v1 ids of capabilities the plan marks reviewed. An id with no draft in `specs` gets no hash. */
+  reviewed?: readonly string[];
   /** Release tags; order does not matter. */
   releases?: readonly ReleaseTag[];
   /** Release version of the merged PR that delivered an item (v1 id): beats the tag backfill. */
@@ -55,6 +70,10 @@ export interface ItemPlanData {
   id: string;
   criteria?: Criterion[];
   aliases?: string[];
+  /** Applied changes only: ISO time the change counts as applied. */
+  appliedAt?: string;
+  /** Reviewed capabilities only: `specHash` of the migrated spec. */
+  reviewedHash?: string;
   shippedIn?: { version: string; source: "pr-merge" | "release-tag" };
   flags: DataFlag[];
   /** Present when `loe` was a legacy bucket: drop the numeric loe, set this rationale. */
@@ -147,8 +166,10 @@ function firstReleaseAfter(completedAt: string, releases: readonly ReleaseTag[])
 // ── Build ────────────────────────────────────────────────────────
 
 /** Data for every item in the tree. Same tree, plan and options always give the same result. */
-export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, options: PlanDataOptions = {}): PlanData {
-  const { releases = [], prMerges = {} } = options;
+export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, options: PlanDataOptions): PlanData {
+  const { cutAt, releases = [], prMerges = {} } = options;
+  const reviewed = new Set(options.reviewed ?? []);
+  const specById = new Map((options.specs ?? []).map((d) => [d.capability, d]));
   const result: PlanData = {
     items: {},
     flagCounts: { "criteria-in-tags": 0, "duplicate-title": 0, "legacy-parent-id": 0, "stale-description": 0 },
@@ -189,6 +210,10 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
         data.shippedIn = { version: prMerges[item.id]!, source: "pr-merge" };
       }
 
+      if (entry?.target === "change" && entry.applied) data.appliedAt = item.completedAt ?? cutAt;
+      const draft = specById.get(item.id);
+      if (entry?.target === "capability" && reviewed.has(item.id) && draft) data.reviewedHash = specHash(draft);
+
       if (criteriaInTags(item)) data.flags.push("criteria-in-tags");
       if ((titles.get(item.title.trim().toLowerCase()) ?? 0) > 1) data.flags.push("duplicate-title");
       if ("parentId" in item) data.flags.push("legacy-parent-id");
@@ -209,7 +234,7 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
       const existing = result.items[item.id];
       const merged = existing ? { ...data, aliases: existing.aliases } : data;
       const interesting =
-        merged.criteria || merged.aliases || merged.shippedIn || merged.flags.length || merged.legacyLoe || merged.droppedMeta || merged.droppedLog;
+        merged.criteria || merged.aliases || merged.appliedAt || merged.reviewedHash || merged.shippedIn || merged.flags.length || merged.legacyLoe || merged.droppedMeta || merged.droppedLog;
       if (interesting) result.items[item.id] = merged;
       else delete result.items[item.id];
 
