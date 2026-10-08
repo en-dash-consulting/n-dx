@@ -104,6 +104,17 @@ describe("tree-sitter runner", () => {
     expect(result.captures.structure[0].end).toEqual({ line: 9, column: 1 });
   });
 
+  it("counts columns in UTF-16 code units, as JavaScript strings do", async (ctx) => {
+    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    const pack = makePack([{ name: "fields", scm: "(variable_declarator name: (identifier) @field)" }]);
+    const source = 'class A { String s = "é😀"; int x; }';
+    const result = await runner.parseSource({ grammarPath: JAVA_WASM, pack }, "A.java", source);
+
+    if (result.status !== "parsed") throw new Error("expected a parse");
+    const x = result.captures.fields.find((c) => c.text === "x");
+    expect(x?.start).toEqual({ line: 1, column: source.indexOf("x;") });
+  });
+
   it("reports ERROR nodes", async (ctx) => {
     if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
     const result = await runner.parseSource(target, "Broken.java", "class A { void f() { @@ ## } }");
@@ -180,6 +191,30 @@ describe("tree-sitter runner", () => {
     }
 
     await expect(runner.parseSource(target, "b.java", SOURCE)).rejects.toThrow(/after dispose/);
+  });
+
+  it("rejects a parse still compiling its pack when dispose() runs", async (ctx) => {
+    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    const freed = vi.spyOn(Query.prototype, "delete");
+    try {
+      const pending = runner.parseSource(target, "a.java", SOURCE);
+      runner.dispose();
+
+      await expect(pending).rejects.toThrow(/after dispose/);
+      // Nothing was compiled after dispose, so nothing is left unfreed.
+      expect(freed).not.toHaveBeenCalled();
+    } finally {
+      freed.mockRestore();
+    }
+  });
+
+  it("rejects a parse in flight when dispose() frees the parser", async (ctx) => {
+    if (!existsSync(JAVA_WASM)) ctx.skip(NOT_BUILT);
+    await runner.parseSource(target, "a.java", SOURCE);
+    const pending = runner.parseSource(target, "b.java", SOURCE);
+    runner.dispose();
+
+    await expect(pending).rejects.toThrow(/after dispose/);
   });
 
   it("fails loudly on a query that does not compile", async (ctx) => {
