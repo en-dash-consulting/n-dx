@@ -170,8 +170,8 @@ describe("computeLandings", () => {
     const tree = {
       product: [],
       changes: [
-        node({ id: MERGED, type: "change", children: [node({ id: MERGED_TASK, type: "task" })] }),
-        node({ id: FAST, type: "change", aliases: [SQUASHED] }),
+        node({ id: MERGED, type: "change", status: "completed", children: [node({ id: MERGED_TASK, type: "task" })] }),
+        node({ id: FAST, type: "change", status: "completed", aliases: [SQUASHED] }),
         node({ id: REBASED, type: "change", status: "cancelled" }),
       ],
     } as unknown as V2Tree;
@@ -180,6 +180,38 @@ describe("computeLandings", () => {
     expect(Object.keys(landings).sort()).toEqual([MERGED, FAST].sort());
     expect(landings[MERGED]).toMatchObject({ landed: true, commit: merge });
     expect(landings[FAST]).toMatchObject({ landed: false });
+  });
+
+  it("does not land an open change whose first task is merged and tagged and second is not", async () => {
+    git("checkout", "-q", "-b", "feature");
+    await commit("a.txt", `Task one${trailer(MERGED_TASK)}`);
+    git("checkout", "-q", "main");
+    git("merge", "--no-ff", "-q", "-m", "merge", "feature");
+    git("tag", "v0.2.0");
+    git("checkout", "-q", "-b", "unmerged");
+    await commit("b.txt", `Task two${trailer(FAST)}`);
+    git("checkout", "-q", "main");
+
+    const node = (fields: Record<string, unknown>) => ({ title: String(fields.id), slug: String(fields.id), ...fields });
+    const task = (id: string) => node({ id, type: "task" });
+    const tree = {
+      product: [],
+      changes: [node({ id: MERGED, type: "change", status: "in_progress", children: [task(MERGED_TASK), task(FAST)] })],
+    } as unknown as V2Tree;
+
+    const landing = (await computeLandings(tree, options()))[MERGED];
+    expect(landing).toEqual({ landed: false, reason: "change still open" });
+    expect(await resolveShippedIn({}, landing, repo)).toBeUndefined();
+  });
+
+  it("lands an open change that was applied", async () => {
+    git("checkout", "-q", "-b", "feature");
+    await commit("a.txt", `Add a${trailer(MERGED)}`);
+    git("checkout", "-q", "main");
+    git("merge", "--no-ff", "-q", "-m", "merge", "feature");
+    const node = { id: MERGED, type: "change", title: "t", slug: "t", appliedAt: "2026-10-01T00:00:00Z" };
+    const tree = { product: [], changes: [node] } as unknown as V2Tree;
+    expect((await computeLandings(tree, options()))[MERGED]).toMatchObject({ landed: true });
   });
 });
 

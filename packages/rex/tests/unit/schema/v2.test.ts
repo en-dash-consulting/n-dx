@@ -428,10 +428,10 @@ describe("isolation", () => {
   it("no runtime module imports the v2 modules yet", () => {
     const srcRoot = join(import.meta.dirname, "../../../src");
     // The v2 modules (schema, rules, state writer, dual-read loader, tree
-    // writer) may import each other; nothing else may import them until the
+    // writer, computed edges, product status, change landing) may import each other; nothing else may import them until the
     // v2 store wires them in.
     const v2Files = new Set(
-      ["schema/v2.ts", "schema/v2-rules.ts", "store/state-writer.ts", "store/prd-model-reader.ts", "store/prd-model-writer.ts", "core/product-edges.ts", "core/product-status.ts"].map(
+      ["schema/v2.ts", "schema/v2-rules.ts", "store/state-writer.ts", "store/prd-model-reader.ts", "store/prd-model-writer.ts", "core/product-edges.ts", "core/product-status.ts", "core/change-landing.ts"].map(
         (f) => join(srcRoot, f),
       ),
     );

@@ -49,6 +49,7 @@ import {
   readJsonCache,
   resolveMainRef,
   type ChangeCommitsOptions,
+  type TrailerCommit,
 } from "./change-commits.js";
 import { trailerIds } from "./product-edges.js";
 
@@ -111,19 +112,47 @@ export async function scanLandings(repoDir: string, tip: string, commits: Readon
   return out;
 }
 
-async function loadLandings(options: ChangeCommitsOptions): Promise<Record<string, Landed>> {
+/** What landing depends on besides the change itself: loaded once per call. */
+interface LandingInputs {
+  ref: string;
+  trailerCommits: TrailerCommit[];
+  landings: Record<string, Landed>;
+}
+
+async function loadLandingInputs(options: ChangeCommitsOptions): Promise<LandingInputs> {
   const { ref, tip } = await resolveMainRef(options.repoDir, options.ref);
   await assertFullHistory(options.repoDir);
+  const trailerCommits = await loadTrailerCommits({ ...options, ref });
   const path = join(options.cacheDir, CHANGE_LANDING_CACHE_FILENAME);
   const cached = await readJsonCache<LandingCache>(path, (c) => typeof c.tip === "string" && typeof c.landed === "object" && c.landed !== null);
-  if (cached && cached.ref === ref && cached.tip === tip) return cached.landed;
+  if (cached && cached.ref === ref && cached.tip === tip) return { ref, trailerCommits, landings: cached.landed };
 
-  const trailerCommits = await loadTrailerCommits({ ...options, ref });
-  const landed = Object.fromEntries(await scanLandings(options.repoDir, tip, new Set(trailerCommits.map((c) => c.hash))));
+  const landings = Object.fromEntries(await scanLandings(options.repoDir, tip, new Set(trailerCommits.map((c) => c.hash))));
   await mkdir(options.cacheDir, { recursive: true });
-  const cache: LandingCache = { version: CACHE_VERSION, ref, tip, landed };
+  const cache: LandingCache = { version: CACHE_VERSION, ref, tip, landed: landings };
   await atomicWrite(path, JSON.stringify(cache) + "\n");
-  return landed;
+  return { ref, trailerCommits, landings };
+}
+
+/** Where a set of item ids landed, from already-loaded inputs. Pure. */
+function landingFrom(itemIds: Iterable<string>, inputs: LandingInputs): ChangeLanding {
+  const wanted = new Set(itemIds);
+  const commits = inputs.trailerCommits.filter((c) => c.items.some((id) => wanted.has(id)));
+  if (commits.length === 0) {
+    return {
+      landed: false,
+      reason:
+        `no commit naming this change or its tasks is reachable from ${inputs.ref}: ` +
+        "its branch is unmerged, or was squash- or rebase-merged without the N-DX-Item trailer",
+    };
+  }
+  let latest: { hash: string; landed: Landed } | undefined;
+  for (const { hash } of commits) {
+    const landed = inputs.landings[hash];
+    if (landed && (latest === undefined || landed.position > latest.landed.position)) latest = { hash, landed };
+  }
+  if (!latest) throw new Error(`commit-landing cache has no entry for ${commits[0].hash}; delete the cache directory and retry`);
+  return { landed: true, commit: latest.landed.commit, lastCommit: latest.hash };
 }
 
 /**
@@ -132,37 +161,25 @@ async function loadLandings(options: ChangeCommitsOptions): Promise<Record<strin
  * `computeChangeCommits`: a truncated history would read as not landed.
  */
 export async function computeLanding(itemIds: Iterable<string>, options: ChangeCommitsOptions): Promise<ChangeLanding> {
-  const wanted = new Set(itemIds);
-  const { ref } = await resolveMainRef(options.repoDir, options.ref);
-  const commits = (await loadTrailerCommits({ ...options, ref })).filter((c) => c.items.some((id) => wanted.has(id)));
-  if (commits.length === 0) {
-    return {
-      landed: false,
-      reason:
-        `no commit naming this change or its tasks is reachable from ${ref}: ` +
-        "its branch is unmerged, or was squash- or rebase-merged without the N-DX-Item trailer",
-    };
-  }
-  const landings = await loadLandings({ ...options, ref });
-  let latest: { hash: string; landed: Landed } | undefined;
-  for (const { hash } of commits) {
-    const landed = landings[hash];
-    if (landed && (latest === undefined || landed.position > latest.landed.position)) latest = { hash, landed };
-  }
-  if (!latest) throw new Error(`commit-landing cache has no entry for ${commits[0].hash}; delete ${options.cacheDir} and retry`);
-  return { landed: true, commit: latest.landed.commit, lastCommit: latest.hash };
+  return landingFrom(itemIds, await loadLandingInputs(options));
 }
+
+const OPEN_CHANGE: ChangeLanding = { landed: false, reason: "change still open" };
 
 /**
  * The landing of every live change (cancelled and retired ones will never
  * land), by change id. A change's commits are those naming it, its tasks or
- * subtasks, or an alias of any.
+ * subtasks, or an alias of any. A change that is neither completed nor applied
+ * is still open and has not landed, whatever its commits show: half-merged work
+ * has not shipped. The ref, shallow check and both caches load once per call.
  */
 export async function computeLandings(tree: V2Tree, options: ChangeCommitsOptions): Promise<Record<string, ChangeLanding>> {
+  const inputs = await loadLandingInputs(options);
   const out: Record<string, ChangeLanding> = {};
   for (const { node, retired } of indexTree(tree, { includeTombstones: true }).entries) {
     if (node.type !== "change" || retired || node.status === "cancelled") continue;
-    out[node.id] = await computeLanding(trailerIds(node), options);
+    const finished = node.status === "completed" || node.appliedAt !== undefined;
+    out[node.id] = finished ? landingFrom(trailerIds(node), inputs) : OPEN_CHANGE;
   }
   return out;
 }
