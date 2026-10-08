@@ -22,12 +22,12 @@
  * The plan also proposes the area list (flagging titles that are not
  * job-shaped, and areas that hold no product node) and the constraints.
  *
- * @module core/migration-plan
+ * @module migrations/v1-to-v2/migration-plan
  */
 
-import type { ItemLevel, ItemStatus, PRDItem } from "../schema/v1.js";
-import type { NodeType } from "../schema/v2.js";
-import { placementRelation, rankPlacementCandidates, type PlacementNode, type PlacementRelation } from "./placement.js";
+import type { ItemLevel, ItemStatus, PRDItem } from "../../schema/v1.js";
+import type { NodeType } from "../../schema/v2.js";
+import { placementRelation, rankPlacementCandidates, type PlacementNode, type PlacementRelation } from "../../core/placement.js";
 
 // ── Plan shape ───────────────────────────────────────────────────
 

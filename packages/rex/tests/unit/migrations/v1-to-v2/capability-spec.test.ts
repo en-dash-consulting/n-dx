@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import type { ItemLevel, ItemStatus, PRDItem } from "../../../src/schema/v1.js";
-import { RequirementSchema } from "../../../src/schema/validate.js";
-import { CapabilityIntentSchema } from "../../../src/schema/v2.js";
-import { classifyV1Tree } from "../../../src/core/migration-plan.js";
-import { draftCapabilitySpecs, toEars, type CapabilitySpecDraft } from "../../../src/core/capability-spec.js";
+import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
+import { RequirementSchema } from "../../../../src/schema/validate.js";
+import { CapabilityIntentSchema } from "../../../../src/schema/v2.js";
+import { classifyV1Tree } from "../../../../src/migrations/v1-to-v2/migration-plan.js";
+import { draftCapabilitySpecs, toEars, type CapabilitySpecDraft } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
 
 let seq = 0;
 function item(level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {

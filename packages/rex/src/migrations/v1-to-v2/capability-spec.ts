@@ -12,7 +12,7 @@
  *   completed descendants). Unfinished work describes what is not built, so it
  *   contributes nothing;
  * - an **automated requirement** for each criterion whose words match test
- *   files the way `verify_criteria` matches them (`./keywords.ts`), held to a
+ *   files the way `verify_criteria` matches them (`core/keywords.ts`), held to a
  *   stricter score so one shared word does not link a test.
  *
  * Code evidence comes from sourcevision, which rex may not import; the caller
@@ -20,13 +20,13 @@
  * the plan leaves `reviewedHash` unset, so the spec reads unreviewed until a
  * person reviews it.
  *
- * @module core/capability-spec
+ * @module migrations/v1-to-v2/capability-spec
  */
 
 import { posix } from "node:path";
-import type { PRDItem, Requirement } from "../schema/v1.js";
-import type { Criterion } from "../schema/v2.js";
-import { extractKeywords, scoreMatch } from "./keywords.js";
+import type { PRDItem, Requirement } from "../../schema/v1.js";
+import type { Criterion } from "../../schema/v2.js";
+import { extractKeywords, scoreMatch } from "../../core/keywords.js";
 import { opensWithWorkVerb, type MigrationPlan } from "./migration-plan.js";
 
 export interface SpecCriterion extends Criterion {

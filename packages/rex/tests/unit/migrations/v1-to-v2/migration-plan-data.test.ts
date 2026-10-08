@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import type { ItemLevel, ItemStatus, PRDItem } from "../../../src/schema/v1.js";
-import { specHash } from "../../../src/schema/v2-rules.js";
-import type { CapabilitySpecDraft } from "../../../src/core/capability-spec.js";
-import { classifyV1Tree } from "../../../src/core/migration-plan.js";
+import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
+import { specHash } from "../../../../src/schema/v2-rules.js";
+import type { CapabilitySpecDraft } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
+import { classifyV1Tree } from "../../../../src/migrations/v1-to-v2/migration-plan.js";
 import {
   buildPlanData,
   type PlanDataOptions,
   dropCorrupt,
   legacyLoeRationale,
-} from "../../../src/core/migration-plan-data.js";
+} from "../../../../src/migrations/v1-to-v2/migration-plan-data.js";
 
 let seq = 0;
 function item(level: ItemLevel, title: string, extra: Partial<PRDItem> = {}, children: PRDItem[] = [], status: ItemStatus = "completed"): PRDItem {

@@ -25,12 +25,12 @@
  * - The literal "[object Object]" in `recommendationMeta` or an item's `log`
  *   (written by a pre-squash build; unrecoverable) is dropped and counted.
  *
- * @module core/migration-plan-data
+ * @module migrations/v1-to-v2/migration-plan-data
  */
 
-import type { PRDItem } from "../schema/v1.js";
-import type { Criterion } from "../schema/v2.js";
-import { specHash } from "../schema/v2-rules.js";
+import type { PRDItem } from "../../schema/v1.js";
+import type { Criterion } from "../../schema/v2.js";
+import { specHash } from "../../schema/v2-rules.js";
 import type { CapabilitySpecDraft } from "./capability-spec.js";
 import type { MigrationPlan } from "./migration-plan.js";
 

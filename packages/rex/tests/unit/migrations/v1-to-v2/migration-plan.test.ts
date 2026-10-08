@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { ItemLevel, ItemStatus, PRDItem } from "../../../src/schema/v1.js";
+import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
 import {
   classifyV1Tree,
   hasWorkToken,
@@ -7,7 +7,7 @@ import {
   isJobShaped,
   releaseToken,
   type PlanEntry,
-} from "../../../src/core/migration-plan.js";
+} from "../../../../src/migrations/v1-to-v2/migration-plan.js";
 
 let seq = 0;
 function item(level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {

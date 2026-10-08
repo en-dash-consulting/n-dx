@@ -446,9 +446,9 @@ describe("isolation", () => {
         "core/change-landing.ts",
         "core/placement.ts",
         "core/placement-policy.ts",
-        "core/migration-plan.ts",
-        "core/capability-spec.ts",
-        "core/migration-plan-data.ts",
+        "migrations/v1-to-v2/migration-plan.ts",
+        "migrations/v1-to-v2/capability-spec.ts",
+        "migrations/v1-to-v2/migration-plan-data.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),
