@@ -1,0 +1,22 @@
+---
+id: "1596039e-ee3b-4708-b011-d691a08024aa"
+level: "task"
+title: "Read dependencies and versions from Gradle builds"
+status: "pending"
+priority: "medium"
+tags:
+  - "language-packs"
+  - "phase-2"
+  - "sourcevision"
+  - "java"
+source: "roadmap"
+acceptanceCriteria:
+  - "The version catalog is read exactly and libs.* references resolve through it"
+  - "Plugins, string dependency coordinates and the Java toolchain version are read from Groovy and Kotlin DSL build scripts"
+  - "Script-derived values are marked best-effort and computed values are left unresolved"
+  - "The Spring Boot version is reported when the plugin or catalog declares it"
+  - "Fixture goldens cover Groovy, Kotlin DSL, a version catalog and a computed version"
+description: "Extend the module reader for Gradle without running Gradle. Read gradle/libs.versions.toml exactly (versions, libraries, plugins, bundles). From build.gradle and build.gradle.kts, read the plugins block (including org.springframework.boot and its version), string dependency coordinates and version-catalog references (libs.x.y) in the dependencies block, and the Java toolchain languageVersion or sourceCompatibility. Use the tree-sitter Groovy and Kotlin grammars if building them follows the same pinned-WASM path as Java; otherwise use conservative patterns.\n\nValues from build scripts are marked best-effort; values from the version catalog are exact. Anything computed at build time (variables, conditionals, buildSrc logic) stays unresolved, never guessed."
+lastModified: "2026-10-07T23:56:42.192Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
