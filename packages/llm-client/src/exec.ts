@@ -1126,9 +1126,11 @@ export interface SpawnToolOptions {
    */
   timeout?: number;
   /**
-   * Windows-only: when true, suppress the console window that Windows would
-   * otherwise create for console-subsystem executables spawned from a headless
-   * (background/daemon) process.  Ignored on non-Windows platforms.
+   * Windows-only: suppress the console window Windows would otherwise create
+   * for a console-subsystem child. Defaults to true, because a visible window
+   * per spawn means a test suite or an agent run flashes hundreds of consoles
+   * across the screen and steals keyboard focus while it does. Pass false only
+   * for a child a person is meant to see. Ignored on non-Windows platforms.
    */
   windowsHide?: boolean;
   /**
@@ -1197,7 +1199,7 @@ export function spawnTool(
       env,
       stdio: logFd === undefined ? "ignore" : ["ignore", logFd, logFd],
       detached: true,
-      windowsHide: opts.windowsHide ?? false,
+      windowsHide: opts.windowsHide ?? true,
     });
     if (logFd !== undefined) closeSync(logFd);
     child.unref();
@@ -1216,7 +1218,7 @@ export function spawnTool(
       cwd,
       env,
       stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
-      windowsHide: opts.windowsHide ?? false,
+      windowsHide: opts.windowsHide ?? true,
     });
 
     let stdout = "";
@@ -1297,7 +1299,7 @@ export function spawnManaged(
     cwd,
     env,
     stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
-    windowsHide: opts.windowsHide ?? false,
+    windowsHide: opts.windowsHide ?? true,
   });
 
   const done = new Promise<SpawnToolResult>((resolve) => {

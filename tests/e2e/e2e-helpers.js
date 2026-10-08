@@ -103,6 +103,7 @@ export function run(args, opts = {}) {
     encoding: "utf-8",
     timeout: DEFAULT_TIMEOUT,
     stdio: "pipe",
+    windowsHide: true,
     ...withSandboxedClaudeConfig(opts),
   });
 }
@@ -121,6 +122,7 @@ export function runFail(args, opts = {}) {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
+      windowsHide: true,
       ...withSandboxedClaudeConfig(opts),
     });
     throw new Error("Expected command to fail");
@@ -143,6 +145,7 @@ export function runResult(args, opts = {}) {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
+      windowsHide: true,
       ...withSandboxedClaudeConfig(opts),
     });
     return { stdout, stderr: "", code: 0 };
