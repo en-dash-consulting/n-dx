@@ -184,6 +184,30 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Grammars are a build artifact (never committed). Without them the
+      # tree-sitter runner and grammar tests skip, so a regression there goes
+      # green. Built on the Linux leg only; SV_REQUIRE_GRAMMARS=1 (set for the
+      # test steps below) turns any missing-grammar skip into a failure. The
+      # cache holds the SHA-256-verified CLI and grammar archives
+      # (build-grammars.mjs re-verifies them on use) plus the wasi-sdk the CLI
+      # fetches on first use. Key on the script, which holds every pin.
+      - name: Cache grammar build downloads
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/sourcevision/build/cache
+            ~/.cache/tree-sitter
+          key: grammars-${{ runner.os }}-${{ hashFiles('packages/sourcevision/scripts/build-grammars.mjs') }}
+
+      - name: Build tree-sitter grammars
+        if: runner.os == 'Linux'
+        run: node packages/sourcevision/scripts/build-grammars.mjs
+
+      - name: Require built grammars in tests
+        if: runner.os == 'Linux'
+        run: echo "SV_REQUIRE_GRAMMARS=1" >> "$GITHUB_ENV"
+
       - name: Check no source maps in publish
         if: runner.os == 'Linux'
         run: |
