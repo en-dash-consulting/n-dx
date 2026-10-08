@@ -29,6 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Go build reader throws when a project subdirectory is unreadable](./go-build-reader-throws-when-a-project.md) | pending |
+| [Go resolver drops the edge to a package whose files were all skipped by the parser](./go-resolver-drops-the-edge-to-a.md) | pending |
 | [Read go.mod and go.work with versions](./read-go-mod-and-go-work-with-versions.md) | completed |
-| [Resolve Go import paths to package files](./resolve-go-import-paths-to-package-files.md) | in_progress |
+| [Resolve Go import paths to package files](./resolve-go-import-paths-to-package-files.md) | completed |
 | [Switch Go import edges from the regex parser to the pack](./switch-go-import-edges-from-the-regex.md) | pending |
