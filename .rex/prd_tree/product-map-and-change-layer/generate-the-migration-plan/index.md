@@ -37,7 +37,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Migration plan counts completed work under cancelled or deleted descendants, so a live feature built only from abandoned work becomes a capability](./migration-plan-counts-completed-work.md) | pending |
 | [Migration plan emits two different criteria sets for a capability, so reviewedHash can mismatch the migrated spec](./migration-plan-emits-two-different.md) | completed |
 | [Migration plan makes cancelled or deleted v1 epics and features into standing areas and capabilities](./migration-plan-makes-cancelled-or.md) | completed |
-| [Migration plan recognises only "ndx"/"n-dx" as a product name, so another repository's "Acme 2.0" release epic becomes an area](./migration-plan-recognises-only-ndx-n.md) | pending |
+| [Migration plan recognises only "ndx"/"n-dx" as a product name, so another repository's "Acme 2.0" release epic becomes an area](./migration-plan-recognises-only-ndx-n.md) | completed |
 | [Migration plan turns a version-numbered epic that is not a release into a release umbrella (e.g. "Python 3.12 support")](./migration-plan-turns-a-version.md) | completed |
 | [Optional Jev judgments and confidence for the migration plan](./optional-jev-judgments-and-confidence.md) | pending |
 | [Plan ids, aliases, backfill and data fixes](./plan-ids-aliases-backfill-and-data-fixes.md) | completed |
