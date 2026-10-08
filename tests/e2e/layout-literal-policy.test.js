@@ -21,24 +21,24 @@
  *
  * Both were found by review, not by a test, which is what this file is for.
  *
- * ## A wall for the directories, a ratchet for the config files
+ * ## A wall
  *
- * The acceptance criterion this rule serves is absolute — *no* literal
- * `.rex/`, `.hench/` or `.sourcevision/` outside the resolver and the
- * migration command — and for those three names it is now met. They are a
- * **wall**: any site outside {@link ALLOWED} fails, and there is no inventory
- * to register one in. Adding a literal back means editing the allow-list and
- * saying why.
+ * The rule is absolute, for the three tool directories and the loose `.n-dx*`
+ * config files alike: no literal outside {@link ALLOWED}, and nowhere to
+ * register an exception. Any site fails with its file and line. Adding a
+ * literal back means editing the allow-list and saying why.
  *
- * The `.n-dx*` config files are still a **ratchet**. The resolver owns those
- * paths too, and the config-reader defect below was `.n-dx.json`, so a rule
- * that ignored them would not catch the bug that prompted the rule — but 29
- * sites across llm-client, hench and web's routes have not been swept yet.
- * Each is named in `tests/layout-literal-inventory.md` with the count it is
- * allowed: a **new** file fails, an existing file that grows fails, and a file
- * that reaches zero has to leave the list. When that sweep lands, the
- * inventory is deleted and the two halves collapse into one wall, with no
- * change to the detector.
+ * It was not always both. The directories reached zero first and became a wall
+ * while the config files were still a **ratchet** — 29 sites across
+ * llm-client, hench and web, each registered in an inventory with the count it
+ * was allowed, so a new file failed and a listed one could only shrink. That
+ * sweep has landed, so the two halves have collapsed into one wall with no
+ * change to the detector, and the inventory no longer carries a count.
+ *
+ * The `.n-dx*` family is in scope even though the task that asked for this
+ * rule names only the three directories: the resolver owns those paths too,
+ * and the config-reader defect above was `.n-dx.json`, so a rule that let it
+ * through would not have caught the bug that prompted the rule.
  *
  * ## Why the detector looks the way it does
  *
@@ -52,7 +52,7 @@
  * exemptions rather than read them.
  *
  * @see packages/llm-client/src/layout.ts — the resolver and its lookup order
- * @see tests/layout-literal-inventory.md — the debt, and what is being done about it
+ * @see tests/layout-literal-inventory.md — how to comply, and how the sweep got here
  */
 
 import { describe, it, expect } from "vitest";
@@ -60,7 +60,6 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const ROOT = join(import.meta.dirname, "../..");
-const INVENTORY_PATH = join(ROOT, "tests", "layout-literal-inventory.md");
 
 /**
  * Files that are *allowed* to name a layout path, because naming it is their
@@ -106,30 +105,12 @@ const PATHS_MODULE = /\/src\/(?:[^/]+\/)?paths\.ts$/;
  * A path-shaped literal naming something the layout owns: the three tool
  * directories, or one of the loose `.n-dx*` files that moved with them.
  *
- * The `.n-dx*` family is in scope even though the task names only the three
- * directories: the resolver owns those paths too, and the config-reader bug
- * described above was `.n-dx.json`, so a rule that let it through would not
- * have caught the defect that prompted the rule.
+ * One pattern for both, because the rule is now one wall. The detector did not
+ * change when the config half stopped being a ratchet — only what the suite
+ * does with what it finds.
  */
 const LAYOUT_LITERAL =
   /(["'`])(\.(?:rex|hench|sourcevision)(?:\/[^"'`\s]*)?|\.n-dx(?:\.local)?\.json|\.n-dx-web[^"'`\s]*)\1/g;
-
-/**
- * The three tool directories, which are a wall rather than a ratchet.
- *
- * Matched against a site's captured text, so it sees the literal with its
- * quotes: `".rex/prd_tree/"` is a directory site, `".n-dx.json"` is not.
- */
-const DIRECTORY_LITERAL = /^(["'`])\.(?:rex|hench|sourcevision)(?:\/|\1)/;
-
-/** Split a file's sites into the two halves the rule treats differently. */
-function partition(sites) {
-  const directories = sites.filter((s) => DIRECTORY_LITERAL.test(s.text));
-  return {
-    directories,
-    configs: sites.filter((s) => !DIRECTORY_LITERAL.test(s.text)),
-  };
-}
 
 /**
  * Blank out comment bodies, preserving newlines so line numbers still line up
@@ -268,6 +249,25 @@ export function scanProductionFiles() {
   return [...seen];
 }
 
+/**
+ * Every layout literal in one file's source, with the line it sits on.
+ *
+ * Shared with the self-tests below so they exercise the scan the wall runs,
+ * rather than a second copy of it that can agree with itself while the real
+ * one has gone blind.
+ */
+function findSites(source) {
+  const code = blankComments(source);
+  const sites = [];
+  for (const match of code.matchAll(LAYOUT_LITERAL)) {
+    sites.push({
+      line: code.slice(0, match.index).split("\n").length,
+      text: match[0],
+    });
+  }
+  return sites;
+}
+
 /** Every flagged file, with the line and text of each literal in it. */
 export function findLayoutLiterals() {
   const found = new Map();
@@ -279,46 +279,27 @@ export function findLayoutLiterals() {
       seen.add(relPath);
       if (ALLOWED.includes(relPath) || PATHS_MODULE.test(relPath)) continue;
 
-      const code = blankComments(readFileSync(file, "utf8"));
-      const sites = [];
-      for (const match of code.matchAll(LAYOUT_LITERAL)) {
-        sites.push({
-          line: code.slice(0, match.index).split("\n").length,
-          text: match[0],
-        });
-      }
+      const sites = findSites(readFileSync(file, "utf8"));
       if (sites.length > 0) found.set(relPath, sites);
     }
   }
   return found;
 }
 
-/** The heading after which rows describe files that have not merged yet. */
-const PENDING_HEADING = "### Registered ahead of merge";
-
 /**
- * `| path | count | …` rows of the inventory.
+ * The wall's report: one `file:line  literal` line per site.
  *
- * `ceilings` is every row, because a ceiling applies wherever the file is.
- * `pending` is the subset below {@link PENDING_HEADING} — ceilings registered
- * for literals that arrive with a branch still in review. Those are exempt
- * from the stale-row check and nothing else: a file can already exist on the
- * default branch and be perfectly clean there, and still be about to gain a
- * literal from an open PR.
+ * Separate from the assertion so the self-test can drive it with a fixture.
+ * On a clean tree the wall's own expectation is `[] === []`, which proves the
+ * rule holds but not that it can still name an offender — and naming one is
+ * the whole of its value on the day it fires.
  */
-function readInventory() {
-  const ceilings = new Map();
-  const pending = new Set();
-  let inPending = false;
-  for (const raw of readFileSync(INVENTORY_PATH, "utf8").split("\n")) {
-    const line = raw.trim();
-    if (line.startsWith("### ")) inPending = line === PENDING_HEADING;
-    const row = /^\|\s*`([^`]+)`\s*\|\s*(\d+)\s*\|/.exec(line);
-    if (!row) continue;
-    ceilings.set(row[1], Number(row[2]));
-    if (inPending) pending.add(row[1]);
+function offenders(found) {
+  const lines = [];
+  for (const [file, sites] of found) {
+    for (const site of sites) lines.push(`  ${file}:${site.line}  ${site.text}`);
   }
-  return { ceilings, pending };
+  return lines;
 }
 
 describe("layout-literal policy", () => {
@@ -344,24 +325,41 @@ describe("layout-literal policy", () => {
 
   it("still matches a literal when it sees one (detector self-test)", () => {
     // The pattern half of the same guard, on a fixture rather than the tree,
-    // so it keeps its teeth once the inventory is empty.
-    const code = blankComments(
+    // so it keeps its teeth now that the tree is clean and the wall's own
+    // assertion is `[] === []`.
+    const sites = findSites(
       [
         'const a = join(dir, ".rex/prd_tree");',
         'const b = ".n-dx.json";',
         'const c = resolveLayout(root).henchDir;',
       ].join("\n"),
     );
-    const sites = [...code.matchAll(LAYOUT_LITERAL)].map((m) => ({
-      line: code.slice(0, m.index).split("\n").length,
-      text: m[0],
-    }));
 
+    // Both halves, one pattern: a directory and a config file are the same
+    // kind of finding now.
     expect(sites.map((s) => s.text)).toEqual(['".rex/prd_tree"', '".n-dx.json"']);
-    expect(partition(sites).directories.map((s) => s.text)).toEqual(['".rex/prd_tree"']);
-    expect(partition(sites).configs.map((s) => s.text)).toEqual(['".n-dx.json"']);
-    // Every site carries a line number, so a failure can point at one.
-    for (const site of sites) expect(site.line).toBeGreaterThan(0);
+    expect(sites.map((s) => s.line)).toEqual([1, 2]);
+  });
+
+  it("reports a new .n-dx* literal with its file and line (wall self-test)", () => {
+    // The acceptance criterion the ratchet's retirement has to meet: a config
+    // literal anywhere outside ALLOWED fails, and the failure says where. The
+    // wall below cannot show this on a clean tree, so it is shown here against
+    // the same `findSites` the real scan uses.
+    const sites = findSites(
+      [
+        'const cfg = join(root, ".n-dx.json");',
+        "const unrelated = 1;",
+        'const local = join(root, ".n-dx.local.json");',
+        'const port = join(root, ".n-dx-web.port");',
+      ].join("\n"),
+    );
+
+    expect(offenders(new Map([["packages/web/src/server/example.ts", sites]]))).toEqual([
+      '  packages/web/src/server/example.ts:1  ".n-dx.json"',
+      '  packages/web/src/server/example.ts:3  ".n-dx.local.json"',
+      '  packages/web/src/server/example.ts:4  ".n-dx-web.port"',
+    ]);
   });
 
   it("does not flag the resolver, the paths modules or the twins", () => {
@@ -416,96 +414,27 @@ describe("layout-literal policy", () => {
     expect([...path.matchAll(LAYOUT_LITERAL)]).toHaveLength(1);
   });
 
-  it("allows no literal .rex/, .hench/ or .sourcevision/ path at all", () => {
-    // The wall. There is no inventory for these — the sweep is finished, so a
-    // site here is a new one, and the only way to add one back is to edit
-    // ALLOWED above and say why.
-    const offenders = [];
-    for (const [file, sites] of findLayoutLiterals()) {
-      for (const site of partition(sites).directories) {
-        offenders.push(`  ${file}:${site.line}  ${site.text}`);
-      }
-    }
+  it("allows no literal .rex/, .hench/, .sourcevision/ or .n-dx* path at all", () => {
+    // The wall, both halves. The sweep is finished and there is no inventory
+    // to register a site in, so anything here is a new one and the only way to
+    // keep it is to edit ALLOWED above and say why.
+    const found = offenders(findLayoutLiterals());
 
     expect(
-      offenders,
+      found,
       `Literal layout path(s). Ask the resolver instead:\n` +
-        `${offenders.join("\n")}\n\n` +
+        `${found.join("\n")}\n\n` +
         `  import { resolveLayout } from "@n-dx/llm-client";\n` +
-        `  const { rexDir, henchDir, sourcevisionDir } = resolveLayout(root);\n\n` +
+        `  const { rexDir, henchDir, sourcevisionDir } = resolveLayout(root);\n` +
+        `  const { configFile, localConfigFile } = resolveLayout(root);\n\n` +
         `A package with a paths module (rex, sourcevision, hench, web) asks that\n` +
-        `instead. Display copy that cannot reach a resolver — viewer text, static\n` +
-        `help — names the command or the tool rather than the directory; see\n` +
+        `instead; hench reaches the resolver through src/prd/llm-gateway.ts.\n` +
+        `Display copy that cannot reach a resolver — viewer text, static help —\n` +
+        `names the command or the tool rather than the directory, or takes the\n` +
+        `resolved name from the server; see\n` +
         `packages/web/src/viewer/views/hench-config.ts for the worked example.\n` +
         `If the file genuinely owns the layout decision, add it to ALLOWED in\n` +
         `${toPosixRelative(join(ROOT, "tests/e2e/layout-literal-policy.test.js"))} and say why.`,
-    ).toEqual([]);
-  });
-
-  it("names no .n-dx* file that is not in the inventory", () => {
-    const { ceilings } = readInventory();
-    const unlisted = [...findLayoutLiterals().entries()]
-      .map(([file, sites]) => [file, partition(sites).configs])
-      .filter(([file, configs]) => configs.length > 0 && !ceilings.has(file))
-      .map(([file, configs]) => `  ${file}:${configs[0].line}  ${configs[0].text}`);
-
-    expect(
-      unlisted,
-      `New literal config path(s). Ask the resolver instead:\n` +
-        `${unlisted.join("\n")}\n\n` +
-        `  import { resolveLayout } from "@n-dx/llm-client";\n` +
-        `  const { configFile, localConfigFile } = resolveLayout(root);\n\n` +
-        `These are still a ratchet rather than a wall only because the config\n` +
-        `sweep has not run. A file not already in tests/layout-literal-inventory.md\n` +
-        `does not get a row — route it.`,
-    ).toEqual([]);
-  });
-
-  it("holds every .n-dx* file at or below its recorded count", () => {
-    const { ceilings } = readInventory();
-    const grown = [];
-    for (const [file, sites] of findLayoutLiterals()) {
-      const configs = partition(sites).configs;
-      const ceiling = ceilings.get(file);
-      if (ceiling === undefined || configs.length <= ceiling) continue;
-      grown.push(
-        `  ${file}: ${configs.length} literals, inventory allows ${ceiling}\n` +
-          configs.slice(ceiling).map((s) => `      ${file}:${s.line}  ${s.text}`).join("\n"),
-      );
-    }
-
-    expect(
-      grown,
-      `File(s) added a literal config path:\n${grown.join("\n")}\n\n` +
-        `These files are already carrying layout debt, which is why they are in\n` +
-        `tests/layout-literal-inventory.md — but the count may only go down.\n` +
-        `Route the new call through the resolver or the package's paths module.`,
-    ).toEqual([]);
-  });
-
-  it("carries no inventory row for a file that no longer has any", () => {
-    // Keeps the debt figure honest as the sweep lands: a row left behind after
-    // its file is clean would hold the total above the truth and hide the next
-    // literal added to that file.
-    //
-    // A row for a file that does not exist is not stale — it is a ceiling
-    // registered ahead of a branch that has not merged yet. Without that, this
-    // rule could only land in one exact position in the review queue: three of
-    // the four branches open when it was written add a file carrying literals,
-    // and each would have failed the moment it merged. Pre-registering is the
-    // difference between a policy that slots in anywhere and one that has to
-    // be timed.
-    const found = findLayoutLiterals();
-    const { ceilings, pending } = readInventory();
-    const stale = [...ceilings.keys()]
-      .filter((file) => !pending.has(file))
-      .filter((file) => partition(found.get(file) ?? []).configs.length === 0);
-
-    expect(
-      stale,
-      `tests/layout-literal-inventory.md lists file(s) with no literals left:\n` +
-        stale.map((f) => `  - ${f}`).join("\n") +
-        `\nDelete the row and lower the total — that is the ratchet working.`,
     ).toEqual([]);
   });
 });

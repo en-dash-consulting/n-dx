@@ -1,0 +1,6 @@
+stages:
+  - build
+compile:
+  stage: build
+  script:
+    - go build ./...

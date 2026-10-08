@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createSourcevisionMcpServer, startMcpServer } from "../../../src/cli/mcp.js";
+import { computeReadinessForProject, READINESS_CAVEAT } from "../../../src/cli/commands/readiness.js";
 import { DATA_FILES } from "../../../src/schema/data-files.js";
+import type { SdlcProfile } from "../../../src/schema/v1.js";
 
 const EXPECTED_TOOLS = [
   "get_overview",
@@ -18,6 +20,7 @@ const EXPECTED_TOOLS = [
   "get_next_steps",
   "get_classifications",
   "set_file_archetype",
+  "get_readiness",
 ];
 
 const EXPECTED_RESOURCES = ["summary", "zones", "routes"];
@@ -34,6 +37,25 @@ function minimalManifest() {
     phases: [],
     enrichment: {},
     tokenUsage: {},
+  };
+}
+
+/** An SDLC profile that found nothing — every section present and empty. */
+function emptySdlcProfile(): SdlcProfile {
+  return {
+    schemaVersion: "1.0.0",
+    commands: [],
+    tests: { frameworks: [], suites: [] },
+    ci: [],
+    cd: [],
+    rollback: [],
+    migrations: [],
+    featureFlags: [],
+    qualityGates: [],
+    observability: [],
+    containers: [],
+    iac: [],
+    parseFailures: [],
   };
 }
 
@@ -250,5 +272,99 @@ describe("Sourcevision MCP server factory", () => {
   it("factory is re-exported from public API", async () => {
     const publicApi = await import("../../../src/public.js");
     expect(typeof publicApi.createSourcevisionMcpServer).toBe("function");
+  });
+
+  /**
+   * `get_readiness` must answer exactly what `sourcevision readiness` prints,
+   * because the two are the same question asked over different transports. The
+   * tool scores on demand rather than serving `readiness.json`, so the
+   * agreement holds even when that file is stale or missing.
+   */
+  describe("get_readiness", () => {
+    async function connect() {
+      const server = createSourcevisionMcpServer(tmpDir);
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      return { server, client };
+    }
+
+    it("explains how to get a profile when none has been analyzed, as an error", async () => {
+      const { server, client } = await connect();
+
+      const result = await client.callTool({ name: "get_readiness", arguments: {} });
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content[0].text).toContain("No SDLC profile found");
+      expect(content[0].text).toContain("sourcevision analyze");
+      // A client that branches on isError must not read the explanation as a
+      // scorecard.
+      expect(result.isError).toBe(true);
+
+      await client.close();
+      await server.close();
+    });
+
+    it("reports a profile that is not a profile as an error, not a crash", async () => {
+      await writeFile(join(svDir, DATA_FILES.sdlcProfile), JSON.stringify({ schemaVersion: "1.0.0" }), "utf-8");
+      const { server, client } = await connect();
+
+      const result = await client.callTool({ name: "get_readiness", arguments: {} });
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(result.isError).toBe(true);
+      expect(content[0].text).toMatch(/does not match the schema/);
+      expect(content[0].text).toContain("sourcevision analyze");
+      expect(content[0].text).not.toMatch(/TypeError|undefined/);
+
+      await client.close();
+      await server.close();
+    });
+
+    it("returns the same score the CLI computes, plus the heuristic caveat", async () => {
+      await writeFile(
+        join(svDir, DATA_FILES.sdlcProfile),
+        JSON.stringify(emptySdlcProfile()),
+        "utf-8",
+      );
+      const { server, client } = await connect();
+
+      const result = await client.callTool({ name: "get_readiness", arguments: {} });
+      expect(result.isError).toBeFalsy();
+
+      const content = result.content as Array<{ type: string; text: string }>;
+      const payload = JSON.parse(content[0].text);
+      const fromCli = computeReadinessForProject(tmpDir);
+
+      expect(payload.overall).toBe(fromCli.overall);
+      expect(payload.dimensions).toEqual(fromCli.dimensions);
+      expect(payload.suggestions).toEqual(fromCli.suggestions);
+      expect(payload.caveat).toBe(READINESS_CAVEAT);
+
+      await client.close();
+      await server.close();
+    });
+
+    it("scores the profile on disk rather than serving a stale readiness.json", async () => {
+      await writeFile(
+        join(svDir, DATA_FILES.sdlcProfile),
+        JSON.stringify(emptySdlcProfile()),
+        "utf-8",
+      );
+      // A readiness.json left over from an earlier run, claiming a score the
+      // profile beside it cannot support. The tool must ignore it.
+      await writeFile(
+        join(svDir, DATA_FILES.readiness),
+        JSON.stringify({ overall: 99, dimensions: {}, suggestions: [] }),
+        "utf-8",
+      );
+      const { server, client } = await connect();
+
+      const result = await client.callTool({ name: "get_readiness", arguments: {} });
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(JSON.parse(content[0].text).overall).not.toBe(99);
+
+      await client.close();
+      await server.close();
+    });
   });
 });
