@@ -12,7 +12,7 @@ source: "roadmap"
 acceptanceCriteria:
   - "No web source reads level outside a compatibility shim"
   - "Plan, Work and Live e2e tests pass"
-description: "Item CRUD routes accept type; the about 41 web files that read level move to type; the product layer becomes the home page with Plan, Work and Live remapped."
-lastModified: "2026-10-06T16:54:31.789Z"
+description: "Item CRUD routes accept type; the about 41 web files that read level move to type; the product layer becomes the home page with Plan, Work and Live remapped.\n\nLabel a capability's criteria 'capability criteria' and a work item's acceptanceCriteria 'done when' (terminology decided 2026-10-08)."
+lastModified: "2026-10-08T18:56:31.327Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
