@@ -5,7 +5,7 @@
     "perCallTokens": 22753,
     "uniqueTokens": 14250,
     "skills": 13,
-    "skillTokens": 17604
+    "skillTokens": 18043
   },
   "skills": [
     {
@@ -37,6 +37,13 @@
       "tokens": 1486
     },
     {
+      "name": "ndx-work",
+      "file": "packages/core/assistant-assets/skills/ndx-work.md",
+      "shipped": true,
+      "chars": 5073,
+      "tokens": 1269
+    },
+    {
       "name": "dev-link",
       "file": ".claude/skills/dev-link/SKILL.md",
       "shipped": false,
@@ -47,8 +54,8 @@
       "name": "ndx-capture",
       "file": "packages/core/assistant-assets/skills/ndx-capture.md",
       "shipped": true,
-      "chars": 4639,
-      "tokens": 1160
+      "chars": 4815,
+      "tokens": 1204
     },
     {
       "name": "ndx-plan",
@@ -56,13 +63,6 @@
       "shipped": true,
       "chars": 4553,
       "tokens": 1139
-    },
-    {
-      "name": "ndx-work",
-      "file": "packages/core/assistant-assets/skills/ndx-work.md",
-      "shipped": true,
-      "chars": 3495,
-      "tokens": 874
     },
     {
       "name": "ndx-config",
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "64ae94f68e9714d8",
-  "recordedAt": "2026-10-07T16:52:16.510Z",
-  "commit": "5e5e7ff7bded",
+  "contentHash": "145ec311b955eb6f",
+  "recordedAt": "2026-10-08T19:46:48.446Z",
+  "commit": "1b4796c4728a",
   "dirty": false
 }
