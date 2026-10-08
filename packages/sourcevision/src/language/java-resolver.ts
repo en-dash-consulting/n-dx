@@ -16,7 +16,8 @@
  *   wildcard imports. Names found nowhere (java.lang, type parameters,
  *   inherited member types) are dropped;
  * - anything naming a package not in the project is external, attributed to
- *   its package: the segments before the first capitalised one.
+ *   its package: the segments before the first capitalised one. A missing
+ *   type in a project package (generated code) is dropped, not external.
  *
  * @module sourcevision/language/java-resolver
  */
@@ -214,14 +215,18 @@ class Collector {
   private readonly files = new Multimap();
   private readonly external = new Multimap();
 
-  constructor(private readonly self: string) {}
+  constructor(
+    private readonly self: string,
+    private readonly projectPackages: ReadonlySet<string>,
+  ) {}
 
   file(paths: Iterable<string>, symbol: string): void {
     for (const path of paths) if (path !== this.self) this.files.add(path, symbol);
   }
 
+  /** A package the project declares is never external, even when the type is missing (e.g. generated at build time). */
   externalPackage(pkg: string, symbol: string): void {
-    if (pkg) this.external.add(pkg, symbol);
+    if (pkg && !this.projectPackages.has(pkg)) this.external.add(pkg, symbol);
   }
 
   result(): FileReferences {
@@ -235,7 +240,7 @@ class Collector {
 }
 
 function resolveFile(index: JavaIndex, file: JavaFileFacts): FileReferences {
-  const out = new Collector(file.path);
+  const out = new Collector(file.path, index.packages);
   const declaredHere = new Set(file.declared.map((q) => q.slice(q.lastIndexOf(".") + 1)));
   const singles = new Map<string, readonly string[]>();
   const wildcards: string[][] = [];
