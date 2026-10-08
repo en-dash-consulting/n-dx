@@ -3,13 +3,18 @@
  * of a change. Nothing here is stored: every value is derived from the loaded
  * tree (and, for `realizedBy`, from git), so it cannot drift from its source.
  *
- * - `changedBy`: product node → the changes that amend it (inverse of `amends`).
- * - `boundBy`: product node → the constraints that bind it (inverse of `appliesTo`).
+ * - `changedBy`: product node → the changes that amend or touch it (inverse of
+ *   `amends` and `touches`).
+ * - `boundBy`: product node → the constraints that bind it (inverse of `appliesTo`;
+ *   a constraint on an area or capability also binds its descendant capabilities).
  * - `coChanges`: product node → the other nodes changed or touched by the same
  *   changes, with how many changes they share.
  * - `realizedBy`: capability → the commits, files and zones of the changes that
  *   amended it. Commits are found by `N-DX-Item` trailer (`change-commits.ts`).
  * - {@link deriveChangeKind}: a change's kind, read from how it relates to the map.
+ *
+ * Cancelled and deleted changes contribute no edge of any kind: a change that
+ * will never land must not steer placement through `coChanges` or `realizedBy`.
  *
  * Every ref (`amends[].target`, `touches`, `appliesTo`) goes through the tree
  * index, so an alias of a folded id lands on the node it was folded into. A
@@ -84,12 +89,19 @@ export interface CoChange {
 }
 
 export interface ProductEdges {
-  /** Product node id → ids of the changes that amend it, in tree order. */
+  /** Product node id → ids of the live changes that amend or touch it, in tree order. */
   changedBy: Record<string, string[]>;
   /** Product node id → ids of the constraints that bind it, in tree order. */
   boundBy: Record<string, string[]>;
   /** Product node id → nodes it shares changes with, most shared first, then by id. */
   coChanges: Record<string, CoChange[]>;
+}
+
+/** Every live capability below a node. */
+function descendantCapabilities(node: RuleNode): RuleNode[] {
+  return (node.children ?? []).flatMap((child) =>
+    child.status === "deleted" ? [] : [...(child.type === "capability" ? [child] : []), ...descendantCapabilities(child)],
+  );
 }
 
 function push(map: Record<string, string[]>, key: string, value: string): void {
@@ -109,18 +121,23 @@ export function computeEdges(tree: V2Tree): ProductEdges {
     const bound =
       appliesTo === "all"
         ? live.map((e) => e.node).filter((n) => n.type === "capability")
-        : (appliesTo ?? []).map((ref) => index.resolve(ref));
+        : (appliesTo ?? []).flatMap((ref) => {
+            const target = index.resolve(ref);
+            return target ? [target, ...descendantCapabilities(target)] : [];
+          });
     for (const target of bound) if (target && target.id !== node.id) push(edges.boundBy, target.id, node.id);
   }
 
   const shared = new Map<string, Map<string, number>>();
   for (const { node } of index.entries) {
     if (node.type !== "change") continue;
+    if (node.status === "cancelled") continue;
     const change = node as ChangeNode;
-    const amended = (change.amends ?? []).map((a) => index.resolve(a.target)).filter((n): n is RuleNode => n !== undefined);
-    for (const target of amended) push(edges.changedBy, target.id, change.id);
+    const resolved = (refs: readonly string[]) => refs.map((ref) => index.resolve(ref)).filter((n): n is RuleNode => n !== undefined);
+    const related = [...resolved((change.amends ?? []).map((a) => a.target)), ...resolved(change.touches ?? [])];
+    for (const target of related) push(edges.changedBy, target.id, change.id);
 
-    const ids = new Set([...amended, ...(change.touches ?? []).map((ref) => index.resolve(ref))].filter((n): n is RuleNode => n !== undefined).map((n) => n.id));
+    const ids = new Set(related.map((n) => n.id));
     for (const a of ids) {
       for (const b of ids) {
         if (a === b) continue;
@@ -172,13 +189,18 @@ export async function computeRealizedBy(
   const trailerCommits = await loadTrailerCommits(options);
   const out: Record<string, Realization> = {};
 
-  const capabilities = Object.keys(edges.changedBy).filter((id) => index.resolve(id)?.type === "capability");
+  // `changedBy` also holds touching changes; only amendments realize a capability.
+  const namedBy = new Map<string, Set<string>>();
+  for (const [id, changeIds] of Object.entries(edges.changedBy)) {
+    if (index.resolve(id)?.type !== "capability") continue;
+    const amending = changeIds
+      .map((changeId) => index.resolve(changeId) as ChangeNode | undefined)
+      .filter((change): change is ChangeNode => change?.amends?.some((a) => index.resolve(a.target)?.id === id) === true);
+    if (amending.length > 0) namedBy.set(id, new Set(amending.flatMap(trailerIds)));
+  }
+  const capabilities = [...namedBy.keys()];
   const commitsOf = new Map<string, string[]>();
-  for (const id of capabilities) {
-    const named = new Set(edges.changedBy[id].flatMap((changeId) => {
-      const change = index.resolve(changeId);
-      return change ? trailerIds(change) : [];
-    }));
+  for (const [id, named] of namedBy) {
     commitsOf.set(id, trailerCommits.filter((c) => c.items.some((item) => named.has(item))).map((c) => c.hash));
   }
 

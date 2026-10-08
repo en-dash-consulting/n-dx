@@ -62,18 +62,34 @@ describe("computeEdges", () => {
       change("ch-1", { amends: [amend("folded-a", "modified"), amend("cap-b", "modified")] }),
       change("ch-2", { amends: [amend("cap-a", "modified")], touches: ["cap-b", "cap-c"] }),
       change("ch-gone", { status: "deleted", amends: [amend("cap-a", "modified")] }),
+      change("ch-cancelled", { status: "cancelled", amends: [amend("cap-a", "modified")], touches: ["cap-c"] }),
       change("ch-dangling", { amends: [amend("nowhere", "modified")] }),
     ],
   );
   const edges = computeEdges(t);
 
   it("changedBy inverts amends, resolving aliases and skipping deleted changes and unresolved targets", () => {
-    expect(edges.changedBy).toEqual({ "cap-a": ["ch-1", "ch-2"], "cap-b": ["ch-1"] });
+    expect(edges.changedBy).toEqual({ "cap-a": ["ch-1", "ch-2"], "cap-b": ["ch-1", "ch-2"], "cap-c": ["ch-2"] });
+  });
+
+  it("changedBy also inverts touches, and a cancelled change adds no edge", () => {
+    expect(edges.changedBy["cap-c"]).toEqual(["ch-2"]);
+    expect(edges.changedBy["cap-a"]).not.toContain("ch-cancelled");
+    expect(edges.coChanges["cap-c"]?.find((c) => c.id === "cap-a")?.changes).toBe(1);
+  });
+
+  it("a constraint on an area binds its descendant capabilities", () => {
+    expect(edges.boundBy["cap-c"]).toEqual(["con-all", "con-some"]);
+    const nested = computeEdges(tree([
+      node({ id: "a", type: "area", children: [node({ id: "k", type: "capability", children: [cap("k2")] })] }),
+      node({ id: "con", type: "constraint", appliesTo: ["k"] }),
+    ], []));
+    expect(nested.boundBy).toEqual({ k: ["con"], k2: ["con"] });
   });
 
   it("boundBy inverts appliesTo: all binds capabilities, ids resolve through aliases", () => {
     expect(edges.boundBy["cap-a"]).toEqual(["con-all", "con-some"]);
-    expect(edges.boundBy["cap-b"]).toEqual(["con-all"]);
+    expect(edges.boundBy["cap-b"]).toEqual(["con-all", "con-some"]);
     expect(edges.boundBy["area"]).toEqual(["con-some"]);
     expect(edges.boundBy["con-all"]).toBeUndefined();
   });
