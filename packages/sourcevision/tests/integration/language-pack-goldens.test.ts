@@ -45,7 +45,7 @@ describe("harness over a stand-in pack", () => {
       grammarPath: JAVA_WASM,
       pack: {
         id: "java-stand-in",
-        config: { ...goConfig, extensions: [".java"] },
+        config: { ...goConfig, extensions: new Set([".java"]) },
         grammar: { name: "tree-sitter-java", version: "0.23.5" },
         queries: [{ name: "methods", path: join(dir, "methods.scm") }],
         provenance: {},
@@ -65,10 +65,6 @@ describe("harness over a stand-in pack", () => {
 });
 
 describe("language pack goldens", () => {
-  it.skipIf(statuses.length > 0)("has no built-in packs registered yet", () => {
-    expect(statuses).toEqual([]);
-  });
-
   for (const status of statuses) {
     const { pack } = status;
     describe(pack.id, () => {
