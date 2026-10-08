@@ -43,11 +43,11 @@ import { readFile, readdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { ItemLevel, PRDItem } from "../schema/index.js";
 import { SCHEMA_VERSION, isCompatibleSchema } from "../schema/index.js";
-import { ItemStateSchema, NodeIntentSchema, RootHeaderSchema, SCHEMA_VERSION_V2, isV2Schema, type ItemState, type NodeType, type StateFile } from "../schema/v2.js";
+import { ItemStateSchema, NodeIntentSchema, RootHeaderSchema, SCHEMA_VERSION_V2, isV2Schema, type ItemState, type Layer, type NodeType, type StateFile } from "../schema/v2.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
 import { parseFolderTree, parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "./paths.js";
-import { STATE_FILE_NAME, loadStateFile } from "./state-writer.js";
+import { STATE_FILE_NAME, extraTopLevelKeys, loadStateFile } from "./state-writer.js";
 import { parseTreeMeta } from "./tree-meta.js";
 
 export const PRODUCT_DIRNAME = "product";
@@ -104,6 +104,21 @@ export interface LoadPrdModelOptions {
    * field; its row can.
    */
   stateRows?: Map<string, ItemState>;
+  /**
+   * v2 only: filled with each `state.yaml`'s top-level keys other than
+   * `schema` and `items`, by the folder the file sits in. Files without any
+   * are not listed.
+   */
+  folderState?: FolderStateKeys;
+}
+
+/**
+ * Top-level `state.yaml` keys other than `schema` and `items`, by folder: a
+ * layer root's by its layer, a folder node's by the node's id.
+ */
+export interface FolderStateKeys {
+  layers: Partial<Record<Layer, Record<string, unknown>>>;
+  nodes: Map<string, Record<string, unknown>>;
 }
 
 // ── Schema skew ──────────────────────────────────────────────────
@@ -196,11 +211,11 @@ export async function loadPrdModel(rexDir: string, options: LoadPrdModelOptions 
   }
 
   const warnings: ParseWarning[] = [...header.warnings];
-  const ctx: ReadContext = { warnings, ignoreStamp: readOnly !== undefined, stateRows: options.stateRows };
+  const ctx: ReadContext = { warnings, ignoreStamp: readOnly !== undefined, stateRows: options.stateRows, folderState: options.folderState };
   const tree = v2
     ? {
-        product: await readLayer(productDir, ctx),
-        changes: await readLayer(join(rexDir, CHANGES_DIRNAME), ctx),
+        product: await readLayer(productDir, "product", ctx),
+        changes: await readLayer(join(rexDir, CHANGES_DIRNAME), "changes", ctx),
       }
     : await readV1Tree(join(rexDir, PRD_TREE_DIRNAME), warnings);
   return {
@@ -271,12 +286,15 @@ interface ReadContext {
   warnings: ParseWarning[];
   ignoreStamp: boolean;
   stateRows?: Map<string, ItemState>;
+  folderState?: FolderStateKeys;
 }
 
-async function readLayer(layerDir: string, ctx: ReadContext): Promise<RuleNode[]> {
+async function readLayer(layerDir: string, layer: Layer, ctx: ReadContext): Promise<RuleNode[]> {
   if (!(await isDirectory(layerDir))) return [];
   const folder = await readFolder(layerDir, ctx);
   warnOrphanRows(layerDir, folder, ctx.warnings);
+  const extra = extraTopLevelKeys(folder.state);
+  if (extra && ctx.folderState) ctx.folderState.layers[layer] = extra;
   return folder.children;
 }
 
@@ -320,6 +338,8 @@ async function readFolderNode(dir: string, ctx: ReadContext): Promise<RuleNode |
   if (!node) return null;
   folder.claimed.add(node.id);
   warnOrphanRows(dir, folder, ctx.warnings);
+  const extra = extraTopLevelKeys(folder.state);
+  if (extra) ctx.folderState?.nodes.set(node.id, extra);
   if (folder.children.length) node.children = folder.children;
   return node;
 }

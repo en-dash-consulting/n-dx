@@ -111,6 +111,31 @@ describe("rex export / import-bundle on a v2 tree", () => {
     expect(await snapshot(dest.rexDir)).toEqual(await snapshot(src.rexDir));
   });
 
+  it("keeps a state.yaml's own top-level key in the same folder through the round trip", async () => {
+    const src = await v2Project("src");
+    const dest = await emptyV2Project("dest");
+    const out = join(tmp, "bundle.json");
+    await editText(join(src.rexDir, "changes", "add-apple-pay", "state.yaml"), (text) => `${text}futureTop: {"retain":true}\n`);
+
+    run(["export", `--out=${out}`, src.dir]);
+    run(["import-bundle", `--in=${out}`, dest.dir]);
+    expect(await readFile(join(dest.rexDir, "changes", "add-apple-pay", "state.yaml"), "utf-8")).toContain('futureTop: {"retain":true}');
+    expect(await snapshot(dest.rexDir)).toEqual(await snapshot(src.rexDir));
+  });
+
+  it("refuses a bundle with an invalid root header, writing nothing", async () => {
+    const src = await v2Project("src");
+    const dest = await emptyV2Project("dest");
+    const out = join(tmp, "bundle.json");
+    run(["export", `--out=${out}`, src.dir]);
+    const bundle = JSON.parse(await readFile(out, "utf-8"));
+    await writeFile(out, JSON.stringify({ ...bundle, header: { requirements: "not-an-array", stewards: 42 } }));
+    const before = await snapshot(dest.rexDir);
+
+    expect(run(["import-bundle", `--in=${out}`, dest.dir], true)).toMatch(/not a valid root header/);
+    expect(await snapshot(dest.rexDir)).toEqual(before);
+  });
+
   it("imports a v1 bundle into the change layer", async () => {
     const dest = await v2Project("dest");
     const bundle = join(tmp, "v1.json");

@@ -192,6 +192,49 @@ describe("envelope v2 round trip", () => {
     expect(files).toEqual(await snapshot(src));
   });
 
+  it("keeps a state.yaml's own top-level keys in the same folder's file", async () => {
+    const src = await copyV2Fixture(join(tmp, "src"), "lf");
+    // At indentation zero, after items: a folder node's file and a layer root's.
+    await editText(join(src, "changes", "add-apple-pay", "state.yaml"), (text) => `${text}futureTop: {"retain":true}\n`);
+    await writeFile(join(src, "product", "state.yaml"), 'schema: "rex/v2"\nitems: {}\nlayerTop: 1\n');
+    const bundle = (await exportedJson(src)) as PRDBundleV2;
+    expect(bundle.folderState).toEqual({
+      layers: { product: { layerTop: 1 } },
+      nodes: { [CHANGE]: { futureTop: { retain: true } } },
+    });
+
+    const dest = await emptyV2Tree("dest");
+    await importBundleIntoV2(dest, parseAnyBundle(bundle), "merge");
+    const files = await snapshot(dest);
+    expect(files["changes/add-apple-pay/state.yaml"]).toContain('futureTop: {"retain":true}');
+    expect(files["product/state.yaml"]).toContain("layerTop: 1");
+    expect(files).toEqual(await snapshot(src));
+  });
+
+  it("omits folderState when no state.yaml has extra top-level keys", async () => {
+    const bundle = (await exportedJson(await copyV2Fixture(join(tmp, "src"), "lf"))) as PRDBundleV2;
+    expect(bundle).not.toHaveProperty("folderState");
+  });
+
+  it("keeps a local folder's top-level keys over the bundle's on merge", async () => {
+    const src = await copyV2Fixture(join(tmp, "src"), "lf");
+    const before = await snapshot(src);
+    const bundle = { ...(await exportedJson(src) as PRDBundleV2), folderState: { nodes: { [CHANGE]: { futureTop: 1 } } } };
+    await importBundleIntoV2(src, parseAnyBundle(bundle), "merge");
+    expect(await snapshot(src)).toEqual(before);
+  });
+
+  it("round-trips a root header key this build does not declare", async () => {
+    const src = await copyV2Fixture(join(tmp, "src"), "lf");
+    await editText(join(src, "product", "index.md"), (text) => text.replace('---\n\n', 'futureHeader: {"x":1}\n---\n\n'));
+    const bundle = (await exportedJson(src)) as PRDBundleV2;
+    expect(bundle.header).toMatchObject({ futureHeader: { x: 1 } });
+
+    const dest = await emptyV2Tree("dest");
+    await importBundleIntoV2(dest, parseAnyBundle(bundle), "merge");
+    expect(await snapshot(dest)).toEqual(await snapshot(src));
+  });
+
   it("refuses to export a node whose own field is named state, which the envelope reserves", async () => {
     const src = await copyV2Fixture(join(tmp, "src"), "lf");
     await editText(join(src, "changes", "add-apple-pay", "index.md"), (text) =>
@@ -296,6 +339,28 @@ describe("parseAnyBundle", () => {
     expect(() => parseAnyBundle(v2Bundle({ product: [node({ id: TASK, type: "task", slug: "t" })] }))).toThrow(/layer/);
   });
 
+  it("refuses a header with invalid root fields", () => {
+    expect(() => parseAnyBundle(v2Bundle({}, { header: { requirements: "not-an-array", stewards: 42 } }))).toThrow(
+      /not a valid root header: requirements: .*; stewards: /,
+    );
+    expect(() => parseAnyBundle(v2Bundle({}, { header: { stewards: ["@a", 7] } }))).toThrow(/stewards\.1/);
+    expect(() => parseAnyBundle(v2Bundle({}, { header: { body: 3 } }))).toThrow(/"body" that is not a string/);
+  });
+
+  it("refuses folderState keys that cannot land back in a state.yaml", () => {
+    const change = node({ id: CHANGE, type: "change", slug: "c", children: [node({ id: TASK, type: "task", slug: "t" })] });
+    const parse = (folderState: unknown) => () => parseAnyBundle(v2Bundle({ changes: [change] }, { folderState }));
+    expect(parse({ nodes: { [TASK]: { x: 1 } } })).toThrow(/not folder nodes in this bundle: c0000000-0000-4000-8000-000000000002/);
+    expect(parse({ nodes: { [EPIC]: { x: 1 } } })).toThrow(/not folder nodes/);
+    expect(parse({ layers: { roadmap: { x: 1 } } })).toThrow(/names no layer: roadmap/);
+    expect(parse({ layers: { changes: { items: {} } } })).toThrow(/holds items, which state.yaml owns/);
+    expect(parse({ nodes: { [CHANGE]: "x" } })).toThrow(/must be an object/);
+    expect(parse({ other: {} })).toThrow(/unknown keys: other/);
+    expect(parseAnyBundle(v2Bundle({ changes: [change] }, { folderState: { nodes: { [CHANGE]: { x: 1 } } } }))).toMatchObject({
+      bundle: { folderState: { nodes: { [CHANGE]: { x: 1 } } } },
+    });
+  });
+
   it("refuses an id used twice across the layers", () => {
     const bundle = v2Bundle({
       product: [node({ id: AREA, type: "area", slug: "a" })],
@@ -357,6 +422,15 @@ describe("rejected imports write nothing", () => {
     const before = await snapshot(dest);
     const clash = v2Bundle({ changes: [node({ id: EPIC, type: "change", slug: "add-apple-pay" })] });
     await expect(importBundleIntoV2(dest, parseAnyBundle(clash), "merge")).rejects.toThrow(BundleError);
+    expect(await snapshot(dest)).toEqual(before);
+  });
+
+  it("refuses a bundle with an invalid root header before writing", async () => {
+    const src = await copyV2Fixture(join(tmp, "src"), "lf");
+    const bundle = { ...(await exportedJson(src) as PRDBundleV2), header: { requirements: "not-an-array", stewards: 42 } };
+    const dest = await emptyV2Tree("dest");
+    const before = await snapshot(dest);
+    await expect(async () => importBundleIntoV2(dest, parseAnyBundle(bundle), "merge")).rejects.toThrow(/not a valid root header/);
     expect(await snapshot(dest)).toEqual(before);
   });
 });

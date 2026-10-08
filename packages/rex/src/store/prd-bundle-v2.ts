@@ -7,8 +7,12 @@
  * apart under `state`, children nested ({@link BundleNodeV2}). Keeping the
  * row apart is what lets a state key this build does not declare (a retired
  * field, or one a newer rex wrote) land back in `state.yaml` rather than in
- * frontmatter. The same carve-out applies: a bundle is written outside the
- * rex directory and never read as storage.
+ * frontmatter. For the same reason a `state.yaml`'s own top-level keys other
+ * than `schema` and `items` travel in `folderState` ({@link BundleFolderStateV2})
+ * and are written back to the same folder's file. The root header is checked
+ * against the schema `product/index.md` is read with. The same carve-out
+ * applies: a bundle is written outside the rex directory and never read as
+ * storage.
  *
  * Which envelope is used follows the tree, not a flag:
  *
@@ -47,6 +51,7 @@ import type { PRDItem } from "../schema/index.js";
 import {
   ItemStateSchema,
   NodeIntentSchema,
+  RootHeaderSchema,
   SCHEMA_VERSION_V2,
   isV2Schema,
   type ItemState,
@@ -58,7 +63,7 @@ import { withLock } from "./file-lock.js";
 import { resolveSiblingSlugs } from "./folder-tree-serializer.js";
 import { prdLockPath } from "./paths.js";
 import type { ParseWarning } from "./folder-tree-parser.js";
-import { PRODUCT_DIRNAME, V1_LEVEL_TYPES, loadPrdModel, type PrdModel } from "./prd-model-reader.js";
+import { PRODUCT_DIRNAME, V1_LEVEL_TYPES, loadPrdModel, type FolderStateKeys, type PrdModel } from "./prd-model-reader.js";
 import { writePrdModel } from "./prd-model-writer.js";
 
 /** Envelope version that carries both v2 layers. */
@@ -79,6 +84,17 @@ export interface BundleNodeV2 {
   [key: string]: unknown;
 }
 
+/**
+ * Each folder's `state.yaml` top-level keys other than `schema` and `items`
+ * (keys a newer rex added), so they land back in the same folder's file. A
+ * layer root's go under `layers`, a folder node's under `nodes` by its id.
+ * Kept beside the nodes rather than on them, so no node field is reserved.
+ */
+export interface BundleFolderStateV2 {
+  layers?: Partial<Record<Layer, Record<string, unknown>>>;
+  nodes?: Record<string, Record<string, unknown>>;
+}
+
 export interface PRDBundleV2 {
   bundle: typeof BUNDLE_KIND;
   bundleVersion: typeof BUNDLE_VERSION_V2;
@@ -91,6 +107,8 @@ export interface PRDBundleV2 {
   exportedFrom?: BundleProvenance;
   product: BundleNodeV2[];
   changes: BundleNodeV2[];
+  /** Omitted when no `state.yaml` has such keys. */
+  folderState?: BundleFolderStateV2;
 }
 
 /** A parsed bundle of either envelope. */
@@ -142,6 +160,8 @@ export interface BuildBundleV2Options {
    * undeclared one is carried as intent.
    */
   stateRows?: ReadonlyMap<string, ItemState>;
+  /** Each `state.yaml`'s extra top-level keys (`LoadPrdModelOptions.folderState`). Without it none are carried. */
+  folderState?: FolderStateKeys;
 }
 
 /** Snapshot a loaded v2 model into an envelope v2 bundle. The nodes are deep-cloned. */
@@ -151,6 +171,7 @@ export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {
   if (options.branch) provenance.branch = options.branch;
   if (options.commit) provenance.commit = options.commit;
   const header = carriedHeader(model.header);
+  const folderState = options.folderState ? carriedFolderState(options.folderState) : undefined;
 
   return {
     bundle: BUNDLE_KIND,
@@ -162,7 +183,17 @@ export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {
     ...(Object.keys(provenance).length > 0 ? { exportedFrom: provenance } : {}),
     product: toBundleNodes(model.tree.product, rows),
     changes: toBundleNodes(model.tree.changes, rows),
+    ...(folderState ? { folderState } : {}),
   };
+}
+
+/** The reader's folder keys in envelope form, deep-cloned, or undefined when there are none. */
+function carriedFolderState(keys: FolderStateKeys): BundleFolderStateV2 | undefined {
+  const out: BundleFolderStateV2 = {};
+  const layers = LAYERS.filter((layer) => keys.layers[layer] !== undefined);
+  if (layers.length > 0) out.layers = Object.fromEntries(layers.map((layer) => [layer, structuredClone(keys.layers[layer])]));
+  if (keys.nodes.size > 0) out.nodes = Object.fromEntries([...keys.nodes].map(([id, extra]) => [id, structuredClone(extra)]));
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /** Loaded nodes as envelope nodes: a field is state when it is declared state or its row holds it. */
@@ -198,8 +229,9 @@ export interface V2Export {
 /** Read the v2 tree under the PRD lock and build its bundle. */
 export async function exportV2Bundle(rexDir: string, options: BuildBundleV2Options = {}): Promise<V2Export> {
   const stateRows = new Map<string, ItemState>();
-  const model = await withLock(prdLockPath(rexDir), () => loadPrdModel(rexDir, { stateRows }));
-  return { bundle: buildBundleV2(model, { stateRows, ...options }), warnings: model.warnings };
+  const folderState: FolderStateKeys = { layers: {}, nodes: new Map() };
+  const model = await withLock(prdLockPath(rexDir), () => loadPrdModel(rexDir, { stateRows, folderState }));
+  return { bundle: buildBundleV2(model, { stateRows, folderState, ...options }), warnings: model.warnings };
 }
 
 function carriedHeader(header: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
@@ -251,6 +283,8 @@ function parseBundleV2(candidate: Record<string, unknown>): PRDBundleV2 {
   if (candidate.header !== undefined && !isRecord(candidate.header)) {
     throw new BundleError('Bundle "header" must be an object.');
   }
+  const header = carriedHeader(candidate.header as Record<string, unknown> | undefined);
+  assertValidHeader(header, title, schema);
 
   for (const layer of LAYERS) assertValidNodes(candidate[layer] as unknown[]);
   const product = candidate.product as BundleNodeV2[];
@@ -258,6 +292,7 @@ function parseBundleV2(candidate: Record<string, unknown>): PRDBundleV2 {
   const { tree } = fromBundleNodes(product, changes);
   assertUniqueIds(tree);
   assertLegalStructure(tree);
+  const folderState = parseFolderState(candidate.folderState, tree);
 
   const parsed: PRDBundleV2 = {
     bundle: BUNDLE_KIND,
@@ -268,8 +303,8 @@ function parseBundleV2(candidate: Record<string, unknown>): PRDBundleV2 {
     product,
     changes,
   };
-  const header = carriedHeader(candidate.header as Record<string, unknown> | undefined);
   if (header) parsed.header = header;
+  if (folderState) parsed.folderState = folderState;
   if (isRecord(candidate.exportedFrom)) {
     const { branch, commit } = candidate.exportedFrom;
     const provenance: BundleProvenance = {};
@@ -278,6 +313,85 @@ function parseBundleV2(candidate: Record<string, unknown>): PRDBundleV2 {
     if (Object.keys(provenance).length > 0) parsed.exportedFrom = provenance;
   }
   return parsed;
+}
+
+function describeIssues(issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>): string {
+  return issues.map((i) => `${i.path.map(String).join(".") || "(root)"}: ${i.message}`).join("; ");
+}
+
+/**
+ * Hold the root header, as the writer would rebuild it from the envelope's
+ * title and schema, to the schema the reader checks `product/index.md`
+ * against. Unknown keys pass, as they do on disk.
+ */
+function assertValidHeader(header: Record<string, unknown> | undefined, title: string, schema: string): void {
+  const { body, ...fields } = header ?? {};
+  if (body !== undefined && typeof body !== "string") {
+    throw new BundleError('Bundle "header" has a "body" that is not a string. Nothing was written.');
+  }
+  const result = RootHeaderSchema.safeParse({ ...fields, title, schema });
+  if (!result.success) {
+    throw new BundleError(`Bundle "header" is not a valid root header: ${describeIssues(result.error.issues)}. Nothing was written.`);
+  }
+}
+
+/**
+ * Validate the envelope's `folderState`: layer names, folder-node ids from
+ * this bundle (a leaf keeps no `state.yaml`, so its keys would be lost), and
+ * key sets without `schema` or `items`, which the file itself owns.
+ */
+function parseFolderState(raw: unknown, tree: V2Tree): BundleFolderStateV2 | undefined {
+  if (raw === undefined) return undefined;
+  if (!isRecord(raw)) throw new BundleError('Bundle "folderState" must be an object. Nothing was written.');
+  const unknown = Object.keys(raw).filter((key) => key !== "layers" && key !== "nodes");
+  if (unknown.length > 0) {
+    throw new BundleError(`Bundle "folderState" has unknown keys: ${unknown.join(", ")}. Nothing was written.`);
+  }
+  const out: BundleFolderStateV2 = {};
+  if (raw.layers !== undefined) {
+    const layers = keyedRecords(raw.layers, "folderState.layers");
+    const bad = Object.keys(layers).filter((key) => !(LAYERS as readonly string[]).includes(key));
+    if (bad.length > 0) {
+      throw new BundleError(`Bundle "folderState.layers" names no layer: ${bad.join(", ")}. Nothing was written.`);
+    }
+    out.layers = layers;
+  }
+  if (raw.nodes !== undefined) {
+    const nodes = keyedRecords(raw.nodes, "folderState.nodes");
+    const folders = folderNodeIds(tree);
+    const bad = Object.keys(nodes).filter((id) => !folders.has(id));
+    if (bad.length > 0) {
+      throw new BundleError(
+        `Bundle "folderState.nodes" names ids that are not folder nodes in this bundle: ${bad.join(", ")}. Nothing was written.`,
+      );
+    }
+    out.nodes = nodes;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** An object of `state.yaml` top-level key sets, each checked. */
+function keyedRecords(raw: unknown, where: string): Record<string, Record<string, unknown>> {
+  if (!isRecord(raw)) throw new BundleError(`Bundle "${where}" must be an object. Nothing was written.`);
+  for (const [key, extra] of Object.entries(raw)) {
+    if (!isRecord(extra)) throw new BundleError(`Bundle "${where}.${key}" must be an object. Nothing was written.`);
+    const owned = Object.keys(extra).filter((k) => k === "schema" || k === "items");
+    if (owned.length > 0) {
+      throw new BundleError(`Bundle "${where}.${key}" holds ${owned.join(" and ")}, which state.yaml owns. Nothing was written.`);
+    }
+  }
+  return raw as Record<string, Record<string, unknown>>;
+}
+
+/** Ids of nodes the writer stores as folders (and so with a `state.yaml`): changes, and nodes with children. */
+function folderNodeIds(tree: V2Tree): Set<string> {
+  const ids = new Set<string>();
+  const visit = (node: RuleNode): void => {
+    if (node.type === "change" || (node.children?.length ?? 0) > 0) ids.add(node.id);
+    node.children?.forEach(visit);
+  };
+  LAYERS.forEach((layer) => tree[layer].forEach(visit));
+  return ids;
 }
 
 /**
@@ -307,8 +421,7 @@ function assertValidNodes(nodes: unknown[]): void {
     }
     for (const result of [NodeIntentSchema.safeParse(intent), ItemStateSchema.safeParse(state)]) {
       if (!result.success) {
-        const issues = result.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
-        throw new BundleError(`Bundle contains an invalid node ${label}: ${issues}. Nothing was written.`);
+        throw new BundleError(`Bundle contains an invalid node ${label}: ${describeIssues(result.error.issues)}. Nothing was written.`);
       }
     }
     assertValidNodes((node.children as unknown[] | undefined) ?? []);
@@ -514,15 +627,25 @@ export async function importBundleIntoV2(rexDir: string, parsed: ParsedBundle, m
     const { tree, carried, stateKeys } = incomingTree(parsed);
     const wasEmpty = countNodes(model.tree.product) + countNodes(model.tree.changes) === 0;
     // A merge keeps a local node over the bundle's, and the local row on disk already says what is state.
-    if (mode === "merge") for (const id of idsOf(model.tree)) stateKeys.delete(id);
+    const local = mode === "merge" ? idsOf(model.tree) : new Set<string>();
+    for (const id of local) stateKeys.delete(id);
     const outcome = mergeV2Tree(model.tree, tree, mode, carried);
     const adopt = wasEmpty || (mode === "replace" && carried.length === LAYERS.length);
     const next: PrdModel = { ...model, tree: outcome.tree };
+    const folderState: FolderStateKeys = { layers: {}, nodes: new Map() };
     if (adopt) {
       next.title = parsed.bundle.title;
       if (parsed.version === BUNDLE_VERSION_V2) next.header = parsed.bundle.header;
     }
-    await writePrdModel(rexDir, next, { removed: outcome.removed, stateKeys });
+    if (parsed.version === BUNDLE_VERSION_V2) {
+      const carried = parsed.bundle.folderState ?? {};
+      // Layer roots follow the header's rule; a folder node's keys follow its node, so a local node keeps its own.
+      if (adopt) folderState.layers = structuredClone(carried.layers ?? {});
+      for (const [id, extra] of Object.entries(carried.nodes ?? {})) {
+        if (!local.has(id)) folderState.nodes.set(id, structuredClone(extra));
+      }
+    }
+    await writePrdModel(rexDir, next, { removed: outcome.removed, stateKeys, folderState });
     return outcome;
   });
 }

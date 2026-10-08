@@ -55,6 +55,7 @@ import {
   TaskIntentSchema,
   isV2Schema,
   type ItemState,
+  type Layer,
   type NodeType,
   type StateFile,
 } from "../schema/v2.js";
@@ -64,8 +65,23 @@ import { isLockHeld } from "./file-lock.js";
 import { parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
 import { SLUG_RULE_VERSION, isWindowsSafeSegment } from "./folder-tree-serializer.js";
 import { prdLockPath } from "./paths.js";
-import { CHANGES_DIRNAME, PRODUCT_DIRNAME, assertPrdModelWritable, assertV2TreeWritable, type PrdModel } from "./prd-model-reader.js";
-import { STATE_FILE_NAME, emptyStateFile, loadStateFile, sameTextOnDisk, saveStateFile, type ProductSpec } from "./state-writer.js";
+import {
+  CHANGES_DIRNAME,
+  PRODUCT_DIRNAME,
+  assertPrdModelWritable,
+  assertV2TreeWritable,
+  type FolderStateKeys,
+  type PrdModel,
+} from "./prd-model-reader.js";
+import {
+  STATE_FILE_NAME,
+  emptyStateFile,
+  extraTopLevelKeys,
+  loadStateFile,
+  sameTextOnDisk,
+  saveStateFile,
+  type ProductSpec,
+} from "./state-writer.js";
 
 export interface WritePrdModelOptions {
   /**
@@ -80,6 +96,13 @@ export interface WritePrdModelOptions {
    * fresh tree) this is the only way an undeclared state key stays state.
    */
   stateKeys?: ReadonlyMap<string, ReadonlySet<string>>;
+  /**
+   * Top-level `state.yaml` keys to set, beyond `schema` and `items`: a layer
+   * root's by layer, a folder node's by its id. Each overwrites the key in the
+   * folder's file; keys already there and not named here are kept. A node
+   * written as a leaf has no `state.yaml`, so its entry is ignored.
+   */
+  folderState?: FolderStateKeys;
   /** Clock for `revisedAt` stamps. */
   now?: () => Date;
 }
@@ -139,11 +162,15 @@ export async function writePrdModel(
 
   const productDir = join(rexDir, PRODUCT_DIRNAME);
   const changesDir = join(rexDir, CHANGES_DIRNAME);
-  const loaded = await loadAllStateFiles([productDir, changesDir], options.stateKeys ?? new Map());
+  const loaded = await loadAllStateFiles(
+    [productDir, changesDir],
+    options.stateKeys ?? new Map(),
+    options.folderState ?? { layers: {}, nodes: new Map() },
+  );
   plan.files.set(join(productDir, INDEX_FILE), renderRootHeader(model, stamp));
-  await planFolder(productDir, model.tree.product, null, stamp, loaded, plan);
-  if (model.tree.changes.length > 0 || (await listDir(changesDir)) !== null) {
-    await planFolder(changesDir, model.tree.changes, null, stamp, loaded, plan);
+  await planFolder(productDir, model.tree.product, "product", stamp, loaded, plan);
+  if (model.tree.changes.length > 0 || loaded.folderState.layers.changes || (await listDir(changesDir)) !== null) {
+    await planFolder(changesDir, model.tree.changes, "changes", stamp, loaded, plan);
   }
   await assertStaleRemovable(plan.stale, collectIds(model), options.removed ?? new Set());
 
@@ -193,13 +220,16 @@ interface LoadedState {
   rows: Map<string, ItemState>;
   /** {@link WritePrdModelOptions.stateKeys}. */
   stateKeys: ReadonlyMap<string, ReadonlySet<string>>;
+  /** {@link WritePrdModelOptions.folderState}. */
+  folderState: FolderStateKeys;
 }
 
 async function loadAllStateFiles(
   roots: readonly string[],
   stateKeys: ReadonlyMap<string, ReadonlySet<string>>,
+  folderState: FolderStateKeys,
 ): Promise<LoadedState> {
-  const loaded: LoadedState = { files: new Map(), rows: new Map(), stateKeys };
+  const loaded: LoadedState = { files: new Map(), rows: new Map(), stateKeys, folderState };
   const walk = async (dir: string): Promise<void> => {
     for (const entry of (await listDir(dir)) ?? []) {
       if (entry.name.startsWith(".")) continue;
@@ -217,13 +247,13 @@ async function loadAllStateFiles(
 }
 
 /**
- * Plan folder `dir`: `owner` (the folder node, or null for a layer root) and
- * `nodes`, its children. Everything is validated here, before any write.
+ * Plan folder `dir`: `owner` (the folder node, or the layer for a layer root)
+ * and `nodes`, its children. Everything is validated here, before any write.
  */
 async function planFolder(
   dir: string,
   nodes: readonly RuleNode[],
-  owner: RuleNode | null,
+  owner: RuleNode | Layer,
   stamp: string,
   loaded: LoadedState,
   plan: Plan,
@@ -231,6 +261,8 @@ async function planFolder(
   plan.dirs.add(dir);
   const entries = (await listDir(dir)) ?? [];
   const existing = loaded.files.get(dir) ?? { ...emptyStateFile(), schema: stamp };
+  const { layers, nodes: byOwner } = loaded.folderState;
+  Object.assign(existing, typeof owner === "string" ? layers[owner] : byOwner.get(owner.id));
   const rows: Record<string, ItemState> = {};
   const specs = new Map<string, ProductSpec>();
   const keep = (node: RuleNode, intent: Record<string, unknown>): void => {
@@ -245,7 +277,7 @@ async function planFolder(
     if (spec) specs.set(node.id, spec);
   };
 
-  if (owner) {
+  if (typeof owner !== "string") {
     const intent: Record<string, unknown> = {};
     keep(owner, intent);
     assertValidIntent(owner, intent, dir);
@@ -278,8 +310,7 @@ async function planFolder(
     }
   }
 
-  const extraTopKeys = Object.keys(existing).some((k) => k !== "schema" && k !== "items");
-  if (Object.keys(rows).length === 0 && !extraTopKeys) {
+  if (Object.keys(rows).length === 0 && !extraTopLevelKeys(existing)) {
     plan.states.push({ dir, file: null, specs });
   } else {
     // Reusing the loaded object keeps the original lines of keys this build does not know.
