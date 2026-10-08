@@ -11,9 +11,14 @@
  * A value a build file declares. A value that depends on something outside
  * the repository (a remote parent, an imported BOM) or on an undefined
  * property is `resolved: false` with the reason, never a guess.
+ *
+ * `bestEffort: true` marks a value read from a build *script* (Gradle's
+ * `build.gradle(.kts)`), which is a program: the literal was there, but the
+ * script may override it. Values from data files (a pom, a version catalog)
+ * are exact and carry no flag.
  */
 export type BuildValue =
-  | { readonly resolved: true; readonly value: string }
+  | { readonly resolved: true; readonly value: string; readonly bestEffort?: true }
   | { readonly resolved: false; readonly reason: string };
 
 export interface BuildDependency {
@@ -22,7 +27,7 @@ export interface BuildDependency {
   /** Maven artifactId, Gradle name; Go uses the last path element. */
   readonly artifact: string;
   readonly version: BuildValue;
-  /** `compile` when the build file declares none. */
+  /** Maven scope (`compile` when none is declared) or the Gradle configuration name (`implementation`, `testImplementation`, …). */
   readonly scope: string;
 }
 

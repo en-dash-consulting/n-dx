@@ -1,0 +1,94 @@
+[
+  {
+    "module": ":",
+    "dir": "",
+    "buildSystem": "gradle",
+    "group": {
+      "resolved": true,
+      "value": "com.example",
+      "bestEffort": true
+    },
+    "version": {
+      "resolved": true,
+      "value": "1.0.0",
+      "bestEffort": true
+    },
+    "dependencies": [
+      {
+        "group": "com.example",
+        "artifact": "broken",
+        "version": {
+          "resolved": false,
+          "reason": "version.ref \"nowhere\" is not in [versions]"
+        },
+        "scope": "implementation"
+      },
+      {
+        "group": "com.fasterxml.jackson.module",
+        "artifact": "jackson-module-kotlin",
+        "version": {
+          "resolved": true,
+          "value": "2.17.2"
+        },
+        "scope": "implementation"
+      },
+      {
+        "group": "org.jetbrains.kotlinx",
+        "artifact": "kotlinx-coroutines-core",
+        "version": {
+          "resolved": true,
+          "value": "1.8.1",
+          "bestEffort": true
+        },
+        "scope": "implementation"
+      },
+      {
+        "group": "org.junit.jupiter",
+        "artifact": "junit-jupiter-api",
+        "version": {
+          "resolved": true,
+          "value": "5.11.0"
+        },
+        "scope": "testImplementation"
+      },
+      {
+        "group": "org.junit.jupiter",
+        "artifact": "junit-jupiter-engine",
+        "version": {
+          "resolved": true,
+          "value": "5.11.0"
+        },
+        "scope": "testImplementation"
+      },
+      {
+        "group": "org.springframework.boot",
+        "artifact": "spring-boot-dependencies",
+        "version": {
+          "resolved": true,
+          "value": "3.3.4"
+        },
+        "scope": "implementation"
+      },
+      {
+        "group": "org.springframework.boot",
+        "artifact": "spring-boot-starter-web",
+        "version": {
+          "resolved": false,
+          "reason": "no version in the script; a plugin or platform may manage it"
+        },
+        "scope": "implementation"
+      }
+    ],
+    "javaVersion": {
+      "resolved": true,
+      "value": "21"
+    },
+    "springBootVersion": {
+      "resolved": true,
+      "value": "3.3.4"
+    },
+    "notices": [
+      "build.gradle.kts: libs.missing.entry is not a library in the libs version catalog"
+    ]
+  }
+]

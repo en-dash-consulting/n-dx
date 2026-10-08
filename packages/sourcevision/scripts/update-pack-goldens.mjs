@@ -17,6 +17,7 @@ process.env.SV_UPDATE_PACK_GOLDENS = "1";
 const GOLDEN_TESTS = [
   "tests/integration/language-pack-goldens.test.ts",
   "tests/unit/language/java-maven-build.test.ts", // build-model goldens under tests/fixtures/maven-build
+  "tests/unit/language/java-gradle-build.test.ts", // build-model goldens under tests/fixtures/gradle-build
 ];
 
 const vitest = await startVitest("test", GOLDEN_TESTS, {
