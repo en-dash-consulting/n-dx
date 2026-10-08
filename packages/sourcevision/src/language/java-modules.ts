@@ -61,8 +61,10 @@ async function readMavenModules(projectDir: string): Promise<JavaModule[]> {
     const pom = await readText(join(projectDir, dir, "pom.xml"));
     if (pom === null) return;
     const xml = pom.replace(/<!--[\s\S]*?-->/g, "");
+    // Plugin configuration reuses the tag name (antlr4, protobuf, ...) for non-Java roots.
+    const build = xml.replace(/<plugins>[\s\S]*?<\/plugins>/g, "");
 
-    const declared = [...tagValues(xml, "sourceDirectory"), ...tagValues(xml, "testSourceDirectory")].map(
+    const declared = [...tagValues(build, "sourceDirectory"), ...tagValues(build, "testSourceDirectory")].map(
       resolveMavenPath,
     );
     modules.push({
