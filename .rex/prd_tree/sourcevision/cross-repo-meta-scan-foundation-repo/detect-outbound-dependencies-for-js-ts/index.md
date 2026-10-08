@@ -2,9 +2,12 @@
 id: "21c17d38-c771-4e30-9db4-281733055adc"
 level: "task"
 title: "Detect outbound dependencies for JS/TS and Go into outbound.json"
-status: "pending"
+status: "completed"
 priority: "high"
 source: "ndx-capture"
+startedAt: "2026-10-08T16:43:27.630Z"
+completedAt: "2026-10-08T16:43:27.630Z"
+endedAt: "2026-10-08T16:43:27.630Z"
 acceptanceCriteria:
   - "`analyzers/outbound-detection.ts` emits `OutboundDependency` records with `file`, `line`, `kind`, `target`, `targetSource`, `client` and `confidence`, typed in `schema/v1.ts`."
   - "JS/TS detection runs through the TypeScript compiler API and covers `fetch`, axios, got, undici, ky, node-fetch, gRPC clients, SQS/SNS/Kafka/RabbitMQ clients and pg/mysql/mongo/redis clients."
@@ -18,7 +21,7 @@ acceptanceCriteria:
   - "Unit tests under `packages/sourcevision/tests/unit/analyzers/` cover each client family for both languages and both `targetSource` paths."
 description: "SourceVision detects only the provider side of HTTP — `analyzers/server-route-detection.ts` and `go-route-detection.ts` produce inbound `ServerRoute` entries. Without the consumer side, a repo that calls another repo is invisible. Add `analyzers/outbound-detection.ts`, mirroring the shape of the route detectors, producing:\n\n`OutboundDependency { file, line, kind: \"http\" | \"grpc\" | \"queue\" | \"database\" | \"cache\" | \"env\", target: string, targetSource: \"literal\" | \"env\" | \"config\" | \"unknown\", client: string, confidence }`\n\nJS/TS goes through the TypeScript compiler API: `fetch`, axios, got, undici, ky, node-fetch; gRPC clients; SQS/SNS/Kafka/RabbitMQ clients; pg/mysql/mongo/redis clients. Go reuses the existing Go parsing: `net/http`, grpc, aws-sdk, sarama, go-redis, `database/sql`.\n\nRecord URL literals, the `process.env.X` / `os.Getenv(\"X\")` names feeding a client, and OpenAPI or `.proto` files as declared contracts. Deterministic, no LLM, no network. Store as `outbound.json`.\n\n**Resolved: `confidence` is about the call, not the target.** The open question was what `confidence` an env-var-sourced target should carry. The answer is that it should carry the same confidence as any other — because `targetSource` already records that the target is an environment variable name rather than an address. Scoring the env case lower would encode the same fact twice in two fields that can then disagree, which is the defect shape this codebase has been bitten by repeatedly (a count beside the array it counts; a `usedBy` list duplicated into persisted links).\n\nSo `confidence` answers \"how sure are we this is an outbound client call at all\" — lower it for a call reached through an alias, a wrapper, or a dynamic member access — and `targetSource` answers \"do we know where it points\". The downstream matcher (`c28d2b18`, http/infra edge sources for workspace crossings) branches on `targetSource === \"env\"` to look the name up against other members' routes; it needs a category to switch on, not a threshold to guess at.\n\nUse the three-level `\"certain\" | \"likely\" | \"inferred\"` vocabulary rather than a 0–1 number: the numeric sites in this schema (`FileClassification`, `Zone`, `Finding`) are scores a model produced, whereas this is a detector saying how direct the evidence was.\n\n**Where that vocabulary lives.** `schema/v1.ts` declares it as `SdlcConfidence`, landed by the SDLC readiness task `91327de0`. Import it; do not inline the three literals into `OutboundDependency`, which is what lets two definitions drift apart. Nothing else about `SdlcProfile` is needed here — the two features share a vocabulary, not a dependency. The `Sdlc` prefix is a leftover from the union having had exactly one user; if it grates once this record uses it too, rename it to `Confidence` in the same change rather than declaring a second one.\n\n**Scope note.** Twelve JS/TS client families plus six Go families, each needing detection and tests, is more than one sitting. Split into subtasks before starting — by language, or by `kind` — rather than landing one thin pass over everything."
 assignee: "Sterling H <sterling.h@endash.us>"
-lastModified: "2026-10-07T16:13:17.023Z"
+lastModified: "2026-10-08T16:43:28.151Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -27,6 +30,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Declare OutboundDependency, register outbound.json and wire an empty detector with declared contracts](./declare-outbounddependency-register.md) | completed |
-| [Detect Go outbound clients on the existing Go parser](./detect-go-outbound-clients-on-the.md) | in_progress |
+| [Detect Go outbound clients on the existing Go parser](./detect-go-outbound-clients-on-the.md) | completed |
 | [Detect JS/TS HTTP and gRPC clients through the TypeScript compiler API](./detect-js-ts-http-and-grpc-clients.md) | completed |
 | [Detect JS/TS queue, database and cache clients](./detect-js-ts-queue-database-and-cache.md) | completed |
