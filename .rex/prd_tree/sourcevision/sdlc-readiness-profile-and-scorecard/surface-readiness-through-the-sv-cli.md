@@ -2,12 +2,14 @@
 id: "e29bdb3e-0108-4374-b95b-cc73976b7556"
 level: "task"
 title: "Surface readiness through the sv CLI, ndx passthrough, MCP and the sv status"
-status: "in_progress"
+status: "completed"
 priority: "medium"
 blockedBy:
   - "e6649d84-5c5d-4e48-8a83-7ea8a37dc110"
 source: "ndx-capture"
 startedAt: "2026-10-08T13:48:33.714Z"
+completedAt: "2026-10-08T14:17:54.911Z"
+endedAt: "2026-10-08T14:17:54.911Z"
 acceptanceCriteria:
   - "`sourcevision readiness` runs and prints the scorecard; `--json` prints the machine-readable artifact; help is registered in `cli/help.ts` and appears in `sourcevision --help`."
   - "`ndx readiness` is registered in `COMMAND_DISPATCH` in `packages/core/cli.js` as a spawn, matching the existing delegate pattern; `packages/core` gains no imports and `tests/e2e/architecture-policy.test.js` passes."
@@ -20,6 +22,6 @@ acceptanceCriteria:
   - "A changeset exists with patch bumps for `@n-dx/sourcevision`, `@n-dx/core` and `@n-dx/web`."
 description: "Four surfaces, each following its tier's existing pattern:\n\n- `sourcevision readiness [--json]` as a CLI command under `cli/commands/`, with help registered in `cli/help.ts`.\n- `ndx readiness` in `COMMAND_DISPATCH` in `packages/core/cli.js`, following the existing delegate pattern — orchestration spawns, it never imports.\n- `get_readiness` as an MCP tool in `cli/mcp.ts`, returning the same artifact the CLI prints.\n- Types re-exported through `packages/web/src/server/domain-gateway.ts` only, with no logic there, plus `readiness: { overall, analyzedAt }` on the sv status in `packages/web/src/server/routes-status.ts` so the hub card can show it later.\n\nA dashboard view is out of scope — the status field exists so the view can be built later without touching this work again. Docs for the command and the artifacts go in `docs/packages/sourcevision.md` and `docs/guide/commands.md`, marking the scorecard as heuristic and listing every detector in a table."
 assignee: "Sterling H <sterling.h@endash.us>"
-lastModified: "2026-10-08T13:48:34.220Z"
+lastModified: "2026-10-08T14:17:55.431Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

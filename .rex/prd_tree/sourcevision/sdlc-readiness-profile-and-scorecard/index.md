@@ -2,9 +2,12 @@
 id: "7d36ef27-6a39-42bb-ac8f-39059ac330b2"
 level: "feature"
 title: "SDLC readiness profile and scorecard: evidence-based CI/CD maturity for agent readiness"
-status: "pending"
+status: "completed"
 priority: "medium"
 source: "ndx-capture"
+startedAt: "2026-10-08T14:17:57.759Z"
+completedAt: "2026-10-08T14:17:57.759Z"
+endedAt: "2026-10-08T14:17:57.759Z"
 acceptanceCriteria:
   - "`SdlcProfile` is declared in `packages/sourcevision/src/schema/v1.ts` and `sdlcProfile: \"sdlc-profile.json\"` is registered in `schema/data-files.ts`."
   - "Every detection carries evidence shaped `{ kind, path, line?, excerpt?, confidence: \"certain\" | \"likely\" | \"inferred\" }`; no detection is recorded without at least one evidence entry."
@@ -37,7 +40,7 @@ acceptanceCriteria:
   - "A changeset exists with patch bumps for `@n-dx/sourcevision`, `@n-dx/core` and `@n-dx/web` (scoped names only)."
   - "Nothing under `packages/rex/` or `packages/hench/` changes."
 description: "`ndx analyze` answers \"how is this code structured\" but not \"how ready is this repo to be worked by an autonomous agent?\" That is effectively a CI/CD maturity evaluation: tests, automated CI, automated CD, deployment and rollback patterns, data migrations, traffic shifting, feature toggles, quality gates, observability. The output must be evidence-based, scored, and consumable by the CLI, the MCP server, the dashboard, and later by `ndx recommend`.\n\nTwo artifacts, kept separate: a deterministic `sdlc-profile.json` of what was detected, and a `ReadinessScore` computed from it. Detection and judgement do not get mixed.\n\nWhat already exists and must be reused rather than forked:\n- `analyzers/project-profile.ts` already detects frameworks, CI surfaces, build surfaces and release infrastructure by file existence, writes `.sourcevision/project-profile.json`, and is built in `cli/commands/analyze.ts`. Extend that pattern; the new analyzer sits beside it.\n- The inventory's `codeOnly` filter (`analyzers/inventory.ts`) defaults to true and drops YAML, JSON, TOML, Dockerfile and `.tf` files. Do **not** widen the inventory — it would pollute zone detection. The new analyzer gets its own bounded walk, as `project-profile.ts` and `export/iso-declared.ts` already do.\n- `export/iso-declared.ts` already parses Terraform and CloudFormation resources. Reuse it.\n- `packages/rex/src/core/health.ts` is the scorecard pattern to copy: weighted dimensions scored 0-100, overall as the weighted sum, suggestions aimed at the weakest dimension. Keeping the same shape lets the dashboard render both identically.\n- `packages/llm-client/src/repo-trust.ts` already judges agent config safety. Reference its findings as the `agentSafety` dimension input; do not move or change it.\n- `packages/hench/src/tools/test-command-resolver.ts`, rex's `.rex/config.json` `test` field, and `packages/core/readme-generator.js` `detectCommands` each discover test commands differently. The profile's `commands` section is designed so they can later read one source of truth; unifying them is explicitly not this work.\n\nCarried over from the earlier readiness design and still binding: all CI providers are parsed up front rather than GitHub-only, so a supported provider never silently contributes missing data; a provider file that is present but unparseable is reported as a parse failure with its path, never as absence; readiness gaps stay out of the zone-findings stream, which is zone-scoped and LLM-enriched, because mixing them would corrupt zone health scores.\n\nHonest limits to preserve in the output: this tells you whether tests exist, run, and where the holes are — not whether they are good. Infra reading is configuration review, not a pentest or CVE scan. The scorecard is heuristic and must be labelled as such wherever it is published.\n\nOut of scope, to be captured separately as follow-ups: the dashboard view, turning gaps into rex proposals, changing hench gates, unifying the three test-command resolvers, and any remote API call (GitHub branch protection via API). Nothing in rex or hench changes in this work.\n\nOpen questions to settle during the work: whether the starting weights are right, and how precise each detector must be before its evidence is allowed to move a score."
-lastModified: "2026-10-05T17:36:59.142Z"
+lastModified: "2026-10-08T14:17:58.308Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -48,4 +51,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Build the readiness scorecard with weights in one exported constant](./build-the-readiness-scorecard-with.md) | completed |
 | [Build the sdlc-profile analyzer with its own bounded walk and CI parsing](./build-the-sdlc-profile-analyzer-with.md) | completed |
 | [Declare the SdlcProfile schema and register sdlc-profile.json](./declare-the-sdlcprofile-schema-and.md) | completed |
-| [Surface readiness through the sv CLI, ndx passthrough, MCP and the sv status](./surface-readiness-through-the-sv-cli.md) | in_progress |
+| [Surface readiness through the sv CLI, ndx passthrough, MCP and the sv status](./surface-readiness-through-the-sv-cli.md) | completed |
