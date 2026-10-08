@@ -189,6 +189,10 @@ describe("rex cli/commands import surface", () => {
     // web a v2 module before the v2 store is wired in (see the isolation test
     // in tests/unit/schema/v2.test.ts).
     "../../store/state-merge.js",
+    // `rex export` / `rex import-bundle` dispatch on the tree layout and the
+    // bundle envelope through prd-bundle-v2, the one caller of the v2 bundle.
+    // Not routed through public.ts for the same reason as state-merge above.
+    "../../store/prd-bundle-v2.js",
     "../../store/title-to-filename.js",
     "../../workflow/default.js",
   ]);

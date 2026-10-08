@@ -511,6 +511,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "artifact, not PRD storage: it must be written outside .rex/ entirely,\n" +
       "and nothing in rex ever reads it as a backend.\n" +
       "\n" +
+      "A v2 tree (product/ and changes/) exports as a v2 bundle carrying both\n" +
+      "layers, whole: --item and narrative are not supported on one yet.\n" +
+      "\n" +
       "--item=<id-or-slug> scopes the bundle to one epic, feature or task. The\n" +
       "scope is a closure rather than a filter: the item arrives with every\n" +
       "descendant beneath it, with the transitive blockedBy closure so no\n" +
@@ -565,6 +568,12 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "\n" +
       "The tree is snapshotted before the write, so 'rex restore' can undo an\n" +
       "import; on --replace the discarded items are also kept in .rex/archive.json.\n" +
+      "\n" +
+      "A v2 tree (product/ and changes/) accepts both bundle formats: a v2\n" +
+      "bundle carries both layers, a v1 bundle lands in the change layer and\n" +
+      "its --replace replaces that layer only. A v1 tree accepts v1 bundles\n" +
+      "only. 'rex restore' does not cover a v2 tree, so --replace on one needs\n" +
+      "--no-snapshot.\n" +
       "\n" +
       "Named 'import-bundle' because 'rex import' is an alias for 'rex analyze'.\n" +
       "Also available as 'ndx prd import'.",

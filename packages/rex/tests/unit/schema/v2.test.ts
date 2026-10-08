@@ -422,13 +422,16 @@ describe("isolation", () => {
     // loader, tree writer) may import each other; nothing else may import
     // them until the v2 store wires them in. The one exception is the
     // `rex merge-state` git driver, which imports state-merge: branches merge
-    // state.yaml before any rex command reads it.
+    // state.yaml before any rex command reads it. And `rex export` /
+    // `rex import-bundle`, which import prd-bundle-v2 to dispatch on the tree
+    // layout and the bundle envelope, so a v2 tree can be carried.
     const v2Files = new Set(
       [
         "schema/v2.ts",
         "schema/v2-rules.ts",
         "store/state-writer.ts",
         "store/state-merge.ts",
+        "store/prd-bundle-v2.ts",
         "store/prd-model-reader.ts",
         "store/prd-model-writer.ts",
       ].map(
