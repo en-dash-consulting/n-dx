@@ -240,7 +240,7 @@ but knowing what they mean helps you navigate the project history:
 |---------|---------|
 | `N-DX-Status: <id> <from> → <to>` | PRD item status transition captured in this commit (e.g. `in_progress → completed`). The dashboard uses this to correlate commits with PRD items. |
 | `N-DX: <vendor>/<model> · run <run-id>` | LLM vendor, model name, and hench run ID that authored the commit. |
-| `N-DX-Item: <url>` | Direct link to the PRD item in the dashboard. |
+| `N-DX-Item: <item-id>` | The PRD item this commit is for. Older commits carry a dashboard permalink instead; readers accept both forms. |
 
 If you are closing a PRD task with a manual commit, add an `N-DX-Status`
 trailer so the dashboard picks up the transition:

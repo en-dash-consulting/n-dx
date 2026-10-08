@@ -17,12 +17,19 @@
  * | Trailer         | Answers                  | Example                                  |
  * |-----------------|--------------------------|------------------------------------------|
  * | `N-DX:`         | what produced the commit | `skill/ndx-capture`, `claude/opus · run 1f3` |
- * | `N-DX-Item:`    | which PRD item it is for | a dashboard permalink                    |
+ * | `N-DX-Item:`    | which PRD item it is for | `5ee70ad3-313d-46f0-b99c-592d5e49dc74`   |
  * | `N-DX-Status:`  | what status changed      | `<taskId> in_progress → completed`       |
  *
  * `N-DX:` takes a free-form producer string. `N-DX-Item:` and `N-DX-Status:`
  * are emitted by the hench run loop; `N-DX-Status:` is consumed by
  * `rex backfill-commit-attribution`.
+ *
+ * `N-DX-Item:` carries the **item id**. It used to carry a dashboard permalink
+ * (`<publicUrl>/#/rex/item/<id>`), which baked the writer's host — usually
+ * `http://localhost:3117` — into permanent history and resolved to nothing on
+ * any other machine. Readers accept both: `itemIdFromTrailer`
+ * (`packages/rex/src/core/change-commits.ts`) unwraps a permalink to the same
+ * id, so commits written before the change still attribute. Emit only the id.
  *
  * ## Why this string is duplicated
  *

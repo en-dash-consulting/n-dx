@@ -99,12 +99,17 @@ variants of one another and should not be unified:
 | Trailer | Answers | Example value | Emitted by |
 |---------|---------|---------------|------------|
 | `N-DX:` | What produced this commit | `skill/ndx-capture`, `claude/opus · run 1f3`, `pre-run commit gate` | skills, hench, `packages/core/commit-trailers.js` |
-| `N-DX-Item:` | Which PRD item it is for | a dashboard permalink | hench run loop |
+| `N-DX-Item:` | Which PRD item it is for | `5ee70ad3-313d-46f0-b99c-592d5e49dc74` | hench run loop |
 | `N-DX-Status:` | What status changed | `<taskId> in_progress → completed` | hench run loop |
 
 `N-DX:` takes a free-form producer string, so a new commit source picks a value
 rather than a new key. `N-DX-Status:` is consumed by
 `rex backfill-commit-attribution`.
+
+`N-DX-Item:` carries the item id. It used to carry a dashboard permalink, which
+wrote the author's host into permanent history; readers still accept that form
+(`itemIdFromTrailer` in `packages/rex/src/core/change-commits.ts`), but nothing
+should emit it.
 
 **Commits created from source, not from a skill** — `packages/core/export.js`
 (dashboard deploy) and `packages/core/git-preflight.js` (the `ndx init` baseline
