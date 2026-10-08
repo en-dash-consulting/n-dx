@@ -4,7 +4,7 @@
  * tests/integration/java-zones.test.ts.
  */
 
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -13,6 +13,7 @@ import { buildPackImportGraph, isPackFile, packsFor } from "../../../src/analyze
 import { javaPack } from "../../../src/language/java-pack.js";
 import { grammarBuildDir } from "../../../src/language/package-paths.js";
 import type { Inventory } from "../../../src/schema/v1.js";
+import { skipUnlessGrammar } from "../../helpers/grammar.js";
 
 const file = (path: string): Inventory["files"][number] =>
   ({ path, size: 1, language: "Java", lineCount: 1, hash: "x", role: "source", category: "code" }) as Inventory["files"][number];
@@ -81,9 +82,10 @@ describe("buildPackImportGraph", () => {
     }
   });
 
-  it.skipIf(!existsSync(join(grammarBuildDir(), `${javaPack.grammar.name}.wasm`)))(
+  it(
     "degrades a pack whose query the loaded grammar rejects, with one notice naming the pack and the error",
-    async () => {
+    async (ctx) => {
+      skipUnlessGrammar(ctx, join(grammarBuildDir(), `${javaPack.grammar.name}.wasm`));
       const dir = mkdtempSync(join(tmpdir(), "sv-pack-imports-query-"));
       try {
         const queryPath = join(dir, "bad.scm");
