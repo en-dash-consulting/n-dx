@@ -2,27 +2,38 @@
  * Stale-build detection, shared by the e2e globalSetup (tests/e2e/verify-build.js)
  * and the affected-suite gate (scripts/run-all-tests.mjs).
  *
- * A package's `dist/` is stale when a source file under its `src/` is newer than
- * everything in `dist/`. Several root tests read a package through `dist/`, so
- * against a stale build they check the OLD code and pass on a change they should
- * fail.
+ * Several root tests read a package through `dist/`, so against a stale build
+ * they check the OLD code and pass on a change they should fail.
+ *
+ * Freshness is content-based, not mtime-based. A full build of a package writes
+ * `dist/.build-stamp.json` as its LAST step, holding a hash of the source it
+ * compiled (scripts/write-build-stamp.mjs). A package is stale when the stamp is
+ * missing or its hash differs from the current source. This handles both cases
+ * an mtime comparison gets wrong:
+ *  - a partial build (web `build:landing`) refreshes files in dist/ but never
+ *    writes the stamp, so the compiled server is still judged stale;
+ *  - an incremental `tsc` that emits nothing (source rewritten with identical
+ *    content) leaves dist/ untouched, but the content hash is unchanged, so the
+ *    stamp from the earlier full build still matches.
  */
 
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 
 /** Source extensions that a build turns into dist/ output. */
 export const SOURCE_EXTENSIONS = /\.(ts|tsx|js|jsx|mts|cts)$/;
 
-/**
- * Newest mtime (ms) among files under `dir` matching `matches`, or 0 if the
- * directory is absent. Skips nested node_modules (and, when walking a source
- * tree, nested dist) so vendored or generated files never masquerade as edited
- * sources.
- */
-export function newestMtime(dir, matches, skipDist) {
-  let newest = 0;
+/** File name of the stamp inside a package's dist/. */
+export const BUILD_STAMP_FILE = ".build-stamp.json";
 
+/**
+ * Source files under `dir` that a build compiles, as sorted absolute paths.
+ * Skips node_modules and nested dist so vendored or generated files never
+ * masquerade as sources.
+ */
+function sourceFiles(dir) {
+  const out = [];
   const walk = (current) => {
     let entries;
     try {
@@ -30,48 +41,56 @@ export function newestMtime(dir, matches, skipDist) {
     } catch {
       return;
     }
-
     for (const entry of entries) {
-      if (entry.name === "node_modules") continue;
-      if (skipDist && entry.name === "dist") continue;
+      if (entry.name === "node_modules" || entry.name === "dist") continue;
       const full = join(current, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (matches(entry.name)) {
-        try {
-          const { mtimeMs } = statSync(full);
-          if (mtimeMs > newest) newest = mtimeMs;
-        } catch {
-          // Race with a concurrent edit/delete — ignore this file.
-        }
-      }
+      if (entry.isDirectory()) walk(full);
+      else if (SOURCE_EXTENSIONS.test(entry.name)) out.push(full);
     }
   };
-
   if (existsSync(dir)) walk(dir);
-  return newest;
+  return out.sort();
+}
+
+/** Hash of every compiled source file's path and content under `srcDir`. */
+export function sourceHash(srcDir) {
+  const hash = createHash("sha256");
+  for (const file of sourceFiles(srcDir)) {
+    hash.update(relative(srcDir, file).split(sep).join("/"));
+    hash.update("\0");
+    hash.update(readFileSync(file));
+    hash.update("\0");
+  }
+  return hash.digest("hex");
+}
+
+/** Record that `distDir` was fully built from the current content of `srcDir`. */
+export function writeBuildStamp(srcDir, distDir) {
+  writeFileSync(join(distDir, BUILD_STAMP_FILE), JSON.stringify({ sourceHash: sourceHash(srcDir) }) + "\n");
 }
 
 /**
- * Seconds by which `srcDir` is newer than `distDir`, or 0 when the build is
- * current. Compares against the newest file anywhere in dist/, not one nominated
- * artifact: incremental tsc rewrites only the outputs whose sources changed.
+ * Whether `distDir` is a build of the current `srcDir`: false when the stamp is
+ * missing, unreadable, or records different source content.
  */
-export function staleSeconds(srcDir, distDir) {
-  const builtAt = newestMtime(distDir, () => true, false);
-  const editedAt = newestMtime(srcDir, (f) => SOURCE_EXTENSIONS.test(f), true);
-  return editedAt > builtAt ? Math.max(1, Math.round((editedAt - builtAt) / 1000)) : 0;
+export function isBuildCurrent(srcDir, distDir) {
+  try {
+    const stamp = JSON.parse(readFileSync(join(distDir, BUILD_STAMP_FILE), "utf8"));
+    return stamp.sourceHash === sourceHash(srcDir);
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Packages the change edited under `src/` whose `dist/` is older than that
- * source. Packages with no `src/` or no `dist/` directory (core) are not built
- * and never reported.
+ * Packages the change edited under `src/` whose `dist/` is not a full build of
+ * the current source. Packages with no `src/` or no `dist/` directory (core) are
+ * not built and never reported.
  *
  * @param {string} root repository root
  * @param {string[]} changedFiles repo-relative paths
  * @param {{ dir: string, name: string }[]} manifests
- * @returns {{ dir: string, name: string, ageSeconds: number }[]}
+ * @returns {{ dir: string, name: string }[]}
  */
 export function staleChangedPackages(root, changedFiles, manifests) {
   const stale = [];
@@ -80,8 +99,7 @@ export function staleChangedPackages(root, changedFiles, manifests) {
     const distDir = join(root, "packages", dir, "dist");
     if (!existsSync(srcDir) || !existsSync(distDir)) continue;
     if (!changedFiles.some((f) => f.startsWith(`packages/${dir}/src/`))) continue;
-    const ageSeconds = staleSeconds(srcDir, distDir);
-    if (ageSeconds > 0) stale.push({ dir, name, ageSeconds });
+    if (!isBuildCurrent(srcDir, distDir)) stale.push({ dir, name });
   }
   return stale;
 }
@@ -89,7 +107,7 @@ export function staleChangedPackages(root, changedFiles, manifests) {
 /** The gate's failure message: names each package and the command that fixes it. */
 export function staleDistMessage(stale) {
   const lines = stale.map(
-    (s) => `  - ${s.name}: src edited ${s.ageSeconds}s after last build — run \`pnpm --filter ${s.name} build\``,
+    (s) => `  - ${s.name}: dist/ is not a full build of the current src — run \`pnpm --filter ${s.name} build\``,
   );
   return (
     `Stale dist/ — the change edited package sources that were not rebuilt:\n${lines.join("\n")}\n\n` +
