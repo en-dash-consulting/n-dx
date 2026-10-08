@@ -1,0 +1,24 @@
+def springBootVersion = '3.1.0'
+def javaVer = project.findProperty('java') ?: '17'
+ext.jacksonVersion = '2.15.0'
+
+plugins {
+    id 'org.springframework.boot' version "$springBootVersion"
+}
+
+sourceCompatibility = javaVer
+
+if (project.hasProperty('legacy')) {
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(8)
+        }
+    }
+}
+
+dependencies {
+    implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
+    implementation 'org.apache.commons:commons-lang3:3.+'
+    implementation dynamicDependency
+    implementation "com.example:$artifactName:1.0"
+}

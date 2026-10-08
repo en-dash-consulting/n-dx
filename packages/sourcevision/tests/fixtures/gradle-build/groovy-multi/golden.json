@@ -1,0 +1,123 @@
+[
+  {
+    "module": ":",
+    "dir": "",
+    "buildSystem": "gradle",
+    "group": {
+      "resolved": true,
+      "value": "com.example",
+      "bestEffort": true
+    },
+    "version": {
+      "resolved": true,
+      "value": "0.1.0",
+      "bestEffort": true
+    },
+    "dependencies": [],
+    "springBootVersion": {
+      "resolved": true,
+      "value": "3.2.5",
+      "bestEffort": true
+    },
+    "notices": []
+  },
+  {
+    "module": ":app",
+    "dir": "app",
+    "buildSystem": "gradle",
+    "dependencies": [
+      {
+        "group": "com.example",
+        "artifact": "generated",
+        "version": {
+          "resolved": false,
+          "reason": "computed in the build script: $generatedVersion"
+        },
+        "scope": "runtimeOnly"
+      },
+      {
+        "group": "com.google.guava",
+        "artifact": "guava",
+        "version": {
+          "resolved": true,
+          "value": "33.2.1-jre",
+          "bestEffort": true
+        },
+        "scope": "implementation"
+      },
+      {
+        "group": "org.apache.commons",
+        "artifact": "commons-lang3",
+        "version": {
+          "resolved": true,
+          "value": "3.14.0",
+          "bestEffort": true
+        },
+        "scope": "implementation"
+      },
+      {
+        "group": "org.junit.jupiter",
+        "artifact": "junit-jupiter",
+        "version": {
+          "resolved": true,
+          "value": "5.10.2",
+          "bestEffort": true
+        },
+        "scope": "testImplementation"
+      },
+      {
+        "group": "org.springframework.boot",
+        "artifact": "spring-boot-starter-web",
+        "version": {
+          "resolved": false,
+          "reason": "no version in the script; a plugin or platform may manage it"
+        },
+        "scope": "implementation"
+      },
+      {
+        "group": "org.springframework.cloud",
+        "artifact": "spring-cloud-dependencies",
+        "version": {
+          "resolved": true,
+          "value": "2023.0.1",
+          "bestEffort": true
+        },
+        "scope": "implementation"
+      }
+    ],
+    "javaVersion": {
+      "resolved": true,
+      "value": "17",
+      "bestEffort": true
+    },
+    "springBootVersion": {
+      "resolved": true,
+      "value": "3.2.5",
+      "bestEffort": true
+    },
+    "notices": []
+  },
+  {
+    "module": ":lib",
+    "dir": "lib",
+    "buildSystem": "gradle",
+    "dependencies": [
+      {
+        "group": "org.slf4j",
+        "artifact": "slf4j-api",
+        "version": {
+          "resolved": true,
+          "value": "2.0.13",
+          "bestEffort": true
+        },
+        "scope": "api"
+      }
+    ],
+    "javaVersion": {
+      "resolved": true,
+      "value": "11",
+      "bestEffort": true
+    },
+    "notices": []
+  }
+]
