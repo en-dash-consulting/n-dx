@@ -25,11 +25,12 @@ export default defineConfig({
     include: [
       "tests/**/*.test.ts",
     ],
-    exclude: sandboxBlocksNetwork
-      ? [
-          "tests/e2e/cli-serve.test.ts",
-        ]
-      : [],
+    exclude: [
+      // Fixture repositories under tests/fixtures/ contain *.test.ts files that
+      // exist to be detected by the sdlc-profile analyzer, not to run here.
+      "tests/fixtures/**",
+      ...(sandboxBlocksNetwork ? ["tests/e2e/cli-serve.test.ts"] : []),
+    ],
     // Raised from 5000ms, matching hench and rex. Three suites
     // (branch-work-collector, pr-markdown, pr-markdown-reviewer-output) build
     // real git repos in a temp dir: each test spends 8-13 `git` spawns on

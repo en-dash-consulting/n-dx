@@ -55,6 +55,7 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | `ndx reshape [dir]` | LLM-powered PRD restructuring |
 | `ndx reorganize [dir]` | Detect and fix structural issues |
 | `ndx prune [dir]` | Remove completed subtrees |
+| `ndx readiness [dir]` | Score SDLC readiness for autonomous agent work (`--json`) |
 | `ndx reset [dir]` | Remove analysis data and start fresh |
 | `ndx show <run-id> [dir]` | Show details of an agent run |
 | `ndx usage [dir]` | Token usage analytics |

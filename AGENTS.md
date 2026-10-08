@@ -272,6 +272,7 @@ Two MCP servers provide structured access to project data. They are configured i
 - `get_imports`
 - `get_classifications`
 - `get_route_tree`
+- `get_readiness`
 
 **Write tools** (modify project state, use with care):
 

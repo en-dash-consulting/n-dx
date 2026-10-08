@@ -144,6 +144,7 @@ const SOURCEVISION_SUBCOMMANDS = [
   "narrate",
   "serve",
   "validate",
+  "readiness",
   "export-pdf",
   "iso",
   "pr-markdown",

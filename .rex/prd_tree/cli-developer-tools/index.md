@@ -59,7 +59,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record](./hench-record-no-tokens-leaves-the.md) | completed |
 | [`hench record` with no usage window silently claims the entire session transcript](./hench-record-with-no-usage-window.md) | completed |
 | [`ndx ci` architecture-policy step always fails: ci.js child_process allowlist has drifted from the e2e test's](./ndx-ci-architecture-policy-step-always.md) | completed |
-| [`ndx ci` fails any user project that imports child_process: its allowlist only names n-dx's own files and cannot be configured](./ndx-ci-fails-any-user-project-that.md) | pending |
+| [`ndx ci` fails any user project that imports child_process: its allowlist only names n-dx's own files and cannot be configured](./ndx-ci-fails-any-user-project-that.md) | completed |
 | [`node packages/core/ci.js .` is a silent no-op, yet `pnpm verify` and CONTRIBUTING.md run the CI gate that way](./node-packages-core-ci-js-is-a-silent.md) | completed |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-carries.md) | completed |
 | [Pre-dispatch project-dir resolution still lets a directory shadow a config key](./pre-dispatch-project-dir-resolution.md) | completed |
@@ -67,3 +67,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Skill commit steps prescribe a POSIX-only heredoc, which fails in PowerShell and can drop the attribution trailer](./skill-commit-steps-prescribe-a-posix.md) | completed |
 | [Skills that call add_item describe item content in prose instead of naming its parameters](./skills-that-call-add-item-describe.md) | completed |
 | [Skills that record runs omit --startedAt, so each one's first record claims the whole session](./skills-that-record-runs-omit-startedat.md) | completed |
+| [Let a project opt in to restricted-import rules in ndx ci](./let-a-project-opt-in-to-restricted.md) | pending |

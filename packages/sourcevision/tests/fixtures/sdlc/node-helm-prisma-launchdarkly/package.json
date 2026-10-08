@@ -1,0 +1,16 @@
+{
+  "name": "shop-api",
+  "scripts": {
+    "test": "vitest run",
+    "lint": "eslint .",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "launchdarkly-node-server-sdk": "^8.0.0",
+    "pino": "^9.0.0",
+    "@sentry/node": "^8.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.0"
+  }
+}
