@@ -35,4 +35,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Rank placement candidates with rules and the text model](./rank-placement-candidates-with-rules.md) | completed |
 | [Register the placement modules with the v2 isolation test](./register-the-placement-modules-with.md) | completed |
 | [Return a placement as a target and a relation, and place on constraints](./return-a-placement-as-a-target-and-a.md) | completed |
-| [Tighten placement: an explicit code-health marker, title-led relations, and proposals for unmatched changes](./tighten-placement-an-explicit-code.md) | pending |
+| [Tighten placement: an explicit code-health marker, title-led relations, and proposals for unmatched changes](./tighten-placement-an-explicit-code.md) | completed |
