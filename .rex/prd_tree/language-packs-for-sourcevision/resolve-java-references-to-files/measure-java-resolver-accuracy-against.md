@@ -15,10 +15,11 @@ blockedBy:
 source: "roadmap"
 acceptanceCriteria:
   - "The script compares resolver edges with a scip-java index and reports precision, recall and the top unmatched patterns"
-  - "The steps to produce the scip-java index are documented next to the script"
-  - "The rex log holds either the results per corpus repository with proposed G2 thresholds, or the exact commands the operator must run because scip-java or a JDK was unavailable"
+  - "The operator commands to install scip-java and produce each index are documented next to the script"
+  - "The script reads the corpus and indexes from the machine-local directory and never clones, builds or downloads"
+  - "The rex log holds either the results per corpus repository with proposed G2 thresholds, or the exact operator commands when the indexes were absent"
   - "Neither scip-java nor a JDK becomes an n-dx dependency, and the script is excluded from the default test run"
-description: "Add a script that, for each drift-corpus repository that builds, reads a scip-java index (produced by running scip-java manually with the documented command, JDK and build tool), reduces it to file-to-file reference edges inside the repository, and compares them with the resolver's edges. Report precision, recall and the top unmatched patterns in each direction.\n\nscip-java, the JDK and Maven or Gradle are needed only to run this measurement; they are not dependencies of n-dx and the script is not part of the default test run. If they are available, run it and append the numbers and proposed precision and recall thresholds for gate G2 to the rex log; if they are not, say so in the log and leave the run to the operator, with the exact commands."
+description: "Add a script that, for each drift-corpus repository that builds, reads a scip-java index, reduces it to file-to-file reference edges inside the repository, and compares them with the resolver's edges. Report precision, recall and the top unmatched patterns in each direction.\n\nThe operator produces the index outside the agent run: hench's agent session refuses network git commands and the scip-java build needs a JDK, Maven or Gradle and network access. Document the exact commands next to the script (install scip-java, build each corpus repository in ~/.cache/ndx-java-corpus/, write index.scip to a known path). The script reads the corpus and the indexes from that machine-local directory and never clones, builds or downloads anything.\n\nIf the indexes are present, run the comparison and append the numbers and proposed precision and recall thresholds for gate G2 to the rex log. If they are not, write the exact operator commands to the rex log and stop; the operator then runs the comparison and records the numbers.\n\nscip-java, the JDK and Maven or Gradle are not dependencies of n-dx, and the script is not part of the default test run."
 lastModified: "2026-10-08T00:04:16.904Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
