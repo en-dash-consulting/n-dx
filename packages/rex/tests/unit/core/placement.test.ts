@@ -78,6 +78,7 @@ describe("placementRelation (rules decide the relation)", () => {
 
   it("a title without an amending verb touches, and intent prose never decides", () => {
     expect(placementRelation({ title: "Token rotation" })).toBe("touches");
+    expect(placementRelation({ title: "Do not add retries to the hub" })).toBe("touches");
     expect(placementRelation({ title: "Rename the lock helper", intent: "the new store layout makes the old name misleading" })).toBe("touches");
     expect(placementRelation({ title: "Rename the lock helper", intent: "Allow a new store layout; adds a support file" })).toBe("touches");
   });
