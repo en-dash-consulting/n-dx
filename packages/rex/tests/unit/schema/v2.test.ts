@@ -430,12 +430,13 @@ describe("isolation", () => {
     // The v2 modules (schema, rules, state writer, state merge, bundle v2,
     // dual-read loader, tree writer, apply engine, apply policy, product-edit
     // handler, computed edges, product status, change landing, placement and
-    // its policy) may import each other; nothing else may import them until
-    // the v2 store wires them in. The exceptions are the `rex merge-state` git
-    // driver, which imports state-merge (branches merge state.yaml before any
-    // rex command reads it), and `rex export` / `rex import-bundle`, which
-    // import prd-bundle-v2 to dispatch on the tree layout and the bundle
-    // envelope, so a v2 tree can be carried.
+    // its policy, change selection, change completion) may import each other;
+    // nothing else may import them until the v2 store wires them in. The
+    // exceptions are the `rex merge-state` git driver, which imports
+    // state-merge (branches merge state.yaml before any rex command reads it),
+    // and `rex export` / `rex import-bundle`, which import prd-bundle-v2 to
+    // dispatch on the tree layout and the bundle envelope, so a v2 tree can be
+    // carried.
     const v2Files = new Set(
       [
         "schema/v2.ts",
@@ -453,6 +454,8 @@ describe("isolation", () => {
         "core/change-landing.ts",
         "core/placement.ts",
         "core/placement-policy.ts",
+        "core/change-selection.ts",
+        "core/change-completion.ts",
         "codeowners/plan.ts",
         "cli/commands/codeowners.ts",
       ].map(
