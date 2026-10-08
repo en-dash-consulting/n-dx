@@ -25,9 +25,10 @@
  * - `reviewedHash` on each capability the caller lists as reviewed: the
  *   `specHash` of its drafted spec, so it reads reviewed until the spec is
  *   edited. Unlisted nodes stay unreviewed.
- * - `slug` on each item whose v1 directory name Windows cannot create (a title
- *   of "Con", "AUX" or "Nul"): v2 freezes slugs and the writer refuses such a
- *   name, so the plan assigns a safe replacement (`con-<id6>`, from
+ * - `slug` on each item whose v1 directory name cannot be frozen in v2 (a title
+ *   of "Con", "AUX" or "Nul", which Windows cannot create, or "Index", which is
+ *   its folder's index.md once the item is a leaf): v2 freezes slugs and the
+ *   writer refuses such a name, so the plan assigns a replacement (`con-<id6>`, from
  *   `freeSlug`), records the v1 name in `slug.from`, and flags `unsafe-slug`.
  *   Safe names are not listed: the v1 name is the v2 slug.
  * - The literal "[object Object]" in `recommendationMeta` or an item's `log`
@@ -81,7 +82,7 @@ export interface ItemPlanData {
   /** From `acceptanceCriteria`; never set for a capability, whose spec is its draft. */
   criteria?: Criterion[];
   aliases?: string[];
-  /** Present when the v1 directory name (`from`) is not Windows-safe: the v2 slug to freeze instead (`to`). */
+  /** Present when the v1 directory name (`from`) cannot be frozen (`isUsableFrozenSlug`): the v2 slug to freeze instead (`to`). */
   slug?: { from: string; to: string };
   /** Applied changes only: ISO time the change counts as applied. */
   appliedAt?: string;
