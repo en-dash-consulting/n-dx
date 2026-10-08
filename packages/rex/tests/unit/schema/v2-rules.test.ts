@@ -39,7 +39,7 @@ describe("rule table", () => {
   it("errors precede warnings and every rule has a severity", () => {
     const severities = V2_RULE_IDS.map((id) => RULE_SEVERITY[id]);
     expect(severities.indexOf("warning")).toBe(severities.lastIndexOf("error") + 1);
-    expect(V2_RULE_IDS).toHaveLength(21);
+    expect(V2_RULE_IDS).toHaveLength(22);
   });
 
   it("a healthy tree has no findings", () => {
@@ -126,6 +126,32 @@ describe("fix-not-spike", () => {
     const findings = check("fix-not-spike", { changes: [both] });
     expect(ids(findings)).toEqual([both.id]);
     expect(findings[0].severity).toBe("error");
+  });
+});
+
+describe("fix-not-additive", () => {
+  const added = { target: "n", delta: "added", summary: "s", under: "area" };
+  const removed = { target: "r", delta: "removed", summary: "s" };
+  const modified = { target: "m", delta: "modified", summary: "s" };
+
+  it("passes a fix that modifies or touches, and a non-fix that adds or removes", () => {
+    const changes = [
+      node("change", { fix: true, amends: [modified], touches: ["x"] }),
+      node("change", { fix: true }),
+      node("change", { amends: [added, removed] }),
+      node("change", { fix: false, amends: [added] }),
+    ];
+    expect(check("fix-not-additive", { changes })).toEqual([]);
+  });
+
+  it("fails a fix with an added or a removed amendment", () => {
+    const withAdd = node("change", { fix: true, amends: [modified, added] });
+    const withRemove = node("change", { fix: true, amends: [removed] });
+    const findings = check("fix-not-additive", { changes: [withAdd, withRemove] });
+    expect(ids(findings)).toEqual([withAdd.id, withRemove.id]);
+    expect(findings[0].severity).toBe("error");
+    expect(findings[0].message).toContain("added");
+    expect(findings[1].message).toContain("removed");
   });
 });
 

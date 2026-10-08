@@ -350,7 +350,8 @@ export interface ChangeIntent extends BaseIntent, EffortIntent {
    * open, every product node it amends or touches reads health `defective`
    * (`core/product-status.ts`), and its kind is `fix` unless it has an
    * `added` or `removed` amendment (`core/product-edges.ts`).
-   * Never also a spike (`fix-not-spike`).
+   * Never also a spike (`fix-not-spike`), and never carries an `added` or
+   * `removed` amendment (`fix-not-additive`).
    */
   fix?: boolean;
   priority?: Priority;

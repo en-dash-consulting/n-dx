@@ -57,6 +57,7 @@ export type V2RuleId =
   | "change-has-target"
   | "change-placed-at-close"
   | "fix-not-spike"
+  | "fix-not-additive"
   | "amendment-type"
   | "ref-unique"
   | "ref-resolves"
@@ -187,6 +188,7 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "change-has-target": "error",
   "change-placed-at-close": "error",
   "fix-not-spike": "error",
+  "fix-not-additive": "error",
   "amendment-type": "error",
   "ref-unique": "error",
   "ref-resolves": "error",
@@ -302,6 +304,16 @@ const fixNotSpike: Rule = ({ entries }) =>
       ? [finding("fix-not-spike", node, `Change "${node.title}" is both a fix and a spike; a fix repairs product nodes, a spike changes none`)]
       : [],
   );
+
+/** A fix repairs nodes that exist; adding or removing one is a feature or a retirement, which `deriveChangeKind` reports instead of "fix". */
+const fixNotAdditive: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) => {
+    if (node.type !== "change" || !node.fix) return [];
+    const deltas = [...new Set((node.amends ?? []).map((a) => a.delta).filter((d) => d === "added" || d === "removed"))];
+    return deltas.length === 0
+      ? []
+      : [finding("fix-not-additive", node, `Change "${node.title}" is a fix but carries an ${deltas.join(" and a ")} amendment; a fix repairs existing nodes, so drop fix: true or the amendment`)];
+  });
 
 /** `type` names what an `added` amendment creates (a capability when absent, unreported); it means nothing on another delta. */
 const amendmentType: Rule = ({ entries }) =>
@@ -722,6 +734,7 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "change-has-target": changeHasTarget,
   "change-placed-at-close": changePlacedAtClose,
   "fix-not-spike": fixNotSpike,
+  "fix-not-additive": fixNotAdditive,
   "amendment-type": amendmentType,
   "ref-unique": refUnique,
   "ref-resolves": refResolves,

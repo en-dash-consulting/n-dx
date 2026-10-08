@@ -36,6 +36,13 @@ describe("deriveChangeKind (design table)", () => {
     expect(kind(c)).toBe(expected);
   });
 
+  it("reads the type of an added amendment: a new constraint is a policy change, a capability or no type a feature", () => {
+    const added = (type?: Amendment["type"]): Amendment => ({ target: "new", delta: "added", summary: "s", under: "area", ...(type ? { type } : {}) });
+    expect(kind(change("c", { amends: [added("constraint")] }))).toBe("policy-change");
+    expect(kind(change("c", { amends: [added("capability")] }))).toBe("feature");
+    expect(kind(change("c", { amends: [added()] }))).toBe("feature");
+  });
+
   it("ranks a constraint above other amendments, and amendments above touches", () => {
     expect(kind(change("c", { amends: [amend("cap-a", "added"), amend("con", "modified")] }))).toBe("policy-change");
     expect(kind(change("c", { amends: [amend("cap-a", "removed"), amend("cap-b", "added")] }))).toBe("feature");

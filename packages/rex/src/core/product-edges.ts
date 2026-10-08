@@ -33,7 +33,7 @@
  */
 
 import { indexTree, type RuleNode, type TreeIndex, type V2Tree } from "../schema/v2-rules.js";
-import type { ChangeNode, ConstraintNode } from "../schema/v2.js";
+import type { Amendment, ChangeNode, ConstraintNode } from "../schema/v2.js";
 import { loadCommitFiles, loadTrailerCommits, type ChangeCommitsOptions } from "./change-commits.js";
 
 // ── Index ────────────────────────────────────────────────────────
@@ -76,7 +76,9 @@ export type ChangeKind = (typeof CHANGE_KINDS)[number];
 export function deriveChangeKind(change: ChangeNode, index: Pick<TreeIndex, "resolve">): ChangeKind | undefined {
   const amends = change.amends ?? [];
   if (change.fix === true && !amends.some((a) => a.delta === "added" || a.delta === "removed")) return "fix";
-  if (amends.some((a) => index.resolve(a.target)?.type === "constraint")) return "policy-change";
+  // An added amendment's target does not exist yet, so its `type` says what it creates.
+  const amendsConstraint = (a: Amendment) => (a.delta === "added" ? a.type : index.resolve(a.target)?.type) === "constraint";
+  if (amends.some(amendsConstraint)) return "policy-change";
   for (const [delta, kind] of [["added", "feature"], ["modified", "enhancement"], ["removed", "retirement"]] as const) {
     if (amends.some((a) => a.delta === delta)) return kind;
   }
