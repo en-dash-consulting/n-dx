@@ -1,11 +1,11 @@
 /**
  * Outbound detection — the shape, the contracts and the ordering.
  *
- * This is the first of four slices, so there is deliberately nothing here
- * asserting a detected call site: `dependencies` is empty by design until the
- * JS/TS and Go slices land. What is pinned now is everything those slices will
- * build on — the contract discovery, the canonical ordering, and the fact that
- * nothing on this path reads a network or an LLM.
+ * Contract discovery, canonical ordering, schema validity and the inventory
+ * walk that feeds call-site detection. The detection rules themselves live in
+ * `outbound-js-detection.test.ts`, which drives the AST walk with source text
+ * directly; what is pinned here is that `detectOutbound` reaches the files the
+ * inventory names, and skips the ones it should.
  *
  * @see src/analyzers/outbound-detection.ts
  */
@@ -33,6 +33,10 @@ import type { Inventory } from "../../../src/schema/index.js";
  */
 const FILES: Record<string, string> = {
   "src/index.ts": `export const name = "svc";\n`,
+  "src/orders.ts": `import axios from "axios";\nexport const list = () => axios.get(process.env.ORDERS_URL);\n`,
+  // Role "test" in the inventory below — its call site is a fixture, not a
+  // dependency this repository has.
+  "src/orders.test.ts": `import axios from "axios";\naxios.get("https://fixture.example.com/x");\n`,
   "api/openapi.yaml": `openapi: 3.0.0\n`,
   "api/swagger.json": `{"swagger":"2.0"}\n`,
   "docs/openapi.v2.yml": `openapi: 3.1.0\n`,
@@ -59,13 +63,31 @@ const codeOnlyInventory: Inventory = {
       role: "source",
       category: "core",
     },
+    {
+      path: "src/orders.ts",
+      size: 90,
+      language: "TypeScript",
+      lineCount: 2,
+      hash: "h",
+      role: "source",
+      category: "core",
+    },
+    {
+      path: "src/orders.test.ts",
+      size: 80,
+      language: "TypeScript",
+      lineCount: 2,
+      hash: "h",
+      role: "test",
+      category: "core",
+    },
   ],
   summary: {
-    totalFiles: 1,
-    totalLines: 1,
-    byLanguage: { TypeScript: 1 },
-    byRole: { source: 1 },
-    byCategory: { core: 1 },
+    totalFiles: 3,
+    totalLines: 5,
+    byLanguage: { TypeScript: 3 },
+    byRole: { source: 2, test: 1 },
+    byCategory: { core: 3 },
   },
 };
 
@@ -144,8 +166,35 @@ describe("detectOutbound", () => {
     ]);
   });
 
-  it("reports no call sites yet — the detection slices are separate tasks", async () => {
+  it("detects call sites in the source files the inventory names", async () => {
     const data = await detectOutbound(root, codeOnlyInventory);
+
+    expect(data.dependencies).toEqual([
+      {
+        file: "src/orders.ts",
+        line: 2,
+        kind: "http",
+        target: "ORDERS_URL",
+        targetSource: "env",
+        client: "axios",
+        confidence: "certain",
+      },
+    ]);
+  });
+
+  it("skips test files, whose call sites are fixtures rather than dependencies", async () => {
+    const data = await detectOutbound(root, codeOnlyInventory);
+    expect(data.dependencies.map((d) => d.file)).not.toContain("src/orders.test.ts");
+  });
+
+  it("ignores a source file the inventory does not carry", async () => {
+    // The inventory is the one list of files every analyzer works from —
+    // ignore rules and skip directories included. Walking for sources here
+    // would quietly disagree with the rest of the analysis.
+    const data = await detectOutbound(root, {
+      ...codeOnlyInventory,
+      files: codeOnlyInventory.files.filter((f) => f.path !== "src/orders.ts"),
+    });
     expect(data.dependencies).toEqual([]);
   });
 
