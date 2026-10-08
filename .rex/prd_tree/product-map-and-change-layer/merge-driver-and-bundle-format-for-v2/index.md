@@ -28,6 +28,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Bundle envelope v2 that still imports v1 bundles](./bundle-envelope-v2-that-still-imports.md) | completed |
-| [Bundle v2 export of a childless non-change folder with extra state.yaml keys produces a bundle import refuses](./bundle-v2-export-of-a-childless-non.md) | pending |
+| [Bundle v2 export of a childless non-change folder with extra state.yaml keys produces a bundle import refuses](./bundle-v2-export-of-a-childless-non.md) | completed |
 | [Bundle v2 keeps unknown top-level state.yaml keys and validates the carried root header](./bundle-v2-keeps-unknown-top-level.md) | completed |
 | [Merge state.yaml rows by id with a custom merge driver](./merge-state-yaml-rows-by-id-with-a.md) | completed |
