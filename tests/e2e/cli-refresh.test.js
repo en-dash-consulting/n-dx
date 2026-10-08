@@ -147,6 +147,36 @@ describe("n-dx refresh", () => {
     expect(stdout).toContain(`Live reload: attempted on :${port} and succeeded (2 WebSocket clients notified).`);
   });
 
+  it("sends the per-user token on the live-reload signal when the token file exists", async () => {
+    // With auth on, the hub and a project server answer 401 without it.
+    const home = join(tmpDir, "ndx-home");
+    await mkdir(home, { recursive: true });
+    await writeFile(join(home, "auth.token"), "reload-token-value\n", { mode: 0o600 });
+    const mockPath = join(tmpDir, "mock-fetch-auth.mjs");
+    await writeFile(
+      mockPath,
+      [
+        "globalThis.fetch = async (_url, init = {}) => {",
+        "  const ok = (init.headers ?? {})['X-Ndx-Token'] === 'reload-token-value';",
+        "  return new Response(JSON.stringify(ok ? { ok: true } : { error: 'unauthorized' }),",
+        "    { status: ok ? 200 : 401, headers: { 'content-type': 'application/json' } });",
+        "};",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    const port = 3117;
+    await writeFile(join(tmpDir, ".n-dx-web.port"), String(port));
+    const env = { ...process.env, NDX_HOME: home };
+    delete env.N_DX_HOME;
+    const stdout = execFileSync(
+      "node",
+      ["--import", pathToFileURL(mockPath).href, CLI_PATH, "refresh", "--ui-only", "--no-build", tmpDir],
+      { encoding: "utf-8", timeout: 60000, stdio: "pipe", env },
+    );
+    expect(stdout).toContain(`Live reload: attempted on :${port} and succeeded.`);
+  });
+
   it("prints restart-required guidance when live reload signaling is unavailable", async () => {
     const mockPath = join(tmpDir, "mock-fetch-404.mjs");
     await writeFile(

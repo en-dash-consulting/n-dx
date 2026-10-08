@@ -38,6 +38,12 @@ export interface RuleOptions {
   /** Days a product node may stay revised before `long-revised` warns. Default 14. */
   longRevisedDays?: number;
   /**
+   * Criteria a capability may carry, its own plus those inherited from parent
+   * capabilities, before `criteria-growth` warns. Default 15; the caller reads
+   * it from `structureHealth.maxCriteriaPerCapability` in the rex config.
+   */
+  maxCriteria?: number;
+  /**
    * This project's releases, for `title-release-token`: the package version
    * line plus every `plannedRelease` and `shippedIn` in the tree. A title
    * version token is flagged only when it names one of these. Default none.
@@ -51,6 +57,7 @@ export type V2RuleId =
   | "change-has-target"
   | "change-placed-at-close"
   | "fix-not-spike"
+  | "fix-not-additive"
   | "amendment-type"
   | "ref-unique"
   | "ref-resolves"
@@ -64,6 +71,7 @@ export type V2RuleId =
   | "capability-criteria"
   | "long-revised"
   | "area-balance"
+  | "criteria-growth"
   | "unreviewed-spec"
   | "run-settings"
   | "retired-state-field"
@@ -78,6 +86,8 @@ export interface RuleFinding {
 }
 
 export const DEFAULT_LONG_REVISED_DAYS = 14;
+/** `criteria-growth` warns when a capability's own plus inherited criteria exceed this. */
+export const DEFAULT_MAX_CRITERIA = 15;
 /** `area-balance` warns when one area holds more than this share of capabilities. */
 export const AREA_MAX_SHARE = 0.4;
 /** `area-balance` warns when an area holds fewer capabilities than this. */
@@ -173,11 +183,49 @@ export function isOpenChange(node: RuleNode): boolean {
   return node.type === "change" && !isAppliedChange(node) && !ABANDONED_CHANGE_STATUSES.has(node.status ?? "pending");
 }
 
+/** Statuses only reached once work on a change began. */
+const STARTED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["in_progress", "completed", "failing"]);
+
+/**
+ * An open change that is building its edit: started (`startedAt` set, or a
+ * status only work reaches) or placed (`needsPlacement` not set). An
+ * unstarted Inbox draft is not, so the node it amends keeps reading revised
+ * until someone places or starts it.
+ */
+export function isBuildingChange(node: RuleNode): boolean {
+  if (!isOpenChange(node)) return false;
+  return !node.needsPlacement || !!node.startedAt || STARTED_CHANGE_STATUSES.has(node.status ?? "pending");
+}
+
+/**
+ * Product nodes being changed: each target a building change amends, and
+ * every capability below an amended capability, since a child's spec
+ * inherits its parent's criteria. Resolves through `index`, so pass a
+ * tombstone-aware index to see retired targets.
+ */
+export function changingNodes({ entries, resolve }: TreeIndex): Set<RuleNode> {
+  const changing = new Set<RuleNode>();
+  for (const { node, retired } of entries) {
+    // A change under a deleted ancestor is retired with it, whatever its own status.
+    if (retired || !isBuildingChange(node)) continue;
+    for (const a of node.type === "change" ? (node.amends ?? []) : []) {
+      const target = resolve(a.target);
+      if (target) changing.add(target);
+    }
+  }
+  // Entries are depth first, so a parent is settled before its children.
+  for (const { node, parent } of entries) {
+    if (node.type === "capability" && parent?.type === "capability" && changing.has(parent)) changing.add(node);
+  }
+  return changing;
+}
+
 /** Each rule's fixed severity. */
 export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "change-has-target": "error",
   "change-placed-at-close": "error",
   "fix-not-spike": "error",
+  "fix-not-additive": "error",
   "amendment-type": "error",
   "ref-unique": "error",
   "ref-resolves": "error",
@@ -191,6 +239,7 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "capability-criteria": "warning",
   "long-revised": "warning",
   "area-balance": "warning",
+  "criteria-growth": "warning",
   "unreviewed-spec": "warning",
   "run-settings": "warning",
   "retired-state-field": "warning",
@@ -253,7 +302,7 @@ export function specHash(spec: { statement?: string; criteria?: Criterion[] }): 
 }
 
 /** A product node's spec as `specHash` reads it: its own statement and criteria (a constraint has none). */
-function nodeSpec(node: RuleNode): { statement?: string; criteria?: Criterion[] } {
+export function nodeSpec(node: RuleNode): { statement?: string; criteria?: Criterion[] } {
   return node.type === "capability" ? node : { statement: node.type === "constraint" ? node.statement : undefined };
 }
 
@@ -292,6 +341,16 @@ const fixNotSpike: Rule = ({ entries }) =>
       ? [finding("fix-not-spike", node, `Change "${node.title}" is both a fix and a spike; a fix repairs product nodes, a spike changes none`)]
       : [],
   );
+
+/** A fix repairs nodes that exist; adding or removing one is a feature or a retirement, which `deriveChangeKind` reports instead of "fix". */
+const fixNotAdditive: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) => {
+    if (node.type !== "change" || !node.fix) return [];
+    const deltas = (["added", "removed"] as const).filter((d) => (node.amends ?? []).some((a) => a.delta === d));
+    return deltas.length === 0
+      ? []
+      : [finding("fix-not-additive", node, `Change "${node.title}" is a fix but has ${deltas.join(" and ")} amendments; a fix repairs existing nodes, so drop fix: true or those amendments`)];
+  });
 
 /** `type` names what an `added` amendment creates (a capability when absent, unreported); it means nothing on another delta. */
 const amendmentType: Rule = ({ entries }) =>
@@ -610,8 +669,9 @@ const checkRequirement: Rule = ({ entries }) =>
 const DAY_MS = 86_400_000;
 
 /**
- * A product node is revised when its spec no longer hashes to `metAt` and no open
- * change amends it (an amended one is "changing" instead). A node never met
+ * A product node is revised when its spec no longer hashes to `metAt` and it
+ * is not changing ({@link changingNodes}: no building change amends it or a
+ * parent capability; such a node is "changing" instead). A node never met
  * (`metAt` absent) is proposed, not revised. Age is measured from
  * `revisedAt`, which the state writer stamps when a spec edit first makes the
  * hash differ from `metAt` and clears whenever the hash equals `metAt` again
@@ -619,16 +679,9 @@ const DAY_MS = 86_400_000;
  * every state write (checks, reviewedHash) re-stamps that. Without
  * `revisedAt` the age is unknown and nothing is reported.
  */
-const longRevised: Rule = ({ entries, resolve }, { now, longRevisedDays = DEFAULT_LONG_REVISED_DAYS }) => {
-  const amended = new Set<RuleNode>();
-  for (const { node } of entries) {
-    if (node.type !== "change" || !isOpenChange(node)) continue;
-    for (const a of node.amends ?? []) {
-      const target = resolve(a.target);
-      if (target) amended.add(target);
-    }
-  }
-  return entries.flatMap(({ node }) => {
+const longRevised: Rule = (index, { now, longRevisedDays = DEFAULT_LONG_REVISED_DAYS }) => {
+  const amended = changingNodes(index);
+  return index.entries.flatMap(({ node }) => {
     if (node.type !== "capability" && node.type !== "constraint") return [];
     if (!node.metAt || amended.has(node)) return [];
     if (specHash(nodeSpec(node)) === node.metAt) return [];
@@ -661,6 +714,24 @@ const areaBalance: Rule = ({ entries }) => {
       return [finding("area-balance", area, `Area "${area.title}" holds ${pct} percent of all capabilities; consider splitting it`)];
     }
     return [];
+  });
+};
+
+/**
+ * Every brief that touches a capability carries its criteria and its parent
+ * capabilities', so the count that matters is own plus inherited. Past the
+ * threshold the brief's budget starts trimming them.
+ */
+const criteriaGrowth: Rule = ({ entries }, { maxCriteria = DEFAULT_MAX_CRITERIA }) => {
+  const totals = new Map<RuleNode, number>();
+  return entries.flatMap(({ node, parent }) => {
+    if (node.type !== "capability") return [];
+    const own = node.criteria?.length ?? 0;
+    const total = own + (parent ? (totals.get(parent) ?? 0) : 0);
+    totals.set(node, total);
+    if (total <= maxCriteria) return [];
+    const detail = total > own ? `${own} own + ${total - own} inherited` : `${own}`;
+    return [finding("criteria-growth", node, `Capability "${node.title}" carries ${total} criteria (${detail}; threshold ${maxCriteria}); consolidate them with a modify change, or \`rex product tidy\` once it exists`)];
   });
 };
 
@@ -705,6 +776,7 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "change-has-target": changeHasTarget,
   "change-placed-at-close": changePlacedAtClose,
   "fix-not-spike": fixNotSpike,
+  "fix-not-additive": fixNotAdditive,
   "amendment-type": amendmentType,
   "ref-unique": refUnique,
   "ref-resolves": refResolves,
@@ -718,6 +790,7 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "capability-criteria": capabilityCriteria,
   "long-revised": longRevised,
   "area-balance": areaBalance,
+  "criteria-growth": criteriaGrowth,
   "unreviewed-spec": unreviewedSpec,
   "run-settings": runSettings,
   "retired-state-field": retiredStateField,
