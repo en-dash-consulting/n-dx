@@ -16,6 +16,18 @@
     field: (field_identifier) @call.name)
   arguments: (argument_list) @call.arguments) @call.invocation
 
+; Any other function kind (`f()("z")`, `(fn)("z")`, `func() {}("z")`) has no
+; name or receiver, but still owns its argument list, so the pairing rule
+; above stays true. `h[k]("z")`, `pkg.F[int]("z")` and `[]byte("z")` parse as
+; type conversions (no argument_list), so they yield no string argument.
+(call_expression
+  function: [
+    (call_expression)
+    (parenthesized_expression)
+    (func_literal)
+  ]
+  arguments: (argument_list) @call.arguments) @call.invocation
+
 (call_expression
   arguments: (argument_list
     [(interpreted_string_literal) (raw_string_literal)] @call.string_argument))
