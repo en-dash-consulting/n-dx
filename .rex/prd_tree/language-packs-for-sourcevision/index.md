@@ -23,4 +23,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Language pack interface inside sourcevision](./language-pack-interface-inside/index.md) | pending |
 | [Read Maven and Gradle build files](./read-maven-and-gradle-build-files/index.md) | pending |
 | [Resolve Java references to files](./resolve-java-references-to-files/index.md) | pending |
-| [Run tree-sitter grammars in Node through WASM](./run-tree-sitter-grammars-in-node/index.md) | pending |
+| [Run tree-sitter grammars in Node through WASM](./run-tree-sitter-grammars-in-node/index.md) | completed |
