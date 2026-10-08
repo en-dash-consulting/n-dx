@@ -18,7 +18,7 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { grammarBuildDir } from "./package-paths.js";
 import { javaPack } from "./java-pack.js";
 import type { LanguageConfig } from "./registry.js";
 
@@ -169,12 +169,6 @@ export interface LanguagePack {
 /** Packs registered in sourcevision. */
 export const BUILTIN_PACKS: readonly LanguagePack[] = [javaPack];
 
-/**
- * Where `scripts/build-grammars.mjs` writes grammars: `<package>/build/grammars`.
- * Resolves the same from `src/language/` and `dist/language/`.
- */
-export const DEFAULT_GRAMMAR_DIR = fileURLToPath(new URL("../../build/grammars", import.meta.url));
-
 /** How a pack's language will be analyzed. */
 export type PackMode = "structure" | "inventory-only";
 
@@ -191,7 +185,7 @@ export interface PackStatus {
 export interface LoadPacksOptions {
   /** Defaults to {@link BUILTIN_PACKS}. */
   readonly packs?: readonly LanguagePack[];
-  /** Defaults to {@link DEFAULT_GRAMMAR_DIR}. */
+  /** Defaults to {@link grammarBuildDir}. */
   readonly grammarDir?: string;
   /** Receives one message per degraded pack. Defaults to `console.warn`. */
   readonly warn?: (message: string) => void;
@@ -204,7 +198,7 @@ export interface LoadPacksOptions {
  */
 export function loadLanguagePacks(options: LoadPacksOptions = {}): PackStatus[] {
   const packs = options.packs ?? BUILTIN_PACKS;
-  const grammarDir = options.grammarDir ?? DEFAULT_GRAMMAR_DIR;
+  const grammarDir = options.grammarDir ?? grammarBuildDir();
   const warn = options.warn ?? ((message: string) => console.warn(message));
 
   return packs.map((pack) => {
