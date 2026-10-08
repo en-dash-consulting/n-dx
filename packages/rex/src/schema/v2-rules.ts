@@ -11,7 +11,7 @@
  * not part of the product layer or the plan. Two rules also read tombstones
  * (a node an applied `removed` amendment retired): `ref-resolves`, for which
  * a reference to one is history, not dangling; and `removed-target-live`,
- * which reports an open change removing one.
+ * which reports an open change touching, amending or adding under one.
  *
  * @module rex/schema/v2-rules
  */
@@ -388,7 +388,8 @@ function sameChangeTree(node: RuleNode, added: ReadonlyMap<string, AddedAmendmen
 
 /**
  * Every reference names a node of the kind its field needs, live or retired:
- * a reference to a tombstone is history, not dangling. touches, a modified or
+ * a reference to a tombstone is history, not dangling (an open change's is
+ * `removed-target-live`'s). touches, a modified or
  * removed amendment's target and appliesTo name product nodes; dependsOn
  * names a capability; blockedBy names a change-layer node; an added
  * amendment's `under` names a node that can hold the added type ({@link HOLDER}).
