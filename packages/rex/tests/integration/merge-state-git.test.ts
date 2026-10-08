@@ -76,7 +76,15 @@ describe("rex-state merge driver in a real repository", () => {
       "merge.rex-state.driver",
       `${JSON.stringify(process.execPath)} ${JSON.stringify(CLI_DIST)} merge-state %O %A %B %P`,
     );
-    await writeFile(join(repo, ".gitattributes"), ".rex/product/**/state.yaml merge=rex-state\n", "utf-8");
+    // Mirror `ndx init`: it pins `<rex>/**/*.yaml text eol=lf` alongside the merge
+    // driver (core/gitattributes-pins.js). Without the pin, Windows runners'
+    // core.autocrlf=true writes conflicted files with CRLF. Written literally
+    // because rex tests must not import from the orchestration tier (core).
+    await writeFile(
+      join(repo, ".gitattributes"),
+      ".rex/product/**/state.yaml text eol=lf merge=rex-state\n",
+      "utf-8",
+    );
 
     await mkdir(join(repo, FOLDER), { recursive: true });
     await writeFile(join(repo, FOLDER, "index.md"), capabilityDoc(SPEC_0), "utf-8");
