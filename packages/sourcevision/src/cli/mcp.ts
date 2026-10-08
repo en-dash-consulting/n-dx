@@ -26,6 +26,7 @@ import {
 } from "./sourcevision-core.js";
 import { findZoneById } from "../analyzers/zone-identity.js";
 import { computeReadinessForProject, READINESS_CAVEAT } from "./commands/readiness.js";
+import { CLIError } from "./errors.js";
 import { resolveSourcevisionPaths } from "../paths.js";
 import { WorkspaceBinding, type BoundWorkspace } from "./mcp-workspace.js";
 
@@ -630,8 +631,13 @@ function registerReadinessTools(server: McpServer, context: McpContext): void {
           }],
         };
       } catch (err) {
+        // Marked as an error so a client that branches on `isError` does not
+        // read "No SDLC profile found" as a scorecard. The suggestion travels
+        // with the message, because the fix is always a command to run.
+        const suggestion = err instanceof CLIError && err.suggestion ? ` ${err.suggestion}` : "";
         return {
-          content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+          content: [{ type: "text", text: `${err instanceof Error ? err.message : String(err)}${suggestion}` }],
+          isError: true,
         };
       }
     },

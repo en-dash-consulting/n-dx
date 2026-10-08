@@ -111,6 +111,33 @@ describe("sourcevision readiness", () => {
       await writeFile(join(svDir, DATA_FILES.sdlcProfile), "{ not json", "utf-8");
       expect(() => computeReadinessForProject(tmpDir)).toThrow(/Could not read/);
     });
+
+    /**
+     * The profile is a file, so it can be hand-edited or left behind by an
+     * analyzer that wrote a different shape. The scorer indexes every section
+     * without guarding; without validation a missing one surfaces as a raw
+     * TypeError instead of the "re-run analyze" this command owes the user.
+     */
+    it("rejects well-formed JSON that is not a profile, pointing at analyze", async () => {
+      await writeFile(join(svDir, DATA_FILES.sdlcProfile), JSON.stringify({ schemaVersion: "1.0.0" }), "utf-8");
+
+      try {
+        computeReadinessForProject(tmpDir);
+        expect.unreachable("should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(CLIError);
+        expect((err as CLIError).message).toMatch(/does not match the schema/);
+        expect((err as CLIError).suggestion).toContain("sourcevision analyze");
+      }
+    });
+
+    it("rejects a profile missing one section rather than crashing on it", async () => {
+      const { rollback: _dropped, ...withoutRollback } = emptyProfile();
+      await writeFile(join(svDir, DATA_FILES.sdlcProfile), JSON.stringify(withoutRollback), "utf-8");
+
+      expect(() => computeReadinessForProject(tmpDir)).toThrow(CLIError);
+      expect(() => computeReadinessForProject(tmpDir)).toThrow(/rollback/);
+    });
   });
 
   describe("scoring", () => {
@@ -201,6 +228,33 @@ describe("sourcevision readiness", () => {
       const output = log.mock.calls.map((c) => String(c[0])).join("\n");
       expect(output).toContain(READINESS_CAVEAT);
       expect(output).toContain("SDLC readiness");
+    });
+
+    it("lists every file the analyzer could not parse", async () => {
+      await writeProfile({
+        ...emptyProfile(),
+        parseFailures: [
+          { path: ".github/workflows/ci.yml", kind: "github-actions", reason: "YAML anchors are not supported" },
+        ],
+      });
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      cmdReadiness(tmpDir, {});
+
+      const output = log.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(output).toContain("Could not parse");
+      expect(output).toContain(".github/workflows/ci.yml");
+      expect(output).toContain("YAML anchors are not supported");
+    });
+
+    it("prints no parse block when every file was read", async () => {
+      await writeProfile(profileWithTests());
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      cmdReadiness(tmpDir, {});
+
+      const output = log.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(output).not.toContain("Could not parse");
     });
 
     it("prints a line for every dimension", async () => {

@@ -49,6 +49,13 @@ interface Line {
   number: number;
   indent: number;
   text: string;
+  /** The line as written, for block scalars that keep their body verbatim. */
+  raw: string;
+  /**
+   * Indented with a tab. Structure refuses it; a block scalar body keeps it,
+   * because a tab inside a `run: |` script is content, not indentation.
+   */
+  tab: boolean;
 }
 
 /**
@@ -181,7 +188,10 @@ function findKeyColon(text: string): number {
 
 function readLines(source: string): Line[] {
   const lines: Line[] = [];
-  const raw = source.split(/\r?\n/);
+  // A byte-order mark is not indentation. Editors on Windows write one, and
+  // counting it as a leading character would indent the first line by one,
+  // which parses the rest of the document as a stray block.
+  const raw = (source.startsWith("﻿") ? source.slice(1) : source).split(/\r?\n|\r/);
   for (let i = 0; i < raw.length; i++) {
     const original = raw[i];
     const lineNumber = i + 1;
@@ -193,26 +203,42 @@ function readLines(source: string): Line[] {
       if (lines.length > 0) throw new YamlSubsetError("Multi-document streams are not supported", lineNumber);
       continue;
     }
-    if (/^\t/.test(original) || /^ *\t/.test(original)) {
-      throw new YamlSubsetError("Tab indentation is not valid YAML", lineNumber);
-    }
+    const tab = /^[ \t]*\t/.test(original);
     const indent = original.length - original.trimStart().length;
     const text = stripComment(original.trim());
     if (text === "") continue;
     for (const [pattern, message] of UNSUPPORTED) {
       if (pattern.test(text)) throw new YamlSubsetError(message, lineNumber);
     }
-    lines.push({ number: lineNumber, indent, text });
+    lines.push({ number: lineNumber, indent, text, raw: original, tab });
   }
   return lines;
 }
 
-/** Block scalars (`|`, `>`) — the body is taken verbatim, folded or not. */
+/**
+ * A line about to be read as structure — a key or a sequence item.
+ *
+ * YAML forbids tabs in indentation, and guessing a width would invent
+ * structure. The check lives here rather than in `readLines` so that a tab
+ * inside a block scalar's body, which is content, is left alone.
+ */
+function requireSpaces(line: Line): void {
+  if (line.tab) throw new YamlSubsetError("Tab indentation is not valid YAML", line.number);
+}
+
+/**
+ * Block scalars (`|`, `>`) — the body is taken verbatim, folded or not.
+ *
+ * The body keeps each line as written, minus the indentation of its first
+ * line, so a heredoc or a tab-indented script inside `run: |` survives.
+ */
 function readBlockScalar(lines: Line[], start: number, parentIndent: number, fold: boolean): [string, number] {
   const body: string[] = [];
   let i = start;
+  const bodyIndent = i < lines.length ? lines[i].indent : 0;
   while (i < lines.length && lines[i].indent > parentIndent) {
-    body.push(lines[i].text);
+    const line = lines[i];
+    body.push(line.raw.slice(Math.min(bodyIndent, line.indent)).trimEnd());
     i++;
   }
   return [fold ? body.join(" ") : body.join("\n"), i];
@@ -234,6 +260,7 @@ function parseSequence(lines: Line[], start: number, indent: number): [YamlValue
   while (i < lines.length && lines[i].indent === indent) {
     const line = lines[i];
     if (!line.text.startsWith("- ") && line.text !== "-") break;
+    requireSpaces(line);
 
     const rest = line.text === "-" ? "" : line.text.slice(2).trim();
     i++;
@@ -299,7 +326,18 @@ function readMappingValue(
   if (next < lines.length && lines[next].indent > keyIndent) {
     return parseBlock(lines, next, lines[next].indent);
   }
+  // YAML lets a sequence sit at the same indent as the key that owns it —
+  // `on:` followed by `- push` at column 0 is the house style in the GitLab
+  // CI docs and in many workflows. Reading it as "no value" would drop every
+  // line after it.
+  if (next < lines.length && lines[next].indent === keyIndent && isSequenceItem(lines[next])) {
+    return parseSequence(lines, next, keyIndent);
+  }
   return [null, next];
+}
+
+function isSequenceItem(line: Line): boolean {
+  return line.text.startsWith("- ") || line.text === "-";
 }
 
 function parseMapping(lines: Line[], start: number, indent: number): [Record<string, YamlValue>, number] {
@@ -308,7 +346,8 @@ function parseMapping(lines: Line[], start: number, indent: number): [Record<str
 
   while (i < lines.length && lines[i].indent === indent) {
     const line = lines[i];
-    if (line.text.startsWith("- ")) break;
+    if (isSequenceItem(line)) break;
+    requireSpaces(line);
 
     const colon = findKeyColon(line.text);
     if (colon === -1) {
@@ -332,7 +371,13 @@ function parseMapping(lines: Line[], start: number, indent: number): [Record<str
 export function parseYamlSubset(source: string): YamlValue {
   const lines = readLines(source);
   if (lines.length === 0) return null;
-  const [value] = parseBlock(lines, 0, lines[0].indent);
+  const [value, next] = parseBlock(lines, 0, lines[0].indent);
+  if (next < lines.length) {
+    // A line no container claimed. Returning what was read so far would be
+    // the half-read document this module exists to refuse.
+    requireSpaces(lines[next]);
+    throw new YamlSubsetError("Unexpected content", lines[next].number);
+  }
   return value;
 }
 

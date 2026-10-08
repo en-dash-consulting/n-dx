@@ -290,12 +290,31 @@ describe("Sourcevision MCP server factory", () => {
       return { server, client };
     }
 
-    it("explains how to get a profile when none has been analyzed", async () => {
+    it("explains how to get a profile when none has been analyzed, as an error", async () => {
       const { server, client } = await connect();
 
       const result = await client.callTool({ name: "get_readiness", arguments: {} });
       const content = result.content as Array<{ type: string; text: string }>;
       expect(content[0].text).toContain("No SDLC profile found");
+      expect(content[0].text).toContain("sourcevision analyze");
+      // A client that branches on isError must not read the explanation as a
+      // scorecard.
+      expect(result.isError).toBe(true);
+
+      await client.close();
+      await server.close();
+    });
+
+    it("reports a profile that is not a profile as an error, not a crash", async () => {
+      await writeFile(join(svDir, DATA_FILES.sdlcProfile), JSON.stringify({ schemaVersion: "1.0.0" }), "utf-8");
+      const { server, client } = await connect();
+
+      const result = await client.callTool({ name: "get_readiness", arguments: {} });
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(result.isError).toBe(true);
+      expect(content[0].text).toMatch(/does not match the schema/);
+      expect(content[0].text).toContain("sourcevision analyze");
+      expect(content[0].text).not.toMatch(/TypeError|undefined/);
 
       await client.close();
       await server.close();
