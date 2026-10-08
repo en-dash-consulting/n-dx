@@ -272,15 +272,18 @@ const changeHasTarget: Rule = ({ entries }) =>
   });
 
 /**
- * Placement is required before close: a completed change cannot carry
- * `needsPlacement`. A placed change with no target is `change-has-target`'s,
- * so together they hold every completed change to a target unless it is a spike.
+ * Placement is required before close: a completed or applied change cannot
+ * carry `needsPlacement` (an applied change has realized its targets, so it
+ * was placed). A placed change with no target is `change-has-target`'s, so
+ * together they hold every completed change to a target unless it is a spike.
  */
 const changePlacedAtClose: Rule = ({ entries }) =>
   entries.flatMap(({ node }) => {
-    if (node.type !== "change" || node.status !== "completed" || !node.needsPlacement) return [];
+    if (node.type !== "change" || !node.needsPlacement) return [];
+    if (node.status !== "completed" && !isAppliedChange(node)) return [];
+    const state = node.status === "completed" ? "completed" : "applied";
     const untargeted = node.spike || hasTarget(node) ? "" : "; it must also amend or touch a product node, or be a spike";
-    return [finding("change-placed-at-close", node, `Change "${node.title}" is completed but still needs placement; a person must confirm its targets before it closes${untargeted}`)];
+    return [finding("change-placed-at-close", node, `Change "${node.title}" is ${state} but still needs placement; a person must confirm its targets before it closes${untargeted}`)];
   });
 
 const fixNotSpike: Rule = ({ entries }) =>
@@ -302,8 +305,14 @@ const amendmentType: Rule = ({ entries }) =>
 
 const named = (node: RuleNode): string => `${node.type} "${node.title}" (${node.id})`;
 
-/** An id, display id or alias names one live node across both layers. Reported on the later node. */
-const refUnique: Rule = ({ entries }) => {
+/**
+ * An id, display id or alias names one live node across both layers. Reported
+ * on the later node. A live node's `id` is also checked against tombstones:
+ * reusing a retired id would point every reference to the retired node at the
+ * new one. Display ids may be renumbered after a removal, and a folded id kept
+ * as an alias is the documented pattern, so only `id` is held against tombstones.
+ */
+const refUnique: Rule = ({ entries }, _options, withTombstones) => {
   const owner = new Map<string, RuleNode>();
   const findings: RuleFinding[] = [];
   for (const { node } of entries) {
@@ -312,6 +321,12 @@ const refUnique: Rule = ({ entries }) => {
       if (!first) owner.set(ref, node);
       else findings.push(finding("ref-unique", node, `"${ref}" names both ${named(first)} and ${named(node)}`));
     }
+  }
+  const retiredIds = new Map<string, RuleNode>();
+  for (const { node, retired } of withTombstones.entries) if (retired && !retiredIds.has(node.id)) retiredIds.set(node.id, node);
+  for (const { node } of entries) {
+    const tombstone = retiredIds.get(node.id);
+    if (tombstone) findings.push(finding("ref-unique", node, `"${node.id}" names both retired ${named(tombstone)} and ${named(node)}; a retired id is history and cannot be reused`));
   }
   return findings;
 };
@@ -389,13 +404,15 @@ function sameChangeTree(node: RuleNode, added: ReadonlyMap<string, AddedAmendmen
 /**
  * Every reference names a node of the kind its field needs, live or retired:
  * a reference to a tombstone is history, not dangling (an open change's is
- * `removed-target-live`'s). touches, a modified or
- * removed amendment's target and appliesTo name product nodes; dependsOn
- * names a capability; blockedBy names a change-layer node; an added
- * amendment's `under` names a node that can hold the added type ({@link HOLDER}).
- * An added amendment's target does not exist until apply, so it is not
- * checked. Its `under` may name a node the same change adds: in an unapplied
- * change only when the additions form a tree ({@link sameChangeTree}).
+ * `open-change-refs-live`'s). touches, a modified or removed amendment's
+ * target and appliesTo name product nodes; dependsOn names a capability;
+ * blockedBy names a change-layer node; an added amendment's `under` names a
+ * node that can hold the added type ({@link HOLDER}).
+ * An added amendment's target exists only after apply: in an unapplied change
+ * it must name nothing yet, live or retired, or apply would create a second
+ * node under an id, display id or alias already claimed. Its `under` may name
+ * a node the same change adds: in an unapplied change only when the additions
+ * form a tree ({@link sameChangeTree}).
  */
 const refResolves: Rule = (_index, _options, { entries, resolve }) => {
   const parentOf = new Map(entries.map((e) => [e.node, e.parent]));
@@ -428,6 +445,10 @@ const refResolves: Rule = (_index, _options, { entries, resolve }) => {
         if (a.delta !== "added") {
           refs.push([`${a.delta} amendment target`, a.target, PRODUCT_NODE]);
           continue;
+        }
+        const taken = tree ? resolve(a.target) : undefined;
+        if (taken && added.get(a.target) === a) {
+          findings.push(finding("ref-resolves", node, `change "${node.title}" adds "${a.target}", which already names ${describePlace(placeOf(taken))} "${taken.title}"; an added node needs an id no node claims`));
         }
         if (a.under === undefined) continue;
         const holder = added.get(a.under);

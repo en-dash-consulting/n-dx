@@ -101,6 +101,13 @@ describe("change-placed-at-close", () => {
     expect(findings[2].message).toContain("must also amend or touch");
   });
 
+  it("fails an applied change still needing placement, whatever its status", () => {
+    const applied = node("change", { status: "in_progress", appliedAt: "2026-10-05T00:00:00.000Z", needsPlacement: true, touches: ["a"] });
+    const findings = check("change-placed-at-close", { changes: [applied] });
+    expect(ids(findings)).toEqual([applied.id]);
+    expect(findings[0].message).toContain("is applied but still needs placement");
+  });
+
   it("leaves a completed untargeted change that needs no placement to change-has-target", () => {
     const bare = node("change", { status: "completed" });
     const tree: V2Tree = { product: [], changes: [bare] };
@@ -171,6 +178,15 @@ describe("ref-unique", () => {
     const survivor = cap({ id: "survivor", aliases: ["folded"] });
     expect(check("ref-unique", { product: [folded, survivor] })).toEqual([]);
   });
+
+  it("fails a live node that reuses a tombstone's id, but not its display id or alias", () => {
+    const gone = cap({ id: "gone", title: "Gone", displayId: "A1.3", aliases: ["older"], status: "deleted" });
+    const reused = node("change", { id: "gone", title: "Reused" });
+    const renumbered = cap({ id: "fresh", displayId: "A1.3", aliases: ["older"] });
+    const findings = check("ref-unique", { product: [gone, renumbered], changes: [reused] });
+    expect(ids(findings)).toEqual([reused.id]);
+    expect(findings[0].message).toBe('"gone" names both retired capability "Gone" (gone) and change "Reused" (gone); a retired id is history and cannot be reused');
+  });
 });
 
 describe("ref-resolves", () => {
@@ -228,6 +244,33 @@ describe("ref-resolves", () => {
   it("does not check an added amendment's target, which exists only after apply", () => {
     const change = node("change", { amends: [{ target: "not-yet", delta: "added", summary: "s" }] });
     expect(check("ref-resolves", { changes: [change] })).toEqual([]);
+  });
+
+  it("fails an unapplied change adding a target some node already claims by id, display id or alias, live or retired", () => {
+    const product = [
+      node("area", { id: "area" }, [
+        cap({ id: "a", title: "Live A", displayId: "A1.1", aliases: ["old-a"] }),
+        cap({ id: "gone", title: "Gone", status: "deleted" }),
+      ]),
+    ];
+    const adds = (target: string, fields: Record<string, unknown> = {}) =>
+      node("change", { amends: [{ target, delta: "added", summary: "s", under: "area" }], ...fields });
+    const byId = adds("a");
+    const byDisplayId = adds("A1.1");
+    const byAlias = adds("old-a");
+    const retired = adds("gone");
+    const applied = adds("a", { appliedAt: "2026-10-05T00:00:00.000Z" });
+    const twice = node("change", { amends: [{ target: "a", delta: "added", summary: "s" }, { target: "a", delta: "added", summary: "s" }] });
+    const findings = check("ref-resolves", { product, changes: [byId, byDisplayId, byAlias, retired, applied, twice] });
+    expect(findings.map((f) => [f.nodeId, f.message.match(/adds "([^"]+)", which already names (.+?) "([^"]+)"/)?.slice(1)])).toEqual([
+      [byId.id, ["a", "a capability", "Live A"]],
+      [byDisplayId.id, ["A1.1", "a capability", "Live A"]],
+      [byAlias.id, ["old-a", "a capability", "Live A"]],
+      [retired.id, ["gone", "a capability", "Gone"]],
+      [twice.id, undefined],
+      [twice.id, ["a", "a capability", "Live A"]],
+    ]);
+    expect(findings[4].message).toContain('adds "a" more than once');
   });
 
   describe("same-change parents of an unapplied change", () => {
