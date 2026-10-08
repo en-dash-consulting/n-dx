@@ -71,28 +71,45 @@ const MAX_LINKED_TESTS = 3;
 const TEST_FILE_SUFFIX = /[._](?:test|spec)\.[cm]?[jt]sx?$/;
 
 const EARS_OPENERS = /^(?:when|while|if|where)\b/i;
-const TEST_MARKER = /\s*\((?:tests?|tested|unit tests?|e2e)\)\s*$/i;
+const TEST_MARKER = /\s*\((?:tests?|tested|unit tests?|e2e)\)$/i;
+const TRAILING_PUNCTUATION = /[.;:\s]+$/;
 
 function lowerFirst(text: string): string {
   // Leave acronyms ("MCP", "PRD") as written.
   return /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
 }
 
+/** Criterion text without its trailing "(test)" marker or punctuation, in either order. */
+function criterionCore(text: string): string {
+  return text.trim().replace(TRAILING_PUNCTUATION, "").replace(TEST_MARKER, "").replace(TRAILING_PUNCTUATION, "");
+}
+
 /** One criterion in EARS form: EARS-shaped text is kept, the rest wrapped in the ubiquitous form. */
 export function toEars(text: string): string {
-  const core = text.trim().replace(TEST_MARKER, "").replace(/[.;:\s]+$/, "");
+  const core = criterionCore(text);
   if (EARS_OPENERS.test(core) || /\bshall\b/i.test(core)) return `${core}.`;
   return `The system shall ensure that ${lowerFirst(core)}.`;
 }
 
+/** A sentence end, not the dot of an abbreviation ("e.g.", "i.e.", "etc.", "vs."). */
+const SENTENCE_BREAK = /(?<!\b(?:e\.g|i\.e|etc|vs)\.)(?<=[.!?])\s+|\n/;
+/** Review metadata or a reference, not a description of the product ("**Severity:** …", "Verdict: …", "GitHub #368."). */
+const NOT_A_STATEMENT = /^(?:[#*>|`\-[]|(?:severity|verdict|priority|status|github|issue|pr)\b)/i;
+const MIN_STATEMENT_WORDS = 4;
+
 function firstSentence(text: string | undefined): string | undefined {
-  const sentence = text?.trim().split(/(?<=[.!?])\s+|\n/)[0]?.trim();
+  const sentence = text?.trim().split(SENTENCE_BREAK)[0]?.trim();
   return sentence ? sentence : undefined;
+}
+
+function usableStatement(sentence: string | undefined): sentence is string {
+  if (sentence === undefined || NOT_A_STATEMENT.test(sentence) || opensWithWorkVerb(sentence)) return false;
+  return sentence.split(/\s+/).length >= MIN_STATEMENT_WORDS;
 }
 
 function draftStatement(item: PRDItem): { statement: string; fromTitle: boolean } {
   const sentence = firstSentence(item.description);
-  if (sentence !== undefined && !opensWithWorkVerb(sentence)) {
+  if (usableStatement(sentence)) {
     return { statement: /[.!?]$/.test(sentence) ? sentence : `${sentence}.`, fromTitle: false };
   }
   const title = item.title.trim();
@@ -176,7 +193,7 @@ export function draftCapabilitySpecs(
           if (tests.length > 0) {
             const requirement: Requirement = {
               id: `${entry.id}:${criterion.id}`,
-              title: raw.trim().replace(TEST_MARKER, ""),
+              title: criterionCore(raw),
               description: `Linked by keyword to: ${tests.join(", ")}`,
               category: "technical",
               validationType: "automated",

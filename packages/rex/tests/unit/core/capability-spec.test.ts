@@ -57,6 +57,11 @@ describe("toEars", () => {
     expect(toEars("Every v1 item appears in the plan (test)")).toBe("The system shall ensure that every v1 item appears in the plan.");
     expect(toEars("MCP writes go to the worktree")).toBe("The system shall ensure that MCP writes go to the worktree.");
   });
+
+  it("drops a test marker that ends in punctuation", () => {
+    expect(toEars("The task stays claimed (tests).")).toBe("The system shall ensure that the task stays claimed.");
+    expect(toEars("Reads agree on a live claim (test);")).toBe("The system shall ensure that reads agree on a live claim.");
+  });
 });
 
 describe("draftCapabilitySpecs", () => {
@@ -127,6 +132,27 @@ describe("draftCapabilitySpecs", () => {
     expect(dirWords.criteria[1].requirement).toBeDefined();
     const [tied] = draft(items, { testFiles: wide });
     expect(tied.requirements).toEqual([]);
+  });
+
+  it("falls back to the title when the description opens with metadata, a reference or a fragment", () => {
+    const descriptions = [
+      "**Severity:** medium — **Verdict:** should-fix (captured from a review).",
+      "Verdict: must-fix. The rest explains.",
+      "GitHub #368. Details follow.",
+      "## Summary\nPicks tasks.",
+    ];
+    for (const description of descriptions) {
+      const items = [item("epic", "Rex", [item("feature", "Claim handling", [item("task", "Hold claims")], "completed", { description })])];
+      const [s] = draft(items);
+      expect(s.statement, description).toBe("The product provides claim handling.");
+      expect(s.notes.join(" ")).toMatch(/drafted from the title/);
+    }
+  });
+
+  it("does not cut a statement at an abbreviation", () => {
+    const description = "Records the transition in the commit message (e.g. completed or failing) for every run. More text.";
+    const items = [item("epic", "Rex", [item("feature", "Commit trailers", [item("task", "Write trailers")], "completed", { description })])];
+    expect(draft(items)[0].statement).toBe("Records the transition in the commit message (e.g. completed or failing) for every run.");
   });
 
   it("keeps a Title Case name as written in a title-drafted statement", () => {
