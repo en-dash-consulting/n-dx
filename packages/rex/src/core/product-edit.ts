@@ -18,9 +18,15 @@
  *   draft is refreshed instead: its `proposed` becomes the latest statement and
  *   the new diff is appended to its intent. A second draft would let applying
  *   the older one write the older spec over the newer edit.
+ * - **reverted** (the spec hashes to `metAt` again while an open product-edit
+ *   draft amends the node): the drafted edit was abandoned, and applying it
+ *   would write the abandoned spec over the revert. The draft's amendment for
+ *   the node is dropped, and a draft left with nothing to amend or touch is
+ *   cancelled with its open tasks and subtasks. `revisedAt` is cleared, so the
+ *   node reads met.
  *
- * A spec that still hashes to `metAt` is `unchanged`; a node never met is
- * `proposed` and has no build to revise. Both return the tree as given.
+ * A spec that still hashes to `metAt` with no open draft is `unchanged`; a node
+ * never met is `proposed` and has no build to revise. Both return the tree as given.
  *
  * Pure and deterministic like {@link applyAmendments}: works on a copy and
  * leaves writing to the caller. Wired to nothing yet.
@@ -29,8 +35,8 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { Amendment, Criterion } from "../schema/v2.js";
-import { isOpenChange, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import type { Amendment, ChangeNode, Criterion } from "../schema/v2.js";
+import { CLOSED_STATUSES, isOpenChange, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { appendHistory, freeSlug, resolve, stampMet } from "./apply-amendments.js";
 
 /** The spec `metAt` hashes: statement and criteria (a constraint has a statement only). */
@@ -50,13 +56,17 @@ export interface ProductEditOptions {
   newId?: () => string;
 }
 
-export type ProductEditOutcome = "editorial" | "revised" | "unchanged" | "proposed";
+export type ProductEditOutcome = "editorial" | "revised" | "reverted" | "unchanged" | "proposed";
 
 export interface ProductEditResult {
   /** The tree after handling the edit; the input tree is not modified. */
   tree: V2Tree;
   outcome: ProductEditOutcome;
-  /** For a `revised` outcome, the node's draft: newly drafted, or the open one refreshed. */
+  /**
+   * For `revised`, the node's draft: newly drafted, or the open one refreshed.
+   * For `reverted`, the draft as left: cancelled, or still open without the
+   * node's amendment when it amends or touches other nodes.
+   */
   change?: RuleNode;
 }
 
@@ -76,11 +86,13 @@ export function handleProductEdit(tree: V2Tree, nodeRef: string, before: Spec, o
     throw new ProductEditError(nodeRef, "not a live capability or constraint");
   }
   if (!found.metAt) return { tree, outcome: "proposed" };
-  if (specHash(specOf(found)) === found.metAt) return { tree, outcome: "unchanged" };
+  const atMet = specHash(specOf(found)) === found.metAt;
+  if (atMet && !openDraft(tree, found.id)) return { tree, outcome: "unchanged" };
 
   const next = structuredClone(tree);
   const node = resolve(next.product, found.id)!;
   const label = node.displayId ?? node.id;
+  if (atMet) return { tree: next, outcome: "reverted", change: withdrawDraft(next, node, label, options.now) };
   const after = specOf(node);
   const diff = describeDiff(specOf({ ...before, type: node.type }), after);
   const summary = options.summary?.trim() || diff.summary;
@@ -127,13 +139,34 @@ export function handleProductEdit(tree: V2Tree, nodeRef: string, before: Spec, o
 }
 
 /** The open, unapplied product-edit change whose modified amendment targets `nodeId`, and that amendment. */
-function openDraft(tree: V2Tree, nodeId: string): { change: RuleNode; amendment: Amendment } | undefined {
+function openDraft(tree: V2Tree, nodeId: string): { change: RuleNode & ChangeNode; amendment: Amendment } | undefined {
   for (const change of tree.changes) {
     if (!isOpenChange(change) || change.source !== PRODUCT_EDIT_SOURCE) continue;
     const amendment = change.amends?.find((a) => a.delta === "modified" && resolve(tree.product, a.target)?.id === nodeId);
     if (amendment) return { change, amendment };
   }
   return undefined;
+}
+
+/** After `node` is reverted to its met spec, drop its open draft's amendment, cancel a draft left empty, and return the draft. */
+function withdrawDraft(tree: V2Tree, node: RuleNode, label: string, now: Date): RuleNode {
+  const { change, amendment } = openDraft(tree, node.id)!;
+  const date = now.toISOString().slice(0, 10);
+  delete node.revisedAt;
+  change.amends = change.amends?.filter((a) => a !== amendment);
+  const emptied = !change.amends?.length &&!change.touches?.length;
+  const note = emptied
+    ? `Cancelled on ${date}: ${label} was reverted to its met spec.`
+    : `${label} was reverted to its met spec on ${date}; its amendment was dropped.`;
+  change.intent = [change.intent ?? "", "", note].join("\n");
+  if (emptied) cancelOpen(change);
+  return change;
+}
+
+/** Cancel `node` and every descendant not already closed. */
+function cancelOpen(node: RuleNode): void {
+  if (!CLOSED_STATUSES.has(node.status ?? "pending")) node.status = "cancelled";
+  for (const child of node.children ?? []) cancelOpen(child);
 }
 
 /** Two diff summaries as one, each part listed once. */

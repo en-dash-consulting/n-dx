@@ -239,6 +239,74 @@ describe("handleProductEdit: a second edit refreshes the open draft", () => {
   });
 });
 
+describe("handleProductEdit: reverting to the met spec withdraws the open draft", () => {
+  const B = { statement: "A shopper can pay by card or wallet.", criteria: CRITERIA };
+
+  /** Edit A → B, then patch the tree, then edit B back to A. */
+  function revert(patch: (t: V2Tree) => void = () => {}): { input: V2Tree; result: ReturnType<typeof handleProductEdit> } {
+    const input = handleProductEdit(tree(B), CAP, BEFORE, OPTS).tree;
+    patch(input);
+    Object.assign(cap(input), structuredClone(BEFORE));
+    return { input, result: handleProductEdit(input, CAP, B, { ...OPTS, now: new Date("2026-10-08T09:00:00.000Z") }) };
+  }
+
+  it("cancels the draft, so no open product-edit draft amends the node", () => {
+    const { result } = revert();
+    expect(result.outcome).toBe("reverted");
+    expect(result.change).toBe(result.tree.changes[0]);
+    expect(result.change?.status).toBe("cancelled");
+    expect(result.change?.amends).toEqual([]);
+    expect(result.change?.intent?.split("\n").at(-1)).toBe("Cancelled on 2026-10-08: A1.1 was reverted to its met spec.");
+    expect(() => applyAmendments(result.tree, "draft-1", { commit: "abc1234", now: NOW })).toThrow();
+  });
+
+  it("clears revisedAt, so the node reads met at the reverted spec", () => {
+    const { result } = revert();
+    const node = cap(result.tree);
+    expect(node.revisedAt).toBeUndefined();
+    expect(node.metAt).toBe(specHash(specOfCap(node)));
+    expect(node.statement).toBe(STATEMENT);
+  });
+
+  it("leaves the input tree unmodified", () => {
+    const { input } = revert();
+    expect(cap(input).revisedAt).toBe(NOW.toISOString());
+    expect(input.changes[0].status).toBe("pending");
+    expect(input.changes[0].amends).toHaveLength(1);
+  });
+
+  it("cancels the draft's open tasks and subtasks, keeping closed ones", () => {
+    const { result } = revert((t) => {
+      t.changes[0].children = [
+        { id: "t1", type: "task", title: "Build", slug: "build", status: "in_progress", children: [{ id: "s1", type: "subtask", title: "Part", slug: "part", status: "pending" }] },
+        { id: "t2", type: "task", title: "Done", slug: "done", status: "completed" },
+      ] as RuleNode[];
+    });
+    const [t1, t2] = result.change!.children!;
+    expect([t1.status, t1.children![0].status, t2.status]).toEqual(["cancelled", "cancelled", "completed"]);
+  });
+
+  it("drops only the node's amendment from a draft that amends other nodes too", () => {
+    const other = { target: CON, delta: "modified", summary: "statement edited", proposed: "Card data is tokenised." } as const;
+    const { result } = revert((t) => t.changes[0].amends!.push({ ...other }));
+    expect(result.outcome).toBe("reverted");
+    expect(result.change?.status).toBe("pending");
+    expect(result.change?.amends).toEqual([other]);
+    expect(result.change?.intent?.split("\n").at(-1)).toBe("A1.1 was reverted to its met spec on 2026-10-08; its amendment was dropped.");
+    expect(cap(result.tree).revisedAt).toBeUndefined();
+  });
+
+  it("is unchanged when the draft is already closed", () => {
+    const { input, result } = revert((t) => Object.assign(t.changes[0], { status: "cancelled" }));
+    expect(result.outcome).toBe("unchanged");
+    expect(result.tree).toBe(input);
+  });
+});
+
+function specOfCap(node: RuleNode): { statement?: string; criteria?: Criterion[] } {
+  return { statement: node.statement, criteria: node.criteria };
+}
+
 describe("handleProductEdit: nothing to do", () => {
   it("reports unchanged when the spec still hashes to metAt", () => {
     const input = tree({ body: "Card payments, reworded." });

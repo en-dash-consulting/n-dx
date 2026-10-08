@@ -247,12 +247,12 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
   return findings;
 };
 
-/** Statuses after which a change no longer acts on the product layer. */
-const CLOSED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["completed", "cancelled", "deleted"]);
+/** Statuses that close a change-layer node; a closed change no longer acts on the product layer. */
+export const CLOSED_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["completed", "cancelled", "deleted"]);
 
 /** A change that is neither applied nor closed, so its amendments are still to come. */
 export function isOpenChange(node: RuleNode): node is RuleNode & ChangeNode {
-  return node.type === "change" && !node.appliedIn && !CLOSED_CHANGE_STATUSES.has(node.status ?? "pending");
+  return node.type === "change" && !node.appliedIn && !CLOSED_STATUSES.has(node.status ?? "pending");
 }
 
 const removedTargetLive: Rule = ({ entries, resolve }) =>
