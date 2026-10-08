@@ -519,7 +519,35 @@ describe("depends-on-acyclic", () => {
     const c = cap({ id: "c", title: "C", dependsOn: ["a"] });
     const findings = check("depends-on-acyclic", { product: [node("area", {}, [a, b, c])] });
     expect(findings).toHaveLength(1);
-    expect(findings[0].message).toBe('dependsOn cycle: "A" → "B" → "C" → "A"');
+    expect(findings[0].message).toBe('dependsOn cycle among "A", "B", "C"');
+  });
+
+  it("reports a cycle on its smallest id, path rotated there, whichever node the walk starts at", () => {
+    const a = cap({ id: "a", title: "A", dependsOn: ["b"] });
+    const b = cap({ id: "b", title: "B", dependsOn: ["c"] });
+    const c = cap({ id: "c", title: "C", dependsOn: ["b"] });
+    const withA = check("depends-on-acyclic", { product: [node("area", {}, [a, c, b])] });
+    const withoutA = check("depends-on-acyclic", { product: [node("area", {}, [c, b])] });
+    expect(withA).toHaveLength(1);
+    expect(withA[0].nodeId).toBe("b");
+    expect(withA[0].message).toBe('dependsOn cycle among "B", "C"');
+    expect(withoutA).toEqual(withA);
+  });
+
+  it("reports a knot of several cycles once, identically whichever capability the walk enters it from", () => {
+    const knot = () => [
+      cap({ id: "a", title: "A", dependsOn: ["b", "c"] }),
+      cap({ id: "b", title: "B", dependsOn: ["c"] }),
+      cap({ id: "c", title: "C", dependsOn: ["a"] }),
+    ];
+    const [a, b, c] = knot();
+    const [, b2, c2] = knot();
+    const fromA = check("depends-on-acyclic", { product: [node("area", {}, [a, b, c])] });
+    const fromC = check("depends-on-acyclic", { product: [node("area", {}, [c2, b2, knot()[0]])] });
+    expect(fromA).toHaveLength(1);
+    expect(fromA[0].nodeId).toBe("a");
+    expect(fromA[0].message).toBe('dependsOn cycle among "A", "B", "C"');
+    expect(fromC).toEqual(fromA);
   });
 
   it("fails a self-dependency", () => {
