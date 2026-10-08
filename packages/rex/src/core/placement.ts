@@ -232,7 +232,11 @@ function asProposal(value: unknown): { proposal: PlacementProposal } | { reason:
   const p = parsed.data;
   const nonEmpty = (v: unknown) => typeof v === "string" && v.trim() !== "";
   const ok =
-    p.delta === "added" && ADDED_NODE_TYPES.has(p.type as AddedNodeType) && nonEmpty(p.under) && nonEmpty(p.title);
+    p.delta === "added" &&
+    ADDED_NODE_TYPES.has(p.type as AddedNodeType) &&
+    nonEmpty(p.target) &&
+    nonEmpty(p.under) &&
+    nonEmpty(p.title);
   return ok
     ? { proposal: p as PlacementProposal }
     : { reason: "is not an added amendment with type, under and title" };

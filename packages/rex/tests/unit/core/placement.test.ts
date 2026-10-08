@@ -215,6 +215,7 @@ describe("placeChange (rules + text model)", () => {
     ["a non-string proposed and a null criteria.add", { ...proposal, proposed: 42, criteria: { add: null } }],
     ["a non-string summary", { ...proposal, summary: 7 }],
     ["no target", { ...proposal, target: "" }],
+    ["a whitespace-only target", { ...proposal, target: "  " }],
   ])("drops a proposal with %s, with a warning", async (_n, bad) => {
     const result = await placeChange(change, caps, { model: async () => ({ propose: bad as PlacementProposal }), areas });
     expect(result.model).toEqual({ pick: null, agrees: false });
