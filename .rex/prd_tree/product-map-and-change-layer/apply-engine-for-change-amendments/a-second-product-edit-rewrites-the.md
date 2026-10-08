@@ -1,0 +1,20 @@
+---
+id: "7546b066-7f56-4c47-b1be-d28719f9cdef"
+level: "task"
+title: "A second product edit rewrites the proposal of a completed but unapplied draft"
+status: "pending"
+priority: "high"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:high"
+  - "pr-10"
+  - "rex"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "Editing met A1.1 A→B, completing the draft without applying it, then editing B→C leaves the completed draft's amendment proposing B (test)"
+  - "That second edit drafts a new change proposing C and names the completed draft as stale in the result (test)"
+  - "The test 'refreshes a completed but unapplied draft: it is still open' is replaced by tests of the new behaviour"
+description: "Verdict: should-fix. Found reviewing d71f7e48 (commit 28f38ab5a), which made openDraft (packages/rex/src/core/product-edit.ts) use the shared isOpenChange, so a completed but unapplied change now counts as open.\n\nScenario: A1.1 is met at A. The steward edits it to B, which drafts change 1 proposing B. Change 1's work is completed but not applied (rex.applyOn review or release). The steward edits A1.1 again, to C. openDraft finds change 1 because it is open, and the refresh branch of handleProductEdit sets its amendment's proposed to C and appends to its intent. Change 1 stays completed. When it is applied, A1.1 gets metAt = specHash(C), so it reads as met at C although nobody built C. That is a silent wrong build status. Before the PR 30 merge, completed drafts were closed, so this edit drafted a new change 2.\n\nThe test \"refreshes a completed but unapplied draft: it is still open\" (tests/unit/core/product-edit.test.ts) records the current behaviour and must change with the fix.\n\nReachable once handleProductEdit is wired to a CLI or MCP path and applyOn is not \"complete\". Nothing reaches it today.\n\nOptions:\n(a) Keep isOpenChange for open, but refresh only drafts whose status is not completed. For a completed one, draft a new change and report the completed draft as stale, as f1581c8a decides for the revert path. Cheap, and consistent with \"do not reopen or modify completed work\". Recommended.\n(b) Refresh the completed draft and move it back to pending, so apply waits for the new work. This reopens completed work, which the f1581c8a decision rules out.\n\nRelated: f1581c8a covers the revert path. Since 28f38ab5a that path withdraws a completed draft: it drops the amendment, and an emptied draft keeps status completed while its intent says \"Cancelled\". 8967d9cb covers several open drafts for one node. Consider doing all three in one run.\n\nDecision (2026-10-07, Ryan): option (a). Refresh only open product-edit drafts that are not completed. For a completed but unapplied draft, draft a new change and report the completed draft as stale; do not modify completed work. Change the test that records the current refresh behaviour. Done in the same run as f1581c8a."
+lastModified: "2026-10-08T03:48:42.708Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
