@@ -33,4 +33,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [No test checks that buildPackImportGraph passes unparsed pack files to the resolver](./no-test-checks-that.md) | pending |
 | [Read go.mod and go.work with versions](./read-go-mod-and-go-work-with-versions.md) | completed |
 | [Resolve Go import paths to package files](./resolve-go-import-paths-to-package-files.md) | completed |
-| [Switch Go import edges from the regex parser to the pack](./switch-go-import-edges-from-the-regex.md) | in_progress |
+| [Switch Go import edges from the regex parser to the pack](./switch-go-import-edges-from-the-regex.md) | completed |
