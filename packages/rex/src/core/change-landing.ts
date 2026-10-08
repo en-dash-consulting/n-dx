@@ -30,8 +30,8 @@
  * ## shippedIn
  *
  * A stamped `shippedIn` wins. Without one, {@link resolveShippedIn} falls back
- * to the first release tag (`v?X.Y.Z`, no prerelease suffix) containing the
- * landing commit.
+ * to the first release tag (`X.Y.Z`, `vX.Y.Z` or `<package>@X.Y.Z`, no
+ * prerelease suffix) containing the landing commit.
  *
  * @module rex/core/change-landing
  */
@@ -169,9 +169,10 @@ export async function computeLandings(tree: V2Tree, options: ChangeCommitsOption
 
 // ── shippedIn ────────────────────────────────────────────────────
 
-const RELEASE_TAG = /^v?(\d+\.\d+\.\d+)$/;
+/** `X.Y.Z`, `vX.Y.Z`, or a changesets monorepo tag `<package>@X.Y.Z`; no prerelease suffix. */
+const RELEASE_TAG = /^(?:\S+@)?v?(\d+\.\d+\.\d+)$/;
 
-/** The version of the earliest-created release tag (`v?X.Y.Z`) whose history contains `commit`, or undefined. */
+/** The version of the earliest-created release tag (see {@link RELEASE_TAG}) whose history contains `commit`, or undefined. */
 export async function firstReleaseContaining(repoDir: string, commit: string): Promise<string | undefined> {
   const tags = await git(repoDir, ["tag", "--contains", commit, "--sort=creatordate"]);
   for (const tag of tags.split("\n")) {

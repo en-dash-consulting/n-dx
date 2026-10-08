@@ -210,6 +210,13 @@ describe("resolveShippedIn", () => {
     expect(await resolveShippedIn({}, landing, repo)).toBe("0.2.0");
   });
 
+  it("reads a changesets monorepo tag (<package>@X.Y.Z), skipping its prereleases", async () => {
+    const landing = await landedChange();
+    git("tag", "@n-dx/rex@0.9.0-next.0");
+    git("tag", "@n-dx/rex@0.9.0");
+    expect(await resolveShippedIn({}, landing, repo)).toBe("0.9.0");
+  });
+
   it("is undefined when landed but unreleased, or not landed", async () => {
     const landing = await landedChange();
     expect(await resolveShippedIn({}, landing, repo)).toBeUndefined();
