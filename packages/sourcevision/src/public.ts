@@ -172,6 +172,11 @@ export type {
   CallType,
   FunctionNode,
   CallGraphSummary,
+  // outbound.json
+  OutboundData,
+  OutboundDependency,
+  DeclaredContract,
+  Confidence,
   // workspace
   WorkspaceMember,
   WorkspaceConfig,
