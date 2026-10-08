@@ -229,6 +229,105 @@ describe("ref-resolves", () => {
     const change = node("change", { amends: [{ target: "not-yet", delta: "added", summary: "s" }] });
     expect(check("ref-resolves", { changes: [change] })).toEqual([]);
   });
+
+  describe("same-change parents of an unapplied change", () => {
+    const adds = (...pairs: [target: string, under?: string, type?: string][]) =>
+      node("change", { amends: pairs.map(([target, under, type]) => ({ target, delta: "added", summary: "s", under, type })) });
+
+    it("passes additions that form a tree ending at an existing node or the root", () => {
+      const change = adds(["new-a", "area"], ["new-b", "new-a"], ["new-c"], ["new-d", "new-c"], ["rule", "new-d", "constraint"]);
+      expect(check("ref-resolves", { product: [node("area", { id: "area" })], changes: [change] })).toEqual([]);
+    });
+
+    it("fails an addition placed under itself", () => {
+      const change = adds(["new-a", "new-a"]);
+      const findings = checkV2Rules({ product: [], changes: [change] }, { now: NOW });
+      expect(findings.map((f) => [f.rule, f.nodeId])).toEqual([["ref-resolves", change.id]]);
+      expect(findings[0].message).toContain('"new-a" under itself');
+    });
+
+    it("fails a cycle once, naming its amendments, and an addition under the cycle", () => {
+      const change = adds(["new-a", "new-b"], ["new-b", "new-a"], ["new-c", "new-a"]);
+      const findings = checkV2Rules({ product: [], changes: [change] }, { now: NOW });
+      expect(findings.map((f) => f.rule)).toEqual(["ref-resolves", "ref-resolves"]);
+      expect(findings[0].message).toContain('adds "new-a" under "new-b", "new-b" under "new-a"');
+      expect(findings[1].message).toContain('adds "new-c" under "new-a", whose same-change parents never reach');
+    });
+
+    it("fails a same-change parent that cannot hold the added type", () => {
+      const change = adds(["rule", "area", "constraint"], ["new-cap", "rule"], ["top", "area"], ["mid", "top"], ["deep", "mid"]);
+      const findings = check("ref-resolves", { product: [node("area", { id: "area" })], changes: [change] });
+      expect(findings.map((f) => f.message.match(/under "([^"]+)" names (.+?) the same change/)?.slice(1))).toEqual([
+        ["rule", "a constraint"],
+        ["mid", "a capability nested in a capability"],
+      ]);
+    });
+
+    it("leaves an applied change's same-change parents to the materialized tree", () => {
+      const change = node("change", {
+        appliedAt: "2026-10-05T00:00:00.000Z",
+        amends: [{ target: "new-a", delta: "added", summary: "s", under: "new-a" }],
+      });
+      expect(check("ref-resolves", { changes: [change] })).toEqual([]);
+    });
+  });
+
+  describe("destination kind", () => {
+    it("fails the reproduction: touches and an added capability under a task", () => {
+      const change = node("change", {
+        touches: ["task-1"],
+        amends: [{ target: "new-cap", delta: "added", summary: "s", under: "task-1" }],
+      }, [node("task", { id: "task-1", title: "Task one" })]);
+      const findings = checkV2Rules({ product: [], changes: [change] }, { now: NOW });
+      expect(findings.map((f) => [f.rule, f.message])).toEqual([
+        ["ref-resolves", `change "${change.title}" touches "task-1" names a task "Task one", not a product-layer node`],
+        ["ref-resolves", `change "${change.title}" added amendment under "task-1" names a task "Task one", not an area or a capability not nested in another, which can hold a capability`],
+      ]);
+    });
+
+    it("fails each field naming the wrong kind, naming the field, the reference and the kind found", () => {
+      const task = node("task", { id: "t" });
+      const product = [
+        node("area", { id: "area" }, [
+          cap({ id: "top" }, [cap({ id: "nested" })]),
+          cap({ id: "a", dependsOn: ["area"], blockedBy: ["top"] }),
+          node("constraint", { id: "k", appliesTo: ["t"] }),
+        ]),
+        node("constraint", { id: "gone-task-ref", appliesTo: ["gone-task"] }),
+      ];
+      const change = node("change", {
+        touches: ["t"],
+        amends: [
+          { target: "t", delta: "modified", summary: "s" },
+          { target: "t", delta: "removed", summary: "s" },
+          { target: "n1", delta: "added", summary: "s", under: "nested" },
+          { target: "n2", delta: "added", summary: "s", under: "k" },
+          { target: "n3", delta: "added", summary: "s", under: "t", type: "constraint" },
+        ],
+      }, [task, node("task", { id: "gone-task", status: "deleted" })]);
+      const findings = check("ref-resolves", { product, changes: [change] });
+      expect(findings.map((f) => [f.nodeId, f.message.match(/ (\S+(?: amendment \S+)?) "([^"]+)" names (an? [a-z ]+?) "/)?.slice(1)])).toEqual([
+        ["a", ["blockedBy", "top", "a capability"]],
+        ["a", ["dependsOn", "area", "an area"]],
+        ["k", ["appliesTo", "t", "a task"]],
+        ["gone-task-ref", ["appliesTo", "gone-task", "a task"]],
+        [change.id, ["touches", "t", "a task"]],
+        [change.id, ["modified amendment target", "t", "a task"]],
+        [change.id, ["removed amendment target", "t", "a task"]],
+        [change.id, ["added amendment under", "nested", "a capability nested in a capability"]],
+        [change.id, ["added amendment under", "k", "a constraint"]],
+        [change.id, ["added amendment under", "t", "a task"]],
+      ]);
+    });
+
+    it("passes a constraint added under any product node", () => {
+      const product = [node("area", { id: "area" }, [cap({ id: "top" }, [cap({ id: "nested" })]), node("constraint", { id: "k" })])];
+      const change = node("change", {
+        amends: ["area", "top", "nested", "k"].map((under) => ({ target: `rule-${under}`, delta: "added", summary: "s", under, type: "constraint" })),
+      });
+      expect(check("ref-resolves", { product, changes: [change] })).toEqual([]);
+    });
+  });
 });
 
 describe("title-release-token", () => {
@@ -343,23 +442,25 @@ describe("removed-target-live", () => {
     expect(check("removed-target-live", { product: [cap({ id: "a" })], changes: [removes("a")] })).toEqual([]);
   });
 
-  it("fails a removal of a retired or change-layer node, and a completed but unapplied change's", () => {
+  it("fails a removal of a retired node, and a completed but unapplied change's", () => {
     const gone = removes("gone");
-    const task = node("task", { id: "t" });
-    const wrongLayer = removes("t");
     const completedUnapplied = removes("gone", { status: "completed" });
     const findings = check("removed-target-live", {
       product: [cap({ id: "gone", status: "deleted" })],
-      changes: [gone, wrongLayer, node("change", {}, [task]), completedUnapplied],
+      changes: [gone, completedUnapplied],
     });
-    expect(ids(findings)).toEqual([gone.id, wrongLayer.id, completedUnapplied.id]);
+    expect(ids(findings)).toEqual([gone.id, completedUnapplied.id]);
   });
 
-  it("leaves a target that names no node to ref-resolves", () => {
+  it("leaves a target that names no node, or a change-layer node, to ref-resolves", () => {
     const missing = removes("nope");
-    const tree: V2Tree = { product: [], changes: [missing] };
+    const wrongLayer = removes("t");
+    const tree: V2Tree = { product: [], changes: [missing, wrongLayer, node("change", { spike: true }, [node("task", { id: "t" })])] };
     const findings = checkV2Rules(tree, { now: NOW }, ["ref-resolves", "removed-target-live"]);
-    expect(findings.map((f) => [f.rule, f.nodeId])).toEqual([["ref-resolves", missing.id]]);
+    expect(findings.map((f) => [f.rule, f.nodeId])).toEqual([
+      ["ref-resolves", missing.id],
+      ["ref-resolves", wrongLayer.id],
+    ]);
   });
 
   it("does not judge applied or abandoned changes", () => {

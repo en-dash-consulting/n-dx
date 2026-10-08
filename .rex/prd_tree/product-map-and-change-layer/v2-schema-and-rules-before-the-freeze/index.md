@@ -19,4 +19,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add the v2 schema fields decided before the freeze](./add-the-v2-schema-fields-decided.md) | completed |
 | [An amendment's type is accepted on any delta and may be missing on an added one](./an-amendment-s-type-is-accepted-on-any.md) | completed |
 | [Fix the v2 rules for applied changes, Inbox changes, fixes and reference integrity](./fix-the-v2-rules-for-applied-changes.md) | completed |
-| [Reject cyclic same-change parents and wrong-kind references in the v2 rules](./reject-cyclic-same-change-parents-and.md) | pending |
+| [Reject cyclic same-change parents and wrong-kind references in the v2 rules](./reject-cyclic-same-change-parents-and.md) | in_progress |

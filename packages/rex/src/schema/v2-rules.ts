@@ -19,7 +19,7 @@
 import { createHash } from "node:crypto";
 import type { ItemStatus } from "./v1.js";
 import { validateRunSettings } from "./validate.js";
-import { layerOf, RETIRED_STATE_FIELDS, type Criterion, type Layer, type V2Node } from "./v2.js";
+import { layerOf, RETIRED_STATE_FIELDS, type AddedNodeType, type Amendment, type Criterion, type Layer, type NodeType, type V2Node } from "./v2.js";
 
 // ── Inputs and findings ──────────────────────────────────────────
 
@@ -316,30 +316,131 @@ const refUnique: Rule = ({ entries }) => {
   return findings;
 };
 
+/** Where a node sits, as placement reads it: its type and its parent's. */
+interface Place {
+  type: NodeType;
+  parentType?: NodeType;
+}
+
+/** A kind a reference must name: a test over the place it names, and how a finding describes it. */
+interface Destination {
+  holds: (place: Place) => boolean;
+  wanted: string;
+}
+
+const PRODUCT_NODE: Destination = { holds: ({ type }) => layerOf(type) === "product", wanted: "a product-layer node" };
+const CHANGE_NODE: Destination = { holds: ({ type }) => layerOf(type) === "changes", wanted: "a change-layer node" };
+const CAPABILITY: Destination = { holds: ({ type }) => type === "capability", wanted: "a capability" };
+
 /**
- * Every reference names a node, live or retired: a reference to a tombstone is
- * history, not dangling. Checked: touches, a modified or removed amendment's
- * target, an added amendment's `under` (or a node the same change adds),
- * appliesTo, dependsOn and blockedBy. An added amendment's target does not
- * exist until apply, so it is not checked.
+ * What can hold an added node, by `layer-nesting` and `capability-depth`: a
+ * capability goes under an area or a top-level capability; a constraint under
+ * any product node.
  */
-const refResolves: Rule = ({ entries }, _options, { resolve }) =>
-  entries.flatMap(({ node }) => {
-    const refs: [field: string, ref: string][] = (node.blockedBy ?? []).map((ref) => ["blockedBy", ref]);
+const HOLDER: Readonly<Record<AddedNodeType, Destination>> = {
+  capability: {
+    holds: ({ type, parentType }) => type === "area" || (type === "capability" && parentType !== "capability"),
+    wanted: "an area or a capability not nested in another, which can hold a capability",
+  },
+  constraint: { ...PRODUCT_NODE, wanted: "a product-layer node, which can hold a constraint" },
+};
+
+const describePlace = ({ type, parentType }: Place): string =>
+  type === "capability" && parentType === "capability" ? "a capability nested in a capability" : `${type === "area" ? "an" : "a"} ${type}`;
+
+type AddedAmendment = Amendment & { delta: "added" };
+
+/**
+ * An unapplied change's additions placed under one another must form a tree:
+ * each chain of same-change parents ends at an existing node or the layer
+ * root. Reports each cycle once, naming its amendments, and each addition
+ * whose chain runs into one. Returns the additions whose chain ends.
+ */
+function sameChangeTree(node: RuleNode, added: ReadonlyMap<string, AddedAmendment>): { findings: RuleFinding[]; placed: Set<AddedAmendment> } {
+  const findings: RuleFinding[] = [];
+  const placed = new Set<AddedAmendment>();
+  const reported = new Set<string>();
+  for (const a of added.values()) {
+    const path: AddedAmendment[] = [a];
+    let cycle: AddedAmendment[] | undefined;
+    for (let next = a.under === undefined ? undefined : added.get(a.under); next; next = next.under === undefined ? undefined : added.get(next.under)) {
+      const at = path.indexOf(next);
+      if (at >= 0) {
+        cycle = path.slice(at);
+        break;
+      }
+      path.push(next);
+    }
+    if (!cycle) {
+      placed.add(a);
+    } else if (cycle[0] !== a) {
+      findings.push(finding("ref-resolves", node, `change "${node.title}" adds "${a.target}" under "${a.under}", whose same-change parents never reach an existing node or the layer root`));
+    } else {
+      const key = cycle.map((c) => c.target).sort().join(" ");
+      if (reported.has(key)) continue;
+      reported.add(key);
+      const what = cycle.length === 1 ? `"${a.target}" under itself` : cycle.map((c) => `"${c.target}" under "${c.under}"`).join(", ");
+      findings.push(finding("ref-resolves", node, `change "${node.title}" adds ${what}; added nodes cannot hold one another in a cycle`));
+    }
+  }
+  return { findings, placed };
+}
+
+/**
+ * Every reference names a node of the kind its field needs, live or retired:
+ * a reference to a tombstone is history, not dangling. touches, a modified or
+ * removed amendment's target and appliesTo name product nodes; dependsOn
+ * names a capability; blockedBy names a change-layer node; an added
+ * amendment's `under` names a node that can hold the added type ({@link HOLDER}).
+ * An added amendment's target does not exist until apply, so it is not
+ * checked. Its `under` may name a node the same change adds: in an unapplied
+ * change only when the additions form a tree ({@link sameChangeTree}).
+ */
+const refResolves: Rule = (_index, _options, { entries, resolve }) => {
+  const parentOf = new Map(entries.map((e) => [e.node, e.parent]));
+  const placeOf = (target: RuleNode): Place => ({ type: target.type, parentType: parentOf.get(target)?.type });
+  return entries.flatMap(({ node, retired }) => {
+    if (retired) return [];
+    const findings: RuleFinding[] = [];
+    const refs: [field: string, ref: string, destination: Destination][] = (node.blockedBy ?? []).map((ref) => ["blockedBy", ref, CHANGE_NODE]);
     if (node.type === "change") {
-      const added = new Set((node.amends ?? []).filter((a) => a.delta === "added").map((a) => a.target));
-      for (const ref of node.touches ?? []) refs.push(["touches", ref]);
+      const added = new Map<string, AddedAmendment>();
+      for (const a of node.amends ?? []) if (a.delta === "added" && !added.has(a.target)) added.set(a.target, a as AddedAmendment);
+      const tree = isAppliedChange(node) ? undefined : sameChangeTree(node, added);
+      if (tree) findings.push(...tree.findings);
+      /** A same-change parent's place: its added type, under its own `under`. */
+      const addedPlace = (holder: AddedAmendment): Place => {
+        if (holder.under === undefined) return { type: holder.type ?? "capability" };
+        const above = added.get(holder.under);
+        return { type: holder.type ?? "capability", parentType: above ? (above.type ?? "capability") : resolve(holder.under)?.type };
+      };
+      for (const ref of node.touches ?? []) refs.push(["touches", ref, PRODUCT_NODE]);
       for (const a of node.amends ?? []) {
-        if (a.delta !== "added") refs.push([`${a.delta} amendment target`, a.target]);
-        else if (a.under && !added.has(a.under)) refs.push(["added amendment under", a.under]);
+        if (a.delta !== "added") {
+          refs.push([`${a.delta} amendment target`, a.target, PRODUCT_NODE]);
+          continue;
+        }
+        if (a.under === undefined) continue;
+        const holder = added.get(a.under);
+        const destination = HOLDER[a.type ?? "capability"];
+        if (!holder) refs.push(["added amendment under", a.under, destination]);
+        else if (tree?.placed.has(a as AddedAmendment) && !destination.holds(addedPlace(holder))) {
+          findings.push(finding("ref-resolves", node, `change "${node.title}" added amendment under "${a.under}" names ${describePlace(addedPlace(holder))} the same change adds, not ${destination.wanted}`));
+        }
       }
     }
-    if (node.type === "capability") for (const ref of node.dependsOn ?? []) refs.push(["dependsOn", ref]);
-    if (node.type === "constraint" && Array.isArray(node.appliesTo)) for (const ref of node.appliesTo) refs.push(["appliesTo", ref]);
-    return refs
-      .filter(([, ref]) => !resolve(ref))
-      .map(([field, ref]) => finding("ref-resolves", node, `${node.type} "${node.title}" ${field} "${ref}" names no node`));
+    if (node.type === "capability") for (const ref of node.dependsOn ?? []) refs.push(["dependsOn", ref, CAPABILITY]);
+    if (node.type === "constraint" && Array.isArray(node.appliesTo)) for (const ref of node.appliesTo) refs.push(["appliesTo", ref, PRODUCT_NODE]);
+    for (const [field, ref, destination] of refs) {
+      const target = resolve(ref);
+      if (!target) findings.push(finding("ref-resolves", node, `${node.type} "${node.title}" ${field} "${ref}" names no node`));
+      else if (!destination.holds(placeOf(target))) {
+        findings.push(finding("ref-resolves", node, `${node.type} "${node.title}" ${field} "${ref}" names ${describePlace(placeOf(target))} "${target.title}", not ${destination.wanted}`));
+      }
+    }
+    return findings;
   });
+};
 
 const titleReleaseTokenRule: Rule = ({ entries }, { releases }) =>
   entries.flatMap(({ node }) => {
@@ -401,21 +502,21 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
 
 /**
  * An open change removes only a live product node. A target that names no
- * node at all is `ref-resolves`'s; this rule reports one that is retired or
- * in the change layer.
+ * node, or a change-layer node, is `ref-resolves`'s; this rule reports a
+ * retired product node.
  */
 const removedTargetLive: Rule = ({ entries, resolve }, _options, withTombstones) =>
   entries
     .filter(({ node }) => isOpenChange(node))
     .flatMap(({ node }) =>
       (node.type === "change" ? (node.amends ?? []) : [])
-        .filter((a) => a.delta === "removed" && withTombstones.resolve(a.target))
         .filter((a) => {
-          const target = resolve(a.target);
-          return !target || layerOf(target.type) !== "product";
+          if (a.delta !== "removed" || resolve(a.target)) return false;
+          const retired = withTombstones.resolve(a.target);
+          return !!retired && layerOf(retired.type) === "product";
         })
         .map((a) =>
-          finding("removed-target-live", node, `Change "${node.title}" removes "${a.target}", which is not a live product node`),
+          finding("removed-target-live", node, `Change "${node.title}" removes "${a.target}", which is already retired`),
         ),
     );
 
