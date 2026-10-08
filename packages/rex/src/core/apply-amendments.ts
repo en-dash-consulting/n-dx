@@ -119,7 +119,9 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
     if (amendment.base !== undefined && !checkBase(tree, next, amendment, options, fail)) continue;
     const node = APPLY[amendment.delta](next, amendment, context, fail);
     if (!node) continue;
-    node.body = appendHistory(node.body, `- ${date} ${label} ${amendment.delta}: ${amendment.summary}`);
+    // One line: a newline in the summary would let "## ..." become a body heading and split History.
+    const summary = amendment.summary.replace(/\s+/g, " ").trim();
+    node.body = appendHistory(node.body, `- ${date} ${label} ${amendment.delta}: ${summary}`);
     applied.push({ delta: amendment.delta, nodeId: node.id, summary: amendment.summary });
   }
   if (problems.length > 0) throw new ApplyAmendmentsError(label, problems);

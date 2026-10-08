@@ -172,6 +172,14 @@ describe("applyAmendments: modified", () => {
     expect(cap.body).toBe("Card payments.\n\n## History\n\n- 2026-10-07 CH-1 modified: Tighten");
   });
 
+  it("collapses a multi-line summary with a heading into one History line", () => {
+    const amendments = [modify({ proposed: "A shopper can pay by card or wallet.", summary: "Tighten\n\n## Notes" })];
+    const { tree: out } = applyAmendments(tree(amendments), CHANGE, OPTS);
+    const body = get(out, CAP).body ?? "";
+    expect(body).toBe("Card payments.\n\n## History\n\n- 2026-10-07 CH-1 modified: Tighten ## Notes");
+    expect(body.split("\n").filter((l) => /^#{1,2} /.test(l))).toEqual(["## History"]);
+  });
+
   it("writes a constraint's proposed statement", () => {
     const { tree: out } = applyAmendments(tree([{ target: CON, delta: "modified", summary: "s", proposed: "No card data stored." }]), CHANGE, OPTS);
     expect(get(out, CON)).toMatchObject({ statement: "No card data stored.", metAt: specHash({ statement: "No card data stored." }) });
