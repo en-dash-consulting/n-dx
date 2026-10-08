@@ -83,6 +83,23 @@ describe("Ready to run", () => {
     expect(rows()[1].querySelector(".prd-status-in_progress")).not.toBeNull();
   });
 
+  it("marks a row whose task carries saved run settings, with a label not just a dot", async () => {
+    // The dot says the task will not run on the project defaults; a screen
+    // reader needs the words, so the label carries the meaning.
+    await mount([
+      { ...TASKS[0], saved: true },
+      { ...TASKS[1], saved: false },
+      // A server that predates saved settings sends no field at all.
+      { id: "t-c", title: "Older server", status: "pending", priority: "low", parentChain: [], criteriaCount: 0, resume: false },
+    ]);
+
+    const dots = rows().map((r) => r.querySelector(".ready-saved-dot"));
+    expect(dots[0]).not.toBeNull();
+    expect(dots[0]!.getAttribute("aria-label")).toBe("Saved run settings");
+    expect(dots[1]).toBeNull();
+    expect(dots[2]).toBeNull();
+  });
+
   it("labels the primary button Prepare… or Resume… and opens the modal from it and the title", async () => {
     const props = await mount();
     expect(rows()[0].querySelector(".ready-primary")!.textContent).toBe("Prepare…");

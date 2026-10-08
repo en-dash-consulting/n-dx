@@ -3,13 +3,16 @@
 Every production source file that still spells out where n-dx keeps its config
 files, instead of asking the resolver.
 
-**29 literals across 22 files, all of them `.n-dx*`.** That number is the debt,
-and it may only go down.
+**0 literals.** The `.n-dx*` sweep landed with PR 29's "Route the remaining
+.n-dx config readers through the resolver"; the table below is empty and may
+not gain a row. Until the follow-up task turns the config half of
+`tests/e2e/layout-literal-policy.test.js` into the same wall the directory half
+already is, this file is what keeps it at zero: a file not listed here fails
+the policy test the moment it names one of these paths.
 
-The three tool directories — `.rex/`, `.hench/`, `.sourcevision/` — are no
-longer on this list. They are a **wall**: `tests/e2e/layout-literal-policy.test.js`
-fails on any site outside its `ALLOWED` list, and there is nowhere to register
-a new one. This file covers only what is left.
+The three tool directories — `.rex/`, `.hench/`, `.sourcevision/` — were
+already a **wall**: `tests/e2e/layout-literal-policy.test.js` fails on any site
+outside its `ALLOWED` list, and there is nowhere to register a new one.
 
 ## Why this file exists
 
@@ -30,9 +33,15 @@ literal was reaching for is quietly skipped:
   overrides, workspace members and the architecture declared for the iso map
   were all ignored on a new-layout project — and the analysis still succeeded,
   with different results and nothing to say why.
+- The last 29 sites — llm-client's three config loaders, hench's CLI-name,
+  weekly-budget, archival, retention and test-command readers, and fourteen
+  files in web's server and viewer — read a root `.n-dx.json` on every layout,
+  so a `.ndx/` project's dashboard saved CLI timeouts, feature flags and
+  project settings to a file nothing else read, and its Ask ledger landed at
+  the root instead of in `.ndx/`.
 
-Both were caught by a human reading a diff. That is not a repeatable control,
-which is what the policy test is for.
+The first two were caught by a human reading a diff. That is not a repeatable
+control, which is what the policy test is for.
 
 ## The rule
 
@@ -74,9 +83,9 @@ not have caught the bug that prompted the rule.
 | `packages/rex/src/store/prd-md-migration.ts` | `LEGACY_SOURCE_FILE_PREFIX` — the `.rex/` prefix carried by `sourceFile` attributions already written by the flat `prd.md`/`prd.json` backends. A value in data on disk, not a path the process constructs; those backends only ever existed under `.rex/`. |
 | `packages/*/src/**/paths.ts` | A package's paths module answers the resolver's question for that package. |
 
-## Clearing an entry
+## Keeping it at zero
 
-Replace the literal with the resolved path:
+Ask the resolver instead of spelling a file name:
 
 ```js
 import { resolveLayout } from "@n-dx/llm-client";
@@ -85,85 +94,37 @@ const { configFile, localConfigFile } = resolveLayout(root);
 
 A package with a paths module (`rex`, `sourcevision`, `hench`, `web`) asks that
 instead — it already composes the resolver with the package's own filenames.
-Then lower the file's count, or delete its row when it reaches zero, and lower
-the total at the top of this file.
+Hench reaches the resolver through `src/prd/llm-gateway.ts`, as it does every
+foundation-tier import. The viewer cannot reach it at all: a view that has to
+*display* the file's name takes it from the server, which resolves it
+(`GET /api/cli/timeouts` reports `configFile` for exactly this reason).
 
-## When this file goes away
+A public constant that has to keep its legacy name — `PORT_FILE` in web's
+`start.ts`, `PROJECT_CONFIG_FILE` and `LOCAL_CONFIG_FILE` in llm-client — asks
+the resolver for the legacy layout by name (`resolveLayout(".", { mode:
+"legacy" })` touches no disk) rather than spelling the name a second time, and
+is for labels only: no reader joins it to a root.
 
-Three cuts have landed:
+## How the count got here
 
-- **PR B3 (#453)** took 193 sites to 160, but it routed **hench and web only**,
-  where the task it serves (`c64f053e`) reads "hench, web *and core*".
+- **PR B3 (#453)** took 193 sites to 160, routing hench and web.
 - **PR 1a (`d31d9aa8`)** took 149 to 53: all of core, hench's git-bookkeeping
-  classifiers, and the hench and web files that task enumerates — plus the
-  web side of the dashboard's port and pid markers (`server/start.ts`'s
-  write, the Workspaces board and the hub's reads), which had to move in the
-  same change as core's reads or the two would name different files.
+  classifiers, and the dashboard's port and pid markers.
 - **PR 1b (`9a09a196`)** took 53 to 29 by clearing the last of the three tool
-  directories, which is what turned that half into a wall: rex's sourcevision
-  artifact attributions and its canonical PRD bucket key, sourcevision's PRD
-  reader (in a helper nothing calls yet) and its static help text, hench's
-  reviewer brief, and the eight viewer sites.
+  directories, which turned that half into a wall.
+- **PR 29** took 29 to 0: the project-config readers in llm-client, hench and
+  web, the dashboard's usage ledger, and the one viewer site, which now shows
+  the name the server resolves.
 
-What is left is one shape: **project-config readers** that spell `.n-dx.json` /
-`.n-dx.local.json` instead of taking `configFile` from the resolver. They are
-spread across llm-client, hench, and web's routes, and they are the exact defect
-the second story at the top of this file describes. Two web entries are not
-config files but the dashboard's own markers (`.n-dx-web.port`,
-`.n-dx-web-usage.jsonl`); they resolve the same way.
-
-When that sweep finishes, this file is deleted, the two halves of the rule
-collapse into one wall, and the exemption table above stands on its own.
-
-## A note on the counts
-
-These numbers are the detector's, and until PR 1a the detector could not see
-through a glob. Its comment blanker read the `/*` inside `".hench/**"` as the
+The counts were the detector's, and until PR 1a the detector could not see
+through a glob: its comment blanker read the `/*` inside `".hench/**"` as the
 start of a block comment and blanked the rest of the file, so fourteen sites in
-seven files — every `blockedPaths` entry in hench's guard defaults among them —
-were silently exempt and the total read lower than the truth. PR 1a fixed the
-blanker and cleared most of what it exposed.
+seven files were silently exempt. PR 1a fixed the blanker.
 
 ---
 
 ## The debt
 
-Counts are ceilings. A file may hold fewer than its number; it may not hold
-more.
-
-### hench
-
-| File | Literals | Names |
-|---|---|---|
-| `packages/hench/src/agent/planning/cli-identity.ts` | 1 | .n-dx.json |
-| `packages/hench/src/quota/claude-quota.ts` | 1 | .n-dx.json |
-| `packages/hench/src/store/run-archiver.ts` | 1 | .n-dx.json |
-| `packages/hench/src/store/run-retention-scheduler.ts` | 1 | .n-dx.json |
-| `packages/hench/src/store/run-retention.ts` | 1 | .n-dx.json |
-| `packages/hench/src/tools/test-command-resolver.ts` | 1 | .n-dx.json |
-
-### llm-client
-
-| File | Literals | Names |
-|---|---|---|
-| `packages/llm-client/src/config.ts` | 2 | .n-dx.json, .n-dx.local.json |
-| `packages/llm-client/src/llm-config.ts` | 2 | .n-dx.json, .n-dx.local.json |
-| `packages/llm-client/src/project-config.ts` | 2 | .n-dx.json, .n-dx.local.json |
-
-### web
-
-| File | Literals | Names |
-|---|---|---|
-| `packages/web/src/server/routes-config.ts` | 2 | .n-dx.json, .n-dx.local.json |
-| `packages/web/src/server/routes-llm.ts` | 2 | .n-dx.json, .n-dx.local.json |
-| `packages/web/src/server/routes-sourcevision-ask.ts` | 2 | .n-dx.json, .n-dx.local.json |
-| `packages/web/src/server/routes-token-usage.ts` | 2 | .n-dx.json |
-| `packages/web/src/server/cli-name.ts` | 1 | .n-dx.json |
-| `packages/web/src/server/dashboard-usage.ts` | 1 | .n-dx-web-usage.jsonl |
-| `packages/web/src/server/routes-cli-timeout.ts` | 1 | .n-dx.json |
-| `packages/web/src/server/routes-features.ts` | 1 | .n-dx.json |
-| `packages/web/src/server/routes-project-settings.ts` | 1 | .n-dx.json |
-| `packages/web/src/server/routes-sourcevision.ts` | 1 | .n-dx.json |
-| `packages/web/src/server/start.ts` | 1 | .n-dx-web.port |
-| `packages/web/src/server/task-usage/usage-cleanup-scheduler.ts` | 1 | .n-dx.json |
-| `packages/web/src/viewer/views/cli-timeout.ts` | 1 | .n-dx.json |
+No rows. A `.n-dx*` literal in any production file fails
+`tests/e2e/layout-literal-policy.test.js`; route it through the resolver rather
+than adding a row here.

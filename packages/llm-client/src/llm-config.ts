@@ -5,8 +5,8 @@
  * a new `llm` section and legacy `claude` settings.
  */
 
-import { join } from "node:path";
 import { access, readFile } from "node:fs/promises";
+import { resolveLayout } from "./layout.js";
 import { deepMerge } from "./project-config.js";
 import {
   LLM_VENDOR,
@@ -21,8 +21,6 @@ import {
 import type { ClaudeConfig } from "./types.js";
 import { normalizeCodexModel } from "./config.js";
 
-const PROJECT_CONFIG_FILE = ".n-dx.json";
-const LOCAL_CONFIG_FILE = ".n-dx.local.json";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
@@ -283,8 +281,9 @@ function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
  *   {@link resolveClaudeConfig}.
  */
 export async function loadLLMConfig(dir: string): Promise<LLMConfig> {
-  const projectData = await loadJSONFile(join(dir, PROJECT_CONFIG_FILE));
-  const localData = await loadJSONFile(join(dir, LOCAL_CONFIG_FILE));
+  const { configFile, localConfigFile } = resolveLayout(dir);
+  const projectData = await loadJSONFile(configFile);
+  const localData = await loadJSONFile(localConfigFile);
 
   // Merge project and local configs (local wins)
   let merged: Record<string, unknown> | null = projectData;

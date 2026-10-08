@@ -147,8 +147,17 @@ export function defaultsOf(prep: PrepResponse): PrepDefaults {
     tokenBudget: r.tokenBudget.value,
     fresh: r.fresh.value,
     allowDirty: r.allowDirty.value,
-    contextNotes: "",
+    // Notes have no project default, so the task's own are the starting value:
+    // a run with no edit gets them from hench, and a Save with no edit keeps
+    // them. Started empty, an unrelated Save would silently delete them.
+    contextNotes: savedNotesOf(prep),
   };
+}
+
+/** The notes the task carries, else `""`. */
+export function savedNotesOf(prep: PrepResponse): string {
+  const notes = prep.saved?.["contextNotes"];
+  return typeof notes === "string" ? notes : "";
 }
 
 /** Where a field's default came from, as the resolve JSON names it. Notes have no default. */
@@ -163,9 +172,11 @@ export function sourceOf(prep: PrepResponse, key: RunOptionKey): string | null {
  * The source strings are hench's: `task.run`, plus the `task.run.tier` /
  * `task.run.models` forms for the two model fields, where which saved key won
  * is worth knowing. The prefix is the test so a new form does not read as
- * "from the project" here.
+ * "from the project" here. Notes are not resolved against a project value, so
+ * the saved block itself answers for them.
  */
 export function isSavedOnTask(prep: PrepResponse, key: RunOptionKey): boolean {
+  if (key === "contextNotes") return savedNotesOf(prep) !== "";
   return (sourceOf(prep, key) ?? "").startsWith("task.run");
 }
 
@@ -196,10 +207,15 @@ export function effective<K extends keyof PrepDefaults>(defaults: PrepDefaults, 
 /**
  * Set one field. A value equal to the default (or an empty string) clears
  * the edit, so a field put back by hand stops counting as changed.
+ *
+ * Notes are the one field whose default can be a non-empty string — the
+ * task's saved notes — so emptying them is an edit in its own right: the
+ * reader clearing what the task carries, which a Save must then drop.
  */
 export function setField(defaults: PrepDefaults, edits: PrepEdits, key: RunOptionKey, value: unknown): PrepEdits {
   const next: Record<string, unknown> = { ...edits };
-  if (value === defaults[key] || value === "" || value === undefined) delete next[key];
+  const unset = value === "" && key !== "contextNotes";
+  if (value === defaults[key] || unset || value === undefined) delete next[key];
   else next[key] = value;
   return next as PrepEdits;
 }
@@ -249,6 +265,9 @@ export function runOptionsOf(defaults: PrepDefaults, edits: PrepEdits): RunOptio
     delete options.reviewOptional;
   } else if (options.reviewModel !== undefined) options.review = true;
   if (!maxTurnsApplies(defaults, edits)) delete options.maxTurns;
+  // Notes cleared by hand: a Save drops them, but there is no "no notes" a
+  // run can be told, so an empty context file is not sent.
+  if (options.contextNotes === "") delete options.contextNotes;
   for (const [key, value] of Object.entries(options)) {
     if (value !== false) continue;
     const meaningful = NEGATABLE.has(key) && defaults[key as keyof PrepDefaults] === true;
@@ -264,20 +283,39 @@ export function runOptionsOf(defaults: PrepDefaults, edits: PrepEdits): RunOptio
 const LAUNCH_ONLY: ReadonlySet<RunOptionKey> = new Set(["fresh", "allowDirty"] as RunOptionKey[]);
 
 /**
+ * The two fields a saved block spells as a portable tier plus per-vendor pins
+ * rather than as the single id the modal shows.
+ */
+const MODEL_FIELDS = {
+  model: { tier: "tier", pins: "models" },
+  reviewModel: { tier: "reviewTier", pins: "reviewModels" },
+} as const satisfies Partial<Record<RunOptionKey, { tier: string; pins: "models" | "reviewModels" }>>;
+
+/**
  * The `run` block a Save writes: what the modal shows now, minus anything the
  * project would have said anyway.
  *
  * Two shapes meet here. The modal edits one launch's options — a `model` is a
  * single id, because a launch knows its vendor. A saved block is
  * vendor-agnostic, because the task may later be run under a different one, so
- * an exact model is written as `models: {<vendor>: <id>}` keyed by the vendor
- * this project is on today. Nothing is inferred about any other vendor: a pin
- * saved here says "on claude, use this", and `ndx work` on codex falls through
- * to its own chain.
+ * model intent is a portable `tier` plus exact pins per vendor
+ * (`models: {<vendor>: <id>}`). The modal only ever resolves ONE vendor's
+ * model, so the two model fields are not rebuilt from what is shown:
  *
- * A field equal to its project default is omitted rather than frozen: saving
- * "the default as it is today" would quietly pin the task against a config
- * change the reader never intended to opt out of.
+ * - **Untouched**, the saved `tier` and `models` (and `reviewTier` /
+ *   `reviewModels`) go back exactly as they were. Rebuilding them from the
+ *   resolved id would turn a `tier: "heavy"` into a pin for today's vendor —
+ *   a task that was meant to follow the project's tier table, and to resolve
+ *   on codex too, would stop doing both over an unrelated Save.
+ * - **Edited**, the choice is a pin for this vendor alone: the tier goes,
+ *   the other vendors' pins stay. Nothing is inferred about any other vendor:
+ *   a pin saved here says "on claude, use this", and `ndx work` on codex falls
+ *   through to its own chain.
+ *
+ * Every other field equal to its project default is omitted rather than
+ * frozen: saving "the default as it is today" would quietly pin the task
+ * against a config change the reader never intended to opt out of. Notes have
+ * no project default, so they are saved whenever they are non-empty.
  *
  * Returns null when nothing is left to save, which is how a Save clears a block.
  */
@@ -287,60 +325,57 @@ export function saveBodyOf(
   edits: PrepEdits,
 ): Record<string, unknown> | null {
   const vendor = prep.resolved.vendor.value;
+  const saved: Record<string, unknown> = prep.saved ?? {};
   const block: Record<string, unknown> = {};
 
-  /**
-   * The saved model map for `key`, minus this vendor's entry — the pins for
-   * vendors this project is not on today.
-   *
-   * They have to be carried forward explicitly. The modal only ever resolves
-   * ONE vendor's model, so a block rebuilt from `effective` alone would drop a
-   * `models.codex` pin the moment a Claude session saved anything at all. That
-   * is silent data loss in a field whose entire purpose is to survive a change
-   * of vendor.
-   */
-  const otherVendorPins = (key: "models" | "reviewModels"): Record<string, unknown> => {
-    const saved = (prep.saved ?? {})[key];
-    if (saved === null || typeof saved !== "object" || Array.isArray(saved)) return {};
-    const kept: Record<string, unknown> = {};
-    for (const [v, model] of Object.entries(saved as Record<string, unknown>)) {
-      if (v !== vendor) kept[v] = model;
-    }
-    return kept;
+  /** The saved per-vendor map under `key`, or `{}` when there is none. */
+  const savedPins = (key: "models" | "reviewModels"): Record<string, unknown> => {
+    const map = saved[key];
+    if (map === null || typeof map !== "object" || Array.isArray(map)) return {};
+    return { ...(map as Record<string, unknown>) };
   };
 
   /** The value this field would have without the task's block, else its current default. */
   const projectValue = (key: RunOptionKey): unknown => {
+    if (key === "contextNotes") return "";
     const fallback = fallbackOf(prep, key);
     return fallback ? fallback.value : defaults[key as keyof PrepDefaults];
   };
 
   for (const spec of RUN_OPTION_SPECS) {
     const key = spec.key;
-    if (LAUNCH_ONLY.has(key)) continue;
+    if (LAUNCH_ONLY.has(key) || key in MODEL_FIELDS) continue;
     // `effective` reads the edit, else what is resolved now — which already
     // includes whatever the task had saved, so an untouched saved field is
     // carried forward rather than dropped.
     const value = effective(defaults, edits, key as keyof PrepDefaults);
     if (value === undefined || value === "") continue;
     if (value === projectValue(key)) continue;
-
-    // The active vendor's pin overrides its own entry and leaves the rest.
-    if (key === "model") block["models"] = { ...otherVendorPins("models"), [vendor]: value };
-    else if (key === "reviewModel") block["reviewModels"] = { ...otherVendorPins("reviewModels"), [vendor]: value };
-    else block[key] = value;
+    block[key] = value;
   }
 
-  // A pin for another vendor survives even when this vendor's model is back at
-  // the project default and so contributed nothing above.
-  for (const key of ["models", "reviewModels"] as const) {
-    if (block[key] !== undefined) continue;
-    const others = otherVendorPins(key);
-    if (Object.keys(others).length > 0) block[key] = others;
+  for (const [field, { tier, pins }] of Object.entries(MODEL_FIELDS)) {
+    const key = field as RunOptionKey;
+    const edited = edits[key];
+    if (edited === undefined) {
+      if (saved[tier] !== undefined) block[tier] = saved[tier];
+      const map = savedPins(pins);
+      if (Object.keys(map).length > 0) block[pins] = map;
+      continue;
+    }
+    // Back at the project default is "stop overriding this vendor": no pin,
+    // and the tier that produced the old value goes with it.
+    const map = savedPins(pins);
+    delete map[vendor];
+    if (edited !== projectValue(key)) map[vendor] = edited;
+    if (Object.keys(map).length > 0) block[pins] = map;
   }
 
   // A reviewer pinned with no review to run is not a setting, it is a leftover.
-  if (block["review"] !== true) {
+  // Judged on whether a review would run — a `review: true` the config
+  // supplies is omitted from the block above, and the reviewer still applies.
+  if (effective(defaults, edits, "review") !== true) {
+    delete block["reviewTier"];
     delete block["reviewModels"];
     delete block["reviewOptional"];
   }

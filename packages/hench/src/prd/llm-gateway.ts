@@ -66,6 +66,7 @@ export {
 export {
   NDX_CONTAINER_DIRNAME,
   detectLayoutMode,
+  projectRootOf,
   relativeToRoot,
   resolveLayout,
 } from "@n-dx/llm-client";

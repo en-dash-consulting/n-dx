@@ -22,13 +22,12 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./response-utils.js";
 import { AggregationResultCache } from "./aggregation-cache.js";
 import {
-  DASHBOARD_USAGE_FILE,
   dashboardUsagePath,
   readDashboardUsage,
 } from "./dashboard-usage.js";
@@ -607,13 +606,12 @@ function resolveSourceMeta(ctx: ServerContext): UtilizationSourceMeta {
   const rexLabel = `${relative(ctx.projectDir, ctx.rexDir)}/execution-log.jsonl`;
   const henchLabel = `${relative(ctx.projectDir, henchDir)}/runs/*.json`;
   const svLabel = `${relative(ctx.projectDir, svDir)}/manifest.json`;
+  const dashboardLabel = relative(ctx.projectDir, dashboardPath).split(sep).join("/");
   return {
     rex: existsSync(rexPath) ? rexLabel : `missing (${rexLabel})`,
     hench: existsSync(henchPath) ? henchLabel : `missing (${henchLabel})`,
     sourcevision: existsSync(svPath) ? svLabel : `missing (${svLabel})`,
-    dashboard: existsSync(dashboardPath)
-      ? DASHBOARD_USAGE_FILE
-      : `missing (${DASHBOARD_USAGE_FILE})`,
+    dashboard: existsSync(dashboardPath) ? dashboardLabel : `missing (${dashboardLabel})`,
   };
 }
 
@@ -861,7 +859,7 @@ function parseQuery(url: string): URLSearchParams {
 }
 
 function loadConfiguredModel(projectDir: string): ConfiguredModel {
-  const path = join(projectDir, ".n-dx.json");
+  const path = resolveLayout(projectDir).configFile;
   if (!existsSync(path)) return { vendor: DEFAULT_LLM_VENDOR, model: "default" };
   try {
     const raw = readFileSync(path, "utf-8");
@@ -895,7 +893,7 @@ function loadWeeklyBudgetConfig(
   hasConfiguredBudget: boolean;
   validationErrors: WeeklyBudgetValidationError[];
 } {
-  const path = join(projectDir, ".n-dx.json");
+  const path = resolveLayout(projectDir).configFile;
   if (!existsSync(path)) {
     return { config: undefined, hasConfiguredBudget: false, validationErrors: [] };
   }
