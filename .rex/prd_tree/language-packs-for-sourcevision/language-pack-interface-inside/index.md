@@ -28,4 +28,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add a golden-file fixture harness for language packs](./add-a-golden-file-fixture-harness-for.md) | pending |
 | [Add a tree-sitter runner that executes pack queries](./add-a-tree-sitter-runner-that-executes.md) | pending |
-| [Define the language pack type and built-in pack loader](./define-the-language-pack-type-and.md) | pending |
+| [Define the language pack type and built-in pack loader](./define-the-language-pack-type-and.md) | in_progress |
