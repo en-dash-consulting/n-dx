@@ -33,6 +33,7 @@ export const DATA_FILES = {
   sdlcProfile: "sdlc-profile.json",
   readiness: "readiness.json",
   infrastructure: "infrastructure.json",
+  outbound: "outbound.json",
 } as const;
 
 export const ALL_DATA_FILES = Object.values(DATA_FILES);

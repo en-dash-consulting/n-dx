@@ -2700,7 +2700,8 @@ var DATA_FILES = {
   projectProfile: "project-profile.json",
   sdlcProfile: "sdlc-profile.json",
   readiness: "readiness.json",
-  infrastructure: "infrastructure.json"
+  infrastructure: "infrastructure.json",
+  outbound: "outbound.json"
 };
 var ALL_DATA_FILES = Object.values(DATA_FILES);
 
