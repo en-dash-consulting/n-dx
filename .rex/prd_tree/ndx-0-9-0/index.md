@@ -23,4 +23,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Phase 2 PR 3: ndx work honours run settings saved on a task](./phase-2-pr-3-ndx-work-honours-run/index.md) | completed |
 | [Phase 2 PR 4: save run settings from the Prepare task modal](./phase-2-pr-4-save-run-settings-from/index.md) | completed |
 | [Prepare task: run one task from Work with every ndx work option visible](./prepare-task-run-one-task-from-work/index.md) | completed |
-| [The hub sends no per-user token on its own calls to project servers, so queued runs and the session cap fail with auth on](./the-hub-sends-no-per-user-token-on-its.md) | pending |
+| [The hub sends no per-user token on its own calls to project servers, so queued runs and the session cap fail with auth on](./the-hub-sends-no-per-user-token-on-its.md) | in_progress |
