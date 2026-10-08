@@ -24,4 +24,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Read stewards from the product layer and generate code-owner files per host](./read-stewards-from-the-product-layer.md) | in_progress |
+| [Code-owner files go stale after a stewards edit until someone re-runs rex codeowners](./code-owner-files-go-stale-after-a.md) | pending |
+| [Read stewards from the product layer and generate code-owner files per host](./read-stewards-from-the-product-layer.md) | completed |
