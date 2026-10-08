@@ -2,7 +2,7 @@
 id: "e779a36a-d012-4293-ad0a-fd23d5c1744b"
 level: "feature"
 title: "Apply engine for change amendments"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "product-map"
@@ -12,10 +12,13 @@ tags:
 blockedBy:
   - "dc3b80c1-4d3c-486f-ba03-0b6bbe9fd50d"
 source: "roadmap"
+startedAt: "2026-10-08T06:47:15.811Z"
+completedAt: "2026-10-08T06:47:15.811Z"
+endedAt: "2026-10-08T06:47:15.811Z"
 acceptanceCriteria: []
 description: "Apply merges a change's amendments into the product layer, deterministically, with no model call. Run with the strongest model tier and --review.\n\nRoadmap PR 10 · wave 1 · lane rex-domain."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-06T16:54:28.369Z"
+lastModified: "2026-10-08T06:47:17.274Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -32,7 +35,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Apply refuses a change over a pre-existing dependsOn cycle whose report rotates after a removal](./apply-refuses-a-change-over-a-pre.md) | completed |
 | [Apply refuses a removal outside a pre-existing dependsOn knot because the DFS reports a different sub-cycle](./apply-refuses-a-removal-outside-a-pre.md) | completed |
 | [Applying an older map-edit draft reverts a later direct edit to the same node](./applying-an-older-map-edit-draft.md) | completed |
-| [Find product-edit drafts anywhere in the change tree, and store applied amendment targets by node id](./find-product-edit-drafts-anywhere-in.md) | in_progress |
+| [Find product-edit drafts anywhere in the change tree, and store applied amendment targets by node id](./find-product-edit-drafts-anywhere-in.md) | completed |
 | [Handle direct map edits: editorial re-stamp or revised with a drafted change](./handle-direct-map-edits-editorial-re.md) | completed |
 | [Retiring an area or capability leaves its live descendants hidden from every v2 rule](./retiring-an-area-or-capability-leaves.md) | completed |
 | [Reverting a product edit leaves a completed but unapplied draft able to write the abandoned spec](./reverting-a-product-edit-leaves-a.md) | completed |
