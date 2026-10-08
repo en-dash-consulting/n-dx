@@ -18,8 +18,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A change that adds the same target twice passes the v2 rules, hiding a self-parent on the duplicate](./a-change-that-adds-the-same-target.md) | pending |
-| [An open change may modify, touch or add under a retired product node without a v2 rule finding](./an-open-change-may-modify-touch-or-add.md) | pending |
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | pending |
 | [Codex drops most of packages/web/AGENTS.md: root plus nested AGENTS.md exceeds its 32 KiB combined project-doc budget](./codex-drops-most-of-packages-web.md) | pending |
 | [Codex never sees the per-package governance or the path-scoped rules, because they live only in Claude-loaded files](./codex-never-sees-the-per-package.md) | cancelled |

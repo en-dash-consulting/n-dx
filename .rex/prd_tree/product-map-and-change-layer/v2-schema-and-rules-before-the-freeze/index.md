@@ -17,7 +17,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A change that adds the same target twice passes the v2 rules, hiding a self-parent on the duplicate](./a-change-that-adds-the-same-target.md) | pending |
 | [Add the v2 schema fields decided before the freeze](./add-the-v2-schema-fields-decided.md) | completed |
 | [An amendment's type is accepted on any delta and may be missing on an added one](./an-amendment-s-type-is-accepted-on-any.md) | completed |
+| [An open change may modify, touch or add under a retired product node without a v2 rule finding](./an-open-change-may-modify-touch-or-add.md) | pending |
 | [Fix the v2 rules for applied changes, Inbox changes, fixes and reference integrity](./fix-the-v2-rules-for-applied-changes.md) | completed |
 | [Reject cyclic same-change parents and wrong-kind references in the v2 rules](./reject-cyclic-same-change-parents-and.md) | completed |
