@@ -32,5 +32,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Java pack grammar version is not tied to the build pin](./java-pack-grammar-version-is-not-tied.md) | pending |
 | [Language-pack fixtures and goldens are not pinned to LF, so a Windows CRLF checkout fails the golden comparison](./language-pack-fixtures-and-goldens-are.md) | completed |
 | [Register Java as a language with inventory roles](./register-java-as-a-language-with.md) | completed |
-| [Seed the Java drift corpus and measure the parse rate](./seed-the-java-drift-corpus-and-measure.md) | pending |
+| [Seed the Java drift corpus and measure the parse rate](./seed-the-java-drift-corpus-and-measure.md) | completed |
 | [Write the Java structure queries with goldens](./write-the-java-structure-queries-with.md) | completed |
