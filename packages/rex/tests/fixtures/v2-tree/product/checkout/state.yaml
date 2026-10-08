@@ -4,4 +4,4 @@ items:
     status: "in_progress"
   "a0000000-0000-4000-8000-000000000002":
     status: "completed"
-    specReviewed: true
+    reviewedHash: "bf2fc6b6fc4969943aeaa1d56e131459bd2385fe0507e3ca2a2792c03c5fe6a8"
