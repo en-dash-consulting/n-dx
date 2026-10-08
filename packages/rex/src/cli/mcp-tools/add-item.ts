@@ -94,7 +94,7 @@ export const addItemTool = defineTool({
     parentId: z.string().optional().describe("Parent item ID"),
     description: z.string().optional().describe("Item description"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("Priority"),
-    acceptanceCriteria: z.array(z.string()).optional().describe("Acceptance criteria"),
+    acceptanceCriteria: z.array(z.string()).optional().describe("Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria"),
     tags: z.array(z.string()).optional().describe("Tags"),
     source: z.string().optional().describe("Source of this item"),
     blockedBy: z.array(z.string()).optional().describe("IDs of blocking items"),

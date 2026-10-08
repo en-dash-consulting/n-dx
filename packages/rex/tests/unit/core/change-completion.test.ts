@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { addTask, ChangeCompletionError, completeChange, completeTask } from "../../../src/core/change-completion.js";
 import type { ApplyOn } from "../../../src/core/apply-policy.js";
 import { isOpenChange, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { ChangeIntentSchema, TaskIntentSchema } from "../../../src/schema/v2.js";
 
 const NOW = new Date("2026-10-08T12:00:00.000Z");
 const OLD = "A shopper can pay by card.";
@@ -94,6 +95,13 @@ describe("completeChange", () => {
     expect(statement(result.tree)).toBe(NEW);
   });
 
+  it("applies the same product layer whether or not the change has acceptanceCriteria", () => {
+    const plain = completeChange(tree(change()), "ch", opts());
+    const withDoneWhen = completeChange(tree(change({ acceptanceCriteria: ["Wallets pay"] })), "ch", opts());
+    expect(withDoneWhen.apply?.applied).toBe(true);
+    expect(withDoneWhen.tree.product).toEqual(plain.tree.product);
+  });
+
   it("refuses while a live task is not completed", () => {
     expect(() => completeChange(tree(change({ children: [task("t", { status: "cancelled" })] })), "ch", opts())).toThrow(/task t is not completed/);
   });
@@ -119,10 +127,14 @@ describe("addTask split rule", () => {
     expect(theChange(result.tree).children?.[0]).not.toHaveProperty("acceptanceCriteria");
   });
 
-  it("keeps criteria that are not a list on the change rather than dropping them", () => {
-    const result = addTask(tree(inFlight({ acceptanceCriteria: "Wallets pay" })), "ch", task("t"));
-    expect(result.split?.movedCriteria).toEqual([]);
-    expect(theChange(result.tree).acceptanceCriteria).toBe("Wallets pay");
+  it("moves a typed list: both nodes still parse against their intent schemas", () => {
+    // The fixture's bare `{ id: "r" }` requirement is not a full Requirement; drop it to parse.
+    const typed = inFlight({ requirements: undefined });
+    expect(ChangeIntentSchema.parse(typed).acceptanceCriteria).toEqual(["Wallets pay"]);
+    const result = addTask(tree(typed), "ch", task("t"));
+    const c = theChange(result.tree);
+    expect(ChangeIntentSchema.parse(c).acceptanceCriteria).toBeUndefined();
+    expect(TaskIntentSchema.parse(c.children?.[0]).acceptanceCriteria).toEqual(["Wallets pay"]);
   });
 
   it("treats a change whose only tasks are deleted as task-less", () => {

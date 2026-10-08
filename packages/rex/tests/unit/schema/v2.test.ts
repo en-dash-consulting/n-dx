@@ -219,6 +219,16 @@ describe("per-type intent", () => {
     }
   });
 
+  it("declares acceptanceCriteria on a change as an optional string list, as on a task", () => {
+    const change = { id: ID, type: "change", title: "C", slug: "c" };
+    expect(ChangeIntentSchema.parse(change).acceptanceCriteria).toBeUndefined();
+    expect(ChangeIntentSchema.parse({ ...change, acceptanceCriteria: ["Wallets pay"] }).acceptanceCriteria).toEqual(["Wallets pay"]);
+    expect(ChangeIntentSchema.shape.acceptanceCriteria).toBeDefined();
+    for (const bad of ["Wallets pay", [{ id: "c1", text: "Wallets pay" }]]) {
+      expect(ChangeIntentSchema.safeParse({ ...change, acceptanceCriteria: bad }).success, JSON.stringify(bad)).toBe(false);
+    }
+  });
+
   it("records an optional discoveredFrom item and run on a change", () => {
     const change = { id: ID, type: "change", title: "C", slug: "c" };
     expect(ChangeIntentSchema.parse(change).discoveredFrom).toBeUndefined();

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { computeProductStatus, HEALTH_VALUES, INTENT_STATUSES, type ProductStatus } from "../../../src/core/product-status.js";
-import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment, CheckResult, Criterion } from "../../../src/schema/v2.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
 import { copyV2Fixture } from "../../helpers/v2-fixture.js";
@@ -91,6 +91,16 @@ describe("computeProductStatus", () => {
     };
     const out = computeProductStatus(tree);
     expect([out.a.status, out.b.status]).toEqual(["changing", "changing"]);
+  });
+
+  it("ignores a change's acceptanceCriteria: its targets' spec hash and status stay the same", () => {
+    const plain = fixture();
+    const withDoneWhen = fixture();
+    for (const c of withDoneWhen.changes) Object.assign(c, { acceptanceCriteria: ["works", "Wallets pay"] });
+    expect(computeProductStatus(withDoneWhen)).toEqual(computeProductStatus(plain));
+    const caps = (t: V2Tree) => t.product[0].children ?? [];
+    expect(caps(withDoneWhen).map((n) => specHash(nodeSpec(n)))).toEqual(caps(plain).map((n) => specHash(nodeSpec(n))));
+    expect(caps(withDoneWhen).map((n) => n.metAt)).toEqual(caps(plain).map((n) => n.metAt));
   });
 
   describe("retired", () => {

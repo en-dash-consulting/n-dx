@@ -23,9 +23,10 @@
  *
  * When an `in_progress` change with no live task gains its first task, the
  * in-flight work becomes that task: it takes `in_progress` and the change's
- * `startedAt`, the change returns to `pending`, and the change's
- * `acceptanceCriteria` move to the task. `requirements`, `amends` and
- * `touches` stay on the change. The change keeps `startedAt`, so it still
+ * `startedAt`, the change returns to `pending`, and the change's typed
+ * `acceptanceCriteria` list ("done when") moves to the task, after any the
+ * task already has. `requirements`, `amends` and `touches` stay on the
+ * change. The change keeps `startedAt`, so it still
  * reads started (`isBuildingChange`).
  *
  * @module rex/core/change-completion
@@ -42,7 +43,7 @@ export type ChangeCompletionOptions = ApplyOnTriggerOptions;
 export interface ChangeSplit {
   changeId: string;
   taskId: string;
-  /** Criteria moved from the change to the task; empty when the change had none. */
+  /** Acceptance criteria moved from the change to the task; empty when the change had none. */
   movedCriteria: string[];
 }
 
@@ -126,12 +127,11 @@ export function addTask(tree: V2Tree, changeRef: string, task: RuleNode): Change
   added.status = "in_progress";
   if (change.startedAt !== undefined) added.startedAt = change.startedAt;
   change.status = "pending";
-  // A passthrough key with no schema: move only a list; any other value stays on the change rather than being lost.
-  const movedCriteria = Array.isArray(change.acceptanceCriteria) ? (change.acceptanceCriteria as string[]) : [];
-  if (movedCriteria.length > 0) {
-    added.acceptanceCriteria = [...((added.acceptanceCriteria as string[] | undefined) ?? []), ...movedCriteria];
+  const movedCriteria = change.type === "change" ? (change.acceptanceCriteria ?? []) : [];
+  if (change.type === "change") delete change.acceptanceCriteria;
+  if (movedCriteria.length > 0 && added.type === "task") {
+    added.acceptanceCriteria = [...(added.acceptanceCriteria ?? []), ...movedCriteria];
   }
-  if (Array.isArray(change.acceptanceCriteria) || change.acceptanceCriteria === undefined) delete change.acceptanceCriteria;
   result.split = { changeId: change.id, taskId: added.id, movedCriteria };
   return result;
 }

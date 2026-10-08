@@ -179,7 +179,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "items": {
             "type": "string"
           },
-          "description": "Acceptance criteria"
+          "description": "Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria"
         },
         "tags": {
           "type": "array",
@@ -298,7 +298,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "items": {
             "type": "string"
           },
-          "description": "New acceptance criteria"
+          "description": "New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria"
         },
         "priority": {
           "type": "string",
