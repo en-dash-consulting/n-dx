@@ -15,7 +15,7 @@ source: "roadmap"
 acceptanceCriteria:
   - "A stray v1 item converts with the plan's rules (test)"
   - "The health warning fires on a squashed fixture"
-description: "ndx migrate converts v1 PRD files that arrive from branches opened before the cut. rex health warns when an applied change's appliedIn commit is not reachable from main (the sign of a squash or rebase merge)."
-lastModified: "2026-10-06T04:20:25.797Z"
+description: "ndx migrate converts v1 PRD files that arrive from branches opened before the cut. rex health warns when an applied change's appliedIn commit is not reachable from main (the sign of a squash or rebase merge). Before warning, try the re-point from PR 11; warn only for SHAs it cannot match."
+lastModified: "2026-10-07T21:28:30.688Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
