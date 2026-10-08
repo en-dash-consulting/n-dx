@@ -11,6 +11,9 @@ import { loadPrdModel, type PrdModel } from "../../../src/store/prd-model-reader
 import { writePrdModel, type WritePrdModelOptions } from "../../../src/store/prd-model-writer.js";
 import { withLock } from "../../../src/store/file-lock.js";
 import { prdLockPath } from "../../../src/store/paths.js";
+import { buildPlanData } from "../../../src/migrations/v1-to-v2/migration-plan-data.js";
+import { classifyV1Tree } from "../../../src/migrations/v1-to-v2/migration-plan.js";
+import type { PRDItem } from "../../../src/schema/v1.js";
 import { SLUG_RULE_VERSION } from "../../../src/store/folder-tree-serializer.js";
 import type { RuleNode } from "../../../src/schema/v2-rules.js";
 import { EOLS, copyV2Fixture, type Eol } from "../../helpers/v2-fixture.js";
@@ -341,6 +344,20 @@ describe("writePrdModel", () => {
       find(all(model), TASK).slug = "aux";
       await expect(write(rexDir, model)).rejects.toThrow(/Windows/);
       expect(await snapshot(rexDir)).toEqual(before);
+    });
+
+    it("accepts a migrated tree whose v1 slugs were con, aux and nul", async () => {
+      const v1: PRDItem[] = ["Con", "AUX", "Nul"].map((title, i) => ({ id: `item-${i}`, level: "task", title, status: "pending" }));
+      const plan = buildPlanData(v1, classifyV1Tree(v1), { cutAt: "2026-10-08T00:00:00Z" });
+      const rexDir = await copyFixture();
+      const model = await loadPrdModel(rexDir, quiet);
+      for (const item of v1) {
+        const slug = plan.items[item.id]!.slug!.to;
+        find(all(model), CHANGE).children!.push({ id: item.id, type: "task", title: item.title, slug } as RuleNode);
+      }
+      await write(rexDir, model);
+      const reread = await loadPrdModel(rexDir, quiet);
+      for (const item of v1) expect(find(all(reread), item.id).slug).toBe(plan.items[item.id]!.slug!.to);
     });
 
     it.each(["console", "auxiliary", "null-handling", "com10", "lpt0x", "prn-report"])("accepts %s", async (slug) => {

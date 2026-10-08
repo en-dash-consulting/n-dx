@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
 import { specHash } from "../../../../src/schema/v2-rules.js";
 import type { CapabilitySpecDraft } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
+import { isWindowsSafeSegment } from "../../../../src/store/folder-tree-serializer.js";
 import { classifyV1Tree } from "../../../../src/migrations/v1-to-v2/migration-plan.js";
 import {
   buildPlanData,
@@ -74,7 +75,7 @@ describe("data problem flags", () => {
     expect(data.items[dupB.id]!.flags).toContain("duplicate-title");
     expect(data.items[parent.id]!.flags).toContain("legacy-parent-id");
     expect(data.items[stale.id]!.flags).toContain("stale-description");
-    expect(data.flagCounts).toEqual({ "criteria-in-tags": 1, "duplicate-title": 2, "legacy-parent-id": 1, "stale-description": 1 });
+    expect(data.flagCounts).toEqual({ "criteria-in-tags": 1, "duplicate-title": 2, "legacy-parent-id": 1, "stale-description": 1, "unsafe-slug": 0 });
   });
 
   it("does not flag an unrelated item", () => {
@@ -174,6 +175,28 @@ describe('"[object Object]" values', () => {
     expect(dropCorrupt(u.recommendationMeta)).toEqual({ b: "ok" });
     expect(dropCorrupt(t.recommendationMeta)).toBeUndefined();
     expect(dropCorrupt(logged.log)).toEqual(["kept"]);
+  });
+});
+
+describe("Windows-unsafe v1 slugs", () => {
+  it.each(["Con", "AUX", "Nul"])("gives a v1 item titled %s a Windows-safe slug, flagged, with the old name recorded", (title) => {
+    const unsafe = item("task", title);
+    const data = dataFor([item("epic", "Area", {}, [item("feature", "Thing", {}, [unsafe, item("task", "Fine")])])]);
+    const planned = data.items[unsafe.id]!;
+    expect(planned.flags).toContain("unsafe-slug");
+    expect(planned.slug!.from).toBe(title.toLowerCase());
+    expect(isWindowsSafeSegment(planned.slug!.to)).toBe(true);
+    expect(planned.slug!.to.startsWith(`${title.toLowerCase()}-`)).toBe(true);
+    expect(data.flagCounts["unsafe-slug"]).toBe(1);
+  });
+
+  it("leaves a safe slug alone, including a duplicate title the v1 rule already suffixed", () => {
+    const [a, b, ok] = [item("task", "Con"), item("task", "con"), item("task", "Console")];
+    const data = dataFor([item("epic", "Area", {}, [item("feature", "Thing", {}, [a, b, ok])])]);
+    expect(data.items[a.id]?.slug).toBeUndefined();
+    expect(data.items[b.id]?.slug).toBeUndefined();
+    expect(data.items[ok.id]?.slug).toBeUndefined();
+    expect(data.flagCounts["unsafe-slug"]).toBe(0);
   });
 });
 

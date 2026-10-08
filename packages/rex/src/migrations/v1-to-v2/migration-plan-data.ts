@@ -22,6 +22,11 @@
  * - `reviewedHash` on each capability the caller lists as reviewed: the
  *   `specHash` of its drafted spec, so it reads reviewed until the spec is
  *   edited. Unlisted nodes stay unreviewed.
+ * - `slug` on each item whose v1 directory name Windows cannot create (a title
+ *   of "Con", "AUX" or "Nul"): v2 freezes slugs and the writer refuses such a
+ *   name, so the plan assigns a safe replacement (`con-<id6>`, from
+ *   `freeSlug`), records the v1 name in `slug.from`, and flags `unsafe-slug`.
+ *   Safe names are not listed: the v1 name is the v2 slug.
  * - The literal "[object Object]" in `recommendationMeta` or an item's `log`
  *   (written by a pre-squash build; unrecoverable) is dropped and counted.
  *
@@ -33,10 +38,12 @@ import type { Criterion } from "../../schema/v2.js";
 import { specHash } from "../../schema/v2-rules.js";
 import type { CapabilitySpecDraft } from "./capability-spec.js";
 import type { MigrationPlan } from "./migration-plan.js";
+import { freeSlug } from "../../core/apply-amendments.js";
+import { isWindowsSafeSegment, resolveSiblingSlugs } from "../../store/folder-tree-serializer.js";
 
 export const CORRUPT_VALUE = "[object Object]";
 
-export const DATA_FLAGS = ["criteria-in-tags", "duplicate-title", "legacy-parent-id", "stale-description"] as const;
+export const DATA_FLAGS = ["criteria-in-tags", "duplicate-title", "legacy-parent-id", "stale-description", "unsafe-slug"] as const;
 export type DataFlag = (typeof DATA_FLAGS)[number];
 
 export interface ReleaseTag {
@@ -70,6 +77,8 @@ export interface ItemPlanData {
   id: string;
   criteria?: Criterion[];
   aliases?: string[];
+  /** Present when the v1 directory name (`from`) is not Windows-safe: the v2 slug to freeze instead (`to`). */
+  slug?: { from: string; to: string };
   /** Applied changes only: ISO time the change counts as applied. */
   appliedAt?: string;
   /** Reviewed capabilities only: `specHash` of the migrated spec. */
@@ -172,7 +181,7 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
   const specById = new Map((options.specs ?? []).map((d) => [d.capability, d]));
   const result: PlanData = {
     items: {},
-    flagCounts: { "criteria-in-tags": 0, "duplicate-title": 0, "legacy-parent-id": 0, "stale-description": 0 },
+    flagCounts: { "criteria-in-tags": 0, "duplicate-title": 0, "legacy-parent-id": 0, "stale-description": 0, "unsafe-slug": 0 },
     legacyLoe: 0,
     corrupt: { recommendationMeta: 0, logEntries: 0 },
   };
@@ -184,8 +193,16 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
       const key = item.title.trim().toLowerCase();
       titles.set(key, (titles.get(key) ?? 0) + 1);
     }
+    const v1Slugs = resolveSiblingSlugs([...list]);
+    const siblingSlugs = [...v1Slugs.values()].map((slug) => ({ slug }));
     for (const item of list) {
       const data: ItemPlanData = { id: item.id, flags: [], droppedMeta: 0, droppedLog: 0 };
+
+      const v1Slug = v1Slugs.get(item.id)!;
+      if (!isWindowsSafeSegment(v1Slug)) {
+        data.slug = { from: v1Slug, to: freeSlug(item.title, item.id, siblingSlugs) };
+        data.flags.push("unsafe-slug");
+      }
 
       if (item.acceptanceCriteria?.length) {
         data.criteria = item.acceptanceCriteria.map((text, i) => ({ id: `c${i + 1}`, text }));
@@ -238,6 +255,7 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
       const existing = result.items[item.id];
       const merged = existing ? { ...data, aliases: existing.aliases } : data;
       const interesting =
+        merged.slug ||
         merged.criteria || merged.aliases || merged.appliedAt || merged.reviewedHash || merged.shippedIn || merged.flags.length || merged.legacyLoe || merged.droppedMeta || merged.droppedLog;
       if (interesting) result.items[item.id] = merged;
       else delete result.items[item.id];
