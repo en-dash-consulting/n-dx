@@ -44,6 +44,7 @@ const tree: V2Tree = {
       children: [node({ id: "task-1", type: "task" })],
     }),
     node({ id: "ch-2", type: "change", amends: [{ target: "cap-b", delta: "added", summary: "s" }], touches: ["cap-a"] }),
+    node({ id: "ch-dead", type: "change", status: "cancelled", amends: [{ target: "cap-a", delta: "modified", summary: "s" }] }),
   ],
 };
 const zoneOf = (file: string) => (file.startsWith("src/web/") ? "web" : file.startsWith("src/rex/") ? "rex" : undefined);
@@ -70,6 +71,8 @@ describe("computeRealizedBy", () => {
     const viaAlias = await commit(["src/rex/c.ts"], "Part C\n\nN-DX-Item: old-ch-1");
     const forB = await commit(["src/web/d.ts"], "Part D\n\nN-DX-Item: ch-2");
     await commit(["src/web/unrelated.ts"], "Other\n\nN-DX-Item: someone-else");
+    // A cancelled change's commits do not realize the capability it amended.
+    await commit(["src/web/dead.ts"], "Dead end\n\nN-DX-Item: ch-dead");
 
     const realized = await computeRealizedBy(tree, computeEdges(tree), { repoDir: repo, cacheDir, zoneOf });
 
