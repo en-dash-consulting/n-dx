@@ -43,7 +43,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { ItemLevel, PRDItem } from "../schema/index.js";
 import { SCHEMA_VERSION, isCompatibleSchema } from "../schema/index.js";
-import { ItemStateSchema, NodeIntentSchema, RootHeaderSchema, SCHEMA_VERSION_V2, isV2Schema, type NodeType, type StateFile } from "../schema/v2.js";
+import { ItemStateSchema, NodeIntentSchema, RootHeaderSchema, SCHEMA_VERSION_V2, isV2Schema, type ItemState, type NodeType, type StateFile } from "../schema/v2.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
 import { parseFolderTree, parseFrontmatter, type ParseWarning } from "./folder-tree-parser.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "./paths.js";
@@ -98,6 +98,12 @@ export interface LoadPrdModelOptions {
   env?: NodeJS.ProcessEnv;
   /** Where the skew warning goes. Defaults to stderr. */
   warn?: (message: string) => void;
+  /**
+   * v2 only: filled with each loaded node's `state.yaml` row, by id. A merged
+   * node cannot tell a state field this build does not declare from an intent
+   * field; its row can.
+   */
+  stateRows?: Map<string, ItemState>;
 }
 
 // ── Schema skew ──────────────────────────────────────────────────
@@ -190,10 +196,11 @@ export async function loadPrdModel(rexDir: string, options: LoadPrdModelOptions 
   }
 
   const warnings: ParseWarning[] = [...header.warnings];
+  const ctx: ReadContext = { warnings, ignoreStamp: readOnly !== undefined, stateRows: options.stateRows };
   const tree = v2
     ? {
-        product: await readLayer(productDir, warnings, readOnly !== undefined),
-        changes: await readLayer(join(rexDir, CHANGES_DIRNAME), warnings, readOnly !== undefined),
+        product: await readLayer(productDir, ctx),
+        changes: await readLayer(join(rexDir, CHANGES_DIRNAME), ctx),
       }
     : await readV1Tree(join(rexDir, PRD_TREE_DIRNAME), warnings);
   return {
@@ -259,10 +266,17 @@ async function readV1Tree(treeRoot: string, warnings: ParseWarning[]): Promise<V
 
 // ── v2 ───────────────────────────────────────────────────────────
 
-async function readLayer(layerDir: string, warnings: ParseWarning[], ignoreStamp: boolean): Promise<RuleNode[]> {
+/** What every v2 read step shares. */
+interface ReadContext {
+  warnings: ParseWarning[];
+  ignoreStamp: boolean;
+  stateRows?: Map<string, ItemState>;
+}
+
+async function readLayer(layerDir: string, ctx: ReadContext): Promise<RuleNode[]> {
   if (!(await isDirectory(layerDir))) return [];
-  const folder = await readFolder(layerDir, warnings, ignoreStamp);
-  warnOrphanRows(layerDir, folder, warnings);
+  const folder = await readFolder(layerDir, ctx);
+  warnOrphanRows(layerDir, folder, ctx.warnings);
   return folder.children;
 }
 
@@ -274,17 +288,17 @@ interface FolderRead {
 }
 
 /** The nodes stored directly in `dir`: subfolders with an `index.md`, and leaf `.md` files, in slug order. */
-async function readFolder(dir: string, warnings: ParseWarning[], ignoreStamp: boolean): Promise<FolderRead> {
-  const state = await loadStateFile(dir, { ignoreSchemaStamp: ignoreStamp });
+async function readFolder(dir: string, ctx: ReadContext): Promise<FolderRead> {
+  const state = await loadStateFile(dir, { ignoreSchemaStamp: ctx.ignoreStamp });
   const claimed = new Set<string>();
   const named: Array<{ name: string; node: RuleNode }> = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
-      const node = await readFolderNode(join(dir, entry.name), warnings, ignoreStamp);
+      const node = await readFolderNode(join(dir, entry.name), ctx);
       if (node) named.push({ name: entry.name, node });
     } else if (entry.isFile() && entry.name.endsWith(".md") && entry.name !== "index.md") {
       const name = entry.name.slice(0, -".md".length);
-      const node = await readNode(join(dir, entry.name), name, state, warnings);
+      const node = await readNode(join(dir, entry.name), name, state, ctx);
       if (node) {
         claimed.add(node.id);
         named.push({ name, node });
@@ -295,17 +309,17 @@ async function readFolder(dir: string, warnings: ParseWarning[], ignoreStamp: bo
   return { state, children: named.map(({ node }) => node), claimed };
 }
 
-async function readFolderNode(dir: string, warnings: ParseWarning[], ignoreStamp: boolean): Promise<RuleNode | null> {
+async function readFolderNode(dir: string, ctx: ReadContext): Promise<RuleNode | null> {
   const indexPath = join(dir, "index.md");
   if ((await readIfExists(indexPath)) === null) {
-    warnings.push({ path: dir, message: "Folder has no index.md; skipped with its contents" });
+    ctx.warnings.push({ path: dir, message: "Folder has no index.md; skipped with its contents" });
     return null;
   }
-  const folder = await readFolder(dir, warnings, ignoreStamp);
-  const node = await readNode(indexPath, basename(dir), folder.state, warnings);
+  const folder = await readFolder(dir, ctx);
+  const node = await readNode(indexPath, basename(dir), folder.state, ctx);
   if (!node) return null;
   folder.claimed.add(node.id);
-  warnOrphanRows(dir, folder, warnings);
+  warnOrphanRows(dir, folder, ctx.warnings);
   if (folder.children.length) node.children = folder.children;
   return node;
 }
@@ -323,8 +337,9 @@ async function readNode(
   path: string,
   name: string,
   state: StateFile,
-  warnings: ParseWarning[],
+  ctx: ReadContext,
 ): Promise<RuleNode | null> {
+  const { warnings } = ctx;
   const text = (await readIfExists(path)) ?? "";
   const fm = parseFrontmatter(text, path, warnings);
   if (!fm) return null;
@@ -340,7 +355,9 @@ async function readNode(
     warnings.push({ path, message: `Frontmatter slug "${intent.data.slug}" differs from the stored name "${name}"` });
   }
   // State is tool-written and authoritative for its fields; an absent row reads as pending.
-  return { status: "pending", ...intent.data, ...state.items[intent.data.id] } as RuleNode;
+  const row = state.items[intent.data.id];
+  if (row) ctx.stateRows?.set(intent.data.id, row);
+  return { status: "pending", ...intent.data, ...row } as RuleNode;
 }
 
 /**

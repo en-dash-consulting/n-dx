@@ -3,9 +3,12 @@
  *
  * Envelope v1 (`../core/prd-bundle.ts`) carries a v1 item list. Envelope v2
  * carries what a v2 tree holds: the root header, the `product` layer and the
- * `changes` layer, each node as the v2 reader loads it (intent merged with
- * its `state.yaml` row, children nested). The same carve-out applies: a
- * bundle is written outside the rex directory and never read as storage.
+ * `changes` layer. Each node is its intent fields with its `state.yaml` row
+ * apart under `state`, children nested ({@link BundleNodeV2}). Keeping the
+ * row apart is what lets a state key this build does not declare (a retired
+ * field, or one a newer rex wrote) land back in `state.yaml` rather than in
+ * frontmatter. The same carve-out applies: a bundle is written outside the
+ * rex directory and never read as storage.
  *
  * Which envelope is used follows the tree, not a flag:
  *
@@ -41,7 +44,15 @@ import {
 } from "../core/prd-bundle.js";
 import { ITEM_BOOKKEEPING_FIELDS } from "../core/sync.js";
 import type { PRDItem } from "../schema/index.js";
-import { ItemStateSchema, NodeIntentSchema, SCHEMA_VERSION_V2, isV2Schema, type Layer } from "../schema/v2.js";
+import {
+  ItemStateSchema,
+  NodeIntentSchema,
+  SCHEMA_VERSION_V2,
+  isV2Schema,
+  type ItemState,
+  type Layer,
+  type NodeType,
+} from "../schema/v2.js";
 import { checkV2Rules, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { withLock } from "./file-lock.js";
 import { resolveSiblingSlugs } from "./folder-tree-serializer.js";
@@ -53,6 +64,21 @@ import { writePrdModel } from "./prd-model-writer.js";
 /** Envelope version that carries both v2 layers. */
 export const BUNDLE_VERSION_V2 = 2;
 
+/**
+ * One node in envelope v2: intent fields at the top, the node's `state.yaml`
+ * row under `state` (omitted when empty), children nested. A declared state
+ * field outside `state`, or an intent field inside it, is refused on parse.
+ */
+export interface BundleNodeV2 {
+  id: string;
+  type: NodeType;
+  title: string;
+  slug: string;
+  state?: ItemState;
+  children?: BundleNodeV2[];
+  [key: string]: unknown;
+}
+
 export interface PRDBundleV2 {
   bundle: typeof BUNDLE_KIND;
   bundleVersion: typeof BUNDLE_VERSION_V2;
@@ -63,8 +89,8 @@ export interface PRDBundleV2 {
   header?: Record<string, unknown>;
   exportedAt: string;
   exportedFrom?: BundleProvenance;
-  product: RuleNode[];
-  changes: RuleNode[];
+  product: BundleNodeV2[];
+  changes: BundleNodeV2[];
 }
 
 /** A parsed bundle of either envelope. */
@@ -78,6 +104,14 @@ const LAYERS: readonly Layer[] = ["product", "changes"];
 const STAMPED_HEADER_KEYS: ReadonlySet<string> = new Set(["title", "schema", "slugRule"]);
 
 const STATE_KEYS: ReadonlySet<string> = new Set(Object.keys(ItemStateSchema.shape));
+
+/** Keys a node's `state` block may not hold: intent any node type declares, and the envelope's own. */
+const NOT_STATE_KEYS: ReadonlySet<string> = new Set([
+  ...NodeIntentSchema.options.flatMap((schema) => Object.keys(schema.shape)),
+  "body",
+  "children",
+  "state",
+]);
 
 /** Whether `rexDir` holds a v2 tree, by the rule the dual-read loader uses: `product/` exists. */
 export function hasV2Tree(rexDir: string): boolean {
@@ -102,10 +136,17 @@ export interface BuildBundleV2Options {
   exportedAt?: string;
   branch?: string;
   commit?: string;
+  /**
+   * Each node's `state.yaml` row, by id (`LoadPrdModelOptions.stateRows`).
+   * Without it only declared state fields go under `state`, and an
+   * undeclared one is carried as intent.
+   */
+  stateRows?: ReadonlyMap<string, ItemState>;
 }
 
 /** Snapshot a loaded v2 model into an envelope v2 bundle. The nodes are deep-cloned. */
 export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {}): PRDBundleV2 {
+  const rows = options.stateRows ?? new Map<string, ItemState>();
   const provenance: BundleProvenance = {};
   if (options.branch) provenance.branch = options.branch;
   if (options.commit) provenance.commit = options.commit;
@@ -119,9 +160,26 @@ export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {
     ...(header ? { header } : {}),
     exportedAt: options.exportedAt ?? new Date().toISOString(),
     ...(Object.keys(provenance).length > 0 ? { exportedFrom: provenance } : {}),
-    product: structuredClone(model.tree.product),
-    changes: structuredClone(model.tree.changes),
+    product: toBundleNodes(model.tree.product, rows),
+    changes: toBundleNodes(model.tree.changes, rows),
   };
+}
+
+/** Loaded nodes as envelope nodes: a field is state when it is declared state or its row holds it. */
+function toBundleNodes(nodes: readonly RuleNode[], rows: ReadonlyMap<string, ItemState>): BundleNodeV2[] {
+  return nodes.map((node) => {
+    const row = rows.get(node.id);
+    const out: Record<string, unknown> = {};
+    const state: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(structuredClone(node))) {
+      if (key === "children") continue;
+      if (STATE_KEYS.has(key) || (row !== undefined && Object.hasOwn(row, key))) state[key] = value;
+      else out[key] = value;
+    }
+    if (Object.keys(state).length > 0) out.state = state;
+    if (node.children?.length) out.children = toBundleNodes(node.children, rows);
+    return out as BundleNodeV2;
+  });
 }
 
 export interface V2Export {
@@ -132,8 +190,9 @@ export interface V2Export {
 
 /** Read the v2 tree under the PRD lock and build its bundle. */
 export async function exportV2Bundle(rexDir: string, options: BuildBundleV2Options = {}): Promise<V2Export> {
-  const model = await withLock(prdLockPath(rexDir), () => loadPrdModel(rexDir));
-  return { bundle: buildBundleV2(model, options), warnings: model.warnings };
+  const stateRows = new Map<string, ItemState>();
+  const model = await withLock(prdLockPath(rexDir), () => loadPrdModel(rexDir, { stateRows }));
+  return { bundle: buildBundleV2(model, { stateRows, ...options }), warnings: model.warnings };
 }
 
 function carriedHeader(header: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
@@ -186,8 +245,10 @@ function parseBundleV2(candidate: Record<string, unknown>): PRDBundleV2 {
     throw new BundleError('Bundle "header" must be an object.');
   }
 
-  const tree: V2Tree = { product: candidate.product as RuleNode[], changes: candidate.changes as RuleNode[] };
-  for (const layer of LAYERS) assertValidNodes(tree[layer]);
+  for (const layer of LAYERS) assertValidNodes(candidate[layer] as unknown[]);
+  const product = candidate.product as BundleNodeV2[];
+  const changes = candidate.changes as BundleNodeV2[];
+  const { tree } = fromBundleNodes(product, changes);
   assertUniqueIds(tree);
   assertLegalStructure(tree);
 
@@ -197,8 +258,8 @@ function parseBundleV2(candidate: Record<string, unknown>): PRDBundleV2 {
     schema,
     title,
     exportedAt,
-    product: tree.product,
-    changes: tree.changes,
+    product,
+    changes,
   };
   const header = carriedHeader(candidate.header as Record<string, unknown> | undefined);
   if (header) parsed.header = header;
@@ -212,7 +273,12 @@ function parseBundleV2(candidate: Record<string, unknown>): PRDBundleV2 {
   return parsed;
 }
 
-/** Hold each node's intent and state to the schemas the tree's own files are held to. */
+/**
+ * Hold each node's intent and `state` block to the schemas the tree's own
+ * files are held to, and each field to its side: a declared state field
+ * outside `state` would otherwise be written as frontmatter, and an intent
+ * field inside it into `state.yaml`.
+ */
 function assertValidNodes(nodes: unknown[]): void {
   for (const node of nodes) {
     if (!isRecord(node)) throw new BundleError("Bundle contains a node that is not an object.");
@@ -220,10 +286,17 @@ function assertValidNodes(nodes: unknown[]): void {
     if (node.children !== undefined && !Array.isArray(node.children)) {
       throw new BundleError(`Bundle node ${label} has a "children" that is not an array.`);
     }
-    const intent: Record<string, unknown> = {};
-    const state: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(node)) {
-      if (key !== "children") (STATE_KEYS.has(key) ? state : intent)[key] = value;
+    if (node.state !== undefined && !isRecord(node.state)) {
+      throw new BundleError(`Bundle node ${label} has a "state" that is not an object.`);
+    }
+    const state = (node.state ?? {}) as Record<string, unknown>;
+    const intent = Object.fromEntries(Object.entries(node).filter(([key]) => key !== "children" && key !== "state"));
+    const misplaced = [
+      ...Object.keys(intent).filter((key) => STATE_KEYS.has(key)).map((key) => `state field "${key}" outside "state"`),
+      ...Object.keys(state).filter((key) => NOT_STATE_KEYS.has(key)).map((key) => `field "${key}" inside "state"`),
+    ];
+    if (misplaced.length > 0) {
+      throw new BundleError(`Bundle node ${label} has ${misplaced.join(", ")}. Nothing was written.`);
     }
     for (const result of [NodeIntentSchema.safeParse(intent), ItemStateSchema.safeParse(state)]) {
       if (!result.success) {
@@ -279,11 +352,32 @@ export function v1ItemsToNodes(items: readonly PRDItem[]): RuleNode[] {
   });
 }
 
-/** A parsed bundle as a v2 tree, and which layers it carries. */
-function incomingTree(parsed: ParsedBundle): { tree: V2Tree; carried: readonly Layer[] } {
+/** A bundle's tree as the v2 reader would load it, and the undeclared state keys of each node, by id. */
+interface IncomingTree {
+  tree: V2Tree;
+  stateKeys: Map<string, Set<string>>;
+}
+
+/** Envelope nodes as loaded nodes: each `state` block merged over its intent, as the reader merges a row. */
+function fromBundleNodes(product: readonly BundleNodeV2[], changes: readonly BundleNodeV2[]): IncomingTree {
+  const stateKeys = new Map<string, Set<string>>();
+  const convert = (nodes: readonly BundleNodeV2[]): RuleNode[] =>
+    nodes.map((bundled) => {
+      const { children, state, ...intent } = structuredClone(bundled);
+      const undeclared = Object.keys(state ?? {}).filter((key) => !STATE_KEYS.has(key));
+      if (undeclared.length > 0) stateKeys.set(bundled.id, new Set(undeclared));
+      const node = { ...intent, ...state } as RuleNode;
+      if (children?.length) node.children = convert(children);
+      return node;
+    });
+  return { tree: { product: convert(product), changes: convert(changes) }, stateKeys };
+}
+
+/** A parsed bundle as a v2 tree, which layers it carries, and its undeclared state keys. */
+function incomingTree(parsed: ParsedBundle): IncomingTree & { carried: readonly Layer[] } {
   return parsed.version === 1
-    ? { tree: { product: [], changes: v1ItemsToNodes(parsed.bundle.items) }, carried: ["changes"] }
-    : { tree: { product: parsed.bundle.product, changes: parsed.bundle.changes }, carried: LAYERS };
+    ? { tree: { product: [], changes: v1ItemsToNodes(parsed.bundle.items) }, stateKeys: new Map(), carried: ["changes"] }
+    : { ...fromBundleNodes(parsed.bundle.product, parsed.bundle.changes), carried: LAYERS };
 }
 
 // ── Merge ────────────────────────────────────────────────────────
@@ -410,8 +504,10 @@ export async function countReplaceable(rexDir: string, parsed: ParsedBundle): Pr
 export async function importBundleIntoV2(rexDir: string, parsed: ParsedBundle, mode: ImportMode): Promise<V2MergeOutcome> {
   return withLock(prdLockPath(rexDir), async () => {
     const model = await loadPrdModel(rexDir);
-    const { tree, carried } = incomingTree(parsed);
+    const { tree, carried, stateKeys } = incomingTree(parsed);
     const wasEmpty = countNodes(model.tree.product) + countNodes(model.tree.changes) === 0;
+    // A merge keeps a local node over the bundle's, and the local row on disk already says what is state.
+    if (mode === "merge") for (const id of idsOf(model.tree)) stateKeys.delete(id);
     const outcome = mergeV2Tree(model.tree, tree, mode, carried);
     const adopt = wasEmpty || (mode === "replace" && carried.length === LAYERS.length);
     const next: PrdModel = { ...model, tree: outcome.tree };
@@ -419,7 +515,7 @@ export async function importBundleIntoV2(rexDir: string, parsed: ParsedBundle, m
       next.title = parsed.bundle.title;
       if (parsed.version === BUNDLE_VERSION_V2) next.header = parsed.bundle.header;
     }
-    await writePrdModel(rexDir, next, { removed: outcome.removed });
+    await writePrdModel(rexDir, next, { removed: outcome.removed, stateKeys });
     return outcome;
   });
 }

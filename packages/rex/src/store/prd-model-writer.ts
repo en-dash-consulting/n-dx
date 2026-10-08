@@ -74,6 +74,12 @@ export interface WritePrdModelOptions {
    * listed here.
    */
   removed?: ReadonlySet<string>;
+  /**
+   * Keys to store in `state.yaml` for a node, by id, beyond the declared
+   * state fields. For a node whose row is not on disk yet (an import into a
+   * fresh tree) this is the only way an undeclared state key stays state.
+   */
+  stateKeys?: ReadonlyMap<string, ReadonlySet<string>>;
   /** Clock for `revisedAt` stamps. */
   now?: () => Date;
 }
@@ -133,7 +139,7 @@ export async function writePrdModel(
 
   const productDir = join(rexDir, PRODUCT_DIRNAME);
   const changesDir = join(rexDir, CHANGES_DIRNAME);
-  const loaded = await loadAllStateFiles([productDir, changesDir]);
+  const loaded = await loadAllStateFiles([productDir, changesDir], options.stateKeys ?? new Map());
   plan.files.set(join(productDir, INDEX_FILE), renderRootHeader(model, stamp));
   await planFolder(productDir, model.tree.product, null, stamp, loaded, plan);
   if (model.tree.changes.length > 0 || (await listDir(changesDir)) !== null) {
@@ -176,16 +182,24 @@ interface Plan {
   stale: Array<{ path: string; isDir: boolean }>;
 }
 
-/** Every `state.yaml` on disk, read before planning so a row can follow its node to another folder. */
+/**
+ * Every `state.yaml` on disk, read before planning so a row can follow its
+ * node to another folder, and the state keys the caller named.
+ */
 interface LoadedState {
   /** By folder path. */
   files: Map<string, StateFile>;
   /** Every row, by node id, whichever folder holds it; the first found wins. */
   rows: Map<string, ItemState>;
+  /** {@link WritePrdModelOptions.stateKeys}. */
+  stateKeys: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
-async function loadAllStateFiles(roots: readonly string[]): Promise<LoadedState> {
-  const loaded: LoadedState = { files: new Map(), rows: new Map() };
+async function loadAllStateFiles(
+  roots: readonly string[],
+  stateKeys: ReadonlyMap<string, ReadonlySet<string>>,
+): Promise<LoadedState> {
+  const loaded: LoadedState = { files: new Map(), rows: new Map(), stateKeys };
   const walk = async (dir: string): Promise<void> => {
     for (const entry of (await listDir(dir)) ?? []) {
       if (entry.name.startsWith(".")) continue;
@@ -221,7 +235,11 @@ async function planFolder(
   const specs = new Map<string, ProductSpec>();
   const keep = (node: RuleNode, intent: Record<string, unknown>): void => {
     // A node that moved here (or flipped leaf to folder) has its row in another folder's file.
-    const row = splitState(node, existing.items[node.id] ?? loaded.rows.get(node.id), intent);
+    const previous = existing.items[node.id] ?? loaded.rows.get(node.id);
+    const named = loaded.stateKeys.get(node.id);
+    const alsoState = (key: string): boolean =>
+      (previous !== undefined && Object.hasOwn(previous, key)) || named?.has(key) === true;
+    const row = splitState(node, alsoState, intent);
     if (Object.keys(row).length > 0) rows[node.id] = row;
     const spec = productSpec(node);
     if (spec) specs.set(node.id, spec);
@@ -304,14 +322,15 @@ function assertSlug(node: RuleNode, folder: boolean, dir: string): void {
 
 /**
  * The row `node` stores in `state.yaml`: known state fields, plus any field
- * its row on disk already held, in whichever folder (a newer build's state stays state).
- * Everything else is copied to `intent`.
+ * `alsoState` names (its row on disk already held it, in whichever folder, or
+ * the caller said so), so a newer build's state stays state. Everything else
+ * is copied to `intent`.
  */
-function splitState(node: RuleNode, previous: ItemState | undefined, intent: Record<string, unknown>): ItemState {
+function splitState(node: RuleNode, alsoState: (key: string) => boolean, intent: Record<string, unknown>): ItemState {
   const row: ItemState = {};
   for (const [key, value] of Object.entries(node)) {
     if (value === undefined || key === "children") continue;
-    if (STATE_KEYS.has(key) || (previous !== undefined && Object.hasOwn(previous, key))) {
+    if (STATE_KEYS.has(key) || alsoState(key)) {
       if (key === "status" && value === "pending") continue;
       row[key] = value;
     } else {

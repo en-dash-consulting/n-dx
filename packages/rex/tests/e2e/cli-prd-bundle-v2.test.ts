@@ -13,7 +13,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { buildBundle } from "../../src/core/prd-bundle.js";
 import type { PRDItem } from "../../src/schema/index.js";
-import { copyV2Fixture } from "../helpers/v2-fixture.js";
+import { copyV2Fixture, editText } from "../helpers/v2-fixture.js";
 
 const cliPath = join(fileURLToPath(import.meta.url), "..", "..", "..", "dist", "cli", "index.js");
 
@@ -92,6 +92,22 @@ describe("rex export / import-bundle on a v2 tree", () => {
     expect(bundle.changes).toHaveLength(1);
 
     expect(run(["import-bundle", `--in=${out}`, dest.dir])).toMatch(/Imported 4 new items/);
+    expect(await snapshot(dest.rexDir)).toEqual(await snapshot(src.rexDir));
+  });
+
+  it("keeps a state.yaml key this build does not declare in state.yaml through the round trip", async () => {
+    const src = await v2Project("src");
+    const dest = await emptyV2Project("dest");
+    const out = join(tmp, "bundle.json");
+    // After the declared keys, where the canonical writer puts an unknown one.
+    await editText(join(src.rexDir, "changes", "add-apple-pay", "state.yaml"), (text) =>
+      text.replace(/( {4}prs: .*\n)/, '$1    futureField: "x"\n'),
+    );
+
+    run(["export", `--out=${out}`, src.dir]);
+    run(["import-bundle", `--in=${out}`, dest.dir]);
+    expect(await readFile(join(dest.rexDir, "changes", "add-apple-pay", "state.yaml"), "utf-8")).toContain('futureField: "x"');
+    expect(await readFile(join(dest.rexDir, "changes", "add-apple-pay", "index.md"), "utf-8")).not.toContain("futureField");
     expect(await snapshot(dest.rexDir)).toEqual(await snapshot(src.rexDir));
   });
 

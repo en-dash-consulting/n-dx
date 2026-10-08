@@ -18,11 +18,12 @@ import {
   mergeV2Tree,
   parseAnyBundle,
   v1ItemsToNodes,
+  type BundleNodeV2,
   type PRDBundleV2,
 } from "../../../src/store/prd-bundle-v2.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
-import { copyV2Fixture } from "../../helpers/v2-fixture.js";
+import { copyV2Fixture, editText } from "../../helpers/v2-fixture.js";
 
 const AREA = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
@@ -108,7 +109,7 @@ function v1Bundle(): unknown {
   return JSON.parse(JSON.stringify(bundle));
 }
 
-function v2Bundle(tree: Partial<V2Tree>, extra: Record<string, unknown> = {}): Record<string, unknown> {
+function v2Bundle(tree: { product?: BundleNodeV2[]; changes?: BundleNodeV2[] }, extra: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     bundle: "rex/prd-bundle",
     bundleVersion: BUNDLE_VERSION_V2,
@@ -134,6 +135,15 @@ function find(nodes: readonly RuleNode[], id: string): RuleNode | undefined {
   return undefined;
 }
 
+function findBundled(nodes: readonly BundleNodeV2[], id: string): BundleNodeV2 | undefined {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    const hit = findBundled(n.children ?? [], id);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
 describe("envelope v2 round trip", () => {
   it("exports both layers and the header", async () => {
     const src = await copyV2Fixture(join(tmp, "src"), "lf");
@@ -142,7 +152,9 @@ describe("envelope v2 round trip", () => {
     expect(bundle.header).toEqual({ stewards: ["@shop/core"], body: "The product layer of a small shop." });
     expect(bundle.product.map((n) => n.id)).toEqual([AREA]);
     expect(bundle.changes.map((n) => n.id)).toEqual([CHANGE]);
-    expect(find(bundle.product, CAPABILITY)).toMatchObject({ status: "completed", reviewedHash: expect.any(String) });
+    const capability = findBundled(bundle.product, CAPABILITY);
+    expect(capability).toMatchObject({ statement: expect.any(String), state: { status: "completed", reviewedHash: expect.any(String) } });
+    expect(capability).not.toHaveProperty("status");
   });
 
   it("imports into an empty v2 tree byte-identically to the source", async () => {
@@ -160,6 +172,24 @@ describe("envelope v2 round trip", () => {
     const outcome = await importBundleIntoV2(dest, parseAnyBundle(await exportedJson(src)), "replace");
     expect(outcome).toMatchObject({ added: 4, replaced: 4 });
     expect(await snapshot(dest)).toEqual(await snapshot(src));
+  });
+
+  it("keeps a state.yaml key this build does not declare in state.yaml, not frontmatter", async () => {
+    const src = await copyV2Fixture(join(tmp, "src"), "lf");
+    // After the declared keys, where the canonical writer puts an unknown one.
+    await editText(join(src, "changes", "add-apple-pay", "state.yaml"), (text) =>
+      text.replace(/( {4}prs: .*\n)/, '$1    futureField: "x"\n'),
+    );
+    const bundle = (await exportedJson(src)) as PRDBundleV2;
+    expect(bundle.changes[0]).toMatchObject({ id: CHANGE, state: { futureField: "x", status: "in_progress" } });
+    expect(bundle.changes[0]).not.toHaveProperty("futureField");
+
+    const dest = await emptyV2Tree("dest");
+    await importBundleIntoV2(dest, parseAnyBundle(bundle), "merge");
+    const files = await snapshot(dest);
+    expect(files["changes/add-apple-pay/state.yaml"]).toContain('futureField: "x"');
+    expect(files["changes/add-apple-pay/index.md"]).not.toContain("futureField");
+    expect(files).toEqual(await snapshot(src));
   });
 
   it("re-importing reports identical collisions and writes nothing new", async () => {
@@ -240,9 +270,18 @@ describe("parseAnyBundle", () => {
 
   it("refuses a node with invalid intent or state", () => {
     expect(() => parseAnyBundle(v2Bundle({ changes: [{ id: CHANGE, type: "change", title: "x" } as RuleNode] }))).toThrow(BundleError);
-    expect(() =>
-      parseAnyBundle(v2Bundle({ changes: [node({ id: CHANGE, type: "change", slug: "x", status: "bogus" as never })] })),
-    ).toThrow(/invalid node/);
+    const bogus = { ...node({ id: CHANGE, type: "change", slug: "x" }), state: { status: "bogus" } };
+    expect(() => parseAnyBundle(v2Bundle({ changes: [bogus] }))).toThrow(/invalid node/);
+  });
+
+  it("refuses a declared state field outside the state block", () => {
+    const misplaced = node({ id: CHANGE, type: "change", slug: "x", status: "completed" });
+    expect(() => parseAnyBundle(v2Bundle({ changes: [misplaced] }))).toThrow(/state field "status" outside "state"/);
+  });
+
+  it("refuses an intent field inside the state block", () => {
+    const misplaced = { ...node({ id: CHANGE, type: "change", slug: "x" }), state: { title: "Moved" } };
+    expect(() => parseAnyBundle(v2Bundle({ changes: [misplaced] }))).toThrow(/field "title" inside "state"/);
   });
 
   it("refuses a node in the wrong layer", () => {
