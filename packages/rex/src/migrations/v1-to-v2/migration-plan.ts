@@ -88,13 +88,40 @@ export interface MigrationPlan {
 
 // ── Title signals ────────────────────────────────────────────────
 
+/** Product names a release title may carry (`ndx 0.9.0`) when the caller names none. */
+export const DEFAULT_PRODUCT_NAMES: readonly string[] = ["ndx", "n-dx"];
+
+export interface ClassifyOptions {
+  /** Names a release title may put before its version (`Acme 2.0`). Defaults to {@link DEFAULT_PRODUCT_NAMES}. */
+  productNames?: readonly string[];
+}
+
+const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const releaseTokenCache = new Map<string, RegExp>();
+
 /**
  * A release version: `0.9.0`, `v1.2`. A dotted number counts only when the title
- * opens with it (`0.6.0 / PR 4`), or it follows `v`, `release` or the product name
- * (`ndx 0.9.0`, `n-dx 1.0`). Any other version names a dependency or runtime
+ * opens with it (`0.6.0 / PR 4`), or it follows `v`, `release` or a product name
+ * (`ndx 0.9.0`, `Acme 2.0`). Any other version names a dependency or runtime
  * (`Python 3.12 support`, `Upgrade to Vitest 4.1`), not a release.
  */
-const RELEASE_TOKEN = /(?:^\s*v?|(?<![\w.])v|\b(?:n-?dx|releases?)\s+v?)(\d+\.\d+(?:\.\d+)?)(?![\w.])/i;
+function releaseTokenPattern(productNames: readonly string[]): RegExp {
+  const names = [...new Set(productNames.map((n) => n.trim()).filter((n) => n !== ""))]
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegex);
+  const key = names.join("\u0000");
+  let re = releaseTokenCache.get(key);
+  if (re === undefined) {
+    const prefix = ["releases?", ...names].join("|");
+    re = new RegExp(
+      `(?:^\\s*v?|(?<![\\w.])v|(?<![\\w-])(?:${prefix})\\s+v?)(\\d+\\.\\d+(?:\\.\\d+)?)(?![\\w.])`,
+      "i",
+    );
+    releaseTokenCache.set(key, re);
+  }
+  return re;
+}
 /** A unit of delivered work: `PR 4`, `PR #12`, `#499`. */
 const WORK_TOKEN = /\bPR\s*#?\d+\b|(?:^|\s)#\d+\b/i;
 
@@ -123,8 +150,8 @@ function leadWord(title: string): string | undefined {
 }
 
 /** The release a title names, if any. */
-export function releaseToken(title: string): string | undefined {
-  return RELEASE_TOKEN.exec(title)?.[1];
+export function releaseToken(title: string, productNames: readonly string[] = DEFAULT_PRODUCT_NAMES): string | undefined {
+  return releaseTokenPattern(productNames).exec(title)?.[1];
 }
 
 /** The title names a PR or an issue. */
@@ -133,8 +160,8 @@ export function hasWorkToken(title: string): boolean {
 }
 
 /** An epic that is delivery, not a part of the product: a release, PR or issue is named. */
-export function isDeliveryEpic(title: string): boolean {
-  return releaseToken(title) !== undefined || hasWorkToken(title);
+export function isDeliveryEpic(title: string, productNames: readonly string[] = DEFAULT_PRODUCT_NAMES): boolean {
+  return releaseToken(title, productNames) !== undefined || hasWorkToken(title);
 }
 
 function isFixShaped(item: PRDItem): boolean {
@@ -219,8 +246,8 @@ class PlanBuilder {
   }
 }
 
-function classifyEpic(epic: PRDItem, plan: PlanBuilder): void {
-  const release = releaseToken(epic.title);
+function classifyEpic(epic: PRDItem, plan: PlanBuilder, productNames: readonly string[]): void {
+  const release = releaseToken(epic.title, productNames);
   if (hasWorkToken(epic.title)) {
     plan.change(epic, {
       ...(release ? { plannedRelease: release } : {}),
@@ -366,11 +393,12 @@ function proposeAreas(plan: PlanBuilder): ProposedArea[] {
 }
 
 /** Classify a v1 item tree into a migration plan. */
-export function classifyV1Tree(items: readonly PRDItem[]): MigrationPlan {
+export function classifyV1Tree(items: readonly PRDItem[], options: ClassifyOptions = {}): MigrationPlan {
+  const productNames = options.productNames ?? DEFAULT_PRODUCT_NAMES;
   const plan = new PlanBuilder();
   for (const item of items) {
     if (item.level === "epic") {
-      classifyEpic(item, plan);
+      classifyEpic(item, plan, productNames);
     } else {
       plan.change(item, { reasons: [`a v1 ${item.level} at the root: its own change`] });
       plan.workUnder(item.children, item.id);

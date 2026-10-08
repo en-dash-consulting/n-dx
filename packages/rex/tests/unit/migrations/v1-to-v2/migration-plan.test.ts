@@ -51,6 +51,24 @@ describe("title tokens", () => {
     }
   });
 
+  it("reads the caller's product name as a release prefix", () => {
+    expect(releaseToken("Acme 2.0")).toBeUndefined();
+    expect(releaseToken("Acme 2.0", ["acme"])).toBe("2.0");
+    expect(releaseToken("MyApp 2.0 launch", ["acme", "myapp"])).toBe("2.0");
+    expect(releaseToken("Python 3.12 support", ["acme"])).toBeUndefined();
+    const plan = classifyV1Tree([item("epic", "Acme 2.0", [item("feature", "Billing", [item("task", "Do it")])])], { productNames: ["acme"] });
+    expect(plan.entries.find((e) => e.title === "Acme 2.0")?.target).toBe("release");
+    const billing = plan.entries.find((e) => e.title === "Billing");
+    expect(billing?.target).toBe("change");
+    expect(billing?.plannedRelease).toBe("2.0");
+  });
+
+  it("escapes regex metacharacters in a product name", () => {
+    expect(() => releaseToken("C++ 2.0", ["c++", "(", "[x"])).not.toThrow();
+    expect(releaseToken("C++ 2.0", ["c++"])).toBe("2.0");
+    expect(releaseToken("Cxx 2.0", ["c++"])).toBeUndefined();
+  });
+
   it("reads a PR or issue token", () => {
     expect(hasWorkToken("0.8.0 / PR 15 · Hub admission gate")).toBe(true);
     expect(hasWorkToken("Hotfix · #499 MCP servers")).toBe(true);
