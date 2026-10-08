@@ -84,10 +84,20 @@ export interface PackSourceFile {
 
 /** A project file one file refers to, with the names that led there. */
 export interface FileReference {
-  /** Project-relative path of the target file. */
+  /**
+   * Project-relative path of the target file. A language whose imports name a
+   * package directory (Go) gives the directory; the zones phase expands it to
+   * the files beneath (`resolveEdgeTarget` in `analyzers/zones.ts`).
+   */
   readonly to: string;
   /** Sorted, distinct; `*` for a wildcard import. */
   readonly symbols: readonly string[];
+}
+
+/** The build-system module an external package comes from, when the resolver knows it. */
+export interface ExternalModule {
+  readonly path: string;
+  readonly version?: string;
 }
 
 /** A package outside the project that one file refers to. */
@@ -96,6 +106,8 @@ export interface ExternalReference {
   readonly package: string;
   /** Sorted, distinct; `*` for a wildcard import. */
   readonly symbols: readonly string[];
+  /** Held in memory only; the imports schema has no field for it. */
+  readonly module?: ExternalModule;
 }
 
 /** Everything one file refers to. Both lists are sorted and deduplicated. */
@@ -111,6 +123,12 @@ export interface FileReferences {
  * analysis by {@link PackResolver.prepare}.
  */
 export interface PackResolver {
+  /**
+   * A resolver bound to what resolution needs from outside the source files
+   * (build files such as `go.mod`), read from `projectDir`. Call once per
+   * analysis, before {@link prepare}. Absent when sources are enough (Java).
+   */
+  forProject?(projectDir: string): Promise<PackResolver>;
   /** Index every file of the project; call once per analysis. */
   prepare(files: readonly PackSourceFile[]): PreparedResolver;
 }

@@ -1,8 +1,9 @@
 /**
  * Go language pack: the pinned tree-sitter grammar plus the structure
- * queries under `queries/go/`. Structure only — no resolver yet, so Go keeps
- * its regex import parser (`analyzers/go-imports.ts`) and the pack stays out
- * of the imports phase (see `packsFor` in `analyzers/pack-imports.ts`).
+ * queries under `queries/go/`. The resolver (`go-resolver.ts`) is not attached
+ * yet, so Go keeps its regex import parser (`analyzers/go-imports.ts`) and the
+ * pack stays out of the imports phase (see `packsFor` in
+ * `analyzers/pack-imports.ts`) until the switch-over.
  *
  * @module sourcevision/language/go-pack
  */

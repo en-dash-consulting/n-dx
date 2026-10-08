@@ -99,7 +99,8 @@ export async function buildPackImportGraph(
         continue;
       }
       const parsed = await parsePackFiles(runner, target, files, targetDir);
-      const prepared = status.pack.resolver.prepare(parsed);
+      const resolver = (await status.pack.resolver.forProject?.(targetDir)) ?? status.pack.resolver;
+      const prepared = resolver.prepare(parsed);
 
       for (const { path } of parsed) {
         const refs = prepared.resolve(path);
