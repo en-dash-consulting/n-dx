@@ -27,7 +27,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A Java grammar that fails to load fails the whole imports phase, including JS/TS edges](./a-java-grammar-that-fails-to-load.md) | pending |
+| [A grammar that loads but rejects a pack query fails the whole imports phase](./a-grammar-that-loads-but-rejects-a.md) | pending |
+| [A Java grammar that fails to load fails the whole imports phase, including JS/TS edges](./a-java-grammar-that-fails-to-load.md) | completed |
 | [Discover Java modules and source roots](./discover-java-modules-and-source-roots.md) | completed |
 | [Feed Java edges into the analyze pipeline](./feed-java-edges-into-the-analyze.md) | completed |
 | [Include Java in multi-language detection beside other build markers](./include-java-in-multi-language.md) | completed |
