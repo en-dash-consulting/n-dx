@@ -25,6 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A multi-line amendment summary breaks the History section the apply engine writes](./a-multi-line-amendment-summary-breaks.md) | pending |
 | [A revert withdraws only the first of several open product-edit drafts for the same node](./a-revert-withdraws-only-the-first-of.md) | pending |
+| [Adapt the apply engine and product-edit handler to PR 30's schema and rules](./adapt-the-apply-engine-and-product.md) | pending |
 | [Apply added, modified and removed amendments to the product layer](./apply-added-modified-and-removed.md) | completed |
 | [Applying an older map-edit draft reverts a later direct edit to the same node](./applying-an-older-map-edit-draft.md) | completed |
 | [Handle direct map edits: editorial re-stamp or revised with a drafted change](./handle-direct-map-edits-editorial-re.md) | completed |
