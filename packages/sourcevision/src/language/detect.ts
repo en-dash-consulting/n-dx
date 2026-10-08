@@ -389,6 +389,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
  * - `parseableExtensions`: union of all parseable extensions
  * - `testFilePatterns`: concatenation of all patterns
  * - `configFilenames`: union of all config filenames
+ * - `configFilePatterns`: concatenation of all patterns (omitted when none)
  * - `skipDirectories`: union of all skip directories
  * - `generatedFilePatterns`: concatenation of all patterns
  * - `entryPointPatterns`: concatenation of all patterns
@@ -408,6 +409,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
   const parseableExtensions = new Set<string>();
   const testFilePatterns: RegExp[] = [];
   const configFilenames = new Set<string>();
+  const configFilePatterns: RegExp[] = [];
   const skipDirectories = new Set<string>();
   const generatedFilePatterns: RegExp[] = [];
   const entryPointPatterns: RegExp[] = [];
@@ -417,6 +419,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     for (const ext of config.parseableExtensions) parseableExtensions.add(ext);
     for (const p of config.testFilePatterns) testFilePatterns.push(p);
     for (const f of config.configFilenames) configFilenames.add(f);
+    for (const p of config.configFilePatterns ?? []) configFilePatterns.push(p);
     for (const d of config.skipDirectories) skipDirectories.add(d);
     for (const p of config.generatedFilePatterns) generatedFilePatterns.push(p);
     for (const p of config.entryPointPatterns) entryPointPatterns.push(p);
@@ -429,6 +432,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     parseableExtensions,
     testFilePatterns,
     configFilenames,
+    ...(configFilePatterns.length > 0 ? { configFilePatterns } : {}),
     skipDirectories,
     generatedFilePatterns,
     entryPointPatterns,
