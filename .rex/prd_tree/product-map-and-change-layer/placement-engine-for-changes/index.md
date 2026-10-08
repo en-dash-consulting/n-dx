@@ -2,7 +2,7 @@
 id: "51527b42-cc67-4a5a-83b3-61179298dfaf"
 level: "feature"
 title: "Placement engine for changes"
-status: "completed"
+status: "pending"
 priority: "medium"
 tags:
   - "product-map"
@@ -15,12 +15,11 @@ blockedBy:
   - "001478c3-fa5a-45eb-bd4c-6b3161abccd2"
 source: "roadmap"
 startedAt: "2026-10-07T22:27:11.998Z"
-completedAt: "2026-10-08T05:20:36.615Z"
 endedAt: "2026-10-08T05:20:36.615Z"
 acceptanceCriteria: []
 description: "Decides which capabilities a new change amends or touches. Three tiers: rules, the configured text model, Jev. Jev is optional.\n\nRoadmap PR 12 · wave 1 · lane rex-domain."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-08T05:20:36.895Z"
+lastModified: "2026-10-08T06:29:03.888Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -38,3 +37,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Register the placement modules with the v2 isolation test](./register-the-placement-modules-with.md) | completed |
 | [Return a placement as a target and a relation, and place on constraints](./return-a-placement-as-a-target-and-a.md) | completed |
 | [Tighten placement: an explicit code-health marker, title-led relations, and proposals for unmatched changes](./tighten-placement-an-explicit-code.md) | completed |
+| [Validate a placement proposal against the shared amendment schema](./validate-a-placement-proposal-against.md) | pending |
