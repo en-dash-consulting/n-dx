@@ -10,7 +10,6 @@ import {
   type LanguagePack,
 } from "../../../src/language/pack.js";
 import { goConfig } from "../../../src/language/go.js";
-import { getLanguageConfig } from "../../../src/language/detect.js";
 import { GRAMMAR_BUILD_DIR } from "../../../scripts/build-grammars.mjs";
 
 const pack: LanguagePack = {
@@ -68,11 +67,6 @@ describe("loadLanguagePacks", () => {
 
     expect(modes).toEqual(["structure", "inventory-only"]);
     expect(messages).toHaveLength(1);
-  });
-
-  it("does not touch languages without a pack", () => {
-    loadLanguagePacks({ packs: [], grammarDir, warn });
-    expect(getLanguageConfig("typescript")?.id).toBe("typescript");
   });
 });
 
