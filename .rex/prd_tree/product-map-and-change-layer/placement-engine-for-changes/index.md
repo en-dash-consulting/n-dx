@@ -27,11 +27,11 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A new-capability proposal is impossible when no rule fires, and the model is never told the areas](./a-new-capability-proposal-is.md) | pending |
+| [A new-capability proposal is impossible when no rule fires, and the model is never told the areas](./a-new-capability-proposal-is.md) | completed |
 | [Add Jev placement and the autoAccept setting](./add-jev-placement-and-the-autoaccept.md) | completed |
 | [Free-text intent prose flips a placement's relation to amends](./free-text-intent-prose-flips-a.md) | pending |
 | [Let Jev abstain and validate its confidence before confident placement](./let-jev-abstain-and-validate-its.md) | completed |
-| [Placement treats every sourcevision-sourced change as a code-health finding](./placement-treats-every-sourcevision.md) | pending |
+| [Placement treats every sourcevision-sourced change as a code-health finding](./placement-treats-every-sourcevision.md) | completed |
 | [Rank placement candidates with rules and the text model](./rank-placement-candidates-with-rules.md) | completed |
 | [Register the placement modules with the v2 isolation test](./register-the-placement-modules-with.md) | completed |
 | [Return a placement as a target and a relation, and place on constraints](./return-a-placement-as-a-target-and-a.md) | completed |
