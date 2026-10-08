@@ -43,7 +43,11 @@ export function loadGrammar(grammarPath: string): Promise<Language> {
 export interface SourcePosition {
   /** One-based line. */
   readonly line: number;
-  /** Zero-based column, in bytes of the UTF-8 source (tree-sitter's unit). */
+  /**
+   * Zero-based column in UTF-16 code units — web-tree-sitter parses the
+   * JavaScript string, so this indexes the line as `String.prototype` does,
+   * not by UTF-8 byte.
+   */
   readonly column: number;
 }
 
@@ -129,6 +133,8 @@ export function createTreeSitterRunner(options: RunnerOptions = {}): TreeSitterR
     let entry = compiled.get(key);
     if (!entry) {
       entry = loadGrammar(target.grammarPath).then((language) => {
+        // Compiling after dispose() would leave queries nothing frees.
+        assertLive();
         const queries = target.pack.queries.map((q) => {
           const query = new Query(language, readFileSync(q.path, "utf8"));
           owned.push(query);
@@ -142,17 +148,24 @@ export function createTreeSitterRunner(options: RunnerOptions = {}): TreeSitterR
     return entry;
   }
 
+  function assertLive(): void {
+    if (disposed) throw new Error("tree-sitter runner used after dispose()");
+  }
+
   function skip(path: string, sizeBytes: number): SkippedFile {
     skippedOversized++;
     return { status: "skipped", path, reason: "oversized", sizeBytes };
   }
 
   async function parseSource(target: RunnablePack, path: string, source: string): Promise<FileResult> {
-    if (disposed) throw new Error("tree-sitter runner used after dispose()");
+    assertLive();
     const sizeBytes = Buffer.byteLength(source, "utf8");
     if (sizeBytes > maxFileBytes) return skip(path, sizeBytes);
 
     const { language, queries } = await compile(target);
+    // dispose() may have run during the await; the freed parser and queries
+    // would then be used from inside the process-wide WASM heap.
+    assertLive();
     parser ??= new Parser();
     parser.setLanguage(language);
     const tree = parser.parse(source);
