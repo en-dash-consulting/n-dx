@@ -14,7 +14,7 @@ import { contentHash, type MigrationSource, type SourceItem } from "../migration
 import { defineMigration } from "../pipeline.js";
 import { draftCapabilitySpecs, type CapabilitySpecDraft, type SpecDraftOptions } from "./capability-spec.js";
 import { buildPlanData, type ItemPlanData, type PlanData, type PlanDataOptions } from "./migration-plan-data.js";
-import { classifyV1Tree, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
+import { classifyV1Tree, type ClassifyOptions, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
 
 export const V1_TREE_SOURCE_KIND = "rex-v1-tree";
 
@@ -53,15 +53,16 @@ export interface V1ToV2Summary {
 
 /** Outside facts the rules read; the caller gathers them, the migration never shells out. */
 export type V1ToV2Options = Partial<Pick<SpecDraftOptions, "testFiles" | "codeFiles" | "testCommand" | "minTestScore">> &
-  Omit<PlanDataOptions, "cutAt" | "specs">;
+  Omit<PlanDataOptions, "cutAt" | "specs"> &
+  ClassifyOptions;
 
 export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Summary, V1ToV2Options>({
   id: "v1-to-v2",
   from: "v1",
   to: "v2",
   rules(items, { cutAt, options = {} }) {
-    const { testFiles = [], codeFiles, testCommand, minTestScore, reviewed, releases, prMerges } = options;
-    const plan = classifyV1Tree(items);
+    const { testFiles = [], codeFiles, testCommand, minTestScore, reviewed, releases, prMerges, productNames } = options;
+    const plan = classifyV1Tree(items, { productNames });
     const specs = draftCapabilitySpecs(plan, items, { testFiles, codeFiles, testCommand, minTestScore });
     const data = buildPlanData(items, plan, { cutAt, specs, reviewed, releases, prMerges });
     const specById = new Map(specs.map((s) => [s.capability, s]));

@@ -43,6 +43,14 @@ describe("v1-to-v2 migration", () => {
     expect(plan.summary.legacyLoe).toBe(1);
   });
 
+  it("passes the caller's product names to classification", async () => {
+    const acme = [item("a1", "epic", "Acme 2.0", [item("a2", "feature", "Billing", [], "pending")])];
+    expect((await v1ToV2.plan(v1TreeSource(acme), { cutAt: CUT })).entries.a1?.target).toBe("area");
+    const plan = await v1ToV2.plan(v1TreeSource(acme), { cutAt: CUT, options: { productNames: ["acme"] } });
+    expect(plan.entries.a1?.target).toBe("release");
+    expect(plan.entries.a2?.plannedRelease).toBe("2.0");
+  });
+
   it("writes a plan file the reader accepts and returns equal", async () => {
     const plan = await v1ToV2.plan(v1TreeSource(tree()), { cutAt: CUT, options });
     expect(parsePlanFile(formatPlanFile(plan))).toEqual(JSON.parse(formatPlanFile(plan)));
