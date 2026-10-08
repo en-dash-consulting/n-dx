@@ -123,6 +123,16 @@ describe("rex export / import-bundle on a v2 tree", () => {
     expect(await snapshot(dest.rexDir)).toEqual(await snapshot(src.rexDir));
   });
 
+  it("refuses to export a childless area folder's top-level key, naming the folder and writing no bundle", async () => {
+    const src = await v2Project("src");
+    const out = join(tmp, "bundle.json");
+    await rm(join(src.rexDir, "product", "checkout", "pay-by-card.md"));
+    await editText(join(src.rexDir, "product", "checkout", "state.yaml"), (text) => `${text}futureTop: 1\n`);
+
+    expect(run(["export", `--out=${out}`, src.dir], true)).toMatch(/product\/checkout\/ \(futureTop\)/);
+    expect(existsSync(out)).toBe(false);
+  });
+
   it("refuses a bundle with an invalid root header, writing nothing", async () => {
     const src = await v2Project("src");
     const dest = await emptyV2Project("dest");

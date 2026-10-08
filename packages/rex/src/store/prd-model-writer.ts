@@ -325,8 +325,12 @@ async function planFolder(
   }
 }
 
-/** A change is always a folder; other nodes only while they have children. */
-function isFolderNode(node: RuleNode): boolean {
+/**
+ * A change is always a folder; other nodes only while they have children.
+ * The one rule for which nodes keep a `state.yaml` of their own: the bundle's
+ * export and parse use it too, so they cannot disagree with the writer.
+ */
+export function isFolderNode(node: RuleNode): boolean {
   return node.type === "change" || (node.children?.length ?? 0) > 0;
 }
 

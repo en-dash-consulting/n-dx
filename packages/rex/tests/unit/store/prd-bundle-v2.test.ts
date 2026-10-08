@@ -211,6 +211,25 @@ describe("envelope v2 round trip", () => {
     expect(files).toEqual(await snapshot(src));
   });
 
+  it("refuses to export top-level keys from a childless area folder, which the writer stores as a leaf", async () => {
+    const src = await copyV2Fixture(join(tmp, "src"), "lf");
+    await rm(join(src, "product", "checkout", "pay-by-card.md"));
+    await editText(join(src, "product", "checkout", "state.yaml"), (text) => `${text}futureTop: 1\n`);
+    await expect(exportV2Bundle(src)).rejects.toThrow(/product\/checkout\/ \(futureTop\).*Add a child back/s);
+  });
+
+  it("carries top-level keys from a childless change, which is always a folder", async () => {
+    const src = await copyV2Fixture(join(tmp, "src"), "lf");
+    await rm(join(src, "changes", "add-apple-pay", "wire-the-button.md"));
+    await editText(join(src, "changes", "add-apple-pay", "state.yaml"), (text) => `${text}futureTop: 1\n`);
+    const bundle = (await exportedJson(src)) as PRDBundleV2;
+    expect(bundle.folderState).toEqual({ nodes: { [CHANGE]: { futureTop: 1 } } });
+
+    const dest = await emptyV2Tree("dest");
+    await importBundleIntoV2(dest, parseAnyBundle(bundle), "merge");
+    expect(await snapshot(dest)).toEqual(await snapshot(src));
+  });
+
   it("omits folderState when no state.yaml has extra top-level keys", async () => {
     const bundle = (await exportedJson(await copyV2Fixture(join(tmp, "src"), "lf"))) as PRDBundleV2;
     expect(bundle).not.toHaveProperty("folderState");

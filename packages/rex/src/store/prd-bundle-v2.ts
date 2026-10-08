@@ -64,7 +64,7 @@ import { resolveSiblingSlugs } from "./folder-tree-serializer.js";
 import { prdLockPath } from "./paths.js";
 import type { ParseWarning } from "./folder-tree-parser.js";
 import { PRODUCT_DIRNAME, V1_LEVEL_TYPES, loadPrdModel, type FolderStateKeys, type PrdModel } from "./prd-model-reader.js";
-import { writePrdModel } from "./prd-model-writer.js";
+import { isFolderNode, writePrdModel } from "./prd-model-writer.js";
 
 /** Envelope version that carries both v2 layers. */
 export const BUNDLE_VERSION_V2 = 2;
@@ -171,6 +171,7 @@ export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {
   if (options.branch) provenance.branch = options.branch;
   if (options.commit) provenance.commit = options.commit;
   const header = carriedHeader(model.header);
+  if (options.folderState) assertFolderStateOwners(model.tree, options.folderState);
   const folderState = options.folderState ? carriedFolderState(options.folderState) : undefined;
 
   return {
@@ -185,6 +186,29 @@ export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {
     changes: toBundleNodes(model.tree.changes, rows),
     ...(folderState ? { folderState } : {}),
   };
+}
+
+/**
+ * Refuse folder keys whose node the writer would store as a leaf: a childless
+ * area or capability folder, which a hand edit can leave. Import refuses such
+ * a bundle (its `state.yaml` would have no folder), so the tree is fixed first.
+ */
+function assertFolderStateOwners(tree: V2Tree, keys: FolderStateKeys): void {
+  if (keys.nodes.size === 0) return;
+  const stray: string[] = [];
+  const visit = (node: RuleNode, dir: string): void => {
+    const path = `${dir}/${node.slug}`;
+    const extra = keys.nodes.get(node.id);
+    if (extra && !isFolderNode(node)) stray.push(`${path}/ (${Object.keys(extra).join(", ")})`);
+    node.children?.forEach((child) => visit(child, path));
+  };
+  LAYERS.forEach((layer) => tree[layer].forEach((node) => visit(node, layer)));
+  if (stray.length > 0) {
+    throw new BundleError(
+      `Folders with no children keep top-level state.yaml keys a bundle cannot carry, because the tree stores such a node as a leaf file: ${stray.join("; ")}. ` +
+        `Add a child back, or turn the folder into a leaf file (<slug>.md) and move or drop its extra state.yaml keys, then export again. Nothing was written.`,
+    );
+  }
 }
 
 /** The reader's folder keys in envelope form, deep-cloned, or undefined when there are none. */
@@ -383,11 +407,11 @@ function keyedRecords(raw: unknown, where: string): Record<string, Record<string
   return raw as Record<string, Record<string, unknown>>;
 }
 
-/** Ids of nodes the writer stores as folders (and so with a `state.yaml`): changes, and nodes with children. */
+/** Ids of nodes the writer stores as folders, and so with a `state.yaml` ({@link isFolderNode}). */
 function folderNodeIds(tree: V2Tree): Set<string> {
   const ids = new Set<string>();
   const visit = (node: RuleNode): void => {
-    if (node.type === "change" || (node.children?.length ?? 0) > 0) ids.add(node.id);
+    if (isFolderNode(node)) ids.add(node.id);
     node.children?.forEach(visit);
   };
   LAYERS.forEach((layer) => tree[layer].forEach(visit));
