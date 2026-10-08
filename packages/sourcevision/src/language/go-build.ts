@@ -251,7 +251,7 @@ function directives(text: string, file: string, notices: string[]): Directive[] 
   return out;
 }
 
-/** Split a line into fields (quoted strings unquoted) and its trailing `//` comment. */
+/** Split a line into fields (quoted strings unquoted, parentheses separate) and its trailing `//` comment. */
 function tokenize(line: string): { fields: string[]; comment: string } {
   const fields: string[] = [];
   let i = 0;
@@ -266,9 +266,12 @@ function tokenize(line: string): { fields: string[]; comment: string } {
       const stop = end < 0 ? line.length : end;
       fields.push(line.slice(i + 1, stop));
       i = stop + 1;
+    } else if (c === "(" || c === ")") {
+      fields.push(c); // its own token, as in Go's lexer: `require(` opens a block
+      i++;
     } else {
       let j = i;
-      while (j < line.length && line[j] !== " " && line[j] !== "\t" && !(line[j] === "/" && line[j + 1] === "/")) j++;
+      while (j < line.length && !" \t()".includes(line[j]) && !(line[j] === "/" && line[j + 1] === "/")) j++;
       fields.push(line.slice(i, j));
       i = j;
     }

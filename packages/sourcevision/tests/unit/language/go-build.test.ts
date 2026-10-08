@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { readGoBuildModels, readGoWorkFiles } from "../../../src/language/go-build.js";
+import { parseGoMod, readGoBuildModels, readGoWorkFiles } from "../../../src/language/go-build.js";
 
 const FIXTURES = fileURLToPath(new URL("../../fixtures/go-build", import.meta.url));
 const ver = (value: string) => ({ resolved: true, value });
@@ -52,6 +52,12 @@ describe("go.mod build model", () => {
       "go.mod:6: require expects a module path and a version",
       "go.mod has no module directive",
     ]);
+  });
+
+  it("opens a block when the paren touches the verb, as Go's lexer does", () => {
+    const m = parseGoMod("", "go.mod", "module example.com/m\n\nrequire(\n\texample.com/a v1.0.0\n)\n");
+    expect(m.dependencies.map((d) => `${d.group}/${d.artifact}`)).toEqual(["example.com/a"]);
+    expect(m.notices).toEqual([]);
   });
 
   it("skips vendor, and reports an unreadable or missing go.mod as a notice", async () => {
