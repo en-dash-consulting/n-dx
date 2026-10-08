@@ -102,6 +102,7 @@ export function execFileSyncCli(binary, args, options) {
     // Outer quote pair: cmd.exe /s strips only the outermost quotes, keeping
     // per-token inner quotes (spaced paths) intact.
     return execFileSync("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
+      windowsHide: true,
       ...options,
       windowsVerbatimArguments: true,
     });
@@ -127,6 +128,7 @@ export function spawnCli(binary, args, options = {}) {
     const cmdLine = buildWindowsCliCommandLine(binary, args);
     logCliInvocation({ binary, args, cwd: options.cwd, via: "spawnCli", commandLine: cmdLine });
     return spawn("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
+      windowsHide: true,
       ...options,
       windowsVerbatimArguments: true,
     });

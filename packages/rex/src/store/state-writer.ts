@@ -95,6 +95,12 @@ export function emptyStateFile(): StateFile {
   return { schema: SCHEMA_VERSION_V2, items: {} };
 }
 
+/** A file's top-level keys other than `schema` and `items` (keys a newer build added), or undefined when none. */
+export function extraTopLevelKeys(file: StateFile): Record<string, unknown> | undefined {
+  const extra = Object.entries(file).filter(([key]) => !KNOWN_TOP_KEYS.has(key));
+  return extra.length > 0 ? Object.fromEntries(extra) : undefined;
+}
+
 export interface ParseStateOptions {
   /**
    * Accept any `schema` stamp, for read-only inspection of a tree from a
@@ -278,8 +284,8 @@ function keyLine(key: string, value: unknown, raw: Map<string, RawEntry> | undef
   return `${/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ? key : JSON.stringify(key)}: ${json}`;
 }
 
-/** Compact JSON with every object's keys sorted. */
-function canonicalJson(value: unknown): string {
+/** Compact JSON with every object's keys sorted: the form every value is written in. */
+export function canonicalJson(value: unknown): string {
   return JSON.stringify(value, (_key, v: unknown) =>
     v !== null && typeof v === "object" && !Array.isArray(v)
       ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, (v as Record<string, unknown>)[k]]))

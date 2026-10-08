@@ -482,16 +482,17 @@ export const BranchWorkRecordSchema = z.object({
   metadata: BranchWorkRecordMetadataSchema.optional(),
 });
 
-// ── SDLC readiness profile ──────────────────────────────────────────────────
+/** Runtime twin of `Confidence` in `v1.ts` — one vocabulary, both detectors. */
+const ConfidenceSchema = z.enum(["certain", "likely", "inferred"]);
 
-const SdlcConfidenceSchema = z.enum(["certain", "likely", "inferred"]);
+// ── SDLC readiness profile ──────────────────────────────────────────────────
 
 const SdlcEvidenceSchema = z.object({
   kind: z.string().min(1),
   path: z.string().min(1),
   line: z.number().int().positive().optional(),
   excerpt: z.string().optional(),
-  confidence: SdlcConfidenceSchema,
+  confidence: ConfidenceSchema,
 });
 
 /**
@@ -649,6 +650,31 @@ export const SdlcProfileSchema = z.object({
   parseFailures: z.array(SdlcParseFailureSchema),
 });
 
+// ── Outbound dependencies ───────────────────────────────────────────────────
+
+const OutboundDependencySchema = z.object({
+  file: z.string().min(1),
+  line: z.number().int().positive(),
+  kind: z.enum(["http", "grpc", "queue", "database", "cache", "env"]),
+  // Not `min(1)`: an unresolvable target is recorded as the empty string
+  // alongside `targetSource: "unknown"`, which is a real detection — a call we
+  // can see but cannot address.
+  target: z.string(),
+  targetSource: z.enum(["literal", "env", "config", "unknown"]),
+  client: z.string().min(1),
+  confidence: ConfidenceSchema,
+});
+
+const DeclaredContractSchema = z.object({
+  file: z.string().min(1),
+  kind: z.enum(["openapi", "proto"]),
+});
+
+export const OutboundSchema = z.object({
+  dependencies: z.array(OutboundDependencySchema),
+  contracts: z.array(DeclaredContractSchema),
+});
+
 // ── Validation helpers ──────────────────────────────────────────────────────
 
 export type ValidationResult<T> =
@@ -688,6 +714,8 @@ export function validateModule(
       return validate(CallGraphSchema, data);
     case "sdlcProfile":
       return validate(SdlcProfileSchema, data);
+    case "outbound":
+      return validate(OutboundSchema, data);
     default:
       return {
         ok: false,

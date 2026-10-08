@@ -8,8 +8,10 @@
  *
  * - **bundle** (default) — the portable JSON transport artifact. It goes to an
  *   operator-chosen path outside `.rex/` and nothing in rex ever
- *   reads it as storage. See `../../core/prd-bundle.ts` for the format, the
- *   carve-out rationale, and what `--item` scoping pulls in.
+ *   reads it as storage. A v1 tree is written as envelope v1 (see
+ *   `../../core/prd-bundle.ts` for the format, the carve-out rationale, and
+ *   what `--item` scoping pulls in); a v2 tree as envelope v2, both layers
+ *   (see `../../store/prd-bundle-v2.ts`).
  * - **narrative** (`--format=narrative`) — prose Markdown for a stakeholder,
  *   with no ids, slugs or status codes. Deliberately one-way; the bundle is
  *   the round-trip surface. See `../../core/prd-narrative.ts`.
@@ -30,6 +32,7 @@ import {
 import { atomicWrite, atomicWriteJSON } from "../../store/atomic-write.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
 import { buildBundle, countItems, scopeItems } from "../../core/prd-bundle.js";
+import { countNodes, exportV2Bundle, hasV2Tree } from "../../store/prd-bundle-v2.js";
 import type { ScopedSelection } from "../../core/prd-bundle.js";
 import { renderNarrative } from "../../core/prd-narrative.js";
 import type { PRDDocument, PRDItem } from "../../schema/index.js";
@@ -191,7 +194,13 @@ export async function cmdExport(dir: string, flags: Record<string, string>): Pro
     narrative ? "./prd.md" : "./prd-bundle.json",
   );
 
-  const store = await resolveStore(resolveRexPaths(dir).rexDir);
+  const rexDir = resolveRexPaths(dir).rexDir;
+  if (hasV2Tree(rexDir)) {
+    await exportV2(dir, rexDir, outPath, out, format, scope);
+    return;
+  }
+
+  const store = await resolveStore(rexDir);
 
   // Loaded under the PRD lock. The tree is written file-by-file, so an
   // unlocked read racing a writer can capture a mixed state — and unlike a
@@ -199,7 +208,6 @@ export async function cmdExport(dir: string, flags: Record<string, string>): Pro
   // later import. Read-only span, so this must never be withTransaction,
   // which rewrites the tree on the way out. The lock file lives in rexDir,
   // which may not exist on a project that was never initialised.
-  const rexDir = resolveRexPaths(dir).rexDir;
   await mkdir(rexDir, { recursive: true });
   const doc = await withLock(prdLockPath(rexDir), () => store.loadDocument());
 
@@ -249,6 +257,45 @@ export async function cmdExport(dir: string, flags: Record<string, string>): Pro
 
   result(`Exported ${items} item${items === 1 ? "" : "s"} to ${outPath}`);
   if (selection && target) reportScope(selection, target);
+  info(`Import elsewhere with: rex import-bundle --in=${out}`);
+}
+
+/**
+ * Export a v2 tree as envelope v2, both layers, whole. Scoping and narrative
+ * rendering read the v1 item model; they are refused here rather than run
+ * against the v1 store, which would render an empty PRD.
+ */
+async function exportV2(
+  dir: string,
+  rexDir: string,
+  outPath: string,
+  out: string,
+  format: ExportFormat,
+  scope: string | undefined,
+): Promise<void> {
+  if (format === "narrative" || scope !== undefined) {
+    throw new CLIError(
+      `${format === "narrative" ? "--format=narrative" : "--item"} is not supported on a v2 tree yet.`,
+      "Export the whole PRD as a bundle: rex export --out=<path.json>",
+    );
+  }
+
+  const { bundle, warnings } = await exportV2Bundle(rexDir, {
+    branch: resolveGitBranch(dir),
+    commit: await captureGitCommitHash(dir),
+  });
+  // A node the reader skipped is not in the bundle; say so rather than ship a quietly short PRD.
+  for (const warning of warnings) warn(`${warning.path}: ${warning.message}`);
+
+  await mkdir(dirname(outPath), { recursive: true });
+  await atomicWriteJSON(outPath, bundle);
+
+  const items = countNodes(bundle.product) + countNodes(bundle.changes);
+  if (format === "json") {
+    result(JSON.stringify({ out: outPath, items, schema: bundle.schema, exportedAt: bundle.exportedAt }, null, 2));
+    return;
+  }
+  result(`Exported ${items} item${items === 1 ? "" : "s"} to ${outPath}`);
   info(`Import elsewhere with: rex import-bundle --in=${out}`);
 }
 

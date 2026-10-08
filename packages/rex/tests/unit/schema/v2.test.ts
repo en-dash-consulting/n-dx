@@ -427,16 +427,23 @@ describe("field coverage (design intent/state tables)", () => {
 describe("isolation", () => {
   it("no runtime module imports the v2 modules yet", () => {
     const srcRoot = join(import.meta.dirname, "../../../src");
-    // The v2 modules (schema, rules, state writer, dual-read loader, tree
-    // writer, apply engine, apply policy, product-edit handler, computed edges,
-    // product status, change landing, placement and its policy, change selection,
-    // change completion) may import each other; nothing else may import them
-    // until the v2 store wires them in.
+    // The v2 modules (schema, rules, state writer, state merge, bundle v2,
+    // dual-read loader, tree writer, apply engine, apply policy, product-edit
+    // handler, computed edges, product status, change landing, placement and
+    // its policy, change selection, change completion) may import each other;
+    // nothing else may import them until the v2 store wires them in. The
+    // exceptions are the `rex merge-state` git driver, which imports
+    // state-merge (branches merge state.yaml before any rex command reads it),
+    // and `rex export` / `rex import-bundle`, which import prd-bundle-v2 to
+    // dispatch on the tree layout and the bundle envelope, so a v2 tree can be
+    // carried.
     const v2Files = new Set(
       [
         "schema/v2.ts",
         "schema/v2-rules.ts",
         "store/state-writer.ts",
+        "store/state-merge.ts",
+        "store/prd-bundle-v2.ts",
         "store/prd-model-reader.ts",
         "store/prd-model-writer.ts",
         "core/apply-amendments.ts",
