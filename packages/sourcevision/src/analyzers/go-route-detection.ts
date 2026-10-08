@@ -22,8 +22,17 @@ const VALID_METHODS = new Set<string>(["GET", "POST", "PUT", "PATCH", "DELETE", 
  * - Line comments: // ...
  * - Block comments: /* ... * /
  * Preserves string literals (double-quoted and backtick-quoted).
+ *
+ * Line structure is preserved: a comment is replaced by the newlines it spanned,
+ * so an offset's line number in the stripped text is the line number in the
+ * original. `go-outbound-detection.ts` reports a line for every detection and
+ * reads it off this text; without that guarantee every detection after the
+ * first multi-line comment would name the wrong line.
+ *
+ * Exported so the Go analyzers share one lexer. A second comment stripper is a
+ * second set of string-literal edge cases to get wrong.
  */
-function stripGoComments(source: string): string {
+export function stripGoComments(source: string): string {
   const result: string[] = [];
   let i = 0;
 
@@ -71,13 +80,18 @@ function stripGoComments(source: string): string {
       continue;
     }
 
-    // Block comment — replace with space to preserve separation
+    // Block comment — a space to preserve separation, then the newlines it
+    // spanned so every later offset keeps its original line number.
     if (ch === '/' && i + 1 < source.length && source[i + 1] === '*') {
       const end = source.indexOf('*/', i + 2);
       if (end === -1) {
         break;
       }
+      const spanned = source.slice(i, end + 2);
       result.push(' ');
+      for (let n = spanned.indexOf('\n'); n !== -1; n = spanned.indexOf('\n', n + 1)) {
+        result.push('\n');
+      }
       i = end + 2;
       continue;
     }
