@@ -25,10 +25,11 @@
   "files": [
     "dist",
     "!dist/**/*.map",
+    "!dist/.build-stamp.json",
     "build.js"
   ],
   "scripts": {
-    "build": "tsc && node build.js",
+    "build": "tsc && node build.js && node ../../scripts/write-build-stamp.mjs",
     "build:viewer": "node build.js --viewer-only",
     "build:landing": "node build.js --landing-only",
     "dev": "node dev.js",

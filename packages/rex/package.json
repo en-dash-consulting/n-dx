@@ -23,10 +23,11 @@
   },
   "files": [
     "dist",
-    "!dist/**/*.map"
+    "!dist/**/*.map",
+    "!dist/.build-stamp.json"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node ../../scripts/write-build-stamp.mjs",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
