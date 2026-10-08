@@ -22,7 +22,8 @@
  *   - `status` is recomputed from the merged row: a merged `completedAt`
  *     means the item was completed, and the timestamp rules clear
  *     `completedAt` whenever an item leaves `completed`, so the status is
- *     `completed`. Otherwise it conflicts.
+ *     `completed`. Otherwise it conflicts. The same holds when only
+ *     `completedAt` diverged and the later side's completion was kept.
  *   - `startedAt` and `revisedAt` take the earlier stamp; `lastModified`
  *     the later.
  *   - Every other field, `lastModifiedBy` included, takes the side with the
@@ -167,6 +168,10 @@ function mergeRow(
   }
   // A recomputed `metAt` equals the current spec hash, so the spec is no longer revised.
   if (divergent.includes("metAt") && spec && row.metAt === specHash(spec)) delete row.revisedAt;
+  // A `completedAt` taken from one side by `lastModified` while `status` came
+  // from the other (re-completed here, failed there) must not leave a
+  // completion under a non-completed status: recompute it the same way.
+  if (divergent.includes("completedAt") && isValue(row.completedAt) && isValue(row.status)) row.status = "completed";
   return row;
 }
 

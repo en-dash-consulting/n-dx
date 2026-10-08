@@ -160,6 +160,30 @@ describe("status is recomputed from the merged row", () => {
     });
   });
 
+  it("reads completed when a re-completion's completedAt wins over the other side's status change", () => {
+    // Ours re-completed the item after a reopen; theirs failed it earlier. Status
+    // is unchanged on ours, so a plain three-way would take theirs.
+    const base = state({ [A]: { status: "completed", completedAt: "2026-10-01T00:00:00Z", lastModified: "2026-10-01T00:00:00Z" } });
+    const ours = state({ [A]: { status: "completed", completedAt: "2026-10-03T00:00:00Z", lastModified: "2026-10-03T00:00:00Z" } });
+    const theirs = state({ [A]: { status: "failing", failureReason: "x", lastModified: "2026-10-02T00:00:00Z" } });
+
+    const { merged, conflicts } = mergeStateYaml(base, ours, theirs);
+
+    expect(conflicts).toEqual([]);
+    expect(rows(merged)[A]).toMatchObject({ status: "completed", completedAt: "2026-10-03T00:00:00Z" });
+  });
+
+  it("follows the later side's status when its removal of completedAt wins", () => {
+    const base = state({ [A]: { status: "completed", completedAt: "2026-10-01T00:00:00Z", lastModified: "2026-10-01T00:00:00Z" } });
+    const ours = state({ [A]: { status: "completed", completedAt: "2026-10-02T00:00:00Z", lastModified: "2026-10-02T00:00:00Z" } });
+    const theirs = state({ [A]: { status: "failing", lastModified: "2026-10-03T00:00:00Z" } });
+
+    const { merged, conflicts } = mergeStateYaml(base, ours, theirs);
+
+    expect(conflicts).toEqual([]);
+    expect(rows(merged)[A]).toEqual({ status: "failing", lastModified: "2026-10-03T00:00:00Z" });
+  });
+
   it("conflicts when no completion decides it", () => {
     const base = state({ [A]: { status: "pending" } });
     const ours = state({ [A]: { status: "deferred", lastModified: "2026-10-02T00:00:00Z" } });
