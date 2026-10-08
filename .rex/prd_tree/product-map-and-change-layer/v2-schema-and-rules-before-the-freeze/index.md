@@ -16,7 +16,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A change that adds the same target twice passes the v2 rules, hiding a self-parent on the duplicate](./a-change-that-adds-the-same-target.md) | pending |
+| [A change that adds the same target twice passes the v2 rules, hiding a self-parent on the duplicate](./a-change-that-adds-the-same-target.md) | completed |
 | [Add the v2 schema fields decided before the freeze](./add-the-v2-schema-fields-decided.md) | completed |
 | [An amendment's type is accepted on any delta and may be missing on an added one](./an-amendment-s-type-is-accepted-on-any.md) | completed |
 | [An open change may modify, touch or add under a retired product node without a v2 rule finding](./an-open-change-may-modify-touch-or-add.md) | completed |
