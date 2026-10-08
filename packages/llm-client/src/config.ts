@@ -5,8 +5,8 @@
  * in hench, rex, and sourcevision into a single shared implementation.
  */
 
-import { join } from "node:path";
 import { readFile, access } from "node:fs/promises";
+import { resolveLayout } from "./layout.js";
 import { deepMerge } from "./project-config.js";
 import type { ClaudeConfig } from "./types.js";
 import {
@@ -18,8 +18,6 @@ import {
   type TaskTier,
 } from "./llm-types.js";
 
-const PROJECT_CONFIG_FILE = ".n-dx.json";
-const LOCAL_CONFIG_FILE = ".n-dx.local.json";
 
 /**
  * Default Claude model ID used when no model is explicitly configured.
@@ -867,8 +865,9 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
  * @param dir  The directory containing .n-dx.json (project root)
  */
 export async function loadClaudeConfig(dir: string): Promise<ClaudeConfig> {
-  const projectData = await loadJSONFile(join(dir, PROJECT_CONFIG_FILE));
-  const localData = await loadJSONFile(join(dir, LOCAL_CONFIG_FILE));
+  const { configFile, localConfigFile } = resolveLayout(dir);
+  const projectData = await loadJSONFile(configFile);
+  const localData = await loadJSONFile(localConfigFile);
 
   // Merge project and local configs (local wins)
   let merged: Record<string, unknown> | null = projectData;

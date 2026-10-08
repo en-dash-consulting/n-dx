@@ -1,16 +1,29 @@
 /**
  * Project-level configuration utilities shared across packages.
  *
- * Handles loading .n-dx.json overrides and deep-merging them into
+ * Handles loading the project config overrides and deep-merging them into
  * package-specific configs. Previously duplicated identically in
  * both rex and hench.
+ *
+ * Which files hold the overrides is the layout resolver's decision
+ * (`./layout.ts`): `.n-dx.json` and `.n-dx.local.json` on the legacy layout,
+ * `.ndx/config.json` and `.ndx/config.local.json` on the `.ndx/` one. Nothing
+ * here spells a file name; every read asks `resolveLayout`.
  */
 
-import { dirname, join } from "node:path";
 import { readFile, access } from "node:fs/promises";
+import { projectRootOf, relativeToRoot, resolveLayout } from "./layout.js";
 
-export const PROJECT_CONFIG_FILE = ".n-dx.json";
-export const LOCAL_CONFIG_FILE = ".n-dx.local.json";
+const LEGACY_LAYOUT = resolveLayout(".", { mode: "legacy" });
+
+/**
+ * The project config file's name on the **legacy** layout, for messages and
+ * labels only. It is not where a reader looks: a `.ndx/` project keeps the
+ * file at `.ndx/config.json`, which only {@link resolveLayout} can say.
+ */
+export const PROJECT_CONFIG_FILE = relativeToRoot(LEGACY_LAYOUT, LEGACY_LAYOUT.configFile);
+/** The machine-local config file's name on the legacy layout; see {@link PROJECT_CONFIG_FILE}. */
+export const LOCAL_CONFIG_FILE = relativeToRoot(LEGACY_LAYOUT, LEGACY_LAYOUT.localConfigFile);
 
 /**
  * Deep merge source into target. Source values take precedence.
@@ -65,45 +78,50 @@ async function loadJSONFile(
 
 /** One file's contribution to a package's project-level overrides. */
 export interface ProjectOverrideSource {
-  /** File the section was read from — {@link PROJECT_CONFIG_FILE} or {@link LOCAL_CONFIG_FILE}. */
+  /**
+   * File the section was read from, relative to the project root: `.n-dx.json`
+   * or `.n-dx.local.json` on the legacy layout, `.ndx/config.json` or
+   * `.ndx/config.local.json` on the `.ndx/` one.
+   */
   file: string;
   /** The package-scoped section (e.g., the "rex" key) as written in that file. */
   data: Record<string, unknown>;
 }
 
 /**
- * Load a package's override section from `.n-dx.json` and `.n-dx.local.json`
- * separately, without merging them — so a caller that needs to blame a
- * specific file for an invalid value (rather than just apply the merged
- * result) can tell which file a key came from. Only files that actually
- * declare a non-empty section for `packageKey` are included, in precedence
- * order (`.n-dx.json` first, `.n-dx.local.json` last — later entries win, as
- * in {@link loadProjectOverrides}).
+ * Load a package's override section from the project config file and its
+ * machine-local overlay separately, without merging them — so a caller that
+ * needs to blame a specific file for an invalid value (rather than just apply
+ * the merged result) can tell which file a key came from. Only files that
+ * actually declare a non-empty section for `packageKey` are included, in
+ * precedence order (the shared file first, the local overlay last — later
+ * entries win, as in {@link loadProjectOverrides}).
  *
- * @param configDir The package config directory (e.g., /project/.rex)
+ * @param configDir The package's state directory (`/project/.rex` or
+ *                  `/project/.ndx/rex`); the project root is recovered from it.
  * @param packageKey The key to extract (e.g., "rex")
  */
 export async function loadProjectOverrideSources(
   configDir: string,
   packageKey: string,
 ): Promise<ProjectOverrideSource[]> {
-  const projectDir = dirname(configDir);
-  const projectData = await loadJSONFile(join(projectDir, PROJECT_CONFIG_FILE));
-  const localData = await loadJSONFile(join(projectDir, LOCAL_CONFIG_FILE));
+  const layout = resolveLayout(projectRootOf(configDir));
+  const projectData = await loadJSONFile(layout.configFile);
+  const localData = await loadJSONFile(layout.localConfigFile);
 
   const sources: ProjectOverrideSource[] = [];
   if (projectData && projectData[packageKey]) {
-    sources.push({ file: PROJECT_CONFIG_FILE, data: projectData[packageKey] as Record<string, unknown> });
+    sources.push({ file: relativeToRoot(layout, layout.configFile), data: projectData[packageKey] as Record<string, unknown> });
   }
   if (localData && localData[packageKey]) {
-    sources.push({ file: LOCAL_CONFIG_FILE, data: localData[packageKey] as Record<string, unknown> });
+    sources.push({ file: relativeToRoot(layout, layout.localConfigFile), data: localData[packageKey] as Record<string, unknown> });
   }
   return sources;
 }
 
 /**
- * Load project-level overrides for a specific package, merging
- * .n-dx.json with .n-dx.local.json (local wins).
+ * Load project-level overrides for a specific package, merging the project
+ * config file with its machine-local overlay (local wins).
  *
  * Returns the package-scoped section (e.g., the "rex" key) or an empty object.
  *

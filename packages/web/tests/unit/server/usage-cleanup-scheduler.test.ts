@@ -252,6 +252,14 @@ describe("UsageCleanupScheduler", () => {
       expect(config.intervalMs).toBe(DEFAULT_CLEANUP_INTERVAL_MS);
     });
 
+    it("returns the interval from .ndx/config.json on the .ndx/ layout", async () => {
+      await mkdir(join(tmpDir, ".ndx"), { recursive: true });
+      await writeFile(join(tmpDir, ".ndx", "config.json"), JSON.stringify({ cleanup: { intervalMs: 42 } }), "utf-8");
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ cleanup: { intervalMs: 7 } }), "utf-8");
+
+      expect(loadCleanupConfig(tmpDir).intervalMs).toBe(42);
+    });
+
     it("returns configured interval from .n-dx.json", async () => {
       await writeFile(
         join(tmpDir, ".n-dx.json"),

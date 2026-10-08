@@ -508,3 +508,24 @@ describe("layout resolver: viewer twin matches the foundation implementation", (
     expect(prefixes.some((p) => ".ndx/rex/prd_tree/x".startsWith(p))).toBe(true);
   });
 });
+
+describe("layout resolver: project root of a state directory", () => {
+  it("is the parent on the legacy layout and the container's parent on the .ndx/ layout", () => {
+    const legacy = foundation.resolveLayout(legacyRoot);
+    const ndx = foundation.resolveLayout(ndxRoot);
+    for (const field of ["rexDir", "henchDir", "sourcevisionDir"]) {
+      expect(foundation.projectRootOf(legacy[field]), `legacy ${field}`).toBe(legacyRoot);
+      expect(foundation.projectRootOf(ndx[field]), `ndx ${field}`).toBe(ndxRoot);
+    }
+  });
+
+  it("resolves the layout the state directory came from, so project overrides are read from .ndx/config.json", () => {
+    // The defect this guards: `dirname(".ndx/hench")` is the container, where
+    // no `.ndx/` exists, so the layout resolved there was legacy and the
+    // config file it named was `.ndx/.n-dx.json` — a file nothing writes.
+    const ndx = foundation.resolveLayout(ndxRoot);
+    const again = foundation.resolveLayout(foundation.projectRootOf(ndx.henchDir));
+    expect(again.mode).toBe("ndx");
+    expect(again.configFile).toBe(ndx.configFile);
+  });
+});
