@@ -131,6 +131,9 @@ describe("other n-dx-serialized tracked files are pinned to LF", () => {
     ".ndx/rex/changes/add-apple-pay/state.yaml",
     "packages/rex/tests/fixtures/v2-tree/product/index.md",
     "packages/rex/tests/fixtures/v2-tree/changes/add-apple-pay/state.yaml",
+    // language-pack fixtures: sources and goldens are compared byte-for-byte.
+    "packages/sourcevision/tests/fixtures/language-packs/java/golden.json",
+    "packages/sourcevision/tests/fixtures/language-packs/java/src/Example.java",
   ];
 
   it.each(surfaces)("git resolves eol=lf for %s", (path) => {
