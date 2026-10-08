@@ -384,7 +384,7 @@ describe("isolation", () => {
   it("no runtime module imports the v2 modules yet", () => {
     const srcRoot = join(import.meta.dirname, "../../../src");
     // The v2 modules (schema, rules, state writer, dual-read loader, tree
-    // writer, apply engine, map-edit handler) may import each other; nothing else may import
+    // writer, apply engine, product-edit handler) may import each other; nothing else may import
     // them until the v2 store wires them in.
     const v2Files = new Set(
       [
@@ -394,7 +394,7 @@ describe("isolation", () => {
         "store/prd-model-reader.ts",
         "store/prd-model-writer.ts",
         "core/apply-amendments.ts",
-        "core/map-edit.ts",
+        "core/product-edit.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

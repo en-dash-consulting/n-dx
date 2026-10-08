@@ -5,12 +5,12 @@
 
 import { describe, it, expect } from "vitest";
 import { applyAmendments } from "../../../src/core/apply-amendments.js";
-import { MapEditError, handleMapEdit, type MapEditOptions } from "../../../src/core/map-edit.js";
+import { ProductEditError, handleProductEdit, type ProductEditOptions } from "../../../src/core/product-edit.js";
 import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Criterion } from "../../../src/schema/v2.js";
 
 const NOW = new Date("2026-10-07T12:00:00.000Z");
-const OPTS: MapEditOptions = { now: NOW, newId: () => "draft-1" };
+const OPTS: ProductEditOptions = { now: NOW, newId: () => "draft-1" };
 
 const CAP = "cap-1";
 const CON = "con-1";
@@ -67,21 +67,21 @@ function cap(t: V2Tree): RuleNode {
   return t.product[0].children![0];
 }
 
-function refusal(fn: () => unknown): MapEditError {
+function refusal(fn: () => unknown): ProductEditError {
   try {
     fn();
   } catch (err) {
-    if (err instanceof MapEditError) return err;
+    if (err instanceof ProductEditError) return err;
     throw err;
   }
-  throw new Error("expected MapEditError");
+  throw new Error("expected ProductEditError");
 }
 
-describe("handleMapEdit: editorial", () => {
+describe("handleProductEdit: editorial", () => {
   const edited = { statement: "A shopper can pay with a card." };
 
   it("re-stamps metAt so the node stays met, and records a History line", () => {
-    const { tree: out, outcome, change } = handleMapEdit(tree(edited), "A1.1", BEFORE, { ...OPTS, editorial: true, summary: "Wording" });
+    const { tree: out, outcome, change } = handleProductEdit(tree(edited), "A1.1", BEFORE, { ...OPTS, editorial: true, summary: "Wording" });
     const node = cap(out);
     expect(outcome).toBe("editorial");
     expect(change).toBeUndefined();
@@ -92,12 +92,12 @@ describe("handleMapEdit: editorial", () => {
   });
 
   it("derives the History summary from the diff when none is given", () => {
-    const { tree: out } = handleMapEdit(tree(edited), CAP, BEFORE, { ...OPTS, editorial: true });
+    const { tree: out } = handleProductEdit(tree(edited), CAP, BEFORE, { ...OPTS, editorial: true });
     expect(cap(out).body).toMatch(/- 2026-10-07 editorial: statement edited$/);
   });
 });
 
-describe("handleMapEdit: substantive", () => {
+describe("handleProductEdit: substantive", () => {
   const edited = {
     statement: "A shopper can pay by card or wallet.",
     criteria: [
@@ -106,8 +106,8 @@ describe("handleMapEdit: substantive", () => {
     ],
   };
 
-  it("leaves the node revised and drafts one Inbox change with source map-edit", () => {
-    const { tree: out, outcome, change } = handleMapEdit(tree(edited), "A1.1", BEFORE, OPTS);
+  it("leaves the node revised and drafts one Inbox change with source product-edit", () => {
+    const { tree: out, outcome, change } = handleProductEdit(tree(edited), "A1.1", BEFORE, OPTS);
     const node = cap(out);
     expect(outcome).toBe("revised");
     expect(node.metAt).toBe(MET);
@@ -122,7 +122,7 @@ describe("handleMapEdit: substantive", () => {
       type: "change",
       title: "Build the revised Pay by card",
       slug: "build-the-revised-pay-by-card",
-      source: "map-edit",
+      source: "product-edit",
       status: "pending",
       needsPlacement: true,
       amends: [
@@ -136,7 +136,7 @@ describe("handleMapEdit: substantive", () => {
     });
     expect(change?.intent).toBe(
       [
-        "Pay by card (A1.1) was edited on the map. Build it.",
+        "Pay by card (A1.1) was edited in the product layer. Build it.",
         "",
         "- Statement: “A shopper can pay by card.” → “A shopper can pay by card or wallet.”",
         "- Added c3: Receipt sent",
@@ -147,12 +147,12 @@ describe("handleMapEdit: substantive", () => {
   });
 
   it("keeps an earlier revisedAt, so the revision's age is not reset", () => {
-    const { tree: out } = handleMapEdit(tree({ ...edited, revisedAt: "2026-09-01T00:00:00.000Z" }), CAP, BEFORE, OPTS);
+    const { tree: out } = handleProductEdit(tree({ ...edited, revisedAt: "2026-09-01T00:00:00.000Z" }), CAP, BEFORE, OPTS);
     expect(cap(out).revisedAt).toBe("2026-09-01T00:00:00.000Z");
   });
 
   it("drafts a change that, applied, makes the node met at the edited spec", () => {
-    const { tree: drafted, change } = handleMapEdit(tree(edited), CAP, BEFORE, OPTS);
+    const { tree: drafted, change } = handleProductEdit(tree(edited), CAP, BEFORE, OPTS);
     const { tree: out } = applyAmendments(drafted, change!.id, { commit: "abc1234", now: NOW });
     const node = cap(out);
     expect(node.criteria).toEqual(edited.criteria);
@@ -165,7 +165,7 @@ describe("handleMapEdit: substantive", () => {
     const con = t.product[0].children![1];
     const before = { statement: con.statement };
     con.statement = "No card data stored.";
-    const { outcome, change } = handleMapEdit(t, CON, before, OPTS);
+    const { outcome, change } = handleProductEdit(t, CON, before, OPTS);
     expect(outcome).toBe("revised");
     expect(change?.amends).toEqual([{ target: CON, delta: "modified", summary: "statement edited", proposed: "No card data stored." }]);
   });
@@ -173,50 +173,112 @@ describe("handleMapEdit: substantive", () => {
   it("suffixes the draft's slug when another change holds it", () => {
     const t = tree(edited);
     t.changes.push({ id: "other", type: "change", title: "x", slug: "build-the-revised-pay-by-card", status: "pending" } as RuleNode);
-    expect(handleMapEdit(t, CAP, BEFORE, OPTS).change?.slug).toBe("build-the-revised-pay-by-card-draft1");
+    expect(handleProductEdit(t, CAP, BEFORE, OPTS).change?.slug).toBe("build-the-revised-pay-by-card-draft1");
   });
 });
 
-describe("handleMapEdit: nothing to do", () => {
+describe("handleProductEdit: a second edit refreshes the open draft", () => {
+  const B = { statement: "A shopper can pay by card or wallet.", criteria: CRITERIA };
+  const C = { statement: "A shopper can pay by card, wallet or bank.", criteria: [...CRITERIA, { id: "c3", text: "Receipt sent" }] };
+
+  /** Edit A → B, then B → C, each handled as it happens. */
+  function twoEdits(): ReturnType<typeof handleProductEdit> {
+    const first = handleProductEdit(tree(B), CAP, BEFORE, OPTS).tree;
+    Object.assign(cap(first), structuredClone(C));
+    return handleProductEdit(first, CAP, B, { ...OPTS, now: new Date("2026-10-08T09:00:00.000Z"), newId: () => "draft-2" });
+  }
+
+  it("leaves exactly one open product-edit draft for the node", () => {
+    const { tree: out, outcome, change } = twoEdits();
+    expect(outcome).toBe("revised");
+    expect(out.changes).toHaveLength(1);
+    expect(change).toBe(out.changes[0]);
+    expect(change?.id).toBe("draft-1");
+    expect(cap(out).revisedAt).toBe(NOW.toISOString());
+  });
+
+  it("proposes the latest statement and lists both diffs in its intent", () => {
+    const { change } = twoEdits();
+    expect(change?.amends).toEqual([
+      { target: "A1.1", delta: "modified", summary: "statement edited; criteria c3 added", proposed: C.statement },
+    ]);
+    expect(change?.intent).toBe(
+      [
+        "Pay by card (A1.1) was edited in the product layer. Build it.",
+        "",
+        `- Statement: “${STATEMENT}” → “${B.statement}”`,
+        "",
+        "Edited again on 2026-10-08:",
+        "",
+        `- Statement: “${B.statement}” → “${C.statement}”`,
+        "- Added c3: Receipt sent",
+      ].join("\n"),
+    );
+  });
+
+  it("applied after both edits, leaves the node met at the latest spec", () => {
+    const { tree: drafted, change } = twoEdits();
+    const { tree: out } = applyAmendments(drafted, change!.id, { commit: "abc1234", now: NOW });
+    const node = cap(out);
+    expect(node.statement).toBe(C.statement);
+    expect(node.criteria).toEqual(C.criteria);
+    expect(node.metAt).toBe(specHash(C));
+    expect(node.revisedAt).toBeUndefined();
+  });
+
+  it("drafts anew when the earlier draft is applied, closed or from another source", () => {
+    const closed: Partial<RuleNode>[] = [{ appliedIn: "abc1234" }, { status: "completed" }, { status: "cancelled" }, { source: "recommend" }];
+    for (const patch of closed) {
+      const first = handleProductEdit(tree(B), CAP, BEFORE, OPTS).tree;
+      Object.assign(first.changes[0], patch);
+      Object.assign(cap(first), structuredClone(C));
+      const { tree: out, change } = handleProductEdit(first, CAP, B, { ...OPTS, newId: () => "draft-2" });
+      expect(out.changes.map((c) => c.id)).toEqual(["draft-1", "draft-2"]);
+      expect(change?.id).toBe("draft-2");
+    }
+  });
+});
+
+describe("handleProductEdit: nothing to do", () => {
   it("reports unchanged when the spec still hashes to metAt", () => {
     const input = tree({ body: "Card payments, reworded." });
-    const { tree: out, outcome } = handleMapEdit(input, CAP, BEFORE, OPTS);
+    const { tree: out, outcome } = handleProductEdit(input, CAP, BEFORE, OPTS);
     expect(outcome).toBe("unchanged");
     expect(out).toEqual(input);
   });
 
   it("reports proposed for a node never met: there is no build to revise", () => {
     const input = tree({ metAt: undefined, statement: "Changed" });
-    const { tree: out, outcome } = handleMapEdit(input, CAP, BEFORE, { ...OPTS, editorial: true });
+    const { tree: out, outcome } = handleProductEdit(input, CAP, BEFORE, { ...OPTS, editorial: true });
     expect(outcome).toBe("proposed");
     expect(out).toEqual(input);
   });
 });
 
-describe("handleMapEdit: refusals", () => {
+describe("handleProductEdit: refusals", () => {
   it("refuses a node that is not a live capability or constraint", () => {
-    expect(refusal(() => handleMapEdit(tree(), "A1", BEFORE, OPTS)).message).toMatch(/not a live capability or constraint/);
-    expect(refusal(() => handleMapEdit(tree(), "nope", BEFORE, OPTS)).message).toMatch(/not a live capability or constraint/);
-    expect(refusal(() => handleMapEdit(tree({ status: "deleted" }), CAP, BEFORE, OPTS)).message).toMatch(/not a live/);
+    expect(refusal(() => handleProductEdit(tree(), "A1", BEFORE, OPTS)).message).toMatch(/not a live capability or constraint/);
+    expect(refusal(() => handleProductEdit(tree(), "nope", BEFORE, OPTS)).message).toMatch(/not a live capability or constraint/);
+    expect(refusal(() => handleProductEdit(tree({ status: "deleted" }), CAP, BEFORE, OPTS)).message).toMatch(/not a live/);
   });
 
   it("refuses an editorial edit to a node already revised, which would mark the unbuilt revision met", () => {
     const revised = { statement: "A shopper can pay by card or wallet." };
     const reworded = { statement: "A shopper can pay by card or by wallet." };
     const input = tree(reworded);
-    expect(refusal(() => handleMapEdit(input, CAP, { ...BEFORE, ...revised }, { ...OPTS, editorial: true })).message).toMatch(/already revised/);
+    expect(refusal(() => handleProductEdit(input, CAP, { ...BEFORE, ...revised }, { ...OPTS, editorial: true })).message).toMatch(/already revised/);
     expect(cap(input).metAt).toBe(MET);
   });
 
   it("refuses a taken id for the draft", () => {
-    expect(refusal(() => handleMapEdit(tree({ statement: "x" }), CAP, BEFORE, { ...OPTS, newId: () => CON })).message).toMatch(/con-1 is already taken/);
+    expect(refusal(() => handleProductEdit(tree({ statement: "x" }), CAP, BEFORE, { ...OPTS, newId: () => CON })).message).toMatch(/con-1 is already taken/);
   });
 
   it("leaves the input tree untouched", () => {
     const input = tree({ statement: "x" });
     const before = structuredClone(input);
-    handleMapEdit(input, CAP, BEFORE, OPTS);
-    handleMapEdit(input, CAP, BEFORE, { ...OPTS, editorial: true });
+    handleProductEdit(input, CAP, BEFORE, OPTS);
+    handleProductEdit(input, CAP, BEFORE, { ...OPTS, editorial: true });
     expect(input).toEqual(before);
   });
 });

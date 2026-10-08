@@ -16,7 +16,7 @@
 import { createHash } from "node:crypto";
 import type { ItemStatus } from "./v1.js";
 import { validateRunSettings } from "./validate.js";
-import { layerOf, type Criterion, type Layer, type V2Node } from "./v2.js";
+import { layerOf, type ChangeNode, type Criterion, type Layer, type V2Node } from "./v2.js";
 
 // ── Inputs and findings ──────────────────────────────────────────
 
@@ -250,7 +250,8 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
 /** Statuses after which a change no longer acts on the product layer. */
 const CLOSED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["completed", "cancelled", "deleted"]);
 
-function isOpenChange(node: RuleNode): boolean {
+/** A change that is neither applied nor closed, so its amendments are still to come. */
+export function isOpenChange(node: RuleNode): node is RuleNode & ChangeNode {
   return node.type === "change" && !node.appliedIn && !CLOSED_CHANGE_STATUSES.has(node.status ?? "pending");
 }
 

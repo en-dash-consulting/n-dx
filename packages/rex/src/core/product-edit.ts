@@ -9,11 +9,15 @@
  *   new spec, so the node stays met, and a History line records the edit.
  *   Refused when the node was already revised before this edit.
  * - **any other spec edit**: `metAt` is kept, so the node reads revised
- *   (`revisedAt` is stamped unless already set), and one change is drafted in
- *   the Inbox (`source: "map-edit"`, `needsPlacement: true`) from the diff.
+ *   (`revisedAt` is stamped unless already set), and the node gets one drafted
+ *   change in the Inbox (`source: "product-edit"`, `needsPlacement: true`).
  *   Its amendment carries the edited statement as `proposed`, so applying the
- *   change stamps `metAt` at the edited spec. The criteria diff, which the map
- *   already holds, is described in the change's `intent`.
+ *   change stamps `metAt` at the edited spec. The criteria diff, which the
+ *   product layer already holds, is described in the change's `intent`.
+ *   When an open, unapplied product-edit change already amends the node, that
+ *   draft is refreshed instead: its `proposed` becomes the latest statement and
+ *   the new diff is appended to its intent. A second draft would let applying
+ *   the older one write the older spec over the newer edit.
  *
  * A spec that still hashes to `metAt` is `unchanged`; a node never met is
  * `proposed` and has no build to revise. Both return the tree as given.
@@ -21,12 +25,12 @@
  * Pure and deterministic like {@link applyAmendments}: works on a copy and
  * leaves writing to the caller. Wired to nothing yet.
  *
- * @module rex/core/map-edit
+ * @module rex/core/product-edit
  */
 
 import { randomUUID } from "node:crypto";
 import type { Amendment, Criterion } from "../schema/v2.js";
-import { specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { isOpenChange, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { appendHistory, freeSlug, resolve, stampMet } from "./apply-amendments.js";
 
 /** The spec `metAt` hashes: statement and criteria (a constraint has a statement only). */
@@ -35,41 +39,41 @@ export interface Spec {
   criteria?: Criterion[];
 }
 
-export interface MapEditOptions {
+export interface ProductEditOptions {
   /** The edit changes wording only: re-stamp instead of drafting a change. */
   editorial?: boolean;
   /** History line text for an editorial edit, or the drafted amendment's summary. Default: derived from the diff. */
   summary?: string;
   /** Date written on History lines and `revisedAt`. */
   now: Date;
-  /** Id for the drafted change. Default `randomUUID`. */
+  /** Id for a newly drafted change. Default `randomUUID`. */
   newId?: () => string;
 }
 
-export type MapEditOutcome = "editorial" | "revised" | "unchanged" | "proposed";
+export type ProductEditOutcome = "editorial" | "revised" | "unchanged" | "proposed";
 
-export interface MapEditResult {
+export interface ProductEditResult {
   /** The tree after handling the edit; the input tree is not modified. */
   tree: V2Tree;
-  outcome: MapEditOutcome;
-  /** The drafted change, for a `revised` outcome. */
+  outcome: ProductEditOutcome;
+  /** For a `revised` outcome, the node's draft: newly drafted, or the open one refreshed. */
   change?: RuleNode;
 }
 
-export class MapEditError extends Error {
+export class ProductEditError extends Error {
   constructor(node: string, message: string) {
     super(`Cannot handle the edit to ${node}: ${message}`);
-    this.name = "MapEditError";
+    this.name = "ProductEditError";
   }
 }
 
-export const MAP_EDIT_SOURCE = "map-edit";
+export const PRODUCT_EDIT_SOURCE = "product-edit";
 
 /** Handle the direct edit of `nodeRef` (id, display id or alias), whose spec was `before`. */
-export function handleMapEdit(tree: V2Tree, nodeRef: string, before: Spec, options: MapEditOptions): MapEditResult {
+export function handleProductEdit(tree: V2Tree, nodeRef: string, before: Spec, options: ProductEditOptions): ProductEditResult {
   const found = resolve(tree.product, nodeRef);
   if (!found || (found.type !== "capability" && found.type !== "constraint")) {
-    throw new MapEditError(nodeRef, "not a live capability or constraint");
+    throw new ProductEditError(nodeRef, "not a live capability or constraint");
   }
   if (!found.metAt) return { tree, outcome: "proposed" };
   if (specHash(specOf(found)) === found.metAt) return { tree, outcome: "unchanged" };
@@ -84,18 +88,27 @@ export function handleMapEdit(tree: V2Tree, nodeRef: string, before: Spec, optio
   if (options.editorial) {
     // Re-stamping over an unbuilt revision would mark that revision met.
     if (specHash(specOf({ ...before, type: node.type })) !== node.metAt) {
-      throw new MapEditError(label, "it is already revised, so an editorial re-stamp would mark the unbuilt revision met");
+      throw new ProductEditError(label, "it is already revised, so an editorial re-stamp would mark the unbuilt revision met");
     }
     stampMet(node);
     node.body = appendHistory(node.body, `- ${options.now.toISOString().slice(0, 10)} editorial: ${summary}`);
     return { tree: next, outcome: "editorial" };
   }
 
+  node.revisedAt ??= options.now.toISOString();
+  const open = openDraft(next, node.id);
+  if (open) {
+    const { change, amendment } = open;
+    amendment.proposed = after.statement ?? "";
+    amendment.summary = options.summary?.trim() || mergeSummaries(amendment.summary, diff.summary);
+    change.intent = [change.intent ?? "", "", `Edited again on ${options.now.toISOString().slice(0, 10)}:`, "", ...diff.lines].join("\n");
+    return { tree: next, outcome: "revised", change };
+  }
+
   const id = (options.newId ?? randomUUID)();
   if (resolve([...next.product, ...next.changes], id, { includeDeleted: true })) {
-    throw new MapEditError(label, `the new id ${id} is already taken`);
+    throw new ProductEditError(label, `the new id ${id} is already taken`);
   }
-  node.revisedAt ??= options.now.toISOString();
   const title = `Build the revised ${node.title}`;
   const amendment: Amendment = { target: label, delta: "modified", summary, proposed: after.statement ?? "" };
   const change = {
@@ -103,14 +116,29 @@ export function handleMapEdit(tree: V2Tree, nodeRef: string, before: Spec, optio
     type: "change",
     title,
     slug: freeSlug(title, id, next.changes),
-    source: MAP_EDIT_SOURCE,
-    intent: [`${node.title} (${label}) was edited on the map. Build it.`, "", ...diff.lines].join("\n"),
+    source: PRODUCT_EDIT_SOURCE,
+    intent: [`${node.title} (${label}) was edited in the product layer. Build it.`, "", ...diff.lines].join("\n"),
     amends: [amendment],
     status: "pending",
     needsPlacement: true,
   } as RuleNode;
   next.changes = [...next.changes, change];
   return { tree: next, outcome: "revised", change };
+}
+
+/** The open, unapplied product-edit change whose modified amendment targets `nodeId`, and that amendment. */
+function openDraft(tree: V2Tree, nodeId: string): { change: RuleNode; amendment: Amendment } | undefined {
+  for (const change of tree.changes) {
+    if (!isOpenChange(change) || change.source !== PRODUCT_EDIT_SOURCE) continue;
+    const amendment = change.amends?.find((a) => a.delta === "modified" && resolve(tree.product, a.target)?.id === nodeId);
+    if (amendment) return { change, amendment };
+  }
+  return undefined;
+}
+
+/** Two diff summaries as one, each part listed once. */
+function mergeSummaries(earlier: string, later: string): string {
+  return [...new Set([...earlier.split("; "), ...later.split("; ")].filter(Boolean))].join("; ");
 }
 
 /** The part of a node `metAt` hashes; a constraint's criteria never count. */
