@@ -13,7 +13,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 
@@ -46,7 +46,6 @@ interface ProjectSettingsPutBody {
 // Constants
 // ---------------------------------------------------------------------------
 
-const NDX_CONFIG = ".n-dx.json";
 const VALID_LANGUAGES = new Set(["typescript", "javascript", "go", "auto"]);
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
@@ -56,7 +55,7 @@ const MAX_PORT = 65535;
 // ---------------------------------------------------------------------------
 
 function readNdxConfig(projectDir: string): Record<string, unknown> {
-  const configPath = join(projectDir, NDX_CONFIG);
+  const configPath = resolveLayout(projectDir).configFile;
   if (!existsSync(configPath)) return {};
   try {
     return JSON.parse(readFileSync(configPath, "utf-8"));
@@ -66,7 +65,7 @@ function readNdxConfig(projectDir: string): Record<string, unknown> {
 }
 
 function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
-  const configPath = join(projectDir, NDX_CONFIG);
+  const configPath = resolveLayout(projectDir).configFile;
   writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
 }
 

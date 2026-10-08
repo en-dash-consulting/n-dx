@@ -12,7 +12,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import { ClaudeClientError } from "@n-dx/llm-client";
@@ -27,7 +28,7 @@ import {
   resetAggregationCache,
 } from "../../../src/server/routes-token-usage.js";
 import {
-  DASHBOARD_USAGE_FILE,
+  dashboardUsagePath,
   readDashboardUsage,
   recordDashboardUsage,
   type DashboardUsageRecord,
@@ -117,7 +118,7 @@ describe("dashboard usage ledger", () => {
   it("skips a torn line without losing the records around it", async () => {
     recordDashboardUsage(tmpDir, usageRecord({ inputTokens: 1 }));
     await writeFile(
-      join(tmpDir, DASHBOARD_USAGE_FILE),
+      dashboardUsagePath(tmpDir),
       `${JSON.stringify(usageRecord({ inputTokens: 1 }))}\n{"timestamp":"2026-03\n${JSON.stringify(usageRecord({ inputTokens: 3 }))}\n`,
       "utf-8",
     );
@@ -129,7 +130,7 @@ describe("dashboard usage ledger", () => {
     // Defaulting the timestamp would file historical spend into today's
     // since/until bucket, which reads as a spike that never happened.
     await writeFile(
-      join(tmpDir, DASHBOARD_USAGE_FILE),
+      dashboardUsagePath(tmpDir),
       `{"command":"ask","inputTokens":500}\n`,
       "utf-8",
     );
@@ -357,7 +358,7 @@ describe("Ask spend in the utilization rollup", () => {
     routeOptions = stub(() => Promise.resolve({ text: "ok", tokenUsage: { input: 1, output: 1 } }));
     await ask("Anything?");
 
-    expect((await utilization()).source.dashboard).toBe(DASHBOARD_USAGE_FILE);
+    expect((await utilization()).source.dashboard).toBe(relative(tmpDir, dashboardUsagePath(tmpDir)));
   });
 
   // ── Failure paths ─────────────────────────────────────────────────────────
@@ -442,7 +443,36 @@ describe("Ask spend in the utilization rollup", () => {
     await ask("One.");
     await ask("Two.");
 
-    const raw = await readFile(join(tmpDir, DASHBOARD_USAGE_FILE), "utf-8");
+    const raw = await readFile(dashboardUsagePath(tmpDir), "utf-8");
     expect(raw.trimEnd().split("\n")).toHaveLength(2);
+  });
+});
+
+describe("dashboard usage ledger on the .ndx/ layout", () => {
+  it("records and reads .ndx/web-usage.jsonl, writing nothing at the project root", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "dash-usage-ndx-"));
+    try {
+      await mkdir(join(dir, ".ndx"));
+      const record: DashboardUsageRecord = {
+        timestamp: "2026-10-07T00:00:00.000Z",
+        command: "ask",
+        vendor: "claude",
+        model: "m",
+        inputTokens: 1,
+        outputTokens: 2,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
+        calls: 1,
+        outcome: "success",
+      };
+      recordDashboardUsage(dir, record);
+
+      expect(dashboardUsagePath(dir)).toBe(join(dir, ".ndx", "web-usage.jsonl"));
+      expect(existsSync(join(dir, ".ndx", "web-usage.jsonl"))).toBe(true);
+      expect(existsSync(join(dir, ".n-dx-web-usage.jsonl"))).toBe(false);
+      expect(readDashboardUsage(dir)).toEqual([record]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
