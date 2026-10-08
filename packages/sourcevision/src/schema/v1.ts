@@ -992,6 +992,29 @@ export interface ProjectSurface {
   kind: string;
 }
 
+// ── Detection confidence ────────────────────────────────────────────────────
+
+/**
+ * How firmly a detection is believed.
+ *
+ * `certain` — the artifact states it outright (a `test` script in
+ * `package.json`, a job named in a workflow file, a direct `fetch()` call).
+ * `likely` — a strong conventional signal (a migrations directory beside a
+ * known ORM config, a client reached through a one-hop alias).
+ * `inferred` — read from indirect evidence (a deploy step guessed from the
+ * arguments of a shell command, a call behind a dynamic member access).
+ *
+ * Deliberately three words rather than a 0–1 number. The numeric sites in this
+ * schema (`FileClassification`, `Zone`, `Finding`) are scores a model
+ * produced; this is a detector saying how direct the evidence was, and a
+ * detector has no basis for the precision a number implies.
+ *
+ * Shared vocabulary, not a shared dependency: `SdlcEvidence` and
+ * `OutboundDependency` both grade their own detections with it and have
+ * nothing else in common. One definition, so the two cannot drift.
+ */
+export type Confidence = "certain" | "likely" | "inferred";
+
 // ── Infrastructure ──────────────────────────────────────────────────────────
 // What the import graph structurally cannot show: runtime infrastructure (a
 // queue, bucket, cache or database has no import signature) and injection
@@ -1066,18 +1089,6 @@ export interface InfrastructureData {
 // detection does not compile — the rule is enforced by the type, not by a
 // convention a later analyzer can forget.
 
-/**
- * How firmly a detection is believed.
- *
- * `certain` — the artifact states it outright (a `test` script in
- * `package.json`, a job named in a workflow file).
- * `likely` — a strong conventional signal (a migrations directory beside a
- * known ORM config).
- * `inferred` — read from indirect evidence (a deploy step guessed from the
- * arguments of a shell command).
- */
-export type SdlcConfidence = "certain" | "likely" | "inferred";
-
 /** One artifact that proves a detection. */
 export interface SdlcEvidence {
   /**
@@ -1093,7 +1104,7 @@ export interface SdlcEvidence {
   line?: number;
   /** The proving text, trimmed. Kept short — a line, not a file. */
   excerpt?: string;
-  confidence: SdlcConfidence;
+  confidence: Confidence;
 }
 
 /**
@@ -1396,4 +1407,69 @@ export interface SdlcProfile {
    * `SdlcParseFailure`.
    */
   parseFailures: SdlcParseFailure[];
+}
+
+// ── Outbound dependencies ───────────────────────────────────────────────────
+// The consumer side of the wire. `server-route-detection.ts` and
+// `go-route-detection.ts` find the routes a repository *serves*; these find
+// the ones it *calls*. Without both halves a repository that talks to another
+// repository is invisible, which is what makes a cross-repo scan impossible.
+//
+// Written to `outbound.json` by every `sv analyze`. Deterministic: no LLM, no
+// network, no resolution beyond what the source text states.
+
+/** One outbound call site: this file, at this line, talks to something else. */
+export interface OutboundDependency {
+  /** Project-relative path to the file holding the call. */
+  file: string;
+  /** 1-indexed line of the call. */
+  line: number;
+  /** What sort of thing is being talked to. */
+  kind: "http" | "grpc" | "queue" | "database" | "cache" | "env";
+  /**
+   * Where the call points — a URL or address when `targetSource` is
+   * `literal`, the environment variable's name when it is `env`, the config
+   * key when it is `config`, and the empty string when it is `unknown`.
+   */
+  target: string;
+  /**
+   * How `target` was obtained. A category to switch on, not a grade: the
+   * cross-repo matcher branches on `"env"` to look the name up against other
+   * repositories' routes.
+   */
+  targetSource: "literal" | "env" | "config" | "unknown";
+  /** The client making the call: `fetch`, `axios`, `pg`, `sarama`, … */
+  client: string;
+  /**
+   * How sure we are **that this is an outbound call at all** — not how sure we
+   * are where it points, which is `targetSource`'s job.
+   *
+   * A direct client call is `certain` whether its target is a URL literal or
+   * an environment variable name; only indirection in reaching the call (an
+   * alias, a wrapper, a dynamic member access) lowers it. Grading the env case
+   * lower would state the same fact in two fields that can then disagree.
+   */
+  confidence: Confidence;
+}
+
+/**
+ * An interface the repository declares in a file, rather than one inferred
+ * from a call.
+ *
+ * Kept apart from `OutboundDependency` because it is a different kind of
+ * claim: a `.proto` or OpenAPI document says what an interface *is*, with no
+ * call site and no direction. A repository may declare a contract it only
+ * serves, only consumes, or both.
+ */
+export interface DeclaredContract {
+  /** Project-relative path to the contract file. */
+  file: string;
+  /** `openapi` — an OpenAPI or Swagger document. `proto` — a protobuf definition. */
+  kind: "openapi" | "proto";
+}
+
+/** `outbound.json` — the full outbound picture for one analysis. */
+export interface OutboundData {
+  dependencies: OutboundDependency[];
+  contracts: DeclaredContract[];
 }

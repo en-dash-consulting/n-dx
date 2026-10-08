@@ -2,9 +2,10 @@
 id: "380bc7b5-6aa8-43ad-aa73-ea9214ce7209"
 level: "subtask"
 title: "Declare OutboundDependency, register outbound.json and wire an empty detector with declared contracts"
-status: "pending"
+status: "in_progress"
 priority: "high"
+startedAt: "2026-10-08T15:43:14.411Z"
 description: "First slice of the outbound-dependency split: the shape, the file, and the wiring, so every later slice ships something that writes outbound.json.\n\nDeclare OutboundDependency in schema/v1.ts: { file, line, kind: \"http\" | \"grpc\" | \"queue\" | \"database\" | \"cache\" | \"env\", target, targetSource: \"literal\" | \"env\" | \"config\" | \"unknown\", client, confidence }. confidence reuses the existing three-level union from schema/v1.ts (SdlcConfidence); if the Sdlc prefix grates now that a second record uses it, rename it to Confidence in this change and update both call sites, keeping exactly one definition. Add the zod schema in schema/validate.ts and register outbound: \"outbound.json\" in schema/data-files.ts (and web's mirror in packages/web/src/shared/data-files.ts).\n\nAdd analyzers/outbound-detection.ts mirroring the shape of server-route-detection.ts, with a detectOutbound entry point that today returns no dependencies but already walks the inventory, records OpenAPI (openapi.* / swagger.* yaml or json) and .proto files as declared contracts, and sorts output canonically via util/sort.ts. Wire it into cli/commands/analyze.ts beside the route detectors so every sv analyze writes outbound.json. Deterministic, no LLM, no network.\n\nAcceptance criteria:\n- OutboundDependency is typed in schema/v1.ts with the fields above and reuses the one existing confidence union; no second three-literal union exists in the schema.\n- outbound.json is registered in schema/data-files.ts and web's mirror, validated by schema/validate.ts, and written by every sv analyze; one e2e test proves the write and validates the file.\n- OpenAPI and .proto files found in the repo appear as declared contracts in outbound.json, with their paths, in a test.\n- Output is canonically ordered; two runs over an unchanged repo produce byte-identical files.\n- No LLM and no network call anywhere on the path."
-lastModified: "2026-10-08T15:41:59.215Z"
+lastModified: "2026-10-08T15:43:14.891Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

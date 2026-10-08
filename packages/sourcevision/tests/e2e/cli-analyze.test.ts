@@ -4,7 +4,7 @@ import { mkdtemp, cp, rm } from "node:fs/promises";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { validate, InventorySchema, ImportsSchema, ClassificationsSchema, ZonesSchema, ComponentsSchema, SdlcProfileSchema } from "../../src/schema/validate.js";
+import { validate, InventorySchema, ImportsSchema, ClassificationsSchema, ZonesSchema, ComponentsSchema, SdlcProfileSchema, OutboundSchema } from "../../src/schema/validate.js";
 import { readAnalyzeProgress } from "../../src/analyzers/analyze-progress.js";
 import { DATA_FILES } from "../../src/schema/data-files.js";
 import { READINESS_DIMENSIONS } from "../../src/analyzers/readiness-score.js";
@@ -102,6 +102,38 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
     expect(readiness.overall).toBeGreaterThanOrEqual(0);
     expect(readiness.overall).toBeLessThanOrEqual(100);
     expect(Object.keys(readiness.dimensions).sort()).toEqual([...READINESS_DIMENSIONS].sort());
+  });
+
+  // `--fast` makes no LLM calls, so a run that produces outbound.json under it
+  // is also the evidence that nothing on this path needs a model.
+  it("writes outbound.json on every run, with declared contracts, identically each time", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-e2e-"));
+    await cp(FIXTURE_DIR, tmpDir, { recursive: true });
+    writeFileSync(join(tmpDir, "openapi.yaml"), "openapi: 3.0.0\n");
+    writeFileSync(join(tmpDir, "orders.proto"), 'syntax = "proto3";\n');
+
+    const svDir = join(tmpDir, ".sourcevision");
+    const outboundPath = join(svDir, "outbound.json");
+    const run = () => execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], { encoding: "utf-8", timeout: 30000 });
+
+    run();
+    expect(existsSync(outboundPath)).toBe(true);
+
+    const first = readFileSync(outboundPath, "utf-8");
+    const outbound = JSON.parse(first);
+    expect(validate(OutboundSchema, outbound).ok).toBe(true);
+
+    // The contract files are not in a code-only inventory; they still have to
+    // be found, with the paths a consumer can open.
+    expect(outbound.contracts).toEqual([
+      { file: "openapi.yaml", kind: "openapi" },
+      { file: "orders.proto", kind: "proto" },
+    ]);
+
+    // Canonical ordering, checked the way it will actually bite: a re-run over
+    // an unchanged tree must not produce a diff.
+    run();
+    expect(readFileSync(outboundPath, "utf-8")).toBe(first);
   });
 
   it("publishes progress while it runs and leaves it finished, with the previous same-mode run attached", async () => {
