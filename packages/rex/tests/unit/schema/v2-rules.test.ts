@@ -762,6 +762,19 @@ describe("long-revised", () => {
     expect(findings[0].message).toContain("35 days");
   });
 
+  it("still warns while only an untouched Inbox draft amends the node", () => {
+    const draft = node("change", { needsPlacement: true, amends: [{ target: "r", delta: "modified", summary: "s" }] });
+    expect(ids(check("long-revised", { product: [revised()], changes: [draft] }))).toEqual(["r"]);
+    const started = node("change", { needsPlacement: true, status: "in_progress", amends: [{ target: "r", delta: "modified", summary: "s" }] });
+    expect(check("long-revised", { product: [revised()], changes: [started] })).toEqual([]);
+  });
+
+  it("passes a sub-capability whose parent a building change amends", () => {
+    const parent = cap({ id: "p" }, [revised()]);
+    const amending = node("change", { amends: [{ target: "p", delta: "modified", summary: "s" }] });
+    expect(check("long-revised", { product: [parent], changes: [amending] })).toEqual([]);
+  });
+
   it("measures age from revisedAt, not a later state write's lastModified", () => {
     const checked = revised({ revisedAt: "2026-08-07T00:00:00Z", lastModified: "2026-10-05T00:00:00Z" });
     const findings = check("long-revised", { product: [checked] });

@@ -183,6 +183,42 @@ export function isOpenChange(node: RuleNode): boolean {
   return node.type === "change" && !isAppliedChange(node) && !ABANDONED_CHANGE_STATUSES.has(node.status ?? "pending");
 }
 
+/** Statuses only reached once work on a change began. */
+const STARTED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["in_progress", "completed", "failing"]);
+
+/**
+ * An open change that is building its edit: started (`startedAt` set, or a
+ * status only work reaches) or placed (`needsPlacement` not set). An
+ * unstarted Inbox draft is not, so the node it amends keeps reading revised
+ * until someone places or starts it.
+ */
+export function isBuildingChange(node: RuleNode): boolean {
+  if (!isOpenChange(node)) return false;
+  return !node.needsPlacement || !!node.startedAt || STARTED_CHANGE_STATUSES.has(node.status ?? "pending");
+}
+
+/**
+ * Product nodes being changed: each target a building change amends, and
+ * every capability below an amended capability, since a child's spec
+ * inherits its parent's criteria. Resolves through `index`, so pass a
+ * tombstone-aware index to see retired targets.
+ */
+export function changingNodes({ entries, resolve }: TreeIndex): Set<RuleNode> {
+  const changing = new Set<RuleNode>();
+  for (const { node } of entries) {
+    if (!isBuildingChange(node)) continue;
+    for (const a of node.type === "change" ? (node.amends ?? []) : []) {
+      const target = resolve(a.target);
+      if (target) changing.add(target);
+    }
+  }
+  // Entries are depth first, so a parent is settled before its children.
+  for (const { node, parent } of entries) {
+    if (node.type === "capability" && parent?.type === "capability" && changing.has(parent)) changing.add(node);
+  }
+  return changing;
+}
+
 /** Each rule's fixed severity. */
 export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "change-has-target": "error",
@@ -621,8 +657,9 @@ const checkRequirement: Rule = ({ entries }) =>
 const DAY_MS = 86_400_000;
 
 /**
- * A product node is revised when its spec no longer hashes to `metAt` and no open
- * change amends it (an amended one is "changing" instead). A node never met
+ * A product node is revised when its spec no longer hashes to `metAt` and it
+ * is not changing ({@link changingNodes}: no building change amends it or a
+ * parent capability; such a node is "changing" instead). A node never met
  * (`metAt` absent) is proposed, not revised. Age is measured from
  * `revisedAt`, which the state writer stamps when a spec edit first makes the
  * hash differ from `metAt` and clears whenever the hash equals `metAt` again
@@ -630,16 +667,9 @@ const DAY_MS = 86_400_000;
  * every state write (checks, reviewedHash) re-stamps that. Without
  * `revisedAt` the age is unknown and nothing is reported.
  */
-const longRevised: Rule = ({ entries, resolve }, { now, longRevisedDays = DEFAULT_LONG_REVISED_DAYS }) => {
-  const amended = new Set<RuleNode>();
-  for (const { node } of entries) {
-    if (node.type !== "change" || !isOpenChange(node)) continue;
-    for (const a of node.amends ?? []) {
-      const target = resolve(a.target);
-      if (target) amended.add(target);
-    }
-  }
-  return entries.flatMap(({ node }) => {
+const longRevised: Rule = (index, { now, longRevisedDays = DEFAULT_LONG_REVISED_DAYS }) => {
+  const amended = changingNodes(index);
+  return index.entries.flatMap(({ node }) => {
     if (node.type !== "capability" && node.type !== "constraint") return [];
     if (!node.metAt || amended.has(node)) return [];
     if (specHash(nodeSpec(node)) === node.metAt) return [];
