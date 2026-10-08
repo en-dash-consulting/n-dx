@@ -441,7 +441,10 @@ export function formatHealthScore(health: StructureHealthScore): string {
 // warnings when the structure degrades. Used by CLI write commands
 // (add, analyze, plan) and the CI gate.
 
-const STRUCTURE_DEFAULTS: Required<StructureHealthThresholds> = {
+/** The v1 tree checks; `maxCriteriaPerCapability` belongs to the v2 `criteria-growth` rule. */
+type TreeThresholds = Required<Omit<StructureHealthThresholds, "maxCriteriaPerCapability">>;
+
+const STRUCTURE_DEFAULTS: TreeThresholds = {
   maxTopLevelEpics: 15,
   maxTreeDepth: 5,
   maxChildrenPerContainer: 20,
@@ -472,7 +475,7 @@ export interface StructureHealthResult {
 
 function resolveStructureThresholds(
   overrides?: StructureHealthThresholds,
-): Required<StructureHealthThresholds> {
+): TreeThresholds {
   return { ...STRUCTURE_DEFAULTS, ...overrides };
 }
 

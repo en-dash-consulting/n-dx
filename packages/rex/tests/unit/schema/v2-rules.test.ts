@@ -34,7 +34,7 @@ describe("rule table", () => {
   it("errors precede warnings and every rule has a severity", () => {
     const severities = V2_RULE_IDS.map((id) => RULE_SEVERITY[id]);
     expect(severities.indexOf("warning")).toBe(severities.lastIndexOf("error") + 1);
-    expect(V2_RULE_IDS).toHaveLength(13);
+    expect(V2_RULE_IDS).toHaveLength(14);
   });
 
   it("a healthy tree has no findings", () => {
@@ -233,6 +233,37 @@ describe("specHash", () => {
     expect(specHash({ statement: " S ", criteria: [{ id: "c1", text: "T " }] })).toBe(specHash(base));
     expect(specHash({ ...base, statement: "S2" })).not.toBe(specHash(base));
     expect(specHash({ ...base, criteria: [{ id: "c2", text: "T" }] })).not.toBe(specHash(base));
+  });
+});
+
+describe("criteria-growth", () => {
+  const criteria = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `k${i}`, text: `Criterion ${i}` }));
+  const run = (product: RuleNode[], maxCriteria?: number) =>
+    checkV2Rules({ product, changes: [] }, { now: NOW, maxCriteria }, ["criteria-growth"]);
+
+  it("passes a capability at the default threshold of 15", () => {
+    expect(run([cap({ criteria: criteria(15) })])).toEqual([]);
+  });
+
+  it("warns past the threshold and names the capability", () => {
+    const findings = run([cap({ id: "big", title: "Big one", criteria: criteria(16) })]);
+    expect(ids(findings)).toEqual(["big"]);
+    expect(findings[0].message).toContain("Big one");
+    expect(findings[0].message).toContain("16 criteria");
+    expect(findings[0].severity).toBe("warning");
+  });
+
+  it("counts criteria inherited from parent capabilities", () => {
+    const child = cap({ id: "child", criteria: criteria(6) });
+    const parent = cap({ id: "parent", criteria: criteria(10) }, [child]);
+    const findings = run([parent]);
+    expect(ids(findings)).toEqual(["child"]);
+    expect(findings[0].message).toContain("6 own + 10 inherited");
+  });
+
+  it("honours a configured threshold", () => {
+    expect(ids(run([cap({ id: "a", criteria: criteria(4) })], 3))).toEqual(["a"]);
+    expect(run([cap({ criteria: criteria(4) })], 4)).toEqual([]);
   });
 });
 

@@ -35,6 +35,12 @@ export interface RuleOptions {
   /** Days a product node may stay revised before `long-revised` warns. Default 14. */
   longRevisedDays?: number;
   /**
+   * Criteria a capability may carry, its own plus those inherited from parent
+   * capabilities, before `criteria-growth` warns. Default 15; the caller reads
+   * it from `structureHealth.maxCriteriaPerCapability` in the rex config.
+   */
+  maxCriteria?: number;
+  /**
    * This project's releases, for `title-release-token`: the package version
    * line plus every `plannedRelease` and `shippedIn` in the tree. A title
    * version token is flagged only when it names one of these. Default none.
@@ -55,6 +61,7 @@ export type V2RuleId =
   | "capability-criteria"
   | "long-revised"
   | "area-balance"
+  | "criteria-growth"
   | "unreviewed-spec"
   | "run-settings"
   | "retired-state-field";
@@ -68,6 +75,8 @@ export interface RuleFinding {
 }
 
 export const DEFAULT_LONG_REVISED_DAYS = 14;
+/** `criteria-growth` warns when a capability's own plus inherited criteria exceed this. */
+export const DEFAULT_MAX_CRITERIA = 15;
 /** `area-balance` warns when one area holds more than this share of capabilities. */
 export const AREA_MAX_SHARE = 0.4;
 /** `area-balance` warns when an area holds fewer capabilities than this. */
@@ -122,6 +131,7 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "capability-criteria": "warning",
   "long-revised": "warning",
   "area-balance": "warning",
+  "criteria-growth": "warning",
   "unreviewed-spec": "warning",
   "run-settings": "warning",
   "retired-state-field": "warning",
@@ -345,6 +355,24 @@ const areaBalance: Rule = ({ entries }) => {
   });
 };
 
+/**
+ * Every brief that touches a capability carries its criteria and its parent
+ * capabilities', so the count that matters is own plus inherited. Past the
+ * threshold the brief's budget starts trimming them.
+ */
+const criteriaGrowth: Rule = ({ entries }, { maxCriteria = DEFAULT_MAX_CRITERIA }) => {
+  const totals = new Map<RuleNode, number>();
+  return entries.flatMap(({ node, parent }) => {
+    if (node.type !== "capability") return [];
+    const own = node.criteria?.length ?? 0;
+    const total = own + (parent ? (totals.get(parent) ?? 0) : 0);
+    totals.set(node, total);
+    if (total <= maxCriteria) return [];
+    const detail = total > own ? `${own} own + ${total - own} inherited` : `${own}`;
+    return [finding("criteria-growth", node, `Capability "${node.title}" carries ${total} criteria (${detail}; threshold ${maxCriteria}); consolidate them with a modify change, or \`rex product tidy\` once it exists`)];
+  });
+};
+
 const unreviewedSpec: Rule = ({ entries }) =>
   entries
     .filter(({ node }) => (node.type === "capability" || node.type === "constraint") && node.specReviewed !== true)
@@ -392,6 +420,7 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "capability-criteria": capabilityCriteria,
   "long-revised": longRevised,
   "area-balance": areaBalance,
+  "criteria-growth": criteriaGrowth,
   "unreviewed-spec": unreviewedSpec,
   "run-settings": runSettings,
   "retired-state-field": retiredStateField,
