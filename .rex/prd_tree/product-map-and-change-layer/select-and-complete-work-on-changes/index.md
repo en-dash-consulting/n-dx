@@ -27,4 +27,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Complete changes, split task-less changes and trigger apply](./complete-changes-split-task-less.md) | pending |
-| [Select placed changes and tasks, including task-less changes](./select-placed-changes-and-tasks.md) | pending |
+| [Select placed changes and tasks, including task-less changes](./select-placed-changes-and-tasks.md) | in_progress |
