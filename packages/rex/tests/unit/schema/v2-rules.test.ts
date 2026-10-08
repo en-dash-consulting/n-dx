@@ -263,6 +263,26 @@ describe("ref-resolves", () => {
       ]);
     });
 
+    it("fails a target added twice, once per target, in open and applied changes", () => {
+      const open = adds(["dup", "area"], ["dup", "dup"], ["dup"], ["ok", "area"]);
+      const applied = node("change", {
+        appliedAt: "2026-10-05T00:00:00.000Z",
+        amends: [
+          { target: "x", delta: "added", summary: "s" },
+          { target: "x", delta: "added", summary: "s" },
+        ],
+      });
+      const findings = check("ref-resolves", { product: [node("area", { id: "area" })], changes: [open, applied] });
+      expect(findings.map((f) => f.nodeId)).toEqual([open.id, applied.id]);
+      expect(findings[0].message).toContain('adds "dup" more than once');
+    });
+
+    it("keeps the first addition when judging same-change parents", () => {
+      const change = adds(["dup", "area"], ["dup", "dup"], ["child", "dup"]);
+      const findings = check("ref-resolves", { product: [node("area", { id: "area" })], changes: [change] });
+      expect(findings).toHaveLength(1);
+    });
+
     it("leaves an applied change's same-change parents to the materialized tree", () => {
       const change = node("change", {
         appliedAt: "2026-10-05T00:00:00.000Z",
@@ -450,6 +470,45 @@ describe("removed-target-live", () => {
       changes: [gone, completedUnapplied],
     });
     expect(ids(findings)).toEqual([gone.id, completedUnapplied.id]);
+  });
+
+  describe("every product reference of an open change", () => {
+    const gone = () => cap({ id: "gone", status: "deleted" });
+    const amend = (a: Record<string, unknown>) => node("change", { amends: [{ summary: "s", ...a }] });
+    const cases: [string, () => RuleNode][] = [
+      ["touches", () => node("change", { touches: ["gone"] })],
+      ["a modified target", () => amend({ target: "gone", delta: "modified" })],
+      ["an added amendment's under", () => amend({ target: "n", delta: "added", under: "gone" })],
+      ["a constraint added under it", () => amend({ target: "n", delta: "added", under: "gone", type: "constraint" })],
+    ];
+
+    it.each(cases)("fails %s naming a retired node", (_name, make) => {
+      const change = make();
+      const findings = check("removed-target-live", { product: [gone()], changes: [change] });
+      expect(ids(findings)).toEqual([change.id]);
+      expect(findings[0].message).toContain('"gone"');
+    });
+
+    it.each(cases)("passes %s naming a live node", (_name, make) => {
+      const live = cap({ id: "gone" });
+      expect(check("removed-target-live", { product: [live], changes: [make()] })).toEqual([]);
+    });
+
+    it.each(cases)("does not judge an applied change's %s", (_name, make) => {
+      const applied = make();
+      Object.assign(applied, { appliedAt: "2026-10-05T00:00:00.000Z", status: "completed" });
+      expect(check("removed-target-live", { product: [gone()], changes: [applied] })).toEqual([]);
+    });
+
+    it("lets an added amendment sit under a node the same change adds", () => {
+      const change = node("change", {
+        amends: [
+          { target: "n", delta: "added", summary: "s", under: "gone" },
+          { target: "m", delta: "added", summary: "s", under: "n" },
+        ],
+      });
+      expect(ids(check("removed-target-live", { product: [gone()], changes: [change] }))).toEqual([change.id]);
+    });
   });
 
   it("leaves a target that names no node, or a change-layer node, to ref-resolves", () => {

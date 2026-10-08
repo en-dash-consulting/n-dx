@@ -405,7 +405,15 @@ const refResolves: Rule = (_index, _options, { entries, resolve }) => {
     const refs: [field: string, ref: string, destination: Destination][] = (node.blockedBy ?? []).map((ref) => ["blockedBy", ref, CHANGE_NODE]);
     if (node.type === "change") {
       const added = new Map<string, AddedAmendment>();
-      for (const a of node.amends ?? []) if (a.delta === "added" && !added.has(a.target)) added.set(a.target, a as AddedAmendment);
+      const duplicated = new Set<string>();
+      for (const a of node.amends ?? []) {
+        if (a.delta !== "added") continue;
+        if (!added.has(a.target)) added.set(a.target, a as AddedAmendment);
+        else if (!duplicated.has(a.target)) {
+          duplicated.add(a.target);
+          findings.push(finding("ref-resolves", node, `change "${node.title}" adds "${a.target}" more than once; the first addition stands and the rest are ignored`));
+        }
+      }
       const tree = isAppliedChange(node) ? undefined : sameChangeTree(node, added);
       if (tree) findings.push(...tree.findings);
       /** A same-change parent's place: its added type, under its own `under`. */
@@ -501,24 +509,39 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
 };
 
 /**
- * An open change removes only a live product node. A target that names no
- * node, or a change-layer node, is `ref-resolves`'s; this rule reports a
- * retired product node.
+ * An open change refers only to live product nodes: its touches, its modified
+ * and removed targets, and where an added amendment goes (`under`, unless it
+ * names a node the same change adds). A plan against a retired node cannot be
+ * realized; a reference to one is history only for an applied change. A
+ * reference that names no node, or a change-layer node, is `ref-resolves`'s;
+ * this rule reports a retired product node.
  */
 const removedTargetLive: Rule = ({ entries, resolve }, _options, withTombstones) =>
   entries
     .filter(({ node }) => isOpenChange(node))
-    .flatMap(({ node }) =>
-      (node.type === "change" ? (node.amends ?? []) : [])
-        .filter((a) => {
-          if (a.delta !== "removed" || resolve(a.target)) return false;
-          const retired = withTombstones.resolve(a.target);
+    .flatMap(({ node }) => {
+      const amends = node.type === "change" ? (node.amends ?? []) : [];
+      const added = new Set(amends.filter((a) => a.delta === "added").map((a) => a.target));
+      const refs: [field: string, ref: string][] = [
+        ...(node.type === "change" ? (node.touches ?? []) : []).map((ref): [string, string] => ["touches", ref]),
+        ...amends.flatMap((a): [string, string][] =>
+          a.delta !== "added"
+            ? [[`${a.delta} amendment target`, a.target]]
+            : a.under !== undefined && !added.has(a.under)
+              ? [["added amendment under", a.under]]
+              : [],
+        ),
+      ];
+      return refs
+        .filter(([, ref]) => {
+          if (resolve(ref)) return false;
+          const retired = withTombstones.resolve(ref);
           return !!retired && layerOf(retired.type) === "product";
         })
-        .map((a) =>
-          finding("removed-target-live", node, `Change "${node.title}" removes "${a.target}", which is already retired`),
-        ),
-    );
+        .map(([field, ref]) =>
+          finding("removed-target-live", node, `Change "${node.title}" ${field} "${ref}" names a retired node; an open change cannot plan against one`),
+        );
+    });
 
 const capabilityStatement: Rule = ({ entries }) =>
   entries
