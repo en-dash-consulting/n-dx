@@ -70,12 +70,13 @@ export async function runPlanPipeline<TData, TEntry, TSummary, TOptions>(
     const recorded: Record<string, RecordedAnswer> = {};
     const earlier = previous?.answers[name] ?? {};
     for (const q of pass.questions(entries, data)) {
+      // Own-property lookups: an item id may name an Object.prototype member ("constructor").
       const content = itemHash.get(q.id);
-      const entry = entries[q.id];
+      const entry = Object.hasOwn(entries, q.id) ? entries[q.id] : undefined;
       if (content === undefined || entry === undefined) throw new Error(`${name} pass asked about ${q.id}, which has no source item and entry`);
-      if (q.id in recorded) throw new Error(`${name} pass asked about ${q.id} twice`);
+      if (Object.hasOwn(recorded, q.id)) throw new Error(`${name} pass asked about ${q.id} twice`);
       const hash = answerHash(content, q.question);
-      const prior = earlier[q.id];
+      const prior = Object.hasOwn(earlier, q.id) ? earlier[q.id] : undefined;
       const answer = prior && prior.hash === hash && prior.model === seam.model ? prior.answer : await seam.ask(q);
       recorded[q.id] = { hash, model: seam.model, answer };
       entries[q.id] = pass.merge(entry, answer);

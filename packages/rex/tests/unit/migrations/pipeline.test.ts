@@ -139,6 +139,30 @@ describe("plan pipeline", () => {
     expect(Object.keys(second.answers.text ?? {})).toEqual(["/tasks"]);
   });
 
+  it("plans items whose ids name Object.prototype members", async () => {
+    const routes = [
+      { path: "constructor", handler: "build" },
+      { path: "toString", handler: "render" },
+    ];
+    const first = await bootstrap.plan(routeSource(routes), { cutAt: CUT, seams: { text: textSeam() } });
+    expect(first.entries.constructor).toEqual({ target: "capability", title: "build", statement: "Answers build." });
+    const text = textSeam();
+    await bootstrap.plan(routeSource(routes), { cutAt: CUT, seams: { text }, previous: parsePlanFile(formatPlanFile(first)) });
+    expect(text.ask).not.toHaveBeenCalled();
+  });
+
+  it("refuses a question about an item with no entry, even one named like a prototype member", async () => {
+    const stray = defineMigration<Route[], RouteEntry, null>({
+      id: "stray-proto",
+      from: "a",
+      to: "b",
+      rules: () => ({ entries: {}, summary: null }),
+      passes: { text: { questions: () => [{ id: "constructor", question: 1 }], merge: (e) => e } },
+    });
+    const source = routeSource([{ path: "constructor", handler: "build" }]);
+    await expect(stray.plan(source, { cutAt: CUT, seams: { text: textSeam() } })).rejects.toThrow(/no source item and entry/);
+  });
+
   it("changes the source digest when an item changes", async () => {
     const a = await bootstrap.plan(routeSource(ROUTES()), { cutAt: CUT });
     const b = await bootstrap.plan(routeSource([{ path: "/tasks", handler: "other" }, ROUTES()[1]!]), { cutAt: CUT });
