@@ -12,9 +12,9 @@ tags:
 source: "ndx-adversarial-review"
 startedAt: "2026-10-08T02:50:01.644Z"
 completedAt: "2026-10-08T03:04:09.450Z"
+endedAt: "2026-10-08T03:04:09.450Z"
 resolutionType: "code-change"
 resolutionDetail: "Shipped built grammars (4a591e152, hench run aa4a7a62). The run's review never spawned; operator adversarial review (assisted run 511149ea) found nothing; SV_REQUIRE_GRAMMARS=1 tarball tests 8/8."
-endedAt: "2026-10-08T03:04:09.450Z"
 acceptanceCriteria:
   - "A packed @n-dx/sourcevision tarball (pnpm pack) contains every built-in pack's grammar WASM and query files"
   - "loadLanguagePacks run from an installed tarball reports structure mode for Java"

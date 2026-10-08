@@ -14,9 +14,9 @@ blockedBy:
 source: "roadmap"
 startedAt: "2026-10-08T02:23:40.344Z"
 completedAt: "2026-10-08T03:04:07.983Z"
+endedAt: "2026-10-08T03:04:07.983Z"
 resolutionType: "code-change"
 resolutionDetail: "Code from hench run 9444b5a0 (a01418929, 54dcd503b); the gate failure was the jsdom import-path bug fixed by 8ce5cd15 (5f3fdb3f2). Operator-verified 2026-10-08: web 5316 and sourcevision 2520 tests pass."
-endedAt: "2026-10-08T03:04:07.983Z"
 acceptanceCriteria:
   - "sv analyze on a Java fixture repository writes import edges and external imports for Java files"
   - "Zones are produced for the fixture Spring Boot-style repository"
