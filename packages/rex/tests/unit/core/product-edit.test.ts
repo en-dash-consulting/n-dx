@@ -81,10 +81,11 @@ describe("handleProductEdit: editorial", () => {
   const edited = { statement: "A shopper can pay with a card." };
 
   it("re-stamps metAt so the node stays met, and records a History line", () => {
-    const { tree: out, outcome, change } = handleProductEdit(tree(edited), "A1.1", BEFORE, { ...OPTS, editorial: true, summary: "Wording" });
+    const { tree: out, outcome, drafts, stale } = handleProductEdit(tree(edited), "A1.1", BEFORE, { ...OPTS, editorial: true, summary: "Wording" });
     const node = cap(out);
     expect(outcome).toBe("editorial");
-    expect(change).toBeUndefined();
+    expect(drafts).toEqual([]);
+    expect(stale).toEqual([]);
     expect(node.metAt).toBe(specHash(node));
     expect(node.revisedAt).toBeUndefined();
     expect(node.body).toBe("Card payments.\n\n## History\n\n- 2026-10-07 editorial: Wording");
@@ -107,7 +108,8 @@ describe("handleProductEdit: substantive", () => {
   };
 
   it("leaves the node revised and drafts one Inbox change with source product-edit", () => {
-    const { tree: out, outcome, change } = handleProductEdit(tree(edited), "A1.1", BEFORE, OPTS);
+    const { tree: out, outcome, drafts: [change], stale } = handleProductEdit(tree(edited), "A1.1", BEFORE, OPTS);
+    expect(stale).toEqual([]);
     const node = cap(out);
     expect(outcome).toBe("revised");
     expect(node.metAt).toBe(MET);
@@ -152,7 +154,7 @@ describe("handleProductEdit: substantive", () => {
   });
 
   it("drafts a change that, applied, makes the node met at the edited spec", () => {
-    const { tree: drafted, change } = handleProductEdit(tree(edited), CAP, BEFORE, OPTS);
+    const { tree: drafted, drafts: [change] } = handleProductEdit(tree(edited), CAP, BEFORE, OPTS);
     const { tree: out } = applyAmendments(drafted, change!.id, { appliedAt: NOW.toISOString(), now: NOW });
     const node = cap(out);
     expect(node.criteria).toEqual(edited.criteria);
@@ -165,7 +167,7 @@ describe("handleProductEdit: substantive", () => {
     const con = t.product[0].children![1];
     const before = { statement: con.statement };
     con.statement = "No card data stored.";
-    const { outcome, change } = handleProductEdit(t, CON, before, OPTS);
+    const { outcome, drafts: [change] } = handleProductEdit(t, CON, before, OPTS);
     expect(outcome).toBe("revised");
     expect(change?.amends).toEqual([
       { target: CON, delta: "modified", summary: "statement edited", proposed: "No card data stored.", base: specHash({ statement: "No card data stored." }) },
@@ -173,7 +175,7 @@ describe("handleProductEdit: substantive", () => {
   });
 
   it("records the edited spec as base, so apply refuses the draft after another change edits the node", () => {
-    const { tree: drafted, change } = handleProductEdit(tree(edited), CAP, BEFORE, OPTS);
+    const { tree: drafted, drafts: [change] } = handleProductEdit(tree(edited), CAP, BEFORE, OPTS);
     expect(change?.amends?.[0].base).toBe(specHash(edited));
     const other = { id: "other", type: "change", title: "Other", slug: "other", status: "pending" } as RuleNode;
     drafted.changes.push({ ...other, amends: [{ target: CAP, delta: "modified", summary: "s", proposed: "Something else." }] } as RuleNode);
@@ -185,11 +187,11 @@ describe("handleProductEdit: substantive", () => {
   it("suffixes the draft's slug when another change holds it", () => {
     const t = tree(edited);
     t.changes.push({ id: "other", type: "change", title: "x", slug: "build-the-revised-pay-by-card", status: "pending" } as RuleNode);
-    expect(handleProductEdit(t, CAP, BEFORE, OPTS).change?.slug).toBe("build-the-revised-pay-by-card-draft1");
+    expect(handleProductEdit(t, CAP, BEFORE, OPTS).drafts[0]?.slug).toBe("build-the-revised-pay-by-card-draft1");
   });
 });
 
-describe("handleProductEdit: a second edit refreshes the open draft", () => {
+describe("handleProductEdit: a second edit refreshes pending drafts", () => {
   const B = { statement: "A shopper can pay by card or wallet.", criteria: CRITERIA };
   const C = { statement: "A shopper can pay by card, wallet or bank.", criteria: [...CRITERIA, { id: "c3", text: "Receipt sent" }] };
 
@@ -201,16 +203,17 @@ describe("handleProductEdit: a second edit refreshes the open draft", () => {
   }
 
   it("leaves exactly one open product-edit draft for the node", () => {
-    const { tree: out, outcome, change } = twoEdits();
+    const { tree: out, outcome, drafts, stale } = twoEdits();
     expect(outcome).toBe("revised");
     expect(out.changes).toHaveLength(1);
-    expect(change).toBe(out.changes[0]);
-    expect(change?.id).toBe("draft-1");
+    expect(drafts).toEqual([out.changes[0]]);
+    expect(drafts[0].id).toBe("draft-1");
+    expect(stale).toEqual([]);
     expect(cap(out).revisedAt).toBe(NOW.toISOString());
   });
 
   it("proposes the latest statement and lists both diffs in its intent", () => {
-    const { change } = twoEdits();
+    const { drafts: [change] } = twoEdits();
     expect(change?.amends).toEqual([
       { target: "A1.1", delta: "modified", summary: "statement edited; criteria c3 added", proposed: C.statement, base: specHash(C) },
     ]);
@@ -229,7 +232,7 @@ describe("handleProductEdit: a second edit refreshes the open draft", () => {
   });
 
   it("applied after both edits, leaves the node met at the latest spec", () => {
-    const { tree: drafted, change } = twoEdits();
+    const { tree: drafted, drafts: [change] } = twoEdits();
     const { tree: out } = applyAmendments(drafted, change!.id, { appliedAt: NOW.toISOString(), now: NOW });
     const node = cap(out);
     expect(node.statement).toBe(C.statement);
@@ -244,23 +247,57 @@ describe("handleProductEdit: a second edit refreshes the open draft", () => {
       const first = handleProductEdit(tree(B), CAP, BEFORE, OPTS).tree;
       Object.assign(first.changes[0], patch);
       Object.assign(cap(first), structuredClone(C));
-      const { tree: out, change } = handleProductEdit(first, CAP, B, { ...OPTS, newId: () => "draft-2" });
+      const { tree: out, drafts, stale } = handleProductEdit(first, CAP, B, { ...OPTS, newId: () => "draft-2" });
       expect(out.changes.map((c) => c.id)).toEqual(["draft-1", "draft-2"]);
-      expect(change?.id).toBe("draft-2");
+      expect(drafts.map((c) => c.id)).toEqual(["draft-2"]);
+      expect(stale).toEqual([]);
     }
   });
 
-  it("refreshes a completed but unapplied draft: it is still open", () => {
+  describe("a completed but unapplied draft", () => {
+    /** Edit A → B, complete the draft without applying it, then edit B → C. */
+    function afterCompleted(): { input: V2Tree; result: ReturnType<typeof handleProductEdit> } {
+      const input = handleProductEdit(tree(B), CAP, BEFORE, OPTS).tree;
+      input.changes[0].status = "completed";
+      Object.assign(cap(input), structuredClone(C));
+      return { input, result: handleProductEdit(input, CAP, B, { ...OPTS, newId: () => "draft-2" }) };
+    }
+
+    it("is left proposing B, as completed", () => {
+      const { input, result } = afterCompleted();
+      expect(result.tree.changes[0]).toEqual(input.changes[0]);
+      expect(result.tree.changes[0]).toMatchObject({ status: "completed", amends: [{ proposed: B.statement, base: specHash(B) }] });
+    });
+
+    it("is reported as stale beside a new draft proposing C", () => {
+      const { result } = afterCompleted();
+      expect(result.outcome).toBe("revised");
+      expect(result.stale).toEqual([result.tree.changes[0]]);
+      expect(result.drafts).toEqual([result.tree.changes[1]]);
+      expect(result.drafts[0]).toMatchObject({ id: "draft-2", status: "pending", amends: [{ proposed: C.statement, base: specHash(C) }] });
+    });
+
+    it("is refused at apply, so it cannot mark C met with B's build", () => {
+      const { result } = afterCompleted();
+      const applyOpts = { appliedAt: NOW.toISOString(), now: NOW };
+      expect(() => applyAmendments(result.tree, "draft-1", applyOpts)).toThrow(/no longer matches the target's spec/);
+      expect(cap(applyAmendments(result.tree, "draft-2", applyOpts).tree).metAt).toBe(specHash(C));
+    });
+  });
+
+  it("refreshes every pending draft, so none proposes an older statement", () => {
     const first = handleProductEdit(tree(B), CAP, BEFORE, OPTS).tree;
-    first.changes[0].status = "completed";
+    // Two branches each drafted for A1.1, then merged.
+    first.changes.push({ ...structuredClone(first.changes[0]), id: "draft-0", slug: "other-branch" });
     Object.assign(cap(first), structuredClone(C));
-    const { tree: out, change } = handleProductEdit(first, CAP, B, { ...OPTS, newId: () => "draft-2" });
-    expect(out.changes.map((c) => c.id)).toEqual(["draft-1"]);
-    expect(change?.id).toBe("draft-1");
+    const { tree: out, drafts } = handleProductEdit(first, CAP, B, { ...OPTS, newId: () => "draft-2" });
+    expect(out.changes.map((c) => c.id)).toEqual(["draft-1", "draft-0"]);
+    expect(drafts.map((c) => c.id)).toEqual(["draft-1", "draft-0"]);
+    for (const change of out.changes) expect(change.amends).toMatchObject([{ proposed: C.statement, base: specHash(C) }]);
   });
 });
 
-describe("handleProductEdit: reverting to the met spec withdraws the open draft", () => {
+describe("handleProductEdit: reverting to the met spec withdraws pending drafts", () => {
   const B = { statement: "A shopper can pay by card or wallet.", criteria: CRITERIA };
 
   /** Edit A → B, then patch the tree, then edit B back to A. */
@@ -274,10 +311,11 @@ describe("handleProductEdit: reverting to the met spec withdraws the open draft"
   it("cancels the draft, so no open product-edit draft amends the node", () => {
     const { result } = revert();
     expect(result.outcome).toBe("reverted");
-    expect(result.change).toBe(result.tree.changes[0]);
-    expect(result.change?.status).toBe("cancelled");
-    expect(result.change?.amends).toEqual([]);
-    expect(result.change?.intent?.split("\n").at(-1)).toBe("Cancelled on 2026-10-08: A1.1 was reverted to its met spec.");
+    expect(result.drafts).toEqual([result.tree.changes[0]]);
+    expect(result.stale).toEqual([]);
+    expect(result.drafts[0].status).toBe("cancelled");
+    expect(result.drafts[0].amends).toEqual([]);
+    expect(result.drafts[0].intent?.split("\n").at(-1)).toBe("Cancelled on 2026-10-08: A1.1 was reverted to its met spec.");
     expect(() => applyAmendments(result.tree, "draft-1", { appliedAt: NOW.toISOString(), now: NOW })).toThrow();
   });
 
@@ -303,7 +341,7 @@ describe("handleProductEdit: reverting to the met spec withdraws the open draft"
         { id: "t2", type: "task", title: "Done", slug: "done", status: "completed" },
       ] as RuleNode[];
     });
-    const [t1, t2] = result.change!.children!;
+    const [t1, t2] = result.drafts[0].children!;
     expect([t1.status, t1.children![0].status, t2.status]).toEqual(["cancelled", "cancelled", "completed"]);
   });
 
@@ -311,16 +349,68 @@ describe("handleProductEdit: reverting to the met spec withdraws the open draft"
     const other = { target: CON, delta: "modified", summary: "statement edited", proposed: "Card data is tokenised." } as const;
     const { result } = revert((t) => t.changes[0].amends!.push({ ...other }));
     expect(result.outcome).toBe("reverted");
-    expect(result.change?.status).toBe("pending");
-    expect(result.change?.amends).toEqual([other]);
-    expect(result.change?.intent?.split("\n").at(-1)).toBe("A1.1 was reverted to its met spec on 2026-10-08; its amendment was dropped.");
+    expect(result.drafts[0].status).toBe("pending");
+    expect(result.drafts[0].amends).toEqual([other]);
+    expect(result.drafts[0].intent?.split("\n").at(-1)).toBe("A1.1 was reverted to its met spec on 2026-10-08; its amendment was dropped.");
     expect(cap(result.tree).revisedAt).toBeUndefined();
   });
 
-  it("is unchanged when the draft is already closed", () => {
+  it("withdraws every pending draft amending the node", () => {
+    const { result } = revert((t) => t.changes.push({ ...structuredClone(t.changes[0]), id: "draft-0", slug: "other-branch" }));
+    expect(result.drafts.map((c) => c.id)).toEqual(["draft-1", "draft-0"]);
+    for (const change of result.tree.changes) expect(change).toMatchObject({ status: "cancelled", amends: [] });
+  });
+
+  it("only clears revisedAt when the draft is already closed", () => {
     const { input, result } = revert((t) => Object.assign(t.changes[0], { status: "cancelled" }));
+    expect(result.outcome).toBe("reverted");
+    expect(result.drafts).toEqual([]);
+    expect(result.tree.changes).toEqual(input.changes);
+    expect(cap(result.tree).revisedAt).toBeUndefined();
+  });
+
+  it("is unchanged when the draft is closed and the node not revised", () => {
+    const { input, result } = revert((t) => {
+      Object.assign(t.changes[0], { status: "cancelled" });
+      delete cap(t).revisedAt;
+    });
     expect(result.outcome).toBe("unchanged");
     expect(result.tree).toBe(input);
+  });
+
+  describe("a completed but unapplied draft", () => {
+    const completed = (t: V2Tree) => Object.assign(t.changes[0], { status: "completed" });
+
+    it("is reported as stale and left as it was", () => {
+      const { input, result } = revert(completed);
+      expect(result.outcome).toBe("reverted");
+      expect(result.drafts).toEqual([]);
+      expect(result.stale).toEqual([result.tree.changes[0]]);
+      expect(result.tree.changes[0]).toEqual(input.changes[0]);
+      expect(cap(result.tree).revisedAt).toBeUndefined();
+    });
+
+    it("is still reported once the node is no longer revised", () => {
+      const { result: first } = revert(completed);
+      const again = handleProductEdit(first.tree, CAP, BEFORE, OPTS);
+      expect(again.outcome).toBe("unchanged");
+      expect(again.stale.map((c) => c.id)).toEqual(["draft-1"]);
+    });
+
+    it("is refused at apply, so it cannot write the abandoned spec over the revert", () => {
+      const { result } = revert(completed);
+      expect(() => applyAmendments(result.tree, "draft-1", { appliedAt: NOW.toISOString(), now: NOW })).toThrow(/no longer matches the target's spec/);
+    });
+
+    it("is left alone beside a pending draft that is withdrawn", () => {
+      const { result } = revert((t) => {
+        t.changes.push({ ...structuredClone(t.changes[0]), id: "draft-0", slug: "other-branch" });
+        completed(t);
+      });
+      expect(result.stale.map((c) => c.id)).toEqual(["draft-1"]);
+      expect(result.drafts.map((c) => c.id)).toEqual(["draft-0"]);
+      expect(result.tree.changes.map((c) => c.status)).toEqual(["completed", "cancelled"]);
+    });
   });
 });
 
