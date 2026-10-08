@@ -31,6 +31,7 @@ import { swiftConfig } from "./swift.js";
 import { pythonConfig } from "./python.js";
 import { csharpConfig } from "./csharp.js";
 import { javaConfig, javaSecondaryConfig } from "./java.js";
+import { terraformConfig } from "./terraform.js";
 
 // ── Config registry ─────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ const LANGUAGE_CONFIGS: ReadonlyMap<string, LanguageConfig> = new Map([
   ["python", pythonConfig],
   ["csharp", csharpConfig],
   ["java", javaConfig],
+  ["terraform", terraformConfig],
   ["typescript", typescriptConfig],
   ["javascript", typescriptConfig],
 ]);
@@ -116,6 +118,31 @@ async function hasJavaMarker(rootDir: string): Promise<boolean> {
   const markers = ["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"];
   for (const m of markers) {
     if (await fileExists(join(rootDir, m))) return true;
+  }
+  return false;
+}
+
+/** Directories never searched for `.tf` files. */
+const TERRAFORM_SCAN_SKIP = new Set(["node_modules", "vendor", "venv", "site-packages"]);
+
+/**
+ * Terraform marker present? Any `.tf` file within three directory levels of
+ * the root. Hidden directories (including `.terraform/`) are not searched.
+ * `detectLanguage` consults it only when no other marker matched;
+ * `detectLanguages` adds Terraform whenever it is present.
+ */
+async function hasTerraformMarker(dir: string, depth = 0): Promise<boolean> {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  if (entries.some((e) => e.isFile() && e.name.endsWith(".tf"))) return true;
+  if (depth >= 3) return false;
+  for (const e of entries) {
+    if (!e.isDirectory() || e.name.startsWith(".") || TERRAFORM_SCAN_SKIP.has(e.name)) continue;
+    if (await hasTerraformMarker(join(dir, e.name), depth + 1)) return true;
   }
   return false;
 }
@@ -339,6 +366,9 @@ export async function detectLanguage(rootDir: string): Promise<LanguageConfig> {
   // mixed repositories keep their existing primary language.
   if (await hasJavaMarker(rootDir)) return javaConfig;
 
+  // Terraform is primary only when nothing else matched; Java outranks it.
+  if (await hasTerraformMarker(rootDir)) return terraformConfig;
+
   // Step 6: No markers → fallback to TypeScript/JS
   return typescriptConfig;
 }
@@ -368,6 +398,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
   ]);
 
   const hasJava = await hasJavaMarker(rootDir);
+  const hasTerraform = await hasTerraformMarker(rootDir);
   const present: Array<{ config: LanguageConfig; count: number }> = [];
 
   // When any markers are present, count source files so we can order by
@@ -383,7 +414,8 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
 
   // No markers → fallback to TypeScript/JS for backward compatibility.
   if (present.length === 0) {
-    return [hasJava ? javaConfig : typescriptConfig];
+    if (hasJava) return hasTerraform ? [javaConfig, terraformConfig] : [javaConfig];
+    return [hasTerraform ? terraformConfig : typescriptConfig];
   }
 
   // Stable ordering by descending file count, ties broken by the same
@@ -397,6 +429,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
   // secondary variant keeps Java from skipping or flagging the primary
   // language's `out/` and `generated/` files.
   if (hasJava) configs.push(javaSecondaryConfig);
+  if (hasTerraform) configs.push(terraformConfig);
   return configs;
 }
 
