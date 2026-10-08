@@ -29,8 +29,11 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [computeChangeCommits defaults to the local main branch, which a CI checkout lacks and a worktree may hold stale](./computechangecommits-defaults-to-the.md) | completed |
 | [computeChangeCommits returns a truncated commit list from a shallow clone without saying so](./computechangecommits-returns-a.md) | completed |
 | [computeProductStatus never marks a node defective for an open fix, because an open change cannot derive kind fix](./computeproductstatus-never-marks-a.md) | pending |
+| [Count only started or placed changes as building, and let children follow an amended parent](./count-only-started-or-placed-changes.md) | pending |
 | [deriveChangeKind calls a change that adds a new constraint a feature, not a policy change](./derivechangekind-calls-a-change-that.md) | pending |
+| [Keep retired nodes visible to status, kind and edges](./keep-retired-nodes-visible-to-status.md) | pending |
 | [Re-point recorded commit SHAs that a rebase or squash rewrote](./re-point-recorded-commit-shas-that-a.md) | pending |
 | [Warn when a capability's criteria grow past a threshold](./warn-when-a-capability-s-criteria-grow.md) | pending |
 | [Work out a change's commits from its N-DX-Item trailers instead of storing them](./work-out-a-change-s-commits-from-its-n.md) | completed |
 | [Work out when a change landed from git history](./work-out-when-a-change-landed-from-git.md) | pending |
+| [Match the computed edges to the design: touches, cancelled changes and inherited bindings](./match-the-computed-edges-to-the-design.md) | pending |
