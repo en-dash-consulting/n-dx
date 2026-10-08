@@ -32,7 +32,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [computeChangeCommits returns a truncated commit list from a shallow clone without saying so](./computechangecommits-returns-a.md) | completed |
 | [computeProductStatus never marks a node defective for an open fix, because an open change cannot derive kind fix](./computeproductstatus-never-marks-a.md) | completed |
 | [computeProductStatus reports a retired node defective from its last failing check](./computeproductstatus-reports-a-retired.md) | completed |
-| [Count only started or placed changes as building, and let children follow an amended parent](./count-only-started-or-placed-changes.md) | in_progress |
+| [Count only started or placed changes as building, and let children follow an amended parent](./count-only-started-or-placed-changes.md) | completed |
 | [deriveChangeKind calls a change that adds a new constraint a feature, not a policy change](./derivechangekind-calls-a-change-that.md) | completed |
 | [Keep retired nodes visible to status, kind and edges](./keep-retired-nodes-visible-to-status.md) | completed |
 | [Match the computed edges to the design: touches, cancelled changes and inherited bindings](./match-the-computed-edges-to-the-design.md) | completed |
