@@ -72,6 +72,20 @@ describe("detectMigrationTools", () => {
     expect(sqlc?.sqlFiles).toEqual(["query/users.sql"]);
   });
 
+  it("lists Atlas migrations from the directory holding atlas.sum", () => {
+    const [atlas] = detect(FIXTURES.atlas!);
+    expect(atlas?.sqlFiles).toEqual(["migrations/20240101.sql"]);
+  });
+
+  it("detects Liquibase in JHipster's config/liquibase layout", () => {
+    const fixture = {
+      "src/main/resources/config/liquibase/master.xml": "<databaseChangeLog></databaseChangeLog>",
+      "src/main/resources/config/liquibase/changelog/20240101000000_added_entity_Owner.xml":
+        "<databaseChangeLog><changeSet/></databaseChangeLog>",
+    };
+    expect(detect(fixture)).toEqual([{ tool: "liquibase", files: Object.keys(fixture).sort(), sqlFiles: [] }]);
+  });
+
   it("detects flyway from its config alone", () => {
     expect(tools({ "flyway.toml": "[flyway]" })).toEqual(["flyway"]);
   });
