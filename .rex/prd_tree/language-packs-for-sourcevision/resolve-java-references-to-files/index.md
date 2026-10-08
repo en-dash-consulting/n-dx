@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Discover Java modules and source roots](./discover-java-modules-and-source-roots.md) | pending |
+| [Discover Java modules and source roots](./discover-java-modules-and-source-roots.md) | completed |
 | [Feed Java edges into the analyze pipeline](./feed-java-edges-into-the-analyze.md) | pending |
 | [Include Java in multi-language detection beside other build markers](./include-java-in-multi-language.md) | pending |
 | [Measure Java resolver accuracy against scip-java](./measure-java-resolver-accuracy-against.md) | pending |

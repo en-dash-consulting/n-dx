@@ -2,7 +2,7 @@
 id: "24b251ed-e90b-42e9-af25-a3f5fb62628d"
 level: "task"
 title: "Discover Java modules and source roots"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "language-packs"
@@ -10,12 +10,17 @@ tags:
   - "sourcevision"
   - "java"
 source: "roadmap"
+startedAt: "2026-10-08T02:05:05.461Z"
+completedAt: "2026-10-08T02:09:24.418Z"
+endedAt: "2026-10-08T02:09:24.418Z"
+resolutionType: "code-change"
+resolutionDetail: "Added src/language/java-modules.ts (discoverJavaModules) with unit tests for Maven, Gradle Groovy/Kotlin and no-build-file layouts."
 acceptanceCriteria:
   - "Maven multi-module repositories list every module and its source roots, recursively"
   - "Gradle repositories with Groovy and Kotlin settings files list included modules and their source roots"
   - "A repository with no build file falls back to package-declaration roots"
   - "Unit tests cover single-module, multi-module Maven, Gradle Kotlin DSL and no-build-file layouts"
 description: "Find every module and its source roots without running Maven or Gradle. Maven: the root pom.xml and each <modules> entry, recursively. Gradle: include(...) and include '...' entries in settings.gradle and settings.gradle.kts, with projectDir overrides when they are literal. Each module contributes src/main/java and src/test/java when present, plus any literal sourceDirectory or srcDirs it declares. Repositories with no build file fall back to directories whose files' package declarations match their path.\n\nThis is the module reader that the next feature extends with dependencies and versions; keep it in its own module so that feature can build on it."
-lastModified: "2026-10-07T23:56:07.433Z"
+lastModified: "2026-10-08T02:09:24.675Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
