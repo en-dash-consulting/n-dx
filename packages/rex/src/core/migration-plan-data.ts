@@ -1,0 +1,232 @@
+/**
+ * Migration plan, data: ids, aliases, backfill and data fixes.
+ *
+ * Pure and deterministic like {@link classifyV1Tree}: reads the v1 tree and
+ * the plan, writes nothing, and keys everything by v1 item id so the result
+ * can be re-applied to a newer tree. Callers supply the outside facts (release
+ * tags, PR merges); this module never shells out.
+ *
+ * - Criterion ids `c1…cn` in source order, from `acceptanceCriteria`.
+ * - Aliases: a release umbrella dissolves, so its id is aliased to its first
+ *   child change and old references still resolve.
+ * - `shippedIn` for completed items: a PR merge's release wins; otherwise the
+ *   first release tagged at or after `completedAt`.
+ * - Flags, one per problem class: criteria kept in tags, duplicate sibling
+ *   titles, a legacy `parentId` field, a stale description.
+ * - Legacy `loe` buckets (`xs|s|m|l|xl`): no numeric loe, the bucket kept as
+ *   text at the start of `loeRationale`. Buckets are never mapped to weeks.
+ * - The literal "[object Object]" in `recommendationMeta` or a log entry
+ *   (written by a pre-squash build; unrecoverable) is dropped and counted.
+ *
+ * @module core/migration-plan-data
+ */
+
+import type { LogEntry, PRDItem } from "../schema/v1.js";
+import type { Criterion } from "../schema/v2.js";
+import type { MigrationPlan } from "./migration-plan.js";
+
+export const CORRUPT_VALUE = "[object Object]";
+
+export const DATA_FLAGS = ["criteria-in-tags", "duplicate-title", "legacy-parent-id", "stale-description"] as const;
+export type DataFlag = (typeof DATA_FLAGS)[number];
+
+export interface ReleaseTag {
+  version: string;
+  /** ISO date the tag was created. */
+  date: string;
+}
+
+export interface PlanDataOptions {
+  /** Release tags; order does not matter. */
+  releases?: readonly ReleaseTag[];
+  /** Release version of the merged PR that delivered an item (v1 id): beats the tag backfill. */
+  prMerges?: Readonly<Record<string, string>>;
+  /** The execution log, to count corrupt values (see {@link cleanLogEntries} to drop them). */
+  logEntries?: readonly LogEntry[];
+}
+
+export interface LegacyLoe {
+  /** The bucket as written (`xl`). */
+  bucket: string;
+  /** `loeRationale` after conversion: begins with `Legacy estimate: <bucket>`. */
+  loeRationale: string;
+}
+
+export interface ItemPlanData {
+  /** v1 id. */
+  id: string;
+  criteria?: Criterion[];
+  aliases?: string[];
+  shippedIn?: { version: string; source: "pr-merge" | "release-tag" };
+  flags: DataFlag[];
+  /** Present when `loe` was a legacy bucket: drop the numeric loe, set this rationale. */
+  legacyLoe?: LegacyLoe;
+  /** `recommendationMeta` values dropped at conversion. */
+  droppedMeta: number;
+}
+
+export interface PlanData {
+  /** Keyed by v1 item id; only items with something to say. */
+  items: Record<string, ItemPlanData>;
+  /** Items per flag. */
+  flagCounts: Record<DataFlag, number>;
+  legacyLoe: number;
+  /** Corrupt values dropped, by where they were found. */
+  corrupt: { recommendationMeta: number; logEntries: number };
+}
+
+// ── Item rules ───────────────────────────────────────────────────
+
+const LEGACY_BUCKETS = new Set(["xs", "s", "m", "l", "xl"]);
+const CRITERIA_TAG = /^(?:ac|criteria|criterion|acceptance)[:\s-]/i;
+const STALE_DESCRIPTION = /\b(?:todo|tbd|will be (?:added|implemented|built)|to be (?:added|implemented|built)|not yet|yet to)\b/i;
+const MIN_PROSE_TAG = 40;
+
+/** The bucket when `loe` is a legacy `xs|s|m|l|xl` string, else undefined. */
+export function legacyLoeBucket(item: PRDItem): string | undefined {
+  const loe = item.loe;
+  if (typeof loe !== "string") return undefined;
+  const bucket = loe.trim().toLowerCase();
+  return LEGACY_BUCKETS.has(bucket) ? bucket : undefined;
+}
+
+/** `loeRationale` for an item whose `loe` was a legacy bucket; the existing rationale follows the prefix. */
+export function legacyLoeRationale(bucket: string, rationale: unknown): string {
+  const prefix = `Legacy estimate: ${bucket}`;
+  return typeof rationale === "string" && rationale.trim() !== "" ? `${prefix}. ${rationale}` : prefix;
+}
+
+/** Criteria sit in tags: a tag that is a sentence or an `ac:` / `criteria:` entry. */
+function criteriaInTags(item: PRDItem): boolean {
+  return (item.tags ?? []).some((t) => CRITERIA_TAG.test(t) || (/\s/.test(t) && t.length >= MIN_PROSE_TAG));
+}
+
+function staleDescription(item: PRDItem): boolean {
+  const done = item.status === "completed" || item.status === "cancelled" || item.status === "deleted";
+  return done && item.description !== undefined && STALE_DESCRIPTION.test(item.description);
+}
+
+/** Count `[object Object]` strings in a value: the value itself, or any string within an object or array. */
+export function countCorrupt(value: unknown): number {
+  if (value === CORRUPT_VALUE) return 1;
+  if (Array.isArray(value)) return value.reduce<number>((n, v) => n + countCorrupt(v), 0);
+  if (value !== null && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).reduce<number>((n, v) => n + countCorrupt(v), 0);
+  }
+  return 0;
+}
+
+/** Remove every `[object Object]` value, and the keys that held it. Returns the value, or undefined when it was itself corrupt. */
+export function dropCorrupt<T>(value: T): T | undefined {
+  if ((value as unknown) === CORRUPT_VALUE) return undefined;
+  if (Array.isArray(value)) return value.filter((v) => v !== CORRUPT_VALUE).map((v) => dropCorrupt(v)) as T;
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const cleaned = dropCorrupt(v);
+      if (cleaned !== undefined) out[k] = cleaned;
+    }
+    return out as T;
+  }
+  return value;
+}
+
+/** Log entries with corrupt values removed, and how many values were. */
+export function cleanLogEntries(entries: readonly LogEntry[]): { entries: LogEntry[]; dropped: number } {
+  let dropped = 0;
+  const cleaned = entries.map((entry) => {
+    const n = countCorrupt(entry);
+    if (n === 0) return entry;
+    dropped += n;
+    return dropCorrupt(entry) as LogEntry;
+  });
+  return { entries: cleaned, dropped };
+}
+
+/** The first release tagged at or after `completedAt`. */
+function firstReleaseAfter(completedAt: string, releases: readonly ReleaseTag[]): string | undefined {
+  const done = Date.parse(completedAt);
+  if (Number.isNaN(done)) return undefined;
+  let best: { version: string; at: number } | undefined;
+  for (const r of releases) {
+    const at = Date.parse(r.date);
+    if (Number.isNaN(at) || at < done) continue;
+    if (best === undefined || at < best.at) best = { version: r.version, at };
+  }
+  return best?.version;
+}
+
+// ── Build ────────────────────────────────────────────────────────
+
+/** Data for every item in the tree. Same tree, plan and options always give the same result. */
+export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, options: PlanDataOptions = {}): PlanData {
+  const { releases = [], prMerges = {}, logEntries = [] } = options;
+  const result: PlanData = {
+    items: {},
+    flagCounts: { "criteria-in-tags": 0, "duplicate-title": 0, "legacy-parent-id": 0, "stale-description": 0 },
+    legacyLoe: 0,
+    corrupt: { recommendationMeta: 0, logEntries: 0 },
+  };
+  const entryById = new Map(plan.entries.map((e) => [e.id, e]));
+
+  const visit = (list: readonly PRDItem[]): void => {
+    const titles = new Map<string, number>();
+    for (const item of list) {
+      const key = item.title.trim().toLowerCase();
+      titles.set(key, (titles.get(key) ?? 0) + 1);
+    }
+    for (const item of list) {
+      const data: ItemPlanData = { id: item.id, flags: [], droppedMeta: 0 };
+
+      if (item.acceptanceCriteria?.length) {
+        data.criteria = item.acceptanceCriteria.map((text, i) => ({ id: `c${i + 1}`, text }));
+      }
+
+      const entry = entryById.get(item.id);
+      if (entry?.target === "release") {
+        const first = item.children?.[0];
+        if (first) {
+          const host = result.items[first.id] ?? { id: first.id, flags: [], droppedMeta: 0 };
+          host.aliases = [...(host.aliases ?? []), item.id];
+          result.items[first.id] = host;
+        }
+      }
+
+      if (item.status === "completed" && item.completedAt !== undefined) {
+        const merged = prMerges[item.id];
+        const tagged = firstReleaseAfter(item.completedAt, releases);
+        if (merged !== undefined) data.shippedIn = { version: merged, source: "pr-merge" };
+        else if (tagged !== undefined) data.shippedIn = { version: tagged, source: "release-tag" };
+      } else if (item.status === "completed" && prMerges[item.id] !== undefined) {
+        data.shippedIn = { version: prMerges[item.id]!, source: "pr-merge" };
+      }
+
+      if (criteriaInTags(item)) data.flags.push("criteria-in-tags");
+      if ((titles.get(item.title.trim().toLowerCase()) ?? 0) > 1) data.flags.push("duplicate-title");
+      if ("parentId" in item) data.flags.push("legacy-parent-id");
+      if (staleDescription(item)) data.flags.push("stale-description");
+
+      const bucket = legacyLoeBucket(item);
+      if (bucket !== undefined) {
+        data.legacyLoe = { bucket, loeRationale: legacyLoeRationale(bucket, item.loeRationale) };
+        result.legacyLoe += 1;
+      }
+
+      data.droppedMeta = countCorrupt(item.recommendationMeta);
+      result.corrupt.recommendationMeta += data.droppedMeta;
+      for (const flag of data.flags) result.flagCounts[flag] += 1;
+
+      const existing = result.items[item.id];
+      const merged = existing ? { ...data, aliases: existing.aliases } : data;
+      const interesting =
+        merged.criteria || merged.aliases || merged.shippedIn || merged.flags.length || merged.legacyLoe || merged.droppedMeta;
+      if (interesting) result.items[item.id] = merged;
+      else delete result.items[item.id];
+
+      visit(item.children ?? []);
+    }
+  };
+  visit(items);
+  result.corrupt.logEntries = cleanLogEntries(logEntries).dropped;
+  return result;
+}
