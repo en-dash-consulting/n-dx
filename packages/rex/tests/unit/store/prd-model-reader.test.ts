@@ -23,7 +23,8 @@ import { FolderTreeStore } from "../../../src/store/folder-tree-store.js";
 import { withLock } from "../../../src/store/file-lock.js";
 import { PRD_TREE_DIRNAME, prdLockPath } from "../../../src/store/paths.js";
 import { loadStateFile, saveStateFile } from "../../../src/store/state-writer.js";
-import type { RuleNode } from "../../../src/schema/v2-rules.js";
+import { specHash, type RuleNode } from "../../../src/schema/v2-rules.js";
+import type { Criterion } from "../../../src/schema/v2.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 import { EOLS, copyV2Fixture, editText, type Eol } from "../../helpers/v2-fixture.js";
 
@@ -116,12 +117,14 @@ describe.each(EOLS)("v2 trees (%s)", (eol) => {
     expect(area).toMatchObject({ id: AREA, type: "area", slug: "checkout", status: "in_progress" });
     expect(area.body).toBe("Everything between the basket and the receipt.");
     expect(area.children?.map((n) => n.id)).toEqual([CAPABILITY]);
-    expect(find(model, CAPABILITY)).toMatchObject({
+    const capability = find(model, CAPABILITY);
+    expect(capability).toMatchObject({
       type: "capability",
       status: "completed",
-      specReviewed: true,
       criteria: [{ id: "c1", text: "A valid card is charged once" }, { id: "c2", text: "A declined card shows why" }],
     });
+    // The fixture's spec was reviewed as it stands.
+    expect(capability?.reviewedHash).toBe(specHash(capability as { statement?: string; criteria?: Criterion[] }));
 
     const [change] = model.tree.changes;
     expect(change).toMatchObject({

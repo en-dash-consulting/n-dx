@@ -14,5 +14,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add the v2 schema fields decided before the freeze](./add-the-v2-schema-fields-decided.md) | pending |
+| [Add the v2 schema fields decided before the freeze](./add-the-v2-schema-fields-decided.md) | in_progress |
 | [Fix the v2 rules for applied changes, Inbox changes, fixes and reference integrity](./fix-the-v2-rules-for-applied-changes.md) | pending |

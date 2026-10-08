@@ -16,7 +16,7 @@
 import { createHash } from "node:crypto";
 import type { ItemStatus } from "./v1.js";
 import { validateRunSettings } from "./validate.js";
-import { layerOf, type Criterion, type Layer, type V2Node } from "./v2.js";
+import { layerOf, RETIRED_STATE_FIELDS, type Criterion, type Layer, type V2Node } from "./v2.js";
 
 // ── Inputs and findings ──────────────────────────────────────────
 
@@ -56,7 +56,8 @@ export type V2RuleId =
   | "long-revised"
   | "area-balance"
   | "unreviewed-spec"
-  | "run-settings";
+  | "run-settings"
+  | "retired-state-field";
 
 export interface RuleFinding {
   rule: V2RuleId;
@@ -122,6 +123,7 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "area-balance": "warning",
   "unreviewed-spec": "warning",
   "run-settings": "warning",
+  "retired-state-field": "warning",
 };
 
 function finding(rule: V2RuleId, node: RuleNode, message: string): RuleFinding {
@@ -177,6 +179,11 @@ export function specHash(spec: { statement?: string; criteria?: Criterion[] }): 
     (spec.criteria ?? []).map((c) => [c.id, c.text.trim()]),
   ]);
   return createHash("sha256").update(canonical).digest("hex");
+}
+
+/** A product node's spec as `specHash` reads it: its own statement and criteria (a constraint has none). */
+function nodeSpec(node: RuleNode): { statement?: string; criteria?: Criterion[] } {
+  return node.type === "capability" ? node : { statement: node.type === "constraint" ? node.statement : undefined };
 }
 
 // ── Rules ────────────────────────────────────────────────────────
@@ -251,7 +258,7 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
 const CLOSED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["completed", "cancelled", "deleted"]);
 
 function isOpenChange(node: RuleNode): boolean {
-  return node.type === "change" && !node.appliedIn && !CLOSED_CHANGE_STATUSES.has(node.status ?? "pending");
+  return node.type === "change" && !node.appliedAt && !CLOSED_CHANGE_STATUSES.has(node.status ?? "pending");
 }
 
 const removedTargetLive: Rule = ({ entries, resolve }) =>
@@ -288,7 +295,7 @@ const DAY_MS = 86_400_000;
  * `revisedAt`, which the state writer stamps when a spec edit first makes the
  * hash differ from `metAt` and clears whenever the hash equals `metAt` again
  * (see `ItemState.revisedAt`). It is not measured from `lastModified`, because
- * every state write (checks, specReviewed) re-stamps that. Without
+ * every state write (checks, reviewedHash) re-stamps that. Without
  * `revisedAt` the age is unknown and nothing is reported.
  */
 const longRevised: Rule = ({ entries, resolve }, { now, longRevisedDays = DEFAULT_LONG_REVISED_DAYS }) => {
@@ -303,7 +310,7 @@ const longRevised: Rule = ({ entries, resolve }, { now, longRevisedDays = DEFAUL
   return entries.flatMap(({ node }) => {
     if (node.type !== "capability" && node.type !== "constraint") return [];
     if (!node.metAt || amended.has(node)) return [];
-    if (specHash(node.type === "capability" ? node : { statement: node.statement }) === node.metAt) return [];
+    if (specHash(nodeSpec(node)) === node.metAt) return [];
     const revised = node.revisedAt ? Date.parse(node.revisedAt) : Number.NaN;
     if (Number.isNaN(revised)) return [];
     const days = Math.floor((now.getTime() - revised) / DAY_MS);
@@ -336,9 +343,10 @@ const areaBalance: Rule = ({ entries }) => {
   });
 };
 
+/** A product node is reviewed while `reviewedHash` equals its current spec hash. */
 const unreviewedSpec: Rule = ({ entries }) =>
   entries
-    .filter(({ node }) => (node.type === "capability" || node.type === "constraint") && node.specReviewed !== true)
+    .filter(({ node }) => (node.type === "capability" || node.type === "constraint") && node.reviewedHash !== specHash(nodeSpec(node)))
     .map(({ node }) => finding("unreviewed-spec", node, `${node.type} "${node.title}" has a spec no person has reviewed`));
 
 /**
@@ -358,6 +366,19 @@ const runSettings: Rule = ({ entries }) =>
     return [finding("run-settings", node, `Invalid ${check.error} on ${node.type} "${node.title}"; ndx work ignores this block until it is fixed`)];
   });
 
+/**
+ * A state key the schema retired (`RETIRED_STATE_FIELDS`) still on a node. The
+ * file loads and keeps the key, but nothing reads it; the warning says why.
+ */
+const retiredStateField: Rule = ({ entries }) =>
+  entries.flatMap(({ node }) =>
+    Object.entries(RETIRED_STATE_FIELDS)
+      .filter(([key]) => node[key] !== undefined)
+      .map(([key, reason]) =>
+        finding("retired-state-field", node, `${node.type} "${node.title}" still carries "${key}", which is ignored: ${reason}`),
+      ),
+  );
+
 /** Every rule, errors first, in the order findings are reported. */
 const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "change-has-target": changeHasTarget,
@@ -372,6 +393,7 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "area-balance": areaBalance,
   "unreviewed-spec": unreviewedSpec,
   "run-settings": runSettings,
+  "retired-state-field": retiredStateField,
 };
 
 export const V2_RULE_IDS = Object.keys(RULES) as V2RuleId[];

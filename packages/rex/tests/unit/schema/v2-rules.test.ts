@@ -9,6 +9,7 @@ import {
   type V2RuleId,
   type V2Tree,
 } from "../../../src/schema/v2-rules.js";
+import { RETIRED_STATE_FIELDS, type Criterion } from "../../../src/schema/v2.js";
 
 const NOW = new Date("2026-10-06T00:00:00Z");
 let seq = 0;
@@ -19,9 +20,10 @@ function node(type: RuleNode["type"], fields: Record<string, unknown> = {}, chil
   return { id, type, title: `${type} ${seq}`, slug: id, children, ...fields } as RuleNode;
 }
 
-/** A capability that passes every capability rule. */
+/** A capability that passes every capability rule, reviewed at its own spec unless `fields` says otherwise. */
 function cap(fields: Record<string, unknown> = {}, children: RuleNode[] = []): RuleNode {
-  return node("capability", { statement: "Users can do a thing", criteria: [{ id: "c1", text: "It works" }], specReviewed: true, ...fields }, children);
+  const spec = { statement: "Users can do a thing", criteria: [{ id: "c1", text: "It works" }], ...fields } as { statement?: string; criteria?: Criterion[] };
+  return node("capability", { reviewedHash: specHash(spec), ...spec }, children);
 }
 
 function check(rule: V2RuleId, tree: Partial<V2Tree>, now = NOW) {
@@ -34,7 +36,7 @@ describe("rule table", () => {
   it("errors precede warnings and every rule has a severity", () => {
     const severities = V2_RULE_IDS.map((id) => RULE_SEVERITY[id]);
     expect(severities.indexOf("warning")).toBe(severities.lastIndexOf("error") + 1);
-    expect(V2_RULE_IDS).toHaveLength(12);
+    expect(V2_RULE_IDS).toHaveLength(13);
   });
 
   it("a healthy tree has no findings", () => {
@@ -195,7 +197,7 @@ describe("removed-target-live", () => {
   });
 
   it("does not judge applied or closed changes, whose removals already happened", () => {
-    const changes = [removes("gone", { appliedIn: "abc123" }), removes("gone", { status: "completed" }), removes("gone", { status: "cancelled" })];
+    const changes = [removes("gone", { appliedAt: "2026-10-05T00:00:00.000Z" }), removes("gone", { status: "completed" }), removes("gone", { status: "cancelled" })];
     expect(check("removed-target-live", { changes })).toEqual([]);
   });
 });
@@ -338,13 +340,43 @@ describe("run-settings", () => {
 });
 
 describe("unreviewed-spec", () => {
-  it("passes reviewed capabilities and constraints", () => {
-    expect(check("unreviewed-spec", { product: [cap(), node("constraint", { specReviewed: true })] })).toEqual([]);
+  const RULE = "No card numbers in logs";
+
+  it("passes capabilities and constraints whose reviewedHash is their current spec hash", () => {
+    const constraint = node("constraint", { statement: RULE, reviewedHash: specHash({ statement: RULE }) });
+    expect(check("unreviewed-spec", { product: [cap(), constraint] })).toEqual([]);
   });
 
   it("warns on an unreviewed capability or constraint", () => {
-    const capability = cap({ specReviewed: false });
-    const constraint = node("constraint");
+    const capability = cap({ reviewedHash: undefined });
+    const constraint = node("constraint", { statement: RULE });
     expect(ids(check("unreviewed-spec", { product: [capability, constraint, node("area")] }))).toEqual([capability.id, constraint.id]);
+  });
+
+  it("warns once the spec is edited after review", () => {
+    const capability = cap({ reviewedHash: specHash({ statement: "Users can do a thing", criteria: [] }) });
+    const constraint = node("constraint", { statement: `${RULE}, ever`, reviewedHash: specHash({ statement: RULE }) });
+    expect(ids(check("unreviewed-spec", { product: [capability, constraint] }))).toEqual([capability.id, constraint.id]);
+  });
+
+  it("ignores the retired specReviewed flag", () => {
+    const capability = cap({ reviewedHash: undefined, specReviewed: true });
+    expect(ids(check("unreviewed-spec", { product: [capability] }))).toEqual([capability.id]);
+  });
+});
+
+describe("retired-state-field", () => {
+  it("warns once per retired key a node still carries, naming the key", () => {
+    const capability = cap({ specReviewed: true });
+    const change = node("change", { touches: ["x"], appliedIn: "e3d7052fe" });
+    const findings = check("retired-state-field", { product: [capability], changes: [change] });
+    expect(ids(findings)).toEqual([capability.id, change.id]);
+    expect(findings[0].message).toContain('"specReviewed"');
+    expect(findings[0].message).toContain(RETIRED_STATE_FIELDS.specReviewed);
+    expect(findings[1].message).toContain('"appliedIn"');
+  });
+
+  it("is silent on a tree with no retired keys", () => {
+    expect(check("retired-state-field", { product: [cap()], changes: [node("change", { appliedAt: "2026-10-05T00:00:00.000Z" })] })).toEqual([]);
   });
 });

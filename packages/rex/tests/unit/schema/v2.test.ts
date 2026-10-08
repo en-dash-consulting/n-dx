@@ -24,6 +24,8 @@ import {
   ChangeIntentSchema,
   TaskIntentSchema,
   SubtaskIntentSchema,
+  CheckResultSchema,
+  RETIRED_STATE_FIELDS,
   type TaskIntent,
 } from "../../../src/schema/v2.js";
 import { RUN_SETTING_KEYS, type PRDItem } from "../../../src/schema/v1.js";
@@ -130,8 +132,22 @@ describe("criteria and amendments", () => {
       proposed: "The system exports a narrative report.",
       under: "A4",
       title: "Export a narrative report",
+      type: "capability",
     });
     expect(r.success).toBe(true);
+  });
+
+  it("types an added node as a capability or a constraint, nothing else", () => {
+    const added = { target: "A4.9", delta: "added", summary: "New rule", under: "A4", title: "No card numbers in logs" };
+    expect(AmendmentSchema.safeParse({ ...added, type: "constraint" }).success).toBe(true);
+    expect(AmendmentSchema.safeParse({ ...added, type: "area" }).success).toBe(false);
+    expect(AmendmentSchema.safeParse({ ...added, type: "change" }).success).toBe(false);
+  });
+
+  it("records the target's spec hash the amendment was drafted against", () => {
+    const r = AmendmentSchema.safeParse({ target: ID, delta: "modified", summary: "s", base: "a".repeat(64) });
+    expect(r.success && r.data.base).toBe("a".repeat(64));
+    expect(AmendmentSchema.safeParse({ target: ID, delta: "modified", summary: "s", base: 1 }).success).toBe(false);
   });
 
   it("rejects an unknown delta", () => {
@@ -172,9 +188,11 @@ describe("per-type intent", () => {
         touches: [ID],
         plannedRelease: "1.0.0",
         spike: false,
+        fix: true,
         priority: "high",
       }).success,
     ).toBe(true);
+    expect(ChangeIntentSchema.safeParse({ ...common, type: "change", fix: "yes" }).success).toBe(false);
     expect(TaskIntentSchema.safeParse({ ...common, type: "task", priority: "low", acceptanceCriteria: ["a"] }).success).toBe(true);
     expect(SubtaskIntentSchema.safeParse({ ...common, type: "subtask" }).success).toBe(true);
   });
@@ -285,9 +303,10 @@ describe("state", () => {
       resolutionDetail: "y",
       metAt: "sha256:abc",
       revisedAt: "2026-10-06T01:00:00.000Z",
-      specReviewed: true,
-      checks: [{ requirementId: "r1", result: "pass", at: "2026-10-06T01:00:00.000Z" }],
-      appliedIn: "e3d7052fe",
+      reviewedHash: "b".repeat(64),
+      checks: [{ requirementId: "r1", result: "pass", at: "2026-10-06T01:00:00.000Z", commit: "e3d7052fe" }],
+      appliedAt: "2026-10-06T01:00:00.000Z",
+      appliedAmendsHash: "c".repeat(64),
       shippedIn: "1.0.0",
       prs: ["https://github.com/o/r/pull/1"],
       issues: ["WM-1"],
@@ -300,6 +319,22 @@ describe("state", () => {
       lastModifiedBy: "Ryan Keith <ryan.k@endash.us>",
     });
     expect(r.success).toBe(true);
+  });
+
+  it("records the commit a check ran against", () => {
+    const check = { requirementId: "r1", result: "fail", at: "2026-10-06T01:00:00.000Z" };
+    expect(CheckResultSchema.parse({ ...check, commit: "e3d7052fe" }).commit).toBe("e3d7052fe");
+    expect(CheckResultSchema.safeParse(check).success).toBe(true);
+    expect(CheckResultSchema.safeParse({ ...check, commit: 7 }).success).toBe(false);
+  });
+
+  it("loads a retired key and keeps its value unconverted", () => {
+    expect(Object.keys(RETIRED_STATE_FIELDS).sort()).toEqual(["appliedIn", "specReviewed"]);
+    const state = ItemStateSchema.parse({ status: "completed", appliedIn: "e3d7052fe", specReviewed: true });
+    expect(state).toEqual({ status: "completed", appliedIn: "e3d7052fe", specReviewed: true });
+    expect(state.appliedAt).toBeUndefined();
+    expect(state.reviewedHash).toBeUndefined();
+    for (const key of Object.keys(RETIRED_STATE_FIELDS)) expect(ItemStateSchema.shape).not.toHaveProperty(key);
   });
 
   it("allows an empty entry (absent status reads as pending)", () => {
@@ -357,7 +392,7 @@ describe("field coverage (design intent/state tables)", () => {
     ["area", AreaIntentSchema, ["summary", "stewards"]],
     ["capability", CapabilityIntentSchema, ["statement", "criteria", "requirements", "dependsOn"]],
     ["constraint", ConstraintIntentSchema, ["statement", "requirements", "appliesTo"]],
-    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "priority", "loe", "loeRationale", "loeConfidence", "effort", "requirements", "discoveredFrom", "run"]],
+    ["change", ChangeIntentSchema, ["intent", "amends", "touches", "plannedRelease", "spike", "fix", "priority", "loe", "loeRationale", "loeConfidence", "effort", "requirements", "discoveredFrom", "run"]],
     ["task", TaskIntentSchema, ["description", "acceptanceCriteria", "requirements", "priority", "loe", "loeRationale", "loeConfidence", "effort", "run"]],
     ["subtask", SubtaskIntentSchema, ["description", "acceptanceCriteria"]],
   ];
@@ -371,8 +406,8 @@ describe("field coverage (design intent/state tables)", () => {
     const STATE = [
       "status", "startedAt", "completedAt", "endedAt", "activeIntervals",
       "failureReason", "resolutionType", "resolutionDetail",
-      "metAt", "revisedAt", "specReviewed", "checks",
-      "appliedIn", "shippedIn", "prs", "issues", "commits", "links",
+      "metAt", "revisedAt", "reviewedHash", "checks",
+      "appliedAt", "appliedAmendsHash", "shippedIn", "prs", "issues", "commits", "links",
       "assignee", "ready", "needsPlacement",
       "lastModified", "lastModifiedBy",
     ];
