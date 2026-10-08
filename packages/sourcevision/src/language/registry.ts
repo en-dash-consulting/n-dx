@@ -36,6 +36,13 @@ export interface LanguageConfig {
   /** Known configuration/build filenames (e.g. `"go.mod"`, `"tsconfig.json"`). */
   readonly configFilenames: ReadonlySet<string>;
 
+  /**
+   * Path patterns for config files a bare filename cannot name
+   * (`application-*.yml`, `gradle/libs.versions.toml`). Optional; matched
+   * against the repo-relative path in addition to `configFilenames`.
+   */
+  readonly configFilePatterns?: readonly RegExp[];
+
   /** Directories to skip during file traversal, in addition to the base set. */
   readonly skipDirectories: ReadonlySet<string>;
 

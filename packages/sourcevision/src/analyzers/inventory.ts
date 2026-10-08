@@ -265,6 +265,7 @@ export function classifyRole(filePath: string, language: string, langConfig?: La
   // 3. Config — language-specific filenames + universal heuristics
   if (
     config.configFilenames.has(name) ||
+    config.configFilePatterns?.some((pat) => pat.test(filePath)) ||
     CONFIG_CONVENTION_PATTERN.test(name) ||
     name.startsWith("tsconfig") ||
     name === ".env" ||
