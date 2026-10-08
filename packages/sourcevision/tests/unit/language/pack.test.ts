@@ -60,6 +60,12 @@ describe("loadLanguagePacks", () => {
     expect(messages[0]).toContain("inventory only");
   });
 
+  it("names the build:grammars script in a source checkout", () => {
+    const [status] = loadLanguagePacks({ packs: [pack], grammarDir, warn });
+
+    expect(status.notice).toContain("pnpm --filter @n-dx/sourcevision build:grammars");
+  });
+
   it("reports each pack independently", () => {
     writeFileSync(join(grammarDir, "tree-sitter-fake.wasm"), "");
     const other = { ...pack, grammar: { name: "tree-sitter-absent", version: "0.1.0" } };
