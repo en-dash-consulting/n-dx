@@ -17,7 +17,8 @@
  *   feature becomes a change (applied when completed) with its tasks kept.
  * - A change is placed on a capability or constraint by the placement rules
  *   (`rankPlacementCandidates`) only on a clear leader; otherwise it is held
- *   with `needsPlacement`, as is any item the rules cannot shape.
+ *   with `needsPlacement`, as is any item the rules cannot shape. The model
+ *   passes (`./placement-pass.ts`) may then place a held change.
  *
  * The plan also proposes the area list (flagging titles that are not
  * job-shaped, and areas that hold no product node) and the constraints.
@@ -27,7 +28,13 @@
 
 import type { ItemLevel, ItemStatus, PRDItem } from "../../schema/v1.js";
 import type { NodeType } from "../../schema/v2.js";
-import { placementRelation, rankPlacementCandidates, type PlacementNode, type PlacementRelation } from "../../core/placement.js";
+import {
+  placementRelation,
+  rankPlacementCandidates,
+  type PlacementChange,
+  type PlacementNode,
+  type PlacementRelation,
+} from "../../core/placement.js";
 
 // ── Plan shape ───────────────────────────────────────────────────
 
@@ -355,11 +362,15 @@ function historyOf(item: PRDItem, node: string, area: string, plan: PlanBuilder)
  */
 const MIN_PLACEMENT_SCORE = 2;
 
+/** A v1 item as the change placement ranks: the same input for the rules and the model passes. */
+export function placementChangeOf(item: PRDItem): PlacementChange {
+  return { title: item.title, intent: item.description, fix: isFixShaped(item), tags: item.tags };
+}
+
 /** Place held changes on a clear rules leader; otherwise hold them for a person. */
 function place(plan: PlanBuilder): void {
   for (const { entry, area, item } of plan.unplaced) {
-    const fix = isFixShaped(item);
-    const change = { title: item.title, intent: item.description, fix, tags: item.tags };
+    const change = placementChangeOf(item);
     entry.relation ??= placementRelation(change);
     const local = plan.productNodes.filter((n) => n.area === area);
     const pools = area !== undefined && local.length > 0 ? [local, plan.productNodes] : [plan.productNodes];

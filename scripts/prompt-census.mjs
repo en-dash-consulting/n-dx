@@ -190,6 +190,12 @@ const SURFACES = [
   },
   {
     pkg: "rex",
+    file: "packages/rex/src/analyze/place-reason.ts",
+    builder: "buildPlacementEnvelope",
+    purpose: "Place a change on a shortlisted capability or constraint, or propose a new node.",
+  },
+  {
+    pkg: "rex",
     file: "packages/rex/src/analyze/rename-resolve.ts",
     builder: "buildRenameEnvelope",
     purpose: "Pick the better of two colliding item titles.",

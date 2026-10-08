@@ -74,7 +74,7 @@ export async function runPlanPipeline<TData, TEntry, TSummary, TOptions>(
     passes.push(record);
     const recorded: Record<string, RecordedAnswer> = {};
     const earlier = previous?.answers[name] ?? {};
-    for (const q of pass.questions(entries, data)) {
+    for (const q of pass.questions(entries, data, context)) {
       // Own-property lookups: an item id may name an Object.prototype member ("constructor").
       const content = itemHash.get(q.id);
       const entry = Object.hasOwn(entries, q.id) ? entries[q.id] : undefined;
@@ -96,7 +96,7 @@ export async function runPlanPipeline<TData, TEntry, TSummary, TOptions>(
         }
       }
       recorded[q.id] = { hash, model: seam.model, answer };
-      entries[q.id] = pass.merge(entry, answer);
+      entries[q.id] = await pass.merge(entry, answer, { question: q.question, context });
     }
     answers[name] = recorded;
   }

@@ -4,7 +4,9 @@
  * Source: {@link v1TreeSource}, a v1 item tree. Rules: classification
  * (`./migration-plan.ts`), capability spec drafts (`./capability-spec.ts`) and
  * per-item data (`./migration-plan-data.ts`), joined into one entry per v1
- * item. No model pass is defined yet; nothing applies the plan yet.
+ * item. Model passes: text and Jev placement of the changes the rules hold
+ * (`./placement-pass.ts`); the caller supplies their seams with
+ * `placementSeams`. Nothing applies the plan yet.
  *
  * @module migrations/v1-to-v2
  */
@@ -15,6 +17,7 @@ import { defineMigration } from "../pipeline.js";
 import { draftCapabilitySpecs, type CapabilitySpecDraft, type SpecDraftOptions } from "./capability-spec.js";
 import { buildPlanData, type ItemPlanData, type PlanData, type PlanDataOptions } from "./migration-plan-data.js";
 import { classifyV1Tree, type ClassifyOptions, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
+import { placementJevPass, placementTextPass, type PlacementFields, type PlacementPassOptions } from "./placement-pass.js";
 
 export const V1_TREE_SOURCE_KIND = "rex-v1-tree";
 
@@ -37,7 +40,7 @@ export function v1TreeSource(items: readonly PRDItem[]): MigrationSource<readonl
   return { kind: V1_TREE_SOURCE_KIND, read: () => ({ data: items, items: sourceItems(items, undefined, []) }) };
 }
 
-export interface V1ToV2Entry extends PlanEntry {
+export interface V1ToV2Entry extends PlanEntry, PlacementFields {
   data?: ItemPlanData;
   spec?: CapabilitySpecDraft;
 }
@@ -54,7 +57,8 @@ export interface V1ToV2Summary {
 /** Outside facts the rules read; the caller gathers them, the migration never shells out. */
 export type V1ToV2Options = Partial<Pick<SpecDraftOptions, "testFiles" | "codeFiles" | "testCommand" | "minTestScore">> &
   Omit<PlanDataOptions, "cutAt" | "specs"> &
-  ClassifyOptions;
+  ClassifyOptions &
+  PlacementPassOptions;
 
 export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Summary, V1ToV2Options>({
   id: "v1-to-v2",
@@ -85,4 +89,5 @@ export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Sum
       },
     };
   },
+  passes: { text: placementTextPass, jev: placementJevPass },
 });

@@ -62,11 +62,15 @@ export interface PassSeam {
   ask(question: ModelQuestion): Promise<unknown>;
 }
 
-export interface ModelPass<TData, TEntry> {
+export interface ModelPass<TData, TEntry, TOptions = undefined> {
   /** Questions to ask, at most one per item, from the entries so far. */
-  questions(entries: Readonly<Record<string, TEntry>>, data: TData): ModelQuestion[];
-  /** The entry with an answer folded in. */
-  merge(entry: TEntry, answer: unknown): TEntry;
+  questions(entries: Readonly<Record<string, TEntry>>, data: TData, context: PlanContext<TOptions>): ModelQuestion[];
+  /** The entry with an answer (recorded or fresh) to `question` folded in. */
+  merge(
+    entry: TEntry,
+    answer: unknown,
+    at: { question: unknown; context: PlanContext<TOptions> },
+  ): TEntry | Promise<TEntry>;
 }
 
 export interface PlanContext<TOptions = undefined> {
@@ -90,7 +94,7 @@ export interface MigrationDefinition<TData, TEntry, TSummary, TOptions = undefin
   to: string;
   /** Deterministic: same data and context, same result. */
   rules(data: TData, context: PlanContext<TOptions>): RulesResult<TEntry, TSummary>;
-  passes?: Partial<Record<ModelPassName, ModelPass<TData, TEntry>>>;
+  passes?: Partial<Record<ModelPassName, ModelPass<TData, TEntry, TOptions>>>;
 }
 
 /** Applies a reviewed plan. A slot for the apply command; no migration fills it yet. */
