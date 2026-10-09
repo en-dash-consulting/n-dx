@@ -5,15 +5,15 @@
     "perCallTokens": 22851,
     "uniqueTokens": 14348,
     "skills": 13,
-    "skillTokens": 20066
+    "skillTokens": 20439
   },
   "skills": [
     {
       "name": "ndx-adversarial-review",
       "file": "packages/core/assistant-assets/skills/ndx-adversarial-review.md",
       "shipped": true,
-      "chars": 22151,
-      "tokens": 5538
+      "chars": 22420,
+      "tokens": 5605
     },
     {
       "name": "iso-map",
@@ -23,6 +23,13 @@
       "tokens": 2072
     },
     {
+      "name": "ndx-reshape",
+      "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
+      "shipped": true,
+      "chars": 7584,
+      "tokens": 1896
+    },
+    {
       "name": "triage",
       "file": ".claude/skills/triage/SKILL.md",
       "shipped": false,
@@ -30,32 +37,25 @@
       "tokens": 1856
     },
     {
-      "name": "ndx-reshape",
-      "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
-      "shipped": true,
-      "chars": 7339,
-      "tokens": 1835
-    },
-    {
       "name": "ndx-work",
       "file": "packages/core/assistant-assets/skills/ndx-work.md",
       "shipped": true,
-      "chars": 6549,
-      "tokens": 1638
+      "chars": 6794,
+      "tokens": 1699
     },
     {
       "name": "ndx-capture",
       "file": "packages/core/assistant-assets/skills/ndx-capture.md",
       "shipped": true,
-      "chars": 6162,
-      "tokens": 1541
+      "chars": 6407,
+      "tokens": 1602
     },
     {
       "name": "ndx-plan",
       "file": "packages/core/assistant-assets/skills/ndx-plan.md",
       "shipped": true,
-      "chars": 5901,
-      "tokens": 1476
+      "chars": 6146,
+      "tokens": 1537
     },
     {
       "name": "dev-link",
@@ -68,8 +68,8 @@
       "name": "ndx-config",
       "file": "packages/core/assistant-assets/skills/ndx-config.md",
       "shipped": true,
-      "chars": 4740,
-      "tokens": 1185
+      "chars": 4985,
+      "tokens": 1247
     },
     {
       "name": "ndx-feedback",
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "5b64cca9e5c628f0",
-  "recordedAt": "2026-10-09T05:32:51.006Z",
-  "commit": "fd9b8ccf4030",
+  "contentHash": "25ae167107e10c32",
+  "recordedAt": "2026-10-09T16:55:32.158Z",
+  "commit": "13c6f41b559e",
   "dirty": false
 }
