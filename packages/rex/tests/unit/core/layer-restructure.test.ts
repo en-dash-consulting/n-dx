@@ -120,6 +120,21 @@ describe("draftProductReshape", () => {
     ]);
   });
 
+  it("skips a merge of a constraint whose requirements or appliesTo the survivor would not carry", () => {
+    const requirement = { id: "r1", title: "Suite passes", category: "quality", validationType: "automated", acceptanceCriteria: ["green"] };
+    const cases: Array<[Record<string, unknown>, RegExp]> = [
+      [{ requirements: [requirement] }, /con2 has requirements, which a merge would drop/],
+      [{ appliesTo: "all" }, /con2 has appliesTo, which a merge would drop/],
+    ];
+    for (const [extra, reason] of cases) {
+      const constraint = (id: string, fields: Record<string, unknown> = {}) => node({ id, type: "constraint", statement: `${id} holds`, ...fields });
+      const tree: RuleNode[] = [node({ id: "area1", type: "area", children: [constraint("con1"), constraint("con2", extra)] })];
+      const draft = draftProductReshape(tree, [{ id: "p", action: { action: "merge", survivorId: "con1", mergedIds: ["con2"], reason: "r" } }]);
+      expect(draft.amends).toEqual([]);
+      expect(draft.skipped).toEqual([{ proposalId: "p", reason: expect.stringMatching(reason) }]);
+    }
+  });
+
   it("drafts a merge of a capability whose body is only History", () => {
     const tree: RuleNode[] = [node({ id: "area1", type: "area", children: [capability("cap1"), capability("cap2", { body: "## History\n\n- 2026-10-01 CH1 added: s" })] })];
     const draft = draftProductReshape(tree, [{ id: "p", action: { action: "merge", survivorId: "cap1", mergedIds: ["cap2"], reason: "r" } }]);
