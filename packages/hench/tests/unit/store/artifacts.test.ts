@@ -39,6 +39,7 @@ describe("isHenchRuntimeArtifact", () => {
 
   it("matches the pending-commit scratch file", () => {
     expect(isHenchRuntimeArtifact(".hench-commit-msg.txt")).toBe(true);
+    expect(isHenchRuntimeArtifact(".ndx-commit-msg.txt")).toBe(true);
   });
 
   it("matches the run log directory, which exists before the run's gates fire", () => {
