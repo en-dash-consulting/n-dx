@@ -16,6 +16,7 @@ import {
   getLevelLabel,
   getLevelPlural,
 } from "../schema/index.js";
+import { checkV2Rules, type RuleFinding, type V2Tree } from "../schema/v2-rules.js";
 import { walkTree } from "./tree.js";
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -564,4 +565,28 @@ export function checkStructureHealth(
   walkContainers(items);
 
   return { healthy: warnings.length === 0, warnings };
+}
+
+// ── v2 tree rules ───────────────────────────────────────────────────────────
+
+/**
+ * Run every v2 tree rule over a loaded v2 tree. `structureHealth` supplies
+ * `maxCriteriaPerCapability` as the `criteria-growth` threshold.
+ */
+export function checkV2TreeHealth(
+  tree: V2Tree,
+  structureHealth?: StructureHealthThresholds,
+  now: Date = new Date(),
+): RuleFinding[] {
+  return checkV2Rules(tree, { now, maxCriteria: structureHealth?.maxCriteriaPerCapability });
+}
+
+/** Render v2 rule findings as text. */
+export function formatV2Findings(findings: readonly RuleFinding[]): string {
+  if (findings.length === 0) return "Tree rules: no findings";
+  const lines = ["Tree rules:"];
+  for (const f of findings) {
+    lines.push(`  ${f.severity === "error" ? "✗" : "⚠"} ${f.message} [${f.rule}]`);
+  }
+  return lines.join("\n");
 }

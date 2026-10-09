@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
-import { computeHealthScore, formatHealthScore } from "../../core/health.js";
+import { prdLayout, loadPrdModel } from "../../store/prd-model-reader.js";
+import { computeHealthScore, formatHealthScore, checkV2TreeHealth, formatV2Findings } from "../../core/health.js";
 
 import { result } from "../output.js";
 
@@ -19,8 +20,17 @@ export async function cmdHealth(
 
   const rexDir = resolveRexPaths(dir).rexDir;
   const store = await resolveStore(rexDir);
-  const doc = await store.loadDocument();
 
+  // A v2 tree has no level-based items to score; the v2 tree rules run instead.
+  // A v1 tree takes the path below, unchanged.
+  if ((await prdLayout(rexDir)) === "v2") {
+    const model = await loadPrdModel(rexDir);
+    const findings = checkV2TreeHealth(model.tree, (await store.loadConfig()).structureHealth);
+    result(flags.format === "json" ? JSON.stringify({ treeRules: findings }, null, 2) : formatV2Findings(findings));
+    return;
+  }
+
+  const doc = await store.loadDocument();
   const health = computeHealthScore(doc.items);
 
   if (flags.format === "json") {

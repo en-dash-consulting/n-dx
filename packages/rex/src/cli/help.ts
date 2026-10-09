@@ -694,7 +694,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Computes a multi-dimensional health score (0–100) for the PRD structure.\n" +
       "Evaluates depth (items at correct nesting), balance (even distribution),\n" +
       "granularity (task quality), completeness (metadata coverage), and\n" +
-      "staleness (stale in-progress items). Includes up to 3 improvement suggestions.",
+      "staleness (stale in-progress items). Includes up to 3 improvement suggestions.\n\n" +
+      "On a v2 tree (product/ and changes/) it runs the tree rules instead and lists their\n" +
+      "findings, including a capability over rex.structureHealth.maxCriteriaPerCapability\n" +
+      "capability criteria (own plus inherited; default 15).",
     options: [
       { flag: "--format=json", description: "Machine-readable output" },
     ],
