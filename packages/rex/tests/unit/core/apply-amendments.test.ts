@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { ApplyAmendmentsError, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
+import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
 import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
@@ -513,10 +513,11 @@ describe("applyAmendmentsProblems", () => {
     ]);
   });
 
-  it("does not count a summary-only amendment, which placement records by decision, but still counts the others", () => {
+  it("counts a summary-only amendment, with the others", () => {
     const bare: Amendment = { target: CAP, delta: "modified", summary: "s" };
-    expect(applyAmendmentsProblems(tree([bare]), CHANGE, NOW)).toEqual([]);
+    expect(applyAmendmentsProblems(tree([bare]), CHANGE, NOW)).toEqual([`amendment 1 (modified ${CAP}): ${NOTHING_TO_MODIFY}`]);
     expect(applyAmendmentsProblems(tree([bare, { target: CON, delta: "modified", summary: "s", criteria: { remove: ["c1"] } }]), CHANGE, NOW)).toEqual([
+      `amendment 1 (modified ${CAP}): ${NOTHING_TO_MODIFY}`,
       `amendment 2 (modified ${CON}): a constraint has no criteria`,
     ]);
   });

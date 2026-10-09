@@ -6,7 +6,7 @@
  * it writes the change's `touches` or a `modified` amendment and clears
  * `needsPlacement` (`core/change-place.ts`). An amendment takes its
  * `proposed` text and `criteria` delta here: no other tool edits a v2
- * amendment, and apply refuses a modified amendment with neither.
+ * amendment, and an amends placement with neither is refused, as apply would.
  */
 
 import { z } from "zod";
@@ -70,16 +70,16 @@ export const placeChangeTool = defineTool({
   description:
     "Place a v2 change on the product layer. Without target: returns the rules' shortlist of capabilities and constraints the change " +
     "could amend or touch, best first, and the relation the rules chose. With target: records it (touches joins the change's touches; " +
-    "amends adds a modified amendment with any proposed text and criteria delta; apply_change needs at least one) and clears needsPlacement. " +
+    "amends adds a modified amendment and needs proposed text or a criteria delta, or it is refused as apply_change would) and clears needsPlacement. " +
     "Only an open change is placed.",
   schema: {
     id: z.string().describe("Change id, display id (e.g. CH-12) or alias"),
     target: z.string().optional().describe("Capability or constraint to place the change on. Omit to get the shortlist without writing"),
     relation: z.enum(["touches", "amends"]).optional().describe("With target: touches (works on it) or amends (edits its requirements). Default: the rules' relation"),
     summary: z.string().optional().describe("With target and relation amends: the amendment's summary. Default: the change's title"),
-    proposed: z.string().optional().describe("With target and relation amends: the target's replacement statement"),
+    proposed: z.string().optional().describe("With target and relation amends: the target's replacement statement. Required with amends unless criteria is given"),
     criteria: AmendmentSchema.shape.criteria.describe(
-      "With target and relation amends: capability criteria edits ({add?: [{id, text}], replace?: [{id, text}], remove?: [id]})",
+      "With target and relation amends: capability criteria edits ({add?: [{id, text}], replace?: [{id, text}], remove?: [id]}). Required with amends unless proposed is given",
     ),
   },
   access: (args) => (args.target === undefined ? "read" : "write"),

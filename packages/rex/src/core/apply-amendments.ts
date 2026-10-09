@@ -154,18 +154,13 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
  * `force`, since a base that goes stale is apply's to judge later, and
  * discards the result, so no stamp (`appliedAt`, `metAt`) reaches the caller's
  * tree, which apply never modifies.
- *
- * {@link NOTHING_TO_MODIFY} is not counted: a summary-only `modified`
- * amendment is what place_change records when it is given no content, by
- * decision. While one is present apply stops before the rules on the result,
- * so the dry run reports only the other amendments' own problems.
  */
 export function applyAmendmentsProblems(tree: V2Tree, changeRef: string, now: Date): readonly string[] {
   try {
     applyAmendments(tree, changeRef, { appliedAt: now.toISOString(), now, force: true });
     return [];
   } catch (error) {
-    if (error instanceof ApplyAmendmentsError) return error.problems.filter((p) => !p.endsWith(`: ${NOTHING_TO_MODIFY}`));
+    if (error instanceof ApplyAmendmentsError) return error.problems;
     throw error;
   }
 }

@@ -10,7 +10,8 @@
  *   change's `touches`; an `amends` target becomes a `modified` amendment with
  *   `base` set to the target's current spec hash, so apply refuses it if the
  *   spec moves first, carrying the caller's `proposed` text and `criteria`
- *   delta (apply needs one of them to modify the target). The change is
+ *   delta (apply needs one of them to modify the target, so an amends
+ *   placement with neither is refused). The change is
  *   dry-run through apply (`applyAmendmentsProblems`), and a problem the new
  *   amendment brings refuses the placement in apply's words, since nothing
  *   edits the amendment afterwards. Either clears `needsPlacement`.
@@ -24,7 +25,7 @@
  */
 
 import type { Amendment, ChangeNode, CriteriaDelta } from "../schema/v2.js";
-import { applyAmendmentsProblems } from "./apply-amendments.js";
+import { applyAmendmentsProblems, NOTHING_TO_MODIFY } from "./apply-amendments.js";
 import { checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import {
   placementRelation,
@@ -130,7 +131,10 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
     // Only what the new amendment brings: the change's earlier amendments were judged when they were stored.
     const before = new Set(applyAmendmentsProblems(tree, change.id, now));
     const problems = applyAmendmentsProblems(next, change.id, now).filter((p) => !before.has(p));
-    if (problems.length) throw new ChangePlacementError(`Cannot place change ${label}: ${problems.join("; ")}`);
+    if (problems.length) {
+      const hint = problems.some((p) => p.endsWith(NOTHING_TO_MODIFY)) ? ". Pass proposed or criteria, or use relation touches" : "";
+      throw new ChangePlacementError(`Cannot place change ${label}: ${problems.join("; ")}${hint}`);
+    }
   }
   return { tree: next, change: change.id, placement: { target: target.id, relation } };
 }
