@@ -12,6 +12,12 @@
 # Action versions: checkout@v6, setup-node@v6, pnpm/action-setup@v5 all run
 # on Node.js 24. upload-artifact@v4 and download-artifact@v4 are already on
 # Node.js 24 and do not require bumping.
+#
+# Every `uses:` is pinned to a commit SHA with the version in a trailing
+# comment. A version tag is a moving pointer the action's owner can repoint at
+# any commit, so a tag pin re-resolves on every run; a SHA does not. Dependabot
+# (.github/dependabot.yml) opens the PRs that move these pins, which is what
+# keeps pinning from meaning "never updated".
 
 name: CI
 
@@ -19,6 +25,18 @@ on:
   push:
     branches: [main]
   pull_request:
+
+# Least privilege for every job in this file. CI only ever needs to read the
+# checkout; nothing here writes to the repository, comments on a PR, or mints
+# a token. Without this block the jobs inherit the repository default, which
+# is write — and these jobs run code from the pull request branch, so the
+# token they hold is the blast radius of anything that branch executes.
+#
+# GitHub already downgrades the token to read-only for pull requests from a
+# fork, so this is what covers same-repository branches, which get the
+# repository default.
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -69,18 +87,27 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: ${{ matrix.fetch-depth }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 22
           cache: pnpm
+
+      # Before install: the lockfile decides what install fetches, so a gate
+      # that runs afterwards has already let the thing it is checking for run.
+      # Invoked directly rather than through `pnpm security:lockfile` so the
+      # gate does not depend on pnpm's script runner working against an
+      # uninstalled workspace. The script itself has no dependencies.
+      - name: Check supply-chain integrity
+        if: runner.os == 'Linux'
+        run: node scripts/check-lockfile-integrity.mjs
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -169,7 +196,7 @@ jobs:
       # not an error, so a collector that died before the write is still fine here.
       - name: Upload smoke artifact
         if: always() && matrix.smoke
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ndx-cli-smoke-${{ matrix.smoke }}
           path: ndx-cli-smoke-${{ matrix.smoke }}.json
@@ -245,21 +272,21 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 22
 
       - name: Download macOS smoke artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ndx-cli-smoke-macos
           path: smoke-macos
 
       - name: Download Windows smoke artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ndx-cli-smoke-windows
           path: smoke-windows
