@@ -23,7 +23,6 @@
  */
 
 import type { PRDItem } from "../../schema/v1.js";
-import { specHash } from "../../schema/v2-rules.js";
 import type { ModelPass, ModelQuestion, PlanContext } from "../migration.js";
 import {
   asSentence,
@@ -37,7 +36,7 @@ import {
   type CapabilitySpecDraft,
   type CriterionCandidate,
 } from "./capability-spec.js";
-import type { ItemPlanData } from "./migration-plan-data.js";
+import { stampReview, type ItemPlanData } from "./migration-plan-data.js";
 import type { PlanEntry } from "./migration-plan.js";
 
 /** The question kind a seam must list in `kinds` to be asked for specs. */
@@ -210,8 +209,8 @@ export const specTextPass: ModelPass<readonly PRDItem[], Entry, SpecPassOptions 
     if (!entry.spec || !isSpecQuestion(question)) throw new Error(`spec answer for ${entry.id}, which has no spec draft`);
     const model = modelOf(context);
     const spec = redraftSpec(entry.spec, question, asSpecAnswer(answer), model, context.options?.testCommand);
-    // A capability listed as reviewed is reviewed as migrated: its hash follows the spec it gets.
-    const data = entry.data?.reviewedHash !== undefined ? { ...entry.data, reviewedHash: specHash(spec) } : entry.data;
+    // Reviewed only if the redraft is the spec the reviewer approved.
+    const data = entry.data ? stampReview(entry.data, spec) : undefined;
     return { ...entry, spec, ...(data ? { data } : {}) };
   },
 };

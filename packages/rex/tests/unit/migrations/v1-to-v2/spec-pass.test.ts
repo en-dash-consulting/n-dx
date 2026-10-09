@@ -138,14 +138,45 @@ describe("v1-to-v2 spec text pass", () => {
     expect(spec.notes.join("\n")).toMatch(/packages\/web\/tests\/x\.test\.ts, which the question did not pass in/);
   });
 
-  it("carries no specReviewed field and leaves reviewedHash unset; a reviewed capability's hash follows the redrafted spec", async () => {
+  it("carries no specReviewed field and leaves an unlisted capability's reviewedHash unset", async () => {
     const p = await plan(drafter(GOOD));
     expect(p.entries.f1!.spec).not.toHaveProperty("specReviewed");
     expect(p.entries.f1!.data?.reviewedHash).toBeUndefined();
+  });
 
-    const reviewed = await plan(drafter(GOOD), { options: { reviewed: ["f1"] } });
-    const spec = reviewed.entries.f1!.spec!;
-    expect(reviewed.entries.f1!.data?.reviewedHash).toBe(specHash(spec));
+  it("stamps reviewedHash when the redraft is the spec the reviewer approved", async () => {
+    const approved = specHash((await plan(drafter(GOOD))).entries.f1!.spec!);
+    const p = await plan(drafter(GOOD), { options: { reviewed: [{ id: "f1", hash: approved }] } });
+    expect(p.entries.f1!.data).toMatchObject({ approvedHash: approved, reviewedHash: approved });
+    expect(p.entries.f1!.data?.reviewNote).toBeUndefined();
+    expect(p.summary.reviewQueue.map((q) => q.id)).not.toContain("f1");
+  });
+
+  it("leaves a redraft that differs from the approved spec unreviewed, noted and queued", async () => {
+    // The reviewer approved the template draft; the model then redrafted it.
+    const template = await v1ToV2.plan(v1TreeSource(tree()), { cutAt: CUT, options: { testFiles: TEST_FILES } });
+    const approved = specHash(template.entries.f1!.spec!);
+    const p = await plan(drafter(GOOD), { options: { reviewed: [{ id: "f1", hash: approved }] } });
+    const current = specHash(p.entries.f1!.spec!);
+    expect(current).not.toBe(approved);
+    expect(p.entries.f1!.data?.reviewedHash).toBeUndefined();
+    expect(p.entries.f1!.data?.reviewNote).toContain(`approved ${approved}`);
+    expect(p.entries.f1!.data?.reviewNote).toContain(`current ${current}`);
+    expect(p.summary.reviewQueue).toContainEqual({ id: "f1", held: false, specChanged: true });
+
+    // Approving the template stamps it when no model redrafts.
+    const plain = await v1ToV2.plan(v1TreeSource(tree()), { cutAt: CUT, options: { testFiles: TEST_FILES, reviewed: [{ id: "f1", hash: approved }] } });
+    expect(plain.entries.f1!.data?.reviewedHash).toBe(approved);
+  });
+
+  it("keeps reviewedHash on a re-run with unchanged sources", async () => {
+    const approved = specHash((await plan(drafter(GOOD))).entries.f1!.spec!);
+    const options = { reviewed: [{ id: "f1", hash: approved }] };
+    const first = await plan(drafter(GOOD), { options });
+    const again = drafter({ statement: "Something else entirely happens here.", criteria: [] });
+    const second = await plan(again, { previous: first, options });
+    expect(again).not.toHaveBeenCalled();
+    expect(second.entries.f1!.data?.reviewedHash).toBe(approved);
   });
 
   it("records the answers in the plan and reuses them on an unchanged re-run", async () => {

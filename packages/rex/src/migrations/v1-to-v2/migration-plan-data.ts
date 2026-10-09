@@ -22,9 +22,11 @@
  *   `completedAt`, else the plan's cut time. Without it the change would read
  *   as changing forever. `appliedIn` and `specReviewed` are retired and never
  *   written.
- * - `reviewedHash` on each capability the caller lists as reviewed: the
- *   `specHash` of its drafted spec, so it reads reviewed until the spec is
- *   edited. Unlisted nodes stay unreviewed.
+ * - `reviewedHash` on each capability the caller lists as reviewed, only while
+ *   its drafted spec's `specHash` is the hash the reviewer approved
+ *   (`stampReview`). A draft that changed since approval stays unreviewed, with
+ *   a `reviewNote` naming both hashes, and joins the review queue. Unlisted
+ *   nodes stay unreviewed.
  * - `slug` on each item whose v1 directory name cannot be frozen in v2 (a title
  *   of "Con", "AUX" or "Nul", which Windows cannot create, or "Index", which is
  *   its folder's index.md once the item is a leaf): v2 freezes slugs and the
@@ -58,13 +60,19 @@ export interface ReleaseTag {
   date: string;
 }
 
+/** A capability a reviewer approved: its v1 id and the `specHash` of the draft they read. */
+export interface ReviewedSpec {
+  id: string;
+  hash: string;
+}
+
 export interface PlanDataOptions {
   /** ISO time the plan is cut: the `appliedAt` of an applied change with no `completedAt`. Required, so the plan stays deterministic. */
   cutAt: string;
   /** Drafted specs (`draftCapabilitySpecs`), the source of each `reviewedHash`. */
   specs?: readonly CapabilitySpecDraft[];
-  /** v1 ids of capabilities the plan marks reviewed. An id with no draft in `specs` gets no hash. */
-  reviewed?: readonly string[];
+  /** Capabilities a reviewer approved, each with the `specHash` they approved. An id with no draft in `specs` gets no hash. */
+  reviewed?: readonly ReviewedSpec[];
   /** Release tags; order does not matter. */
   releases?: readonly ReleaseTag[];
   /** Release version of the merged PR that delivered an item (v1 id): beats the tag backfill. */
@@ -88,8 +96,12 @@ export interface ItemPlanData {
   slug?: { from: string; to: string };
   /** Applied changes only: ISO time the change counts as applied. */
   appliedAt?: string;
-  /** Reviewed capabilities only: `specHash` of the migrated spec. */
+  /** Listed capabilities only: the `specHash` the reviewer approved. Plan-only; never written to v2. */
+  approvedHash?: string;
+  /** Set only while the migrated spec's `specHash` is `approvedHash`. */
   reviewedHash?: string;
+  /** Set when the migrated spec is not the one approved: names the approved and current hashes. */
+  reviewNote?: string;
   shippedIn?: { version: string; source: "pr-merge" | "release-tag" };
   flags: DataFlag[];
   /** Present when `loe` was a legacy bucket: drop the numeric loe, set this rationale. */
@@ -225,12 +237,29 @@ function planSlugs(items: readonly PRDItem[], plan: MigrationPlan): Map<string, 
   return out;
 }
 
+// ── Review ───────────────────────────────────────────────────────
+
+/**
+ * `data` with review re-checked against `spec`, the capability's current draft:
+ * `reviewedHash` when its `specHash` is `approvedHash`, else a `reviewNote`
+ * naming both. Every pass that changes the draft calls this. Data with no
+ * `approvedHash` is returned as is.
+ */
+export function stampReview(data: ItemPlanData, spec: { statement?: string; criteria?: Criterion[] }): ItemPlanData {
+  const { approvedHash } = data;
+  if (approvedHash === undefined) return data;
+  const { reviewedHash: _reviewed, reviewNote: _note, ...rest } = data;
+  const current = specHash(spec);
+  if (current === approvedHash) return { ...rest, reviewedHash: current };
+  return { ...rest, reviewNote: `the draft changed since review: approved ${approvedHash}, current ${current}; review it again` };
+}
+
 // ── Build ────────────────────────────────────────────────────────
 
 /** Data for every item in the tree. Same tree, plan and options always give the same result. */
 export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, options: PlanDataOptions): PlanData {
   const { cutAt, releases = [], prMerges = {} } = options;
-  const reviewed = new Set(options.reviewed ?? []);
+  const approved = new Map((options.reviewed ?? []).map((r) => [r.id, r.hash]));
   const specById = new Map((options.specs ?? []).map((d) => [d.capability, d]));
   const result: PlanData = {
     items: {},
@@ -286,7 +315,10 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
         data.appliedAt = done !== undefined && !Number.isNaN(Date.parse(done)) ? done : cutAt;
       }
       const draft = specById.get(item.id);
-      if (entry?.target === "capability" && reviewed.has(item.id) && draft) data.reviewedHash = specHash(draft);
+      const approvedHash = approved.get(item.id);
+      if (entry?.target === "capability" && approvedHash !== undefined && draft) {
+        Object.assign(data, stampReview({ ...data, approvedHash }, draft));
+      }
 
       if (criteriaInTags(item)) data.flags.push("criteria-in-tags");
       if ((titles.get(item.title.trim().toLowerCase()) ?? 0) > 1) data.flags.push("duplicate-title");
@@ -309,7 +341,7 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
       const merged = existing ? { ...data, aliases: existing.aliases } : data;
       const interesting =
         merged.slug ||
-        merged.criteria || merged.aliases || merged.appliedAt || merged.reviewedHash || merged.shippedIn || merged.flags.length || merged.legacyLoe || merged.droppedMeta || merged.droppedLog;
+        merged.criteria || merged.aliases || merged.appliedAt || merged.approvedHash || merged.shippedIn || merged.flags.length || merged.legacyLoe || merged.droppedMeta || merged.droppedLog;
       if (interesting) result.items[item.id] = merged;
       else delete result.items[item.id];
 

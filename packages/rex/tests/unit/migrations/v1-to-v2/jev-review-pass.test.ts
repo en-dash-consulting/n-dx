@@ -7,6 +7,7 @@ import { v1ToV2, v1TreeSource, type V1ToV2Options } from "../../../../src/migrat
 import { MIGRATION_JUDGE_TASK_CLASS } from "../../../../src/migrations/v1-to-v2/jev-review-pass.js";
 import { planSeams, type PlanSeamOptions } from "../../../../src/migrations/v1-to-v2/seams.js";
 import { choiceAnswer, mockJudge, noulAnswer } from "../../../helpers/jev-judge.js";
+import { specHash } from "../../../../src/schema/v2-rules.js";
 
 function item(id: string, level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {
   return { id, level, title, status, children, ...extra };
@@ -110,12 +111,23 @@ describe("v1-to-v2 Jev review", () => {
     }
   });
 
-  it("never stamps reviewedHash: a dropped link on a reviewed capability clears it", async () => {
-    const kept = await plan(CONFIDENT, judgeWith({ place: choiceAnswer("f1", 0.5) }), { options: { reviewed: ["f1"] } });
-    expect(kept.entries.f1?.data?.reviewedHash).toBeDefined();
-    const p = await plan(CONFIDENT, judgeWith({ place: choiceAnswer("f1", 0.5), "link:l1": noulAnswer(0.05) }), { options: { reviewed: ["f1"] } });
+  it("after a dropped link, stamps reviewedHash only when the spec is the approved one", async () => {
+    const drop = () => judgeWith({ place: choiceAnswer("f1", 0.5), "link:l1": noulAnswer(0.05) });
+    const unreviewed = await plan(CONFIDENT, drop());
+    const spec = unreviewed.entries.f1!.spec!;
+    expect(spec.tests).toEqual([]);
+    const current = specHash(spec);
+
+    // Links are not hashed: the spec the reviewer approved is still the spec.
+    const kept = await plan(CONFIDENT, drop(), { options: { reviewed: [{ id: "f1", hash: current }] } });
+    expect(kept.entries.f1?.data?.reviewedHash).toBe(current);
+    expect(kept.entries.f1?.data?.reviewNote).toBeUndefined();
+
+    const stale = specHash({ statement: "Something older.", criteria: [] });
+    const p = await plan(CONFIDENT, drop(), { options: { reviewed: [{ id: "f1", hash: stale }] } });
     expect(p.entries.f1?.data?.reviewedHash).toBeUndefined();
-    expect(p.entries.f1?.reasons.at(-1)).toContain("reviewedHash cleared");
+    expect(p.entries.f1?.data?.reviewNote).toContain(`approved ${stale}, current ${current}`);
+    expect(p.summary.reviewQueue).toContainEqual(expect.objectContaining({ id: "f1", specChanged: true }));
   });
 
   it("flags a criterion Jev reads as process", async () => {

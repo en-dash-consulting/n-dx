@@ -141,16 +141,33 @@ describe("appliedAt and reviewedHash", () => {
     expect(Object.values(data.items).some((d) => d.appliedAt !== undefined)).toBe(false);
   });
 
-  it("stamps reviewedHash only on listed capabilities, from the drafted spec", () => {
+  const SPEC = { statement: "It works.", criteria: [{ id: "c1", text: "When x, y." }] };
+
+  it("stamps reviewedHash only on listed capabilities whose draft is the approved spec", () => {
     const { items } = tree({});
     const plan = classifyV1Tree(items);
     const caps = plan.entries.filter((e) => e.target === "capability");
     expect(caps.length).toBeGreaterThan(0);
-    const specs = caps.map((c) => ({ capability: c.id, statement: "It works.", criteria: [{ id: "c1", text: "When x, y." }] }) as unknown as CapabilitySpecDraft);
+    const specs = caps.map((c) => ({ capability: c.id, ...SPEC }) as unknown as CapabilitySpecDraft);
     const [first, ...rest] = caps;
-    const data = buildPlanData(items, plan, { cutAt: CUT, specs, reviewed: [first!.id] });
-    expect(data.items[first!.id]!.reviewedHash).toBe(specHash({ statement: "It works.", criteria: [{ id: "c1", text: "When x, y." }] }));
+    const data = buildPlanData(items, plan, { cutAt: CUT, specs, reviewed: [{ id: first!.id, hash: specHash(SPEC) }] });
+    expect(data.items[first!.id]).toMatchObject({ approvedHash: specHash(SPEC), reviewedHash: specHash(SPEC) });
+    expect(data.items[first!.id]!.reviewNote).toBeUndefined();
     for (const c of rest) expect(data.items[c.id]?.reviewedHash).toBeUndefined();
+  });
+
+  it("leaves a capability whose draft changed since approval unreviewed, naming both hashes", () => {
+    const { items } = tree({});
+    const plan = classifyV1Tree(items);
+    const cap = plan.entries.find((e) => e.target === "capability")!;
+    const approved = specHash({ ...SPEC, statement: "It used to work." });
+    const draft = { capability: cap.id, ...SPEC } as unknown as CapabilitySpecDraft;
+    const data = buildPlanData(items, plan, { cutAt: CUT, specs: [draft], reviewed: [{ id: cap.id, hash: approved }] });
+    const d = data.items[cap.id]!;
+    expect(d.reviewedHash).toBeUndefined();
+    expect(d.approvedHash).toBe(approved);
+    expect(d.reviewNote).toContain(`approved ${approved}`);
+    expect(d.reviewNote).toContain(`current ${specHash(SPEC)}`);
   });
 
   it("takes a capability's criteria only from its draft, so a reviewed node hashes to reviewedHash", () => {
@@ -159,7 +176,7 @@ describe("appliedAt and reviewedHash", () => {
     const plan = classifyV1Tree(items);
     const cap = plan.entries.find((e) => e.target === "capability")!;
     const draft = { capability: cap.id, statement: "It adds X.", criteria: [{ id: "c1", text: "When asked, X is added." }] } as unknown as CapabilitySpecDraft;
-    const data = buildPlanData(items, plan, { cutAt: CUT, specs: [draft], reviewed: [cap.id] });
+    const data = buildPlanData(items, plan, { cutAt: CUT, specs: [draft], reviewed: [{ id: cap.id, hash: specHash(draft) }] });
     expect(data.items[cap.id]!.criteria).toBeUndefined();
     const node = { type: "capability" as const, statement: draft.statement, criteria: draft.criteria };
     expect(data.items[cap.id]!.reviewedHash).toBe(specHash(nodeSpec(node as never)));
@@ -169,7 +186,7 @@ describe("appliedAt and reviewedHash", () => {
     const { items } = tree({});
     const plan = classifyV1Tree(items);
     const cap = plan.entries.find((e) => e.target === "capability")!;
-    expect(buildPlanData(items, plan, { cutAt: CUT, reviewed: [cap.id] }).items[cap.id]?.reviewedHash).toBeUndefined();
+    expect(buildPlanData(items, plan, { cutAt: CUT, reviewed: [{ id: cap.id, hash: specHash(SPEC) }] }).items[cap.id]?.reviewedHash).toBeUndefined();
   });
 });
 

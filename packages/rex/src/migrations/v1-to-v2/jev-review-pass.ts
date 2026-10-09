@@ -25,8 +25,10 @@
  * is a disagreement and the link stays, flagged. A kind other than the rules'
  * and a process criterion are flagged, never applied: retargeting restructures
  * the tree and dropping a criterion renumbers the spec, so a person decides.
- * Jev never stamps `reviewedHash`: a dropped link on a capability listed as
- * reviewed clears it, so the changed spec reads unreviewed.
+ * After a drop, review is re-checked as after any redraft (`stampReview`):
+ * `reviewedHash` stays only while the spec's hash is the approved one. Links
+ * are not hashed, so a drop alone keeps an approved spec reviewed; the drop
+ * itself is noted on the spec.
  *
  * @module migrations/v1-to-v2/jev-review-pass
  */
@@ -36,6 +38,7 @@ import { PLACEMENT_JEV_MIN_CONFIDENCE, type PlacementJudge } from "../../core/pl
 import type { ItemLevel, PRDItem } from "../../schema/v1.js";
 import type { ModelPass, ModelQuestion, PlanContext } from "../migration.js";
 import { evidenceNotes, indexItems, linkedTestsOf, type CapabilitySpecDraft, type SpecCriterion } from "./capability-spec.js";
+import { stampReview, type ItemPlanData } from "./migration-plan-data.js";
 import type { PlanEntry, ProposedArea } from "./migration-plan.js";
 import { placementJevPass, rawJevAnswer, settingsOf, type PlacementFields, type PlacementPassOptions, type PlacementQuestion } from "./placement-pass.js";
 import type { SpecFields, SpecPassOptions } from "./spec-pass.js";
@@ -120,6 +123,8 @@ export interface JevReviewFields {
 export interface ReviewQueueItem {
   id: string;
   held: boolean;
+  /** Listed as reviewed, but the draft is not the spec the reviewer approved (`reviewNote`). */
+  specChanged?: true;
   confidence?: number;
 }
 
@@ -133,7 +138,7 @@ export interface JevReviewSummary {
   otherKind: number;
 }
 
-type Entry = PlanEntry & PlacementFields & SpecFields & JevReviewFields;
+type Entry = PlanEntry & PlacementFields & SpecFields & JevReviewFields & { data?: ItemPlanData };
 type Options = (PlacementPassOptions & SpecPassOptions) | undefined;
 
 const noulConfidence = (p: number): number => Math.abs(2 * p - 1);
@@ -333,12 +338,7 @@ function mergeReview(entry: Entry, review: ReviewQuestion, answer: JevBundleAnsw
     const drops = testLinks.filter((l) => l.dropped);
     let spec = drops.length > 0 ? dropLinks(entry.spec, drops, context.options?.testCommand) : entry.spec;
     if (notes.length > 0) spec = { ...spec, notes: [...spec.notes, ...notes] };
-    next = { ...next, spec };
-    if (drops.length > 0 && entry.data?.reviewedHash !== undefined) {
-      const { reviewedHash: _hash, ...data } = entry.data;
-      next = { ...next, data };
-      reasons.push("Jev dropped test links from the reviewed spec: reviewedHash cleared, review it again");
-    }
+    next = { ...next, spec, ...(entry.data ? { data: stampReview(entry.data, spec) } : {}) };
   }
   return { ...next, reasons, jevReview };
 }
@@ -388,11 +388,19 @@ export const jevPass: ModelPass<readonly PRDItem[], Entry, Options> = {
 
 // ── Summary ──────────────────────────────────────────────────────
 
-/** Held items first, then entries Jev judged by ascending confidence; plan order breaks ties. Unjudged held items lead. */
+/**
+ * Held items first, then entries Jev judged or whose approved spec changed, by
+ * ascending confidence; plan order breaks ties. Unjudged entries lead their group.
+ */
 export function reviewQueue(entries: Readonly<Record<string, Entry>>): ReviewQueueItem[] {
   const queued = Object.values(entries)
-    .filter((e) => e.needsPlacement === true || e.confidence !== undefined)
-    .map((e) => ({ id: e.id, held: e.needsPlacement === true, ...(e.confidence !== undefined ? { confidence: e.confidence } : {}) }));
+    .filter((e) => e.needsPlacement === true || e.confidence !== undefined || e.data?.reviewNote !== undefined)
+    .map((e) => ({
+      id: e.id,
+      held: e.needsPlacement === true,
+      ...(e.data?.reviewNote !== undefined ? { specChanged: true as const } : {}),
+      ...(e.confidence !== undefined ? { confidence: e.confidence } : {}),
+    }));
   const rank = (q: ReviewQueueItem) => q.confidence ?? -1;
   return queued.sort((a, b) => Number(b.held) - Number(a.held) || rank(a) - rank(b));
 }

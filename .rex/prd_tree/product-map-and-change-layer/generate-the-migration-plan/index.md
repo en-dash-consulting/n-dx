@@ -50,6 +50,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Placement answers are keyed by what the model sees](./placement-answers-are-keyed-by-what.md) | pending |
 | [Placement seams and passes read rex.placement from two separate inputs, so a caller that passes it only to placementSeams has a configured Jev ignored](./placement-seams-and-passes-read-rex.md) | completed |
 | [Plan ids, aliases, backfill and data fixes](./plan-ids-aliases-backfill-and-data-fixes.md) | completed |
-| [reviewedHash only for the spec a reviewer approved](./reviewedhash-only-for-the-spec-a.md) | pending |
+| [reviewedHash only for the spec a reviewer approved](./reviewedhash-only-for-the-spec-a.md) | in_progress |
 | [Stamp appliedAt and reviewedHash when migrating historical items](./stamp-appliedat-and-reviewedhash-when.md) | completed |
 | [The migration can freeze a Windows-unsafe v1 slug (con, aux, nul) into v2, leaving the tree permanently unwritable](./the-migration-can-freeze-a-windows.md) | completed |

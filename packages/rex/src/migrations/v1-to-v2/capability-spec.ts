@@ -21,7 +21,8 @@
  *
  * Code evidence comes from sourcevision, which rex may not import; the caller
  * passes it in per capability. A draft is unreviewed: applying the plan leaves
- * `reviewedHash` unset unless the caller lists the capability as reviewed.
+ * `reviewedHash` unset unless the caller lists the capability as reviewed with
+ * this draft's `specHash` (`stampReview` in `./migration-plan-data.ts`).
  *
  * @module migrations/v1-to-v2/capability-spec
  */
