@@ -15,6 +15,7 @@ acceptanceCriteria:
   - "The npm check covers all six packages in PACKAGES, not only @n-dx/core"
   - "RELEASING.md describes the new behaviour if it documents the verify step"
 description: "In .github/workflows/release.yml, the step \"Verify tags and GitHub releases match npm\" (lines 226-232) treats \"is this version on npm?\" as its test for \"did this run publish?\". Right after a publish, the registry can take several minutes to show the new version. On the 0.7.1 release (run 36168208924), changesets logged \"Successfully published\" at 17:44:11, the verify step ran 22 seconds later, got a 404, printed \"@n-dx/core@0.7.1 is not on npm; nothing to verify.\" and exited 0. Tags and releases happened to be fine, but a real tag or release gap on that run would also have passed — the exact failure the step was added to catch. It also checks only @n-dx/core for the whole fixed group."
-lastModified: "2026-09-25T17:57:59.542Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-09T14:52:34.967Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
