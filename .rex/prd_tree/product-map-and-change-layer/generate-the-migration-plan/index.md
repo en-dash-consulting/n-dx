@@ -25,7 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A dissolved release epic aliases no child and is listed in the summary](./a-dissolved-release-epic-aliases-no.md) | pending |
+| [A dissolved release epic aliases no child and is listed in the summary](./a-dissolved-release-epic-aliases-no.md) | completed |
 | [A seam failure mid-pass discards every model answer the plan already paid for](./a-seam-failure-mid-pass-discards-every.md) | completed |
 | [A spec draft answer with one extra key fails the whole text pass, so no later capability is redrafted and Jev placement does not run](./a-spec-draft-answer-with-one-extra-key.md) | completed |
 | [An incomplete migration plan drops the later passes' recorded answers, so a retry pays for every Jev judgment again](./an-incomplete-migration-plan-drops-the.md) | completed |
