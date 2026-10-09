@@ -311,4 +311,129 @@ describe("backfill-commit-attribution", () => {
     expect(updated!.commits).toHaveLength(1);
     expect(updated!.commits![0].hash).toBe(sha);
   });
+
+  /**
+   * The three gaps below are what a real repository's history exercises and a
+   * single-trailer fixture never does. Each is scoped to one defect so a
+   * regression names itself.
+   */
+
+  it("records every item a commit's trailers name, not just the first", async () => {
+    // A commit that completes two items carries two N-DX-Status trailers.
+    // Attributing it to only the first loses the other item's history.
+    const firstId = randomUUID();
+    const secondId = randomUUID();
+
+    const doc: PRDDocument = {
+      schema: SCHEMA_VERSION,
+      title: "Test PRD",
+      items: [
+        { id: firstId, title: "First Task", status: "completed", level: "task" },
+        { id: secondId, title: "Second Task", status: "completed", level: "task" },
+      ],
+    };
+
+    const store = new FolderTreeStore(rexDir);
+    await store.saveDocument(doc);
+
+    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "initial"', { cwd: projectDir });
+
+    // Mirrors the real shape: a blank line separates the N-DX-Status lines
+    // from the final Co-Authored-By paragraph, so git's own trailer parser
+    // sees only the last paragraph. The body is scanned instead.
+    const message = [
+      "Complete both tasks",
+      "",
+      `N-DX-Status: ${firstId} in_progress → completed`,
+      `N-DX-Status: ${secondId} pending → completed`,
+      "",
+      "Co-Authored-By: Someone <someone@example.com>",
+    ].join("\n");
+    await writeFile(join(projectDir, ".commit-msg"), message, "utf-8");
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add src.ts", { cwd: projectDir });
+    await execAsync("git commit -F .commit-msg", { cwd: projectDir });
+    const { stdout } = await execAsync("git rev-parse HEAD", { cwd: projectDir });
+    const sha = stdout.trim();
+
+    await cmdBackfillCommitAttribution(projectDir);
+
+    for (const id of [firstId, secondId]) {
+      const item = await readPRDItem(rexDir, id);
+      expect(item!.commits).toHaveLength(1);
+      expect(item!.commits![0].hash).toBe(sha);
+    }
+  });
+
+  it("accepts the ASCII arrow form as well as the Unicode one", async () => {
+    // Both forms occur in history; a parser that reads only `→` silently
+    // skips every commit written with `->`.
+    const taskId = randomUUID();
+    const doc: PRDDocument = {
+      schema: SCHEMA_VERSION,
+      title: "Test PRD",
+      items: [{ id: taskId, title: "Test Task", status: "completed", level: "task" }],
+    };
+
+    const store = new FolderTreeStore(rexDir);
+    await store.saveDocument(doc);
+
+    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "initial"', { cwd: projectDir });
+
+    const message = `Complete task\n\nN-DX-Status: ${taskId} in_progress -> completed`;
+    await writeFile(join(projectDir, ".commit-msg"), message, "utf-8");
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add src.ts", { cwd: projectDir });
+    await execAsync("git commit -F .commit-msg", { cwd: projectDir });
+    const { stdout } = await execAsync("git rev-parse HEAD", { cwd: projectDir });
+    const sha = stdout.trim();
+
+    await cmdBackfillCommitAttribution(projectDir);
+
+    const updated = await readPRDItem(rexDir, taskId);
+    expect(updated!.commits).toHaveLength(1);
+    expect(updated!.commits![0].hash).toBe(sha);
+  });
+
+  it("reads a history whose log exceeds the default exec buffer", async () => {
+    // The whole log is buffered in memory. At exec's 1 MiB default this
+    // repository's own history overflowed and the command reported
+    // "could not read git history" and recorded nothing — a silent no-op.
+    // One oversized body reproduces that without building a long history.
+    const taskId = randomUUID();
+    const doc: PRDDocument = {
+      schema: SCHEMA_VERSION,
+      title: "Test PRD",
+      items: [{ id: taskId, title: "Test Task", status: "completed", level: "task" }],
+    };
+
+    const store = new FolderTreeStore(rexDir);
+    await store.saveDocument(doc);
+
+    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "initial"', { cwd: projectDir });
+
+    // ~2 MiB of body, comfortably past the 1 MiB default.
+    const filler = Array.from({ length: 24_000 }, (_, i) => `padding line ${i} ${"x".repeat(60)}`).join("\n");
+    const message = `Complete task\n\n${filler}\n\nN-DX-Status: ${taskId} in_progress → completed`;
+    expect(Buffer.byteLength(message, "utf-8")).toBeGreaterThan(1024 * 1024);
+
+    await writeFile(join(projectDir, ".commit-msg"), message, "utf-8");
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add src.ts", { cwd: projectDir });
+    await execAsync("git commit -F .commit-msg", { cwd: projectDir });
+    const { stdout } = await execAsync("git rev-parse HEAD", { cwd: projectDir });
+    const sha = stdout.trim();
+
+    await cmdBackfillCommitAttribution(projectDir);
+
+    const updated = await readPRDItem(rexDir, taskId);
+    expect(updated!.commits).toHaveLength(1);
+    expect(updated!.commits![0].hash).toBe(sha);
+  });
 });

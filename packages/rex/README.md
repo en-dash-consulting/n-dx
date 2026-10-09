@@ -424,7 +424,7 @@ feat: update authentication flow
 
 N-DX-Status: task-abc-123 in_progress → completed
 N-DX: claude/claude-opus-4-7 · run 550e8400-e29b-41d4-a716-446655440000
-N-DX-Item: https://dashboard.example.com/#/rex/item/task-abc-123
+N-DX-Item: task-abc-123
 ```
 
 ### Trailers
@@ -433,30 +433,20 @@ N-DX-Item: https://dashboard.example.com/#/rex/item/task-abc-123
 |---------|---------|--------------|
 | `N-DX-Status` | Task status transition (if status changed) | When the commit marks a task as completed |
 | `N-DX` | Authorship audit: vendor, model, and run ID | Always (identifies the agent that created the commit) |
-| `N-DX-Item` | Dashboard permalink to the PRD task | Always (when task ID is available) |
+| `N-DX-Item` | The PRD item id this commit is for | Always (when task ID is available) |
 
-### N-DX-Item URL configuration
+### N-DX-Item values
 
-The dashboard base URL for the `N-DX-Item` trailer is resolved from `.n-dx.json`:
+The value is the item id. Earlier versions wrote a dashboard permalink
+(`<publicUrl>/#/rex/item/<taskId>`, defaulting to `http://localhost:3117`),
+which recorded the author's host in permanent history and resolved to nothing
+on any other machine; `web.publicUrl` no longer affects the trailer.
 
-```json
-{
-  "web": {
-    "publicUrl": "https://dashboard.example.com"
-  }
-}
-```
-
-When `web.publicUrl` is not configured, defaults to `http://localhost:3117` (the standard local development server URL).
-
-The full URL is constructed as: `<publicUrl>/#/rex/item/<taskId>`
-
-### Handling misconfigured or unreachable URLs
-
-If `web.publicUrl` is misconfigured or unreachable:
-- The `N-DX-Item` trailer is still emitted with the configured URL
-- A warning is logged, but the commit is not blocked
-- Reviewers can manually visit the dashboard if needed
+Readers accept both forms. `itemIdFromTrailer` in `src/core/change-commits.ts`
+unwraps a permalink of any host to the same id, so commits written before the
+change still attribute. A change's commits are computed from these trailers
+rather than stored, because a rebase or squash rewrites a SHA while the trailer
+survives.
 
 ## Default workflow
 
