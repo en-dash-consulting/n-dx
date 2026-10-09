@@ -15,5 +15,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Document landing through the queue](./document-landing-through-the-queue.md) | in_progress |
+| [Document landing through the queue](./document-landing-through-the-queue.md) | completed |
+| [PR template and its test still say GitHub squash-merges PRs](./pr-template-and-its-test-still-say.md) | pending |
 | [Workflows answer merge_group events](./workflows-answer-merge-group-events.md) | completed |
