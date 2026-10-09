@@ -39,3 +39,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Timer-expiry auto-commit carries hench's trailers](./timer-expiry-auto-commit-carries-hench.md) | completed |
 | [Write one final trailer block on every hench commit](./write-one-final-trailer-block-on-every.md) | completed |
 | [Write the item id as the N-DX-Item trailer value](./write-the-item-id-as-the-n-dx-item.md) | completed |
+| [Skill commits name their paths and read unquoted status paths](./skill-commits-name-their-paths-and.md) | pending |
