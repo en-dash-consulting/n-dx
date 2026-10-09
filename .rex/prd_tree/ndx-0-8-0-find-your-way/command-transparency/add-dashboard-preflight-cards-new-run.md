@@ -17,6 +17,7 @@ acceptanceCriteria:
   - "The listed commands have working Run buttons; sourcevision reset requires confirmation."
   - "Terminal-only commands appear as labelled rows, not buttons."
 description: "Show each command's declared effects as a preflight card with Run and Cancel. Add Run buttons for status, next, tree, report, verify, prd export, prd import, an auth re-check and a confirm-gated sourcevision reset. Commands that stay terminal-only (init, start, dev, pair-programming, bicker) say so in their row instead of showing an inert button.\n\nImplementation notes: Extend packages/web/src/viewer/views/commands.ts and server/routes-commands.ts; route every run through the shared job tray. Constraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR."
-lastModified: "2026-10-02T17:03:47.620Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-09T14:52:34.967Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
