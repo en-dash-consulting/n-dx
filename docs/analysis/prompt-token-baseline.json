@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 38,
-    "perCallTokens": 23189,
-    "uniqueTokens": 14686,
+    "perCallTokens": 23263,
+    "uniqueTokens": 14760,
     "skills": 13,
     "skillTokens": 18043
   },
@@ -103,8 +103,8 @@
   "byPackage": {
     "rex": {
       "surfaces": 21,
-      "perCallTokens": 15653,
-      "uniqueTokens": 7631
+      "perCallTokens": 15727,
+      "uniqueTokens": 7705
     },
     "sourcevision": {
       "surfaces": 7,
@@ -585,11 +585,11 @@
       "builder": "buildSpecDraftEnvelope",
       "purpose": "Redraft a capability spec in present tense, citing the source item of every criterion.",
       "inline": false,
-      "literals": 21,
+      "literals": 22,
       "constants": {},
-      "ownTokens": 264,
-      "fixedChars": 1055,
-      "fixedTokens": 264
+      "ownTokens": 338,
+      "fixedChars": 1350,
+      "fixedTokens": 338
     },
     {
       "pkg": "rex",
@@ -1011,8 +1011,8 @@
       }
     ]
   },
-  "contentHash": "41c44413dd81cfdc",
-  "recordedAt": "2026-10-09T03:13:58.612Z",
-  "commit": "42437af67f2c",
+  "contentHash": "05aee0cf4f7e303f",
+  "recordedAt": "2026-10-09T05:02:21.581Z",
+  "commit": "b8fd8d70d6f2",
   "dirty": false
 }
