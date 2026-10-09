@@ -119,6 +119,20 @@ function templateCandidates(draft: CapabilitySpecDraft): CriterionCandidate[] {
   return draft.criteria.map((c) => ({ text: c.text, raw: c.text, source: c.source, tests: c.tests ?? [] }));
 }
 
+const ENSURE_THE_SYSTEM = /^the system shall ensure that the system\s+/i;
+
+/**
+ * "The system shall ensure that the system keeps X" is a model habit, not a
+ * behaviour: keep the verb phrase and let {@link toEars} restore "The system
+ * shall keep X". A phrase whose verb it cannot recognise keeps "shall" as is.
+ */
+function dropEnsureThatTheSystem(text: string): string {
+  const rest = text.trim().replace(ENSURE_THE_SYSTEM, "");
+  if (rest === text.trim()) return text;
+  const ears = toEars(rest);
+  return ears.startsWith("The system shall ensure that ") ? `The system shall ${rest.replace(/[.\s]+$/, "")}.` : ears;
+}
+
 /**
  * The template draft redrafted with a model answer. Pure: the same draft,
  * question and answer always give the same spec.
@@ -160,7 +174,7 @@ export function redraftSpec(
       if (passedTests.has(t)) tests.push(t);
       else notes.push(`the model linked ${String(t)}, which the question did not pass in: not linked`);
     }
-    accepted.push({ text: toEars(text), raw: text, source, tests });
+    accepted.push({ text: toEars(dropEnsureThatTheSystem(text)), raw: text, source, tests });
   }
 
   // A rejected criterion, or none kept, falls back to the template for every source no accepted criterion cites.

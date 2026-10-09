@@ -35,6 +35,15 @@ describe("text spec drafter", () => {
     for (const text of ["Task selection", "Add priority ordering", "next-task.ts", "priority-ordering.test.ts"]) expect(prompt).toContain(text);
   });
 
+  it("tells the model to name the actor and leave out decisions, documentation edits and process steps", async () => {
+    reply(JSON.stringify({ statement: null, criteria: [] }));
+    await createTextSpecModel("model-x").draft(question);
+    const prompt = String(mockSpawnClaude.mock.calls[0]![0]);
+    expect(prompt).toContain("Name the actor and the behaviour.");
+    expect(prompt).toContain('Never open a criterion with "The system shall ensure that"');
+    expect(prompt).toMatch(/Leave out criteria that record a decision .*a documentation edit .*or a process step/);
+  });
+
   it("throws on a reply that is not a spec draft", async () => {
     const { draft } = createTextSpecModel("model-x");
     reply("It picks tasks.");

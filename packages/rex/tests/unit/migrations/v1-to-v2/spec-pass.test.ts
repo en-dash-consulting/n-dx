@@ -86,6 +86,18 @@ describe("v1-to-v2 spec text pass", () => {
     expect(spec.requirements.map((r) => r.id)).toEqual(["f1:c1"]);
   });
 
+  it("stores a drafted \"The system shall ensure that the system keeps …\" as \"The system shall keep …\"", async () => {
+    const p = await plan(
+      drafter({
+        statement: "Picks the next actionable task by priority.",
+        criteria: [{ text: "The system shall ensure that the system keeps ties ordered by creation time.", source: "t1" }],
+      }),
+    );
+    const texts = p.entries.f1!.spec!.criteria.map((c) => c.text);
+    expect(texts).toContain("The system shall keep ties ordered by creation time.");
+    expect(texts.join("\n")).not.toContain("ensure that the system");
+  });
+
   it("rejects a criterion citing no source or one outside the capability, keeping the template criteria with a note", async () => {
     const p = await plan(
       drafter({
