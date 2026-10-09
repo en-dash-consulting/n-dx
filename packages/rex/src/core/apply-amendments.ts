@@ -146,6 +146,30 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   return { tree: next, applied };
 }
 
+/**
+ * The problems {@link applyAmendments} would refuse the change `changeRef`
+ * with, or none. A dry run for the write tools that store amendments
+ * (add_item, place_change): nothing edits an amendment once stored, so one
+ * apply would refuse is refused up front, in apply's own words. Runs with
+ * `force`, since a base that goes stale is apply's to judge later, and
+ * discards the result, so no stamp (`appliedAt`, `metAt`) reaches the caller's
+ * tree, which apply never modifies.
+ *
+ * {@link NOTHING_TO_MODIFY} is not counted: a summary-only `modified`
+ * amendment is what place_change records when it is given no content, by
+ * decision. While one is present apply stops before the rules on the result,
+ * so the dry run reports only the other amendments' own problems.
+ */
+export function applyAmendmentsProblems(tree: V2Tree, changeRef: string, now: Date): readonly string[] {
+  try {
+    applyAmendments(tree, changeRef, { appliedAt: now.toISOString(), now, force: true });
+    return [];
+  } catch (error) {
+    if (error instanceof ApplyAmendmentsError) return error.problems.filter((p) => !p.endsWith(`: ${NOTHING_TO_MODIFY}`));
+    throw error;
+  }
+}
+
 // ── Applied amends ───────────────────────────────────────────────
 
 /**
@@ -318,7 +342,7 @@ function constraintFields(amendment: Amendment, fail: (message: string) => void)
 }
 
 /** Criteria after a delta, and every id that does not fit them. */
-export interface CriteriaDeltaResult {
+interface CriteriaDeltaResult {
   criteria: Criterion[];
   /** One message per misfit id; the delta applies only when empty. */
   problems: string[];
@@ -327,10 +351,9 @@ export interface CriteriaDeltaResult {
 /**
  * Apply `delta` to a capability's `criteria`: remove, then replace, then add.
  * Removing or replacing an id the criteria lack, or adding one they have, is a
- * problem. Pure. Apply's `modified` delta and placement both judge a delta
- * with this, so placement refuses exactly what apply would.
+ * problem. Pure.
  */
-export function applyCriteriaDelta(criteria: readonly Criterion[], delta: CriteriaDelta | undefined): CriteriaDeltaResult {
+function applyCriteriaDelta(criteria: readonly Criterion[], delta: CriteriaDelta | undefined): CriteriaDeltaResult {
   let next = [...criteria];
   const problems: string[] = [];
   const has = (id: string): boolean => next.some((c) => c.id === id);

@@ -88,13 +88,19 @@ describe("Inbox change placed with its amendment content, then applied over MCP"
     expect(await rexFiles()).toEqual(before);
   });
 
+  const modify = (criteria: Record<string, unknown>) => ({ target: "A1.1", delta: "modified", summary: "s", criteria });
   it.each([
-    ["removes a criterion it lacks", { remove: ["c7"] }, "criterion c7 to remove does not exist"],
-    ["replaces a criterion it lacks", { replace: [{ id: "c7", text: "x" }] }, "criterion c7 to replace does not exist"],
-    ["adds a criterion it has", { add: [{ id: "c1", text: "x" }] }, "criterion c1 to add already exists"],
-  ])("refuses add_item with an amendment that %s and writes nothing", async (_label, criteria, message) => {
+    ["removes a criterion it lacks", modify({ remove: ["c7"] }), "criterion c7 to remove does not exist"],
+    ["replaces a criterion it lacks", modify({ replace: [{ id: "c7", text: "x" }] }), "criterion c7 to replace does not exist"],
+    ["adds a criterion it has", modify({ add: [{ id: "c1", text: "x" }] }), "criterion c1 to add already exists"],
+    [
+      "replaces a criterion of a capability it adds",
+      { target: "A1.9", delta: "added", summary: "s", under: "A1", title: "Refunds", proposed: "Refunds work.", criteria: { replace: [{ id: "c1", text: "x" }] } },
+      "amendment 1 (added A1.9): a new capability has no criteria to replace or remove",
+    ],
+  ])("refuses add_item with an amendment that %s, in apply's words, and writes nothing", async (_label, amendment, message) => {
     const before = await rexFiles();
-    const amends = [{ target: "A1.1", delta: "modified", summary: "s", criteria }];
+    const amends = [amendment];
     const result = (await client.callTool({ name: "add_item", arguments: { title: "Refunds by card", amends } })) as {
       content: { text: string }[];
       isError?: boolean;

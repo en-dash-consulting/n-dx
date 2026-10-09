@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { addChangeNode, AddChangeNodeError } from "../../../src/core/change-add.js";
 import { ClosedChangeError } from "../../../src/core/change-completion.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
+import type { Amendment } from "../../../src/schema/v2.js";
 
 const NOW = new Date("2026-10-08T12:00:00.000Z");
 const node = (fields: Record<string, unknown>): RuleNode => ({ title: fields.id as string, slug: fields.id as string, ...fields }) as RuleNode;
@@ -9,6 +10,11 @@ const tree = (...changes: RuleNode[]): V2Tree => ({
   product: [node({ id: "area", type: "area", children: [node({ id: "cap", type: "capability", statement: "Pay." })] })],
   changes,
 });
+const withConstraint = (): V2Tree => {
+  const t = tree();
+  t.product[0].children!.push(node({ id: "rule", type: "constraint", statement: "Keep it safe." }));
+  return t;
+};
 const open = (extra: Record<string, unknown> = {}) => node({ id: "ch", type: "change", touches: ["cap"], ...extra });
 const opts = { now: NOW, newId: () => "new" };
 
@@ -46,6 +52,39 @@ describe("addChangeNode", () => {
     const c2 = { add: [{ id: "c2", text: "x" }] };
     expect(() => add(c2, c2)).toThrow(/criterion c2 to add already exists/);
     expect(add(c2, { remove: ["c2"] }).node.id).toBe("new");
+  });
+
+  const applyRefusals: [string, Amendment[], RegExp][] = [
+    ["a criteria delta on a constraint", [{ target: "rule", delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }], /amendment 1 \(modified rule\): a constraint has no criteria/],
+    ["replace on a capability the change adds", [{ target: "new-cap", delta: "added", summary: "s", under: "area", title: "New", proposed: "P.", criteria: { replace: [{ id: "c1", text: "x" }] } }], /amendment 1 \(added new-cap\): a new capability has no criteria to replace or remove/],
+    ["remove on a capability the change adds", [{ target: "new-cap", delta: "added", summary: "s", under: "area", title: "New", proposed: "P.", criteria: { remove: ["c1"] } }], /a new capability has no criteria to replace or remove/],
+    ["criteria on a constraint the change adds", [{ target: "new-rule", delta: "added", type: "constraint", summary: "s", under: "area", title: "Rule", proposed: "P.", criteria: { add: [{ id: "c1", text: "x" }] } }], /amendment 1 \(added new-rule\): a constraint has no criteria; state it in proposed/],
+  ];
+
+  it.each(applyRefusals)("refuses %s with apply's problem, writing nothing", (_label, amends, message) => {
+    const input = withConstraint();
+    const before = structuredClone(input);
+    expect(() => addChangeNode(input, { type: "change", title: "A", amends }, opts)).toThrow(AddChangeNodeError);
+    expect(() => addChangeNode(input, { type: "change", title: "A", amends }, opts)).toThrow(message);
+    expect(input).toEqual(before);
+  });
+
+  it("accepts what apply accepts, and never stamps the tree", () => {
+    const input = withConstraint();
+    const before = structuredClone(input);
+    const amends: Amendment[] = [
+      { target: "new-cap", delta: "added", summary: "s", under: "area", title: "New", proposed: "P.", criteria: { add: [{ id: "c1", text: "x" }] } },
+      { target: "rule", delta: "modified", summary: "s", proposed: "Stricter." },
+    ];
+    const { tree: next, node: added } = addChangeNode(input, { type: "change", title: "A", amends }, opts);
+    expect(added).not.toHaveProperty("appliedAt");
+    expect(next.product).toEqual(before.product);
+    expect(input).toEqual(before);
+  });
+
+  it("does not refuse a stale base: that is apply's to judge, with force available", () => {
+    const amends = [{ target: "cap", delta: "modified" as const, summary: "s", proposed: "Pay more.", base: "stale" }];
+    expect(addChangeNode(tree(), { type: "change", title: "A", amends }, opts).node).toMatchObject({ amends });
   });
 
   it("refuses a change whose target does not resolve", () => {

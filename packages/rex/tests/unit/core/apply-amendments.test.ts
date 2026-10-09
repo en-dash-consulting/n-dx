@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { ApplyAmendmentsError, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, resolve } from "../../../src/core/apply-amendments.js";
+import { ApplyAmendmentsError, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
 import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
@@ -492,6 +492,37 @@ describe("applyAmendments: rules on the result", () => {
     const input = tree([{ target: CON, delta: "modified", summary: "s", proposed: "x" }]);
     delete get(input, CAP).statement;
     expect(get(applyAmendments(input, CHANGE, OPTS).tree, CON).statement).toBe("x");
+  });
+});
+
+describe("applyAmendmentsProblems", () => {
+  it("returns apply's problems, or none, and never modifies the tree it was given", () => {
+    const refused = tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]);
+    const accepted = tree([{ target: "A1.1", delta: "modified", summary: "s", criteria: { remove: ["c2"] } }]);
+    const before = structuredClone([refused, accepted]);
+    expect(applyAmendmentsProblems(refused, CHANGE, NOW)).toEqual([`amendment 1 (modified ${CON}): a constraint has no criteria`]);
+    expect(applyAmendmentsProblems(accepted, CHANGE, NOW)).toEqual([]);
+    expect([refused, accepted]).toEqual(before);
+  });
+
+  it("chains amendments of one capability in order", () => {
+    const add = (criteria: Amendment["criteria"]): Amendment => ({ target: CAP, delta: "modified", summary: "s", criteria });
+    expect(applyAmendmentsProblems(tree([add({ add: [{ id: "c3", text: "x" }] }), add({ remove: ["c3"] })]), CHANGE, NOW)).toEqual([]);
+    expect(applyAmendmentsProblems(tree([add({ remove: ["c2"] }), add({ remove: ["c2"] })]), CHANGE, NOW)).toEqual([
+      `amendment 2 (modified ${CAP}): criterion c2 to remove does not exist`,
+    ]);
+  });
+
+  it("does not count a summary-only amendment, which placement records by decision, but still counts the others", () => {
+    const bare: Amendment = { target: CAP, delta: "modified", summary: "s" };
+    expect(applyAmendmentsProblems(tree([bare]), CHANGE, NOW)).toEqual([]);
+    expect(applyAmendmentsProblems(tree([bare, { target: CON, delta: "modified", summary: "s", criteria: { remove: ["c1"] } }]), CHANGE, NOW)).toEqual([
+      `amendment 2 (modified ${CON}): a constraint has no criteria`,
+    ]);
+  });
+
+  it("does not count a stale base, which force applies", () => {
+    expect(applyAmendmentsProblems(tree([{ target: CAP, delta: "modified", summary: "s", proposed: "New", base: "0".repeat(64) }]), CHANGE, NOW)).toEqual([]);
   });
 });
 

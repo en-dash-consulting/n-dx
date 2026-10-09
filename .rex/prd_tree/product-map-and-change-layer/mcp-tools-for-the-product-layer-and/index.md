@@ -28,7 +28,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add get_product, get_capability, place_change and apply_change](./add-get-product-get-capability-place.md) | completed |
 | [add_item nests a change or subtask under a closed change, bypassing the follow-up rule](./add-item-nests-a-change-or-subtask.md) | completed |
-| [add_item stores a v2 amendment carrying criteria that apply always refuses: a criteria delta on a constraint, or replace/remove on an added capability](./add-item-stores-a-v2-amendment.md) | pending |
+| [add_item stores a v2 amendment carrying criteria that apply always refuses: a criteria delta on a constraint, or replace/remove on an added capability](./add-item-stores-a-v2-amendment.md) | in_progress |
 | [add_item stores a v2 modified amendment whose criteria delta does not fit the capability, which apply_change always refuses](./add-item-stores-a-v2-modified.md) | completed |
 | [add_item takes a type and defaults to a change in the Inbox](./add-item-takes-a-type-and-defaults-to.md) | completed |
 | [get_capability's id cursor skips open changes when the cursor change is applied mid-paging](./get-capability-s-id-cursor-skips-open.md) | completed |

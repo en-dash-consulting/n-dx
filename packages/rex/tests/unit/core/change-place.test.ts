@@ -89,8 +89,8 @@ describe("recordPlacement", () => {
     ["an applied change", { status: "completed", appliedAt: "2026-10-01T00:00:00.000Z" }, { target: "card" }, /is applied at 2026-10-01/],
     ["a cancelled change", { status: "cancelled" }, { target: "card" }, /is cancelled; only an open change is placed/],
     ["proposed on a touches placement", {}, { target: "card", relation: "touches" as const, proposed: "x" }, /relation amends/],
-    ["a criteria delta on a constraint", {}, { target: "arch", relation: "amends" as const, criteria: { remove: ["c1"] } }, /constraint, which has no criteria; state it in proposed/],
-    // Apply refuses these against the spec placement pins as base, and no tool edits the amendment afterwards.
+    // Apply refuses these (in these words), and no tool edits the amendment afterwards.
+    ["a criteria delta on a constraint", {}, { target: "arch", relation: "amends" as const, criteria: { remove: ["c1"] } }, /amendment 1 \(modified arch\): a constraint has no criteria/],
     ["removing a criterion the capability lacks", {}, { target: "A1.1", relation: "amends" as const, criteria: { remove: ["c7"] } }, /criterion c7 to remove does not exist/],
     ["replacing a criterion the capability lacks", {}, { target: "A1.1", relation: "amends" as const, criteria: { replace: [{ id: "c7", text: "x" }] } }, /criterion c7 to replace does not exist/],
     ["adding a criterion the capability has", {}, { target: "A1.1", relation: "amends" as const, criteria: { add: [{ id: "c1", text: "x" }] } }, /criterion c1 to add already exists/],
@@ -102,7 +102,7 @@ describe("recordPlacement", () => {
   it("names every criterion id that does not fit in one refusal", () => {
     const criteria = { remove: ["c7"], replace: [{ id: "c8", text: "x" }], add: [{ id: "c2", text: "x" }] };
     expect(() => recordPlacement(tree(), "ch", { target: "card", relation: "amends", criteria }, NOW)).toThrow(
-      /criterion c7 to remove does not exist; criterion c8 to replace does not exist; criterion c2 to add already exists/,
+      /c7 to remove does not exist; .*c8 to replace does not exist; .*c2 to add already exists/,
     );
   });
 
@@ -110,6 +110,27 @@ describe("recordPlacement", () => {
     const criteria = { remove: ["c2"], replace: [{ id: "c1", text: "Visa and wallets are accepted" }], add: [{ id: "c3", text: "x" }] };
     const { tree: next } = recordPlacement(tree(), "ch", { target: "card", relation: "amends", criteria }, NOW);
     expect(changeIn(next).amends![0]).toMatchObject({ target: "card", delta: "modified", criteria });
+  });
+
+  it("names the refused amendment by its place among the change's amends, as apply does", () => {
+    const earlier = { amends: [{ target: "refund", delta: "modified", summary: "s", criteria: { add: [{ id: "c3", text: "x" }] } }] };
+    expect(() => recordPlacement(tree(earlier), "ch", { target: "card", relation: "amends", criteria: { remove: ["c3"] } }, NOW)).toThrow(
+      /amendment 2 \(modified card\): criterion c3 to remove does not exist/,
+    );
+  });
+
+  it("judges only the amendment it records, not the change's earlier ones", () => {
+    const broken = { amends: [{ target: "arch", delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }] };
+    const { tree: next } = recordPlacement(tree(broken), "ch", { target: "card", relation: "amends", proposed: "Cards and wallets" }, NOW);
+    expect(changeIn(next).amends).toHaveLength(2);
+  });
+
+  it("never stamps the tree: the dry run's apply is discarded", () => {
+    const input = tree();
+    const { tree: next } = recordPlacement(input, "ch", { target: "card", relation: "amends", criteria: { add: [{ id: "c3", text: "x" }] } }, NOW);
+    expect(changeIn(next)).not.toHaveProperty("appliedAt");
+    expect(indexTree(next).resolve("card")).toEqual(indexTree(input).resolve("card"));
+    expect(indexTree(next).resolve("card")).not.toHaveProperty("metAt");
   });
 
   it("refuses a ref that is not a change", () => {

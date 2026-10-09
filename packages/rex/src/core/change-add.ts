@@ -16,6 +16,9 @@
  * The new node is checked against the v2 rules; an error finding about it
  * refuses the add (an unresolved `blockedBy`, `touches` or amendment target,
  * for instance). Findings about other nodes are not this add's to report.
+ * A change with amends is also dry-run through apply
+ * ({@link applyAmendmentsProblems}) and refused with apply's problems: no
+ * tool edits an amendment once stored, so one apply refuses never would apply.
  *
  * Pure: works on a copy and leaves writing to the caller.
  *
@@ -24,9 +27,9 @@
 
 import { randomUUID } from "node:crypto";
 import type { Priority } from "../schema/v1.js";
-import type { Amendment, ChangeNodeType, Criterion, DiscoveredFrom, SavedRunSettings } from "../schema/v2.js";
+import type { Amendment, ChangeNodeType, DiscoveredFrom, SavedRunSettings } from "../schema/v2.js";
 import { checkV2Rules, indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { applyCriteriaDelta, freeSlug } from "./apply-amendments.js";
+import { applyAmendmentsProblems, freeSlug } from "./apply-amendments.js";
 import { addTask, closedState, ClosedChangeError, type ChangeSplit } from "./change-completion.js";
 
 export interface AddChangeNodeInput {
@@ -89,26 +92,6 @@ const PARENT_TYPE: Readonly<Record<ChangeNodeType, { type: ChangeNodeType; requi
   subtask: { type: "task", required: true },
 };
 
-/**
- * Refuse a `modified` amendment whose criteria delta does not fit its
- * capability's current criteria: apply always refuses it and no tool edits the
- * amendment afterwards. The same check as placement (`applyCriteriaDelta`);
- * apply re-checks against the spec at apply time. Amendments of one capability
- * chain in order, as apply runs them.
- */
-function refuseMisfitCriteria(tree: V2Tree, amends: readonly Amendment[] | undefined): void {
-  const index = indexTree(tree);
-  const current = new Map<RuleNode, Criterion[]>();
-  for (const amendment of amends ?? []) {
-    if (amendment.delta !== "modified" || !amendment.criteria) continue;
-    const target = index.resolve(amendment.target);
-    if (target?.type !== "capability") continue;
-    const { criteria, problems } = applyCriteriaDelta(current.get(target) ?? target.criteria ?? [], amendment.criteria);
-    if (problems.length) throw new AddChangeNodeError(`Cannot amend "${target.title}": ${problems.join("; ")}`);
-    current.set(target, criteria);
-  }
-}
-
 /** Add `input` to the change layer of `tree`. */
 export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: AddChangeNodeOptions): AddChangeNodeResult {
   const { type } = input;
@@ -123,8 +106,6 @@ export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: 
   if (input.parentId !== undefined && type !== "task" && parent?.type !== want.type) {
     throw new AddChangeNodeError(`No live ${want.type} "${input.parentId}" to add the ${type} under`);
   }
-
-  refuseMisfitCriteria(tree, input.amends);
 
   const id = (options.newId ?? randomUUID)();
   if (indexTree(tree, { includeTombstones: true }).resolve(id)) throw new AddChangeNodeError(`The new id ${id} is already taken`);
@@ -155,6 +136,8 @@ export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: 
 
   const errors = checkV2Rules(next, { now: options.now }).filter((f) => f.nodeId === id && f.severity === "error");
   if (errors.length) throw new AddChangeNodeError(`Cannot add ${type} "${input.title}": ${errors.map((f) => f.message).join("; ")}`);
+  const problems = input.amends?.length ? applyAmendmentsProblems(next, id, options.now) : [];
+  if (problems.length) throw new AddChangeNodeError(`Cannot add ${type} "${input.title}": ${problems.join("; ")}`);
   return { tree: next, node: indexTree(next).resolve(id)!, split };
 }
 
