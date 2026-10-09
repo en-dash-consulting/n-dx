@@ -26,7 +26,7 @@ import { randomUUID } from "node:crypto";
 import type { Priority } from "../schema/v1.js";
 import type { Amendment, ChangeNodeType, DiscoveredFrom, SavedRunSettings } from "../schema/v2.js";
 import { checkV2Rules, indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { freeSlug } from "./apply-amendments.js";
+import { applyCriteriaDelta, freeSlug } from "./apply-amendments.js";
 import { addTask, closedState, ClosedChangeError, type ChangeSplit } from "./change-completion.js";
 
 export interface AddChangeNodeInput {
@@ -89,6 +89,23 @@ const PARENT_TYPE: Readonly<Record<ChangeNodeType, { type: ChangeNodeType; requi
   subtask: { type: "task", required: true },
 };
 
+/**
+ * Refuse a `modified` amendment whose criteria delta does not fit its
+ * capability's current criteria: apply always refuses it and no tool edits the
+ * amendment afterwards. The same check as placement (`applyCriteriaDelta`);
+ * apply re-checks against the spec at apply time.
+ */
+function refuseMisfitCriteria(tree: V2Tree, amends: readonly Amendment[] | undefined): void {
+  const index = indexTree(tree);
+  for (const amendment of amends ?? []) {
+    if (amendment.delta !== "modified" || !amendment.criteria) continue;
+    const target = index.resolve(amendment.target);
+    if (target?.type !== "capability") continue;
+    const { problems } = applyCriteriaDelta(target.criteria ?? [], amendment.criteria);
+    if (problems.length) throw new AddChangeNodeError(`Cannot amend "${target.title}": ${problems.join("; ")}`);
+  }
+}
+
 /** Add `input` to the change layer of `tree`. */
 export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: AddChangeNodeOptions): AddChangeNodeResult {
   const { type } = input;
@@ -103,6 +120,8 @@ export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: 
   if (input.parentId !== undefined && type !== "task" && parent?.type !== want.type) {
     throw new AddChangeNodeError(`No live ${want.type} "${input.parentId}" to add the ${type} under`);
   }
+
+  refuseMisfitCriteria(tree, input.amends);
 
   const id = (options.newId ?? randomUUID)();
   if (indexTree(tree, { includeTombstones: true }).resolve(id)) throw new AddChangeNodeError(`The new id ${id} is already taken`);

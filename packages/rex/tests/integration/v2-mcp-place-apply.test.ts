@@ -87,4 +87,20 @@ describe("Inbox change placed with its amendment content, then applied over MCP"
     expect(result.content[0].text).toContain(message);
     expect(await rexFiles()).toEqual(before);
   });
+
+  it.each([
+    ["removes a criterion it lacks", { remove: ["c7"] }, "criterion c7 to remove does not exist"],
+    ["replaces a criterion it lacks", { replace: [{ id: "c7", text: "x" }] }, "criterion c7 to replace does not exist"],
+    ["adds a criterion it has", { add: [{ id: "c1", text: "x" }] }, "criterion c1 to add already exists"],
+  ])("refuses add_item with an amendment that %s and writes nothing", async (_label, criteria, message) => {
+    const before = await rexFiles();
+    const amends = [{ target: "A1.1", delta: "modified", summary: "s", criteria }];
+    const result = (await client.callTool({ name: "add_item", arguments: { title: "Refunds by card", amends } })) as {
+      content: { text: string }[];
+      isError?: boolean;
+    };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(message);
+    expect(await rexFiles()).toEqual(before);
+  });
 });

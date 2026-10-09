@@ -28,6 +28,16 @@ describe("addChangeNode", () => {
     expect(addChangeNode(tree(), { type: "change", title: "A", amends }, opts).node).toMatchObject({ amends });
   });
 
+  it("refuses an amendment whose criteria delta does not fit the capability", () => {
+    const withCriteria = tree();
+    withCriteria.product[0].children![0].criteria = [{ id: "c1", text: "Pays" }];
+    const add = (criteria: Record<string, unknown>) =>
+      addChangeNode(withCriteria, { type: "change", title: "A", amends: [{ target: "cap", delta: "modified", summary: "s", criteria }] }, opts);
+    expect(() => add({ remove: ["c7"] })).toThrow(/criterion c7 to remove does not exist/);
+    expect(() => add({ add: [{ id: "c1", text: "x" }] })).toThrow(/criterion c1 to add already exists/);
+    expect(add({ add: [{ id: "c2", text: "x" }] }).node.id).toBe("new");
+  });
+
   it("refuses a change whose target does not resolve", () => {
     expect(() => addChangeNode(tree(), { type: "change", title: "T", touches: ["nope"] }, opts)).toThrow(/nope/);
   });
