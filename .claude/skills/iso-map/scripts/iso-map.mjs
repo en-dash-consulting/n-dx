@@ -2064,7 +2064,7 @@ function splitRemote(remote) {
   if (!trimmed) return void 0;
   const url = trimmed.match(/^[A-Za-z][A-Za-z0-9+.\-]*:\/\/([^/:]+)(?::\d+)?\/(.*)$/s);
   const scp = url ? null : trimmed.match(/^(?:[^@/]+@)?([\w.\-]+):(?!\/)(.*)$/s);
-  if (scp && !(scp[1].includes(".") || scp[1].toLowerCase() === "localhost")) return void 0;
+  if (scp && /^[A-Za-z]$/.test(scp[1])) return void 0;
   const matched = url ?? scp;
   if (!matched) return void 0;
   const segments = matched[2].replace(/\.git\/*$/, "").split("/").filter(Boolean);
