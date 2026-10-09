@@ -46,6 +46,44 @@ function makeProposal(
   };
 }
 
+// ── Apply: kept changes on a v2 change layer ─────────────────────────────────
+
+describe("applyProposals — kept changes", () => {
+  const applied = (delta: string) =>
+    ({ status: "completed", appliedAt: "2026-10-01T00:00:00.000Z", amends: [{ delta, target: "x" }] }) as Partial<PRDItem>;
+
+  it("skips deleting a change prune keeps, or a subtree holding one, and applies the rest", () => {
+    const items: PRDItem[] = [
+      makeEpic("retiring", [], applied("removed")),
+      makeEpic("holder", [makeFeature("nested", [], applied("added"))]),
+      makeEpic("e-empty"),
+    ];
+    const result = applyProposals(items, [
+      makeProposal(1, "delete", { kind: "delete", itemId: "retiring", subtreeCount: 1 }),
+      makeProposal(2, "delete", { kind: "delete", itemId: "holder", subtreeCount: 2 }),
+      makeProposal(3, "delete", { kind: "delete", itemId: "e-empty", subtreeCount: 1 }),
+    ]);
+    expect(result.results.map((r) => r.success)).toEqual([false, false, true]);
+    expect(result.results[0].error).toMatch(/^Skipped: cannot delete "Epic retiring".*mark a node retired/);
+    expect(result.results[1].error).toMatch(/holds "Feature nested"/);
+    expect(items.map((i) => i.id)).toEqual(["retiring", "holder"]);
+  });
+
+  it("skips merging away any applied change, even one that only modifies", () => {
+    const items: PRDItem[] = [makeEpic("e1", [makeTask("t1"), makeTask("t2", applied("modified"))])];
+    const result = applyProposals(items, [makeProposal(1, "merge", { kind: "merge", sourceIds: ["t1", "t2"], targetId: "t1" })]);
+    expect(result.results[0]).toMatchObject({ success: false, error: expect.stringMatching(/^Skipped: cannot merge away "Task t2".*applied change/) });
+    expect(items[0].children!.map((c) => c.id)).toEqual(["t1", "t2"]);
+  });
+
+  it("skips collapsing away a change prune keeps", () => {
+    const items: PRDItem[] = [makeEpic("e1", [makeFeature("f1", [makeTask("t1")], applied("removed"))])];
+    const result = applyProposals(items, [makeProposal(1, "collapse", { kind: "collapse", parentId: "e1", childId: "f1" })]);
+    expect(result.results[0]).toMatchObject({ success: false, error: expect.stringMatching(/^Skipped: cannot collapse away/) });
+    expect(items[0].children!.map((c) => c.id)).toEqual(["f1"]);
+  });
+});
+
 // ── Apply: delete ────────────────────────────────────────────────────────────
 
 describe("applyProposals — delete", () => {

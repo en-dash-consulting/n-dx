@@ -88,7 +88,15 @@ describe("get_capability", () => {
   });
 
   it("refuses an area, naming get_product", async () => {
-    expect(error(await handleGetCapability(rexDir, { id: "A1" }))).toMatch(/is an area.*get_product/);
+    expect(error(await handleGetCapability(rexDir, { id: "A1" }))).toBe(
+      '"A1" is an area, not a capability or constraint. Use get_product to see the product layer.',
+    );
+  });
+
+  it("refuses an unknown id, naming get_product", async () => {
+    expect(error(await handleGetCapability(rexDir, { id: "nope" }))).toBe(
+      '"nope" names no product node. Use get_product to see the product layer.',
+    );
   });
 });
 

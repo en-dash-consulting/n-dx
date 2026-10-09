@@ -105,6 +105,19 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     sections: [
       { title: "Levels", content: "epic, feature, task, subtask" },
       {
+        title: "On a v2 PRD (product/ and changes/)",
+        content:
+          "Every add creates a change, or a task or subtask under --parent:\n" +
+          "  rex add [change|task|subtask] --title=\"...\" [--parent=<id>]\n" +
+          "A description (or --file, or stdin) becomes one change each, with no LLM;\n" +
+          "with --format=json and no --accept it is a preview that writes nothing.\n" +
+          "A new change lands in the Inbox; the output names it and the suggested\n" +
+          "placement, which 'rex change place' records. Levels are refused.\n" +
+          "--criterion is the item's acceptance criteria (done when). A capability's\n" +
+          "capability criteria are edited with 'rex product edit' or 'rex change place'\n" +
+          "(--capability-criterion), never here.",
+      },
+      {
         title: "Duplicate handling (smart mode)",
         content:
           "Prompt: Duplicate action (c/m/p)\n" +
@@ -120,7 +133,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--parent=<id>", description: "Parent item ID to nest under" },
       { flag: "--priority=<p>", description: "Priority: critical, high, medium, low" },
       { flag: "--description=\"...\"", description: "Item description" },
-      { flag: "--criterion=\"...\"", description: "Acceptance criterion, manual mode only (repeatable, one per flag)" },
+      { flag: "--criterion=\"...\"", description: "Acceptance criterion (done when) for this item, manual mode only (repeatable, one per flag); not a capability criterion" },
+      { flag: "--type=<type>", description: "v2 only: change (default), task or subtask" },
       { flag: "--source=\"...\"", description: "Item source, manual mode only (e.g. ndx-capture)" },
       { flag: "--file=<path>", description: "Import from a freeform text file (repeatable)" },
       { flag: "--accept", description: "Auto-accept LLM proposals without review" },
@@ -132,8 +146,86 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex add task --title=\"Login form\" --parent=abc --criterion=\"Rejects an empty password\" --criterion=\"Locks after 5 failures\" --source=ndx-capture", description: "Add a task with acceptance criteria and a source" },
       { command: "rex add \"Add dark mode support\"", description: "Smart add from description" },
       { command: "rex add --file=ideas.txt --file=notes.md .", description: "Import from multiple files" },
+      { command: "rex add --title=\"Refund card payments\" --criterion=\"A refund reaches the card\"", description: "v2: add a change to the Inbox with acceptance criteria" },
     ],
-    related: ["analyze", "update"],
+    related: ["analyze", "update", "change"],
+  },
+  product: {
+    tool: "rex",
+    command: "product",
+    summary: "show or edit the product layer (v2 PRD)",
+    usage: [
+      "rex product show [<node>] [options] [dir]",
+      "rex product edit <node> [--statement=\"...\"] [--capability-criterion=\"<id>: <text>\"] [--editorial] [dir]",
+    ],
+    description:
+      "show: the areas, capabilities and constraints with computed status and\n" +
+      "health; with a node (id, display id or alias), that capability or\n" +
+      "constraint in detail: statement, capability criteria and the changes on it.\n\n" +
+      "edit: change a capability's or constraint's statement or capability\n" +
+      "criteria directly. A met node then reads revised and gets a drafted change\n" +
+      "in the Inbox to build it; --editorial says only the wording moved, so it\n" +
+      "stays met. Editing it back to its met spec withdraws the draft.\n\n" +
+      "Capability criteria (--capability-criterion) are the standing requirement\n" +
+      "a capability is met against. They are not acceptance criteria: those are a\n" +
+      "work item's done-when, set with --criterion on 'rex add'.\n" +
+      "v2 PRD only; refused on a v1 PRD (.rex/prd_tree/).",
+    options: [
+      { flag: "--statement=\"...\"", description: "edit: the node's new statement" },
+      { flag: "--capability-criterion=\"<id>: <text>\"", description: "edit: add (new id) or replace (existing id) a capability criterion (repeatable). Not --criterion" },
+      { flag: "--remove-capability-criterion=<id>", description: "edit: remove a capability criterion (repeatable)" },
+      { flag: "--editorial", description: "edit: wording only, nothing to build; the node stays met" },
+      { flag: "--summary=\"...\"", description: "edit: History line, or the drafted amendment's summary" },
+      { flag: "--format=json", description: "Machine-readable output" },
+    ],
+    examples: [
+      { command: "rex product show", description: "The product layer with status and health" },
+      { command: "rex product show A1.1", description: "One capability: statement, capability criteria, changes" },
+      { command: "rex product edit A1.1 --capability-criterion=\"c3: A refund reaches the card\"", description: "Add a capability criterion; drafts a change" },
+      { command: "rex product edit A1.1 --statement=\"A shopper pays by card.\" --editorial", description: "Reword without drafting a change" },
+    ],
+    related: ["change", "add", "health"],
+  },
+  change: {
+    tool: "rex",
+    command: "change",
+    summary: "place or apply a change (v2 PRD)",
+    usage: [
+      "rex change place <change> [--target=<node>] [--relation=touches|amends] [options] [dir]",
+      "rex change apply <change> [--force] [dir]",
+    ],
+    description:
+      "place: without --target, print the placement rules' shortlist of\n" +
+      "capabilities and constraints the change could amend or touch, best first.\n" +
+      "With --target, record it: touches joins the change's touches; amends adds\n" +
+      "an amendment, whose new statement (--proposed) and capability criteria\n" +
+      "edits (--capability-criterion, --remove-capability-criterion) apply needs.\n" +
+      "Either clears needsPlacement. Only an open change is placed.\n\n" +
+      "apply: apply the change's amendments to the product layer as a steward,\n" +
+      "whatever rex.applyOn says, and stamp the change applied. Refused whole,\n" +
+      "listing every problem, when an amendment does not fit or its target's spec\n" +
+      "moved since it was drafted (--force overrides that last check).\n\n" +
+      "--capability-criterion edits the target capability's capability criteria.\n" +
+      "It is not --criterion, the acceptance criteria (done when) a change or\n" +
+      "task gets on 'rex add'.\n" +
+      "v2 PRD only; refused on a v1 PRD (.rex/prd_tree/).",
+    options: [
+      { flag: "--target=<node>", description: "place: capability or constraint (id or display id); omit for the shortlist" },
+      { flag: "--relation=<r>", description: "place: touches or amends (default: the rules' relation)" },
+      { flag: "--summary=\"...\"", description: "place, amends: the amendment's summary (default: the change's title)" },
+      { flag: "--proposed=\"...\"", description: "place, amends: the target's replacement statement" },
+      { flag: "--capability-criterion=\"<id>: <text>\"", description: "place, amends: add (new id) or replace (existing id) a capability criterion of the target (repeatable)" },
+      { flag: "--remove-capability-criterion=<id>", description: "place, amends: remove a capability criterion of the target (repeatable)" },
+      { flag: "--force", description: "apply: apply amendments whose target's spec moved since drafting" },
+      { flag: "--format=json", description: "Machine-readable output" },
+    ],
+    examples: [
+      { command: "rex change place CH-2", description: "Show where the change could go" },
+      { command: "rex change place CH-2 --target=A1.1 --relation=touches", description: "It works on the capability" },
+      { command: "rex change place CH-2 --target=A1.1 --relation=amends --capability-criterion=\"c3: A refund reaches the card\"", description: "It adds a capability criterion" },
+      { command: "rex change apply CH-2", description: "Apply its amendments to the product layer" },
+    ],
+    related: ["product", "add", "health"],
   },
   update: {
     tool: "rex",
@@ -259,7 +351,11 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     usage: "rex reshape [options] [dir]",
     description:
       "Uses an LLM to analyze the current PRD and propose structural changes:\n" +
-      "merges, splits, reparenting, title updates, and description improvements.",
+      "merges, splits, reparenting, title updates, and description improvements.\n\n" +
+      "On a v2 PRD the change layer is restructured as above. Proposals on the\n" +
+      "product layer move no file: accepted ones are drafted as one change whose\n" +
+      "removed and added amendments describe the restructure, applied later with\n" +
+      "'rex change apply'.",
     options: [
       { flag: "--dry-run", description: "Preview proposals without applying" },
       { flag: "--accept", description: "Auto-accept proposals without review" },
@@ -281,7 +377,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     description:
       "Removes fully-completed branches from the PRD tree and archives them\n" +
       "to .rex/archive.json. Optionally runs a consolidation pass to clean\n" +
-      "up remaining items.",
+      "up remaining items.\n\n" +
+      "On a v2 PRD only the change layer is pruned. The product layer is never\n" +
+      "pruned: a product node is retired by a change's removed amendment.",
     options: [
       { flag: "--dry-run", description: "Preview what would be pruned" },
       { flag: "--smart", description: "Use LLM-assisted consolidation after pruning" },
@@ -622,6 +720,33 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["validate", "status"],
   },
+  release: {
+    tool: "rex",
+    command: "release",
+    summary: "stamp shippedIn on the changes a release ships",
+    usage: "rex release stamp <version> [--dry-run] [--format=json] [dir]",
+    description:
+      "Stamps shippedIn: <version> on every change that is finished (completed\n" +
+      "or applied), unstamped, landed on main, and not yet in any release tag.\n" +
+      "Landing is read from git: release tags, ancestry and N-DX-Item trailers.\n" +
+      "A stamped change is never restamped, so a re-run changes nothing. A\n" +
+      "finished change that has not landed is listed and left unstamped.\n\n" +
+      "Under rex.applyOn \"release\", completed changes awaiting apply are\n" +
+      "applied first, then stamped. A refused apply fails the command.\n\n" +
+      "<version> is X.Y.Z or vX.Y.Z (stored as X.Y.Z); prereleases are refused.\n" +
+      "On a v1 tree, or with no rex directory, it prints that there is nothing\n" +
+      "to stamp and succeeds without running git.\n\n" +
+      "Needs full git history (fetch-depth: 0 on a CI checkout).",
+    options: [
+      { flag: "--dry-run", description: "Report what would be applied and stamped; write nothing" },
+      { flag: "--format=json", description: "Print the report as JSON (version, applied, stamped, skipped)" },
+    ],
+    examples: [
+      { command: "rex release stamp 1.4.0", description: "Stamp the changes shipping in 1.4.0" },
+      { command: "rex release stamp v1.4.0 --dry-run", description: "Preview the stamp" },
+    ],
+    related: ["status"],
+  },
   "tree-diff": {
     tool: "rex",
     command: "tree-diff",
@@ -638,14 +763,23 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Because the diff is by id, an item that was reparented is reported once\n" +
       "as 'moved' rather than twice as a removal and an addition. Categories\n" +
       "overlap: a task added and finished on this branch is both added and\n" +
-      "completed.",
+      "completed.\n\n" +
+      "When either side is a v2 tree, a product map section lists the\n" +
+      "capabilities and constraints added, modified (title, statement or\n" +
+      "capability criteria) and retired beside the change list. A v1 tree has no\n" +
+      "product layer and no such section.\n\n" +
+      "--format=markdown writes the report as a pull-request comment: plain\n" +
+      "CommonMark with no host-specific syntax, for any CI to post.",
     options: [
       { flag: "--from=<ref>", description: "Baseline commit (default: the default branch)" },
       { flag: "--to=<ref>", description: "Target commit (default: the working tree)" },
       { flag: "--against=<dir>", description: "Compare against another checkout's tree instead of a commit" },
       { flag: "--json", description: "Machine-readable output (same as --format=json)" },
+      { flag: "--format=markdown", description: "Pull-request comment as host-neutral Markdown" },
+      { flag: "--out=<file>", description: "Write the report to a file instead of stdout (not inside the PRD storage directory)" },
     ],
     examples: [
+      { command: "rex tree-diff --format=markdown --out=prd-diff.md", description: "Write the PR comment for a CI step to post" },
       { command: "rex tree-diff", description: "What this branch changed, against the default branch" },
       { command: "rex tree-diff --from=v0.7.0 --to=HEAD", description: "Compare two commits" },
       { command: "rex tree-diff --against=../main-checkout", description: "Compare this worktree against its anchor" },
@@ -662,7 +796,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Analyzes the PRD tree using both programmatic detectors and LLM reasoning.\n" +
       "Programmatic: orphaned features, near-duplicates, oversized/undersized containers.\n" +
       "LLM: semantic merge, update, reparent, split, and obsolete proposals.\n" +
-      "Use --fast to skip LLM analysis for quick structural checks only.",
+      "Use --fast to skip LLM analysis for quick structural checks only.\n\n" +
+      "On a v2 PRD the change layer is analyzed and fixed as above. The product\n" +
+      "layer's structural issues are reported only; --accept never applies them.",
     options: [
       { flag: "--accept", description: "Apply all low-risk structural proposals" },
       { flag: "--accept=<ids>", description: "Apply specific structural proposals by ID (comma-separated)" },
@@ -694,7 +830,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Computes a multi-dimensional health score (0–100) for the PRD structure.\n" +
       "Evaluates depth (items at correct nesting), balance (even distribution),\n" +
       "granularity (task quality), completeness (metadata coverage), and\n" +
-      "staleness (stale in-progress items). Includes up to 3 improvement suggestions.",
+      "staleness (stale in-progress items). Includes up to 3 improvement suggestions.\n\n" +
+      "On a v2 tree (product/ and changes/) it runs the tree rules instead and lists their\n" +
+      "findings, including a capability over rex.structureHealth.maxCriteriaPerCapability\n" +
+      "capability criteria (own plus inherited; default 15).",
     options: [
       { flag: "--format=json", description: "Machine-readable output" },
     ],
@@ -790,6 +929,8 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   health: ["reorganize", "report", "validate"],
   "migrate-to-md": ["init", "validate", "status"],
   "migrate-to-folder-tree": ["init", "status", "validate"],
+  product: ["change", "add", "health"],
+  change: ["product", "add", "health"],
   mcp: [],
 };
 

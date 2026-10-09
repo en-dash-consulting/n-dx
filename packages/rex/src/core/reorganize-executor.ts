@@ -9,6 +9,10 @@
  * - collapse → moveItem() + removeFromTree()
  * - split  → (deferred: requires LLM or user input for grouping)
  *
+ * A merge that would fold away an applied change, or a delete or collapse
+ * that would remove a change prune keeps, fails with a `Skipped:` reason and
+ * the other proposals still apply (see `core/prune.ts`).
+ *
  * Proposals are applied atomically — the caller saves the document once
  * after all proposals are applied.
  *
@@ -28,7 +32,14 @@ import type {
 import { removeFromTree, findItem } from "./tree.js";
 import { mergeItems } from "./merge.js";
 import { moveItem } from "./move.js";
-import { pruneItems } from "./prune.js";
+import { deleteKeepReason, mergeKeepReason, pruneItems, pruneKeepReason } from "./prune.js";
+import { keptItemRefusal } from "./reshape.js";
+
+/** Throw `Skipped: …` when a proposal would take an item `keepReason` keeps out of the tree. */
+function refuseKept(items: PRDItem[], ids: readonly string[], keepReason: (item: PRDItem) => string | undefined, verb: string): void {
+  const refusal = keptItemRefusal(items, ids, keepReason, verb);
+  if (refusal) throw new Error(refusal);
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -112,6 +123,7 @@ function applyOne(items: PRDItem[], proposal: ReorganizationProposal): PRDItem[]
 function applyMerge(items: PRDItem[], detail: MergeDetail): PRDItem[] {
   // Snapshot absorbed items before merge removes them
   const absorbedIds = detail.sourceIds.filter((id) => id !== detail.targetId);
+  refuseKept(items, absorbedIds, mergeKeepReason, "merge away");
   const snapshots: PRDItem[] = [];
   for (const id of absorbedIds) {
     const entry = findItem(items, id);
@@ -142,6 +154,7 @@ function applyMove(items: PRDItem[], detail: MoveDetail): void {
 }
 
 function applyDelete(items: PRDItem[], detail: DeleteDetail): PRDItem[] {
+  refuseKept(items, [detail.itemId], deleteKeepReason, "delete");
   // Snapshot before removal
   const entry = findItem(items, detail.itemId);
   const snapshot = entry ? structuredClone(entry.item) : null;
@@ -172,6 +185,8 @@ function applyCollapse(items: PRDItem[], detail: CollapseDetail): void {
   if (!childEntry) {
     throw new Error(`Child "${detail.childId}" not found`);
   }
+  // The child goes; its children move up, so only the child itself is checked.
+  refuseKept(items, [detail.childId], pruneKeepReason, "collapse away");
 
   // Move grandchildren (child's children) up to the parent
   const grandchildren = [...(childEntry.item.children ?? [])];

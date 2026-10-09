@@ -436,6 +436,8 @@ const SUBCOMMAND_REGISTRY = {
     { name: "tree", parent: "rex", category: "Rex", summary: "Show full PRD hierarchy with color-coded status", keywords: ["tree", "hierarchy", "structure", "color", "status", "visualization"], related: ["status", "next"] },
     { name: "tree-diff", parent: "rex", category: "Rex", summary: "Compare two PRD trees (commits, or a worktree against its anchor)", keywords: ["diff", "compare", "changed", "moved", "delta", "branch", "worktree", "anchor"], related: ["tree", "status"] },
     { name: "add", parent: "rex", category: "Rex", summary: "Add items to the PRD (manual or smart LLM mode)", keywords: ["create", "epic", "feature", "task", "subtask", "LLM", "smart"], related: ["analyze", "update"] },
+    { name: "product", parent: "rex", category: "Rex", summary: "Show or edit the product layer of a v2 PRD", keywords: ["v2", "capability", "constraint", "capability criteria", "editorial"], related: ["change", "add"] },
+    { name: "change", parent: "rex", category: "Rex", summary: "Place or apply a change on a v2 PRD", keywords: ["v2", "placement", "amend", "touches", "apply"], related: ["product", "add"] },
     { name: "update", parent: "rex", category: "Rex", summary: "Update item status, priority, or title", keywords: ["modify", "change", "complete", "status"], related: ["add", "next"] },
     { name: "move", parent: "rex", category: "Rex", summary: "Reparent an item in the PRD tree", keywords: ["reparent", "hierarchy", "reorganize"], related: ["reshape"] },
     { name: "reshape", parent: "rex", category: "Rex", summary: "LLM-powered PRD restructuring", keywords: ["restructure", "merge", "split", "reorganize", "LLM"], related: ["prune", "move"] },
@@ -944,7 +946,7 @@ const ORCHESTRATOR_HELP_DEFS = {
   },
   add: {
     summary: "add items to the PRD",
-    description: "Add items to the PRD from freeform descriptions, files, or stdin.\nDelegates to 'rex add' — supports smart-add (LLM-powered),\nmanual level-based add, and file import.",
+    description: "Add items to the PRD from freeform descriptions, files, or stdin.\nDelegates to 'rex add' — supports smart-add (LLM-powered),\nmanual level-based add, and file import.\nOn a v2 PRD (product/ and changes/) each add creates a change in the Inbox\nand prints it with its suggested placement ('rex change place' records one).\n--criterion is the item's acceptance criteria; a capability's capability\ncriteria are edited with 'rex product edit'.",
     usage: [
       "ndx add <level> [dir]",
       'ndx add "<description>" ["<desc2>"]',
