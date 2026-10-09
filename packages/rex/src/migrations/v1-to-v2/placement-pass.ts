@@ -28,23 +28,31 @@ import {
   type PlacementModels,
   type PlacementSettings,
 } from "../../core/placement-policy.js";
-import type {
-  PlacementArea,
-  PlacementChange,
-  PlacementModel,
-  PlacementNode,
-  PlacementProposal,
-  PlacementTarget,
+import {
+  rankPlacementCandidates,
+  type PlacementArea,
+  type PlacementChange,
+  type PlacementModel,
+  type PlacementNode,
+  type PlacementProposal,
+  type PlacementTarget,
 } from "../../core/placement.js";
 import type { PRDItem } from "../../schema/v1.js";
 import type { ModelPass, ModelQuestion, PassSeam, PlanContext } from "../migration.js";
 import type { ModelPassName } from "../plan-file.js";
 import { placementChangeOf, type PlanEntry } from "./migration-plan.js";
 
-/** What a placement question carries: every input the answer depends on. */
 /** The question kind a seam must list in `kinds` to be asked for placements. */
 export const PLACEMENT_QUESTION_KIND = "placement";
 
+/**
+ * What a placement question carries: every input the answer depends on, and
+ * nothing else, because the recorded answer is keyed on it (`answerHash`).
+ * `nodes` holds only the rules shortlist's nodes, in full: the models see no
+ * other capability, and re-ranking this subset reproduces the shortlist, so a
+ * replay decides exactly as the recording did. Renaming any other capability
+ * leaves the question, and its paid-for answer, unchanged.
+ */
 export interface PlacementQuestion {
   kind: "placement";
   change: PlacementChange;
@@ -156,12 +164,14 @@ function questionsFor(
   }
   if (seam?.kinds && !seam.kinds.includes(PLACEMENT_QUESTION_KIND)) return [];
   const byId = itemsById(items);
-  const { nodes, areas } = productOf(entries, byId);
+  const { nodes: all, areas } = productOf(entries, byId);
   const out: ModelQuestion[] = [];
   for (const e of Object.values(entries)) {
     const item = byId.get(e.id);
     if (!item || !isHeldChange(e)) continue;
-    const question: PlacementQuestion = { kind: "placement", change: placementChangeOf(item), nodes, areas };
+    const change = placementChangeOf(item);
+    const shortlisted = new Set(rankPlacementCandidates(change, all).map((c) => c.target));
+    const question: PlacementQuestion = { kind: "placement", change, nodes: all.filter((n) => shortlisted.has(n.id)), areas };
     out.push({ id: e.id, question });
   }
   return out;

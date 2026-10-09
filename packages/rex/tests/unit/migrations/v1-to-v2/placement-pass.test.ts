@@ -172,6 +172,45 @@ describe("v1-to-v2 placement passes", () => {
     expect(judge).not.toHaveBeenCalled();
   });
 
+  describe("answers are keyed by what the model sees", () => {
+    const withUnrelated = (title: string): PRDItem[] => {
+      const t = tree();
+      t[0]!.children!.push(item("f3", "feature", title, [item("t3", "task", "Render charts")]));
+      return t;
+    };
+    const settings: PlacementSettings = { models: "text", autoAccept: "agree" };
+    const replan = (tiers: PRDItem[], text: PlacementModel, previous?: Awaited<ReturnType<typeof plan>>) =>
+      v1ToV2.plan(v1TreeSource(tiers), {
+        cutAt: CUT,
+        seams: planSeams({ settings, text: { model: TEXT_MODEL, place: text } }),
+        previous,
+        options: { placement: settings },
+      });
+
+    it("renaming a capability outside the shortlist keeps the recorded answer", async () => {
+      const first = await replan(withUnrelated("Dashboard"), textSeam("f1"));
+      const text = textSeam("f2");
+      const again = await replan(withUnrelated("Dashboard rendering"), text, first);
+      expect(text).not.toHaveBeenCalled();
+      expect(again.entries.t9?.placement).toBe("f1");
+    });
+
+    it("renaming a capability inside the shortlist asks again", async () => {
+      const first = await replan(withUnrelated("Dashboard"), textSeam("f1"));
+      const renamed = withUnrelated("Dashboard");
+      renamed[0]!.children![0]!.title = "Task selection order";
+      const text = textSeam("f1");
+      await replan(renamed, text, first);
+      expect(text).toHaveBeenCalledTimes(1);
+    });
+
+    it("replaying a recorded answer decides as the recording did", async () => {
+      const first = await replan(withUnrelated("Dashboard"), textSeam("f1"));
+      const again = await replan(withUnrelated("Dashboard rendering"), textSeam("f2"), first);
+      expect(again.entries.t9).toEqual(first.entries.t9);
+    });
+  });
+
   it("asks only about held changes", async () => {
     const text = textSeam(null);
     await plan({ models: "text", autoAccept: "agree" }, { text });
