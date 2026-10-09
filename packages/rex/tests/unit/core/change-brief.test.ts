@@ -474,6 +474,122 @@ describe("buildChangeBrief — budget", () => {
     expect(brief.overBudget).toBe(true);
   });
 
+  /**
+   * The `change` section is required, so the budget admits it with no allowance
+   * and never trims it. Every free-text field and every list inside it is
+   * therefore a hole in the budget unless it is bounded: an unbounded one makes
+   * the brief exceed its budget *and* crowds out the capabilities section, which
+   * is the one the budget exists to protect. The crowded fixture above cannot
+   * reach this — its long text all sits in sections the budget may trim.
+   */
+  describe("a change section that cannot be trimmed stays bounded", () => {
+    function withChange(fields: Record<string, unknown>): ChangeBriefOptions {
+      const caps = Array.from({ length: 6 }, (_, i) =>
+        node({
+          id: `cap-${i}`,
+          type: "capability",
+          title: `Capability ${i}`,
+          statement: "A short promise.",
+          criteria: [criterion("c1", "A short criterion.")],
+        }),
+      );
+      const tree: V2Tree = {
+        product: [node({ id: "area", type: "area", title: "Area", children: caps })],
+        changes: [
+          node({
+            id: "ch-huge",
+            type: "change",
+            title: "A change with a great deal to say",
+            intent: "Short intent.",
+            children: [node({ id: "t-huge", type: "task", title: "Do it", status: "pending" })],
+            ...fields,
+          }),
+        ],
+      };
+      return { tree, unit: unitFor(tree, "t-huge") };
+    }
+
+    const inBudget = (options: ChangeBriefOptions): void => {
+      const brief = buildChangeBrief(options);
+      expect(brief.tokens).toBeLessThanOrEqual(BRIEF_TOKEN_BUDGET);
+      expect(brief.overBudget).toBe(false);
+      // The section the budget protects survives, with its detail.
+      expect(brief.sections.map((s) => s.name)).toContain("capabilities");
+    };
+
+    it("bounds an amendment's proposed text", () => {
+      inBudget(
+        withChange({
+          amends: [amend("cap-0", "replaced", "Rewrite the promise", { proposed: "A proposed line.\n".repeat(3_000) })],
+        }),
+      );
+    });
+
+    it("bounds an amendment's summary", () => {
+      inBudget(withChange({ amends: [amend("cap-0", "replaced", "s".repeat(40_000))] }));
+    });
+
+    it("bounds the criteria one amendment adds, replaces and removes", () => {
+      inBudget(
+        withChange({
+          amends: [
+            amend("cap-0", "replaced", "Rework the criteria", {
+              criteria: {
+                add: Array.from({ length: 400 }, (_, i) => criterion(`a${i}`, "An added criterion at some length. ".repeat(20))),
+                replace: Array.from({ length: 400 }, (_, i) => criterion(`r${i}`, "A replacement criterion. ".repeat(20))),
+                remove: Array.from({ length: 400 }, (_, i) => `x${i}`),
+              },
+            }),
+          ],
+        }),
+      );
+    });
+
+    it("bounds the number of amendments", () => {
+      inBudget(
+        withChange({
+          amends: Array.from({ length: 300 }, (_, i) =>
+            amend(`cap-${i % 6}`, "replaced", `Amendment ${i} says something of ordinary length about the capability.`),
+          ),
+        }),
+      );
+    });
+
+    function withTask(fields: Record<string, unknown>): ChangeBriefOptions {
+      const options = withChange({ touches: ["cap-0"] });
+      const task = options.tree.changes?.[0].children?.[0] as RuleNode;
+      Object.assign(task, fields);
+      return options;
+    }
+
+    it("bounds a task description", () => {
+      inBudget(withTask({ description: "A long description paragraph. ".repeat(1_400) }));
+    });
+
+    it("bounds the failure reason the previous run wrote", () => {
+      // hench writes this one, and a failed run's reason can carry a whole
+      // error dump — the likeliest way a required section outgrows the budget.
+      inBudget(withTask({ failureReason: "Error: something blew up at line 42.\n".repeat(1_100) }));
+    });
+
+    it("bounds the done-when list, the tags and the blockers", () => {
+      inBudget(
+        withTask({
+          acceptanceCriteria: Array.from({ length: 600 }, (_, i) => `Criterion ${i} says something of ordinary length.`),
+          tags: Array.from({ length: 300 }, (_, i) => `tag-number-${i}`),
+          blockedBy: Array.from({ length: 200 }, (_, i) => `blocker-id-${i}`),
+        }),
+      );
+    });
+
+    it("bounds the touched-without-amending list", () => {
+      const options = withChange({ touches: Array.from({ length: 2_000 }, (_, i) => `cap-${i % 6}`) });
+      inBudget(options);
+      // The count is still reported, so a trimmed list does not read as the whole set.
+      expect(renderChangeBrief(options)).toMatch(/and \d+ more \(of 2000\)/);
+    });
+  });
+
   it("caps a long list inside a section even when the budget is unlimited", () => {
     const tree = crowded();
     const brief = buildChangeBrief({ tree, unit: unitFor(tree, "t-big"), budgetTokens: 1_000_000 });

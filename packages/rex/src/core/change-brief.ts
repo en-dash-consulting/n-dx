@@ -22,8 +22,12 @@
  * budget is spent, so capabilities and constraints survive a crowded brief
  * while the tail (realized-by paths, recent changes, workflow, log) goes first.
  * `task` and `change` are never dropped — a brief without the work is not a
- * shorter brief, it is a useless one — so a single enormous change can still
- * come in over budget, which `overBudget` reports rather than hides.
+ * shorter brief, it is a useless one. Because the budget cannot trim them,
+ * every free-text field and every list inside them is bounded at render time
+ * instead; an unbounded one would not make the brief long, it would make the
+ * brief lose its capabilities section. A work item still large enough to
+ * outrun the budget on its bounded fields alone comes in over, which
+ * `overBudget` reports rather than hides.
  *
  * A list section that does not fit is **trimmed, not dropped**. Thirty
  * capabilities whose text outruns the whole budget must not cost the brief its
@@ -109,6 +113,40 @@ const MAX_INTENT_CHARS = 1_500;
 const MAX_STATEMENT_CHARS = 800;
 /** Characters of one criterion, which is a sentence and is cut on one line. */
 const MAX_CRITERION_CHARS = 300;
+/**
+ * Bounds on one amendment, which the `change` section renders.
+ *
+ * `change` is a required section: the budget admits it with no allowance and
+ * never trims it, because a brief without the work is useless. That makes an
+ * unbounded field inside it a hole in the budget rather than a long paragraph.
+ * One amendment carrying a few pages of proposed spec pushes the whole brief
+ * past its budget and crowds out the capabilities section, which is the section
+ * the budget exists to protect. A summary is a line; proposed text is a
+ * capability's statement and its criteria, so it gets more room than a plain
+ * statement but is still cut at a line boundary.
+ */
+const MAX_SUMMARY_CHARS = 300;
+const MAX_PROPOSED_CHARS = 1_200;
+/** Amendments, and touched-without-amending nodes, listed in the change section. */
+const MAX_AMENDMENTS = 12;
+const MAX_TOUCHES = 25;
+/** Criteria listed per amendment, added and replaced counted together. */
+const MAX_AMENDMENT_CRITERIA = 10;
+/**
+ * Bounds on the work item the `task` section renders.
+ *
+ * `task` is required for the same reason `change` is, and bounded for the same
+ * reason: a task description runs to paragraphs and `failureReason` is written
+ * by the previous run, so it can carry a whole error dump. Unbounded, either
+ * one makes a required section larger than the budget, which costs the brief
+ * its capabilities rather than costing the field its tail.
+ */
+const MAX_DESCRIPTION_CHARS = 2_000;
+const MAX_FAILURE_CHARS = 1_500;
+/** Done-when criteria, tags and blockers listed for the work item. */
+const MAX_DONE_WHEN = 20;
+const MAX_TAGS = 20;
+const MAX_BLOCKERS = 20;
 
 // ── Sections ─────────────────────────────────────────────────────
 
@@ -617,6 +655,16 @@ function capped<T>(items: readonly T[], max: number, noun: string, indentBy = ""
   };
 }
 
+/**
+ * A capped list rendered inline, saying how many it left out. Inline rather
+ * than on its own line because these sit after a label ("Blocked by: …"), where
+ * a separate trim line would read as a list item of its own.
+ */
+function joinCapped(list: { items: readonly string[]; omitted: number }): string {
+  const total = list.items.length + list.omitted;
+  return list.omitted > 0 ? `${list.items.join(", ")}, and ${list.omitted} more (of ${total})` : list.items.join(", ");
+}
+
 function label(node: RuleNode): string {
   return node.displayId ? `${node.title} (${node.displayId})` : node.title;
 }
@@ -625,17 +673,20 @@ function renderTask({ unit }: BriefContext): string {
   const { node, kind } = unit;
   const out = [`## Current ${kind}`, `**${node.title}**${node.displayId ? ` · ${node.displayId}` : ""}`, `ID: ${node.id}`, `Status: ${node.status ?? "pending"}`];
   if (node.priority) out.push(`Priority: ${node.priority}`);
-  if (node.blockedBy?.length) out.push(`Blocked by: ${node.blockedBy.join(", ")}`);
+  const blockers = capped(node.blockedBy ?? [], MAX_BLOCKERS, "blockers");
+  if (blockers.items.length > 0) out.push(`Blocked by: ${joinCapped(blockers)}`);
   const description = typeof node.description === "string" ? node.description : undefined;
-  if (description) out.push(`\n${description}`);
-  const doneWhen = stringList(node.acceptanceCriteria);
-  if (doneWhen.length > 0) {
+  if (description) out.push(`\n${trimToLine(description, MAX_DESCRIPTION_CHARS, "the description")}`);
+  const doneWhen = capped(stringList(node.acceptanceCriteria), MAX_DONE_WHEN, "done-when criteria");
+  if (doneWhen.items.length > 0) {
     out.push("\nDone when:");
-    for (const c of doneWhen) out.push(`- ${c}`);
+    for (const c of doneWhen.items) out.push(`- ${elide(c, MAX_CRITERION_CHARS)}`);
+    if (doneWhen.note) out.push(doneWhen.note);
   }
-  if (node.tags?.length) out.push(`\nTags: ${node.tags.join(", ")}`);
+  const tags = capped(node.tags ?? [], MAX_TAGS, "tags");
+  if (tags.items.length > 0) out.push(`\nTags: ${joinCapped(tags)}`);
   if (node.failureReason) {
-    out.push("\n### A previous attempt failed — do not repeat it", node.failureReason);
+    out.push("\n### A previous attempt failed — do not repeat it", trimToLine(node.failureReason, MAX_FAILURE_CHARS, "the failure reason"));
     out.push(
       "Diagnose why that happened before changing anything, and take a different approach. " +
         "If the approach was right and only its execution was wrong, say so and explain what you are doing differently.",
@@ -675,11 +726,13 @@ function renderChange({ change, kind, unit, titleOf }: BriefContext): string {
   const amends = change.amends ?? [];
   if (amends.length > 0) {
     out.push("\nAmendments to the product map:");
-    for (const a of amends) out.push(renderAmendment(a, titleOf));
+    const shown = capped(amends, MAX_AMENDMENTS, "amendments");
+    for (const a of shown.items) out.push(renderAmendment(a, titleOf));
+    if (shown.note) out.push(shown.note);
   }
-  const touches = (change.touches ?? []).map(titleOf);
-  if (touches.length > 0) out.push(`\nTouches without amending: ${touches.join(", ")}`);
-  if (amends.length === 0 && touches.length === 0) {
+  const touches = capped((change.touches ?? []).map(titleOf), MAX_TOUCHES, "touched nodes");
+  if (touches.items.length > 0) out.push(`\nTouches without amending: ${joinCapped(touches)}`);
+  if (amends.length === 0 && touches.items.length === 0) {
     out.push("\nThis change names no product node yet. Place it before completing it.");
   }
   return out.join("\n");
@@ -687,12 +740,26 @@ function renderChange({ change, kind, unit, titleOf }: BriefContext): string {
 
 function renderAmendment(a: Amendment, titleOf: (ref: string) => string): string {
   const target = a.delta === "added" ? `${a.title ?? a.target}${a.under ? ` under ${titleOf(a.under)}` : ""} (new ${a.type ?? "capability"})` : titleOf(a.target);
-  const out = [`- **${a.delta}** ${target} — ${a.summary}`];
-  if (a.proposed) out.push(indent(`Proposed:\n${a.proposed}`, "  "));
-  for (const [verb, list] of [["add", a.criteria?.add], ["replace", a.criteria?.replace]] as const) {
-    for (const c of list ?? []) out.push(`  - ${verb} capability criterion ${c.id}: ${c.text}`);
+  const out = [`- **${a.delta}** ${target} — ${elide(a.summary, MAX_SUMMARY_CHARS)}`];
+  if (a.proposed) {
+    out.push(indent(`Proposed:\n${trimToLine(a.proposed, MAX_PROPOSED_CHARS, "the proposed text")}`, "  "));
   }
-  for (const id of a.criteria?.remove ?? []) out.push(`  - remove capability criterion ${id}`);
+  const criteria = capped(
+    [
+      ...(a.criteria?.add ?? []).map((c) => ["add", c] as const),
+      ...(a.criteria?.replace ?? []).map((c) => ["replace", c] as const),
+    ],
+    MAX_AMENDMENT_CRITERIA,
+    "capability criteria",
+    "  ",
+  );
+  for (const [verb, c] of criteria.items) {
+    out.push(`  - ${verb} capability criterion ${c.id}: ${elide(c.text, MAX_CRITERION_CHARS)}`);
+  }
+  if (criteria.note) out.push(criteria.note);
+  const removed = capped(a.criteria?.remove ?? [], MAX_AMENDMENT_CRITERIA, "removed capability criteria", "  ");
+  for (const id of removed.items) out.push(`  - remove capability criterion ${id}`);
+  if (removed.note) out.push(removed.note);
   return out.join("\n");
 }
 
