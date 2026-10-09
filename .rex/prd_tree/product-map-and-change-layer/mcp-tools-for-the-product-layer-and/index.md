@@ -34,5 +34,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [place_change takes the amendment's proposed text and capability criteria](./place-change-takes-the-amendment-s.md) | pending |
 | [Read tools default to open and recent changes, with paging](./read-tools-default-to-open-and-recent.md) | completed |
 | [Rex MCP tool access kinds are unpinned, so a write tool can flip to read and escape #499 write refusal](./rex-mcp-tool-access-kinds-are-unpinned.md) | completed |
-| [v2 MCP write tools take their timestamp inside the PRD lock](./v2-mcp-write-tools-take-their.md) | pending |
+| [v2 MCP write tools take their timestamp inside the PRD lock](./v2-mcp-write-tools-take-their.md) | completed |
 | [v2 split leaves an open activeIntervals entry on a change that returns to pending](./v2-split-leaves-an-open.md) | completed |
