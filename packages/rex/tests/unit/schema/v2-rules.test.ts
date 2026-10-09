@@ -744,7 +744,7 @@ describe("criteria-growth", () => {
     const findings = run([cap({ id: "big", title: "Big one", criteria: criteria(16) })]);
     expect(ids(findings)).toEqual(["big"]);
     expect(findings[0].message).toContain("Big one");
-    expect(findings[0].message).toContain("16 criteria");
+    expect(findings[0].message).toContain("16 capability criteria");
     expect(findings[0].severity).toBe("warning");
   });
 

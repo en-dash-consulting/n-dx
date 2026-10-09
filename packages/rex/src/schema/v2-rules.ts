@@ -731,7 +731,7 @@ const criteriaGrowth: Rule = ({ entries }, { maxCriteria = DEFAULT_MAX_CRITERIA 
     totals.set(node, total);
     if (total <= maxCriteria) return [];
     const detail = total > own ? `${own} own + ${total - own} inherited` : `${own}`;
-    return [finding("criteria-growth", node, `Capability "${node.title}" carries ${total} criteria (${detail}; threshold ${maxCriteria}); consolidate them with a modify change, or \`rex product tidy\` once it exists`)];
+    return [finding("criteria-growth", node, `Capability "${node.title}" carries ${total} capability criteria (${detail}; threshold ${maxCriteria}); consolidate them with a modify change, or \`rex product tidy\` once it exists`)];
   });
 };
 
