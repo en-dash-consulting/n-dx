@@ -138,13 +138,22 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
   },
   {
     "name": "add_item",
-    "description": "Add a new item to the PRD. Use when the user discusses a new feature, requirement, or work item that should be tracked.",
+    "description": "Add a new item to the PRD. Use when the user discusses a new feature, requirement, or work item that should be tracked. On a v2 PRD pass type (default change; a change that neither amends nor touches lands in the Inbox needing placement); on a v1 PRD pass level.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "title": {
           "type": "string",
           "description": "Item title"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "change",
+            "task",
+            "subtask"
+          ],
+          "description": "v2: node type, default change. A task's parent is a change, a subtask's a task. On v1, task and subtask stand in for level"
         },
         "level": {
           "type": "string",
@@ -154,7 +163,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             "task",
             "subtask"
           ],
-          "description": "Item level"
+          "description": "v1 only: item level. Refused on a v2 PRD, which takes type"
         },
         "parentId": {
           "type": "string",
@@ -162,7 +171,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
         },
         "description": {
           "type": "string",
-          "description": "Item description"
+          "description": "Item description (a v2 change's intent)"
         },
         "priority": {
           "type": "string",
@@ -262,11 +271,119 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           },
           "additionalProperties": false,
           "description": "Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."
+        },
+        "amends": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "delta": {
+                "type": "string",
+                "enum": [
+                  "added",
+                  "modified",
+                  "removed"
+                ]
+              },
+              "summary": {
+                "type": "string"
+              },
+              "criteria": {
+                "type": "object",
+                "properties": {
+                  "add": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "replace": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/properties/amends/items/properties/criteria/properties/add/items"
+                    }
+                  },
+                  "remove": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": true
+              },
+              "proposed": {
+                "type": "string"
+              },
+              "under": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "capability",
+                  "constraint"
+                ]
+              },
+              "base": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "target",
+              "delta",
+              "summary"
+            ],
+            "additionalProperties": true
+          },
+          "description": "v2 change only: product-layer edits the change carries ({target, delta: added|modified|removed, summary, criteria?, proposed?, under?, title?, type?})"
+        },
+        "touches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "v2 change only: product node IDs the change works on without amending them"
+        },
+        "discoveredFrom": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true,
+          "description": "v2 change only: {item?, run?}, the change or task (and hench run) whose work surfaced this one. Use it for a follow-up to a closed change"
         }
       },
       "required": [
-        "title",
-        "level"
+        "title"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

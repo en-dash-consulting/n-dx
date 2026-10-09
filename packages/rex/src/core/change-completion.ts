@@ -31,6 +31,10 @@
  * change is closed at the split time and the task opens one from then, so
  * each node's duration stays its own and the pending change stops accruing.
  *
+ * A change that is completed, applied, cancelled or deleted takes no new
+ * task: work found after it closed is a follow-up change whose
+ * `discoveredFrom.item` names it ({@link ClosedChangeError}).
+ *
  * @module rex/core/change-completion
  */
 
@@ -112,14 +116,47 @@ export function completeChange(tree: V2Tree, changeRef: string, options: ChangeC
   return closeChange(result, change, options);
 }
 
+/** Why a change takes no new task: work found after it closed is a follow-up change. */
+export type ClosedChangeState = "completed" | "applied" | "cancelled" | "deleted";
+
+/** Thrown by {@link addTask} for a change that is completed, applied, cancelled or deleted. */
+export class ClosedChangeError extends ChangeCompletionError {
+  constructor(
+    readonly changeId: string,
+    readonly state: ClosedChangeState,
+    label: string,
+  ) {
+    super(
+      `Cannot add a task to change ${label}: it is ${state}. ` +
+        `Add a follow-up change instead, with discoveredFrom: { item: "${changeId}" }.`,
+    );
+    this.name = "ClosedChangeError";
+  }
+}
+
+/** The state that closes `change` to new tasks; `retired` when it sits under a deleted node. Undefined while open. */
+function closedState(change: RuleNode, retired: boolean): ClosedChangeState | undefined {
+  if (retired || change.status === "deleted") return "deleted";
+  if (change.appliedAt) return "applied";
+  if (change.status === "completed" || change.status === "cancelled") return change.status;
+  return undefined;
+}
+
 /**
  * Add `task` as the last child of the change `changeRef`, splitting the
  * change when this is the first live task of an `in_progress` change. `now`
- * is the split time: it closes the change's open active interval.
+ * is the split time: it closes the change's open active interval. A change
+ * that is completed, applied, cancelled or deleted is refused with
+ * {@link ClosedChangeError}.
  */
 export function addTask(tree: V2Tree, changeRef: string, task: RuleNode, now: Date): ChangeCompletionResult {
   if (task.type !== "task") throw new ChangeCompletionError(`Cannot add ${task.type} ${task.id} as a task`);
   const next = structuredClone(tree);
+  const all = indexTree(next, { includeTombstones: true });
+  const target = all.resolve(changeRef);
+  const entry = target?.type === "change" ? all.entries.find((e) => e.node === target) : undefined;
+  const closed = entry && closedState(entry.node, !!entry.retired);
+  if (entry && closed) throw new ClosedChangeError(entry.node.id, closed, entry.node.displayId ?? entry.node.id);
   const { node: change } = locate(next, changeRef, "change");
   const added = structuredClone(task);
   const first = liveTasks(change).length === 0;

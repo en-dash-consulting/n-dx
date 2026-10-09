@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addTask, ChangeCompletionError, completeChange, completeTask } from "../../../src/core/change-completion.js";
+import { addTask, ChangeCompletionError, ClosedChangeError, completeChange, completeTask } from "../../../src/core/change-completion.js";
 import type { ApplyOn } from "../../../src/core/apply-policy.js";
 import { isOpenChange, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import { ChangeIntentSchema, TaskIntentSchema } from "../../../src/schema/v2.js";
@@ -158,6 +158,29 @@ describe("addTask split rule", () => {
       const result = addTask(tree(inFlight({ activeIntervals: intervals })), "ch", task("t"), NOW);
       expect(theChange(result.tree).activeIntervals).toEqual(intervals);
       expect(theChange(result.tree).children?.[0]).not.toHaveProperty("activeIntervals");
+    }
+  });
+
+  it("refuses a task under a closed change, naming its state and suggesting a follow-up change", () => {
+    const cases: [RuleNode[], string][] = [
+      [[change({ status: "completed" })], "completed"],
+      [[change({ status: "completed", appliedAt: NOW.toISOString() })], "applied"],
+      [[change({ appliedAt: NOW.toISOString() })], "applied"],
+      [[change({ status: "cancelled" })], "cancelled"],
+      [[change({ status: "deleted" })], "deleted"],
+      [[node({ id: "outer", type: "change", status: "deleted", children: [change()] })], "deleted"],
+    ];
+    for (const [changes, state] of cases) {
+      let error: unknown;
+      try {
+        addTask(tree(...changes), "ch", task("t"), NOW);
+      } catch (e) {
+        error = e;
+      }
+      expect(error, state).toBeInstanceOf(ClosedChangeError);
+      expect((error as ClosedChangeError).state).toBe(state);
+      expect((error as Error).message).toContain(`it is ${state}`);
+      expect((error as Error).message).toContain('discoveredFrom: { item: "ch" }');
     }
   });
 
