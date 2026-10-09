@@ -42,12 +42,14 @@ function isTrailerBlock(paragraph: string): boolean {
  *   a trailer block, even when it reads like one (`fix: …`).
  * - A trailer line already present verbatim in the final block is not repeated.
  *
- * Trailing whitespace on the message is normalised away, so the result does not
+ * Line endings are normalised to LF and trailing whitespace is dropped, so the result does not
  * depend on whether the writer ended its message with a newline. The result
  * ends with exactly one newline.
  */
 export function appendTrailerBlock(message: string, trailers: readonly string[]): string {
-  const body = message.replace(/\s+$/, "");
+  // CRLF/CR → LF first: `\n[ \t]*\n` does not match `\n\r\n`, which would hide the
+  // agent's final block. git strips the \r from the commit anyway.
+  const body = message.replace(/\r\n?/g, "\n").replace(/\s+$/, "");
   const paragraphs = body.split(/\n[ \t]*\n/);
   const last = paragraphs[paragraphs.length - 1];
   const endsInBlock = paragraphs.length > 1 && isTrailerBlock(last);

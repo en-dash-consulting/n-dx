@@ -95,6 +95,10 @@ describe("work commit — one final trailer block", () => {
       "agent's trailers split by a blank line",
       "feat: update x\n\nN-DX-Item: task-1\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n",
     ],
+    [
+      "CRLF line endings, agent's own trailer",
+      "feat: update x\r\n\r\nCo-Authored-By: Claude <noreply@anthropic.com>\r\n",
+    ],
   ];
 
   for (const [label, message] of messages) {
@@ -127,5 +131,15 @@ describe("work commit — one final trailer block", () => {
 
     const items = gitCommitTrailers(projectDir).filter(([key]) => key === "N-DX-Item");
     expect(items).toEqual([["N-DX-Item", TASK_ID]]);
+  });
+
+  it("keeps a CRLF agent trailer and does not repeat hench's trailer already in it", async () => {
+    await commitWithMessage(
+      `feat: update x\r\n\r\nCo-Authored-By: Claude <noreply@anthropic.com>\r\nN-DX-Item: ${TASK_ID}\r\n`,
+    );
+
+    const trailers = gitCommitTrailers(projectDir);
+    expect(trailers).toContainEqual(["Co-Authored-By", "Claude <noreply@anthropic.com>"]);
+    expect(trailers.filter(([key]) => key === "N-DX-Item")).toEqual([["N-DX-Item", TASK_ID]]);
   });
 });
