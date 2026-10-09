@@ -2052,6 +2052,31 @@ import { join as join3, basename as basename2, resolve as resolve2 } from "node:
 
 // packages/sourcevision/src/util/git-remote.ts
 import { execFileSync } from "node:child_process";
+
+// packages/llm-client/src/git-remote-url.ts
+function stripRemoteCredentials(remote) {
+  const trimmed = remote.trim();
+  const match = trimmed.match(/^([A-Za-z][A-Za-z0-9+.\-]*:\/\/)(?:[^/@]*@)?(.*)$/s);
+  return match ? `${match[1]}${match[2]}` : trimmed;
+}
+function splitRemote(remote) {
+  const trimmed = stripRemoteCredentials(remote).trim();
+  if (!trimmed) return void 0;
+  const url = trimmed.match(/^[A-Za-z][A-Za-z0-9+.\-]*:\/\/([^/:]+)(?::\d+)?\/(.*)$/s);
+  const scp = url ? null : trimmed.match(/^(?:[^@/]+@)?([\w.\-]+):(?!\/)(.*)$/s);
+  if (scp && /^[A-Za-z]$/.test(scp[1])) return void 0;
+  const matched = url ?? scp;
+  if (!matched) return void 0;
+  const segments = matched[2].replace(/\.git\/*$/, "").split("/").filter(Boolean);
+  if (segments.length < 2) return void 0;
+  return { host: matched[1], segments };
+}
+function remoteToWebUrl(remote) {
+  const raw = splitRemote(remote);
+  return raw ? `https://${raw.host}/${raw.segments.join("/")}` : void 0;
+}
+
+// packages/sourcevision/src/util/git-remote.ts
 function gitCommand(root, args) {
   try {
     return execFileSync("git", args, {
@@ -2067,22 +2092,9 @@ function gitCommand(root, args) {
 function isGitWorkTree(root) {
   return gitCommand(root, ["rev-parse", "--is-inside-work-tree"]) === "true";
 }
-function stripRemoteCredentials(remote) {
-  const trimmed = remote.trim();
-  const match = trimmed.match(/^([A-Za-z][A-Za-z0-9+.\-]*:\/\/)(?:[^/@]*@)?(.*)$/s);
-  return match ? `${match[1]}${match[2]}` : trimmed;
-}
 function readOriginUrl(root) {
   const url = gitCommand(root, ["config", "--get", "remote.origin.url"]);
   return url ? stripRemoteCredentials(url) : void 0;
-}
-function remoteToWebUrl(remote) {
-  const cleaned = remote.trim().replace(/\.git$/, "");
-  const ssh = cleaned.match(/^[\w.-]+@([\w.-]+):(.+)$/);
-  if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
-  const https = cleaned.match(/^https?:\/\/(?:[^@/]+@)?([\w.-]+\/.+)$/);
-  if (https) return `https://${https[1]}`;
-  return void 0;
 }
 
 // packages/sourcevision/src/export/iso-scan.ts

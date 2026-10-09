@@ -110,7 +110,7 @@ export const editItemTool = defineTool({
     id: z.string().describe("Item ID"),
     title: z.string().optional().describe("New title"),
     description: z.string().optional().describe("New description"),
-    acceptanceCriteria: z.array(z.string()).optional().describe("New acceptance criteria"),
+    acceptanceCriteria: z.array(z.string()).optional().describe("New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria"),
     priority: z.enum(["critical", "high", "medium", "low"]).optional().describe("New priority"),
     level: z.enum(["epic", "feature", "task", "subtask"]).optional().describe("New level (epic, feature, task, subtask)"),
     tags: z.array(z.string()).optional().describe("New tags"),

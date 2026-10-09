@@ -93,6 +93,14 @@ describe("computeProductStatus", () => {
     expect([out.a.status, out.b.status]).toEqual(["changing", "changing"]);
   });
 
+  // The spec-hash half (apply stamps `metAt`) is in change-completion.test.ts.
+  it("ignores a change's acceptanceCriteria when computing its targets' status", () => {
+    const plain = fixture();
+    const withDoneWhen = fixture();
+    for (const c of withDoneWhen.changes) Object.assign(c, { acceptanceCriteria: ["works", "Wallets pay"] });
+    expect(computeProductStatus(withDoneWhen)).toEqual(computeProductStatus(plain));
+  });
+
   describe("retired", () => {
     const APPLIED = "2026-10-01T00:00:00.000Z";
 

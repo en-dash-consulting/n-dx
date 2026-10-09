@@ -23,10 +23,17 @@
  *
  * When an `in_progress` change with no live task gains its first task, the
  * in-flight work becomes that task: it takes `in_progress` and the change's
- * `startedAt`, the change returns to `pending`, and the change's
- * `acceptanceCriteria` move to the task. `requirements`, `amends` and
- * `touches` stay on the change. The change keeps `startedAt`, so it still
- * reads started (`isBuildingChange`).
+ * `startedAt`, the change returns to `pending`, and the change's typed
+ * `acceptanceCriteria` list ("done when") moves to the task, after any the
+ * task already has. `requirements`, `amends` and `touches` stay on the
+ * change. The change keeps `startedAt`, so it still
+ * reads started (`isBuildingChange`). An open `activeIntervals` entry on the
+ * change is closed at the split time and the task opens one from then, so
+ * each node's duration stays its own and the pending change stops accruing.
+ *
+ * A change that is completed, applied, cancelled or deleted takes no new
+ * task: work found after it closed is a follow-up change whose
+ * `discoveredFrom.item` names it ({@link ClosedChangeError}).
  *
  * @module rex/core/change-completion
  */
@@ -42,7 +49,7 @@ export type ChangeCompletionOptions = ApplyOnTriggerOptions;
 export interface ChangeSplit {
   changeId: string;
   taskId: string;
-  /** Criteria moved from the change to the task; empty when the change had none. */
+  /** Acceptance criteria moved from the change to the task; empty when the change had none. */
   movedCriteria: string[];
 }
 
@@ -109,13 +116,49 @@ export function completeChange(tree: V2Tree, changeRef: string, options: ChangeC
   return closeChange(result, change, options);
 }
 
+/** Why a change takes no new task: work found after it closed is a follow-up change. */
+export type ClosedChangeState = "completed" | "applied" | "cancelled" | "deleted";
+
+/** Thrown for a node added under a change that is completed, applied, cancelled or deleted. */
+export class ClosedChangeError extends ChangeCompletionError {
+  constructor(
+    readonly changeId: string,
+    readonly state: ClosedChangeState,
+    label: string,
+    /** What was being added, for the message. */
+    adding: "task" | "change" | "subtask" = "task",
+  ) {
+    super(
+      `Cannot add ${adding === "change" ? "a change under" : `a ${adding} to`} change ${label}: it is ${state}. ` +
+        `Add a follow-up change instead, with discoveredFrom: { item: "${changeId}" }.`,
+    );
+    this.name = "ClosedChangeError";
+  }
+}
+
+/** The state that closes `change` to new tasks; `retired` when it sits under a deleted node. Undefined while open. */
+export function closedState(change: RuleNode, retired: boolean): ClosedChangeState | undefined {
+  if (retired || change.status === "deleted") return "deleted";
+  if (change.appliedAt) return "applied";
+  if (change.status === "completed" || change.status === "cancelled") return change.status;
+  return undefined;
+}
+
 /**
  * Add `task` as the last child of the change `changeRef`, splitting the
- * change when this is the first live task of an `in_progress` change.
+ * change when this is the first live task of an `in_progress` change. `now`
+ * is the split time: it closes the change's open active interval. A change
+ * that is completed, applied, cancelled or deleted is refused with
+ * {@link ClosedChangeError}.
  */
-export function addTask(tree: V2Tree, changeRef: string, task: RuleNode): ChangeCompletionResult {
+export function addTask(tree: V2Tree, changeRef: string, task: RuleNode, now: Date): ChangeCompletionResult {
   if (task.type !== "task") throw new ChangeCompletionError(`Cannot add ${task.type} ${task.id} as a task`);
   const next = structuredClone(tree);
+  const all = indexTree(next, { includeTombstones: true });
+  const target = all.resolve(changeRef);
+  const entry = target?.type === "change" ? all.entries.find((e) => e.node === target) : undefined;
+  const closed = entry && closedState(entry.node, !!entry.retired);
+  if (entry && closed) throw new ClosedChangeError(entry.node.id, closed, entry.node.displayId ?? entry.node.id);
   const { node: change } = locate(next, changeRef, "change");
   const added = structuredClone(task);
   const first = liveTasks(change).length === 0;
@@ -126,12 +169,17 @@ export function addTask(tree: V2Tree, changeRef: string, task: RuleNode): Change
   added.status = "in_progress";
   if (change.startedAt !== undefined) added.startedAt = change.startedAt;
   change.status = "pending";
-  // A passthrough key with no schema: move only a list; any other value stays on the change rather than being lost.
-  const movedCriteria = Array.isArray(change.acceptanceCriteria) ? (change.acceptanceCriteria as string[]) : [];
-  if (movedCriteria.length > 0) {
-    added.acceptanceCriteria = [...((added.acceptanceCriteria as string[] | undefined) ?? []), ...movedCriteria];
+  const splitAt = now.toISOString();
+  const open = change.activeIntervals?.filter((iv) => iv.end === undefined) ?? [];
+  if (open.length > 0) {
+    for (const iv of open) iv.end = splitAt;
+    added.activeIntervals = [...(added.activeIntervals ?? []), { start: splitAt }];
   }
-  if (Array.isArray(change.acceptanceCriteria) || change.acceptanceCriteria === undefined) delete change.acceptanceCriteria;
+  const movedCriteria = change.type === "change" ? (change.acceptanceCriteria ?? []) : [];
+  if (change.type === "change") delete change.acceptanceCriteria;
+  if (movedCriteria.length > 0 && added.type === "task") {
+    added.acceptanceCriteria = [...(added.acceptanceCriteria ?? []), ...movedCriteria];
+  }
   result.split = { changeId: change.id, taskId: added.id, movedCriteria };
   return result;
 }

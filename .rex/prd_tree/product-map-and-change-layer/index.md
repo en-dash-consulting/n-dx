@@ -30,7 +30,7 @@ plannedRelease: "1.0.0"
 | [Docs, skills and policies for the v2 model](./docs-skills-and-policies-for-the-v2/index.md) | pending |
 | [Every n-dx commit carries an item trailer](./every-n-dx-commit-carries-an-item/index.md) | pending |
 | [Generate the migration plan](./generate-the-migration-plan/index.md) | completed |
-| [MCP tools for the product layer and changes](./mcp-tools-for-the-product-layer-and/index.md) | pending |
+| [MCP tools for the product layer and changes](./mcp-tools-for-the-product-layer-and/index.md) | completed |
 | [Merge driver and bundle format for v2](./merge-driver-and-bundle-format-for-v2/index.md) | completed |
 | [Migrate this repository and cut 1.0.0](./migrate-this-repository-and-cut-1-0-0/index.md) | pending |
 | [Move the Jev client into llm-client and redact Bitbucket tokens](./move-the-jev-client-into-llm-client/index.md) | completed |
@@ -50,5 +50,5 @@ plannedRelease: "1.0.0"
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | completed |
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
 | [v2 schema and rules before the freeze](./v2-schema-and-rules-before-the-freeze/index.md) | completed |
-| [v2 store transaction for the product and change layers](./v2-store-transaction-for-the-product/index.md) | pending |
+| [v2 store transaction for the product and change layers](./v2-store-transaction-for-the-product/index.md) | completed |
 | [Bootstrap the product layer from an established codebase](./bootstrap-the-product-layer-from-an.md) | pending |
