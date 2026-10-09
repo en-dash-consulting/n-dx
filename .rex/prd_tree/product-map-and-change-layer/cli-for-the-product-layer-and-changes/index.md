@@ -31,6 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Apply-engine refusals say bare "criteria": "a constraint has no criteria", "a new capability has no criteria to replace or remove"](./apply-engine-refusals-say-bare.md) | completed |
 | [capability-criteria warning says bare "criteria": "Capability X has no criteria"](./capability-criteria-warning-says-bare.md) | completed |
 | [criteria-growth warning says bare "criteria" instead of "capability criteria"](./criteria-growth-warning-says-bare.md) | completed |
+| [get_capability refusal text is pinned only by a regex, so the 0.9.0 soft freeze on its wording goes unguarded](./get-capability-refusal-text-is-pinned.md) | pending |
 | [Lower title-release-token to a warning so a release-named title does not fail rex health or ndx ci](./lower-title-release-token-to-a-warning.md) | completed |
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | completed |
 | [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | completed |
@@ -42,7 +43,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [rex health does not report changes that are not landed on main](./rex-health-does-not-report-changes.md) | completed |
 | [rex health never passes the project's releases to the v2 rules, so title-release-token cannot fire](./rex-health-never-passes-the-project-s.md) | completed |
 | [rex health on a v2 tree drops the reader's parse warnings and reports "no findings" for a tree with skipped nodes](./rex-health-on-a-v2-tree-drops-the.md) | completed |
-| [rex product show with an unknown ref refuses with "Use get_product to see the product layer"](./rex-product-show-with-an-unknown-ref.md) | pending |
+| [rex product show with an unknown ref refuses with "Use get_product to see the product layer"](./rex-product-show-with-an-unknown-ref.md) | completed |
 | [rex prune on a v2 tree can remove the applied change that marks a product node retired](./rex-prune-on-a-v2-tree-can-remove-the.md) | completed |
 | [rex prune's consolidation and --smart can merge away the applied change that retires a product node](./rex-prune-s-consolidation-and-smart.md) | completed |
 | [rex reshape aborts with no draft when one product proposal places an added node under a node another proposal removes](./rex-reshape-aborts-with-no-draft-when.md) | completed |
