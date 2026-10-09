@@ -107,6 +107,31 @@ export function buildCoAuthoredByTrailerLine(): string {
   return "Co-Authored-By: En Dash's n-dx <n-dx@endash.us>";
 }
 
+/**
+ * The trailers hench puts on a commit it makes for a run, in block order:
+ * N-DX-Status (when the commit records a status change), N-DX (vendor, model,
+ * run), N-DX-Item (the item id, which rex's `computeChangeCommits` reads) and
+ * Co-Authored-By. Shared by the normal commit path and the timer-expiry
+ * auto-commit so both land the same trailers.
+ */
+export function buildRunTrailers(
+  run: Pick<RunRecord, "id" | "vendor" | "model" | "weight" | "diagnostics">,
+  taskId: string | undefined,
+  opts: { status?: { from: string; to: string } } = {},
+): string[] {
+  const trailers: string[] = [];
+  if (opts.status && taskId) {
+    trailers.push(`N-DX-Status: ${taskId} ${opts.status.from} → ${opts.status.to}`);
+  }
+  const vendor = run.vendor ?? run.diagnostics?.vendor ?? "unknown";
+  const model = run.model ?? "unknown";
+  const weight = run.weight && run.weight !== "standard" ? ` (${run.weight})` : "";
+  trailers.push(`N-DX: ${vendor}/${model}${weight} · run ${run.id}`);
+  if (taskId) trailers.push(`N-DX-Item: ${taskId}`);
+  trailers.push(buildCoAuthoredByTrailerLine());
+  return trailers;
+}
+
 // ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
@@ -2980,16 +3005,9 @@ export async function performCommitPromptIfNeeded(
   //   when the dashboard moved. `itemIdFromTrailer` in rex's
   //   `core/change-commits.ts` unwraps a legacy permalink to the same id.
   // - Co-Authored-By: GitHub co-authorship attribution.
-  const trailers: string[] = [];
-  if (oldStatus && newStatus && oldStatus !== newStatus && taskId) {
-    trailers.push(`N-DX-Status: ${taskId} ${oldStatus} → ${newStatus}`);
-  }
-  const vendor = run.vendor ?? run.diagnostics?.vendor ?? "unknown";
-  const model = run.model ?? "unknown";
-  const weight = run.weight && run.weight !== "standard" ? ` (${run.weight})` : "";
-  trailers.push(`N-DX: ${vendor}/${model}${weight} · run ${run.id}`);
-  if (taskId) trailers.push(`N-DX-Item: ${taskId}`);
-  trailers.push(buildCoAuthoredByTrailerLine());
+  const trailers = buildRunTrailers(run, taskId, {
+    status: oldStatus && newStatus && oldStatus !== newStatus ? { from: oldStatus, to: newStatus } : undefined,
+  });
   try {
     const { writeFileSync } = await import("node:fs");
     writeFileSync(msgPath, appendTrailerBlock(readFileSync(msgPath, "utf-8"), trailers), "utf-8");

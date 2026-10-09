@@ -118,6 +118,7 @@ import {
   recordClaimLoss,
   handleRunFailure,
   formatModelLabel,
+  buildRunTrailers,
 } from "./shared.js";
 import type { SharedLoopOptions } from "./shared.js";
 import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
@@ -2239,6 +2240,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     timeoutMs: commitMsgTimeoutMs,
     // RunRecord carries worktreeRoot/branch/startHead under those exact names.
     origin: run,
+    // Without these the auto-commit carries no N-DX-Item and rex's realized-by
+    // edge never sees it.
+    trailers: buildRunTrailers(run, taskId),
   });
 
   // Prompt section diagnostics — captured on first attempt, stored on run record.
