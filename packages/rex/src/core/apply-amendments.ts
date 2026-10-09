@@ -80,6 +80,9 @@ export interface ApplyAmendmentsResult {
   applied: AppliedAmendment[];
 }
 
+/** The problem a `modified` amendment with neither `proposed` nor a criteria delta reports. */
+export const NOTHING_TO_MODIFY = "nothing to modify: no proposed text or criteria delta";
+
 export class ApplyAmendmentsError extends Error {
   readonly problems: readonly string[];
   /** The rule findings the result introduced, when that is why apply refused. */
@@ -321,7 +324,7 @@ const applyModified: DeltaApply = ({ product }, amendment, _options, fail) => {
   }
   const delta = amendment.criteria;
   const hasCriteriaDelta = Boolean(delta?.add?.length || delta?.replace?.length || delta?.remove?.length);
-  if (amendment.proposed === undefined && !hasCriteriaDelta) return void fail("nothing to modify: no proposed text or criteria delta");
+  if (amendment.proposed === undefined && !hasCriteriaDelta) return void fail(NOTHING_TO_MODIFY);
   if (hasCriteriaDelta && node.type !== "capability") return void fail("a constraint has no criteria");
 
   let criteria: Criterion[] = node.type === "capability" ? [...(node.criteria ?? [])] : [];

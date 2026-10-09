@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import { applyAmendments, ApplyAmendmentsError } from "../../core/apply-amendments.js";
+import { applyAmendments, ApplyAmendmentsError, NOTHING_TO_MODIFY } from "../../core/apply-amendments.js";
 import { indexTree } from "../../schema/v2-rules.js";
 import { prdLayout } from "../../store/prd-model-reader.js";
 import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
@@ -41,7 +41,12 @@ export async function handleApplyChange(
     });
     return textResult(JSON.stringify({ change, appliedAt, applied }));
   } catch (err) {
-    if (err instanceof ApplyAmendmentsError) return textResult(err.message, true);
+    if (err instanceof ApplyAmendmentsError) {
+      const hint = err.problems.some((p) => p.endsWith(NOTHING_TO_MODIFY))
+        ? " A modified amendment's content is supplied by place_change's proposed and criteria (with target and relation amends) when the change is placed."
+        : "";
+      return textResult(err.message + hint, true);
+    }
     return textResult(`Error: ${(err as Error).message}`, true);
   }
 }

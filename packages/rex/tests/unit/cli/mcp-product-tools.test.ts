@@ -132,6 +132,30 @@ describe("place_change", () => {
     json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
     expect(error(await handlePlaceChange(store(), rexDir, { id: "CH-1", target: "A1.1" }))).toMatch(/CH-1 is applied at/);
   });
+
+  it("records proposed text and a criteria delta on the amendment, with the target's current base", async () => {
+    const id = await inboxChange("Refunds by card");
+    const criteria = { add: [{ id: "c9", text: "A card payment can be refunded" }], remove: ["c2"] };
+    json(await handlePlaceChange(store(), rexDir, { id, target: "A1.1", relation: "amends", proposed: "A shopper can pay and be refunded by card.", criteria }));
+    const { item } = json(await handleGetItem(store(), rexDir, { id }));
+    expect(item.amends).toEqual([
+      { target: CAPABILITY, delta: "modified", summary: "Refunds by card", proposed: "A shopper can pay and be refunded by card.", criteria, base: expect.any(String) },
+    ]);
+
+    // Without them, the amendment stays summary-only, on the same base.
+    const bare = await inboxChange("Wallets");
+    json(await handlePlaceChange(store(), rexDir, { id: bare, target: "A1.1", relation: "amends" }));
+    const [amendment] = json(await handleGetItem(store(), rexDir, { id: bare })).item.amends;
+    expect(amendment).toEqual({ target: CAPABILITY, delta: "modified", summary: "Wallets", base: item.amends[0].base });
+  });
+
+  it("refuses proposed or criteria without relation amends, naming it", async () => {
+    const id = await inboxChange("Tidy the card form");
+    expect(error(await handlePlaceChange(store(), rexDir, { id, target: "A1.1", relation: "touches", proposed: "x" }))).toMatch(/relation amends/);
+    expect(error(await handlePlaceChange(store(), rexDir, { id, target: "A1.1", criteria: { remove: ["c1"] } }))).toMatch(/relation amends/);
+    expect(error(await handlePlaceChange(store(), rexDir, { id, proposed: "x" }))).toMatch(/relation amends/);
+    expect(json(await handleGetItem(store(), rexDir, { id })).item.needsPlacement).toBe(true);
+  });
 });
 
 describe("apply_change", () => {
@@ -151,6 +175,14 @@ describe("apply_change", () => {
     json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
     expect(error(await handleApplyChange(store(), rexDir, { id: "CH-1" }))).toMatch(/Cannot apply change CH-1: already applied at/);
     expect(error(await handleApplyChange(store(), rexDir, { id: "CH-404" }))).toMatch(/no live change "CH-404"/);
+  });
+
+  it("names place_change's proposed and criteria when a modified amendment has nothing to modify", async () => {
+    const id = await inboxChange("Refunds by card");
+    json(await handlePlaceChange(store(), rexDir, { id, target: "A1.1", relation: "amends" }));
+    const message = error(await handleApplyChange(store(), rexDir, { id }));
+    expect(message).toMatch(/nothing to modify/);
+    expect(message).toMatch(/place_change.*proposed.*criteria/);
   });
 });
 

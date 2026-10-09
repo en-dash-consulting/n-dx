@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [add_item takes a type and defaults to a change in the Inbox](./add-item-takes-a-type-and-defaults-to.md) | completed |
 | [get_capability's id cursor skips open changes when the cursor change is applied mid-paging](./get-capability-s-id-cursor-skips-open.md) | pending |
 | [Give v2 changes an optional acceptanceCriteria list](./give-v2-changes-an-optional.md) | completed |
-| [place_change takes the amendment's proposed text and capability criteria](./place-change-takes-the-amendment-s.md) | pending |
+| [place_change takes the amendment's proposed text and capability criteria](./place-change-takes-the-amendment-s.md) | in_progress |
 | [Read tools default to open and recent changes, with paging](./read-tools-default-to-open-and-recent.md) | completed |
 | [Rex MCP tool access kinds are unpinned, so a write tool can flip to read and escape #499 write refusal](./rex-mcp-tool-access-kinds-are-unpinned.md) | completed |
 | [v2 MCP write tools take their timestamp inside the PRD lock](./v2-mcp-write-tools-take-their.md) | completed |

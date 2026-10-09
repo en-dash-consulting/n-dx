@@ -9,7 +9,9 @@
  * - {@link recordPlacement} writes the choice: a `touches` target joins the
  *   change's `touches`; an `amends` target becomes a `modified` amendment with
  *   `base` set to the target's current spec hash, so apply refuses it if the
- *   spec moves first. Either clears `needsPlacement`.
+ *   spec moves first, carrying the caller's `proposed` text and `criteria`
+ *   delta (apply needs one of them to modify the target). Either clears
+ *   `needsPlacement`.
  *
  * Only an open change is placed. The result is checked against the v2 rules;
  * an error finding about the change refuses the placement.
@@ -19,7 +21,7 @@
  * @module rex/core/change-place
  */
 
-import type { ChangeNode } from "../schema/v2.js";
+import type { Amendment, ChangeNode, CriteriaDelta } from "../schema/v2.js";
 import { checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import {
   placementRelation,
@@ -37,6 +39,9 @@ export class ChangePlacementError extends Error {
     this.name = "ChangePlacementError";
   }
 }
+
+/** Refusal for `proposed` or `criteria` on a placement that is not an amendment. */
+export const PLACEMENT_CONTENT_NEEDS_AMENDS = "proposed and criteria describe an amendment: pass them with target and relation amends";
 
 export interface PlacementSuggestion {
   /** Id of the change placed. */
@@ -65,6 +70,10 @@ export interface RecordPlacementInput {
   relation?: PlacementRelation;
   /** An amendment's summary. Default: the change's title. */
   summary?: string;
+  /** An amendment's replacement statement. Relation amends only. */
+  proposed?: string;
+  /** An amendment's criteria delta. Relation amends only. */
+  criteria?: CriteriaDelta;
 }
 
 export interface RecordPlacementResult {
@@ -84,6 +93,9 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
     throw new ChangePlacementError(`"${input.target}" is not a live capability or constraint; a change is placed on one (see get_product)`);
   }
   const relation = input.relation ?? placementRelation(placementInput(change));
+  if (relation !== "amends" && (input.proposed !== undefined || input.criteria !== undefined)) {
+    throw new ChangePlacementError(PLACEMENT_CONTENT_NEEDS_AMENDS);
+  }
   const label = change.displayId ?? change.id;
   const amends = (change.amends ?? []).some((a) => index.resolve(a.target) === target);
   const touches = (change.touches ?? []).some((ref) => index.resolve(ref) === target);
@@ -97,10 +109,15 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
     const rest = (change.touches ?? []).filter((ref) => index.resolve(ref) !== target);
     if (rest.length) change.touches = rest;
     else delete change.touches;
-    change.amends = [
-      ...(change.amends ?? []),
-      { target: target.id, delta: "modified", summary: input.summary ?? change.title, base: specHash(nodeSpec(target)) },
-    ];
+    const amendment: Amendment = {
+      target: target.id,
+      delta: "modified",
+      summary: input.summary ?? change.title,
+      ...(input.proposed !== undefined ? { proposed: input.proposed } : {}),
+      ...(input.criteria !== undefined ? { criteria: input.criteria } : {}),
+      base: specHash(nodeSpec(target)),
+    };
+    change.amends = [...(change.amends ?? []), amendment];
   }
   delete change.needsPlacement;
 
