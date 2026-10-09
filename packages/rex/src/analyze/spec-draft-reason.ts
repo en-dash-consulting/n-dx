@@ -38,7 +38,7 @@ export function buildSpecDraftEnvelope(question: SpecQuestion): PromptEnvelope {
       [
         "Use only the items below. Do not add a requirement none of them states.",
         "The statement is one present-tense sentence about what the product does, not about work done on it.",
-        "Each criterion states one behaviour, in EARS form where it fits (\"When …, the system shall …\" or \"The system shall …\").",
+        "Each criterion states one behaviour and contains \"shall\": \"<actor> shall …\" or \"When/While/If …, <actor> shall …\". Never write a bare present-tense sentence (\"The inventory lists …\").",
         "Each criterion cites the id of the item it came from as source. Cite only ids listed below.",
         "Name the actor and the behaviour. Never open a criterion with \"The system shall ensure that\"; write \"The system shall keep …\" or name the actor (\"The scheduler shall …\").",
         "Leave out criteria that record a decision (\"X is justified or relocated\"), a documentation edit (a docstring or comment describes …) or a process step: tests pass, docs updated, changeset added, build or review done.",

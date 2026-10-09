@@ -32,7 +32,7 @@ import {
   isPresentTenseStatement,
   linkedTestsOf,
   NO_STATEMENT_NOTE,
-  toEars,
+  toModelEars,
   type CapabilitySpecDraft,
   type CriterionCandidate,
 } from "./capability-spec.js";
@@ -123,10 +123,10 @@ const ENSURE_THE_SYSTEM = /^the system shall ensure that the system\s+/i;
 
 /**
  * "The system shall ensure that the system keeps X" is a model habit, not a
- * behaviour: keep the verb phrase and let {@link toEars} restore "The system
+ * behaviour: keep the verb phrase and let {@link toModelEars} restore "The system
  * shall keep X"; "does not X" and "shall X" become "shall not X" and "shall X".
  * A phrase whose verb it cannot put in base form ("is", "refreshes") is kept
- * as written: grammatical beats short.
+ * as the model's sentence, "The system refreshes X".
  */
 function dropEnsureThatTheSystem(text: string): string {
   const rest = text.trim().replace(ENSURE_THE_SYSTEM, "");
@@ -134,8 +134,7 @@ function dropEnsureThatTheSystem(text: string): string {
   const negated = /^(?:does|do) not\s+/i.exec(rest);
   if (negated) return `The system shall not ${rest.slice(negated[0].length)}`;
   if (/^shall\s/i.test(rest)) return `The system ${rest}`;
-  const ears = toEars(rest);
-  return ears.startsWith("The system shall ensure that ") ? text : ears;
+  return `The system ${rest}`;
 }
 
 /**
@@ -179,7 +178,7 @@ export function redraftSpec(
       if (passedTests.has(t)) tests.push(t);
       else notes.push(`the model linked ${String(t)}, which the question did not pass in: not linked`);
     }
-    accepted.push({ text: toEars(dropEnsureThatTheSystem(text)), raw: text, source, tests });
+    accepted.push({ text: toModelEars(dropEnsureThatTheSystem(text)), raw: text, source, tests });
   }
 
   // A rejected criterion, or none kept, falls back to the template for every source no accepted criterion cites.

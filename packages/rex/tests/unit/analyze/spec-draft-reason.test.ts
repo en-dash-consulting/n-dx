@@ -41,6 +41,7 @@ describe("text spec drafter", () => {
     const prompt = String(mockSpawnClaude.mock.calls[0]![0]);
     expect(prompt).toContain("Name the actor and the behaviour.");
     expect(prompt).toContain('Never open a criterion with "The system shall ensure that"');
+    expect(prompt).toContain('contains "shall"');
     expect(prompt).toMatch(/Leave out criteria that record a decision .*a documentation edit .*or a process step/);
   });
 

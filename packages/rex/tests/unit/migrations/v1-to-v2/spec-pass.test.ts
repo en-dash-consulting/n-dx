@@ -112,8 +112,30 @@ describe("v1-to-v2 spec text pass", () => {
     expect(p.entries.f1!.spec!.criteria.map((c) => c.text)).toEqual([
       "The system shall not pick blocked tasks.",
       "The system shall break ties by age.",
-      "The system shall ensure that the system refreshes the queue.",
+      "The system refreshes the queue.",
     ]);
+  });
+
+  it("keeps the model's own subject: shall and When/While/If wording unchanged, a present-tense verb converted, an unconvertible one as written", async () => {
+    const p = await plan(
+      drafter({
+        statement: "Picks the next actionable task by priority.",
+        criteria: [
+          { text: "The scheduler shall pick the oldest task.", source: "t1" },
+          { text: "When a task is blocked, the scheduler shall skip it.", source: "s1" },
+          { text: "The inventory lists every prompt surface", source: "f1" },
+          { text: "The dashboard is refreshed on every write.", source: "t1" },
+        ],
+      }),
+    );
+    const texts = p.entries.f1!.spec!.criteria.map((c) => c.text);
+    expect(texts).toEqual([
+      "The scheduler shall pick the oldest task.",
+      "When a task is blocked, the scheduler shall skip it.",
+      "The inventory shall list every prompt surface.",
+      "The dashboard is refreshed on every write.",
+    ]);
+    expect(texts.join("\n")).not.toContain("ensure that");
   });
 
   it("rejects a criterion citing no source or one outside the capability, keeping the template criteria with a note", async () => {

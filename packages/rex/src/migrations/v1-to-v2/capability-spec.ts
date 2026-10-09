@@ -192,6 +192,33 @@ export function toEars(text: string): string {
   return `The system shall ensure that ${lowerFirst(core)}.`;
 }
 
+/** A verb after one of these belongs to the subject phrase ("The log of runs lists …"), not to the sentence. */
+const PHRASE_LINKS = new Set(["of", "and", "or", "for", "in", "on", "to", "by", "with", "from", "that", "which"]);
+/** How far into a subject-led sentence the verb is looked for ("The run history inventory lists …"). */
+const MAX_SUBJECT_WORDS = 5;
+
+/**
+ * A model criterion in EARS form. "shall" and When/While/If wording is kept;
+ * "The X lists Y" becomes "The X shall list Y" when the verb converts; any
+ * other sentence is kept as written. It never wraps the model's sentence in
+ * "The system shall ensure that", which hides the model's own subject.
+ */
+export function toModelEars(text: string): string {
+  const core = criterionCore(text);
+  if (EARS_OPENERS.test(core) || /\bshall\b/i.test(core)) return `${core}.`;
+  const words = core.split(/\s+/);
+  if (/^(?:the|a|an|each|every)$/i.test(words[0] ?? "")) {
+    for (let i = 2; i < Math.min(words.length, MAX_SUBJECT_WORDS + 1); i++) {
+      if (PHRASE_LINKS.has(words[i - 1]!.toLowerCase())) continue;
+      const verb = behaviourVerb(words[i]!);
+      if (!verb) continue;
+      return `${words.slice(0, i).join(" ")} shall ${verb}${words.slice(i + 1).map((w) => ` ${w}`).join("")}.`;
+    }
+  }
+  const ears = toEars(core);
+  return ears.startsWith("The system shall ensure that ") ? asSentence(core) : ears;
+}
+
 /** A sentence end, not the dot of an abbreviation ("e.g.", "i.e.", "etc.", "vs."). */
 const SENTENCE_BREAK = /(?<!\b(?:e\.g|i\.e|etc|vs)\.)(?<=[.!?])\s+|\n/;
 /** Review metadata or a reference, not a description of the product ("**Severity:** …", "Verdict: …", "GitHub #368."). */
