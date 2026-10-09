@@ -44,13 +44,13 @@ const GOOD: SpecAnswer = {
   ],
 };
 
-function plan(draft: SpecModel, extra: { previous?: PlanFile; options?: V1ToV2Options; text?: PlacementModel } = {}) {
+function plan(draft: SpecModel, extra: { previous?: PlanFile; options?: V1ToV2Options; text?: PlacementModel; items?: PRDItem[] } = {}) {
   const seams = planSeams({
     settings: { models: "text", autoAccept: "agree" },
     spec: { model: MODEL, draft },
     ...(extra.text ? { text: { model: MODEL, place: extra.text } } : {}),
   });
-  return v1ToV2.plan(v1TreeSource(tree()), {
+  return v1ToV2.plan(v1TreeSource(extra.items ?? tree()), {
     cutAt: CUT,
     seams,
     ...(extra.previous ? { previous: extra.previous } : {}),
@@ -165,6 +165,17 @@ describe("v1-to-v2 spec text pass", () => {
     const again = drafter(GOOD);
     await plan(again, { previous: first, options: { codeFiles: { f1: ["packages/rex/src/core/next-task.ts"] } } });
     expect(again).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks the parent again when a child task completes, though the parent's own source hash is unchanged", async () => {
+    const first = await plan(drafter(GOOD));
+    const later = tree();
+    later[0]!.children![0]!.children![1]!.status = "completed";
+
+    const again = drafter(GOOD);
+    await plan(again, { previous: first, items: later });
+    expect(again).toHaveBeenCalledTimes(1);
+    expect((again.mock.calls[0]![0] as SpecQuestion).history.map((h) => h.id)).toContain("t2");
   });
 
   it("without a spec drafter the template draft stands", async () => {

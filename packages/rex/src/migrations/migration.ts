@@ -50,7 +50,14 @@ export interface RulesResult<TEntry, TSummary> {
 export interface ModelQuestion {
   /** Source item the question is about; its entry receives the answer. */
   id: string;
-  /** JSON-serialisable; part of the recorded answer's hash. */
+  /**
+   * JSON-serialisable; part of the recorded answer's hash. A recorded answer is
+   * reused when the source item's hash and this question both match, and the
+   * source hash covers only the item's own content (a v1 item's children are not
+   * in it). So the question must carry every input the answer depends on, such as
+   * a child's status or criteria: an input left out never triggers a re-ask and
+   * the answer goes stale silently.
+   */
   question: unknown;
 }
 
