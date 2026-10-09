@@ -31,4 +31,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Give v2 changes an optional acceptanceCriteria list](./give-v2-changes-an-optional.md) | completed |
 | [Read tools default to open and recent changes, with paging](./read-tools-default-to-open-and-recent.md) | pending |
 | [Rex MCP tool access kinds are unpinned, so a write tool can flip to read and escape #499 write refusal](./rex-mcp-tool-access-kinds-are-unpinned.md) | pending |
-| [v2 split leaves an open activeIntervals entry on a change that returns to pending](./v2-split-leaves-an-open.md) | pending |
+| [v2 split leaves an open activeIntervals entry on a change that returns to pending](./v2-split-leaves-an-open.md) | completed |
