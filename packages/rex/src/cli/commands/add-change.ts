@@ -20,6 +20,7 @@ import type { Priority } from "../../schema/index.js";
 import type { ChangeNodeType } from "../../schema/v2.js";
 import { indexTree, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
 import { resolveRexPaths, resolveStore } from "../../store/index.js";
+import { loadPrdModel } from "../../store/prd-model-reader.js";
 import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -99,7 +100,35 @@ export async function cmdAddChangesFromDescriptions(
       ...(flags.priority ? { priority: flags.priority as Priority } : {}),
     };
   });
+  // `--format=json` without `--accept` is smart-add's preview contract (the
+  // dashboard's Quick Add relies on it): report what would be created, write nothing.
+  if (flags.format === "json" && flags.accept !== "true") {
+    const { tree } = await loadPrdModel(resolveRexPaths(dir).rexDir);
+    const rows = jsonRows(planChanges(tree, inputs, new Date()).added);
+    // `proposals` and `qualityIssues` keep smart-add's preview keys, so a v1-shaped reader sees an empty preview, not a parse error.
+    return result(JSON.stringify({ preview: true, changes: rows, proposals: [], qualityIssues: [] }, null, 2));
+  }
   report(await addChanges(dir, inputs), flags.format === "json");
+}
+
+/** `inputs` added to `tree` in memory, with the placement shortlist for each new change still in the Inbox. */
+function planChanges(start: V2Tree, inputs: AddChangeNodeInput[], now: Date): { tree: V2Tree; added: Added[] } {
+  let tree = start;
+  const ids: string[] = [];
+  for (const input of inputs) {
+    const out = addChangeNode(tree, input, { now });
+    tree = out.tree;
+    ids.push(out.node.id);
+  }
+  const index = indexTree(tree);
+  const added = ids.map((id): Added => {
+    const node = index.resolve(id)!;
+    if (node.type !== "change" || !node.needsPlacement) return { node };
+    const suggestion = suggestPlacement(tree, id);
+    const targets = suggestion.shortlist.map((c) => index.resolve(c.target)!);
+    return { node, suggestion, targets: Object.fromEntries(targets.map((t) => [t.id, { id: t.id, displayId: t.displayId, title: t.title }])) };
+  });
+  return { tree, added };
 }
 
 /** Add every input in one transaction, logging each, and rank placement for each new change. */
@@ -108,24 +137,8 @@ async function addChanges(dir: string, inputs: AddChangeNodeInput[]): Promise<Ad
   let now!: Date;
   const { result: added } = await withPrdModelTransaction(rexDir, (model) => {
     now = new Date();
-    let tree: V2Tree = model.tree;
-    const ids: string[] = [];
-    for (const input of inputs) {
-      const out = addChangeNode(tree, input, { now });
-      tree = out.tree;
-      ids.push(out.node.id);
-    }
-    const index = indexTree(tree);
-    return {
-      tree,
-      result: ids.map((id): Added => {
-        const node = index.resolve(id)!;
-        if (node.type !== "change" || !node.needsPlacement) return { node };
-        const suggestion = suggestPlacement(tree, id);
-        const targets = suggestion.shortlist.map((c) => index.resolve(c.target)!);
-        return { node, suggestion, targets: Object.fromEntries(targets.map((t) => [t.id, { id: t.id, displayId: t.displayId, title: t.title }])) };
-      }),
-    };
+    const planned = planChanges(model.tree, inputs, now);
+    return { tree: planned.tree, result: planned.added };
   });
   const store = await resolveStore(rexDir);
   for (const { node } of added) {
@@ -134,15 +147,19 @@ async function addChanges(dir: string, inputs: AddChangeNodeInput[]): Promise<Ad
   return added;
 }
 
+function jsonRows(added: Added[]) {
+  return added.map(({ node, suggestion }) => ({
+    id: node.id,
+    type: node.type,
+    title: node.title,
+    ...(node.needsPlacement ? { needsPlacement: true } : {}),
+    ...(suggestion ? { placement: { relation: suggestion.relation, shortlist: suggestion.shortlist } } : {}),
+  }));
+}
+
 function report(added: Added[], json: boolean): void {
   if (json) {
-    const rows = added.map(({ node, suggestion }) => ({
-      id: node.id,
-      type: node.type,
-      title: node.title,
-      ...(node.needsPlacement ? { needsPlacement: true } : {}),
-      ...(suggestion ? { placement: { relation: suggestion.relation, shortlist: suggestion.shortlist } } : {}),
-    }));
+    const rows = jsonRows(added);
     return result(JSON.stringify(rows.length === 1 ? rows[0] : rows, null, 2));
   }
   for (const { node, suggestion, targets } of added) {

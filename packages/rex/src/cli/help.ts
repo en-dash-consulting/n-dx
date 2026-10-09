@@ -109,7 +109,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
         content:
           "Every add creates a change, or a task or subtask under --parent:\n" +
           "  rex add [change|task|subtask] --title=\"...\" [--parent=<id>]\n" +
-          "A description (or --file, or stdin) becomes one change each, with no LLM.\n" +
+          "A description (or --file, or stdin) becomes one change each, with no LLM;\n" +
+          "with --format=json and no --accept it is a preview that writes nothing.\n" +
           "A new change lands in the Inbox; the output names it and the suggested\n" +
           "placement, which 'rex change place' records. Levels are refused.\n" +
           "--criterion is the item's acceptance criteria (done when). A capability's\n" +

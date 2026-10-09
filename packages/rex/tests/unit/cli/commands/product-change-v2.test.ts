@@ -194,6 +194,19 @@ describe("rex add on a v2 tree", () => {
     expect(text().match(/Created change:/g)).toHaveLength(2);
   });
 
+  it("previews without writing under --format=json without --accept (the dashboard's Quick Add)", async () => {
+    const before = (await changes()).length;
+    await cmdAddChangesFromDescriptions(tmp, ["Support refunds when paying by card"], { format: "json", fast: "true" });
+    const body = JSON.parse(text());
+    expect(body).toMatchObject({ preview: true, proposals: [], changes: [{ title: "Support refunds when paying by card", placement: { relation: "amends" } }] });
+    expect((await changes()).length).toBe(before);
+
+    out.length = 0;
+    await cmdAddChangesFromDescriptions(tmp, ["Support refunds when paying by card"], { format: "json", accept: "true" });
+    expect(JSON.parse(text())).toMatchObject({ title: "Support refunds when paying by card", needsPlacement: true });
+    expect((await changes()).length).toBe(before + 1);
+  });
+
   it("titleFrom cuts a long first line at a word", () => {
     const long = "word ".repeat(30).trim();
     const title = titleFrom(long);
