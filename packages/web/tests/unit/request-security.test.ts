@@ -198,6 +198,24 @@ describe("HTTP request token (per-user)", () => {
     expect(out2.status()).toBe(401);
   });
 
+  it("still strips ?ndx_token= from a navigation the cookie already authenticates", () => {
+    // The printed URL is reopened on every `ndx start`. Letting it through
+    // unredirected left the token in the address bar and handed the static
+    // route "/?ndx_token=…", which it did not match — a bare "Not found".
+    const req = makeRequest("GET", { Cookie: `ndx_token=${TOKEN}` });
+    (req as { url?: string }).url = `/?ndx_token=${TOKEN}`;
+    const res = makeResponse();
+    expect(handleRequestSecurity(req, res.response, opts)).toBe(true);
+    expect(res.status()).toBe(302);
+    expect(res.headers.get("location")).toBe("/");
+
+    // A wrong query token on an authenticated request is ignored, not a 401.
+    const stale = makeRequest("GET", { Cookie: `ndx_token=${TOKEN}` });
+    (stale as { url?: string }).url = `/prd?ndx_token=${TOKEN}x`;
+    const out = makeResponse();
+    expect(handleRequestSecurity(stale, out.response, opts)).toBe(false);
+  });
+
   it("checks Host before the token, so a valid token on a foreign Host is still 421", () => {
     const req = makeRequest("GET", { Host: "attacker.example:3117", Authorization: `Bearer ${TOKEN}` });
     const res = makeResponse();
