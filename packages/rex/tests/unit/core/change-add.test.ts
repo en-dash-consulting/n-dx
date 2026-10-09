@@ -52,4 +52,33 @@ describe("addChangeNode", () => {
   it("refuses an unresolved blockedBy", () => {
     expect(() => addChangeNode(tree(), { type: "change", title: "T", blockedBy: ["ghost"] }, opts)).toThrow(/ghost/);
   });
+
+  it("nests a change under an open change", () => {
+    const { tree: next } = addChangeNode(tree(open()), { type: "change", title: "Child", parentId: "ch" }, opts);
+    expect(next.changes[0].children?.[0]).toMatchObject({ id: "new", type: "change" });
+  });
+
+  it.each([
+    ["completed", { status: "completed" }],
+    ["applied", { status: "completed", appliedAt: "2026-10-01T00:00:00.000Z" }],
+    ["cancelled", { status: "cancelled" }],
+    ["deleted", { status: "deleted" }],
+  ])("refuses a change under a %s change, suggesting a follow-up", (state, extra) => {
+    let error: unknown;
+    try {
+      addChangeNode(tree(open(extra)), { type: "change", title: "Late", parentId: "ch" }, opts);
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ClosedChangeError);
+    expect((error as ClosedChangeError).state).toBe(state);
+    expect((error as Error).message).toMatch(/follow-up change.*discoveredFrom/);
+  });
+
+  it("refuses a subtask under a task of a closed change, but not of an open one", () => {
+    const task = node({ id: "t", type: "task" });
+    expect(() => addChangeNode(tree(open({ status: "completed", children: [task] })), { type: "subtask", title: "S", parentId: "t" }, opts)).toThrow(ClosedChangeError);
+    const inner = node({ id: "in", type: "change", touches: ["cap"], status: "cancelled", children: [node({ id: "t2", type: "task" })] });
+    expect(() => addChangeNode(tree(open({ children: [inner] })), { type: "subtask", title: "S", parentId: "t2" }, opts)).toThrow(ClosedChangeError);
+  });
 });

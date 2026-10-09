@@ -27,7 +27,7 @@ import type { Priority } from "../schema/v1.js";
 import type { Amendment, ChangeNodeType, DiscoveredFrom, SavedRunSettings } from "../schema/v2.js";
 import { checkV2Rules, indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { freeSlug } from "./apply-amendments.js";
-import { addTask, type ChangeSplit } from "./change-completion.js";
+import { addTask, closedState, ClosedChangeError, type ChangeSplit } from "./change-completion.js";
 
 export interface AddChangeNodeInput {
   type: ChangeNodeType;
@@ -97,6 +97,7 @@ export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: 
 
   const want = PARENT_TYPE[type];
   if (want.required && input.parentId === undefined) throw new AddChangeNodeError(`A ${type} needs parentId: the ${want.type} it belongs to`);
+  refuseClosedChange(tree, input.parentId, type);
   const parent = input.parentId === undefined ? undefined : indexTree(tree).resolve(input.parentId);
   // A task's parent is resolved by addTask, which names a closed change's state.
   if (input.parentId !== undefined && type !== "task" && parent?.type !== want.type) {
@@ -133,6 +134,20 @@ export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: 
   const errors = checkV2Rules(next, { now: options.now }).filter((f) => f.nodeId === id && f.severity === "error");
   if (errors.length) throw new AddChangeNodeError(`Cannot add ${type} "${input.title}": ${errors.map((f) => f.message).join("; ")}`);
   return { tree: next, node: indexTree(next).resolve(id)!, split };
+}
+
+/**
+ * A closed change (completed, applied, cancelled or deleted) takes no new
+ * change, and none of its tasks a subtask: later work is a follow-up change.
+ * A task's own parent is checked by {@link addTask}.
+ */
+function refuseClosedChange(tree: V2Tree, parentId: string | undefined, type: ChangeNodeType): void {
+  if (parentId === undefined || type === "task") return;
+  const all = indexTree(tree, { includeTombstones: true });
+  let entry = all.entries.find((e) => e.node === all.resolve(parentId));
+  while (entry && entry.node.type !== "change") entry = all.entries.find((e) => e.node === entry!.parent);
+  const closed = entry && closedState(entry.node, !!entry.retired);
+  if (entry && closed) throw new ClosedChangeError(entry.node.id, closed, entry.node.displayId ?? entry.node.id, type);
 }
 
 /** The intent fields `input` sets, named as `input.type` stores them, plus Inbox placement for an untargeted change. */

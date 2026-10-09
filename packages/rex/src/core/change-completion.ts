@@ -119,15 +119,17 @@ export function completeChange(tree: V2Tree, changeRef: string, options: ChangeC
 /** Why a change takes no new task: work found after it closed is a follow-up change. */
 export type ClosedChangeState = "completed" | "applied" | "cancelled" | "deleted";
 
-/** Thrown by {@link addTask} for a change that is completed, applied, cancelled or deleted. */
+/** Thrown for a node added under a change that is completed, applied, cancelled or deleted. */
 export class ClosedChangeError extends ChangeCompletionError {
   constructor(
     readonly changeId: string,
     readonly state: ClosedChangeState,
     label: string,
+    /** What was being added, for the message. */
+    adding: "task" | "change" | "subtask" = "task",
   ) {
     super(
-      `Cannot add a task to change ${label}: it is ${state}. ` +
+      `Cannot add ${adding === "change" ? "a change under" : `a ${adding} to`} change ${label}: it is ${state}. ` +
         `Add a follow-up change instead, with discoveredFrom: { item: "${changeId}" }.`,
     );
     this.name = "ClosedChangeError";
@@ -135,7 +137,7 @@ export class ClosedChangeError extends ChangeCompletionError {
 }
 
 /** The state that closes `change` to new tasks; `retired` when it sits under a deleted node. Undefined while open. */
-function closedState(change: RuleNode, retired: boolean): ClosedChangeState | undefined {
+export function closedState(change: RuleNode, retired: boolean): ClosedChangeState | undefined {
   if (retired || change.status === "deleted") return "deleted";
   if (change.appliedAt) return "applied";
   if (change.status === "completed" || change.status === "cancelled") return change.status;
