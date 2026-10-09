@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
+import type { ParseWarning } from "../../store/index.js";
 import { prdLayout, loadPrdModel } from "../../store/prd-model-reader.js";
-import type { ParseWarning } from "../../store/folder-tree-parser.js";
 import { computeHealthScore, formatHealthScore, checkV2TreeHealth, formatV2Findings, checkChangeLandings, formatLandingHealth } from "../../core/health.js";
 
 import { result } from "../output.js";
