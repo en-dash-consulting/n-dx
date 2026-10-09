@@ -194,11 +194,16 @@ export async function assertV2TreeWritable(rexDir: string): Promise<void> {
 
 // ── Entry point ──────────────────────────────────────────────────
 
+/** Which layout {@link loadPrdModel} reads under `rexDir`, without reading the tree. */
+export async function prdLayout(rexDir: string): Promise<PrdModel["layout"]> {
+  return (await isDirectory(join(rexDir, PRODUCT_DIRNAME))) ? "v2" : "v1";
+}
+
 /** Load the PRD under `rexDir` as one model, from whichever layout it uses. */
 export async function loadPrdModel(rexDir: string, options: LoadPrdModelOptions = {}): Promise<PrdModel> {
   const ignore = options.ignoreSchemaSkew ?? ignoreSchemaSkewRequested([], options.env ?? process.env);
   const productDir = join(rexDir, PRODUCT_DIRNAME);
-  const v2 = await isDirectory(productDir);
+  const v2 = (await prdLayout(rexDir)) === "v2";
   const header = v2 ? await readV2Header(productDir) : await readV1Header(rexDir);
 
   let readOnly: SchemaSkewError | undefined;

@@ -82,7 +82,7 @@ describe("rex MCP tools/list contract", () => {
   it("registers every tool module, named after its file", () => {
     const toolsDir = join(dirname(fileURLToPath(import.meta.url)), "../../../src/cli/mcp-tools");
     /** Shared infrastructure rather than a tool. */
-    const support = new Set(["index.ts", "registry.ts", "tool.ts", "result.ts", "claims.ts"]);
+    const support = new Set(["index.ts", "registry.ts", "tool.ts", "result.ts", "claims.ts", "clock.ts"]);
 
     const fromFiles = readdirSync(toolsDir)
       .filter((f) => f.endsWith(".ts") && !support.has(f))
