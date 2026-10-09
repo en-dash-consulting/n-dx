@@ -57,6 +57,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # rex release stamp needs full history and release tags.
+          fetch-depth: 0
 
       - name: Validate trusted publisher OIDC exchange
         # Runs only when manually dispatched with mode=validate-oidc. Mints

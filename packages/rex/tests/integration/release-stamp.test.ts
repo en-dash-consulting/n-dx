@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { cmdRelease } from "../../src/cli/commands/release.js";
 import { CLIError } from "../../src/cli/errors.js";
@@ -50,13 +50,13 @@ async function landChange(): Promise<void> {
   git("merge", "--no-ff", "-q", "-m", "Merge feature", "feature");
 }
 
-/** Every PRD file under the rex directory except the derived cache, by relative path. */
+/** Every PRD file under the rex directory except the derived cache, by forward-slash relative path. */
 async function snapshot(): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const entry of await readdir(rexDir, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
-    const path = relative(rexDir, join(entry.parentPath, entry.name));
-    if (path.startsWith(".cache")) continue;
+    const path = relative(rexDir, join(entry.parentPath, entry.name)).split(sep).join("/");
+    if (path.startsWith(".cache/")) continue;
     out[path] = await readFile(join(rexDir, path), "utf-8");
   }
   return out;

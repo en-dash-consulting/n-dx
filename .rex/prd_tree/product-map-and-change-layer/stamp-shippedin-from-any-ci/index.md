@@ -27,5 +27,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add rex release stamp and call it from the Version Packages workflow](./add-rex-release-stamp-and-call-it-from.md) | completed |
-| [Fix the release-stamp idempotence test on Windows and give the release checkout full history](./fix-the-release-stamp-idempotence-test.md) | pending |
+| [Fix the release-stamp idempotence test on Windows and give the release checkout full history](./fix-the-release-stamp-idempotence-test.md) | in_progress |
 | [No test covers rex release dispatch through the CLI entry, so the v1 never-fail path can regress unseen](./no-test-covers-rex-release-dispatch.md) | completed |

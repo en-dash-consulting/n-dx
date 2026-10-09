@@ -21,6 +21,17 @@ describe("version-packages", () => {
     expect(workflow).toMatch(/^\s*version-script: pnpm run version-packages\s*$/m);
   });
 
+  // The stamp reads full history and release tags; a shallow clone makes it
+  // fail, and the fail-open group turns that into a release with nothing stamped.
+  it("runs in a full-history checkout", () => {
+    // A Windows checkout may carry CRLF; release.yml has no eol pin.
+    const workflow = readFileSync(join(ROOT, ".github/workflows/release.yml"), "utf-8").replace(/\r\n/g, "\n");
+    const checkout = workflow.match(/^ {6}- name: Checkout\n((?: {8}.*\n|\s*\n)*)/m);
+    expect(checkout).not.toBeNull();
+    expect(checkout[1]).toMatch(/^ {8}uses: actions\/checkout@/m);
+    expect(checkout[1]).toMatch(/^ {8}with:\n(?: {10}#.*\n)* {10}fetch-depth: 0\s*$/m);
+  });
+
   it("runs changeset version, then the stamp in a fail-open group", () => {
     expect(script).toBe(
       "changeset version && { node packages/rex/dist/cli/index.js release stamp " +
