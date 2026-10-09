@@ -35,11 +35,13 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | completed |
 | [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | completed |
 | [No test covers shippedIn or retired-node releases in collectReleases, so dropping either goes unnoticed](./no-test-covers-shippedin-or-retired.md) | completed |
+| [rex change place drops the placement's pending warnings, so the CLI user is not told apply will refuse until other changes close](./rex-change-place-drops-the-placement-s.md) | pending |
 | [rex change place names MCP parameters, not CLI flags, when it refuses a summary-only amends placement](./rex-change-place-names-mcp-parameters.md) | completed |
-| [rex change place refusals name MCP tools and parameters: "see get_product", "edit it with edit_item"](./rex-change-place-refusals-name-mcp.md) | pending |
+| [rex change place refusals name MCP tools and parameters: "see get_product", "edit it with edit_item"](./rex-change-place-refusals-name-mcp.md) | completed |
 | [rex health does not report changes that are not landed on main](./rex-health-does-not-report-changes.md) | completed |
 | [rex health never passes the project's releases to the v2 rules, so title-release-token cannot fire](./rex-health-never-passes-the-project-s.md) | completed |
 | [rex health on a v2 tree drops the reader's parse warnings and reports "no findings" for a tree with skipped nodes](./rex-health-on-a-v2-tree-drops-the.md) | completed |
+| [rex product show with an unknown ref refuses with "Use get_product to see the product layer"](./rex-product-show-with-an-unknown-ref.md) | pending |
 | [rex prune on a v2 tree can remove the applied change that marks a product node retired](./rex-prune-on-a-v2-tree-can-remove-the.md) | completed |
 | [rex prune's consolidation and --smart can merge away the applied change that retires a product node](./rex-prune-s-consolidation-and-smart.md) | completed |
 | [rex reshape aborts with no draft when one product proposal places an added node under a node another proposal removes](./rex-reshape-aborts-with-no-draft-when.md) | completed |
