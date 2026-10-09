@@ -35,7 +35,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | completed |
 | [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | completed |
 | [No test covers shippedIn or retired-node releases in collectReleases, so dropping either goes unnoticed](./no-test-covers-shippedin-or-retired.md) | completed |
-| [rex change place drops the placement's pending warnings, so the CLI user is not told apply will refuse until other changes close](./rex-change-place-drops-the-placement-s.md) | pending |
+| [recordPlacement's pending and blockedBy pass-through has no test with a real pending problem, so emptying them goes unnoticed](./recordplacement-s-pending-and.md) | pending |
+| [rex change place drops the placement's pending warnings, so the CLI user is not told apply will refuse until other changes close](./rex-change-place-drops-the-placement-s.md) | completed |
 | [rex change place names MCP parameters, not CLI flags, when it refuses a summary-only amends placement](./rex-change-place-names-mcp-parameters.md) | completed |
 | [rex change place refusals name MCP tools and parameters: "see get_product", "edit it with edit_item"](./rex-change-place-refusals-name-mcp.md) | completed |
 | [rex health does not report changes that are not landed on main](./rex-health-does-not-report-changes.md) | completed |
