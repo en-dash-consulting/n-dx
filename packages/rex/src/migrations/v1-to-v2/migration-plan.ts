@@ -186,9 +186,9 @@ export function opensWithWorkVerb(text: string): boolean {
   return lead !== undefined && (WORK_VERBS.has(lead) || FIX_WORDS.has(lead));
 }
 
-function isWorkShaped(item: PRDItem): boolean {
+function isWorkShaped(item: PRDItem, productNames: readonly string[]): boolean {
   const lead = leadWord(item.title);
-  return (lead !== undefined && WORK_VERBS.has(lead)) || WORK_NOUNS.test(item.title) || isDeliveryEpic(item.title);
+  return (lead !== undefined && WORK_VERBS.has(lead)) || WORK_NOUNS.test(item.title) || isDeliveryEpic(item.title, productNames);
 }
 
 function isConstraintShaped(title: string): boolean {
@@ -290,10 +290,10 @@ function classifyEpic(epic: PRDItem, plan: PlanBuilder, productNames: readonly s
   if (isConstraintShaped(epic.title)) {
     plan.constraints.push({ source: epic.id, title: epic.title, appliesTo: "all" });
   }
-  for (const child of epic.children ?? []) classifyUnderArea(child, epic.id, plan);
+  for (const child of epic.children ?? []) classifyUnderArea(child, epic.id, plan, productNames);
 }
 
-function classifyUnderArea(item: PRDItem, area: string, plan: PlanBuilder): void {
+function classifyUnderArea(item: PRDItem, area: string, plan: PlanBuilder, productNames: readonly string[]): void {
   if (item.level !== "feature") {
     plan.change(item, { reasons: [`a v1 ${item.level} directly under an area: its own change`] }, area);
     plan.workUnder(item.children, item.id);
@@ -301,9 +301,10 @@ function classifyUnderArea(item: PRDItem, area: string, plan: PlanBuilder): void
   }
 
   const fix = isFixShaped(item);
-  const work = isWorkShaped(item);
+  const work = isWorkShaped(item, productNames);
   if (fix || work) {
-    plan.change(item, { reasons: [fix ? "fix-shaped feature: a change" : "work-shaped feature: a change"] }, area);
+    const release = releaseToken(item.title, productNames);
+    plan.change(item, { ...(release ? { plannedRelease: release } : {}), reasons: [fix ? "fix-shaped feature: a change" : "work-shaped feature: a change"] }, area);
     plan.workUnder(item.children, item.id);
     return;
   }

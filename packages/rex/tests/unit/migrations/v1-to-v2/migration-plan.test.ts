@@ -63,6 +63,21 @@ describe("title tokens", () => {
     expect(billing?.plannedRelease).toBe("2.0");
   });
 
+  it("reads the caller's product name in a feature title as a release change", () => {
+    const tree = () => [item("epic", "Search", [item("feature", "Acme 2.1 search", [item("task", "Do it")])])];
+    const named = classifyV1Tree(tree(), { productNames: ["acme"] });
+    const feature = byTitle(named.entries, "Acme 2.1 search");
+    expect(feature.target).toBe("change");
+    expect(feature.plannedRelease).toBe("2.1");
+  });
+
+  it("classifies a feature the same without product names", () => {
+    const plan = classifyV1Tree([item("epic", "Search", [item("feature", "Acme 2.1 search", [item("task", "Do it")])])]);
+    const feature = byTitle(plan.entries, "Acme 2.1 search");
+    expect(feature.target).toBe("capability");
+    expect(feature.plannedRelease).toBeUndefined();
+  });
+
   it("escapes regex metacharacters in a product name", () => {
     expect(() => releaseToken("C++ 2.0", ["c++", "(", "[x"])).not.toThrow();
     expect(releaseToken("C++ 2.0", ["c++"])).toBe("2.0");
