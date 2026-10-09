@@ -38,6 +38,16 @@ describe("addChangeNode", () => {
     expect(add({ add: [{ id: "c2", text: "x" }] }).node.id).toBe("new");
   });
 
+  it("judges amendments of one capability in order, as apply does", () => {
+    const withCriteria = tree();
+    withCriteria.product[0].children![0].criteria = [{ id: "c1", text: "Pays" }];
+    const add = (...deltas: Record<string, unknown>[]) =>
+      addChangeNode(withCriteria, { type: "change", title: "A", amends: deltas.map((criteria) => ({ target: "cap", delta: "modified" as const, summary: "s", criteria })) }, opts);
+    const c2 = { add: [{ id: "c2", text: "x" }] };
+    expect(() => add(c2, c2)).toThrow(/criterion c2 to add already exists/);
+    expect(add(c2, { remove: ["c2"] }).node.id).toBe("new");
+  });
+
   it("refuses a change whose target does not resolve", () => {
     expect(() => addChangeNode(tree(), { type: "change", title: "T", touches: ["nope"] }, opts)).toThrow(/nope/);
   });

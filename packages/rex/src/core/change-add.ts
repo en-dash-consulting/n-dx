@@ -24,7 +24,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Priority } from "../schema/v1.js";
-import type { Amendment, ChangeNodeType, DiscoveredFrom, SavedRunSettings } from "../schema/v2.js";
+import type { Amendment, ChangeNodeType, Criterion, DiscoveredFrom, SavedRunSettings } from "../schema/v2.js";
 import { checkV2Rules, indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { applyCriteriaDelta, freeSlug } from "./apply-amendments.js";
 import { addTask, closedState, ClosedChangeError, type ChangeSplit } from "./change-completion.js";
@@ -93,16 +93,19 @@ const PARENT_TYPE: Readonly<Record<ChangeNodeType, { type: ChangeNodeType; requi
  * Refuse a `modified` amendment whose criteria delta does not fit its
  * capability's current criteria: apply always refuses it and no tool edits the
  * amendment afterwards. The same check as placement (`applyCriteriaDelta`);
- * apply re-checks against the spec at apply time.
+ * apply re-checks against the spec at apply time. Amendments of one capability
+ * chain in order, as apply runs them.
  */
 function refuseMisfitCriteria(tree: V2Tree, amends: readonly Amendment[] | undefined): void {
   const index = indexTree(tree);
+  const current = new Map<RuleNode, Criterion[]>();
   for (const amendment of amends ?? []) {
     if (amendment.delta !== "modified" || !amendment.criteria) continue;
     const target = index.resolve(amendment.target);
     if (target?.type !== "capability") continue;
-    const { problems } = applyCriteriaDelta(target.criteria ?? [], amendment.criteria);
+    const { criteria, problems } = applyCriteriaDelta(current.get(target) ?? target.criteria ?? [], amendment.criteria);
     if (problems.length) throw new AddChangeNodeError(`Cannot amend "${target.title}": ${problems.join("; ")}`);
+    current.set(target, criteria);
   }
 }
 
