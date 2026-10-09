@@ -180,6 +180,11 @@ describe("rex add on a v2 tree", () => {
     expect((await changes()).find((c) => c.id === id)?.title).toBe("0.9.0 release audit");
   });
 
+  it("accepts a title naming a PR, which the rule flags with no releases known", async () => {
+    const id = await addInbox("PR 12 follow-up");
+    expect((await changes()).find((c) => c.id === id)?.title).toBe("PR 12 follow-up");
+  });
+
   it("adds a task under a change", async () => {
     await cmdAddChange(tmp, "task", { title: "Write the refund call", parent: "CH-1" });
     expect(text()).toContain("Created task: Write the refund call");
