@@ -4,7 +4,7 @@ import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.j
 import type { PlacementJudge, PlacementSettings } from "../../../../src/core/placement-policy.js";
 import { formatPlanFile, type PlanFile } from "../../../../src/migrations/plan-file.js";
 import { v1ToV2, v1TreeSource, type V1ToV2Options } from "../../../../src/migrations/v1-to-v2/index.js";
-import { MIGRATION_JUDGE_TASK_CLASS } from "../../../../src/migrations/v1-to-v2/jev-review-pass.js";
+import { MIGRATION_JUDGE_TASK_CLASS, reviewQueue } from "../../../../src/migrations/v1-to-v2/jev-review-pass.js";
 import { planSeams, type PlanSeamOptions } from "../../../../src/migrations/v1-to-v2/seams.js";
 import { choiceAnswer, mockJudge, noulAnswer } from "../../../helpers/jev-judge.js";
 import { specHash } from "../../../../src/schema/v2-rules.js";
@@ -156,6 +156,53 @@ describe("v1-to-v2 Jev review", () => {
       { id: "e1", held: false, confidence: expect.closeTo(0.2) },
       { id: "f1", held: false, confidence: expect.closeTo(0.9) },
     ]);
+  });
+
+  describe("flag threshold", () => {
+    // p 0.45 is confidence 0.1: Jev is undecided. p 0.2 is confidence 0.6.
+    const undecided = () => judgeWith({ place: choiceAnswer("f1", 0.5), "criterion:c1": noulAnswer(0.45), "link:l1": noulAnswer(0.45), job: noulAnswer(0.45) });
+
+    it("records an undecided answer but raises no note or flag", async () => {
+      const p = await plan(CONFIDENT, undecided());
+      expect(p.entries.f1?.jevReview?.criteria).toEqual({ c1: { probability: 0.45, confidence: expect.closeTo(0.1) } });
+      expect(p.entries.f1?.jevReview?.testLinks).toMatchObject([{ probability: 0.45, dropped: false }]);
+      expect(p.entries.f1?.spec?.notes.join("\n")).not.toMatch(/Jev (reads|doubts)/);
+      expect(p.summary.areas.find((a) => a.id === "e1")?.notes.join("\n")).not.toContain("Jev reads the title");
+      expect(p.summary.jevReview).toMatchObject({ flaggedCriteria: 0, flaggedTestLinks: 0, flaggedAreas: 0 });
+    });
+
+    it("flags the same answers at the default threshold once confident", async () => {
+      const p = await plan(CONFIDENT, judgeWith({ place: choiceAnswer("f1", 0.5), "criterion:c1": noulAnswer(0.2), "link:l1": noulAnswer(0.4) }));
+      // 0.2 → confidence 0.6 flags; 0.4 → 0.2 does not.
+      expect(p.summary.jevReview).toMatchObject({ flaggedCriteria: 1, flaggedTestLinks: 0 });
+    });
+
+    it("takes the threshold from the migration options", async () => {
+      const lax = await plan(CONFIDENT, undecided(), { options: { jevFlagMinConfidence: 0 } });
+      expect(lax.summary.jevReview).toMatchObject({ flaggedCriteria: 1, flaggedTestLinks: 1, flaggedAreas: 1 });
+      expect(lax.entries.f1?.spec?.notes.join("\n")).toContain("as process");
+      const strict = await plan(
+        CONFIDENT,
+        judgeWith({ place: choiceAnswer("f1", 0.5), "criterion:c1": noulAnswer(0.2) }),
+        { options: { jevFlagMinConfidence: 0.7 } },
+      );
+      expect(strict.summary.jevReview?.flaggedCriteria).toBe(0);
+      await expect(plan(CONFIDENT, undecided(), { options: { jevFlagMinConfidence: 2 } })).rejects.toThrow(/jevFlagMinConfidence/);
+    });
+
+    it("ranks entries by confident flags, never an undecided answer above a confident flag", () => {
+      const base = { target: "capability", reasons: [] } as never;
+      const noul = (probability: number) => ({ probability, confidence: Math.abs(2 * probability - 1) });
+      const entry = (id: string, confidence: number, criteria: Record<string, ReturnType<typeof noul>>) =>
+        ({ ...base, id, confidence, jevReview: { criteria } }) as never;
+      const queue = reviewQueue({
+        undecided: entry("undecided", 0.01, { c1: noul(0.495) }),
+        one: entry("one", 0.6, { c1: noul(0.2) }),
+        two: entry("two", 0.8, { c1: noul(0.1), c2: noul(0.15) }),
+        sure: entry("sure", 0.9, { c1: noul(0.9) }),
+      });
+      expect(queue.map((q) => q.id)).toEqual(["two", "one", "undecided", "sure"]);
+    });
   });
 
   it("without a key the pass is skipped with one warning, and the plan equals the plan without it", async () => {

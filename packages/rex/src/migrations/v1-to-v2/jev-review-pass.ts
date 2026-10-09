@@ -20,6 +20,13 @@
  * A choice's confidence is Jev's own; a noul's is its distance from undecided,
  * |2p − 1|. An entry Jev judged carries the lowest confidence of its answers.
  *
+ * A noul raises a note or a flag only at or above a confidence threshold,
+ * {@link JEV_FLAG_MIN_CONFIDENCE} unless `jevFlagMinConfidence` says otherwise:
+ * an answer near even odds is Jev undecided, not Jev disagreeing. Weaker
+ * answers are still recorded on the entry. The review queue ranks entries by
+ * their number of confident flags, so an undecided answer never outranks a
+ * confident one.
+ *
  * Acceptance follows `rex.placement.autoAccept`, as placement does. A test
  * link Jev judges irrelevant is dropped only under `confident`, at or above
  * `PLACEMENT_JEV_MIN_CONFIDENCE`; the rules linked it, so under `agree` Jev's no
@@ -52,6 +59,25 @@ export const MIGRATION_JUDGE_TASK_CLASS = "prd.migrate.judge";
 
 /** Below this probability of yes, Jev reads the answer as no. */
 const NOUL_YES = 0.5;
+
+/** A noul answer flags only at or above this confidence (|2p − 1|); `jevFlagMinConfidence` overrides it. */
+export const JEV_FLAG_MIN_CONFIDENCE = 0.4;
+
+/** Migration options the review reads. */
+export interface JevReviewOptions {
+  /** Least confidence, in [0, 1], at which a noul answer raises a note or a flag. */
+  jevFlagMinConfidence?: number;
+}
+
+/** The effective flag threshold; a value outside [0, 1] is an error, not a silent default. */
+export function flagThresholdOf(options: JevReviewOptions | undefined): number {
+  const t = options?.jevFlagMinConfidence ?? JEV_FLAG_MIN_CONFIDENCE;
+  if (!Number.isFinite(t) || t < 0 || t > 1) throw new Error(`jevFlagMinConfidence must be in [0, 1], got ${t}`);
+  return t;
+}
+
+/** Jev read the noul as no, and confidently enough to flag. */
+const flags = (n: NoulJudgment, threshold: number): boolean => n.probability < NOUL_YES && n.confidence >= threshold;
 
 export const KIND_CHOICES = ["area", "capability", "constraint", "change"] as const;
 export type KindChoice = (typeof KIND_CHOICES)[number];
@@ -140,7 +166,7 @@ export interface JevReviewSummary {
 }
 
 type Entry = PlanEntry & PlacementFields & SpecFields & JevReviewFields & { data?: ItemPlanData };
-type Options = (PlacementPassOptions & SpecPassOptions) | undefined;
+type Options = (PlacementPassOptions & SpecPassOptions & JevReviewOptions) | undefined;
 
 const noulConfidence = (p: number): number => Math.abs(2 * p - 1);
 
@@ -305,6 +331,7 @@ function mergeReview(entry: Entry, review: ReviewQuestion, answer: JevBundleAnsw
   const jevReview: JevReview = {};
   const reasons = [...entry.reasons];
   let next: Entry = entry;
+  const threshold = flagThresholdOf(context.options);
 
   if (review.held) {
     const kind = answerOf(answers, "kind", "choice");
@@ -324,13 +351,13 @@ function mergeReview(entry: Entry, review: ReviewQuestion, answer: JevBundleAnsw
     for (const c of review.capability.criteria) {
       const p = answerOf(answers, `criterion:${c.id}`, "noul").noul;
       criteria[c.id] = { probability: p, confidence: noulConfidence(p) };
-      if (p < NOUL_YES) notes.push(`Jev reads ${c.id} as process, not product behaviour (p ${p}): confirm or remove it`);
+      if (flags(criteria[c.id]!, threshold)) notes.push(`Jev reads ${c.id} as process, not product behaviour (p ${p}): confirm or remove it`);
     }
     const testLinks = review.capability.links.map((l, i): TestLinkJudgment => {
       const p = answerOf(answers, `link:${linkKey(i)}`, "noul").noul;
       const confidence = noulConfidence(p);
       const dropped = p < NOUL_YES && autoAccept === "confident" && confidence >= PLACEMENT_JEV_MIN_CONFIDENCE;
-      if (p < NOUL_YES && !dropped) notes.push(`Jev doubts ${l.test} exercises ${l.criterion} (p ${p}): confirm the link`);
+      if (!dropped && flags({ probability: p, confidence }, threshold)) notes.push(`Jev doubts ${l.test} exercises ${l.criterion} (p ${p}): confirm the link`);
       return { ...l, probability: p, confidence, dropped };
     });
     jevReview.criteria = criteria;
@@ -404,35 +431,52 @@ export const jevReviewPass = jevPassOver(false);
 
 // ── Summary ──────────────────────────────────────────────────────
 
+/** Confident flags Jev raised on an entry: criteria, kept test links and the area title. */
+function confidentFlags(entry: Entry, threshold: number): number {
+  const r = entry.jevReview;
+  if (!r) return 0;
+  return (
+    Object.values(r.criteria ?? {}).filter((c) => flags(c, threshold)).length +
+    (r.testLinks ?? []).filter((l) => !l.dropped && flags(l, threshold)).length +
+    (r.jobShaped && flags(r.jobShaped, threshold) ? 1 : 0)
+  );
+}
+
 /**
  * Held items first, then entries Jev judged or whose approved spec changed, by
- * ascending confidence; plan order breaks ties. Unjudged entries lead their group.
+ * descending number of confident flags, then ascending confidence; plan order
+ * breaks ties. Unjudged entries lead their flag group.
  */
-export function reviewQueue(entries: Readonly<Record<string, Entry>>): ReviewQueueItem[] {
+export function reviewQueue(entries: Readonly<Record<string, Entry>>, threshold = JEV_FLAG_MIN_CONFIDENCE): ReviewQueueItem[] {
   const queued = Object.values(entries)
     .filter((e) => e.needsPlacement === true || e.confidence !== undefined || e.data?.reviewNote !== undefined)
     .map((e) => ({
-      id: e.id,
-      held: e.needsPlacement === true,
-      ...(e.data?.reviewNote !== undefined ? { specChanged: true as const } : {}),
-      ...(e.confidence !== undefined ? { confidence: e.confidence } : {}),
+      item: {
+        id: e.id,
+        held: e.needsPlacement === true,
+        ...(e.data?.reviewNote !== undefined ? { specChanged: true as const } : {}),
+        ...(e.confidence !== undefined ? { confidence: e.confidence } : {}),
+      } satisfies ReviewQueueItem,
+      flagged: confidentFlags(e, threshold),
     }));
   const rank = (q: ReviewQueueItem) => q.confidence ?? -1;
-  return queued.sort((a, b) => Number(b.held) - Number(a.held) || rank(a) - rank(b));
+  return queued
+    .sort((a, b) => Number(b.item.held) - Number(a.item.held) || b.flagged - a.flagged || rank(a.item) - rank(b.item))
+    .map((q) => q.item);
 }
 
-/** An area with Jev's job-shaped probability and, below even odds, a note. */
-export function withJevArea(area: ProposedArea, entry: Entry | undefined): ProposedArea {
+/** An area with Jev's job-shaped probability and, when Jev confidently reads it as no, a note. */
+export function withJevArea(area: ProposedArea, entry: Entry | undefined, threshold = JEV_FLAG_MIN_CONFIDENCE): ProposedArea {
   const judged = entry?.jevReview?.jobShaped;
   if (!judged) return area;
-  const notes = judged.probability < NOUL_YES
+  const notes = flags(judged, threshold)
     ? [...area.notes, `Jev reads the title as not named for a job a user does (p ${judged.probability})`]
     : area.notes;
   return { ...area, jevJobShaped: judged.probability, notes };
 }
 
 /** Counts across the plan; undefined when Jev reviewed nothing. */
-export function jevReviewSummary(entries: Readonly<Record<string, Entry>>): JevReviewSummary | undefined {
+export function jevReviewSummary(entries: Readonly<Record<string, Entry>>, threshold = JEV_FLAG_MIN_CONFIDENCE): JevReviewSummary | undefined {
   const reviewed = Object.values(entries).filter((e) => e.jevReview !== undefined);
   if (reviewed.length === 0) return undefined;
   const summary: JevReviewSummary = { droppedTestLinks: 0, flaggedTestLinks: 0, flaggedCriteria: 0, flaggedAreas: 0, otherKind: 0 };
@@ -440,10 +484,10 @@ export function jevReviewSummary(entries: Readonly<Record<string, Entry>>): JevR
     const r = e.jevReview!;
     for (const l of r.testLinks ?? []) {
       if (l.dropped) summary.droppedTestLinks += 1;
-      else if (l.probability < NOUL_YES) summary.flaggedTestLinks += 1;
+      else if (flags(l, threshold)) summary.flaggedTestLinks += 1;
     }
-    summary.flaggedCriteria += Object.values(r.criteria ?? {}).filter((c) => c.probability < NOUL_YES).length;
-    if (r.jobShaped && r.jobShaped.probability < NOUL_YES) summary.flaggedAreas += 1;
+    summary.flaggedCriteria += Object.values(r.criteria ?? {}).filter((c) => flags(c, threshold)).length;
+    if (r.jobShaped && flags(r.jobShaped, threshold)) summary.flaggedAreas += 1;
     if (r.kind && r.kind.choice !== e.target) summary.otherKind += 1;
   }
   return summary;

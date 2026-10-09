@@ -22,11 +22,13 @@ import { buildPlanData, stampReview, type ItemPlanData, type PlanData, type Plan
 import { classifyV1Tree, type ClassifyOptions, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
 import {
   jevHeldPass,
+  flagThresholdOf,
   jevReviewPass,
   jevReviewSummary,
   reviewQueue,
   withJevArea,
   type JevReviewFields,
+  type JevReviewOptions,
   type JevReviewSummary,
   type ReviewQueueItem,
 } from "./jev-review-pass.js";
@@ -85,7 +87,8 @@ export interface V1ToV2Summary {
 export type V1ToV2Options = Partial<Pick<SpecDraftOptions, "testFiles" | "codeFiles" | "testCommand" | "minTestScore">> &
   Omit<PlanDataOptions, "cutAt" | "specs"> &
   ClassifyOptions &
-  PlacementPassOptions;
+  PlacementPassOptions &
+  JevReviewOptions;
 
 /**
  * The template specs again, from the placements every stage so far settled:
@@ -156,12 +159,13 @@ export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Sum
     };
   },
   stages,
-  summarize(entries, summary) {
-    const jevReview = jevReviewSummary(entries);
+  summarize(entries, summary, context) {
+    const threshold = flagThresholdOf(context.options);
+    const jevReview = jevReviewSummary(entries, threshold);
     return {
       ...summary,
-      areas: summary.areas.map((a) => withJevArea(a, Object.hasOwn(entries, a.id) ? entries[a.id] : undefined)),
-      reviewQueue: reviewQueue(entries),
+      areas: summary.areas.map((a) => withJevArea(a, Object.hasOwn(entries, a.id) ? entries[a.id] : undefined, threshold)),
+      reviewQueue: reviewQueue(entries, threshold),
       ...(jevReview ? { jevReview } : {}),
     };
   },
