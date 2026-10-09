@@ -1,9 +1,16 @@
 import { resolve } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { prdLayout, loadPrdModel } from "../../store/prd-model-reader.js";
+import type { ParseWarning } from "../../store/folder-tree-parser.js";
 import { computeHealthScore, formatHealthScore, checkV2TreeHealth, formatV2Findings, checkChangeLandings, formatLandingHealth } from "../../core/health.js";
 
 import { result } from "../output.js";
+
+/** Nodes the reader skipped; the tree rules never see them, so "no findings" alone would hide them. */
+function formatReaderWarnings(warnings: ParseWarning[]): string {
+  if (warnings.length === 0) return "";
+  return `Reader warnings:\n${warnings.map((w) => `  ${w.path}: ${w.message}`).join("\n")}\n\n`;
+}
 
 /**
  * `rex health [options] [dir]`
@@ -29,8 +36,8 @@ export async function cmdHealth(
     const landings = await checkChangeLandings(model.tree, { repoDir: resolve(dir), cacheDir: resolveRexPaths(dir).cacheDir });
     result(
       flags.format === "json"
-        ? JSON.stringify({ treeRules: findings, landings }, null, 2)
-        : `${formatV2Findings(findings)}\n${formatLandingHealth(landings)}`,
+        ? JSON.stringify({ treeRules: findings, warnings: model.warnings, landings }, null, 2)
+        : `${formatV2Findings(findings)}\n${formatReaderWarnings(model.warnings)}${formatLandingHealth(landings)}`,
     );
     return;
   }

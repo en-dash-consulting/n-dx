@@ -1,7 +1,7 @@
 /** `rex health` on a v2 tree: the tree rules run, and the capability-criteria threshold comes from config. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
@@ -62,6 +62,39 @@ describe("rex health on a v2 tree", () => {
     expect(await run()).not.toContain("criteria-growth");
     await writeFile(join(tmp, ".n-dx.json"), JSON.stringify({ rex: { structureHealth: { maxCriteriaPerCapability: 4 } } }));
     expect(await run()).toContain("criteria-growth");
+  });
+});
+
+describe("rex health reader warnings on a v2 tree", () => {
+  it("reports a node with invalid intent frontmatter by path", async () => {
+    const file = join(rexDir, "product", "checkout", "pay-by-card.md");
+    await writeFile(file, (await readFile(file, "utf-8")).replace('type: "capability"', 'type: "bogus"'));
+    const text = await run();
+    expect(text).toContain("Reader warnings:");
+    expect(text).toContain("pay-by-card.md");
+    expect(text).toContain("Invalid node intent, skipped");
+  });
+
+  it("reports a folder without index.md as skipped", async () => {
+    await mkdir(join(rexDir, "product", "orphan-area"));
+    await writeFile(join(rexDir, "product", "orphan-area", "note.md"), "x");
+    const text = await run();
+    expect(text).toContain("Reader warnings:");
+    expect(text).toContain("orphan-area");
+    expect(text).toContain("no index.md");
+  });
+
+  it("prints no warnings heading for a clean tree", async () => {
+    expect(await run()).not.toContain("Reader warnings");
+  });
+
+  it("includes warnings in the JSON payload beside treeRules", async () => {
+    await mkdir(join(rexDir, "product", "orphan-area"));
+    out.length = 0;
+    await cmdHealth(tmp, { format: "json" });
+    const payload = JSON.parse(out.join("\n"));
+    expect(payload).toHaveProperty("treeRules");
+    expect(payload.warnings).toEqual([expect.objectContaining({ path: expect.stringContaining("orphan-area") })]);
   });
 });
 
