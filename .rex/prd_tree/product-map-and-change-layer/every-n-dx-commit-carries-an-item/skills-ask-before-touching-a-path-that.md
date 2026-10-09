@@ -1,0 +1,20 @@
+---
+id: "b4641f27-f564-412b-9462-2ad0738fd744"
+level: "task"
+title: "Skills ask before touching a path that was already dirty"
+status: "completed"
+priority: "high"
+source: "review"
+startedAt: "2026-10-09T05:24:32.829Z"
+completedAt: "2026-10-09T05:32:24.334Z"
+endedAt: "2026-10-09T05:32:24.334Z"
+acceptanceCriteria:
+  - "Every committing skill, before its first write, checks the paths it will change against the dirty list from its start and on overlap asks the user to commit or stash them first; for PRD writes any dirty path under .rex/prd_tree/ is an overlap"
+  - "If the user declines, the commit step stages only the skill's own paths and names the paths it left out"
+  - "The SKILLS.md template teaches the same step (tests/e2e/skill-commit-isolation.test.js checks every skill and the template)"
+  - "tests/integration/skill-commit-behavior.test.js covers the /ndx-capture case: a parent index.md already dirty is surfaced before the write, and once the user commits it the skill's commit holds both the new task file and the parent's Children row"
+  - "The generated .claude/skills and .agents/skills copies match the sources (tests/e2e/skill-sync.test.js)"
+description: "From Ryan's review of #619 (2026-10-09 05:04Z, ndx-capture.md:18). The explicit-path staging rule leaves every path that was dirty at the start unstaged, even when the skill itself changed it. Example: the user has an uncommitted edit in a feature's index.md; /ndx-capture adds a task under it; the task file is committed but the feature's index.md with the new Children row is not, so main gets a task its parent does not list. For /ndx-work the commit holds only part of a task the PRD reads as completed, and the N-DX-Item evidence misses the rest. Decision (Ryan, 2026-10-09): just before its first write, each committing skill compares what it is about to change with the dirty list from its start and, on any overlap, names the paths and asks the user to commit or stash them before continuing. For PRD writes (ndx-capture, ndx-plan, ndx-reshape, ndx-adversarial-review, and the status/log writes of ndx-work) any dirty path under .rex/prd_tree/ counts as an overlap, because rex can rewrite the parent's and ancestors' index.md (Children tables re-sort). For ndx-work the files named in the approved plan count too; for ndx-config the config file it will write. If the user declines, the skill keeps today's fallback: commit only its own paths and name what it left out. Update the SKILLS.md template the same way. This edits skill sources and the generated .claude/skills and .agents/skills copies, so it runs as an assisted /ndx-work (hench agents cannot write .claude/)."
+lastModified: "2026-10-09T05:32:26.278Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

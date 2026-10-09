@@ -150,6 +150,16 @@ describe("stageRunWork", () => {
     expect(stagedPaths(dir)).not.toContain(".hench-commit-msg.txt");
   });
 
+  it("never stages the skills' commit-message scratch file", async () => {
+    const baseline = await captureBaselineDirty(dir);
+    await writeFile(join(dir, ".ndx-commit-msg.txt"), "feat: something\n");
+    await writeFile(join(dir, "src", "real-work.ts"), "export const h = 1;\n");
+
+    const result = await stageRunWork(dir, baseline);
+    expect(result.staged).toEqual(["src/real-work.ts"]);
+    expect(stagedPaths(dir)).not.toContain(".ndx-commit-msg.txt");
+  });
+
   it("never stages the PRD paths — the commit prompt owns those", async () => {
     // Staging them here would capture the PRD as it was *before* the
     // completion write that performCommitPromptIfNeeded is about to make.

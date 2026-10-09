@@ -89,6 +89,35 @@ describe("startCommitMsgWatcher (auto-commit timer)", () => {
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
 
+  it("adds the run's trailers as one final block, readable through git's parser", async () => {
+    const { startCommitMsgWatcher } = await import(
+      "../../src/agent/lifecycle/commit-msg-watcher.js"
+    );
+    const { buildRunTrailers } = await import("../../src/agent/lifecycle/shared.js");
+
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add src.ts", { cwd: projectDir });
+
+    const taskId = "a0c1e859-972f-4f95-adba-fc643da307d1";
+    const watcher = startCommitMsgWatcher({
+      projectDir,
+      timeoutMs: 150,
+      trailers: buildRunTrailers({ id: "run-1", vendor: "claude", model: "m" }, taskId),
+    });
+    await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: update x\n\nBody.", "utf-8");
+    await waitFor(() => watcher.didAutoCommit());
+    watcher.cancel();
+
+    const git = async (format: string) =>
+      (await execAsync(`git log -1 --format="${format}"`, { cwd: projectDir })).stdout.trim();
+    expect(await git("%(trailers:key=N-DX-Item,valueonly)")).toBe(taskId);
+    // All three sit in the one block git parses.
+    const block = await git("%(trailers:only,unfold)");
+    expect(block).toContain("N-DX: claude/m · run run-1");
+    expect(block).toContain(`N-DX-Item: ${taskId}`);
+    expect(block).toContain("Co-Authored-By:");
+  });
+
   it("arms the timer only once even when the file is re-written", async () => {
     const { startCommitMsgWatcher } = await import(
       "../../src/agent/lifecycle/commit-msg-watcher.js"

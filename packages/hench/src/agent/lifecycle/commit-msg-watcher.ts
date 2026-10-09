@@ -21,11 +21,12 @@
  */
 
 import { watch as fsWatch } from "node:fs";
-import { readFileSync, existsSync, unlinkSync } from "node:fs";
+import { readFileSync, existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { execGitMutation } from "../../process/git-mutation.js";
 import { checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 import { detail, info } from "../../types/output.js";
+import { appendTrailerBlock } from "./commit-trailers.js";
 
 /** The sentinel file the agent writes its proposed commit message to. */
 const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
@@ -62,6 +63,12 @@ export interface CommitMsgWatcherOptions {
    * the message file for the operator. Omitted means nothing to enforce.
    */
   origin?: RunGitOrigin;
+  /**
+   * Trailers added to the agent's message (one final block, joining the agent's
+   * own when its message ends in one) before the commit. Omitted means the
+   * message is committed as written.
+   */
+  trailers?: readonly string[];
   /** Test seam — defaults to the real git-backed check. */
   checkOrigin?: (dir: string, origin: RunGitOrigin | undefined) => string | undefined;
 }
@@ -80,7 +87,7 @@ export interface CommitMsgWatcherOptions {
  * timer is never set, making the function a no-op for the commit path.
  */
 export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgWatcher {
-  const { projectDir, timeoutMs, origin } = opts;
+  const { projectDir, timeoutMs, origin, trailers } = opts;
   const checkOrigin = opts.checkOrigin ?? checkRunGitOrigin;
   const msgPath = join(projectDir, PENDING_COMMIT_FILE);
 
@@ -165,6 +172,9 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
     // uncommitted with nothing reporting it — and the next task's commit
     // absorbed it.
     try {
+      if (trailers && trailers.length > 0) {
+        writeFileSync(msgPath, appendTrailerBlock(message, trailers), "utf-8");
+      }
       await execGitMutation(projectDir, ["commit", "-F", PENDING_COMMIT_FILE], 30_000);
     } catch (err) {
       // Same disposition as the origin-drift refusal above: the staged changes

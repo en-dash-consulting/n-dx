@@ -68,6 +68,16 @@ describe("ndx init ignore template", () => {
     expect(entries).toContain("ndx-export/");
   });
 
+  it("ignores the skills' commit-message scratch file, here and in the template", () => {
+    // `git commit -F .ndx-commit-msg.txt` can fail (hook, nothing staged,
+    // interrupted session) before the skill deletes the file; unignored, the
+    // next `git add -A` commits it. The `.hench|.rex` filter above skips it.
+    for (const file of [TEMPLATE, REPO_IGNORE]) {
+      const lines = readFileSync(file, "utf-8").split("\n").map((l) => l.trim());
+      expect(lines, `${file} must list .ndx-commit-msg.txt`).toContain(".ndx-commit-msg.txt");
+    }
+  });
+
   it("names no stale lock file", () => {
     // The folder-tree lock is `.rex/prd.lock`; `prd.json.lock` is a legacy
     // name FileStore no longer writes.

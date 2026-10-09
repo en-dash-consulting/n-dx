@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-10-09T05:25:43.952Z
-- **Commit** — `3ad806729d87`
-- **Content hash** — `c580ededa8d64d67` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-10-09T16:55:32.158Z
+- **Commit** — `13c6f41b559e`
+- **Content hash** — `25ae167107e10c32` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
-- **Surfaces** — 38
-- **Per-call total** — 23,279 tokens (what every surface costs, summed)
-- **Unique fixed text** — 14,776 tokens (distinct text a rewrite has to edit)
+- **Surfaces** — 36
+- **Per-call total** — 22,851 tokens (what every surface costs, summed)
+- **Unique fixed text** — 14,348 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -77,7 +77,7 @@ so a jump is never mistaken for a regression or a win.
   same prompt already gave elsewhere and resolving a task-size contradiction (hours vs
   engineer-weeks). No instruction was removed from a prompt that did not still state it.
 
-## rex — 15,743 per-call / 7,721 unique, 21 surfaces
+## rex — 15,217 per-call / 7,195 unique, 19 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
@@ -96,8 +96,6 @@ so a jump is never mistaken for a regression or a win.
 | `buildSpecEnvelope` | `packages/rex/src/analyze/guided.ts` | Turn guided answers into a structured spec. | 22 | 150 | 432 | 582 |
 | `buildModifyEnvelope` | `packages/rex/src/analyze/modify-reason.ts` | Apply a natural-language edit to an existing PRD item. | 29 | 295 | 492 | 787 |
 | `buildGroupRenameEnvelope` | `packages/rex/src/analyze/propose-group-renames.ts` | Rename a group of sibling items to a consistent scheme. | 27 | 214 | 29 | 243 |
-| `buildPlacementEnvelope` | `packages/rex/src/analyze/place-reason.ts` | Place a change on a shortlisted capability or constraint, or propose a new node. | 15 | 172 | — | 172 |
-| `buildSpecDraftEnvelope` | `packages/rex/src/analyze/spec-draft-reason.ts` | Redraft a capability spec in present tense, citing the source item of every criterion. | 22 | 354 | — | 354 |
 | `buildRenameEnvelope` | `packages/rex/src/analyze/rename-resolve.ts` | Pick the better of two colliding item titles. | 23 | 204 | 29 | 233 |
 | `buildReshapeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Propose a restructure of the PRD hierarchy. | 7 | 18 | 1,402 | 1,420 |
 | `buildBodyMergeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Merge two item descriptions into one during a reshape. | 12 | 106 | — | 106 |
@@ -115,13 +113,13 @@ so a jump is never mistaken for a regression or a win.
 | `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 27 | 119 | — | 119 |
 | `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
-## hench — 4,533 per-call / 4,533 unique, 9 surfaces
+## hench — 4,631 per-call / 4,631 unique, 9 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
-| `buildSystemPrompt` | `packages/hench/src/agent/planning/prompt.ts` | The agent's system prompt — role, rules, workflow, error handling. | 76 | 1,143 | — | 1,143 |
+| `buildSystemPrompt` | `packages/hench/src/agent/planning/prompt.ts` | The agent's system prompt — role, rules, workflow, error handling. | 77 | 1,186 | — | 1,186 |
 | `buildGoLanguageContext` | `packages/hench/src/agent/planning/prompt.ts` | Go toolchain and convention context, added when the project is Go. | 26 | 278 | — | 278 |
-| `formatTaskBrief` | `packages/hench/src/agent/planning/brief.ts` | Render the task brief section — task, parent chain, requirements. | 43 | 237 | — | 237 |
+| `formatTaskBrief` | `packages/hench/src/agent/planning/brief.ts` | Render the task brief section — task, parent chain, requirements. | 49 | 292 | — | 292 |
 | `buildReviewSystemPrompt` | `packages/hench/src/agent/analysis/adversarial-review.ts` | System prompt for the adversarial review pass. | 27 | 331 | — | 331 |
 | `buildReviewBrief` | `packages/hench/src/agent/analysis/adversarial-review.ts` | Brief handed to the reviewer — what to attack and where to report. | 149 | 1,831 | — | 1,831 |
 | `buildOrientationSystemPrompt` | `packages/hench/src/agent/lifecycle/orientation.ts` | System prompt for the one-off repository orientation pass. | 10 | 147 | — | 147 |
@@ -171,7 +169,7 @@ reproducible without a model call. Dump any of them with `--dump <package>`.
 |---|---|---|---:|---:|---:|
 | rex | `buildAssessmentEnvelope` | Granularity assessment over one two-task proposal. | 497 | 245 | 742 |
 | sourcevision | `buildPrimerEnvelope` | Primer distillation over a fixed 3-zone CONTEXT.md excerpt. | 229 | 137 | 366 |
-| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,380 | n/a — 464 of the fixed text is on another branch | 916 |
+| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,478 | n/a — 520 of the fixed text is on another branch | 958 |
 | core | `buildReviewerPrompt` | Pair-programming reviewer prompt over three changed files. | 281 | 16 | 297 |
 
 A `fixed` figure above the assembled length is not an error: the fixed column counts
@@ -218,10 +216,10 @@ per section rather than as one literal. These are the same sections
 
 | Section | Chars | Tokens | Share |
 |---|---:|---:|---:|
-| `system` | 2,992 | 748 | 81.7% |
-| `brief` | 668 | 167 | 18.3% |
+| `system` | 3,162 | 791 | 82.6% |
+| `brief` | 668 | 167 | 17.4% |
 
-## Workflow skills — 18,043 tokens, 13 skills
+## Workflow skills — 20,439 tokens, 13 skills
 
 A skill body enters the agent's context whole the moment the skill is invoked,
 so its size is a per-invocation bill in the same way a builder's fixed text is a
@@ -234,15 +232,15 @@ portability guards until this table gave them a number.
 
 | Skill | Shipped | Chars | Tokens |
 |---|:-:|---:|---:|
-| `ndx-adversarial-review` | yes | 20,921 | 5,231 |
+| `ndx-adversarial-review` | yes | 22,420 | 5,605 |
 | `iso-map` | — | 8,285 | 2,072 |
+| `ndx-reshape` | yes | 7,584 | 1,896 |
 | `triage` | — | 7,421 | 1,856 |
-| `ndx-reshape` | yes | 5,941 | 1,486 |
-| `ndx-work` | yes | 5,073 | 1,269 |
+| `ndx-work` | yes | 6,794 | 1,699 |
+| `ndx-capture` | yes | 6,407 | 1,602 |
+| `ndx-plan` | yes | 6,146 | 1,537 |
 | `dev-link` | — | 5,054 | 1,264 |
-| `ndx-capture` | yes | 4,815 | 1,204 |
-| `ndx-plan` | yes | 4,553 | 1,139 |
-| `ndx-config` | yes | 3,444 | 861 |
+| `ndx-config` | yes | 4,985 | 1,247 |
 | `ndx-feedback` | yes | 2,565 | 642 |
 | `no-plan-mode` | yes | 2,476 | 619 |
 | `ndx-zone` | yes | 817 | 205 |

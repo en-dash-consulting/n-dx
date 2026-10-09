@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const SCRIPT = join(import.meta.dirname, "../../scripts/run-all-tests.mjs");
 
@@ -112,30 +113,100 @@ describe("run-all-tests.mjs affected gate on a stale build", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  const gate = () =>
-    spawnSync(process.execPath, [join(root, "scripts/run-all-tests.mjs"), "affected", "HEAD"], {
+  /**
+   * A stand-in `pnpm` first on PATH. It logs its arguments; with FAKE_PNPM=build it
+   * stamps each --filter package's dist/ as a full build, with fail it exits 1 after
+   * printing, with noop it does nothing. Suites (`run test`) are not exercised: the
+   * gate either stops before them or the fake exits 0 for them.
+   */
+  const installFakePnpm = () => {
+    const bin = join(root, "fakebin");
+    const impl = join(bin, "pnpm-impl.mjs");
+    write(
+      "fakebin/pnpm-impl.mjs",
+      `import { appendFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { writeBuildStamp } from ${JSON.stringify(pathToFileURL(join(root, "scripts/lib/stale-dist.mjs")).href)};
+const args = process.argv.slice(2);
+appendFileSync(${JSON.stringify(join(root, "pnpm-calls.log"))}, JSON.stringify(args) + "\\n");
+if (!args.includes("build")) process.exit(0);
+if (process.env.FAKE_PNPM === "fail") { console.error("tsc: boom"); process.exit(1); }
+if (process.env.FAKE_PNPM === "build") {
+  args.forEach((a, i) => {
+    if (args[i - 1] !== "--filter") return;
+    const dir = a.replace("@n-dx/", "");
+    const dist = join(${JSON.stringify(root)}, "packages", dir, "dist");
+    mkdirSync(dist, { recursive: true });
+    writeBuildStamp(join(${JSON.stringify(root)}, "packages", dir, "src"), dist);
+  });
+}
+`,
+      0,
+    );
+    write("fakebin/pnpm", `#!/bin/sh\nexec "${process.execPath}" "${impl}" "$@"\n`, 0);
+    chmodSync(join(bin, "pnpm"), 0o755);
+    write("fakebin/pnpm.cmd", `@"${process.execPath}" "${impl}" %*\r\n`, 0);
+    return bin;
+  };
+  const pnpmCalls = () => {
+    try {
+      return readFileSync(join(root, "pnpm-calls.log"), "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+    } catch {
+      return [];
+    }
+  };
+  const gate = (mode = "noop", extra = []) =>
+    spawnSync(process.execPath, [join(root, "scripts/run-all-tests.mjs"), "affected", "HEAD", ...extra], {
       cwd: root,
       encoding: "utf-8",
+      env: {
+        ...process.env,
+        FAKE_PNPM: mode,
+        PATH: `${installFakePnpm()}${delimiter}${process.env.PATH}`,
+      },
     });
+  const editSource = () => write("packages/llm-client/src/config.ts", "export const MODEL = 'new';\n", 0);
 
-  it("fails before running any suite, naming the package and its build command", () => {
-    write("packages/llm-client/src/config.ts", "export const MODEL = 'new';\n", 0);
-    const result = gate();
+  it("builds exactly the stale packages in one pnpm call, names them, and re-checks the stamp", () => {
+    editSource();
+    const result = gate("build");
+    expect(result.stdout).toContain("test-gate: rebuilt @n-dx/llm-client");
+    expect(result.stdout).not.toContain("stale-dist=");
+    const builds = pnpmCalls().filter((a) => a.includes("build"));
+    expect(builds).toEqual([["--filter", "@n-dx/llm-client", "run", "build"]]);
+  });
+
+  it("fails with the build output and the stale-dist line when the build fails", () => {
+    editSource();
+    const result = gate("fail");
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("@n-dx/llm-client");
-    expect(result.stderr).toContain("pnpm --filter @n-dx/llm-client build");
+    expect(result.stderr).toContain("tsc: boom");
     expect(result.stdout).toContain("test-gate: stale-dist=llm-client");
     expect(result.stdout).not.toContain("────────");
   });
 
-  it("lists the selection without the stale check", () => {
-    write("packages/llm-client/src/config.ts", "export const MODEL = 'new';\n", 0);
-    const result = spawnSync(
-      process.execPath,
-      [join(root, "scripts/run-all-tests.mjs"), "affected", "HEAD", "--list"],
-      { cwd: root, encoding: "utf-8" },
-    );
+  it("fails when a package is still stale after its build", () => {
+    editSource();
+    const result = gate("noop");
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Still stale after the build");
+    expect(result.stdout).toContain("test-gate: stale-dist=llm-client");
+  });
+
+  it("builds nothing when every stamp is current", () => {
+    editSource();
+    gate("build");
+    rmSync(join(root, "pnpm-calls.log"), { force: true });
+    gate("fail");
+    expect(pnpmCalls().filter((a) => a.includes("build"))).toEqual([]);
+  });
+
+  it("lists the selection without checking or building", () => {
+    editSource();
+    const result = gate("fail", ["--list"]);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("test-gate: selected-suites=");
+    expect(pnpmCalls()).toEqual([]);
   });
 });
