@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { execFileSync } from "node:child_process";
 import { resolveVendorCliEnv } from "../../src/child-env.js";
 
 const source: NodeJS.ProcessEnv = Object.freeze({
@@ -12,6 +13,63 @@ const source: NodeJS.ProcessEnv = Object.freeze({
 });
 
 describe("resolveVendorCliEnv", () => {
+  const cloud = Object.freeze({
+    AWS_ACCESS_KEY_ID: "fixture-access", AWS_SECRET_ACCESS_KEY: "fixture-secret",
+    AWS_SESSION_TOKEN: "fixture-session", AWS_PROFILE: "fixture-profile", AWS_REGION: "us-east-1",
+    AWS_DEFAULT_REGION: "us-west-2", AWS_SHARED_CREDENTIALS_FILE: "/fixture/credentials",
+    AWS_CONFIG_FILE: "/fixture/config", AWS_BEARER_TOKEN_BEDROCK: "fixture-bedrock",
+    GOOGLE_APPLICATION_CREDENTIALS: "/fixture/google.json", CLOUD_ML_REGION: "global",
+    ANTHROPIC_VERTEX_PROJECT_ID: "fixture-project", AWS_UNRELATED_SECRET: "unrelated",
+    GITHUB_TOKEN: "fixture-github",
+  });
+  const awsNames = Object.keys(cloud).filter((name) => name.startsWith("AWS_") && name !== "AWS_UNRELATED_SECRET");
+
+  it.each(["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX"])("retains %s authentication in a real child", (mode) => {
+    const input = Object.freeze({ ...cloud, [mode]: "1" });
+    const report = vi.fn();
+    const env = resolveVendorCliEnv({}, { deny: ["CLOUD_ML_REGION"] }, input, report);
+    const expected = Object.fromEntries(Object.entries(input).filter(([name]) =>
+      name === mode || name === "ANTHROPIC_VERTEX_PROJECT_ID" ||
+      (mode === "CLAUDE_CODE_USE_BEDROCK" ? awsNames.includes(name) : ["GOOGLE_APPLICATION_CREDENTIALS", "CLOUD_ML_REGION"].includes(name))));
+    const keys = Object.keys(input);
+    const script = `process.stdout.write(JSON.stringify(Object.fromEntries(${JSON.stringify(keys)}.filter(k => process.env[k] !== undefined).map(k => [k, process.env[k]]))))`;
+    const child = JSON.parse(execFileSync(process.execPath, ["-e", script], { env, encoding: "utf8" }));
+    expect(child).toEqual(expected);
+    expect(input.AWS_SECRET_ACCESS_KEY).toBe("fixture-secret");
+    const kept = mode === "CLAUDE_CODE_USE_BEDROCK" ? awsNames : ["GOOGLE_APPLICATION_CREDENTIALS", "CLOUD_ML_REGION"];
+    for (const name of kept) expect(report.mock.calls[0][0]).not.toContain(name);
+    expect(report.mock.calls[0][0]).toContain("AWS_UNRELATED_SECRET");
+  });
+
+  it.each([undefined, "", "0", "false", "off", "no"])("does not enable cloud exceptions for inactive flags (%s)", (value) => {
+    const env = resolveVendorCliEnv({}, undefined, { ...cloud, CLAUDE_CODE_USE_BEDROCK: value, CLAUDE_CODE_USE_VERTEX: value });
+    for (const name of [...awsNames, "GOOGLE_APPLICATION_CREDENTIALS"]) expect(env[name]).toBeUndefined();
+  });
+
+  it.each(["1", "true", "TRUE", "yes", "on"])("recognizes enabled mode flags (%s) case-insensitively", (value) => {
+    const env = resolveVendorCliEnv({}, undefined, {
+      claude_code_use_bedrock: value, aws_secret_access_key: "fixture-aws",
+      claude_code_use_vertex: value, google_application_credentials: "/fixture/google.json",
+    });
+    expect(env.aws_secret_access_key).toBe("fixture-aws");
+    expect(env.google_application_credentials).toBe("/fixture/google.json");
+  });
+
+  it.each(["codex", "google", "local"] as const)("never grants Claude cloud exceptions to %s", (vendor) => {
+    const env = resolveVendorCliEnv({ vendor }, undefined, { ...cloud, CLAUDE_CODE_USE_BEDROCK: "1", CLAUDE_CODE_USE_VERTEX: "1" });
+    for (const name of [...awsNames, "GOOGLE_APPLICATION_CREDENTIALS"]) expect(env[name]).toBeUndefined();
+  });
+
+  it("keeps operator allows and does not enable a mode stripped by the policy", () => {
+    const env = resolveVendorCliEnv({}, {
+      deny: ["CLAUDE_CODE_USE_BEDROCK"], allow: ["AWS_PROFILE", "GOOGLE_APPLICATION_CREDENTIALS"],
+    }, { ...cloud, CLAUDE_CODE_USE_BEDROCK: "1" });
+    expect(env.CLAUDE_CODE_USE_BEDROCK).toBeUndefined();
+    expect(env.AWS_PROFILE).toBe("fixture-profile");
+    expect(env.GOOGLE_APPLICATION_CREDENTIALS).toBe("/fixture/google.json");
+    expect(env.AWS_SECRET_ACCESS_KEY).toBeUndefined();
+  });
+
   it("keeps only Claude authentication plus plumbing by default without mutation", () => {
     const env = resolveVendorCliEnv({}, undefined, source);
     for (const name of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CONFIG_DIR", "HOME", "PATH", "HTTPS_PROXY", "NODE_EXTRA_CA_CERTS"]) {

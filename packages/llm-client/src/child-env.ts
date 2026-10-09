@@ -122,6 +122,17 @@ export function resolveVendorCliEnv(
     : vendor === LLM_VENDOR.CODEX
       ? ["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME"]
       : keyName ? [keyName] : [];
+  if (vendor === LLM_VENDOR.CLAUDE) {
+    const modeEnabled = (flag: string): boolean => Object.entries(env).some(([name, value]) =>
+      name.toUpperCase() === flag && value !== undefined && ["1", "true", "yes", "on"].includes(value.toLowerCase()));
+    // Keep exact cloud authentication names only for the mode the child will use.
+    if (modeEnabled("CLAUDE_CODE_USE_BEDROCK")) authNames.push(
+      "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE",
+      "AWS_REGION", "AWS_DEFAULT_REGION", "AWS_SHARED_CREDENTIALS_FILE", "AWS_CONFIG_FILE",
+      "AWS_BEARER_TOKEN_BEDROCK",
+    );
+    if (modeEnabled("CLAUDE_CODE_USE_VERTEX")) authNames.push("GOOGLE_APPLICATION_CREDENTIALS", "CLOUD_ML_REGION");
+  }
   const authSet = new Set(authNames.map((name) => name.toUpperCase()));
   for (const [name, value] of Object.entries(source)) {
     if (value !== undefined && authSet.has(name.toUpperCase())) env[name] = value;

@@ -45,6 +45,30 @@ function mockSpawn(authFailure = false): void {
 }
 
 describe("foundation vendor CLI spawn containment", () => {
+  it.each(["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX"])("retains active %s credentials at the provider spawn boundary", async (mode) => {
+    vi.stubEnv("CLAUDE_CODE_USE_BEDROCK", "");
+    vi.stubEnv("CLAUDE_CODE_USE_VERTEX", "");
+    vi.stubEnv(mode, "1");
+    vi.stubEnv("AWS_ACCESS_KEY_ID", "fixture-access");
+    vi.stubEnv("AWS_SECRET_ACCESS_KEY", "fixture-secret");
+    vi.stubEnv("AWS_SESSION_TOKEN", "fixture-session");
+    vi.stubEnv("AWS_PROFILE", "fixture-profile");
+    vi.stubEnv("AWS_REGION", "us-east-1");
+    vi.stubEnv("GOOGLE_APPLICATION_CREDENTIALS", "/fixture/google.json");
+    vi.stubEnv("CLOUD_ML_REGION", "global");
+    mockSpawn();
+    const client = createCliClient({ claudeConfig: {}, envPolicy: { allow: ["GITHUB_TOKEN"] }, maxRetries: 0 });
+    expect((await client.complete({ prompt: "test", model: "test" })).text).toBe("done");
+    const env: NodeJS.ProcessEnv = spawnCli.mock.calls[0][2].env;
+    for (const name of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE", "AWS_REGION"]) {
+      expect(env[name]).toBe(mode === "CLAUDE_CODE_USE_BEDROCK" ? process.env[name] : undefined);
+    }
+    expect(env.GOOGLE_APPLICATION_CREDENTIALS).toBe(mode === "CLAUDE_CODE_USE_VERTEX" ? "/fixture/google.json" : undefined);
+    expect(env.CLOUD_ML_REGION).toBe("global");
+    expect(env.GITHUB_TOKEN).toBe("fixture-github");
+    expect(env.FAKE_SERVICE_API_KEY).toBeUndefined();
+  });
+
   it.each(["claude", "codex"] as const)("filters %s spawns and honors explicit allow entries", async (vendor) => {
     mockSpawn();
     const envPolicy = { allow: ["GITHUB_TOKEN"] };
