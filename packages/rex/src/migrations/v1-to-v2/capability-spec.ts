@@ -224,9 +224,13 @@ export function toModelEars(text: string): string {
 /** A sentence end, not the dot of an abbreviation ("e.g.", "i.e.", "etc.", "vs."). */
 const SENTENCE_BREAK = /(?<!\b(?:e\.g|i\.e|etc|vs)\.)(?<=[.!?])\s+|\n/;
 /** Review metadata or a reference, not a description of the product ("**Severity:** …", "Verdict: …", "GitHub #368."). */
-const NOT_A_STATEMENT = /^(?:[#*>|`\-[]|(?:severity|verdict|priority|status|github|issue|pr)\b)/i;
-/** Wording that describes work or a wish rather than what the product does now. */
-const WORK_SHAPED = /\b(?:(?:this|the) (?:feature|task|change|epic|pr|item|ticket|story)\b|will|should|needs? to|todo|tbd)\b|^(?:currently|today|right now|we|i|users? (?:can(?:not|'t)|need|want))\b/i;
+const NOT_A_STATEMENT = /^(?:[#*>|\-[]|(?:severity|verdict|priority|status|github|issue|pr)\b)/i;
+/**
+ * Wording that describes work or a wish rather than what the product does now.
+ * "the task", "the change", "the item" and "the PR" are product vocabulary in a
+ * PRD tool, so only the demonstrative "this feature/task/…" marks work.
+ */
+const WORK_SHAPED = /\b(?:this (?:feature|task|change|epic|pr|item|ticket|story)\b|will|should|needs? to|todo|tbd)\b|^(?:currently|today|right now|we|i|users? (?:can(?:not|'t)|need|want))\b/i;
 const MIN_STATEMENT_WORDS = 4;
 
 function firstSentence(text: string | undefined): string | undefined {

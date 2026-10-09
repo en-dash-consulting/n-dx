@@ -3,7 +3,7 @@ import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.j
 import { RequirementSchema } from "../../../../src/schema/validate.js";
 import { CapabilityIntentSchema } from "../../../../src/schema/v2.js";
 import { classifyV1Tree } from "../../../../src/migrations/v1-to-v2/migration-plan.js";
-import { draftCapabilitySpecs, isProcessCriterion, toEars, type CapabilitySpecDraft } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
+import { draftCapabilitySpecs, isPresentTenseStatement, isProcessCriterion, toEars, type CapabilitySpecDraft } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
 
 let seq = 0;
 function item(level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {
@@ -88,6 +88,47 @@ describe("toEars", () => {
     expect(toEars("Logs are kept for a week")).toBe("The system shall ensure that logs are kept for a week.");
     expect(toEars("Runs show their model")).toBe("The system shall ensure that runs show their model.");
     expect(toEars("Claims expire after an hour")).toBe("The system shall ensure that claims expire after an hour.");
+  });
+});
+
+describe("isPresentTenseStatement", () => {
+  // Statements the 2026-10-09 full-tree live run rejected; the task records three verbatim,
+  // the rest are written in the same shape (product vocabulary, or an opening code span).
+  const VALID = [
+    "Hench refuses to mark a task completed while the task's work is still uncommitted",
+    "`ndx self-heal` persists its recommendations into the PRD as tagged items",
+    "Rex stores each PRD item at a readable, title-only slug path",
+    "Rex reports the change a run made as a diff against the PRD tree",
+    "`ndx work` picks the next item whose dependencies are completed",
+    "The dashboard links each task to the PR that closed it",
+    "`rex status` prints the completion tree for every epic",
+    "Hench commits the item's files after the task gate passes",
+  ];
+
+  it.each(VALID)("accepts %s", (s) => {
+    expect(isPresentTenseStatement(s)).toBe(true);
+  });
+
+  it.each([
+    "This feature will add X",
+    "We need to support Y",
+    "Add a Z",
+    "TODO: wire the gateway",
+    "This task adds the gateway to every package",
+    "The dashboard should list every run",
+  ])("rejects work- or wish-shaped %s", (s) => {
+    expect(isPresentTenseStatement(s)).toBe(false);
+  });
+
+  it.each(["# Heading about the dashboard runs", "- a list item about runs", "| a | table | row | here |", "Severity: high for every run", "**Severity:** high for every run"])(
+    "rejects metadata %s",
+    (s) => {
+      expect(isPresentTenseStatement(s)).toBe(false);
+    },
+  );
+
+  it("rejects an undefined sentence", () => {
+    expect(isPresentTenseStatement(undefined)).toBe(false);
   });
 });
 
