@@ -9,7 +9,7 @@ Validate with scoped commands. Do not run the whole repository suite.
 - Package test file: `pnpm --filter @n-dx/<pkg> exec vitest run <file>`
 - Package suite: `pnpm --filter @n-dx/<pkg> exec vitest run`
 - Root test file: `node_modules/.bin/vitest run tests/<path>`
-- Build only what you changed: `pnpm --filter @n-dx/<pkg> build`. Root e2e tests spawn built CLIs, so rebuild a changed package before running them.
+- Build only what you changed: `pnpm --filter @n-dx/<pkg> build`. Root e2e tests spawn built CLIs, so rebuild a changed package before running them. The affected gate rebuilds stale packages itself, so tasks need no rebuild reminder; you still build what you changed before running root e2e tests yourself.
 - Do not prefix commands with `cd … &&`; use `--filter`.
 
 Cost: one full pass (`pnpm test`, `run-all-tests.mjs`) takes ~9 min quiet, ~14 min loaded; the root suite alone 2.5–6 min. hench's gate runs the affected suites after you finish, and CI runs everything on three OSes. Widen only when a scoped failure needs it.

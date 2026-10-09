@@ -32,6 +32,10 @@ const EXPECTED_TOOLS = [
   "facets",
   "get_token_usage",
   "get_capabilities",
+  "get_product",
+  "get_capability",
+  "place_change",
+  "apply_change",
 ];
 
 const EXPECTED_RESOURCES = ["prd", "workflow", "log"];

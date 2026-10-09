@@ -32,9 +32,10 @@
  * |                                                  | appliedAt, appliedAmendsHash, shippedIn,     |
  * | constraint: statement, requirements, appliesTo   |   prs, issues (changes)                      |
  * |                                                  | links*                                       |
- * | change: intent, amends, touches, plannedRelease, | assignee, ready, needsPlacement              |
- * |   spike, fix, priority, requirements, loe,       | lastModified, lastModifiedBy                 |
- * |   loeRationale, loeConfidence, effort*,          |                                              |
+ * | change: intent, acceptanceCriteria, amends,      | assignee, ready, needsPlacement              |
+ * |   touches, plannedRelease, spike, fix, priority, | lastModified, lastModifiedBy                 |
+ * |   requirements, loe, loeRationale,               |                                              |
+ * |   loeConfidence, effort*,                        |                                              |
  * |   discoveredFrom { item?, run? }, run            |                                              |
  * | task/subtask: description, acceptanceCriteria;   |                                              |
  * |   task also requirements, priority, loe,         |                                              |
@@ -55,8 +56,9 @@
  * ## Spec hash
  *
  * `metAt`, `reviewedHash` and an amendment's `base` all hold a spec hash
- * (`specHash` in `./v2-rules.ts`): the node's own statement and criteria, not
- * the criteria it inherits from its parent. Inheritance needs no hash: a child
+ * (`specHash` in `./v2-rules.ts`): the node's own statement and capability
+ * criteria, not those it inherits from its parent. A change's or task's
+ * `acceptanceCriteria` ("done when") never enter it. Inheritance needs no hash: a child
  * reads as changing while an open change amends its parent.
  *
  * State keys an earlier draft declared and this schema dropped are listed in
@@ -338,6 +340,14 @@ export interface ChangeIntent extends BaseIntent, EffortIntent {
   type: "change";
   /** Why the change exists. */
   intent?: string;
+  /**
+   * Done when: the change's own work, with a task's name and shape. Not a
+   * capability's `criteria` (the product's standing spec): never read by
+   * `specHash`, `metAt`, `reviewedHash`, amendments or product status. The
+   * split rule moves it to a task-less change's first task
+   * (`core/change-completion.ts`). Optional; no rule requires it.
+   */
+  acceptanceCriteria?: string[];
   amends?: Amendment[];
   /** Product node ids the change works on without amending them. */
   touches?: string[];
@@ -426,6 +436,7 @@ export const ChangeIntentSchema = z
     ...baseIntentShape,
     type: z.literal("change"),
     intent: z.string().optional(),
+    acceptanceCriteria: z.array(z.string()).optional(),
     amends: z.array(AmendmentSchema).optional(),
     touches: z.array(z.string()).optional(),
     plannedRelease: z.string().optional(),

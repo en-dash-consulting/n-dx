@@ -71,6 +71,19 @@ export async function buildIsoSkill() {
     // Nothing may be external: the whole point is a file with no dependencies.
     // A `node:` builtin import is fine and stays as an import.
     external: [],
+    // The bundled sources reach the monorepo's one git-remote-URL parser, which
+    // lives in @n-dx/llm-client because web needs it too. Importing it through
+    // that package's barrel pulls @anthropic-ai/sdk in behind it and takes this
+    // file from 136 KB to 750 KB — an LLM SDK inside a script that draws a
+    // diagram. The alias resolves the import to the one pure, dependency-free
+    // module the bundle actually uses.
+    //
+    // This is also a guard: if bundled code starts importing something else
+    // from @n-dx/llm-client, the build fails on the missing export rather than
+    // quietly growing by half a megabyte.
+    alias: {
+      "@n-dx/llm-client": join(ROOT, "packages/llm-client/src/git-remote-url.ts"),
+    },
     legalComments: "none",
     charset: "utf8",
   });

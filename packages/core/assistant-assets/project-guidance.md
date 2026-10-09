@@ -25,43 +25,30 @@ Four-tier dependency hierarchy (each layer imports only from the layer below):
 
 Zero circular dependencies. The web package sits alongside orchestration — it imports all domain packages to serve the unified dashboard.
 
-#### Web package internal zone layering
-
-The web package forms a hub topology with `web-viewer` at the centre:
-
-```
-  web-server          (composition root — Express routes, gateways, MCP handlers)
-       ↓                    ↓ (serves static assets only, no runtime import)
-  web-viewer          (Preact UI hub — components, hooks, views)
-       ↑ ↓                  ↓
-  viewer-message-pipeline  (messaging middleware — coalescer, throttle, rate-limiter, request-dedup)
-       ↓                    ↓
-  src/shared/         (framework-agnostic utilities — data-files, features, view-id, view-routing)
-```
-
-`web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `src/shared/`, while also receiving imports from sub-directories such as `crash/`. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `src/shared/` is the foundation layer with zero upward dependencies, enforced by `boundary-check.test.ts`.
-
-Measured zone metrics are not reproduced here — they change with every analysis. Run `ndx analyze --deep .` and read `.sourcevision/zones.json`; per-package policies live in `packages/*/AGENTS.md`.
+The web package's internal layering (`web-server` → `web-viewer` →
+`viewer-message-pipeline` → `src/shared/`) is package-level policy and lives in
+`packages/web/AGENTS.md`.
 
 ##### Monorepo-wide zone fragility governance
 
-Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragility zone requiring active governance.
+Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragility
+zone requiring active governance. Zone ids and metrics are Louvain output and move
+between analyses, so no list of them is reproduced here — read the live values with
+`ndx analyze --deep .` then `ndx zone <id>` (or the `/ndx-zone` skill). These rules
+hold whatever the current zones are:
 
-**Do not treat a zone list in this file as current.** Zone IDs and metrics are outputs of Louvain community detection and change between analyses — zones merge, split, and get renamed as the import graph moves. Read the live values instead:
+- **Two-consumer rule.** A new module in a shared directory needs at least two
+  distinct consumer zones. A single-consumer utility belongs next to its use site.
+- **Cohesion monitoring.** If a zone's cohesion drops below its current value after
+  a change, the change needs explicit justification.
+- **Directory policies outlive zone detection.** A rule tied to a directory (barrel
+  imports, framework-agnostic constraints) stays in force whether or not Louvain
+  currently emits a zone for it — tests enforce it, not the analyser. Correct a stale
+  metric; do not delete a policy because its zone stopped appearing.
 
-```sh
-ndx analyze --deep .        # refresh .sourcevision/
-ndx zone <zone-id>          # or the /ndx-zone skill for a single zone
-```
-
-Then filter `.sourcevision/zones.json` on the threshold above. A zone named in a governance doc but absent from the current analysis has usually been renamed or merged, not deleted — check the directory before concluding a boundary is gone.
-
-**Universal governance rules** (apply to any zone that meets the threshold):
-- **Two-consumer rule:** A new module must have at least two distinct consumer zones before being added. Single-consumer utilities belong closer to their dominant use site.
-- **Addition review required:** Treat these as risk zones requiring active review on additions. Changes have a wide blast radius.
-- **Cohesion monitoring:** If a zone's cohesion drops below its current value after a change, the change needs explicit justification.
-
-**Directory policies outlive zone detection.** Rules tied to a directory (barrel imports, framework-agnostic constraints, CLI-only content) stay in force whether or not Louvain currently emits a zone for it, because they are enforced by tests rather than by the analyser. Correct a stale metric; do not delete a policy just because its zone stopped appearing.
+Per-package zone policy lives in `packages/<pkg>/AGENTS.md`. Fuller treatment,
+including the dual-fragility threshold and the web package's internal layering:
+[docs/architecture/overview.md](docs/architecture/overview.md).
 
 > **Spawn-exempt exception:** `config.js` directly reads/writes package config files (`.rex/config.json`, `.hench/config.json`, `.sourcevision/manifest.json`, `.n-dx.json`) rather than delegating to spawned CLIs. This is intentional — config operations require cross-package reads, atomic merges, and validation logic that cannot be expressed as a single CLI spawn. It is the only orchestration-tier script that breaks the spawn-only rule.
 
@@ -69,14 +56,19 @@ Then filter `.sourcevision/zones.json` on the threshold above. A zone named in a
 
 Packages that import from other packages at runtime concentrate **all** cross-package imports into a single gateway module per upstream package. This makes the dependency surface explicit, auditable, and easy to update when upstream APIs change.
 
-| Package | Gateway file | Imports from | Re-exports |
-|---------|-------------|--------------|------------|
-| hench | `src/prd/rex-gateway.ts` | rex | 25 functions + 5 constants + 13 types (schema, store, tree, save-file report, derived-cache dirname, tree conformance, task selection, claims, timestamps, auto-completion, parent reset, requirements, level helpers, finding acknowledgment) |
-| hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | 114 functions + 5 classes + 17 constants + 60 types (config, vendor constants, JSON, output and colour, help, errors, process execution and git worktrees, token parsing, model resolution, Claude API effort, usage formatting, prompt envelope and failure categories, prompt-section costs, Codex policy flags, tool-definition converters, LM Studio, provider registry, folder-layout resolver, credential redaction, repository trust, available-memory reading) |
-| web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants (including the derived-cache dirname), tree utilities |
-| web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types, live analyze progress reader, analyze command-line check, cross-repo artifact types (repo identity, outbound, infrastructure) |
-| web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
-| web | `src/viewer/api.ts` | `src/viewer/types.ts`, `src/viewer/route-state.ts` | Viewer types (LoadedData, NavigateTo, DetailItem), route-state functions — inbound API contract for sibling zones (crash, route, performance) |
+| Package | Gateway file | Imports from |
+|---------|-------------|--------------|
+| hench | `src/prd/rex-gateway.ts` | rex |
+| hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client |
+| web | `src/server/rex-gateway.ts` | rex |
+| web | `src/server/domain-gateway.ts` | sourcevision |
+| web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` |
+| web | `src/viewer/api.ts` | `src/viewer/types.ts`, `src/viewer/route-state.ts` |
+
+Each gateway's export inventory, and the export ceiling
+`tests/e2e/architecture-policy.test.js` holds it to, are in
+[docs/architecture/gateways.md](docs/architecture/gateways.md) — read the file
+itself before adding to one.
 
 Rules:
 - **One gateway per source package** — all runtime imports from a given upstream package pass through a single gateway. A consumer may have multiple gateways (e.g. web has separate gateways for rex and sourcevision).
@@ -123,11 +115,24 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced.
 
-**What the code enforces:** the MCP write tools, the dashboard's PRD-writing routes (item CRUD, merge, prune, restore, and the SourceVision Ask panel's `apply-refinements`), and the bulk restructurers `reorganize`, `prune`, and `reshape` perform their read-modify-write inside `store.withTransaction`, which holds the PRD file lock across the whole span — a concurrent writer's item is no longer silently dropped by their full-document save. Their LLM analysis runs on an unlocked snapshot; accepted proposals are re-applied against a freshly loaded document under the lock. `saveDocument` itself always takes the lock, so writes cannot interleave, and a writer that cannot acquire the lock within its timeout fails loudly with an error naming the holder PID rather than proceeding.
+**What the code enforces.** The MCP write tools, the dashboard's PRD-writing
+routes and the bulk restructurers (`reorganize`, `prune`, `reshape`) do their
+read-modify-write inside `store.withTransaction`, which holds the PRD file lock
+for the whole span. `saveDocument` always takes the lock, and a writer that
+cannot acquire it fails loudly naming the holder's PID rather than proceeding.
 
-**The PRD lock is per workspace, one per `rexDir`.** `prdLockPath(rexDir)` means each worktree's `.rex/` has its own lock, so two worktrees of the same repository write their own trees in parallel without contending — which is the point of worktree workspaces, and also why the lock is no help across them. The dashboard follows the same rule: every PRD-writing route resolves its store from the request's `ctx.rexDir`, so a request made under `/w/<key>/` (or with `X-Ndx-Workspace`) writes *that worktree's* `.rex/prd_tree/` and nothing else. There is no cross-workspace write anywhere in the dashboard — editing the anchor's PRD while viewing a branch means switching workspace through the breadcrumb switcher, which is a full navigation. The PRD view shows a one-line strip naming the workspace whenever it is not the anchor, so the write target is never inferred from the URL alone. MCP sessions follow the same rule: stdio rex/sv servers (and the `ndx mcp` hub bridge) bind to the worktree named by the client's MCP roots, so a desktop worktree session writes its own `.rex/prd_tree/` under its own lock, and a root that cannot be served refuses writes instead of falling back to the launch checkout.
+**The lock is per workspace**, one per `rexDir`: two worktrees of the same
+repository write their own trees in parallel without contending, so the lock is
+no help across them. Every dashboard route and MCP session writes the worktree
+it was addressed for and no other.
 
-**What remains operator discipline:** other CLI write paths (`analyze`/`plan` imports, `update`, `move`, `remove`, `fix`, and similar) still do their own load→mutate→save — the lock serializes their write but does not merge concurrent changes, so for those commands the last full-document writer still wins. Do not run them concurrently with other PRD writers, and prefer waiting for a background PRD-writing command to finish before making MCP writes: a restructure computed on a stale snapshot can turn individual proposals into no-ops (reported, not silent).
+**What remains operator discipline.** Other CLI write paths (`analyze`/`plan`
+imports, `update`, `move`, `remove`, `fix`) still load→mutate→save: the lock
+serializes their write but does not merge concurrent changes, so the last
+full-document writer wins. Do not run them alongside another PRD writer.
+
+Full reasoning, including the bundle and narrative carve-outs:
+[docs/architecture/prd-write-concurrency.md](docs/architecture/prd-write-concurrency.md).
 
 **PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
 

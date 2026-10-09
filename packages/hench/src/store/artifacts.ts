@@ -81,7 +81,7 @@ const RUNTIME_ENTRIES_IN_HENCH_DIR: readonly string[] = [
  * refuses to complete over a directory it created itself: the `.hench/mcp/`
  * story above, again.
  */
-const RUNTIME_ENTRIES_AT_ROOT: readonly string[] = [".hench-commit-msg.txt", ".run-logs/"];
+const RUNTIME_ENTRIES_AT_ROOT: readonly string[] = [".hench-commit-msg.txt", ".ndx-commit-msg.txt", ".run-logs/"];
 
 /**
  * `.gitignore` lines `hench init` writes for a project, named for the layout it

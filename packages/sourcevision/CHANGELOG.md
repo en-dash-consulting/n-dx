@@ -1,5 +1,222 @@
 # @n-dx/sourcevision
 
+## 0.9.0
+
+### Patch Changes
+
+- [#569](https://github.com/en-dash-consulting/n-dx/pull/569) [`c1af698`](https://github.com/en-dash-consulting/n-dx/commit/c1af6987f02b0620edea263c4415fa1219b03d4e) Thanks [@endash-shal](https://github.com/endash-shal)! - Close every known dependency vulnerability ahead of the release.
+  
+  `pnpm audit` reported two critical and three high advisories. One was reachable from shipped code: `@modelcontextprotocol/sdk` 1.30.0 (GHSA-6qxp-vccf-f47h, an OAuth client that could send credentials to an authorization server the MCP server chooses), a direct dependency of rex, sourcevision and web. It moves to 1.32.0.
+  
+  The other four are transitive and are pinned with overrides in the same style as the existing ones: `proxy-addr` ≥ 2.0.8 (GHSA-jqcg-44mw-7w3h, IP spoofing — reached from shipped code through the MCP SDK's express), plus three that only ever load in development tooling — `shell-quote` ≥ 1.11.0 (GHSA-pqg4-j6r4-53mv, via `@changesets/cli`) and `vue` ≥ 3.5.42 with `source-map-js` ≥ 1.2.2 (GHSA-g2v6-rqmx-r4w6 and GHSA-68fv-2mgg-jv7q, both via vitepress's docs build).
+  
+  `pnpm audit` now reports no known vulnerabilities.
+
+- [#588](https://github.com/en-dash-consulting/n-dx/pull/588) [`1dfc0c7`](https://github.com/en-dash-consulting/n-dx/commit/1dfc0c7e7947ffa6054cb6ef9efc214805253a16) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Each package's full build now ends by writing `dist/.build-stamp.json`, a hash of the source it compiled. The repository's affected test gate uses it to tell a current build from a stale one by content rather than by file times, so a partial build no longer hides stale compiled code and an identical-content rewrite no longer demands a rebuild.
+   The stamp is excluded from the published tarballs.
+
+- [#599](https://github.com/en-dash-consulting/n-dx/pull/599) [`168b80c`](https://github.com/en-dash-consulting/n-dx/commit/168b80c1edfe45f408cedb75d6ca0efc2cbc8e29) Thanks [@endash-shal](https://github.com/endash-shal)! - Report repo identity and scan counts on `GET /api/status`, and name the repository on each hub card.
+  
+  The sv section of the status response gains `repo` (the analysis manifest's repo identity), counts for `outbound` and `infrastructure`, and `readiness` — an explicit `null` until the SDLC readiness scorer exists, so the field is part of the contract now rather than a second response shape later. Every field is present on an unanalysed project, carrying null or zero instead of being absent.
+  
+  The hub's `ProjectCard` carries `repoName` and `remoteHost`, and the home page shows them under each card's title. A project's registered name is the worktree's; the repo name is the repository's, so two worktrees of one repository now read as what they are. The hub still makes no direct read of any `.sourcevision/` path — all of this arrives through the child's HTTP API.
+  
+  `RepoIdentity`, `InfrastructureData` and its members are exported from `@n-dx/sourcevision` and re-exported through web's `domain-gateway.ts`.
+
+- [#532](https://github.com/en-dash-consulting/n-dx/pull/532) [`eff0f79`](https://github.com/en-dash-consulting/n-dx/commit/eff0f79db748ee2ec71c27abbde166fdcfbfc722) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Jev client and its judgment cache move from sourcevision into `@n-dx/llm-client`, so rex can ask judgment-shaped questions without importing a sibling domain package. Behaviour, the cache file location and its format are unchanged. Per-call ledger accounting, which a foundation-tier module cannot reach upward for, is now an injection seam: sourcevision registers its run ledger through `setJevObserver` when `sv analyze` starts.
+
+- [#529](https://github.com/en-dash-consulting/n-dx/pull/529) [`2028e7a`](https://github.com/en-dash-consulting/n-dx/commit/2028e7a2e298d88c9b9d66020cc380bbdce19b4c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Clear the last literal `.rex/`, `.hench/` and `.sourcevision/` paths, and make
+  the policy that forbids them a wall rather than a ratchet.
+  
+  Where n-dx keeps its state is `resolveLayout`'s decision — `.ndx/rex` or
+  `.rex`, depending on the project's layout. A literal takes that decision a
+  second time in a file that has no idea which layout it is running under, and it
+  fails *silently*: the wrong path is simply a path nothing wrote to, which is
+  indistinguishable from a project that has nothing to show.
+  
+  Two of the sites cleared here were live defects of exactly that shape, both on
+  a migrated project: `rex analyze` stamped every proposal it derived from an
+  analysis with `.sourcevision/zones.json`, naming a file the project does not
+  have, and hench's reviewer was told to list `.rex/prd_tree/` before capturing a
+  finding — a listing that came back empty, so every finding looked new and
+  duplicates got filed. A third, sourcevision's `prd-epic-resolver`, built its
+  paths from a fixed `.rex` too, but in a helper nothing calls; it now asks the
+  resolver so the literal is gone, and no command's behaviour changes.
+  
+  The rest were display copy and one bucket key. Viewer text that names a
+  directory now names the command or the tool instead (`Make sure hench is
+  initialized for this project`), because the browser has no resolver to ask;
+  `sv pr-markdown --help` names its output file without fixing the folder; and
+  `rex status`'s canonical PRD bucket key now comes from the same constant as the
+  attributions it has to match, rather than from a second copy that agreed by eye.
+  
+  Two files are allowed to keep a literal, both with the argument in their own
+  docstring: the viewer's `state-paths.ts`, a browser-safe twin of
+  `layoutStateNames()` pinned to the resolver by the contract test, because
+  `layout.ts` reaches for `node:fs` at module scope and cannot be bundled; and
+  rex's `LEGACY_SOURCE_FILE_PREFIX`, which is a value already written into PRD
+  data rather than a path any process constructs.
+  
+  `tests/e2e/layout-literal-policy.test.js` now fails on *any* `.rex/`, `.hench/`
+  or `.sourcevision/` literal outside that allow-list, naming the file and line.
+  The `.n-dx*` config files stay on the inventory ratchet — 29 sites across
+  llm-client, hench and web are still waiting on that sweep — and the detector's
+  self-test now floors the files it visits rather than the literals it finds, so
+  it keeps its teeth once the debt reaches zero.
+
+- [#596](https://github.com/en-dash-consulting/n-dx/pull/596) [`31c0647`](https://github.com/en-dash-consulting/n-dx/commit/31c0647830a5b33d965e661acc41911d84ec5673) Thanks [@endash-shal](https://github.com/endash-shal)! - Detect Go outbound clients into `outbound.json`.
+  
+  The fourth and last outbound slice. `analyzers/go-outbound-detection.ts` reports `net/http` (`http.Get`/`Post`/`NewRequest`, and the `client.Do` that issues a request) and `google.golang.org/grpc` (`Dial`, `DialContext`, `NewClient`, and generated `New…Client` stubs) as `kind: "http"` and `"grpc"`; the AWS SDK's SQS and SNS clients across both generations, and `sarama`, as `"queue"`; `go-redis` as `"cache"`; and `database/sql` as `"database"`. `outbound-detection.ts` dispatches `.go` files here, exactly as `server-route-detection.ts` dispatches them to `go-route-detection.ts`, so a mixed-language repository produces one canonically sorted artifact whose consumer never learns which detector found what.
+  
+  Same record and same two-field rule as the JS/TS slices: a literal address, the `os.Getenv` variable's name, or a struct-field or viper key in `targetSource`, and nothing but reach in `confidence`. An import alias stays `certain` — renaming a package at the import is not indirection at the call site.
+  
+  No second Go parser: `extractGoImports` resolves which local name each package is bound to, and `stripGoComments` (now exported from `go-route-detection.ts`) removes what must not be matched. That stripper now replaces a block comment with the newlines it spanned rather than a single space, so an offset's line number survives it — without that, every detection after the first multi-line comment named the wrong line.
+  
+  Two rules came out of probing the detector against this repository's own Go fixtures, where it initially reported both:
+  
+  - **A method name alone rarely identifies a client.** `r.Header.Get("Authorization")` — a server-side header read — was reported as an outbound HTTP call, because `Get` is in `net/http`'s vocabulary and nothing else in the file contradicted it. Each family now declares which of its methods are strong enough to carry a detection on a receiver the file never binds; for `net/http`, `go-redis` and `database/sql` that set is empty, because `Get`, `Set`, `Do`, `Query` and `Exec` are method names on everything. A bound receiver is unambiguous and still reports.
+  - **A positional target is read from its position only.** `sql.Open("postgres", dsn)` with `dsn` a parameter reported `"postgres"` — the driver name — as the address of the database, because an unresolved target fell back to scanning the other arguments for a literal. An unresolved target is now `unknown`; it is never the next literal in the call.
+
+- [#596](https://github.com/en-dash-consulting/n-dx/pull/596) [`1a39dd5`](https://github.com/en-dash-consulting/n-dx/commit/1a39dd59ebf8ad3338e28e7ce111c6f3c52bbd25) Thanks [@endash-shal](https://github.com/endash-shal)! - Detect JS/TS HTTP and gRPC call sites into `outbound.json`.
+  
+  The second outbound slice fills in what the first one left empty. `analyzers/outbound-detection.ts` now reports call sites for `fetch` (global and `node-fetch`), axios, got, ky and undici as `kind: "http"`, and gRPC client construction — on the module object, through a `loadPackageDefinition` result, or a generated `*Client` stub — as `kind: "grpc"`.
+  
+  Detection runs through the TypeScript compiler API, never a regular expression over source text. A regex cannot tell `axios.get(url)` from `cache.get(key)`, and that difference is the whole value of the artifact. The walk resolves which local names reach a client library first — imports, `require`, destructuring, aliases, and instances from `axios.create()` / `new Pool()` — and only reports calls made through those names, so an unrelated `.get()` on an unrelated object is structurally incapable of being reported.
+  
+  The two graded fields stay independent, as the schema specifies. `targetSource` says where a call points: a URL literal, the name behind `process.env.X` (including inside an interpolated URL), a config key path, or nothing. `confidence` says only how directly the call was reached — `certain` for a direct call on an imported client, `likely` for an alias or a configured instance, `inferred` for a dynamic member access. A literal target and an env target on equally direct calls therefore grade identically, which is pinned by a test so the two fields cannot drift into stating one fact twice.
+  
+  Files are read from the inventory, so the same ignore rules, skip directories and incremental caching apply as everywhere else; test and docs roles are skipped, since a call site in a fixture is not a dependency the repository has. Still deterministic: no LLM, no network, canonically ordered.
+
+- [#596](https://github.com/en-dash-consulting/n-dx/pull/596) [`9c16798`](https://github.com/en-dash-consulting/n-dx/commit/9c167986b258634de6a91abe3221c477fab5d2b4) Thanks [@endash-shal](https://github.com/endash-shal)! - Detect JS/TS queue, database and cache clients into `outbound.json`.
+  
+  The third outbound slice completes JS/TS coverage. `analyzers/outbound-detection.ts` now reports SQS and SNS through both AWS SDK generations, Kafka (`kafkajs`) and RabbitMQ (`amqplib`) as `kind: "queue"`; `pg`, `mysql`, `mysql2`, `mongodb` and `mongoose` as `kind: "database"`; and `redis` and `ioredis` as `kind: "cache"`. Same compiler-API path and the same two-field rule as the HTTP slice — a connection string, a queue URL, a topic ARN or the environment variable's name in `targetSource`, and nothing but reach in `confidence`.
+  
+  Four shapes needed more than a row in the client table, because these libraries do not put the destination where an HTTP client does:
+  
+  - **AWS SDK v3 states the target on a command object**, not on the client and not as an argument to `send`. A constructed object's options are now read through, so `send(new SendMessageCommand({ QueueUrl }))` reports the queue rather than an unknown target.
+  - **A connection is often awaited**, and a channel comes from the connection, so `await` is no longer counted as a hop and a factory inherits the target its source was configured with. `amqp.connect(url)` reports the broker, and the channel's `sendToQueue` reports the queue.
+  - **A broker list is an array**, sometimes built by splitting an environment variable, so both resolve to the one fact a cross-repo matcher can use.
+  - **`ioredis` exports its constructor as the default**, so the local name carries no information. The spec says the default is constructible once, rather than keying on whatever the importer called it — which also makes an aliased constructor resolve, at `likely`, as the alias rule already required.
+  
+  The base-fallback rule that made `api.get("/orders")` report the host it was configured with is now explicit rather than universal. A bare path matches no producer and needs the base; a queue name is a whole target, so the broker never displaces it. The fallback still applies to any client whose call names nothing at all.
+
+- [#596](https://github.com/en-dash-consulting/n-dx/pull/596) [`48eaa38`](https://github.com/en-dash-consulting/n-dx/commit/48eaa386916bdcaf8b208924716906793f903008) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `outbound.json`: the shape, the file, and the pipeline wiring.
+  
+  SourceVision detects only the provider side of HTTP — `server-route-detection.ts` and `go-route-detection.ts` record the routes a repository serves. Without the consumer side, a repository that calls another repository is invisible, which is what makes a cross-repo scan impossible.
+  
+  This lands the first slice: `OutboundDependency` in `schema/v1.ts`, a zod schema in `schema/validate.ts`, `outbound.json` registered in `schema/data-files.ts` and web's mirror, and `analyzers/outbound-detection.ts` wired into `sv analyze`. Call-site detection is deliberately empty — JS/TS HTTP and gRPC, JS/TS queue/database/cache, and Go each follow as their own change, and each now adds detections to a file consumers already read rather than introducing the file and its readers at once.
+  
+  What the detector does find today is declared contracts: OpenAPI/Swagger documents and `.proto` files, with their paths. These are not found through the inventory alone, because `.proto` and `.yaml` are not programming languages and the default `codeOnly` inventory omits them — both sources are consulted and merged, rather than widening the inventory and changing the input to zone detection for every project.
+  
+  `confidence` grades the call, not the target: a direct client call is `certain` whether its target is a URL literal or an environment variable name, and only indirection in reaching the call lowers it. `targetSource` separately says where the call points, so the cross-repo matcher has a category to switch on rather than a threshold to guess at. The three-level vocabulary it uses was `SdlcConfidence`, named for having had exactly one user; now that a second, unrelated record grades its detections with it, it is `Confidence` — still one definition, so the two cannot drift.
+  
+  Deterministic throughout: no LLM, no network, and canonically ordered, so re-analysing an unchanged tree produces a byte-identical file.
+
+- [#550](https://github.com/en-dash-consulting/n-dx/pull/550) [`4910d78`](https://github.com/en-dash-consulting/n-dx/commit/4910d7843de364099da985ccbb1fb43ed733d516) Thanks [@endash-shal](https://github.com/endash-shal)! - Persist infrastructure discovery as `infrastructure.json`.
+  
+  Runtime infrastructure and injection seams — the two things the import graph structurally cannot show — were discovered inside the iso export, so what they found existed only in a rendered HTML page and nothing else could read it. Discovery moved to `analyzers/infrastructure.ts`, runs during `sv analyze`, and is written to `infrastructure.json` alongside the other data files.
+  
+  The logic is the same logic, moved: the same fixture renders to the same sha256 before and after. The export reads the file instead of recomputing and falls back to discovering it when there is none — a repository scanned with no analysis, which is how the standalone iso-map skill runs on an arbitrary repo, and an analysis made before the file existed.
+  
+  The persisted shape keeps links apart from resources, each carrying whether a person declared the use or source names the resource. Neither array is re-sorted on the way to disk: discovery emits config-declared resources first and a config `usedBy` in written order, so sorting would reorder the map's nodes.
+
+- [#550](https://github.com/en-dash-consulting/n-dx/pull/550) [`7009820`](https://github.com/en-dash-consulting/n-dx/commit/7009820fc4f80df48c03940161756ea7454c2260) Thanks [@endash-shal](https://github.com/endash-shal)! - Record the repository's identity on the analysis manifest.
+  
+  `manifest.json` had `targetPath` and nothing else, so two analyses could not be told apart or correlated once they left their own directory. `Manifest.repo` now carries `name`, `remoteUrl`, `remoteHost`, `remotePath` and `defaultBranch`, populated on every run. A directory with no remote — or no git at all — still gets a populated identity, named after the directory, with the remote fields `null`: "looked and found no remote" is something the artifact can now say.
+  
+  Reading the remote moved into `util/git-remote.ts`, which the iso export's source links now use too, so there is one implementation rather than two that can disagree. The field is optional, so an analysis produced before it existed still validates.
+  
+  `remoteUrl` is the redacted remote: an origin such as `https://user:token@github.com/acme/widget.git` is recorded as `https://github.com/acme/widget.git`. Redaction happens in the reader, so no caller can hold the credentialed form — the manifest is designed to be committed and must not carry a token. scp-like `git@host:path` remotes are left intact; that username is not a secret.
+
+- [#592](https://github.com/en-dash-consulting/n-dx/pull/592) [`f042e50`](https://github.com/en-dash-consulting/n-dx/commit/f042e5007066f8f61062e92ef5abe267df945177) Thanks [@endash-shal](https://github.com/endash-shal)! - Build the sdlc-profile analyzer, and write `sdlc-profile.json` on every analyze.
+  
+  `analyzers/sdlc-profile.ts` discovers what a repository can actually do — its commands, CI pipelines with classified jobs and steps, deployments, containers, migrations, quality gates, test suites, observability and feature flags — each claim carrying the file that proves it.
+  
+  It walks for itself rather than reading the inventory, because the `codeOnly` filter drops the YAML, TOML and Dockerfiles it needs and widening it would pollute zone detection. `inventory.ts` is untouched; its `IgnoreFilter` is reused so there is no second `.gitignore` interpreter. The walk is bounded on depth, file count and per-file size, and each bound is covered by a test.
+  
+  The four CI dialects share one small YAML-subset parser rather than four line scanners. It refuses anchors, aliases, merge keys, tags and multi-document streams instead of returning a half-read document — a job silently missing its steps would read downstream as "this project does not test".
+  
+  A recognised file that cannot be read is recorded in a new `parseFailures` section with its path, so "no CI is configured" and "CI is configured and unreadable" stay distinguishable. `SdlcCiPipeline.jobs` now carries jobs with their steps rather than job names, which the schema as first declared could not express.
+  
+  Deterministic throughout: no LLM call, no network, no clock, and two runs over an unchanged tree produce byte-identical output.
+
+- [#550](https://github.com/en-dash-consulting/n-dx/pull/550) [`d254b19`](https://github.com/en-dash-consulting/n-dx/commit/d254b19f7074d487f59f052063fa0ca918079bd8) Thanks [@endash-shal](https://github.com/endash-shal)! - Declare the `SdlcProfile` schema and register `sdlc-profile.json`.
+  
+  Evidence-based CI/CD maturity for a repository: sections for commands, tests, ci, cd, rollback, migrations, featureFlags, qualityGates, observability, containers and iac. Every detection carries at least one piece of evidence — `{ kind, path, line?, excerpt?, confidence }` — and `SdlcEvidenceList` is a non-empty tuple, so a detection with no proof does not compile. The validator enforces the same rule at the boundary for profiles written by anything else.
+  
+  The `commands` section models test, lint, typecheck, build, deploy and migrate uniformly, shaped so `test-command-resolver.ts`, rex's `.rex/config.json` `test` key and `readme-generator.js`'s `detectCommands` can adopt it later. Nothing is wired to it here — the analyzer and the scorecard are separate work.
+
+- [#572](https://github.com/en-dash-consulting/n-dx/pull/572) [`2543aa7`](https://github.com/en-dash-consulting/n-dx/commit/2543aa77b70af8133a28d8317cde4be32eb81739) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `sv analyze` installs its SIGTERM/SIGINT handlers before the progress file first says `running`, so a stop sent on seeing it is always recorded and exits 128 + signal instead of killing the process outright ([#562](https://github.com/en-dash-consulting/n-dx/issues/562)).
+
+- [#520](https://github.com/en-dash-consulting/n-dx/pull/520) [`0ec098a`](https://github.com/en-dash-consulting/n-dx/commit/0ec098ae8fe51a8f62a7a8e8400eba9e47971a1d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `sv mcp .` now serves the worktree named by the client's MCP roots, so a Claude desktop session in a linked worktree reads that worktree's `.sourcevision/` and `set_file_archetype` writes its config rather than the main checkout's ([#499](https://github.com/en-dash-consulting/n-dx/issues/499)). A root naming another worktree of the same repository that has no `.sourcevision/` refuses `set_file_archetype`; reads fall back to the startup directory with a warning. An explicit directory (`sv mcp /abs/path`) and the dashboard's HTTP MCP keep the directory they were given. The startup directory must still hold `.sourcevision/`. `get_overview` now reports the project name, not the full path, on Windows.
+
+- [#592](https://github.com/en-dash-consulting/n-dx/pull/592) [`e188d87`](https://github.com/en-dash-consulting/n-dx/commit/e188d87cf3204ffa7f40bf5597ec78707a0564a0) Thanks [@endash-shal](https://github.com/endash-shal)! - Add the SDLC readiness scorecard, `analyzers/readiness-score.ts`.
+  
+  Turns the `sdlc-profile.json` detections into a weighted score, keeping the shape of rex's PRD structure health (`packages/rex/src/core/health.ts`) so the dashboard can render repo readiness and PRD health with one component: dimensions scored 0-100, overall as the weighted sum, suggestions aimed at the weakest dimension.
+  
+  - The nine weights — testing, ci, cd, rollback, migrations, featureFlags, qualityGates, observability, agentSafety — live in one exported `READINESS_WEIGHTS` constant. Nothing restates them, and the report order and the tie-break between equally weak dimensions are both read from it.
+  - Every dimension's `evidence` is carried through from the profile's own detections rather than recomputed, so a score traces back to the artifact the analyzer saw. A dimension with no evidence scores zero with a gap explaining the absence, rather than being credited for a section nobody looked at.
+  - Gaps are the useful output: `ReadinessGap.wouldRaiseScore` is required, so a gap that only complains does not compile.
+  - `agentSafety` reads `repo-trust` findings from `@n-dx/llm-client`, which is unchanged; it is injectable so scoring is a pure function of its inputs.
+  
+  The scorecard is heuristic — it reports whether tests exist, run, and where the holes are, not whether they are good — and consumers must label it as such. Nothing is surfaced through the CLI, MCP or the dashboard yet.
+
+- [#592](https://github.com/en-dash-consulting/n-dx/pull/592) [`cc9ce2c`](https://github.com/en-dash-consulting/n-dx/commit/cc9ce2c7b3df83ac6709bfaf38240ea23bff564b) Thanks [@endash-shal](https://github.com/endash-shal)! - Surface SDLC readiness through the CLI, `ndx`, MCP and the dashboard status.
+  
+  `analyze` now writes `readiness.json` beside `sdlc-profile.json` — the weighted
+  score computed from the detected profile. Four surfaces read it:
+  
+  - `sourcevision readiness [--json]` prints the scorecard, with the evidence
+    behind each dimension and the gap that would raise it.
+  - `ndx readiness` delegates to it, forwarding `--json`.
+  - `get_readiness` on the SourceVision MCP server returns the same artifact.
+  - `GET /api/status` carries `sv.readiness` (`{ overall, analyzedAt }`), null
+    rather than absent on an analysis that produced no readiness artifact.
+  
+  The CLI and MCP surfaces recompute from `sdlc-profile.json` rather than serving
+  `readiness.json`, so a weight change shows up without a re-analysis; the
+  persisted file is for readers that only want the headline. The scorecard is
+  heuristic — it detects whether a practice exists and is wired up, not whether it
+  is good — and is labelled as such on every surface that publishes it.
+
+- [#607](https://github.com/en-dash-consulting/n-dx/pull/607) [`ce25794`](https://github.com/en-dash-consulting/n-dx/commit/ce2579434098c1994c73d91b1964f2b54b8f202f) Thanks [@endash-shal](https://github.com/endash-shal)! - One host-neutral git-remote-URL parser, in `@n-dx/llm-client`
+  
+  `parseGitRemoteUrl` splits an origin remote into `{ host, owner, repo, path, kind }`
+  for https, ssh and scp-style forms, where `kind` distinguishes `github`,
+  `bitbucket-cloud`, a self-hosted `bitbucket-dc` and `other`. Data Center's `/scm/`
+  clone prefix is dropped from the identity path, so the same repository parses the
+  same way over https and ssh.
+  
+  The three readers that each had their own regex now share it: sourcevision's
+  analysis manifest and iso export, and the web dashboard's project route. They
+  disagreed — web's split on `[/:]` read `ssh://git@host:7999/PROJ/repo.git` as the
+  repo `repo` with no owner, while sourcevision's could not parse that form at all.
+  A new architecture-policy rule fails the build on a second parser.
+  
+  An scp-style remote does not need a dotted host: `git@work-github:acme/widget.git`
+  (an ssh config alias) and `git@bitbucket:PROJ/widget.git` (a short internal
+  hostname) parse like any other. Only a one-character host is refused, because
+  that is a Windows drive letter and git reads `C:\src\repo` as a local path.
+
+- [#597](https://github.com/en-dash-consulting/n-dx/pull/597) [`5941241`](https://github.com/en-dash-consulting/n-dx/commit/594124123ada89c08571274f80b425e84d17b2dc) Thanks [@endash-shal](https://github.com/endash-shal)! - Derive cross-repo workspace crossings from outbound HTTP calls and shared infrastructure, not only npm imports.
+  
+  `analyzers/workspace-crossings.ts` had one signal: an external import naming a sibling member's package. It now has three, all in that same module — no second aggregator. Every cross-repo crossing carries `source: "npm" | "http" | "infra"` and an `evidence` sentence naming both sides, because an edge no import supports is unreadable without one. Intra-repo crossings carry neither; they come from the import graph Louvain partitioned, which is none of these three.
+  
+  **http** reads each member's `outbound.json` and resolves its `http` and `grpc` calls against the other members. A literal target is matched on two independent signals: the host being a member's declared `baseUrl` host (a person said so), and the path being a route that member's `components.json` says it serves (its own analysis said so). Both hold, or a declared host with no path to check, is `certain`; either alone is `likely`. The edge lands on the file that handles the route, not the package entry point.
+  
+  **infra** joins two members that reference one resource: the same `infra:` id is `certain`, the same name for a queue, topic, bucket or stream is `likely`. The rule is restricted to those kinds deliberately — two repos both having a `database` called `primary` are not talking to each other. A shared resource has no direction, so one edge is emitted per member pair per resource, oriented by member id so repeated runs produce the same graph.
+  
+  Two questions this settles:
+  
+  - **Matching an env-var name to a producer.** Neither side's convention is taken as canonical. Both the variable name and the host are reduced to their identity words — the ones that say *which* thing rather than *what* it is — so `ORDERS_URL` and `orders.internal` meet in the middle without either repo adopting the other's spelling. `WorkspaceMember` gains `baseUrl` for members to declare where they serve; an env match against a declared base URL is `likely` and is drawn, an env match against a member's *name* alone is not.
+  - **The threshold.** `certain` and `likely` are drawn, `inferred` is withheld — every `inferred` rule here rests on two names resembling each other and nothing else, and a name collision between repositories is ordinary. A wrong edge in a cross-repo map is read as architecture, which is worse than a missing one.
+  
+  Withheld candidates are reported rather than dropped: `sourcevision workspace` prints each one with its reason, which is nearly always a member that has declared no `baseUrl` — a one-line fix the operator cannot make if the near-miss is invisible. `sourcevision workspace --status` prints edge counts broken down by source.
+  
+  `sortCrossings` now tie-breaks on `source`, because two sources can draw the same file pair and without it `zones.json` stopped being byte-stable. Web mirrors the two new fields in its schema and zone-crossing validator; a zod object strips undeclared keys, so leaving them out would have made the evidence vanish between the analyzer and the dashboard rather than fail loudly.
+- Updated dependencies [[`1dfc0c7`](https://github.com/en-dash-consulting/n-dx/commit/1dfc0c7e7947ffa6054cb6ef9efc214805253a16), [`eff0f79`](https://github.com/en-dash-consulting/n-dx/commit/eff0f79db748ee2ec71c27abbde166fdcfbfc722), [`cf19d5a`](https://github.com/en-dash-consulting/n-dx/commit/cf19d5a29ffa9ad4df8bb2befb2dd3f266785e05), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`f46b952`](https://github.com/en-dash-consulting/n-dx/commit/f46b95235daf551cd0cc7c13ae162204aff74527), [`8bae238`](https://github.com/en-dash-consulting/n-dx/commit/8bae2381270ebcd2c419b4c8d8c90ffd87ac3047), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`86751c5`](https://github.com/en-dash-consulting/n-dx/commit/86751c571f74bb04949e8b5cc1007eddf4ea1e21), [`fefc307`](https://github.com/en-dash-consulting/n-dx/commit/fefc3072a4a1f7a902a5f456fa4475faeebb5b71), [`5802bc2`](https://github.com/en-dash-consulting/n-dx/commit/5802bc221ecab89d6be697b65e90d6db8c138674), [`0ec098a`](https://github.com/en-dash-consulting/n-dx/commit/0ec098ae8fe51a8f62a7a8e8400eba9e47971a1d), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`ce25794`](https://github.com/en-dash-consulting/n-dx/commit/ce2579434098c1994c73d91b1964f2b54b8f202f), [`b671123`](https://github.com/en-dash-consulting/n-dx/commit/b6711238559f132c7f0f7099b525d08108cfc445), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b)]:
+  - @n-dx/llm-client@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes
