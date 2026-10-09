@@ -46,7 +46,7 @@ plannedRelease: "1.0.0"
 | [Shared assistant guidance for every vendor](./shared-assistant-guidance-for-every/index.md) | pending |
 | [Single state writer for state.yaml](./single-state-writer-for-state-yaml/index.md) | completed |
 | [Split the rex MCP tools into one module per tool](./split-the-rex-mcp-tools-into-one/index.md) | completed |
-| [Stamp shippedIn from any CI](./stamp-shippedin-from-any-ci/index.md) | completed |
+| [Stamp shippedIn from any CI](./stamp-shippedin-from-any-ci/index.md) | pending |
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | completed |
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
 | [v2 schema and rules before the freeze](./v2-schema-and-rules-before-the-freeze/index.md) | completed |
