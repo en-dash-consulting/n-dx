@@ -41,7 +41,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [rex health on a v2 tree drops the reader's parse warnings and reports "no findings" for a tree with skipped nodes](./rex-health-on-a-v2-tree-drops-the.md) | completed |
 | [rex prune on a v2 tree can remove the applied change that marks a product node retired](./rex-prune-on-a-v2-tree-can-remove-the.md) | pending |
 | [rex reshape aborts with no draft when one product proposal places an added node under a node another proposal removes](./rex-reshape-aborts-with-no-draft-when.md) | completed |
-| [rex reshape cannot move or split any product node that a change has ever touched, because apply's History line counts as "a body"](./rex-reshape-cannot-move-or-split-any.md) | in_progress |
+| [rex reshape cannot move or split any product node that a change has ever touched, because apply's History line counts as "a body"](./rex-reshape-cannot-move-or-split-any.md) | completed |
 | [Run the v2 tree rules from rex health and pass structureHealth.maxCriteriaPerCapability to criteria-growth](./run-the-v2-tree-rules-from-rex-health.md) | completed |
 | [Show the product layer delta in tree-diff and emit the PR comment as Markdown](./show-the-product-layer-delta-in-tree.md) | completed |
 | [tree-diff --format=markdown appends "no PRD tree at this source." to the comment on stdout](./tree-diff-format-markdown-appends-no.md) | completed |
