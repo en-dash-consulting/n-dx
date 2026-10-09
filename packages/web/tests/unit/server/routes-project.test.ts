@@ -8,9 +8,9 @@ import type { ServerContext } from "../../../src/server/types.js";
 import {
   handleProjectRoute,
   extractProjectMetadata,
-  extractRepoName,
   clearProjectMetadataCache,
 } from "../../../src/server/routes-project.js";
+import { parseGitRemoteUrl } from "@n-dx/llm-client";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server that only runs project routes. */
@@ -30,29 +30,22 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
   });
 }
 
-describe("extractRepoName", () => {
-  it("extracts repo name from HTTPS URL with .git suffix", () => {
-    expect(extractRepoName("https://github.com/user/my-repo.git")).toBe("my-repo");
-  });
-
-  it("extracts repo name from HTTPS URL without .git suffix", () => {
-    expect(extractRepoName("https://github.com/user/my-repo")).toBe("my-repo");
-  });
-
-  it("extracts repo name from SSH URL", () => {
-    expect(extractRepoName("git@github.com:user/my-repo.git")).toBe("my-repo");
-  });
-
-  it("extracts repo name from SSH URL without .git suffix", () => {
-    expect(extractRepoName("git@github.com:user/my-repo")).toBe("my-repo");
-  });
-
-  it("handles trailing slashes", () => {
-    expect(extractRepoName("https://github.com/user/my-repo/")).toBe("my-repo");
-  });
-
-  it("returns null for empty string", () => {
-    expect(extractRepoName("")).toBeNull();
+describe("repository name comes from the shared parser", () => {
+  // The URL forms themselves are pinned in
+  // packages/llm-client/tests/unit/git-remote-url.test.ts. What matters here is
+  // that this route reads them through that parser rather than a second regex —
+  // a local copy is how the dashboard header and the analysis manifest came to
+  // be able to name the same repository differently.
+  it("agrees with parseGitRemoteUrl on every form the route can be given", () => {
+    for (const remote of [
+      "https://github.com/user/my-repo.git",
+      "https://github.com/user/my-repo",
+      "git@github.com:user/my-repo.git",
+      "https://github.com/user/my-repo/",
+      "ssh://git@bitbucket.example.com:7999/PROJ/my-repo.git",
+    ]) {
+      expect(parseGitRemoteUrl(remote)?.repo, remote).toBe("my-repo");
+    }
   });
 });
 
