@@ -5,7 +5,8 @@
  * Several files that n-dx reads to decide *what it may execute* live inside
  * the repository and are usually tracked by git: the hench guard in
  * `.hench/config.json` (command allowlist, blocked paths, git subcommands,
- * permission mode), the test command in `.rex/config.json`, and the MCP
+ * permission mode, the child-environment allowlist), the test command in
+ * `.rex/config.json`, and the MCP
  * servers in `.mcp.json`. A clone, a fork, or a checked-out pull request can
  * therefore ship a *looser* policy than the one the user's own `ndx init`
  * would have written, and nothing used to say so.
@@ -29,6 +30,14 @@
  *   is not trusted: the allowlists intersect with the baseline and the
  *   blocked paths union with it, so an untrusted checkout can only ever
  *   *tighten* what the user's defaults allow.
+ *
+ * `guard.env.allow` is surfaced rather than clamped. It names variables the
+ * agent's child processes may keep, so a repository-supplied entry widens
+ * what a model-chosen command can read — but the same field is how an
+ * operator deliberately passes a credential their own test suite needs, and
+ * the two are indistinguishable once merged. Clamping would silently undo the
+ * operator's intent, so the entries go in the digest and into a warning
+ * instead: the user is asked, rather than overruled.
  *
  * The trust store is deliberately a plain file for now. It records a
  * decision, not a secret; an encrypted store is a later concern.
@@ -187,6 +196,15 @@ export interface RepoExecutionConfig {
   sources: string[];
   language: string | null;
   guard: GuardBaseline | null;
+  /**
+   * `guard.env.allow` as the repository ships it — names the agent's child
+   * processes may keep even when the credential filter would strip them.
+   *
+   * Only `allow` is collected. `deny` can only remove variables, so a
+   * repository cannot use it to reach a credential, and putting it in the
+   * digest would re-prompt the user for a change that never widens anything.
+   */
+  envAllow: string[];
   permissionMode: string | null;
   provider: string | null;
   /** `.rex/config.json` → `test`. */
@@ -258,6 +276,11 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
       }
     : null;
 
+  const rawEnv = rawGuard && rawGuard.env && typeof rawGuard.env === "object" && !Array.isArray(rawGuard.env)
+    ? (rawGuard.env as Record<string, unknown>)
+    : null;
+  const envAllow = rawEnv ? stringArray(rawEnv.allow) ?? [] : [];
+
   const rexConfigPath = join(layout.rexDir, "config.json");
   const rexConfig = readJson(rexConfigPath);
   if (rexConfig) sources.push(relOf(root, rexConfigPath));
@@ -290,6 +313,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
           allowedGitSubcommands: [...guard.allowedGitSubcommands].sort(),
         }
       : null,
+    envAllow: [...envAllow].sort(),
     permissionMode: optionalString(merged.permissionMode),
     provider: optionalString(merged.provider),
     testCommand: optionalString(rexConfig?.test),
@@ -310,6 +334,7 @@ export type RepoTrustFindingCode =
   | "commands-added"
   | "blocked-paths-removed"
   | "git-subcommands-added"
+  | "env-allow-added"
   | "permission-bypass"
   | "test-command"
   | "mcp-servers"
@@ -389,6 +414,15 @@ export function assessRepoExecutionConfig(config: RepoExecutionConfig): RepoTrus
         severity: "warning",
         message: `Allows git subcommands outside the baseline: ${gitAdded.join(", ")}`,
         values: gitAdded,
+      });
+    }
+
+    if (config.envAllow.length) {
+      findings.push({
+        code: "env-allow-added",
+        severity: "warning",
+        message: `Passes credential-shaped environment variables through to the agent's processes: ${config.envAllow.join(", ")}`,
+        values: [...config.envAllow],
       });
     }
 
