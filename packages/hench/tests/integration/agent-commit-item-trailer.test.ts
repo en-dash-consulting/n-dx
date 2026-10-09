@@ -20,6 +20,7 @@ import type { RunRecord, TaskBrief } from "../../src/schema/index.js";
 import {
   briefForRun,
   buildAgentCommitTrailers,
+  findCommitsMissingItem,
   finalizeRun,
 } from "../../src/agent/lifecycle/shared.js";
 import { buildSystemPrompt } from "../../src/agent/planning/prompt.js";
@@ -162,5 +163,22 @@ describe("finalizeRun reports commits git cannot tie to the task", () => {
     expect(run.commits).toHaveLength(2);
     expect(run.commitsMissingItem).toBeUndefined();
     expect(formatCommitsMissingItem(run)).toEqual([]);
+  });
+
+  it("findCommitsMissingItem keeps each commit's items apart across several commits", async () => {
+    const ok = commit(1, `feat: ok\n\nN-DX-Item: ${TASK}`);
+    const many = commit(2, "feat: many\n\nN-DX-Item: x-1\nN-DX-Item: x-2");
+    const none = commit(3, "feat: none");
+    const refs = [ok, many, none].map((sha) => ({ sha, subject: "s" }));
+
+    expect(await findCommitsMissingItem(projectDir, refs, TASK)).toEqual([
+      { sha: many, subject: "s", items: ["x-1", "x-2"] },
+      { sha: none, subject: "s", items: [] },
+    ]);
+  });
+
+  it("findCommitsMissingItem says nothing for commits it cannot read", async () => {
+    const refs = [{ sha: "0".repeat(40), subject: "gone" }];
+    expect(await findCommitsMissingItem(projectDir, refs, TASK)).toEqual([]);
   });
 });

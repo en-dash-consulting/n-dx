@@ -166,17 +166,26 @@ export function buildAgentCommitTrailers(
 }
 
 /**
- * The brief text and envelope sent for `run`: the selection-time brief plus
- * the run's commit trailers ({@link buildAgentCommitTrailers}), which need the
- * run id and so cannot be rendered before the run record exists.
+ * The selection-time brief plus the run's commit trailers
+ * ({@link buildAgentCommitTrailers}), which need the run id and so cannot be
+ * rendered before the run record exists. Loops that send only the brief text
+ * call this and {@link formatTaskBrief}; they skip the envelope.
  */
+export function withCommitTrailers(
+  brief: TaskBrief,
+  run: Pick<RunRecord, "id" | "taskId" | "vendor" | "model" | "weight" | "diagnostics">,
+): TaskBrief {
+  return { ...brief, commitTrailers: buildAgentCommitTrailers(run) };
+}
+
+/** {@link withCommitTrailers}, rendered both as text and as a prompt envelope. */
 export function briefForRun(
   brief: TaskBrief,
   run: Pick<RunRecord, "id" | "taskId" | "vendor" | "model" | "weight" | "diagnostics">,
   config: HenchConfig,
   extraContext?: string,
 ): { brief: TaskBrief; briefText: string; envelope: PromptEnvelope } {
-  const withTrailers: TaskBrief = { ...brief, commitTrailers: buildAgentCommitTrailers(run) };
+  const withTrailers = withCommitTrailers(brief, run);
   return {
     brief: withTrailers,
     briefText: formatTaskBrief(withTrailers),
@@ -3559,21 +3568,39 @@ export async function findCommitsMissingItem(
   commits: readonly RunCommitRecord[],
   taskId: string,
 ): Promise<RunCommitItemMismatch[]> {
+  if (commits.length === 0) return [];
+  // One call for every commit: `--no-walk=unsorted` reads exactly the listed
+  // shas. Unit separator after the hash, record separator between items; a
+  // trailer value holds neither.
+  let output: string;
+  try {
+    output = await execStdout(
+      "git",
+      [
+        "log",
+        "--no-walk=unsorted",
+        "--format=%H%x1f%(trailers:key=N-DX-Item,valueonly,separator=%x1e)%x1d",
+        ...commits.map((commit) => commit.sha),
+      ],
+      { cwd: projectDir, timeout: 10_000 },
+    );
+  } catch {
+    // Unreadable commits: say nothing rather than report trailers we could not check.
+    return [];
+  }
+  const itemsBySha = new Map<string, string[]>();
+  for (const record of output.split("\x1d")) {
+    const [sha, rawItems = ""] = record.split("\x1f");
+    if (!sha.trim()) continue;
+    itemsBySha.set(
+      sha.trim(),
+      rawItems.split("\x1e").map((item) => item.trim()).filter(Boolean),
+    );
+  }
   const missing: RunCommitItemMismatch[] = [];
   for (const commit of commits) {
-    let items: string[];
-    try {
-      const output = await execStdout(
-        "git",
-        ["log", "-1", "--format=%(trailers:key=N-DX-Item,valueonly)", commit.sha],
-        { cwd: projectDir, timeout: 10_000 },
-      );
-      items = output.split("\n").map((line) => line.trim()).filter(Boolean);
-    } catch {
-      // Unreadable commit: say nothing rather than report a trailer we could not check.
-      continue;
-    }
-    if (!items.includes(taskId)) missing.push({ ...commit, items });
+    const items = itemsBySha.get(commit.sha);
+    if (items && !items.includes(taskId)) missing.push({ ...commit, items });
   }
   return missing;
 }

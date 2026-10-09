@@ -38,12 +38,13 @@ import type { PruneOutcome, PruneShape } from "./context-prune.js";
 import { parseTokenUsageWithDiagnostic } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
+import { formatTaskBrief } from "../planning/brief.js";
 import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
 import { createLivelockDetector } from "../analysis/livelock.js";
 import type { LivelockDetector } from "../analysis/livelock.js";
 import {
   prepareBrief,
-  briefForRun,
+  withCommitTrailers,
   executeDryRun,
   transitionToInProgress,
   initRunRecord,
@@ -765,7 +766,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
   });
-  const { briefText } = briefForRun(brief, run, config);
+  const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
   section(
     opts.runNumber !== undefined
@@ -1370,7 +1371,7 @@ async function runLocalToolLoop(params: {
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
   });
-  const { briefText } = briefForRun(brief, run, config);
+  const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
   section(
     opts.runNumber !== undefined
@@ -1920,7 +1921,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
   });
-  const { briefText } = briefForRun(brief, run, config);
+  const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: briefText },
