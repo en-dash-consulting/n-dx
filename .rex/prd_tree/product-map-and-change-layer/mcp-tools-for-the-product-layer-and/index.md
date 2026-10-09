@@ -29,7 +29,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add get_product, get_capability, place_change and apply_change](./add-get-product-get-capability-place.md) | completed |
 | [add_item nests a change or subtask under a closed change, bypassing the follow-up rule](./add-item-nests-a-change-or-subtask.md) | completed |
 | [add_item takes a type and defaults to a change in the Inbox](./add-item-takes-a-type-and-defaults-to.md) | completed |
+| [get_capability's id cursor skips open changes when the cursor change is applied mid-paging](./get-capability-s-id-cursor-skips-open.md) | pending |
 | [Give v2 changes an optional acceptanceCriteria list](./give-v2-changes-an-optional.md) | completed |
+| [place_change takes the amendment's proposed text and capability criteria](./place-change-takes-the-amendment-s.md) | pending |
 | [Read tools default to open and recent changes, with paging](./read-tools-default-to-open-and-recent.md) | completed |
 | [Rex MCP tool access kinds are unpinned, so a write tool can flip to read and escape #499 write refusal](./rex-mcp-tool-access-kinds-are-unpinned.md) | completed |
+| [v2 MCP write tools take their timestamp inside the PRD lock](./v2-mcp-write-tools-take-their.md) | pending |
 | [v2 split leaves an open activeIntervals entry on a change that returns to pending](./v2-split-leaves-an-open.md) | completed |

@@ -39,4 +39,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | pending |
 | [v2 isolation test misses imports of the core v2 modules and dynamic import() of any v2 module](./v2-isolation-test-misses-imports-of.md) | pending |
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | pending |
-| [get_capability's id cursor skips open changes when the cursor change is applied mid-paging](./get-capability-s-id-cursor-skips-open.md) | pending |
