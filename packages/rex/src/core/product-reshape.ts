@@ -20,7 +20,11 @@
  * dependsOn, or one another live node names in dependsOn or appliesTo, since
  * the copy has a new id. A body that is only History is copyable: the
  * retired original keeps its History, and the copy's starts with a line
- * naming the original's id (the added amendment's summary). Modified and
+ * naming the original's id (the added amendment's summary). A merge is
+ * skipped on the same grounds when a merged node has any of these (its
+ * requirements, dependsOn or appliesTo included) or another live node names
+ * it, since the survivor's modified amendment takes over only capability
+ * criteria and a statement. Modified and
  * removed amendments carry `base`, the target's spec hash now, so applying
  * the change after someone else edited the node is refused rather than a
  * silent revert. The change is added through `addChangeNode`, which dry-runs
@@ -179,6 +183,14 @@ function amendmentsFor(product: readonly RuleNode[], proposal: ReshapeProposal, 
       }
       const nested = nodes.find((n) => liveDescendants(n).length > 0);
       if (nested) return `${label(product, nested.id)} has children; move them before merging it`;
+      for (const n of nodes) {
+        const lost = cannotRetire(product, n, [], {
+          drops: "a merge would drop",
+          strands: "a merge would leave pointing at a retired node",
+          notYet: "no amendment carries it to the survivor yet",
+        });
+        if (lost) return lost;
+      }
       const carried = survivor.type === "capability" ? nodes.flatMap((n) => criteriaOf(n)) : [];
       const add = renumber(carried, criteriaOf(survivor));
       const modified: Amendment[] =
@@ -277,18 +289,40 @@ function added(node: RuleNode, parent: RuleNode, summary: string, newId: () => s
  */
 function cannotCopy(product: readonly RuleNode[], node: RuleNode): string | undefined {
   if (node.type !== "capability" && node.type !== "constraint") return `an ${node.type} cannot be moved by an amendment; only a capability or constraint can`;
+  if (liveDescendants(node).length) return `${node.displayId ?? node.id} has children; move them first`;
+  return cannotRetire(product, node, node.type === "constraint" ? ["requirements", "appliesTo"] : [], {
+    drops: "an added copy would drop",
+    strands: "a copy with a new id would leave pointing at a retired node",
+    notYet: "no amendment moves it whole yet",
+  });
+}
+
+type CarriedField = "requirements" | "appliesTo";
+
+/**
+ * Why retiring `node` would lose something, or undefined: its tags, notes
+ * outside History, any of requirements, dependsOn and appliesTo not in
+ * `carried` (what the amendment replacing it takes over), or another live
+ * node naming it. History is not lost: the retired node keeps it.
+ */
+function cannotRetire(
+  product: readonly RuleNode[],
+  node: RuleNode,
+  carried: readonly CarriedField[],
+  words: { drops: string; strands: string; notYet: string },
+): string | undefined {
   const name = node.displayId ?? node.id;
-  if (liveDescendants(node).length) return `${name} has children; move them first`;
-  const n = node as RuleNode & { tags?: unknown[]; body?: string; requirements?: unknown[]; dependsOn?: unknown[] };
+  const n = node as RuleNode & { tags?: unknown[]; body?: string; requirements?: unknown[]; dependsOn?: unknown[]; appliesTo?: unknown };
   const dropped = [
     n.tags?.length ? "tags" : undefined,
     bodyNotes(n.body) ? "notes outside History in its body" : undefined,
-    node.type === "capability" && n.requirements?.length ? "requirements" : undefined,
-    node.type === "capability" && n.dependsOn?.length ? "dependsOn" : undefined,
+    n.requirements?.length && !carried.includes("requirements") ? "requirements" : undefined,
+    n.dependsOn?.length ? "dependsOn" : undefined,
+    n.appliesTo !== undefined && !carried.includes("appliesTo") ? "appliesTo" : undefined,
   ].filter((k): k is string => k !== undefined);
-  if (dropped.length) return `${name} has ${dropped.join(", ")}, which an added copy would drop; no amendment moves it whole yet`;
+  if (dropped.length) return `${name} has ${dropped.join(", ")}, which ${words.drops}; ${words.notYet}`;
   const dependent = liveNodes(product).find((other) => other.id !== node.id && names(other, node));
-  if (dependent) return `${label(product, dependent.id)} names ${name}, which a copy with a new id would leave pointing at a retired node; no amendment moves it whole yet`;
+  if (dependent) return `${label(product, dependent.id)} names ${name}, which ${words.strands}; ${words.notYet}`;
   return undefined;
 }
 

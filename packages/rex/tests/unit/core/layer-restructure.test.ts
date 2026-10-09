@@ -78,6 +78,55 @@ describe("draftProductReshape", () => {
     ]);
   });
 
+  it("skips a merge of a capability whose requirements, dependsOn, tags or body the survivor would not carry", () => {
+    const requirement = { id: "r1", title: "Suite passes", category: "quality", validationType: "automated", acceptanceCriteria: ["green"] };
+    const cases: Array<[Record<string, unknown>, RegExp]> = [
+      [{ requirements: [requirement] }, /cap2 has requirements, which a merge would drop/],
+      [{ dependsOn: ["cap3"] }, /cap2 has dependsOn, which a merge would drop/],
+      [{ tags: ["checkout"] }, /cap2 has tags, which a merge would drop/],
+      [{ body: "Raised by support.\n\n## History\n\n- 2026-10-01 CH1 added: s" }, /cap2 has notes outside History in its body, which a merge would drop/],
+    ];
+    for (const [extra, reason] of cases) {
+      const tree: RuleNode[] = [node({ id: "area1", type: "area", children: [capability("cap1"), capability("cap2", extra), capability("cap3")] })];
+      const draft = draftProductReshape(tree, [{ id: "p", action: { action: "merge", survivorId: "cap1", mergedIds: ["cap2"], reason: "r" } }]);
+      expect(draft.amends).toEqual([]);
+      expect(draft.skipped).toEqual([{ proposalId: "p", reason: expect.stringMatching(reason) }]);
+      expect(draft.skipped[0].reason).toMatch(/no amendment carries it to the survivor yet$/);
+    }
+  });
+
+  it("skips a merge of a node another live node names in dependsOn or appliesTo, the survivor included", () => {
+    const tree: RuleNode[] = [
+      node({
+        id: "area1",
+        type: "area",
+        children: [
+          capability("cap1", { dependsOn: ["cap4"] }),
+          capability("cap2", { displayId: "A1.2" }),
+          capability("cap3", { dependsOn: ["A1.2"] }),
+          capability("cap4"),
+          capability("cap5"),
+          node({ id: "con1", type: "constraint", statement: "s", appliesTo: ["cap5"] }),
+        ],
+      }),
+    ];
+    const merge = (id: string, mergedId: string) => ({ id, action: { action: "merge" as const, survivorId: "cap1", mergedIds: [mergedId], reason: "r" } });
+    const draft = draftProductReshape(tree, [merge("p1", "cap2"), merge("p2", "cap4"), merge("p3", "cap5")]);
+    expect(draft.amends).toEqual([]);
+    expect(draft.skipped).toEqual([
+      { proposalId: "p1", reason: expect.stringMatching(/cap3 names A1\.2, which a merge would leave pointing at a retired node/) },
+      { proposalId: "p2", reason: expect.stringMatching(/cap1 names cap4/) },
+      { proposalId: "p3", reason: expect.stringMatching(/con1 names cap5/) },
+    ]);
+  });
+
+  it("drafts a merge of a capability whose body is only History", () => {
+    const tree: RuleNode[] = [node({ id: "area1", type: "area", children: [capability("cap1"), capability("cap2", { body: "## History\n\n- 2026-10-01 CH1 added: s" })] })];
+    const draft = draftProductReshape(tree, [{ id: "p", action: { action: "merge", survivorId: "cap1", mergedIds: ["cap2"], reason: "r" } }]);
+    expect(draft.skipped).toEqual([]);
+    expect(draft.amends.map((a) => [a.delta, a.target])).toEqual([["removed", "cap2"], ["modified", "cap1"]]);
+  });
+
   it("skips a merge across types, which would drop the merged node's capability criteria", () => {
     const draft = draftProductReshape(product(), [
       { id: "p1", action: { action: "merge", survivorId: "area2", mergedIds: ["cap1"], reason: "r" } },
