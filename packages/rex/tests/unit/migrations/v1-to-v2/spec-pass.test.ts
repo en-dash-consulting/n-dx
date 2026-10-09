@@ -98,6 +98,24 @@ describe("v1-to-v2 spec text pass", () => {
     expect(texts.join("\n")).not.toContain("ensure that the system");
   });
 
+  it("never stores an ungrammatical \"shall\" when dropping \"ensure that the system\"", async () => {
+    const p = await plan(
+      drafter({
+        statement: "Picks the next actionable task by priority.",
+        criteria: [
+          { text: "The system shall ensure that the system does not pick blocked tasks.", source: "t1" },
+          { text: "The system shall ensure that the system shall break ties by age.", source: "s1" },
+          { text: "The system shall ensure that the system refreshes the queue.", source: "f1" },
+        ],
+      }),
+    );
+    expect(p.entries.f1!.spec!.criteria.map((c) => c.text)).toEqual([
+      "The system shall not pick blocked tasks.",
+      "The system shall break ties by age.",
+      "The system shall ensure that the system refreshes the queue.",
+    ]);
+  });
+
   it("rejects a criterion citing no source or one outside the capability, keeping the template criteria with a note", async () => {
     const p = await plan(
       drafter({

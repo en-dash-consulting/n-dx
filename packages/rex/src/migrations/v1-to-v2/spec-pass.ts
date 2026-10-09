@@ -124,13 +124,18 @@ const ENSURE_THE_SYSTEM = /^the system shall ensure that the system\s+/i;
 /**
  * "The system shall ensure that the system keeps X" is a model habit, not a
  * behaviour: keep the verb phrase and let {@link toEars} restore "The system
- * shall keep X". A phrase whose verb it cannot recognise keeps "shall" as is.
+ * shall keep X"; "does not X" and "shall X" become "shall not X" and "shall X".
+ * A phrase whose verb it cannot put in base form ("is", "refreshes") is kept
+ * as written: grammatical beats short.
  */
 function dropEnsureThatTheSystem(text: string): string {
   const rest = text.trim().replace(ENSURE_THE_SYSTEM, "");
   if (rest === text.trim()) return text;
+  const negated = /^(?:does|do) not\s+/i.exec(rest);
+  if (negated) return `The system shall not ${rest.slice(negated[0].length)}`;
+  if (/^shall\s/i.test(rest)) return `The system ${rest}`;
   const ears = toEars(rest);
-  return ears.startsWith("The system shall ensure that ") ? `The system shall ${rest.replace(/[.\s]+$/, "")}.` : ears;
+  return ears.startsWith("The system shall ensure that ") ? text : ears;
 }
 
 /**
