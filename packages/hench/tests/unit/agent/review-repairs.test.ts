@@ -14,7 +14,7 @@ import { mkdtemp, writeFile, mkdir, rm, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { initGitFixtureRepoSync } from "../../helpers/index.js";
+import { gitCommitTrailers, initGitFixtureRepoSync } from "../../helpers/index.js";
 import {
   snapshotDirtyState,
   diffDirtyState,
@@ -134,6 +134,25 @@ describe("review-repairs", () => {
       // The user's dirt is still uncommitted, exactly as it was.
       const status = git(repoDir, "status", "--porcelain").trim();
       expect(status).toBe("?? dirty.ts");
+    });
+
+    it("carries the item id as N-DX-Item, in one final trailer block (git's parser)", async () => {
+      await writeFile(join(repoDir, "base.ts"), "export const base = 2;\n");
+      await commitReviewRepairs(repoDir, {
+        paths: ["base.ts"],
+        runId: RUN_ID,
+        taskId: TASK_ID,
+        trailer: TRAILER,
+      });
+
+      expect(
+        git(repoDir, "log", "-1", "--format=%(trailers:key=N-DX-Item,valueonly)").trim(),
+      ).toBe(TASK_ID);
+      expect(gitCommitTrailers(repoDir)).toEqual([
+        ["N-DX", `review-pass repairs (task ${TASK_ID})`],
+        ["N-DX-Item", TASK_ID],
+        ["Co-Authored-By", "Test <test@example.com>"],
+      ]);
     });
 
     it("commits a deletion made by the reviewer", async () => {

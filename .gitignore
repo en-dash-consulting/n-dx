@@ -12,6 +12,7 @@ package-lock.json
 .hench/mcp/
 .hench/session-cache.json
 .hench-commit-msg.txt
+.ndx-commit-msg.txt
 .run-logs/
 .n-dx.json
 .n-dx.local.json

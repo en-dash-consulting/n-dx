@@ -1172,6 +1172,27 @@ function hasPrdStatusUpdate(toolCalls: ToolCallRecord[]): boolean {
 }
 
 /**
+ * Run-summary lines naming each run commit whose N-DX-Item trailer, as git
+ * parses it, is not the run's task ({@link RunRecord.commitsMissingItem}).
+ * Empty when every commit carries the task id.
+ *
+ * Exported for testing.
+ */
+export function formatCommitsMissingItem(
+  run: Pick<RunRecord, "taskId" | "commitsMissingItem">,
+): string[] {
+  const missing = run.commitsMissingItem ?? [];
+  if (missing.length === 0) return [];
+  return [
+    `${missing.length} commit${missing.length === 1 ? "" : "s"} not tied to this task (no \`N-DX-Item: ${run.taskId}\` trailer git can read):`,
+    ...missing.map((c) => {
+      const found = c.items.length > 0 ? ` (N-DX-Item: ${c.items.join(", ")})` : "";
+      return `  ${c.sha.slice(0, 9)} ${c.subject}${found}`;
+    }),
+  ];
+}
+
+/**
  * Format a change classification summary for the run output.
  *
  * Examples:
@@ -1635,6 +1656,7 @@ async function runOne(
 
   // Change classification
   info(formatChangeClassification(run.toolCalls, run.commits, run.uncommittedPaths));
+  for (const line of formatCommitsMissingItem(run)) warn(line);
 
   const summaryLine = formatRunSummaryLine(run);
   if (summaryLine) info(summaryLine);
