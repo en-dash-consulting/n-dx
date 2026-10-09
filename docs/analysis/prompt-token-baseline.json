@@ -5,15 +5,15 @@
     "perCallTokens": 22851,
     "uniqueTokens": 14348,
     "skills": 13,
-    "skillTokens": 19181
+    "skillTokens": 20066
   },
   "skills": [
     {
       "name": "ndx-adversarial-review",
       "file": "packages/core/assistant-assets/skills/ndx-adversarial-review.md",
       "shipped": true,
-      "chars": 21539,
-      "tokens": 5385
+      "chars": 22151,
+      "tokens": 5538
     },
     {
       "name": "iso-map",
@@ -33,29 +33,29 @@
       "name": "ndx-reshape",
       "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
       "shipped": true,
-      "chars": 6715,
-      "tokens": 1679
+      "chars": 7339,
+      "tokens": 1835
     },
     {
       "name": "ndx-work",
       "file": "packages/core/assistant-assets/skills/ndx-work.md",
       "shipped": true,
-      "chars": 5917,
-      "tokens": 1480
+      "chars": 6549,
+      "tokens": 1638
     },
     {
       "name": "ndx-capture",
       "file": "packages/core/assistant-assets/skills/ndx-capture.md",
       "shipped": true,
-      "chars": 5589,
-      "tokens": 1398
+      "chars": 6162,
+      "tokens": 1541
     },
     {
       "name": "ndx-plan",
       "file": "packages/core/assistant-assets/skills/ndx-plan.md",
       "shipped": true,
-      "chars": 5327,
-      "tokens": 1332
+      "chars": 5901,
+      "tokens": 1476
     },
     {
       "name": "dev-link",
@@ -68,8 +68,8 @@
       "name": "ndx-config",
       "file": "packages/core/assistant-assets/skills/ndx-config.md",
       "shipped": true,
-      "chars": 4214,
-      "tokens": 1054
+      "chars": 4740,
+      "tokens": 1185
     },
     {
       "name": "ndx-feedback",
@@ -987,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "b560bab2a75217f3",
-  "recordedAt": "2026-10-09T04:32:10.272Z",
-  "commit": "5edf9dce5582",
+  "contentHash": "5b64cca9e5c628f0",
+  "recordedAt": "2026-10-09T05:32:51.006Z",
+  "commit": "fd9b8ccf4030",
   "dirty": false
 }

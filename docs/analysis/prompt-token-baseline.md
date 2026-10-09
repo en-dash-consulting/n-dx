@@ -10,9 +10,9 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-10-09T04:32:10.272Z
-- **Commit** — `5edf9dce5582`
-- **Content hash** — `b560bab2a75217f3` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-10-09T05:32:51.006Z
+- **Commit** — `fd9b8ccf4030`
+- **Content hash** — `5b64cca9e5c628f0` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36
 - **Per-call total** — 22,851 tokens (what every surface costs, summed)
@@ -219,7 +219,7 @@ per section rather than as one literal. These are the same sections
 | `system` | 3,162 | 791 | 82.6% |
 | `brief` | 668 | 167 | 17.4% |
 
-## Workflow skills — 19,181 tokens, 13 skills
+## Workflow skills — 20,066 tokens, 13 skills
 
 A skill body enters the agent's context whole the moment the skill is invoked,
 so its size is a per-invocation bill in the same way a builder's fixed text is a
@@ -232,15 +232,15 @@ portability guards until this table gave them a number.
 
 | Skill | Shipped | Chars | Tokens |
 |---|:-:|---:|---:|
-| `ndx-adversarial-review` | yes | 21,539 | 5,385 |
+| `ndx-adversarial-review` | yes | 22,151 | 5,538 |
 | `iso-map` | — | 8,285 | 2,072 |
 | `triage` | — | 7,421 | 1,856 |
-| `ndx-reshape` | yes | 6,715 | 1,679 |
-| `ndx-work` | yes | 5,917 | 1,480 |
-| `ndx-capture` | yes | 5,589 | 1,398 |
-| `ndx-plan` | yes | 5,327 | 1,332 |
+| `ndx-reshape` | yes | 7,339 | 1,835 |
+| `ndx-work` | yes | 6,549 | 1,638 |
+| `ndx-capture` | yes | 6,162 | 1,541 |
+| `ndx-plan` | yes | 5,901 | 1,476 |
 | `dev-link` | — | 5,054 | 1,264 |
-| `ndx-config` | yes | 4,214 | 1,054 |
+| `ndx-config` | yes | 4,740 | 1,185 |
 | `ndx-feedback` | yes | 2,565 | 642 |
 | `no-plan-mode` | yes | 2,476 | 619 |
 | `ndx-zone` | yes | 817 | 205 |
