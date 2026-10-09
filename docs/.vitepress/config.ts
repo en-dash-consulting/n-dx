@@ -83,6 +83,7 @@ export default defineConfig({
             { text: "Level System", link: "/architecture/level-system-reference" },
             { text: "Viewer Architecture", link: "/architecture/viewer-architecture" },
             { text: "PRD Folder-Tree Schema", link: "/architecture/prd-folder-tree-schema" },
+            { text: "PRD Write Concurrency", link: "/architecture/prd-write-concurrency" },
           ],
         },
         {
