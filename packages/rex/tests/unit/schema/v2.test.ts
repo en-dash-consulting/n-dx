@@ -447,8 +447,10 @@ describe("isolation", () => {
     // command reads it),
     // and `rex export` / `rex import-bundle`, which import prd-bundle-v2 to
     // dispatch on the tree layout and the bundle envelope, so a v2 tree can be
-    // carried, and the MCP add_item and get_item tools, which dispatch on the
-    // tree layout so a v2 tree takes changes and reads them back.
+    // carried, and the MCP tools that dispatch on the tree layout (add_item,
+    // get_item, get_prd_status) or serve the v2 tree alone (get_product,
+    // get_capability, place_change, apply_change, and the product report and
+    // change placement they read through).
     const v2Files = new Set(
       [
         "schema/v2.ts",
@@ -470,8 +472,15 @@ describe("isolation", () => {
         "core/change-selection.ts",
         "core/change-completion.ts",
         "core/change-add.ts",
+        "core/change-place.ts",
+        "core/product-report.ts",
         "cli/mcp-tools/add-item.ts",
         "cli/mcp-tools/get-item.ts",
+        "cli/mcp-tools/get-prd-status.ts",
+        "cli/mcp-tools/get-product.ts",
+        "cli/mcp-tools/get-capability.ts",
+        "cli/mcp-tools/place-change.ts",
+        "cli/mcp-tools/apply-change.ts",
         "codeowners/plan.ts",
         "cli/commands/codeowners.ts",
       ].map(

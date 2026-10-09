@@ -42,6 +42,14 @@ const EXPECTED: Record<string, Access | { args: unknown; access: Access }[]> = {
   facets: "read",
   get_token_usage: "read",
   get_capabilities: "read",
+  get_product: "read",
+  get_capability: "read",
+  place_change: [
+    { args: { id: "CH-1" }, access: "read" },
+    { args: { id: "CH-1", target: "A1.1" }, access: "write" },
+    { args: { id: "CH-1", target: "A1.1", relation: "amends" }, access: "write" },
+  ],
+  apply_change: "write",
 };
 
 describe("rex MCP tool access kinds", () => {

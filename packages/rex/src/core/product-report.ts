@@ -1,0 +1,262 @@
+/**
+ * Read-only reports over a v2 tree, the shapes the rex MCP read tools return:
+ *
+ * - {@link productReport}: the product layer as areas → capabilities and
+ *   constraints, each with its computed status and health (`get_product`).
+ * - {@link capabilityReport}: one capability or constraint with its parent
+ *   chain, status, and the changes and constraints related to it
+ *   (`get_capability`).
+ * - {@link prdStatusReport}: product status per area and change counts per
+ *   release (`get_prd_status` on a v2 tree).
+ *
+ * Pure: every value is derived from the tree passed in. Nothing reads git, so
+ * `realizedBy` is not reported here.
+ *
+ * @module rex/core/product-report
+ */
+
+import type { ItemStatus } from "../schema/v1.js";
+import type { ChangeNode } from "../schema/v2.js";
+import { indexTree, isAppliedChange, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { compareReleases } from "./change-selection.js";
+import { computeEdges, productIndex, type CoChange } from "./product-edges.js";
+import { computeProductStatus, type Health, type IntentStatus, type ProductStatus } from "./product-status.js";
+
+// ── get_product ──────────────────────────────────────────────────
+
+/** A product node as the product report lists it. Areas carry no status. */
+export interface ProductReportNode {
+  id: string;
+  displayId?: string;
+  type: "area" | "capability" | "constraint";
+  title: string;
+  /** An area's summary. */
+  summary?: string;
+  /** A capability's or constraint's statement. */
+  statement?: string;
+  status?: IntentStatus;
+  health?: Health;
+  children?: ProductReportNode[];
+}
+
+/** The live product layer, areas first as stored, with each capability's and constraint's status and health. */
+export function productReport(tree: V2Tree): ProductReportNode[] {
+  const status = computeProductStatus(tree);
+  const visit = (node: RuleNode): ProductReportNode[] => {
+    if (node.status === "deleted") return [];
+    if (node.type !== "area" && node.type !== "capability" && node.type !== "constraint") return [];
+    const children = (node.children ?? []).flatMap(visit);
+    const row = status[node.id];
+    return [{
+      id: node.id,
+      ...(node.displayId ? { displayId: node.displayId } : {}),
+      type: node.type,
+      title: node.title,
+      ...(node.type === "area" && node.summary ? { summary: node.summary } : {}),
+      ...(node.type !== "area" && node.statement ? { statement: node.statement } : {}),
+      ...(row ?? {}),
+      ...(children.length ? { children } : {}),
+    }];
+  };
+  return tree.product.flatMap(visit);
+}
+
+// ── get_capability ───────────────────────────────────────────────
+
+export class ProductReportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProductReportError";
+  }
+}
+
+/** A change related to a product node, and how. */
+export interface RelatedChange {
+  id: string;
+  displayId?: string;
+  title: string;
+  status: ItemStatus;
+  /** `amends` when any of the change's amendments targets the node; otherwise `touches`. */
+  relation: "amends" | "touches";
+  /** Still acting on the product layer: not applied, cancelled or deleted. */
+  open: boolean;
+  applied: boolean;
+}
+
+export interface CapabilityReport {
+  /** The node as stored (intent and state), without its children. */
+  node: Omit<RuleNode, "children">;
+  /** Ancestors, root first. */
+  parentChain: Array<{ id: string; displayId?: string; title: string; type: string }>;
+  /** Live sub-capabilities and constraints directly below. */
+  children: Array<{ id: string; displayId?: string; title: string; type: string }>;
+  status: ProductStatus;
+  /** Live changes that amend or touch the node, open ones first, in tree order. */
+  changes: RelatedChange[];
+  /** Constraints that bind the node. */
+  boundBy: Array<{ id: string; displayId?: string; title: string }>;
+  /** Nodes the same changes also amend or touch, most shared first. */
+  coChanges: CoChange[];
+}
+
+/** The capability or constraint `ref` names (id, display id or alias; a retired one too). */
+export function capabilityReport(tree: V2Tree, ref: string): CapabilityReport {
+  const index = productIndex(tree);
+  const node = index.resolve(ref);
+  if (!node || (node.type !== "capability" && node.type !== "constraint")) {
+    const what = node ? `is ${article(node.type)} ${node.type}, not a capability or constraint` : "names no product node";
+    throw new ProductReportError(`"${ref}" ${what}. Use get_product to see the product layer.`);
+  }
+  const status = computeProductStatus(tree)[node.id];
+  if (!status) throw new ProductReportError(`"${ref}" is deleted and no applied change retired it, so it has no status.`);
+
+  const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
+  const parentChain: CapabilityReport["parentChain"] = [];
+  for (let p = parentOf.get(node); p; p = parentOf.get(p)) parentChain.unshift({ ...brief(p), type: p.type });
+
+  const edges = computeEdges(tree);
+  const related = (edges.changedBy[node.id] ?? []).flatMap((id) => {
+    const change = index.resolve(id) as ChangeNode | undefined;
+    if (!change) return [];
+    const amends = (change.amends ?? []).some((a) => index.resolve(a.target)?.id === node.id);
+    return [{
+      ...brief(change),
+      status: change.status ?? "pending",
+      relation: amends ? ("amends" as const) : ("touches" as const),
+      applied: isAppliedChange(change),
+      open: isOpenChange(change),
+    }];
+  });
+  const changes = [...related.filter((c) => c.open), ...related.filter((c) => !c.open)];
+
+  const { children: kids, ...stored } = node;
+  return {
+    node: stored,
+    parentChain,
+    children: (kids ?? []).filter((c) => c.status !== "deleted").map((c) => ({ ...brief(c), type: c.type })),
+    status,
+    changes,
+    boundBy: (edges.boundBy[node.id] ?? []).flatMap((id) => {
+      const constraint = index.resolve(id);
+      return constraint ? [brief(constraint)] : [];
+    }),
+    coChanges: edges.coChanges[node.id] ?? [],
+  };
+}
+
+// ── get_prd_status ───────────────────────────────────────────────
+
+/** Change counts: by status, plus how many are open and how many applied. */
+export interface ChangeCounts {
+  total: number;
+  /** Not applied, cancelled or deleted: still acting on the product layer. */
+  open: number;
+  applied: number;
+  byStatus: Partial<Record<ItemStatus, number>>;
+}
+
+export interface AreaStatus {
+  id: string;
+  displayId?: string;
+  title: string;
+  capabilities: number;
+  constraints: number;
+  /** Capabilities and constraints per intent status. Retired nodes are not counted. */
+  status: Partial<Record<IntentStatus, number>>;
+  defective: number;
+  /** Open changes that amend or touch a node in the area. */
+  openChanges: number;
+}
+
+export interface ReleaseStatus {
+  /** `shippedIn` when set, else `plannedRelease`; null for a change with neither. */
+  release: string | null;
+  changes: ChangeCounts;
+}
+
+export interface PrdStatusReport {
+  /** Every live top-level change. */
+  changes: ChangeCounts;
+  /** Open changes waiting for a person to confirm their targets. */
+  inbox: number;
+  areas: AreaStatus[];
+  /** Nearest release first; unscheduled last. */
+  releases: ReleaseStatus[];
+}
+
+/** Product status per area and change counts per release. */
+export function prdStatusReport(tree: V2Tree): PrdStatusReport {
+  const status = computeProductStatus(tree);
+  const index = indexTree(tree);
+  const changes = tree.changes.filter((c) => c.type === "change" && c.status !== "deleted");
+
+  const areaOf = new Map<string, RuleNode>();
+  for (const { node, parent } of index.entries) {
+    if (node.type === "area") areaOf.set(node.id, node);
+    else if (parent && areaOf.has(parent.id)) areaOf.set(node.id, areaOf.get(parent.id)!);
+  }
+
+  const openByArea = new Map<string, Set<string>>();
+  for (const change of changes) {
+    if (!isOpenChange(change)) continue;
+    const c = change as ChangeNode;
+    for (const ref of [...(c.amends ?? []).map((a) => a.target), ...(c.touches ?? [])]) {
+      const area = areaOf.get(index.resolve(ref)?.id ?? "");
+      if (!area) continue;
+      const ids = openByArea.get(area.id) ?? new Set<string>();
+      ids.add(change.id);
+      openByArea.set(area.id, ids);
+    }
+  }
+
+  const areas = tree.product.filter((n) => n.type === "area" && n.status !== "deleted").map((area): AreaStatus => {
+    const row: AreaStatus = { ...brief(area), capabilities: 0, constraints: 0, status: {}, defective: 0, openChanges: openByArea.get(area.id)?.size ?? 0 };
+    for (const { node } of index.entries) {
+      if (areaOf.get(node.id) !== area || (node.type !== "capability" && node.type !== "constraint")) continue;
+      const s = status[node.id];
+      if (!s) continue;
+      row[node.type === "capability" ? "capabilities" : "constraints"]++;
+      row.status[s.status] = (row.status[s.status] ?? 0) + 1;
+      if (s.health === "defective") row.defective++;
+    }
+    return row;
+  });
+
+  const byRelease = new Map<string | null, RuleNode[]>();
+  for (const change of changes) {
+    const c = change as ChangeNode;
+    const release = c.shippedIn ?? c.plannedRelease ?? null;
+    byRelease.set(release, [...(byRelease.get(release) ?? []), change]);
+  }
+  const releases = [...byRelease]
+    .sort(([a], [b]) => compareReleases(a ?? undefined, b ?? undefined))
+    .map(([release, list]) => ({ release, changes: countChanges(list) }));
+
+  return {
+    changes: countChanges(changes),
+    inbox: changes.filter((c) => isOpenChange(c) && c.needsPlacement).length,
+    areas,
+    releases,
+  };
+}
+
+function countChanges(changes: readonly RuleNode[]): ChangeCounts {
+  const counts: ChangeCounts = { total: changes.length, open: 0, applied: 0, byStatus: {} };
+  for (const c of changes) {
+    const s = c.status ?? "pending";
+    counts.byStatus[s] = (counts.byStatus[s] ?? 0) + 1;
+    if (isOpenChange(c)) counts.open++;
+    if (isAppliedChange(c)) counts.applied++;
+  }
+  return counts;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────
+
+function brief(node: RuleNode): { id: string; displayId?: string; title: string } {
+  return { id: node.id, ...(node.displayId ? { displayId: node.displayId } : {}), title: node.title };
+}
+
+function article(word: string): string {
+  return /^[aeiou]/.test(word) ? "an" : "a";
+}

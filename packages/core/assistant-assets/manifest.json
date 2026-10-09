@@ -59,7 +59,9 @@
           "get_recommendations",
           "get_token_usage",
           "health",
-          "facets"
+          "facets",
+          "get_product",
+          "get_capability"
         ],
         "write": [
           "claim_task",
@@ -71,7 +73,9 @@
           "merge_items",
           "append_log",
           "verify_criteria",
-          "reorganize"
+          "reorganize",
+          "place_change",
+          "apply_change"
         ]
       }
     },

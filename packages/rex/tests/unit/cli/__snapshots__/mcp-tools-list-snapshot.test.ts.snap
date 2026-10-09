@@ -4,7 +4,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
 "[
   {
     "name": "get_prd_status",
-    "description": "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress.",
+    "description": "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress. On a v2 PRD: change counts, the Inbox count, product status per area and change counts per release.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -771,6 +771,101 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
     "inputSchema": {
       "type": "object",
       "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_product",
+    "description": "Get the product layer of a v2 PRD: areas, and the capabilities and constraints under them, each with its computed status (proposed, changing, met, revised, retired) and health (ok, defective). Use get_capability for one node's detail.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_capability",
+    "description": "Get one capability or constraint of a v2 PRD: its statement, capability criteria and requirements, parent chain, computed status and health, the changes that amend or touch it, the constraints that bind it, and the nodes changed alongside it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Capability or constraint id, display id (e.g. A1.2) or alias"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "place_change",
+    "description": "Place a v2 change on the product layer. Without target: returns the rules' shortlist of capabilities and constraints the change could amend or touch, best first, and the relation the rules chose. With target: records it (touches joins the change's touches; amends adds a modified amendment) and clears needsPlacement. Only an open change is placed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Change id, display id (e.g. CH-12) or alias"
+        },
+        "target": {
+          "type": "string",
+          "description": "Capability or constraint to place the change on. Omit to get the shortlist without writing"
+        },
+        "relation": {
+          "type": "string",
+          "enum": [
+            "touches",
+            "amends"
+          ],
+          "description": "With target: touches (works on it) or amends (edits its requirements). Default: the rules' relation"
+        },
+        "summary": {
+          "type": "string",
+          "description": "With target and relation amends: the amendment's summary. Default: the change's title"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "apply_change",
+    "description": "Apply an open v2 change's amendments to the product layer as a steward, whatever rex.applyOn says: added nodes are created, modified ones edited, removed ones retired, and the change is stamped appliedAt. The whole apply is refused, listing every problem, when an amendment does not fit or its target's spec moved since it was drafted (force overrides that last check).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Change id, display id (e.g. CH-12) or alias"
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Apply amendments whose base no longer matches their target's spec"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
