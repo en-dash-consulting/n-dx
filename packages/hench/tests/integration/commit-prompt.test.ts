@@ -775,7 +775,7 @@ status: in_progress
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
 
-  it("adds N-DX-Item trailer with dashboard permalink to the commit message", async () => {
+  it("writes the item id as the N-DX-Item value, not a dashboard URL", async () => {
     const { performCommitPromptIfNeeded } = await import(
       "../../src/agent/lifecycle/shared.js"
     );
@@ -783,7 +783,8 @@ status: in_progress
     // Setup: Create initial commit
     await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
 
-    // Create .n-dx.json with a public URL
+    // A configured public URL must no longer reach the trailer: the value is
+    // the item id, which survives a host change and an offline checkout.
     const ndxConfig = {
       web: {
         publicUrl: "https://dashboard.example.com",
@@ -831,15 +832,16 @@ status: in_progress
     // Verify the commit was created
     expect(await getHeadSubject(projectDir)).toBe("feat: update x");
 
-    // Verify the commit message includes the N-DX-Item trailer with the configured public URL
+    // Verify the trailer carries the bare item id and no permalink
     const { stdout: fullMessage } = await execAsync("git log -1 --format='%B'", { cwd: projectDir });
-    expect(fullMessage).toContain("N-DX-Item:");
-    expect(fullMessage).toContain("https://dashboard.example.com/#/rex/item/task-1");
+    expect(fullMessage).toMatch(/^N-DX-Item: task-1$/m);
+    expect(fullMessage).not.toContain("dashboard.example.com");
+    expect(fullMessage).not.toContain("/#/rex/item/");
 
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
 
-  it("falls back to localhost URL when web.publicUrl is not configured", async () => {
+  it("writes the N-DX-Item trailer when the project has no config file", async () => {
     const { performCommitPromptIfNeeded } = await import(
       "../../src/agent/lifecycle/shared.js"
     );
@@ -883,10 +885,10 @@ status: in_progress
     // Verify the commit was created
     expect(await getHeadSubject(projectDir)).toBe("feat: update x");
 
-    // Verify the commit message includes the N-DX-Item trailer with fallback localhost URL
+    // Verify the trailer is written from the task id alone — no config is read
     const { stdout: fullMessage } = await execAsync("git log -1 --format='%B'", { cwd: projectDir });
-    expect(fullMessage).toContain("N-DX-Item:");
-    expect(fullMessage).toContain("http://localhost:3117/#/rex/item/task-1");
+    expect(fullMessage).toMatch(/^N-DX-Item: task-1$/m);
+    expect(fullMessage).not.toContain("localhost:3117");
 
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });

@@ -9,35 +9,43 @@
  * @module rex/cli/commands/backfill-commit-attribution
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { join } from "node:path";
 import { info, warn } from "../output.js";
+import { git } from "../../core/change-commits.js";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import type { PRDItem, CommitAttribution } from "../../schema/index.js";
 
-const execAsync = promisify(execFile);
+/**
+ * Matches one `N-DX-Status: <taskId> <oldStatus> <arrow> <newStatus>` line.
+ *
+ * Both arrow forms are accepted because both occur in history: hench writes
+ * `→`, while messages composed by hand or by a vendor CLI commonly use `->`.
+ * Reading only one form silently skips every commit written with the other.
+ */
+const STATUS_TRAILER_RE = /^N-DX-Status:\s+(\S+)\s+(\S+)\s+(?:→|->)\s+(\S+)/;
 
 /**
- * Parse git log output to extract N-DX-Status trailers.
+ * Every N-DX-Status trailer in a commit message body, in the order written.
  *
- * Format: `git log --format=%B` produces commit subject + body with trailers.
- * The function looks for trailers like:
- *   N-DX-Status: <taskId> <oldStatus> → <newStatus>
+ * The whole body is scanned rather than git's own trailer parser
+ * (`%(trailers:key=…)`), which reads only the message's final paragraph. Most
+ * of this project's history puts a blank line between the N-DX-Status lines
+ * and the closing `Co-Authored-By`, so git classifies them as prose: on this
+ * repository git recognised 3 of the 53 commits that carry one.
+ *
+ * A commit that completes several items carries one trailer per item and is
+ * attributed to all of them — returning only the first loses the rest.
  */
-function parseNdxStatusTrailer(body: string): { taskId: string; oldStatus: string; newStatus: string } | null {
-  const lines = body.split("\n");
-  for (const line of lines) {
-    const match = line.match(/^N-DX-Status:\s+(\S+)\s+(\S+)\s+→\s+(\S+)/);
+function parseNdxStatusTrailers(
+  body: string,
+): Array<{ taskId: string; oldStatus: string; newStatus: string }> {
+  const trailers: Array<{ taskId: string; oldStatus: string; newStatus: string }> = [];
+  for (const line of body.split("\n")) {
+    const match = line.match(STATUS_TRAILER_RE);
     if (match) {
-      return {
-        taskId: match[1],
-        oldStatus: match[2],
-        newStatus: match[3],
-      };
+      trailers.push({ taskId: match[1], oldStatus: match[2], newStatus: match[3] });
     }
   }
-  return null;
+  return trailers;
 }
 
 /**
@@ -88,54 +96,45 @@ async function getCommitsWithNdxStatus(
     newStatus: string;
   }>
 > {
-  try {
-    // Use ASCII field separator to avoid ambiguity with newlines in commit bodies
-    const FS = String.fromCharCode(0x1f); // Unit separator
-    const RS = String.fromCharCode(0x1e); // Record separator
+  // Use ASCII field separator to avoid ambiguity with newlines in commit bodies
+  const FS = String.fromCharCode(0x1f); // Unit separator
+  const RS = String.fromCharCode(0x1e); // Record separator
 
-    const format = `%H${FS}%cI${FS}%an${FS}%ae${FS}%B${RS}`;
-    const { stdout } = await execAsync("git", ["log", `--pretty=format:${format}`, "--reverse"], {
-      cwd: projectDir,
-    });
+  const format = `%H${FS}%cI${FS}%an${FS}%ae${FS}%B${RS}`;
+  // Runs through core's `git` helper rather than a bare execFile: the whole
+  // log is buffered, and at exec's 1 MiB default this repository's own
+  // 3.5 MiB history overflowed, so the command warned and recorded nothing.
+  const stdout = await git(projectDir, ["log", `--pretty=format:${format}`, "--reverse"]);
 
-    const commits = [];
-    const records = stdout.split(RS);
+  const commits = [];
 
-    for (const record of records) {
-      if (!record.trim()) continue;
+  for (const record of stdout.split(RS)) {
+    if (!record.trim()) continue;
 
-      const fields = record.split(FS);
-      if (fields.length < 5) continue;
+    const fields = record.split(FS);
+    if (fields.length < 5) continue;
 
-      const hash = fields[0].trim();
-      const timestamp = fields[1].trim();
-      const author = fields[2].trim();
-      const authorEmail = fields[3].trim();
-      const body = fields[4];
+    const hash = fields[0].trim();
+    const timestamp = fields[1].trim();
+    const author = fields[2].trim();
+    const authorEmail = fields[3].trim();
+    const body = fields[4];
 
-      // Parse N-DX-Status trailer from commit body
-      const trailer = parseNdxStatusTrailer(body);
-      if (trailer) {
-        commits.push({
-          hash,
-          timestamp,
-          author,
-          authorEmail,
-          taskId: trailer.taskId,
-          oldStatus: trailer.oldStatus,
-          newStatus: trailer.newStatus,
-        });
-      }
+    // One entry per trailer: a commit closing several items attributes to each.
+    for (const trailer of parseNdxStatusTrailers(body)) {
+      commits.push({
+        hash,
+        timestamp,
+        author,
+        authorEmail,
+        taskId: trailer.taskId,
+        oldStatus: trailer.oldStatus,
+        newStatus: trailer.newStatus,
+      });
     }
-
-    return commits;
-  } catch (err) {
-    // If git fails (e.g., no commits), return empty list
-    if ((err as { code: string }).code === "ENOENT") {
-      return [];
-    }
-    throw err;
   }
+
+  return commits;
 }
 
 /**
