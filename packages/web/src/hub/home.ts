@@ -61,6 +61,20 @@ export function runningLabel(card: ProjectCard): string | null {
 }
 
 /**
+ * "acme-api · github.com", the repository the card's project is a checkout of.
+ *
+ * Null when the project has not been analysed, which is the common state of a
+ * freshly registered one — an empty line there would be a permanent gap on
+ * every card for the sake of the few that can fill it. The host is omitted
+ * when there is no remote; a local-only repository still has a name worth
+ * showing, and "acme-api · " is not an improvement on "acme-api".
+ */
+export function repoLabel(card: ProjectCard): string | null {
+  if (!card.repoName) return null;
+  return card.remoteHost ? `${card.repoName} · ${card.remoteHost}` : card.repoName;
+}
+
+/**
  * The card's one-line summary, in the order someone scanning for a project
  * reads it: what it is doing, then what state it is in, then what is next.
  */
@@ -122,6 +136,7 @@ h1 { font-size: 1.25rem; margin: 0; font-weight: 600; }
 .dot-healthy { background: var(--green); }
 .dot-starting { background: var(--orange); }
 .dot-unreachable, .dot-stopped { background: var(--red); }
+.repo { color: var(--text-dim); font-size: 0.75rem; overflow-wrap: anywhere; }
 .path { color: var(--text-muted); font-size: 0.72rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
 .facts { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .fact { font-size: 0.72rem; color: var(--text-dim); background: var(--bg-hover); border-radius: 4px; padding: 0.1rem 0.4rem; }
@@ -403,8 +418,14 @@ export function renderCard(card: ProjectCard): string {
     </div>`
     : `<div class="actions"><a class="action" href="${escapeHtml(card.url)}">Open dashboard</a></div>`;
 
+  // Above the path, because it answers the same question better: the path says
+  // where this checkout happens to live, the repo says what it is.
+  const repo = repoLabel(card);
+  const repoLine = repo ? `<p class="repo">${escapeHtml(repo)}</p>` : "";
+
   return `<li class="card${card.reachable ? "" : " card-unreachable"}">
     <div class="card-title">${statusDot(card)}<a href="${escapeHtml(card.url)}">${escapeHtml(card.name)}</a></div>
+    ${repoLine}
     <p class="path">${escapeHtml(card.repoRoot)}</p>
     <div class="facts">${facts}</div>
     ${next}

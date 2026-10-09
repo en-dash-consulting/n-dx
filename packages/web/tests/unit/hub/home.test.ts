@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { renderHomePage, renderCard, cardFacts, dirtyLabel, progressLabel, runningLabel } from "../../../src/hub/home.js";
+import { renderHomePage, renderCard, cardFacts, dirtyLabel, progressLabel, runningLabel, repoLabel } from "../../../src/hub/home.js";
 import type { HubOverview, ProjectCard } from "../../../src/hub/overview.js";
 
 /**
@@ -31,6 +31,8 @@ function card(overrides: Partial<ProjectCard> = {}): ProjectCard {
     percentComplete: 42,
     nextTaskTitle: "Wire the thing",
     analyzedAt: "2026-09-16T09:00:00.000Z",
+    repoName: "acme-api",
+    remoteHost: "github.com",
     ...overrides,
   };
 }
@@ -43,6 +45,7 @@ const TWO_PROJECTS: HubOverview = {
       id: "beta", name: "Beta App", repoRoot: "/repos/beta", url: "/p/beta/",
       state: "unreachable", reachable: false, error: "connect ECONNREFUSED",
       branch: null, dirtyFiles: null, activeRuns: null, percentComplete: null, nextTaskTitle: null,
+      repoName: null, remoteHost: null,
     }),
   ],
 };
@@ -80,6 +83,15 @@ describe("card labels", () => {
       .toEqual(["not answering — connect ECONNREFUSED"]);
     expect(cardFacts(card({ reachable: false, error: null }))).toEqual(["not answering"]);
   });
+
+  it("names the repository and its host, dropping the host when there is no remote", () => {
+    expect(repoLabel(card())).toBe("acme-api · github.com");
+    expect(repoLabel(card({ remoteHost: null }))).toBe("acme-api");
+    // Not analysed, or analysed by a build with no repo block: no line at all,
+    // rather than a permanent empty one on every unanalysed project's card.
+    expect(repoLabel(card({ repoName: null }))).toBeNull();
+    expect(repoLabel(card({ repoName: null, remoteHost: "github.com" }))).toBeNull();
+  });
 });
 
 describe("renderHomePage", () => {
@@ -98,6 +110,39 @@ describe("renderHomePage", () => {
     expect(cards[0].textContent).toContain("Next: Wire the thing");
 
     expect(doc.querySelector("header .count")?.textContent).toBe("2 projects");
+  });
+
+  it("names the repository on each analysed card, apart from the path it sits at", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS));
+    const [alpha, beta] = doc.querySelectorAll(".card");
+
+    expect(alpha.querySelector(".repo")?.textContent).toBe("acme-api · github.com");
+    // Still the registered name in the heading — the repo line is additional
+    // information, not a replacement for the link you click.
+    expect(alpha.querySelector(".card-title a")?.textContent).toBe("Alpha App");
+    expect(alpha.querySelector(".path")?.textContent).toBe("/repos/alpha");
+
+    // Nothing is known about beta's repository, so it gets no line.
+    expect(beta.querySelector(".repo")).toBeNull();
+  });
+
+  it("omits the repo line for a project that has not been analysed", () => {
+    const doc = renderToDocument(renderHomePage({
+      generatedAt: "t",
+      projects: [card({ repoName: null, remoteHost: null })],
+    }));
+    expect(doc.querySelector(".card .repo")).toBeNull();
+    // The rest of the card is unaffected.
+    expect(doc.querySelector(".card .path")?.textContent).toBe("/repos/alpha");
+  });
+
+  it("escapes a repo name and host rather than letting them close a tag", () => {
+    const doc = renderToDocument(renderHomePage({
+      generatedAt: "t",
+      projects: [card({ repoName: '<img src=x onerror="alert(1)">', remoteHost: "a&b.com" })],
+    }));
+    expect(doc.querySelector("img")).toBeNull();
+    expect(doc.querySelector(".card .repo")?.textContent).toBe('<img src=x onerror="alert(1)"> · a&b.com');
   });
 
   it("marks an unreachable project and offers it no Start working button", () => {

@@ -16,6 +16,9 @@ import {join, relative, resolve, sep} from "node:path";import type {
   Zone,
   ZoneCrossing,
   SubAnalysisRef,
+  Components,
+  OutboundData,
+  InfrastructureData,
 } from "../schema/index.js";
 import { DATA_FILES } from "../schema/data-files.js";
 import { toPosix } from "../util/paths.js";
@@ -39,6 +42,62 @@ export interface SubAnalysis {
   inventory?: Inventory;
   /** Loaded imports (if available). */
   imports?: Imports;
+  /** Loaded components (if available) — read for its `serverRoutes`. */
+  components?: Components;
+  /** Loaded outbound dependencies and declared contracts (if available). */
+  outbound?: OutboundData;
+  /** Loaded infrastructure discovery (if available). */
+  infrastructure?: InfrastructureData;
+  /**
+   * The base URL this member serves on, from its `workspace.members` entry.
+   * Absent on auto-detected members — auto-detection reads directories, and a
+   * directory does not state an address.
+   */
+  baseUrl?: string;
+}
+
+/**
+ * Read and parse one of a member's analysis files, or `undefined`.
+ *
+ * Absent and malformed are the same answer deliberately: a member analyzed
+ * before a given file existed, and one whose file was truncated, both leave
+ * the aggregator with nothing to read, and failing the whole aggregation over
+ * one optional artifact would make a workspace unusable over a single stale
+ * member.
+ */
+export function readMemberFile<T>(svDir: string, fileName: string): T | undefined {
+  const path = join(svDir, fileName);
+  if (!existsSync(path)) return undefined;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The optional analysis files every member load path reads, in one list so the
+ * two loaders (auto-detection here, config resolution in
+ * `workspace-aggregate.ts`) cannot drift into reading different sets.
+ */
+export function loadMemberArtifacts(svDir: string): Pick<
+  SubAnalysis,
+  "zones" | "inventory" | "imports" | "components" | "outbound" | "infrastructure"
+> {
+  const artifacts: ReturnType<typeof loadMemberArtifacts> = {};
+  const zones = readMemberFile<Zones>(svDir, DATA_FILES.zones);
+  if (zones) artifacts.zones = zones;
+  const inventory = readMemberFile<Inventory>(svDir, DATA_FILES.inventory);
+  if (inventory) artifacts.inventory = inventory;
+  const imports = readMemberFile<Imports>(svDir, DATA_FILES.imports);
+  if (imports) artifacts.imports = imports;
+  const components = readMemberFile<Components>(svDir, DATA_FILES.components);
+  if (components) artifacts.components = components;
+  const outbound = readMemberFile<OutboundData>(svDir, DATA_FILES.outbound);
+  if (outbound) artifacts.outbound = outbound;
+  const infrastructure = readMemberFile<InfrastructureData>(svDir, DATA_FILES.infrastructure);
+  if (infrastructure) artifacts.infrastructure = infrastructure;
+  return artifacts;
 }
 
 // ── Detection ────────────────────────────────────────────────────────────────
@@ -223,44 +282,13 @@ function loadSubAnalysis(rootDir: string, subDir: string): SubAnalysis | null {
   const prefix = toPosix(relative(rootDir, subDir));
   const id = pathToId(prefix);
 
-  const result: SubAnalysis = {
+  return {
     id,
     prefix,
     svDir,
     manifest,
+    ...loadMemberArtifacts(svDir),
   };
-
-  // Load zones if available
-  const zonesPath = join(svDir, DATA_FILES.zones);
-  if (existsSync(zonesPath)) {
-    try {
-      result.zones = JSON.parse(readFileSync(zonesPath, "utf-8"));
-    } catch {
-      // Zones unavailable
-    }
-  }
-
-  // Load inventory if available
-  const inventoryPath = join(svDir, DATA_FILES.inventory);
-  if (existsSync(inventoryPath)) {
-    try {
-      result.inventory = JSON.parse(readFileSync(inventoryPath, "utf-8"));
-    } catch {
-      // Inventory unavailable
-    }
-  }
-
-  // Load imports if available
-  const importsPath = join(svDir, DATA_FILES.imports);
-  if (existsSync(importsPath)) {
-    try {
-      result.imports = JSON.parse(readFileSync(importsPath, "utf-8"));
-    } catch {
-      // Imports unavailable
-    }
-  }
-
-  return result;
 }
 
 /**
