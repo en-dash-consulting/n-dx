@@ -2,7 +2,7 @@
 id: "8cc70b76-8b1f-4506-8f5e-799cc153468d"
 level: "feature"
 title: "Generate the migration plan"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "product-map"
@@ -15,11 +15,12 @@ blockedBy:
   - "51527b42-cc67-4a5a-83b3-61179298dfaf"
 source: "roadmap"
 startedAt: "2026-10-09T04:22:49.930Z"
-endedAt: "2026-10-09T05:13:39.044Z"
+completedAt: "2026-10-09T05:35:22.755Z"
+endedAt: "2026-10-09T05:35:22.755Z"
 acceptanceCriteria: []
 description: "ndx migrate --plan writes a reviewable plan and moves nothing. It reads the v1 tree only, so it can run early and feed the area review.\n\nRoadmap PR 13 · wave 1 · lane migration."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-09T05:23:42.164Z"
+lastModified: "2026-10-09T05:35:23.632Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -56,6 +57,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Rank the migration review queue by confident Jev flags, not by the least confident answer](./rank-the-migration-review-queue-by.md) | completed |
 | [reviewedHash only for the spec a reviewer approved](./reviewedhash-only-for-the-spec-a.md) | completed |
 | [Spec drafts state behaviour, never "the system shall ensure that the system" or a decision](./spec-drafts-state-behaviour-never-the.md) | completed |
-| [Spec merge keeps the model's own subject instead of wrapping it in "The system shall ensure that"](./spec-merge-keeps-the-model-s-own.md) | in_progress |
+| [Spec merge keeps the model's own subject instead of wrapping it in "The system shall ensure that"](./spec-merge-keeps-the-model-s-own.md) | completed |
 | [Stamp appliedAt and reviewedHash when migrating historical items](./stamp-appliedat-and-reviewedhash-when.md) | completed |
 | [The migration can freeze a Windows-unsafe v1 slug (con, aux, nul) into v2, leaving the tree permanently unwritable](./the-migration-can-freeze-a-windows.md) | completed |
