@@ -131,7 +131,7 @@
     },
     {
       "path": "packages/sourcevision/src/util/git-remote.ts",
-      "reason": "Git remote reader — the one implementation, shared by the iso map (which reads the HEAD commit time and origin remote so the rendered page is reproducible and can link to source) and the analysis manifest (which records the repository's identity). It cannot route through llm-client's exec(): it is bundled verbatim into the generated skill script below, which has to stay dependency-free, so only node: builtins may appear. Replaces the former packages/sourcevision/src/export/iso-sources.ts entry, whose git reading moved here."
+      "reason": "Git remote reader — the one implementation, shared by the iso map (which reads the HEAD commit time and origin remote so the rendered page is reproducible and can link to source) and the analysis manifest (which records the repository's identity). It cannot route through llm-client's exec(): it is bundled verbatim into the generated skill script below, which has to stay dependency-free, so only node: builtins may appear. It does import @n-dx/llm-client for the URL parsing (parseGitRemoteUrl and friends, which web needs too) — scripts/build-iso-skill.mjs aliases that import to the one pure module so the barrel, and @anthropic-ai/sdk behind it, stay out of the bundle. Replaces the former packages/sourcevision/src/export/iso-sources.ts entry, whose git reading moved here."
     },
     {
       "path": ".claude/skills/iso-map/scripts/iso-map.mjs",
