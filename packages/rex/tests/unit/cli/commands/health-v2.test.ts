@@ -3,6 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cmdHealth } from "../../../../src/cli/commands/health.js";
@@ -96,7 +97,8 @@ describe("rex health landing check on a v2 tree", () => {
       sh(origin, "commit", "-q", "-m", name);
     }
     const clone = join(tmp, "clone");
-    sh(tmp, "clone", "-q", "--depth", "1", `file://${origin}`, clone);
+    // --depth is ignored for a plain local path; a file URL makes git honour it.
+    sh(tmp, "clone", "-q", "--depth", "1", pathToFileURL(origin).href, clone);
     await cp(rexDir, join(clone, ".rex"), { recursive: true });
     await completeChange(clone);
     out.length = 0;
