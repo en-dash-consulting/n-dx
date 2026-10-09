@@ -17,6 +17,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { completeConfigGroups, validateConfigConstraints } from "./hench-config-fields.js";
+import { contextWriteFloor, hasCacheWrites, highConsumptionThreshold, runBudgetedTokens } from "./token-cost.js";
 
 const WORKFLOW_PREFIX = "/api/hench/workflow/";
 
@@ -47,7 +48,18 @@ interface WorkflowSuggestion {
 interface WorkflowStats {
   successRate: number;
   avgTurns: number;
+  /**
+   * Average tokens per run, in the units `checkTokenBudget` enforces
+   * (uncached input + cache writes + output).
+   */
   avgTokensPerRun: number;
+  /**
+   * Lowest observed arrival cost — the floor a proposed `tokenBudget` must
+   * clear. 0 only when no run wrote cache.
+   */
+  contextWriteFloor: number;
+  /** Whether any run wrote cache, and so whether `avgTokensPerRun` carries writes. */
+  promptCached: boolean;
   avgDurationMs: number;
   failuresByStatus: Record<string, number>;
   troubleTaskIds: string[];
@@ -157,13 +169,19 @@ function saveSuggestionHistory(projectDir: string, history: SuggestionHistory): 
   );
 }
 
-// ── Analysis engine (self-contained — no imports from hench) ─────────
+// ── Analysis engine ──────────────────────────────────────────────────
+//
+// The counting rule, the arrival-cost floor and the high-consumption
+// thresholds come from ./token-cost.js — a deliberate port of hench's
+// token-cost.ts, kept honest by tests/e2e/token-cost-parity.test.js. This
+// engine used to count `input + output` and compare the result against a
+// fixed 100,000, which on a prompt-cached project is about a twelfth of the
+// budgeted total — so the threshold fired on almost every such project and
+// the budget it then proposed was in the wrong units.
 
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded"]);
 
-function totalTokens(run: RunData): number {
-  return (run.tokenUsage.input ?? 0) + (run.tokenUsage.output ?? 0);
-}
+const totalTokens = runBudgetedTokens;
 
 function median(values: number[]): number {
   if (values.length === 0) return 0;
@@ -177,7 +195,8 @@ function median(values: number[]): number {
 function computeStats(runs: RunData[], config?: HenchConfigData | null): WorkflowStats {
   if (runs.length === 0) {
     return {
-      successRate: 0, avgTurns: 0, avgTokensPerRun: 0, avgDurationMs: 0,
+      successRate: 0, avgTurns: 0, avgTokensPerRun: 0, contextWriteFloor: 0,
+      promptCached: false, avgDurationMs: 0,
       failuresByStatus: {}, troubleTaskIds: [], turnLimitHits: 0, budgetExceededCount: 0,
     };
   }
@@ -213,7 +232,9 @@ function computeStats(runs: RunData[], config?: HenchConfigData | null): Workflo
   const budgetExceededCount = runs.filter((r) => r.status === "budget_exceeded").length;
 
   return {
-    successRate, avgTurns, avgTokensPerRun, avgDurationMs,
+    successRate, avgTurns, avgTokensPerRun,
+    contextWriteFloor: contextWriteFloor(runs), promptCached: hasCacheWrites(runs),
+    avgDurationMs,
     failuresByStatus, troubleTaskIds, turnLimitHits, budgetExceededCount,
   };
 }
@@ -232,7 +253,10 @@ function generateSuggestions(
   const suggestions: WorkflowSuggestion[] = [];
 
   // ── Token efficiency ──
-  if (stats.avgTokensPerRun > 100000 && stats.successRate < 0.5) {
+  // The threshold is rescaled into budgeted units only for projects whose
+  // runs actually wrote cache; one that never did gets no 12x inflation, and
+  // raising its threshold would silence a suggestion that should fire.
+  if (stats.avgTokensPerRun > highConsumptionThreshold(runs) && stats.successRate < 0.5) {
     suggestions.push({
       id: nextId("token-efficiency"),
       category: "token-efficiency",
@@ -242,7 +266,12 @@ function generateSuggestions(
       rationale: `Average ${Math.round(stats.avgTokensPerRun).toLocaleString()} tokens/run with only ${Math.round(stats.successRate * 100)}% success rate.`,
       impact: "Reduces wasted tokens on tasks that are unlikely to succeed.",
       configChanges: (config?.tokenBudget ?? 0) === 0
-        ? { tokenBudget: Math.round(stats.avgTokensPerRun * 0.7) }
+        ? {
+            tokenBudget: Math.max(
+              Math.round(stats.avgTokensPerRun * 0.7),
+              stats.contextWriteFloor,
+            ),
+          }
         : undefined,
       autoApplicable: (config?.tokenBudget ?? 0) === 0,
     });
@@ -253,7 +282,9 @@ function generateSuggestions(
     const completedTokens = completedRuns.map(totalTokens);
     const medianTokens = median(completedTokens);
     if (medianTokens > 0) {
-      const suggestedBudget = Math.round(medianTokens * 2);
+      // Never below the measured arrival cost — a project that turned
+      // caching on has a median from its cheap pre-caching history.
+      const suggestedBudget = Math.max(Math.round(medianTokens * 2), stats.contextWriteFloor);
       suggestions.push({
         id: nextId("token-efficiency"),
         category: "token-efficiency",

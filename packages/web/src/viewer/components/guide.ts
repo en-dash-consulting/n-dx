@@ -118,7 +118,7 @@ const GUIDE_CONTENT: Partial<Record<ViewId, { description: string; lookFor: stri
     actions: "Expand a requirement to see its acceptance criteria and the status of every item it applies to. Add or edit requirements from the item detail panel in the Tasks view.",
   },
   "hench-adaptive": {
-    description: "Monitors run history and proposes workflow-parameter adjustments (turn limits, token budgets, retry settings) as the project evolves. Adjustments can be applied, dismissed, or auto-applied when adaptive mode is on.",
+    description: "Monitors run history and proposes workflow-parameter adjustments (turn limits, token budgets, retry settings) as the project evolves. Adjustments are recommendations: each one is written to the config only when you apply it.",
     lookFor: "High-priority adjustments with strong rationale. Trends moving the wrong way (falling success rate, rising token usage). Config keys you never want auto-tuned.",
     actions: "Apply or dismiss each recommendation. Lock keys you manage manually. Enable adaptive mode to auto-apply safe adjustments; review the history to audit past changes.",
   },

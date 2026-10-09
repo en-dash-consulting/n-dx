@@ -121,3 +121,47 @@ export function contextWriteFloor(runs: RunRecord[]): number {
 
   return completedFloor || cacheWriteFloor;
 }
+
+/**
+ * Where "high token consumption" starts, in budgeted units, for a run set with
+ * no cache writes at all — `avgTokensPerRun` is then still an input + output
+ * sum. This is the original threshold, unchanged.
+ */
+export const HIGH_COUNTED_TOKENS_PER_RUN_UNCACHED = 100_000;
+
+/**
+ * Where "high token consumption" starts once any run in the set wrote cache,
+ * whatever its status — `avgTokensPerRun` then counts cache writes too.
+ *
+ * Counting cache writes moved the measure by roughly 12x — across the
+ * completed runs in this repository's `.hench/runs/` (2026-09) the median went
+ * from 39.5K to 489K — so the uncached number would fire on almost every
+ * prompt-cached project. 1.2M keeps it at the same place the uncached
+ * threshold used to occupy relative to that population: about 2.5x the median
+ * completed run.
+ *
+ * Gating on whether the set has cache writes, rather than switching globally,
+ * matters because a project with no cache writes never gets the 12x
+ * inflation: the 100K threshold still fits its `avgTokensPerRun`, and raising
+ * it 12x for those runs would silence a suggestion that should fire.
+ *
+ * Gating on `promptCached` rather than on `contextWriteFloor > 0` matters for
+ * the other direction: a project whose cached runs have all failed has no
+ * completed run to measure a floor from, but its totals are inflated exactly
+ * the same, and comparing them against 100K fired this suggestion on every
+ * such project.
+ */
+export const HIGH_COUNTED_TOKENS_PER_RUN_CACHED = 1_200_000;
+
+/**
+ * The high-consumption threshold in the units `runs` are counted in.
+ *
+ * Gating on {@link hasCacheWrites} rather than on `contextWriteFloor > 0`: a
+ * project whose cached runs have all failed has no completed run to measure a
+ * floor from, but its totals are inflated exactly the same.
+ */
+export function highConsumptionThreshold(runs: RunRecord[]): number {
+  return hasCacheWrites(runs)
+    ? HIGH_COUNTED_TOKENS_PER_RUN_CACHED
+    : HIGH_COUNTED_TOKENS_PER_RUN_UNCACHED;
+}
