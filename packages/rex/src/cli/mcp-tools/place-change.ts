@@ -15,6 +15,7 @@ import type { PRDStore } from "../../store/index.js";
 import { NO_PRODUCT_LAYER } from "./get-product.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
+import { systemClock, type Clock } from "./clock.js";
 
 export interface PlaceChangeArgs {
   id: string;
@@ -23,7 +24,7 @@ export interface PlaceChangeArgs {
   summary?: string;
 }
 
-export async function handlePlaceChange(store: PRDStore, rexDir: string, args: PlaceChangeArgs): Promise<McpResult> {
+export async function handlePlaceChange(store: PRDStore, rexDir: string, args: PlaceChangeArgs, clock: Clock = systemClock): Promise<McpResult> {
   try {
     if ((await prdLayout(rexDir)) !== "v2") return textResult(`${NO_PRODUCT_LAYER} Changes are placed on a v2 PRD only.`, true);
     if (args.target === undefined) {
@@ -34,8 +35,9 @@ export async function handlePlaceChange(store: PRDStore, rexDir: string, args: P
       return textResult(JSON.stringify(suggestPlacement(tree, args.id), null, 2));
     }
     const target = args.target;
-    const now = new Date();
+    let now!: Date;
     const { result } = await withPrdModelTransaction(rexDir, (model) => {
+      now = clock();
       const placed = recordPlacement(model.tree, args.id, { target, relation: args.relation, summary: args.summary }, now);
       return { tree: placed.tree, result: placed };
     });

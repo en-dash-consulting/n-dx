@@ -25,6 +25,7 @@ import type { PRDItem, ItemLevel, Priority, RunSettings } from "../../schema/ind
 import type { PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
+import { systemClock, type Clock } from "./clock.js";
 
 const ADD_TYPES = ["change", "task", "subtask"] as const satisfies readonly ChangeNodeType[];
 
@@ -50,11 +51,17 @@ export interface AddItemArgs {
   discoveredFrom?: DiscoveredFrom;
 }
 
-export async function handleAddItem(store: PRDStore, projectDir: string, rexDir: string, args: AddItemArgs): Promise<McpResult> {
+export async function handleAddItem(
+  store: PRDStore,
+  projectDir: string,
+  rexDir: string,
+  args: AddItemArgs,
+  clock: Clock = systemClock,
+): Promise<McpResult> {
   try {
     const runCheck = validateRunSettings(args.run);
     if (!runCheck.ok) return textResult(`Invalid run settings: ${runCheck.error}`, true);
-    if ((await prdLayout(rexDir)) === "v2") return await addV2(store, rexDir, args, runCheck.value);
+    if ((await prdLayout(rexDir)) === "v2") return await addV2(store, rexDir, args, runCheck.value, clock);
     const level = v1Level(args);
     if ("error" in level) return textResult(level.error, true);
     return await addV1(store, projectDir, rexDir, { ...args, level: level.level }, runCheck.value);
@@ -82,7 +89,7 @@ function v1Level(args: AddItemArgs): { level: ItemLevel } | { error: string } {
   return { level: level as ItemLevel };
 }
 
-async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: RunSettings | undefined): Promise<McpResult> {
+async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: RunSettings | undefined, clock: Clock): Promise<McpResult> {
   if (args.level !== undefined) {
     return textResult(
       `This PRD uses the v2 layout, where items have a type, not a level: pass type (${ADD_TYPES.join(", ")}) instead of level "${args.level}". ` +
@@ -91,8 +98,10 @@ async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: Ru
     );
   }
   const type = (args.type ?? "change") as ChangeNodeType;
-  const now = new Date();
+  // Read after the tree is loaded under the lock: a writer that held it first may have opened an interval later than a clock read made before waiting.
+  let now!: Date;
   const { result } = await withPrdModelTransaction(rexDir, (model) => {
+    now = clock();
     const added = addChangeNode(
       model.tree,
       {

@@ -13,13 +13,20 @@ import type { PRDStore } from "../../store/index.js";
 import { NO_PRODUCT_LAYER } from "./get-product.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
+import { systemClock, type Clock } from "./clock.js";
 
-export async function handleApplyChange(store: PRDStore, rexDir: string, args: { id: string; force?: boolean }): Promise<McpResult> {
+export async function handleApplyChange(
+  store: PRDStore,
+  rexDir: string,
+  args: { id: string; force?: boolean },
+  clock: Clock = systemClock,
+): Promise<McpResult> {
   try {
     if ((await prdLayout(rexDir)) !== "v2") return textResult(`${NO_PRODUCT_LAYER} Changes are applied on a v2 PRD only.`, true);
-    const now = new Date();
-    const appliedAt = now.toISOString();
+    let appliedAt!: string;
     const { result } = await withPrdModelTransaction(rexDir, (model) => {
+      const now = clock();
+      appliedAt = now.toISOString();
       const out = applyAmendments(model.tree, args.id, { appliedAt, now, force: args.force });
       // Logged and returned by id: args.id may be a display id, which can later name another change.
       const change = indexTree(out.tree).resolve(args.id)!.id;
