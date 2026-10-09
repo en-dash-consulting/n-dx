@@ -2,7 +2,7 @@
 id: "8cc70b76-8b1f-4506-8f5e-799cc153468d"
 level: "feature"
 title: "Generate the migration plan"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "product-map"
@@ -14,10 +14,13 @@ blockedBy:
   - "dc3b80c1-4d3c-486f-ba03-0b6bbe9fd50d"
   - "51527b42-cc67-4a5a-83b3-61179298dfaf"
 source: "roadmap"
+startedAt: "2026-10-09T04:22:49.930Z"
+completedAt: "2026-10-09T04:22:49.930Z"
+endedAt: "2026-10-09T04:22:49.930Z"
 acceptanceCriteria: []
 description: "ndx migrate --plan writes a reviewable plan and moves nothing. It reads the v1 tree only, so it can run early and feed the area review.\n\nRoadmap PR 13 · wave 1 · lane migration."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-06T15:51:24.007Z"
+lastModified: "2026-10-09T04:22:50.223Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -30,7 +33,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A spec draft answer with one extra key fails the whole text pass, so no later capability is redrafted and Jev placement does not run](./a-spec-draft-answer-with-one-extra-key.md) | completed |
 | [An incomplete migration plan drops the later passes' recorded answers, so a retry pays for every Jev judgment again](./an-incomplete-migration-plan-drops-the.md) | completed |
 | [Cancelled or deleted children of release epics are held, never rules-placed](./cancelled-or-deleted-children-of.md) | completed |
-| [Cancelled or deleted items outside release epics and noun-shaped area features are still rules-placed](./cancelled-or-deleted-items-outside.md) | pending |
+| [Cancelled or deleted items outside release epics and noun-shaped area features are still rules-placed](./cancelled-or-deleted-items-outside.md) | completed |
 | [Capability specs see every placement, including the text and Jev passes'](./capability-specs-see-every-placement.md) | completed |
 | [Classify the v1 tree and propose areas and constraints](./classify-the-v1-tree-and-propose-areas.md) | completed |
 | [Draft capability specs with a text model by default](./draft-capability-specs-with-a-text.md) | completed |
