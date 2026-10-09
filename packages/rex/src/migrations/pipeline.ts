@@ -7,7 +7,9 @@
  * pass, the model and the hash of the item's content and question all match,
  * so only new or changed items reach the seam. A seam error stops the asking,
  * keeps the answers so far and marks the pass `incomplete` in the header; later
- * passes do not run, and the plan must not be applied. The migration's
+ * passes do not run, and the plan must not be applied. A pass that did not run
+ * carries the earlier plan's answers unchanged (its header lists no record for
+ * it); the hash and model check on the next run still decides reuse. The migration's
  * `summarize`, when it has one, then rebuilds the summary from the final
  * entries. Writes nothing: the caller
  * writes the returned plan with `writePlanFile`.
@@ -68,7 +70,12 @@ export async function runPlanPipeline<TData, TEntry, TSummary, TOptions>(
 
   let stopped = false;
   for (const name of MODEL_PASSES) {
-    if (stopped) break;
+    if (stopped) {
+      // Not run, but its earlier answers are kept so the next run still reuses them.
+      const kept = previous?.answers[name];
+      if (kept) answers[name] = kept;
+      continue;
+    }
     const pass = migration.passes?.[name];
     const seam = context.seams?.[name];
     if (!pass || !seam) continue;

@@ -182,6 +182,37 @@ describe("plan pipeline", () => {
       expect(Object.keys(plan.answers.text ?? {})).toEqual(["/runs", "/teams", "/users"]);
     });
 
+    describe("after a complete text+jev plan", () => {
+      const changedTasks = () => {
+        const routes = THREE();
+        routes[0] = { path: "/tasks", handler: "listTasksV2" };
+        return routes;
+      };
+      const down = () =>
+        seam("text-model", () => {
+          throw new Error("down");
+        });
+
+      it("carries the earlier Jev answers when the text seam throws", async () => {
+        const first = await bootstrap.plan(routeSource(THREE()), { cutAt: CUT, seams: { text: textSeam(), jev: jevSeam() } });
+        const jev = jevSeam();
+        const failed = await bootstrap.plan(routeSource(changedTasks()), { cutAt: CUT, seams: { text: down(), jev }, previous: first });
+        expect(jev.ask).not.toHaveBeenCalled();
+        expect(failed.answers.jev).toEqual(first.answers.jev);
+        expect(failed.header.passes.map((p) => p.name)).toEqual(["rules", "text"]);
+      });
+
+      it("asks Jev on a re-plan from that output only for items whose question changed", async () => {
+        const first = await bootstrap.plan(routeSource(THREE()), { cutAt: CUT, seams: { text: textSeam(), jev: jevSeam() } });
+        const failed = await bootstrap.plan(routeSource(changedTasks()), { cutAt: CUT, seams: { text: down(), jev: jevSeam() }, previous: first });
+        const previous = parsePlanFile(formatPlanFile(failed));
+        const jev = jevSeam();
+        await bootstrap.plan(routeSource(changedTasks()), { cutAt: CUT, seams: { text: textSeam(), jev }, previous });
+        expect(jev.ask).toHaveBeenCalledTimes(1);
+        expect(jev.ask).toHaveBeenCalledWith({ id: "/tasks", question: { judge: "Answers listTasksV2." } });
+      });
+    });
+
     it("is distinguishable from a complete plan when read back", async () => {
       const failed = await bootstrap.plan(routeSource(THREE()), { cutAt: CUT, seams: { text: failingOnThird() } });
       expect(parsePlanFile(formatPlanFile(failed)).header.passes[1]?.incomplete).toEqual({ error: "rate limited" });
