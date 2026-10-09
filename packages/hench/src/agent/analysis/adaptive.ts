@@ -36,8 +36,8 @@ export interface ProjectMetrics {
    */
   recentAvgTokens: number;
   /**
-   * Lowest counted cost of a completed prompt-cached run in the window — the
-   * floor a proposed `tokenBudget` must clear. 0 when unmeasurable.
+   * Lowest observed arrival cost in the window — the floor a proposed
+   * `tokenBudget` must clear. 0 only when no run in the window wrote cache.
    * See {@link contextWriteFloor}.
    */
   contextWriteFloor: number;
