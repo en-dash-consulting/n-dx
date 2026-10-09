@@ -12,7 +12,8 @@
  *
  * A write whose result breaks a v2 rule the tree did not already break (a
  * change moved under a task, a `blockedBy` left dangling) is refused before
- * anything is written. Config, log and workflow are the v1 store's: they do
+ * anything is written, as is one that removes a change prune keeps (an
+ * applied change with removed or added amendments). Config, log and workflow are the v1 store's: they do
  * not depend on the tree layout.
  *
  * @module rex/store/change-layer-store
@@ -22,7 +23,9 @@ import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.
 import { SCHEMA_VERSION } from "../schema/v1.js";
 import { newErrors } from "../core/apply-amendments.js";
 import { changeLayerFromItems, changeLayerItems, productLayerItems } from "../core/layer-projection.js";
-import { findItem, insertChild, removeFromTree, updateInTree } from "../core/tree.js";
+import { pruneKeepReason } from "../core/prune.js";
+import { findItem, insertChild, removeFromTree, updateInTree, walkTree } from "../core/tree.js";
+import type { RuleNode } from "../schema/v2-rules.js";
 import type { PRDStore, StoreCapabilities } from "./contracts.js";
 import { loadPrdModel, prdLayout } from "./prd-model-reader.js";
 import { withPrdModelTransaction } from "./prd-model-transaction.js";
@@ -55,6 +58,8 @@ export class ChangeLayerStore implements PRDStore {
         const doc: PRDDocument = { schema: SCHEMA_VERSION, title: model.title, items: changeLayerItems(model.tree.changes) };
         const value = await fn(doc);
         const { changes, removed } = changeLayerFromItems(doc.items, model.tree.changes);
+        const kept = keptRemovals(model.tree.changes, removed);
+        if (kept.length) throw new ChangeLayerWriteError(kept);
         const tree = { product: model.tree.product, changes };
         const broken = newErrors(model.tree, tree, this.now());
         if (broken.length) throw new ChangeLayerWriteError(broken.map((f) => `the result breaks ${f.rule}: ${f.message}`));
@@ -121,6 +126,20 @@ export class ChangeLayerStore implements PRDStore {
   capabilities(): StoreCapabilities {
     return { adapter: "v2-change-layer", supportsTransactions: true, supportsWatch: false };
   }
+}
+
+/**
+ * A problem for each removed change prune keeps ({@link pruneKeepReason}): the
+ * backstop behind the restructure guards, so no write path can delete the
+ * change that marks a product node retired. Other completed changes may go.
+ */
+function keptRemovals(changes: readonly RuleNode[], removed: ReadonlySet<string>): string[] {
+  const problems: string[] = [];
+  for (const { item } of walkTree(changeLayerItems(changes))) {
+    const reason = removed.has(item.id) ? pruneKeepReason(item) : undefined;
+    if (reason) problems.push(`"${item.title}" (${item.id}) cannot be removed: ${reason}`);
+  }
+  return problems;
 }
 
 /** The store the restructuring commands write: the change layer on a v2 tree, `base` itself on a v1 tree. */

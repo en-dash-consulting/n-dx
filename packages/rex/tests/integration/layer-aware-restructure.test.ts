@@ -46,6 +46,8 @@ import { cmdChange } from "../../src/cli/commands/change.js";
 import { addChangeNode } from "../../src/core/change-add.js";
 import { withPrdModelTransaction } from "../../src/store/prd-model-transaction.js";
 import type { RuleNode } from "../../src/schema/v2-rules.js";
+import { ChangeLayerWriteError, resolveLayerStore } from "../../src/store/change-layer-store.js";
+import { resolveStore } from "../../src/store/index.js";
 
 const AREA = "a0000000-0000-4000-8000-000000000001";
 const PAY_BY_CARD = "a0000000-0000-4000-8000-000000000002";
@@ -117,6 +119,14 @@ afterEach(async () => {
 function proposeOnProduct(proposals: ReshapeProposal[]): void {
   mockReasonForReshape.mockImplementation(async (items: PRDItem[]) => ({
     proposals: items.some((i) => (i as PRDItem & { type?: string }).type === "area") ? proposals : [],
+    tokenUsage: { calls: 1, inputTokens: 1, outputTokens: 1 },
+  }));
+}
+
+/** Proposals for the change layer only: the mock answers [] for the product layer. */
+function proposeOnChanges(proposals: ReshapeProposal[]): void {
+  mockReasonForReshape.mockImplementation(async (items: PRDItem[]) => ({
+    proposals: items.some((i) => (i as PRDItem & { type?: string }).type === "area") ? [] : proposals,
     tokenUsage: { calls: 1, inputTokens: 1, outputTokens: 1 },
   }));
 }
@@ -311,28 +321,103 @@ describe("rex prune on a v2 tree", () => {
   });
 
   it("keeps the applied change that retires a node, reports why, and the node still reads retired", async () => {
-    proposeOnProduct([{ id: "p1", action: { action: "obsolete", itemId: GIFT_CARDS, reason: "No longer sold" } }]);
-    await cmdReshape(tmp, { accept: "true" });
-    const drafted = (await loadPrdModel(rexDir)).tree.changes.find((c) => c.title === PRODUCT_RESHAPE_TITLE)!;
-    await cmdChange(tmp, "apply", drafted.id, {});
-    // Finished and applied: on a v1 tree this subtree would be pruned.
-    await withPrdModelTransaction(rexDir, (model) => {
-      const retiring = model.tree.changes.find((c) => c.id === drafted.id)!;
-      retiring.status = "completed";
-      return { tree: model.tree, result: undefined };
-    });
-    expect((await loadPrdModel(rexDir)).tree.changes.find((c) => c.id === drafted.id)).toMatchObject({ status: "completed" });
-    output = [];
+    const retiring = await retireGiftCards();
 
     await cmdPrune(tmp, { yes: "true", "no-consolidate": "true" });
 
     const { tree } = await loadPrdModel(rexDir);
-    expect(tree.changes.map((c) => c.id)).toContain(drafted.id);
+    expect(tree.changes.map((c) => c.id)).toContain(retiring);
     expect(tree.changes.map((c) => c.id)).not.toContain(DONE_CHANGE);
     expect(output.join("\n")).toMatch(/Kept 1 completed item[\s\S]*product status reads it to mark a node retired/);
+    await expectGiftCardsRetired();
+  });
 
-    output = [];
-    await cmdProduct(tmp, "show", GIFT_CARDS, { format: "json" });
-    expect(JSON.parse(output.join("\n"))).toMatchObject({ status: { status: "retired" } });
+  it("skips a consolidation merge that would fold the retiring change away, and the node still reads retired", async () => {
+    const retiring = await retireGiftCards();
+    proposeOnChanges([{ id: "m1", action: { action: "merge", survivorId: APPLE_PAY, mergedIds: [retiring], reason: "Same checkout work" } }]);
+
+    await cmdPrune(tmp, { yes: "true", accept: "true" });
+
+    expect(mockReasonForReshape).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ consolidateMode: true }));
+    const { tree } = await loadPrdModel(rexDir);
+    expect(tree.changes.map((c) => c.id)).toEqual(expect.arrayContaining([APPLE_PAY, retiring]));
+    expect(tree.changes.map((c) => c.id)).not.toContain(DONE_CHANGE);
+    expect(output.join("\n")).toMatch(/Warning: Skipped: cannot merge away "Reshape the product layer"/);
+    await expectGiftCardsRetired();
+  });
+
+  it("leaves the retiring change in place when --smart proposes merging it away", async () => {
+    const retiring = await retireGiftCards();
+    proposeOnChanges([{ id: "m1", action: { action: "merge", survivorId: APPLE_PAY, mergedIds: [retiring], reason: "Same checkout work" } }]);
+
+    await cmdPrune(tmp, { smart: "true", accept: "true" });
+
+    expect(mockReasonForReshape).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ pruneMode: true }));
+    expect((await loadPrdModel(rexDir)).tree.changes.map((c) => c.id)).toContain(retiring);
+    expect(output.join("\n")).toMatch(/Warning: Skipped: cannot merge away/);
+    await expectGiftCardsRetired();
   });
 });
+
+describe("kept changes on a v2 tree", () => {
+  it("rex reshape skips a merge naming an applied change that only modifies, and applies the other proposals", async () => {
+    const { result: modifying } = await withPrdModelTransaction(rexDir, (model) => {
+      const { tree, node } = addChangeNode(
+        model.tree,
+        { type: "change", title: "Reword gift cards", description: "Clearer.", amends: [{ target: GIFT_CARDS, delta: "modified", summary: "Clearer", proposed: "A shopper can pay with a gift card or e-gift." }] },
+        { now: new Date() },
+      );
+      return { tree, result: node.id };
+    });
+    await cmdChange(tmp, "apply", modifying, {});
+    expect((await loadPrdModel(rexDir)).tree.changes.find((c) => c.id === modifying)).toHaveProperty("appliedAt");
+    proposeOnChanges([
+      { id: "m1", action: { action: "merge", survivorId: APPLE_PAY, mergedIds: [modifying], reason: "Same checkout work" } },
+      { id: "o1", action: { action: "obsolete", itemId: APPLE_PAY, reason: "Wallets wait a release" } },
+    ]);
+
+    await cmdReshape(tmp, { accept: "true" });
+
+    const { tree } = await loadPrdModel(rexDir);
+    expect(tree.changes.find((c) => c.id === modifying)).toBeDefined();
+    expect(tree.changes.find((c) => c.id === APPLE_PAY)?.status).toBe("deferred");
+    expect(output.join("\n")).toMatch(/Skipped: cannot merge away "Reword gift cards".*applied change/);
+  });
+
+  it("the change-layer store refuses to remove a change prune keeps, and still removes other completed changes", async () => {
+    const retiring = await retireGiftCards();
+    const { store } = await resolveLayerStore(rexDir, await resolveStore(rexDir));
+
+    await expect(store.removeItem(retiring)).rejects.toThrow(ChangeLayerWriteError);
+    await expect(store.removeItem(retiring)).rejects.toThrow(/cannot be removed: applied change with removed amendments/);
+    await store.removeItem(DONE_CHANGE);
+
+    expect((await loadPrdModel(rexDir)).tree.changes.map((c) => c.id)).toEqual(expect.arrayContaining([APPLE_PAY, retiring]));
+    expect((await loadPrdModel(rexDir)).tree.changes.map((c) => c.id)).not.toContain(DONE_CHANGE);
+    await expectGiftCardsRetired();
+  });
+});
+
+/** Draft, apply and complete a change retiring Gift cards; its id. */
+async function retireGiftCards(): Promise<string> {
+  proposeOnProduct([{ id: "p1", action: { action: "obsolete", itemId: GIFT_CARDS, reason: "No longer sold" } }]);
+  await cmdReshape(tmp, { accept: "true" });
+  const drafted = (await loadPrdModel(rexDir)).tree.changes.find((c) => c.title === PRODUCT_RESHAPE_TITLE)!;
+  await cmdChange(tmp, "apply", drafted.id, {});
+  // Finished and applied: on a v1 tree this subtree would be pruned.
+  await withPrdModelTransaction(rexDir, (model) => {
+    model.tree.changes.find((c) => c.id === drafted.id)!.status = "completed";
+    return { tree: model.tree, result: undefined };
+  });
+  expect((await loadPrdModel(rexDir)).tree.changes.find((c) => c.id === drafted.id)).toMatchObject({ status: "completed" });
+  mockReasonForReshape.mockReset();
+  mockReasonForReshape.mockResolvedValue({ proposals: [], tokenUsage: { calls: 1, inputTokens: 1, outputTokens: 1 } });
+  output = [];
+  return drafted.id;
+}
+
+async function expectGiftCardsRetired(): Promise<void> {
+  output = [];
+  await cmdProduct(tmp, "show", GIFT_CARDS, { format: "json" });
+  expect(JSON.parse(output.join("\n"))).toMatchObject({ status: { status: "retired" } });
+}

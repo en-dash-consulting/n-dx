@@ -71,6 +71,32 @@ export function pruneKeepReason(item: PRDItem): string | undefined {
     : "applied change with added amendments: it records where a product node came from";
 }
 
+/**
+ * Why a restructure must not merge `item` away into another item, or undefined.
+ *
+ * Wider than {@link pruneKeepReason}: every applied change, whatever its
+ * amendments, because its id is what N-DX-Item commit trailers, the rex
+ * health landing check and the `shippedIn` stamp refer to.
+ */
+export function mergeKeepReason(item: PRDItem): string | undefined {
+  return (item as PRDItem & { appliedAt?: string }).appliedAt
+    ? "applied change: commit trailers, rex health and its shippedIn release refer to its id"
+    : undefined;
+}
+
+/**
+ * Why a restructure must not delete `item` with its subtree, or undefined:
+ * the subtree holds an item {@link pruneKeepReason} keeps, so deleting agrees
+ * with prune.
+ */
+export function deleteKeepReason(item: PRDItem): string | undefined {
+  for (const { item: held } of walkTree([item])) {
+    const reason = pruneKeepReason(held);
+    if (reason) return held === item ? reason : `holds "${held.title}", an ${reason}`;
+  }
+  return undefined;
+}
+
 /** Whether `item` or any descendant must be kept. */
 function holdsKept(item: PRDItem): boolean {
   return pruneKeepReason(item) !== undefined || (item.children ?? []).some(holdsKept);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PRDItem } from "../../../src/schema/v1.js";
-import { isFullyCompleted, findPrunableItems, findKeptItems, pruneItems, countSubtree } from "../../../src/core/prune.js";
+import { isFullyCompleted, findPrunableItems, findKeptItems, pruneItems, countSubtree, mergeKeepReason, deleteKeepReason } from "../../../src/core/prune.js";
 
 function item(overrides: Partial<PRDItem> & { id: string; title: string; level: PRDItem["level"] }): PRDItem {
   return { status: "pending", ...overrides };
@@ -326,6 +326,14 @@ describe("applied changes that retire or add product nodes", () => {
     const modifies = applied("mod", "modified");
     const unapplied = item({ id: "un", title: "un", level: "epic", status: "completed", amends: [{ delta: "removed", target: "x" }] } as PRDItem);
     expect(pruneItems([modifies, unapplied]).pruned.map((i) => i.id)).toEqual(["mod", "un"]);
+  });
+
+  it("merge keeps every applied change; delete keeps what prune keeps, subtree included", () => {
+    expect(mergeKeepReason(applied("mod", "modified"))).toMatch(/applied change/);
+    expect(mergeKeepReason(plain("done"))).toBeUndefined();
+    expect(deleteKeepReason(applied("mod", "modified"))).toBeUndefined();
+    expect(deleteKeepReason(applied("keep", "removed"))).toMatch(/retired/);
+    expect(deleteKeepReason(item({ id: "p", title: "p", level: "epic", children: [applied("keep", "added")] }))).toMatch(/^holds "keep", an applied change/);
   });
 
   it("does not prune a completed parent whose child is kept", () => {
