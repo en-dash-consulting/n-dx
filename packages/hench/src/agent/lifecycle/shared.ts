@@ -885,7 +885,7 @@ export interface StageRunWorkResult {
  *   rest" from meaning `git add -A`, which is explicitly what the agent is
  *   told never to do.
  * - **Hench's own runtime artifacts**, including `.hench-commit-msg.txt`
- *   itself — committing the sentinel would be absurd, and the run-logs are
+ *   and the skills' `.ndx-commit-msg.txt` itself — committing the sentinel would be absurd, and the run-logs are
  *   gitignored by `hench init` anyway.
  * - **The PRD paths.** `performCommitPromptIfNeeded` stages those itself
  *   after writing the completion, so that the status transition and the code
