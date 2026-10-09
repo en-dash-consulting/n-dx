@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { addTask, ChangeCompletionError, completeChange, completeTask } from "../../../src/core/change-completion.js";
+import { addTask, ChangeCompletionError, ClosedChangeError, completeChange, completeTask } from "../../../src/core/change-completion.js";
 import type { ApplyOn } from "../../../src/core/apply-policy.js";
-import { isOpenChange, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { isOpenChange, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { ChangeIntentSchema, TaskIntentSchema } from "../../../src/schema/v2.js";
 
 const NOW = new Date("2026-10-08T12:00:00.000Z");
 const OLD = "A shopper can pay by card.";
@@ -94,6 +95,14 @@ describe("completeChange", () => {
     expect(statement(result.tree)).toBe(NEW);
   });
 
+  it("applies the same product layer, spec hash included, whether or not the change has acceptanceCriteria", () => {
+    const plain = completeChange(tree(change()), "ch", opts());
+    const withDoneWhen = completeChange(tree(change({ acceptanceCriteria: ["Wallets pay"] })), "ch", opts());
+    expect(withDoneWhen.apply?.applied).toBe(true);
+    expect(withDoneWhen.tree.product[0].children?.[0].metAt).toBe(specHash({ statement: NEW }));
+    expect(withDoneWhen.tree.product).toEqual(plain.tree.product);
+  });
+
   it("refuses while a live task is not completed", () => {
     expect(() => completeChange(tree(change({ children: [task("t", { status: "cancelled" })] })), "ch", opts())).toThrow(/task t is not completed/);
   });
@@ -104,7 +113,7 @@ describe("addTask split rule", () => {
     change({ status: "in_progress", startedAt: "2026-10-07T09:00:00.000Z", acceptanceCriteria: ["Wallets pay"], requirements: [{ id: "r" }], touches: ["cap"], ...extra });
 
   it("moves the criteria to the new first task, which takes over the in-flight work", () => {
-    const result = addTask(tree(inFlight()), "ch", task("t", { acceptanceCriteria: ["Own"] }));
+    const result = addTask(tree(inFlight()), "ch", task("t", { acceptanceCriteria: ["Own"] }), NOW);
     expect(result.split).toEqual({ changeId: "ch", taskId: "t", movedCriteria: ["Wallets pay"] });
     const c = theChange(result.tree);
     expect(c.status).toBe("pending");
@@ -114,24 +123,70 @@ describe("addTask split rule", () => {
   });
 
   it("splits without criteria when the change has none", () => {
-    const result = addTask(tree(inFlight({ acceptanceCriteria: undefined })), "ch", task("t"));
+    const result = addTask(tree(inFlight({ acceptanceCriteria: undefined })), "ch", task("t"), NOW);
     expect(result.split?.movedCriteria).toEqual([]);
     expect(theChange(result.tree).children?.[0]).not.toHaveProperty("acceptanceCriteria");
   });
 
-  it("keeps criteria that are not a list on the change rather than dropping them", () => {
-    const result = addTask(tree(inFlight({ acceptanceCriteria: "Wallets pay" })), "ch", task("t"));
-    expect(result.split?.movedCriteria).toEqual([]);
-    expect(theChange(result.tree).acceptanceCriteria).toBe("Wallets pay");
+  it("moves a typed list: both nodes still parse against their intent schemas", () => {
+    // The fixture's bare `{ id: "r" }` requirement is not a full Requirement; drop it to parse.
+    const typed = inFlight({ requirements: undefined });
+    expect(ChangeIntentSchema.parse(typed).acceptanceCriteria).toEqual(["Wallets pay"]);
+    const result = addTask(tree(typed), "ch", task("t"), NOW);
+    const c = theChange(result.tree);
+    expect(ChangeIntentSchema.parse(c).acceptanceCriteria).toBeUndefined();
+    expect(TaskIntentSchema.parse(c.children?.[0]).acceptanceCriteria).toEqual(["Wallets pay"]);
   });
 
   it("treats a change whose only tasks are deleted as task-less", () => {
-    expect(addTask(tree(inFlight({ children: [task("gone", { status: "deleted" })] })), "ch", task("t")).split).not.toBeNull();
+    expect(addTask(tree(inFlight({ children: [task("gone", { status: "deleted" })] })), "ch", task("t"), NOW).split).not.toBeNull();
+  });
+
+  it("closes the change's open interval at the split and opens one on the task", () => {
+    const closed = { start: "2026-10-06T09:00:00.000Z", end: "2026-10-06T10:00:00.000Z" };
+    const open = { start: "2026-10-07T09:00:00.000Z" };
+    const result = addTask(tree(inFlight({ activeIntervals: [closed, open] })), "ch", task("t"), NOW);
+    const c = theChange(result.tree);
+    expect(c.activeIntervals).toEqual([closed, { ...open, end: NOW.toISOString() }]);
+    expect(c.activeIntervals?.some((iv) => iv.end === undefined)).toBe(false);
+    expect(c.children?.[0].activeIntervals).toEqual([{ start: NOW.toISOString() }]);
+  });
+
+  it("opens no interval on the task when the change had none open", () => {
+    const closed = { start: "2026-10-06T09:00:00.000Z", end: "2026-10-06T10:00:00.000Z" };
+    for (const intervals of [undefined, [closed]]) {
+      const result = addTask(tree(inFlight({ activeIntervals: intervals })), "ch", task("t"), NOW);
+      expect(theChange(result.tree).activeIntervals).toEqual(intervals);
+      expect(theChange(result.tree).children?.[0]).not.toHaveProperty("activeIntervals");
+    }
+  });
+
+  it("refuses a task under a closed change, naming its state and suggesting a follow-up change", () => {
+    const cases: [RuleNode[], string][] = [
+      [[change({ status: "completed" })], "completed"],
+      [[change({ status: "completed", appliedAt: NOW.toISOString() })], "applied"],
+      [[change({ appliedAt: NOW.toISOString() })], "applied"],
+      [[change({ status: "cancelled" })], "cancelled"],
+      [[change({ status: "deleted" })], "deleted"],
+      [[node({ id: "outer", type: "change", status: "deleted", children: [change()] })], "deleted"],
+    ];
+    for (const [changes, state] of cases) {
+      let error: unknown;
+      try {
+        addTask(tree(...changes), "ch", task("t"), NOW);
+      } catch (e) {
+        error = e;
+      }
+      expect(error, state).toBeInstanceOf(ClosedChangeError);
+      expect((error as ClosedChangeError).state).toBe(state);
+      expect((error as Error).message).toContain(`it is ${state}`);
+      expect((error as Error).message).toContain('discoveredFrom: { item: "ch" }');
+    }
   });
 
   it("does not split a pending change or one that already has a task", () => {
     for (const c of [inFlight({ status: "pending" }), inFlight({ children: [task("u")] })]) {
-      const result = addTask(tree(c), "ch", task("t"));
+      const result = addTask(tree(c), "ch", task("t"), NOW);
       expect(result.split).toBeNull();
       expect(theChange(result.tree).acceptanceCriteria).toEqual(["Wallets pay"]);
       expect(theChange(result.tree).children?.at(-1)).toMatchObject({ id: "t" });

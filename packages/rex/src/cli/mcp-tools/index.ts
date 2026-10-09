@@ -40,3 +40,7 @@ export { handleHealth } from "./health.js";
 export { handleFacets } from "./facets.js";
 export { handleGetTokenUsage } from "./get-token-usage.js";
 export { handleGetCapabilities, type WorkspaceInfo } from "./get-capabilities.js";
+export { handleGetProduct } from "./get-product.js";
+export { handleGetCapability } from "./get-capability.js";
+export { handlePlaceChange } from "./place-change.js";
+export { handleApplyChange } from "./apply-change.js";

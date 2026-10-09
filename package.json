@@ -18,6 +18,7 @@
     "validate": "pnpm -r run validate",
     "verify": "pnpm security:obfuscation && vitest run tests/e2e && node packages/core/cli.js ci .",
     "security:obfuscation": "node scripts/check-obfuscated-code.mjs",
+    "security:lockfile": "node scripts/check-lockfile-integrity.mjs",
     "prompt-census": "node scripts/prompt-census.mjs",
     "preview:export": "node scripts/export-preview-demo.mjs",
     "gauntlet": "vitest run tests/gauntlet --exclude '**/sourcevision-evals/evals.test.js'",

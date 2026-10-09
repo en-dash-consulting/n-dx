@@ -4,10 +4,16 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
 "[
   {
     "name": "get_prd_status",
-    "description": "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress.",
+    "description": "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress. On a v2 PRD: change counts over all changes, the Inbox count, product status per area and change counts per release (releases with open changes and the newest closed ones; allReleases lists every release).",
     "inputSchema": {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "allReleases": {
+          "type": "boolean",
+          "description": "v2 only: list every release, not just those with open changes and the newest closed ones"
+        }
+      },
+      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -138,13 +144,22 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
   },
   {
     "name": "add_item",
-    "description": "Add a new item to the PRD. Use when the user discusses a new feature, requirement, or work item that should be tracked.",
+    "description": "Add a new item to the PRD. Use when the user discusses a new feature, requirement, or work item that should be tracked. On a v2 PRD pass type (default change; a change that neither amends nor touches lands in the Inbox needing placement); on a v1 PRD pass level.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "title": {
           "type": "string",
           "description": "Item title"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "change",
+            "task",
+            "subtask"
+          ],
+          "description": "v2: node type, default change. A task's parent is a change, a subtask's a task. On v1, task and subtask stand in for level"
         },
         "level": {
           "type": "string",
@@ -154,7 +169,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             "task",
             "subtask"
           ],
-          "description": "Item level"
+          "description": "v1 only: item level. Refused on a v2 PRD, which takes type"
         },
         "parentId": {
           "type": "string",
@@ -162,7 +177,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
         },
         "description": {
           "type": "string",
-          "description": "Item description"
+          "description": "Item description (a v2 change's intent)"
         },
         "priority": {
           "type": "string",
@@ -179,7 +194,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "items": {
             "type": "string"
           },
-          "description": "Acceptance criteria"
+          "description": "Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria"
         },
         "tags": {
           "type": "array",
@@ -262,11 +277,119 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           },
           "additionalProperties": false,
           "description": "Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."
+        },
+        "amends": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "delta": {
+                "type": "string",
+                "enum": [
+                  "added",
+                  "modified",
+                  "removed"
+                ]
+              },
+              "summary": {
+                "type": "string"
+              },
+              "criteria": {
+                "type": "object",
+                "properties": {
+                  "add": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "replace": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/properties/amends/items/properties/criteria/properties/add/items"
+                    }
+                  },
+                  "remove": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": true
+              },
+              "proposed": {
+                "type": "string"
+              },
+              "under": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "capability",
+                  "constraint"
+                ]
+              },
+              "base": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "target",
+              "delta",
+              "summary"
+            ],
+            "additionalProperties": true
+          },
+          "description": "v2 change only: product-layer edits the change carries ({target, delta: added|modified|removed, summary, criteria?, proposed?, under?, title?, type?})"
+        },
+        "touches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "v2 change only: product node IDs the change works on without amending them"
+        },
+        "discoveredFrom": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true,
+          "description": "v2 change only: {item?, run?}, the change or task (and hench run) whose work surfaced this one. Use it for a follow-up to a closed change"
         }
       },
       "required": [
-        "title",
-        "level"
+        "title"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
@@ -298,7 +421,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "items": {
             "type": "string"
           },
-          "description": "New acceptance criteria"
+          "description": "New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria"
         },
         "priority": {
           "type": "string",
@@ -654,6 +777,168 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
     "inputSchema": {
       "type": "object",
       "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_product",
+    "description": "Get the product layer of a v2 PRD: areas, and the capabilities and constraints under them, each with its computed status (proposed, changing, met, revised, retired) and health (ok, defective). Use get_capability for one node's detail.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_capability",
+    "description": "Get one capability or constraint of a v2 PRD: its statement, capability criteria and requirements, parent chain, computed status and health, one page of the changes that amend or touch it (changeCounts covers all), the constraints that bind it, and the nodes changed alongside it. By default the changes are every open one plus the 10 most recently applied; use status, since and cursor (changesPage.nextCursor) to read more.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Capability or constraint id, display id (e.g. A1.2) or alias"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "recent",
+            "open",
+            "applied",
+            "all"
+          ],
+          "description": "Which changes to list. Default recent: open plus the latest applied. all pages through the whole history"
+        },
+        "since": {
+          "type": "string",
+          "description": "Only changes released (shippedIn, else plannedRelease) in this version or later, e.g. 1.2.0"
+        },
+        "cursor": {
+          "type": "string",
+          "description": "changesPage.nextCursor from the previous call, with the same status and since"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Changes per page (default 25)"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "place_change",
+    "description": "Place a v2 change on the product layer. Without target: returns the rules' shortlist of capabilities and constraints the change could amend or touch, best first, and the relation the rules chose. With target: records it (touches joins the change's touches; amends adds a modified amendment and needs proposed text or a criteria delta, or it is refused as apply_change would) and clears needsPlacement. Only an open change is placed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Change id, display id (e.g. CH-12) or alias"
+        },
+        "target": {
+          "type": "string",
+          "description": "Capability or constraint to place the change on. Omit to get the shortlist without writing"
+        },
+        "relation": {
+          "type": "string",
+          "enum": [
+            "touches",
+            "amends"
+          ],
+          "description": "With target: touches (works on it) or amends (edits its requirements). Default: the rules' relation"
+        },
+        "summary": {
+          "type": "string",
+          "description": "With target and relation amends: the amendment's summary. Default: the change's title"
+        },
+        "proposed": {
+          "type": "string",
+          "description": "With target and relation amends: the target's replacement statement. Required with amends unless criteria is given"
+        },
+        "criteria": {
+          "type": "object",
+          "properties": {
+            "add": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "text"
+                ],
+                "additionalProperties": true
+              }
+            },
+            "replace": {
+              "type": "array",
+              "items": {
+                "$ref": "#/properties/criteria/properties/add/items"
+              }
+            },
+            "remove": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": true,
+          "description": "With target and relation amends: capability criteria edits ({add?: [{id, text}], replace?: [{id, text}], remove?: [id]}). Required with amends unless proposed is given"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "apply_change",
+    "description": "Apply an open v2 change's amendments to the product layer as a steward, whatever rex.applyOn says: added nodes are created, modified ones edited, removed ones retired, and the change is stamped appliedAt. The whole apply is refused, listing every problem, when an amendment does not fit or its target's spec moved since it was drafted (force overrides that last check).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Change id, display id (e.g. CH-12) or alias"
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Apply amendments whose base no longer matches their target's spec"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {

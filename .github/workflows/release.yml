@@ -39,6 +39,12 @@ on:
           - publish
           - validate-oidc
 
+# Deny by default at the file level; the release job below grants itself
+# exactly what it needs. A job added here later starts with nothing rather
+# than inheriting the repository default, which is write — and this is the
+# workflow that holds the OIDC identity npm trusts.
+permissions: {}
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -56,7 +62,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Validate trusted publisher OIDC exchange
         # Runs only when manually dispatched with mode=validate-oidc. Mints
@@ -138,11 +144,11 @@ jobs:
 
       - name: Install pnpm
         if: github.event_name == 'push' || inputs.mode == 'publish'
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
 
       - name: Setup Node
         if: github.event_name == 'push' || inputs.mode == 'publish'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
@@ -190,7 +196,7 @@ jobs:
         # push-git-tags=true, push-with-git-cli=false — tags and the version
         # commit are pushed through the GitHub API and signed by GitHub; set
         # push-with-git-cli: true to go back to plain `git push`).
-        uses: changesets/action@v2
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2 branch head, 2026-10-09 — upstream ships no v2 tag
         with:
           version-script: pnpm exec changeset version
           publish-script: pnpm exec changeset publish
