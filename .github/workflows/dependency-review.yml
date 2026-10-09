@@ -1,0 +1,41 @@
+# Dependency review for pull requests.
+#
+# Complements, rather than duplicates, the controls already in .npmrc:
+# `ignore-scripts` stops an install hook executing and `minimum-release-age`
+# keeps versions younger than three days out, but neither says anything about
+# whether a package the PR adds has a known advisory against it. This does,
+# by diffing the dependency graph of the base and head commits.
+#
+# scripts/check-lockfile-integrity.mjs covers the other half — a dependency
+# resolved from somewhere other than the registry, which has no advisory
+# record to check in the first place.
+name: Dependency Review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      # No `comment-summary-in-pr`: it needs `pull-requests: write`, which a
+      # pull request from a fork cannot be granted — the step would fail on
+      # exactly the contributions this check exists for. The findings appear
+      # in the job log and in the check's annotations instead.
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # `high` rather than `moderate`: this gate is new, and one that
+          # blocks a PR over a moderate advisory in a transitive dev
+          # dependency on its first week is one people learn to bypass.
+          # Tighten it once the baseline is known to be clean.
+          fail-on-severity: high

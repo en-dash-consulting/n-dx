@@ -158,7 +158,7 @@ function Constraints({ constraints }: { constraints: ConstraintRow[] }) {
             h("td", null, h(HealthTag, { health: constraint.health })),
             h("td", null,
               constraint.appliesTo === "all"
-                ? h("span", { class: "tag" }, "all map nodes")
+                ? h("span", { class: "tag" }, "all product nodes")
                 : constraint.appliesTo.map((title) => h("span", { key: title, class: "tag" }, title)),
             ),
           ),

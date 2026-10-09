@@ -106,7 +106,7 @@ describe("ProductView", () => {
     const section = el.querySelector(".pm-constraints");
     expect(section).not.toBeNull();
     expect(section?.textContent).toContain("Architecture integrity");
-    expect(section?.textContent).toContain("all map nodes");
+    expect(section?.textContent).toContain("all product nodes");
 
     const broken = el.querySelector('[data-constraint-id="constraint-cross-os"]');
     expect(broken?.querySelector(".pm-health")?.getAttribute("data-health")).toBe("defective");
