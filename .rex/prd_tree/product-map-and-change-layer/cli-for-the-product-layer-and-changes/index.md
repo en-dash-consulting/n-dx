@@ -27,7 +27,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A product reshape move drafts an added copy that loses the capability's requirements, dependsOn, tags and body](./a-product-reshape-move-drafts-an-added.md) | pending |
 | [Add rex product and rex change commands; ndx add creates a change](./add-rex-product-and-rex-change.md) | completed |
-| [criteria-growth warning says bare "criteria" instead of "capability criteria"](./criteria-growth-warning-says-bare.md) | pending |
+| [capability-criteria warning says bare "criteria": "Capability X has no criteria"](./capability-criteria-warning-says-bare.md) | pending |
+| [criteria-growth warning says bare "criteria" instead of "capability criteria"](./criteria-growth-warning-says-bare.md) | completed |
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | completed |
 | [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | pending |
 | [rex health does not report changes that are not landed on main](./rex-health-does-not-report-changes.md) | completed |
