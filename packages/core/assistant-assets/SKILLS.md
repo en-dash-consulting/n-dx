@@ -29,7 +29,7 @@ Reference for skill authors: every skill is classified by mutation footprint. Fi
 
 **§triage** — dry-run by default. Can close GitHub issues and update project board fields when the user explicitly authorizes it. All mutations are external (GitHub API); no local files are touched. No commit warranted.
 
-**¶ndx-adversarial-review** — writes nothing during the review itself (Steps 1–6, including the duplicate check). It becomes file-modifying only after the user explicitly approves findings in Step 5, and then only through rex MCP writes to `.rex/prd_tree/` — a new item, or an `edit_item` addition to one that already tracks the finding. It never edits source and never applies a fix — fixing an approved item is a separate `/ndx-work` run. Because the approved path does write local files, it is declared `"commits": true` and carries the rule-2 commit step, trailers included, in Step 7 — with one deliberate deviation: it stages `git add .rex/prd_tree/` instead of `git add -A`, and scopes its porcelain check the same way. Its diff mode takes the dirty working tree as the review subject, so unscoped staging would commit the user's in-progress work under the review's name.
+**¶ndx-adversarial-review** — writes nothing during the review itself (Steps 1–6, including the duplicate check). It becomes file-modifying only after the user explicitly approves findings in Step 5, and then only through rex MCP writes to `.rex/prd_tree/` — a new item, or an `edit_item` addition to one that already tracks the finding. It never edits source and never applies a fix — fixing an approved item is a separate `/ndx-work` run. Because the approved path does write local files, it is declared `"commits": true` and carries the rule-2 commit step, trailers included, in Step 7 — with one deliberate deviation: it scopes its porcelain check to `.rex/prd_tree/`, so it can only ever stage paths there. Its diff mode takes the dirty working tree as the review subject, so unscoped staging would commit the user's in-progress work under the review's name.
 
 **no-plan-mode** — the rule text in `no-plan-mode.md` describes behavior enforced inside the hench system prompt (`packages/hench/src/agent/planning/prompt.ts`). The skill file exists as documentation for Claude Code users, not as a behavior injected at invocation time. Never add a commit step here.
 
@@ -42,15 +42,44 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
 ## Rules for new skills
 
 1. **Read-only** — no commit step. Document which MCP tools / CLI commands you call.
-2. **File-modifying (local files)** — declare `"commits": true` in `manifest.json` and add a terminal commit step in exactly this form:
+2. **File-modifying (local files)** — declare `"commits": true` in `manifest.json`, note what is already dirty before the skill writes anything, check for overlap just before its first write, and add a terminal commit step. The note goes at the start:
 
    ````
-   Run `git status --porcelain` against the project root. If empty, print
-   "Working tree clean — nothing to commit." and stop. Otherwise stage all
-   changes with `git add -A`, then build the message with your file-writing
-   tool — never with shell quoting — and commit it from that file.
+   Run `git -c core.quotepath=false status --porcelain --untracked-files=all`
+   against the project root and keep its output. Every path it lists is the user's work in
+   progress, and the commit step at the end stages only paths that are not on
+   this list.
+   ````
 
-   Write exactly this to a scratch file such as `.git/NDX_COMMIT_MSG`:
+   The overlap check goes just before the skill's first write:
+
+   ````
+   Check for overlap first: if any path on the list you kept at the start is
+   one this skill is about to change, name those paths and ask the user to
+   commit or stash them before you write. Once they have, run
+   `git -c core.quotepath=false status --porcelain --untracked-files=all`
+   again and keep that output as the list instead; if they decline, carry on,
+   and those paths stay out of the commit.
+   ````
+
+   A skill that writes through rex MCP cannot know which `index.md` files the
+   write rewrites — rex updates the parent's and ancestors' Children tables —
+   so for it any dirty path under `.rex/prd_tree/` is an overlap.
+
+   The commit step takes exactly this form:
+
+   ````
+   Run `git -c core.quotepath=false status --porcelain --untracked-files=all`
+   against the project root. The paths to commit are the ones that are not on the list you kept
+   at the start. If there are none, print "Working tree clean — nothing to
+   commit." and stop. Otherwise stage exactly those paths, naming each one:
+   `git add -- <path> <path> …`. Never `git add -A` or `git add .`. A path
+   still on the list stays out of this commit even if the skill changed it; name it in
+   your summary as part of the change this commit leaves out. Then build the
+   message with your file-writing tool — never with shell quoting — and
+   commit it from that file.
+
+   Write exactly this to `.ndx-commit-msg.txt` at the project root:
 
    ```
    <skill-name>: <concise description of what changed>
@@ -59,8 +88,47 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
    ```
 
-   Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
+   Then run `git commit -F .ndx-commit-msg.txt -- <the same paths>` and
+   delete `.ndx-commit-msg.txt`.
    ````
+
+   **Stage by explicit path.** A skill runs in the user's working tree, often
+   for a long session, so the tree can hold their unrelated in-progress work.
+   Staging the whole tree sweeps it into a commit attributed to the skill.
+   Staging only the paths that were not dirty at the start keeps their work
+   out, while still catching rex MCP writes under `.rex/prd_tree/` that the
+   skill never edited by hand. The list is file by file
+   (`--untracked-files=all`), so a new file inside a directory that was
+   already untracked still counts as new.
+
+   **Commit the same paths.** `git add` keeps the user's paths out of the
+   staging step, but `git commit` without a pathspec commits the whole index,
+   so anything the user had already `git add`-ed would land in the skill's
+   commit. Naming the paths on the commit (`git commit -F <file> -- <paths>`)
+   commits only those, the way hench's `commitPrdTreeIfStaged` does, and
+   leaves the user's staged work staged.
+
+   **Read paths unquoted.** By default porcelain status output quotes a path
+   with non-ASCII characters (`"caf\303\251.md"`), and `git add --` does not
+   match the quoted form, so one such path aborts the whole staging step.
+   `-c core.quotepath=false` prints those paths as they are. A path with a
+   literal quote, backslash or control character is still quoted; that stays a
+   loud failure, never a silent one.
+
+   **Ask before touching a dirty path.** Explicit-path staging alone keeps a
+   dirty path out even when the skill changed it, so `/ndx-capture` adding a
+   task under a feature whose `index.md` the user had edited would commit the
+   task file without the parent's Children row. The overlap check surfaces
+   that before the write, while the user can still commit or stash their
+   edit, so the skill's commit holds its whole change.
+
+   **Keep the scratch file at the project root, never under `.git/`.** In a
+   linked worktree `.git` is a file, not a directory, so a write to
+   `.git/<anything>` fails with "not a directory". `git rev-parse --git-path`
+   resolves the real directory, but it points outside the worktree: a Claude
+   desktop worktree session refuses to write there, and the OS temp directory
+   costs a permission prompt on every commit. Explicit-path staging keeps the
+   root-level file out of the commit.
 
    Add an `N-DX-Item: <id>` line between the two **when the skill's commit is
    for exactly one PRD item** — see [the one-item rule](#the-one-item-rule).
@@ -85,11 +153,10 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
    classifies on. Omit the flag on a skill that commits and the test fails,
    because it will be checked as read-only.
 
-   Exception to `git add -A`: a skill whose *input* is the uncommitted working
-   tree (today only `ndx-adversarial-review`, whose diff mode reviews the dirty
-   tree) must stage only the paths it wrote (`git add .rex/prd_tree/`) and scope
-   its porcelain check the same way — otherwise it commits the very work it was
-   reviewing.
+   A skill whose *input* is the uncommitted working tree (today only
+   `ndx-adversarial-review`, whose diff mode reviews the dirty tree) also
+   scopes its porcelain check to the paths it can write
+   (`-- .rex/prd_tree/`), so nothing outside them can reach its commit.
 
 3. **File-modifying (external only — GitHub, npm, global links)** — no commit step. Note in this table why.
 4. **Hench loop skills** — flag as out-of-scope in this table. Do not add commit steps.

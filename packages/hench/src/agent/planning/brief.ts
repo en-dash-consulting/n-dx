@@ -504,6 +504,21 @@ export function formatTaskBrief(brief: TaskBrief): string {
     );
   }
 
+  // Commit trailers — the task id and run live here, not in the system prompt,
+  // which is built per project. Placed near the top so a brief truncated to
+  // the vendor's context limit still carries them.
+  if (brief.commitTrailers?.length) {
+    sections.push("\n## Commit Trailers");
+    sections.push(
+      "End every commit message you write for this task with these exact lines, " +
+        "in one final trailer block together with your own trailers (such as " +
+        "Co-Authored-By:) and no blank line between them:",
+    );
+    sections.push("```");
+    sections.push(...brief.commitTrailers);
+    sections.push("```");
+  }
+
   // Parent chain
   if (brief.parentChain.length > 0) {
     sections.push("\n## Context (Parent Chain)");
