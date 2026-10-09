@@ -33,7 +33,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Draft present-tense capability specs grounded in code and tests](./draft-present-tense-capability-specs.md) | completed |
 | [Enriched placement in the migration plan: text by default, Jev when configured](./enriched-placement-in-the-migration.md) | completed |
 | [Give migrations a home: framework and the v1-to-v2 folder](./give-migrations-a-home-framework-and.md) | completed |
-| [Migration contract does not say a model question must carry every input its answer depends on, so a minimal question reuses a stale answer](./migration-contract-does-not-say-a.md) | pending |
+| [Migration contract does not say a model question must carry every input its answer depends on, so a minimal question reuses a stale answer](./migration-contract-does-not-say-a.md) | completed |
 | [Migration plan and freeSlug can freeze the slug "index", which the v2 writer refuses on a leaf](./migration-plan-and-freeslug-can-freeze.md) | completed |
 | [Migration plan checks slugs against v1 siblings, so items that become v2 siblings can share a slug and the writer refuses the tree](./migration-plan-checks-slugs-against-v1.md) | completed |
 | [Migration plan counts completed work under cancelled or deleted descendants, so a live feature built only from abandoned work becomes a capability](./migration-plan-counts-completed-work.md) | completed |
