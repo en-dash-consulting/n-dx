@@ -14,7 +14,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync, spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { cp, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   createTmpDir,
@@ -25,6 +25,8 @@ import {
 } from "./e2e-helpers.js";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
+/** A small v2 tree (product/ + changes/): one area, one capability, change CH-1 amending it. */
+const V2_FIXTURE = join(import.meta.dirname, "../../packages/rex/tests/fixtures/v2-tree");
 const LOOPBACK_HOST = "127.0.0.1";
 /** Mirrors PORT_FILE in packages/web/src/server/start.ts. */
 const PORT_FILE = ".n-dx-web.port";
@@ -71,6 +73,8 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
   beforeAll(async () => {
     tmpDir = await createTmpDir("ndx-mcp-e2e-");
     await setupRexDir(tmpDir);
+    // product/ makes the rex MCP tools read the v2 tree; the v1 store files stay for the server.
+    await cp(V2_FIXTURE, join(tmpDir, ".rex"), { recursive: true });
     await setupSourcevisionDir(tmpDir);
 
     // Find an available port
@@ -179,6 +183,45 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
     expect(toolNames).toContain("get_prd_status");
     expect(toolNames).toContain("get_next_task");
     expect(toolNames).toContain("add_item");
+  });
+
+  it("calls the product-layer tools on /mcp/rex against a v2 tree", async () => {
+    if (!canBindPorts) return;
+    const url = `http://localhost:${port}/mcp/rex`;
+    const init = await jsonRpc(url, "initialize", {
+      protocolVersion: "2024-11-05",
+      capabilities: {},
+      clientInfo: { name: "e2e-test", version: "1.0.0" },
+    });
+    const sessionId = init.sessionId;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json, text/event-stream", "Mcp-Session-Id": sessionId },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+    });
+    const call = async (name, args = {}) => {
+      const res = await jsonRpc(url, "tools/call", { name, arguments: args }, sessionId);
+      expect(res.status).toBe(200);
+      const { content, isError } = res.body.result;
+      expect(isError, `${name}: ${content[0].text}`).toBeFalsy();
+      return JSON.parse(content[0].text);
+    };
+
+    const status = await call("get_prd_status");
+    expect(status).toMatchObject({ layout: "v2", areas: [{ displayId: "A1", openChanges: 1 }], releases: [{ release: "1.2.0" }] });
+
+    const product = await call("get_product");
+    expect(product.areas[0].children[0]).toMatchObject({ displayId: "A1.1", status: "changing" });
+
+    const capability = await call("get_capability", { id: "A1.1" });
+    expect(capability.changes).toEqual([expect.objectContaining({ displayId: "CH-1", relation: "amends" })]);
+
+    const { id } = await call("add_item", { title: "Tidy the card form" });
+    const placed = await call("place_change", { id, target: "A1.1", relation: "touches" });
+    expect(placed).toEqual({ change: id, target: capability.node.id, relation: "touches" });
+
+    const applied = await call("apply_change", { id: "CH-1" });
+    expect(applied.applied).toEqual([expect.objectContaining({ delta: "modified", nodeId: capability.node.id })]);
   });
 
   it("initializes an MCP session on /mcp/sourcevision", async () => {
