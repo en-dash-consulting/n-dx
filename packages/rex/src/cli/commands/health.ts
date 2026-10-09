@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import type { ParseWarning } from "../../store/index.js";
 import { prdLayout, loadPrdModel } from "../../store/prd-model-reader.js";
@@ -18,6 +19,19 @@ function formatReaderWarnings(warnings: ParseWarning[]): string {
  * Show the structure health score for the PRD.
  * Scores 5 dimensions: depth, balance, granularity, completeness, staleness.
  */
+/** The project's package.json `version`, or undefined when there is no package.json or no version. */
+async function readPackageVersion(dir: string): Promise<string | undefined> {
+  let text: string;
+  try {
+    text = await readFile(join(resolve(dir), "package.json"), "utf-8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw err;
+  }
+  const version: unknown = (JSON.parse(text) as { version?: unknown }).version;
+  return typeof version === "string" ? version : undefined;
+}
+
 export async function cmdHealth(
   dir: string,
   flags: Record<string, string>,
@@ -32,7 +46,7 @@ export async function cmdHealth(
   // A v1 tree takes the path below, unchanged.
   if ((await prdLayout(rexDir)) === "v2") {
     const model = await loadPrdModel(rexDir);
-    const findings = checkV2TreeHealth(model.tree, (await store.loadConfig()).structureHealth);
+    const findings = checkV2TreeHealth(model.tree, (await store.loadConfig()).structureHealth, new Date(), await readPackageVersion(dir));
     const landings = await checkChangeLandings(model.tree, { repoDir: resolve(dir), cacheDir: resolveRexPaths(dir).cacheDir });
     result(
       flags.format === "json"

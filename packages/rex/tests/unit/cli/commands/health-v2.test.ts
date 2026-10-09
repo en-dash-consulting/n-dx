@@ -65,6 +65,38 @@ describe("rex health on a v2 tree", () => {
   });
 });
 
+describe("rex health title-release-token on a v2 tree", () => {
+  const CHANGE_TITLE = "Add Apple Pay";
+
+  async function retitleChange(title: string, plannedRelease?: string) {
+    await withPrdModelTransaction(rexDir, (model) => {
+      const tree = structuredClone(model.tree);
+      const change = tree.changes.find((n) => n.title === CHANGE_TITLE) as unknown as { title: string; plannedRelease?: string };
+      change.title = title;
+      if (plannedRelease) change.plannedRelease = plannedRelease;
+      return { tree, result: undefined };
+    });
+  }
+
+  it("flags a change titled with its own plannedRelease", async () => {
+    await retitleChange("0.9.0 release audit", "0.9.0");
+    const text = await run();
+    expect(text).toContain("title-release-token");
+    expect(text).toContain("0.9.0");
+  });
+
+  it("flags a title naming the package.json version", async () => {
+    await writeFile(join(tmp, "package.json"), JSON.stringify({ name: "p", version: "2.4.1" }));
+    await retitleChange("Ship 2.4.1 hardening");
+    expect(await run()).toContain("title-release-token");
+  });
+
+  it("does not flag a dependency version that is not a project release", async () => {
+    await retitleChange("Upgrade zod to 3.25.76", "0.9.0");
+    expect(await run()).not.toContain("title-release-token");
+  });
+});
+
 describe("rex health reader warnings on a v2 tree", () => {
   it("reports a node with invalid intent frontmatter by path", async () => {
     const file = join(rexDir, "product", "checkout", "pay-by-card.md");

@@ -572,15 +572,38 @@ export function checkStructureHealth(
 // ── v2 tree rules ───────────────────────────────────────────────────────────
 
 /**
+ * This project's releases, for `title-release-token`: the package version
+ * (when known) plus every `plannedRelease` and `shippedIn` in the tree,
+ * retired nodes included. Deduplicated, in first-seen order.
+ */
+export function collectReleases(tree: V2Tree, packageVersion?: string): string[] {
+  const releases = new Set<string>();
+  if (packageVersion) releases.add(packageVersion);
+  for (const { node } of indexTree(tree, { includeTombstones: true }).entries) {
+    const { plannedRelease, shippedIn } = node as { plannedRelease?: string; shippedIn?: string };
+    if (plannedRelease) releases.add(plannedRelease);
+    if (shippedIn) releases.add(shippedIn);
+  }
+  return [...releases];
+}
+
+/**
  * Run every v2 tree rule over a loaded v2 tree. `structureHealth` supplies
- * `maxCriteriaPerCapability` as the `criteria-growth` threshold.
+ * `maxCriteriaPerCapability` as the `criteria-growth` threshold. The tree's own
+ * releases (see `collectReleases`) arm `title-release-token`; pass the project's
+ * `packageVersion` to include its version line.
  */
 export function checkV2TreeHealth(
   tree: V2Tree,
   structureHealth?: StructureHealthThresholds,
   now: Date = new Date(),
+  packageVersion?: string,
 ): RuleFinding[] {
-  return checkV2Rules(tree, { now, maxCriteria: structureHealth?.maxCriteriaPerCapability });
+  return checkV2Rules(tree, {
+    now,
+    maxCriteria: structureHealth?.maxCriteriaPerCapability,
+    releases: collectReleases(tree, packageVersion),
+  });
 }
 
 /** A finished change with no commit reachable from main. */
