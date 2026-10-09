@@ -11,11 +11,12 @@ tags:
 blockedBy:
   - "fdddee24-1661-4f65-adc7-3946452bc8f8"
 source: "roadmap"
+startedAt: "2026-10-09T01:19:01.356Z"
 acceptanceCriteria:
   - "Each tool has unit tests and is listed in tools/list"
   - "mcp-transport e2e covers one call to each new tool"
 run: {"contextNotes":"Rebuild before finishing: after your last edit under packages/<pkg>/src, run `pnpm --filter @n-dx/<pkg> build`, and run it again if the adversarial review repairs any file under packages/<pkg>/src. Hench runs its affected test gate right after the review without rebuilding, and the gate refuses a stale dist/ (runs d3e891fe and 699cd138 failed this way; tracked as a hench bug under d0c26ff0)."}
 description: "New tools in their own modules. get_prd_status reports per area and per release."
-lastModified: "2026-10-08T21:43:54.086Z"
+lastModified: "2026-10-09T01:43:54.876Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
