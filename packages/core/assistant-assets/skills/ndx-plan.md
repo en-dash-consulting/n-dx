@@ -2,6 +2,8 @@ Analyze the codebase and propose PRD updates.
 
 **Before anything else, mark where this run's token usage starts:** run `ndx hench usage mark --task=skill:ndx-plan .`. The CLI snapshots the session transcript's cumulative usage and position under that id; the record step at the end computes this run's spend as the difference between that snapshot and the transcript then — arithmetic done by code, not a timestamp typed by hand. If the command reports no session or transcript, continue; the record will say it fell back.
 
+**Then note what is already dirty:** run `git status --porcelain --untracked-files=all` against the project root and keep its output. Every path it lists is the user's work in progress, and the commit step at the end stages only paths that are not on this list.
+
 1. Call `get_overview` (sourcevision MCP) to understand current project state
 2. Call `get_findings` (sourcevision MCP) to identify anti-patterns and suggestions
 3. Call `get_prd_status` (rex MCP) to see existing PRD items and avoid duplicates
@@ -17,7 +19,7 @@ Analyze the codebase and propose PRD updates.
    - `priority` — `critical`, `high`, `medium`, or `low`, inferred from the finding's severity and what it blocks
    - `source` — `ndx-plan`, so it stays clear which analysis produced the item
 8. Show the updated PRD tree via `get_prd_status`
-9. **Commit**: run `git status --porcelain` against the project root — this picks up every MCP write under `.rex/prd_tree/` (each `add_item` call produces a new `<slug>/index.md`). If the output is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block . Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to a scratch file such as `.git/NDX_COMMIT_MSG`:
+9. **Commit**: run `git status --porcelain --untracked-files=all` against the project root — this picks up every MCP write under `.rex/prd_tree/` (each `add_item` call produces a new `<slug>/index.md`). The paths to commit are the ones that are not on the list you kept at the start. If there are none, print "Working tree clean — nothing to commit." and stop. Otherwise stage exactly those paths, naming each one: `git add -- <path> <path> …`. Never `git add -A` or `git add .`: the paths already on the list are the user's work in progress, and staging them would attribute it to this skill. If this skill wrote to a path that was already on the list, leave it unstaged and tell the user it now holds both their changes and this skill's. Then commit with the n-dx authorship + model audit trailer block. Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to `.ndx-commit-msg.txt` at the project root — never under `.git/`, which is a file, not a directory, in a linked worktree:
 
    ```
    ndx-plan: add <N> proposed PRD items
@@ -26,7 +28,7 @@ Analyze the codebase and propose PRD updates.
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
    ```
 
-   Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
+   Then run `git commit -F .ndx-commit-msg.txt` and delete `.ndx-commit-msg.txt`.
 
    Replace `<N>` with the count of items created. Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
 

@@ -3,7 +3,8 @@
  *
  * These tests are static (no git operations, no LLM calls). They verify:
  *   1. Each file-modifying skill contains the required commit instructions
- *      in the correct format (guard → stage → commit with skill-scoped message).
+ *      in the correct format (snapshot → guard → explicit-path stage → commit
+ *      from a project-root message file, with a skill-scoped message).
  *   2. Read-only skills do not contain git commit instructions.
  *   3. The hench run-loop commit pathway (shared.ts) is not modified by
  *      skill-level commit additions — no skill-specific commit messages appear
@@ -15,7 +16,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   getSkillBody,
@@ -40,6 +41,55 @@ const FILE_MODIFYING_SKILLS = getSkillNames().filter((n) => SKILL_META[n].commit
 /** Skills that declare no commit, and must NOT include git commit instructions. */
 const READ_ONLY_SKILLS = getSkillNames().filter((n) => SKILL_META[n].commits !== true);
 
+/** The snapshot of already-dirty paths a committing skill takes at its start. */
+const SNAPSHOT_COMMAND = "git status --porcelain --untracked-files=all";
+
+/** The one sentence that may name whole-tree staging: the one forbidding it. */
+const STAGING_PROHIBITION = "Never `git add -A` or `git add .`";
+
+/**
+ * Every `git add` in `text` that stages the whole tree, once the prohibition
+ * sentence is set aside. Covers `-A`, `--all` and a bare `.` (not `.rex/…`).
+ */
+function wholeTreeStaging(text) {
+  return [
+    ...text
+      .replaceAll(STAGING_PROHIBITION, "")
+      .matchAll(/git add (?:-A|--all|\.(?![\w/-]))/g),
+  ].map((m) => m[0]);
+}
+
+/** Every path under `.git/` that `text` names, such as `.git/NDX_COMMIT_MSG`. */
+function pathsUnderDotGit(text) {
+  return [...text.matchAll(/\.git\/[\w.-]+/g)].map((m) => m[0]);
+}
+
+/**
+ * Every text that teaches a commit step: the canonical skill sources, each
+ * vendor's generated copies, and the skill-author template. A generated copy
+ * that drifted from its source is skill-sync's to catch; this guards the rule
+ * in whichever copy an assistant actually reads.
+ */
+function commitStepTexts() {
+  const texts = getSkillNames().map((name) => ({
+    label: `assistant-assets/skills/${name}.md`,
+    text: getSkillBody(name),
+  }));
+  for (const skillDir of [".claude/skills", ".agents/skills"]) {
+    for (const name of getSkillNames()) {
+      const file = join(ROOT, skillDir, name, "SKILL.md");
+      if (existsSync(file)) {
+        texts.push({ label: `${skillDir}/${name}/SKILL.md`, text: readFileSync(file, "utf-8") });
+      }
+    }
+  }
+  texts.push({
+    label: "assistant-assets/SKILLS.md",
+    text: readFileSync(join(ROOT, "packages/core/assistant-assets/SKILLS.md"), "utf-8"),
+  });
+  return texts;
+}
+
 // ── File-modifying skill commit step format ──────────────────────────────────
 
 describe("file-modifying skills: commit step presence", () => {
@@ -49,20 +99,32 @@ describe("file-modifying skills: commit step presence", () => {
       expect(body).toContain("git status --porcelain");
     });
 
-    // ndx-adversarial-review's diff mode takes the dirty working tree as its
-    // review subject, so it must stage only the PRD tree it wrote — `git add -A`
-    // there would commit the very work under review. Every other committing
-    // skill has no uncommitted subject and stages everything.
-    const expectedStage =
-      skill === "ndx-adversarial-review" ? "git add .rex/prd_tree/" : "git add -A";
-
-    it(`${skill}: stages its changes before committing (${expectedStage})`, () => {
+    // A skill runs in the user's working tree, which can hold their unrelated
+    // in-progress work — for /ndx-work, across a long session. The commit step
+    // stages only paths that were not dirty when the skill started, so the
+    // skill must take that snapshot before its first write.
+    it(`${skill}: notes the already-dirty paths before it writes anything`, () => {
       const body = getSkillBody(skill);
-      expect(body).toContain(expectedStage);
-      if (skill === "ndx-adversarial-review") {
-        // The body may only mention `git add -A` to prohibit it.
-        expect(body).toContain("never `git add -A`");
-      }
+      const snapshot = body.indexOf(SNAPSHOT_COMMAND);
+      expect(snapshot, "no `git status --porcelain --untracked-files=all` snapshot").toBeGreaterThan(-1);
+      expect(body).toMatch(/keep its output/);
+      expect(snapshot, "the snapshot must come before the commit step").toBeLessThan(
+        body.indexOf("git commit -F"),
+      );
+    });
+
+    it(`${skill}: stages by explicit path, never the whole tree`, () => {
+      const body = getSkillBody(skill);
+      expect(body).toContain("git add -- <path> <path> …");
+      expect(body).toMatch(/not on the list you kept/);
+      expect(wholeTreeStaging(body), "stages the whole tree").toEqual([]);
+    });
+
+    it(`${skill}: writes the commit message to .ndx-commit-msg.txt at the project root`, () => {
+      const body = getSkillBody(skill);
+      expect(body).toContain("`.ndx-commit-msg.txt` at the project root");
+      expect(body).toContain("git commit -F .ndx-commit-msg.txt");
+      expect(body).toContain("delete `.ndx-commit-msg.txt`");
     });
 
     // ndx-work's commit is the *task's* work, not the skill's own bookkeeping,
@@ -112,6 +174,38 @@ describe("file-modifying skills: commit step presence", () => {
       expect(body.toLowerCase()).toMatch(/mcp|prd_tree|side-effect|project root/);
     });
   }
+});
+
+// ── Every copy of the commit step: worktree-safe and scoped ──────────────────
+
+describe("commit-step texts: no whole-tree staging, no scratch file under .git/", () => {
+  // In a linked worktree `.git` is a file, not a directory, so a scratch file
+  // such as `.git/NDX_COMMIT_MSG` fails with "not a directory" at the last
+  // step of the skill. Whole-tree staging sweeps the user's in-progress work
+  // into a commit attributed to the skill.
+  for (const { label, text } of commitStepTexts()) {
+    it(`${label}: names no path under .git/`, () => {
+      expect(pathsUnderDotGit(text)).toEqual([]);
+    });
+
+    it(`${label}: never stages the whole tree`, () => {
+      expect(wholeTreeStaging(text)).toEqual([]);
+    });
+  }
+
+  it("the scan covers each vendor's generated copies (guards against a vacuous suite)", () => {
+    const labels = commitStepTexts().map((t) => t.label);
+    expect(labels).toContain(".claude/skills/ndx-work/SKILL.md");
+    expect(labels).toContain(".agents/skills/ndx-work/SKILL.md");
+  });
+
+  it("the skill-author template teaches the snapshot, explicit-path staging and the root scratch file", () => {
+    const template = readFileSync(join(ROOT, "packages/core/assistant-assets/SKILLS.md"), "utf-8");
+    expect(template).toContain(SNAPSHOT_COMMAND);
+    expect(template).toContain("git add -- <path> <path> …");
+    expect(template).toContain(STAGING_PROHIBITION);
+    expect(template).toContain("git commit -F .ndx-commit-msg.txt");
+  });
 });
 
 // ── The item trailer: emitted when the commit is for exactly one item ───────

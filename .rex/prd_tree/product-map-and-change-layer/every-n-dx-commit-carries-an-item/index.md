@@ -29,8 +29,8 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Add the item trailer to skill, PRD-write and operator commits](./add-the-item-trailer-to-skill-prd.md) | completed |
 | [Report commits that carry no item trailer](./report-commits-that-carry-no-item.md) | pending |
 | [Review-repair commits carry the N-DX-Item trailer](./review-repair-commits-carry-the-n-dx.md) | completed |
-| [Skill commit-message scratch file works in linked worktrees](./skill-commit-message-scratch-file.md) | pending |
-| [Skill commit steps stage only their own changes](./skill-commit-steps-stage-only-their.md) | pending |
+| [Skill commit-message scratch file works in linked worktrees](./skill-commit-message-scratch-file.md) | completed |
+| [Skill commit steps stage only their own changes](./skill-commit-steps-stage-only-their.md) | completed |
 | [Timer-expiry auto-commit carries hench's trailers](./timer-expiry-auto-commit-carries-hench.md) | pending |
 | [Write one final trailer block on every hench commit](./write-one-final-trailer-block-on-every.md) | completed |
 | [Write the item id as the N-DX-Item trailer value](./write-the-item-id-as-the-n-dx-item.md) | completed |

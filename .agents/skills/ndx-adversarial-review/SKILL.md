@@ -19,6 +19,8 @@ The necessity pass is not optional and is not a formality. A review that lists t
 
 **Before reading anything, mark where this review's token usage starts:** run `ndx hench usage mark --task=skill:ndx-adversarial-review .`. The CLI snapshots the session transcript's cumulative usage and position; Step 7's record computes the review's spend as the difference between that snapshot and the transcript then — arithmetic done by code, not a timestamp typed by hand. If the command reports no session or transcript, continue; the record will say it fell back.
 
+**Then note what is already dirty:** run `git status --porcelain --untracked-files=all` against the project root and keep its output. Every path it lists is the user's work in progress, and the commit step at the end stages only paths that are not on this list.
+
 Then read the argument, if any:
 
 - **No argument → diff mode.** Review the working diff: `git status --porcelain`, then `git diff` plus `git diff --cached` and the contents of any untracked files. If the working tree is clean, fall back to the branch diff — but **resolve the default branch, never assume it**. Run `git symbolic-ref --short refs/remotes/origin/HEAD`, which returns an already-remote-qualified ref like `origin/main`, and diff against that: `git diff <that ref>...HEAD`. It is a local lookup with no network call. In a fresh or `--single-branch` clone `origin/HEAD` is often unset and the command fails; when it does, ask the user which branch to compare against rather than guessing. (`git remote show origin` also reports the default branch, but it contacts the remote, so it is a poor silent fallback.) Say which diff you ended up reviewing.
@@ -144,7 +146,7 @@ In claim mode, if the review disproved a completion claim, also call `update_tas
 
 Then close out the run:
 
-1. **Commit.** `add_item`, `edit_item`, and `update_task_status` write to `.rex/prd_tree/<slug>/index.md` even though you edited no file directly, so there are changes to commit. Run `git status --porcelain -- .rex/prd_tree/`; if it is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage only what the review wrote with `git add .rex/prd_tree/` — never `git add -A` here: in diff mode the dirty working tree is the very thing under review, and staging everything would sweep the user's in-progress work into a commit attributed to the review. Commit with the n-dx authorship + model audit trailer block . Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to a scratch file such as `.git/NDX_COMMIT_MSG`:
+1. **Commit.** `add_item`, `edit_item`, and `update_task_status` write to `.rex/prd_tree/<slug>/index.md` even though you edited no file directly, so there are changes to commit. Run `git status --porcelain --untracked-files=all -- .rex/prd_tree/`. The paths to commit are the ones that are not on the list you kept in Step 1. If there are none, print "Working tree clean — nothing to commit." and stop. Otherwise stage only what the review wrote, naming each path: `git add -- <path> <path> …`. Never `git add -A` or `git add .`: in diff mode the dirty working tree is the very thing under review, and staging everything would sweep the user's in-progress work into a commit attributed to the review. If the review wrote to a path that was already on the list, leave it unstaged and tell the user it now holds both their changes and the review's. Commit with the n-dx authorship + model audit trailer block. Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to `.ndx-commit-msg.txt` at the project root — never under `.git/`, which is a file, not a directory, in a linked worktree:
 
    ```
    ndx-adversarial-review: capture <n> findings from <target>
@@ -153,7 +155,7 @@ Then close out the run:
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
    ```
 
-   Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
+   Then run `git commit -F .ndx-commit-msg.txt` and delete `.ndx-commit-msg.txt`.
 
    Substitute `<n>` with the number of items created and `<target>` with what was reviewed. Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
 2. **Record.** Run `ndx hench record --task=skill:ndx-adversarial-review --status=completed --title="Adversarial review: <target>" --summary="<n findings, m captured>" .`. The `skill:` form puts the cost in the orphans bucket of `get_token_usage`, which is right for a review that produced several items rather than advancing one. The record measures from the mark taken in Step 1; without that mark it falls back to the session's previous record and says so.

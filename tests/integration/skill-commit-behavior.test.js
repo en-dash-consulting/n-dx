@@ -9,6 +9,9 @@
  * Coverage:
  *   • Each file-modifying skill produces exactly one commit when the tree is dirty.
  *   • Each file-modifying skill produces no commit when the tree is clean.
+ *   • Paths the user had already modified when the skill started stay out of
+ *     its commit, unstaged.
+ *   • The commit step works in a linked worktree, where `.git` is a file.
  *   • The hench run-loop does not double-commit: its performCommitPromptIfNeeded
  *     returns early when the skill commit sentinel is absent (no pending commit file).
  *
@@ -16,6 +19,7 @@
  * @see packages/core/assistant-assets/skills/ndx-capture.md
  * @see packages/core/assistant-assets/skills/ndx-plan.md
  * @see packages/core/assistant-assets/skills/ndx-reshape.md
+ * @see packages/core/assistant-assets/skills/ndx-work.md
  * @see packages/hench/src/agent/lifecycle/shared.ts — performCommitPromptIfNeeded
  * @see tests/e2e/skill-commit-isolation.test.js — structural companion tests
  */
@@ -24,7 +28,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -91,21 +95,47 @@ function buildSkillCommitMessage(skillName, subject) {
   ].join("\n");
 }
 
+/** The project-root scratch file every skill writes its commit message to. */
+const SCRATCH = ".ndx-commit-msg.txt";
+
+/**
+ * The paths `git status --porcelain --untracked-files=all` lists — what a
+ * skill keeps at its start, and compares against at its commit step.
+ */
+function dirtyPaths(cwd) {
+  return execSync("git status --porcelain --untracked-files=all", { cwd, encoding: "utf-8" })
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.slice(3));
+}
+
 /**
  * Run the exact commit-step logic described in every file-modifying skill:
  *
- *   1. git status --porcelain  →  if empty, skip
- *   2. git add -A
- *   3. git commit -m "<message>"
+ *   1. git status --porcelain --untracked-files=all  →  keep the paths that
+ *      are not in `baseline` (the snapshot taken at the skill's start); if
+ *      none, skip
+ *   2. git add -- <each of those paths>
+ *   3. write the message to .ndx-commit-msg.txt, git commit -F it, delete it
  *
- * Returns true if a commit was created, false if the tree was clean.
+ * Returns true if a commit was created, false if there was nothing to commit.
  */
-function runSkillCommitStep(cwd, commitMessage) {
-  const status = execSync("git status --porcelain", { cwd, encoding: "utf-8" });
-  if (!status.trim()) return false;
-  execSync("git add -A", { cwd });
-  execSync(`git commit -m ${JSON.stringify(commitMessage)}`, { cwd });
+function runSkillCommitStep(cwd, commitMessage, baseline = []) {
+  const paths = dirtyPaths(cwd).filter((p) => !baseline.includes(p));
+  if (paths.length === 0) return false;
+  execFileSync("git", ["add", "--", ...paths], { cwd });
+  writeFileSync(join(cwd, SCRATCH), `${commitMessage}\n`);
+  execFileSync("git", ["commit", "-F", SCRATCH], { cwd });
+  rmSync(join(cwd, SCRATCH));
   return true;
+}
+
+/** One trailer's value on HEAD, as git's own trailer parser reads it. */
+function headTrailer(cwd, key) {
+  return execFileSync("git", ["log", "-1", `--format=%(trailers:key=${key},valueonly)`], {
+    cwd,
+    encoding: "utf-8",
+  }).trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -273,6 +303,104 @@ describe("/ndx-capture: MCP-side-effect dirtiness is detected and committed", ()
     const committed = runSkillCommitStep(dir, commitMessage);
     expect(committed).toBe(false);
     expect(countCommits(dir)).toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The user's in-progress work stays out of the skill's commit
+// ---------------------------------------------------------------------------
+
+describe("skill commit step: the user's in-progress work is not staged", () => {
+  // /ndx-work runs for a long session in the user's own working tree. Whole-
+  // tree staging used to sweep their unrelated edits into a commit attributed
+  // to the task.
+  let dir;
+  beforeEach(() => { dir = makeGitRepo(); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it("commits only the skill's paths and leaves the user's modified and untracked files unstaged", () => {
+    writeFileSync(join(dir, "README.md"), "# test\n\nthe user's edit\n");
+    writeFileSync(join(dir, "notes.txt"), "the user's scratch notes\n");
+    const baseline = dirtyPaths(dir);
+
+    // The task's own edit, plus the PRD write its MCP calls make.
+    writeFileSync(join(dir, "src.ts"), "export const x = 1;\n");
+    const prdDir = join(dir, ".rex", "prd_tree", "the-task");
+    mkdirSync(prdDir, { recursive: true });
+    writeFileSync(join(prdDir, "index.md"), "# The task\n");
+
+    const message = [
+      "fix: the task",
+      "",
+      "N-DX: skill/ndx-work",
+      "N-DX-Item: 8df7dc0a-0000-4000-8000-000000000000",
+      "Co-Authored-By: En Dash's n-dx <n-dx@endash.us>",
+    ].join("\n");
+    expect(runSkillCommitStep(dir, message, baseline)).toBe(true);
+
+    expect(latestCommitFiles(dir).sort()).toEqual([".rex/prd_tree/the-task/index.md", "src.ts"]);
+    expect(dirtyPaths(dir).sort()).toEqual(["README.md", "notes.txt"]);
+    expect(execSync("git diff --cached --name-only", { cwd: dir, encoding: "utf-8" })).toBe("");
+    expect(existsSync(join(dir, SCRATCH)), "scratch file left behind").toBe(false);
+    expect(headTrailer(dir, "N-DX-Item")).toBe("8df7dc0a-0000-4000-8000-000000000000");
+    expect(headTrailer(dir, "N-DX")).toBe("skill/ndx-work");
+  });
+
+  it("counts a new file inside a directory that was already untracked as the skill's", () => {
+    // An epic the user created but has not committed; the skill adds a child.
+    // Without --untracked-files=all both states list only the directory, and
+    // the child would be indistinguishable from the user's work.
+    const epic = join(dir, ".rex", "prd_tree", "uncommitted-epic");
+    mkdirSync(epic, { recursive: true });
+    writeFileSync(join(epic, "index.md"), "# Uncommitted epic\n");
+    const baseline = dirtyPaths(dir);
+
+    writeFileSync(join(epic, "new-task.md"), "# New task\n");
+    expect(runSkillCommitStep(dir, "ndx-capture: add 'New task' to PRD", baseline)).toBe(true);
+
+    expect(latestCommitFiles(dir)).toEqual([".rex/prd_tree/uncommitted-epic/new-task.md"]);
+    expect(dirtyPaths(dir)).toEqual([".rex/prd_tree/uncommitted-epic/index.md"]);
+  });
+
+  it("makes no commit when every dirty path was already dirty at the start", () => {
+    writeFileSync(join(dir, "README.md"), "# test\n\nthe user's edit\n");
+    const baseline = dirtyPaths(dir);
+    const before = countCommits(dir);
+    expect(runSkillCommitStep(dir, "ndx-config: update llm.vendor configuration", baseline)).toBe(false);
+    expect(countCommits(dir)).toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Linked worktrees: `.git` is a file
+// ---------------------------------------------------------------------------
+
+describe("skill commit step: works in a linked worktree", () => {
+  let dir;
+  let worktree;
+  beforeEach(() => {
+    dir = makeGitRepo();
+    worktree = mkdtempSync(join(tmpdir(), "skill-commit-worktree-"));
+    rmSync(worktree, { recursive: true, force: true });
+    execFileSync("git", ["worktree", "add", "-q", "-b", "skill-branch", worktree], { cwd: dir });
+  });
+  afterEach(() => {
+    rmSync(worktree, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("commits from the project-root scratch file where a .git/ scratch path cannot be written", () => {
+    // The old scratch path: `.git` is a file here, so this write fails.
+    expect(() => writeFileSync(join(worktree, ".git", "NDX_COMMIT_MSG"), "x")).toThrow();
+
+    writeFileSync(join(worktree, ".n-dx.json"), '{"llm":{"vendor":"claude"}}\n');
+    const message = buildSkillCommitMessage("ndx-config", "update llm.vendor configuration");
+    expect(runSkillCommitStep(worktree, message)).toBe(true);
+
+    expect(latestCommitFiles(worktree)).toEqual([".n-dx.json"]);
+    expect(headTrailer(worktree, "N-DX")).toBe("skill/ndx-config");
+    expect(existsSync(join(worktree, SCRATCH)), "scratch file left behind").toBe(false);
+    expect(dirtyPaths(worktree)).toEqual([]);
   });
 });
 

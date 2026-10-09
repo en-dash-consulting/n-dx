@@ -2,6 +2,8 @@ View or change n-dx configuration with guided assistance.
 
 **Before anything else, mark where this run's token usage starts:** run `ndx hench usage mark --task=skill:ndx-config .`. The CLI snapshots the session transcript's cumulative usage and position under that id; the record step at the end computes this run's spend as the difference between that snapshot and the transcript then — arithmetic done by code, not a timestamp typed by hand. If the command reports no session or transcript, continue; the record will say it fell back.
 
+**Then note what is already dirty:** run `git status --porcelain --untracked-files=all` against the project root and keep its output. Every path it lists is the user's work in progress, and the commit step at the end stages only paths that are not on this list.
+
 Available configuration areas:
 - LLM settings: vendor (claude/codex), model, API keys, CLI paths
 - Rex settings: budget thresholds, level-of-effort params, adapter
@@ -18,9 +20,9 @@ Run the appropriate `ndx config` command to apply changes.
 
 After applying any configuration change, commit the modified files:
 
-1. Run `git status --porcelain` against the project root. This catches every dirty path — both direct file edits to `.n-dx.json`/`.rex/config.json`/`.hench/config.json` *and* MCP side-effect writes under `.rex/prd_tree/`. If the output is empty, print "Working tree clean — nothing to commit." and stop.
-2. Run `git add -A` to stage all changes.
-3. Commit with a message that names the key changed and includes the n-dx authorship + model audit trailer block . Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to a scratch file such as `.git/NDX_COMMIT_MSG`:
+1. Run `git status --porcelain --untracked-files=all` against the project root. This catches every dirty path — both direct file edits to `.n-dx.json`/`.rex/config.json`/`.hench/config.json` *and* MCP side-effect writes under `.rex/prd_tree/`. The paths to commit are the ones that are not on the list you kept at the start. If there are none, print "Working tree clean — nothing to commit." and stop.
+2. Stage exactly those paths, naming each one: `git add -- <path> <path> …`. Never `git add -A` or `git add .`: the paths already on the list are the user's work in progress, and staging them would attribute it to this skill. If this skill wrote to a path that was already on the list, leave it unstaged and tell the user it now holds both their changes and this skill's.
+3. Commit with a message that names the key changed and includes the n-dx authorship + model audit trailer block. Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to `.ndx-commit-msg.txt` at the project root — never under `.git/`, which is a file, not a directory, in a linked worktree:
 
    ```
    ndx-config: update <key> configuration
@@ -29,7 +31,7 @@ After applying any configuration change, commit the modified files:
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
    ```
 
-   Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
+   Then run `git commit -F .ndx-commit-msg.txt` and delete `.ndx-commit-msg.txt`.
 
    Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
 
