@@ -718,6 +718,7 @@ describe("capability-criteria", () => {
     const findings = check("capability-criteria", { product: [none, empty] });
     expect(ids(findings)).toEqual([none.id, empty.id]);
     expect(findings[0].severity).toBe("warning");
+    expect(findings[0].message).toBe(`Capability "${none.title}" has no capability criteria`);
   });
 });
 

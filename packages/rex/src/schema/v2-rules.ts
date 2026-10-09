@@ -643,7 +643,7 @@ const capabilityStatement: Rule = ({ entries }) =>
 const capabilityCriteria: Rule = ({ entries }) =>
   entries
     .filter(({ node }) => node.type === "capability" && !node.criteria?.length)
-    .map(({ node }) => finding("capability-criteria", node, `Capability "${node.title}" has no criteria`));
+    .map(({ node }) => finding("capability-criteria", node, `Capability "${node.title}" has no capability criteria`));
 
 /** A node keeps one result per requirement: the last run's. */
 const checkUnique: Rule = ({ entries }) =>
