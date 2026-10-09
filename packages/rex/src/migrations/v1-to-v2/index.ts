@@ -4,9 +4,10 @@
  * Source: {@link v1TreeSource}, a v1 item tree. Rules: classification
  * (`./migration-plan.ts`), capability spec drafts (`./capability-spec.ts`) and
  * per-item data (`./migration-plan-data.ts`), joined into one entry per v1
- * item. Model passes: text and Jev placement of the changes the rules hold
- * (`./placement-pass.ts`); the caller supplies their seams with
- * `placementSeams`. Nothing applies the plan yet.
+ * item. Model passes: the text pass redrafts capability specs
+ * (`./spec-pass.ts`) and, with the Jev pass, places the changes the rules hold
+ * (`./placement-pass.ts`); the caller supplies their seams with `planSeams`
+ * (`./seams.ts`). Nothing applies the plan yet.
  *
  * @module migrations/v1-to-v2
  */
@@ -18,6 +19,8 @@ import { draftCapabilitySpecs, type CapabilitySpecDraft, type SpecDraftOptions }
 import { buildPlanData, type ItemPlanData, type PlanData, type PlanDataOptions } from "./migration-plan-data.js";
 import { classifyV1Tree, type ClassifyOptions, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
 import { placementJevPass, placementTextPass, type PlacementFields, type PlacementPassOptions } from "./placement-pass.js";
+import { isSpecQuestion, specTextPass } from "./spec-pass.js";
+import type { ModelPass } from "../migration.js";
 
 export const V1_TREE_SOURCE_KIND = "rex-v1-tree";
 
@@ -60,6 +63,21 @@ export type V1ToV2Options = Partial<Pick<SpecDraftOptions, "testFiles" | "codeFi
   ClassifyOptions &
   PlacementPassOptions;
 
+/**
+ * The text pass asks both kinds of question: placement of held changes and
+ * spec redrafts of capabilities. The two never ask about the same item. Spec
+ * questions come from the rules' placements; a change the text pass places
+ * joins the capability's history on the next plan, not this one.
+ */
+const textPass: ModelPass<readonly PRDItem[], V1ToV2Entry, V1ToV2Options> = {
+  questions: (entries, items, context) => [
+    ...placementTextPass.questions(entries, items, context),
+    ...specTextPass.questions(entries, items, context),
+  ],
+  merge: (entry, answer, at) =>
+    isSpecQuestion(at.question) ? specTextPass.merge(entry, answer, at) : placementTextPass.merge(entry, answer, at),
+};
+
 export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Summary, V1ToV2Options>({
   id: "v1-to-v2",
   from: "v1",
@@ -89,5 +107,5 @@ export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Sum
       },
     };
   },
-  passes: { text: placementTextPass, jev: placementJevPass },
+  passes: { text: textPass, jev: placementJevPass },
 });

@@ -5,7 +5,7 @@ import type { PlacementJudge, PlacementSettings } from "../../../../src/core/pla
 import type { PlacementModel } from "../../../../src/core/placement.js";
 import { formatPlanFile } from "../../../../src/migrations/plan-file.js";
 import { v1ToV2, v1TreeSource } from "../../../../src/migrations/v1-to-v2/index.js";
-import { placementSeams } from "../../../../src/migrations/v1-to-v2/placement-pass.js";
+import { planSeams } from "../../../../src/migrations/v1-to-v2/seams.js";
 
 function item(id: string, level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed"): PRDItem {
   return { id, level, title, status, children };
@@ -35,7 +35,7 @@ const judgeSeam = (choice: string, confidence: number) =>
   }));
 
 function plan(settings: PlacementSettings, tiers: { text?: PlacementModel; judge?: PlacementJudge; jevAvailable?: boolean; rulesOnly?: boolean } = {}) {
-  const seams = placementSeams({
+  const seams = planSeams({
     settings,
     rulesOnly: tiers.rulesOnly,
     ...(tiers.text ? { text: { model: TEXT_MODEL, place: tiers.text } } : {}),
@@ -74,7 +74,7 @@ describe("v1-to-v2 placement passes", () => {
   it("a re-plan reuses the recorded text answer and applies the new accept rule", async () => {
     const first = await plan({ models: "text", autoAccept: "none" }, { text: textSeam("f1") });
     const text = textSeam("f2");
-    const seams = placementSeams({ settings: { models: "text", autoAccept: "agree" }, text: { model: TEXT_MODEL, place: text } });
+    const seams = planSeams({ settings: { models: "text", autoAccept: "agree" }, text: { model: TEXT_MODEL, place: text } });
     const again = await v1ToV2.plan(v1TreeSource(tree()), {
       cutAt: CUT,
       seams,

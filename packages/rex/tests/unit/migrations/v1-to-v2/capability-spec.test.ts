@@ -3,7 +3,7 @@ import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.j
 import { RequirementSchema } from "../../../../src/schema/validate.js";
 import { CapabilityIntentSchema } from "../../../../src/schema/v2.js";
 import { classifyV1Tree } from "../../../../src/migrations/v1-to-v2/migration-plan.js";
-import { draftCapabilitySpecs, toEars, type CapabilitySpecDraft } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
+import { draftCapabilitySpecs, isProcessCriterion, toEars, type CapabilitySpecDraft } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
 
 let seq = 0;
 function item(level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {
@@ -62,10 +62,49 @@ describe("toEars", () => {
     expect(toEars("The task stays claimed (tests).")).toBe("The system shall ensure that the task stays claimed.");
     expect(toEars("Reads agree on a live claim (test);")).toBe("The system shall ensure that reads agree on a live claim.");
   });
+
+  it("gives a verb-led criterion its subject in the base form", () => {
+    expect(toEars("removes dead exports")).toBe("The system shall remove dead exports.");
+    expect(toEars("Records the transition (test)")).toBe("The system shall record the transition.");
+    expect(toEars("applies the plan once")).toBe("The system shall apply the plan once.");
+    expect(toEars("matches criteria to tests")).toBe("The system shall match criteria to tests.");
+  });
+
+  it("keeps a plural subject that looks like a verb as the subject", () => {
+    expect(toEars("Logs are kept for a week")).toBe("The system shall ensure that logs are kept for a week.");
+    expect(toEars("Runs show their model")).toBe("The system shall ensure that runs show their model.");
+    expect(toEars("Claims expire after an hour")).toBe("The system shall ensure that claims expire after an hour.");
+  });
+});
+
+describe("isProcessCriterion", () => {
+  it("recognises tests passing, docs updated, a changeset, a clean build and review", () => {
+    for (const text of [
+      "All tests pass",
+      "Existing tests pass (test)",
+      "pnpm typecheck passes",
+      "Docs are updated",
+      "README updated with the new flag",
+      "Changeset added",
+      "Add a changeset",
+      "Add unit tests for the parser",
+      "No type errors",
+      "PR is reviewed",
+      "The system shall ensure that all tests pass.",
+    ]) {
+      expect(isProcessCriterion(text), text).toBe(true);
+    }
+  });
+
+  it("leaves product behaviour that mentions tests or docs alone", () => {
+    for (const text of ["The test gate runs the affected suites", "Failing tests block completion", "The docs view lists every page"]) {
+      expect(isProcessCriterion(text), text).toBe(false);
+    }
+  });
 });
 
 describe("draftCapabilitySpecs", () => {
-  it("drafts a statement for every capability in the plan, marked unreviewed", () => {
+  it("drafts a spec for every capability in the plan, with no retired specReviewed field", () => {
     const items = tree();
     const plan = classifyV1Tree(items);
     const specs = draftCapabilitySpecs(plan, items, { testFiles: TEST_FILES });
@@ -73,17 +112,29 @@ describe("draftCapabilitySpecs", () => {
     expect(capabilities.length).toBe(2);
     expect(specs.map((s) => s.capability)).toEqual(capabilities);
     for (const s of specs) {
-      expect(s.statement.trim()).not.toBe("");
-      expect(s.specReviewed).toBe(false);
+      expect(s).not.toHaveProperty("specReviewed");
+      expect(s).not.toHaveProperty("draftedBy");
     }
   });
 
-  it("states the capability in present tense from its description, or from its title when the description is work", () => {
+  it("states the capability in present tense from its description, and asks for a statement when the description is work", () => {
     const specs = draft();
     expect(spec(specs, "Task selection").statement).toBe("Picks the next actionable task by priority and dependencies.");
     const live = spec(specs, "Live tab");
-    expect(live.statement).toBe("The product provides live tab.");
-    expect(live.notes.join(" ")).toMatch(/drafted from the title/);
+    expect(live.statement).toBeUndefined();
+    expect(live.notes.join(" ")).toMatch(/no present-tense statement/);
+  });
+
+  it("does not copy a description that describes the work or a wish", () => {
+    for (const description of [
+      "This feature adds a live view of runs.",
+      "Currently the dashboard shows nothing while a run is live.",
+      "The dashboard will show live runs as they happen.",
+      "Users cannot see which run is live today.",
+    ]) {
+      const items = [item("epic", "Web", [item("feature", "Live runs", [item("task", "Show runs")], "completed", { description })])];
+      expect(draft(items)[0].statement, description).toBeUndefined();
+    }
   });
 
   it("draws EARS criteria from the capability and its applied history, deduplicated, never from unfinished work", () => {
@@ -95,6 +146,8 @@ describe("draftCapabilitySpecs", () => {
       "When a claim is stale, the selector skips it.",
     ]);
     expect(s.criteria.map((c) => c.text).join(" ")).not.toMatch(/released on exit/);
+    expect(s.criteria.map((c) => c.source.replace(/-\d+$/, ""))).toEqual(["feature", "feature", "subtask"]);
+    for (const c of s.criteria) expect(s.sources).toContain(c.source);
     expect(s.sources[0]).toBe(s.capability);
     expect(s.sources.map((id) => id.replace(/-\d+$/, ""))).toEqual(["feature", "task", "task", "subtask"]);
   });
@@ -134,7 +187,37 @@ describe("draftCapabilitySpecs", () => {
     expect(tied.requirements).toEqual([]);
   });
 
-  it("falls back to the title when the description opens with metadata, a reference or a fragment", () => {
+  it("leaves process criteria out of the spec", () => {
+    const items = [
+      item("epic", "Rex", [
+        item("feature", "Claim handling", [], "completed", {
+          description: "Holds tasks for one worktree.",
+          acceptanceCriteria: ["Claims expire after an hour", "Existing tests pass", "Docs are updated", "Changeset added"],
+        }),
+      ]),
+    ];
+    expect(draft(items)[0].criteria.map((c) => c.text)).toEqual(["The system shall ensure that claims expire after an hour."]);
+  });
+
+  it("links tests only in the packages of the capability's code files", () => {
+    const items = [
+      item("epic", "Hench", [
+        item("feature", "Prompt sections", [], "completed", {
+          description: "Builds the agent prompt from sections.",
+          acceptanceCriteria: ["Workspace prompt sections are trimmed"],
+        }),
+      ]),
+    ];
+    const testFiles = ["packages/web/tests/unit/workspace-prompt-sections.test.ts", "packages/hench/tests/unit/prompt-sections.test.ts"];
+    const [unscoped] = draft(items, { testFiles });
+    expect(unscoped.tests).toEqual(["packages/web/tests/unit/workspace-prompt-sections.test.ts"]);
+    const id = items[0].children![0].id;
+    const [scoped] = draft(items, { testFiles, codeFiles: { [id]: ["packages/hench/src/agent/prompt.ts"] } });
+    expect(scoped.tests).toEqual(["packages/hench/tests/unit/prompt-sections.test.ts"]);
+    expect(scoped.criteria[0].tests).toEqual(scoped.tests);
+  });
+
+  it("has no statement when the description opens with metadata, a reference or a fragment", () => {
     const descriptions = [
       "**Severity:** medium — **Verdict:** should-fix (captured from a review).",
       "Verdict: must-fix. The rest explains.",
@@ -144,8 +227,8 @@ describe("draftCapabilitySpecs", () => {
     for (const description of descriptions) {
       const items = [item("epic", "Rex", [item("feature", "Claim handling", [item("task", "Hold claims")], "completed", { description })])];
       const [s] = draft(items);
-      expect(s.statement, description).toBe("The product provides claim handling.");
-      expect(s.notes.join(" ")).toMatch(/drafted from the title/);
+      expect(s.statement, description).toBeUndefined();
+      expect(s.notes.join(" ")).toMatch(/no present-tense statement/);
     }
   });
 
@@ -153,11 +236,6 @@ describe("draftCapabilitySpecs", () => {
     const description = "Records the transition in the commit message (e.g. completed or failing) for every run. More text.";
     const items = [item("epic", "Rex", [item("feature", "Commit trailers", [item("task", "Write trailers")], "completed", { description })])];
     expect(draft(items)[0].statement).toBe("Records the transition in the commit message (e.g. completed or failing) for every run.");
-  });
-
-  it("keeps a Title Case name as written in a title-drafted statement", () => {
-    const items = [item("epic", "Hench", [item("feature", "Runtime Prompt Tightening", [item("task", "Cut sections")])])];
-    expect(draft(items)[0].statement).toBe("The product provides Runtime Prompt Tightening.");
   });
 
   it("leaves the command off when no test command is given, naming the tests instead", () => {

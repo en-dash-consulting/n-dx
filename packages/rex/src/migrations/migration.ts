@@ -58,6 +58,11 @@ export interface ModelQuestion {
 export interface PassSeam {
   /** Recorded in the plan header and with each answer. */
   model: string;
+  /**
+   * Question kinds the seam answers, when its pass asks several (`placement`,
+   * `spec`). A pass asks a seam only the kinds listed; absent means every kind.
+   */
+  kinds?: readonly string[];
   /** Returns a JSON-serialisable answer. */
   ask(question: ModelQuestion): Promise<unknown>;
 }

@@ -462,6 +462,7 @@ describe("isolation", () => {
         "migrations/v1-to-v2/migration-plan.ts",
         "migrations/v1-to-v2/capability-spec.ts",
         "migrations/v1-to-v2/migration-plan-data.ts",
+        "migrations/v1-to-v2/spec-pass.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),
