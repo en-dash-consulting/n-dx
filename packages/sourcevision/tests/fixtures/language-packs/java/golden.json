@@ -136,6 +136,7 @@
             }
           }
         ],
+        "annotations": [],
         "type-references": [
           {
             "name": "typeref.name",
@@ -231,6 +232,7 @@
         ],
         "methods": [],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -744,6 +746,7 @@
             }
           }
         ],
+        "annotations": [],
         "type-references": [
           {
             "name": "typeref.field",
@@ -1216,6 +1219,7 @@
         ],
         "methods": [],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -1284,6 +1288,7 @@
         ],
         "methods": [],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -1352,6 +1357,7 @@
         ],
         "methods": [],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -1447,6 +1453,7 @@
           }
         ],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -1541,6 +1548,7 @@
         ],
         "methods": [],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -2964,6 +2972,86 @@
             }
           }
         ],
+        "annotations": [
+          {
+            "name": "annotation.use",
+            "nodeType": "marker_annotation",
+            "text": "@Service",
+            "start": {
+              "line": 12,
+              "column": 0
+            },
+            "end": {
+              "line": 12,
+              "column": 8
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "Service",
+            "start": {
+              "line": 12,
+              "column": 1
+            },
+            "end": {
+              "line": 12,
+              "column": 8
+            }
+          },
+          {
+            "name": "annotation.use",
+            "nodeType": "marker_annotation",
+            "text": "@Autowired",
+            "start": {
+              "line": 15,
+              "column": 2
+            },
+            "end": {
+              "line": 15,
+              "column": 12
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "Autowired",
+            "start": {
+              "line": 15,
+              "column": 3
+            },
+            "end": {
+              "line": 15,
+              "column": 12
+            }
+          },
+          {
+            "name": "annotation.use",
+            "nodeType": "marker_annotation",
+            "text": "@NonNull",
+            "start": {
+              "line": 24,
+              "column": 26
+            },
+            "end": {
+              "line": 24,
+              "column": 34
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "NonNull",
+            "start": {
+              "line": 24,
+              "column": 27
+            },
+            "end": {
+              "line": 24,
+              "column": 34
+            }
+          }
+        ],
         "type-references": [
           {
             "name": "typeref.annotation",
@@ -4297,6 +4385,112 @@
             }
           }
         ],
+        "annotations": [
+          {
+            "name": "annotation.use",
+            "nodeType": "marker_annotation",
+            "text": "@Override",
+            "start": {
+              "line": 14,
+              "column": 6
+            },
+            "end": {
+              "line": 14,
+              "column": 15
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "Override",
+            "start": {
+              "line": 14,
+              "column": 7
+            },
+            "end": {
+              "line": 14,
+              "column": 15
+            }
+          },
+          {
+            "name": "annotation.use",
+            "nodeType": "annotation",
+            "text": "@Audited(\"types\")",
+            "start": {
+              "line": 39,
+              "column": 2
+            },
+            "end": {
+              "line": 39,
+              "column": 19
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "Audited",
+            "start": {
+              "line": 39,
+              "column": 3
+            },
+            "end": {
+              "line": 39,
+              "column": 10
+            }
+          },
+          {
+            "name": "annotation.arguments",
+            "nodeType": "annotation_argument_list",
+            "text": "(\"types\")",
+            "start": {
+              "line": 39,
+              "column": 10
+            },
+            "end": {
+              "line": 39,
+              "column": 19
+            }
+          },
+          {
+            "name": "annotation.string_argument",
+            "nodeType": "string_literal",
+            "text": "\"types\"",
+            "start": {
+              "line": 39,
+              "column": 11
+            },
+            "end": {
+              "line": 39,
+              "column": 18
+            }
+          },
+          {
+            "name": "annotation.use",
+            "nodeType": "marker_annotation",
+            "text": "@Deprecated",
+            "start": {
+              "line": 40,
+              "column": 2
+            },
+            "end": {
+              "line": 40,
+              "column": 13
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "Deprecated",
+            "start": {
+              "line": 40,
+              "column": 3
+            },
+            "end": {
+              "line": 40,
+              "column": 13
+            }
+          }
+        ],
         "type-references": [
           {
             "name": "typeref.extends",
@@ -4795,6 +4989,7 @@
         ],
         "methods": [],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -4863,6 +5058,7 @@
         ],
         "methods": [],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -4931,6 +5127,7 @@
         ],
         "methods": [],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -5079,6 +5276,7 @@
             }
           }
         ],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -5147,6 +5345,7 @@
         ],
         "methods": [],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     },
@@ -5215,6 +5414,7 @@
         ],
         "methods": [],
         "calls": [],
+        "annotations": [],
         "type-references": []
       }
     }

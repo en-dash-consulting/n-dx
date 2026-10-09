@@ -11,7 +11,7 @@ import { javaResolver } from "./java-resolver.js";
 import { queryDir } from "./package-paths.js";
 import type { LanguagePack, RuleProvenance } from "./pack.js";
 
-const QUERY_NAMES = ["packages", "imports", "declarations", "methods", "calls", "type-references"] as const;
+const QUERY_NAMES = ["packages", "imports", "declarations", "methods", "calls", "annotations", "type-references"] as const;
 
 /** Query files ship in `src/language/queries/java`; see `package-paths.ts`. */
 const queryPath = (file: string): string => join(queryDir("java"), file);
@@ -43,6 +43,7 @@ export const javaPack: LanguagePack = {
     declarations: VERIFIED,
     methods: VERIFIED,
     calls: VERIFIED,
+    annotations: VERIFIED,
     "type-references": VERIFIED,
     // Lookup order of a simple type name: declared in the file, single-type
     // import, same package, wildcard import.
