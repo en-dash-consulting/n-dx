@@ -186,6 +186,49 @@ describe("hench review pending", () => {
     );
   });
 
+  it("lists a moved project's findings, ignoring the stale absolute path on the record", async () => {
+    // `reportPath` is absolute, so a project that moved on disk is exactly the
+    // case where it is stale — the command used to prefer it and fail with
+    // "Could not read the review report" for a report sitting right there in
+    // the new .hench/reviews/ under its own run id.
+    await saveRun(
+      henchDir,
+      makeRun(
+        cleanReview({
+          deferredCount: 1,
+          reportPath: join(tmpdir(), "where-the-project-used-to-be", ".hench", "reviews", "run-001.json"),
+        }),
+      ),
+    );
+    await writeReport(parkedReport());
+
+    const { cmdReview } = await import("../../../../src/cli/commands/review.js");
+    await cmdReview(projectDir, ["pending", "run-001"], {});
+
+    const out = printed();
+    expect(out).toContain("1 deferred finding(s)");
+    expect(out).toContain("Stale claim survives a crashed worktree");
+  });
+
+  it("falls back to the recorded path when the canonical location holds nothing", async () => {
+    // The other direction: a report an operator or a future layout put
+    // somewhere else is still reachable, which is why the stored path is kept
+    // as a fallback rather than dropped.
+    const elsewhere = join(projectDir, "archived-reviews");
+    await mkdir(elsewhere, { recursive: true });
+    const storedPath = join(elsewhere, "run-001.json");
+    await writeFile(storedPath, JSON.stringify(parkedReport(), null, 2), "utf-8");
+    await saveRun(henchDir, makeRun(cleanReview({ deferredCount: 1, reportPath: storedPath })));
+    // Nothing at .hench/reviews/run-001.json.
+
+    const { cmdReview } = await import("../../../../src/cli/commands/review.js");
+    await cmdReview(projectDir, ["pending", "run-001"], { format: "json" });
+
+    const payload = JSON.parse(printed());
+    expect(payload.reportPath).toBe(storedPath);
+    expect(payload.deferred).toHaveLength(1);
+  });
+
   it("requires a run id", async () => {
     const { cmdReview } = await import("../../../../src/cli/commands/review.js");
     await expect(cmdReview(projectDir, ["pending"], {})).rejects.toThrow(/Missing run ID/);
