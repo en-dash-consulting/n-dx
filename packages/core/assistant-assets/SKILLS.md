@@ -42,7 +42,7 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
 ## Rules for new skills
 
 1. **Read-only** — no commit step. Document which MCP tools / CLI commands you call.
-2. **File-modifying (local files)** — declare `"commits": true` in `manifest.json`, note what is already dirty before the skill writes anything, and add a terminal commit step. The note goes at the start, before the skill's first write:
+2. **File-modifying (local files)** — declare `"commits": true` in `manifest.json`, note what is already dirty before the skill writes anything, check for overlap just before its first write, and add a terminal commit step. The note goes at the start:
 
    ````
    Run `git status --porcelain --untracked-files=all` against the project
@@ -51,6 +51,20 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
    this list.
    ````
 
+   The overlap check goes just before the skill's first write:
+
+   ````
+   Check for overlap first: if any path on the list you kept at the start is
+   one this skill is about to change, name those paths and ask the user to
+   commit or stash them before you write. Once they have, run `git status
+   --porcelain --untracked-files=all` again and keep that output as the list
+   instead; if they decline, carry on, and those paths stay out of the commit.
+   ````
+
+   A skill that writes through rex MCP cannot know which `index.md` files the
+   write rewrites — rex updates the parent's and ancestors' Children tables —
+   so for it any dirty path under `.rex/prd_tree/` is an overlap.
+
    The commit step takes exactly this form:
 
    ````
@@ -58,10 +72,11 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
    root. The paths to commit are the ones that are not on the list you kept
    at the start. If there are none, print "Working tree clean — nothing to
    commit." and stop. Otherwise stage exactly those paths, naming each one:
-   `git add -- <path> <path> …`. Never `git add -A` or `git add .`. If the
-   skill wrote to a path that was already on the list, leave it unstaged and
-   tell the user. Then build the message with your file-writing tool — never
-   with shell quoting — and commit it from that file.
+   `git add -- <path> <path> …`. Never `git add -A` or `git add .`. A path
+   still on the list stays unstaged even if the skill changed it; name it in
+   your summary as part of the change this commit leaves out. Then build the
+   message with your file-writing tool — never with shell quoting — and
+   commit it from that file.
 
    Write exactly this to `.ndx-commit-msg.txt` at the project root:
 
@@ -83,6 +98,13 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
    skill never edited by hand. The list is file by file
    (`--untracked-files=all`), so a new file inside a directory that was
    already untracked still counts as new.
+
+   **Ask before touching a dirty path.** Explicit-path staging alone keeps a
+   dirty path out even when the skill changed it, so `/ndx-capture` adding a
+   task under a feature whose `index.md` the user had edited would commit the
+   task file without the parent's Children row. The overlap check surfaces
+   that before the write, while the user can still commit or stash their
+   edit, so the skill's commit holds its whole change.
 
    **Keep the scratch file at the project root, never under `.git/`.** In a
    linked worktree `.git` is a file, not a directory, so a write to

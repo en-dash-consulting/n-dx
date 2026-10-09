@@ -44,6 +44,17 @@ const READ_ONLY_SKILLS = getSkillNames().filter((n) => SKILL_META[n].commits !==
 /** The snapshot of already-dirty paths a committing skill takes at its start. */
 const SNAPSHOT_COMMAND = "git status --porcelain --untracked-files=all";
 
+/** What the overlap check asks of the user, and how the skill resumes after. */
+const OVERLAP_ASK = "ask the user to commit or stash";
+const RESNAPSHOT = "again and keep that output as the list instead";
+
+/** The paragraph (or list item) of `text` containing the index `at`. */
+function paragraphAt(text, at) {
+  const start = text.lastIndexOf("\n", at) + 1;
+  const end = text.indexOf("\n", at);
+  return text.slice(start, end === -1 ? undefined : end);
+}
+
 /** The one sentence that may name whole-tree staging: the one forbidding it. */
 const STAGING_PROHIBITION = "Never `git add -A` or `git add .`";
 
@@ -111,6 +122,24 @@ describe("file-modifying skills: commit step presence", () => {
       expect(snapshot, "the snapshot must come before the commit step").toBeLessThan(
         body.indexOf("git commit -F"),
       );
+    });
+
+    // Explicit-path staging alone keeps an already-dirty path out of the
+    // commit even when the skill changed it — /ndx-capture would commit a task
+    // file without its parent's Children row. So before the first write the
+    // skill asks the user to commit or stash any dirty path it will touch.
+    it(`${skill}: checks for overlap with the dirty paths before its first write`, () => {
+      const body = getSkillBody(skill);
+      const check = body.indexOf(OVERLAP_ASK);
+      expect(check, `no "${OVERLAP_ASK}" overlap check`).toBeGreaterThan(-1);
+      expect(check, "the check must follow the snapshot").toBeGreaterThan(body.indexOf(SNAPSHOT_COMMAND));
+      expect(check, "the check must come before the commit step").toBeLessThan(body.indexOf("git commit -F"));
+      const sentence = paragraphAt(body, check);
+      expect(sentence).toContain(RESNAPSHOT);
+      if (skill !== "ndx-config") {
+        // rex rewrites ancestors' index.md, so any dirty PRD path overlaps.
+        expect(sentence).toContain("`.rex/prd_tree/`");
+      }
     });
 
     it(`${skill}: stages by explicit path, never the whole tree`, () => {
@@ -199,9 +228,12 @@ describe("commit-step texts: no whole-tree staging, no scratch file under .git/"
     expect(labels).toContain(".agents/skills/ndx-work/SKILL.md");
   });
 
-  it("the skill-author template teaches the snapshot, explicit-path staging and the root scratch file", () => {
+  it("the skill-author template teaches the snapshot, the overlap check, explicit-path staging and the root scratch file", () => {
     const template = readFileSync(join(ROOT, "packages/core/assistant-assets/SKILLS.md"), "utf-8");
     expect(template).toContain(SNAPSHOT_COMMAND);
+    // The template's code block wraps lines, so match across the wrap.
+    expect(template.replace(/\s+/g, " ")).toContain(OVERLAP_ASK);
+    expect(template.replace(/\s+/g, " ")).toContain(RESNAPSHOT);
     expect(template).toContain("git add -- <path> <path> …");
     expect(template).toContain(STAGING_PROHIBITION);
     expect(template).toContain("git commit -F .ndx-commit-msg.txt");

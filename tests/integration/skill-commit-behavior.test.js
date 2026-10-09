@@ -9,6 +9,8 @@
  * Coverage:
  *   • Each file-modifying skill produces exactly one commit when the tree is dirty.
  *   • Each file-modifying skill produces no commit when the tree is clean.
+ *   • A dirty path the skill is about to touch is surfaced before the write
+ *     (/ndx-capture with a parent index.md the user had edited).
  *   • Paths the user had already modified when the skill started stay out of
  *     its commit, unstaged.
  *   • The commit step works in a linked worktree, where `.git` is a file.
@@ -368,6 +370,72 @@ describe("skill commit step: the user's in-progress work is not staged", () => {
     const before = countCommits(dir);
     expect(runSkillCommitStep(dir, "ndx-config: update llm.vendor configuration", baseline)).toBe(false);
     expect(countCommits(dir)).toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The overlap check: a dirty path the skill is about to touch
+// ---------------------------------------------------------------------------
+
+/**
+ * The overlap check a PRD-writing skill runs before its first write: the
+ * already-dirty paths under `.rex/prd_tree/`, which rex may rewrite (it
+ * updates the parent's and ancestors' Children tables).
+ */
+function prdOverlap(baseline) {
+  return baseline.filter((p) => p.startsWith(".rex/prd_tree/"));
+}
+
+describe("/ndx-capture: a parent index.md the user had already edited", () => {
+  // Without the check, explicit-path staging committed the new task file but
+  // left out the parent's Children row, because the parent was already dirty.
+  const PARENT = ".rex/prd_tree/feature/index.md";
+  const TASK = ".rex/prd_tree/feature/new-task.md";
+  let dir;
+  beforeEach(() => {
+    dir = makeGitRepo();
+    mkdirSync(join(dir, ".rex", "prd_tree", "feature"), { recursive: true });
+    writeFileSync(join(dir, PARENT), "# Feature\n\n## Children\n");
+    execFileSync("git", ["add", "--", PARENT], { cwd: dir });
+    execFileSync("git", ["commit", "-q", "-m", "feature"], { cwd: dir });
+    // The user's own uncommitted edit to the parent.
+    writeFileSync(join(dir, PARENT), "# Feature\n\nThe user's edit.\n\n## Children\n");
+  });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  /** What add_item writes: the task file and a Children row in its parent. */
+  function addItem() {
+    writeFileSync(join(dir, TASK), "# New task\n");
+    writeFileSync(
+      join(dir, PARENT),
+      "# Feature\n\nThe user's edit.\n\n## Children\n\n| [New task](./new-task.md) | pending |\n",
+    );
+  }
+
+  it("surfaces the parent before the write, and once the user commits it the skill's commit holds its whole change", () => {
+    let baseline = dirtyPaths(dir);
+    expect(prdOverlap(baseline)).toEqual([PARENT]);
+
+    // The user commits their edit; the skill takes the snapshot again.
+    execFileSync("git", ["commit", "-q", "-am", "the user's edit"], { cwd: dir });
+    baseline = dirtyPaths(dir);
+    expect(prdOverlap(baseline)).toEqual([]);
+
+    addItem();
+    expect(runSkillCommitStep(dir, "ndx-capture: add 'New task' to PRD", baseline)).toBe(true);
+    expect(latestCommitFiles(dir).sort()).toEqual([PARENT, TASK]);
+    expect(dirtyPaths(dir)).toEqual([]);
+  });
+
+  it("when the user declines, commits only the skill's own paths and leaves the parent out, still dirty", () => {
+    const baseline = dirtyPaths(dir);
+    expect(prdOverlap(baseline)).toEqual([PARENT]);
+
+    addItem();
+    expect(runSkillCommitStep(dir, "ndx-capture: add 'New task' to PRD", baseline)).toBe(true);
+    expect(latestCommitFiles(dir)).toEqual([TASK]);
+    // What the summary must name: paths still on the list.
+    expect(dirtyPaths(dir).filter((p) => baseline.includes(p))).toEqual([PARENT]);
   });
 });
 
