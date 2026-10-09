@@ -55,7 +55,8 @@ export async function cmdTreeDiff(
 
   if (isMarkdown(flags)) {
     await emit(renderTreeDiffMarkdown({ fromLabel: from.label, toLabel: to.label, diff, map }), out);
-    reportWarnings(from, to);
+    // stdout may be the posted comment: every notice goes to stderr.
+    reportWarnings(from, to, warn);
     return;
   }
 
@@ -315,11 +316,18 @@ function show(v: string | null): string {
  * `present: false` with an empty `warnings` array, since there is no on-disk
  * tree for the parser to have warned about. Keying off the warning text alone
  * left that case silent.
+ *
+ * `notice` carries the absent-tree line: `info` (stdout) for text output,
+ * `warn` (stderr) for the Markdown comment, whose stdout must stay clean.
  */
-function reportWarnings(from: ResolvedTree, to: ResolvedTree): void {
+function reportWarnings(
+  from: ResolvedTree,
+  to: ResolvedTree,
+  notice: (message: string) => void = info,
+): void {
   for (const [side, tree] of [[from.label, from], [to.label, to]] as const) {
     if (!tree.present) {
-      info(`${side}: no PRD tree at this source.`);
+      notice(`${side}: no PRD tree at this source.`);
     }
     for (const w of tree.warnings) {
       if (w.message === "Tree root directory does not exist") continue;

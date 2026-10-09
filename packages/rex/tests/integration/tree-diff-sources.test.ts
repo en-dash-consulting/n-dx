@@ -246,6 +246,23 @@ describe("tree-diff against git refs", () => {
     expect(output).toContain(`${firstSha}: no PRD tree at this source.`);
   });
 
+  it("keeps the absent-tree notice out of the Markdown comment on stdout", async () => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (...args: unknown[]) => void out.push(args.join(" "));
+    console.error = (...args: unknown[]) => void err.push(args.join(" "));
+    try {
+      await cmdTreeDiff(dir, { from: firstSha, to: secondSha, format: "markdown" });
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+    expect(out.join("\n")).not.toContain("no PRD tree");
+    expect(err.join("\n")).toContain(`${firstSha}: no PRD tree at this source.`);
+  });
+
   it("leaves the caller's index and working tree untouched", async () => {
     // GIT_INDEX_FILE is what keeps `git checkout -- <path>` from staging the
     // ref's version of every PRD file into the caller's real index. Without
