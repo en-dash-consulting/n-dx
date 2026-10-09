@@ -28,6 +28,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A dissolved release epic aliases no child and is listed in the summary](./a-dissolved-release-epic-aliases-no.md) | completed |
+| [A review-sourced epic becomes a standing area with no capabilities](./a-review-sourced-epic-becomes-a.md) | pending |
 | [A seam failure mid-pass discards every model answer the plan already paid for](./a-seam-failure-mid-pass-discards-every.md) | completed |
 | [A spec draft answer with one extra key fails the whole text pass, so no later capability is redrafted and Jev placement does not run](./a-spec-draft-answer-with-one-extra-key.md) | completed |
 | [An incomplete migration plan drops the later passes' recorded answers, so a retry pays for every Jev judgment again](./an-incomplete-migration-plan-drops-the.md) | completed |
@@ -54,7 +55,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Placement seams and passes read rex.placement from two separate inputs, so a caller that passes it only to placementSeams has a configured Jev ignored](./placement-seams-and-passes-read-rex.md) | completed |
 | [Plan ids, aliases, backfill and data fixes](./plan-ids-aliases-backfill-and-data-fixes.md) | completed |
 | [Rank the migration review queue by confident Jev flags, not by the least confident answer](./rank-the-migration-review-queue-by.md) | completed |
-| [Review-finding features become fix changes, not capabilities](./review-finding-features-become-fix.md) | pending |
+| [Review-finding features become fix changes, not capabilities](./review-finding-features-become-fix.md) | completed |
 | [reviewedHash only for the spec a reviewer approved](./reviewedhash-only-for-the-spec-a.md) | completed |
 | [Spec drafts state behaviour, never "the system shall ensure that the system" or a decision](./spec-drafts-state-behaviour-never-the.md) | completed |
 | [Spec merge keeps the model's own subject instead of wrapping it in "The system shall ensure that"](./spec-merge-keeps-the-model-s-own.md) | completed |
