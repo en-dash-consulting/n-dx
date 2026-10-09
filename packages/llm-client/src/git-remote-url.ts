@@ -99,11 +99,14 @@ function splitRemote(remote: string): RawRemote | undefined {
   if (!trimmed) return undefined;
 
   const url = trimmed.match(/^[A-Za-z][A-Za-z0-9+.\-]*:\/\/([^/:]+)(?::\d+)?\/(.*)$/s);
-  // scp-style has a colon before any slash and no scheme. Requiring a dotted
-  // host (or `localhost`) keeps a Windows path such as `C:/src/repo` from
-  // parsing as the host `C` — git reads that as a local path too.
+  // scp-style has a colon before any slash and no scheme. The host need not be
+  // dotted: `git@work-github:acme/widget.git` names an SSH config alias and
+  // `git@bitbucket:PROJ/widget.git` a short internal hostname, both of which git
+  // resolves and both of which are real remotes. Only a single-letter host is
+  // rejected — that is a Windows drive letter (`C:\src\repo`), which git reads
+  // as a local path, and no host is one character long.
   const scp = url ? null : trimmed.match(/^(?:[^@/]+@)?([\w.\-]+):(?!\/)(.*)$/s);
-  if (scp && !(scp[1].includes(".") || scp[1].toLowerCase() === "localhost")) return undefined;
+  if (scp && /^[A-Za-z]$/.test(scp[1])) return undefined;
 
   const matched = url ?? scp;
   if (!matched) return undefined;

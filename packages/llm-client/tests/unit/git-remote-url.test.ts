@@ -163,13 +163,52 @@ describe("parseGitRemoteUrl — what it refuses", () => {
 
   it("does not read a Windows path as a host", () => {
     // `C:/src/widget` is a local path; parsing it as the host `C` would put a
-    // drive letter in the manifest as a repository host.
+    // drive letter in the manifest as a repository host. A one-character host
+    // is the single shape the parser refuses outright, so cover each spelling
+    // of a drive path that reaches it.
     expect(parseGitRemoteUrl("C:/src/widget")).toBeUndefined();
+    expect(parseGitRemoteUrl("C:src/widget")).toBeUndefined();
+    expect(parseGitRemoteUrl("d:/src/widget")).toBeUndefined();
     expect(parseGitRemoteUrl("C:\\src\\widget")).toBeUndefined();
   });
+});
 
-  it("accepts localhost, the one undotted host that is a real remote", () => {
+describe("parseGitRemoteUrl — hosts with no dot in them", () => {
+  // git does not require a dotted host in a scp-style remote, and both of these
+  // are ordinary origins: an alias resolved by the user's ssh config, and a
+  // short internal hostname resolved by a search domain or hosts file. Refusing
+  // them would blank the manifest's remote fields, drop the dashboard's parsed
+  // repository name and lose the iso export's source links for anyone whose
+  // origin is written that way.
+
+  it("parses an SSH config alias as the host", () => {
+    expect(parseGitRemoteUrl("git@work-github:acme/widget.git")).toEqual({
+      host: "work-github",
+      owner: "acme",
+      repo: "widget",
+      path: "acme/widget",
+      kind: "other",
+    });
+  });
+
+  it("parses a short internal hostname", () => {
+    expect(parseGitRemoteUrl("git@bitbucket:PROJ/widget.git")).toEqual({
+      host: "bitbucket",
+      owner: "PROJ",
+      repo: "widget",
+      path: "PROJ/widget",
+      kind: "bitbucket-dc",
+    });
+  });
+
+  it("accepts localhost", () => {
     expect(parseGitRemoteUrl("git@localhost:acme/widget.git")?.host).toBe("localhost");
+  });
+
+  it("builds a browsable URL on an undotted host", () => {
+    expect(remoteToWebUrl("git@work-github:acme/widget.git")).toBe(
+      "https://work-github/acme/widget",
+    );
   });
 });
 
