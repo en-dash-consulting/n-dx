@@ -47,7 +47,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Migration plan turns a version-numbered epic that is not a release into a release umbrella (e.g. "Python 3.12 support")](./migration-plan-turns-a-version.md) | completed |
 | [No test covers models both without Jev, so a change that always parks the text answer would leave every held change unsettled](./no-test-covers-models-both-without-jev.md) | completed |
 | [Optional Jev judgments and confidence for the migration plan](./optional-jev-judgments-and-confidence.md) | completed |
-| [Placement answers are keyed by what the model sees](./placement-answers-are-keyed-by-what.md) | pending |
+| [Placement answers are keyed by what the model sees](./placement-answers-are-keyed-by-what.md) | completed |
 | [Placement seams and passes read rex.placement from two separate inputs, so a caller that passes it only to placementSeams has a configured Jev ignored](./placement-seams-and-passes-read-rex.md) | completed |
 | [Plan ids, aliases, backfill and data fixes](./plan-ids-aliases-backfill-and-data-fixes.md) | completed |
 | [reviewedHash only for the spec a reviewer approved](./reviewedhash-only-for-the-spec-a.md) | completed |
