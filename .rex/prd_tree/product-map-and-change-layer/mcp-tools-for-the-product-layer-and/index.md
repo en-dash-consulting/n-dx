@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add get_product, get_capability, place_change and apply_change](./add-get-product-get-capability-place.md) | completed |
-| [add_item and place_change store a summary-only modified amendment that apply always refuses and no tool can complete](./add-item-and-place-change-store-a.md) | pending |
+| [add_item and place_change store a summary-only modified amendment that apply always refuses and no tool can complete](./add-item-and-place-change-store-a.md) | completed |
 | [add_item nests a change or subtask under a closed change, bypassing the follow-up rule](./add-item-nests-a-change-or-subtask.md) | completed |
 | [add_item refuses a v2 removal that apply would accept once another open change is applied first](./add-item-refuses-a-v2-removal-that.md) | pending |
 | [add_item stores a v2 amendment carrying criteria that apply always refuses: a criteria delta on a constraint, or replace/remove on an added capability](./add-item-stores-a-v2-amendment.md) | completed |
