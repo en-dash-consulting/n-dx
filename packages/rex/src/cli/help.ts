@@ -351,7 +351,11 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     usage: "rex reshape [options] [dir]",
     description:
       "Uses an LLM to analyze the current PRD and propose structural changes:\n" +
-      "merges, splits, reparenting, title updates, and description improvements.",
+      "merges, splits, reparenting, title updates, and description improvements.\n\n" +
+      "On a v2 PRD the change layer is restructured as above. Proposals on the\n" +
+      "product layer move no file: accepted ones are drafted as one change whose\n" +
+      "removed and added amendments describe the restructure, applied later with\n" +
+      "'rex change apply'.",
     options: [
       { flag: "--dry-run", description: "Preview proposals without applying" },
       { flag: "--accept", description: "Auto-accept proposals without review" },
@@ -373,7 +377,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     description:
       "Removes fully-completed branches from the PRD tree and archives them\n" +
       "to .rex/archive.json. Optionally runs a consolidation pass to clean\n" +
-      "up remaining items.",
+      "up remaining items.\n\n" +
+      "On a v2 PRD only the change layer is pruned. The product layer is never\n" +
+      "pruned: a product node is retired by a change's removed amendment.",
     options: [
       { flag: "--dry-run", description: "Preview what would be pruned" },
       { flag: "--smart", description: "Use LLM-assisted consolidation after pruning" },
@@ -754,7 +760,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Analyzes the PRD tree using both programmatic detectors and LLM reasoning.\n" +
       "Programmatic: orphaned features, near-duplicates, oversized/undersized containers.\n" +
       "LLM: semantic merge, update, reparent, split, and obsolete proposals.\n" +
-      "Use --fast to skip LLM analysis for quick structural checks only.",
+      "Use --fast to skip LLM analysis for quick structural checks only.\n\n" +
+      "On a v2 PRD the change layer is analyzed and fixed as above. The product\n" +
+      "layer's structural issues are reported only; --accept never applies them.",
     options: [
       { flag: "--accept", description: "Apply all low-risk structural proposals" },
       { flag: "--accept=<ids>", description: "Apply specific structural proposals by ID (comma-separated)" },

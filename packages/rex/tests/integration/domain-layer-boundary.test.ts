@@ -203,6 +203,10 @@ describe("rex cli/commands import surface", () => {
     "../../store/prd-model-transaction.js",
     "../../schema/v2.js",
     "../../schema/v2-rules.js",
+    // `rex reshape`, `rex reorganize` and `rex prune` restructure a v2 tree's
+    // change layer through this PRDStore adapter and read its product layer
+    // for analysis. Not routed through public.ts for the same reason as state-merge.
+    "../../store/change-layer-store.js",
     "../../store/title-to-filename.js",
     "../../workflow/default.js",
   ]);

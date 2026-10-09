@@ -241,7 +241,7 @@ function checkBase(before: V2Tree, after: V2Tree, amendment: Amendment, { force 
 }
 
 /** Error findings in `after` that `before` did not have, compared by rule, node and message. */
-function newErrors(before: V2Tree, after: V2Tree, now: Date): RuleFinding[] {
+export function newErrors(before: V2Tree, after: V2Tree, now: Date): RuleFinding[] {
   const key = (f: RuleFinding): string => `${f.rule}\0${f.nodeId}\0${f.message}`;
   const errors = (t: V2Tree): RuleFinding[] => checkV2Rules(t, { now }).filter((f) => f.severity === "error");
   const had = new Set(errors(before).map(key));

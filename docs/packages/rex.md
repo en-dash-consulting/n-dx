@@ -82,6 +82,8 @@ rex change apply CH-2 .                              # apply its amendments to t
 
 `--criterion` is always a work item's acceptance criteria (done when). A capability's capability criteria use `--capability-criterion="<id>: <text>"` (and `--remove-capability-criterion=<id>`), on `rex product edit` and `rex change place` only. A description passed to `rex add` becomes one change, without LLM decomposition. On a v1 PRD, `rex add` is unchanged and `rex product` / `rex change` refuse.
 
+`rex reshape`, `rex reorganize` and `rex prune` restructure the change layer as they do a v1 PRD, and never write under `product/`. On the product layer, `rex reshape` drafts its accepted proposals as one change with removed and added amendments (a move is a removal plus an added copy) for `rex change apply`; `rex reorganize` only reports; `rex prune` does not apply.
+
 ## Recommend
 
 ```sh

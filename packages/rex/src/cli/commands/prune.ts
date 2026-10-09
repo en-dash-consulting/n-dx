@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
-import { resolveStore, resolveRexPaths } from "../../store/index.js";
+import { resolveStore, resolveRexPaths, type PRDStore } from "../../store/index.js";
+import { resolveLayerStore } from "../../store/change-layer-store.js";
 import { findPrunableItems, pruneItems, countSubtree } from "../../core/prune.js";
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
@@ -101,6 +102,19 @@ function formatLevelSummary(byLevel: Record<string, number>): string {
   return formatLevels(byLevel);
 }
 
+/**
+ * The store prune reads and writes. On a v2 tree it is the change layer
+ * alone: the product layer is never pruned, since a product node is retired
+ * only by applying a change's `removed` amendment.
+ */
+async function resolvePruneStore(rexDir: string, flags: Record<string, string>): Promise<PRDStore> {
+  const { store, v2 } = await resolveLayerStore(rexDir, await resolveStore(rexDir));
+  if (v2 && flags.format !== "json") {
+    info("Pruning the change layer only. The product layer is not pruned: retire a product node with a change's removed amendment.");
+  }
+  return store;
+}
+
 export async function cmdPrune(
   dir: string,
   flags: Record<string, string>,
@@ -120,7 +134,7 @@ export async function cmdPrune(
   }
 
   const rexDir = resolveRexPaths(dir).rexDir;
-  const store = await resolveStore(rexDir);
+  const store = await resolvePruneStore(rexDir, flags);
 
   // Snapshot the tree before any mutation so `rex restore` can undo this prune.
   await ensureSnapshot(rexDir, "prune", flags);
@@ -549,7 +563,7 @@ async function smartPrune(
   flags: Record<string, string>,
 ): Promise<void> {
   const rexDir = resolveRexPaths(dir).rexDir;
-  const store = await resolveStore(rexDir);
+  const store = await resolvePruneStore(rexDir, flags);
   const doc = await store.loadDocument();
 
   if (doc.items.length === 0) {
