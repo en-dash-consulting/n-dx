@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PRDItem } from "../../../src/schema/v1.js";
-import { isFullyCompleted, findPrunableItems, pruneItems, countSubtree } from "../../../src/core/prune.js";
+import { isFullyCompleted, findPrunableItems, findKeptItems, pruneItems, countSubtree } from "../../../src/core/prune.js";
 
 function item(overrides: Partial<PRDItem> & { id: string; title: string; level: PRDItem["level"] }): PRDItem {
   return { status: "pending", ...overrides };
@@ -303,5 +303,35 @@ describe("countSubtree", () => {
   it("counts item with empty children array as 1", () => {
     const leaf = item({ id: "1", title: "Leaf", level: "task", children: [] });
     expect(countSubtree(leaf)).toBe(1);
+  });
+});
+
+describe("applied changes that retire or add product nodes", () => {
+  const appliedFields = (delta: string) => ({ appliedAt: "2026-10-01T00:00:00.000Z", amends: [{ delta, target: "x" }] });
+  const applied = (id: string, delta: string, children?: PRDItem[]) =>
+    item({ id, title: id, level: "epic", status: "completed", children, ...appliedFields(delta) } as PRDItem);
+  const plain = (id: string) => item({ id, title: id, level: "epic", status: "completed" });
+
+  it.each(["removed", "added"])("keeps an applied change with a %s amendment, subtree included", (delta) => {
+    const keep = applied("keep", delta, [item({ id: "t", title: "t", level: "task", status: "completed" })]);
+    const items = [keep, plain("done")];
+    expect(findPrunableItems(items).map((i) => i.id)).toEqual(["done"]);
+    expect(pruneItems(items).pruned.map((i) => i.id)).toEqual(["done"]);
+    expect(items.map((i) => i.id)).toEqual(["keep"]);
+    expect(findKeptItems([keep])[0].reason).toContain(delta);
+  });
+
+  it("prunes an applied change that only modifies, or one never applied", () => {
+    const modifies = applied("mod", "modified");
+    const unapplied = item({ id: "un", title: "un", level: "epic", status: "completed", amends: [{ delta: "removed", target: "x" }] } as PRDItem);
+    expect(pruneItems([modifies, unapplied]).pruned.map((i) => i.id)).toEqual(["mod", "un"]);
+  });
+
+  it("does not prune a completed parent whose child is kept", () => {
+    const parent = item({ id: "p", title: "p", level: "epic", status: "completed", children: [applied("keep", "removed"), plain("other")] });
+    const items = [parent];
+    expect(findPrunableItems(items).map((i) => i.id)).toEqual(["other"]);
+    expect(pruneItems(items).pruned.map((i) => i.id)).toEqual(["other"]);
+    expect(parent.children!.map((i) => i.id)).toEqual(["keep"]);
   });
 });

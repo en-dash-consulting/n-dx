@@ -47,6 +47,45 @@ export function isFullyCompleted(item: PRDItem): boolean {
   return true;
 }
 
+/** An item prune keeps although it is fully completed, with the reason. */
+export interface KeptItem {
+  item: PRDItem;
+  reason: string;
+}
+
+/**
+ * Why prune must keep `item` itself, or undefined.
+ *
+ * On a v2 tree a product node reads "retired" only while an applied change
+ * with a `removed` amendment for it exists, and an `added` amendment records
+ * where a node came from. Pruning that change would leave a deleted product
+ * node with no status row, so it stays. v1 items carry neither field.
+ */
+export function pruneKeepReason(item: PRDItem): string | undefined {
+  const { appliedAt, amends } = item as PRDItem & { appliedAt?: string; amends?: { delta?: string }[] };
+  if (!appliedAt) return undefined;
+  const kinds = new Set((amends ?? []).map((a) => a.delta).filter((d) => d === "removed" || d === "added"));
+  if (kinds.size === 0) return undefined;
+  return `applied change with ${[...kinds].join(" and ")} amendments: product status reads it to mark a node retired`;
+}
+
+/** Whether `item` or any descendant must be kept. */
+function holdsKept(item: PRDItem): boolean {
+  return pruneKeepReason(item) !== undefined || (item.children ?? []).some(holdsKept);
+}
+
+/** Fully completed items prune keeps, with the reason, outermost first. */
+export function findKeptItems(items: PRDItem[]): KeptItem[] {
+  const kept: KeptItem[] = [];
+  for (const { item, parents } of walkTree(items)) {
+    const reason = pruneKeepReason(item);
+    if (!reason || !isFullyCompleted(item)) continue;
+    if (parents.some((p) => pruneKeepReason(p))) continue;
+    kept.push({ item, reason });
+  }
+  return kept;
+}
+
 /**
  * Identify which root-level subtrees (and nested subtrees) are fully
  * completed and eligible for pruning.
@@ -59,9 +98,9 @@ export function findPrunableItems(items: PRDItem[]): PRDItem[] {
   for (const { item, parents } of walkTree(items)) {
     // Only prune top-level completed subtrees — skip items whose parent
     // is also fully completed (they'll be pruned as part of the parent).
-    if (!isFullyCompleted(item)) continue;
+    if (!isFullyCompleted(item) || holdsKept(item) || parents.some((p) => pruneKeepReason(p))) continue;
     const parent = parents[parents.length - 1];
-    if (parent && isFullyCompleted(parent)) continue;
+    if (parent && isFullyCompleted(parent) && !holdsKept(parent)) continue;
     prunable.push(item);
   }
   return prunable;
@@ -87,7 +126,8 @@ export function pruneItems(items: PRDItem[]): PruneResult {
   // Walk the array in reverse so splicing doesn't shift unvisited indices.
   for (let i = items.length - 1; i >= 0; i--) {
     const item = items[i];
-    if (isFullyCompleted(item)) {
+    if (pruneKeepReason(item)) continue;
+    if (isFullyCompleted(item) && !holdsKept(item)) {
       // The entire subtree is completed — remove it.
       // Use unshift to maintain original order despite reverse iteration.
       pruned.unshift(item);

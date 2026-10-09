@@ -41,6 +41,7 @@ import { cmdPrune } from "../../src/cli/commands/prune.js";
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 import { applyAmendments } from "../../src/core/apply-amendments.js";
 import { PRODUCT_RESHAPE_TITLE } from "../../src/core/product-reshape.js";
+import { cmdProduct } from "../../src/cli/commands/product.js";
 import { cmdChange } from "../../src/cli/commands/change.js";
 import { addChangeNode } from "../../src/core/change-add.js";
 import { withPrdModelTransaction } from "../../src/store/prd-model-transaction.js";
@@ -307,5 +308,31 @@ describe("rex prune on a v2 tree", () => {
     expect(tree.changes.map((c) => c.id)).toEqual([APPLE_PAY]);
     expect(tree.product[0].children?.map((c) => c.id)).toContain(PAY_BY_CARD);
     expect(output.join("\n")).toMatch(/The product layer is not pruned/);
+  });
+
+  it("keeps the applied change that retires a node, reports why, and the node still reads retired", async () => {
+    proposeOnProduct([{ id: "p1", action: { action: "obsolete", itemId: GIFT_CARDS, reason: "No longer sold" } }]);
+    await cmdReshape(tmp, { accept: "true" });
+    const drafted = (await loadPrdModel(rexDir)).tree.changes.find((c) => c.title === PRODUCT_RESHAPE_TITLE)!;
+    await cmdChange(tmp, "apply", drafted.id, {});
+    // Finished and applied: on a v1 tree this subtree would be pruned.
+    await withPrdModelTransaction(rexDir, (model) => {
+      const retiring = model.tree.changes.find((c) => c.id === drafted.id)!;
+      retiring.status = "completed";
+      return { tree: model.tree, result: undefined };
+    });
+    expect((await loadPrdModel(rexDir)).tree.changes.find((c) => c.id === drafted.id)).toMatchObject({ status: "completed" });
+    output = [];
+
+    await cmdPrune(tmp, { yes: "true", "no-consolidate": "true" });
+
+    const { tree } = await loadPrdModel(rexDir);
+    expect(tree.changes.map((c) => c.id)).toContain(drafted.id);
+    expect(tree.changes.map((c) => c.id)).not.toContain(DONE_CHANGE);
+    expect(output.join("\n")).toMatch(/Kept 1 completed item[\s\S]*product status reads it to mark a node retired/);
+
+    output = [];
+    await cmdProduct(tmp, "show", GIFT_CARDS, { format: "json" });
+    expect(JSON.parse(output.join("\n"))).toMatchObject({ status: { status: "retired" } });
   });
 });
