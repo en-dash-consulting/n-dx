@@ -1,7 +1,7 @@
 ---
 id: "5ca97c50-6fd3-4d97-99cd-42f7638eacfb"
 level: "feature"
-title: "Migrate this repository and cut 1.0.0"
+title: "Migrate this repository"
 status: "pending"
 priority: "high"
 tags:
@@ -29,9 +29,9 @@ blockedBy:
   - "abd05895-1b96-4798-bfb8-8e4b66fca049"
 source: "roadmap"
 acceptanceCriteria: []
-description: "Critical path end. Human review starts as soon as plan generation works; the code part is the final migration commit and the major changeset. After merge, update the ndx-runner install at once: pre-cut builds do not understand the v2 tree.\n\nRoadmap PR 26 · wave 4 · lane migration."
+description: "Critical path end. Human review starts as soon as plan generation works; the code part is the final migration commit, with a patch changeset. After merge, update the ndx-runner install at once: pre-migration builds do not understand the v2 tree.\n\nRe-scoped 2026-10-09: 0.10.0 follows 0.9.0 under the soft freeze, so this feature no longer cuts 1.0.0. The cut is its own deferred feature, \"Cut 1.0.0 when the product is ready to advertise\", which waits for Ryan's call.\n\nRoadmap PR 26 · wave 4 · lane migration."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-08T18:56:24.908Z"
+lastModified: "2026-10-09T19:07:27.903Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -40,6 +40,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Approve the area and constraint list for this repository](./approve-the-area-and-constraint-list.md) | pending |
-| [Pass the release gate and publish](./pass-the-release-gate-and-publish.md) | pending |
 | [Review the drafted capability specs area by area](./review-the-drafted-capability-specs.md) | pending |
-| [Run the final migration on this repository and add the major changeset](./run-the-final-migration-on-this.md) | pending |
+| [Run the final migration on this repository](./run-the-final-migration-on-this.md) | pending |
