@@ -42,7 +42,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Migration plan recognises only "ndx"/"n-dx" as a product name, so another repository's "Acme 2.0" release epic becomes an area](./migration-plan-recognises-only-ndx-n.md) | completed |
 | [Migration plan turns a version-numbered epic that is not a release into a release umbrella (e.g. "Python 3.12 support")](./migration-plan-turns-a-version.md) | completed |
 | [No test covers models both without Jev, so a change that always parks the text answer would leave every held change unsettled](./no-test-covers-models-both-without-jev.md) | pending |
-| [Optional Jev judgments and confidence for the migration plan](./optional-jev-judgments-and-confidence.md) | pending |
+| [Optional Jev judgments and confidence for the migration plan](./optional-jev-judgments-and-confidence.md) | completed |
 | [Placement seams and passes read rex.placement from two separate inputs, so a caller that passes it only to placementSeams has a configured Jev ignored](./placement-seams-and-passes-read-rex.md) | pending |
 | [Plan ids, aliases, backfill and data fixes](./plan-ids-aliases-backfill-and-data-fixes.md) | completed |
 | [Stamp appliedAt and reviewedHash when migrating historical items](./stamp-appliedat-and-reviewedhash-when.md) | completed |
