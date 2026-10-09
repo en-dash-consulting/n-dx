@@ -1,5 +1,5 @@
 import { PROJECT_DIRS, guardBaselineForLanguage } from "../prd/llm-gateway.js";
-import type { LLMVendor } from "../prd/llm-gateway.js";
+import type { LLMVendor, EnvPolicyConfig } from "../prd/llm-gateway.js";
 export type { MemoryThrottleConfig } from "../process/memory-throttle.js";
 export type { MemoryMonitorConfig } from "../process/memory-monitor.js";
 export type { RuntimePoolConfig } from "../process/pool.js";
@@ -47,6 +47,8 @@ export interface PolicyLimitsConfig {
 export interface GuardConfig {
   blockedPaths: string[];
   allowedCommands: string[];
+  /** Credential filtering shared by tool processes and vendor CLIs. */
+  env?: EnvPolicyConfig;
   commandTimeout: number;
   maxFileSize: number;
   /** Timeout in ms for spawn-based execution (spawnTool/spawnManaged). 0 = no timeout. */

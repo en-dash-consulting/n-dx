@@ -762,7 +762,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     const proc = spawnCli(cliBinary, [...spawnConfig.args], {
       cwd,
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
-      env: cliEnv ?? process.env,
+      env: cliEnv ?? resolveVendorCliEnv({ vendor: tokenMetadata.vendor }),
     });
 
     // proc.pid is undefined when the spawn failed outright (ENOENT); the
@@ -2082,7 +2082,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // CLI-specific: load config for CLI path and env resolution
   const cliBinary = resolveVendorCliPath(llmConfig, config);
-  const cliEnv = resolveVendorCliEnv(llmConfig);
+  const cliEnv = resolveVendorCliEnv(llmConfig, config.guard.env, (names) => {
+    detail(`CLI environment: stripped ${names.join(", ")}`, { captureWhenQuiet: true });
+  });
 
   // Pin the spawned session's MCP servers to *this* project directory, so the
   // agent's PRD writes land in the worktree the run is executing in. Without
