@@ -1,5 +1,477 @@
 # @n-dx/rex
 
+## 0.9.0
+
+### Patch Changes
+
+- [#526](https://github.com/en-dash-consulting/n-dx/pull/526) [`ddd4e15`](https://github.com/en-dash-consulting/n-dx/commit/ddd4e1573f7a1e80c943ffa2875347b9f8b4717c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex add` (smart add) and the dashboard's proposal accept routes now keep `loe`, `loeRationale` and `loeConfidence` on the tasks they create; invalid values are dropped. `rex add` no longer strips the fields while attaching duplicate reasons.
+
+- [#610](https://github.com/en-dash-consulting/n-dx/pull/610) [`572d759`](https://github.com/en-dash-consulting/n-dx/commit/572d759e36c98f7f067e40fb1474f7154792a081) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `add_item` (v2 change with `amends`) and `place_change` (relation `amends`) now dry-run `apply_change` before they store an amendment. If apply would refuse it, they refuse with apply's own message and write nothing. This covers, for example, a criteria delta on a constraint, `criteria.replace` or `criteria.remove` on a capability the same change adds, and criterion ids that do not fit the capability. A summary-only modified amendment (no proposed text and no criteria delta) is refused too: pass proposed or criteria, or use relation touches. A stale `base` is still accepted.
+
+- [#610](https://github.com/en-dash-consulting/n-dx/pull/610) [`8eb093b`](https://github.com/en-dash-consulting/n-dx/commit/8eb093be6652abaeb840e585332eb33b2bf740b0) Thanks [@ryrykeith](https://github.com/ryrykeith)! - MCP `add_item` takes `type` (change, task, subtask) plus `amends`, `touches` and `discoveredFrom` on a v2 tree, where `level` is refused. With no type it creates a change, and a change that neither amends nor touches lands in the Inbox with `needsPlacement`. A task under a completed, applied, cancelled or deleted change is refused (also in core `addTask`), and the error suggests a follow-up change with `discoveredFrom`. `get_item` reads v2 trees. On a v1 tree `add_item` works as before: `level` is now optional in the schema, `task`/`subtask` types stand in for it, and v2-only types and fields are refused naming the v1 layout.
+
+- [#610](https://github.com/en-dash-consulting/n-dx/pull/610) [`536e9a8`](https://github.com/en-dash-consulting/n-dx/commit/536e9a88647bbb57fe6379fd1b36d8b52e755467) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `add_item` (v2 change with `amends`) and `place_change` (relation `amends`) refuse only what `apply_change` would always refuse. A problem that only another open change causes, such as removing a node another open change still amends (`open-change-refs-live`) or whose live descendants another open change removes, no longer refuses: the change is stored and the response carries an additive `warnings` list naming the open change(s) and apply's message. `apply_change` is unchanged and still refuses until that change is applied or closed.
+
+- [#583](https://github.com/en-dash-consulting/n-dx/pull/583) [`c47baa4`](https://github.com/en-dash-consulting/n-dx/commit/c47baa4a12f8428b755bfbf8008a89b2a5e4e589) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 apply engine stamps `appliedAmendsHash` and reports an applied change whose amends were edited afterwards, refuses an amendment whose `base` no longer matches its target's spec (unless forced), refuses a result that breaks a v2 rule the input did not, creates a constraint for an added amendment with `type: "constraint"`, and clears the change's `needsPlacement`. Product-edit drafts record `base`.
+
+- [#583](https://github.com/en-dash-consulting/n-dx/pull/583) [`28f38ab`](https://github.com/en-dash-consulting/n-dx/commit/28f38ab5a520f76ca551c30e544f796521d9cc60) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 apply engine now stamps `appliedAt` (a timestamp the caller passes) instead of `appliedIn`, refuses an already applied change by `appliedAt`, and takes no commit option. A completed but unapplied product-edit draft counts as open, as in the v2 rules.
+
+- [#583](https://github.com/en-dash-consulting/n-dx/pull/583) [`f3694e7`](https://github.com/en-dash-consulting/n-dx/commit/f3694e7cab6d135f3e5bb791c01aa58232dab634) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `rex.applyOn` (`core/apply-policy.ts`), read from `.n-dx.json`: `complete` (default) applies a change when it completes, `review` waits for a steward's explicit apply, and `release` applies at release stamping. A steward's apply runs under every mode; an invalid value falls back to `complete` with a warning. `changesAwaitingApply` lists completed but unapplied changes, which stay open, so their capabilities keep reading changing. Not wired into the store, CLI or MCP yet.
+
+- [#569](https://github.com/en-dash-consulting/n-dx/pull/569) [`c1af698`](https://github.com/en-dash-consulting/n-dx/commit/c1af6987f02b0620edea263c4415fa1219b03d4e) Thanks [@endash-shal](https://github.com/endash-shal)! - Close every known dependency vulnerability ahead of the release.
+  
+  `pnpm audit` reported two critical and three high advisories. One was reachable from shipped code: `@modelcontextprotocol/sdk` 1.30.0 (GHSA-6qxp-vccf-f47h, an OAuth client that could send credentials to an authorization server the MCP server chooses), a direct dependency of rex, sourcevision and web. It moves to 1.32.0.
+  
+  The other four are transitive and are pinned with overrides in the same style as the existing ones: `proxy-addr` ≥ 2.0.8 (GHSA-jqcg-44mw-7w3h, IP spoofing — reached from shipped code through the MCP SDK's express), plus three that only ever load in development tooling — `shell-quote` ≥ 1.11.0 (GHSA-pqg4-j6r4-53mv, via `@changesets/cli`) and `vue` ≥ 3.5.42 with `source-map-js` ≥ 1.2.2 (GHSA-g2v6-rqmx-r4w6 and GHSA-68fv-2mgg-jv7q, both via vitepress's docs build).
+  
+  `pnpm audit` now reports no known vulnerabilities.
+
+- [#605](https://github.com/en-dash-consulting/n-dx/pull/605) [`d1ae043`](https://github.com/en-dash-consulting/n-dx/commit/d1ae043b127dcf49085e408a0c287d50b6cf2a10) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix `rex backfill-commit-attribution` reading only part of a real repository's history.
+  
+  The command buffered the whole `git log` body in memory through a bare `execFile`, whose 1 MiB default it outgrew — on this repository's own 3.5 MiB history it reported "could not read git history" and did nothing, a silent no-op. It now runs through core's `git` helper, the same path `change-commits.ts` already uses with a 256 MiB ceiling for exactly this reason, so its `node:child_process` entry drops out of the allowlist.
+  
+  Two parsing gaps surfaced once it could read the log at all:
+  
+  - **Only the first trailer per commit was read.** A commit that touches several items carries one `N-DX-Status` trailer per item; this repository's 53 such commits carry 122 trailers between them, so better than half were being dropped. Every trailer is now read.
+  - **Only the Unicode arrow was matched.** Both `→` and `->` occur in history; the `->` form was skipped entirely.
+  
+  The body is still scanned rather than handed to git's own `%(trailers:…)` parser, which reads only a message's final paragraph: most of this history puts a blank line between the `N-DX-Status` lines and the closing `Co-Authored-By`, so git classifies them as prose and recognises 3 of the 53 commits. A comment on the parser records that.
+
+- [#588](https://github.com/en-dash-consulting/n-dx/pull/588) [`1dfc0c7`](https://github.com/en-dash-consulting/n-dx/commit/1dfc0c7e7947ffa6054cb6ef9efc214805253a16) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Each package's full build now ends by writing `dist/.build-stamp.json`, a hash of the source it compiled. The repository's affected test gate uses it to tell a current build from a stale one by content rather than by file times, so a partial build no longer hides stale compiled code and an identical-content rewrite no longer demands a rebuild.
+   The stamp is excluded from the published tarballs.
+
+- [#589](https://github.com/en-dash-consulting/n-dx/pull/589) [`5399355`](https://github.com/en-dash-consulting/n-dx/commit/53993552706a40311b3caeef53f66be1944b40c0) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex export` (`ndx prd export`) on a v2 tree writes bundle envelope v2, carrying the root header and both the product and change layers, each node's `state.yaml` row apart under `state` so a state key this rex does not declare still imports into `state.yaml`, and each `state.yaml`'s own top-level keys other than `schema` and `items` under `folderState`, written back to the same folder's file. The carried root header is validated before anything is written. A v1 tree still writes envelope v1. `rex import-bundle` (`ndx prd import`) accepts both: into a v2 tree a v2 bundle imports whole and a v1 bundle lands in the change layer (its `--replace` replaces that layer only); a v1 tree takes v1 bundles and refuses a v2 one before writing. `--replace` on a v2 tree needs `--no-snapshot`, since `rex restore` covers the v1 tree only. Export still refuses any output path inside the rex directory.
+
+- [#584](https://github.com/en-dash-consulting/n-dx/pull/584) [`73bab95`](https://github.com/en-dash-consulting/n-dx/commit/73bab9592b9ceda77239ad83b84b610c7db34f8e) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Change-commit lookup defaults to origin/HEAD, then origin/main, then main, so a CI checkout without a local main and a clone with a stale local main both resolve.
+
+- [#584](https://github.com/en-dash-consulting/n-dx/pull/584) [`d059e28`](https://github.com/en-dash-consulting/n-dx/commit/d059e284f7c9320e436884d96e3cc3467bc502b0) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Change-commit lookup refuses a shallow clone with an error naming `git fetch --unshallow` and `fetch-depth: 0`, instead of returning a truncated commit list.
+
+- [#584](https://github.com/en-dash-consulting/n-dx/pull/584) [`0df9e0f`](https://github.com/en-dash-consulting/n-dx/commit/0df9e0fcbb4cd85938301380f4a5a5968a470d5d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A change's landing on main is worked out from git history alone: the first-parent merge commit that carries its `N-DX-Item` trailer commits, or the commit itself when fast-forwarded or rebased. A squash merge reports `landed: false` with the reason. Landings are cached under `.ndx/rex/.cache`. `shippedIn` falls back to the first release tag containing the landing commit when no stamp exists.
+
+- [#518](https://github.com/en-dash-consulting/n-dx/pull/518) [`b73b061`](https://github.com/en-dash-consulting/n-dx/commit/b73b06162cb210705583e6846f2349de8901c85d) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the mechanical paths deterministic, and stop re-reading the PRD tree.
+  
+  Two LLM/agent round trips that were doing work code can do exactly, and four
+  places where the PRD folder tree was read or written more times than once.
+  Measured on this repository's own PRD: 431 item directories, 1,853 files,
+  8.3 MB.
+  
+  **Deterministic pre-run commit subject** (`hench.git.commitMessage`). The
+  pre-run commit gate asked a light-tier model for a one-line subject
+  summarising the operator's *pre-existing* uncommitted changes, and
+  `commit-subject.ts` existed to strip the preambles and fences that came back
+  before the text reached `git commit -m`. The subject is now computed from the
+  dirty file list — `chore(rex,web): pre-run checkpoint, 12 files, 340 lines` —
+  with the conventional-commit type inferred only where the file list proves it
+  (`docs`, `test`, else `chore`; never `feat` or `fix`, which are claims about
+  intent). This also replaces the fixed `"chore: commit local changes before
+  hench run"` that every failed model call fell back to. Set
+  `hench.git.commitMessage: "llm"` to restore the model.
+  
+  **No duplicate `in_progress` write** (`hench.promptAgentToMarkInProgress`).
+  The API-path prompt told the agent to mark its task `in_progress` via
+  `rex_update_status`, but hench already made that transition before the agent
+  starts (`transitionToInProgress`, both loops). The step cost a tool round
+  trip and a second write of a value already on disk, which also left
+  `.rex/prd_tree/` dirty ahead of the uncommitted-work gate. The *completion*
+  step is unchanged and not comparable: that call is a request rex parks on the
+  task claim rather than a PRD write, and it carries the `resolutionType` and
+  `resolutionDetail` hench applies once the test gate passes.
+  
+  **Faster folder-tree parse** (no flag; output is byte-identical). The parser
+  issued a `readdir` for each of the four scans a directory gets and a `stat`
+  per entry to find subdirectories, all strictly sequentially. It now reads each
+  directory once with `withFileTypes` and parses sibling subtrees concurrently
+  under a bounded gate. Warnings and digest insertion order are merged in
+  sibling order, so a depth-first walk's exact output is preserved — pinned by
+  `parse-order-equivalence.test.ts` and verified byte-for-byte against the
+  previous implementation on the full tree. **803 ms → 206 ms.**
+  
+  **No duplicate full-tree write.** Eighteen call sites ran
+  `syncFolderTree(rexDir, store)` immediately after a store mutation.
+  `FileStore` has written the tree inside the mutation's own locked span since
+  the tree became the backend, so each of those re-read the whole PRD and
+  re-serialized it for no byte of change — and did so *less* safely, since
+  `syncFolderTree` passes no `loadedAt`/`loadedFiles` and so runs with the
+  stale-save guard disarmed. Removed; the function stays for deliberate
+  full-tree rebuilds. **~1.2 s saved per mutation.**
+  
+  **Single-parse reads** (`performance.fastReads`, default off).
+  `loadItemsPreferFolderTree` parsed the tree, separately loaded the document —
+  which parses the same tree — and merged the two, on top of the load its
+  callers had already done. The merge predates the folder tree being the
+  backend; both sides are now the same parse. `rex next` **2.41 s → 749 ms**
+  with the flag on, output byte-identical.
+  
+  **Single-item writes** (`performance.fastWrites`, default off). A one-field
+  update handed the whole document to the serializer, which walked every
+  directory to find that all but one file was unchanged. The targeted path
+  writes the item's own `index.md` and its parent's (whose children table
+  prints the child's title and status) and nothing else, declining to the full
+  write whenever the change could move a file or the item's on-disk path is not
+  where the serializer would put it. `updateItem` **782 ms → 315 ms.**
+  
+  Both `performance` flags read from `.rex/config.json`, overridable per
+  command with `REX_FAST_READS` / `REX_FAST_WRITES`. They default off: the
+  previous path stays the one that ships until the new one is chosen
+  deliberately.
+
+- [#605](https://github.com/en-dash-consulting/n-dx/pull/605) [`e1393f0`](https://github.com/en-dash-consulting/n-dx/commit/e1393f02ee074010e9678873ba2ff1f39181a0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - The `N-DX-Item` commit trailer now carries the PRD item id rather than a dashboard permalink. The permalink was built from `web.publicUrl`, defaulting to `http://localhost:3117`, so every autonomous commit wrote the author's host into permanent history and resolved to nothing on any other machine; `web.publicUrl` no longer affects the trailer. Readers accept both forms — `itemIdFromTrailer` unwraps a permalink of any host to the same id — so commits written before this change keep attributing.
+
+- [#579](https://github.com/en-dash-consulting/n-dx/pull/579) [`cf19d5a`](https://github.com/en-dash-consulting/n-dx/commit/cf19d5a29ffa9ad4df8bb2befb2dd3f266785e05) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add the placement decision for a change on the product layer (`core/placement-policy.ts`). `rex.placement.models` (`text`, `jev`, `both`) chooses which tiers run beside the rules, and `rex.placement.autoAccept` (`none`, `agree`, `confident`) decides when a placement is accepted without a person; a change without one gets `needsPlacement`. Jev runs under its own `prd.place.judge` task class, which is not a default judgment route, so exporting `TYPESAFE_API_KEY` alone never turns it on. `confident` needs a Jev pick at confidence 0.8 or higher that is on the rules shortlist. Jev can abstain with a none-of-these option, which is never auto-accepted, and a Jev confidence that is not finite or is outside 0–1 is ignored with a warning. Without Jev, `both` falls back to the text model and `jev` to rules only, each with a warning. Not wired into the store, CLI or MCP yet.
+
+- [#584](https://github.com/en-dash-consulting/n-dx/pull/584) [`b2b021a`](https://github.com/en-dash-consulting/n-dx/commit/b2b021a4394a868057f8f83e7bdc848c19c9144c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `computeLandings` reports a change that is neither completed nor applied as not landed ("change still open"), so `resolveShippedIn` gives it no release; a change with one task merged and tagged and another unmerged no longer reads as shipped. It also resolves the main ref, checks for a shallow clone and loads the trailer and landing caches once per call instead of once per change. `core/change-landing.ts` joins the v2 modules in the isolation test.
+
+- [#529](https://github.com/en-dash-consulting/n-dx/pull/529) [`2028e7a`](https://github.com/en-dash-consulting/n-dx/commit/2028e7a2e298d88c9b9d66020cc380bbdce19b4c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Clear the last literal `.rex/`, `.hench/` and `.sourcevision/` paths, and make
+  the policy that forbids them a wall rather than a ratchet.
+  
+  Where n-dx keeps its state is `resolveLayout`'s decision — `.ndx/rex` or
+  `.rex`, depending on the project's layout. A literal takes that decision a
+  second time in a file that has no idea which layout it is running under, and it
+  fails *silently*: the wrong path is simply a path nothing wrote to, which is
+  indistinguishable from a project that has nothing to show.
+  
+  Two of the sites cleared here were live defects of exactly that shape, both on
+  a migrated project: `rex analyze` stamped every proposal it derived from an
+  analysis with `.sourcevision/zones.json`, naming a file the project does not
+  have, and hench's reviewer was told to list `.rex/prd_tree/` before capturing a
+  finding — a listing that came back empty, so every finding looked new and
+  duplicates got filed. A third, sourcevision's `prd-epic-resolver`, built its
+  paths from a fixed `.rex` too, but in a helper nothing calls; it now asks the
+  resolver so the literal is gone, and no command's behaviour changes.
+  
+  The rest were display copy and one bucket key. Viewer text that names a
+  directory now names the command or the tool instead (`Make sure hench is
+  initialized for this project`), because the browser has no resolver to ask;
+  `sv pr-markdown --help` names its output file without fixing the folder; and
+  `rex status`'s canonical PRD bucket key now comes from the same constant as the
+  attributions it has to match, rather than from a second copy that agreed by eye.
+  
+  Two files are allowed to keep a literal, both with the argument in their own
+  docstring: the viewer's `state-paths.ts`, a browser-safe twin of
+  `layoutStateNames()` pinned to the resolver by the contract test, because
+  `layout.ts` reaches for `node:fs` at module scope and cannot be bundled; and
+  rex's `LEGACY_SOURCE_FILE_PREFIX`, which is a value already written into PRD
+  data rather than a path any process constructs.
+  
+  `tests/e2e/layout-literal-policy.test.js` now fails on *any* `.rex/`, `.hench/`
+  or `.sourcevision/` literal outside that allow-list, naming the file and line.
+  The `.n-dx*` config files stay on the inventory ratchet — 29 sites across
+  llm-client, hench and web are still waiting on that sweep — and the detector's
+  self-test now floors the files it visits rather than the literals it finds, so
+  it keeps its teeth once the debt reaches zero.
+
+- [#610](https://github.com/en-dash-consulting/n-dx/pull/610) [`b03c3a7`](https://github.com/en-dash-consulting/n-dx/commit/b03c3a74508c601c2e71596d6fc565a70cc3feb6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - New rex MCP tools for a v2 PRD: `get_product` (areas, capabilities and constraints with computed status and health), `get_capability` (one node with its parent chain, related changes, binding constraints and co-changes), `place_change` (the rules' placement shortlist without `target`; with `target`, records a touches or a modified amendment, with the amendment's `proposed` text and `criteria` delta, and clears `needsPlacement`; a criteria delta naming an id the capability lacks, or adding one it has, is refused at placement, as apply would refuse it) and `apply_change` (a steward applies a change's amendments whatever `rex.applyOn` says). Each refuses a v1 tree. On a v2 tree `get_prd_status` reports change counts, the Inbox count, product status per area and change counts per release. The assistant-assets manifest lists the four tools.
+
+- [#610](https://github.com/en-dash-consulting/n-dx/pull/610) [`e6941fc`](https://github.com/en-dash-consulting/n-dx/commit/e6941fc042beeb45fb9ef91c102b2639f5ce4a43) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On a v2 PRD, rex MCP read tools no longer grow with change history. `get_capability` lists every open change plus the 10 most recently applied by default, with `status` (`recent`, `open`, `applied`, `all`), `since` (release), `cursor` and `limit` to read more, and reports `changeCounts` over all related changes and `changesPage.nextCursor`. The cursor is opaque and records the last row's position, so a change applied between pages no longer makes the listing skip the open changes after it. `get_prd_status` lists releases with open changes and the 5 newest closed ones (`allReleases` lists all, `releasesOmitted` counts the rest); its change counts still cover every change.
+
+- [#531](https://github.com/en-dash-consulting/n-dx/pull/531) [`3cb924b`](https://github.com/en-dash-consulting/n-dx/commit/3cb924b648eb3076ac738b65caaff15a6f186c59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex migrate-slugs` now names the condition it actually checked when it refuses. The hint claimed the resolved store "is a remote adapter with no paths to rename", which was never the test and describes a backend kind that no longer exists; the guard checks whether the store implements `adoptSlugRule`, so that is what it now says.
+
+- [#582](https://github.com/en-dash-consulting/n-dx/pull/582) [`8bae238`](https://github.com/en-dash-consulting/n-dx/commit/8bae2381270ebcd2c419b4c8d8c90ffd87ac3047) Thanks [@endash-shal](https://github.com/endash-shal)! - Every remaining reader of the project config asks the layout resolver where it lives, so a project on the `.ndx/` layout is read from `.ndx/config.json` (and `.ndx/config.local.json`) instead of a root `.n-dx.json` nothing writes. In `@n-dx/llm-client` that is `loadLLMConfig`, `loadClaudeConfig`, `loadProjectOverrides` and `loadProjectOverrideSources`, whose `file` label is now the root-relative path of the file read; `PROJECT_CONFIG_FILE` and `LOCAL_CONFIG_FILE` keep their legacy names for labels. In `@n-dx/hench`: the project CLI name, the Claude weekly budget, archival and retention settings and `hench.fullTestCommand`. In `@n-dx/web`: the config, LLM, features, CLI-timeout, project-settings, SourceVision (zone pins and Ask timeout), token-usage and usage-cleanup routes, the CLI name, and the dashboard usage ledger, which lands at `.ndx/web-usage.jsonl` on that layout; `GET /api/cli/timeouts` now reports `configFile`, the file the overrides live in, and the CLI Timeouts page shows it. The layout-literal inventory reaches zero.
+  
+  The same sweep found that hench and rex recovered the project root from their own state directory as its parent, which on the `.ndx/` layout is the container — so `loadConfig`'s project overrides and the `loadClaudeConfig` / `loadLLMConfig` adapters read `.ndx/.n-dx.json`, a file nothing writes, and every override was silently ignored on a migrated project. `projectRootOf` in `@n-dx/llm-client` (exported, and through hench's llm gateway) steps over the container, and `loadProjectOverrideSources` and both packages' adapters use it.
+
+- [#512](https://github.com/en-dash-consulting/n-dx/pull/512) [`b770844`](https://github.com/en-dash-consulting/n-dx/commit/b770844d0100ca48eedc07d7aacfcf149c2583ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop refusing every task completion in a project on the `.ndx/` layout.
+  
+  Hench's uncommitted-work gate refuses to mark a task completed while the work
+  that completes it is still in the working tree. The PRD writes hench makes
+  itself are supposed to be discounted — the agent's `rex_update_status` call and
+  hench's own completion write land in the PRD tree by design, so counting them
+  would refuse everything.
+  
+  That discount list, and the staging list the completion commit derives from the
+  same definition, were spelled `.rex/...` and nothing else. On a project migrated
+  to the `.ndx/` container the PRD lives at `.ndx/rex/prd_tree/`, so:
+  
+  - `prdPathsToStage` existence-checked a directory nothing writes to, found none,
+    and the completion commit landed empty;
+  - the gate then refused the task over the very PRD writes it had just declined
+    to stage, naming `.ndx/rex/prd_tree/<task>/index.md` back to the operator as
+    the agent's leaked work.
+  
+  Every task completion failed, in every project on the new layout, with a
+  refusal that pointed at hench's own files. Both lists now come from the layout
+  resolver: the staged set resolves the project's actual layout (a writer has to
+  pick one spelling), while the discount covers both, like
+  `HENCH_RUNTIME_GITIGNORE_ENTRIES` already did for `.hench/` — it is a classifier
+  answering "is this hench's own bookkeeping?" about a path git handed it.
+  
+  Two adjacent paths had the same literal and are fixed with it:
+  `scopePrdPathsToReport` dropped every path in the store's save report, and the
+  changed-files/repaired-files filters treated nothing under `.ndx/` as
+  bookkeeping — so on a migrated project every run looked like it had changed
+  files and the full-suite gate fired for runs that produced no code.
+  
+  Separately, the dashboard's derived `<rexDir>/.cache/prd.json` is now gitignored
+  by `rex init` and discounted by the gate. The `ndx start` watcher regenerates it
+  on every PRD write, so a run made while the dashboard was up had a regenerable
+  cache file counted as the task's own leaked work — on either layout. Its name is
+  now a single constant in rex's paths module (`PRD_CACHE_DIRNAME`) that the
+  gitignore rule, the gate and the web server all read, rather than a literal in
+  each.
+
+- [#530](https://github.com/en-dash-consulting/n-dx/pull/530) [`7e7ef56`](https://github.com/en-dash-consulting/n-dx/commit/7e7ef56662296000ad88f0a2d0bcf718e5a984ba) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Every package's guidance now lives in its `AGENTS.md`, with the `CLAUDE.md`
+  beside it reduced to the `@AGENTS.md` import. Zone policies and seam registries
+  for `core`, `rex`, `hench` and `web` were readable only by Claude Code before
+  this; Codex and any other assistant that reads nested `AGENTS.md` files now get
+  them too. `tests/e2e/instruction-alignment.test.js` fails a package CLAUDE.md
+  with no AGENTS.md beside it, or one carrying content of its own.
+
+- [#585](https://github.com/en-dash-consulting/n-dx/pull/585) [`e18a6f3`](https://github.com/en-dash-consulting/n-dx/commit/e18a6f3cb6663afb72d6eb0d32a6405e6694a8bf) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Tighten placement's rules. A change counts as a code-health finding only when it carries the `code-health` tag, no longer because its source is sourcevision. The relation is decided by an explicit `Relation: amends` or `Relation: touches` line in the intent, else by an amending verb opening the title (`Add`, `Support`, `Replace`, …), else touches; `fix: true` and `code-health` always touch. A change no rule matches can still get a new-capability proposal from the text model, which is given the list of areas, and a proposal under an unknown area is dropped. A proposal is never auto-accepted.
+
+- [#585](https://github.com/en-dash-consulting/n-dx/pull/585) [`cc560f2`](https://github.com/en-dash-consulting/n-dx/commit/cc560f2ab365814ee414a7be905414fbc2642e50) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A placement is now a target and a relation. `PlacementDecision.accepted`, each shortlist candidate and each Jev ranking entry carry `{ target, relation }`, with `relation` either `touches` or `amends`. The rules alone pick the relation: a change with `fix: true` or a code-health finding touches its target, a change whose title or intent asks for new behaviour amends it, and any other change touches it. The text model and Jev pick only the target. Constraints are ranked as candidates alongside capabilities, and a code-health finding (source `sourcevision` or tag `code-health`) is placed on the architecture constraint. The text model can propose a new capability or constraint under an area as an `added` amendment with a type. A proposal is never auto-accepted in any `autoAccept` mode, so it always leaves `needsPlacement` set for a person.
+
+- [#579](https://github.com/en-dash-consulting/n-dx/pull/579) [`86751c5`](https://github.com/en-dash-consulting/n-dx/commit/86751c571f74bb04949e8b5cc1007eddf4ea1e21) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Rank placement candidates for a change from rules (package and path mentions, title word overlap, file evidence against realized-by) and an optional text model on the new `prd.place` task class; the model counts as agreeing only when it picks the rules' top candidate.
+
+- [#531](https://github.com/en-dash-consulting/n-dx/pull/531) [`3700d62`](https://github.com/en-dash-consulting/n-dx/commit/3700d62dc7a521353c813d5bab0776eef097bf07) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Remove `src/store/adapter-config.ts` — the last of the tracker-integration code.
+  
+  `adapter-config.ts` was the remains of the adapter registry: `.rex/adapters.json`
+  persistence plus credential redaction and environment resolution. It was extracted
+  as a neutral module when the Notion, Jira, Asana and GitHub Projects adapters were
+  deleted, specifically so the dashboard's `routes-notion.ts` could keep reading the
+  file. That route has since been deleted too, which left the module with no caller
+  anywhere in the repository while it was still exported from `public.ts` and
+  `src/store/index.ts`.
+  
+  Gone from the public API: `loadAdapterConfigs`, `getAdapterConfig`,
+  `saveAdapterConfig`, `removeAdapterConfig`, `isSensitiveField`, `envVarName`,
+  `redactValue`, `isRedactedField`, `resolveRedactedConfig`, and the `AdapterConfig`,
+  `AdapterConfigField` and `RedactedField` types.
+  
+  This supersedes the earlier plan to keep the redaction and env-var helpers for a
+  future work-tracker bridge. That plan predated the removal of their last caller.
+  Keeping them would have frozen a credential-persistence API for a feature that no
+  longer exists into the frozen public surface, on the strength of a consumer that does not
+  exist yet and will own its own config when it does — the helpers are forty lines of
+  string manipulation, cheaper to write again in the right package than to carry as a
+  semver commitment in the wrong one.
+  
+  `file-adapter.ts` (the local store) and `src/core/sync.ts` (item bookkeeping, not the
+  sync engine) are untouched, as before.
+  
+  Two pieces of housekeeping travelled with it, because both were about this removal:
+  
+  - `packages/rex/tests/integration/domain-layer-boundary.test.ts` still listed
+    `../../store/adapter-registry.js` in `KNOWN_VIOLATIONS` after that file was
+    deleted. The list is only ever read as "is this import permitted", so an entry
+    whose module is gone permits nothing and nothing complains — it just leaves the
+    tracked surface describing imports that cannot happen. The entry is removed and a
+    new assertion fails on any `KNOWN_VIOLATIONS` entry whose module no longer exists,
+    so the next deletion cannot leave one behind.
+  - The changeset for the original adapter removal said the credential helpers
+    "stayed". They ship in the same release as this change, so that sentence would
+    have contradicted this entry in a single changelog. It now says they were moved at
+    that step and removed later, which is what happened.
+  
+  `docs/archive/collaborative-workflows-discovery.md` still describes the adapters and
+  `.rex/adapters.json`. That is deliberate: the archive is explicitly point-in-time
+  ("every page here describes the state of the project on the date it was written and
+  has not been maintained since"), and it is retained to record why a decision was
+  made. Editing it would falsify the record rather than update it.
+
+- [#531](https://github.com/en-dash-consulting/n-dx/pull/531) [`f65e407`](https://github.com/en-dash-consulting/n-dx/commit/f65e407f4a4cec417865be9c40c3b58cf9040f99) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Remove the Notion, Jira, Asana and GitHub Projects store adapters, `rex sync`,
+  `rex adapter` and the `sync_with_remote` MCP tool.
+  
+  No project used them. They were written against the whole-document store model
+  that the folder tree replaced, so every one of them had been carrying a
+  conversion layer between a PRD tree and a flat list of remote records — four
+  copies of a translation nobody was running. A work-tracker bridge is planned as
+  its own package, built against the storage model that actually exists; keeping
+  four unexercised adapters alive until then buys nothing and has to be migrated
+  with every schema change.
+  
+  Gone from rex: `notion-*`, `jira-*`, `asana-*` and `github-projects-*` under
+  `src/store/`, the `integration-schema` system and its four tracker schemas, the
+  `AdapterRegistry`, `SyncEngine`, the `sync` and `adapter` CLI commands with
+  their help entries, and the `sync_with_remote` MCP tool. Gone from core: the
+  `ndx sync` command, its help and its command-effects entry.
+  
+  Two dashboard surfaces went with them, because they could not outlive what they
+  called: `routes-integrations.ts`, whose every handler began by importing the
+  deleted integration-schema modules, and `POST /api/commands/sync`, which spawned
+  the deleted CLI command. `routes-notion.ts` survived this step — it reads and writes
+  `.rex/adapters.json` through the credential helpers below — and is removed by the
+  dashboard change that follows. The Notion wizard, the feature toggles and the
+  remaining viewer views are a separate change.
+  
+  What stayed, and why:
+  
+  - **`file-adapter.ts` and `folder-tree-store.ts`** — the local stores. Untouched.
+  - **`src/core/sync.ts`** — not the sync engine despite the name. It is the item
+    bookkeeping module (`stampModified`, `isModifiedSinceSync`,
+    `ITEM_BOOKKEEPING_FIELDS`), and the folder-tree store, the bundle exporter and
+    `rex analyze` all depend on it.
+  - **Credential redaction and environment resolution**, moved at this step into
+    `src/store/adapter-config.ts` as plain functions rather than registry methods,
+    so that `routes-notion.ts` kept working. They did not survive the release:
+    deleting that route left them without a caller, and a later change in this
+    same release removes the module. See the entry for that change.
+  - **`WorkItemLink` in the schema.** Items may still record a link to an external
+    system; nothing in rex writes one now. Removing the field is a schema change,
+    not an adapter removal.
+  
+  `createStore` keeps its adapter-name parameter and now throws for anything other
+  than `"file"`. Callers across rex and hench pass the name explicitly, and a
+  parameter that is silently ignored is worse than one that is checked — a caller
+  asking for `"notion"` should hear that it is gone rather than quietly receive the
+  local store.
+  
+  The redaction rule changed shape. It used to read each adapter's `configSchema`
+  for an explicit `sensitive: true`; those schemas went with the adapters, so the
+  key name is now the only signal and the rule had to widen to match it. A key
+  whose name ends in `token`, `secret`, `password`, `passphrase`, `apikey` or
+  `credential` is redacted — which newly covers `apiToken`, previously caught only
+  by Jira's schema flag. The match is anchored at the end of the key rather than
+  done as a substring, so `projectKey` is still stored in the clear: redacting it
+  would write a `__redacted` marker over a value that was never a secret and then
+  fail to resolve it from an environment variable nobody set.
+
+- [#531](https://github.com/en-dash-consulting/n-dx/pull/531) [`d52dcd2`](https://github.com/en-dash-consulting/n-dx/commit/d52dcd20be39bb165bdfcb7d6f391bd7c07fd874) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Remove the documentation for the tracker adapters, `ndx sync`, `rex sync`, `rex
+  adapter` and the `sync_with_remote` MCP tool, and drop `.rex/adapters.json` from
+  the recommended `.gitignore` template.
+  
+  The code went in the two changes before this one. Documentation that outlives
+  the feature it describes is worse than no documentation: a reader who finds
+  `ndx config rex.adapter notion .` in a guide has no way to tell it is a fossil
+  until they run it, and a command reference listing a command that no longer
+  exists makes the whole reference untrustworthy. A work-tracker bridge ships
+  later as its own package; when it does it gets its own documentation, written
+  against the storage model that will actually exist rather than inherited from
+  the adapters it replaces.
+  
+  Gone from the guides: the "Using `ndx sync` for team-backed PRDs" section of
+  [Keeping Your PRD Alive](https://n-dx.dev/guide/change-management) along with
+  its two Notion team workflows, conflict-resolution rules and the external-adapter
+  branch of the maintenance checklist; the `ndx sync` row in the command
+  reference; the `sync_with_remote` row in the MCP tool tables of the MCP guide,
+  the rex package page and rex's own README; the `ndx sync` row and the
+  `sync_with_remote` entry in `@n-dx/core`'s README, which is the package's npm
+  page; and the `rex sync` / `rex adapter` examples from the rex CLI listing.
+  Rex's README also now lists `claim_task` and `release_task`, so its stated tool
+  count matches the eighteen tools the server registers.
+  
+  A new check in `tests/e2e/command-docs-parity.test.js` runs the existing parity
+  rule in the other direction: every `ndx <command>` row in the repository README,
+  the command guide and `@n-dx/core`'s README must name a command the registry
+  knows. Before this, a removed command could stay documented indefinitely.
+  
+  **`change-management.md` was kept rather than deleted.** The task that
+  scheduled this work called for the whole file. Four of its five sections —
+  drift detection, the four-cycle maintenance loop, archive management and the
+  recovery playbook — have nothing to do with trackers and nothing else documents
+  them; the sync material was about 15% of the page. Deleting all of it to remove
+  that 15% would have cost four sections of live guidance and broken the sidebar
+  entry plus two inbound links for no gain. The tracker content was excised
+  instead, which satisfies the same requirement.
+  
+  Three references to files that no longer exist were corrected while they were
+  in reach: `rex/src/core/notion-map.ts` in the level-system reference,
+  `routes-integrations.ts` and `routes-notion.ts` in the zone inventory, and the
+  Notion and integrations sections of the Project view in the accessibility route
+  table. The `/notion-config` and `/integrations` redirect aliases are still
+  documented in the viewer architecture page, because those aliases still exist —
+  they point at `/project` for 0.8.0 URL compatibility.
+  
+  `.rex/adapters.json` is gone from the recommended ignore template
+  (`packages/core/assistant-assets/ndx.gitignore`) and from the three documented
+  copies of it. Nothing produces the file any more. `ndx init` does not apply that
+  template — users copy it by hand — so an existing project's `.gitignore` is
+  untouched and keeps ignoring any `adapters.json` left over from an old setup. The repository's own `.gitignore` drops the entry in the same
+  change, because `tests/unit/ndx-gitignore-template.test.js` requires the
+  template and this repository to list identical `.rex/` entries.
+  
+  The dated audit tables in `docs/cli-ui-gap.md` keep their `ndx sync` row, with a
+  note that the command was since removed. That table records what shipped on a
+  given date; rewriting it would falsify the history it exists to preserve. The
+  current-state inventories in the same file did drop the removed rows.
+
+- [#584](https://github.com/en-dash-consulting/n-dx/pull/584) [`5802bc2`](https://github.com/en-dash-consulting/n-dx/commit/5802bc221ecab89d6be697b65e90d6db8c138674) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Rex can re-point recorded commit SHAs that a rebase, cherry-pick or squash rewrote to the commit they became on main (same author date and subject, patch-id, or N-DX-Item trailer and subject, then an optional host pull-request lookup), returning unmatched SHAs with a reason. `exec` gains an `input` option that writes to the child's stdin.
+
+- [#604](https://github.com/en-dash-consulting/n-dx/pull/604) [`ac9592e`](https://github.com/en-dash-consulting/n-dx/commit/ac9592eeb6bc361aed36ae106ceaa28d4d710b2d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex add` and `rex update` now support repeatable `--criterion` and `--source` flags in manual mode, matching MCP `add_item` and `edit_item` ([#511](https://github.com/en-dash-consulting/n-dx/issues/511)). Structured acceptance criteria can now be set from the CLI without the MCP server or manual JSON editing.
+
+- [#591](https://github.com/en-dash-consulting/n-dx/pull/591) [`b6c2324`](https://github.com/en-dash-consulting/n-dx/commit/b6c2324e6d597cecdb2b19523f0b2410561f4249) Thanks [@ryrykeith](https://github.com/ryrykeith)! - New `rex codeowners` generates `CODEOWNERS` and `.bitbucket/CODEOWNERS` from the product layer's stewards (root default, per-area override), one rule per area folder. Opt-in with `"codeOwners": true` in `.rex/config.json`; `--check` reports stale files. `@org/team` handles go to the GitHub file only, with a warning for the Bitbucket omission.
+
+- [#584](https://github.com/en-dash-consulting/n-dx/pull/584) [`81a283a`](https://github.com/en-dash-consulting/n-dx/commit/81a283afe4f66520417fdf06b5008c985ec5c1a1) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add a `criteria-growth` tree rule that warns when a capability's own plus inherited criteria exceed 15, configurable as `structureHealth.maxCriteriaPerCapability`.
+
+- [#573](https://github.com/en-dash-consulting/n-dx/pull/573) [`c3d5eb0`](https://github.com/en-dash-consulting/n-dx/commit/c3d5eb070761ab8054c6a78f444db4833c203914) Thanks [@ryrykeith](https://github.com/ryrykeith)! - PRD folder tree: a backslash in a quoted string field (e.g. a title `C:\new dir`) no longer reads back as a newline, and `\r` and `\uXXXX` escapes now decode. The frontmatter parser decodes double-quoted values with `JSON.parse`, matching how both tree writers quote them.
+
+- [#526](https://github.com/en-dash-consulting/n-dx/pull/526) [`cc10e8f`](https://github.com/en-dash-consulting/n-dx/commit/cc10e8f9de93dd0733358d4c57b7ff4c92737eca) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Front matter now keeps `loe` as a number and keeps `loeRationale` and `loeConfidence`, and no object-valued field is written as `[object Object]`.
+
+- [#520](https://github.com/en-dash-consulting/n-dx/pull/520) [`0ec098a`](https://github.com/en-dash-consulting/n-dx/commit/0ec098ae8fe51a8f62a7a8e8400eba9e47971a1d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex mcp .` now serves the worktree named by the client's MCP roots, so a Claude desktop session in a linked worktree writes that worktree's PRD rather than the main checkout's ([#499](https://github.com/en-dash-consulting/n-dx/issues/499)). A root naming another worktree of the same repository that has no `.rex/` refuses writes instead of falling back. An explicit directory (`rex mcp /abs/path`) and the dashboard's HTTP MCP keep the directory they were given. `get_capabilities` reports the served `workspace`. `@n-dx/llm-client` exports the shared `resolveWorkspaceFromRoots` helper.
+
+- [#537](https://github.com/en-dash-consulting/n-dx/pull/537) [`0845cde`](https://github.com/en-dash-consulting/n-dx/commit/0845cde144ff5365a24d0df7cbd48752870e9492) Thanks [@ryrykeith](https://github.com/ryrykeith)! - PRD items can carry a `run` block of saved run settings (a portable model `tier`, optional per-vendor `models` pins, provider, permission mode, review, `reviewTier`, `reviewModels`, review optional, skip test gate, max turns, token budget, context notes). Saved settings are vendor-agnostic, so a task saved under Claude still carries its model intent when run on Codex; there is no bare `model` key. An unknown vendor name in `models` is rejected with the valid list. It round-trips through the folder tree, an empty block is never written, and rex exports `validateRunSettings` so every writer applies the same rules. Writers (MCP, `rex update --run`) reject a malformed block; the store keeps a hand-edited or newer-version block unchanged, warns on load, and never lets it block writes to other items. Nothing reads the block yet.
+
+- [#537](https://github.com/en-dash-consulting/n-dx/pull/537) [`26a7883`](https://github.com/en-dash-consulting/n-dx/commit/26a7883836aae2d1a1bbea9f827d6675f9ee08bb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The saved `run` block is writable through MCP `add_item` / `edit_item` (`edit_item` replaces the whole block, `run: null` removes it) and `rex update --run='<json>'` (`--run=` or `--run=null` clears it); invalid JSON or an unknown key exits non-zero listing the valid keys, and an unknown vendor in `models` is rejected naming the valid vendors. `PATCH /api/rex/items/:id` now accepts only status, failureReason, priority, tags, title, description, acceptanceCriteria and requirements (any other key is a 400 naming it) and does its read-modify-write inside the PRD lock, answering 409 when another process holds it.
+
+- [#589](https://github.com/en-dash-consulting/n-dx/pull/589) [`878ff2f`](https://github.com/en-dash-consulting/n-dx/commit/878ff2facb3cacb20f6727d0eca07d5a3e20f765) Thanks [@ryrykeith](https://github.com/ryrykeith)! - New `rex merge-state` git merge driver for the v2 trees' per-folder `state.yaml`: rows merge by item id, so children added or completed on parallel branches merge cleanly. A `metAt` both sides changed is recomputed from the node's spec hash, and a `status` both sides changed reads `completed` when the merged row records a completion; anything else that cannot be decided leaves conflict markers on that field. `ndx init` pins `<rex>/product/**/state.yaml` and `<rex>/changes/**/state.yaml` to `merge=rex-state` and registers the driver beside `rex-prd`.
+
+- [#618](https://github.com/en-dash-consulting/n-dx/pull/618) [`33eb557`](https://github.com/en-dash-consulting/n-dx/commit/33eb557571c1c3d0020a08e0d12318c34729600a) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Turn `rex backfill-commit-attribution` into a read-only trailer coverage report.
+  
+  Schema v2 stores no `commits` on an item — a commit's SHA is not its identity, so a change's commits are computed from its `N-DX-Item` trailers on demand. That left the backfill writing state nothing reads. What survives is the question it was really answering: how much of history can be attributed at all, which is worth knowing before the trailer format is frozen.
+  
+  The command now reports, for every commit reachable from the default branch, whether its message carries an `N-DX-Item` or `N-DX-Status` trailer — grouped by author and by month, with totals. `--json` (or `--format=json`) prints the same report machine-readably, and `--ref=<branch>` reads another branch.
+  
+  It writes nothing: not under the rex directory, not the trailer cache `change-commits.ts` keeps, and it no longer loads the PRD at all.
+  
+  Two counts are reported rather than one, because they disagree and the gap matters. `covered` scans the whole message; `attributed` asks git's own trailer parser, which is what attribution actually reads — and git reads trailers only from a message's final paragraph. On this repository 67 of the 79 covered commits write the trailer outside it, so a single number would either call history covered that nothing can attribute, or hide that the trailer was written at all. Merge commits are counted separately for the same reason: they carry no trailer by construction.
+  
+  A git failure — an unknown ref, a shallow CI checkout — now fails the command with the cause named. The predecessor caught it and returned normally, which reported an unreadable log as success.
+
+- [#583](https://github.com/en-dash-consulting/n-dx/pull/583) [`43bfdc2`](https://github.com/en-dash-consulting/n-dx/commit/43bfdc2a54c741ce489f8773addad39fd6e91ebd) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add the v2 apply engine (`core/apply-amendments.ts`). It applies a change's amendments to the product layer with no model call. `added` creates a capability under an area or capability. `modified` writes the proposed statement and adds, replaces or removes criteria by id. `removed` retires the node by setting its status to `deleted`. Each amended node gets a History line, and each added or modified node gets `metAt`, the hash of its statement and criteria only, so editing the prose body never changes it. The change gets `appliedIn`. A change that only touches nodes leaves `product/` byte-identical. Any problem refuses the whole apply and leaves the tree as it was. Add the product-edit handler (`core/product-edit.ts`) for direct edits to a capability or constraint. An editorial edit re-stamps `metAt`. Any other edit leaves the node revised and drafts one Inbox change with `source: "product-edit"`. A later edit refreshes that draft while it is open and unapplied, instead of drafting a second one. An edit back to the met spec withdraws that draft: it drops the node's amendment, cancels a draft left empty, and clears `revisedAt`. v2 is still not wired to the store.
+
+- [#610](https://github.com/en-dash-consulting/n-dx/pull/610) [`8f74ce5`](https://github.com/en-dash-consulting/n-dx/commit/8f74ce575d927ce8f2b945631b48e299512d8006) Thanks [@ryrykeith](https://github.com/ryrykeith)! - v2 changes take an optional, typed `acceptanceCriteria` list ("done when" for the change's own work), the same shape as a task's. The split rule moves it to a task-less change's first task. It never feeds the spec hash or product status, which read only a capability's capability criteria.
+
+- [#594](https://github.com/en-dash-consulting/n-dx/pull/594) [`aec78fd`](https://github.com/en-dash-consulting/n-dx/commit/aec78fdbf418c367c13fc5ea27583ce8bfba39d5) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add v2 change completion (`core/change-completion.ts`, not wired yet): a change completes when its last live task does (a pending change only; cancelled tasks block, deleted ones are ignored), or on its own when task-less, then applies to the product layer per `rex.applyOn`. A task-less in-progress change that gains its first task hands its in-flight work and acceptance criteria to that task.
+
+- [#594](https://github.com/en-dash-consulting/n-dx/pull/594) [`966f42b`](https://github.com/en-dash-consulting/n-dx/commit/966f42bb67c4ed3427ffec328afcbd1c3520268a) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add v2 work selection (`core/change-selection.ts`, not wired yet): picks placed changes and tasks, a task-less change being its own unit; orders by priority, then nearest `plannedRelease`, then dependency order. `needsPlacement` blocks autonomous selection only; `resolveWorkById` still returns it. `readyOnly` and `assignee` filters are opt-in.
+
+- [#584](https://github.com/en-dash-consulting/n-dx/pull/584) [`b24dea0`](https://github.com/en-dash-consulting/n-dx/commit/b24dea028c2d8b623a9c87a25df5f5fd7a309476) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Schema v2 no longer stores a change's `commits`. They are now worked out from `N-DX-Item` trailers (both the permalink form and the bare id) on commits reachable from main. A rebase or squash changes a commit's SHA but keeps its trailer. The result is cached in rex's `.cache` directory. A `state.yaml` that still has `commits` still loads; the key is kept but ignored, and the new `retired-state-field` rule warns about it.
+
+- [#584](https://github.com/en-dash-consulting/n-dx/pull/584) [`e0085f3`](https://github.com/en-dash-consulting/n-dx/commit/e0085f37d3b81e6b25b2bc6416687c29e63a7115) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add computed edges for the v2 product layer (`core/product-edges.ts`): `changedBy` and `boundBy` (inverses of `amends` and `appliesTo`), `coChanges`, `realizedBy` (commits, files and zones of the changes that amended a capability, found by `N-DX-Item` trailer), and the derived change kind (feature, enhancement, retirement, fix, refactor, policy change, spike). A ref that is an alias of a folded id resolves to the node it was folded into. The files per commit are cached in `<rexDir>/.cache/commit-files.json` (gitignored) and rebuilt when missing. v2 is still not wired to the store.
+
+- [#565](https://github.com/en-dash-consulting/n-dx/pull/565) [`8f4385a`](https://github.com/en-dash-consulting/n-dx/commit/8f4385ab8e82bdc66b6e3a44bdd8bb64e0fb7af7) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add a dual-read PRD loader (`store/prd-model-reader.ts`) that reads either the v1 `prd_tree` (levels mapped to v2 types) or the v2 `product/` and `changes/` roots (intent merged with `state.yaml`) into one model. State fields found in v2 frontmatter are dropped with a warning, so `state.yaml` stays the only source of status. A schema major this build cannot read is refused with a message naming both versions and the fix; `NDX_IGNORE_SCHEMA_SKEW=1` or `--ignore-schema-skew` reads it for inspection with a stderr warning and refuses every write. v2 is still not wired to the store.
+
+- [#528](https://github.com/en-dash-consulting/n-dx/pull/528) [`ff18c5f`](https://github.com/en-dash-consulting/n-dx/commit/ff18c5f8c6edca19f7a8c4032f60b77bb7317afa) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add the v2 PRD schema: node types, intent and state fields, and the v2 validation rules as pure functions. Not wired to the store yet, so nothing reads or writes v2 trees.
+
+- [#583](https://github.com/en-dash-consulting/n-dx/pull/583) [`7f24f8a`](https://github.com/en-dash-consulting/n-dx/commit/7f24f8abfe6790df3a19bc00408f94782a44afcf) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Handle direct edits to the v2 product layer (`core/product-edit.ts`). An editorial edit re-stamps `metAt` and records a History line. Any other edit leaves the node revised and drafts one change, with `source: product-edit` and `needsPlacement`. A later edit refreshes that draft instead of drafting a second change, and an edit back to the met spec withdraws it. A completed but unapplied draft is reported as stale and never modified. Every History line is written on one line. The v2 `depends-on-acyclic` rule now reports one finding per set of mutually dependent capabilities, on its smallest-id member with the members in sorted order, so the same cycle is reported the same way every time. Retiring a node that still has live descendants is refused unless the same change removes them too. v2 is still not wired to the store.
+
+- [#584](https://github.com/en-dash-consulting/n-dx/pull/584) [`441efa9`](https://github.com/en-dash-consulting/n-dx/commit/441efa9b87a779d0b433688a72a3bde18a9ab753) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Compute intent status and health for v2 capabilities and constraints (`core/product-status.ts`). Status is retired, changing, proposed, revised or met. A node reads changing only while a building change (started, or placed out of the Inbox) amends it or a parent capability, so an untouched Inbox draft leaves it revised; `long-revised` uses the same definition. Health is defective when a current check fails (results for removed requirements are ignored, latest per requirement wins) or an open fix targets the node; a retired node is always ok. Both are derived on read and never written to intent or state files. v2 is still not wired to the store.
+
+- [#580](https://github.com/en-dash-consulting/n-dx/pull/580) [`4670500`](https://github.com/en-dash-consulting/n-dx/commit/46705002256ecb6445d01f297c69ab0d59beafb9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Three more v2 rule errors before the freeze. `ref-resolves` rejects an unapplied change that adds a target some node already claims by id, display id or alias, live or retired, since apply would create a second node under that ref. `ref-unique` rejects a live node whose id a tombstone holds (display ids may be renumbered and a folded id kept as an alias stays allowed). `change-placed-at-close` also fires on an applied change that still carries `needsPlacement`.
+
+- [#580](https://github.com/en-dash-consulting/n-dx/pull/580) [`ab06a3c`](https://github.com/en-dash-consulting/n-dx/commit/ab06a3c767ad4a1904f738341852da3cfedf48b5) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Tighten the v2 validation rules before the schema freeze. A change is applied only when `appliedAt` is set, and a completed but unapplied change stays open (`isAppliedChange` and `isOpenChange` are now exported). Inbox changes (`needsPlacement`) may have no target yet but cannot close unplaced. New errors cover a change that is both a fix and a spike, a `type` on a modified or removed amendment, duplicate check results, ids, display ids or aliases claimed by two nodes, and references that name no node. A check result for a requirement the node no longer has is a warning. `indexTree` is exported, resolves ids before aliases, and can index retired nodes with `includeTombstones`. v2 is still not wired to the store.
+
+- [#580](https://github.com/en-dash-consulting/n-dx/pull/580) [`0eb2303`](https://github.com/en-dash-consulting/n-dx/commit/0eb2303255ac0d8d32a7050201859f4bbd3e4014) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 rules now reject an open change that touches, modifies or adds under a retired product node (`open-change-refs-live` covers every product reference, not only removals), and a change that adds the same target twice (`ref-resolves`; the first addition still stands). Applied changes may still reference retired nodes.
+
+- [#580](https://github.com/en-dash-consulting/n-dx/pull/580) [`a7f4f2c`](https://github.com/en-dash-consulting/n-dx/commit/a7f4f2c86bc0048de1068b89fa4f31d5bc147305) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 `ref-resolves` rule now rejects a change whose added nodes are placed under themselves or in a cycle, and a reference that names the wrong kind of node: touches, amendment targets and appliesTo must name product nodes, dependsOn a capability, blockedBy a change-layer node, and an added node's `under` a node that can hold it. `open-change-refs-live` now reports only retired targets.
+
+- [#559](https://github.com/en-dash-consulting/n-dx/pull/559) [`22f46cd`](https://github.com/en-dash-consulting/n-dx/commit/22f46cd853c558acbee7603e6358808913c7de09) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Correct the v2 PRD schema before any v2 files are written: the map layer is now the product layer (`ProductNodeType`, `PRODUCT_NODE_TYPES`, `V2Tree.product`), level-of-effort fields (`loeRationale`, `loeConfidence`) are declared and `effort` is reserved, change intent records `discoveredFrom` (the item or run that found it), and change and task intent carry an optional saved run-settings block (`run`) checked by a new run-settings warning rule. v2 is still not wired to the store.
+
+- [#580](https://github.com/en-dash-consulting/n-dx/pull/580) [`ff842c5`](https://github.com/en-dash-consulting/n-dx/commit/ff842c57c3095f49ed305a19709f7c071c6b5f55) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add the v2 PRD schema fields decided before the freeze, all optional: `fix` on a change; `type` (capability or constraint) and `base` (the target's spec hash when drafted) on an amendment; `commit` on a check result; `reviewedHash` on product-node state, replacing `specReviewed`; and `appliedAt` and `appliedAmendsHash` on change state, replacing `appliedIn`. `appliedIn` and `specReviewed` are retired: an older `state.yaml` that still has them loads and keeps them unconverted, and a new `retired-state-field` warning rule reports them. `unreviewed-spec` now compares `reviewedHash` with the current spec hash. v2 is still not wired to the store.
+
+- [#559](https://github.com/en-dash-consulting/n-dx/pull/559) [`0196dec`](https://github.com/en-dash-consulting/n-dx/commit/0196decec982928a3528e52d8165d6318cef818c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add the v2 state writer (`store/state-writer.ts`), the one module that reads and writes per-folder `state.yaml`. Output is canonical (fixed key order, LF endings), unknown keys keep their original line byte for byte, writes refuse to run outside the PRD lock, and `revisedAt` is stamped and cleared against `metAt`. The file lock gains `isLockHeld`. v2 is still not wired to the store.
+
+- [#610](https://github.com/en-dash-consulting/n-dx/pull/610) [`034fecb`](https://github.com/en-dash-consulting/n-dx/commit/034fecbb0c5bb282bf50c9c24724272b67130891) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Adds `withPrdModelTransaction`, the v2 write path: it loads the product and change layers, runs the caller's mutation and writes the result under one hold of the PRD lock, and refuses a v1 tree.
+
+- [#565](https://github.com/en-dash-consulting/n-dx/pull/565) [`454b148`](https://github.com/en-dash-consulting/n-dx/commit/454b148804a7b0505674748a9b8f7d26b025b000) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add the v2 tree writer (`store/prd-model-writer.ts`). Paths come from each node's frozen `slug`, so a title edit never moves a file. No `index.md` gets a Children table. Intent goes to Markdown and state goes to `state.yaml`. The schema stamp and slug rule go in `product/index.md`, not `tree-meta.json`. A change is always a folder. The writer refuses to delete a file holding a node the model lacks unless the caller names it as removed. Under the PRD lock it re-reads the root stamp from disk and refuses a tree that is not stamped v2, whatever its `state.yaml` files say. When a node moves to another folder, or a leaf becomes a folder, the state fields this build does not know stay in the node's `state.yaml` row and do not leak into its Markdown. A slug Windows cannot create (a device name such as `con` or `nul`, a trailing dot or space, or a character such as `:`) is refused before any file is written; the check is exported from the store as `isWindowsSafeSegment`. The v2 fixture round-trips byte-identically. v2 is still not wired to the store.
+
+- [#565](https://github.com/en-dash-consulting/n-dx/pull/565) [`aef2f1f`](https://github.com/en-dash-consulting/n-dx/commit/aef2f1f454bfad3c2da1eef844ce83d680937245) Thanks [@ryrykeith](https://github.com/ryrykeith)! - v2 trees on a Windows CRLF checkout: the reader loads a CRLF file into the same model as its LF copy (bodies included), and the v2 writer and `state.yaml` writer leave a file alone when it differs only by CRLF. `ndx init` now pins `<rexDir>/**/*.yaml` (the v2 `state.yaml` files) to LF.
+
+- [#527](https://github.com/en-dash-consulting/n-dx/pull/527) [`dd1e933`](https://github.com/en-dash-consulting/n-dx/commit/dd1e933604ef70fe18e1eb1361a4fee93dbbc936) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Split the rex MCP tool handlers into one module per tool behind a registry.
+  
+  `cli/mcp-tools.ts` held all nineteen tools in one 1,083-line file and `mcp.ts`
+  held their names, descriptions and input schemas inline, so every MCP change
+  touched both. Each tool now owns its name, description, schema, access kind and
+  handler in `cli/mcp-tools/<tool>.ts`; `registry.ts` lists them in registration
+  order and `mcp.ts` registers whatever it lists.
+  
+  Behaviour-neutral: the `tools/list` response is byte-for-byte identical, and a
+  snapshot generated from the pre-split server is checked into
+  `tests/unit/cli/mcp-tools-list-snapshot.test.ts` as the evidence.
+
+- [#547](https://github.com/en-dash-consulting/n-dx/pull/547) [`6187c2a`](https://github.com/en-dash-consulting/n-dx/commit/6187c2ad176f8c74d66dcdbc306ece63c3d08935) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On Windows, PRD store writes retry a rename that fails because another process briefly has the target open (EPERM, EACCES or EBUSY), instead of failing the command. The temp file is removed if the rename still fails.
+- Updated dependencies [[`1dfc0c7`](https://github.com/en-dash-consulting/n-dx/commit/1dfc0c7e7947ffa6054cb6ef9efc214805253a16), [`eff0f79`](https://github.com/en-dash-consulting/n-dx/commit/eff0f79db748ee2ec71c27abbde166fdcfbfc722), [`cf19d5a`](https://github.com/en-dash-consulting/n-dx/commit/cf19d5a29ffa9ad4df8bb2befb2dd3f266785e05), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`f46b952`](https://github.com/en-dash-consulting/n-dx/commit/f46b95235daf551cd0cc7c13ae162204aff74527), [`8bae238`](https://github.com/en-dash-consulting/n-dx/commit/8bae2381270ebcd2c419b4c8d8c90ffd87ac3047), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`86751c5`](https://github.com/en-dash-consulting/n-dx/commit/86751c571f74bb04949e8b5cc1007eddf4ea1e21), [`fefc307`](https://github.com/en-dash-consulting/n-dx/commit/fefc3072a4a1f7a902a5f456fa4475faeebb5b71), [`5802bc2`](https://github.com/en-dash-consulting/n-dx/commit/5802bc221ecab89d6be697b65e90d6db8c138674), [`0ec098a`](https://github.com/en-dash-consulting/n-dx/commit/0ec098ae8fe51a8f62a7a8e8400eba9e47971a1d), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`ce25794`](https://github.com/en-dash-consulting/n-dx/commit/ce2579434098c1994c73d91b1964f2b54b8f202f), [`b671123`](https://github.com/en-dash-consulting/n-dx/commit/b6711238559f132c7f0f7099b525d08108cfc445), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b)]:
+  - @n-dx/llm-client@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes
