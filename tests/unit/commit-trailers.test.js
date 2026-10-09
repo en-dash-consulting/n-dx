@@ -125,9 +125,10 @@ describe("buildCommitMessage", () => {
 
 /**
  * A PR's description becomes the body of the merge commit that lands on main,
- * so the template's trailer block is what puts `N-DX-Item` on that commit. A template whose block git would not parse — a blank
- * line inside it, or anything after it — ships a trailer that silently never
- * reaches history, which is exactly the failure the evidence layer cannot see.
+ * so the template's trailer block is what puts `N-DX-Item` on that commit. A
+ * template whose block git would not parse — a blank line inside it, or
+ * anything after it — ships a trailer that silently never reaches history,
+ * which is exactly the failure the evidence layer cannot see.
  */
 describe("the pull-request template carries a trailer block", () => {
   const template = readFileSync(join(ROOT, ".github/pull_request_template.md"), "utf-8").replace(
