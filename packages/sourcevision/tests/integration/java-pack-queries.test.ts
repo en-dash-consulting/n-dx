@@ -41,6 +41,7 @@ describe("java pack", () => {
       "declarations",
       "methods",
       "calls",
+      "annotations",
       "type-references",
     ]);
   });
