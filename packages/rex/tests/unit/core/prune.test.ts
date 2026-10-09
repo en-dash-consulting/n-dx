@@ -319,6 +319,7 @@ describe("applied changes that retire or add product nodes", () => {
     expect(pruneItems(items).pruned.map((i) => i.id)).toEqual(["done"]);
     expect(items.map((i) => i.id)).toEqual(["keep"]);
     expect(findKeptItems([keep])[0].reason).toContain(delta);
+    expect(findKeptItems([keep])[0].reason).toMatch(delta === "removed" ? /retired/ : /came from/);
   });
 
   it("prunes an applied change that only modifies, or one never applied", () => {

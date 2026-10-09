@@ -66,7 +66,9 @@ export function pruneKeepReason(item: PRDItem): string | undefined {
   if (!appliedAt) return undefined;
   const kinds = new Set((amends ?? []).map((a) => a.delta).filter((d) => d === "removed" || d === "added"));
   if (kinds.size === 0) return undefined;
-  return `applied change with ${[...kinds].join(" and ")} amendments: product status reads it to mark a node retired`;
+  return kinds.has("removed")
+    ? `applied change with ${[...kinds].join(" and ")} amendments: product status reads it to mark a node retired`
+    : "applied change with added amendments: it records where a product node came from";
 }
 
 /** Whether `item` or any descendant must be kept. */
