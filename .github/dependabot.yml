@@ -1,0 +1,43 @@
+# Dependabot configuration.
+#
+# The `github-actions` ecosystem is the half that makes SHA-pinned workflows
+# maintainable: every `uses:` in .github/workflows/ is pinned to a commit, so
+# nothing drifts on its own — and without an updater, nothing moves at all and
+# the pins quietly rot. Dependabot rewrites both the SHA and the trailing
+# version comment, so the PR says which version it is moving to.
+#
+# npm updates are weekly and grouped. They matter less here than they would
+# elsewhere, because .npmrc already sets ignore-scripts (no install-time
+# execution) and minimum-release-age (no freshly-published versions) — this is
+# about staying current on advisories, not about blocking a live attack.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(actions)"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # One PR per risk class rather than one per package: a dev-dependency
+      # bump and a production bump deserve different scrutiny, and batching
+      # them together means neither gets it.
+      dev-dependencies:
+        dependency-type: development
+        patterns: ["*"]
+      production-dependencies:
+        dependency-type: production
+        patterns: ["*"]
