@@ -16,8 +16,11 @@
  * A proposal no amendment can express (a group, a title-only update, moving
  * an area or a node with children) is skipped with the reason. So is moving
  * or splitting a node the `added` copy would not carry whole: one with tags,
- * a body, or capability requirements or dependsOn, or one another live node
- * names in dependsOn or appliesTo, since the copy has a new id. Modified and
+ * notes in its body outside History, or capability requirements or
+ * dependsOn, or one another live node names in dependsOn or appliesTo, since
+ * the copy has a new id. A body that is only History is copyable: the
+ * retired original keeps its History, and the copy's starts with a line
+ * naming the original's id (the added amendment's summary). Modified and
  * removed amendments carry `base`, the target's spec hash now, so applying
  * the change after someone else edited the node is refused rather than a
  * silent revert. The change is added through `addChangeNode`, which dry-runs
@@ -35,7 +38,7 @@ import { randomUUID } from "node:crypto";
 import type { Amendment, CriteriaDelta, Criterion } from "../schema/v2.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
 import type { ReshapeProposal } from "./reshape.js";
-import { nodeSpecHash, resolve, upsertCriteriaDelta } from "./apply-amendments.js";
+import { bodyNotes, nodeSpecHash, resolve, upsertCriteriaDelta } from "./apply-amendments.js";
 import { addChangeNode, AddChangeNodeError } from "./change-add.js";
 
 export const PRODUCT_RESHAPE_TITLE = "Reshape the product layer";
@@ -158,7 +161,7 @@ function amendmentsFor(product: readonly RuleNode[], proposal: ReshapeProposal, 
       if (node.type === "capability" && parent.type !== "area" && parent.type !== "capability") {
         return `a capability goes under an area or capability, not the ${parent.type} ${label(product, parent.id)}`;
       }
-      return [removed(node, action.reason), added(node, parent, action.reason, newId)];
+      return [removed(node, action.reason), added(node, parent, `${action.reason} (moved from ${node.id})`, newId)];
     }
     case "merge": {
       const survivor = find(action.survivorId);
@@ -204,7 +207,7 @@ function amendmentsFor(product: readonly RuleNode[], proposal: ReshapeProposal, 
         added(
           { ...node, title: child.title, statement: child.description, criteria: (child.acceptanceCriteria ?? []).map((text, i) => ({ id: `c${i + 1}`, text })) } as RuleNode,
           parent,
-          action.reason,
+          `${action.reason} (split from ${node.id})`,
           newId,
         ),
       );
@@ -269,7 +272,8 @@ function added(node: RuleNode, parent: RuleNode, summary: string, newId: () => s
  * An added capability takes only a title, statement and capability criteria,
  * an added constraint also its requirements and appliesTo, and the copy gets
  * a new id. A move that would drop anything else the node has, or leave
- * another node naming the retired original, is not drafted.
+ * another node naming the retired original, is not drafted. History is not
+ * dropped: the retired original keeps it.
  */
 function cannotCopy(product: readonly RuleNode[], node: RuleNode): string | undefined {
   if (node.type !== "capability" && node.type !== "constraint") return `an ${node.type} cannot be moved by an amendment; only a capability or constraint can`;
@@ -278,7 +282,7 @@ function cannotCopy(product: readonly RuleNode[], node: RuleNode): string | unde
   const n = node as RuleNode & { tags?: unknown[]; body?: string; requirements?: unknown[]; dependsOn?: unknown[] };
   const dropped = [
     n.tags?.length ? "tags" : undefined,
-    n.body ? "a body" : undefined,
+    bodyNotes(n.body) ? "notes outside History in its body" : undefined,
     node.type === "capability" && n.requirements?.length ? "requirements" : undefined,
     node.type === "capability" && n.dependsOn?.length ? "dependsOn" : undefined,
   ].filter((k): k is string => k !== undefined);

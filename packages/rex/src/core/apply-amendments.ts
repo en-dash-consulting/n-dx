@@ -591,14 +591,32 @@ export function appendHistory(body: string | undefined, rawLine: string): string
   const line = rawLine.replace(/\s+/g, " ").trim();
   const text = (body ?? "").trimEnd();
   const lines = text === "" ? [] : text.split("\n");
-  const start = lines.findIndex((l) => l.trim() === HISTORY_HEADING);
-  if (start === -1) return [...(lines.length ? [...lines, ""] : []), HISTORY_HEADING, "", line].join("\n");
-  let end = lines.findIndex((l, i) => i > start && /^#{1,2} /.test(l));
-  if (end === -1) end = lines.length;
+  const section = historySection(lines);
+  if (!section) return [...(lines.length ? [...lines, ""] : []), HISTORY_HEADING, "", line].join("\n");
+  const { start, end } = section;
   // Insert after the section's last non-blank line, keeping blank lines before the next heading.
   let at = end;
   while (at > start + 1 && lines[at - 1].trim() === "") at--;
   // A list line straight after prose would join its paragraph.
   const gap = at === start + 1 || !lines[at - 1].startsWith("- ") ? [""] : [];
   return [...lines.slice(0, at), ...gap, line, ...lines.slice(at)].join("\n");
+}
+
+/**
+ * `body` without its History section, trimmed: the notes it holds outside
+ * History. Empty when the body is only History (or none), as one a change's
+ * apply created is.
+ */
+export function bodyNotes(body: string | undefined): string {
+  const lines = (body ?? "").split("\n");
+  const section = historySection(lines);
+  return (section ? [...lines.slice(0, section.start), ...lines.slice(section.end)] : lines).join("\n").trim();
+}
+
+/** The History section of `lines`: its heading's index to the next `#` or `##` heading's (or the end). */
+function historySection(lines: readonly string[]): { start: number; end: number } | undefined {
+  const start = lines.findIndex((l) => l.trim() === HISTORY_HEADING);
+  if (start === -1) return undefined;
+  const end = lines.findIndex((l, i) => i > start && /^#{1,2} /.test(l));
+  return { start, end: end === -1 ? lines.length : end };
 }

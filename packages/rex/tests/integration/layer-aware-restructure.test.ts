@@ -41,6 +41,10 @@ import { cmdPrune } from "../../src/cli/commands/prune.js";
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 import { applyAmendments } from "../../src/core/apply-amendments.js";
 import { PRODUCT_RESHAPE_TITLE } from "../../src/core/product-reshape.js";
+import { cmdChange } from "../../src/cli/commands/change.js";
+import { addChangeNode } from "../../src/core/change-add.js";
+import { withPrdModelTransaction } from "../../src/store/prd-model-transaction.js";
+import type { RuleNode } from "../../src/schema/v2-rules.js";
 
 const AREA = "a0000000-0000-4000-8000-000000000001";
 const PAY_BY_CARD = "a0000000-0000-4000-8000-000000000002";
@@ -137,6 +141,38 @@ describe("rex reshape on a v2 tree", () => {
     // The draft is one a steward can apply: the move happens then, not now.
     const applied = applyAmendments(tree, drafted!.id, { appliedAt: "2026-10-09T00:00:00.000Z", now: new Date("2026-10-09T00:00:00Z") });
     expect(applied.applied.map((a) => a.delta)).toEqual(["removed", "added"]);
+  });
+
+  it("moves a capability that rex change apply created, whose body is only History, once the drafted change is applied", async () => {
+    const STORE_CREDIT = "a0000000-0000-4000-8000-000000000006";
+    const { result: adding } = await withPrdModelTransaction(rexDir, (model) => {
+      const { tree, node } = addChangeNode(
+        model.tree,
+        {
+          type: "change",
+          title: "Add store credit",
+          description: "Refunds as credit.",
+          amends: [{ target: STORE_CREDIT, delta: "added", summary: "Refunds as credit", type: "capability", under: AREA, title: "Store credit", proposed: "A shopper can pay with store credit.", criteria: { add: [{ id: "c1", text: "The credit goes down" }] } }],
+        },
+        { now: new Date() },
+      );
+      return { tree, result: node.id };
+    });
+    await cmdChange(tmp, "apply", adding, {});
+    const created = (await loadPrdModel(rexDir)).tree.product.find((n) => n.id === AREA)!.children!.find((n) => n.id === STORE_CREDIT) as RuleNode & { body?: string };
+    expect(created.body).toMatch(/^## History\n\n- \d{4}-\d{2}-\d{2} \S+ added: Refunds as credit$/);
+
+    proposeOnProduct([{ id: "p1", action: { action: "reparent", itemId: STORE_CREDIT, newParentId: DELIVERY, reason: "Credit is issued at delivery" } }]);
+    await cmdReshape(tmp, { accept: "true" });
+    expect(output.join("\n")).not.toMatch(/Not drafted/);
+    const drafted = (await loadPrdModel(rexDir)).tree.changes.find((c) => c.title === PRODUCT_RESHAPE_TITLE)!;
+    await cmdChange(tmp, "apply", drafted.id, {});
+
+    const { tree } = await loadPrdModel(rexDir);
+    expect(tree.product.find((n) => n.id === AREA)!.children!.find((n) => n.id === STORE_CREDIT)?.status).toBe("deleted");
+    const copy = tree.product.find((n) => n.id === DELIVERY)!.children!.find((n) => n.title === "Store credit") as RuleNode & { body?: string; statement?: string };
+    expect(copy).toMatchObject({ statement: "A shopper can pay with store credit.", criteria: [{ id: "c1", text: "The credit goes down" }] });
+    expect(copy.body).toMatch(new RegExp(`added: Credit is issued at delivery \\(moved from ${STORE_CREDIT}\\)$`));
   });
 
   it("does not draft a move that would drop a capability's requirements and dependsOn, and says why", async () => {

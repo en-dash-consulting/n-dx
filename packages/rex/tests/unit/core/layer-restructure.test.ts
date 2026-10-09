@@ -107,7 +107,8 @@ describe("draftProductReshape", () => {
       [{ requirements: [requirement] }, /has requirements, which an added copy would drop/],
       [{ dependsOn: ["cap2"] }, /has dependsOn, which an added copy would drop/],
       [{ tags: ["checkout"] }, /has tags, which an added copy would drop/],
-      [{ body: "## History\n\nKept." }, /has a body, which an added copy would drop/],
+      [{ body: "Raised by support.\n\n## History\n\n- 2026-10-01 CH1 added: s" }, /has notes outside History in its body, which an added copy would drop/],
+      [{ body: "## History\n\n- 2026-10-01 CH1 added: s\n\n## Notes\n\nKept." }, /has notes outside History in its body/],
     ];
     for (const [extra, reason] of cases) {
       const tree: RuleNode[] = [
@@ -126,6 +127,22 @@ describe("draftProductReshape", () => {
       // A hand-written change would use the same added amendment, so the reason must not send the user there.
       expect(draft.skipped[0].reason).toMatch(/no amendment moves it whole yet$/);
     }
+  });
+
+  it("drafts a move or split of a capability whose body is only the History apply wrote, naming the original in the copy's summary", () => {
+    const tree: RuleNode[] = [
+      node({ id: "area1", type: "area", children: [capability("cap1", { body: "## History\n\n- 2026-10-01 CH1 added: s\n- 2026-10-02 CH2 modified: t" })] }),
+      node({ id: "area2", type: "area" }),
+    ];
+    const move = draftProductReshape(tree, [{ id: "move", action: { action: "reparent", itemId: "cap1", newParentId: "area2", reason: "r" } }], { newId: ids() });
+    expect(move.skipped).toEqual([]);
+    expect(move.amends.map((a) => [a.delta, a.target, a.under, a.summary])).toEqual([
+      ["removed", "cap1", undefined, "r"],
+      ["added", "new-1", "area2", "r (moved from cap1)"],
+    ]);
+    const split = draftProductReshape(tree, [{ id: "split", action: { action: "split", sourceId: "cap1", reason: "r", children: [{ title: "A", level: "feature" }] } }], { newId: ids() });
+    expect(split.skipped).toEqual([]);
+    expect(split.amends[1]).toMatchObject({ delta: "added", summary: "r (split from cap1)" });
   });
 
   it("skips a move of a node another live node names in dependsOn or appliesTo", () => {

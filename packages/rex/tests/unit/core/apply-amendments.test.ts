@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
+import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, bodyNotes, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
 import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
@@ -611,6 +611,16 @@ describe("appendHistory", () => {
     const body = appendHistory("## History\n\n- a", "- b: Typo\n\n## Notes");
     expect(body).toBe("## History\n\n- a\n- b: Typo ## Notes");
     expect(appendHistory(body, "- c")).toBe("## History\n\n- a\n- b: Typo ## Notes\n- c");
+  });
+});
+
+describe("bodyNotes", () => {
+  it("is the body without its History section, empty when History is all there is", () => {
+    expect(bodyNotes(undefined)).toBe("");
+    expect(bodyNotes(appendHistory(undefined, "- a"))).toBe("");
+    expect(bodyNotes("Raised by support.\n\n## History\n\n- a")).toBe("Raised by support.");
+    expect(bodyNotes("## History\n\n- a\n\n## Notes\n\nx")).toBe("## Notes\n\nx");
+    expect(bodyNotes("No history here.")).toBe("No history here.");
   });
 });
 
