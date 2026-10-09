@@ -28,6 +28,7 @@ import {
 } from "../../src/cli/mcp-tools/index.js";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
 import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
+import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 
 // ── Setup helpers ─────────────────────────────────────────────────────────────
 
@@ -137,6 +138,23 @@ describe("MCP write tools — folder tree state", () => {
     expect(res.isError).toBeFalsy();
     const epics = await treeEpics(rexDir);
     expect(epics[0].run).toEqual({ tier: "heavy", models: { claude: "m1", codex: "m2" }, skipTestGate: false });
+  });
+
+  it("add_item and edit_item set a change's acceptanceCriteria, read back as the typed field", async () => {
+    const { rexDir, store } = await setupRexDir(tmpDir);
+
+    const epicRes = await handleAddItem(store, tmpDir, rexDir, { title: "Epic A", level: "epic", acceptanceCriteria: ["Ships"] });
+    const { id: epicId } = JSON.parse(epicRes.content[0].text) as { id: string };
+    const featRes = await handleAddItem(store, tmpDir, rexDir, { title: "Feature B", level: "feature", parentId: epicId });
+    const { id: featId } = JSON.parse(featRes.content[0].text) as { id: string };
+    const edit = await handleEditItem(store, tmpDir, { id: featId, acceptanceCriteria: ["Wallets pay", "Cards still pay"] });
+    expect(edit.isError).toBeFalsy();
+
+    const model = await loadPrdModel(rexDir, { env: {}, warn: () => {} });
+    const [epic] = model.tree.changes;
+    const feature = epic.children?.[0];
+    expect(epic).toMatchObject({ type: "change", acceptanceCriteria: ["Ships"] });
+    expect(feature).toMatchObject({ id: featId, type: "change", acceptanceCriteria: ["Wallets pay", "Cards still pay"] });
   });
 
   it("add_item epic → feature → task produces 3-level nesting", async () => {

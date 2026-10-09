@@ -24,7 +24,7 @@ import { withLock } from "../../../src/store/file-lock.js";
 import { PRD_TREE_DIRNAME, prdLockPath } from "../../../src/store/paths.js";
 import { loadStateFile, saveStateFile } from "../../../src/store/state-writer.js";
 import { specHash, type RuleNode } from "../../../src/schema/v2-rules.js";
-import type { Criterion } from "../../../src/schema/v2.js";
+import { ChangeIntentSchema, type Criterion } from "../../../src/schema/v2.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 import { EOLS, copyV2Fixture, editText, type Eol } from "../../helpers/v2-fixture.js";
 
@@ -86,6 +86,15 @@ describe("v1 tree", () => {
       expect(type).toBe(expectedType[item.level]);
       expect(slug).toBeTruthy();
     });
+  });
+
+  it("reads a v1 feature's acceptanceCriteria as the change's typed field", async () => {
+    const rexDir = join(tmp, ".rex");
+    await cp(V1_FIXTURE, join(rexDir, PRD_TREE_DIRNAME), { recursive: true });
+    const change = find(await loadPrdModel(rexDir, quiet), "22222222-2222-2222-2222-222222222222");
+    expect(change).toMatchObject({ type: "change", level: "feature" });
+    expect(change.type === "change" && change.acceptanceCriteria).toEqual(["Users can sign in", "Sessions expire after inactivity"]);
+    expect(ChangeIntentSchema.shape.acceptanceCriteria.safeParse(change.acceptanceCriteria).success).toBe(true);
   });
 
   it("names each item by its stored folder or file", async () => {
