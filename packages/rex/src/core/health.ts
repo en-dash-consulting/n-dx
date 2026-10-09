@@ -16,8 +16,10 @@ import {
   getLevelLabel,
   getLevelPlural,
 } from "../schema/index.js";
-import { checkV2Rules, type RuleFinding, type V2Tree } from "../schema/v2-rules.js";
+import { checkV2Rules, indexTree, type RuleFinding, type V2Tree } from "../schema/v2-rules.js";
 import { walkTree } from "./tree.js";
+import { computeLandings } from "./change-landing.js";
+import type { ChangeCommitsOptions } from "./change-commits.js";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface HealthDimensions {
@@ -579,6 +581,47 @@ export function checkV2TreeHealth(
   now: Date = new Date(),
 ): RuleFinding[] {
   return checkV2Rules(tree, { now, maxCriteria: structureHealth?.maxCriteriaPerCapability });
+}
+
+/** A finished change with no commit reachable from main. */
+export interface UnlandedChange {
+  id: string;
+  title: string;
+  reason: string;
+}
+
+/** The landing check: the unlanded changes, or why git could not answer. */
+export type LandingHealth = { available: true; notLanded: UnlandedChange[] } | { available: false; error: string };
+
+/**
+ * Completed or applied changes that have not landed on main. A git failure
+ * (no repository, unresolvable main ref, shallow clone) is returned as
+ * `available: false`, never thrown: it is a health note, not a crash.
+ */
+export async function checkChangeLandings(tree: V2Tree, options: ChangeCommitsOptions): Promise<LandingHealth> {
+  try {
+    const landings = await computeLandings(tree, options);
+    const notLanded: UnlandedChange[] = [];
+    for (const { node } of indexTree(tree).entries) {
+      if (node.type !== "change") continue;
+      const landing = landings[node.id];
+      if (!landing || landing.landed) continue;
+      if (node.status !== "completed" && node.appliedAt === undefined) continue;
+      notLanded.push({ id: node.id, title: node.title, reason: landing.reason });
+    }
+    return { available: true, notLanded };
+  } catch (err) {
+    return { available: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Render the landing check as text. */
+export function formatLandingHealth(health: LandingHealth): string {
+  if (!health.available) return `Landing check unavailable: ${health.error}`;
+  if (health.notLanded.length === 0) return "Landing: every completed change is on main";
+  const lines = ["Not landed on main:"];
+  for (const c of health.notLanded) lines.push(`  ⚠ ${c.title} (${c.id}): ${c.reason}`);
+  return lines.join("\n");
 }
 
 /** Render v2 rule findings as text. */

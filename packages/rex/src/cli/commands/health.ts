@@ -1,7 +1,7 @@
-import { join } from "node:path";
+import { resolve } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { prdLayout, loadPrdModel } from "../../store/prd-model-reader.js";
-import { computeHealthScore, formatHealthScore, checkV2TreeHealth, formatV2Findings } from "../../core/health.js";
+import { computeHealthScore, formatHealthScore, checkV2TreeHealth, formatV2Findings, checkChangeLandings, formatLandingHealth } from "../../core/health.js";
 
 import { result } from "../output.js";
 
@@ -26,7 +26,12 @@ export async function cmdHealth(
   if ((await prdLayout(rexDir)) === "v2") {
     const model = await loadPrdModel(rexDir);
     const findings = checkV2TreeHealth(model.tree, (await store.loadConfig()).structureHealth);
-    result(flags.format === "json" ? JSON.stringify({ treeRules: findings }, null, 2) : formatV2Findings(findings));
+    const landings = await checkChangeLandings(model.tree, { repoDir: resolve(dir), cacheDir: resolveRexPaths(dir).cacheDir });
+    result(
+      flags.format === "json"
+        ? JSON.stringify({ treeRules: findings, landings }, null, 2)
+        : `${formatV2Findings(findings)}\n${formatLandingHealth(landings)}`,
+    );
     return;
   }
 
