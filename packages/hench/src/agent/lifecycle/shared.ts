@@ -91,7 +91,7 @@ import {
   prepareRecoveryPathspecs,
   renderPaths,
 } from "./uncommitted-work-gate.js";
-import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
+import type { CommitMsgWatcher, CommitMsgWatcherOptions } from "./commit-msg-watcher.js";
 
 // ---------------------------------------------------------------------------
 // Co-authorship trailer
@@ -130,6 +130,26 @@ export function buildRunTrailers(
   if (taskId) trailers.push(`N-DX-Item: ${taskId}`);
   trailers.push(buildCoAuthoredByTrailerLine());
   return trailers;
+}
+
+/**
+ * Options for the run's timer-expiry commit watcher. The trailers are what
+ * give the auto-commit an N-DX-Item for rex's realized-by edge; keeping the
+ * wiring here lets a test pin it without driving the whole CLI loop.
+ */
+export function commitMsgWatcherOptions(
+  run: RunRecord,
+  taskId: string | undefined,
+  config: { commitMsgTimeoutMs?: number },
+  projectDir: string,
+): CommitMsgWatcherOptions {
+  return {
+    projectDir,
+    timeoutMs: config.commitMsgTimeoutMs ?? 0,
+    // RunRecord carries worktreeRoot/branch/startHead under those exact names.
+    origin: run,
+    trailers: buildRunTrailers(run, taskId),
+  };
 }
 
 /**

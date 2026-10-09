@@ -119,7 +119,7 @@ import {
   recordClaimLoss,
   handleRunFailure,
   formatModelLabel,
-  buildRunTrailers,
+  commitMsgWatcherOptions,
 } from "./shared.js";
 import type { SharedLoopOptions } from "./shared.js";
 import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
@@ -2241,16 +2241,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // uncommitted-work gate refuses to record the task done, and the next
   // run's pre-run commit gate offers the leftovers as a checkpoint. Set a
   // positive timeout to restore the timer, knowing it commits unverified.
-  const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 0;
-  const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher({
-    projectDir,
-    timeoutMs: commitMsgTimeoutMs,
-    // RunRecord carries worktreeRoot/branch/startHead under those exact names.
-    origin: run,
-    // Without these the auto-commit carries no N-DX-Item and rex's realized-by
-    // edge never sees it.
-    trailers: buildRunTrailers(run, taskId),
-  });
+  const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher(
+    commitMsgWatcherOptions(run, taskId, config, projectDir),
+  );
 
   // Prompt section diagnostics — captured on first attempt, stored on run record.
   let promptSectionDiagnostics: PromptSectionDiagnostic[] | undefined;
