@@ -6,6 +6,7 @@
  *   and change counts per release (`core/product-report.ts`).
  */
 
+import { z } from "zod";
 import { computeStats } from "../../core/stats.js";
 import { prdStatusReport } from "../../core/product-report.js";
 import { loadPrdModel, prdLayout } from "../../store/prd-model-reader.js";
@@ -13,11 +14,11 @@ import type { PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
 
-export async function handleGetPrdStatus(store: PRDStore, rexDir: string): Promise<McpResult> {
+export async function handleGetPrdStatus(store: PRDStore, rexDir: string, args: { allReleases?: boolean } = {}): Promise<McpResult> {
   try {
     if ((await prdLayout(rexDir)) === "v2") {
       const model = await loadPrdModel(rexDir);
-      return textResult(JSON.stringify({ title: model.title, layout: "v2", ...prdStatusReport(model.tree) }, null, 2));
+      return textResult(JSON.stringify({ title: model.title, layout: "v2", ...prdStatusReport(model.tree, args) }, null, 2));
     }
     const doc = await store.loadDocument();
     const overall = computeStats(doc.items);
@@ -39,8 +40,11 @@ export const getPrdStatusTool = defineTool({
   name: "get_prd_status",
   description:
     "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress. " +
-    "On a v2 PRD: change counts, the Inbox count, product status per area and change counts per release.",
-  schema: {},
+    "On a v2 PRD: change counts over all changes, the Inbox count, product status per area and change counts per release " +
+    "(releases with open changes and the newest closed ones; allReleases lists every release).",
+  schema: {
+    allReleases: z.boolean().optional().describe("v2 only: list every release, not just those with open changes and the newest closed ones"),
+  },
   access: "read",
-  run: (ws) => handleGetPrdStatus(ws.store, ws.rexDir),
+  run: (ws, args) => handleGetPrdStatus(ws.store, ws.rexDir, args),
 });

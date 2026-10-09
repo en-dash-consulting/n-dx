@@ -59,10 +59,12 @@ describe("capabilityReport", () => {
     expect(report.children).toEqual([{ id: "card-3ds", title: "card-3ds", type: "capability" }]);
     expect(report.status).toEqual({ status: "changing", health: "ok" });
     expect(report.changes).toEqual([
-      { id: "amend-card", title: "amend-card", status: "in_progress", relation: "amends", open: true, applied: false },
-      { id: "touch-card", title: "touch-card", status: "pending", relation: "touches", open: true, applied: false },
-      { id: "shipped", title: "shipped", status: "completed", relation: "touches", open: false, applied: true },
+      { id: "amend-card", title: "amend-card", status: "in_progress", relation: "amends", open: true, applied: false, release: "1.2.0" },
+      { id: "touch-card", title: "touch-card", status: "pending", relation: "touches", open: true, applied: false, release: "1.2.0" },
+      { id: "shipped", title: "shipped", status: "completed", relation: "touches", open: false, applied: true, appliedAt: APPLIED, release: "1.0.0" },
     ]);
+    expect(report.changeCounts).toMatchObject({ total: 3, open: 2, applied: 1 });
+    expect(report.changesPage).toEqual({ matched: 3 });
     expect(report.boundBy).toEqual([{ id: "pci", title: "pci" }]);
     expect(report.coChanges).toEqual([{ id: "label", changes: 1 }]);
   });
@@ -121,5 +123,72 @@ describe("prdStatusReport", () => {
       [null, 2],
     ]);
     expect(report.releases[1].changes).toMatchObject({ open: 2, applied: 0 });
+  });
+});
+
+describe("bounded change history", () => {
+  const N = 300;
+  const stamp = (i: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString();
+  const historyTree = (): V2Tree => {
+    const t = tree();
+    for (let i = 0; i < N; i++) {
+      t.changes.push(change(`old-${i}`, { status: "completed", appliedAt: stamp(i), shippedIn: `1.${i % 50}.0`, touches: ["card"] }));
+    }
+    return t;
+  };
+  const ids = (r: { changes: Array<{ id: string }> }) => r.changes.map((c) => c.id);
+
+  it("by default lists open changes and the latest applied ones only, newest first, with counts over all", () => {
+    const r = capabilityReport(historyTree(), "card");
+    expect(ids(r).slice(0, 2)).toEqual(["amend-card", "touch-card"]);
+    // "shipped" was applied in October, after every generated change.
+    expect(ids(r).slice(2)).toEqual(["shipped", ...Array.from({ length: 9 }, (_, i) => `old-${N - 1 - i}`)]);
+    expect(r.changeCounts).toMatchObject({ total: N + 3, open: 2, applied: N + 1 });
+    expect(r.changesPage).toEqual({ matched: 12 });
+  });
+
+  it("stays the same size however long the history grows", () => {
+    const small = JSON.stringify(capabilityReport(tree(), "card")).length;
+    const big = JSON.stringify(capabilityReport(historyTree(), "card")).length;
+    expect(big).toBeLessThan(small + 2_500);
+  });
+
+  it("pages through the whole history with the cursor, without repeats or gaps", () => {
+    const t = historyTree();
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const r = capabilityReport(t, "card", { status: "all", limit: 50, cursor });
+      expect(r.changes.length).toBeLessThanOrEqual(50);
+      seen.push(...ids(r));
+      cursor = r.changesPage.nextCursor;
+      pages++;
+    } while (cursor);
+    expect(pages).toBe(Math.ceil((N + 3) / 50));
+    expect(new Set(seen).size).toBe(N + 3);
+  });
+
+  it("filters by status and by release, and caps the page size", () => {
+    const t = historyTree();
+    expect(ids(capabilityReport(t, "card", { status: "open" }))).toEqual(["amend-card", "touch-card"]);
+    expect(capabilityReport(t, "card", { status: "applied", since: "1.49.0", limit: 100 }).changesPage.matched).toBe(N / 50);
+    expect(capabilityReport(t, "card", { status: "all", limit: 10_000 }).changes).toHaveLength(100);
+  });
+
+  it("rejects a cursor that is not in the result", () => {
+    expect(() => capabilityReport(historyTree(), "card", { cursor: "nope" })).toThrow(/Cursor "nope"/);
+  });
+
+  it("get_prd_status lists releases with open changes and the newest closed ones; counts still cover all", () => {
+    const t = historyTree();
+    const r = prdStatusReport(t);
+    expect(r.changes.total).toBe(6 + N);
+    expect(r.releases.length).toBeLessThanOrEqual(5 + 4);
+    expect(r.releasesOmitted).toBeGreaterThan(0);
+    expect(r.releases.map((x) => x.release)).toEqual(expect.arrayContaining(["1.2.0", "1.10.0", null]));
+    const all = prdStatusReport(t, { allReleases: true });
+    expect(all.releasesOmitted).toBe(0);
+    expect(all.releases.length).toBe(r.releases.length + r.releasesOmitted);
   });
 });

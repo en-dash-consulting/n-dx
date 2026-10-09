@@ -84,7 +84,7 @@ describe("get_capability", () => {
     expect(body.node).toMatchObject({ id: CAPABILITY, criteria: [{ id: "c1" }, { id: "c2" }] });
     expect(body.parentChain).toEqual([{ id: AREA, displayId: "A1", title: "Checkout", type: "area" }]);
     expect(body.status).toEqual({ status: "changing", health: "ok" });
-    expect(body.changes).toEqual([{ id: CHANGE, displayId: "CH-1", title: "Add Apple Pay", status: "in_progress", relation: "amends", open: true, applied: false }]);
+    expect(body.changes).toEqual([{ id: CHANGE, displayId: "CH-1", title: "Add Apple Pay", status: "in_progress", relation: "amends", open: true, applied: false, release: "1.2.0" }]);
   });
 
   it("refuses an area, naming get_product", async () => {

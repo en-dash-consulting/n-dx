@@ -81,6 +81,28 @@ export interface RelatedChange {
   /** Still acting on the product layer: not applied, cancelled or deleted. */
   open: boolean;
   applied: boolean;
+  appliedAt?: string;
+  /** `shippedIn` when set, else `plannedRelease`. */
+  release?: string;
+}
+
+/** Which related changes `capabilityReport` lists. `recent` is the default. */
+export type ChangeFilter = "recent" | "open" | "applied" | "all";
+
+/** Applied changes `recent` keeps besides every open one. */
+export const RECENT_APPLIED = 10;
+export const DEFAULT_PAGE_SIZE = 25;
+export const MAX_PAGE_SIZE = 100;
+
+export interface ChangePageOptions {
+  /** `recent` (default): every open change plus the {@link RECENT_APPLIED} most recently applied. */
+  status?: ChangeFilter;
+  /** Keep changes whose release (shippedIn, else plannedRelease) is this one or later. */
+  since?: string;
+  /** `changesPage.nextCursor` of the previous page. */
+  cursor?: string;
+  /** Page size, 1 to {@link MAX_PAGE_SIZE}; default {@link DEFAULT_PAGE_SIZE}. */
+  limit?: number;
 }
 
 export interface CapabilityReport {
@@ -91,8 +113,16 @@ export interface CapabilityReport {
   /** Live sub-capabilities and constraints directly below. */
   children: Array<{ id: string; displayId?: string; title: string; type: string }>;
   status: ProductStatus;
-  /** Live changes that amend or touch the node, open ones first, in tree order. */
+  /** One page of the live changes that amend or touch the node: open ones first, then newest applied. */
   changes: RelatedChange[];
+  /** Counts over every related change, whatever the page shows. */
+  changeCounts: ChangeCounts;
+  changesPage: {
+    /** Changes matching the filter, across all pages. */
+    matched: number;
+    /** Pass as `cursor` for the next page; absent on the last. */
+    nextCursor?: string;
+  };
   /** Constraints that bind the node. */
   boundBy: Array<{ id: string; displayId?: string; title: string }>;
   /** Nodes the same changes also amend or touch, most shared first. */
@@ -100,7 +130,7 @@ export interface CapabilityReport {
 }
 
 /** The capability or constraint `ref` names (id, display id or alias; a retired one too). */
-export function capabilityReport(tree: V2Tree, ref: string): CapabilityReport {
+export function capabilityReport(tree: V2Tree, ref: string, page: ChangePageOptions = {}): CapabilityReport {
   const index = productIndex(tree);
   const node = index.resolve(ref);
   if (!node || (node.type !== "capability" && node.type !== "constraint")) {
@@ -125,9 +155,12 @@ export function capabilityReport(tree: V2Tree, ref: string): CapabilityReport {
       relation: amends ? ("amends" as const) : ("touches" as const),
       applied: isAppliedChange(change),
       open: isOpenChange(change),
+      ...(change.appliedAt ? { appliedAt: change.appliedAt } : {}),
+      ...((change.shippedIn ?? change.plannedRelease) ? { release: (change.shippedIn ?? change.plannedRelease)! } : {}),
     }];
   });
-  const changes = [...related.filter((c) => c.open), ...related.filter((c) => !c.open)];
+  const changeCounts = countChanges(related.map((c) => index.resolve(c.id)!));
+  const { changes, matched, nextCursor } = pageChanges(related, page);
 
   const { children: kids, ...stored } = node;
   return {
@@ -136,12 +169,44 @@ export function capabilityReport(tree: V2Tree, ref: string): CapabilityReport {
     children: (kids ?? []).filter((c) => c.status !== "deleted").map((c) => ({ ...brief(c), type: c.type })),
     status,
     changes,
+    changeCounts,
+    changesPage: { matched, ...(nextCursor ? { nextCursor } : {}) },
     boundBy: (edges.boundBy[node.id] ?? []).flatMap((id) => {
       const constraint = index.resolve(id);
       return constraint ? [brief(constraint)] : [];
     }),
     coChanges: edges.coChanges[node.id] ?? [],
   };
+}
+
+/** Filter, order (open first, then newest applied) and slice related changes. A cancelled or deleted change is never related, so is never listed. */
+function pageChanges(related: RelatedChange[], opts: ChangePageOptions): { changes: RelatedChange[]; matched: number; nextCursor?: string } {
+  const status = opts.status ?? "recent";
+  const limit = Math.min(Math.max(Math.trunc(opts.limit ?? DEFAULT_PAGE_SIZE), 1), MAX_PAGE_SIZE);
+  const open = related.filter((c) => c.open);
+  const applied = related.filter((c) => c.applied).sort((a, b) => (b.appliedAt ?? "").localeCompare(a.appliedAt ?? ""));
+
+  let matching: RelatedChange[];
+  switch (status) {
+    case "open": matching = open; break;
+    case "applied": matching = applied; break;
+    case "all": matching = [...open, ...applied]; break;
+    default: matching = [...open, ...applied.slice(0, RECENT_APPLIED)];
+  }
+  if (opts.since !== undefined) {
+    const since = opts.since;
+    matching = matching.filter((c) => c.release !== undefined && compareReleases(c.release, since) >= 0);
+  }
+
+  let start = 0;
+  if (opts.cursor !== undefined) {
+    const at = matching.findIndex((c) => c.id === opts.cursor);
+    if (at < 0) throw new ProductReportError(`Cursor "${opts.cursor}" is not in this result. Restart without a cursor, keeping the same status and since.`);
+    start = at + 1;
+  }
+  const changes = matching.slice(start, start + limit);
+  const more = start + limit < matching.length;
+  return { changes, matched: matching.length, ...(more ? { nextCursor: changes[changes.length - 1].id } : {}) };
 }
 
 // ── get_prd_status ───────────────────────────────────────────────
@@ -180,12 +245,17 @@ export interface PrdStatusReport {
   /** Open changes waiting for a person to confirm their targets. */
   inbox: number;
   areas: AreaStatus[];
-  /** Nearest release first; unscheduled last. */
+  /** Nearest release first; unscheduled last. Default: every release with an open change, the unscheduled one, and the {@link RECENT_RELEASES} newest of the rest. */
   releases: ReleaseStatus[];
+  /** Releases left out of `releases`; `changes` still counts theirs. `allReleases` lists them. */
+  releasesOmitted: number;
 }
 
+/** Fully closed releases `prdStatusReport` lists besides those with open changes. */
+export const RECENT_RELEASES = 5;
+
 /** Product status per area and change counts per release. */
-export function prdStatusReport(tree: V2Tree): PrdStatusReport {
+export function prdStatusReport(tree: V2Tree, options: { allReleases?: boolean } = {}): PrdStatusReport {
   const status = computeProductStatus(tree);
   const index = indexTree(tree);
   // Every live change, nested ones included: add_item takes a change as a change's parent.
@@ -229,15 +299,19 @@ export function prdStatusReport(tree: V2Tree): PrdStatusReport {
     const release = c.shippedIn ?? c.plannedRelease ?? null;
     byRelease.set(release, [...(byRelease.get(release) ?? []), change]);
   }
-  const releases = [...byRelease]
+  const everyRelease = [...byRelease]
     .sort(([a], [b]) => compareReleases(a ?? undefined, b ?? undefined))
-    .map(([release, list]) => ({ release, changes: countChanges(list) }));
+    .map(([release, list]): ReleaseStatus => ({ release, changes: countChanges(list) }));
+  const closed = everyRelease.filter((r) => r.release !== null && r.changes.open === 0);
+  const dropped = new Set(options.allReleases ? [] : closed.slice(0, Math.max(closed.length - RECENT_RELEASES, 0)));
+  const releases = everyRelease.filter((r) => !dropped.has(r));
 
   return {
     changes: countChanges(changes),
     inbox: changes.filter((c) => isOpenChange(c) && c.needsPlacement).length,
     areas,
     releases,
+    releasesOmitted: dropped.size,
   };
 }
 

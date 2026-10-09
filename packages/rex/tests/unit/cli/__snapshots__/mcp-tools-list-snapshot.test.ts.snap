@@ -4,10 +4,16 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
 "[
   {
     "name": "get_prd_status",
-    "description": "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress. On a v2 PRD: change counts, the Inbox count, product status per area and change counts per release.",
+    "description": "Get PRD title, overall stats, and per-epic stats. Use to understand project scope and progress. On a v2 PRD: change counts over all changes, the Inbox count, product status per area and change counts per release (releases with open changes and the newest closed ones; allReleases lists every release).",
     "inputSchema": {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "allReleases": {
+          "type": "boolean",
+          "description": "v2 only: list every release, not just those with open changes and the newest closed ones"
+        }
+      },
+      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -791,13 +797,37 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
   },
   {
     "name": "get_capability",
-    "description": "Get one capability or constraint of a v2 PRD: its statement, capability criteria and requirements, parent chain, computed status and health, the changes that amend or touch it, the constraints that bind it, and the nodes changed alongside it.",
+    "description": "Get one capability or constraint of a v2 PRD: its statement, capability criteria and requirements, parent chain, computed status and health, one page of the changes that amend or touch it (changeCounts covers all), the constraints that bind it, and the nodes changed alongside it. By default the changes are every open one plus the 10 most recently applied; use status, since and cursor (changesPage.nextCursor) to read more.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "description": "Capability or constraint id, display id (e.g. A1.2) or alias"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "recent",
+            "open",
+            "applied",
+            "all"
+          ],
+          "description": "Which changes to list. Default recent: open plus the latest applied. all pages through the whole history"
+        },
+        "since": {
+          "type": "string",
+          "description": "Only changes released (shippedIn, else plannedRelease) in this version or later, e.g. 1.2.0"
+        },
+        "cursor": {
+          "type": "string",
+          "description": "changesPage.nextCursor from the previous call, with the same status and since"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Changes per page (default 25)"
         }
       },
       "required": [
