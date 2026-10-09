@@ -105,7 +105,8 @@ import {
 import { isAbsolute } from "node:path";
 import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
 import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
-import { BOOKKEEPING_DIR_PREFIXES } from "../../store/paths.js";
+import { BOOKKEEPING_PATHS } from "../../store/paths.js";
+import { matchesProjectPath } from "../../store/artifacts.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -1620,7 +1621,7 @@ async function runAdversarialReviewPass(
     // put in front of it rather than described.
     let scope: Awaited<ReturnType<typeof collectPairReviewScope>>;
     try {
-      scope = await collectPairReviewScope(inv.projectDir, inv.startingHead, BOOKKEEPING_DIR_PREFIXES);
+      scope = await collectPairReviewScope(inv.projectDir, inv.startingHead, BOOKKEEPING_PATHS);
     } catch (err) {
       const failed: ReviewPassOutcome & { ok: false } = {
         ok: false,
@@ -1799,17 +1800,18 @@ async function runAdversarialReviewPass(
     );
   }
 
-  // What the reviewer actually changed, from the snapshot pair. Rex's state is
-  // the completion-metadata commit's territory and hench's holds the report
-  // itself; neither is a repair — see `BOOKKEEPING_DIR_PREFIXES`. Computed even
-  // when the report claims `fixesApplied: false` — the tree, not the report, is
-  // the authority.
+  // What the reviewer actually changed, from the snapshot pair. Rex's own
+  // records are the completion-metadata commit's territory and hench's state
+  // holds the report itself; neither is a repair — see `BOOKKEEPING_PATHS`. A
+  // reviewer edit to `.rex/workflow.md`, which is project content rather than
+  // bookkeeping, is one. Computed even when the report claims
+  // `fixesApplied: false` — the tree, not the report, is the authority.
   let repairedFiles: string[] | undefined;
   if (preReviewState) {
     try {
       const postReviewState = await snapshotDirtyState(inv.projectDir);
       repairedFiles = diffDirtyState(preReviewState, postReviewState).filter(
-        (path) => !BOOKKEEPING_DIR_PREFIXES.some((prefix) => path.startsWith(prefix)),
+        (path) => !matchesProjectPath(path, BOOKKEEPING_PATHS),
       );
     } catch {
       repairedFiles = undefined;
