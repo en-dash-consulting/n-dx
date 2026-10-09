@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
-import { exec as execCb } from "node:child_process";
+import { exec as execCb, execFile as execFileCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
@@ -12,6 +12,24 @@ import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
 import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
+const execFileAsync = promisify(execFileCb);
+
+/**
+ * The values of HEAD's `key` trailers, read through git's own trailer parser
+ * rather than by scanning the message — a line that is not where git expects a
+ * trailer reads as absent here, which is exactly the failure worth catching.
+ *
+ * Runs without a shell: `cmd.exe` keeps the single quotes a POSIX shell would
+ * strip, and does not reliably pass the parentheses in `%(trailers:…)`.
+ */
+async function headTrailer(projectDir: string, key: string): Promise<string> {
+  const { stdout } = await execFileAsync(
+    "git",
+    ["log", "-1", `--format=%(trailers:key=${key},valueonly)`],
+    { cwd: projectDir },
+  );
+  return stdout.trim();
+}
 
 function buildCompletedRun(taskId: string): RunRecord {
   return {
@@ -144,6 +162,45 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
 
     const { stdout: fullMsg } = await execAsync("git log -1 --format='%B'", { cwd: projectDir });
     expect(fullMsg).toContain("Co-Authored-By:");
+  });
+
+  // The record commit is a commit n-dx makes *for* an item, so it carries the
+  // same `N-DX-Item` trailer as the work commit. Without it, a task whose code
+  // the operator committed by hand leaves only this commit in history naming
+  // the task — and rex's realized-by edge, which reads nothing but the trailer,
+  // never sees it. The subject already mentions the id, but no reader parses
+  // subjects: `scanTrailerCommits` asks git for `%(trailers:key=N-DX-Item)`.
+  it("commits with the N-DX-Item trailer naming the task on the autoCommit path", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+
+    const mockStore = {
+      getItem: vi.fn(async (id: string) => {
+        if (id !== taskId) return null;
+        return { id: taskId, status: "in_progress", title: "Test task", level: "task" };
+      }),
+      updateItem: vi.fn(async (id: string, updates: Record<string, unknown>) => {
+        if (id === taskId && updates.status === "completed") {
+          const current = readFileSync(taskIndexPath, "utf-8").replace(/\r\n/g, "\n");
+          await writeFile(taskIndexPath, current.replace("status: in_progress", "status: completed"), "utf-8");
+        }
+      }),
+      appendLog: vi.fn(async () => {}),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(taskId),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store: mockStore,
+    });
+
+    // Read it the way rex does rather than scanning the message text, so the
+    // assertion fails if the line lands somewhere git will not parse as a
+    // trailer (split from the block by a blank line, say).
+    expect(await headTrailer(projectDir, "N-DX-Item")).toBe(taskId);
   });
 
   it("never stages or commits the execution log itself, even across a rotation", async () => {
@@ -646,6 +703,26 @@ describe("commitResetDeferredChanges — stages only the save report's files (WM
     const dirty = await getRexDirtyLines(projectDir);
     expect(dirty).toHaveLength(1);
     expect(dirty[0]).toContain("unrelated-item");
+  });
+
+  // The counterpart to the completion commit's trailer. A reset spans every
+  // deferred task it touched, so there is no single item the commit is "for"
+  // and it emits no `N-DX-Item` — naming one of the N would attribute the
+  // whole commit to it in the realized-by edge.
+  it("emits no N-DX-Item trailer — a reset spans every task it touched", async () => {
+    const { commitResetDeferredChanges } = await import("../../src/agent/lifecycle/shared.js");
+
+    await writeFile(resetTaskPath, "# Deferred task\nstatus: pending\n", "utf-8");
+    const result = await commitResetDeferredChanges(projectDir, 2, {
+      written: [resetRelPath],
+      deleted: [],
+    });
+    expect(result.error).toBeUndefined();
+
+    expect(await headTrailer(projectDir, "N-DX-Item")).toBe("");
+    // The co-authorship trailer is still there, so an empty read above means
+    // "no item trailer", not "no trailer block at all".
+    expect(await headTrailer(projectDir, "Co-Authored-By")).not.toBe("");
   });
 });
 

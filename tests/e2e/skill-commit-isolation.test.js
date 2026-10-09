@@ -65,11 +65,27 @@ describe("file-modifying skills: commit step presence", () => {
       }
     });
 
-    it(`${skill}: uses skill-scoped commit message prefix`, () => {
-      const body = getSkillBody(skill);
-      // The commit message must start with the skill name so commits are attributable.
-      expect(body).toContain(`${skill}:`);
-    });
+    // ndx-work's commit is the *task's* work, not the skill's own bookkeeping,
+    // so its subject follows the project's commit convention (`feat(rex): …`)
+    // and an `ndx-work:` prefix would be wrong. `N-DX: skill/ndx-work`, asserted
+    // below, carries the attribution instead. Every other committing skill
+    // writes only its own PRD/config change and names itself in the subject.
+    if (skill === "ndx-work") {
+      it(`${skill}: defers the subject to the project's commit convention`, () => {
+        const body = getSkillBody(skill);
+        expect(body).toMatch(/commit convention the project's workflow asks for/);
+        // Asserting the absence of the prefix would be satisfied by the
+        // sentence that forbids it, so check the template instead: the fenced
+        // message block must open with the placeholder, not with the skill name.
+        expect(body).toMatch(/```\n\s*<subject>\n/);
+      });
+    } else {
+      it(`${skill}: uses skill-scoped commit message prefix`, () => {
+        const body = getSkillBody(skill);
+        // The commit message must start with the skill name so commits are attributable.
+        expect(body).toContain(`${skill}:`);
+      });
+    }
 
     it(`${skill}: commit step is conditional — skip when tree is clean`, () => {
       const body = getSkillBody(skill);
@@ -95,6 +111,67 @@ describe("file-modifying skills: commit step presence", () => {
       // not just direct file edits — that's the regression we're guarding against.
       expect(body.toLowerCase()).toMatch(/mcp|prd_tree|side-effect|project root/);
     });
+  }
+});
+
+// ── The item trailer: emitted when the commit is for exactly one item ───────
+
+/**
+ * Committing skills whose commit is for exactly one PRD item, and must
+ * therefore carry `N-DX-Item`.
+ *
+ * The rule (stated once in `packages/core/commit-trailers.js`): a commit emits
+ * `N-DX-Item` when it is for exactly one item. `ndx-work` commits the task it
+ * implemented; `ndx-capture` commits the single item it created. The others
+ * span a batch — `ndx-plan` and `ndx-adversarial-review` create several items,
+ * `ndx-reshape` restructures several — and naming one of the N would attribute
+ * the whole commit to it in rex's realized-by edge. `ndx-config` writes config
+ * and is for no item at all.
+ *
+ * Written down rather than derived: which skills are single-item is a product
+ * decision, and deriving it from the bodies would make both assertions below
+ * restate whatever the bodies happen to say.
+ */
+const SINGLE_ITEM_SKILLS = new Set(["ndx-work", "ndx-capture"]);
+
+describe("item trailer: N-DX-Item names the item a skill's commit is for", () => {
+  it("the single-item set is a subset of the committing skills", () => {
+    // Catches a renamed or un-flagged skill, which would otherwise silently
+    // drop out of the assertions below.
+    for (const skill of SINGLE_ITEM_SKILLS) {
+      expect(FILE_MODIFYING_SKILLS, `${skill} is not a committing skill`).toContain(skill);
+    }
+  });
+
+  for (const skill of FILE_MODIFYING_SKILLS) {
+    if (SINGLE_ITEM_SKILLS.has(skill)) {
+      it(`${skill}: commit message carries N-DX-Item`, () => {
+        const body = getSkillBody(skill);
+        expect(
+          body,
+          `${skill} commits for exactly one PRD item, so its trailer block must ` +
+            `include "N-DX-Item: <id>" — it is the only thing tying the commit to ` +
+            `the item (rex's realized-by edge reads the trailer, never the subject).`,
+        ).toContain("N-DX-Item: <id>");
+      });
+
+      it(`${skill}: tells the author to use the bare id, not a dashboard URL`, () => {
+        // The trailer used to carry `<publicUrl>/#/rex/item/<id>`, which baked
+        // the writer's host into permanent history. Readers still unwrap that
+        // form, but nothing should emit it.
+        expect(getSkillBody(skill).toLowerCase()).toMatch(/bare.*never a dashboard url|never a dashboard url/);
+      });
+    } else {
+      it(`${skill}: emits no N-DX-Item — its commit spans more than one item`, () => {
+        const body = getSkillBody(skill);
+        expect(
+          body,
+          `${skill}'s commit is not for a single item, so it must not emit ` +
+            `N-DX-Item. Add it to SINGLE_ITEM_SKILLS only if the skill's commit ` +
+            `is for exactly one item.`,
+        ).not.toContain("N-DX-Item:");
+      });
+    }
   }
 });
 
