@@ -112,6 +112,19 @@ describe("renderTreeDiffMarkdown", () => {
     expect(md).toContain("\\<b\\>x\\</b\\> \\| \\[link\\](http://e) \\`code\\`");
   });
 
+  it("breaks @mentions in titles so posting the comment pings no user or team", () => {
+    const md = renderTreeDiffMarkdown({
+      fromLabel: "main",
+      toLabel: "HEAD",
+      diff,
+      map: diffProductLayer([], [area([capability(NEW, "Notify @infra/oncall and @alice")])]),
+    });
+
+    expect(md).not.toMatch(/@[A-Za-z0-9]/);
+    expect(md).toContain("@‍infra/oncall");
+    expect(md).toContain("@‍alice");
+  });
+
   it("caps each section and says how many it left out", () => {
     const many = Array.from({ length: MAX_LISTED + 3 }, (_, i) =>
       capability(`b0000000-0000-4000-8000-${String(i).padStart(12, "0")}`, `Cap ${i}`),

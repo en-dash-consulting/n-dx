@@ -27,9 +27,19 @@ export interface TreeDiffMarkdownInput {
   map?: MapDiff;
 }
 
-/** Text safe to place in running Markdown: specials escaped, whitespace collapsed. */
+/** Zero-width joiner: splits `@name` so no code host parses a mention. */
+const ZWJ = "‍";
+
+/**
+ * Text safe to place in running Markdown: specials escaped, whitespace
+ * collapsed, and `@` followed by a joiner so a title cannot ping a user or team.
+ */
 function text(value: string): string {
-  return value.replace(/\s+/g, " ").trim().replace(/[\\`*_[\]<>#|]/g, (c) => `\\${c}`);
+  return value
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[\\`*_[\]<>#|]/g, (c) => `\\${c}`)
+    .replace(/@/g, `@${ZWJ}`);
 }
 
 /** Inline code that survives a backtick in its content. */
