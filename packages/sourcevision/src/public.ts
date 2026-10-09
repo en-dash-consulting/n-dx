@@ -122,6 +122,7 @@ export { DATA_FILES, ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "./schema/data-f
 export type {
   // manifest.json
   Manifest,
+  RepoIdentity,
   ModuleInfo,
   ModuleStatus,
   SubAnalysisRef,
@@ -177,6 +178,11 @@ export type {
   OutboundDependency,
   DeclaredContract,
   Confidence,
+  // infrastructure.json
+  InfrastructureData,
+  InfraResource,
+  InfraSeam,
+  InfraLink,
   // workspace
   WorkspaceMember,
   WorkspaceConfig,
