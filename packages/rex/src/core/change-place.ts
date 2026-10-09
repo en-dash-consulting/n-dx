@@ -110,6 +110,10 @@ export interface RecordPlacementResult {
   placement: PlacementTarget;
   /** Problems only other open changes cause: apply refuses until they close, and the placement is stored anyway. */
   warnings: string[];
+  /** The problems behind `warnings`, unworded, for a caller that words them itself. Empty when `warnings` is. */
+  pending: string[];
+  /** The open changes (display id or id) in the way of `pending`; empty when `pending` is. */
+  blockedBy: string[];
 }
 
 /** Record that the open change `changeRef` amends or touches `input.target`. */
@@ -171,7 +175,7 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
       throw new ChangePlacementError(plain, "apply-problems");
     }
   }
-  return { tree: next, change: change.id, placement: { target: target.id, relation }, warnings: pendingWarnings(pending, blockedBy) };
+  return { tree: next, change: change.id, placement: { target: target.id, relation }, warnings: pendingWarnings(pending, blockedBy), pending, blockedBy: [...blockedBy] };
 }
 
 /** The open change `ref` names, or a refusal naming why it cannot be placed. */

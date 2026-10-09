@@ -51,10 +51,12 @@ describe("suggestPlacement", () => {
 describe("recordPlacement", () => {
   it("adds a touches target and clears needsPlacement, leaving the input tree alone", () => {
     const input = tree();
-    const { tree: next, placement, change } = recordPlacement(input, "CH-1", { target: "A1.1", relation: "touches" }, NOW);
+    const placed = recordPlacement(input, "CH-1", { target: "A1.1", relation: "touches" }, NOW);
+    const { tree: next, placement, change } = placed;
     expect({ change, placement }).toEqual({ change: "ch", placement: { target: "card", relation: "touches" } });
     expect(changeIn(next)).toMatchObject({ touches: ["card"] });
     expect(changeIn(next)).not.toHaveProperty("needsPlacement");
+    expect(placed).toMatchObject({ warnings: [], pending: [], blockedBy: [] });
     expect(changeIn(input).needsPlacement).toBe(true);
   });
 

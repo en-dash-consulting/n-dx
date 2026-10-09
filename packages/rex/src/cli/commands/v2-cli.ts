@@ -75,6 +75,17 @@ export function capabilityCriteriaDelta(current: readonly Criterion[], set: read
   return upsertCriteriaDelta(current, set, remove);
 }
 
+/**
+ * The warning for a stored placement whose apply other open changes block,
+ * worded for the CLI; none when nothing is pending. The core string names an
+ * MCP tool, so it is not reused.
+ */
+export function pendingPlacementWarnings(pending: readonly string[], blockedBy: readonly string[]): string[] {
+  if (pending.length === 0) return [];
+  const who = blockedBy.length ? `Open change ${blockedBy.join(", ")} stands in the way` : "Another open change stands in the way";
+  return [`${who}, so rex change apply refuses until it is applied or closed: ${pending.join("; ")}`];
+}
+
 /** Lines naming the rules' placement shortlist and how to record one. */
 export function formatPlacementSuggestion(
   suggestion: PlacementSuggestion,

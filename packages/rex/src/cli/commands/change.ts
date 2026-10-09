@@ -17,7 +17,7 @@ import { resolveRexPaths, resolveStore } from "../../store/index.js";
 import { loadPrdModel } from "../../store/prd-model-reader.js";
 import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
 import { CLIError } from "../errors.js";
-import { result } from "../output.js";
+import { result, warn } from "../output.js";
 import {
   CAPABILITY_CRITERION_FLAG,
   REMOVE_CAPABILITY_CRITERION_FLAG,
@@ -26,6 +26,7 @@ import {
   nodeLabel,
   parseCapabilityCriteria,
   parseRemovedCapabilityCriteria,
+  pendingPlacementWarnings,
   requireV2,
 } from "./v2-cli.js";
 
@@ -111,8 +112,12 @@ async function placeChange(rexDir: string, ref: string, flags: Record<string, st
     itemId: placed.change,
     detail: `${placed.placement.relation} ${placed.placement.target}`,
   });
-  if (flags.format === "json") return result(JSON.stringify({ change: placed.change, ...placed.placement }, null, 2));
+  const warnings = pendingPlacementWarnings(placed.pending, placed.blockedBy);
+  if (flags.format === "json") {
+    return result(JSON.stringify({ change: placed.change, ...placed.placement, ...(warnings.length ? { warnings } : {}) }, null, 2));
+  }
   result(`Placed ${nodeLabel(placed.changeNode)} ${placed.changeNode.title}: ${placed.placement.relation} ${describe(placed.targetNode)}`);
+  for (const w of warnings) warn(w);
 }
 
 async function applyChange(rexDir: string, ref: string, flags: Record<string, string>): Promise<void> {
