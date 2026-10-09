@@ -10,7 +10,7 @@
  */
 
 import { applyAmendments, ApplyAmendmentsError, NOTHING_TO_MODIFY } from "../../core/apply-amendments.js";
-import { recordPlacement, suggestPlacement } from "../../core/change-place.js";
+import { ChangePlacementError, NOTHING_TO_MODIFY_PLACE_HINT, recordPlacement, suggestPlacement } from "../../core/change-place.js";
 import { indexTree, type RuleNode } from "../../schema/v2-rules.js";
 import type { Criterion } from "../../schema/v2.js";
 import { resolveRexPaths, resolveStore } from "../../store/index.js";
@@ -86,17 +86,19 @@ async function placeChange(rexDir: string, ref: string, flags: Record<string, st
     now = new Date();
     const node = indexTree(model.tree).resolve(target) as (RuleNode & { criteria?: Criterion[] }) | undefined;
     const criteria = capabilityCriteriaDelta(node?.criteria ?? [], set, remove);
-    const out = recordPlacement(
-      model.tree,
-      ref,
-      {
-        target,
-        ...(relation ? { relation: relation as "touches" | "amends" } : {}),
-        ...(flags.summary !== undefined ? { summary: flags.summary } : {}),
-        ...(flags.proposed !== undefined ? { proposed: flags.proposed } : {}),
-        ...(criteria ? { criteria } : {}),
-      },
-      now,
+    const out = placeOrExplain(() =>
+      recordPlacement(
+        model.tree,
+        ref,
+        {
+          target,
+          ...(relation ? { relation: relation as "touches" | "amends" } : {}),
+          ...(flags.summary !== undefined ? { summary: flags.summary } : {}),
+          ...(flags.proposed !== undefined ? { proposed: flags.proposed } : {}),
+          ...(criteria ? { criteria } : {}),
+        },
+        now,
+      ),
     );
     const index = indexTree(out.tree);
     return { tree: out.tree, result: { ...out, changeNode: index.resolve(out.change)!, targetNode: index.resolve(out.placement.target)! } };
@@ -137,6 +139,21 @@ async function applyChange(rexDir: string, ref: string, flags: Record<string, st
     `Applied ${nodeLabel(change)} ${change.title}.`,
     ...(applied.length ? applied.map((a) => `  ${a.delta} ${describe(index.resolve(a.nodeId))}`) : ["  It carried no amendments."]),
   ].join("\n"));
+}
+
+/** Run a placement; an amends refusal for lack of content names the CLI flags, not the MCP parameters. */
+function placeOrExplain<T>(place: () => T): T {
+  try {
+    return place();
+  } catch (err) {
+    if (err instanceof ChangePlacementError && err.message.endsWith(NOTHING_TO_MODIFY_PLACE_HINT)) {
+      throw new CLIError(
+        err.message.slice(0, -NOTHING_TO_MODIFY_PLACE_HINT.length),
+        `Pass --proposed="...", --${CAPABILITY_CRITERION_FLAG}="<id>: <text>" or --${REMOVE_CAPABILITY_CRITERION_FLAG}=<id>, or use --relation=touches.`,
+      );
+    }
+    throw err;
+  }
 }
 
 /** Run apply, naming the placement flags that supply a modified amendment's content when it has none. */

@@ -83,7 +83,7 @@ export interface ApplyAmendmentsResult {
 }
 
 /** The problem a `modified` amendment with neither `proposed` nor a criteria delta reports. */
-export const NOTHING_TO_MODIFY = "nothing to modify: no proposed text or criteria delta";
+export const NOTHING_TO_MODIFY = "nothing to modify: no proposed text or capability criteria delta";
 
 export class ApplyAmendmentsError extends Error {
   readonly problems: readonly string[];

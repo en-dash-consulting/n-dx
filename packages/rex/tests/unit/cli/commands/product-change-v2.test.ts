@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { cmdProduct } from "../../../../src/cli/commands/product.js";
 import { cmdChange } from "../../../../src/cli/commands/change.js";
 import { cmdAddChange, cmdAddChangesFromDescriptions, titleFrom } from "../../../../src/cli/commands/add-change.js";
+import { CLIError } from "../../../../src/cli/errors.js";
 import { getCommandHelp } from "../../../../src/cli/help.js";
 import { loadPrdModel } from "../../../../src/store/prd-model-reader.js";
 import { indexTree, type RuleNode } from "../../../../src/schema/v2-rules.js";
@@ -159,6 +160,15 @@ describe("rex change apply", () => {
     const id = await addInbox("Refunds by card");
     const err = await cmdChange(tmp, "place", id, { target: "A1.1", relation: "amends" }).catch((e: Error) => e);
     expect((err as Error).message).toMatch(/nothing to modify/);
+  });
+
+  it("names the CLI flags, never a bare \"criteria\", when it refuses an amends placement with no content", async () => {
+    const id = await addInbox("Refunds by card");
+    const err = (await cmdChange(tmp, "place", id, { target: "A1.1", relation: "amends" }).catch((e: Error) => e)) as CLIError;
+    expect(err).toBeInstanceOf(CLIError);
+    expect(err.suggestion).toMatch(/--proposed.*--capability-criterion.*--relation=touches/);
+    expect(`${err.message} ${err.suggestion}`.replace(/capability criteri/g, "")).not.toMatch(/criteria/);
+    expect(err.message).not.toMatch(/Pass proposed/);
   });
 });
 

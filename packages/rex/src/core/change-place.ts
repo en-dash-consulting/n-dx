@@ -47,6 +47,9 @@ export class ChangePlacementError extends Error {
 /** Refusal for `proposed` or `criteria` on a placement that is not an amendment. */
 export const PLACEMENT_CONTENT_NEEDS_AMENDS = "proposed and criteria describe an amendment: pass them with target and relation amends";
 
+/** Suffix of the MCP-facing refusal for an amends placement with nothing to modify; the CLI swaps it for flag names. */
+export const NOTHING_TO_MODIFY_PLACE_HINT = ". Pass proposed or criteria, or use relation touches";
+
 export interface PlacementSuggestion {
   /** Id of the change placed. */
   change: string;
@@ -140,7 +143,7 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
     pending = novel(after.pending, before.pending);
     blockedBy = after.blockedBy;
     if (problems.length) {
-      const hint = problems.some((p) => p.endsWith(NOTHING_TO_MODIFY)) ? ". Pass proposed or criteria, or use relation touches" : "";
+      const hint = problems.some((p) => p.endsWith(NOTHING_TO_MODIFY)) ? NOTHING_TO_MODIFY_PLACE_HINT : "";
       throw new ChangePlacementError(`Cannot place change ${label}: ${problems.join("; ")}${hint}`);
     }
   }
