@@ -35,7 +35,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Draft capability specs with a text model by default](./draft-capability-specs-with-a-text.md) | completed |
 | [Draft present-tense capability specs grounded in code and tests](./draft-present-tense-capability-specs.md) | completed |
 | [Enriched placement in the migration plan: text by default, Jev when configured](./enriched-placement-in-the-migration.md) | completed |
-| [Feature titles honour productNames when reading a release](./feature-titles-honour-productnames.md) | pending |
+| [Feature titles honour productNames when reading a release](./feature-titles-honour-productnames.md) | completed |
 | [Give migrations a home: framework and the v1-to-v2 folder](./give-migrations-a-home-framework-and.md) | completed |
 | [Migration contract does not say a model question must carry every input its answer depends on, so a minimal question reuses a stale answer](./migration-contract-does-not-say-a.md) | completed |
 | [Migration plan and freeSlug can freeze the slug "index", which the v2 writer refuses on a leaf](./migration-plan-and-freeslug-can-freeze.md) | completed |
