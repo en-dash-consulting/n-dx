@@ -430,7 +430,8 @@ describe("isolation", () => {
     // The v2 modules (schema, rules, state writer, state merge, bundle v2,
     // dual-read loader, tree writer, apply engine, apply policy, product-edit
     // handler, computed edges, product status, change landing, placement and
-    // its policy, change selection, change completion) may import each other;
+    // its policy, change selection, change completion, code owners and
+    // `rex codeowners`, release stamp and `rex release`) may import each other;
     // nothing else may import them until the v2 store wires them in. The
     // exceptions are the `rex merge-state` git driver, which imports
     // state-merge (branches merge state.yaml before any rex command reads it),
@@ -458,6 +459,8 @@ describe("isolation", () => {
         "core/change-completion.ts",
         "codeowners/plan.ts",
         "cli/commands/codeowners.ts",
+        "core/release-stamp.ts",
+        "cli/commands/release.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

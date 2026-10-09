@@ -187,6 +187,9 @@ describe("rex cli/commands import surface", () => {
     // dual-read loader parses, and plans its files in its own pure module.
     "../../store/prd-model-reader.js",
     "../../codeowners/plan.js",
+    // `rex release stamp` writes shippedIn (and, under applyOn release, the
+    // applies) to the v2 tree, which only the v2 tree writer writes.
+    "../../store/prd-model-writer.js",
     "../../store/project-config.js",
     // `rex merge-state` is the git merge driver for v2 state.yaml and the only
     // caller of the merge. Routing it through public.ts would hand hench and

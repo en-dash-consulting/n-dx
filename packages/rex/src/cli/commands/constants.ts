@@ -35,6 +35,7 @@ export function usage(): void {
           { name: "import [dir]", description: "Alias for analyze (file import shorthand)" },
           { name: "export --out=<path>", description: "Write the PRD to a portable JSON bundle (transport, not the dashboard)" },
           { name: "import-bundle --in=<path>", description: "Rebuild the PRD tree from a portable JSON bundle" },
+          { name: "release stamp <version> [dir]", description: "Stamp shippedIn on the changes a release ships (no-op on a v1 tree)" },
           { name: "reorganize [dir]", description: "Detect and fix structural issues in the PRD" },
           { name: "health [dir]", description: "Show structure health score (depth, balance, completeness)" },
           { name: "migrate-to-md [dir]", description: "Create .rex/prd.md from .rex/prd.json without modifying JSON" },

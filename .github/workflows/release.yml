@@ -190,9 +190,16 @@ jobs:
         # push-git-tags=true, push-with-git-cli=false — tags and the version
         # commit are pushed through the GitHub API and signed by GitHub; set
         # push-with-git-cli: true to go back to plain `git push`).
+        #
+        # The version script also runs `rex release stamp <version>`, so the
+        # Version Packages PR carries shippedIn on every change the release
+        # ships. The action runs version-script without a shell, so the
+        # chaining lives in the root `version-packages` script. The stamp never
+        # blocks a release: if it fails, the script prints a warning and
+        # versioning continues (release tags remain the shippedIn fallback).
         uses: changesets/action@v2
         with:
-          version-script: pnpm exec changeset version
+          version-script: pnpm run version-packages
           publish-script: pnpm exec changeset publish
           pr-title: "chore: version packages"
           commit-message: "chore: version packages"

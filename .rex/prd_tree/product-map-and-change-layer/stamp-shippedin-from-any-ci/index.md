@@ -24,4 +24,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add rex release stamp and call it from the Version Packages workflow](./add-rex-release-stamp-and-call-it-from.md) | pending |
+| [Add rex release stamp and call it from the Version Packages workflow](./add-rex-release-stamp-and-call-it-from.md) | in_progress |

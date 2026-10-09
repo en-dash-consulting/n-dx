@@ -48,6 +48,7 @@ PowerShell (no `sh`) and from Git Bash (`sh` at `/usr/bin/sh`), same commit.
 | `packages/llm-client/tests/integration/exec-timeout-tree-kill.test.ts` | scaffolding | 6 of 6 | 4 false failures + **2 false passes** | `describeEachNeedsPosixShell` |
 | `packages/hench/tests/unit/tools/shell.test.ts` | under test | 14 of 34 | 13 false failures + **1 false pass** | `describeNeedsPosixShell` ×4, `itNeedsPosixShell` ×2 |
 | `packages/hench/tests/unit/tools/test-runner.test.ts` | under test | 4 of 58 | 2 false failures + **2 false passes** | `itNeedsPosixShell` ×4 |
+| `tests/unit/release-version-script.test.js` | under test | 2 of 4 | — (new, 2026-10-09) | `describeNeedsPosixShell`; the spawn's own error is asserted absent, so a shell that never launched cannot pass the failing-`changeset` case. The script is the root `version-packages` script, which the release workflow runs on Linux |
 | `packages/hench/tests/unit/tools/git.test.ts` | under test | 7 of 25 | 7 false failures (`expected 'Exit code: 1' to contain 'branch'` etc.) | `itNeedsPosixShell` ×7 |
 
 Totals: 33 guarded cases across 5 files — 26 were failing, 5 were passing
