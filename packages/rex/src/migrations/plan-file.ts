@@ -22,7 +22,8 @@
  *       { "name": "text", "model": "<model id>" },
  *       { "name": "jev", "model": "<model id>" }
  *       // a pass whose seam failed carries "incomplete": { "error": "<message>" }; its answers so
- *       // far are kept, later passes did not run, and the plan must not be applied
+ *       // far are kept, later passes did not run, and the plan must not be applied; a later pass
+ *       // that did not run has no record here but keeps the earlier plan's answers under "answers"
  *     ]
  *   },
  *   "summary": { … },                   // migration-defined, plan-wide (counts, proposed areas, …)
@@ -43,7 +44,9 @@
  *
  * Re-planning with an earlier plan reuses a recorded answer when the pass,
  * model and hash all match, so an unchanged item is not asked again. Only
- * answers used by this plan are recorded. The writer adds nothing time- or
+ * answers used by this plan are recorded, except that a pass skipped because
+ * an earlier pass stopped carries the earlier plan's answers unchanged, so the
+ * retry still reuses them; they say nothing about this plan's entries. The writer adds nothing time- or
  * environment-dependent: the same source, options, `cutAt` and answers give
  * byte-identical files.
  *
