@@ -175,7 +175,7 @@ export interface ReleaseStatus {
 }
 
 export interface PrdStatusReport {
-  /** Every live top-level change. */
+  /** Every live change, nested changes included; a change under a deleted one is not live. */
   changes: ChangeCounts;
   /** Open changes waiting for a person to confirm their targets. */
   inbox: number;
@@ -188,7 +188,8 @@ export interface PrdStatusReport {
 export function prdStatusReport(tree: V2Tree): PrdStatusReport {
   const status = computeProductStatus(tree);
   const index = indexTree(tree);
-  const changes = tree.changes.filter((c) => c.type === "change" && c.status !== "deleted");
+  // Every live change, nested ones included: add_item takes a change as a change's parent.
+  const changes = index.entries.filter((e) => e.root === "changes" && e.node.type === "change").map((e) => e.node);
 
   const areaOf = new Map<string, RuleNode>();
   for (const { node, parent } of index.entries) {

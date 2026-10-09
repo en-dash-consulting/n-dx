@@ -95,6 +95,17 @@ describe("prdStatusReport", () => {
     expect(report.inbox).toBe(1);
   });
 
+  it("counts a change nested under another change, but not one under a deleted change", () => {
+    const t = tree();
+    t.changes[0].children = [change("sub-inbox", { needsPlacement: true, plannedRelease: "2.0.0" }), change("sub-touch", { touches: ["label"] })];
+    t.changes.find((c) => c.id === "deleted")!.children = [change("under-deleted", { needsPlacement: true })];
+    const r = prdStatusReport(t);
+    expect(r.changes).toMatchObject({ total: 8, open: 6 });
+    expect(r.inbox).toBe(2);
+    expect(r.areas.find((a) => a.id === "ship")!.openChanges).toBe(3);
+    expect(r.releases.map((x) => x.release)).toContain("2.0.0");
+  });
+
   it("reports product status per area, with the open changes that target it", () => {
     expect(report.areas).toEqual([
       { id: "pay", displayId: "A1", title: "pay", capabilities: 3, constraints: 1, status: { changing: 2, proposed: 1, met: 1 }, defective: 0, openChanges: 2 },
