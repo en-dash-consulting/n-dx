@@ -27,12 +27,15 @@ import {
   promoteCrossings,
   buildSubAnalysisRefs,
   detectSubAnalyses,
+  loadMemberArtifacts,
 } from "./workspace.js";
 import type { SubAnalysis } from "./workspace.js";
 import {
   buildPackageMap,
-  computeCrossRepoCrossings,
+  computeCrossRepoEdges,
+  countCrossingsBySource,
 } from "./workspace-crossings.js";
+import type { WithheldCrossing } from "./workspace-crossings.js";
 import { generateLlmsTxt } from "./llms-txt.js";
 import { generateContext } from "./context.js";
 import type {
@@ -164,31 +167,13 @@ export function resolveWorkspaceMembers(
       prefix,
       svDir,
       manifest,
+      ...loadMemberArtifacts(svDir),
     };
 
-    // Load zones
-    const zonesPath = join(svDir, DATA_FILES.zones);
-    if (existsSync(zonesPath)) {
-      try {
-        sub.zones = JSON.parse(readFileSync(zonesPath, "utf-8"));
-      } catch { /* zones unavailable */ }
-    }
-
-    // Load inventory
-    const inventoryPath = join(svDir, DATA_FILES.inventory);
-    if (existsSync(inventoryPath)) {
-      try {
-        sub.inventory = JSON.parse(readFileSync(inventoryPath, "utf-8"));
-      } catch { /* inventory unavailable */ }
-    }
-
-    // Load imports
-    const importsPath = join(svDir, DATA_FILES.imports);
-    if (existsSync(importsPath)) {
-      try {
-        sub.imports = JSON.parse(readFileSync(importsPath, "utf-8"));
-      } catch { /* imports unavailable */ }
-    }
+    // The address a member serves on is declared, never discovered — carry it
+    // from the config entry so the crossing computation does not have to read
+    // the config a second time.
+    if (member.baseUrl) sub.baseUrl = member.baseUrl;
 
     results.push(sub);
   }
@@ -310,11 +295,22 @@ function computeImportsSummary(
 }
 
 /**
+ * Aggregated zones plus the cross-repo edges that were not drawn.
+ *
+ * `withheld` is carried beside the data rather than inside it: `zones.json` is
+ * the graph, and a near-miss is not part of the graph. It is reported to the
+ * operator and then dropped.
+ */
+export interface AggregatedZones extends Zones {
+  withheld: WithheldCrossing[];
+}
+
+/**
  * Aggregate zones from all members.
  * Promotes all member zones via promoteZones(), merges intra-member crossings
  * via promoteCrossings(), and computes cross-repo crossings.
  */
-export function aggregateZones(members: SubAnalysis[]): Zones {
+export function aggregateZones(members: SubAnalysis[]): AggregatedZones {
   const allZones: Zone[] = [];
   const allCrossings: ZoneCrossing[] = [];
   const allUnzoned: string[] = [];
@@ -336,16 +332,21 @@ export function aggregateZones(members: SubAnalysis[]): Zones {
     }
   }
 
-  // Compute cross-repo crossings
+  // Cross-repo edges from all three sources (npm imports, outbound http/grpc
+  // calls, shared infrastructure), plus the candidates that did not clear the
+  // confidence threshold.
   const packageMap = buildPackageMap(members);
-  const crossRepoCrossings = computeCrossRepoCrossings(members, allZones, packageMap);
-  allCrossings.push(...crossRepoCrossings);
+  const edges = computeCrossRepoEdges(members, allZones, packageMap);
+  allCrossings.push(...edges.crossings);
 
-  return sortZonesData({
-    zones: allZones,
-    crossings: allCrossings,
-    unzoned: allUnzoned,
-  });
+  return {
+    ...sortZonesData({
+      zones: allZones,
+      crossings: allCrossings,
+      unzoned: allUnzoned,
+    }),
+    withheld: edges.withheld,
+  };
 }
 
 // ── Output writing ──────────────────────────────────────────────────────────
@@ -360,7 +361,13 @@ export function aggregateZones(members: SubAnalysis[]): Zones {
 export function writeWorkspaceOutput(
   rootDir: string,
   members: SubAnalysis[],
-): { zoneCount: number; fileCount: number; crossingCount: number } {
+): {
+  zoneCount: number;
+  fileCount: number;
+  crossingCount: number;
+  bySource: ReturnType<typeof countCrossingsBySource>;
+  withheld: WithheldCrossing[];
+} {
   const absRoot = resolve(rootDir);
   const svDir = resolveSourcevisionPaths(absRoot).svDir;
   mkdirSync(svDir, { recursive: true });
@@ -368,9 +375,11 @@ export function writeWorkspaceOutput(
   // Aggregate data
   const inventory = aggregateInventory(members);
   const imports = aggregateImports(members);
-  const zones = aggregateZones(members);
+  const { withheld, ...zones } = aggregateZones(members);
 
-  // Write data files
+  // Write data files. `withheld` is destructured off above rather than written:
+  // zones.json must stay indistinguishable from single-repo output, and a
+  // near-miss is a report to the operator, not part of the graph.
   writeFileSync(join(svDir, DATA_FILES.inventory), toCanonicalJSON(inventory));
   writeFileSync(join(svDir, DATA_FILES.imports), toCanonicalJSON(imports));
   writeFileSync(join(svDir, DATA_FILES.zones), toCanonicalJSON(zones));
@@ -406,7 +415,34 @@ export function writeWorkspaceOutput(
     zoneCount: zones.zones.length,
     fileCount: inventory.files.length,
     crossingCount: zones.crossings.length,
+    bySource: countCrossingsBySource(zones.crossings),
+    withheld,
   };
+}
+
+/**
+ * Edge counts by source for the last aggregation, read from the workspace
+ * root's `zones.json`.
+ *
+ * Reads the written graph rather than recomputing it: `--status` is a cheap
+ * read-only command, and re-aggregating would load every member's analysis to
+ * answer a question about the output of the last run. `null` when the
+ * workspace has not been aggregated yet, which is a different answer from
+ * "zero edges" and is reported as one.
+ */
+export function getWorkspaceEdgeCounts(
+  rootDir: string,
+): ReturnType<typeof countCrossingsBySource> | null {
+  const zonesPath = join(resolveSourcevisionPaths(resolve(rootDir)).svDir, DATA_FILES.zones);
+  if (!existsSync(zonesPath)) return null;
+
+  try {
+    const zones: Zones = JSON.parse(readFileSync(zonesPath, "utf-8"));
+    if (!Array.isArray(zones.crossings)) return null;
+    return countCrossingsBySource(zones.crossings);
+  } catch {
+    return null;
+  }
 }
 
 /**

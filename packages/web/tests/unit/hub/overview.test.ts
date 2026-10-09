@@ -30,7 +30,10 @@ const HEALTHY: ChildSnapshot = {
   status: {
     rex: { exists: true, percentComplete: 42, nextTaskTitle: "Wire the thing" },
     hench: { activeRuns: 2 },
-    sv: { analyzedAt: "2026-09-16T09:00:00.000Z" },
+    sv: {
+      analyzedAt: "2026-09-16T09:00:00.000Z",
+      repo: { name: "acme-api", remoteHost: "github.com" },
+    },
   },
   git: { branch: "feature/x", files: [{ path: "a.ts" }, { path: "b.ts" }] },
   error: null,
@@ -54,6 +57,53 @@ describe("toProjectCard", () => {
       percentComplete: 42,
       nextTaskTitle: "Wire the thing",
       analyzedAt: "2026-09-16T09:00:00.000Z",
+      repoName: "acme-api",
+      remoteHost: "github.com",
+    });
+  });
+
+  /**
+   * Repo identity arrives from the child's `/api/status` and nowhere else —
+   * the hub never opens `.sourcevision/`. So every state the child can be in
+   * has to produce a card: analysed with a remote, analysed without one, not
+   * analysed, and running an older build that answers no `repo` at all.
+   */
+  describe("repo identity", () => {
+    const withSv = (sv: NonNullable<NonNullable<ChildSnapshot["status"]>["sv"]>): ChildSnapshot => ({
+      ...HEALTHY,
+      status: { ...HEALTHY.status, sv },
+    });
+
+    it("keeps the registered name and the repository's own name apart", () => {
+      // Two worktrees of one repository register under two ids; both report
+      // the same repoName. Collapsing them into one field would lose that.
+      const card = toProjectCard(project("alpha-feature-x"), HEALTHY);
+      expect(card.name).toBe("alpha-feature-x");
+      expect(card.repoName).toBe("acme-api");
+    });
+
+    it("carries a name with no remote host for a local-only repository", () => {
+      const card = toProjectCard(project("a"), withSv({ repo: { name: "scratch", remoteHost: null } }));
+      expect(card.repoName).toBe("scratch");
+      expect(card.remoteHost).toBeNull();
+    });
+
+    it("is null when the project has not been analysed", () => {
+      const card = toProjectCard(project("a"), withSv({ analyzedAt: null, repo: null }));
+      expect(card.repoName).toBeNull();
+      expect(card.remoteHost).toBeNull();
+    });
+
+    it("is null for a child whose build predates the repo block", () => {
+      const card = toProjectCard(project("a"), withSv({ analyzedAt: "2026-09-16T09:00:00.000Z" }));
+      expect(card.repoName).toBeNull();
+      expect(card.remoteHost).toBeNull();
+    });
+
+    it("is null for an unreachable child, like every other field it would have supplied", () => {
+      const card = toProjectCard(project("a"), { status: null, git: null, error: "ECONNREFUSED" });
+      expect(card.repoName).toBeNull();
+      expect(card.remoteHost).toBeNull();
     });
   });
 

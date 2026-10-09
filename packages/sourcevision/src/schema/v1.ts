@@ -467,6 +467,20 @@ export interface ZoneTokenUsage {
   output: number;
 }
 
+/**
+ * Which signal produced a cross-repo crossing.
+ *
+ * `npm` — an external import resolved to a sibling member's package name.
+ * `http` — an outbound http/grpc call resolved to a sibling member that serves
+ * the route, or that declares the base URL the call's env var names.
+ * `infra` — two members reference the same infrastructure resource.
+ *
+ * Only cross-repo edges carry one. An intra-repo crossing comes from the
+ * import graph Louvain partitioned, which is not one of these signals and
+ * would be mislabelled by any of them.
+ */
+export type CrossingSource = "npm" | "http" | "infra";
+
 export interface ZoneCrossing {
   from: string;
   to: string;
@@ -474,6 +488,17 @@ export interface ZoneCrossing {
   fromZone: string;
   /** Zone ID of the target file */
   toZone: string;
+  /**
+   * What produced this edge. Present on cross-repo crossings only; absent on
+   * the intra-repo crossings Louvain derives from the import graph.
+   */
+  source?: CrossingSource;
+  /**
+   * Why this edge was drawn, naming both sides. A sentence, not a code — the
+   * reader of a cross-repo graph has no other way to judge an edge that no
+   * import supports.
+   */
+  evidence?: string;
 }
 
 export interface Zones {
@@ -908,6 +933,17 @@ export interface WorkspaceMember {
   path: string;
   /** Display name and zone prefix. Defaults to directory basename. */
   name?: string;
+  /**
+   * The base URL this member serves on, as other members reach it
+   * (`https://orders-api.internal:8080`).
+   *
+   * Declared rather than detected because nothing in a repository states the
+   * address it is deployed at. It is what lifts an http crossing from a guess
+   * about naming to a statement a person made: an outbound call to this host
+   * resolves to this member outright, and a caller's `ORDERS_API_URL` resolves
+   * to it when the variable's words are the host's words.
+   */
+  baseUrl?: string;
 }
 
 /** Workspace configuration block in .n-dx.json. */
