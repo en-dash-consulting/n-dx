@@ -2,7 +2,7 @@
 id: "2ad5ff1c-6191-4a86-a305-d7673b1dd382"
 level: "feature"
 title: "Stamp shippedIn from any CI"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "product-map"
@@ -13,10 +13,13 @@ tags:
 blockedBy:
   - "e779a36a-d012-4293-ad0a-fd23d5c1744b"
 source: "roadmap"
+startedAt: "2026-10-09T06:34:59.846Z"
+completedAt: "2026-10-09T06:34:59.846Z"
+endedAt: "2026-10-09T06:34:59.846Z"
 acceptanceCriteria: []
 description: "shippedIn is stamped by a CLI step any CI can run (GitHub Actions, Bitbucket Pipelines), with release tags as the fallback.\n\nRoadmap PR 22 · wave 2 · lane core-docs."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-06T15:51:33.409Z"
+lastModified: "2026-10-09T06:35:00.176Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -25,4 +28,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add rex release stamp and call it from the Version Packages workflow](./add-rex-release-stamp-and-call-it-from.md) | completed |
-| [No test covers rex release dispatch through the CLI entry, so the v1 never-fail path can regress unseen](./no-test-covers-rex-release-dispatch.md) | in_progress |
+| [No test covers rex release dispatch through the CLI entry, so the v1 never-fail path can regress unseen](./no-test-covers-rex-release-dispatch.md) | completed |
