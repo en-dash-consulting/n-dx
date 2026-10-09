@@ -55,6 +55,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Plan ids, aliases, backfill and data fixes](./plan-ids-aliases-backfill-and-data-fixes.md) | completed |
 | [Rank the migration review queue by confident Jev flags, not by the least confident answer](./rank-the-migration-review-queue-by.md) | completed |
 | [reviewedHash only for the spec a reviewer approved](./reviewedhash-only-for-the-spec-a.md) | completed |
-| [Spec drafts state behaviour, never "the system shall ensure that the system" or a decision](./spec-drafts-state-behaviour-never-the.md) | pending |
+| [Spec drafts state behaviour, never "the system shall ensure that the system" or a decision](./spec-drafts-state-behaviour-never-the.md) | in_progress |
 | [Stamp appliedAt and reviewedHash when migrating historical items](./stamp-appliedat-and-reviewedhash-when.md) | completed |
 | [The migration can freeze a Windows-unsafe v1 slug (con, aux, nul) into v2, leaving the tree permanently unwritable](./the-migration-can-freeze-a-windows.md) | completed |
