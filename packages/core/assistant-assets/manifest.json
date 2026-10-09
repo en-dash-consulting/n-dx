@@ -21,7 +21,8 @@
     },
     "ndx-work": {
       "description": "Pick up a task from the PRD and begin working on it",
-      "argumentHint": "[task-id]"
+      "argumentHint": "[task-id]",
+      "commits": true
     },
     "ndx-config": {
       "description": "View or change n-dx configuration with guided assistance",
