@@ -26,5 +26,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add direct map editing, workflow settings and Bitbucket remote parsing](./add-direct-map-editing-workflow.md) | pending |
 | [Add one host-neutral remote-URL helper in llm-client](./add-one-host-neutral-remote-url-helper.md) | pending |
+| [Dashboard Quick Add and batch import show an empty preview on a v2 tree](./dashboard-quick-add-and-batch-import.md) | pending |
 | [Make item routes type-aware and remap views that use level](./make-item-routes-type-aware-and-remap.md) | pending |
 | [Web Product view still shows "map node" wording after decision N1](./web-product-view-still-shows-map-node.md) | pending |

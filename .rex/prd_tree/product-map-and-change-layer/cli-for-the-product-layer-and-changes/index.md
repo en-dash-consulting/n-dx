@@ -25,7 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add rex product and rex change commands; ndx add creates a change](./add-rex-product-and-rex-change.md) | pending |
+| [Add rex product and rex change commands; ndx add creates a change](./add-rex-product-and-rex-change.md) | completed |
 | [criteria-growth warning says bare "criteria" instead of "capability criteria"](./criteria-growth-warning-says-bare.md) | pending |
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | pending |
 | [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | pending |
