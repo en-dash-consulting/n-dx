@@ -22,8 +22,8 @@ export const PLACEMENT_TASK_CLASS = "prd.place";
 type PlacementInput = Parameters<PlacementModel>[0];
 
 const ResponseSchema = z.union([
-  z.object({ pick: z.string().min(1).nullable() }).strict(),
-  z.object({ propose: z.record(z.string(), z.unknown()) }).strict(),
+  z.object({ pick: z.string().min(1).nullable() }),
+  z.object({ propose: z.record(z.string(), z.unknown()) }),
 ]);
 
 export function buildPlacementEnvelope(input: PlacementInput): PromptEnvelope {

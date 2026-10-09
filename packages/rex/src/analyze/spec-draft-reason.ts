@@ -22,10 +22,9 @@ const ResponseSchema = z
   .object({
     statement: z.string().nullable(),
     criteria: z.array(
-      z.object({ text: z.string(), source: z.string().optional(), tests: z.array(z.string()).optional() }).strict(),
+      z.object({ text: z.string(), source: z.string().optional(), tests: z.array(z.string()).optional() }),
     ),
-  })
-  .strict();
+  });
 
 export function buildSpecDraftEnvelope(question: SpecQuestion): PromptEnvelope {
   const { capability, history, codeFiles, tests } = question;

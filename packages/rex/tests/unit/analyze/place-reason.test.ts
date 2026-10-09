@@ -49,4 +49,10 @@ describe("text placement model", () => {
     reply('{"choice": "f1"}');
     await expect(place(input)).rejects.toThrow(/wrong shape/);
   });
+
+  it("ignores an extra key beside the pick", async () => {
+    const { place } = createTextPlacementModel("model-x");
+    reply('{"pick": "f1", "reason": "closest"}');
+    expect(await place(input)).toBe("f1");
+  });
 });

@@ -41,5 +41,15 @@ describe("text spec drafter", () => {
     await expect(draft(question)).rejects.toThrow(/not JSON/);
     reply('{"statement": "x"}');
     await expect(draft(question)).rejects.toThrow(/wrong shape/);
+    reply('{"criteria": []}');
+    await expect(draft(question)).rejects.toThrow(/wrong shape/);
+    reply('{"statement": "x"}');
+    await expect(draft(question)).rejects.toThrow(/wrong shape/);
+  });
+
+  it("accepts an extra top-level key and an extra criterion key, and drops them", async () => {
+    reply(JSON.stringify({ statement: "Picks.", notes: "n", criteria: [{ text: "c", source: "t1", reason: "r" }] }));
+    const { draft } = createTextSpecModel("model-x");
+    expect(await draft(question)).toEqual({ statement: "Picks.", criteria: [{ text: "c", source: "t1" }] });
   });
 });
