@@ -285,6 +285,8 @@ describe("computeCrossRepoCrossings", () => {
       to: "packages/api/src/public.ts",
       fromZone: "web:ui",
       toZone: "api:routes",
+      source: "npm",
+      evidence: 'packages/web imports "@myapp/api", the package packages/api publishes',
     });
   });
 

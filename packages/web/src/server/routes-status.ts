@@ -18,7 +18,7 @@ import { jsonResponse } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
 import { computeStats, collectCompletedIds, findNextTask, walkTree } from "./rex-gateway.js";
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
-import type { ReadinessScore } from "./domain-gateway.js";
+import type { ReadinessScore, RepoIdentity, OutboundData, InfrastructureData } from "./domain-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
 import { isProjectInitialized } from "./routes-static.js";
 import { isRunStale } from "./run-staleness.js";
@@ -60,6 +60,24 @@ export interface SourceVisionStatus {
   modulesComplete: number;
   /** Total number of analysis modules. */
   modulesTotal: number;
+  /**
+   * Who this repository is, from the manifest's `repo` block, or `null` on an
+   * analysis produced before that field existed.
+   *
+   * This is the only route by which repository identity reaches the hub. The
+   * hub never opens `.sourcevision/` — it asks each child over HTTP — so a
+   * card can only name a repository if the child's status says so.
+   */
+  repo: RepoIdentity | null;
+  /**
+   * Outbound call sites in `outbound.json`. Zero both when the last analysis
+   * found none and when the artifact predates the detector; the two are not
+   * worth telling apart on a summary count, and `analyzedAt` already says how
+   * old the analysis is.
+   */
+  outbound: number;
+  /** Infrastructure resources discovered in `infrastructure.json`. Zero when absent. */
+  infrastructure: number;
   /**
    * SDLC readiness, or null when this analysis produced no readiness artifact.
    *
@@ -217,18 +235,75 @@ function readReadiness(svDir: string, analyzedAt: string | null): ReadinessSumma
   }
 }
 
-function extractSvStatus(ctx: ServerContext): SourceVisionStatus {
-  const manifestPath = join(ctx.svDir, DATA_FILES.manifest);
-  if (!existsSync(manifestPath)) {
-    return {
-      freshness: "unavailable",
-      analyzedAt: null,
-      minutesAgo: null,
-      modulesComplete: 0,
-      modulesTotal: ANALYSIS_MODULES.length,
-      readiness: null,
-    };
+/**
+ * Read one `.sourcevision/` artifact, or null when it is missing or unreadable.
+ *
+ * Every one of these files is optional: an analysis produced before a detector
+ * existed simply has no artifact for it, and that is not an error the status
+ * route should surface. Each count below is sourced from its own file rather
+ * than from the manifest, so a half-written `.sourcevision/` reports what it
+ * actually has instead of nothing.
+ */
+function readSvArtifact<T>(svDir: string, fileName: string): T | null {
+  try {
+    const path = join(svDir, fileName);
+    if (!existsSync(path)) return null;
+    return JSON.parse(readFileSync(path, "utf-8")) as T;
+  } catch {
+    return null;
   }
+}
+
+/** Length of an array-valued field, or 0 when the artifact or field is absent. */
+function countOf(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+/**
+ * The manifest's `repo` block, or null.
+ *
+ * Validated to the extent the card depends on it — `name` must be a string,
+ * because a card showing `undefined` as a repository name is worse than one
+ * showing no repository at all. The nullable remote fields are passed through
+ * as the manifest wrote them.
+ */
+function repoIdentityOf(manifest: { repo?: unknown }): RepoIdentity | null {
+  const repo = manifest.repo as Partial<RepoIdentity> | undefined;
+  if (!repo || typeof repo.name !== "string") return null;
+  return {
+    name: repo.name,
+    remoteUrl: repo.remoteUrl ?? null,
+    remoteHost: repo.remoteHost ?? null,
+    remotePath: repo.remotePath ?? null,
+    defaultBranch: repo.defaultBranch ?? null,
+  };
+}
+
+/** Counts and identity, read from their own artifacts and shared by every return path. */
+function svArtifactSummary(svDir: string): Pick<SourceVisionStatus, "outbound" | "infrastructure"> {
+  return {
+    outbound: countOf(readSvArtifact<OutboundData>(svDir, DATA_FILES.outbound)?.dependencies),
+    infrastructure: countOf(
+      readSvArtifact<InfrastructureData>(svDir, DATA_FILES.infrastructure)?.resources,
+    ),
+  };
+}
+
+function extractSvStatus(ctx: ServerContext): SourceVisionStatus {
+  const summary = svArtifactSummary(ctx.svDir);
+  const unavailable: SourceVisionStatus = {
+    freshness: "unavailable",
+    analyzedAt: null,
+    minutesAgo: null,
+    modulesComplete: 0,
+    modulesTotal: ANALYSIS_MODULES.length,
+    repo: null,
+    ...summary,
+    readiness: null,
+  };
+
+  const manifestPath = join(ctx.svDir, DATA_FILES.manifest);
+  if (!existsSync(manifestPath)) return unavailable;
 
   try {
     const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
@@ -253,17 +328,12 @@ function extractSvStatus(ctx: ServerContext): SourceVisionStatus {
       minutesAgo,
       modulesComplete,
       modulesTotal: ANALYSIS_MODULES.length,
+      repo: repoIdentityOf(manifest),
+      ...summary,
       readiness: readReadiness(ctx.svDir, analyzedAt),
     };
   } catch {
-    return {
-      freshness: "unavailable",
-      analyzedAt: null,
-      minutesAgo: null,
-      modulesComplete: 0,
-      modulesTotal: ANALYSIS_MODULES.length,
-      readiness: null,
-    };
+    return unavailable;
   }
 }
 

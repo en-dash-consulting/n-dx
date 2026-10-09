@@ -210,6 +210,9 @@ export interface ZoneTokenUsage {
   output: number;
 }
 
+/** Mirror of sourcevision's `CrossingSource`. */
+export type CrossingSource = "npm" | "http" | "infra";
+
 export interface ZoneCrossing {
   from: string;
   to: string;
@@ -217,6 +220,13 @@ export interface ZoneCrossing {
   fromZone: string;
   /** Zone ID of the target file */
   toZone: string;
+  /**
+   * What produced this edge. Present on cross-repo crossings in a workspace
+   * aggregation only; absent on the intra-repo crossings Louvain derives.
+   */
+  source?: CrossingSource;
+  /** Why this edge was drawn, naming both sides. */
+  evidence?: string;
 }
 
 export interface Zones {

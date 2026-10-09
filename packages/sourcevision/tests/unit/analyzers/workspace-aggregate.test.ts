@@ -11,6 +11,7 @@ import {
   aggregateZones,
   writeWorkspaceOutput,
   getWorkspaceStatus,
+  getWorkspaceEdgeCounts,
   resolveMembers,
 } from "../../../src/analyzers/workspace-aggregate.js";
 import type { SubAnalysis } from "../../../src/analyzers/workspace.js";
@@ -694,5 +695,47 @@ describe("resolveMembers", () => {
     // Only the config member, not auto-detected
     expect(result!.members).toHaveLength(1);
     expect(result!.members[0].id).toBe("api");
+  });
+});
+
+// ── getWorkspaceEdgeCounts ──────────────────────────────────────────────────
+
+describe("getWorkspaceEdgeCounts", () => {
+  beforeEach(() => { tmpDir = createTmpDir(); });
+  afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
+
+  function writeRootZones(crossings: unknown[]): void {
+    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    writeFileSync(
+      join(tmpDir, ".sourcevision", "zones.json"),
+      JSON.stringify({ zones: [], crossings, unzoned: [] }),
+    );
+  }
+
+  it("breaks the last aggregation's edges down by source", () => {
+    writeRootZones([
+      { from: "a", to: "b", fromZone: "x", toZone: "y" },
+      { from: "a", to: "b", fromZone: "x", toZone: "y", source: "npm" },
+      { from: "a", to: "b", fromZone: "x", toZone: "y", source: "http" },
+      { from: "a", to: "b", fromZone: "x", toZone: "y", source: "http" },
+      { from: "a", to: "b", fromZone: "x", toZone: "y", source: "infra" },
+    ]);
+
+    expect(getWorkspaceEdgeCounts(tmpDir)).toEqual({ none: 1, npm: 1, http: 2, infra: 1 });
+  });
+
+  it("reports zero for every source when the graph has no edges", () => {
+    writeRootZones([]);
+    expect(getWorkspaceEdgeCounts(tmpDir)).toEqual({ none: 0, npm: 0, http: 0, infra: 0 });
+  });
+
+  it("is null before the workspace has been aggregated", () => {
+    expect(getWorkspaceEdgeCounts(tmpDir)).toBeNull();
+  });
+
+  it("is null for a malformed zones.json rather than throwing", () => {
+    mkdirSync(join(tmpDir, ".sourcevision"), { recursive: true });
+    writeFileSync(join(tmpDir, ".sourcevision", "zones.json"), "{ not json");
+    expect(getWorkspaceEdgeCounts(tmpDir)).toBeNull();
   });
 });

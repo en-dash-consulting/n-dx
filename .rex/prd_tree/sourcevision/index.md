@@ -18,7 +18,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Analyze pipeline improvements](./analyze-pipeline-improvements/index.md) | completed |
 | [Automatic PR Markdown Generation](./automatic-pr-markdown-generation/index.md) | completed |
 | [Background Tab Resource Optimization](./background-tab-resource-optimization/index.md) | completed |
-| [Cross-repo meta-scan foundation: repo identity, persisted infrastructure, outbound dependencies, multi-source crossings](./cross-repo-meta-scan-foundation-repo/index.md) | pending |
+| [Cross-repo meta-scan foundation: repo identity, persisted infrastructure, outbound dependencies, multi-source crossings](./cross-repo-meta-scan-foundation-repo/index.md) | completed |
 | [Fix 1: Go Zone Edge Resolution](./fix-1-go-zone-edge-resolution/index.md) | completed |
 | [Fix 2: Mixed-Language Support](./fix-2-mixed-language-support/index.md) | completed |
 | [Fix observation in sourcevision-2 (1 finding)](./fix-observation-in-sourcevision-2-1/index.md) | completed |

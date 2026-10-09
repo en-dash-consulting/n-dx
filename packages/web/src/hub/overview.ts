@@ -44,6 +44,19 @@ export interface ProjectCard {
   nextTaskTitle: string | null;
   /** ISO timestamp of the last sourcevision analysis. */
   analyzedAt: string | null;
+  /**
+   * The repository's own name, from the analysis manifest's repo identity.
+   *
+   * Distinct from `name`, which is the id the project was registered under —
+   * a path-derived label the operator chose. Two worktrees of one repository
+   * register as two projects with two names and one `repoName`, which is the
+   * whole point of the manifest carrying identity separately from location.
+   * Null when the project has not been analysed, or was analysed before the
+   * manifest carried a repo block.
+   */
+  repoName: string | null;
+  /** Host serving the git remote (`github.com`), or null when there is none. */
+  remoteHost: string | null;
 }
 
 export interface HubOverview {
@@ -51,12 +64,25 @@ export interface HubOverview {
   generatedAt: string;
 }
 
-/** The two child responses a card is built from. Either may be missing. */
+/**
+ * The two child responses a card is built from. Either may be missing.
+ *
+ * Deliberately a structural subset of what the child actually answers: it
+ * declares the fields a card reads and nothing else. Typing it against the
+ * server's own `ProjectStatus` would mean the hub zone importing from
+ * `src/server/`, which it must not do (see packages/web/AGENTS.md) — and the
+ * looser shape is also the honest one, because a child may be an older build
+ * that answers without the newer fields.
+ */
 export interface ChildSnapshot {
   status: {
     rex?: { exists?: boolean; percentComplete?: number; nextTaskTitle?: string | null };
     hench?: { activeRuns?: number };
-    sv?: { analyzedAt?: string | null };
+    sv?: {
+      analyzedAt?: string | null;
+      /** Repo identity from the child's manifest — see {@link ProjectCard.repoName}. */
+      repo?: { name?: string | null; remoteHost?: string | null } | null;
+    };
   } | null;
   git: { branch?: string | null; files?: unknown[] } | null;
   error: string | null;
@@ -99,6 +125,7 @@ export function toProjectCard(project: ProjectView, snapshot: ChildSnapshot | nu
   const port = project.status.port ?? project.port;
   const status = snapshot?.status ?? null;
   const rex = status?.rex;
+  const repo = status?.sv?.repo;
   return {
     id: project.id,
     name: project.name,
@@ -116,6 +143,10 @@ export function toProjectCard(project: ProjectView, snapshot: ChildSnapshot | nu
     percentComplete: rex?.exists && typeof rex.percentComplete === "number" ? rex.percentComplete : null,
     nextTaskTitle: rex?.nextTaskTitle ?? null,
     analyzedAt: status?.sv?.analyzedAt ?? null,
+    // An empty name is the same as none — the card has nothing to render for
+    // either, and `?? null` alone would let "" through to an empty label.
+    repoName: repo?.name || null,
+    remoteHost: repo?.remoteHost || null,
   };
 }
 

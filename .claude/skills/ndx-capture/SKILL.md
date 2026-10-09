@@ -25,12 +25,13 @@ Capture a requirement, feature idea, or task from conversation context.
    ndx-capture: add '<title>' to PRD
 
    N-DX: skill/ndx-capture
+   N-DX-Item: <id>
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
    ```
 
    Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
 
-   Substitute `<title>` with the captured item title. Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
+   Substitute `<title>` with the captured item title and `<id>` with the id `add_item` returned — the bare id, never a dashboard URL. Keep the `N-DX:`, `N-DX-Item:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling, and `N-DX-Item` is what ties the commit to the item it is for.
 
 ## Always do these without being asked
 
