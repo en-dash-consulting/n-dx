@@ -160,7 +160,7 @@ export function capabilityReport(tree: V2Tree, ref: string, page: ChangePageOpti
     }];
   });
   const changeCounts = countChanges(related.map((c) => index.resolve(c.id)!));
-  const { changes, matched, nextCursor } = pageChanges(related, page);
+  const { changes, matched, nextCursor } = pageChanges(node.id, related, page);
 
   const { children: kids, ...stored } = node;
   return {
@@ -179,12 +179,61 @@ export function capabilityReport(tree: V2Tree, ref: string, page: ChangePageOpti
   };
 }
 
+/**
+ * Where a listed change sorts: group (0 open, 1 applied), then for applied
+ * changes `appliedAt` descending, then tree order (`pos`, the index in the
+ * node's related changes).
+ */
+interface ChangePosition { group: 0 | 1; appliedAt: string; pos: number }
+
+function comparePositions(a: ChangePosition, b: ChangePosition): number {
+  if (a.group !== b.group) return a.group - b.group;
+  if (a.appliedAt !== b.appliedAt) return b.appliedAt.localeCompare(a.appliedAt);
+  return a.pos - b.pos;
+}
+
+/**
+ * The page cursor: the last listed row's position plus the query it belongs to,
+ * base64url JSON. Continuing resumes strictly after that position in the
+ * current ordering, so a change that is applied between pages (moving from the
+ * open group to the applied one) does not shift the rest of the listing; it may
+ * be listed again in its new group.
+ */
+interface ChangeCursor extends ChangePosition { v: 1; node: string; status: ChangeFilter; since: string | null; id: string }
+
+function encodeCursor(cursor: ChangeCursor): string {
+  return Buffer.from(JSON.stringify(cursor)).toString("base64url");
+}
+
+function decodeCursor(raw: string, expect: Pick<ChangeCursor, "node" | "status" | "since">): ChangeCursor {
+  const refuse = (why: string) =>
+    new ProductReportError(`Cursor "${raw}" ${why}. Restart without a cursor, keeping the same status and since.`);
+  let c: Partial<ChangeCursor>;
+  try {
+    c = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+  } catch {
+    throw refuse("is not a changesPage.nextCursor");
+  }
+  if (
+    !c || typeof c !== "object" || c.v !== 1 || (c.group !== 0 && c.group !== 1) ||
+    typeof c.appliedAt !== "string" || !Number.isInteger(c.pos) || typeof c.id !== "string" ||
+    typeof c.node !== "string" || typeof c.status !== "string" || (c.since !== null && typeof c.since !== "string")
+  ) throw refuse("is not a changesPage.nextCursor");
+  if (c.node !== expect.node || c.status !== expect.status || c.since !== expect.since) {
+    throw refuse("belongs to a different capability, status or since");
+  }
+  return c as ChangeCursor;
+}
+
 /** Filter, order (open first, then newest applied) and slice related changes. A cancelled or deleted change is never related, so is never listed. */
-function pageChanges(related: RelatedChange[], opts: ChangePageOptions): { changes: RelatedChange[]; matched: number; nextCursor?: string } {
+function pageChanges(nodeId: string, related: RelatedChange[], opts: ChangePageOptions): { changes: RelatedChange[]; matched: number; nextCursor?: string } {
   const status = opts.status ?? "recent";
   const limit = Math.min(Math.max(Math.trunc(opts.limit ?? DEFAULT_PAGE_SIZE), 1), MAX_PAGE_SIZE);
+  const treePos = new Map(related.map((c, i) => [c.id, i]));
+  const position = (c: RelatedChange): ChangePosition =>
+    ({ group: c.open ? 0 : 1, appliedAt: c.open ? "" : (c.appliedAt ?? ""), pos: treePos.get(c.id)! });
   const open = related.filter((c) => c.open);
-  const applied = related.filter((c) => c.applied).sort((a, b) => (b.appliedAt ?? "").localeCompare(a.appliedAt ?? ""));
+  const applied = related.filter((c) => c.applied).sort((a, b) => comparePositions(position(a), position(b)));
 
   let matching: RelatedChange[];
   switch (status) {
@@ -198,15 +247,23 @@ function pageChanges(related: RelatedChange[], opts: ChangePageOptions): { chang
     matching = matching.filter((c) => c.release !== undefined && compareReleases(c.release, since) >= 0);
   }
 
+  const query = { node: nodeId, status, since: opts.since ?? null };
   let start = 0;
   if (opts.cursor !== undefined) {
-    const at = matching.findIndex((c) => c.id === opts.cursor);
-    if (at < 0) throw new ProductReportError(`Cursor "${opts.cursor}" is not in this result. Restart without a cursor, keeping the same status and since.`);
-    start = at + 1;
+    const cursor = decodeCursor(opts.cursor, query);
+    // Tree order is not stored, so take the cursor change's current place when
+    // it is still related. When it is gone, resume at its old index rather than
+    // after it: the change that followed it has moved up into that index.
+    const now = treePos.get(cursor.id);
+    const after: ChangePosition = { ...cursor, pos: now ?? cursor.pos - 0.5 };
+    start = matching.findIndex((c) => comparePositions(position(c), after) > 0);
+    if (start < 0) start = matching.length;
   }
   const changes = matching.slice(start, start + limit);
   const more = start + limit < matching.length;
-  return { changes, matched: matching.length, ...(more ? { nextCursor: changes[changes.length - 1].id } : {}) };
+  if (!more) return { changes, matched: matching.length };
+  const last = changes[changes.length - 1];
+  return { changes, matched: matching.length, nextCursor: encodeCursor({ v: 1, ...query, ...position(last), id: last.id }) };
 }
 
 // ── get_prd_status ───────────────────────────────────────────────

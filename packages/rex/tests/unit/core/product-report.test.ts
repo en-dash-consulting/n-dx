@@ -176,8 +176,73 @@ describe("bounded change history", () => {
     expect(capabilityReport(t, "card", { status: "all", limit: 10_000 }).changes).toHaveLength(100);
   });
 
-  it("rejects a cursor that is not in the result", () => {
-    expect(() => capabilityReport(historyTree(), "card", { cursor: "nope" })).toThrow(/Cursor "nope"/);
+  it("refuses a malformed or foreign cursor, asking for a restart", () => {
+    const t = historyTree();
+    expect(() => capabilityReport(t, "card", { cursor: "nope" })).toThrow(/Cursor "nope" is not a changesPage.nextCursor.*Restart without a cursor/);
+    const other = Buffer.from(JSON.stringify({ hello: 1 })).toString("base64url");
+    expect(() => capabilityReport(t, "card", { cursor: other })).toThrow(/Restart without a cursor/);
+    const cursor = capabilityReport(t, "card", { status: "all", limit: 2 }).changesPage.nextCursor!;
+    expect(() => capabilityReport(t, "card", { status: "applied", limit: 2, cursor })).toThrow(/different capability, status or since/);
+    expect(() => capabilityReport(t, "label", { status: "all", limit: 2, cursor })).toThrow(/different capability, status or since/);
+  });
+
+  it("the cursor is opaque and encodes the last row's position", () => {
+    const r = capabilityReport(historyTree(), "card", { status: "all", limit: 3 });
+    const cursor = r.changesPage.nextCursor!;
+    expect(cursor).not.toContain("old-");
+    expect(JSON.parse(Buffer.from(cursor, "base64url").toString())).toMatchObject({ group: 1, appliedAt: APPLIED, id: "shipped" });
+  });
+
+  describe("a change applied between pages", () => {
+    // The only changes: open [a, b, c, d], each touching "card".
+    const openTree = (): V2Tree => {
+      const t = tree();
+      t.changes = ["a", "b", "c", "d"].map((id) => change(id, { touches: ["card"] }));
+      return t;
+    };
+    const apply = (t: V2Tree, id: string, at: string) => {
+      const c = t.changes.find((x) => x.id === id)!;
+      Object.assign(c, { status: "completed", appliedAt: at });
+    };
+
+    it("does not skip the rest of the open changes (PR #612 review)", () => {
+      const t = openTree();
+      const p1 = capabilityReport(t, "card", { status: "all", limit: 2 });
+      expect(ids(p1)).toEqual(["a", "b"]);
+      apply(t, "b", APPLIED);
+      const p2 = capabilityReport(t, "card", { status: "all", limit: 2, cursor: p1.changesPage.nextCursor });
+      expect(ids(p2)).toEqual(["c", "d"]);
+      expect(p2.changesPage.nextCursor).toBeDefined();
+      const p3 = capabilityReport(t, "card", { status: "all", limit: 2, cursor: p2.changesPage.nextCursor });
+      expect(ids(p3)).toEqual(["b"]);
+      expect(p3.changesPage.nextCursor).toBeUndefined();
+    });
+
+    it("lists every change present throughout, whichever change moves group mid-listing", () => {
+      for (const moved of ["a", "b", "c", "d"]) {
+        for (let pageAt = 1; pageAt <= 3; pageAt++) {
+          const t = openTree();
+          const seen: string[] = [];
+          let cursor: string | undefined;
+          let page = 0;
+          do {
+            if (page === pageAt) apply(t, moved, stamp(page));
+            const r = capabilityReport(t, "card", { status: "all", limit: 1, cursor });
+            seen.push(...ids(r));
+            cursor = r.changesPage.nextCursor;
+            page++;
+          } while (cursor);
+          expect(new Set(seen), `${moved} applied before page ${pageAt}`).toEqual(new Set(["a", "b", "c", "d"]));
+        }
+      }
+    });
+
+    it("continues the recent listing too", () => {
+      const t = openTree();
+      const p1 = capabilityReport(t, "card", { limit: 2 });
+      apply(t, "a", APPLIED);
+      expect(ids(capabilityReport(t, "card", { limit: 2, cursor: p1.changesPage.nextCursor }))).toEqual(["c", "d"]);
+    });
   });
 
   it("get_prd_status lists releases with open changes and the newest closed ones; counts still cover all", () => {
