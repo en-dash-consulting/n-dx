@@ -450,7 +450,8 @@ describe("isolation", () => {
     // carried, and the MCP tools that dispatch on the tree layout (add_item,
     // get_item, get_prd_status) or serve the v2 tree alone (get_product,
     // get_capability, place_change, apply_change, and the product report and
-    // change placement they read through).
+    // change placement they read through), and `rex health`, which runs the
+    // v2 tree rules on a v2 tree (cli/commands/health.ts, core/health.ts).
     const v2Files = new Set(
       [
         "schema/v2.ts",
@@ -483,6 +484,8 @@ describe("isolation", () => {
         "cli/mcp-tools/apply-change.ts",
         "codeowners/plan.ts",
         "cli/commands/codeowners.ts",
+        "cli/commands/health.ts",
+        "core/health.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),
