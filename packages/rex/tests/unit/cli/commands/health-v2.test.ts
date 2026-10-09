@@ -85,6 +85,18 @@ describe("rex health title-release-token on a v2 tree", () => {
     expect(text).toContain("0.9.0");
   });
 
+  it("prints the finding as a warning and does not fail the command", async () => {
+    await retitleChange("0.9.0 release audit", "0.9.0");
+    process.exitCode = undefined;
+    await expect(cmdHealth(tmp, {})).resolves.toBeUndefined();
+    expect(process.exitCode).toBeUndefined();
+    out.length = 0;
+    await cmdHealth(tmp, { format: "json" });
+    const { treeRules } = JSON.parse(out.join("\n"));
+    expect(treeRules).toContainEqual(expect.objectContaining({ rule: "title-release-token", severity: "warning" }));
+    expect(treeRules.filter((f: { severity: string }) => f.severity === "error")).toEqual([]);
+  });
+
   it("flags a title naming the package.json version", async () => {
     await writeFile(join(tmp, "package.json"), JSON.stringify({ name: "p", version: "2.4.1" }));
     await retitleChange("Ship 2.4.1 hardening");

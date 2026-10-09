@@ -471,6 +471,14 @@ describe("title-release-token", () => {
     expect(ids(findings)).toEqual([capability.id, task.id]);
     expect(findings[0].message).toContain('"PR 12"');
   });
+
+  it("reports a warning, not an error: a title is cosmetic", () => {
+    expect(RULE_SEVERITY["title-release-token"]).toBe("warning");
+    const task = node("task", { title: "Prep 0.8.0" });
+    const tree: V2Tree = { product: [], changes: [node("change", { touches: ["x"] }, [task])] };
+    const findings = checkV2Rules(tree, { now: NOW, releases: RELEASES }, ["title-release-token"]);
+    expect(findings.map((f) => f.severity)).toEqual(["warning"]);
+  });
 });
 
 describe("layer-nesting", () => {

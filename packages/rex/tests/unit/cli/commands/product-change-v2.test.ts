@@ -174,6 +174,12 @@ describe("rex add on a v2 tree", () => {
     expect(created).toMatchObject({ needsPlacement: true, acceptanceCriteria: ["A refund reaches the card"] });
   });
 
+  it("accepts a title naming a project release; rex health catches it later", async () => {
+    await writeFile(join(tmp, "package.json"), JSON.stringify({ name: "p", version: "0.9.0" }));
+    const id = await addInbox("0.9.0 release audit");
+    expect((await changes()).find((c) => c.id === id)?.title).toBe("0.9.0 release audit");
+  });
+
   it("adds a task under a change", async () => {
     await cmdAddChange(tmp, "task", { title: "Write the refund call", parent: "CH-1" });
     expect(text()).toContain("Created task: Write the refund call");
