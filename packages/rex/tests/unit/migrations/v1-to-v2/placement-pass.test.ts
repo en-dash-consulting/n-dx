@@ -138,6 +138,16 @@ describe("v1-to-v2 placement passes", () => {
     expect(split.entries.t9).toMatchObject({ needsPlacement: true, modelPlacement: { accepted: null, jev: { pick: "f1" } } });
   });
 
+  it("with models both and no Jev, the text pass decides: placed, not parked, with the Jev-unavailable warning", async () => {
+    const p = await plan({ models: "both", autoAccept: "agree" }, { text: textSeam("f1"), jevAvailable: false });
+    expect(p.entries.t9).toMatchObject({
+      placement: "f1",
+      modelPlacement: { pass: "text", used: "text", models: { text: TEXT_MODEL }, warnings: [expect.stringContaining("Jev is unavailable")] },
+    });
+    expect(p.entries.t9?.needsPlacement).toBeUndefined();
+    expect(p.entries.t9?.parkedTextPlacement).toBeUndefined();
+  });
+
   it("never auto-accepts a new-node proposal from the text model", async () => {
     const proposal = { delta: "added", type: "capability", target: "selection-speed", under: "e1", title: "Selection speed", summary: "Fast picks" } as const;
     for (const autoAccept of ["agree", "confident", "none"] as const) {
