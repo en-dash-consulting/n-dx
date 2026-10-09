@@ -77,7 +77,7 @@ function latestCommitFullMsg(cwd) {
  * Return the list of files changed in the most recent commit.
  */
 function latestCommitFiles(cwd) {
-  return execSync("git show --pretty=format: --name-only HEAD", { cwd, encoding: "utf-8" })
+  return execSync("git -c core.quotepath=false show --pretty=format: --name-only HEAD", { cwd, encoding: "utf-8" })
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -101,11 +101,17 @@ function buildSkillCommitMessage(skillName, subject) {
 const SCRATCH = ".ndx-commit-msg.txt";
 
 /**
- * The paths `git status --porcelain --untracked-files=all` lists — what a
- * skill keeps at its start, and compares against at its commit step.
+ * The paths `git -c core.quotepath=false status --porcelain
+ * --untracked-files=all` lists — what a skill keeps at its start, and
+ * compares against at its commit step. Unquoted, so a non-ASCII path can be
+ * handed straight to `git add --`.
  */
 function dirtyPaths(cwd) {
-  return execSync("git status --porcelain --untracked-files=all", { cwd, encoding: "utf-8" })
+  return execFileSync(
+    "git",
+    ["-c", "core.quotepath=false", "status", "--porcelain", "--untracked-files=all"],
+    { cwd, encoding: "utf-8" },
+  )
     .split("\n")
     .filter(Boolean)
     .map((line) => line.slice(3));
@@ -114,11 +120,12 @@ function dirtyPaths(cwd) {
 /**
  * Run the exact commit-step logic described in every file-modifying skill:
  *
- *   1. git status --porcelain --untracked-files=all  →  keep the paths that
- *      are not in `baseline` (the snapshot taken at the skill's start); if
- *      none, skip
+ *   1. git -c core.quotepath=false status --porcelain --untracked-files=all
+ *      →  keep the paths that are not in `baseline` (the snapshot taken at
+ *      the skill's start); if none, skip
  *   2. git add -- <each of those paths>
- *   3. write the message to .ndx-commit-msg.txt, git commit -F it, delete it
+ *   3. write the message to .ndx-commit-msg.txt,
+ *      git commit -F it -- <the same paths>, delete it
  *
  * Returns true if a commit was created, false if there was nothing to commit.
  */
@@ -127,7 +134,7 @@ function runSkillCommitStep(cwd, commitMessage, baseline = []) {
   if (paths.length === 0) return false;
   execFileSync("git", ["add", "--", ...paths], { cwd });
   writeFileSync(join(cwd, SCRATCH), `${commitMessage}\n`);
-  execFileSync("git", ["commit", "-F", SCRATCH], { cwd });
+  execFileSync("git", ["commit", "-F", SCRATCH, "--", ...paths], { cwd });
   rmSync(join(cwd, SCRATCH));
   return true;
 }
@@ -370,6 +377,31 @@ describe("skill commit step: the user's in-progress work is not staged", () => {
     const before = countCommits(dir);
     expect(runSkillCommitStep(dir, "ndx-config: update llm.vendor configuration", baseline)).toBe(false);
     expect(countCommits(dir)).toBe(before);
+  });
+
+  it("keeps work the user had already staged out of the commit, and still staged", () => {
+    // `git commit` without a pathspec would take the whole index.
+    writeFileSync(join(dir, "README.md"), "# test\n\nthe user's staged edit\n");
+    writeFileSync(join(dir, "user-notes.txt"), "the user's staged notes\n");
+    execFileSync("git", ["add", "--", "README.md", "user-notes.txt"], { cwd: dir });
+    const baseline = dirtyPaths(dir);
+
+    const prdDir = join(dir, ".rex", "prd_tree", "the-task");
+    mkdirSync(prdDir, { recursive: true });
+    writeFileSync(join(prdDir, "index.md"), "# The task\n");
+    expect(runSkillCommitStep(dir, "ndx-capture: add 'The task' to PRD", baseline)).toBe(true);
+
+    expect(latestCommitFiles(dir)).toEqual([".rex/prd_tree/the-task/index.md"]);
+    expect(execSync("git diff --cached --name-only", { cwd: dir, encoding: "utf-8" }).split("\n").filter(Boolean).sort())
+      .toEqual(["README.md", "user-notes.txt"]);
+  });
+
+  it("stages and commits a file with a non-ASCII name", () => {
+    // Quoted porcelain output ("caf\303\251.md") does not match as a pathspec.
+    writeFileSync(join(dir, "café.md"), "# Café\n");
+    expect(runSkillCommitStep(dir, "fix: add the café notes")).toBe(true);
+    expect(latestCommitFiles(dir)).toEqual(["café.md"]);
+    expect(dirtyPaths(dir)).toEqual([]);
   });
 });
 

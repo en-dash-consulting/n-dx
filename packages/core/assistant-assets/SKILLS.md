@@ -45,8 +45,8 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
 2. **File-modifying (local files)** — declare `"commits": true` in `manifest.json`, note what is already dirty before the skill writes anything, check for overlap just before its first write, and add a terminal commit step. The note goes at the start:
 
    ````
-   Run `git status --porcelain --untracked-files=all` against the project
-   root and keep its output. Every path it lists is the user's work in
+   Run `git -c core.quotepath=false status --porcelain --untracked-files=all`
+   against the project root and keep its output. Every path it lists is the user's work in
    progress, and the commit step at the end stages only paths that are not on
    this list.
    ````
@@ -56,9 +56,10 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
    ````
    Check for overlap first: if any path on the list you kept at the start is
    one this skill is about to change, name those paths and ask the user to
-   commit or stash them before you write. Once they have, run `git status
-   --porcelain --untracked-files=all` again and keep that output as the list
-   instead; if they decline, carry on, and those paths stay out of the commit.
+   commit or stash them before you write. Once they have, run
+   `git -c core.quotepath=false status --porcelain --untracked-files=all`
+   again and keep that output as the list instead; if they decline, carry on,
+   and those paths stay out of the commit.
    ````
 
    A skill that writes through rex MCP cannot know which `index.md` files the
@@ -68,12 +69,12 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
    The commit step takes exactly this form:
 
    ````
-   Run `git status --porcelain --untracked-files=all` against the project
-   root. The paths to commit are the ones that are not on the list you kept
+   Run `git -c core.quotepath=false status --porcelain --untracked-files=all`
+   against the project root. The paths to commit are the ones that are not on the list you kept
    at the start. If there are none, print "Working tree clean — nothing to
    commit." and stop. Otherwise stage exactly those paths, naming each one:
    `git add -- <path> <path> …`. Never `git add -A` or `git add .`. A path
-   still on the list stays unstaged even if the skill changed it; name it in
+   still on the list stays out of this commit even if the skill changed it; name it in
    your summary as part of the change this commit leaves out. Then build the
    message with your file-writing tool — never with shell quoting — and
    commit it from that file.
@@ -87,7 +88,8 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
    ```
 
-   Then run `git commit -F .ndx-commit-msg.txt` and delete `.ndx-commit-msg.txt`.
+   Then run `git commit -F .ndx-commit-msg.txt -- <the same paths>` and
+   delete `.ndx-commit-msg.txt`.
    ````
 
    **Stage by explicit path.** A skill runs in the user's working tree, often
@@ -98,6 +100,20 @@ Its commit deviates from rule 2 in one way: the **subject is not prefixed `ndx-w
    skill never edited by hand. The list is file by file
    (`--untracked-files=all`), so a new file inside a directory that was
    already untracked still counts as new.
+
+   **Commit the same paths.** `git add` keeps the user's paths out of the
+   staging step, but `git commit` without a pathspec commits the whole index,
+   so anything the user had already `git add`-ed would land in the skill's
+   commit. Naming the paths on the commit (`git commit -F <file> -- <paths>`)
+   commits only those, the way hench's `commitPrdTreeIfStaged` does, and
+   leaves the user's staged work staged.
+
+   **Read paths unquoted.** By default porcelain status output quotes a path
+   with non-ASCII characters (`"caf\303\251.md"`), and `git add --` does not
+   match the quoted form, so one such path aborts the whole staging step.
+   `-c core.quotepath=false` prints those paths as they are. A path with a
+   literal quote, backslash or control character is still quoted; that stays a
+   loud failure, never a silent one.
 
    **Ask before touching a dirty path.** Explicit-path staging alone keeps a
    dirty path out even when the skill changed it, so `/ndx-capture` adding a

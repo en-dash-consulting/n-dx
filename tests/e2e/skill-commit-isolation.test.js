@@ -42,7 +42,12 @@ const FILE_MODIFYING_SKILLS = getSkillNames().filter((n) => SKILL_META[n].commit
 const READ_ONLY_SKILLS = getSkillNames().filter((n) => SKILL_META[n].commits !== true);
 
 /** The snapshot of already-dirty paths a committing skill takes at its start. */
-const SNAPSHOT_COMMAND = "git status --porcelain --untracked-files=all";
+// core.quotepath=false: porcelain otherwise quotes non-ASCII paths, and `git add --`
+// does not match the quoted form.
+const SNAPSHOT_COMMAND = "git -c core.quotepath=false status --porcelain --untracked-files=all";
+
+/** The commit names the paths it staged, so the user's pre-staged work stays out. */
+const SCOPED_COMMIT = "git commit -F .ndx-commit-msg.txt -- <the same paths>";
 
 /** What the overlap check asks of the user, and how the skill resumes after. */
 const OVERLAP_ASK = "ask the user to commit or stash";
@@ -68,6 +73,13 @@ function wholeTreeStaging(text) {
       .replaceAll(STAGING_PROHIBITION, "")
       .matchAll(/git add (?:-A|--all|\.(?![\w/-]))/g),
   ].map((m) => m[0]);
+}
+
+/** Every `git commit -F <file>` in `text` not followed by a `--` pathspec. */
+function unscopedCommits(text) {
+  return [...text.matchAll(/git commit -F \S+(?:\s+--\s)?/g)]
+    .map((m) => m[0])
+    .filter((cmd) => !/\s--\s$/.test(cmd));
 }
 
 /** Every path under `.git/` that `text` names, such as `.git/NDX_COMMIT_MSG`. */
@@ -105,9 +117,9 @@ function commitStepTexts() {
 
 describe("file-modifying skills: commit step presence", () => {
   for (const skill of FILE_MODIFYING_SKILLS) {
-    it(`${skill}: contains no-op guard (git status --porcelain)`, () => {
+    it(`${skill}: contains no-op guard (status --porcelain)`, () => {
       const body = getSkillBody(skill);
-      expect(body).toContain("git status --porcelain");
+      expect(body).toContain("status --porcelain");
     });
 
     // A skill runs in the user's working tree, which can hold their unrelated
@@ -117,7 +129,7 @@ describe("file-modifying skills: commit step presence", () => {
     it(`${skill}: notes the already-dirty paths before it writes anything`, () => {
       const body = getSkillBody(skill);
       const snapshot = body.indexOf(SNAPSHOT_COMMAND);
-      expect(snapshot, "no `git status --porcelain --untracked-files=all` snapshot").toBeGreaterThan(-1);
+      expect(snapshot, `no \`${SNAPSHOT_COMMAND}\` snapshot`).toBeGreaterThan(-1);
       expect(body).toMatch(/keep its output/);
       expect(snapshot, "the snapshot must come before the commit step").toBeLessThan(
         body.indexOf("git commit -F"),
@@ -152,7 +164,7 @@ describe("file-modifying skills: commit step presence", () => {
     it(`${skill}: writes the commit message to .ndx-commit-msg.txt at the project root`, () => {
       const body = getSkillBody(skill);
       expect(body).toContain("`.ndx-commit-msg.txt` at the project root");
-      expect(body).toContain("git commit -F .ndx-commit-msg.txt");
+      expect(body).toContain(SCOPED_COMMIT);
       expect(body).toContain("delete `.ndx-commit-msg.txt`");
     });
 
@@ -220,6 +232,16 @@ describe("commit-step texts: no whole-tree staging, no scratch file under .git/"
     it(`${label}: never stages the whole tree`, () => {
       expect(wholeTreeStaging(text)).toEqual([]);
     });
+
+    // `git commit` without a pathspec commits the whole index, including
+    // anything the user had already `git add`-ed before the skill ran.
+    it(`${label}: every commit names the paths it commits`, () => {
+      expect(unscopedCommits(text)).toEqual([]);
+    });
+
+    it(`${label}: reads git status with unquoted paths`, () => {
+      expect(text).not.toMatch(/git status --porcelain/);
+    });
   }
 
   it("the scan covers each vendor's generated copies (guards against a vacuous suite)", () => {
@@ -236,7 +258,7 @@ describe("commit-step texts: no whole-tree staging, no scratch file under .git/"
     expect(template.replace(/\s+/g, " ")).toContain(RESNAPSHOT);
     expect(template).toContain("git add -- <path> <path> …");
     expect(template).toContain(STAGING_PROHIBITION);
-    expect(template).toContain("git commit -F .ndx-commit-msg.txt");
+    expect(template).toContain(SCOPED_COMMIT);
   });
 });
 
