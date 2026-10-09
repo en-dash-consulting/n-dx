@@ -28,7 +28,7 @@
     "prepublishOnly": "if [ -z \"$CI\" ]; then pnpm run build && pnpm run typecheck && pnpm run test; fi",
     "prepare": "pnpm run build",
     "changeset": "changeset",
-    "version-packages": "changeset version",
+    "version-packages": "changeset version && { node packages/rex/dist/cli/index.js release stamp \"$(node -p \"require('./packages/core/package.json').version\")\" . || echo 'warning: rex release stamp failed; versioning continues'; }",
     "release": "changeset publish",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",

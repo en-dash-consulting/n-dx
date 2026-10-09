@@ -356,9 +356,9 @@ export type { MergeOptions, MergeValidation, MergePreview, MergeResult } from ".
 
 export {
   countSubtree, isFullyCompleted,
-  findPrunableItems, pruneItems,
+  findPrunableItems, findKeptItems, pruneKeepReason, pruneItems,
 } from "./core/prune.js";
-export type { PruneResult } from "./core/prune.js";
+export type { PruneResult, KeptItem } from "./core/prune.js";
 
 // ---- Core: reorganize -------------------------------------------------------
 

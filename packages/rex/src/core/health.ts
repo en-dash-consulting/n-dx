@@ -16,7 +16,10 @@ import {
   getLevelLabel,
   getLevelPlural,
 } from "../schema/index.js";
+import { checkV2Rules, indexTree, type RuleFinding, type V2Tree } from "../schema/v2-rules.js";
 import { walkTree } from "./tree.js";
+import { computeLandings } from "./change-landing.js";
+import type { ChangeCommitsOptions } from "./change-commits.js";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface HealthDimensions {
@@ -564,4 +567,92 @@ export function checkStructureHealth(
   walkContainers(items);
 
   return { healthy: warnings.length === 0, warnings };
+}
+
+// ── v2 tree rules ───────────────────────────────────────────────────────────
+
+/**
+ * This project's releases, for `title-release-token`: the package version
+ * (when known) plus every `plannedRelease` and `shippedIn` in the tree,
+ * retired nodes included. Deduplicated, in first-seen order.
+ */
+export function collectReleases(tree: V2Tree, packageVersion?: string): string[] {
+  const releases = new Set<string>();
+  if (packageVersion) releases.add(packageVersion);
+  for (const { node } of indexTree(tree, { includeTombstones: true }).entries) {
+    const { plannedRelease, shippedIn } = node as { plannedRelease?: string; shippedIn?: string };
+    if (plannedRelease) releases.add(plannedRelease);
+    if (shippedIn) releases.add(shippedIn);
+  }
+  return [...releases];
+}
+
+/**
+ * Run every v2 tree rule over a loaded v2 tree. `structureHealth` supplies
+ * `maxCriteriaPerCapability` as the `criteria-growth` threshold. The tree's own
+ * releases (see `collectReleases`) arm `title-release-token`; pass the project's
+ * `packageVersion` to include its version line.
+ */
+export function checkV2TreeHealth(
+  tree: V2Tree,
+  structureHealth?: StructureHealthThresholds,
+  now: Date = new Date(),
+  packageVersion?: string,
+): RuleFinding[] {
+  return checkV2Rules(tree, {
+    now,
+    maxCriteria: structureHealth?.maxCriteriaPerCapability,
+    releases: collectReleases(tree, packageVersion),
+  });
+}
+
+/** A finished change with no commit reachable from main. */
+export interface UnlandedChange {
+  id: string;
+  title: string;
+  reason: string;
+}
+
+/** The landing check: the unlanded changes, or why git could not answer. */
+export type LandingHealth = { available: true; notLanded: UnlandedChange[] } | { available: false; error: string };
+
+/**
+ * Completed or applied changes that have not landed on main. A git failure
+ * (no repository, unresolvable main ref, shallow clone) is returned as
+ * `available: false`, never thrown: it is a health note, not a crash.
+ */
+export async function checkChangeLandings(tree: V2Tree, options: ChangeCommitsOptions): Promise<LandingHealth> {
+  try {
+    const landings = await computeLandings(tree, options);
+    const notLanded: UnlandedChange[] = [];
+    for (const { node } of indexTree(tree).entries) {
+      if (node.type !== "change") continue;
+      const landing = landings[node.id];
+      if (!landing || landing.landed) continue;
+      if (node.status !== "completed" && node.appliedAt === undefined) continue;
+      notLanded.push({ id: node.id, title: node.title, reason: landing.reason });
+    }
+    return { available: true, notLanded };
+  } catch (err) {
+    return { available: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Render the landing check as text. */
+export function formatLandingHealth(health: LandingHealth): string {
+  if (!health.available) return `Landing check unavailable: ${health.error}`;
+  if (health.notLanded.length === 0) return "Landing: every completed change is on main";
+  const lines = ["Not landed on main:"];
+  for (const c of health.notLanded) lines.push(`  ⚠ ${c.title} (${c.id}): ${c.reason}`);
+  return lines.join("\n");
+}
+
+/** Render v2 rule findings as text. */
+export function formatV2Findings(findings: readonly RuleFinding[]): string {
+  if (findings.length === 0) return "Tree rules: no findings";
+  const lines = ["Tree rules:"];
+  for (const f of findings) {
+    lines.push(`  ${f.severity === "error" ? "✗" : "⚠"} ${f.message} [${f.rule}]`);
+  }
+  return lines.join("\n");
 }

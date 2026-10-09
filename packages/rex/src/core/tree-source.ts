@@ -42,9 +42,18 @@ import { join, relative, sep, isAbsolute } from "node:path";
 import { tmpdir } from "node:os";
 import { exec, execStdout, PROJECT_DIRS } from "@n-dx/llm-client";
 import { parseFolderTree } from "../store/folder-tree-parser.js";
-import { PRD_TREE_DIRNAME } from "../store/paths.js";
+import { PRD_TREE_DIRNAME, resolveRexPaths } from "../store/paths.js";
+import {
+  CHANGES_DIRNAME,
+  PRODUCT_DIRNAME,
+  SchemaSkewError,
+  loadPrdModel,
+  prdLayout,
+} from "../store/prd-model-reader.js";
 import type { ParseWarning } from "../store/folder-tree-parser.js";
 import type { PRDItem } from "../schema/index.js";
+import type { V2Tree } from "../schema/v2-rules.js";
+import { changeLayerItems } from "./layer-projection.js";
 
 /** Long enough for a large subtree checkout on a cold cache. */
 const GIT_TIMEOUT_MS = 60_000;
@@ -63,6 +72,12 @@ export interface ResolvedTree {
    * predates the PRD does not read as "everything was added".
    */
   present: boolean;
+  /**
+   * Set when the source is a v2 tree: both layers as read. `items` then holds
+   * the change layer projected to v1 items, so the change list works on either
+   * layout. Absent on a v1 tree.
+   */
+  v2?: V2Tree;
 }
 
 /** Raised when a source cannot be resolved at all (unknown ref, no repo). */
@@ -83,8 +98,27 @@ export async function loadTreeFromDir(
   projectDir: string,
   label: string,
 ): Promise<ResolvedTree> {
+  const rexDir = resolveRexPaths(projectDir).rexDir;
+  if ((await prdLayout(rexDir)) === "v2") return readV2(rexDir, label);
   const { items, warnings } = await parseFolderTree(prdTreePath(projectDir));
   return { label, items, warnings, present: !missingRoot(warnings) };
+}
+
+/** A v2 tree under `rexDir`, as one side of a diff. */
+async function readV2(rexDir: string, label: string): Promise<ResolvedTree> {
+  try {
+    const model = await loadPrdModel(rexDir);
+    return {
+      label,
+      items: changeLayerItems(model.tree.changes),
+      warnings: model.warnings,
+      present: true,
+      v2: model.tree,
+    };
+  } catch (err) {
+    if (err instanceof SchemaSkewError) throw new TreeSourceError(err.message);
+    throw err;
+  }
 }
 
 /**
@@ -129,36 +163,23 @@ export async function loadTreeAtRef(
     // that without touching the repository's real hooks configuration.
     const hooksDir = join(scratch, "no-hooks");
     await mkdir(hooksDir);
-    const checkout = await exec(
-      "git",
-      [
-        "-c",
-        `core.hooksPath=${hooksDir}`,
-        `--work-tree=${scratch}`,
-        "checkout",
-        ref,
-        "--",
-        treeRelative,
-      ],
-      {
-        cwd: repoRoot,
-        timeout: GIT_TIMEOUT_MS,
-        // C locale: isMissingPathspec parses git's English error text.
-        env: { ...process.env, GIT_INDEX_FILE: join(scratch, "index"), LC_ALL: "C" },
-      },
-    );
+    const extract = (path: string) => extractPath(repoRoot, scratch, hooksDir, ref, path);
 
-    // A ref that predates the PRD tree has nothing at that path. git reports
-    // that as a failed pathspec match, which is an absent tree rather than an
-    // error — the diff is still meaningful, and saying so is more useful than
-    // reporting every current item as added with no explanation.
-    if (checkout.exitCode !== 0) {
-      if (isMissingPathspec(checkout.stderr)) {
-        return { label: ref, items: [], warnings: [], present: false };
-      }
-      throw new TreeSourceError(
-        `Could not read the PRD tree at "${ref}": ${firstLine(checkout.stderr)}`,
-      );
+    // A v2 tree is recognised by its `product/` folder, as `loadPrdModel`
+    // does. `changes/` is optional: a tree with no change yet has none.
+    const rexRelative = toPosix(relative(repoRoot, resolveRexPaths(realProjectDir).rexDir));
+    if (await extract(`${rexRelative}/${PRODUCT_DIRNAME}`)) {
+      await extract(`${rexRelative}/${CHANGES_DIRNAME}`);
+      // Awaited here: the `finally` below removes the scratch checkout.
+      return await readV2(join(scratch, rexRelative), ref);
+    }
+
+    // A ref that predates the PRD tree has nothing at that path. That is an
+    // absent tree rather than an error — the diff is still meaningful, and
+    // saying so is more useful than reporting every current item as added
+    // with no explanation.
+    if (!(await extract(treeRelative))) {
+      return { label: ref, items: [], warnings: [], present: false };
     }
 
     const { items, warnings } = await parseFolderTree(join(scratch, treeRelative));
@@ -166,6 +187,32 @@ export async function loadTreeAtRef(
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
+}
+
+/**
+ * Check one path of `ref` out into `scratch`. False when `ref` has nothing at
+ * that path; any other git failure throws.
+ */
+async function extractPath(
+  repoRoot: string,
+  scratch: string,
+  hooksDir: string,
+  ref: string,
+  path: string,
+): Promise<boolean> {
+  const checkout = await exec(
+    "git",
+    ["-c", `core.hooksPath=${hooksDir}`, `--work-tree=${scratch}`, "checkout", ref, "--", path],
+    {
+      cwd: repoRoot,
+      timeout: GIT_TIMEOUT_MS,
+      // C locale: isMissingPathspec parses git's English error text.
+      env: { ...process.env, GIT_INDEX_FILE: join(scratch, "index"), LC_ALL: "C" },
+    },
+  );
+  if (checkout.exitCode === 0) return true;
+  if (isMissingPathspec(checkout.stderr)) return false;
+  throw new TreeSourceError(`Could not read the PRD tree at "${ref}": ${firstLine(checkout.stderr)}`);
 }
 
 /**

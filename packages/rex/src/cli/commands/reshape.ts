@@ -9,7 +9,9 @@ import type { MergeAuditEntry, GroupAuditEntry } from "../../core/archive.js";
 import { reasonForReshape, formatReshapeProposal, reasonForBodyMerge } from "../../analyze/reshape-reason.js";
 import { setLLMConfig, setClaudeConfig, setProjectDir, resolveConfiguredModel } from "../../analyze/reason.js";
 import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
-import { migrateToFolderPerTask } from "../../core/folder-per-task-migration.js";
+import { migrateToFolderPerTask, type FolderPerTaskMigrationResult } from "../../core/folder-per-task-migration.js";
+import { loadProductLayerItems, resolveLayerStore } from "../../store/change-layer-store.js";
+import { reshapeProductLayer } from "./reshape-product.js";
 import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
@@ -54,40 +56,47 @@ async function _cmdReshapeCore(
   rexDir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  const store = await resolveStore(rexDir);
+  // On a v2 tree the store is the change layer, restructured as on a v1 tree;
+  // the product layer gets its own pass below, which drafts a change.
+  const { store, v2 } = await resolveLayerStore(rexDir, await resolveStore(rexDir));
   const doc = await store.loadDocument();
+  const productItems = v2 ? await loadProductLayerItems(rexDir) : [];
 
-  if (doc.items.length === 0) {
+  if (doc.items.length === 0 && productItems.length === 0) {
     throw new CLIError(
       "PRD is empty — nothing to reshape.",
       "Run 'rex analyze' first to build your PRD.",
     );
   }
 
-  // Snapshot PRD tree before structural migrations (backup for recovery on failure)
-  const treeRoot = join(rexDir, "prd_tree");
-  const backupSnapshot = await ensureSnapshot(rexDir, "reshape", flags);
+  // The folder-per-task migration and its snapshot are v1 tree passes: a v2
+  // tree has frozen slugs and no prd_tree/.
+  let migrationResult: FolderPerTaskMigrationResult = { migratedCount: 0, migrations: [], errors: [] };
+  if (!v2) {
+    // Snapshot PRD tree before structural migrations (backup for recovery on failure)
+    const treeRoot = join(rexDir, "prd_tree");
+    const backupSnapshot = await ensureSnapshot(rexDir, "reshape", flags);
 
-  // Run folder-per-task structural migration pass
-  info("Migrating non-conforming task structures to folder-per-task form...");
-  let migrationResult;
-  try {
-    migrationResult = await migrateToFolderPerTask(treeRoot);
-  } catch (err) {
-    // Surface the rollback command for recovery
-    throw new CLIError(
-      `Migration failed: ${String(err)}${formatRecoveryHint(backupSnapshot, dir)}`,
-      "Roll the PRD tree back with 'rex restore' as shown above.",
-    );
-  }
-
-  if (migrationResult.errors.length > 0) {
-    for (const err of migrationResult.errors) {
-      warn(`  Warning: ${err.error} (${err.path})`);
+    // Run folder-per-task structural migration pass
+    info("Migrating non-conforming task structures to folder-per-task form...");
+    try {
+      migrationResult = await migrateToFolderPerTask(treeRoot);
+    } catch (err) {
+      // Surface the rollback command for recovery
+      throw new CLIError(
+        `Migration failed: ${String(err)}${formatRecoveryHint(backupSnapshot, dir)}`,
+        "Roll the PRD tree back with 'rex restore' as shown above.",
+      );
     }
-  }
-  if (migrationResult.migratedCount > 0) {
-    info(`Migrated ${migrationResult.migratedCount} item${migrationResult.migratedCount === 1 ? "" : "s"} to folder-per-task form.`);
+
+    if (migrationResult.errors.length > 0) {
+      for (const err of migrationResult.errors) {
+        warn(`  Warning: ${err.error} (${err.path})`);
+      }
+    }
+    if (migrationResult.migratedCount > 0) {
+      info(`Migrated ${migrationResult.migratedCount} item${migrationResult.migratedCount === 1 ? "" : "s"} to folder-per-task form.`);
+    }
   }
 
   // Canonicalize the on-disk tree: load (handles legacy `__parent*` shims and
@@ -99,7 +108,8 @@ async function _cmdReshapeCore(
   // load→save round-trip holds the PRD lock and cannot clobber a concurrent
   // writer; the pass-through callback returns the canonical document for the
   // analysis below.
-  const docAfterCompaction = await store.withTransaction(async (doc) => doc);
+  // A v2 tree has no legacy shapes to canonicalize.
+  const docAfterCompaction = v2 ? doc : await store.withTransaction(async (doc) => doc);
 
   // Load file ownership map for cross-file duplicate detection (FileStore feature)
   const fileOwnership = store instanceof FileStore
@@ -150,6 +160,17 @@ async function _cmdReshapeCore(
     }
   }
 
+  const product = productItems.length > 0
+    ? await reshapeProductLayer({ dir, rexDir, store, items: productItems, model: resolvedModel, vendor, dryRun, accept, review: interactiveReview })
+    : undefined;
+  // Added to every JSON result, so a v2 run still prints one document.
+  const productJson = product ? { product } : {};
+  if (docAfterCompaction.items.length === 0) {
+    if (flags.format === "json") result(JSON.stringify({ dryRun, proposals: [], ...productJson }, null, 2));
+    else result("Change layer: empty, nothing to reshape.");
+    return;
+  }
+
   // Run cross-PRD duplicate detection pass
   const duplicateProposals = detectCrossPRDDuplicates(docAfterCompaction.items, fileOwnership);
 
@@ -183,9 +204,9 @@ async function _cmdReshapeCore(
 
   if (allProposals.length === 0) {
     if (flags.format === "json") {
-      result(JSON.stringify({ dryRun, proposals: [], tokenUsage }, null, 2));
+      result(JSON.stringify({ dryRun, proposals: [], tokenUsage, ...productJson }, null, 2));
     } else {
-      result("No reshape proposals — PRD structure looks good.");
+      result(v2 ? "Change layer: no reshape proposals." : "No reshape proposals — PRD structure looks good.");
     }
     return;
   }
@@ -205,6 +226,7 @@ async function _cmdReshapeCore(
         ...p.action,
       })),
       tokenUsage,
+      ...productJson,
     }, null, 2));
     if (dryRun) return;
   }
@@ -409,6 +431,7 @@ async function _cmdReshapeCore(
       preReshapeCommit,
       mergeAuditTrail: reshapeResult.mergeAuditTrail,
       errors: reshapeResult.errors.map((e) => e.error),
+      ...productJson,
     }, null, 2));
   } else {
     result(`Applied ${reshapeResult.applied.length} reshape action${reshapeResult.applied.length === 1 ? "" : "s"}.`);

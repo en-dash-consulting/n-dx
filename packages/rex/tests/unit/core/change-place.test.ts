@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { applyAmendmentsProblems } from "../../../src/core/apply-amendments.js";
 import { ChangePlacementError, recordPlacement, suggestPlacement } from "../../../src/core/change-place.js";
 import { indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 
@@ -51,10 +52,12 @@ describe("suggestPlacement", () => {
 describe("recordPlacement", () => {
   it("adds a touches target and clears needsPlacement, leaving the input tree alone", () => {
     const input = tree();
-    const { tree: next, placement, change } = recordPlacement(input, "CH-1", { target: "A1.1", relation: "touches" }, NOW);
+    const placed = recordPlacement(input, "CH-1", { target: "A1.1", relation: "touches" }, NOW);
+    const { tree: next, placement, change } = placed;
     expect({ change, placement }).toEqual({ change: "ch", placement: { target: "card", relation: "touches" } });
     expect(changeIn(next)).toMatchObject({ touches: ["card"] });
     expect(changeIn(next)).not.toHaveProperty("needsPlacement");
+    expect(placed).toMatchObject({ warnings: [], pending: [], blockedBy: [] });
     expect(changeIn(input).needsPlacement).toBe(true);
   });
 
@@ -93,13 +96,33 @@ describe("recordPlacement", () => {
     ["proposed on a touches placement", {}, { target: "card", relation: "touches" as const, proposed: "x" }, /relation amends/],
     // Apply refuses these (in these words), and no tool edits the amendment afterwards.
     ["a summary-only amends placement", {}, { target: "card", relation: "amends" as const }, /nothing to modify.*Pass proposed or criteria, or use relation touches/],
-    ["a criteria delta on a constraint", {}, { target: "arch", relation: "amends" as const, criteria: { remove: ["c1"] } }, /amendment 1 \(modified arch\): a constraint has no criteria/],
+    ["a criteria delta on a constraint", {}, { target: "arch", relation: "amends" as const, criteria: { remove: ["c1"] } }, /amendment 1 \(modified arch\): a constraint has no capability criteria/],
     ["removing a criterion the capability lacks", {}, { target: "A1.1", relation: "amends" as const, criteria: { remove: ["c7"] } }, /criterion c7 to remove does not exist/],
     ["replacing a criterion the capability lacks", {}, { target: "A1.1", relation: "amends" as const, criteria: { replace: [{ id: "c7", text: "x" }] } }, /criterion c7 to replace does not exist/],
     ["adding a criterion the capability has", {}, { target: "A1.1", relation: "amends" as const, criteria: { add: [{ id: "c1", text: "x" }] } }, /criterion c1 to add already exists/],
   ])("refuses %s", (_label, changeFields, input, message) => {
     expect(() => recordPlacement(tree(changeFields), "ch", input, NOW)).toThrow(ChangePlacementError);
     expect(() => recordPlacement(tree(changeFields), "ch", input, NOW)).toThrow(message);
+  });
+
+  it.each([
+    ["not-a-target", {}, { target: "nope" }],
+    ["already-amends", { amends: [{ target: "card", delta: "modified", summary: "s" }] }, { target: "A1.1", relation: "touches" as const }],
+    ["change-not-open", { status: "cancelled" }, { target: "card" }],
+    ["content-needs-amends", {}, { target: "card", relation: "touches" as const, proposed: "x" }],
+    ["nothing-to-modify", {}, { target: "card", relation: "amends" as const }],
+    ["apply-problems", {}, { target: "A1.1", relation: "amends" as const, criteria: { remove: ["c7"] } }],
+  ])("tags the %s refusal with its kind", (kind, changeFields, input) => {
+    const err = (() => { try { recordPlacement(tree(changeFields), "ch", input, NOW); } catch (e) { return e as ChangePlacementError; } })();
+    expect(err?.kind).toBe(kind);
+  });
+
+  it("tags an unknown change, and keeps the MCP-only wording out of `plain`", () => {
+    const unknown = (() => { try { recordPlacement(tree(), "zz", { target: "card" }, NOW); } catch (e) { return e as ChangePlacementError; } })();
+    expect(unknown?.kind).toBe("no-such-change");
+    const bad = (() => { try { recordPlacement(tree(), "ch", { target: "nope" }, NOW); } catch (e) { return e as ChangePlacementError; } })()!;
+    expect(bad.message).toMatch(/\(see get_product\)$/);
+    expect(bad.plain).not.toMatch(/get_product/);
   });
 
   it("names every criterion id that does not fit in one refusal", () => {
@@ -138,5 +161,35 @@ describe("recordPlacement", () => {
 
   it("refuses a ref that is not a change", () => {
     expect(() => suggestPlacement(tree(), "card")).toThrow(/No live change "card"/);
+  });
+});
+
+// recordPlacement's pending/blockedBy branch is defensive: place writes only
+// modified amendments, pending comes only from removals, and pending that
+// existed before the placement is filtered. These pin why it is empty today.
+describe("recordPlacement pending and blockedBy", () => {
+  const withChanges = (chFields: Record<string, unknown>, others: RuleNode[]): V2Tree => {
+    const t = tree(chFields);
+    t.changes.push(...others);
+    return t;
+  };
+  const removal = (id: string, target: string) =>
+    node({ id, type: "change", displayId: id.toUpperCase(), title: `Remove ${target}`, amends: [{ target, delta: "removed", summary: "gone" }] });
+
+  it("returns no problems when it modifies a capability another open change removes", () => {
+    const placed = recordPlacement(withChanges({}, [removal("rm", "card")]), "ch", { target: "card", proposed: "Cards and wallets" }, NOW);
+    expect(placed).toMatchObject({ warnings: [], pending: [], blockedBy: [] });
+    expect(changeIn(placed.tree).amends).toHaveLength(1);
+  });
+
+  it("refuses, rather than stores with pending warnings, a modify on a descendant of a node under a pending removal", () => {
+    const t = withChanges(
+      // The change retires the whole area, so only card, which rm removes, keeps the removal pending.
+      { amends: ["pay", "refund", "arch"].map((target) => ({ target, delta: "removed", summary: "retire payments" })) },
+      [removal("rm", "card")],
+    );
+    expect(applyAmendmentsProblems(t, "ch", NOW)).toMatchObject({ always: [], blockedBy: ["RM"] });
+    expect(() => recordPlacement(t, "ch", { target: "card", proposed: "Cards and wallets" }, NOW)).toThrow(ChangePlacementError);
+    expect(() => recordPlacement(t, "ch", { target: "card", proposed: "Cards and wallets" }, NOW)).toThrow(/Cannot place change CH-1/);
   });
 });

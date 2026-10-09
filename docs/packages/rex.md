@@ -64,6 +64,35 @@ Produces structured epic/feature/task proposals with duplicate detection. When d
 - **Merge** — update matched items, add only non-duplicates
 - **Proceed** — create duplicates with override markers
 
+## Product Layer and Changes (v2 PRD)
+
+On a v2 PRD (`product/` and `changes/`) the product layer holds the standing requirements, and every add is a change:
+
+```sh
+rex add --title="Refund card payments" --criterion="A refund reaches the card" .  # a change in the Inbox, with its suggested placement
+rex add task --title="Write the refund call" --parent=CH-2 .                        # a task under a change
+rex product show .                                   # areas, capabilities, constraints with status and health
+rex product show A1.1 .                              # one capability: statement, capability criteria, changes
+rex product edit A1.1 --capability-criterion="c3: A refund reaches the card" .     # revise it; drafts a change
+rex product edit A1.1 --statement="..." --editorial .                              # reword it; stays met
+rex change place CH-2 .                              # the placement shortlist
+rex change place CH-2 --target=A1.1 --relation=amends --capability-criterion="c3: ..." .
+rex change apply CH-2 .                              # apply its amendments to the product layer
+```
+
+```sh
+rex tree-diff .                                      # what this branch changed, against the default branch
+rex tree-diff --format=markdown --out=prd-diff.md .  # the pull-request comment, for a CI step to post
+```
+
+When either side of `rex tree-diff` is a v2 tree, a product map section lists the capabilities and constraints added, modified (title, statement or capability criteria) and retired beside the change list; `--json` carries it as `map`. A v1 diff has no such section. `--format=markdown` renders the report as host-neutral CommonMark (headings, lists and inline code only; no HTML, tables or host markers), capped at 50 entries per section. `--out=<file>` writes any format to a file instead of stdout, and is refused inside `.rex/`.
+
+`--criterion` is always a work item's acceptance criteria (done when). A capability's capability criteria use `--capability-criterion="<id>: <text>"` (and `--remove-capability-criterion=<id>`), on `rex product edit` and `rex change place` only. A description passed to `rex add` becomes one change, without LLM decomposition. On a v1 PRD, `rex add` is unchanged and `rex product` / `rex change` refuse.
+
+`rex reshape`, `rex reorganize` and `rex prune` restructure the change layer as they do a v1 PRD, and never write under `product/`. On the product layer, `rex reshape` drafts its accepted proposals as one change with removed and added amendments (a move is a removal plus an added copy) for `rex change apply`. A move or split the copy would not carry whole is not drafted and the output says why: a node with tags, notes in its body outside History, or capability requirements or dependsOn, or one another node names in dependsOn or appliesTo. A body holding only the History section that `rex change apply` writes does not stop a move: the retired original keeps that History, and the copy's starts with a line naming the original's id. A merge is not drafted on the same grounds when a merged node has any of these (requirements, dependsOn or appliesTo included) or another node names it, since the survivor takes over only its capability criteria. Proposals are drafted one at a time, so one that `rex change apply` would refuse together with those before it (a move under an area another proposal removes, say) is not drafted either, with apply's reason, and the rest still are; `rex reorganize` only reports; `rex prune` does not apply, and keeps (reporting why) an applied change that carries removed or added amendments, because product status reads a node as retired only while that change exists. On the change layer, all three skip, with the reason, a merge that would fold away any applied change (its id is what N-DX-Item trailers, rex health and its shippedIn release refer to) and a split, delete or collapse that would remove a change prune keeps; the other accepted proposals still apply, and the change-layer store refuses any other write that removes such a change.
+
+On a v2 PRD, `rex health` runs the tree rules instead of scoring, and prints the reader's warnings and the landing check beside them; `--format=json` prints `{ treeRules, warnings, landings }`. It exits 1 when a tree rule reports an error or the reader skipped a node (a missing or invalid root `index.md`, a folder with no `index.md`, or invalid node intent), and 0 when there are only warnings. `ndx ci` fails its structure-health step on that exit code and shows the error, warning and skipped-node counts. On a v1 PRD, `rex health` prints the score and exits 0, and `ndx ci` fails the step below a score of 50.
+
 ## Recommend
 
 ```sh

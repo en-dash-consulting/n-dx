@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import type { PRDStore } from "../../store/index.js";
+import { loadProductLayerItems, resolveLayerStore } from "../../store/change-layer-store.js";
 import type { PRDDocument } from "../../schema/index.js";
 import {
   detectReorganizations,
@@ -289,13 +290,15 @@ export async function cmdReorganize(
   }
 
   const rexDir = resolveRexPaths(dir).rexDir;
-  const store = await resolveStore(rexDir);
+  // On a v2 tree the store is the change layer; the product layer is only reported.
+  const { store, v2 } = await resolveLayerStore(rexDir, await resolveStore(rexDir));
 
   // Snapshot the tree before any mutation so `rex restore` can undo this reorganize.
   await ensureSnapshot(rexDir, "reorganize", flags);
   const doc = await store.loadDocument();
+  const productItems = v2 ? await loadProductLayerItems(rexDir) : [];
 
-  if (doc.items.length === 0) {
+  if (doc.items.length === 0 && productItems.length === 0) {
     throw new CLIError(
       "PRD is empty — nothing to reorganize.",
       "Run 'rex analyze' first to build your PRD.",
@@ -309,9 +312,12 @@ export async function cmdReorganize(
   // Stage 1: Programmatic detectors
   info("Analyzing PRD structure...");
   const plan = detectReorganizations(doc.items, { includeCompleted });
+  const productPlan = v2 ? reportProductLayer(productItems, includeCompleted, isJson) : undefined;
+  // Added to every JSON result, so a v2 run still prints one document.
+  const productJson = productPlan ? { product: { proposals: productPlan.proposals.map(summarizeProposal), stats: productPlan.stats } } : {};
 
   // Stage 2: LLM reasoning (unless --fast)
-  const reshapeProposals = fast
+  const reshapeProposals = fast || doc.items.length === 0
     ? []
     : await runLlmAnalysis(rexDir, dir, doc.items, plan.proposals, flags);
 
@@ -320,9 +326,9 @@ export async function cmdReorganize(
 
   if (!hasStructural && !hasLlm) {
     if (isJson) {
-      result(JSON.stringify({ structural: { proposals: [], stats: plan.stats }, llm: [] }, null, 2));
+      result(JSON.stringify({ structural: { proposals: [], stats: plan.stats }, llm: [], ...productJson }, null, 2));
     } else {
-      result("No reorganization proposals — PRD structure looks good.");
+      result(v2 ? "Change layer: no reorganization proposals." : "No reorganization proposals — PRD structure looks good.");
     }
     return;
   }
@@ -346,6 +352,7 @@ export async function cmdReorganize(
           stats: plan.stats,
         },
         llm: reshapeProposals.map(summarizeReshapeProposal),
+        ...productJson,
       }, null, 2));
     } else {
       const hints: string[] = [];
@@ -381,8 +388,26 @@ export async function cmdReorganize(
       },
       llm: reshapeProposals.map(summarizeReshapeProposal),
       llmApplied,
+      ...productJson,
     }, null, 2));
   }
+}
+
+/**
+ * Detect structural issues on the product layer of a v2 tree and print them.
+ * Reported only: no --accept flag applies them, since the product layer
+ * changes only through a change's amendments.
+ */
+function reportProductLayer(items: PRDDocument["items"], includeCompleted: boolean, isJson: boolean): ReorganizationPlan {
+  const plan = detectReorganizations(items, { includeCompleted });
+  if (!isJson && plan.proposals.length > 0) {
+    info("");
+    info("─── Product layer (reported only; never applied) ───");
+    info(formatReorganizationPlan(plan));
+    info("Restructure the product layer through a change: 'rex reshape' drafts one.");
+    info("");
+  }
+  return plan;
 }
 
 /**
