@@ -1,5 +1,473 @@
 # @n-dx/core
 
+## 0.9.0
+
+### Minor Changes
+
+- [#569](https://github.com/en-dash-consulting/n-dx/pull/569) [`5642744`](https://github.com/en-dash-consulting/n-dx/commit/5642744d20ed4509fc21b8a4828cb9c533b95290) Thanks [@endash-shal](https://github.com/endash-shal)! - Release 0.8.0 · Find your way — a minor release.
+  
+  The accumulated changesets are individually patches, by the repo's standing rule that a change defaults to `patch` unless a release says otherwise. This one says otherwise: 0.8.0 adds capability rather than only fixing behaviour, so the release is a minor and the fixed group moves together.
+  
+  What it adds:
+  
+  - **The hub** serves every registered repository from one per-user process on port 3117, with a project chooser and a reverse proxy at `/p/<id>/`, so several projects no longer contend for a port.
+  - **Worktree-aware navigation** — a `/w/<key>/` slot in the URL, workspace-tagged WebSocket frames and a breadcrumb switcher, so a branch worktree's PRD, runs and analysis are addressable and writes stay scoped to the worktree the URL names.
+  - **The Workspaces board**, with each worktree's PRD delta against the anchor and the ability to start a run in another worktree by name.
+  - **`ndx mcp <server>`**, a shim that forwards a stdio MCP client to the hub with the workspace header, so a desktop session in a worktree reaches that worktree's servers.
+  - **Hub admission** — a global session cap and memory headroom check that queues a run instead of answering 503.
+  
+  Changesets takes the highest bump across everything pending, so this is the only entry that needs to say `minor`.
+
+### Patch Changes
+
+- [#537](https://github.com/en-dash-consulting/n-dx/pull/537) [`0ac2ad7`](https://github.com/en-dash-consulting/n-dx/commit/0ac2ad7e707428104b7d50fdc6c4b58742f5d141) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `AGENTS.md` now tells Codex and other assistants that a task can carry saved run settings.
+  
+  The Rex guidance that `ndx init` writes into your project lists a new bullet: `add_item` and `edit_item` accept a `run` block (a portable model tier plus optional per-vendor model pins, provider, review, permission mode, test gate, turn and token budgets, notes for the agent). An object replaces the whole block and `null` removes it. Re-run `ndx init` to refresh an existing `AGENTS.md`.
+
+- [#606](https://github.com/en-dash-consulting/n-dx/pull/606) [`6b20ed9`](https://github.com/en-dash-consulting/n-dx/commit/6b20ed9c2416e5ef0f191bf4679097c4cdb67af2) Thanks [@endash-shal](https://github.com/endash-shal)! - Keep `AGENTS.md` inside the budget Codex reads it under, and guard it.
+  
+  Codex reads the root `AGENTS.md` and a package's own together, up to `project_doc_max_bytes`, and silently drops whatever lies past that — no error, no log. `renderAgentsMd` puts the Codex-operational sections last (Workflow, Skills, MCP Servers, Troubleshooting), so an overrun takes exactly the half Codex cannot work without. The root had grown to 30,611 bytes against a ~32,768-byte limit, leaving 2,157 for any nested file: rex, core and llm-client were already over and hench had 127 bytes to spare.
+  
+  **What moved.** Reference prose went to `docs/`; the rules stayed in-context. The web package's internal zone diagram is now a pointer to `packages/web/AGENTS.md`, where it already lived. The gateway table keeps the file addresses and links the export inventory to `docs/architecture/gateways.md`. The concurrency contract keeps its safety table, the PRD invariant and three one-paragraph rules, and links the full reasoning — including the bundle and narrative carve-outs — to a new `docs/architecture/prd-write-concurrency.md`. The root is now 26,628 bytes; rex, core, llm-client and hench fit again.
+  
+  **The guard.** `tests/e2e/agents-md-size-budget.test.js` fails a pull request when the rendered root exceeds the limit minus a 2 KiB margin, or leaves a package file no room, naming the limit and saying that Codex drops the rest. The Codex docs confirm the setting and the truncation but publish no default number, so 32 KiB is treated as this project's budget rather than quoted as a documented constant.
+  
+  Not yet fixed: `packages/web/AGENTS.md` (21,941 bytes) still overruns the chain by 15,329 and needs its own trim; the guard reports it as a warning and will assert on it once that lands.
+
+- [#605](https://github.com/en-dash-consulting/n-dx/pull/605) [`d1ae043`](https://github.com/en-dash-consulting/n-dx/commit/d1ae043b127dcf49085e408a0c287d50b6cf2a10) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix `rex backfill-commit-attribution` reading only part of a real repository's history.
+  
+  The command buffered the whole `git log` body in memory through a bare `execFile`, whose 1 MiB default it outgrew — on this repository's own 3.5 MiB history it reported "could not read git history" and did nothing, a silent no-op. It now runs through core's `git` helper, the same path `change-commits.ts` already uses with a 256 MiB ceiling for exactly this reason, so its `node:child_process` entry drops out of the allowlist.
+  
+  Two parsing gaps surfaced once it could read the log at all:
+  
+  - **Only the first trailer per commit was read.** A commit that touches several items carries one `N-DX-Status` trailer per item; this repository's 53 such commits carry 122 trailers between them, so better than half were being dropped. Every trailer is now read.
+  - **Only the Unicode arrow was matched.** Both `→` and `->` occur in history; the `->` form was skipped entirely.
+  
+  The body is still scanned rather than handed to git's own `%(trailers:…)` parser, which reads only a message's final paragraph: most of this history puts a blank line between the `N-DX-Status` lines and the closing `Co-Authored-By`, so git classifies them as prose and recognises 3 of the 53 commits. A comment on the parser records that.
+
+- [#486](https://github.com/en-dash-consulting/n-dx/pull/486) [`153f6a2`](https://github.com/en-dash-consulting/n-dx/commit/153f6a2babfc936f39fd659a4a8e6686a826b5f8) Thanks [@endash-shal](https://github.com/endash-shal)! - Initialize a blank folder — including its git repository — from the dashboard.
+  
+  `ndx start` in an empty folder already served the setup page with an
+  **Initialize project** button, but the init it ran could never create a git
+  repository: the preflight prompt that offers one needs a TTY, and the wizard
+  spawns `ndx init` with piped stdio. A folder set up that way stayed outside
+  version control, with auto-commit, pair programming, and the hench run loop
+  silently disabled.
+  
+  `ndx init` now takes `--git` / `--no-git`, which answer that prompt ahead of
+  time — the only way a run without a TTY can create a repository. `--git` also
+  gets the `chore: n-dx init` baseline commit the interactive path makes, so the
+  working tree is clean straight out of init.
+  
+  The setup wizard asks the question in the browser instead. A new
+  `GET /api/commands/init/preflight` reports whether the folder is already a
+  repository and whether `git` is on PATH; the question appears only when there
+  is something to decide, is disabled with an explanation when git is missing,
+  and travels to `POST /api/commands/init` as `git: boolean`. The init status
+  endpoint reports `gitRequested` / `gitInitialized`, confirmed from disk rather
+  than from the exit code — `ndx init` treats a failed `git init` as a warning
+  and still exits 0.
+  
+  The wizard also addresses the project through its hub prefix now. Plain `ndx
+  start` registers with the per-user hub, which serves each project at
+  `/p/<id>/`; the page's root-relative `fetch("/api/...")` calls reached the hub
+  instead, which answers 409 once a second project is registered.
+  
+  Initializing from the dashboard also moves the running server onto the layout
+  init wrote. A server started in an empty folder resolves its paths before
+  anything exists, so it holds the legacy roots (`.rex`, `.sourcevision`,
+  `.hench`) while `ndx init` gives a new project the `.ndx/` container — the
+  dashboard went on serving the setup page, and every data route read an empty
+  project, until the server was restarted by hand.
+
+- [#587](https://github.com/en-dash-consulting/n-dx/pull/587) [`062d956`](https://github.com/en-dash-consulting/n-dx/commit/062d956b4ad0974cf178cae63d063c18d6afe5b3) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx ci` no longer fails user projects that import `child_process`. The
+  architecture-policy step enforces n-dx's own spawn allowlist, so it now runs
+  only on the n-dx monorepo and is reported as skipped elsewhere.
+
+- [#548](https://github.com/en-dash-consulting/n-dx/pull/548) [`7cbaf36`](https://github.com/en-dash-consulting/n-dx/commit/7cbaf36efb9ef0c64f42d536521ef56905df8693) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx ci`'s architecture-policy step no longer fails on every run of this
+  repository.
+  
+  `ci.js` and `tests/e2e/architecture-policy.test.js` each kept their own list of
+  files allowed to import `node:child_process`. Nobody kept `ci.js`'s list up to
+  date, so it reported 26 violations that the test allowed. Both now read
+  `packages/core/child-process-allowlist.json`, where every entry carries a
+  reason. Agent worktrees and local harness scratch space are excluded from the
+  scan. A parity test fails if the two scanners ever disagree.
+
+- [#517](https://github.com/en-dash-consulting/n-dx/pull/517) [`fa447e5`](https://github.com/en-dash-consulting/n-dx/commit/fa447e5fb97e4ed0311d1f9c2826600fed183bf9) Thanks [@endash-shal](https://github.com/endash-shal)! - A completed task's commit now contains every file the run changed.
+  
+  Reported from the dashboard's run-task button: files the agent had changed
+  were missing from the commit, and the task was recorded `completed` anyway.
+  Two independent causes, both of which committed before the task was verified
+  complete.
+  
+  **The commit only ever held what the agent staged.** The prompt asks the
+  agent to `git add -- <path...>` naming each path and never to stage the whole
+  tree, so any file it forgot was simply absent from the commit. A new
+  `stageRunWork` stages the run's own work itself, and does it *before* the
+  uncommitted-work gate inspects the tree — order being the point. The gate's
+  job is to refuse a completion claim while finished work sits uncommitted, not
+  to punish an incomplete `git add`; staging first means it sees the run's work
+  as staged and the commit carries all of it, while anything that is **not**
+  the run's work stays dirty and is still refused.
+  
+  Four exclusions keep that from meaning `git add -A`: anything already dirty
+  when the run started (the operator's work in progress, captured by the new
+  `captureBaselineDirty`), hench's own runtime artifacts including the
+  `.hench-commit-msg.txt` sentinel, and the PRD paths, which
+  `performCommitPromptIfNeeded` stages itself *after* writing the completion so
+  the status transition and the code land together. With no baseline captured
+  nothing is staged at all — an unknown baseline cannot tell the run's work from
+  the operator's, and guessing is how someone's work-in-progress ends up inside
+  a task commit.
+  
+  **The mid-run auto-commit timer is off by default** (`hench.commitMsgTimeoutMs`
+  now defaults to `0`, was 300000). Armed, it fired five minutes after the agent
+  wrote its commit message — during the rest of the session and the whole review
+  pass — and committed whatever happened to be staged at that instant: before
+  the test gate, before the uncommitted-work gate, before the completion was
+  written, and without staging the PRD paths or the review repairs. It then set
+  `didAutoCommit()`, which short-circuits the real commit path, so the
+  completion write never reached a commit either and the next run's pre-run gate
+  inherited it. The case it covered — a run that dies after the agent staged its
+  work — is handled without committing anything unverified: the uncommitted-work
+  gate refuses to record the task done, and the next run's pre-run commit gate
+  offers the leftovers as a checkpoint. A positive value restores the timer.
+  
+  That key was also described in three places as "how long the commit-message
+  generation call may run", which it never was. `ndx config`, `hench config` and
+  the dashboard's config form now say what it does.
+  
+  No change was needed for per-iteration gating: `runIterations`, `runLoop` and
+  `runEpicByEpic` already call `shouldStopForUncommittedWork` between tasks, and
+  `between-task-uncommitted-guard.test.ts` already pins all three.
+
+- [#586](https://github.com/en-dash-consulting/n-dx/pull/586) [`5756add`](https://github.com/en-dash-consulting/n-dx/commit/5756addaec3304e7450a0ba487e881a33dca1e92) Thanks [@ryrykeith](https://github.com/ryrykeith)! - With auth on, the hub now presents the per-user token on every call it makes to a project server. Its queued-run replay and `POST /api/hench/execute/check` pre-check used to get 401 (a queued run was dropped as "could not start", the pre-check failed open), and the in-flight count behind the machine-wide session cap read 0, so the cap never held. `ndx refresh --live-server`'s reload request sends the token too.
+
+- [#543](https://github.com/en-dash-consulting/n-dx/pull/543) [`e70f57e`](https://github.com/en-dash-consulting/n-dx/commit/e70f57ed59c60f35fa235845152744baf71b4370) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx init` now names the directories it actually created. The static summary
+  printed `.sourcevision/`, `.rex/` and `.hench/` unconditionally while
+  `establishInitLayout` had already put every new project on the `.ndx/` layout,
+  so a fresh init reported three directories that were not there — the
+  created/reused verdict was right, only the labels were hard-coded. Both recaps
+  (Ink and static) now read their labels from the resolved layout through one
+  shared helper, and `ndx init --help` no longer claims a fixed folder.
+
+- [#605](https://github.com/en-dash-consulting/n-dx/pull/605) [`e1393f0`](https://github.com/en-dash-consulting/n-dx/commit/e1393f02ee074010e9678873ba2ff1f39181a0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - The `N-DX-Item` commit trailer now carries the PRD item id rather than a dashboard permalink. The permalink was built from `web.publicUrl`, defaulting to `http://localhost:3117`, so every autonomous commit wrote the author's host into permanent history and resolved to nothing on any other machine; `web.publicUrl` no longer affects the trailer. Readers accept both forms — `itemIdFromTrailer` unwraps a permalink of any host to the same id — so commits written before this change keep attributing.
+
+- [#605](https://github.com/en-dash-consulting/n-dx/pull/605) [`dfb4a41`](https://github.com/en-dash-consulting/n-dx/commit/dfb4a41625498d4756cc99632d26541939b2e17a) Thanks [@endash-shal](https://github.com/endash-shal)! - Carry `N-DX-Item` on every commit that is for one PRD item
+  
+  The trailer is how rex's realized-by edge finds the commits that realize an
+  item — `computeChangeCommits` reads it and no other part of the message. Only
+  hench's work commit emitted it, so a task whose code the operator committed by
+  hand, or one driven through `/ndx-work` rather than `ndx work`, left nothing in
+  history for the edge to find.
+  
+  Three paths now emit it: hench's `chore(prd):` record commit names the completed
+  task, the `/ndx-work` skill gained a commit step whose trailer block names the
+  task it implemented, and `/ndx-capture` names the item it created. The rule is
+  stated once in `packages/core/commit-trailers.js`, whose `buildTrailerBlock` and
+  `buildCommitMessage` take an optional item id: **emit `N-DX-Item` when the commit
+  is for exactly one item.** A commit spanning several emits none, because naming
+  one of the N would attribute the whole commit to it — that leaves hench's
+  `--reset-deferred` commit, the pre-run gate commit, and the `ndx-plan` /
+  `ndx-reshape` / `ndx-adversarial-review` skills unchanged.
+  
+  The repository also gains `.github/pull_request_template.md`, ending in a trailer
+  block: GitHub copies a PR description into the squash-merge commit, so that is
+  where the trailer has to be for it to reach `main`.
+
+- [#579](https://github.com/en-dash-consulting/n-dx/pull/579) [`cf19d5a`](https://github.com/en-dash-consulting/n-dx/commit/cf19d5a29ffa9ad4df8bb2befb2dd3f266785e05) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add the placement decision for a change on the product layer (`core/placement-policy.ts`). `rex.placement.models` (`text`, `jev`, `both`) chooses which tiers run beside the rules, and `rex.placement.autoAccept` (`none`, `agree`, `confident`) decides when a placement is accepted without a person; a change without one gets `needsPlacement`. Jev runs under its own `prd.place.judge` task class, which is not a default judgment route, so exporting `TYPESAFE_API_KEY` alone never turns it on. `confident` needs a Jev pick at confidence 0.8 or higher that is on the rules shortlist. Jev can abstain with a none-of-these option, which is never auto-accepted, and a Jev confidence that is not finite or is outside 0–1 is ignored with a warning. Without Jev, `both` falls back to the text model and `jev` to rules only, each with a warning. Not wired into the store, CLI or MCP yet.
+
+- [#529](https://github.com/en-dash-consulting/n-dx/pull/529) [`f46b952`](https://github.com/en-dash-consulting/n-dx/commit/f46b95235daf551cd0cc7c13ae162204aff74527) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Route core, and the rest of hench and web, through the layout resolver
+  
+  Every remaining literal `.rex/`, `.hench/`, `.sourcevision/` and `.n-dx*` path
+  in the orchestration tier now asks `resolveLayout` where the project keeps its
+  state, as do the hench and web files the 0.8.0 sweep left behind. On a project
+  that has run `ndx migrate-layout`, these all used to read or write a path
+  nothing is there — silently, because a missing file is indistinguishable from
+  an empty project. Fixed as part of that:
+  
+  - `ndx start stop` and `ndx start status` could not find a running dashboard on
+    the new layout, and left it running.
+  - The staleness notice told a migrated project that all three of its tool
+    directories were missing and that it should re-run `ndx init`.
+  - `ndx ci`, `ndx export` and `ndx refresh` looked for analysis output, the PRD
+    tree and run records under the legacy names; the cross-vendor reviewer found
+    no codebase context, no PRD excerpt and no configured test command.
+  - The guard baseline every hench run is clamped to blocked `.rex/**` and
+    `.hench/**` only, so on the new layout the agent was free to write n-dx's own
+    state, PRD tree included.
+  - The "Strict Safety" workflow template had drifted from that baseline in both
+    copies, dropping half its credential patterns — choosing it left a project
+    *less* protected than the default. Both copies now derive from the baseline.
+  - Hench classified PRD writes by file extension on the new layout, so run
+    summaries reported bookkeeping as documentation changes.
+  - The note printed after a completion commit named a gitignore path the
+    operator does not have, so following it left the tree dirty and the next run
+    still refused to start.
+  
+  New in `@n-dx/llm-client`: `layoutStateNames()`, for the classifiers that are
+  handed a path and must recognise n-dx state under either layout rather than
+  resolve one.
+
+- [#610](https://github.com/en-dash-consulting/n-dx/pull/610) [`b03c3a7`](https://github.com/en-dash-consulting/n-dx/commit/b03c3a74508c601c2e71596d6fc565a70cc3feb6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - New rex MCP tools for a v2 PRD: `get_product` (areas, capabilities and constraints with computed status and health), `get_capability` (one node with its parent chain, related changes, binding constraints and co-changes), `place_change` (the rules' placement shortlist without `target`; with `target`, records a touches or a modified amendment, with the amendment's `proposed` text and `criteria` delta, and clears `needsPlacement`; a criteria delta naming an id the capability lacks, or adding one it has, is refused at placement, as apply would refuse it) and `apply_change` (a steward applies a change's amendments whatever `rex.applyOn` says). Each refuses a v1 tree. On a v2 tree `get_prd_status` reports change counts, the Inbox count, product status per area and change counts per release. The assistant-assets manifest lists the four tools.
+
+- [#520](https://github.com/en-dash-consulting/n-dx/pull/520) [`0ec098a`](https://github.com/en-dash-consulting/n-dx/commit/0ec098ae8fe51a8f62a7a8e8400eba9e47971a1d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Assistant guidance (generated `CLAUDE.md`) now states that stdio rex/sourcevision MCP servers follow the client's MCP roots in worktree sessions, that unservable roots refuse writes, and how to verify the write target with `get_capabilities` ([#499](https://github.com/en-dash-consulting/n-dx/issues/499)).
+
+- [#520](https://github.com/en-dash-consulting/n-dx/pull/520) [`0ec098a`](https://github.com/en-dash-consulting/n-dx/commit/0ec098ae8fe51a8f62a7a8e8400eba9e47971a1d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx mcp <server>` bridging to the hub now follows the client's MCP roots ([#499](https://github.com/en-dash-consulting/n-dx/issues/499)). When the client advertises roots, the shim asks `roots/list` after `initialized`. If the root names another worktree of the same repository, the shim re-opens the hub session for that worktree and closes the first one, so tool calls write the tree the editor is open on rather than the checkout the command started in. The client sees one session throughout. `notifications/roots/list_changed` re-targets the same way. Clients without roots, roots naming the current worktree, and roots in another repository keep the cwd-derived workspace; the last case logs one stderr line.
+
+- [#571](https://github.com/en-dash-consulting/n-dx/pull/571) [`fccbbf3`](https://github.com/en-dash-consulting/n-dx/commit/fccbbf3366e7b4e04be7db7d744c2d026e7f783d) Thanks [@endash-shal](https://github.com/endash-shal)! - `--no-review` and `--no-skip-test-gate` turn a saved setting off for one run.
+  
+  Once a task can save `review: true` or `skipTestGate: true`, a one-off run needs a way to overrule it. Both new flags resolve as `cli-flag`, so they outrank the task's saved block and `hench.*` alike, and — being flags — they apply to every task in a `--loop` or `--iterations` run. `--no-review` carries the saved `reviewModel` and `reviewOptional` with it: there is no reviewer left for them to configure.
+  
+  A flag and its negation together is an error rather than a guess (`--review` with `--no-review`, `--skip-test-gate` with `--no-skip-test-gate`), as are `--review-model` or `--review-optional` alongside `--no-review`.
+  
+  **Behaviour change for dashboard clients.** The run-option tables now carry a `negatedFlag` for the two booleans a task can save, so `runOptionArgs` turns an explicit `review: false` / `skipTestGate: false` into `--no-review` / `--no-skip-test-gate` instead of emitting nothing. That is what lets the dashboard say "off for this run even though the task saved it on". An **absent** key still emits nothing, which is how a request leaves the decision to the task and the config, and booleans nothing can save (`fresh`, `allowDirty`, `reviewOptional`) are unchanged — their `false` still says nothing.
+
+- [#530](https://github.com/en-dash-consulting/n-dx/pull/530) [`7e7ef56`](https://github.com/en-dash-consulting/n-dx/commit/7e7ef56662296000ad88f0a2d0bcf718e5a984ba) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Every package's guidance now lives in its `AGENTS.md`, with the `CLAUDE.md`
+  beside it reduced to the `@AGENTS.md` import. Zone policies and seam registries
+  for `core`, `rex`, `hench` and `web` were readable only by Claude Code before
+  this; Codex and any other assistant that reads nested `AGENTS.md` files now get
+  them too. `tests/e2e/instruction-alignment.test.js` fails a package CLAUDE.md
+  with no AGENTS.md beside it, or one carrying content of its own.
+
+- [#579](https://github.com/en-dash-consulting/n-dx/pull/579) [`86751c5`](https://github.com/en-dash-consulting/n-dx/commit/86751c571f74bb04949e8b5cc1007eddf4ea1e21) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Rank placement candidates for a change from rules (package and path mentions, title word overlap, file evidence against realized-by) and an optional text model on the new `prd.place` task class; the model counts as agreeing only when it picks the rules' top candidate.
+
+- [#531](https://github.com/en-dash-consulting/n-dx/pull/531) [`3c8a8c1`](https://github.com/en-dash-consulting/n-dx/commit/3c8a8c17703fe347c353d578aa39ec25fa5ac539) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Remove the dashboard's Notion and integration surfaces
+  
+  The tracker adapters went in the previous change; these are the dashboard
+  surfaces that existed to configure them. With no adapter behind them they
+  were a settings page for a feature that could not do anything.
+  
+  Deleted: `routes-notion.ts` and its `/api/notion/*` endpoints, the
+  `notion-config` and `integration-config` views, the Notion schema wizard and
+  both stylesheets. The `rex.notionSync` and `rex.integrations` feature toggles
+  go with them — from the registry in `routes-features.ts`, from the route gate
+  table, from the static export's prerendered `features.json`, and from
+  `ndx config --help`. The Project page is now two sections, analyze-and-plan
+  settings and feature flags, with no conditional sections at all.
+  
+  `routes-notion.ts` held the last dynamic `@n-dx/rex/dist/*` import in web, so
+  that escape hatch and its entry in the architecture policy's documented-dynamic-
+  imports registry are both gone. Note that this leaves rex's
+  `src/store/adapter-config.ts` — extracted in the previous change specifically so
+  this route could keep reading `.rex/adapters.json` — without a consumer. It is
+  still exported from `public.ts` and still tested; removing it is a rex decision
+  rather than a dashboard one, so it is left for the follow-up that records the
+  tracker removal.
+  
+  Two things were removed beyond the literal surface, both because deleting the
+  routes made them dead rather than merely unused:
+  
+  - `RouteFeatureGate.prefix`. Both subtree gates were Notion's and
+    `/api/integrations`'; every remaining gate lists its paths exactly. An
+    unexercised matching branch in the function that decides whether a disabled
+    feature's endpoint is reachable is the kind of thing that rots, so the field
+    and its branch go and `exact` becomes required.
+  - The `.cmd-sync-*` and `.intg-*` rules in `commands.css` and `deployed.css`,
+    orphaned when the sync buttons and the integration list went.
+  
+  The `/notion-config` and `/integrations` redirect aliases are deliberately
+  kept. They are URL compatibility for 0.8.0 bookmarks and they point at
+  `/project`, which still exists — removing them would turn a working redirect
+  into a 404 and buy nothing.
+  
+  Unrelated robustness fix in `tests/e2e/prompt-census.test.js`: it enumerated
+  files with `git ls-files`, which reads the index, then read each one from disk.
+  A file deleted in the working tree but not yet staged made it throw ENOENT and
+  report as a crash rather than as the clean result it was. It now skips paths
+  that no longer exist.
+
+- [#531](https://github.com/en-dash-consulting/n-dx/pull/531) [`f65e407`](https://github.com/en-dash-consulting/n-dx/commit/f65e407f4a4cec417865be9c40c3b58cf9040f99) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Remove the Notion, Jira, Asana and GitHub Projects store adapters, `rex sync`,
+  `rex adapter` and the `sync_with_remote` MCP tool.
+  
+  No project used them. They were written against the whole-document store model
+  that the folder tree replaced, so every one of them had been carrying a
+  conversion layer between a PRD tree and a flat list of remote records — four
+  copies of a translation nobody was running. A work-tracker bridge is planned as
+  its own package, built against the storage model that actually exists; keeping
+  four unexercised adapters alive until then buys nothing and has to be migrated
+  with every schema change.
+  
+  Gone from rex: `notion-*`, `jira-*`, `asana-*` and `github-projects-*` under
+  `src/store/`, the `integration-schema` system and its four tracker schemas, the
+  `AdapterRegistry`, `SyncEngine`, the `sync` and `adapter` CLI commands with
+  their help entries, and the `sync_with_remote` MCP tool. Gone from core: the
+  `ndx sync` command, its help and its command-effects entry.
+  
+  Two dashboard surfaces went with them, because they could not outlive what they
+  called: `routes-integrations.ts`, whose every handler began by importing the
+  deleted integration-schema modules, and `POST /api/commands/sync`, which spawned
+  the deleted CLI command. `routes-notion.ts` survived this step — it reads and writes
+  `.rex/adapters.json` through the credential helpers below — and is removed by the
+  dashboard change that follows. The Notion wizard, the feature toggles and the
+  remaining viewer views are a separate change.
+  
+  What stayed, and why:
+  
+  - **`file-adapter.ts` and `folder-tree-store.ts`** — the local stores. Untouched.
+  - **`src/core/sync.ts`** — not the sync engine despite the name. It is the item
+    bookkeeping module (`stampModified`, `isModifiedSinceSync`,
+    `ITEM_BOOKKEEPING_FIELDS`), and the folder-tree store, the bundle exporter and
+    `rex analyze` all depend on it.
+  - **Credential redaction and environment resolution**, moved at this step into
+    `src/store/adapter-config.ts` as plain functions rather than registry methods,
+    so that `routes-notion.ts` kept working. They did not survive the release:
+    deleting that route left them without a caller, and a later change in this
+    same release removes the module. See the entry for that change.
+  - **`WorkItemLink` in the schema.** Items may still record a link to an external
+    system; nothing in rex writes one now. Removing the field is a schema change,
+    not an adapter removal.
+  
+  `createStore` keeps its adapter-name parameter and now throws for anything other
+  than `"file"`. Callers across rex and hench pass the name explicitly, and a
+  parameter that is silently ignored is worse than one that is checked — a caller
+  asking for `"notion"` should hear that it is gone rather than quietly receive the
+  local store.
+  
+  The redaction rule changed shape. It used to read each adapter's `configSchema`
+  for an explicit `sensitive: true`; those schemas went with the adapters, so the
+  key name is now the only signal and the rule had to widen to match it. A key
+  whose name ends in `token`, `secret`, `password`, `passphrase`, `apikey` or
+  `credential` is redacted — which newly covers `apiToken`, previously caught only
+  by Jira's schema flag. The match is anchored at the end of the key rather than
+  done as a substring, so `projectKey` is still stored in the clear: redacting it
+  would write a `__redacted` marker over a value that was never a secret and then
+  fail to resolve it from an environment variable nobody set.
+
+- [#531](https://github.com/en-dash-consulting/n-dx/pull/531) [`d52dcd2`](https://github.com/en-dash-consulting/n-dx/commit/d52dcd20be39bb165bdfcb7d6f391bd7c07fd874) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Remove the documentation for the tracker adapters, `ndx sync`, `rex sync`, `rex
+  adapter` and the `sync_with_remote` MCP tool, and drop `.rex/adapters.json` from
+  the recommended `.gitignore` template.
+  
+  The code went in the two changes before this one. Documentation that outlives
+  the feature it describes is worse than no documentation: a reader who finds
+  `ndx config rex.adapter notion .` in a guide has no way to tell it is a fossil
+  until they run it, and a command reference listing a command that no longer
+  exists makes the whole reference untrustworthy. A work-tracker bridge ships
+  later as its own package; when it does it gets its own documentation, written
+  against the storage model that will actually exist rather than inherited from
+  the adapters it replaces.
+  
+  Gone from the guides: the "Using `ndx sync` for team-backed PRDs" section of
+  [Keeping Your PRD Alive](https://n-dx.dev/guide/change-management) along with
+  its two Notion team workflows, conflict-resolution rules and the external-adapter
+  branch of the maintenance checklist; the `ndx sync` row in the command
+  reference; the `sync_with_remote` row in the MCP tool tables of the MCP guide,
+  the rex package page and rex's own README; the `ndx sync` row and the
+  `sync_with_remote` entry in `@n-dx/core`'s README, which is the package's npm
+  page; and the `rex sync` / `rex adapter` examples from the rex CLI listing.
+  Rex's README also now lists `claim_task` and `release_task`, so its stated tool
+  count matches the eighteen tools the server registers.
+  
+  A new check in `tests/e2e/command-docs-parity.test.js` runs the existing parity
+  rule in the other direction: every `ndx <command>` row in the repository README,
+  the command guide and `@n-dx/core`'s README must name a command the registry
+  knows. Before this, a removed command could stay documented indefinitely.
+  
+  **`change-management.md` was kept rather than deleted.** The task that
+  scheduled this work called for the whole file. Four of its five sections —
+  drift detection, the four-cycle maintenance loop, archive management and the
+  recovery playbook — have nothing to do with trackers and nothing else documents
+  them; the sync material was about 15% of the page. Deleting all of it to remove
+  that 15% would have cost four sections of live guidance and broken the sidebar
+  entry plus two inbound links for no gain. The tracker content was excised
+  instead, which satisfies the same requirement.
+  
+  Three references to files that no longer exist were corrected while they were
+  in reach: `rex/src/core/notion-map.ts` in the level-system reference,
+  `routes-integrations.ts` and `routes-notion.ts` in the zone inventory, and the
+  Notion and integrations sections of the Project view in the accessibility route
+  table. The `/notion-config` and `/integrations` redirect aliases are still
+  documented in the viewer architecture page, because those aliases still exist —
+  they point at `/project` for 0.8.0 URL compatibility.
+  
+  `.rex/adapters.json` is gone from the recommended ignore template
+  (`packages/core/assistant-assets/ndx.gitignore`) and from the three documented
+  copies of it. Nothing produces the file any more. `ndx init` does not apply that
+  template — users copy it by hand — so an existing project's `.gitignore` is
+  untouched and keeps ignoring any `adapters.json` left over from an old setup. The repository's own `.gitignore` drops the entry in the same
+  change, because `tests/unit/ndx-gitignore-template.test.js` requires the
+  template and this repository to list identical `.rex/` entries.
+  
+  The dated audit tables in `docs/cli-ui-gap.md` keep their `ndx sync` row, with a
+  note that the command was since removed. That table records what shipped on a
+  given date; rewriting it would falsify the history it exists to preserve. The
+  current-state inventories in the same file did drop the removed rows.
+
+- [#503](https://github.com/en-dash-consulting/n-dx/pull/503) [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx work --resolve=<value>` now resolves instead of starting a real run. Any value except `false` (which means no flag) resolves, in both core and hench.
+
+- [#537](https://github.com/en-dash-consulting/n-dx/pull/537) [`9120c47`](https://github.com/en-dash-consulting/n-dx/commit/9120c47bfa4a4149f2a5143859e47d818b738c10) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The shared project guidance (and the generated `CLAUDE.md`) now documents the `run` argument of the rex MCP tools `add_item` and `edit_item`.
+
+- [#546](https://github.com/en-dash-consulting/n-dx/pull/546) [`c88ffad`](https://github.com/en-dash-consulting/n-dx/commit/c88ffadeb92f385691f72cfb1356f77910da3d18) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Cut the test time of an `ndx work` run ([#539](https://github.com/en-dash-consulting/n-dx/issues/539)).
+  
+  - **Gate-only retry.** When a task's last run failed only at the test gate, with its work committed and its completion held, `ndx work --task=<id>` skips the agent, re-runs the gate and applies the held completion on green. A review that passed on the same commit is inherited. A second gate failure goes back to the agent. The read-only refusal also stands down when earlier attempts already committed the task's files, instead of re-spawning the agent cold.
+  - **Flake absorption.** With `hench.testGate.rerunCommand`, an unattended run re-runs only the failed suites once; a pass counts and is recorded as `testGate.flakyRerun`.
+  - **Scoped gate.** `hench.testGate.command` replaces the gate command and takes `{base}`, the run's start commit. `scripts/run-all-tests.mjs` gains suite labels, `affected <base>` and `--list`. Run records gain `testGate.base`, `suites`, `scopeFallback`, `firstAttempt`, `rerun` and `gateOnlyRetry`. Both keys are opt-in and appear in `ndx config` help and the dashboard config fields.
+  - **Scoped checks.** The agent brief and the in-hench reviewer run scoped checks only, since the gate follows and CI runs everything.
+  - **Interactive gate prompt.** A failed gate on an interactive run offers rerun/abort/skip again; it used to abort silently.
+
+- [#530](https://github.com/en-dash-consulting/n-dx/pull/530) [`dd765fa`](https://github.com/en-dash-consulting/n-dx/commit/dd765faaf775e497a4a02ca6965aca70f5879933) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Share the architecture governance sections with every assistant. The zone
+  fragility governance, gateway modules, spawn-versus-gateway and concurrency
+  contract sections — including the PRD write invariant — lived only in
+  `claude-addendum.md`, so `AGENTS.md` never carried them and Codex ran without
+  the gateway rules. They now live in `project-guidance.md`; the addendum keeps
+  only the pointers to Claude's per-directory `CLAUDE.md` files. A heading in the
+  addendum that is not on the Claude-only allowlist now fails
+  `tests/e2e/instruction-alignment.test.js`.
+
+- [#619](https://github.com/en-dash-consulting/n-dx/pull/619) [`7692d2b`](https://github.com/en-dash-consulting/n-dx/commit/7692d2ba20dce2a04180b8fe49df8404e497d98c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The commit step in `/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config` and `/ndx-adversarial-review` now stages only its own changes and works in linked worktrees. Each skill notes which paths are already dirty when it starts and stages and commits, by explicit path, only the paths that were not, so the user's in-progress work — staged or not — is no longer swept into the commit. Status is read with `core.quotepath=false`, so a file with a non-ASCII name is staged rather than aborting the step. Before its first write, each skill also checks whether it is about to change a path that was already dirty (for PRD writes, any dirty path under `.rex/prd_tree/`) and asks the user to commit or stash it first, so its commit holds the whole change. The commit message is written to `.ndx-commit-msg.txt` at the project root instead of `.git/NDX_COMMIT_MSG`, which failed with "not a directory" in a linked worktree, where `.git` is a file.
+
+- [#535](https://github.com/en-dash-consulting/n-dx/pull/535) [`2f3033f`](https://github.com/en-dash-consulting/n-dx/commit/2f3033f88f529e8c370ed6cd66dacaaf3516d10d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx start --here` restarts this directory's own token-protected server when its PID file is gone, instead of starting a second dashboard beside it. The server is identified by its owner and command line; no probe sends the token.
+
+- [#535](https://github.com/en-dash-consulting/n-dx/pull/535) [`e1f1b66`](https://github.com/en-dash-consulting/n-dx/commit/e1f1b660811704fcd3d73a1cd99a0d1080b0d0b8) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx start` no longer SIGKILLs a token-protected n-dx server on the requested port; it moves to the next free port, as it already did for the hub and peer dashboards. `ndx start --background` now waits until the server is listening (up to 30s, or until the server exits) instead of giving up after 5s and printing a URL that refused connections.
+
+- [#589](https://github.com/en-dash-consulting/n-dx/pull/589) [`878ff2f`](https://github.com/en-dash-consulting/n-dx/commit/878ff2facb3cacb20f6727d0eca07d5a3e20f765) Thanks [@ryrykeith](https://github.com/ryrykeith)! - New `rex merge-state` git merge driver for the v2 trees' per-folder `state.yaml`: rows merge by item id, so children added or completed on parallel branches merge cleanly. A `metAt` both sides changed is recomputed from the node's spec hash, and a `status` both sides changed reads `completed` when the merged row records a completion; anything else that cannot be decided leaves conflict markers on that field. `ndx init` pins `<rex>/product/**/state.yaml` and `<rex>/changes/**/state.yaml` to `merge=rex-state` and registers the driver beside `rex-prd`.
+
+- [#592](https://github.com/en-dash-consulting/n-dx/pull/592) [`cc9ce2c`](https://github.com/en-dash-consulting/n-dx/commit/cc9ce2c7b3df83ac6709bfaf38240ea23bff564b) Thanks [@endash-shal](https://github.com/endash-shal)! - Surface SDLC readiness through the CLI, `ndx`, MCP and the dashboard status.
+  
+  `analyze` now writes `readiness.json` beside `sdlc-profile.json` — the weighted
+  score computed from the detected profile. Four surfaces read it:
+  
+  - `sourcevision readiness [--json]` prints the scorecard, with the evidence
+    behind each dimension and the gap that would raise it.
+  - `ndx readiness` delegates to it, forwarding `--json`.
+  - `get_readiness` on the SourceVision MCP server returns the same artifact.
+  - `GET /api/status` carries `sv.readiness` (`{ overall, analyzedAt }`), null
+    rather than absent on an analysis that produced no readiness artifact.
+  
+  The CLI and MCP surfaces recompute from `sdlc-profile.json` rather than serving
+  `readiness.json`, so a weight change shows up without a re-analysis; the
+  persisted file is for readers that only want the headline. The scorecard is
+  heuristic — it detects whether a practice exists and is wired up, not whether it
+  is good — and is labelled as such on every surface that publishes it.
+
+- [#618](https://github.com/en-dash-consulting/n-dx/pull/618) [`33eb557`](https://github.com/en-dash-consulting/n-dx/commit/33eb557571c1c3d0020a08e0d12318c34729600a) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Turn `rex backfill-commit-attribution` into a read-only trailer coverage report.
+  
+  Schema v2 stores no `commits` on an item — a commit's SHA is not its identity, so a change's commits are computed from its `N-DX-Item` trailers on demand. That left the backfill writing state nothing reads. What survives is the question it was really answering: how much of history can be attributed at all, which is worth knowing before the trailer format is frozen.
+  
+  The command now reports, for every commit reachable from the default branch, whether its message carries an `N-DX-Item` or `N-DX-Status` trailer — grouped by author and by month, with totals. `--json` (or `--format=json`) prints the same report machine-readably, and `--ref=<branch>` reads another branch.
+  
+  It writes nothing: not under the rex directory, not the trailer cache `change-commits.ts` keeps, and it no longer loads the PRD at all.
+  
+  Two counts are reported rather than one, because they disagree and the gap matters. `covered` scans the whole message; `attributed` asks git's own trailer parser, which is what attribution actually reads — and git reads trailers only from a message's final paragraph. On this repository 67 of the 79 covered commits write the trailer outside it, so a single number would either call history covered that nothing can attribute, or hide that the trailer was written at all. Merge commits are counted separately for the same reason: they carry no trailer by construction.
+  
+  A git failure — an unknown ref, a shallow CI checkout — now fails the command with the cause named. The predecessor caught it and returned normally, which reported an unreadable log as success.
+
+- [#565](https://github.com/en-dash-consulting/n-dx/pull/565) [`aef2f1f`](https://github.com/en-dash-consulting/n-dx/commit/aef2f1f454bfad3c2da1eef844ce83d680937245) Thanks [@ryrykeith](https://github.com/ryrykeith)! - v2 trees on a Windows CRLF checkout: the reader loads a CRLF file into the same model as its LF copy (bodies included), and the v2 writer and `state.yaml` writer leave a file alone when it differs only by CRLF. `ndx init` now pins `<rexDir>/**/*.yaml` (the v2 `state.yaml` files) to LF.
+
+- [#602](https://github.com/en-dash-consulting/n-dx/pull/602) [`b671123`](https://github.com/en-dash-consulting/n-dx/commit/b6711238559f132c7f0f7099b525d08108cfc445) Thanks [@endash-shal](https://github.com/endash-shal)! - Child processes no longer open console windows on Windows. The shared `exec`
+  wrapper defaults `windowsHide` to true, and the core CLI spawn shim, the vitest
+  launcher and the e2e helpers set it, so a test suite or an agent run no longer
+  flashes a console per spawn across the screen and steals keyboard focus.
+
+- [#503](https://github.com/en-dash-consulting/n-dx/pull/503) [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx work --task=<id> --resolve [flags] <dir>` (`hench run --resolve`) prints one JSON object describing the run those flags would start, without starting it: the task, the workspace, every setting (vendor, model, provider, permission mode, review and review model, test gate, budgets, fresh, allow-dirty, reset-deferred) with the config key that supplied it, the per-run options with their flags, types and allowed values, the equivalent `ndx work` command, and each reason the run would refuse — task-not-found, not-actionable, claimed-elsewhere, tree-not-conformant, vendor-unset, vendor-cli-missing, provider-unsupported, model-vendor-mismatch, dirty-tree. It exits 0 when it reports refusals, and takes no claim, writes no PRD or git state and starts no vendor CLI. Resolution uses the run's own flag parsing and model chain, so the reported model is the one the run uses. `resolveTaskModel` now also returns the `source` key that supplied its model.
+- Updated dependencies [[`ddd4e15`](https://github.com/en-dash-consulting/n-dx/commit/ddd4e1573f7a1e80c943ffa2875347b9f8b4717c), [`572d759`](https://github.com/en-dash-consulting/n-dx/commit/572d759e36c98f7f067e40fb1474f7154792a081), [`8eb093b`](https://github.com/en-dash-consulting/n-dx/commit/8eb093be6652abaeb840e585332eb33b2bf740b0), [`536e9a8`](https://github.com/en-dash-consulting/n-dx/commit/536e9a88647bbb57fe6379fd1b36d8b52e755467), [`ba473ac`](https://github.com/en-dash-consulting/n-dx/commit/ba473ac0bc0f73daf70827c9f05c93af1342eb1e), [`c47baa4`](https://github.com/en-dash-consulting/n-dx/commit/c47baa4a12f8428b755bfbf8008a89b2a5e4e589), [`28f38ab`](https://github.com/en-dash-consulting/n-dx/commit/28f38ab5a520f76ca551c30e544f796521d9cc60), [`f3694e7`](https://github.com/en-dash-consulting/n-dx/commit/f3694e7cab6d135f3e5bb791c01aa58232dab634), [`c1af698`](https://github.com/en-dash-consulting/n-dx/commit/c1af6987f02b0620edea263c4415fa1219b03d4e), [`d1ae043`](https://github.com/en-dash-consulting/n-dx/commit/d1ae043b127dcf49085e408a0c287d50b6cf2a10), [`153f6a2`](https://github.com/en-dash-consulting/n-dx/commit/153f6a2babfc936f39fd659a4a8e6686a826b5f8), [`1dfc0c7`](https://github.com/en-dash-consulting/n-dx/commit/1dfc0c7e7947ffa6054cb6ef9efc214805253a16), [`5399355`](https://github.com/en-dash-consulting/n-dx/commit/53993552706a40311b3caeef53f66be1944b40c0), [`73bab95`](https://github.com/en-dash-consulting/n-dx/commit/73bab9592b9ceda77239ad83b84b610c7db34f8e), [`d059e28`](https://github.com/en-dash-consulting/n-dx/commit/d059e284f7c9320e436884d96e3cc3467bc502b0), [`0df9e0f`](https://github.com/en-dash-consulting/n-dx/commit/0df9e0fcbb4cd85938301380f4a5a5968a470d5d), [`fa447e5`](https://github.com/en-dash-consulting/n-dx/commit/fa447e5fb97e4ed0311d1f9c2826600fed183bf9), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`97a67c5`](https://github.com/en-dash-consulting/n-dx/commit/97a67c52da8c5ea7aa800dc91b58fe06424d13a5), [`252829f`](https://github.com/en-dash-consulting/n-dx/commit/252829f03d3075b4d849b9bbb37ee2d8452512e8), [`b73b061`](https://github.com/en-dash-consulting/n-dx/commit/b73b06162cb210705583e6846f2349de8901c85d), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`cda2342`](https://github.com/en-dash-consulting/n-dx/commit/cda2342432db1fd6751c776339cdf68dc1fe2d70), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`f11785e`](https://github.com/en-dash-consulting/n-dx/commit/f11785ec333e3eb456a2f0b9e512e35dd280e955), [`7b1a885`](https://github.com/en-dash-consulting/n-dx/commit/7b1a885498582fa0cfaa58513105201568aec802), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`168b80c`](https://github.com/en-dash-consulting/n-dx/commit/168b80c1edfe45f408cedb75d6ca0efc2cbc8e29), [`153f6a2`](https://github.com/en-dash-consulting/n-dx/commit/153f6a2babfc936f39fd659a4a8e6686a826b5f8), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`5756add`](https://github.com/en-dash-consulting/n-dx/commit/5756addaec3304e7450a0ba487e881a33dca1e92), [`e1393f0`](https://github.com/en-dash-consulting/n-dx/commit/e1393f02ee074010e9678873ba2ff1f39181a0ec), [`dfb4a41`](https://github.com/en-dash-consulting/n-dx/commit/dfb4a41625498d4756cc99632d26541939b2e17a), [`eff0f79`](https://github.com/en-dash-consulting/n-dx/commit/eff0f79db748ee2ec71c27abbde166fdcfbfc722), [`cf19d5a`](https://github.com/en-dash-consulting/n-dx/commit/cf19d5a29ffa9ad4df8bb2befb2dd3f266785e05), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`b2b021a`](https://github.com/en-dash-consulting/n-dx/commit/b2b021a4394a868057f8f83e7bdc848c19c9144c), [`2028e7a`](https://github.com/en-dash-consulting/n-dx/commit/2028e7a2e298d88c9b9d66020cc380bbdce19b4c), [`f46b952`](https://github.com/en-dash-consulting/n-dx/commit/f46b95235daf551cd0cc7c13ae162204aff74527), [`1560be5`](https://github.com/en-dash-consulting/n-dx/commit/1560be5ad66314385a5daadbf8a3e9b0fad06d32), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`b03c3a7`](https://github.com/en-dash-consulting/n-dx/commit/b03c3a74508c601c2e71596d6fc565a70cc3feb6), [`e6941fc`](https://github.com/en-dash-consulting/n-dx/commit/e6941fc042beeb45fb9ef91c102b2639f5ce4a43), [`3cb924b`](https://github.com/en-dash-consulting/n-dx/commit/3cb924b648eb3076ac738b65caaff15a6f186c59), [`8bae238`](https://github.com/en-dash-consulting/n-dx/commit/8bae2381270ebcd2c419b4c8d8c90ffd87ac3047), [`b770844`](https://github.com/en-dash-consulting/n-dx/commit/b770844d0100ca48eedc07d7aacfcf149c2583ec), [`fccbbf3`](https://github.com/en-dash-consulting/n-dx/commit/fccbbf3366e7b4e04be7db7d744c2d026e7f783d), [`31c0647`](https://github.com/en-dash-consulting/n-dx/commit/31c0647830a5b33d965e661acc41911d84ec5673), [`1a39dd5`](https://github.com/en-dash-consulting/n-dx/commit/1a39dd59ebf8ad3338e28e7ce111c6f3c52bbd25), [`9c16798`](https://github.com/en-dash-consulting/n-dx/commit/9c167986b258634de6a91abe3221c477fab5d2b4), [`48eaa38`](https://github.com/en-dash-consulting/n-dx/commit/48eaa386916bdcaf8b208924716906793f903008), [`7e7ef56`](https://github.com/en-dash-consulting/n-dx/commit/7e7ef56662296000ad88f0a2d0bcf718e5a984ba), [`4910d78`](https://github.com/en-dash-consulting/n-dx/commit/4910d7843de364099da985ccbb1fb43ed733d516), [`e18a6f3`](https://github.com/en-dash-consulting/n-dx/commit/e18a6f3cb6663afb72d6eb0d32a6405e6694a8bf), [`cc560f2`](https://github.com/en-dash-consulting/n-dx/commit/cc560f2ab365814ee414a7be905414fbc2642e50), [`b2283bf`](https://github.com/en-dash-consulting/n-dx/commit/b2283bfe53cf8feca406edc167bb6e0baba89a53), [`f44e8cc`](https://github.com/en-dash-consulting/n-dx/commit/f44e8ccf028dc6488a7c84a5b128b0fe8bcb04ea), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`2873f95`](https://github.com/en-dash-consulting/n-dx/commit/2873f9529f5a72f43202b010515f9a81a4a4d079), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`3e4795b`](https://github.com/en-dash-consulting/n-dx/commit/3e4795b8fa35b2629c38d1bb46b0b3cc26851a44), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`3cb924b`](https://github.com/en-dash-consulting/n-dx/commit/3cb924b648eb3076ac738b65caaff15a6f186c59), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`3aa765d`](https://github.com/en-dash-consulting/n-dx/commit/3aa765d8c079e99d20ed7210d2aaee1c26530755), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`86751c5`](https://github.com/en-dash-consulting/n-dx/commit/86751c571f74bb04949e8b5cc1007eddf4ea1e21), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`fefc307`](https://github.com/en-dash-consulting/n-dx/commit/fefc3072a4a1f7a902a5f456fa4475faeebb5b71), [`5642744`](https://github.com/en-dash-consulting/n-dx/commit/5642744d20ed4509fc21b8a4828cb9c533b95290), [`3700d62`](https://github.com/en-dash-consulting/n-dx/commit/3700d62dc7a521353c813d5bab0776eef097bf07), [`3c8a8c1`](https://github.com/en-dash-consulting/n-dx/commit/3c8a8c17703fe347c353d578aa39ec25fa5ac539), [`f65e407`](https://github.com/en-dash-consulting/n-dx/commit/f65e407f4a4cec417865be9c40c3b58cf9040f99), [`d52dcd2`](https://github.com/en-dash-consulting/n-dx/commit/d52dcd20be39bb165bdfcb7d6f391bd7c07fd874), [`7009820`](https://github.com/en-dash-consulting/n-dx/commit/7009820fc4f80df48c03940161756ea7454c2260), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`5802bc2`](https://github.com/en-dash-consulting/n-dx/commit/5802bc221ecab89d6be697b65e90d6db8c138674), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`755fa10`](https://github.com/en-dash-consulting/n-dx/commit/755fa101c96eed3bf5638b4023055c4a96722276), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`ac9592e`](https://github.com/en-dash-consulting/n-dx/commit/ac9592eeb6bc361aed36ae106ceaa28d4d710b2d), [`b6c2324`](https://github.com/en-dash-consulting/n-dx/commit/b6c2324e6d597cecdb2b19523f0b2410561f4249), [`81a283a`](https://github.com/en-dash-consulting/n-dx/commit/81a283afe4f66520417fdf06b5008c985ec5c1a1), [`c3d5eb0`](https://github.com/en-dash-consulting/n-dx/commit/c3d5eb070761ab8054c6a78f444db4833c203914), [`cc10e8f`](https://github.com/en-dash-consulting/n-dx/commit/cc10e8f9de93dd0733358d4c57b7ff4c92737eca), [`0ec098a`](https://github.com/en-dash-consulting/n-dx/commit/0ec098ae8fe51a8f62a7a8e8400eba9e47971a1d), [`0845cde`](https://github.com/en-dash-consulting/n-dx/commit/0845cde144ff5365a24d0df7cbd48752870e9492), [`26a7883`](https://github.com/en-dash-consulting/n-dx/commit/26a7883836aae2d1a1bbea9f827d6675f9ee08bb), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`c88ffad`](https://github.com/en-dash-consulting/n-dx/commit/c88ffadeb92f385691f72cfb1356f77910da3d18), [`f042e50`](https://github.com/en-dash-consulting/n-dx/commit/f042e5007066f8f61062e92ef5abe267df945177), [`d254b19`](https://github.com/en-dash-consulting/n-dx/commit/d254b19f7074d487f59f052063fa0ca918079bd8), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`878ff2f`](https://github.com/en-dash-consulting/n-dx/commit/878ff2facb3cacb20f6727d0eca07d5a3e20f765), [`2543aa7`](https://github.com/en-dash-consulting/n-dx/commit/2543aa77b70af8133a28d8317cde4be32eb81739), [`0ec098a`](https://github.com/en-dash-consulting/n-dx/commit/0ec098ae8fe51a8f62a7a8e8400eba9e47971a1d), [`e188d87`](https://github.com/en-dash-consulting/n-dx/commit/e188d87cf3204ffa7f40bf5597ec78707a0564a0), [`cc9ce2c`](https://github.com/en-dash-consulting/n-dx/commit/cc9ce2c7b3df83ac6709bfaf38240ea23bff564b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`dccc2dd`](https://github.com/en-dash-consulting/n-dx/commit/dccc2ddb0de70aacbd58e2eee270ee1a09504ac4), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`ce25794`](https://github.com/en-dash-consulting/n-dx/commit/ce2579434098c1994c73d91b1964f2b54b8f202f), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`33eb557`](https://github.com/en-dash-consulting/n-dx/commit/33eb557571c1c3d0020a08e0d12318c34729600a), [`6acceef`](https://github.com/en-dash-consulting/n-dx/commit/6acceef81a1d5a470dd37875245018103264d7de), [`43bfdc2`](https://github.com/en-dash-consulting/n-dx/commit/43bfdc2a54c741ce489f8773addad39fd6e91ebd), [`8f74ce5`](https://github.com/en-dash-consulting/n-dx/commit/8f74ce575d927ce8f2b945631b48e299512d8006), [`aec78fd`](https://github.com/en-dash-consulting/n-dx/commit/aec78fdbf418c367c13fc5ea27583ce8bfba39d5), [`966f42b`](https://github.com/en-dash-consulting/n-dx/commit/966f42bb67c4ed3427ffec328afcbd1c3520268a), [`b24dea0`](https://github.com/en-dash-consulting/n-dx/commit/b24dea028c2d8b623a9c87a25df5f5fd7a309476), [`e0085f3`](https://github.com/en-dash-consulting/n-dx/commit/e0085f37d3b81e6b25b2bc6416687c29e63a7115), [`8f4385a`](https://github.com/en-dash-consulting/n-dx/commit/8f4385ab8e82bdc66b6e3a44bdd8bb64e0fb7af7), [`ff18c5f`](https://github.com/en-dash-consulting/n-dx/commit/ff18c5f8c6edca19f7a8c4032f60b77bb7317afa), [`7f24f8a`](https://github.com/en-dash-consulting/n-dx/commit/7f24f8abfe6790df3a19bc00408f94782a44afcf), [`441efa9`](https://github.com/en-dash-consulting/n-dx/commit/441efa9b87a779d0b433688a72a3bde18a9ab753), [`4670500`](https://github.com/en-dash-consulting/n-dx/commit/46705002256ecb6445d01f297c69ab0d59beafb9), [`ab06a3c`](https://github.com/en-dash-consulting/n-dx/commit/ab06a3c767ad4a1904f738341852da3cfedf48b5), [`0eb2303`](https://github.com/en-dash-consulting/n-dx/commit/0eb2303255ac0d8d32a7050201859f4bbd3e4014), [`a7f4f2c`](https://github.com/en-dash-consulting/n-dx/commit/a7f4f2c86bc0048de1068b89fa4f31d5bc147305), [`22f46cd`](https://github.com/en-dash-consulting/n-dx/commit/22f46cd853c558acbee7603e6358808913c7de09), [`ff842c5`](https://github.com/en-dash-consulting/n-dx/commit/ff842c57c3095f49ed305a19709f7c071c6b5f55), [`0196dec`](https://github.com/en-dash-consulting/n-dx/commit/0196decec982928a3528e52d8165d6318cef818c), [`034fecb`](https://github.com/en-dash-consulting/n-dx/commit/034fecbb0c5bb282bf50c9c24724272b67130891), [`454b148`](https://github.com/en-dash-consulting/n-dx/commit/454b148804a7b0505674748a9b8f7d26b025b000), [`aef2f1f`](https://github.com/en-dash-consulting/n-dx/commit/aef2f1f454bfad3c2da1eef844ce83d680937245), [`3a6c2f6`](https://github.com/en-dash-consulting/n-dx/commit/3a6c2f678454d53664add2e2986878050bad0345), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`262b555`](https://github.com/en-dash-consulting/n-dx/commit/262b55551c883f0fbfbce28ff23c0acc6e479acf), [`dd1e933`](https://github.com/en-dash-consulting/n-dx/commit/dd1e933604ef70fe18e1eb1361a4fee93dbbc936), [`b671123`](https://github.com/en-dash-consulting/n-dx/commit/b6711238559f132c7f0f7099b525d08108cfc445), [`52bad34`](https://github.com/en-dash-consulting/n-dx/commit/52bad34c49badd68347133ebc02b8eda35efccc1), [`6187c2a`](https://github.com/en-dash-consulting/n-dx/commit/6187c2ad176f8c74d66dcdbc306ece63c3d08935), [`d39bdb3`](https://github.com/en-dash-consulting/n-dx/commit/d39bdb3521da39eaec5f96d92abb5a4e9f342e1c), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b), [`5941241`](https://github.com/en-dash-consulting/n-dx/commit/594124123ada89c08571274f80b425e84d17b2dc)]:
+  - @n-dx/rex@0.9.0
+  - @n-dx/web@0.9.0
+  - @n-dx/hench@0.9.0
+  - @n-dx/sourcevision@0.9.0
+  - @n-dx/llm-client@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes
