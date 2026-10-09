@@ -758,14 +758,4 @@ export async function analyzeInventory(
   return result;
 }
 
-/**
- * Paths the infrastructure linker may read for name literals. Terraform files
- * are inventoried for roles but excluded here: a resource's own `.tf` file
- * would otherwise list itself as a user and change `infrastructure.json`,
- * which Terraform support must not do.
- */
-export function infrastructureLinkPaths(files: ReadonlyArray<{ path: string; language?: string }>): string[] {
-  return files.filter((f) => f.language !== "Terraform").map((f) => f.path);
-}
-
 export { toCanonicalJSON };
