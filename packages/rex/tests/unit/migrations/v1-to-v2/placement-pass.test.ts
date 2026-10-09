@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import type { JevResponse } from "@n-dx/llm-client";
+import { choiceAnswer, mockJudge } from "../../../helpers/jev-judge.js";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
 import type { PlacementJudge, PlacementSettings } from "../../../../src/core/placement-policy.js";
 import type { PlacementModel } from "../../../../src/core/placement.js";
@@ -28,11 +28,9 @@ const TEXT_MODEL = "text-test";
 const JEV_MODEL = "jev-test";
 
 const textSeam = (answer: Awaited<ReturnType<PlacementModel>>) => vi.fn<PlacementModel>(async () => answer);
+/** Jev also reviews the plan when it places (`./jev-review-pass.ts`): its other questions answer with full confidence. */
 const judgeSeam = (choice: string, confidence: number) =>
-  vi.fn<PlacementJudge>(async (): Promise<JevResponse> => ({
-    model: "jev-1.0.0",
-    answers: { place: { type: "choice", choice, confidence, probabilities: { [choice]: confidence } } },
-  }));
+  mockJudge({ place: choiceAnswer(choice, confidence), kind: choiceAnswer("change", 1) });
 
 function plan(settings: PlacementSettings, tiers: { text?: PlacementModel; judge?: PlacementJudge; jevAvailable?: boolean; rulesOnly?: boolean } = {}) {
   const seams = planSeams({

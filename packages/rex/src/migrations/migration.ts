@@ -107,6 +107,12 @@ export interface MigrationDefinition<TData, TEntry, TSummary, TOptions = undefin
   /** Deterministic: same data and context, same result. */
   rules(data: TData, context: PlanContext<TOptions>): RulesResult<TEntry, TSummary>;
   passes?: Partial<Record<ModelPassName, ModelPass<TData, TEntry, TOptions>>>;
+  /**
+   * The plan-wide summary from the final entries, after every pass ran (or
+   * after the rules alone). Deterministic, like the rules. Absent: the rules'
+   * summary stands.
+   */
+  summarize?(entries: Readonly<Record<string, TEntry>>, summary: TSummary, context: PlanContext<TOptions>): TSummary;
 }
 
 /** Applies a reviewed plan. A slot for the apply command; no migration fills it yet. */

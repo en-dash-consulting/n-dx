@@ -5,7 +5,10 @@
  * (`./placement-pass.ts`), when `rex.placement.models` includes the text tier,
  * and a capability spec redraft (`./spec-pass.ts`), whenever a spec drafter
  * is given. Spec drafting is on by default: the caller passes the drafter
- * unless the plan is rules-only. The Jev seam answers placement only.
+ * unless the plan is rules-only. The Jev seam answers placement when
+ * `rex.placement.models` includes Jev, and review (`./jev-review-pass.ts`)
+ * then or when the `jevReview` option asks for it. Without a TypeSafe key the
+ * Jev seam is left out, with one warning.
  *
  * @module migrations/v1-to-v2/seams
  */
@@ -14,7 +17,8 @@ import { DEFAULT_PLACEMENT_SETTINGS, type PlacementJudge, type PlacementSettings
 import type { PlacementModel } from "../../core/placement.js";
 import type { PassSeam } from "../migration.js";
 import type { ModelPassName } from "../plan-file.js";
-import { PLACEMENT_QUESTION_KIND, PLACEMENT_TIERS, rawJevAnswer, rawTextAnswer } from "./placement-pass.js";
+import { askJevBundle, REVIEW_QUESTION_KIND } from "./jev-review-pass.js";
+import { PLACEMENT_QUESTION_KIND, PLACEMENT_TIERS, rawTextAnswer } from "./placement-pass.js";
 import { isSpecQuestion, SPEC_QUESTION_KIND, type SpecModel } from "./spec-pass.js";
 
 export interface PlanSeamOptions {
@@ -30,6 +34,10 @@ export interface PlanSeamOptions {
   jev?: { model: string; judge: PlacementJudge };
   /** False without a TypeSafe key; the caller reads env. */
   jevAvailable?: boolean;
+  /** Ask Jev to review the plan even when `rex.placement.models` leaves Jev out of placement. */
+  jevReview?: boolean;
+  /** Receives each warning: today, only that a configured Jev has no key. */
+  warn?: (message: string) => void;
 }
 
 /** The pipeline seams: a pass gets one only for the question kinds its tier is configured and available for. */
@@ -59,8 +67,17 @@ export function planSeams(options: PlanSeamOptions): Partial<Record<ModelPassNam
       },
     };
   }
-  if (jev && options.jevAvailable !== false && PLACEMENT_TIERS.jev.includes(models)) {
-    seams.jev = { model: jev.model, kinds: [PLACEMENT_QUESTION_KIND], ask: (q) => rawJevAnswer(q.question, jev.judge) };
+  const jevPlaces = PLACEMENT_TIERS.jev.includes(models);
+  if (jevPlaces || options.jevReview === true) {
+    if (options.jevAvailable === false) {
+      options.warn?.("Jev is configured but unavailable (no TYPESAFE_API_KEY): the Jev pass is skipped");
+    } else if (jev) {
+      seams.jev = {
+        model: jev.model,
+        kinds: [...(jevPlaces ? [PLACEMENT_QUESTION_KIND] : []), REVIEW_QUESTION_KIND],
+        ask: (q) => askJevBundle(q.question, jev.judge),
+      };
+    }
   }
   return seams;
 }

@@ -6,8 +6,10 @@
  * per-item data (`./migration-plan-data.ts`), joined into one entry per v1
  * item. Model passes: the text pass redrafts capability specs
  * (`./spec-pass.ts`) and, with the Jev pass, places the changes the rules hold
- * (`./placement-pass.ts`); the caller supplies their seams with `planSeams`
- * (`./seams.ts`). Nothing applies the plan yet.
+ * (`./placement-pass.ts`); the Jev pass also reviews the plan
+ * (`./jev-review-pass.ts`). The caller supplies their seams with `planSeams`
+ * (`./seams.ts`). The summary ends with the review queue. Nothing applies the
+ * plan yet.
  *
  * @module migrations/v1-to-v2
  */
@@ -18,7 +20,16 @@ import { defineMigration } from "../pipeline.js";
 import { draftCapabilitySpecs, type CapabilitySpecDraft, type SpecDraftOptions } from "./capability-spec.js";
 import { buildPlanData, type ItemPlanData, type PlanData, type PlanDataOptions } from "./migration-plan-data.js";
 import { classifyV1Tree, type ClassifyOptions, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
-import { placementJevPass, placementTextPass, type PlacementFields, type PlacementPassOptions } from "./placement-pass.js";
+import {
+  jevPass,
+  jevReviewSummary,
+  reviewQueue,
+  withJevArea,
+  type JevReviewFields,
+  type JevReviewSummary,
+  type ReviewQueueItem,
+} from "./jev-review-pass.js";
+import { placementTextPass, type PlacementFields, type PlacementPassOptions } from "./placement-pass.js";
 import { isSpecQuestion, specTextPass } from "./spec-pass.js";
 import type { ModelPass } from "../migration.js";
 
@@ -43,7 +54,7 @@ export function v1TreeSource(items: readonly PRDItem[]): MigrationSource<readonl
   return { kind: V1_TREE_SOURCE_KIND, read: () => ({ data: items, items: sourceItems(items, undefined, []) }) };
 }
 
-export interface V1ToV2Entry extends PlanEntry, PlacementFields {
+export interface V1ToV2Entry extends PlanEntry, PlacementFields, JevReviewFields {
   data?: ItemPlanData;
   spec?: CapabilitySpecDraft;
 }
@@ -55,6 +66,10 @@ export interface V1ToV2Summary {
   flagCounts: PlanData["flagCounts"];
   legacyLoe: PlanData["legacyLoe"];
   corrupt: PlanData["corrupt"];
+  /** Held items first, then entries Jev judged by ascending confidence: reviewers start with the weakest calls. */
+  reviewQueue: ReviewQueueItem[];
+  /** What the Jev review flagged and dropped; absent when Jev reviewed nothing. */
+  jevReview?: JevReviewSummary;
 }
 
 /** Outside facts the rules read; the caller gathers them, the migration never shells out. */
@@ -104,8 +119,18 @@ export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Sum
         flagCounts: data.flagCounts,
         legacyLoe: data.legacyLoe,
         corrupt: data.corrupt,
+        reviewQueue: [],
       },
     };
   },
-  passes: { text: textPass, jev: placementJevPass },
+  passes: { text: textPass, jev: jevPass },
+  summarize(entries, summary) {
+    const jevReview = jevReviewSummary(entries);
+    return {
+      ...summary,
+      areas: summary.areas.map((a) => withJevArea(a, Object.hasOwn(entries, a.id) ? entries[a.id] : undefined)),
+      reviewQueue: reviewQueue(entries),
+      ...(jevReview ? { jevReview } : {}),
+    };
+  },
 });

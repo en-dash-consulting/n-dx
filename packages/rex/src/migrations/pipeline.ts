@@ -7,7 +7,9 @@
  * pass, the model and the hash of the item's content and question all match,
  * so only new or changed items reach the seam. A seam error stops the asking,
  * keeps the answers so far and marks the pass `incomplete` in the header; later
- * passes do not run, and the plan must not be applied. Writes nothing: the caller
+ * passes do not run, and the plan must not be applied. The migration's
+ * `summarize`, when it has one, then rebuilds the summary from the final
+ * entries. Writes nothing: the caller
  * writes the returned plan with `writePlanFile`.
  *
  * @module migrations/pipeline
@@ -112,7 +114,7 @@ export async function runPlanPipeline<TData, TEntry, TSummary, TOptions>(
       cutAt: context.cutAt,
       passes,
     },
-    summary,
+    summary: migration.summarize ? migration.summarize(entries, summary, context) : summary,
     entries,
     answers,
   };

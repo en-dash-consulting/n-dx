@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   contentHash,
   stableJson,
+  type MigrationDefinition,
   type MigrationSource,
   type ModelQuestion,
   type PassSeam,
@@ -31,7 +32,7 @@ function routeSource(routes: Route[]): MigrationSource<Route[]> {
   };
 }
 
-const bootstrap = defineMigration<Route[], RouteEntry, { routes: number }>({
+const bootstrapDefinition: MigrationDefinition<Route[], RouteEntry, { routes: number }> = {
   id: "map-to-v2",
   from: "map",
   to: "v2",
@@ -49,7 +50,8 @@ const bootstrap = defineMigration<Route[], RouteEntry, { routes: number }>({
       merge: (entry, answer) => ({ ...entry, confidence: Number(answer) }),
     },
   },
-});
+};
+const bootstrap = defineMigration(bootstrapDefinition);
 
 const ROUTES = (): Route[] => [
   { path: "/tasks", handler: "listTasks" },
@@ -64,6 +66,17 @@ const textSeam = (model = "text-model") => seam(model, (q) => `Answers ${(q.ques
 const jevSeam = () => seam("jev-model", () => 0.9);
 
 describe("plan pipeline", () => {
+  it("summarize rebuilds the summary from the entries every pass produced", async () => {
+    const summarized = defineMigration<Route[], RouteEntry, { routes: number; judged?: number }>({
+      ...bootstrapDefinition,
+      summarize: (entries, summary) => ({ ...summary, judged: Object.values(entries).filter((e) => e.confidence !== undefined).length }),
+    });
+    const rules = await summarized.plan(routeSource(ROUTES()), { cutAt: CUT });
+    expect(rules.summary).toEqual({ routes: 2, judged: 0 });
+    const full = await summarized.plan(routeSource(ROUTES()), { cutAt: CUT, seams: { text: textSeam(), jev: jevSeam() } });
+    expect(full.summary).toEqual({ routes: 2, judged: 2 });
+  });
+
   it("plans a source that is not a PRD tree and writes a valid plan file", async () => {
     const plan = await bootstrap.plan(routeSource(ROUTES()), { cutAt: CUT });
     expect(plan.header).toMatchObject({ migration: "map-to-v2", from: "map", to: "v2", cutAt: CUT, passes: [{ name: "rules" }] });

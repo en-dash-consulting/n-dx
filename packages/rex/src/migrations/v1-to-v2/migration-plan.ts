@@ -74,6 +74,8 @@ export interface ProposedArea {
   productNodes: number;
   /** What a reviewer should look at; empty when nothing stands out. */
   notes: string[];
+  /** Jev's probability that the title names a job (`./jev-review-pass.ts`); absent unless Jev judged it. */
+  jevJobShaped?: number;
 }
 
 export interface ProposedConstraint {
