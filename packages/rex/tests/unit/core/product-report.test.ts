@@ -240,7 +240,7 @@ describe("bounded change history", () => {
     it("continues the recent listing too", () => {
       const t = openTree();
       const p1 = capabilityReport(t, "card", { limit: 2 });
-      apply(t, "a", APPLIED);
+      apply(t, "b", APPLIED);
       expect(ids(capabilityReport(t, "card", { limit: 2, cursor: p1.changesPage.nextCursor }))).toEqual(["c", "d"]);
     });
   });
