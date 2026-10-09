@@ -24,6 +24,7 @@ plannedRelease: "1.0.0"
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
 | [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | completed |
 | [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | completed |
+| [Cut 1.0.0 when the product is ready to advertise](./cut-1-0-0-when-the-product-is-ready-to/index.md) | deferred |
 | [Dashboard on the v2 model](./dashboard-on-the-v2-model/index.md) | pending |
 | [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |
 | [Derived status, health and computed edges](./derived-status-health-and-computed-edges/index.md) | completed |
@@ -32,7 +33,7 @@ plannedRelease: "1.0.0"
 | [Generate the migration plan](./generate-the-migration-plan/index.md) | completed |
 | [MCP tools for the product layer and changes](./mcp-tools-for-the-product-layer-and/index.md) | completed |
 | [Merge driver and bundle format for v2](./merge-driver-and-bundle-format-for-v2/index.md) | completed |
-| [Migrate this repository and cut 1.0.0](./migrate-this-repository-and-cut-1-0-0/index.md) | pending |
+| [Migrate this repository](./migrate-this-repository/index.md) | pending |
 | [Move the Jev client into llm-client and redact Bitbucket tokens](./move-the-jev-client-into-llm-client/index.md) | completed |
 | [Placement engine for changes](./placement-engine-for-changes/index.md) | completed |
 | [Product, Changes and capability views on fixtures](./product-changes-and-capability-views/index.md) | completed |
