@@ -30,5 +30,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Review-repair commits carry the N-DX-Item trailer](./review-repair-commits-carry-the-n-dx.md) | completed |
 | [Skill commit-message scratch file works in linked worktrees](./skill-commit-message-scratch-file.md) | pending |
 | [Skill commit steps stage only their own changes](./skill-commit-steps-stage-only-their.md) | pending |
-| [Write one final trailer block on every hench commit](./write-one-final-trailer-block-on-every.md) | pending |
+| [Write one final trailer block on every hench commit](./write-one-final-trailer-block-on-every.md) | in_progress |
 | [Write the item id as the N-DX-Item trailer value](./write-the-item-id-as-the-n-dx-item.md) | completed |
+| [Timer-expiry auto-commit carries hench's trailers](./timer-expiry-auto-commit-carries-hench.md) | pending |

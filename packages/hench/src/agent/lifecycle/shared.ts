@@ -61,6 +61,7 @@ import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import { formatMissingReviewRefusal, reviewNeverRan } from "../analysis/adversarial-review.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
+import { appendTrailerBlock } from "./commit-trailers.js";
 import { buildPreRunCommitSubject } from "./pre-run-commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
@@ -2291,7 +2292,8 @@ async function scopePrdPathsToReport(
  * The commit is scoped to those same paths, so it lands the PRD write and
  * nothing else — work the operator had already staged stays staged.
  *
- * `itemId`, when the write is for one item, becomes an `N-DX-Item` trailer —
+ * `producer` becomes the `N-DX:` trailer. `itemId`, when the write is for one
+ * item, becomes an `N-DX-Item` trailer —
  * the same trailer the work commit carries, read by rex's `computeChangeCommits`
  * to tie a commit to the item it realizes. Callers whose write spans several
  * items (`commitResetDeferredChanges`) pass none rather than picking one.
@@ -2313,6 +2315,7 @@ export interface PrdTreeCommitResult {
 async function commitPrdTreeIfStaged(
   projectDir: string,
   message: string,
+  producer: string,
   report?: SaveFileReport | null,
   itemId?: string,
 ): Promise<PrdTreeCommitResult> {
@@ -2361,9 +2364,11 @@ async function commitPrdTreeIfStaged(
     // One `-m` for the whole trailer block: a second `-m` inserts a blank line,
     // which ends the block and leaves anything after it as body text git will
     // not parse as a trailer.
-    const trailers = itemId
-      ? `N-DX-Item: ${itemId}\n${buildCoAuthoredByTrailerLine()}`
-      : buildCoAuthoredByTrailerLine();
+    const trailers = [
+      `N-DX: ${producer}`,
+      ...(itemId ? [`N-DX-Item: ${itemId}`] : []),
+      buildCoAuthoredByTrailerLine(),
+    ].join("\n");
     await execGitMutation(
       projectDir,
       ["commit", "-m", message, "-m", trailers, "--", ...prdPaths],
@@ -2409,7 +2414,7 @@ async function commitCompletionMetadata(
   // whole `.rex/prd_tree/`, which under the no-concurrent-PRD-writers contract
   // is just this run's metadata. The message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
-  const result = await commitPrdTreeIfStaged(projectDir, message, report, taskId);
+  const result = await commitPrdTreeIfStaged(projectDir, message, "PRD record (task completion)", report, taskId);
   if (result.error) {
     detail(`Warning: could not commit PRD tree changes: ${result.error.message}`);
   } else if (result.staged > 0) {
@@ -2471,7 +2476,7 @@ export async function commitResetDeferredChanges(
   const message = `chore(prd): reset ${resetCount} deferred/failing task(s) to pending (--reset-deferred)`;
   // No `N-DX-Item`: the reset spans every task it touched, so naming one of
   // them would attribute the whole commit to it in rex's realized-by edge.
-  const result = await commitPrdTreeIfStaged(projectDir, message, report);
+  const result = await commitPrdTreeIfStaged(projectDir, message, "PRD record (--reset-deferred)", report);
   if (result.error) {
     detail(`Warning: could not commit --reset-deferred changes: ${result.error.message}`);
   } else if (result.staged > 0) {
@@ -2962,71 +2967,35 @@ export async function performCommitPromptIfNeeded(
     }
   }
 
-  // Append N-DX-Status trailer if status changed
-  if (oldStatus && newStatus && oldStatus !== newStatus && taskId) {
-    try {
-      const { writeFileSync } = await import("node:fs");
-      const currentMessage = readFileSync(msgPath, "utf-8");
-      // Git trailers are separated from the body by a blank line
-      const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
-      const trailer = `${separator}N-DX-Status: ${taskId} ${oldStatus} → ${newStatus}`;
-      writeFileSync(msgPath, currentMessage + trailer, "utf-8");
-    } catch (err) {
-      // Best-effort: if trailer append fails, proceed with commit anyway
-      detail(`Warning: could not add status trailer: ${(err as Error).message}`);
-    }
-  }
-
-  // Append N-DX authorship trailer with vendor, model, and run ID
-  try {
-    const { writeFileSync } = await import("node:fs");
-    const vendor = run.vendor ?? run.diagnostics?.vendor ?? "unknown";
-    const model = run.model ?? "unknown";
-    const runId = run.id;
-    const weight = run.weight && run.weight !== "standard" ? ` (${run.weight})` : "";
-
-    const currentMessage = readFileSync(msgPath, "utf-8");
-    // Git trailers are separated from the body by a blank line
-    const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
-    const authTrailer = `${separator}N-DX: ${vendor}/${model}${weight} · run ${runId}`;
-    writeFileSync(msgPath, currentMessage + authTrailer, "utf-8");
-  } catch (err) {
-    // Best-effort: if trailer append fails, proceed with commit anyway
-    detail(`Warning: could not add authorship trailer: ${(err as Error).message}`);
-  }
-
-  // Append N-DX-Item trailer naming the PRD item this commit is for.
+  // Append hench's trailers as one block. git parses trailers from the final
+  // paragraph only, so they must share one block — the agent's own, when its
+  // message ends in one. Appended one at a time they were split by blank lines,
+  // and rex's computeChangeCommits (`%(trailers:key=N-DX-Item)`) never saw the
+  // item.
   //
-  // The value is the item id, not a dashboard permalink. A permalink embedded
-  // the reader's host — usually `http://localhost:3117` — so the trailer went
-  // stale the moment the dashboard moved and said nothing useful in a clone
-  // that never ran one. The id is the identity the readers already want:
-  // `itemIdFromTrailer` in rex's `core/change-commits.ts` unwraps a legacy
-  // permalink to the same id, so both forms keep resolving.
-  if (taskId) {
-    try {
-      const { writeFileSync } = await import("node:fs");
-      const currentMessage = readFileSync(msgPath, "utf-8");
-      // Git trailers are separated from the body by a blank line
-      const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
-      const itemTrailer = `${separator}N-DX-Item: ${taskId}`;
-      writeFileSync(msgPath, currentMessage + itemTrailer, "utf-8");
-    } catch (err) {
-      // Best-effort: if trailer append fails, proceed with commit anyway
-      detail(`Warning: could not add item trailer: ${(err as Error).message}`);
-    }
+  // - N-DX-Status: the status change this commit records, when there was one.
+  // - N-DX: what produced the commit (vendor, model, run).
+  // - N-DX-Item: the PRD item this commit is for. The value is the item id, not
+  //   a dashboard permalink, which embedded the writer's host and went stale
+  //   when the dashboard moved. `itemIdFromTrailer` in rex's
+  //   `core/change-commits.ts` unwraps a legacy permalink to the same id.
+  // - Co-Authored-By: GitHub co-authorship attribution.
+  const trailers: string[] = [];
+  if (oldStatus && newStatus && oldStatus !== newStatus && taskId) {
+    trailers.push(`N-DX-Status: ${taskId} ${oldStatus} → ${newStatus}`);
   }
-
-  // Append Co-Authored-By trailer for GitHub co-authorship attribution.
-  // This makes the commit appear in GitHub's contribution graph and audit logs
-  // under the ndx co-author identity.
+  const vendor = run.vendor ?? run.diagnostics?.vendor ?? "unknown";
+  const model = run.model ?? "unknown";
+  const weight = run.weight && run.weight !== "standard" ? ` (${run.weight})` : "";
+  trailers.push(`N-DX: ${vendor}/${model}${weight} · run ${run.id}`);
+  if (taskId) trailers.push(`N-DX-Item: ${taskId}`);
+  trailers.push(buildCoAuthoredByTrailerLine());
   try {
     const { writeFileSync } = await import("node:fs");
-    const currentMessage = readFileSync(msgPath, "utf-8");
-    const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
-    writeFileSync(msgPath, currentMessage + separator + buildCoAuthoredByTrailerLine(), "utf-8");
+    writeFileSync(msgPath, appendTrailerBlock(readFileSync(msgPath, "utf-8"), trailers), "utf-8");
   } catch (err) {
-    detail(`Warning: could not add co-authorship trailer: ${(err as Error).message}`);
+    // Best-effort: if the trailer write fails, proceed with the commit anyway
+    detail(`Warning: could not add commit trailers: ${(err as Error).message}`);
   }
 
   try {
