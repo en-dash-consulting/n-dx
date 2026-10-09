@@ -24,5 +24,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Build the brief from the change and the capabilities it affects](./build-the-brief-from-the-change-and.md) | in_progress |
+| [Build the brief from the change and the capabilities it affects](./build-the-brief-from-the-change-and.md) | completed |
 | [Let agents read capabilities and place follow-ups; run task-less changes](./let-agents-read-capabilities-and-place.md) | pending |
