@@ -182,6 +182,42 @@ describe("rex reshape on a v2 tree", () => {
     expect(drafted.amends).toEqual([expect.objectContaining({ delta: "removed", target: GIFT_CARDS })]);
   });
 
+  it("drafts the proposals apply accepts together and names the one that would make it refuse", async () => {
+    proposeOnProduct([
+      { id: "p1", action: { action: "obsolete", itemId: DELIVERY, reason: "Delivery is outsourced" } },
+      { id: "p2", action: { action: "reparent", itemId: GIFT_CARDS, newParentId: DELIVERY, reason: "Gift cards are redeemed at delivery" } },
+    ]);
+
+    await cmdReshape(tmp, { accept: "true" });
+
+    expect(output.join("\n")).toMatch(/Not drafted: proposal 2: .*under "a0000000-0000-4000-8000-000000000004" is not a live area or capability/);
+    const { tree } = await loadPrdModel(rexDir);
+    const drafted = tree.changes.find((c) => c.title === PRODUCT_RESHAPE_TITLE) as { id: string; amends?: Array<{ delta: string; target: string }> };
+    expect(drafted.amends?.map((a) => [a.delta, a.target])).toEqual([
+      ["removed", DELIVERY],
+      ["removed", "a0000000-0000-4000-8000-000000000005"],
+    ]);
+    // Gift cards was not drafted: no amendment touches it.
+    expect(drafted.amends?.some((a) => a.target === GIFT_CARDS)).toBe(false);
+  });
+
+  it("still restructures the change layer when a product proposal would make apply refuse", async () => {
+    mockReasonForReshape.mockImplementation(async (items: PRDItem[]) => ({
+      proposals: items.some((i) => (i as PRDItem & { type?: string }).type === "area")
+        ? [
+            { id: "p1", action: { action: "obsolete", itemId: DELIVERY, reason: "Delivery is outsourced" } } as ReshapeProposal,
+            { id: "p2", action: { action: "reparent", itemId: GIFT_CARDS, newParentId: DELIVERY, reason: "Redeemed at delivery" } } as ReshapeProposal,
+          ]
+        : [{ id: "c1", action: { action: "obsolete", itemId: APPLE_PAY, reason: "Wallets wait a release" } } as ReshapeProposal],
+      tokenUsage: { calls: 1, inputTokens: 1, outputTokens: 1 },
+    }));
+
+    await cmdReshape(tmp, { accept: "true" });
+
+    const { tree } = await loadPrdModel(rexDir);
+    expect(tree.changes.find((c) => c.id === APPLE_PAY)?.status).toBe("deferred");
+  });
+
   it("restructures the change layer as today, outside product/", async () => {
     mockReasonForReshape.mockImplementation(async (items: PRDItem[]) => ({
       proposals: items.some((i) => i.id === APPLE_PAY)

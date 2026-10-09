@@ -21,7 +21,10 @@
  * removed amendments carry `base`, the target's spec hash now, so applying
  * the change after someone else edited the node is refused rather than a
  * silent revert. The change is added through `addChangeNode`, which dry-runs
- * apply: a draft apply would refuse is refused here.
+ * apply. Proposals are dry-run one at a time with those drafted before them,
+ * so one whose amendments apply would refuse together with theirs (a move
+ * under a node another proposal removes, say) is skipped with apply's
+ * problems, and the rest are drafted.
  *
  * Pure: works on a copy and leaves writing to the caller.
  *
@@ -33,7 +36,7 @@ import type { Amendment, CriteriaDelta, Criterion } from "../schema/v2.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
 import type { ReshapeProposal } from "./reshape.js";
 import { nodeSpecHash, resolve, upsertCriteriaDelta } from "./apply-amendments.js";
-import { addChangeNode } from "./change-add.js";
+import { addChangeNode, AddChangeNodeError } from "./change-add.js";
 
 export const PRODUCT_RESHAPE_TITLE = "Reshape the product layer";
 
@@ -52,6 +55,12 @@ export interface ProductReshapeDraft {
 export interface ProductReshapeOptions {
   /** Id for each node an `added` amendment creates. Default `randomUUID`. */
   newId?: () => string;
+  /**
+   * Why a change carrying `amends` would be refused, or none. Asked once per
+   * proposal with the amendments drafted so far plus the proposal's, so a
+   * proposal that makes the set refused is skipped and the rest still drafted.
+   */
+  refusal?: (amends: readonly Amendment[]) => readonly string[];
 }
 
 /** The amendments `proposals` describe on `product`, and the proposals none can express. */
@@ -63,15 +72,21 @@ export function draftProductReshape(
   const newId = options.newId ?? randomUUID;
   const draft: ProductReshapeDraft = { amends: [], drafted: [], skipped: [] };
   const claimed = new Set<string>();
+  const skip = (proposal: ReshapeProposal, reason: string) => draft.skipped.push({ proposalId: proposal.id, reason });
   for (const proposal of proposals) {
     const outcome = amendmentsFor(product, proposal, newId);
     if (typeof outcome === "string") {
-      draft.skipped.push({ proposalId: proposal.id, reason: outcome });
+      skip(proposal, outcome);
       continue;
     }
     const clash = outcome.find((a) => a.delta !== "added" && claimed.has(a.target));
     if (clash) {
-      draft.skipped.push({ proposalId: proposal.id, reason: `an earlier proposal already amends ${label(product, clash.target)}` });
+      skip(proposal, `an earlier proposal already amends ${label(product, clash.target)}`);
+      continue;
+    }
+    const refused = options.refusal?.([...draft.amends, ...outcome]) ?? [];
+    if (refused.length) {
+      skip(proposal, `with the proposals before it, the change would be refused: ${refused.join("; ")}`);
       continue;
     }
     outcome.filter((a) => a.delta !== "added").forEach((a) => claimed.add(a.target));
@@ -82,24 +97,42 @@ export function draftProductReshape(
 }
 
 export interface ProductReshapeChange {
-  tree: V2Tree;
-  change: RuleNode;
+  draft: ProductReshapeDraft;
+  /** The tree with the drafted change added, when at least one proposal was drafted. */
+  tree?: V2Tree;
+  change?: RuleNode;
 }
 
-/** Add the drafted amendments to `tree` as one open change; `reasons` become its intent. */
+/**
+ * Draft `proposals` on the product layer of `tree` and add the amendments as
+ * one open change, their reasons its intent. Proposals are drafted one at a
+ * time, each dry-run through `addChangeNode` with those before it: one that
+ * would get the change refused (apply's problems, or a rule error) is skipped
+ * with the reason, so one bad proposal never costs the others their draft.
+ */
 export function addProductReshapeChange(
   tree: V2Tree,
-  draft: ProductReshapeDraft,
-  reasons: readonly string[],
+  proposals: readonly ReshapeProposal[],
   now: Date,
+  options: Pick<ProductReshapeOptions, "newId"> = {},
 ): ProductReshapeChange {
-  const description = ["Drafted by rex reshape from proposals on the product layer.", "", ...reasons.map((r) => `- ${r}`)].join("\n");
-  const { tree: next, node } = addChangeNode(
-    tree,
-    { type: "change", title: PRODUCT_RESHAPE_TITLE, description, amends: draft.amends, source: "reshape" },
-    { now },
-  );
-  return { tree: next, change: node };
+  const add = (amends: readonly Amendment[], reasons: readonly string[]) => {
+    const description = ["Drafted by rex reshape from proposals on the product layer.", "", ...reasons.map((r) => `- ${r}`)].join("\n");
+    return addChangeNode(tree, { type: "change", title: PRODUCT_RESHAPE_TITLE, description, amends: [...amends], source: "reshape" }, { now });
+  };
+  const refusal = (amends: readonly Amendment[]): readonly string[] => {
+    try {
+      add(amends, []);
+      return [];
+    } catch (error) {
+      if (error instanceof AddChangeNodeError) return error.problems;
+      throw error;
+    }
+  };
+  const draft = draftProductReshape(tree.product, proposals, { ...options, refusal });
+  if (draft.amends.length === 0) return { draft };
+  const { tree: next, node } = add(draft.amends, proposals.filter((p) => draft.drafted.includes(p.id)).map((p) => p.action.reason));
+  return { draft, tree: next, change: node };
 }
 
 type Outcome = Amendment[] | string;

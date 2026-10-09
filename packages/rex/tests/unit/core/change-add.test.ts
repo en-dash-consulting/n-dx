@@ -66,6 +66,16 @@ describe("addChangeNode", () => {
     const before = structuredClone(input);
     expect(() => addChangeNode(input, { type: "change", title: "A", amends }, opts)).toThrow(AddChangeNodeError);
     expect(() => addChangeNode(input, { type: "change", title: "A", amends }, opts)).toThrow(message);
+    // The problems themselves, without the "Cannot add" prefix, for a caller that reports them.
+    const error = (() => {
+      try {
+        addChangeNode(input, { type: "change", title: "A", amends }, opts);
+      } catch (e) {
+        return e as AddChangeNodeError;
+      }
+    })();
+    expect(error?.problems).toEqual([expect.stringMatching(message)]);
+    expect(error?.problems[0]).not.toMatch(/^Cannot add/);
     expect(input).toEqual(before);
   });
 

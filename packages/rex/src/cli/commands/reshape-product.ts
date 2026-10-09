@@ -10,7 +10,7 @@
 
 import type { PRDItem } from "../../schema/index.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
-import { addProductReshapeChange, draftProductReshape, type ProductReshapeDraft, type SkippedProposal } from "../../core/product-reshape.js";
+import { addProductReshapeChange, type ProductReshapeDraft, type SkippedProposal } from "../../core/product-reshape.js";
 import type { RuleNode } from "../../schema/v2-rules.js";
 import type { LLMVendor } from "@n-dx/llm-client";
 import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
@@ -76,11 +76,8 @@ export async function reshapeProductLayer(opts: ProductReshapeOptions): Promise<
 
   const now = new Date();
   const { result: drafted } = await withPrdModelTransaction<{ draft: ProductReshapeDraft; change?: RuleNode }>(opts.rexDir, (model) => {
-    const draft = draftProductReshape(model.tree.product, accepted);
-    if (draft.amends.length === 0) return { tree: model.tree, result: { draft, change: undefined } };
-    const reasons = accepted.filter((p) => draft.drafted.includes(p.id)).map((p) => p.action.reason);
-    const { tree, change } = addProductReshapeChange(model.tree, draft, reasons, now);
-    return { tree, result: { draft, change } };
+    const { draft, tree, change } = addProductReshapeChange(model.tree, accepted, now);
+    return { tree: tree ?? model.tree, result: { draft, change } };
   });
 
   summary.skipped = drafted.draft.skipped;
