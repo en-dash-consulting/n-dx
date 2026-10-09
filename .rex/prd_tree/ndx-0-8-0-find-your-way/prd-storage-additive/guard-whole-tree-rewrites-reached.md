@@ -14,6 +14,7 @@ acceptanceCriteria:
   - "Read-only previews through MCP and the dashboard are unaffected."
   - "A test spawns the built rex CLI with --allow-on-branch <dir>, the argv form hench and web use."
 description: "Follow-up to bdaf93b2, which guards only the CLI commands. The review of run 5a210edb found that these entry points bypass the guard: the rex MCP reorganize tool applies proposals inside store.withTransaction with no branch check (packages/rex/src/cli/mcp-tools.ts:789), and the dashboard's bulk prune route does the same (packages/web/src/server/routes-rex/prune.ts:434). Closing them needs an opt-in surface that the CLI flag does not provide (for example a tool parameter or a request field), which is a design decision left out of bdaf93b2's scope."
-lastModified: "2026-09-28T23:53:05.046Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-09T14:52:34.967Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
