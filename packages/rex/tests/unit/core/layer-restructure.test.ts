@@ -101,6 +101,60 @@ describe("draftProductReshape", () => {
     expect(draft.amends[1]).toMatchObject({ proposed: "a", criteria: { add: [{ id: "c1", text: "x" }] } });
   });
 
+  it("skips a move or split of a capability whose requirements, dependsOn, tags or body an added copy would drop", () => {
+    const requirement = { id: "r1", title: "Suite passes", category: "quality", validationType: "automated", acceptanceCriteria: ["green"] };
+    const cases: Array<[Record<string, unknown>, RegExp]> = [
+      [{ requirements: [requirement] }, /has requirements, which an added copy would drop/],
+      [{ dependsOn: ["cap2"] }, /has dependsOn, which an added copy would drop/],
+      [{ tags: ["checkout"] }, /has tags, which an added copy would drop/],
+      [{ body: "## History\n\nKept." }, /has a body, which an added copy would drop/],
+    ];
+    for (const [extra, reason] of cases) {
+      const tree: RuleNode[] = [
+        node({ id: "area1", type: "area", children: [capability("cap1", extra), capability("cap2")] }),
+        node({ id: "area2", type: "area" }),
+      ];
+      const draft = draftProductReshape(tree, [
+        { id: "move", action: { action: "reparent", itemId: "cap1", newParentId: "area2", reason: "r" } },
+        { id: "split", action: { action: "split", sourceId: "cap1", reason: "r", children: [{ title: "A", level: "feature" }] } },
+      ]);
+      expect(draft.amends).toEqual([]);
+      expect(draft.skipped).toEqual([
+        { proposalId: "move", reason: expect.stringMatching(reason) },
+        { proposalId: "split", reason: expect.stringMatching(reason) },
+      ]);
+    }
+  });
+
+  it("skips a move of a node another live node names in dependsOn or appliesTo", () => {
+    const tree: RuleNode[] = [
+      node({
+        id: "area1",
+        type: "area",
+        children: [
+          capability("cap1", { displayId: "A1.1" }),
+          capability("cap2", { dependsOn: ["A1.1"] }),
+          capability("cap3"),
+          node({ id: "con1", type: "constraint", statement: "s", appliesTo: ["cap3"] }),
+          capability("cap4", { status: "deleted", dependsOn: ["cap5"] }),
+          capability("cap5"),
+        ],
+      }),
+      node({ id: "area2", type: "area" }),
+    ];
+    const draft = draftProductReshape(tree, [
+      { id: "p1", action: { action: "reparent", itemId: "cap1", newParentId: "area2", reason: "r" } },
+      { id: "p2", action: { action: "reparent", itemId: "cap3", newParentId: "area2", reason: "r" } },
+      { id: "p3", action: { action: "reparent", itemId: "cap5", newParentId: "area2", reason: "r" } },
+    ]);
+    expect(draft.skipped).toEqual([
+      { proposalId: "p1", reason: expect.stringMatching(/cap2 names A1\.1, which a copy with a new id would leave pointing at a retired node/) },
+      { proposalId: "p2", reason: expect.stringMatching(/con1 names cap3/) },
+    ]);
+    // A retired node's dependsOn does not hold a live node in place.
+    expect(draft.drafted).toEqual(["p3"]);
+  });
+
   it("drafts an update of capability criteria as an upsert delta, and skips a title-only update", () => {
     const draft = draftProductReshape(product(), [
       { id: "p1", action: { action: "update", itemId: "cap1", updates: { acceptanceCriteria: ["first", "second"] }, reason: "r" } },

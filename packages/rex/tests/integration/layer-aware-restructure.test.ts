@@ -139,6 +139,25 @@ describe("rex reshape on a v2 tree", () => {
     expect(applied.applied.map((a) => a.delta)).toEqual(["removed", "added"]);
   });
 
+  it("does not draft a move that would drop a capability's requirements and dependsOn, and says why", async () => {
+    const requirement = { id: "r1", title: "Balance is exact", category: "quality", validationType: "automated", acceptanceCriteria: ["no rounding"] };
+    await writeFile(
+      join(rexDir, "product", "checkout", "gift-cards.md"),
+      `---\nid: "${GIFT_CARDS}"\ntype: "capability"\ntitle: "Gift cards"\nslug: "gift-cards"\ndisplayId: "A1.2"\nstatement: "A shopper can pay with a gift card."\ncriteria: [{"id":"c1","text":"The balance goes down"}]\nrequirements: [${JSON.stringify(requirement)}]\ndependsOn: ["${PAY_BY_CARD}"]\n---\n`,
+    );
+    proposeOnProduct([
+      { id: "p1", action: { action: "reparent", itemId: GIFT_CARDS, newParentId: DELIVERY, reason: "Gift cards are redeemed at delivery" } },
+    ]);
+    await cmdReshape(tmp, { accept: "true" });
+
+    const { tree } = await loadPrdModel(rexDir);
+    expect(tree.changes.find((c) => c.title === PRODUCT_RESHAPE_TITLE)).toBeUndefined();
+    const checkout = tree.product.find((n) => n.id === AREA)!;
+    expect(checkout.children?.find((n) => n.id === GIFT_CARDS)).toMatchObject({ requirements: [requirement], dependsOn: [PAY_BY_CARD] });
+    expect(checkout.children?.find((n) => n.id === GIFT_CARDS)?.status).not.toBe("deleted");
+    expect(output.join("\n")).toMatch(/Not drafted: proposal 1: A1\.2 has requirements, dependsOn, which an added copy would drop/);
+  });
+
   it("drafts nothing on --dry-run", async () => {
     proposeOnProduct([{ id: "p1", action: { action: "obsolete", itemId: GIFT_CARDS, reason: "No longer sold" } }]);
     const before = await files(rexDir);

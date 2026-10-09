@@ -25,7 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A product reshape move drafts an added copy that loses the capability's requirements, dependsOn, tags and body](./a-product-reshape-move-drafts-an-added.md) | pending |
+| [A product reshape move drafts an added copy that loses the capability's requirements, dependsOn, tags and body](./a-product-reshape-move-drafts-an-added.md) | in_progress |
 | [Add rex product and rex change commands; ndx add creates a change](./add-rex-product-and-rex-change.md) | completed |
 | [Apply-engine refusals say bare "criteria": "a constraint has no criteria", "a new capability has no criteria to replace or remove"](./apply-engine-refusals-say-bare.md) | pending |
 | [capability-criteria warning says bare "criteria": "Capability X has no criteria"](./capability-criteria-warning-says-bare.md) | completed |

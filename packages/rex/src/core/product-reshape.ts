@@ -14,7 +14,10 @@
  * | update   | `modified` with the new statement, or the new capability criteria |
  *
  * A proposal no amendment can express (a group, a title-only update, moving
- * an area or a node with children) is skipped with the reason. Modified and
+ * an area or a node with children) is skipped with the reason. So is moving
+ * or splitting a node the `added` copy would not carry whole: one with tags,
+ * a body, or capability requirements or dependsOn, or one another live node
+ * names in dependsOn or appliesTo, since the copy has a new id. Modified and
  * removed amendments carry `base`, the target's spec hash now, so applying
  * the change after someone else edited the node is refused rather than a
  * silent revert. The change is added through `addChangeNode`, which dry-runs
@@ -117,7 +120,7 @@ function amendmentsFor(product: readonly RuleNode[], proposal: ReshapeProposal, 
       if (action.newParentId === undefined) return "a product node always has a parent; name the area or capability to move it under";
       const parent = find(action.newParentId);
       if (!parent) return missing(action.newParentId);
-      const unmovable = cannotCopy(node);
+      const unmovable = cannotCopy(product, node);
       if (unmovable) return unmovable;
       if (node.type === "capability" && parent.type !== "area" && parent.type !== "capability") {
         return `a capability goes under an area or capability, not the ${parent.type} ${label(product, parent.id)}`;
@@ -160,7 +163,7 @@ function amendmentsFor(product: readonly RuleNode[], proposal: ReshapeProposal, 
     case "split": {
       const node = find(action.sourceId);
       if (!node) return missing(action.sourceId);
-      const unmovable = cannotCopy(node);
+      const unmovable = cannotCopy(product, node);
       if (unmovable) return unmovable;
       const parent = parentOf(product, node.id);
       if (!parent) return `${label(product, node.id)} has no parent to place its pieces under`;
@@ -227,11 +230,41 @@ function added(node: RuleNode, parent: RuleNode, summary: string, newId: () => s
   };
 }
 
-/** Why `node` cannot be recreated by an `added` amendment, or undefined. */
-function cannotCopy(node: RuleNode): string | undefined {
+/**
+ * Why `node` cannot be recreated by an `added` amendment, or undefined.
+ *
+ * An added capability takes only a title, statement and capability criteria,
+ * an added constraint also its requirements and appliesTo, and the copy gets
+ * a new id. A move that would drop anything else the node has, or leave
+ * another node naming the retired original, is not drafted.
+ */
+function cannotCopy(product: readonly RuleNode[], node: RuleNode): string | undefined {
   if (node.type !== "capability" && node.type !== "constraint") return `an ${node.type} cannot be moved by an amendment; only a capability or constraint can`;
-  if (liveDescendants(node).length) return `${node.displayId ?? node.id} has children; move them first`;
+  const name = node.displayId ?? node.id;
+  if (liveDescendants(node).length) return `${name} has children; move them first`;
+  const n = node as RuleNode & { tags?: unknown[]; body?: string; requirements?: unknown[]; dependsOn?: unknown[] };
+  const dropped = [
+    n.tags?.length ? "tags" : undefined,
+    n.body ? "a body" : undefined,
+    node.type === "capability" && n.requirements?.length ? "requirements" : undefined,
+    node.type === "capability" && n.dependsOn?.length ? "dependsOn" : undefined,
+  ].filter((k): k is string => k !== undefined);
+  if (dropped.length) return `${name} has ${dropped.join(", ")}, which an added copy would drop; move it with a hand-written change`;
+  const dependent = liveNodes(product).find((other) => other.id !== node.id && names(other, node));
+  if (dependent) return `${label(product, dependent.id)} names ${name}, which a copy with a new id would leave pointing at a retired node; move it with a hand-written change`;
   return undefined;
+}
+
+/** Whether `other` names `node` in its dependsOn or appliesTo. */
+function names(other: RuleNode, node: RuleNode): boolean {
+  const o = other as RuleNode & { dependsOn?: unknown; appliesTo?: unknown };
+  const aliases = (node as RuleNode & { aliases?: string[] }).aliases ?? [];
+  const ids = new Set([node.id, ...(node.displayId ? [node.displayId] : []), ...aliases]);
+  return [o.dependsOn, o.appliesTo].some((list) => Array.isArray(list) && list.some((id) => ids.has(id as string)));
+}
+
+function liveNodes(nodes: readonly RuleNode[]): RuleNode[] {
+  return nodes.flatMap((n) => (n.status === "deleted" ? [] : [n, ...liveDescendants(n)]));
 }
 
 function criteriaOf(node: RuleNode): Criterion[] {
