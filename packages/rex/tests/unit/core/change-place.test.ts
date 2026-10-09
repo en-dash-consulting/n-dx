@@ -12,7 +12,14 @@ const tree = (changeFields: Record<string, unknown> = {}): V2Tree => ({
       type: "area",
       title: "Payments",
       children: [
-        node({ id: "card", type: "capability", displayId: "A1.1", title: "Pay by card", statement: "A shopper pays for a basket with a card" }),
+        node({
+          id: "card",
+          type: "capability",
+          displayId: "A1.1",
+          title: "Pay by card",
+          statement: "A shopper pays for a basket with a card",
+          criteria: [{ id: "c1", text: "Visa is accepted" }, { id: "c2", text: "A declined card shows why" }],
+        }),
         node({ id: "refund", type: "capability", title: "Refund an order", statement: "Support refunds an order" }),
         node({ id: "arch", type: "constraint", title: "Architecture", tags: ["architecture"], statement: "Layers import downward" }),
       ],
@@ -83,9 +90,26 @@ describe("recordPlacement", () => {
     ["a cancelled change", { status: "cancelled" }, { target: "card" }, /is cancelled; only an open change is placed/],
     ["proposed on a touches placement", {}, { target: "card", relation: "touches" as const, proposed: "x" }, /relation amends/],
     ["a criteria delta on a constraint", {}, { target: "arch", relation: "amends" as const, criteria: { remove: ["c1"] } }, /constraint, which has no criteria; state it in proposed/],
+    // Apply refuses these against the spec placement pins as base, and no tool edits the amendment afterwards.
+    ["removing a criterion the capability lacks", {}, { target: "A1.1", relation: "amends" as const, criteria: { remove: ["c7"] } }, /criterion c7 to remove does not exist/],
+    ["replacing a criterion the capability lacks", {}, { target: "A1.1", relation: "amends" as const, criteria: { replace: [{ id: "c7", text: "x" }] } }, /criterion c7 to replace does not exist/],
+    ["adding a criterion the capability has", {}, { target: "A1.1", relation: "amends" as const, criteria: { add: [{ id: "c1", text: "x" }] } }, /criterion c1 to add already exists/],
   ])("refuses %s", (_label, changeFields, input, message) => {
     expect(() => recordPlacement(tree(changeFields), "ch", input, NOW)).toThrow(ChangePlacementError);
     expect(() => recordPlacement(tree(changeFields), "ch", input, NOW)).toThrow(message);
+  });
+
+  it("names every criterion id that does not fit in one refusal", () => {
+    const criteria = { remove: ["c7"], replace: [{ id: "c8", text: "x" }], add: [{ id: "c2", text: "x" }] };
+    expect(() => recordPlacement(tree(), "ch", { target: "card", relation: "amends", criteria }, NOW)).toThrow(
+      /criterion c7 to remove does not exist; criterion c8 to replace does not exist; criterion c2 to add already exists/,
+    );
+  });
+
+  it("records a criteria delta that fits the capability", () => {
+    const criteria = { remove: ["c2"], replace: [{ id: "c1", text: "Visa and wallets are accepted" }], add: [{ id: "c3", text: "x" }] };
+    const { tree: next } = recordPlacement(tree(), "ch", { target: "card", relation: "amends", criteria }, NOW);
+    expect(changeIn(next).amends![0]).toMatchObject({ target: "card", delta: "modified", criteria });
   });
 
   it("refuses a ref that is not a change", () => {

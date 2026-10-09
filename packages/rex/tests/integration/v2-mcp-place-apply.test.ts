@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -52,6 +52,13 @@ async function placeAndApply(content: Record<string, unknown>) {
   return (await call("get_capability", { id: CAPABILITY })).node;
 }
 
+/** Every file under `.rex/`, path → content. */
+async function rexFiles(): Promise<Map<string, string>> {
+  const entries = await readdir(join(tmp, ".rex"), { recursive: true, withFileTypes: true });
+  const files = entries.filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name));
+  return new Map(await Promise.all(files.map(async (f) => [f, await readFile(f, "utf8")] as const)));
+}
+
 describe("Inbox change placed with its amendment content, then applied over MCP", () => {
   it("applies proposed text", async () => {
     const node = await placeAndApply({ proposed: "A shopper can pay and be refunded by card." });
@@ -62,5 +69,22 @@ describe("Inbox change placed with its amendment content, then applied over MCP"
     const node = await placeAndApply({ criteria: { add: [{ id: "c9", text: "A card payment can be refunded" }] } });
     expect(node.statement).toBe("A shopper can pay for a basket with a card.");
     expect(node.criteria.map((c: { id: string }) => c.id)).toEqual(["c1", "c2", "c9"]);
+  });
+
+  // A1.1 has criteria c1 and c2. Apply refuses each of these, and nothing edits the amendment once placed.
+  it.each([
+    ["removes a criterion it lacks", { remove: ["c7"] }, "criterion c7 to remove does not exist"],
+    ["replaces a criterion it lacks", { replace: [{ id: "c7", text: "x" }] }, "criterion c7 to replace does not exist"],
+    ["adds a criterion it has", { add: [{ id: "c1", text: "x" }] }, "criterion c1 to add already exists"],
+  ])("refuses a placement that %s and writes nothing", async (_label, criteria, message) => {
+    const { id } = await call("add_item", { title: "Refunds by card" });
+    const before = await rexFiles();
+    const result = (await client.callTool({ name: "place_change", arguments: { id, target: "A1.1", relation: "amends", criteria } })) as {
+      content: { text: string }[];
+      isError?: boolean;
+    };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(message);
+    expect(await rexFiles()).toEqual(before);
   });
 });

@@ -52,7 +52,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Requirement } from "../schema/v1.js";
 import { RequirementSchema } from "../schema/validate.js";
-import { isDisplayId, type Amendment, type Criterion } from "../schema/v2.js";
+import { isDisplayId, type Amendment, type CriteriaDelta, type Criterion } from "../schema/v2.js";
 import { checkV2Rules, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { slugifyTitle } from "../store/folder-tree-serializer.js";
 
@@ -317,7 +317,39 @@ function constraintFields(amendment: Amendment, fail: (message: string) => void)
   };
 }
 
-const applyModified: DeltaApply = ({ product }, amendment, _options, fail) => {
+/** Criteria after a delta, and every id that does not fit them. */
+export interface CriteriaDeltaResult {
+  criteria: Criterion[];
+  /** One message per misfit id; the delta applies only when empty. */
+  problems: string[];
+}
+
+/**
+ * Apply `delta` to a capability's `criteria`: remove, then replace, then add.
+ * Removing or replacing an id the criteria lack, or adding one they have, is a
+ * problem. Pure. Apply's `modified` delta and placement both judge a delta
+ * with this, so placement refuses exactly what apply would.
+ */
+export function applyCriteriaDelta(criteria: readonly Criterion[], delta: CriteriaDelta | undefined): CriteriaDeltaResult {
+  let next = [...criteria];
+  const problems: string[] = [];
+  const has = (id: string): boolean => next.some((c) => c.id === id);
+  for (const id of delta?.remove ?? []) {
+    if (!has(id)) problems.push(`criterion ${id} to remove does not exist`);
+    next = next.filter((c) => c.id !== id);
+  }
+  for (const replacement of delta?.replace ?? []) {
+    if (!has(replacement.id)) problems.push(`criterion ${replacement.id} to replace does not exist`);
+    next = next.map((c) => (c.id === replacement.id ? { ...replacement } : c));
+  }
+  for (const added of delta?.add ?? []) {
+    if (has(added.id)) problems.push(`criterion ${added.id} to add already exists`);
+    else next.push({ ...added });
+  }
+  return { criteria: next, problems };
+}
+
+const applyModified: DeltaApply =({ product }, amendment, _options, fail) => {
   const node = resolve(product, amendment.target);
   if (!node || (node.type !== "capability" && node.type !== "constraint")) {
     return void fail("not a live capability or constraint");
@@ -327,26 +359,8 @@ const applyModified: DeltaApply = ({ product }, amendment, _options, fail) => {
   if (amendment.proposed === undefined && !hasCriteriaDelta) return void fail(NOTHING_TO_MODIFY);
   if (hasCriteriaDelta && node.type !== "capability") return void fail("a constraint has no criteria");
 
-  let criteria: Criterion[] = node.type === "capability" ? [...(node.criteria ?? [])] : [];
-  const has = (id: string): boolean => criteria.some((c) => c.id === id);
-  let ok = true;
-  const reject = (message: string): void => {
-    ok = false;
-    fail(message);
-  };
-  for (const id of delta?.remove ?? []) {
-    if (!has(id)) reject(`criterion ${id} to remove does not exist`);
-    criteria = criteria.filter((c) => c.id !== id);
-  }
-  for (const replacement of delta?.replace ?? []) {
-    if (!has(replacement.id)) reject(`criterion ${replacement.id} to replace does not exist`);
-    criteria = criteria.map((c) => (c.id === replacement.id ? { ...replacement } : c));
-  }
-  for (const added of delta?.add ?? []) {
-    if (has(added.id)) reject(`criterion ${added.id} to add already exists`);
-    else criteria.push({ ...added });
-  }
-  if (!ok) return undefined;
+  const { criteria, problems } = applyCriteriaDelta(node.type === "capability" ? node.criteria ?? [] : [], delta);
+  if (problems.length) return void problems.forEach(fail);
 
   if (amendment.proposed !== undefined) node.statement = amendment.proposed;
   if (node.type === "capability" && hasCriteriaDelta) {

@@ -10,8 +10,10 @@
  *   change's `touches`; an `amends` target becomes a `modified` amendment with
  *   `base` set to the target's current spec hash, so apply refuses it if the
  *   spec moves first, carrying the caller's `proposed` text and `criteria`
- *   delta (apply needs one of them to modify the target). Either clears
- *   `needsPlacement`.
+ *   delta (apply needs one of them to modify the target). A criteria delta
+ *   that does not fit the target's criteria is refused with apply's own check
+ *   (`applyCriteriaDelta`), since nothing edits the amendment afterwards.
+ *   Either clears `needsPlacement`.
  *
  * Only an open change is placed. The result is checked against the v2 rules;
  * an error finding about the change refuses the placement.
@@ -22,6 +24,7 @@
  */
 
 import type { Amendment, ChangeNode, CriteriaDelta } from "../schema/v2.js";
+import { applyCriteriaDelta } from "./apply-amendments.js";
 import { checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import {
   placementRelation,
@@ -100,6 +103,11 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
   // Apply always refuses this, and no tool edits the amendment afterwards: refuse it before it is stored.
   if (target.type === "constraint" && (add?.length || replace?.length || remove?.length)) {
     throw new ChangePlacementError(`"${target.title}" is a constraint, which has no criteria; state it in proposed`);
+  }
+  // Base pins the target's current spec, so these criteria are the ones apply checks the delta against.
+  if (target.type === "capability") {
+    const { problems } = applyCriteriaDelta(target.criteria ?? [], input.criteria);
+    if (problems.length) throw new ChangePlacementError(`Cannot amend "${target.title}": ${problems.join("; ")}`);
   }
   const label = change.displayId ?? change.id;
   const amends = (change.amends ?? []).some((a) => index.resolve(a.target) === target);
