@@ -1,439 +1,251 @@
 /**
- * Integration tests for backfill-commit-attribution command.
+ * `rex backfill-commit-attribution` reports trailer coverage and writes nothing.
  *
- * Tests the backfill command's ability to parse N-DX-Status trailers from git history
- * and populate the commits array in PRD items.
+ * Runs against a real fixture repository: the thing under test is how commit
+ * messages written by real tools parse, which a hand-built fixture object
+ * cannot exercise.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { readdirSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { promisify } from "node:util";
-import { exec as execCb } from "node:child_process";
 import { cmdBackfillCommitAttribution } from "../../src/cli/commands/backfill-commit-attribution.js";
-import { FolderTreeStore } from "../../src/store/folder-tree-store.js";
-import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
-import { SCHEMA_VERSION } from "../../src/schema/index.js";
-import { randomUUID } from "node:crypto";
+import { scanCoverageCommits } from "../../src/core/trailer-coverage.js";
+import type { TrailerCoverageReport } from "../../src/core/trailer-coverage.js";
 
-const execAsync = promisify(execCb);
+const ITEM_A = "9f1c2a3b-0000-4000-8000-00000000000a";
+const ITEM_B = "9f1c2a3b-0000-4000-8000-00000000000b";
 
-/**
- * Initialize git repo with test configuration.
- */
-async function setupGitRepo(dir: string): Promise<void> {
-  await execAsync("git init", { cwd: dir });
-  await execAsync("git config user.email test@test.com", { cwd: dir });
-  await execAsync("git config user.name Test", { cwd: dir });
+let root: string;
+let repo: string;
+let logSpy: ReturnType<typeof vi.spyOn>;
+let clock = 0;
+
+function git(...args: string[]): string {
+  // A fixed, increasing clock keeps `git log` order and the month grouping
+  // deterministic wherever the suite runs.
+  clock += 1;
+  const date = new Date(Date.UTC(2026, 9, 1, 0, clock)).toISOString();
+  return execFileSync("git", args, {
+    cwd: repo,
+    encoding: "utf-8",
+    env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+  }).trim();
 }
 
-/**
- * Create a commit with a specific N-DX-Status trailer.
- */
-async function createCommitWithTrailer(
-  dir: string,
-  file: string,
-  content: string,
-  taskId: string,
-  oldStatus: string,
-  newStatus: string,
-): Promise<string> {
-  await writeFile(join(dir, file), content, "utf-8");
-  await execAsync(`git add ${file}`, { cwd: dir });
-
-  const message = `Complete task\n\nN-DX-Status: ${taskId} ${oldStatus} → ${newStatus}`;
-  const messageFile = join(dir, ".commit-msg");
-  await writeFile(messageFile, message, "utf-8");
-
-  await execAsync(`git commit -F ${messageFile}`, { cwd: dir });
-
-  const { stdout } = await execAsync("git rev-parse HEAD", { cwd: dir });
-  const sha = stdout.trim();
-
-  return sha;
+/** Commit `file` with `message`, written through a file so blank lines survive. */
+async function commit(file: string, message: string): Promise<string> {
+  await writeFile(join(repo, file), `${file} ${clock}\n`, "utf-8");
+  git("add", file);
+  const msgFile = join(root, `msg-${clock}.txt`);
+  await writeFile(msgFile, message, "utf-8");
+  git("commit", "-q", "-F", msgFile);
+  return git("rev-parse", "HEAD");
 }
 
-/**
- * Read the PRD item from the folder tree.
- */
-async function readPRDItem(rexDir: string, itemId: string): Promise<PRDItem | null> {
-  const store = new FolderTreeStore(rexDir);
-  return store.getItem(itemId);
+/** Run the command and return what it printed. */
+async function run(flags: Record<string, string> = {}): Promise<string> {
+  logSpy.mockClear();
+  await cmdBackfillCommitAttribution(repo, flags);
+  return logSpy.mock.calls.map((call) => String(call[0])).join("\n");
 }
+
+async function runJson(): Promise<TrailerCoverageReport> {
+  return JSON.parse(await run({ json: "true" })) as TrailerCoverageReport;
+}
+
+/** Every file in the repository bar git's own internals, as relative paths. */
+function filesUnder(dir: string): string[] {
+  const out: string[] = [];
+  const walk = (current: string) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      if (entry.name === ".git") continue;
+      const full = join(current, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else out.push(relative(dir, full).replace(/\\/g, "/"));
+    }
+  };
+  walk(dir);
+  return out.sort();
+}
+
+beforeEach(async () => {
+  root = await mkdtemp(join(tmpdir(), "rex-trailer-coverage-"));
+  repo = join(root, "repo");
+  execFileSync("git", ["init", "-q", "-b", "main", repo]);
+  git("config", "user.email", "dev@example.com");
+  git("config", "user.name", "Dev");
+  git("config", "commit.gpgsign", "false");
+  logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+});
+
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await rm(root, { recursive: true, force: true });
+});
 
 describe("backfill-commit-attribution", () => {
-  let projectDir: string;
-  let rexDir: string;
-
-  beforeEach(async () => {
-    projectDir = await mkdtemp(join(tmpdir(), "backfill-test-"));
-    rexDir = join(projectDir, ".rex");
-    await mkdir(rexDir, { recursive: true });
-
-    // Mock console to reduce noise
-    vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(console, "error").mockImplementation(() => {});
-
-    // Setup git repo
-    await setupGitRepo(projectDir);
-  });
-
-  afterEach(async () => {
-    vi.restoreAllMocks();
-    await rm(projectDir, { recursive: true, force: true });
-  });
-
-  it("populates commits array from N-DX-Status trailers", async () => {
-    // Create PRD with a task
-    const taskId = randomUUID();
-    const task: PRDItem = {
-      id: taskId,
-      title: "Test Task",
-      status: "completed",
-      level: "task",
-    };
-
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: "Test PRD",
-      items: [task],
-    };
-
-    const store = new FolderTreeStore(rexDir);
-    await store.saveDocument(doc);
-
-    // Create initial commit
-    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync('git commit -m "initial"', { cwd: projectDir });
-
-    // Create a commit with N-DX-Status trailer
-    const sha = await createCommitWithTrailer(
-      projectDir,
-      "src.ts",
-      "export const x = 2;\n",
-      taskId,
-      "in_progress",
-      "completed",
-    );
-
-    // Run backfill
-    await cmdBackfillCommitAttribution(projectDir);
-
-    // Verify item now has commits array
-    const updated = await readPRDItem(rexDir, taskId);
-    expect(updated).not.toBeNull();
-    expect(updated!.commits).toBeDefined();
-    expect(updated!.commits).toHaveLength(1);
-    expect(updated!.commits![0].hash).toBe(sha);
-    expect(updated!.commits![0].author).toBe("Test");
-    expect(updated!.commits![0].authorEmail).toBe("test@test.com");
-    expect(updated!.commits![0].timestamp).toBeDefined();
-  });
-
-  it("is idempotent: re-running backfill does not duplicate commits", async () => {
-    const taskId = randomUUID();
-    const task: PRDItem = {
-      id: taskId,
-      title: "Test Task",
-      status: "completed",
-      level: "task",
-    };
-
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: "Test PRD",
-      items: [task],
-    };
-
-    const store = new FolderTreeStore(rexDir);
-    await store.saveDocument(doc);
-
-    // Create initial commit
-    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync('git commit -m "initial"', { cwd: projectDir });
-
-    // Create a commit with N-DX-Status trailer
-    await createCommitWithTrailer(
-      projectDir,
-      "src.ts",
-      "export const x = 2;\n",
-      taskId,
-      "in_progress",
-      "completed",
-    );
-
-    // First backfill run
-    await cmdBackfillCommitAttribution(projectDir);
-    let updated = await readPRDItem(rexDir, taskId);
-    expect(updated!.commits).toHaveLength(1);
-
-    // Second backfill run should not add duplicates
-    await cmdBackfillCommitAttribution(projectDir);
-    updated = await readPRDItem(rexDir, taskId);
-    expect(updated!.commits).toHaveLength(1);
-  });
-
-  it("accumulates multiple commits for the same item", async () => {
-    const taskId = randomUUID();
-    const task: PRDItem = {
-      id: taskId,
-      title: "Test Task",
-      status: "completed",
-      level: "task",
-    };
-
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: "Test PRD",
-      items: [task],
-    };
-
-    const store = new FolderTreeStore(rexDir);
-    await store.saveDocument(doc);
-
-    // Create initial commit
-    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync('git commit -m "initial"', { cwd: projectDir });
-
-    // Create two commits with N-DX-Status trailers for the same item
-    const sha1 = await createCommitWithTrailer(
-      projectDir,
-      "src.ts",
-      "export const x = 2;\n",
-      taskId,
-      "pending",
-      "in_progress",
-    );
-
-    const sha2 = await createCommitWithTrailer(
-      projectDir,
-      "src.ts",
-      "export const x = 3;\n",
-      taskId,
-      "in_progress",
-      "completed",
-    );
-
-    // Run backfill
-    await cmdBackfillCommitAttribution(projectDir);
-
-    // Verify both commits are recorded
-    const updated = await readPRDItem(rexDir, taskId);
-    expect(updated!.commits).toHaveLength(2);
-    expect(updated!.commits![0].hash).toBe(sha1);
-    expect(updated!.commits![1].hash).toBe(sha2);
-  });
-
-  it("skips commits for items not in PRD", async () => {
-    // Create a commit with N-DX-Status trailer for a non-existent task
-    const nonExistentTaskId = randomUUID();
-
-    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync('git commit -m "initial"', { cwd: projectDir });
-
-    // Create commit with trailer for non-existent task
-    const message = `Complete task\n\nN-DX-Status: ${nonExistentTaskId} pending → completed`;
-    const messageFile = join(projectDir, ".commit-msg");
-    await writeFile(messageFile, message, "utf-8");
-
-    // Setup empty PRD
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: "Test PRD",
-      items: [],
-    };
-
-    const store = new FolderTreeStore(rexDir);
-    await store.saveDocument(doc);
-
-    // Stage a change before the trailer commit — git commit needs something to commit.
-    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync(`git commit -F ${messageFile}`, { cwd: projectDir });
-
-    // Run backfill — should not error
-    await expect(cmdBackfillCommitAttribution(projectDir)).resolves.toBeUndefined();
-
-    // PRD should still be empty
-    const doc2 = await store.loadDocument();
-    expect(doc2.items).toHaveLength(0);
-  });
-
-  it("handles commits without N-DX-Status trailers gracefully", async () => {
-    const taskId = randomUUID();
-    const task: PRDItem = {
-      id: taskId,
-      title: "Test Task",
-      status: "completed",
-      level: "task",
-    };
-
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: "Test PRD",
-      items: [task],
-    };
-
-    const store = new FolderTreeStore(rexDir);
-    await store.saveDocument(doc);
-
-    // Create multiple commits, only one with a trailer
-    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync('git commit -m "initial"', { cwd: projectDir });
-
-    // Commit without trailer
-    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync('git commit -m "update"', { cwd: projectDir });
-
-    // Commit with trailer
-    const sha = await createCommitWithTrailer(
-      projectDir,
-      "src.ts",
-      "export const x = 3;\n",
-      taskId,
-      "in_progress",
-      "completed",
-    );
-
-    // Run backfill
-    await cmdBackfillCommitAttribution(projectDir);
-
-    // Only the commit with trailer should be recorded
-    const updated = await readPRDItem(rexDir, taskId);
-    expect(updated!.commits).toHaveLength(1);
-    expect(updated!.commits![0].hash).toBe(sha);
-  });
-
   /**
-   * The three gaps below are what a real repository's history exercises and a
-   * single-trailer fixture never does. Each is scoped to one defect so a
-   * regression names itself.
+   * The three shapes the report has to tell apart, in one history: a commit
+   * that carries a trailer, one that carries none, and one that carries two.
    */
+  async function buildFixture() {
+    const covered = await commit("a.txt", `Do part A\n\nN-DX-Item: ${ITEM_A}\n`);
+    const uncovered = await commit("b.txt", `Tidy up\n\nNo trailer here.\n`);
+    const twoTrailers = await commit(
+      "c.txt",
+      `Close both tasks\n\nN-DX-Item: ${ITEM_A}\nN-DX-Item: ${ITEM_B}\n`,
+    );
+    return { covered, uncovered, twoTrailers };
+  }
 
-  it("records every item a commit's trailers name, not just the first", async () => {
-    // A commit that completes two items carries two N-DX-Status trailers.
-    // Attributing it to only the first loses the other item's history.
-    const firstId = randomUUID();
-    const secondId = randomUUID();
+  it("counts a commit with a trailer, one without, and one with two", async () => {
+    await buildFixture();
 
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: "Test PRD",
-      items: [
-        { id: firstId, title: "First Task", status: "completed", level: "task" },
-        { id: secondId, title: "Second Task", status: "completed", level: "task" },
-      ],
-    };
+    const report = await runJson();
 
-    const store = new FolderTreeStore(rexDir);
-    await store.saveDocument(doc);
-
-    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync('git commit -m "initial"', { cwd: projectDir });
-
-    // Mirrors the real shape: a blank line separates the N-DX-Status lines
-    // from the final Co-Authored-By paragraph, so git's own trailer parser
-    // sees only the last paragraph. The body is scanned instead.
-    const message = [
-      "Complete both tasks",
-      "",
-      `N-DX-Status: ${firstId} in_progress → completed`,
-      `N-DX-Status: ${secondId} pending → completed`,
-      "",
-      "Co-Authored-By: Someone <someone@example.com>",
-    ].join("\n");
-    await writeFile(join(projectDir, ".commit-msg"), message, "utf-8");
-    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
-    await execAsync("git add src.ts", { cwd: projectDir });
-    await execAsync("git commit -F .commit-msg", { cwd: projectDir });
-    const { stdout } = await execAsync("git rev-parse HEAD", { cwd: projectDir });
-    const sha = stdout.trim();
-
-    await cmdBackfillCommitAttribution(projectDir);
-
-    for (const id of [firstId, secondId]) {
-      const item = await readPRDItem(rexDir, id);
-      expect(item!.commits).toHaveLength(1);
-      expect(item!.commits![0].hash).toBe(sha);
-    }
+    expect(report.totals.commits).toBe(3);
+    expect(report.totals.covered).toBe(2);
+    expect(report.totals.uncovered).toBe(1);
+    // A commit naming two items is still one commit, not two.
+    expect(report.totals.covered + report.totals.uncovered).toBe(report.totals.commits);
   });
 
-  it("accepts the ASCII arrow form as well as the Unicode one", async () => {
-    // Both forms occur in history; a parser that reads only `→` silently
-    // skips every commit written with `->`.
-    const taskId = randomUUID();
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: "Test PRD",
-      items: [{ id: taskId, title: "Test Task", status: "completed", level: "task" }],
-    };
+  it("groups the uncovered commits by author and by month", async () => {
+    await buildFixture();
+    // A second author, so the grouping has something to separate.
+    git("config", "user.email", "other@example.com");
+    git("config", "user.name", "Other");
+    await commit("d.txt", "Unattributed work by someone else\n");
 
-    const store = new FolderTreeStore(rexDir);
-    await store.saveDocument(doc);
+    const report = await runJson();
 
-    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync('git commit -m "initial"', { cwd: projectDir });
+    expect(report.byAuthor).toHaveLength(2);
+    const byEmail = new Map(report.byAuthor.map((a) => [a.authorEmail, a]));
+    expect(byEmail.get("dev@example.com")).toMatchObject({ commits: 3, covered: 2, uncovered: 1 });
+    expect(byEmail.get("other@example.com")).toMatchObject({ commits: 1, covered: 0, uncovered: 1 });
+    // Most uncovered first; the two tie at 1, so the order falls to email.
+    expect(report.byAuthor[0].uncovered).toBe(1);
 
-    const message = `Complete task\n\nN-DX-Status: ${taskId} in_progress -> completed`;
-    await writeFile(join(projectDir, ".commit-msg"), message, "utf-8");
-    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
-    await execAsync("git add src.ts", { cwd: projectDir });
-    await execAsync("git commit -F .commit-msg", { cwd: projectDir });
-    const { stdout } = await execAsync("git rev-parse HEAD", { cwd: projectDir });
-    const sha = stdout.trim();
+    expect(report.byMonth).toHaveLength(1);
+    expect(report.byMonth[0]).toMatchObject({ month: "2026-10", commits: 4, uncovered: 2 });
+  });
 
-    await cmdBackfillCommitAttribution(projectDir);
+  it("reads every N-DX-Item trailer on a commit, not just the first", async () => {
+    const { twoTrailers } = await buildFixture();
 
-    const updated = await readPRDItem(rexDir, taskId);
-    expect(updated!.commits).toHaveLength(1);
-    expect(updated!.commits![0].hash).toBe(sha);
+    const scanned = await scanCoverageCommits(repo, "main");
+    const both = scanned.find((c) => c.hash === twoTrailers);
+
+    // Reading only the first trailer would lose ITEM_B entirely — and on this
+    // project's own history that was better than half of all attributions.
+    expect(both?.writtenItems).toEqual([ITEM_A, ITEM_B]);
+    expect(both?.attributedItems).toEqual([ITEM_A, ITEM_B]);
+  });
+
+  it("counts an N-DX-Status trailer as covered, in either arrow form", async () => {
+    await commit("a.txt", `Close it\n\nN-DX-Status: ${ITEM_A} in_progress → completed\n`);
+    await commit("b.txt", `Close it the other way\n\nN-DX-Status: ${ITEM_B} pending -> completed\n`);
+
+    const report = await runJson();
+
+    expect(report.totals.commits).toBe(2);
+    expect(report.totals.uncovered).toBe(0);
+    // N-DX-Status names an item but is not what v2 attribution reads.
+    expect(report.totals.attributed).toBe(0);
+  });
+
+  it("separates a trailer git's parser cannot see from one it can", async () => {
+    // Written, but not in the final paragraph — the shape most of this
+    // project's own history is in, which git classifies as prose.
+    await commit(
+      "a.txt",
+      `Do the thing\n\nN-DX-Item: ${ITEM_A}\n\nThis paragraph ends the message.\n`,
+    );
+    await commit("b.txt", `Do another thing\n\nN-DX-Item: ${ITEM_B}\n`);
+
+    const report = await runJson();
+
+    expect(report.totals.covered).toBe(2);
+    expect(report.totals.attributed).toBe(1);
+    expect(report.totals.writtenOutsideTrailerBlock).toBe(1);
+  });
+
+  it("counts a merge commit separately so the headline can be read without it", async () => {
+    await commit("base.txt", `Base\n\nN-DX-Item: ${ITEM_A}\n`);
+    git("checkout", "-q", "-b", "feat");
+    await commit("f.txt", `Feature work\n\nN-DX-Item: ${ITEM_B}\n`);
+    git("checkout", "-q", "main");
+    git("merge", "-q", "--no-ff", "-m", "Merge feat", "feat");
+
+    const report = await runJson();
+
+    expect(report.totals.uncovered).toBe(1);
+    expect(report.totals.uncoveredMerges).toBe(1);
+  });
+
+  it("writes nothing — not to .rex/, not a trailer cache, not anywhere", async () => {
+    await buildFixture();
+    // A rex directory that already exists is the case worth pinning: an empty
+    // one proves only that nothing created it.
+    await mkdir(join(repo, ".rex", ".cache"), { recursive: true });
+    await writeFile(join(repo, ".rex", "config.json"), "{}\n", "utf-8");
+
+    const before = filesUnder(repo);
+    const beforeMtimes = before.map((f) => statSync(join(repo, f)).mtimeMs);
+
+    await run();
+    await run({ json: "true" });
+
+    expect(filesUnder(repo)).toEqual(before);
+    expect(before.map((f) => statSync(join(repo, f)).mtimeMs)).toEqual(beforeMtimes);
+  });
+
+  it("prints the same report as text and as JSON", async () => {
+    await buildFixture();
+
+    const report = await runJson();
+    const text = await run();
+
+    expect(text).toContain(`${report.totals.commits} commits`);
+    expect(text).toContain(`${report.totals.covered} carry an item trailer`);
+    expect(text).toContain(`${report.totals.uncovered} do not`);
+    expect(text).toContain(report.ref);
+    expect(text).toContain(report.tip.slice(0, 8));
+    for (const author of report.byAuthor) {
+      expect(text).toContain(`${author.author} <${author.authorEmail}>`);
+      expect(text).toContain(`${author.uncovered} of ${author.commits} uncovered`);
+    }
+    for (const month of report.byMonth) expect(text).toContain(month.month);
   });
 
   it("reads a history whose log exceeds the default exec buffer", async () => {
     // The whole log is buffered in memory. At exec's 1 MiB default this
-    // repository's own history overflowed and the command reported
+    // repository's own history overflowed and the predecessor reported
     // "could not read git history" and recorded nothing — a silent no-op.
     // One oversized body reproduces that without building a long history.
-    const taskId = randomUUID();
-    const doc: PRDDocument = {
-      schema: SCHEMA_VERSION,
-      title: "Test PRD",
-      items: [{ id: taskId, title: "Test Task", status: "completed", level: "task" }],
-    };
-
-    const store = new FolderTreeStore(rexDir);
-    await store.saveDocument(doc);
-
-    await writeFile(join(projectDir, "src.ts"), "export const x = 1;\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync('git commit -m "initial"', { cwd: projectDir });
-
-    // ~2 MiB of body, comfortably past the 1 MiB default.
-    const filler = Array.from({ length: 24_000 }, (_, i) => `padding line ${i} ${"x".repeat(60)}`).join("\n");
-    const message = `Complete task\n\n${filler}\n\nN-DX-Status: ${taskId} in_progress → completed`;
+    const filler = Array.from(
+      { length: 24_000 },
+      (_, i) => `padding line ${i} ${"x".repeat(60)}`,
+    ).join("\n");
+    const message = `Do the thing\n\n${filler}\n\nN-DX-Item: ${ITEM_A}\n`;
     expect(Buffer.byteLength(message, "utf-8")).toBeGreaterThan(1024 * 1024);
+    await commit("a.txt", message);
 
-    await writeFile(join(projectDir, ".commit-msg"), message, "utf-8");
-    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
-    await execAsync("git add src.ts", { cwd: projectDir });
-    await execAsync("git commit -F .commit-msg", { cwd: projectDir });
-    const { stdout } = await execAsync("git rev-parse HEAD", { cwd: projectDir });
-    const sha = stdout.trim();
+    const report = await runJson();
 
-    await cmdBackfillCommitAttribution(projectDir);
+    expect(report.totals.commits).toBe(1);
+    expect(report.totals.covered).toBe(1);
+  });
 
-    const updated = await readPRDItem(rexDir, taskId);
-    expect(updated!.commits).toHaveLength(1);
-    expect(updated!.commits![0].hash).toBe(sha);
+  it("fails loudly when the branch does not exist", async () => {
+    await buildFixture();
+
+    await expect(cmdBackfillCommitAttribution(repo, { ref: "no-such-branch" })).rejects.toThrow(
+      /Could not read git history/,
+    );
   });
 });

@@ -29,4 +29,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Make the command-docs parity and cli-ui-gap drift tests pass on Windows CRLF checkouts](./make-the-command-docs-parity-and-cli.md) | completed |
 | [Regenerate the 0.8.0 documents, run the navigation contract and compare pages against the wireframes](./regenerate-the-0-8-0-documents-run-the.md) | completed |
 | [Rewrite viewer-architecture.md for the shipped navigation model](./rewrite-viewer-architecture-md-for-the.md) | completed |
-| [Write the 0.8.0 release note and confirm per-package tags and GitHub releases after publish](./write-the-0-8-0-release-note-and.md) | pending |
+| [Write the 0.8.0 release note and confirm per-package tags and GitHub releases after publish](./write-the-0-8-0-release-note-and.md) | completed |

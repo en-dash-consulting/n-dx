@@ -176,8 +176,8 @@ variants of one another and should not be unified:
 | `N-DX-Status:` | What status changed | `<taskId> in_progress → completed` | hench run loop |
 
 `N-DX:` takes a free-form producer string, so a new commit source picks a value
-rather than a new key. `N-DX-Status:` is consumed by
-`rex backfill-commit-attribution`.
+rather than a new key. `rex backfill-commit-attribution` reads both `N-DX-Item:`
+and `N-DX-Status:` to report how much of history carries neither.
 
 `N-DX-Item:` carries the item id. It used to carry a dashboard permalink, which
 wrote the author's host into permanent history; readers still accept that form
