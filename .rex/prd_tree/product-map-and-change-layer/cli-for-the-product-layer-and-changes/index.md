@@ -28,7 +28,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A product reshape merge removes merged capabilities without carrying their requirements, dependsOn, tags or body, and leaves dependents naming a retired node](./a-product-reshape-merge-removes-merged.md) | pending |
 | [A product reshape move drafts an added copy that loses the capability's requirements, dependsOn, tags and body](./a-product-reshape-move-drafts-an-added.md) | completed |
 | [Add rex product and rex change commands; ndx add creates a change](./add-rex-product-and-rex-change.md) | completed |
-| [Apply-engine refusals say bare "criteria": "a constraint has no criteria", "a new capability has no criteria to replace or remove"](./apply-engine-refusals-say-bare.md) | pending |
+| [Apply-engine refusals say bare "criteria": "a constraint has no criteria", "a new capability has no criteria to replace or remove"](./apply-engine-refusals-say-bare.md) | completed |
 | [capability-criteria warning says bare "criteria": "Capability X has no criteria"](./capability-criteria-warning-says-bare.md) | completed |
 | [criteria-growth warning says bare "criteria" instead of "capability criteria"](./criteria-growth-warning-says-bare.md) | completed |
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | completed |
