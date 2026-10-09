@@ -56,6 +56,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Rank the migration review queue by confident Jev flags, not by the least confident answer](./rank-the-migration-review-queue-by.md) | completed |
 | [reviewedHash only for the spec a reviewer approved](./reviewedhash-only-for-the-spec-a.md) | completed |
 | [Spec drafts state behaviour, never "the system shall ensure that the system" or a decision](./spec-drafts-state-behaviour-never-the.md) | completed |
-| [Spec merge keeps the model's own subject instead of wrapping it in "The system shall ensure that"](./spec-merge-keeps-the-model-s-own.md) | pending |
+| [Spec merge keeps the model's own subject instead of wrapping it in "The system shall ensure that"](./spec-merge-keeps-the-model-s-own.md) | in_progress |
 | [Stamp appliedAt and reviewedHash when migrating historical items](./stamp-appliedat-and-reviewedhash-when.md) | completed |
 | [The migration can freeze a Windows-unsafe v1 slug (con, aux, nul) into v2, leaving the tree permanently unwritable](./the-migration-can-freeze-a-windows.md) | completed |
