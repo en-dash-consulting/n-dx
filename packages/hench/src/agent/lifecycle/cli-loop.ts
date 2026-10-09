@@ -105,6 +105,7 @@ import {
 import { isAbsolute } from "node:path";
 import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
 import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
+import { resolveAgentCliEffort } from "./agent-effort.js";
 import { BOOKKEEPING_PATHS } from "../../store/paths.js";
 import { matchesProjectPath } from "../../store/artifacts.js";
 import {
@@ -2834,6 +2835,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // Use the adapter to build the vendor-specific spawn configuration
         const spawnConfig = adapter.buildSpawnConfig(envelope, policy, {
           model: opts.spawnModel,
+          // A matching llm.effort rule for agent.execute, validated against
+          // this model. Undefined leaves the flag off so the vendor applies
+          // its own default; non-Claude adapters ignore it either way.
+          effort: resolveAgentCliEffort(opts.spawnModel ?? model, llmConfig),
           permissionMode: currentPermissionMode,
           // Fork the orientation session rather than continuing it, so the
           // parent stays reusable by the next task and this spawn gets its

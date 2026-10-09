@@ -192,6 +192,7 @@ export {
   isClaudeEffort,
   supportsClaudeEffort,
   resolveClaudeApiEffort,
+  resolveClaudeCliEffort,
   resetClaudeEffortWarnings,
 } from "./claude-effort.js";
 export type { ClaudeEffort } from "./claude-effort.js";

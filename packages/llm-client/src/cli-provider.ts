@@ -38,6 +38,7 @@ import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo } from "./provider-interface.js";
 import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
 import { classifyAuthError } from "./llm-error-classifier.js";
+import { resolveClaudeCliEffort } from "./claude-effort.js";
 import { printRetryLine } from "./progress-reporter.js";
 import { formatRetryCountdown } from "./rate-limit.js";
 import { resolveVendorCliEnv } from "./child-env.js";
@@ -126,10 +127,15 @@ function spawnOnce(
 ): Promise<CompletionResult> {
   return new Promise((resolve, reject) => {
     const format = request.outputFormat ?? "json";
+    // `--effort` only when an `llm.effort` rule matched and the model accepts
+    // one. Omitted otherwise so Claude Code applies its own per-model default
+    // rather than ours — see resolveClaudeCliEffort.
+    const effort = resolveClaudeCliEffort(request.model, request.effort, request.taskClass);
     const args = [
       "-p", "-",
       "--output-format", format,
       "--model", request.model,
+      ...(effort ? ["--effort", effort] : []),
       ...(request.cliFlags ?? []),
     ];
 
