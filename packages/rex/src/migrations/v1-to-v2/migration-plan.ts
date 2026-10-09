@@ -270,7 +270,16 @@ function classifyEpic(epic: PRDItem, plan: PlanBuilder, productNames: readonly s
   if (release !== undefined) {
     plan.add(epic, "release", { plannedRelease: release, reasons: [`release-named epic: dissolves into plannedRelease ${release}`] });
     for (const child of epic.children ?? []) {
-      plan.change(child, { plannedRelease: release, reasons: [`split out of release umbrella ${epic.id}`] });
+      if (isAbandoned(child)) {
+        plan.add(child, "change", {
+          plannedRelease: release,
+          applied: false,
+          needsPlacement: true,
+          reasons: [`${child.status} ${child.level} split out of release umbrella ${epic.id}: held as an unapplied change for review, never rules-placed`],
+        });
+      } else {
+        plan.change(child, { plannedRelease: release, reasons: [`split out of release umbrella ${epic.id}`] });
+      }
       plan.workUnder(child.children, child.id);
     }
     return;

@@ -242,6 +242,24 @@ describe("classifyV1Tree", () => {
     expect(byTitle(plan.entries, "Write importer").target).toBe("task");
   });
 
+  it.each<ItemStatus>(["cancelled", "deleted"])(
+    "holds a %s child of a release epic as an unapplied change, never rules-placed",
+    (status) => {
+      // A capability whose title the abandoned child repeats: rules would place it there if it were live.
+      const area = item("epic", "Storage", [item("feature", "Offline cache", [item("task", "Build cache", [], "completed")])]);
+      const release = item("epic", "ndx 0.9.0", [
+        item("feature", "Offline cache", [item("task", "Write store", [], "completed")], status),
+        item("feature", "Offline cache sync", [], "completed"),
+      ]);
+      const plan = classifyV1Tree([area, release]);
+      const abandoned = plan.entries.find((e) => e.id === release.children![0].id)!;
+      expect(abandoned).toMatchObject({ target: "change", applied: false, needsPlacement: true, plannedRelease: "0.9.0" });
+      expect(abandoned.placement).toBeUndefined();
+      expect(plan.entries.find((e) => e.id === release.children![1].id)!.placement).toBeDefined();
+      expect(byTitle(plan.entries, "Write store")).toMatchObject({ target: "task", parent: abandoned.id });
+    },
+  );
+
   it("does not make a deleted feature with a completed child a capability", () => {
     const feature = item("feature", "Offline cache", [item("task", "Build cache", [], "completed")], "deleted");
     const plan = classifyV1Tree([item("epic", "Storage", [feature])]);
