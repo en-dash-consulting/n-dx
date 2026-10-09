@@ -400,6 +400,9 @@ async function dispatchCommand(
     // Invoked by git with temp-file paths (%O %A %B) from any cwd —
     // there is no project dir to check.
     "merge-driver", "merge-state",
+    // `release stamp <version> [dir]`: the dir is third, and a missing rex
+    // directory is the command's no-op, not an error.
+    "release",
   ]);
   if (!SKIP_DIR_CHECK.has(command)) {
     requireRexDir(resolveDir(positional));
@@ -581,6 +584,11 @@ async function dispatchCommand(
       await cmdClaim(resolveDir(dirArgs), positional, flags);
       break;
     }
+    case "release": {
+      const { cmdRelease } = await import("./commands/release.js");
+      await cmdRelease(resolveDir(positional.slice(2)), positional, flags);
+      break;
+    }
     case "reorganize": {
       const { cmdReorganize } = await import("./commands/reorganize.js");
       await cmdReorganize(resolveDir(positional), flags);
@@ -659,7 +667,7 @@ async function dispatchCommand(
         "init", "status", "tree", "tree-diff", "next", "add", "update", "move", "remove", "reshape",
         "prune", "restore", "validate", "fix", "usage", "report", "verify", "ready", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "codeowners",
-        "reorganize", "health", "product", "change", "mcp",
+        "release", "reorganize", "health", "product", "change", "mcp",
         "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
         "backfill-commit-attribution",
       ];

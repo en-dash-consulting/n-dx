@@ -108,6 +108,7 @@ const REX_COMMANDS = [
   "import",
   "export",
   "import-bundle",
+  "release",
   "reorganize",
   "health",
   "product",

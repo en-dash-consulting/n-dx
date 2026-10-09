@@ -720,6 +720,33 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["validate", "status"],
   },
+  release: {
+    tool: "rex",
+    command: "release",
+    summary: "stamp shippedIn on the changes a release ships",
+    usage: "rex release stamp <version> [--dry-run] [--format=json] [dir]",
+    description:
+      "Stamps shippedIn: <version> on every change that is finished (completed\n" +
+      "or applied), unstamped, landed on main, and not yet in any release tag.\n" +
+      "Landing is read from git: release tags, ancestry and N-DX-Item trailers.\n" +
+      "A stamped change is never restamped, so a re-run changes nothing. A\n" +
+      "finished change that has not landed is listed and left unstamped.\n\n" +
+      "Under rex.applyOn \"release\", completed changes awaiting apply are\n" +
+      "applied first, then stamped. A refused apply fails the command.\n\n" +
+      "<version> is X.Y.Z or vX.Y.Z (stored as X.Y.Z); prereleases are refused.\n" +
+      "On a v1 tree, or with no rex directory, it prints that there is nothing\n" +
+      "to stamp and succeeds without running git.\n\n" +
+      "Needs full git history (fetch-depth: 0 on a CI checkout).",
+    options: [
+      { flag: "--dry-run", description: "Report what would be applied and stamped; write nothing" },
+      { flag: "--format=json", description: "Print the report as JSON (version, applied, stamped, skipped)" },
+    ],
+    examples: [
+      { command: "rex release stamp 1.4.0", description: "Stamp the changes shipping in 1.4.0" },
+      { command: "rex release stamp v1.4.0 --dry-run", description: "Preview the stamp" },
+    ],
+    related: ["status"],
+  },
   "tree-diff": {
     tool: "rex",
     command: "tree-diff",

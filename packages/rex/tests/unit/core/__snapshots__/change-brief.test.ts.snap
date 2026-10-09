@@ -1,0 +1,232 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildChangeBrief — golden briefs > renders a feature change's task 1`] = `
+"## Current task
+**Read a bundle into the store** · CH-142.1
+ID: t-reader
+Status: pending
+Priority: high
+
+Parse the bundle and write every item through the store write path.
+
+Done when:
+- Round-trips an exported bundle
+- Refuses a bundle with a schema stamp it cannot read
+
+Tags: pr-19
+
+## Sibling tasks in this change
+- [ ] Wire up the import command (pending)
+- [x] Decide the bundle schema stamp (completed)
+
+## Change: Import a PRD bundle (CH-142)
+kind feature · planned for 0.9.0
+
+Intent:
+A bundle exported from one checkout can be imported into another.
+
+Amendments to the product map:
+- **added** Bundle import under PRD storage (new capability) — Importing a bundle rebuilds the folder tree
+  Proposed:
+  A bundle written by export rebuilds the folder tree through the normal store write path.
+  - add capability criterion c1: Import runs inside store.withTransaction
+- **modified** Folder tree layout — The layout accepts items created by an import
+  - add capability criterion c3: An imported item is indistinguishable from an authored one
+
+Touches without amending: Bundle export
+
+## Capabilities this change affects
+
+### Folder tree layout (A1.1)
+amended · changing · health ok · spec reviewed: no
+Each item is a directory with an index.md.
+
+Capability criteria:
+- c2: An item is one directory with an index.md
+- c1: Every PRD mutation writes the folder tree and nothing else _(inherited from PRD storage)_
+
+Requirements:
+- **Slugs are frozen** [technical/automated]
+  - A rename keeps the original slug
+
+### Bundle export
+touched · proposed · health ok · spec reviewed: no
+The PRD exports to a single transport JSON file.
+
+Capability criteria:
+- c4: The bundle is never written inside .rex/
+
+## Constraints that apply
+
+### No legacy PRD writes
+No mutation writes prd.md or prd.json.
+_Binds: Folder tree layout._
+
+Requirements:
+- **Legacy paths are refused** [technical/automated]
+  - An export path inside .rex/ is refused
+
+### Cross-OS parity
+Every command behaves the same on Linux, macOS and Windows.
+_Binds every capability._
+
+## Neighbouring capabilities (one hop)
+- Slug registry — this work depends on it · proposed · health ok
+
+## Where these capabilities live in code
+
+### Folder tree layout
+- packages/rex/src/store/folder-tree-store.ts
+- packages/rex/src/store/prd-model-writer.ts
+Zones: rex-cli
+
+### Bundle export
+- packages/rex/src/store/prd-bundle-v2.ts
+Zones: rex-cli
+
+## Last 2 changes to these nodes
+- Freeze slugs at creation (CH-100) — completed · shipped in 0.7.0 · 2026-09-01T00:00:00.000Z
+- Move the export writer behind the store (CH-160) — pending
+
+## Commands
+Validate: \`pnpm --filter @n-dx/rex run typecheck\`
+Test: \`pnpm --filter @n-dx/rex exec vitest run\`
+
+## Workflow
+Run the scoped suite before committing.
+Never weaken a test to get green.
+
+## Recent activity
+- [2026-10-08T12:00:00.000Z] status_updated: Status changed to in_progress
+- [2026-10-08T12:30:00.000Z] run_started"
+`;
+
+exports[`buildChangeBrief — golden briefs > renders a fix 1`] = `
+"## Current task
+**Case-fold tags on both sides of the query**
+ID: t-fold
+Status: pending
+
+Normalise the stored tag and the query before comparing.
+
+Done when:
+- An uppercase query matches a lowercase tag
+
+## Change: Tag search misses uppercase tags (CH-150)
+kind fix
+
+Intent:
+A tag query must match regardless of case.
+
+Touches without amending: PRD search
+
+## Capabilities this change affects
+
+### PRD search
+touched · met · health defective · spec reviewed: no
+Items are searchable by title and tag.
+
+Capability criteria:
+- c5: A tag query returns every item carrying the tag
+
+Requirements:
+- **Search is case-insensitive** [technical/automated]
+
+## Constraints that apply
+
+### Cross-OS parity
+Every command behaves the same on Linux, macOS and Windows.
+_Binds every capability._
+
+## Commands
+Validate: \`pnpm --filter @n-dx/rex run typecheck\`
+Test: \`pnpm --filter @n-dx/rex exec vitest run\`
+
+## Workflow
+Run the scoped suite before committing.
+Never weaken a test to get green.
+
+## Recent activity
+- [2026-10-08T12:00:00.000Z] status_updated: Status changed to in_progress
+- [2026-10-08T12:30:00.000Z] run_started"
+`;
+
+exports[`buildChangeBrief — golden briefs > renders a task-less change 1`] = `
+"## Current change
+**Move the export writer behind the store** · CH-160
+ID: ch-taskless
+Status: pending
+
+## This change on the product map
+kind refactor
+
+Intent:
+The export writer reaches past the store today; route it through.
+
+Touches without amending: Bundle export, Folder tree layout
+
+## Capabilities this change affects
+
+### Bundle export
+touched · proposed · health ok · spec reviewed: no
+The PRD exports to a single transport JSON file.
+
+Capability criteria:
+- c4: The bundle is never written inside .rex/
+
+### Folder tree layout (A1.1)
+touched · changing · health ok · spec reviewed: no
+Each item is a directory with an index.md.
+
+Capability criteria:
+- c2: An item is one directory with an index.md
+- c1: Every PRD mutation writes the folder tree and nothing else _(inherited from PRD storage)_
+
+Requirements:
+- **Slugs are frozen** [technical/automated]
+  - A rename keeps the original slug
+
+## Constraints that apply
+
+### Cross-OS parity
+Every command behaves the same on Linux, macOS and Windows.
+_Binds every capability._
+
+### No legacy PRD writes
+No mutation writes prd.md or prd.json.
+_Binds: Folder tree layout._
+
+Requirements:
+- **Legacy paths are refused** [technical/automated]
+  - An export path inside .rex/ is refused
+
+## Neighbouring capabilities (one hop)
+- Slug registry — this work depends on it · proposed · health ok
+
+## Where these capabilities live in code
+
+### Bundle export
+- packages/rex/src/store/prd-bundle-v2.ts
+Zones: rex-cli
+
+### Folder tree layout
+- packages/rex/src/store/folder-tree-store.ts
+- packages/rex/src/store/prd-model-writer.ts
+Zones: rex-cli
+
+## Last 2 changes to these nodes
+- Import a PRD bundle (CH-142) — in_progress · 2026-10-05T00:00:00.000Z
+- Freeze slugs at creation (CH-100) — completed · shipped in 0.7.0 · 2026-09-01T00:00:00.000Z
+
+## Commands
+Validate: \`pnpm --filter @n-dx/rex run typecheck\`
+Test: \`pnpm --filter @n-dx/rex exec vitest run\`
+
+## Workflow
+Run the scoped suite before committing.
+Never weaken a test to get green.
+
+## Recent activity
+- [2026-10-08T12:00:00.000Z] status_updated: Status changed to in_progress
+- [2026-10-08T12:30:00.000Z] run_started"
+`;

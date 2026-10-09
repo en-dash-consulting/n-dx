@@ -24,12 +24,12 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Codex cache safety](./codex-cache-safety/index.md) | pending |
+| [Codex cache safety](./codex-cache-safety/index.md) | completed |
 | [Command transparency](./command-transparency/index.md) | pending |
-| [Dashboard request hardening](./dashboard-request-hardening/index.md) | pending |
+| [Dashboard request hardening](./dashboard-request-hardening/index.md) | completed |
 | [Layout resolver](./layout-resolver/index.md) | completed |
 | [Machine memory reads true on macOS](./machine-memory-reads-true-on-macos/index.md) | completed |
-| [Navigation and landings](./navigation-and-landings/index.md) | pending |
+| [Navigation and landings](./navigation-and-landings/index.md) | completed |
 | [PRD storage additive](./prd-storage-additive/index.md) | pending |
 | [Release readiness](./release-readiness/index.md) | pending |
 | [rex log and budget tuners](./rex-log-and-budget-tuners/index.md) | pending |

@@ -31,6 +31,7 @@
 # Warm-parent session cache, rewritten on every orientation. Machine-local.
 .hench/session-cache.json
 .hench-commit-msg.txt
+.ndx-commit-msg.txt
 
 # Rex ephemeral state
 .rex/.backups/
