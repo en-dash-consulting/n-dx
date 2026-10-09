@@ -43,7 +43,7 @@ export async function handleApplyChange(
   } catch (err) {
     if (err instanceof ApplyAmendmentsError) {
       const hint = err.problems.some((p) => p.endsWith(NOTHING_TO_MODIFY))
-        ? " A modified amendment's content is supplied by place_change's proposed and criteria (with target and relation amends) when the change is placed."
+        ? " No tool edits a stored amendment: add proposed text or a criteria delta to it by hand, or cancel the change and place it again with place_change's proposed or criteria."
         : "";
       return textResult(err.message + hint, true);
     }

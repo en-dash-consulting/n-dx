@@ -842,7 +842,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
   },
   {
     "name": "place_change",
-    "description": "Place a v2 change on the product layer. Without target: returns the rules' shortlist of capabilities and constraints the change could amend or touch, best first, and the relation the rules chose. With target: records it (touches joins the change's touches; amends adds a modified amendment with any proposed text and criteria delta; apply_change needs at least one) and clears needsPlacement. Only an open change is placed.",
+    "description": "Place a v2 change on the product layer. Without target: returns the rules' shortlist of capabilities and constraints the change could amend or touch, best first, and the relation the rules chose. With target: records it (touches joins the change's touches; amends adds a modified amendment and needs proposed text or a criteria delta, or it is refused as apply_change would) and clears needsPlacement. Only an open change is placed.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -868,7 +868,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
         },
         "proposed": {
           "type": "string",
-          "description": "With target and relation amends: the target's replacement statement"
+          "description": "With target and relation amends: the target's replacement statement. Required with amends unless criteria is given"
         },
         "criteria": {
           "type": "object",
@@ -907,7 +907,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             }
           },
           "additionalProperties": true,
-          "description": "With target and relation amends: capability criteria edits ({add?: [{id, text}], replace?: [{id, text}], remove?: [id]})"
+          "description": "With target and relation amends: capability criteria edits ({add?: [{id, text}], replace?: [{id, text}], remove?: [id]}). Required with amends unless proposed is given"
         }
       },
       "required": [

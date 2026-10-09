@@ -60,15 +60,17 @@ describe("recordPlacement", () => {
 
   it("adds a modified amendment with base and the title as summary when the rules say amends", () => {
     const t = tree({ touches: ["card"] });
-    const { tree: next, placement } = recordPlacement(t, "ch", { target: "card" }, NOW);
+    const { tree: next, placement } = recordPlacement(t, "ch", { target: "card", proposed: "Cards and wallets" }, NOW);
     expect(placement.relation).toBe("amends");
     const card = indexTree(t).resolve("card")!;
-    expect(changeIn(next).amends).toEqual([{ target: "card", delta: "modified", summary: "Add wallets to card payment", base: specHash(nodeSpec(card)) }]);
+    expect(changeIn(next).amends).toEqual([
+      { target: "card", delta: "modified", summary: "Add wallets to card payment", proposed: "Cards and wallets", base: specHash(nodeSpec(card)) },
+    ]);
     expect(changeIn(next)).not.toHaveProperty("touches");
   });
 
   it("uses a given summary", () => {
-    const { tree: next } = recordPlacement(tree(), "ch", { target: "card", relation: "amends", summary: "Wallets count as cards" }, NOW);
+    const { tree: next } = recordPlacement(tree(), "ch", { target: "card", relation: "amends", summary: "Wallets count as cards", proposed: "Cards and wallets" }, NOW);
     expect(changeIn(next).amends![0].summary).toBe("Wallets count as cards");
   });
 
@@ -90,6 +92,7 @@ describe("recordPlacement", () => {
     ["a cancelled change", { status: "cancelled" }, { target: "card" }, /is cancelled; only an open change is placed/],
     ["proposed on a touches placement", {}, { target: "card", relation: "touches" as const, proposed: "x" }, /relation amends/],
     // Apply refuses these (in these words), and no tool edits the amendment afterwards.
+    ["a summary-only amends placement", {}, { target: "card", relation: "amends" as const }, /nothing to modify.*Pass proposed or criteria, or use relation touches/],
     ["a criteria delta on a constraint", {}, { target: "arch", relation: "amends" as const, criteria: { remove: ["c1"] } }, /amendment 1 \(modified arch\): a constraint has no capability criteria/],
     ["removing a criterion the capability lacks", {}, { target: "A1.1", relation: "amends" as const, criteria: { remove: ["c7"] } }, /criterion c7 to remove does not exist/],
     ["replacing a criterion the capability lacks", {}, { target: "A1.1", relation: "amends" as const, criteria: { replace: [{ id: "c7", text: "x" }] } }, /criterion c7 to replace does not exist/],

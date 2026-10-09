@@ -142,11 +142,45 @@ describe("place_change", () => {
       { target: CAPABILITY, delta: "modified", summary: "Refunds by card", proposed: "A shopper can pay and be refunded by card.", criteria, base: expect.any(String) },
     ]);
 
-    // Without them, the amendment stays summary-only, on the same base.
-    const bare = await inboxChange("Wallets");
-    json(await handlePlaceChange(store(), rexDir, { id: bare, target: "A1.1", relation: "amends" }));
-    const [amendment] = json(await handleGetItem(store(), rexDir, { id: bare })).item.amends;
-    expect(amendment).toEqual({ target: CAPABILITY, delta: "modified", summary: "Wallets", base: item.amends[0].base });
+  });
+
+  it("refuses an amends placement with neither proposed nor criteria, writing nothing, while touches still places", async () => {
+    const id = await inboxChange("Wallets");
+    const message = error(await handlePlaceChange(store(), rexDir, { id, target: "A1.1", relation: "amends" }));
+    expect(message).toMatch(/nothing to modify/);
+    expect(message).toMatch(/Pass proposed or criteria, or use relation touches/);
+    const unplaced = json(await handleGetItem(store(), rexDir, { id })).item;
+    expect(unplaced.needsPlacement).toBe(true);
+    expect(unplaced).not.toHaveProperty("amends");
+    expect((await log()).filter((e) => e.event === "change_placed")).toEqual([]);
+
+    json(await handlePlaceChange(store(), rexDir, { id, target: "A1.1", relation: "touches" }));
+  });
+
+  it("refuses a summary-only amendment given to add_item, writing nothing", async () => {
+    const before = json(await handleGetPrdStatus(store(), rexDir));
+    const result = await handleAddItem(store(), tmp, rexDir, {
+      title: "Wallets",
+      amends: [{ target: "A1.1", delta: "modified", summary: "Wallets count" }],
+    });
+    expect(error(result)).toMatch(/nothing to modify/);
+    expect(json(await handleGetPrdStatus(store(), rexDir))).toEqual(before);
+  });
+
+  it("stores a removal that only another open change blocks, with a warning, and apply_change waits for that change", async () => {
+    // CH-1 still amends A1.1, so apply refuses a removal of it until CH-1 is applied.
+    const added = json(await handleAddItem(store(), tmp, rexDir, { title: "Drop cards", amends: [{ target: "A1.1", delta: "removed", summary: "Retire" }] }));
+    expect(added.warnings).toEqual([expect.stringMatching(/Open change CH-1 stands in the way.*open-change-refs-live/)]);
+    expect(json(await handleGetItem(store(), rexDir, { id: added.id })).item.amends).toHaveLength(1);
+
+    expect(error(await handleApplyChange(store(), rexDir, { id: added.id }))).toMatch(/open-change-refs-live/);
+    json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
+    expect(json(await handleApplyChange(store(), rexDir, { id: added.id })).applied).toMatchObject([{ delta: "removed", nodeId: CAPABILITY }]);
+  });
+
+  it("still refuses a removal of a node no open change amends when apply would refuse it anyway", async () => {
+    const result = await handleAddItem(store(), tmp, rexDir, { title: "Drop ghost", amends: [{ target: "A1.404", delta: "removed", summary: "Retire" }] });
+    expect(error(result)).toMatch(/not a live product node|does not resolve|A1\.404/);
   });
 
   it("refuses proposed or criteria without relation amends, naming it", async () => {
@@ -177,13 +211,6 @@ describe("apply_change", () => {
     expect(error(await handleApplyChange(store(), rexDir, { id: "CH-404" }))).toMatch(/no live change "CH-404"/);
   });
 
-  it("names place_change's proposed and criteria when a modified amendment has nothing to modify", async () => {
-    const id = await inboxChange("Refunds by card");
-    json(await handlePlaceChange(store(), rexDir, { id, target: "A1.1", relation: "amends" }));
-    const message = error(await handleApplyChange(store(), rexDir, { id }));
-    expect(message).toMatch(/nothing to modify/);
-    expect(message).toMatch(/place_change.*proposed.*criteria/);
-  });
 });
 
 describe("on a v1 tree", () => {

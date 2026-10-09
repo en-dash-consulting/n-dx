@@ -123,7 +123,7 @@ async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: Ru
     );
     return { tree: added.tree, result: added };
   });
-  const { node, split } = result;
+  const { node, split, warnings } = result;
   await store.appendLog({ timestamp: now.toISOString(), event: "item_added", itemId: node.id, detail: `Added ${type}: ${args.title}` });
   return textResult(JSON.stringify({
     id: node.id,
@@ -131,6 +131,7 @@ async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: Ru
     title: node.title,
     ...(node.needsPlacement ? { needsPlacement: true } : {}),
     ...(split ? { split } : {}),
+    ...(warnings.length ? { warnings } : {}),
   }));
 }
 

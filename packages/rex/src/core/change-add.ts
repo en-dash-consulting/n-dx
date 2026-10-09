@@ -18,7 +18,8 @@
  * for instance). Findings about other nodes are not this add's to report.
  * A change with amends is also dry-run through apply
  * ({@link applyAmendmentsProblems}) and refused with apply's problems: no
- * tool edits an amendment once stored, so one apply refuses never would apply.
+ * tool edits an amendment once stored, so one apply always refuses never would
+ * apply. A problem only another open change causes is a warning, not a refusal.
  *
  * Pure: works on a copy and leaves writing to the caller.
  *
@@ -29,7 +30,7 @@ import { randomUUID } from "node:crypto";
 import type { Priority } from "../schema/v1.js";
 import type { Amendment, ChangeNodeType, DiscoveredFrom, SavedRunSettings } from "../schema/v2.js";
 import { checkV2Rules, indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { applyAmendmentsProblems, freeSlug } from "./apply-amendments.js";
+import { applyAmendmentsProblems, freeSlug, NO_PROBLEMS, pendingWarnings } from "./apply-amendments.js";
 import { addTask, closedState, ClosedChangeError, type ChangeSplit } from "./change-completion.js";
 
 export interface AddChangeNodeInput {
@@ -69,6 +70,8 @@ export interface AddChangeNodeResult {
   node: RuleNode;
   /** The split a first task of an `in_progress` change performed. */
   split: ChangeSplit | null;
+  /** Problems only other open changes cause: apply refuses until they close, and the change is stored anyway. */
+  warnings: string[];
 }
 
 export class AddChangeNodeError extends Error {
@@ -141,9 +144,9 @@ export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: 
   const errors = checkV2Rules(next, { now: options.now }).filter((f) => f.nodeId === id && f.severity === "error");
   const refuse = (problems: readonly string[]) => new AddChangeNodeError(`Cannot add ${type} "${input.title}": ${problems.join("; ")}`, problems);
   if (errors.length) throw refuse(errors.map((f) => f.message));
-  const problems = input.amends?.length ? applyAmendmentsProblems(next, id, options.now) : [];
-  if (problems.length) throw refuse(problems);
-  return { tree: next, node: indexTree(next).resolve(id)!, split };
+  const { always, pending, blockedBy } = input.amends?.length ? applyAmendmentsProblems(next, id, options.now) : NO_PROBLEMS;
+  if (always.length) throw refuse(always);
+  return { tree: next, node: indexTree(next).resolve(id)!, split, warnings: pendingWarnings(pending, blockedBy) };
 }
 
 /**

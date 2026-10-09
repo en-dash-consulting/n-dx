@@ -155,12 +155,10 @@ describe("rex change apply", () => {
     expect((await node(CHANGE)).appliedAt).toEqual(expect.any(String));
   });
 
-  it("names the placement flags when a modified amendment has nothing to modify", async () => {
+  it("refuses an amends placement with nothing to modify (c3c42584), so apply never meets one", async () => {
     const id = await addInbox("Refunds by card");
-    await cmdChange(tmp, "place", id, { target: "A1.1", relation: "amends" });
-    const err = await cmdChange(tmp, "apply", id, {}).catch((e: Error & { suggestion?: string }) => e);
+    const err = await cmdChange(tmp, "place", id, { target: "A1.1", relation: "amends" }).catch((e: Error) => e);
     expect((err as Error).message).toMatch(/nothing to modify/);
-    expect((err as { suggestion?: string }).suggestion).toMatch(/--capability-criterion/);
   });
 });
 

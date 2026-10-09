@@ -2,7 +2,7 @@
 id: "5cfa1d83-839a-47a1-ae42-4353cd1acf83"
 level: "feature"
 title: "MCP tools for the product layer and changes"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "product-map"
@@ -15,10 +15,13 @@ blockedBy:
   - "51527b42-cc67-4a5a-83b3-61179298dfaf"
   - "abd05895-1b96-4798-bfb8-8e4b66fca049"
 source: "roadmap"
+startedAt: "2026-10-09T14:56:07.134Z"
+completedAt: "2026-10-09T14:56:07.134Z"
+endedAt: "2026-10-09T14:56:07.134Z"
 acceptanceCriteria: []
 description: "Critical path. Tool names stay; shapes freeze at 1.0.0.\n\nRoadmap PR 17 · wave 2 · lane rex-surface."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-08T18:56:23.299Z"
+lastModified: "2026-10-09T14:56:07.370Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -27,9 +30,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add get_product, get_capability, place_change and apply_change](./add-get-product-get-capability-place.md) | completed |
-| [add_item and place_change store a summary-only modified amendment that apply always refuses and no tool can complete](./add-item-and-place-change-store-a.md) | pending |
+| [add_item and place_change store a summary-only modified amendment that apply always refuses and no tool can complete](./add-item-and-place-change-store-a.md) | completed |
 | [add_item nests a change or subtask under a closed change, bypassing the follow-up rule](./add-item-nests-a-change-or-subtask.md) | completed |
-| [add_item refuses a v2 removal that apply would accept once another open change is applied first](./add-item-refuses-a-v2-removal-that.md) | pending |
+| [add_item refuses a v2 removal that apply would accept once another open change is applied first](./add-item-refuses-a-v2-removal-that.md) | completed |
 | [add_item stores a v2 amendment carrying criteria that apply always refuses: a criteria delta on a constraint, or replace/remove on an added capability](./add-item-stores-a-v2-amendment.md) | completed |
 | [add_item stores a v2 modified amendment whose criteria delta does not fit the capability, which apply_change always refuses](./add-item-stores-a-v2-modified.md) | completed |
 | [add_item takes a type and defaults to a change in the Inbox](./add-item-takes-a-type-and-defaults-to.md) | completed |
