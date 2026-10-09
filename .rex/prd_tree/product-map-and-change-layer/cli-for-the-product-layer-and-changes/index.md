@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Apply-engine refusals say bare "criteria": "a constraint has no criteria", "a new capability has no criteria to replace or remove"](./apply-engine-refusals-say-bare.md) | completed |
 | [capability-criteria warning says bare "criteria": "Capability X has no criteria"](./capability-criteria-warning-says-bare.md) | completed |
 | [criteria-growth warning says bare "criteria" instead of "capability criteria"](./criteria-growth-warning-says-bare.md) | completed |
-| [Lower title-release-token to a warning so a release-named title does not fail rex health or ndx ci](./lower-title-release-token-to-a-warning.md) | pending |
+| [Lower title-release-token to a warning so a release-named title does not fail rex health or ndx ci](./lower-title-release-token-to-a-warning.md) | completed |
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | completed |
 | [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | pending |
 | [No test covers shippedIn or retired-node releases in collectReleases, so dropping either goes unnoticed](./no-test-covers-shippedin-or-retired.md) | completed |
