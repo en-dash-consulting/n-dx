@@ -90,7 +90,7 @@ describe("recordPlacement", () => {
     ["a cancelled change", { status: "cancelled" }, { target: "card" }, /is cancelled; only an open change is placed/],
     ["proposed on a touches placement", {}, { target: "card", relation: "touches" as const, proposed: "x" }, /relation amends/],
     // Apply refuses these (in these words), and no tool edits the amendment afterwards.
-    ["a criteria delta on a constraint", {}, { target: "arch", relation: "amends" as const, criteria: { remove: ["c1"] } }, /amendment 1 \(modified arch\): a constraint has no criteria/],
+    ["a criteria delta on a constraint", {}, { target: "arch", relation: "amends" as const, criteria: { remove: ["c1"] } }, /amendment 1 \(modified arch\): a constraint has no capability criteria/],
     ["removing a criterion the capability lacks", {}, { target: "A1.1", relation: "amends" as const, criteria: { remove: ["c7"] } }, /criterion c7 to remove does not exist/],
     ["replacing a criterion the capability lacks", {}, { target: "A1.1", relation: "amends" as const, criteria: { replace: [{ id: "c7", text: "x" }] } }, /criterion c7 to replace does not exist/],
     ["adding a criterion the capability has", {}, { target: "A1.1", relation: "amends" as const, criteria: { add: [{ id: "c1", text: "x" }] } }, /criterion c1 to add already exists/],

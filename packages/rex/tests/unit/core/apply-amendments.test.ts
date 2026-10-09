@@ -189,7 +189,7 @@ describe("applyAmendments: modified", () => {
     expect(refusal(() => applyAmendments(tree([modify({ criteria: { replace: [{ id: "c9", text: "x" }] } })]), CHANGE, OPTS)).problems[0]).toMatch(/c9 to replace/);
     expect(refusal(() => applyAmendments(tree([modify({ criteria: { remove: ["c9"] } })]), CHANGE, OPTS)).problems[0]).toMatch(/c9 to remove/);
     expect(refusal(() => applyAmendments(tree([modify({ criteria: { add: [{ id: "c1", text: "x" }] } })]), CHANGE, OPTS)).problems[0]).toMatch(/c1 to add already exists/);
-    expect(refusal(() => applyAmendments(tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]), CHANGE, OPTS)).problems[0]).toMatch(/constraint has no criteria/);
+    expect(refusal(() => applyAmendments(tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]), CHANGE, OPTS)).problems[0]).toMatch(/constraint has no capability criteria/);
     expect(refusal(() => applyAmendments(tree([modify({})]), CHANGE, OPTS)).problems[0]).toMatch(/nothing to modify/);
   });
 });
@@ -351,7 +351,7 @@ describe("applyAmendments: added constraints", () => {
       applyAmendments(tree([{ ...constraint, criteria: { add: [{ id: "c1", text: "x" }] }, requirements: [{ id: "r1" }], appliesTo: "some" }]), CHANGE, OPTS),
     ).problems;
     expect(problems).toEqual([
-      "amendment 1 (added con-2): a constraint has no criteria; state it in proposed and list its requirements",
+      "amendment 1 (added con-2): a constraint has no capability criteria; state it in proposed and list its requirements",
       "amendment 1 (added con-2): requirements must be a list of requirements",
       'amendment 1 (added con-2): appliesTo must be "all" or a list of product node references',
     ]);
@@ -500,7 +500,7 @@ describe("applyAmendmentsProblems", () => {
     const refused = tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]);
     const accepted = tree([{ target: "A1.1", delta: "modified", summary: "s", criteria: { remove: ["c2"] } }]);
     const before = structuredClone([refused, accepted]);
-    expect(applyAmendmentsProblems(refused, CHANGE, NOW)).toEqual([`amendment 1 (modified ${CON}): a constraint has no criteria`]);
+    expect(applyAmendmentsProblems(refused, CHANGE, NOW)).toEqual([`amendment 1 (modified ${CON}): a constraint has no capability criteria`]);
     expect(applyAmendmentsProblems(accepted, CHANGE, NOW)).toEqual([]);
     expect([refused, accepted]).toEqual(before);
   });
@@ -517,7 +517,7 @@ describe("applyAmendmentsProblems", () => {
     const bare: Amendment = { target: CAP, delta: "modified", summary: "s" };
     expect(applyAmendmentsProblems(tree([bare]), CHANGE, NOW)).toEqual([]);
     expect(applyAmendmentsProblems(tree([bare, { target: CON, delta: "modified", summary: "s", criteria: { remove: ["c1"] } }]), CHANGE, NOW)).toEqual([
-      `amendment 2 (modified ${CON}): a constraint has no criteria`,
+      `amendment 2 (modified ${CON}): a constraint has no capability criteria`,
     ]);
   });
 

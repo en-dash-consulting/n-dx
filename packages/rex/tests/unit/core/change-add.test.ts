@@ -55,10 +55,10 @@ describe("addChangeNode", () => {
   });
 
   const applyRefusals: [string, Amendment[], RegExp][] = [
-    ["a criteria delta on a constraint", [{ target: "rule", delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }], /amendment 1 \(modified rule\): a constraint has no criteria/],
-    ["replace on a capability the change adds", [{ target: "new-cap", delta: "added", summary: "s", under: "area", title: "New", proposed: "P.", criteria: { replace: [{ id: "c1", text: "x" }] } }], /amendment 1 \(added new-cap\): a new capability has no criteria to replace or remove/],
-    ["remove on a capability the change adds", [{ target: "new-cap", delta: "added", summary: "s", under: "area", title: "New", proposed: "P.", criteria: { remove: ["c1"] } }], /a new capability has no criteria to replace or remove/],
-    ["criteria on a constraint the change adds", [{ target: "new-rule", delta: "added", type: "constraint", summary: "s", under: "area", title: "Rule", proposed: "P.", criteria: { add: [{ id: "c1", text: "x" }] } }], /amendment 1 \(added new-rule\): a constraint has no criteria; state it in proposed/],
+    ["a criteria delta on a constraint", [{ target: "rule", delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }], /amendment 1 \(modified rule\): a constraint has no capability criteria/],
+    ["replace on a capability the change adds", [{ target: "new-cap", delta: "added", summary: "s", under: "area", title: "New", proposed: "P.", criteria: { replace: [{ id: "c1", text: "x" }] } }], /amendment 1 \(added new-cap\): a new capability has no capability criteria to replace or remove/],
+    ["remove on a capability the change adds", [{ target: "new-cap", delta: "added", summary: "s", under: "area", title: "New", proposed: "P.", criteria: { remove: ["c1"] } }], /a new capability has no capability criteria to replace or remove/],
+    ["criteria on a constraint the change adds", [{ target: "new-rule", delta: "added", type: "constraint", summary: "s", under: "area", title: "Rule", proposed: "P.", criteria: { add: [{ id: "c1", text: "x" }] } }], /amendment 1 \(added new-rule\): a constraint has no capability criteria; state it in proposed/],
   ];
 
   it.each(applyRefusals)("refuses %s with apply's problem, writing nothing", (_label, amends, message) => {

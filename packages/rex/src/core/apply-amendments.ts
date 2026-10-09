@@ -13,7 +13,7 @@
  *   `title`, with `proposed` as its statement and `criteria.add` as its
  *   criteria. With `type: "constraint"` it creates a constraint `under` any
  *   live product node instead, with `proposed` as its statement and the
- *   amendment's `requirements` and `appliesTo`; a constraint has no criteria.
+ *   amendment's `requirements` and `appliesTo`; a constraint has no capability criteria.
  *   `target` names the new node: a display id (`A4.9`) becomes its
  *   `displayId` and the id comes from `newId`; anything else is the id.
  * - **modified** edits a live capability or constraint: `proposed`, when
@@ -306,7 +306,7 @@ const applyAdded: DeltaApply = ({ product, changes }, amendment, { options }, fa
 /** A new capability's criteria, from `criteria.add`; undefined after reporting a problem. */
 function capabilityFields(amendment: Amendment, fail: (message: string) => void): { criteria?: Criterion[] } | undefined {
   if (amendment.criteria?.replace?.length || amendment.criteria?.remove?.length) {
-    return void fail("a new capability has no criteria to replace or remove; use criteria.add");
+    return void fail("a new capability has no capability criteria to replace or remove; use criteria.add");
   }
   const criteria = amendment.criteria?.add ?? [];
   const duplicate = firstDuplicate(criteria.map((c) => c.id));
@@ -322,7 +322,7 @@ function constraintFields(amendment: Amendment, fail: (message: string) => void)
   let ok = true;
   if (criteria?.add?.length || criteria?.replace?.length || criteria?.remove?.length) {
     ok = false;
-    fail("a constraint has no criteria; state it in proposed and list its requirements");
+    fail("a constraint has no capability criteria; state it in proposed and list its requirements");
   }
   const parsedRequirements = z.array(RequirementSchema).optional().safeParse(requirements);
   if (!parsedRequirements.success) {
@@ -397,7 +397,7 @@ const applyModified: DeltaApply =({ product }, amendment, _options, fail) => {
   const delta = amendment.criteria;
   const hasCriteriaDelta = Boolean(delta?.add?.length || delta?.replace?.length || delta?.remove?.length);
   if (amendment.proposed === undefined && !hasCriteriaDelta) return void fail(NOTHING_TO_MODIFY);
-  if (hasCriteriaDelta && node.type !== "capability") return void fail("a constraint has no criteria");
+  if (hasCriteriaDelta && node.type !== "capability") return void fail("a constraint has no capability criteria");
 
   const { criteria, problems } = applyCriteriaDelta(node.type === "capability" ? node.criteria ?? [] : [], delta);
   if (problems.length) return void problems.forEach(fail);
