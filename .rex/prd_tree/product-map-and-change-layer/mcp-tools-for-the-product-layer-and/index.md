@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add get_product, get_capability, place_change and apply_change](./add-get-product-get-capability-place.md) | completed |
-| [add_item nests a change or subtask under a closed change, bypassing the follow-up rule](./add-item-nests-a-change-or-subtask.md) | pending |
+| [add_item nests a change or subtask under a closed change, bypassing the follow-up rule](./add-item-nests-a-change-or-subtask.md) | completed |
 | [add_item takes a type and defaults to a change in the Inbox](./add-item-takes-a-type-and-defaults-to.md) | completed |
 | [get_prd_status on v2 drops capabilities and open changes under a nested area](./get-prd-status-on-v2-drops.md) | pending |
 | [Give v2 changes an optional acceptanceCriteria list](./give-v2-changes-an-optional.md) | completed |
