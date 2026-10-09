@@ -15,5 +15,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Document landing through the queue](./document-landing-through-the-queue.md) | pending |
+| [Document landing through the queue](./document-landing-through-the-queue.md) | in_progress |
 | [Workflows answer merge_group events](./workflows-answer-merge-group-events.md) | completed |

@@ -2,9 +2,10 @@
 id: "b035430c-d6fd-4447-b118-c126c38a122d"
 level: "task"
 title: "Document landing through the queue"
-status: "pending"
+status: "in_progress"
 priority: "high"
 source: "ndx-capture"
+startedAt: "2026-10-09T17:07:27.381Z"
 acceptanceCriteria:
   - "CONTRIBUTING.md has a section on landing a pull request: get the approval (a code-owner approval where .github/CODEOWNERS covers a path), then click 'Merge when ready'; the queue tests main plus the PR (or a batch) on a gh-readonly-queue/main/* branch and lands it with a merge commit"
   - "It says the queue's merge method is merge commit and must never be squash or rebase, because rex reads landing from git ancestry and N-DX-Item trailers"
@@ -14,6 +15,6 @@ acceptanceCriteria:
   - "RELEASING.md says the 'Version Packages' PR lands through the queue the same way (approve, then 'Merge when ready'), and that publishing still starts from the push to main the queue's merge commit makes"
   - "No file outside CONTRIBUTING.md, RELEASING.md and .rex/prd_tree/ changes"
 description: "Once main has a merge queue, CONTRIBUTING.md and RELEASING.md must say how a PR lands. Docs only: no package code, no changeset. The repository lands with merge commits only (squash and rebase are disabled; merge_commit_title=PR_TITLE, merge_commit_message=PR_BODY), and rex derives when a change landed from git ancestry and N-DX-Item trailers, so the queue's merge method is merge commit."
-lastModified: "2026-10-09T16:47:57.994Z"
+lastModified: "2026-10-09T17:07:27.705Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
