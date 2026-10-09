@@ -25,7 +25,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A product reshape move drafts an added copy that loses the capability's requirements, dependsOn, tags and body](./a-product-reshape-move-drafts-an-added.md) | in_progress |
+| [A product reshape merge removes merged capabilities without carrying their requirements, dependsOn, tags or body, and leaves dependents naming a retired node](./a-product-reshape-merge-removes-merged.md) | pending |
+| [A product reshape move drafts an added copy that loses the capability's requirements, dependsOn, tags and body](./a-product-reshape-move-drafts-an-added.md) | completed |
 | [Add rex product and rex change commands; ndx add creates a change](./add-rex-product-and-rex-change.md) | completed |
 | [Apply-engine refusals say bare "criteria": "a constraint has no criteria", "a new capability has no criteria to replace or remove"](./apply-engine-refusals-say-bare.md) | pending |
 | [capability-criteria warning says bare "criteria": "Capability X has no criteria"](./capability-criteria-warning-says-bare.md) | completed |
@@ -38,6 +39,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [rex health on a v2 tree drops the reader's parse warnings and reports "no findings" for a tree with skipped nodes](./rex-health-on-a-v2-tree-drops-the.md) | completed |
 | [rex prune on a v2 tree can remove the applied change that marks a product node retired](./rex-prune-on-a-v2-tree-can-remove-the.md) | pending |
 | [rex reshape aborts with no draft when one product proposal places an added node under a node another proposal removes](./rex-reshape-aborts-with-no-draft-when.md) | pending |
+| [rex reshape cannot move or split any product node that a change has ever touched, because apply's History line counts as "a body"](./rex-reshape-cannot-move-or-split-any.md) | pending |
 | [Run the v2 tree rules from rex health and pass structureHealth.maxCriteriaPerCapability to criteria-growth](./run-the-v2-tree-rules-from-rex-health.md) | completed |
 | [Show the product layer delta in tree-diff and emit the PR comment as Markdown](./show-the-product-layer-delta-in-tree.md) | completed |
 | [tree-diff --format=markdown appends "no PRD tree at this source." to the comment on stdout](./tree-diff-format-markdown-appends-no.md) | completed |
