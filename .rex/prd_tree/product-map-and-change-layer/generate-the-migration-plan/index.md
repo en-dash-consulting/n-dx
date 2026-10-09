@@ -30,7 +30,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A spec draft answer with one extra key fails the whole text pass, so no later capability is redrafted and Jev placement does not run](./a-spec-draft-answer-with-one-extra-key.md) | completed |
 | [An incomplete migration plan drops the later passes' recorded answers, so a retry pays for every Jev judgment again](./an-incomplete-migration-plan-drops-the.md) | completed |
 | [Cancelled or deleted children of release epics are held, never rules-placed](./cancelled-or-deleted-children-of.md) | pending |
-| [Capability specs see every placement, including the text and Jev passes'](./capability-specs-see-every-placement.md) | pending |
+| [Capability specs see every placement, including the text and Jev passes'](./capability-specs-see-every-placement.md) | in_progress |
 | [Classify the v1 tree and propose areas and constraints](./classify-the-v1-tree-and-propose-areas.md) | completed |
 | [Draft capability specs with a text model by default](./draft-capability-specs-with-a-text.md) | completed |
 | [Draft present-tense capability specs grounded in code and tests](./draft-present-tense-capability-specs.md) | completed |

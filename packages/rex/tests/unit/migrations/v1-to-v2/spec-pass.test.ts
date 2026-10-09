@@ -1,11 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
 import type { PlacementModel } from "../../../../src/core/placement.js";
+import type { PlacementJudge, PlacementSettings } from "../../../../src/core/placement-policy.js";
 import { specHash } from "../../../../src/schema/v2-rules.js";
 import { v1ToV2, v1TreeSource, type V1ToV2Options } from "../../../../src/migrations/v1-to-v2/index.js";
 import { planSeams } from "../../../../src/migrations/v1-to-v2/seams.js";
 import type { SpecAnswer, SpecModel, SpecQuestion } from "../../../../src/migrations/v1-to-v2/spec-pass.js";
-import type { PlanFile } from "../../../../src/migrations/plan-file.js";
+import { formatPlanFile, type PlanFile } from "../../../../src/migrations/plan-file.js";
+import { choiceAnswer, mockJudge } from "../../../helpers/jev-judge.js";
 
 function item(id: string, level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {
   return { id, level, title, status, children, ...extra };
@@ -222,6 +224,70 @@ describe("v1-to-v2 spec text pass", () => {
     expect(() =>
       planSeams({ text: { model: "a", place: async () => null }, spec: { model: "b", draft: drafter(GOOD) } }),
     ).toThrow(/records one model/);
+  });
+
+  describe("after model placement", () => {
+    /** t9 is applied work the rules hold: it shares only one word with f1. */
+    const held = (): PRDItem[] => [
+      item("e1", "epic", "Planning", [
+        item("f1", "feature", "Task selection", [item("t1", "task", "Add priority ordering")]),
+        item("f2", "feature", "Folder storage", [item("t2", "task", "Write index files")]),
+        item("t9", "task", "Tune selection speed", [], "completed", { acceptanceCriteria: ["Picks a task within 10 ms"] }),
+      ]),
+    ];
+    const CITES_T9: SpecAnswer = {
+      statement: "Picks the next actionable task by priority.",
+      criteria: [{ text: "The system shall pick a task within 10 ms.", source: "t9" }],
+    };
+    const JEV_MODEL = "jev-test";
+    const judge = () => mockJudge({ place: choiceAnswer("f1", 0.95) });
+
+    function placed(settings: PlacementSettings, tiers: { place?: PlacementModel; judge?: PlacementJudge; draft: SpecModel; previous?: PlanFile }) {
+      const seams = planSeams({
+        settings,
+        spec: { model: MODEL, draft: tiers.draft },
+        ...(tiers.place ? { text: { model: MODEL, place: tiers.place } } : {}),
+        ...(tiers.judge ? { jev: { model: JEV_MODEL, judge: tiers.judge } } : {}),
+        jevAvailable: true,
+      });
+      return v1ToV2.plan(v1TreeSource(held()), { cutAt: CUT, seams, ...(tiers.previous ? { previous: tiers.previous } : {}), options: { testFiles: [] } });
+    }
+
+    const cases: Array<[string, PlacementSettings, () => { place?: PlacementModel; judge?: PlacementJudge }]> = [
+      ["the text pass", { models: "text", autoAccept: "agree" }, () => ({ place: vi.fn<PlacementModel>(async () => "f1") })],
+      ["the Jev pass, models jev", { models: "jev", autoAccept: "confident" }, () => ({ judge: judge() })],
+      ["the Jev pass, models both", { models: "both", autoAccept: "agree" }, () => ({ place: vi.fn<PlacementModel>(async () => "f1"), judge: judge() })],
+    ];
+
+    for (const [by, settings, tiers] of cases) {
+      it(`an applied change placed by ${by} is in the spec's sources and question, and a criterion citing it is accepted`, async () => {
+        const rules = await v1ToV2.plan(v1TreeSource(held()), { cutAt: CUT, options: { testFiles: [] } });
+        expect(rules.entries.t9).toMatchObject({ needsPlacement: true, applied: true });
+        expect(rules.entries.f1!.spec!.sources).not.toContain("t9");
+
+        const draft = drafter(CITES_T9);
+        const p = await placed(settings, { ...tiers(), draft });
+        expect(p.entries.t9).toMatchObject({ placement: "f1", modelPlacement: { pass: settings.models === "text" ? "text" : "jev" } });
+        const spec = p.entries.f1!.spec!;
+        expect(spec.sources).toEqual(["f1", "t1", "t9"]);
+        const questions = draft.mock.calls.map(([q]) => q).filter((q) => q.capability.id === "f1");
+        expect(questions).toHaveLength(1);
+        expect(questions[0]!.history.map((h) => h.id)).toEqual(["t1", "t9"]);
+        expect(spec.criteria).toEqual([{ id: "c1", text: "The system shall pick a task within 10 ms.", source: "t9" }]);
+        expect(spec.notes.join("\n")).not.toMatch(/rejected/);
+      });
+
+      it(`a re-run with unchanged inputs makes no model calls (placed by ${by})`, async () => {
+        const first = await placed(settings, { ...tiers(), draft: drafter(CITES_T9) });
+        const again = tiers();
+        const draft = drafter(CITES_T9);
+        const second = await placed(settings, { ...again, draft, previous: first });
+        expect(draft).not.toHaveBeenCalled();
+        if (again.place) expect(again.place).not.toHaveBeenCalled();
+        if (again.judge) expect(again.judge).not.toHaveBeenCalled();
+        expect(formatPlanFile(second)).toBe(formatPlanFile(first));
+      });
+    }
   });
 
   it("asks placement only when the placement tier includes text, even with a spec drafter", async () => {

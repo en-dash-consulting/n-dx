@@ -31,7 +31,7 @@ import { posix } from "node:path";
 import type { PRDItem, Requirement } from "../../schema/v1.js";
 import type { Criterion } from "../../schema/v2.js";
 import { extractKeywords, scoreMatch } from "../../core/keywords.js";
-import { opensWithWorkVerb, type MigrationPlan } from "./migration-plan.js";
+import { opensWithWorkVerb, type PlanEntry } from "./migration-plan.js";
 
 export interface SpecCriterion extends Criterion {
   /** v1 id of the item the criterion came from; always one of the draft's `sources`. */
@@ -336,12 +336,16 @@ function completedHistory(item: PRDItem, out: PRDItem[]): void {
   }
 }
 
-/** The capability's item, then its applied history in plan order: the only items a spec may draw on. */
-export function specSources(plan: MigrationPlan, capability: string, byId: ReadonlyMap<string, PRDItem>): PRDItem[] {
+/**
+ * The capability's item, then its applied history in plan order: the only
+ * items a spec may draw on. The history is every applied change the entries
+ * place on it, whether the rules or a model pass placed it.
+ */
+export function specSources(entries: readonly PlanEntry[], capability: string, byId: ReadonlyMap<string, PRDItem>): PRDItem[] {
   const item = byId.get(capability);
   if (!item) throw new Error(`capability ${capability} is not in the v1 tree the plan was built from`);
   const sources: PRDItem[] = [item];
-  for (const change of plan.entries) {
+  for (const change of entries) {
     if (change.target !== "change" || change.placement !== capability || !change.applied) continue;
     const changeItem = byId.get(change.id);
     if (changeItem) completedHistory(changeItem, sources);
@@ -349,9 +353,9 @@ export function specSources(plan: MigrationPlan, capability: string, byId: Reado
   return sources;
 }
 
-/** Draft a present-tense spec for every capability in the plan, in plan order. */
+/** Draft a present-tense spec for every capability among the plan's entries, in plan order. */
 export function draftCapabilitySpecs(
-  plan: MigrationPlan,
+  plan: { readonly entries: readonly PlanEntry[] },
   items: readonly PRDItem[],
   options: SpecDraftOptions,
 ): CapabilitySpecDraft[] {
@@ -361,7 +365,7 @@ export function draftCapabilitySpecs(
   return plan.entries
     .filter((e) => e.target === "capability")
     .map((entry) => {
-      const sources = specSources(plan, entry.id, byId);
+      const sources = specSources(plan.entries, entry.id, byId);
       const item = sources[0]!;
       const codeFiles = [...(options.codeFiles?.[entry.id] ?? [])].sort();
       const testFiles = scopedTestFiles(options.testFiles, codeFiles);

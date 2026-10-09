@@ -7,9 +7,9 @@
  *
  * A migration plans from a **source adapter**, not from a tree type, so the
  * same pipeline and plan file serve a v1 PRD tree, a codebase map or a tracker
- * import. Planning (`./pipeline.ts`) runs the migration's rules, then an
- * optional text pass, then an optional Jev pass; each model pass calls its
- * injected seam and never a client directly. The plan is written as a plan
+ * import. Planning (`./pipeline.ts`) runs the migration's rules, then its
+ * stages: by default an optional text pass, then an optional Jev pass. Each
+ * model stage calls its injected seam and never a client directly. The plan is written as a plan
  * file (`./plan-file.ts`) for review. `apply` is a slot: nothing fills it yet.
  *
  * @module migrations/migration
@@ -85,6 +85,28 @@ export interface ModelPass<TData, TEntry, TOptions = undefined> {
   ): TEntry | Promise<TEntry>;
 }
 
+/**
+ * A model stage: one model's pass, asked of the entries every stage before it
+ * produced. Several stages may use one model; they share its recorded answers,
+ * so together they ask about an item at most once.
+ */
+export interface ModelStage<TData, TEntry, TOptions = undefined> extends ModelPass<TData, TEntry, TOptions> {
+  model: ModelPassName;
+}
+
+/**
+ * A deterministic stage between model stages: the entries recomputed from
+ * what the stages before it merged. Calls no model, so it runs even after a
+ * model stage stopped.
+ */
+export interface DeriveStage<TData, TEntry, TOptions = undefined> {
+  derive(entries: Readonly<Record<string, TEntry>>, data: TData, context: PlanContext<TOptions>): Record<string, TEntry>;
+}
+
+export type PlanStage<TData, TEntry, TOptions = undefined> =
+  | ModelStage<TData, TEntry, TOptions>
+  | DeriveStage<TData, TEntry, TOptions>;
+
 export interface PlanContext<TOptions = undefined> {
   /** ISO time the plan is cut: the plan's only clock. */
   cutAt: string;
@@ -106,7 +128,10 @@ export interface MigrationDefinition<TData, TEntry, TSummary, TOptions = undefin
   to: string;
   /** Deterministic: same data and context, same result. */
   rules(data: TData, context: PlanContext<TOptions>): RulesResult<TEntry, TSummary>;
+  /** One pass per model, run text then Jev. Shorthand for `stages`; give one or the other. */
   passes?: Partial<Record<ModelPassName, ModelPass<TData, TEntry, TOptions>>>;
+  /** The work after the rules, in order, when one pass per model is not enough. */
+  stages?: readonly PlanStage<TData, TEntry, TOptions>[];
   /**
    * The plan-wide summary from the final entries, after every pass ran (or
    * after the rules alone). Deterministic, like the rules. Absent: the rules'

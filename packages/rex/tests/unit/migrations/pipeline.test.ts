@@ -258,6 +258,83 @@ describe("plan pipeline", () => {
     await expect(stray.plan(source, { cutAt: CUT, seams: { text: textSeam() } })).rejects.toThrow(/no source item and entry/);
   });
 
+  describe("stages", () => {
+    type StagedEntry = RouteEntry & { derived?: boolean };
+    const draftStage = (id: string) => ({
+      model: "text" as const,
+      questions: (entries: Readonly<Record<string, StagedEntry>>) => [{ id, question: { draft: entries[id]!.title, derived: entries[id]!.derived ?? false } }],
+      merge: (entry: StagedEntry, answer: unknown) => ({ ...entry, statement: String(answer) }),
+    });
+    /** Text drafts /tasks, Jev judges it, a derive stage marks every entry, then text drafts /runs. */
+    const staged = defineMigration<Route[], StagedEntry, { routes: number }>({
+      id: "staged",
+      from: "map",
+      to: "v2",
+      rules: bootstrapDefinition.rules,
+      stages: [
+        draftStage("/tasks"),
+        {
+          model: "jev",
+          questions: (entries) => [{ id: "/tasks", question: { judge: entries["/tasks"]!.statement } }],
+          merge: (entry, answer) => ({ ...entry, confidence: Number(answer) }),
+        },
+        { derive: (entries) => Object.fromEntries(Object.entries(entries).map(([id, e]) => [id, { ...e, derived: true }])) },
+        draftStage("/runs"),
+      ],
+    });
+    const draftSeam = () => seam("text-model", (q) => `Answers ${(q.question as { draft: string }).draft}.`);
+
+    it("run in order, each reading the entries the stages before it left, with one answer map per model", async () => {
+      const text = draftSeam();
+      const jev = jevSeam();
+      const plan = await staged.plan(routeSource(ROUTES()), { cutAt: CUT, seams: { text, jev } });
+      expect(text.ask.mock.calls.map(([q]) => q)).toEqual([
+        { id: "/tasks", question: { draft: "listTasks", derived: false } },
+        { id: "/runs", question: { draft: "listRuns", derived: true } },
+      ]);
+      expect(jev.ask).toHaveBeenCalledWith({ id: "/tasks", question: { judge: "Answers listTasks." } });
+      expect(plan.header.passes).toEqual([{ name: "rules" }, { name: "text", model: "text-model" }, { name: "jev", model: "jev-model" }]);
+      expect(Object.keys(plan.answers.text ?? {})).toEqual(["/tasks", "/runs"]);
+
+      const again = { text: draftSeam(), jev: jevSeam() };
+      const second = await staged.plan(routeSource(ROUTES()), { cutAt: CUT, seams: again, previous: parsePlanFile(formatPlanFile(plan)) });
+      expect(again.text.ask).not.toHaveBeenCalled();
+      expect(again.jev.ask).not.toHaveBeenCalled();
+      expect(formatPlanFile(second)).toBe(formatPlanFile(plan));
+    });
+
+    it("refuse a model asking about one item in two stages", async () => {
+      const twice = defineMigration<Route[], StagedEntry, { routes: number }>({ ...bootstrapDefinition, id: "twice", passes: undefined, stages: [draftStage("/tasks"), draftStage("/tasks")] });
+      await expect(twice.plan(routeSource(ROUTES()), { cutAt: CUT, seams: { text: draftSeam() } })).rejects.toThrow(/text pass asked about \/tasks twice/);
+    });
+
+    it("refuse a migration that defines both passes and stages", async () => {
+      const both = defineMigration<Route[], StagedEntry, { routes: number }>({ ...bootstrapDefinition, id: "both", stages: [] });
+      await expect(both.plan(routeSource(ROUTES()), { cutAt: CUT })).rejects.toThrow(/both passes and stages/);
+    });
+
+    it("after a seam error, still derive, skip later model stages and keep their earlier answers", async () => {
+      const first = await staged.plan(routeSource(ROUTES()), { cutAt: CUT, seams: { text: draftSeam(), jev: jevSeam() } });
+      const changed = ROUTES();
+      changed[0] = { path: "/tasks", handler: "listTasksV2" };
+      const down = seam("jev-model", () => {
+        throw new Error("down");
+      });
+      const text = draftSeam();
+      const plan = await staged.plan(routeSource(changed), { cutAt: CUT, seams: { text, jev: down }, previous: first });
+      expect(plan.header.passes).toEqual([
+        { name: "rules" },
+        { name: "text", model: "text-model" },
+        { name: "jev", model: "jev-model", incomplete: { error: "down" } },
+      ]);
+      expect(text.ask).toHaveBeenCalledTimes(1);
+      expect(plan.entries["/runs"]?.derived).toBe(true);
+      expect(plan.entries["/runs"]?.statement).toBeUndefined();
+      expect(plan.answers.text?.["/runs"]).toEqual(first.answers.text?.["/runs"]);
+      expect(plan.answers.jev).toEqual({});
+    });
+  });
+
   it("changes the source digest when an item changes", async () => {
     const a = await bootstrap.plan(routeSource(ROUTES()), { cutAt: CUT });
     const b = await bootstrap.plan(routeSource([{ path: "/tasks", handler: "other" }, ROUTES()[1]!]), { cutAt: CUT });

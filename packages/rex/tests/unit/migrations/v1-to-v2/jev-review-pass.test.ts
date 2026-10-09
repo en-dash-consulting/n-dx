@@ -53,14 +53,14 @@ describe("v1-to-v2 Jev review", () => {
     expect(rules.summary.reviewQueue).toEqual([{ id: "t9", held: true }]);
   });
 
-  it("asks one request per item, batching its questions under the migration judge class", async () => {
+  it("asks one request per item, batching its questions under the migration judge class, held items first", async () => {
     const judge = judgeWith({ place: choiceAnswer("f1", 0.5) });
     await plan(CONFIDENT, judge);
     const asked = judge.mock.calls.map(([request, opts]) => ({ questions: Object.keys(request.questions).sort(), opts }));
     expect(asked).toEqual([
+      { questions: ["kind", "place"], opts: { taskClass: MIGRATION_JUDGE_TASK_CLASS } },
       { questions: ["job"], opts: { taskClass: MIGRATION_JUDGE_TASK_CLASS } },
       { questions: ["criterion:c1", "link:l1"], opts: { taskClass: MIGRATION_JUDGE_TASK_CLASS } },
-      { questions: ["kind", "place"], opts: { taskClass: MIGRATION_JUDGE_TASK_CLASS } },
     ]);
   });
 
@@ -172,7 +172,7 @@ describe("v1-to-v2 Jev review", () => {
   it("the jevReview option reviews when rex.placement leaves Jev out of placement", async () => {
     const judge = judgeWith({ kind: choiceAnswer("change", 0.4) });
     const p = await plan({ models: "text", autoAccept: "agree" }, judge, { seams: { jevReview: true } });
-    expect(judge.mock.calls.map(([r]) => Object.keys(r.questions).sort())).toEqual([["job"], ["criterion:c1", "link:l1"], ["kind"]]);
+    expect(judge.mock.calls.map(([r]) => Object.keys(r.questions).sort())).toEqual([["kind"], ["job"], ["criterion:c1", "link:l1"]]);
     expect(p.entries.t9).toMatchObject({ needsPlacement: true, confidence: 0.4, jevReview: { kind: { choice: "change" } } });
     expect(p.entries.t9?.modelPlacement).toBeUndefined();
 
@@ -193,9 +193,14 @@ describe("v1-to-v2 Jev review", () => {
   });
 
   it("a response missing a review answer stops the pass instead of recording it", async () => {
-    const judge = vi.fn<PlacementJudge>(async () => ({ model: "jev-1.0.0", answers: {} }));
+    const full = judgeWith({ place: choiceAnswer("f1", 0.5) });
+    const judge = vi.fn<PlacementJudge>(async (request, opts) => {
+      const { job: _job, ...answers } = (await full(request, opts)).answers;
+      return { model: "jev-1.0.0", answers };
+    });
     const p = await plan(CONFIDENT, judge);
     expect(p.header.passes.at(-1)?.incomplete?.error).toContain("job");
-    expect(p.answers.jev).toEqual({});
+    // The held change, asked first, is recorded; the area whose answer lacked "job" is not.
+    expect(Object.keys(p.answers.jev ?? {})).toEqual(["t9"]);
   });
 });

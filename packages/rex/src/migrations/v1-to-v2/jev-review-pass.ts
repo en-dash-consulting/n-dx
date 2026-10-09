@@ -2,8 +2,9 @@
  * Migration plan, Jev review: optional judgments, a confidence per entry, and
  * the review queue.
  *
- * The Jev pass sends one request per item, batching that item's independent
- * questions:
+ * Jev sends one request per item, batching that item's independent questions,
+ * in two stages: held changes before the specs are drafted
+ * ({@link jevHeldPass}), everything else after ({@link jevReviewPass}).
  *
  * - a held change (`needsPlacement`): its placement choice
  *   (`./placement-pass.ts`, when Jev places) and a kind choice: area,
@@ -357,34 +358,49 @@ function lowestConfidence(entry: Entry): number | undefined {
 }
 
 /**
- * The Jev pass: one bundled question per item that has a placement or review
- * question. Placement questions come from `placementJevPass`.
+ * One bundled Jev question per item that has a placement or review question,
+ * among the held entries (`held`) or the rest. Placement questions come from
+ * `placementJevPass` and are only ever about held entries.
  */
-export const jevPass: ModelPass<readonly PRDItem[], Entry, Options> = {
-  questions(entries, items, context) {
-    const placements = new Map(placementJevPass.questions(entries, items, context).map((q) => [q.id, q.question as PlacementQuestion]));
-    const review = reviewEnabled(context);
-    const byId = review ? indexItems(items) : new Map<string, PRDItem>();
-    const out: ModelQuestion[] = [];
-    for (const e of Object.values(entries)) {
-      const placement = placements.get(e.id);
-      const r = review ? reviewQuestionOf(e, byId.get(e.id)) : undefined;
-      if (!placement && !r) continue;
-      const question: JevBundleQuestion = { kind: "jev", ...(placement ? { placement } : {}), ...(r ? { review: r } : {}) };
-      out.push({ id: e.id, question });
-    }
-    return out;
-  },
-  async merge(entry, answer, { question, context }) {
-    if (!isBundle(question)) throw new Error(`Jev answer for ${entry.id} to a question that is not a Jev question`);
-    const raw = answer as JevBundleAnswer;
-    let next = entry;
-    if (question.placement) next = await placementJevPass.merge(next, raw, { question: question.placement, context });
-    if (question.review) next = mergeReview(next, question.review, raw, context);
-    const confidence = lowestConfidence(next);
-    return confidence === undefined ? next : { ...next, confidence };
-  },
-};
+function jevPassOver(held: boolean): ModelPass<readonly PRDItem[], Entry, Options> {
+  return {
+    questions(entries, items, context) {
+      const placements = held
+        ? new Map(placementJevPass.questions(entries, items, context).map((q) => [q.id, q.question as PlacementQuestion]))
+        : new Map<string, PlacementQuestion>();
+      const review = reviewEnabled(context);
+      const byId = review ? indexItems(items) : new Map<string, PRDItem>();
+      const out: ModelQuestion[] = [];
+      for (const e of Object.values(entries)) {
+        if ((e.needsPlacement === true) !== held) continue;
+        const placement = placements.get(e.id);
+        const r = review ? reviewQuestionOf(e, byId.get(e.id)) : undefined;
+        if (!placement && !r) continue;
+        const question: JevBundleQuestion = { kind: "jev", ...(placement ? { placement } : {}), ...(r ? { review: r } : {}) };
+        out.push({ id: e.id, question });
+      }
+      return out;
+    },
+    async merge(entry, answer, { question, context }) {
+      if (!isBundle(question)) throw new Error(`Jev answer for ${entry.id} to a question that is not a Jev question`);
+      const raw = answer as JevBundleAnswer;
+      let next = entry;
+      if (question.placement) next = await placementJevPass.merge(next, raw, { question: question.placement, context });
+      if (question.review) next = mergeReview(next, question.review, raw, context);
+      const confidence = lowestConfidence(next);
+      return confidence === undefined ? next : { ...next, confidence };
+    },
+  };
+}
+
+/** The Jev pass over held changes: placement, when Jev places, and the kind question. Runs before specs are drafted. */
+export const jevHeldPass = jevPassOver(true);
+
+/**
+ * The Jev pass over everything else: areas and drafted capabilities. Runs
+ * after the text pass redrafts the specs, so it reviews the final drafts.
+ */
+export const jevReviewPass = jevPassOver(false);
 
 // ── Summary ──────────────────────────────────────────────────────
 
