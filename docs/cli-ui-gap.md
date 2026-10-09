@@ -146,7 +146,8 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `rex usage` | full | medium | Same coverage as `ndx usage` |
 | `rex report` | none | low | JSON for CI; health view covers interactive use |
 | `rex facets` (MCP `facets`) | partial | low | **Deferred by decision (2026-08-14).** Facet filters exist in the PRD tree. A distribution view was scoped and skipped: `facets` is MCP-only (no CLI command), no facets are configured in this project, and the panel would render an empty state for most users. Revisit if facet configuration becomes common. |
-| `rex migrate-to-md` / `migrate-folder-tree-filenames` / `backfill-commit-attribution` | n/a | — | One-time migrations; terminal-only by design |
+| `rex migrate-to-md` / `migrate-folder-tree-filenames` | n/a | — | One-time migrations; terminal-only by design |
+| `rex backfill-commit-attribution` | none | low | Read-only report of commits on the default branch that carry no `N-DX-Item` / `N-DX-Status` trailer, grouped by author and month. `--json` for CI. Terminal-only for now; a coverage panel would belong beside the PRD view |
 | `rex mcp` | n/a | — | Server plumbing; MCP HTTP endpoints served by the dashboard itself |
 
 ## sourcevision package CLI
@@ -277,7 +278,7 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 | `sourcevision reset` | Destructive, low frequency |
 | `sourcevision serve` | Superseded by `ndx start` |
 | `sourcevision git-credential-helper` | Interactive terminal flow |
-| `rex migrate-*` / `backfill-commit-attribution` | One-time migrations |
+| `rex migrate-*` | One-time migrations |
 | `rex mcp` / `sourcevision mcp` | Transport plumbing; HTTP MCP is served by the dashboard |
 | `hench record` | Skill-integration plumbing (writes the run record, and the tokens the skill spent) |
 | MCP `get_capabilities` | Protocol handshake |

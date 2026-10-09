@@ -20,7 +20,7 @@ Gone from the public API: `loadAdapterConfigs`, `getAdapterConfig`,
 This supersedes the earlier plan to keep the redaction and env-var helpers for a
 future work-tracker bridge. That plan predated the removal of their last caller.
 Keeping them would have frozen a credential-persistence API for a feature that no
-longer exists into the 1.0.0 surface, on the strength of a consumer that does not
+longer exists into the frozen public surface, on the strength of a consumer that does not
 exist yet and will own its own config when it does — the helpers are forty lines of
 string manipulation, cheaper to write again in the right package than to carry as a
 semver commitment in the wrong one.

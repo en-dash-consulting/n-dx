@@ -21,7 +21,8 @@
  * | `N-DX-Status:`  | what status changed      | `<taskId> in_progress → completed`       |
  *
  * `N-DX:` takes a free-form producer string. `N-DX-Status:` is emitted by the
- * hench run loop and consumed by `rex backfill-commit-attribution`.
+ * hench run loop. `rex backfill-commit-attribution` reads both `N-DX-Item:` and
+ * `N-DX-Status:` to report how much of history carries neither.
  *
  * `N-DX-Item:` carries the **item id**. It used to carry a dashboard permalink
  * (`<publicUrl>/#/rex/item/<id>`), which baked the writer's host — usually

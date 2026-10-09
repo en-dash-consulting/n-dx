@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { PRDStore } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, TurnTokenUsage } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
 import { GuardRails } from "../../guard/index.js";
 import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, dispatchTool } from "../../tools/dispatch.js";
 import type { ToolContext } from "../../tools/contracts.js";
@@ -38,11 +38,13 @@ import type { PruneOutcome, PruneShape } from "./context-prune.js";
 import { parseTokenUsageWithDiagnostic } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
+import { formatTaskBrief } from "../planning/brief.js";
 import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
 import { createLivelockDetector } from "../analysis/livelock.js";
 import type { LivelockDetector } from "../analysis/livelock.js";
 import {
   prepareBrief,
+  withCommitTrailers,
   executeDryRun,
   transitionToInProgress,
   initRunRecord,
@@ -699,7 +701,8 @@ interface GeminiToolLoopParams {
   config: HenchConfig;
   model: string;
   systemPrompt: string | undefined;
-  briefText: string;
+  /** Rendered once the run exists, with its commit trailers (see briefForRun). */
+  brief: TaskBrief;
   taskTitle: string;
   testCommand: string | undefined;
   taskId: string;
@@ -738,7 +741,7 @@ interface GeminiToolLoopParams {
  */
 async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoopResult> {
   const {
-    provider, config, model, systemPrompt, briefText, taskTitle, testCommand,
+    provider, config, model, systemPrompt, brief, taskTitle, testCommand,
     taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
     baselineUntracked, baselineDirty, llmConfig, opts,
   } = params;
@@ -763,6 +766,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
   });
+  const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
   section(
     opts.runNumber !== undefined
@@ -1294,7 +1298,8 @@ async function runLocalToolLoop(params: {
   config: HenchConfig;
   model: string;
   systemPrompt: string | undefined;
-  briefText: string;
+  /** Rendered once the run exists, with its commit trailers (see briefForRun). */
+  brief: TaskBrief;
   taskTitle: string;
   testCommand: string | undefined;
   taskId: string;
@@ -1310,7 +1315,7 @@ async function runLocalToolLoop(params: {
   opts: AgentLoopOptions;
 }): Promise<AgentLoopResult> {
   const {
-    provider, config, model, systemPrompt, briefText, taskTitle, testCommand,
+    provider, config, model, systemPrompt, brief, taskTitle, testCommand,
     taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
     baselineUntracked, baselineDirty, llmConfig, opts,
   } = params;
@@ -1366,6 +1371,7 @@ async function runLocalToolLoop(params: {
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
   });
+  const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
   section(
     opts.runNumber !== undefined
@@ -1741,8 +1747,10 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const tokenBudget = opts.tokenBudget ?? config.tokenBudget;
   const model = resolveModel(opts.model ?? config.model);
 
-  // Shared: assemble brief, format, build system prompt, display task info
-  const { brief, taskId, briefText, systemPrompt } = await prepareBrief(
+  // Shared: assemble brief, format, build system prompt, display task info.
+  // Each loop below re-renders the brief once its run record exists (see
+  // briefForRun): the commit trailers it adds name the run.
+  const { brief, taskId, briefText: selectionBriefText, systemPrompt } = await prepareBrief(
     store, config, opts.taskId,
     { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, claims: opts.claims, wouldResetIds: opts.wouldResetIds },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
@@ -1753,7 +1761,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   if (dryRun) {
     const run = executeDryRun({
       label: "",
-      briefText,
+      briefText: selectionBriefText,
       systemPrompt,
       taskId,
       taskTitle: brief.task.title,
@@ -1850,7 +1858,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       config,
       model,
       systemPrompt,
-      briefText,
+      brief,
       taskTitle: brief.task.title,
       testCommand: brief.project.testCommand,
       taskId,
@@ -1874,7 +1882,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       config,
       model,
       systemPrompt,
-      briefText,
+      brief,
       taskTitle: brief.task.title,
       testCommand: brief.project.testCommand,
       taskId,
@@ -1913,6 +1921,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
   });
+  const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: briefText },

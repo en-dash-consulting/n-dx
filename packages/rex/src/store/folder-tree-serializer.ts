@@ -643,6 +643,16 @@ export function isWindowsSafeSegment(segment: string): boolean {
 }
 
 /**
+ * Whether `slug` can be frozen on a v2 node: Windows-safe, and not `index`
+ * (any case). A leaf named `index` would overwrite its folder's `index.md`, and
+ * a folder node becomes a leaf when it loses its last child, so no node may
+ * freeze it.
+ */
+export function isUsableFrozenSlug(slug: string): boolean {
+  return isWindowsSafeSegment(slug) && slug.toLowerCase() !== "index";
+}
+
+/**
  * Version of the slug rule implemented below.
  *
  * "The rule" is the three functions that follow — {@link slugifyTitle},

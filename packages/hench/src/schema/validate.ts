@@ -389,6 +389,11 @@ const RunCommitRecordSchema = z.object({
   subject: z.string(),
 });
 
+/** See `RunRecord.commitsMissingItem`. */
+const RunCommitItemMismatchSchema = RunCommitRecordSchema.extend({
+  items: z.array(z.string()),
+});
+
 export const RunRecordSchema = z.object({
   id: z.string(),
   taskId: z.string(),
@@ -440,6 +445,7 @@ export const RunRecordSchema = z.object({
   pid: z.number().int().positive().optional(),
   vendorPid: z.number().int().positive().optional(),
   commits: z.array(RunCommitRecordSchema).optional(),
+  commitsMissingItem: z.array(RunCommitItemMismatchSchema).optional(),
   // Boolean is the legacy shape (records written before the paths existed);
   // new records carry the paths the record commit tried to stage.
   recordCommitPending: z

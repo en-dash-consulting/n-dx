@@ -1,0 +1,21 @@
+---
+id: "1ba34994-ebee-46a6-abe6-fe172ab9dbb3"
+level: "task"
+title: "The statement check rejects valid present-tense statements that name a task, change, item or PR, or open with a code span"
+status: "completed"
+priority: "medium"
+source: "live-run"
+startedAt: "2026-10-09T14:52:37.252Z"
+completedAt: "2026-10-09T15:01:41.220Z"
+endedAt: "2026-10-09T15:01:41.220Z"
+resolutionType: "code-change"
+resolutionDetail: "NOT_A_STATEMENT no longer rejects an opening code span; WORK_SHAPED matches only \"this feature/task/…\", not \"the task/change/item/PR\"."
+acceptanceCriteria:
+  - "isPresentTenseStatement accepts \"Hench refuses to mark a task completed while the task's work is still uncommitted\" and \"`ndx self-heal` persists its recommendations into the PRD as tagged items\" (test)"
+  - "It still rejects work- or wish-shaped text: \"This feature will add X\", \"We need to support Y\", \"Add a Z\", \"TODO: …\" (test)"
+  - "A markdown heading, list item, table row or a \"Severity:\" line is still not a statement (test)"
+  - "Re-checking the 21 statements rejected in the full-tree live run accepts at least 20 of them (test with those sentences as fixtures)"
+description: "From the full-tree live run of 2026-10-09 (text claude-sonnet-5-5, 309 capabilities): the text model wrote a present-tense statement for every capability, but the merge rejected 21 as \"not present tense\" and kept the template statement, so 20 capabilities have none. All 21 are valid statements, e.g. \"Hench refuses to mark a task completed while the task's work is still uncommitted…\", \"`ndx self-heal` persists its recommendations into the PRD as tagged items…\", \"Rex stores each PRD item at a readable, title-only slug path…\".\n\nCause, in isPresentTenseStatement (packages/rex/src/migrations/v1-to-v2/capability-spec.ts:238): NOT_A_STATEMENT (line 227) rejects any statement opening with a backtick code span, and WORK_SHAPED (line 229) rejects any statement containing \"the task\", \"the change\", \"the item\", \"the PR\" and similar, which are product vocabulary in a PRD tool rather than signs of work. The same check guards the template's own statement drafting.\n\nCaptured overnight under PR 13 by the side session; Ryan may move it to the review follow-ups.\n\nBefore finishing, run `pnpm --filter @n-dx/rex build`, and run it again after any review repair that edits rex source: the affected test gate refuses a stale rex dist/, and hench does not rebuild before it."
+lastModified: "2026-10-09T15:01:41.821Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

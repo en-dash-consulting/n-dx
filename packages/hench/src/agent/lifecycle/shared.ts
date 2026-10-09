@@ -22,7 +22,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD, DEFAULT_GIT_COMMIT_MESSAGE_SOURCE } from "../../schema/index.js";
 import type { GitCommitMessageSource } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -61,6 +61,7 @@ import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import { formatMissingReviewRefusal, reviewNeverRan } from "../analysis/adversarial-review.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
+import { appendTrailerBlock } from "./commit-trailers.js";
 import { buildPreRunCommitSubject } from "./pre-run-commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
@@ -90,7 +91,7 @@ import {
   prepareRecoveryPathspecs,
   renderPaths,
 } from "./uncommitted-work-gate.js";
-import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
+import type { CommitMsgWatcher, CommitMsgWatcherOptions } from "./commit-msg-watcher.js";
 
 // ---------------------------------------------------------------------------
 // Co-authorship trailer
@@ -104,6 +105,92 @@ import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
  */
 export function buildCoAuthoredByTrailerLine(): string {
   return "Co-Authored-By: En Dash's n-dx <n-dx@endash.us>";
+}
+
+/**
+ * The trailers hench puts on a commit it makes for a run, in block order:
+ * N-DX-Status (when the commit records a status change), N-DX (vendor, model,
+ * run), N-DX-Item (the item id, which rex's `computeChangeCommits` reads) and
+ * Co-Authored-By. Shared by the normal commit path and the timer-expiry
+ * auto-commit so both land the same trailers.
+ */
+export function buildRunTrailers(
+  run: Pick<RunRecord, "id" | "vendor" | "model" | "weight" | "diagnostics">,
+  taskId: string | undefined,
+  opts: { status?: { from: string; to: string } } = {},
+): string[] {
+  const trailers: string[] = [];
+  if (opts.status && taskId) {
+    trailers.push(`N-DX-Status: ${taskId} ${opts.status.from} → ${opts.status.to}`);
+  }
+  const vendor = run.vendor ?? run.diagnostics?.vendor ?? "unknown";
+  const model = run.model ?? "unknown";
+  const weight = run.weight && run.weight !== "standard" ? ` (${run.weight})` : "";
+  trailers.push(`N-DX: ${vendor}/${model}${weight} · run ${run.id}`);
+  if (taskId) trailers.push(`N-DX-Item: ${taskId}`);
+  trailers.push(buildCoAuthoredByTrailerLine());
+  return trailers;
+}
+
+/**
+ * Options for the run's timer-expiry commit watcher. The trailers are what
+ * give the auto-commit an N-DX-Item for rex's realized-by edge; keeping the
+ * wiring here lets a test pin it without driving the whole CLI loop.
+ */
+export function commitMsgWatcherOptions(
+  run: RunRecord,
+  taskId: string | undefined,
+  config: { commitMsgTimeoutMs?: number },
+  projectDir: string,
+): CommitMsgWatcherOptions {
+  return {
+    projectDir,
+    timeoutMs: config.commitMsgTimeoutMs ?? 0,
+    // RunRecord carries worktreeRoot/branch/startHead under those exact names.
+    origin: run,
+    trailers: buildRunTrailers(run, taskId),
+  };
+}
+
+/**
+ * The trailers the agent puts on a commit it writes itself (the autoCommit
+ * path, or the message it proposes): the run's N-DX and N-DX-Item lines,
+ * exactly as {@link buildRunTrailers} writes them, without hench's own
+ * Co-Authored-By — the agent adds its own.
+ */
+export function buildAgentCommitTrailers(
+  run: Pick<RunRecord, "id" | "taskId" | "vendor" | "model" | "weight" | "diagnostics">,
+): string[] {
+  const coAuthor = buildCoAuthoredByTrailerLine();
+  return buildRunTrailers(run, run.taskId).filter((line) => line !== coAuthor);
+}
+
+/**
+ * The selection-time brief plus the run's commit trailers
+ * ({@link buildAgentCommitTrailers}), which need the run id and so cannot be
+ * rendered before the run record exists. Loops that send only the brief text
+ * call this and {@link formatTaskBrief}; they skip the envelope.
+ */
+export function withCommitTrailers(
+  brief: TaskBrief,
+  run: Pick<RunRecord, "id" | "taskId" | "vendor" | "model" | "weight" | "diagnostics">,
+): TaskBrief {
+  return { ...brief, commitTrailers: buildAgentCommitTrailers(run) };
+}
+
+/** {@link withCommitTrailers}, rendered both as text and as a prompt envelope. */
+export function briefForRun(
+  brief: TaskBrief,
+  run: Pick<RunRecord, "id" | "taskId" | "vendor" | "model" | "weight" | "diagnostics">,
+  config: HenchConfig,
+  extraContext?: string,
+): { brief: TaskBrief; briefText: string; envelope: PromptEnvelope } {
+  const withTrailers = withCommitTrailers(brief, run);
+  return {
+    brief: withTrailers,
+    briefText: formatTaskBrief(withTrailers),
+    envelope: buildPromptEnvelope(withTrailers, config, extraContext),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -807,7 +894,7 @@ export interface StageRunWorkResult {
  *   rest" from meaning `git add -A`, which is explicitly what the agent is
  *   told never to do.
  * - **Hench's own runtime artifacts**, including `.hench-commit-msg.txt`
- *   itself — committing the sentinel would be absurd, and the run-logs are
+ *   and the skills' `.ndx-commit-msg.txt` itself — committing the sentinel would be absurd, and the run-logs are
  *   gitignored by `hench init` anyway.
  * - **The PRD paths.** `performCommitPromptIfNeeded` stages those itself
  *   after writing the completion, so that the status transition and the code
@@ -2291,7 +2378,8 @@ async function scopePrdPathsToReport(
  * The commit is scoped to those same paths, so it lands the PRD write and
  * nothing else — work the operator had already staged stays staged.
  *
- * `itemId`, when the write is for one item, becomes an `N-DX-Item` trailer —
+ * `producer` becomes the `N-DX:` trailer. `itemId`, when the write is for one
+ * item, becomes an `N-DX-Item` trailer —
  * the same trailer the work commit carries, read by rex's `computeChangeCommits`
  * to tie a commit to the item it realizes. Callers whose write spans several
  * items (`commitResetDeferredChanges`) pass none rather than picking one.
@@ -2313,6 +2401,7 @@ export interface PrdTreeCommitResult {
 async function commitPrdTreeIfStaged(
   projectDir: string,
   message: string,
+  producer: string,
   report?: SaveFileReport | null,
   itemId?: string,
 ): Promise<PrdTreeCommitResult> {
@@ -2361,9 +2450,11 @@ async function commitPrdTreeIfStaged(
     // One `-m` for the whole trailer block: a second `-m` inserts a blank line,
     // which ends the block and leaves anything after it as body text git will
     // not parse as a trailer.
-    const trailers = itemId
-      ? `N-DX-Item: ${itemId}\n${buildCoAuthoredByTrailerLine()}`
-      : buildCoAuthoredByTrailerLine();
+    const trailers = [
+      `N-DX: ${producer}`,
+      ...(itemId ? [`N-DX-Item: ${itemId}`] : []),
+      buildCoAuthoredByTrailerLine(),
+    ].join("\n");
     await execGitMutation(
       projectDir,
       ["commit", "-m", message, "-m", trailers, "--", ...prdPaths],
@@ -2409,7 +2500,7 @@ async function commitCompletionMetadata(
   // whole `.rex/prd_tree/`, which under the no-concurrent-PRD-writers contract
   // is just this run's metadata. The message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
-  const result = await commitPrdTreeIfStaged(projectDir, message, report, taskId);
+  const result = await commitPrdTreeIfStaged(projectDir, message, "PRD record (task completion)", report, taskId);
   if (result.error) {
     detail(`Warning: could not commit PRD tree changes: ${result.error.message}`);
   } else if (result.staged > 0) {
@@ -2471,7 +2562,7 @@ export async function commitResetDeferredChanges(
   const message = `chore(prd): reset ${resetCount} deferred/failing task(s) to pending (--reset-deferred)`;
   // No `N-DX-Item`: the reset spans every task it touched, so naming one of
   // them would attribute the whole commit to it in rex's realized-by edge.
-  const result = await commitPrdTreeIfStaged(projectDir, message, report);
+  const result = await commitPrdTreeIfStaged(projectDir, message, "PRD record (--reset-deferred)", report);
   if (result.error) {
     detail(`Warning: could not commit --reset-deferred changes: ${result.error.message}`);
   } else if (result.staged > 0) {
@@ -2962,71 +3053,28 @@ export async function performCommitPromptIfNeeded(
     }
   }
 
-  // Append N-DX-Status trailer if status changed
-  if (oldStatus && newStatus && oldStatus !== newStatus && taskId) {
-    try {
-      const { writeFileSync } = await import("node:fs");
-      const currentMessage = readFileSync(msgPath, "utf-8");
-      // Git trailers are separated from the body by a blank line
-      const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
-      const trailer = `${separator}N-DX-Status: ${taskId} ${oldStatus} → ${newStatus}`;
-      writeFileSync(msgPath, currentMessage + trailer, "utf-8");
-    } catch (err) {
-      // Best-effort: if trailer append fails, proceed with commit anyway
-      detail(`Warning: could not add status trailer: ${(err as Error).message}`);
-    }
-  }
-
-  // Append N-DX authorship trailer with vendor, model, and run ID
-  try {
-    const { writeFileSync } = await import("node:fs");
-    const vendor = run.vendor ?? run.diagnostics?.vendor ?? "unknown";
-    const model = run.model ?? "unknown";
-    const runId = run.id;
-    const weight = run.weight && run.weight !== "standard" ? ` (${run.weight})` : "";
-
-    const currentMessage = readFileSync(msgPath, "utf-8");
-    // Git trailers are separated from the body by a blank line
-    const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
-    const authTrailer = `${separator}N-DX: ${vendor}/${model}${weight} · run ${runId}`;
-    writeFileSync(msgPath, currentMessage + authTrailer, "utf-8");
-  } catch (err) {
-    // Best-effort: if trailer append fails, proceed with commit anyway
-    detail(`Warning: could not add authorship trailer: ${(err as Error).message}`);
-  }
-
-  // Append N-DX-Item trailer naming the PRD item this commit is for.
+  // Append hench's trailers as one block. git parses trailers from the final
+  // paragraph only, so they must share one block — the agent's own, when its
+  // message ends in one. Appended one at a time they were split by blank lines,
+  // and rex's computeChangeCommits (`%(trailers:key=N-DX-Item)`) never saw the
+  // item.
   //
-  // The value is the item id, not a dashboard permalink. A permalink embedded
-  // the reader's host — usually `http://localhost:3117` — so the trailer went
-  // stale the moment the dashboard moved and said nothing useful in a clone
-  // that never ran one. The id is the identity the readers already want:
-  // `itemIdFromTrailer` in rex's `core/change-commits.ts` unwraps a legacy
-  // permalink to the same id, so both forms keep resolving.
-  if (taskId) {
-    try {
-      const { writeFileSync } = await import("node:fs");
-      const currentMessage = readFileSync(msgPath, "utf-8");
-      // Git trailers are separated from the body by a blank line
-      const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
-      const itemTrailer = `${separator}N-DX-Item: ${taskId}`;
-      writeFileSync(msgPath, currentMessage + itemTrailer, "utf-8");
-    } catch (err) {
-      // Best-effort: if trailer append fails, proceed with commit anyway
-      detail(`Warning: could not add item trailer: ${(err as Error).message}`);
-    }
-  }
-
-  // Append Co-Authored-By trailer for GitHub co-authorship attribution.
-  // This makes the commit appear in GitHub's contribution graph and audit logs
-  // under the ndx co-author identity.
+  // - N-DX-Status: the status change this commit records, when there was one.
+  // - N-DX: what produced the commit (vendor, model, run).
+  // - N-DX-Item: the PRD item this commit is for. The value is the item id, not
+  //   a dashboard permalink, which embedded the writer's host and went stale
+  //   when the dashboard moved. `itemIdFromTrailer` in rex's
+  //   `core/change-commits.ts` unwraps a legacy permalink to the same id.
+  // - Co-Authored-By: GitHub co-authorship attribution.
+  const trailers = buildRunTrailers(run, taskId, {
+    status: oldStatus && newStatus && oldStatus !== newStatus ? { from: oldStatus, to: newStatus } : undefined,
+  });
   try {
     const { writeFileSync } = await import("node:fs");
-    const currentMessage = readFileSync(msgPath, "utf-8");
-    const separator = currentMessage.endsWith("\n\n") || currentMessage.endsWith("\n") ? "\n" : "\n\n";
-    writeFileSync(msgPath, currentMessage + separator + buildCoAuthoredByTrailerLine(), "utf-8");
+    writeFileSync(msgPath, appendTrailerBlock(readFileSync(msgPath, "utf-8"), trailers), "utf-8");
   } catch (err) {
-    detail(`Warning: could not add co-authorship trailer: ${(err as Error).message}`);
+    // Best-effort: if the trailer write fails, proceed with the commit anyway
+    detail(`Warning: could not add commit trailers: ${(err as Error).message}`);
   }
 
   try {
@@ -3502,6 +3550,59 @@ async function collectRunCommits(projectDir: string, startHead: string | undefin
     // status/summary normally, just without a Commits: line.
     return [];
   }
+}
+
+/**
+ * The commits in `commits` whose `N-DX-Item` trailer does not name `taskId`.
+ *
+ * Read through git's own trailer parser (`%(trailers:key=N-DX-Item,valueonly)`),
+ * the same view rex's `computeChangeCommits` takes, so a trailer that a blank
+ * line split off into the body counts as missing here too. Hench writes the
+ * trailers on its own commits; this catches the ones the agent wrote, which
+ * hench never amends. A commit naming the task among several items passes.
+ *
+ * Exported for testing.
+ */
+export async function findCommitsMissingItem(
+  projectDir: string,
+  commits: readonly RunCommitRecord[],
+  taskId: string,
+): Promise<RunCommitItemMismatch[]> {
+  if (commits.length === 0) return [];
+  // One call for every commit: `--no-walk=unsorted` reads exactly the listed
+  // shas. Unit separator after the hash, record separator between items; a
+  // trailer value holds neither.
+  let output: string;
+  try {
+    output = await execStdout(
+      "git",
+      [
+        "log",
+        "--no-walk=unsorted",
+        "--format=%H%x1f%(trailers:key=N-DX-Item,valueonly,separator=%x1e)%x1d",
+        ...commits.map((commit) => commit.sha),
+      ],
+      { cwd: projectDir, timeout: 10_000 },
+    );
+  } catch {
+    // Unreadable commits: say nothing rather than report trailers we could not check.
+    return [];
+  }
+  const itemsBySha = new Map<string, string[]>();
+  for (const record of output.split("\x1d")) {
+    const [sha, rawItems = ""] = record.split("\x1f");
+    if (!sha.trim()) continue;
+    itemsBySha.set(
+      sha.trim(),
+      rawItems.split("\x1e").map((item) => item.trim()).filter(Boolean),
+    );
+  }
+  const missing: RunCommitItemMismatch[] = [];
+  for (const commit of commits) {
+    const items = itemsBySha.get(commit.sha);
+    if (items && !items.includes(taskId)) missing.push({ ...commit, items });
+  }
+  return missing;
 }
 
 /**
@@ -4241,6 +4342,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // review-repair commit, the completion-metadata commit), and rollback above
   // only ever reverts uncommitted working-tree changes, never a landed commit.
   run.commits = await collectRunCommits(projectDir, run.startHead);
+
+  // A commit git cannot tie to this task is invisible to rex's change
+  // evidence. Record it for the run summary rather than amend it: the agent's
+  // commits are its own.
+  const missingItem = await findCommitsMissingItem(projectDir, run.commits, run.taskId);
+  if (missingItem.length > 0) run.commitsMissingItem = missingItem;
+  else delete run.commitsMissingItem;
 
   // …and name what the run left behind uncommitted. Computed here, after the
   // rollback above, so it describes the tree as the run actually ends up:

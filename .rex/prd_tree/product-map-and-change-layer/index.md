@@ -21,6 +21,7 @@ plannedRelease: "1.0.0"
 | [Agent brief from the product layer](./agent-brief-from-the-product-layer/index.md) | pending |
 | [Apply engine for change amendments](./apply-engine-for-change-amendments/index.md) | completed |
 | [Apply the migration](./apply-the-migration/index.md) | pending |
+| [Bootstrap the product layer from an established codebase](./bootstrap-the-product-layer-from-an.md) | pending |
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
 | [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | pending |
 | [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | completed |
@@ -28,8 +29,8 @@ plannedRelease: "1.0.0"
 | [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |
 | [Derived status, health and computed edges](./derived-status-health-and-computed-edges/index.md) | completed |
 | [Docs, skills and policies for the v2 model](./docs-skills-and-policies-for-the-v2/index.md) | pending |
-| [Every n-dx commit carries an item trailer](./every-n-dx-commit-carries-an-item/index.md) | pending |
-| [Generate the migration plan](./generate-the-migration-plan/index.md) | pending |
+| [Every n-dx commit carries an item trailer](./every-n-dx-commit-carries-an-item/index.md) | completed |
+| [Generate the migration plan](./generate-the-migration-plan/index.md) | completed |
 | [MCP tools for the product layer and changes](./mcp-tools-for-the-product-layer-and/index.md) | completed |
 | [Merge driver and bundle format for v2](./merge-driver-and-bundle-format-for-v2/index.md) | completed |
 | [Migrate this repository and cut 1.0.0](./migrate-this-repository-and-cut-1-0-0/index.md) | pending |

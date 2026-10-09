@@ -1,0 +1,21 @@
+---
+id: "42ed1f70-ae3e-4c18-89ed-957a6d11a669"
+level: "task"
+title: "Rank the migration review queue by confident Jev flags, not by the least confident answer"
+status: "completed"
+priority: "high"
+source: "live-run"
+startedAt: "2026-10-09T04:54:03.564Z"
+completedAt: "2026-10-09T05:00:42.776Z"
+endedAt: "2026-10-09T05:00:42.776Z"
+resolutionType: "code-change"
+resolutionDetail: "Jev flags need confidence >= 0.4 (option jevFlagMinConfidence); queue ranks held, then confident flag count, then confidence; summary counts share the threshold."
+acceptanceCriteria:
+  - "A Jev criterion or test-link answer raises a note or a flag only when its confidence is at or above a threshold, 0.4 by default and documented in the module; weaker answers are still recorded on the entry (test)"
+  - "The review queue lists held items first, then entries by number of confident flags (most first), then by confidence; an entry whose only weak answer is an undecided one is never ranked above an entry with a confident flag (test)"
+  - "The plan summary's flagged-criteria and flagged-test-link counts use the same threshold (test)"
+  - "The threshold can be set through the migration options (test)"
+description: "From the sampled live run of 2026-10-09 (5 epics, 51 items: Agent Prompt & Workflow Efficiency, LLM Cost Optimization, ndx 0.7.2 · Hotfix, Hotfix · #473, Hotfix · #499; text claude-sonnet-5-5 and jev-1.13.0, models \"both\", jevReview on). Jev raised 26 criterion flags on 16 capabilities, many at a probability near 0.5 with confidence under 0.1, and each became a \"confirm or remove it\" note. The review queue ranks a capability by the lowest confidence among Jev's answers, so \"Hench Runtime Prompt Tightening\" came first after the held items at confidence 0, only because Jev was undecided (p 0.50) on one criterion. The confident flags were the useful ones (p 0.16 and 0.18 at confidence 0.6 and above). Files: packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts (flag notes, reviewQueue, jevReviewSummary).\n\nDecision (Ryan, 2026-10-09): fix in PR 13.\n\nBefore finishing, run `pnpm --filter @n-dx/rex build`, and run it again after any review repair that edits rex source: the affected test gate refuses a stale rex dist/, and hench does not rebuild before it."
+lastModified: "2026-10-09T05:00:43.636Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
