@@ -1,8 +1,10 @@
 /**
  * `rex change place` tells the user, at placement, that apply will refuse
  * until the open changes in the way close. The core placement is stubbed to
- * report a pending problem: real placement only meets one when a new
- * amendment adds a problem the change did not already have.
+ * report a pending problem: real placement cannot produce one today (place
+ * writes only modified amendments, and pending comes only from removals).
+ * The core side is pinned by "recordPlacement pending and blockedBy" in
+ * tests/unit/core/change-place.test.ts.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { applyAmendmentsProblems } from "../../../src/core/apply-amendments.js";
 import { ChangePlacementError, recordPlacement, suggestPlacement } from "../../../src/core/change-place.js";
 import { indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 
@@ -160,5 +161,35 @@ describe("recordPlacement", () => {
 
   it("refuses a ref that is not a change", () => {
     expect(() => suggestPlacement(tree(), "card")).toThrow(/No live change "card"/);
+  });
+});
+
+// recordPlacement's pending/blockedBy branch is defensive: place writes only
+// modified amendments, pending comes only from removals, and pending that
+// existed before the placement is filtered. These pin why it is empty today.
+describe("recordPlacement pending and blockedBy", () => {
+  const withChanges = (chFields: Record<string, unknown>, others: RuleNode[]): V2Tree => {
+    const t = tree(chFields);
+    t.changes.push(...others);
+    return t;
+  };
+  const removal = (id: string, target: string) =>
+    node({ id, type: "change", displayId: id.toUpperCase(), title: `Remove ${target}`, amends: [{ target, delta: "removed", summary: "gone" }] });
+
+  it("returns no problems when it modifies a capability another open change removes", () => {
+    const placed = recordPlacement(withChanges({}, [removal("rm", "card")]), "ch", { target: "card", proposed: "Cards and wallets" }, NOW);
+    expect(placed).toMatchObject({ warnings: [], pending: [], blockedBy: [] });
+    expect(changeIn(placed.tree).amends).toHaveLength(1);
+  });
+
+  it("refuses, rather than stores with pending warnings, a modify on a descendant of a node under a pending removal", () => {
+    const t = withChanges(
+      // The change retires the whole area, so only card, which rm removes, keeps the removal pending.
+      { amends: ["pay", "refund", "arch"].map((target) => ({ target, delta: "removed", summary: "retire payments" })) },
+      [removal("rm", "card")],
+    );
+    expect(applyAmendmentsProblems(t, "ch", NOW)).toMatchObject({ always: [], blockedBy: ["RM"] });
+    expect(() => recordPlacement(t, "ch", { target: "card", proposed: "Cards and wallets" }, NOW)).toThrow(ChangePlacementError);
+    expect(() => recordPlacement(t, "ch", { target: "card", proposed: "Cards and wallets" }, NOW)).toThrow(/Cannot place change CH-1/);
   });
 });

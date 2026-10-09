@@ -165,6 +165,11 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
     const after = applyAmendmentsProblems(next, change.id, now);
     const novel = (all: readonly string[], known: readonly string[]): string[] => all.filter((p) => !known.includes(p));
     const problems = novel(after.always, before.always);
+    // The pending branch is defensive: place writes only `modified` amendments, pending comes only from
+    // removals, and pending that existed before this placement is filtered out here. So it is empty today;
+    // the code goes live if place ever writes a removal. Pinned by the "recordPlacement pending and
+    // blockedBy" tests in tests/unit/core/change-place.test.ts (modify on a capability another change
+    // removes: no problems; modify under a pending removal: refused).
     pending = novel(after.pending, before.pending);
     blockedBy = after.blockedBy;
     if (problems.length) {
