@@ -197,6 +197,12 @@ describe("rex cli/commands import surface", () => {
     // bundle envelope through prd-bundle-v2, the one caller of the v2 bundle.
     // Not routed through public.ts for the same reason as state-merge above.
     "../../store/prd-bundle-v2.js",
+    // `rex product`, `rex change` and `rex add` on a v2 tree write the product
+    // and change layers through the v2 store transaction and read v2 node
+    // types. Not routed through public.ts for the same reason as state-merge.
+    "../../store/prd-model-transaction.js",
+    "../../schema/v2.js",
+    "../../schema/v2-rules.js",
     "../../store/title-to-filename.js",
     "../../workflow/default.js",
   ]);

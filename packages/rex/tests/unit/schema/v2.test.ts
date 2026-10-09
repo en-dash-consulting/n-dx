@@ -451,7 +451,9 @@ describe("isolation", () => {
     // get_item, get_prd_status) or serve the v2 tree alone (get_product,
     // get_capability, place_change, apply_change, and the product report and
     // change placement they read through), and `rex health`, which runs the
-    // v2 tree rules on a v2 tree (cli/commands/health.ts, core/health.ts).
+    // v2 tree rules on a v2 tree (cli/commands/health.ts, core/health.ts), and
+    // the v2 CLI verbs: `rex product`, `rex change`, and `rex add` on a v2 tree
+    // (cli/commands/product.ts, change.ts, add-change.ts and their v2-cli.ts).
     const v2Files = new Set(
       [
         "schema/v2.ts",
@@ -486,6 +488,10 @@ describe("isolation", () => {
         "cli/commands/codeowners.ts",
         "cli/commands/health.ts",
         "core/health.ts",
+        "cli/commands/product.ts",
+        "cli/commands/change.ts",
+        "cli/commands/add-change.ts",
+        "cli/commands/v2-cli.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

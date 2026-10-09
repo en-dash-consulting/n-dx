@@ -342,7 +342,7 @@ function constraintFields(amendment: Amendment, fail: (message: string) => void)
 }
 
 /** Criteria after a delta, and every id that does not fit them. */
-interface CriteriaDeltaResult {
+export interface CriteriaDeltaResult {
   criteria: Criterion[];
   /** One message per misfit id; the delta applies only when empty. */
   problems: string[];
@@ -353,7 +353,7 @@ interface CriteriaDeltaResult {
  * Removing or replacing an id the criteria lack, or adding one they have, is a
  * problem. Pure.
  */
-function applyCriteriaDelta(criteria: readonly Criterion[], delta: CriteriaDelta | undefined): CriteriaDeltaResult {
+export function applyCriteriaDelta(criteria: readonly Criterion[], delta: CriteriaDelta | undefined): CriteriaDeltaResult {
   let next = [...criteria];
   const problems: string[] = [];
   const has = (id: string): boolean => next.some((c) => c.id === id);
@@ -370,6 +370,23 @@ function applyCriteriaDelta(criteria: readonly Criterion[], delta: CriteriaDelta
     else next.push({ ...added });
   }
   return { criteria: next, problems };
+}
+
+/**
+ * The delta that sets each of `set` (replacing an id `current` has, adding a
+ * new one) and removes `remove`, or undefined when both are empty. Ids that do
+ * not fit are left for {@link applyCriteriaDelta} to report. Pure.
+ */
+export function upsertCriteriaDelta(current: readonly Criterion[], set: readonly Criterion[], remove: readonly string[]): CriteriaDelta | undefined {
+  if (!set.length && !remove.length) return undefined;
+  const ids = new Set(current.map((c) => c.id));
+  const add = set.filter((c) => !ids.has(c.id));
+  const replace = set.filter((c) => ids.has(c.id));
+  return {
+    ...(add.length ? { add: [...add] } : {}),
+    ...(replace.length ? { replace: [...replace] } : {}),
+    ...(remove.length ? { remove: [...remove] } : {}),
+  };
 }
 
 const applyModified: DeltaApply =({ product }, amendment, _options, fail) => {

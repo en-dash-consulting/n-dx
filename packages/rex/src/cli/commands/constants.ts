@@ -19,6 +19,8 @@ export function usage(): void {
           { name: "add \"<desc>\" [\"<d2>\"]", description: "Smart add: LLM creates PRD from descriptions" },
           { name: "add --file=<path>", description: "Import ideas from a freeform text file (repeatable)" },
           { name: "echo \"desc\" | add", description: "Pipe text as description (combinable with other sources)" },
+          { name: "product <show|edit> [node]", description: "v2: show the product layer, or edit a node's statement/capability criteria" },
+          { name: "change <place|apply> <id>", description: "v2: place a change on the product layer, or apply its amendments" },
           { name: "update <id> [dir]", description: "Update item status/priority" },
           { name: "remove <epic|task> <id>", description: "Remove an epic or task and all descendants" },
           { name: "move <id> [dir]", description: "Move item to new parent (reparent)" },

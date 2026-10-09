@@ -110,6 +110,8 @@ const REX_COMMANDS = [
   "import-bundle",
   "reorganize",
   "health",
+  "product",
+  "change",
   "claim",
   "migrate-to-md",
   "migrate-folder-tree-filenames",

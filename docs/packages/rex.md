@@ -64,6 +64,24 @@ Produces structured epic/feature/task proposals with duplicate detection. When d
 - **Merge** — update matched items, add only non-duplicates
 - **Proceed** — create duplicates with override markers
 
+## Product Layer and Changes (v2 PRD)
+
+On a v2 PRD (`product/` and `changes/`) the product layer holds the standing requirements, and every add is a change:
+
+```sh
+rex add --title="Refund card payments" --criterion="A refund reaches the card" .  # a change in the Inbox, with its suggested placement
+rex add task --title="Write the refund call" --parent=CH-2 .                        # a task under a change
+rex product show .                                   # areas, capabilities, constraints with status and health
+rex product show A1.1 .                              # one capability: statement, capability criteria, changes
+rex product edit A1.1 --capability-criterion="c3: A refund reaches the card" .     # revise it; drafts a change
+rex product edit A1.1 --statement="..." --editorial .                              # reword it; stays met
+rex change place CH-2 .                              # the placement shortlist
+rex change place CH-2 --target=A1.1 --relation=amends --capability-criterion="c3: ..." .
+rex change apply CH-2 .                              # apply its amendments to the product layer
+```
+
+`--criterion` is always a work item's acceptance criteria (done when). A capability's capability criteria use `--capability-criterion="<id>: <text>"` (and `--remove-capability-criterion=<id>`), on `rex product edit` and `rex change place` only. A description passed to `rex add` becomes one change, without LLM decomposition. On a v1 PRD, `rex add` is unchanged and `rex product` / `rex change` refuse.
+
 ## Recommend
 
 ```sh
