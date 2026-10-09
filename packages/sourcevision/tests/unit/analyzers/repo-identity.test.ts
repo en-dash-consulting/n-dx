@@ -40,6 +40,8 @@ let withoutRemote: string;
 let notGit: string;
 /** A git repo whose origin is an https remote with a token baked into it. */
 let withCredentialedRemote: string;
+/** A git repo whose origin is an scp remote on an undotted host (an ssh alias). */
+let withAliasRemote: string;
 
 /** The secret in `withCredentialedRemote`'s origin; must reach no artifact. */
 const SECRET = "ghp-do-not-commit-me";
@@ -72,6 +74,11 @@ beforeAll(async () => {
     "origin",
     `https://sterling:${SECRET}@github.com/acme/widget.git`,
   ]);
+
+  withAliasRemote = join(root, "checkout-with-alias");
+  await mkdir(withAliasRemote);
+  git(withAliasRemote, ["init", "-q"]);
+  git(withAliasRemote, ["remote", "add", "origin", "git@work-github:acme/widget.git"]);
 });
 
 afterAll(async () => {
@@ -135,6 +142,11 @@ describe("remote parsing is host-neutral", () => {
     ["git@git.internal.example:group/sub/widget.git", {
       host: "git.internal.example", path: "group/sub/widget",
     }],
+    // git does not require a dotted host in an scp remote: the first is an ssh
+    // config alias, the second a short internal hostname. Both resolve for the
+    // developer whose origin says so, so both must parse.
+    ["git@work-github:acme/widget.git", { host: "work-github", path: "acme/widget" }],
+    ["git@bitbucket:PROJ/widget.git", { host: "bitbucket", path: "PROJ/widget" }],
   ];
 
   for (const [remote, expected] of CASES) {
@@ -152,6 +164,24 @@ describe("remote parsing is host-neutral", () => {
   it("answers undefined for a remote it cannot parse", () => {
     expect(parseRemote("not-a-remote")).toBeUndefined();
     expect(parseRemote("")).toBeUndefined();
+  });
+});
+
+describe("readRepoIdentity — origin on a host with no dot in it", () => {
+  // Reproduces the shape that an ssh-config alias gives a real checkout: the
+  // identity must carry the alias as the host rather than falling back to the
+  // directory name with the remote fields blanked.
+
+  it("records the alias as the host and keeps the remote path", () => {
+    const repo = readRepoIdentity(withAliasRemote);
+    expect(repo.remoteUrl).toBe("git@work-github:acme/widget.git");
+    expect(repo.remoteHost).toBe("work-github");
+    expect(repo.remotePath).toBe("acme/widget");
+  });
+
+  it("names the repository from the remote, not the directory", () => {
+    // The directory is "checkout-with-alias"; the repository is "widget".
+    expect(readRepoIdentity(withAliasRemote).name).toBe("widget");
   });
 });
 
