@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-10-09T16:55:32.158Z
-- **Commit** — `13c6f41b559e`
-- **Content hash** — `25ae167107e10c32` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-10-09T18:57:56.580Z
+- **Commit** — `21cefd26264b`
+- **Content hash** — `ffe50f97285f672a` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
-- **Surfaces** — 36
-- **Per-call total** — 22,851 tokens (what every surface costs, summed)
-- **Unique fixed text** — 14,348 tokens (distinct text a rewrite has to edit)
+- **Surfaces** — 38
+- **Per-call total** — 23,377 tokens (what every surface costs, summed)
+- **Unique fixed text** — 14,874 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -77,7 +77,7 @@ so a jump is never mistaken for a regression or a win.
   same prompt already gave elsewhere and resolving a task-size contradiction (hours vs
   engineer-weeks). No instruction was removed from a prompt that did not still state it.
 
-## rex — 15,217 per-call / 7,195 unique, 19 surfaces
+## rex — 15,743 per-call / 7,721 unique, 21 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
@@ -96,6 +96,8 @@ so a jump is never mistaken for a regression or a win.
 | `buildSpecEnvelope` | `packages/rex/src/analyze/guided.ts` | Turn guided answers into a structured spec. | 22 | 150 | 432 | 582 |
 | `buildModifyEnvelope` | `packages/rex/src/analyze/modify-reason.ts` | Apply a natural-language edit to an existing PRD item. | 29 | 295 | 492 | 787 |
 | `buildGroupRenameEnvelope` | `packages/rex/src/analyze/propose-group-renames.ts` | Rename a group of sibling items to a consistent scheme. | 27 | 214 | 29 | 243 |
+| `buildPlacementEnvelope` | `packages/rex/src/analyze/place-reason.ts` | Place a change on a shortlisted capability or constraint, or propose a new node. | 15 | 172 | — | 172 |
+| `buildSpecDraftEnvelope` | `packages/rex/src/analyze/spec-draft-reason.ts` | Redraft a capability spec in present tense, citing the source item of every criterion. | 22 | 354 | — | 354 |
 | `buildRenameEnvelope` | `packages/rex/src/analyze/rename-resolve.ts` | Pick the better of two colliding item titles. | 23 | 204 | 29 | 233 |
 | `buildReshapeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Propose a restructure of the PRD hierarchy. | 7 | 18 | 1,402 | 1,420 |
 | `buildBodyMergeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Merge two item descriptions into one during a reshape. | 12 | 106 | — | 106 |
@@ -169,7 +171,7 @@ reproducible without a model call. Dump any of them with `--dump <package>`.
 |---|---|---|---:|---:|---:|
 | rex | `buildAssessmentEnvelope` | Granularity assessment over one two-task proposal. | 497 | 245 | 742 |
 | sourcevision | `buildPrimerEnvelope` | Primer distillation over a fixed 3-zone CONTEXT.md excerpt. | 229 | 137 | 366 |
-| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,478 | n/a — 520 of the fixed text is on another branch | 958 |
+| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,478 | n/a — 562 of the fixed text is on another branch | 916 |
 | core | `buildReviewerPrompt` | Pair-programming reviewer prompt over three changed files. | 281 | 16 | 297 |
 
 A `fixed` figure above the assembled length is not an error: the fixed column counts
@@ -216,8 +218,8 @@ per section rather than as one literal. These are the same sections
 
 | Section | Chars | Tokens | Share |
 |---|---:|---:|---:|
-| `system` | 3,162 | 791 | 82.6% |
-| `brief` | 668 | 167 | 17.4% |
+| `system` | 2,992 | 748 | 81.7% |
+| `brief` | 668 | 167 | 18.3% |
 
 ## Workflow skills — 20,439 tokens, 13 skills
 

@@ -211,7 +211,7 @@ export type {
 } from "./model-pricing.js";
 
 // Budget preflight
-export { budgetPreflight } from "./budget-preflight.js";
+export { budgetPreflight, estimateTokens, CHARS_PER_TOKEN } from "./budget-preflight.js";
 export type { BudgetPreflightResult } from "./budget-preflight.js";
 
 // Token usage parsing

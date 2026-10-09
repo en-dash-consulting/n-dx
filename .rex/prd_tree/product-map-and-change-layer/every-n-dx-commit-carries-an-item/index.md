@@ -14,13 +14,13 @@ blockedBy:
   - "c81707dc-7c9a-47ba-9043-9a588a87ac76"
 source: "roadmap"
 startedAt: "2026-10-08T20:11:16.792Z"
+completedAt: "2026-10-08T21:30:00.803Z"
+endedAt: "2026-10-08T21:30:00.803Z"
 acceptanceCriteria: []
 description: "The evidence layer and the realized-by edge need commits tied to items. Today only hench auto-commits carry N-DX-Item, and its value is a dashboard URL (usually localhost). The trailer format freezes at 1.0.0, so its value becomes the item id.\n\nRoadmap PR 5 · wave 0 · lane hench."
 assignee: "Sterling H <sterling.h@endash.us>"
 lastModified: "2026-10-08T21:30:01.360Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
-completedAt: "2026-10-08T21:30:00.803Z"
-endedAt: "2026-10-08T21:30:00.803Z"
 ---
 
 ## Children

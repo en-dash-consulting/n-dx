@@ -32,6 +32,7 @@ describe("rex CLI help", () => {
     "analyze",
     "import",
     "migrate-to-md",
+    "release",
     "mcp",
   ];
 

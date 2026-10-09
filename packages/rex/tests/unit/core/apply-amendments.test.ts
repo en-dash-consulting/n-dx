@@ -9,9 +9,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
+import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, bodyNotes, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
 import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
+import { isWindowsSafeSegment } from "../../../src/store/folder-tree-serializer.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
 import { writePrdModel } from "../../../src/store/prd-model-writer.js";
 import { withLock } from "../../../src/store/file-lock.js";
@@ -126,6 +127,18 @@ describe("applyAmendments: added", () => {
     expect(get(out, "abcdef99").slug).toBe("pay-by-card-abcdef");
   });
 
+  it.each(["Con", "AUX", "Nul", "COM1", "lpt9"])("never gives a new node the Windows-unsafe slug for %s", (title) => {
+    const { tree: out } = applyAmendments(tree([{ ...added, title, target: "abcdef99" }]), CHANGE, OPTS);
+    const slug = get(out, "abcdef99").slug;
+    expect(isWindowsSafeSegment(slug)).toBe(true);
+    expect(slug).toBe(`${title.toLowerCase()}-abcdef`);
+  });
+
+  it.each(["Index", "INDEX", "index"])("never gives a new node the slug index for %s", (title) => {
+    const { tree: out } = applyAmendments(tree([{ ...added, title, target: "abcdef99" }]), CHANGE, OPTS);
+    expect(get(out, "abcdef99").slug).toBe("index-abcdef");
+  });
+
   it("refuses a missing or non-container parent, a missing title and a taken id", () => {
     expect(refusal(() => applyAmendments(tree([{ ...added, under: undefined }]), CHANGE, OPTS)).problems[0]).toMatch(/needs under/);
     expect(refusal(() => applyAmendments(tree([{ ...added, under: CON }]), CHANGE, OPTS)).problems[0]).toMatch(/not a live area or capability/);
@@ -189,7 +202,7 @@ describe("applyAmendments: modified", () => {
     expect(refusal(() => applyAmendments(tree([modify({ criteria: { replace: [{ id: "c9", text: "x" }] } })]), CHANGE, OPTS)).problems[0]).toMatch(/c9 to replace/);
     expect(refusal(() => applyAmendments(tree([modify({ criteria: { remove: ["c9"] } })]), CHANGE, OPTS)).problems[0]).toMatch(/c9 to remove/);
     expect(refusal(() => applyAmendments(tree([modify({ criteria: { add: [{ id: "c1", text: "x" }] } })]), CHANGE, OPTS)).problems[0]).toMatch(/c1 to add already exists/);
-    expect(refusal(() => applyAmendments(tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]), CHANGE, OPTS)).problems[0]).toMatch(/constraint has no criteria/);
+    expect(refusal(() => applyAmendments(tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]), CHANGE, OPTS)).problems[0]).toMatch(/constraint has no capability criteria/);
     expect(refusal(() => applyAmendments(tree([modify({})]), CHANGE, OPTS)).problems[0]).toMatch(/nothing to modify/);
   });
 });
@@ -351,7 +364,7 @@ describe("applyAmendments: added constraints", () => {
       applyAmendments(tree([{ ...constraint, criteria: { add: [{ id: "c1", text: "x" }] }, requirements: [{ id: "r1" }], appliesTo: "some" }]), CHANGE, OPTS),
     ).problems;
     expect(problems).toEqual([
-      "amendment 1 (added con-2): a constraint has no criteria; state it in proposed and list its requirements",
+      "amendment 1 (added con-2): a constraint has no capability criteria; state it in proposed and list its requirements",
       "amendment 1 (added con-2): requirements must be a list of requirements",
       'amendment 1 (added con-2): appliesTo must be "all" or a list of product node references',
     ]);
@@ -501,7 +514,7 @@ describe("applyAmendmentsProblems", () => {
     const accepted = tree([{ target: "A1.1", delta: "modified", summary: "s", criteria: { remove: ["c2"] } }]);
     const before = structuredClone([refused, accepted]);
     expect(applyAmendmentsProblems(refused, CHANGE, NOW)).toEqual({
-      always: [`amendment 1 (modified ${CON}): a constraint has no criteria`],
+      always: [`amendment 1 (modified ${CON}): a constraint has no capability criteria`],
       pending: [],
       blockedBy: [],
     });
@@ -522,7 +535,7 @@ describe("applyAmendmentsProblems", () => {
     expect(applyAmendmentsProblems(tree([bare]), CHANGE, NOW).always).toEqual([`amendment 1 (modified ${CAP}): ${NOTHING_TO_MODIFY}`]);
     expect(applyAmendmentsProblems(tree([bare, { target: CON, delta: "modified", summary: "s", criteria: { remove: ["c1"] } }]), CHANGE, NOW).always).toEqual([
       `amendment 1 (modified ${CAP}): ${NOTHING_TO_MODIFY}`,
-      `amendment 2 (modified ${CON}): a constraint has no criteria`,
+      `amendment 2 (modified ${CON}): a constraint has no capability criteria`,
     ]);
   });
 
@@ -583,7 +596,7 @@ describe("applyAmendmentsProblems", () => {
     it("keeps a problem the amendment has on its own as always", () => {
       const input = tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]);
       input.changes.push(other([modifies]));
-      expect(applyAmendmentsProblems(input, CHANGE, NOW)).toMatchObject({ always: [`amendment 1 (modified ${CON}): a constraint has no criteria`], pending: [] });
+      expect(applyAmendmentsProblems(input, CHANGE, NOW)).toMatchObject({ always: [`amendment 1 (modified ${CON}): a constraint has no capability criteria`], pending: [] });
     });
   });
 });
@@ -611,6 +624,16 @@ describe("appendHistory", () => {
     const body = appendHistory("## History\n\n- a", "- b: Typo\n\n## Notes");
     expect(body).toBe("## History\n\n- a\n- b: Typo ## Notes");
     expect(appendHistory(body, "- c")).toBe("## History\n\n- a\n- b: Typo ## Notes\n- c");
+  });
+});
+
+describe("bodyNotes", () => {
+  it("is the body without its History section, empty when History is all there is", () => {
+    expect(bodyNotes(undefined)).toBe("");
+    expect(bodyNotes(appendHistory(undefined, "- a"))).toBe("");
+    expect(bodyNotes("Raised by support.\n\n## History\n\n- a")).toBe("Raised by support.");
+    expect(bodyNotes("## History\n\n- a\n\n## Notes\n\nx")).toBe("## Notes\n\nx");
+    expect(bodyNotes("No history here.")).toBe("No history here.");
   });
 });
 
