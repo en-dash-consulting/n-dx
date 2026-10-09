@@ -124,9 +124,8 @@ describe("buildCommitMessage", () => {
 // ── The pull-request template ───────────────────────────────────────────────
 
 /**
- * GitHub copies a PR's description into the squash-merge commit message, so
- * the template's trailer block is what puts `N-DX-Item` on the commit that
- * actually lands on main. A template whose block git would not parse — a blank
+ * A PR's description becomes the body of the merge commit that lands on main,
+ * so the template's trailer block is what puts `N-DX-Item` on that commit. A template whose block git would not parse — a blank
  * line inside it, or anything after it — ships a trailer that silently never
  * reaches history, which is exactly the failure the evidence layer cannot see.
  */
