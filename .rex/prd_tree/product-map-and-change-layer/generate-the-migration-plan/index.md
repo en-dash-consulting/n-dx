@@ -2,7 +2,7 @@
 id: "8cc70b76-8b1f-4506-8f5e-799cc153468d"
 level: "feature"
 title: "Generate the migration plan"
-status: "completed"
+status: "pending"
 priority: "high"
 tags:
   - "product-map"
@@ -15,12 +15,11 @@ blockedBy:
   - "51527b42-cc67-4a5a-83b3-61179298dfaf"
 source: "roadmap"
 startedAt: "2026-10-09T04:22:49.930Z"
-completedAt: "2026-10-09T05:35:22.755Z"
 endedAt: "2026-10-09T05:35:22.755Z"
 acceptanceCriteria: []
 description: "ndx migrate --plan writes a reviewable plan and moves nothing. It reads the v1 tree only, so it can run early and feed the area review.\n\nRoadmap PR 13 · wave 1 · lane migration."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-09T05:35:23.632Z"
+lastModified: "2026-10-09T06:14:58.269Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -55,6 +54,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Placement seams and passes read rex.placement from two separate inputs, so a caller that passes it only to placementSeams has a configured Jev ignored](./placement-seams-and-passes-read-rex.md) | completed |
 | [Plan ids, aliases, backfill and data fixes](./plan-ids-aliases-backfill-and-data-fixes.md) | completed |
 | [Rank the migration review queue by confident Jev flags, not by the least confident answer](./rank-the-migration-review-queue-by.md) | completed |
+| [Review-finding features become fix changes, not capabilities](./review-finding-features-become-fix.md) | pending |
 | [reviewedHash only for the spec a reviewer approved](./reviewedhash-only-for-the-spec-a.md) | completed |
 | [Spec drafts state behaviour, never "the system shall ensure that the system" or a decision](./spec-drafts-state-behaviour-never-the.md) | completed |
 | [Spec merge keeps the model's own subject instead of wrapping it in "The system shall ensure that"](./spec-merge-keeps-the-model-s-own.md) | completed |
