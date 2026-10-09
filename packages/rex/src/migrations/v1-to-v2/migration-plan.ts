@@ -137,6 +137,18 @@ const WORK_TOKEN = /\bPR\s*#?\d+\b|(?:^|\s)#\d+\b/i;
 const FIX_WORDS = new Set(["fix", "fixes", "hotfix", "bug", "bugfix", "regression", "repair", "patch"]);
 const DEFECT_WORDS = /\b(?:defects?|broken|crash(?:es)?|fails?|failing|leaks?|regressions?|bugs?|findings?)\b/i;
 
+/**
+ * Wording of a review finding: it states what the product gets wrong
+ * ("silently claims", "does not", "can … instead of"), not what it does.
+ */
+const FINDING_WORDING = /\b(?:silently|never|cannot|can't|does\s+not|doesn't|do\s+not|don't|not\s+every)\b|\bcan\b[^.]*?\binstead\s+of\b/i;
+const REVIEW_SOURCE = "ndx-adversarial-review";
+
+/** The item was filed by an adversarial review: its source, or a review or `severity:*` tag, says so. */
+function isReviewFinding(item: PRDItem): boolean {
+  return item.source === REVIEW_SOURCE || (item.tags ?? []).some((t) => t === REVIEW_SOURCE || t.toLowerCase().startsWith("severity:"));
+}
+
 /** Nouns that name a piece of work rather than a part of the product. */
 const WORK_NOUNS = /\b(?:hardening|follow-?ups?|cleanup|migration|refactor(?:ing)?|docs|changesets?)\b/i;
 
@@ -173,7 +185,8 @@ export function isDeliveryEpic(title: string, productNames: readonly string[] = 
   return releaseToken(title, productNames) !== undefined || hasWorkToken(title);
 }
 
-function isFixShaped(item: PRDItem): boolean {
+function isFixShaped(item: PRDItem, areaSource?: string): boolean {
+  if (areaSource === REVIEW_SOURCE || isReviewFinding(item) || FINDING_WORDING.test(item.title)) return true;
   const lead = leadWord(item.title);
   if (lead !== undefined && FIX_WORDS.has(lead)) return true;
   if ((item.tags ?? []).some((t) => FIX_WORDS.has(t.toLowerCase()))) return true;
@@ -302,17 +315,17 @@ function classifyEpic(epic: PRDItem, plan: PlanBuilder, productNames: readonly s
   if (isConstraintShaped(epic.title)) {
     plan.constraints.push({ source: epic.id, title: epic.title, appliesTo: "all" });
   }
-  for (const child of epic.children ?? []) classifyUnderArea(child, epic.id, plan, productNames);
+  for (const child of epic.children ?? []) classifyUnderArea(child, epic.id, plan, productNames, epic.source);
 }
 
-function classifyUnderArea(item: PRDItem, area: string, plan: PlanBuilder, productNames: readonly string[]): void {
+function classifyUnderArea(item: PRDItem, area: string, plan: PlanBuilder, productNames: readonly string[], areaSource?: string): void {
   if (item.level !== "feature") {
     plan.change(item, { reasons: [`a v1 ${item.level} directly under an area: its own change`] }, area);
     plan.workUnder(item.children, item.id);
     return;
   }
 
-  const fix = isFixShaped(item);
+  const fix = isFixShaped(item, areaSource);
   const work = isWorkShaped(item, productNames);
   if (fix || work) {
     const release = releaseToken(item.title, productNames);

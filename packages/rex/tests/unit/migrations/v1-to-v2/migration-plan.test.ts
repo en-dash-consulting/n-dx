@@ -300,6 +300,40 @@ describe("classifyV1Tree", () => {
     });
   });
 
+  describe("a completed review finding is a fix change, not a capability", () => {
+    const done = () => [item("task", "Do it")];
+    const classify = (feature: PRDItem, epicExtra: Partial<PRDItem> = {}) =>
+      classifyV1Tree([item("epic", "Storage", [feature], "completed", epicExtra)]);
+    const expectFix = (plan: ReturnType<typeof classifyV1Tree>, title: string) => {
+      expect(byTitle(plan.entries, title)).toMatchObject({ target: "change", applied: true });
+      expect(plan.entries.some((e) => e.target === "capability")).toBe(false);
+      expect(byTitle(plan.entries, "Do it").target).toBe("task");
+    };
+
+    it("under an area whose source is ndx-adversarial-review", () => {
+      expectFix(classify(item("feature", "Offline cache", done()), { source: "ndx-adversarial-review" }), "Offline cache");
+    });
+
+    it.each([{ tags: ["severity:high"] }, { tags: ["ndx-adversarial-review"] }, { source: "ndx-adversarial-review" }])(
+      "carrying %j",
+      (extra) => expectFix(classify(item("feature", "Offline cache", done(), "completed", extra)), "Offline cache"),
+    );
+
+    it.each([
+      "`hench record` silently claims the transcript",
+      "Cache does not evict",
+      "Lock is never released",
+      "Reclaim cannot find the lock",
+      "Reclaim can unlink a live lock instead of the stale one",
+      "Not every commit carries the trailer",
+    ])("titled %s", (title) => expectFix(classify(item("feature", title, done())), title));
+
+    it("but keeps a noun-shaped capability", () => {
+      const plan = classify(item("feature", "Offline cache", done()));
+      expect(byTitle(plan.entries, "Offline cache").target).toBe("capability");
+    });
+  });
+
   it("does not make a deleted feature with a completed child a capability", () => {
     const feature = item("feature", "Offline cache", [item("task", "Build cache", [], "completed")], "deleted");
     const plan = classifyV1Tree([item("epic", "Storage", [feature])]);
