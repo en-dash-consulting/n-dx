@@ -22,7 +22,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunCommitRecord, RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD, DEFAULT_GIT_COMMIT_MESSAGE_SOURCE } from "../../schema/index.js";
 import type { GitCommitMessageSource } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -130,6 +130,38 @@ export function buildRunTrailers(
   if (taskId) trailers.push(`N-DX-Item: ${taskId}`);
   trailers.push(buildCoAuthoredByTrailerLine());
   return trailers;
+}
+
+/**
+ * The trailers the agent puts on a commit it writes itself (the autoCommit
+ * path, or the message it proposes): the run's N-DX and N-DX-Item lines,
+ * exactly as {@link buildRunTrailers} writes them, without hench's own
+ * Co-Authored-By — the agent adds its own.
+ */
+export function buildAgentCommitTrailers(
+  run: Pick<RunRecord, "id" | "taskId" | "vendor" | "model" | "weight" | "diagnostics">,
+): string[] {
+  const coAuthor = buildCoAuthoredByTrailerLine();
+  return buildRunTrailers(run, run.taskId).filter((line) => line !== coAuthor);
+}
+
+/**
+ * The brief text and envelope sent for `run`: the selection-time brief plus
+ * the run's commit trailers ({@link buildAgentCommitTrailers}), which need the
+ * run id and so cannot be rendered before the run record exists.
+ */
+export function briefForRun(
+  brief: TaskBrief,
+  run: Pick<RunRecord, "id" | "taskId" | "vendor" | "model" | "weight" | "diagnostics">,
+  config: HenchConfig,
+  extraContext?: string,
+): { brief: TaskBrief; briefText: string; envelope: PromptEnvelope } {
+  const withTrailers: TaskBrief = { ...brief, commitTrailers: buildAgentCommitTrailers(run) };
+  return {
+    brief: withTrailers,
+    briefText: formatTaskBrief(withTrailers),
+    envelope: buildPromptEnvelope(withTrailers, config, extraContext),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -3492,6 +3524,41 @@ async function collectRunCommits(projectDir: string, startHead: string | undefin
 }
 
 /**
+ * The commits in `commits` whose `N-DX-Item` trailer does not name `taskId`.
+ *
+ * Read through git's own trailer parser (`%(trailers:key=N-DX-Item,valueonly)`),
+ * the same view rex's `computeChangeCommits` takes, so a trailer that a blank
+ * line split off into the body counts as missing here too. Hench writes the
+ * trailers on its own commits; this catches the ones the agent wrote, which
+ * hench never amends. A commit naming the task among several items passes.
+ *
+ * Exported for testing.
+ */
+export async function findCommitsMissingItem(
+  projectDir: string,
+  commits: readonly RunCommitRecord[],
+  taskId: string,
+): Promise<RunCommitItemMismatch[]> {
+  const missing: RunCommitItemMismatch[] = [];
+  for (const commit of commits) {
+    let items: string[];
+    try {
+      const output = await execStdout(
+        "git",
+        ["log", "-1", "--format=%(trailers:key=N-DX-Item,valueonly)", commit.sha],
+        { cwd: projectDir, timeout: 10_000 },
+      );
+      items = output.split("\n").map((line) => line.trim()).filter(Boolean);
+    } catch {
+      // Unreadable commit: say nothing rather than report a trailer we could not check.
+      continue;
+    }
+    if (!items.includes(taskId)) missing.push({ ...commit, items });
+  }
+  return missing;
+}
+
+/**
  * Record on the run, and persist immediately, when another worktree takes
  * this run's task over mid-flight.
  *
@@ -4228,6 +4295,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // review-repair commit, the completion-metadata commit), and rollback above
   // only ever reverts uncommitted working-tree changes, never a landed commit.
   run.commits = await collectRunCommits(projectDir, run.startHead);
+
+  // A commit git cannot tie to this task is invisible to rex's change
+  // evidence. Record it for the run summary rather than amend it: the agent's
+  // commits are its own.
+  const missingItem = await findCommitsMissingItem(projectDir, run.commits, run.taskId);
+  if (missingItem.length > 0) run.commitsMissingItem = missingItem;
+  else delete run.commitsMissingItem;
 
   // …and name what the run left behind uncommitted. Computed here, after the
   // rollback above, so it describes the tree as the run actually ends up:
