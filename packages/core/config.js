@@ -1191,6 +1191,9 @@ export const TASK_CLASSES = {
   // Jev placement: additive to prd.place and deliberately not in
   // DEFAULT_JUDGMENT_ROUTES, so an exported TYPESAFE_API_KEY alone never enables it.
   "prd.place.judge": "standard",
+  // Jev review of a migration plan (rex migrations/v1-to-v2): opt-in through
+  // rex.placement.models or a migration option, never a default judgment route.
+  "prd.migrate.judge": "standard",
   // sourcevision
   "code.classify": "light",
   "zone.enrich-scan": "light",

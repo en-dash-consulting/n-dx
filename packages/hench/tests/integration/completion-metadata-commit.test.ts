@@ -201,6 +201,9 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
     // assertion fails if the line lands somewhere git will not parse as a
     // trailer (split from the block by a blank line, say).
     expect(await headTrailer(projectDir, "N-DX-Item")).toBe(taskId);
+    // All three trailers share the one final block git parses.
+    expect(await headTrailer(projectDir, "N-DX")).toBe("PRD record (task completion)");
+    expect(await headTrailer(projectDir, "Co-Authored-By")).toBe("En Dash's n-dx <n-dx@endash.us>");
   });
 
   it("never stages or commits the execution log itself, even across a rotation", async () => {
@@ -723,6 +726,7 @@ describe("commitResetDeferredChanges — stages only the save report's files (WM
     // The co-authorship trailer is still there, so an empty read above means
     // "no item trailer", not "no trailer block at all".
     expect(await headTrailer(projectDir, "Co-Authored-By")).not.toBe("");
+    expect(await headTrailer(projectDir, "N-DX")).toBe("PRD record (--reset-deferred)");
   });
 });
 

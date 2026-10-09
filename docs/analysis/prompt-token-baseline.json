@@ -1,19 +1,19 @@
 {
   "model": "claude-sonnet-5",
   "totals": {
-    "surfaces": 36,
-    "perCallTokens": 22753,
-    "uniqueTokens": 14250,
+    "surfaces": 38,
+    "perCallTokens": 23377,
+    "uniqueTokens": 14874,
     "skills": 13,
-    "skillTokens": 18043
+    "skillTokens": 20439
   },
   "skills": [
     {
       "name": "ndx-adversarial-review",
       "file": "packages/core/assistant-assets/skills/ndx-adversarial-review.md",
       "shipped": true,
-      "chars": 20921,
-      "tokens": 5231
+      "chars": 22420,
+      "tokens": 5605
     },
     {
       "name": "iso-map",
@@ -23,6 +23,13 @@
       "tokens": 2072
     },
     {
+      "name": "ndx-reshape",
+      "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
+      "shipped": true,
+      "chars": 7584,
+      "tokens": 1896
+    },
+    {
       "name": "triage",
       "file": ".claude/skills/triage/SKILL.md",
       "shipped": false,
@@ -30,18 +37,25 @@
       "tokens": 1856
     },
     {
-      "name": "ndx-reshape",
-      "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
-      "shipped": true,
-      "chars": 5941,
-      "tokens": 1486
-    },
-    {
       "name": "ndx-work",
       "file": "packages/core/assistant-assets/skills/ndx-work.md",
       "shipped": true,
-      "chars": 5073,
-      "tokens": 1269
+      "chars": 6794,
+      "tokens": 1699
+    },
+    {
+      "name": "ndx-capture",
+      "file": "packages/core/assistant-assets/skills/ndx-capture.md",
+      "shipped": true,
+      "chars": 6407,
+      "tokens": 1602
+    },
+    {
+      "name": "ndx-plan",
+      "file": "packages/core/assistant-assets/skills/ndx-plan.md",
+      "shipped": true,
+      "chars": 6146,
+      "tokens": 1537
     },
     {
       "name": "dev-link",
@@ -51,25 +65,11 @@
       "tokens": 1264
     },
     {
-      "name": "ndx-capture",
-      "file": "packages/core/assistant-assets/skills/ndx-capture.md",
-      "shipped": true,
-      "chars": 4815,
-      "tokens": 1204
-    },
-    {
-      "name": "ndx-plan",
-      "file": "packages/core/assistant-assets/skills/ndx-plan.md",
-      "shipped": true,
-      "chars": 4553,
-      "tokens": 1139
-    },
-    {
       "name": "ndx-config",
       "file": "packages/core/assistant-assets/skills/ndx-config.md",
       "shipped": true,
-      "chars": 3444,
-      "tokens": 861
+      "chars": 4985,
+      "tokens": 1247
     },
     {
       "name": "ndx-feedback",
@@ -102,9 +102,9 @@
   ],
   "byPackage": {
     "rex": {
-      "surfaces": 19,
-      "perCallTokens": 15217,
-      "uniqueTokens": 7195
+      "surfaces": 21,
+      "perCallTokens": 15743,
+      "uniqueTokens": 7721
     },
     "sourcevision": {
       "surfaces": 7,
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4533,
-      "uniqueTokens": 4533
+      "perCallTokens": 4631,
+      "uniqueTokens": 4631
     },
     "core": {
       "surfaces": 1,
@@ -569,6 +569,30 @@
     },
     {
       "pkg": "rex",
+      "file": "packages/rex/src/analyze/place-reason.ts",
+      "builder": "buildPlacementEnvelope",
+      "purpose": "Place a change on a shortlisted capability or constraint, or propose a new node.",
+      "inline": false,
+      "literals": 15,
+      "constants": {},
+      "ownTokens": 172,
+      "fixedChars": 687,
+      "fixedTokens": 172
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/spec-draft-reason.ts",
+      "builder": "buildSpecDraftEnvelope",
+      "purpose": "Redraft a capability spec in present tense, citing the source item of every criterion.",
+      "inline": false,
+      "literals": 22,
+      "constants": {},
+      "ownTokens": 354,
+      "fixedChars": 1414,
+      "fixedTokens": 354
+    },
+    {
+      "pkg": "rex",
       "file": "packages/rex/src/analyze/rename-resolve.ts",
       "builder": "buildRenameEnvelope",
       "purpose": "Pick the better of two colliding item titles.",
@@ -727,11 +751,11 @@
       "builder": "buildSystemPrompt",
       "purpose": "The agent's system prompt — role, rules, workflow, error handling.",
       "inline": false,
-      "literals": 76,
+      "literals": 77,
       "constants": {},
-      "ownTokens": 1143,
-      "fixedChars": 4569,
-      "fixedTokens": 1143
+      "ownTokens": 1186,
+      "fixedChars": 4741,
+      "fixedTokens": 1186
     },
     {
       "pkg": "hench",
@@ -751,11 +775,11 @@
       "builder": "formatTaskBrief",
       "purpose": "Render the task brief section — task, parent chain, requirements.",
       "inline": false,
-      "literals": 43,
+      "literals": 49,
       "constants": {},
-      "ownTokens": 237,
-      "fixedChars": 946,
-      "fixedTokens": 237
+      "ownTokens": 292,
+      "fixedChars": 1166,
+      "fixedTokens": 292
     },
     {
       "pkg": "hench",
@@ -930,9 +954,9 @@
           "tokens": 167
         }
       ],
-      "fixedTokens": 1380,
+      "fixedTokens": 1478,
       "branchConditional": true,
-      "unreachedTokens": 464
+      "unreachedTokens": 562
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -987,8 +1011,8 @@
       }
     ]
   },
-  "contentHash": "145ec311b955eb6f",
-  "recordedAt": "2026-10-08T19:46:48.446Z",
-  "commit": "1b4796c4728a",
+  "contentHash": "ffe50f97285f672a",
+  "recordedAt": "2026-10-09T18:57:56.580Z",
+  "commit": "21cefd26264b",
   "dirty": false
 }

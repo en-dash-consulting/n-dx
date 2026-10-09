@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
 import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
+import { isWindowsSafeSegment } from "../../../src/store/folder-tree-serializer.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
 import { writePrdModel } from "../../../src/store/prd-model-writer.js";
 import { withLock } from "../../../src/store/file-lock.js";
@@ -124,6 +125,18 @@ describe("applyAmendments: added", () => {
   it("suffixes the slug when a sibling holds it", () => {
     const { tree: out } = applyAmendments(tree([{ ...added, title: "Pay by card", target: "abcdef99" }]), CHANGE, OPTS);
     expect(get(out, "abcdef99").slug).toBe("pay-by-card-abcdef");
+  });
+
+  it.each(["Con", "AUX", "Nul", "COM1", "lpt9"])("never gives a new node the Windows-unsafe slug for %s", (title) => {
+    const { tree: out } = applyAmendments(tree([{ ...added, title, target: "abcdef99" }]), CHANGE, OPTS);
+    const slug = get(out, "abcdef99").slug;
+    expect(isWindowsSafeSegment(slug)).toBe(true);
+    expect(slug).toBe(`${title.toLowerCase()}-abcdef`);
+  });
+
+  it.each(["Index", "INDEX", "index"])("never gives a new node the slug index for %s", (title) => {
+    const { tree: out } = applyAmendments(tree([{ ...added, title, target: "abcdef99" }]), CHANGE, OPTS);
+    expect(get(out, "abcdef99").slug).toBe("index-abcdef");
   });
 
   it("refuses a missing or non-container parent, a missing title and a taken id", () => {
