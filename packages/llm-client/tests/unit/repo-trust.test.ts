@@ -120,6 +120,20 @@ describe("collectRepoExecutionConfig", () => {
     expect(collectRepoExecutionConfig(repo).permissionMode).toBeNull();
   });
 
+  // Every field folded into the digest moves it for *every* repository, so a
+  // field added with an always-present empty value would re-open trust across
+  // the board on upgrade: a repository the user trusted reads as `changed`,
+  // which clamps its guard to baseline and lowers bypassPermissions with
+  // nothing in the repository having changed. The literal is the digest this
+  // configuration produced before guard.env.allow was collected — a new field
+  // that is not omitted when empty will fail here.
+  it("keeps the digest a repository without guard.env.allow already had", () => {
+    writeJson(".hench/config.json", { guard: DEFAULT_GUARD, permissionMode: "acceptEdits", provider: "cli" });
+    writeJson(".rex/config.json", { test: "npm test" });
+    writeJson(".mcp.json", { mcpServers: { rex: { command: "ndx", args: ["rex", "mcp", "."] } } });
+    expect(collectRepoExecutionConfig(repo).digest).toBe("f1b6efeb00de4176918dc3a74f0b92be6b48d8953ac0fa1a877058f15659737d");
+  });
+
   // guard.env.allow names variables the credential filter would otherwise
   // strip, so a tracked entry widens what a model-chosen command can read.
   // It has to move the digest, or a checkout trusted before the entry

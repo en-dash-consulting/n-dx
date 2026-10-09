@@ -313,7 +313,10 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
           allowedGitSubcommands: [...guard.allowedGitSubcommands].sort(),
         }
       : null,
-    envAllow: [...envAllow].sort(),
+    // Present only when the repository ships entries. An empty key would
+    // move every existing digest on upgrade, and a repository trusted before
+    // this field existed would read as `changed` with nothing having changed.
+    ...(envAllow.length ? { envAllow: [...envAllow].sort() } : {}),
     permissionMode: optionalString(merged.permissionMode),
     provider: optionalString(merged.provider),
     testCommand: optionalString(rexConfig?.test),
@@ -324,6 +327,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     sources,
     ...body,
     guard,
+    envAllow: [...envAllow].sort(),
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
   };
 }

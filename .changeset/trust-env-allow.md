@@ -8,3 +8,6 @@ variables through to the agent's processes changes the trust digest and raises
 an `env-allow-added` warning in the trust review, instead of taking effect
 unseen on an already-trusted checkout. `guard.env.deny` is not collected — it
 can only remove variables, so it never widens what the agent can read.
+
+A repository that ships no `guard.env.allow` keeps the digest it already had,
+so the upgrade does not re-open trust on checkouts the user has approved.
