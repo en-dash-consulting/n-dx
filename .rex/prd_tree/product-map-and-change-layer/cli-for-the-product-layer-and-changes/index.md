@@ -26,7 +26,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add rex product and rex change commands; ndx add creates a change](./add-rex-product-and-rex-change.md) | pending |
+| [criteria-growth warning says bare "criteria" instead of "capability criteria"](./criteria-growth-warning-says-bare.md) | pending |
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | pending |
+| [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | pending |
 | [rex health does not report changes that are not landed on main](./rex-health-does-not-report-changes.md) | pending |
+| [rex health never passes the project's releases to the v2 rules, so title-release-token cannot fire](./rex-health-never-passes-the-project-s.md) | pending |
 | [Run the v2 tree rules from rex health and pass structureHealth.maxCriteriaPerCapability to criteria-growth](./run-the-v2-tree-rules-from-rex-health.md) | pending |
 | [Show the product layer delta in tree-diff and emit the PR comment as Markdown](./show-the-product-layer-delta-in-tree.md) | pending |

@@ -1,0 +1,19 @@
+---
+id: "36e9ac1d-dcf7-4fee-a925-03019608c7e7"
+level: "task"
+title: "rex health never passes the project's releases to the v2 rules, so title-release-token cannot fire"
+status: "pending"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "rex"
+  - "pr-18"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "rex health on a v2 tree with a change titled with one of its own plannedRelease values reports title-release-token (test)"
+  - "A title naming a dependency version that is not a project release is not flagged by rex health (test)"
+description: "Verdict: should-fix (low).\n\nScenario: on a v2 tree, a change titled \"0.9.0 release audit\" with plannedRelease \"0.9.0\" gets no title-release-token finding from `rex health`. checkV2TreeHealth (packages/rex/src/core/health.ts) calls checkV2Rules without `releases`. Per decision 6ae69b1a, the rule flags a version token only when it names a release in RuleOptions.releases, and when that list is empty it flags nothing. No caller in packages/rex/src fills `releases`: change-add, change-place, apply-amendments and prd-bundle-v2 all omit it. `rex health` is the first caller that runs the whole tree, so it is where the rule was expected to be live.\n\nFix: collect the releases (the package version line, plus every plannedRelease and shippedIn in the tree) in one helper in core, and pass them from checkV2TreeHealth. Cost: small. Whether the write paths (change-add, change-place) should pass them too is a separate decision for the owner."
+lastModified: "2026-10-09T06:34:13.719Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
