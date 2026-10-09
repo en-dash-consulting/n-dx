@@ -1,5 +1,98 @@
 # @n-dx/llm-client
 
+## 0.9.0
+
+### Patch Changes
+
+- [#588](https://github.com/en-dash-consulting/n-dx/pull/588) [`1dfc0c7`](https://github.com/en-dash-consulting/n-dx/commit/1dfc0c7e7947ffa6054cb6ef9efc214805253a16) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Each package's full build now ends by writing `dist/.build-stamp.json`, a hash of the source it compiled. The repository's affected test gate uses it to tell a current build from a stale one by content rather than by file times, so a partial build no longer hides stale compiled code and an identical-content rewrite no longer demands a rebuild.
+   The stamp is excluded from the published tarballs.
+
+- [#532](https://github.com/en-dash-consulting/n-dx/pull/532) [`eff0f79`](https://github.com/en-dash-consulting/n-dx/commit/eff0f79db748ee2ec71c27abbde166fdcfbfc722) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The Jev client and its judgment cache move from sourcevision into `@n-dx/llm-client`, so rex can ask judgment-shaped questions without importing a sibling domain package. Behaviour, the cache file location and its format are unchanged. Per-call ledger accounting, which a foundation-tier module cannot reach upward for, is now an injection seam: sourcevision registers its run ledger through `setJevObserver` when `sv analyze` starts.
+
+- [#579](https://github.com/en-dash-consulting/n-dx/pull/579) [`cf19d5a`](https://github.com/en-dash-consulting/n-dx/commit/cf19d5a29ffa9ad4df8bb2befb2dd3f266785e05) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add the placement decision for a change on the product layer (`core/placement-policy.ts`). `rex.placement.models` (`text`, `jev`, `both`) chooses which tiers run beside the rules, and `rex.placement.autoAccept` (`none`, `agree`, `confident`) decides when a placement is accepted without a person; a change without one gets `needsPlacement`. Jev runs under its own `prd.place.judge` task class, which is not a default judgment route, so exporting `TYPESAFE_API_KEY` alone never turns it on. `confident` needs a Jev pick at confidence 0.8 or higher that is on the rules shortlist. Jev can abstain with a none-of-these option, which is never auto-accepted, and a Jev confidence that is not finite or is outside 0–1 is ignored with a warning. Without Jev, `both` falls back to the text model and `jev` to rules only, each with a warning. Not wired into the store, CLI or MCP yet.
+
+- [#503](https://github.com/en-dash-consulting/n-dx/pull/503) [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `loadLLMConfig` now keeps `llm.claude.reviewModel`, `llm.codex.reviewModel`, `llm.google.reviewModel` and top-level `llm.reviewModel`. They were dropped on load, so a configured reviewer model was silently ignored for those vendors and `ndx work --resolve` reported the vendor default.
+
+- [#529](https://github.com/en-dash-consulting/n-dx/pull/529) [`f46b952`](https://github.com/en-dash-consulting/n-dx/commit/f46b95235daf551cd0cc7c13ae162204aff74527) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Route core, and the rest of hench and web, through the layout resolver
+  
+  Every remaining literal `.rex/`, `.hench/`, `.sourcevision/` and `.n-dx*` path
+  in the orchestration tier now asks `resolveLayout` where the project keeps its
+  state, as do the hench and web files the 0.8.0 sweep left behind. On a project
+  that has run `ndx migrate-layout`, these all used to read or write a path
+  nothing is there — silently, because a missing file is indistinguishable from
+  an empty project. Fixed as part of that:
+  
+  - `ndx start stop` and `ndx start status` could not find a running dashboard on
+    the new layout, and left it running.
+  - The staleness notice told a migrated project that all three of its tool
+    directories were missing and that it should re-run `ndx init`.
+  - `ndx ci`, `ndx export` and `ndx refresh` looked for analysis output, the PRD
+    tree and run records under the legacy names; the cross-vendor reviewer found
+    no codebase context, no PRD excerpt and no configured test command.
+  - The guard baseline every hench run is clamped to blocked `.rex/**` and
+    `.hench/**` only, so on the new layout the agent was free to write n-dx's own
+    state, PRD tree included.
+  - The "Strict Safety" workflow template had drifted from that baseline in both
+    copies, dropping half its credential patterns — choosing it left a project
+    *less* protected than the default. Both copies now derive from the baseline.
+  - Hench classified PRD writes by file extension on the new layout, so run
+    summaries reported bookkeeping as documentation changes.
+  - The note printed after a completion commit named a gitignore path the
+    operator does not have, so following it left the tree dirty and the next run
+    still refused to start.
+  
+  New in `@n-dx/llm-client`: `layoutStateNames()`, for the classifiers that are
+  handed a path and must recognise n-dx state under either layout rather than
+  resolve one.
+
+- [#582](https://github.com/en-dash-consulting/n-dx/pull/582) [`8bae238`](https://github.com/en-dash-consulting/n-dx/commit/8bae2381270ebcd2c419b4c8d8c90ffd87ac3047) Thanks [@endash-shal](https://github.com/endash-shal)! - Every remaining reader of the project config asks the layout resolver where it lives, so a project on the `.ndx/` layout is read from `.ndx/config.json` (and `.ndx/config.local.json`) instead of a root `.n-dx.json` nothing writes. In `@n-dx/llm-client` that is `loadLLMConfig`, `loadClaudeConfig`, `loadProjectOverrides` and `loadProjectOverrideSources`, whose `file` label is now the root-relative path of the file read; `PROJECT_CONFIG_FILE` and `LOCAL_CONFIG_FILE` keep their legacy names for labels. In `@n-dx/hench`: the project CLI name, the Claude weekly budget, archival and retention settings and `hench.fullTestCommand`. In `@n-dx/web`: the config, LLM, features, CLI-timeout, project-settings, SourceVision (zone pins and Ask timeout), token-usage and usage-cleanup routes, the CLI name, and the dashboard usage ledger, which lands at `.ndx/web-usage.jsonl` on that layout; `GET /api/cli/timeouts` now reports `configFile`, the file the overrides live in, and the CLI Timeouts page shows it. The layout-literal inventory reaches zero.
+  
+  The same sweep found that hench and rex recovered the project root from their own state directory as its parent, which on the `.ndx/` layout is the container — so `loadConfig`'s project overrides and the `loadClaudeConfig` / `loadLLMConfig` adapters read `.ndx/.n-dx.json`, a file nothing writes, and every override was silently ignored on a migrated project. `projectRootOf` in `@n-dx/llm-client` (exported, and through hench's llm gateway) steps over the container, and `loadProjectOverrideSources` and both packages' adapters use it.
+
+- [#503](https://github.com/en-dash-consulting/n-dx/pull/503) [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A website open in the user's browser can no longer make the dashboard spawn `ndx` through the prepare routes.
+  
+  `GET /api/hench/prep/:taskId` and `GET /api/hench/ready` answer 403 to a foreign `Origin` or a `Sec-Fetch-Site` other than `same-origin`/`none`; header-less CLI requests still work. Prep and preview spawns are capped at 4 in flight (429 beyond), identical prep resolves share one spawn, and a client disconnect kills the child. `exec` gains a `signal` option to support this.
+
+- [#579](https://github.com/en-dash-consulting/n-dx/pull/579) [`86751c5`](https://github.com/en-dash-consulting/n-dx/commit/86751c571f74bb04949e8b5cc1007eddf4ea1e21) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Rank placement candidates for a change from rules (package and path mentions, title word overlap, file evidence against realized-by) and an optional text model on the new `prd.place` task class; the model counts as agreeing only when it picks the rules' top candidate.
+
+- [#532](https://github.com/en-dash-consulting/n-dx/pull/532) [`fefc307`](https://github.com/en-dash-consulting/n-dx/commit/fefc3072a4a1f7a902a5f456fa4475faeebb5b71) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Redaction now covers Bitbucket and Atlassian credentials. The prefixed shapes are recognised wherever they appear — `ATBB` (Bitbucket Cloud app password), `ATCTT` (scoped Bitbucket access token), `ATATT` (Atlassian API token) and `BBDC-` (Bitbucket Data Center HTTP access token) — and two rules cover the forms a credential without a prefix of its own travels in: `Authorization: Basic <base64>`, which is how Bitbucket Cloud sends an app password, and the `-u user:password` flag, which keeps the username as URL userinfo already does. A credential printed bare with no prefix, key, flag or header is still out of reach; `redact.ts` says why.
+  
+  `redactSecretsDetailed().kinds` now names each kind once, as documented. `assignment` is two rules and appeared twice when both fired.
+
+- [#584](https://github.com/en-dash-consulting/n-dx/pull/584) [`5802bc2`](https://github.com/en-dash-consulting/n-dx/commit/5802bc221ecab89d6be697b65e90d6db8c138674) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Rex can re-point recorded commit SHAs that a rebase, cherry-pick or squash rewrote to the commit they became on main (same author date and subject, patch-id, or N-DX-Item trailer and subject, then an optional host pull-request lookup), returning unmatched SHAs with a reason. `exec` gains an `input` option that writes to the child's stdin.
+
+- [#520](https://github.com/en-dash-consulting/n-dx/pull/520) [`0ec098a`](https://github.com/en-dash-consulting/n-dx/commit/0ec098ae8fe51a8f62a7a8e8400eba9e47971a1d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex mcp .` now serves the worktree named by the client's MCP roots, so a Claude desktop session in a linked worktree writes that worktree's PRD rather than the main checkout's ([#499](https://github.com/en-dash-consulting/n-dx/issues/499)). A root naming another worktree of the same repository that has no `.rex/` refuses writes instead of falling back. An explicit directory (`rex mcp /abs/path`) and the dashboard's HTTP MCP keep the directory they were given. `get_capabilities` reports the served `workspace`. `@n-dx/llm-client` exports the shared `resolveWorkspaceFromRoots` helper.
+
+- [#503](https://github.com/en-dash-consulting/n-dx/pull/503) [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add a shared available-memory reading (`readAvailableMemory`, `getAvailableMemory`).
+  
+  On macOS it counts free + inactive + speculative + purgeable pages from `vm_stat` and takes health from `kern.memorystatus_vm_pressure_level`, instead of `os.freemem()`, which counts only free pages and read a healthy 16 GB Mac as ~115 MB free. When neither can be read the reading is `availableBytes: null` and `pressure: "unknown"`, never 0. Linux and Windows keep `os.freemem()` unchanged. Readings are cached for 5 s and concurrent refreshes share one spawn.
+
+- [#607](https://github.com/en-dash-consulting/n-dx/pull/607) [`ce25794`](https://github.com/en-dash-consulting/n-dx/commit/ce2579434098c1994c73d91b1964f2b54b8f202f) Thanks [@endash-shal](https://github.com/endash-shal)! - One host-neutral git-remote-URL parser, in `@n-dx/llm-client`
+  
+  `parseGitRemoteUrl` splits an origin remote into `{ host, owner, repo, path, kind }`
+  for https, ssh and scp-style forms, where `kind` distinguishes `github`,
+  `bitbucket-cloud`, a self-hosted `bitbucket-dc` and `other`. Data Center's `/scm/`
+  clone prefix is dropped from the identity path, so the same repository parses the
+  same way over https and ssh.
+  
+  The three readers that each had their own regex now share it: sourcevision's
+  analysis manifest and iso export, and the web dashboard's project route. They
+  disagreed — web's split on `[/:]` read `ssh://git@host:7999/PROJ/repo.git` as the
+  repo `repo` with no owner, while sourcevision's could not parse that form at all.
+  A new architecture-policy rule fails the build on a second parser.
+  
+  An scp-style remote does not need a dotted host: `git@work-github:acme/widget.git`
+  (an ssh config alias) and `git@bitbucket:PROJ/widget.git` (a short internal
+  hostname) parse like any other. Only a one-character host is refused, because
+  that is a Windows drive letter and git reads `C:\src\repo` as a local path.
+
+- [#602](https://github.com/en-dash-consulting/n-dx/pull/602) [`b671123`](https://github.com/en-dash-consulting/n-dx/commit/b6711238559f132c7f0f7099b525d08108cfc445) Thanks [@endash-shal](https://github.com/endash-shal)! - Child processes no longer open console windows on Windows. The shared `exec`
+  wrapper defaults `windowsHide` to true, and the core CLI spawn shim, the vitest
+  launcher and the e2e helpers set it, so a test suite or an agent run no longer
+  flashes a console per spawn across the screen and steals keyboard focus.
+
+- [#503](https://github.com/en-dash-consulting/n-dx/pull/503) [`59d6000`](https://github.com/en-dash-consulting/n-dx/commit/59d60002596915310e72da11605c6ebcc3dbd70b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx work --task=<id> --resolve [flags] <dir>` (`hench run --resolve`) prints one JSON object describing the run those flags would start, without starting it: the task, the workspace, every setting (vendor, model, provider, permission mode, review and review model, test gate, budgets, fresh, allow-dirty, reset-deferred) with the config key that supplied it, the per-run options with their flags, types and allowed values, the equivalent `ndx work` command, and each reason the run would refuse — task-not-found, not-actionable, claimed-elsewhere, tree-not-conformant, vendor-unset, vendor-cli-missing, provider-unsupported, model-vendor-mismatch, dirty-tree. It exits 0 when it reports refusals, and takes no claim, writes no PRD or git state and starts no vendor CLI. Resolution uses the run's own flag parsing and model chain, so the reported model is the one the run uses. `resolveTaskModel` now also returns the `source` key that supplied its model.
+
 ## 0.8.0
 
 ### Minor Changes
