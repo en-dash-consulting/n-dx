@@ -561,6 +561,25 @@ describe("applyAmendmentsProblems", () => {
       expect(applyAmendmentsProblems(build([]), CHANGE, NOW).always).toEqual([expect.stringMatching(/live descendants con-child/)]);
     });
 
+    it("is always when a descendant nobody removes stays, even if another open change removes a sibling", () => {
+      const child = (id: string) => ({ id, type: "constraint", title: id, slug: id, statement: "c", status: "pending" }) as RuleNode;
+      const input = tree([{ target: CAP, delta: "removed", summary: "go" }]);
+      get(input, CAP).children = [child("con-a"), child("con-b")];
+      input.changes.push(other([{ target: "con-a", delta: "removed", summary: "go" }]));
+      const problems = applyAmendmentsProblems(input, CHANGE, NOW);
+      expect(problems.always).toEqual([expect.stringMatching(/live descendants con-b would be hidden/)]);
+      expect(problems.pending).toEqual([]);
+    });
+
+    it("names an open change that adds under the removed node", () => {
+      const input = tree([removes]);
+      input.changes.push(other([{ target: "con-new", delta: "added", type: "constraint", under: CON, title: "New", proposed: "n", summary: "s" }]));
+      const problems = applyAmendmentsProblems(input, CHANGE, NOW);
+      expect(problems.always).toEqual([]);
+      expect(problems.pending).toEqual([expect.stringMatching(/open-change-refs-live/)]);
+      expect(problems.blockedBy).toEqual(["CH-2"]);
+    });
+
     it("keeps a problem the amendment has on its own as always", () => {
       const input = tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]);
       input.changes.push(other([modifies]));
