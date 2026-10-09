@@ -28,5 +28,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Close the two should-fix gaps the 114c4bc8 review dropped: vacuous floor test and non-cached high-usage threshold](./close-the-two-should-fix-gaps-the.md) | completed |
 | [Fix the dashboard's duplicate tuners, which recommend a token budget below the arrival cost](./fix-the-dashboard-s-duplicate-tuners.md) | pending |
 | [Make the adaptive and workflow tuners measure run cost in the same token classes as checkTokenBudget](./make-the-adaptive-and-workflow-tuners.md) | completed |
-| [Make the tuners' context-write floor hold when no cached run completed, and harden the two threshold tests](./make-the-tuners-context-write-floor.md) | pending |
+| [Make the tuners' context-write floor hold when no cached run completed, and harden the two threshold tests](./make-the-tuners-context-write-floor.md) | completed |
 | [Set the prune defaults from the 0.7.1 post-release measurement batch](./set-the-prune-defaults-from-the-0-7-1.md) | pending |
