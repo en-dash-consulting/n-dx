@@ -61,4 +61,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Spec merge keeps the model's own subject instead of wrapping it in "The system shall ensure that"](./spec-merge-keeps-the-model-s-own.md) | completed |
 | [Stamp appliedAt and reviewedHash when migrating historical items](./stamp-appliedat-and-reviewedhash-when.md) | completed |
 | [The migration can freeze a Windows-unsafe v1 slug (con, aux, nul) into v2, leaving the tree permanently unwritable](./the-migration-can-freeze-a-windows.md) | completed |
-| [The statement check rejects valid present-tense statements that name a task, change, item or PR, or open with a code span](./the-statement-check-rejects-valid.md) | pending |
+| [The statement check rejects valid present-tense statements that name a task, change, item or PR, or open with a code span](./the-statement-check-rejects-valid.md) | completed |
+| [The template statement check accepts an imperative after a leading clause and a noun-phrase work note as present-tense statements](./the-template-statement-check-accepts.md) | pending |
