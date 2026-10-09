@@ -46,3 +46,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [tree-diff --format=markdown appends "no PRD tree at this source." to the comment on stdout](./tree-diff-format-markdown-appends-no.md) | completed |
 | [tree-diff Markdown comment passes @mentions in titles through, so posting it pings users and teams](./tree-diff-markdown-comment-passes.md) | completed |
 | [tree-diff product map section, --format=markdown and --out are missing from docs/packages/rex.md and have no changeset](./tree-diff-product-map-section-format.md) | completed |
+| [rex change place names MCP parameters, not CLI flags, when it refuses a summary-only amends placement](./rex-change-place-names-mcp-parameters.md) | pending |
