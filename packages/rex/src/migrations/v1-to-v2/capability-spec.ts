@@ -211,7 +211,9 @@ export function toModelEars(text: string): string {
     for (let i = 2; i < Math.min(words.length, MAX_SUBJECT_WORDS + 1); i++) {
       if (PHRASE_LINKS.has(words[i - 1]!.toLowerCase())) continue;
       const verb = behaviourVerb(words[i]!);
-      if (!verb) continue;
+      // A noun in the subject, not its verb: "The run records include …", "The task lists written …".
+      const next = (words[i + 1] ?? "").toLowerCase();
+      if (!verb || SUBJECT_FOLLOWERS.has(next) || BEHAVIOUR_VERBS.has(next)) continue;
       return `${words.slice(0, i).join(" ")} shall ${verb}${words.slice(i + 1).map((w) => ` ${w}`).join("")}.`;
     }
   }

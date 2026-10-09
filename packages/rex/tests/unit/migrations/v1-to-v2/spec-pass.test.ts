@@ -125,6 +125,7 @@ describe("v1-to-v2 spec text pass", () => {
           { text: "When a task is blocked, the scheduler shall skip it.", source: "s1" },
           { text: "The inventory lists every prompt surface", source: "f1" },
           { text: "The dashboard is refreshed on every write.", source: "t1" },
+          { text: "The run records include the model.", source: "s1" },
         ],
       }),
     );
@@ -134,6 +135,7 @@ describe("v1-to-v2 spec text pass", () => {
       "When a task is blocked, the scheduler shall skip it.",
       "The inventory shall list every prompt surface.",
       "The dashboard is refreshed on every write.",
+      "The run records include the model.",
     ]);
     expect(texts.join("\n")).not.toContain("ensure that");
   });
