@@ -109,20 +109,24 @@ const BEHAVIOUR_VERBS = new Set([
   "reuse", "run", "save", "select", "send", "serve", "set", "show", "skip", "sort", "stamp", "start",
   "stop", "store", "support", "track", "update", "use", "validate", "verify", "warn", "write",
 ]);
+/** Auxiliaries: as the second or third word, they make the opening words a subject ("Log entries are kept"). */
+const AUXILIARIES = new Set([
+  "is", "are", "was", "were", "be", "been", "has", "have", "had", "do", "does", "can", "cannot", "must",
+  "should", "will", "shall", "may",
+]);
 /**
- * A second word that makes the first a subject, not a verb: an auxiliary or
- * connective ("logs are kept"), or a plural-subject verb ("reads agree").
- * Behaviour verbs in base form count too ("logs show …").
+ * A second word that makes the first a subject, not a verb: an auxiliary, a
+ * connective, relative pronoun or preposition ("Runs that …", "Runs from …"),
+ * a participle ("Records written …") or a plural-subject verb ("Reads agree",
+ * "Claims expire"). Behaviour verbs in base form count too ("Logs show …").
  */
 const SUBJECT_FOLLOWERS = new Set([
-  "is", "are", "was", "were", "be", "been", "has", "have", "had", "do", "does", "can", "cannot", "must",
-  "should", "will", "shall", "may", "stay", "stays", "remain", "remains", "appear", "appears", "of", "and", "or",
-  "agree", "become", "carry", "change", "contain", "differ", "exist", "get", "go", "live", "need", "point",
-  "succeed", "survive", "work",
-]);
-/** Words that open a verb's object: after a capitalised behaviour verb they mark it as a verb ("Records the transition"). */
-const DETERMINERS = new Set([
-  "a", "an", "the", "every", "each", "all", "any", "no", "its", "their", "his", "her", "one", "only", "it", "them", "this", "that",
+  ...AUXILIARIES,
+  "stay", "stays", "remain", "remains", "appear", "appears", "of", "and", "or",
+  "that", "which", "who", "whose", "from", "with", "without", "in", "into", "on", "at", "by", "to", "for",
+  "written", "taken", "given", "shown", "made", "seen", "held", "kept", "left", "sent", "found",
+  "agree", "become", "carry", "change", "contain", "continue", "differ", "exist", "expire", "get", "go",
+  "live", "need", "persist", "point", "succeed", "survive", "work",
 ]);
 
 /**
@@ -159,23 +163,29 @@ export function isProcessCriterion(text: string): boolean {
   return PROCESS_CRITERIA.some((p) => p.test(core) || p.test(bare));
 }
 
-/** The base form of a behaviour verb ("removes" → "remove", "applies" → "apply"), or undefined. */
+/**
+ * The base form of a third-person behaviour verb ("removes" → "remove",
+ * "applies" → "apply"), or undefined. A bare base form is not read as a verb:
+ * opening a criterion it is a noun ("Run records include …", "Log files …")
+ * or an instruction, not behaviour.
+ */
 function behaviourVerb(word: string): string | undefined {
   const w = word.toLowerCase();
-  const forms = [w, w.replace(/ies$/, "y"), w.replace(/es$/, ""), w.replace(/s$/, "")];
-  return forms.find((f) => BEHAVIOUR_VERBS.has(f));
+  if (!w.endsWith("s")) return undefined;
+  const forms = [w.replace(/ies$/, "y"), w.replace(/es$/, ""), w.replace(/s$/, "")];
+  return forms.find((f) => f !== w && BEHAVIOUR_VERBS.has(f));
 }
 
 /** One criterion in EARS form: EARS-shaped text is kept, a verb-led one gets "The system shall", the rest the ubiquitous form. */
 export function toEars(text: string): string {
   const core = criterionCore(text);
   if (EARS_OPENERS.test(core) || /\bshall\b/i.test(core)) return `${core}.`;
-  const [first = "", second = ""] = core.split(/\s+/, 2);
+  const [first = "", second = "", third = ""] = core.split(/\s+/, 3);
   const verb = behaviourVerb(first);
   const next = second.toLowerCase();
-  // A capital may open a sentence about a plural subject ("Claims expire"); only a determiner after it makes it a verb.
-  const verbLed = /^[a-z]+$/.test(first) ? !SUBJECT_FOLLOWERS.has(next) && !BEHAVIOUR_VERBS.has(next) : DETERMINERS.has(next);
-  if (verb && /^[A-Za-z]+$/.test(first) && verbLed) {
+  // Capitalised or not ("Removes dead exports", "removes dead exports"): the words after it decide.
+  const subject = SUBJECT_FOLLOWERS.has(next) || BEHAVIOUR_VERBS.has(next) || AUXILIARIES.has(third.toLowerCase());
+  if (verb && /^[A-Za-z]+$/.test(first) && !subject) {
     return `The system shall ${verb}${core.slice(first.length)}.`;
   }
   return `The system shall ensure that ${lowerFirst(core)}.`;
@@ -218,11 +228,16 @@ function packageRoot(file: string): string {
   return parts[0] === "packages" && parts.length > 2 ? `packages/${parts[1]}/` : `${parts[0]}/`;
 }
 
-/** Test files in the packages of the code files; every test file when there are none. */
+/**
+ * Test files in the packages of the code files, plus the repository-level
+ * tests outside `packages/` (where a package with no suite of its own, such
+ * as `packages/core`, keeps its tests); every test file when there are no
+ * code files.
+ */
 export function scopedTestFiles(testFiles: readonly string[], codeFiles: readonly string[]): readonly string[] {
   if (codeFiles.length === 0) return testFiles;
   const roots = new Set(codeFiles.map(packageRoot));
-  return testFiles.filter((f) => roots.has(packageRoot(f)));
+  return testFiles.filter((f) => !f.startsWith("packages/") || roots.has(packageRoot(f)));
 }
 
 /**

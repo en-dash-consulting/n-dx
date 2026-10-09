@@ -70,6 +70,20 @@ describe("toEars", () => {
     expect(toEars("matches criteria to tests")).toBe("The system shall match criteria to tests.");
   });
 
+  it("treats a capitalised verb-led criterion, as v1 criteria are written, the same way", () => {
+    expect(toEars("Removes dead exports")).toBe("The system shall remove dead exports.");
+    expect(toEars("Applies patch updates automatically")).toBe("The system shall apply patch updates automatically.");
+    expect(toEars("Shows why a task was skipped")).toBe("The system shall show why a task was skipped.");
+    expect(toEars("Skips invalid entries (test)")).toBe("The system shall skip invalid entries.");
+  });
+
+  it("keeps a capitalised plural subject followed by a relative, preposition, participle or auxiliary", () => {
+    expect(toEars("Runs that fail are retried")).toBe("The system shall ensure that runs that fail are retried.");
+    expect(toEars("Runs from other worktrees appear")).toBe("The system shall ensure that runs from other worktrees appear.");
+    expect(toEars("Records written before the fix still load")).toBe("The system shall ensure that records written before the fix still load.");
+    expect(toEars("Log entries are kept")).toBe("The system shall ensure that log entries are kept.");
+  });
+
   it("keeps a plural subject that looks like a verb as the subject", () => {
     expect(toEars("Logs are kept for a week")).toBe("The system shall ensure that logs are kept for a week.");
     expect(toEars("Runs show their model")).toBe("The system shall ensure that runs show their model.");
@@ -215,6 +229,21 @@ describe("draftCapabilitySpecs", () => {
     const [scoped] = draft(items, { testFiles, codeFiles: { [id]: ["packages/hench/src/agent/prompt.ts"] } });
     expect(scoped.tests).toEqual(["packages/hench/tests/unit/prompt-sections.test.ts"]);
     expect(scoped.criteria[0].tests).toEqual(scoped.tests);
+  });
+
+  it("still links repository-level tests for a package with no suite of its own", () => {
+    const items = [
+      item("epic", "Core", [
+        item("feature", "Spawn guard", [], "completed", {
+          description: "Guards every child process the CLI spawns.",
+          acceptanceCriteria: ["Shell spawn inventory lists every spawn"],
+        }),
+      ]),
+    ];
+    const testFiles = ["tests/e2e/shell-spawn-inventory.test.js", "packages/web/tests/unit/shell-spawn-inventory.test.ts"];
+    const id = items[0].children![0].id;
+    const [s] = draft(items, { testFiles, codeFiles: { [id]: ["packages/core/cli.js"] } });
+    expect(s.tests).toEqual(["tests/e2e/shell-spawn-inventory.test.js"]);
   });
 
   it("has no statement when the description opens with metadata, a reference or a fragment", () => {
