@@ -24,7 +24,7 @@ export interface PriorAttemptWork {
 }
 
 /** Bookkeeping the completion check also ignores (see validation/completion.ts). */
-const BOOKKEEPING_EXCLUDES = [":(exclude).rex", ":(exclude).hench", ":(exclude).hench-commit-msg.txt"];
+const BOOKKEEPING_EXCLUDES = [":(exclude).rex", ":(exclude).hench", ":(exclude).hench-commit-msg.txt", ":(exclude).ndx-commit-msg.txt"];
 
 /**
  * Find the task's files that earlier attempts committed to the current branch.

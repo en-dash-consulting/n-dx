@@ -150,7 +150,7 @@ export async function commitReviewRepairs(
       "-m",
       `fix(review): apply adversarial-review repairs (run ${runId})`,
       "-m",
-      `N-DX: review-pass repairs (task ${taskId})\n${trailer}`,
+      `N-DX: review-pass repairs (task ${taskId})\nN-DX-Item: ${taskId}\n${trailer}`,
       "--",
       ...paths,
     ],

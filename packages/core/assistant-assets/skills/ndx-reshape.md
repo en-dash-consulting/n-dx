@@ -4,6 +4,8 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
 
 **Before anything else, mark where this run's token usage starts:** run `ndx hench usage mark --task=skill:ndx-reshape .`. The CLI snapshots the session transcript's cumulative usage and position under that id; the record step at the end computes this run's spend as the difference between that snapshot and the transcript then — arithmetic done by code, not a timestamp typed by hand. If the command reports no session or transcript, continue; the record will say it fell back.
 
+**Then note what is already dirty:** run `git -c core.quotepath=false status --porcelain --untracked-files=all` against the project root and keep its output. Every path it lists is the user's work in progress, and the commit step at the end stages only paths that are not on this list.
+
 ## Process
 
 1. Call `get_prd_status` (rex MCP) to see the full epic/feature structure and item counts
@@ -19,7 +21,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
    - Suggest new parent epics if needed to group scattered items
    - Suggest level changes (epic->feature, feature->task, etc.)
    - Suggest merges for overlapping items
-4. After user approval, execute the restructuring:
+4. After user approval, check for overlap first: if any path on the list you kept at the start is under `.rex/prd_tree/`, name those paths and ask the user to commit or stash them before you write — every `move_item`, `merge_items`, `edit_item` and `add_item` call rewrites the parent's and ancestors' `index.md` (their Children tables), so a dirty one would keep part of this change out of the commit. Once they have, run `git -c core.quotepath=false status --porcelain --untracked-files=all` again and keep that output as the list instead; if they decline, carry on, and those paths stay out of the commit. Then execute the restructuring:
    - Create new parent epics/features with `add_item` (rex MCP). Set `level` explicitly (`epic` or `feature` — it is required and has no default) and `parentId` for anything that is not a new top-level epic, so a new container never lands at root by accident. A container usually needs no acceptance criteria; when one does have a testable outcome of its own, put them in the `acceptanceCriteria` array rather than in `description`, since that is the field `verify_criteria` and the dashboard's requirements view read
    - Reparent items with `move_item` (rex MCP)
    - Change levels with `edit_item` (rex MCP) using the `level` field
@@ -27,7 +29,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
    - Rename items for consistency with `edit_item` (rex MCP)
 5. Run `reorganize` (rex MCP) with mode `fast` to verify no structural issues remain
 6. Show the updated structure via `get_prd_status`
-7. **Commit**: run `git status --porcelain` against the project root — this catches every MCP-driven write under `.rex/prd_tree/` (`move_item`, `merge_items`, `edit_item`, `add_item`, and `reorganize` all mutate the folder tree). If the output is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block . Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to a scratch file such as `.git/NDX_COMMIT_MSG`:
+7. **Commit**: run `git -c core.quotepath=false status --porcelain --untracked-files=all` against the project root — this catches every MCP-driven write under `.rex/prd_tree/` (`move_item`, `merge_items`, `edit_item`, `add_item`, and `reorganize` all mutate the folder tree). The paths to commit are the ones that are not on the list you kept at the start. If there are none, print "Working tree clean — nothing to commit." and stop. Otherwise stage exactly those paths, naming each one: `git add -- <path> <path> …`. Never `git add -A` or `git add .`: the paths already on the list are the user's work in progress, and staging them would attribute it to this skill. A path still on the list stays out of this commit even if this skill changed it — the user declined to commit or stash it before the write — so name it in your summary as part of the change this commit leaves out. Then commit with the n-dx authorship + model audit trailer block. Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to `.ndx-commit-msg.txt` at the project root — never under `.git/`, which is a file, not a directory, in a linked worktree:
 
    ```
    ndx-reshape: restructure PRD hierarchy
@@ -36,7 +38,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
    ```
 
-   Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
+   Then run `git commit -F .ndx-commit-msg.txt -- <the same paths>` and delete `.ndx-commit-msg.txt`. Name the paths on the commit as well: without them `git commit` takes everything in the index, including anything the user had already staged.
 
    Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
 

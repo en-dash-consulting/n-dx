@@ -43,6 +43,7 @@ const BOOKKEEPING_EXCLUDES = [
   ":(exclude).rex",
   ":(exclude).hench",
   ":(exclude).hench-commit-msg.txt",
+  ":(exclude).ndx-commit-msg.txt",
 ];
 
 /**

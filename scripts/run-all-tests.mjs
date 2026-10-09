@@ -203,6 +203,36 @@ function changedFilesSince(baseRef) {
   }
 }
 
+/** Names the stale packages on stderr plus the `stale-dist` protocol line, then exits 1. */
+function failStale(stale, detail) {
+  console.error(`${staleDistMessage(stale)}\n\n${detail}`);
+  console.log(`test-gate: stale-dist=${stale.map((s) => s.dir).join(",")}`);
+  process.exit(1);
+}
+
+/**
+ * Build the packages whose src/ the change edited and whose dist/ is not a full
+ * build of it: one pnpm call with a --filter per package, so pnpm orders them
+ * by dependency. Never a full build, never a package the stale check did not name.
+ */
+function rebuildStalePackages(changed) {
+  const stale = staleChangedPackages(ROOT, changed, manifests);
+  if (stale.length === 0) return;
+  console.log(`test-gate: rebuilding stale packages: ${stale.map((s) => s.name).join(", ")}`);
+  try {
+    execFileSyncCli("pnpm", [...stale.flatMap((s) => ["--filter", s.name]), "run", "build"], {
+      cwd: ROOT,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (err) {
+    failStale(stale, `Build failed:\n${[err.stdout, err.stderr, err.message].filter(Boolean).join("\n")}`);
+  }
+  const stillStale = staleChangedPackages(ROOT, changed, manifests);
+  if (stillStale.length > 0) failStale(stillStale, "Still stale after the build above.");
+  for (const s of stale) console.log(`test-gate: rebuilt ${s.name}`);
+}
+
 const manifests = readManifests();
 const args = process.argv.slice(2);
 const listOnly = args.includes("--list");
@@ -227,13 +257,10 @@ if (positional[0] === "affected") {
   } else {
     ({ suites: labels, reasons } = selectAffected(changed, manifests));
     // Root tests read packages through dist/. Against a stale build they pass on
-    // a change they should fail, so refuse to run them. (--list runs nothing.)
-    const stale = listOnly ? [] : staleChangedPackages(ROOT, changed, manifests);
-    if (stale.length > 0) {
-      console.error(staleDistMessage(stale));
-      console.log(`test-gate: stale-dist=${stale.map((s) => s.dir).join(",")}`);
-      process.exit(1);
-    }
+    // a change they should fail, so build exactly the stale packages first and
+    // re-check the stamps; a build that fails or leaves a package stale fails
+    // the gate. (--list runs nothing, so it never builds.)
+    if (!listOnly) rebuildStalePackages(changed);
   }
 } else {
   const resolved = resolveLabels(positional.length > 0 ? positional : ["all"], manifests);

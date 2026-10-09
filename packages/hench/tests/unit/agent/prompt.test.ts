@@ -351,4 +351,14 @@ describe("buildSystemPrompt — bare git instruction", () => {
     expect(prompt).toContain("Do NOT run `git commit`");
     expect(prompt).toContain(".hench-commit-msg.txt");
   });
+
+  // git parses trailers from the message's last paragraph only. Agent commits
+  // that wrote `N-DX-Item: …`, a blank line, then `Co-Authored-By: …` left the
+  // item line as body text, invisible to rex's `%(trailers:key=N-DX-Item)`.
+  for (const autoCommit of [true, false]) {
+    it(`tells the agent to write trailers as one final block (autoCommit ${autoCommit})`, () => {
+      const prompt = buildSystemPrompt(project, { ...DEFAULT_HENCH_CONFIG(), autoCommit });
+      expect(prompt).toContain("one final block at the end of the message, with no blank line between them");
+    });
+  }
 });

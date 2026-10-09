@@ -436,6 +436,31 @@ export function commitGitFixtureBaseline(dir: string, message = "baseline"): str
 }
 
 /**
+ * The trailers of `rev`'s commit message, as git itself parses them.
+ *
+ * Uses `%(trailers:only,unfold)`, which prints only the message's final
+ * trailer block — so a trailer that was split off into an earlier paragraph is
+ * absent from the result. That is the property the one-final-block rule needs,
+ * and why tests must assert through this rather than a regex over `%B`.
+ *
+ * @returns `[key, value]` pairs in message order.
+ */
+export function gitCommitTrailers(dir: string, rev = "HEAD"): Array<[string, string]> {
+  const out = execFileSync(
+    "git",
+    ["log", "-1", "--format=%(trailers:only,unfold)", rev],
+    { cwd: dir, encoding: "utf-8" },
+  );
+  return out
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line): [string, string] => {
+      const i = line.indexOf(":");
+      return [line.slice(0, i), line.slice(i + 1).trim()];
+    });
+}
+
+/**
  * Disable the pre-spawn system memory guard in a fixture's hench config.
  *
  * The guard reads REAL host memory before every process-spawning tool, so any

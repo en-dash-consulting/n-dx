@@ -119,9 +119,15 @@ export function buildSystemPrompt(
   const bareGitRule = (commands: string) =>
     `Run ${commands} as a bare command from the project root — git must begin the command line, never prefixed by \`cd ... &&\`, wrapped in a subshell such as \`(cd ...; git ...)\`, or redirected with \`git -C <dir>\`. If you have changed directory, return to the project root as its own separate command first.`;
 
+  // git parses trailers from the message's last paragraph only, so a trailer a
+  // blank line splits from the others is body text to every reader — rex's
+  // `%(trailers:key=N-DX-Item)` among them.
+  const trailerRule =
+    "If the message has trailers (`Key: value` lines such as `Co-Authored-By:`), write them all as one final block at the end of the message, with no blank line between them.";
+
   const commitStep = autoCommit
-    ? `Commit your work with git, using a clear commit message. ${bareGitRule("\`git add\` and \`git commit\`")}`
-    : `Stage exactly the files you changed with \`git add -- <path...>\`, naming each path — never stage the whole tree, which may hold changes that are not yours to commit. ${bareGitRule("\`git add\`")} Then write your proposed commit message to \`.hench-commit-msg.txt\` at the project root. Do NOT run \`git commit\` — ${cliName} will confirm the commit with the user.`;
+    ? `Commit your work with git, using a clear commit message. ${trailerRule} ${bareGitRule("\`git add\` and \`git commit\`")}`
+    : `Stage exactly the files you changed with \`git add -- <path...>\`, naming each path — never stage the whole tree, which may hold changes that are not yours to commit. ${bareGitRule("\`git add\`")} Then write your proposed commit message to \`.hench-commit-msg.txt\` at the project root. ${trailerRule} Do NOT run \`git commit\` — ${cliName} will confirm the commit with the user.`;
 
   const exploreStep = "Explore the codebase to understand context — read the code you are about to change before changing it";
   const testStep = "Run validation/tests if configured";
