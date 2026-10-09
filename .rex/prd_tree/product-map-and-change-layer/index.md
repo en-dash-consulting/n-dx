@@ -22,7 +22,7 @@ plannedRelease: "1.0.0"
 | [Apply engine for change amendments](./apply-engine-for-change-amendments/index.md) | completed |
 | [Apply the migration](./apply-the-migration/index.md) | pending |
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
-| [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | pending |
+| [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | completed |
 | [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | completed |
 | [Dashboard on the v2 model](./dashboard-on-the-v2-model/index.md) | pending |
 | [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |

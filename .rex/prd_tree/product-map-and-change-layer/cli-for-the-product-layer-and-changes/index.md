@@ -2,7 +2,7 @@
 id: "70443075-8352-48a4-a8ed-799505872d4b"
 level: "feature"
 title: "CLI for the product layer and changes"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "product-map"
@@ -14,10 +14,13 @@ blockedBy:
   - "d3bfe8a4-c3d5-4aa4-893b-36fc58647dca"
   - "abd05895-1b96-4798-bfb8-8e4b66fca049"
 source: "roadmap"
+startedAt: "2026-10-09T19:31:05.384Z"
+completedAt: "2026-10-09T19:31:05.384Z"
+endedAt: "2026-10-09T19:31:05.384Z"
 acceptanceCriteria: []
 description: "New verbs and layer-aware restructuring.\n\nRoadmap PR 18 · wave 2 · lane rex-surface."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-08T18:56:24.097Z"
+lastModified: "2026-10-09T19:31:05.674Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -31,7 +34,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Apply-engine refusals say bare "criteria": "a constraint has no criteria", "a new capability has no criteria to replace or remove"](./apply-engine-refusals-say-bare.md) | completed |
 | [capability-criteria warning says bare "criteria": "Capability X has no criteria"](./capability-criteria-warning-says-bare.md) | completed |
 | [criteria-growth warning says bare "criteria" instead of "capability criteria"](./criteria-growth-warning-says-bare.md) | completed |
-| [get_capability refusal text is pinned only by a regex, so the 0.9.0 soft freeze on its wording goes unguarded](./get-capability-refusal-text-is-pinned.md) | pending |
+| [get_capability refusal text is pinned only by a regex, so the 0.9.0 soft freeze on its wording goes unguarded](./get-capability-refusal-text-is-pinned.md) | completed |
 | [Lower title-release-token to a warning so a release-named title does not fail rex health or ndx ci](./lower-title-release-token-to-a-warning.md) | completed |
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | completed |
 | [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | completed |
