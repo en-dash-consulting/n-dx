@@ -5,7 +5,7 @@
 
 Turn `rex backfill-commit-attribution` into a read-only trailer coverage report.
 
-Schema v2 stores no `commits` on an item — a commit's SHA is not its identity, so a change's commits are computed from its `N-DX-Item` trailers on demand. That left the backfill writing state nothing reads. What survives is the question it was really answering: how much of history can be attributed at all, which is worth knowing before the trailer format freezes at 1.0.0.
+Schema v2 stores no `commits` on an item — a commit's SHA is not its identity, so a change's commits are computed from its `N-DX-Item` trailers on demand. That left the backfill writing state nothing reads. What survives is the question it was really answering: how much of history can be attributed at all, which is worth knowing before the trailer format is frozen.
 
 The command now reports, for every commit reachable from the default branch, whether its message carries an `N-DX-Item` or `N-DX-Status` trailer — grouped by author and by month, with totals. `--json` (or `--format=json`) prints the same report machine-readably, and `--ref=<branch>` reads another branch.
 
