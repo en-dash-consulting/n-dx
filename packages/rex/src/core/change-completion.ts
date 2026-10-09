@@ -27,7 +27,9 @@
  * `acceptanceCriteria` list ("done when") moves to the task, after any the
  * task already has. `requirements`, `amends` and `touches` stay on the
  * change. The change keeps `startedAt`, so it still
- * reads started (`isBuildingChange`).
+ * reads started (`isBuildingChange`). An open `activeIntervals` entry on the
+ * change is closed at the split time and the task opens one from then, so
+ * each node's duration stays its own and the pending change stops accruing.
  *
  * @module rex/core/change-completion
  */
@@ -112,9 +114,10 @@ export function completeChange(tree: V2Tree, changeRef: string, options: ChangeC
 
 /**
  * Add `task` as the last child of the change `changeRef`, splitting the
- * change when this is the first live task of an `in_progress` change.
+ * change when this is the first live task of an `in_progress` change. `now`
+ * is the split time: it closes the change's open active interval.
  */
-export function addTask(tree: V2Tree, changeRef: string, task: RuleNode): ChangeCompletionResult {
+export function addTask(tree: V2Tree, changeRef: string, task: RuleNode, now: Date): ChangeCompletionResult {
   if (task.type !== "task") throw new ChangeCompletionError(`Cannot add ${task.type} ${task.id} as a task`);
   const next = structuredClone(tree);
   const { node: change } = locate(next, changeRef, "change");
@@ -127,6 +130,12 @@ export function addTask(tree: V2Tree, changeRef: string, task: RuleNode): Change
   added.status = "in_progress";
   if (change.startedAt !== undefined) added.startedAt = change.startedAt;
   change.status = "pending";
+  const splitAt = now.toISOString();
+  const open = change.activeIntervals?.filter((iv) => iv.end === undefined) ?? [];
+  if (open.length > 0) {
+    for (const iv of open) iv.end = splitAt;
+    added.activeIntervals = [...(added.activeIntervals ?? []), { start: splitAt }];
+  }
   const movedCriteria = change.type === "change" ? (change.acceptanceCriteria ?? []) : [];
   if (change.type === "change") delete change.acceptanceCriteria;
   if (movedCriteria.length > 0 && added.type === "task") {

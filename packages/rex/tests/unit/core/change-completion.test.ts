@@ -113,7 +113,7 @@ describe("addTask split rule", () => {
     change({ status: "in_progress", startedAt: "2026-10-07T09:00:00.000Z", acceptanceCriteria: ["Wallets pay"], requirements: [{ id: "r" }], touches: ["cap"], ...extra });
 
   it("moves the criteria to the new first task, which takes over the in-flight work", () => {
-    const result = addTask(tree(inFlight()), "ch", task("t", { acceptanceCriteria: ["Own"] }));
+    const result = addTask(tree(inFlight()), "ch", task("t", { acceptanceCriteria: ["Own"] }), NOW);
     expect(result.split).toEqual({ changeId: "ch", taskId: "t", movedCriteria: ["Wallets pay"] });
     const c = theChange(result.tree);
     expect(c.status).toBe("pending");
@@ -123,7 +123,7 @@ describe("addTask split rule", () => {
   });
 
   it("splits without criteria when the change has none", () => {
-    const result = addTask(tree(inFlight({ acceptanceCriteria: undefined })), "ch", task("t"));
+    const result = addTask(tree(inFlight({ acceptanceCriteria: undefined })), "ch", task("t"), NOW);
     expect(result.split?.movedCriteria).toEqual([]);
     expect(theChange(result.tree).children?.[0]).not.toHaveProperty("acceptanceCriteria");
   });
@@ -132,19 +132,38 @@ describe("addTask split rule", () => {
     // The fixture's bare `{ id: "r" }` requirement is not a full Requirement; drop it to parse.
     const typed = inFlight({ requirements: undefined });
     expect(ChangeIntentSchema.parse(typed).acceptanceCriteria).toEqual(["Wallets pay"]);
-    const result = addTask(tree(typed), "ch", task("t"));
+    const result = addTask(tree(typed), "ch", task("t"), NOW);
     const c = theChange(result.tree);
     expect(ChangeIntentSchema.parse(c).acceptanceCriteria).toBeUndefined();
     expect(TaskIntentSchema.parse(c.children?.[0]).acceptanceCriteria).toEqual(["Wallets pay"]);
   });
 
   it("treats a change whose only tasks are deleted as task-less", () => {
-    expect(addTask(tree(inFlight({ children: [task("gone", { status: "deleted" })] })), "ch", task("t")).split).not.toBeNull();
+    expect(addTask(tree(inFlight({ children: [task("gone", { status: "deleted" })] })), "ch", task("t"), NOW).split).not.toBeNull();
+  });
+
+  it("closes the change's open interval at the split and opens one on the task", () => {
+    const closed = { start: "2026-10-06T09:00:00.000Z", end: "2026-10-06T10:00:00.000Z" };
+    const open = { start: "2026-10-07T09:00:00.000Z" };
+    const result = addTask(tree(inFlight({ activeIntervals: [closed, open] })), "ch", task("t"), NOW);
+    const c = theChange(result.tree);
+    expect(c.activeIntervals).toEqual([closed, { ...open, end: NOW.toISOString() }]);
+    expect(c.activeIntervals?.some((iv) => iv.end === undefined)).toBe(false);
+    expect(c.children?.[0].activeIntervals).toEqual([{ start: NOW.toISOString() }]);
+  });
+
+  it("opens no interval on the task when the change had none open", () => {
+    const closed = { start: "2026-10-06T09:00:00.000Z", end: "2026-10-06T10:00:00.000Z" };
+    for (const intervals of [undefined, [closed]]) {
+      const result = addTask(tree(inFlight({ activeIntervals: intervals })), "ch", task("t"), NOW);
+      expect(theChange(result.tree).activeIntervals).toEqual(intervals);
+      expect(theChange(result.tree).children?.[0]).not.toHaveProperty("activeIntervals");
+    }
   });
 
   it("does not split a pending change or one that already has a task", () => {
     for (const c of [inFlight({ status: "pending" }), inFlight({ children: [task("u")] })]) {
-      const result = addTask(tree(c), "ch", task("t"));
+      const result = addTask(tree(c), "ch", task("t"), NOW);
       expect(result.split).toBeNull();
       expect(theChange(result.tree).acceptanceCriteria).toEqual(["Wallets pay"]);
       expect(theChange(result.tree).children?.at(-1)).toMatchObject({ id: "t" });
