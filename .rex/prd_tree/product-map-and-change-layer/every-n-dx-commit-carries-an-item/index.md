@@ -27,7 +27,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 |-------|--------|
 | [A CRLF commit message drops the agent's own trailers out of the final trailer block](./a-crlf-commit-message-drops-the-agent.md) | completed |
 | [Add the item trailer to skill, PRD-write and operator commits](./add-the-item-trailer-to-skill-prd.md) | completed |
-| [Agent-written work commits carry the task's N-DX-Item](./agent-written-work-commits-carry-the.md) | in_progress |
+| [Agent-written work commits carry the task's N-DX-Item](./agent-written-work-commits-carry-the.md) | completed |
 | [No test catches cli-loop dropping the run's trailers from the timer-expiry watcher](./no-test-catches-cli-loop-dropping-the.md) | pending |
 | [Report commits that carry no item trailer](./report-commits-that-carry-no-item.md) | pending |
 | [Review-repair commits carry the N-DX-Item trailer](./review-repair-commits-carry-the-n-dx.md) | completed |
