@@ -7,18 +7,12 @@ import { computeHealthScore, formatHealthScore, checkV2TreeHealth, formatV2Findi
 
 import { result } from "../output.js";
 
-/** Nodes the reader skipped; the tree rules never see them, so "no findings" alone would hide them. */
+/** Reader warnings; nodes it skipped never reach the tree rules, so "no findings" alone would hide them. */
 function formatReaderWarnings(warnings: ParseWarning[]): string {
   if (warnings.length === 0) return "";
   return `Reader warnings:\n${warnings.map((w) => `  ${w.path}: ${w.message}`).join("\n")}\n\n`;
 }
 
-/**
- * `rex health [options] [dir]`
- *
- * Show the structure health score for the PRD.
- * Scores 5 dimensions: depth, balance, granularity, completeness, staleness.
- */
 /** The project's package.json `version`, or undefined when there is no package.json or no version. */
 async function readPackageVersion(dir: string): Promise<string | undefined> {
   let text: string;
@@ -32,6 +26,12 @@ async function readPackageVersion(dir: string): Promise<string | undefined> {
   return typeof version === "string" ? version : undefined;
 }
 
+/**
+ * `rex health [options] [dir]`
+ *
+ * v1: the structure health score (depth, balance, granularity, completeness, staleness); always exits 0.
+ * v2: the tree rules, reader warnings and landing check; exits 1 on a rule error or a skipped node.
+ */
 export async function cmdHealth(
   dir: string,
   flags: Record<string, string>,
@@ -53,6 +53,10 @@ export async function cmdHealth(
         ? JSON.stringify({ treeRules: findings, warnings: model.warnings, landings }, null, 2)
         : `${formatV2Findings(findings)}\n${formatReaderWarnings(model.warnings)}${formatLandingHealth(landings)}`,
     );
+    // Gate like `rex validate`: a rule error or a skipped node fails; warnings alone do not.
+    if (findings.some((f) => f.severity === "error") || model.warnings.some((w) => w.skipped)) {
+      process.exitCode = 1;
+    }
     return;
   }
 

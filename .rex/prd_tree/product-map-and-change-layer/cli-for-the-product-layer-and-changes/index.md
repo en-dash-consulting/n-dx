@@ -33,7 +33,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [criteria-growth warning says bare "criteria" instead of "capability criteria"](./criteria-growth-warning-says-bare.md) | completed |
 | [Lower title-release-token to a warning so a release-named title does not fail rex health or ndx ci](./lower-title-release-token-to-a-warning.md) | completed |
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | completed |
-| [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | pending |
+| [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | in_progress |
 | [No test covers shippedIn or retired-node releases in collectReleases, so dropping either goes unnoticed](./no-test-covers-shippedin-or-retired.md) | completed |
 | [rex health does not report changes that are not landed on main](./rex-health-does-not-report-changes.md) | completed |
 | [rex health never passes the project's releases to the v2 rules, so title-release-token cannot fire](./rex-health-never-passes-the-project-s.md) | completed |

@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { cmdHealth } from "../../../../src/cli/commands/health.js";
 import { withPrdModelTransaction } from "../../../../src/store/prd-model-transaction.js";
 import { indexTree } from "../../../../src/schema/v2-rules.js";
-import { copyV2Fixture } from "../../../helpers/v2-fixture.js";
+import { copyV2Fixture, editText } from "../../../helpers/v2-fixture.js";
 
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
 
@@ -25,6 +25,7 @@ beforeEach(async () => {
   vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => void out.push(a.join(" ")));
 });
 afterEach(async () => {
+  process.exitCode = undefined;
   vi.restoreAllMocks();
   await rm(tmp, { recursive: true, force: true });
 });
@@ -62,6 +63,56 @@ describe("rex health on a v2 tree", () => {
     expect(await run()).not.toContain("criteria-growth");
     await writeFile(join(tmp, ".n-dx.json"), JSON.stringify({ rex: { structureHealth: { maxCriteriaPerCapability: 4 } } }));
     expect(await run()).toContain("criteria-growth");
+  });
+});
+
+describe("rex health exit code on a v2 tree", () => {
+  const capabilityFile = () => join(rexDir, "product", "checkout", "pay-by-card.md");
+
+  async function runExit(): Promise<string | number | undefined> {
+    process.exitCode = undefined;
+    await cmdHealth(tmp, { format: "json" });
+    return process.exitCode;
+  }
+
+  it("exits 0 on a clean tree", async () => {
+    expect(await runExit()).toBeUndefined();
+  });
+
+  it("exits 0 when the tree rules report only warnings", async () => {
+    await setCapabilityCriteria(16);
+    expect(await runExit()).toBeUndefined();
+    expect(JSON.parse(out.join("\n")).treeRules).toContainEqual(expect.objectContaining({ rule: "criteria-growth", severity: "warning" }));
+  });
+
+  it("exits 1 when a tree rule reports an error", async () => {
+    await editText(capabilityFile(), (t) => t.replace('criteria: [', 'dependsOn: ["a0000000-0000-4000-8000-000000000099"]\ncriteria: ['));
+    expect(await runExit()).toBe(1);
+    expect(JSON.parse(out.join("\n")).treeRules).toContainEqual(expect.objectContaining({ severity: "error" }));
+  });
+
+  it("exits 1 when the reader skipped a folder with no index.md", async () => {
+    await mkdir(join(rexDir, "product", "orphan-area"));
+    expect(await runExit()).toBe(1);
+    expect(JSON.parse(out.join("\n")).warnings).toEqual([expect.objectContaining({ skipped: true })]);
+  });
+
+  it("exits 1 when the reader skipped a node with invalid intent", async () => {
+    await editText(capabilityFile(), (t) => t.replace('type: "capability"', 'type: "bogus"'));
+    expect(await runExit()).toBe(1);
+  });
+
+  it("exits 1 when the reader skipped a node with unreadable frontmatter", async () => {
+    await writeFile(capabilityFile(), "no frontmatter here\n");
+    expect(await runExit()).toBe(1);
+  });
+
+  it("exits 0 when the only reader warning is benign: a slug that differs from the stored name", async () => {
+    await editText(capabilityFile(), (t) => t.replace('slug: "pay-by-card"', 'slug: "pay-with-card"'));
+    expect(await runExit()).toBeUndefined();
+    const { warnings } = JSON.parse(out.join("\n"));
+    expect(warnings).toEqual([expect.objectContaining({ message: expect.stringContaining("differs from the stored name") })]);
+    expect(warnings[0]).not.toHaveProperty("skipped");
   });
 });
 

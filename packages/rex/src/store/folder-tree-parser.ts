@@ -37,6 +37,8 @@ export interface ParseWarning {
   path: string;
   /** Human-readable description of the problem. */
   message: string;
+  /** The v2 reader dropped a node (and, for a folder, its contents) over this problem. */
+  skipped?: true;
 }
 
 /** Result of parsing a folder tree. Never throws — always returns. */
