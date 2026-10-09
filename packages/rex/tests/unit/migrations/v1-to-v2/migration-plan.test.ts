@@ -260,6 +260,37 @@ describe("classifyV1Tree", () => {
     },
   );
 
+  describe.each<ItemStatus>(["cancelled", "deleted"])("a %s item is held, never rules-placed, on every path", (status) => {
+    const storage = () => item("epic", "Storage", [item("feature", "Offline cache", [item("task", "Build cache", [], "completed")])]);
+    const held = (plan: ReturnType<typeof classifyV1Tree>, title: string) => {
+      const entry = byTitle(plan.entries, title);
+      expect(entry).toMatchObject({ target: "change", applied: false, needsPlacement: true });
+      expect(entry.placement).toBeUndefined();
+    };
+
+    it("fix-shaped and work-shaped features under an area", () => {
+      const area = storage();
+      area.children!.push(item("feature", "Fix offline cache", [], status), item("feature", "Add offline cache sync", [], status));
+      const plan = classifyV1Tree([area]);
+      held(plan, "Fix offline cache");
+      held(plan, "Add offline cache sync");
+    });
+
+    it("a task directly under an area", () => {
+      const area = storage();
+      area.children!.push(item("task", "Cache eviction", [], status));
+      held(classifyV1Tree([area]), "Cache eviction");
+    });
+
+    it("an epic named for a PR", () => {
+      held(classifyV1Tree([storage(), item("epic", "PR 12 offline cache", [], status)]), "PR 12 offline cache");
+    });
+
+    it("a task at the root", () => {
+      held(classifyV1Tree([storage(), item("task", "Cache eviction", [], status)]), "Cache eviction");
+    });
+  });
+
   it("does not make a deleted feature with a completed child a capability", () => {
     const feature = item("feature", "Offline cache", [item("task", "Build cache", [], "completed")], "deleted");
     const plan = classifyV1Tree([item("epic", "Storage", [feature])]);

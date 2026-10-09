@@ -234,8 +234,20 @@ class PlanBuilder {
     return entry;
   }
 
-  /** A change that waits for placement once every product node is known. */
+  /**
+   * A change that waits for placement once every product node is known. An abandoned item is
+   * held for review instead, on every path: unapplied, needing placement, never rules-placed.
+   */
   change(item: PRDItem, fields: Partial<PlanEntry> & { reasons: string[] }, area?: string): PlanEntry {
+    if (isAbandoned(item)) {
+      const { placement: _placement, relation: _relation, ...kept } = fields;
+      return this.add(item, "change", {
+        ...kept,
+        applied: false,
+        needsPlacement: true,
+        reasons: [...fields.reasons, `${item.status} ${item.level}: held as an unapplied change for review, never rules-placed`],
+      });
+    }
     const entry = this.add(item, "change", { applied: item.status === "completed", ...fields });
     if (entry.placement === undefined) this.unplaced.push({ entry, area, item });
     return entry;
@@ -270,16 +282,7 @@ function classifyEpic(epic: PRDItem, plan: PlanBuilder, productNames: readonly s
   if (release !== undefined) {
     plan.add(epic, "release", { plannedRelease: release, reasons: [`release-named epic: dissolves into plannedRelease ${release}`] });
     for (const child of epic.children ?? []) {
-      if (isAbandoned(child)) {
-        plan.add(child, "change", {
-          plannedRelease: release,
-          applied: false,
-          needsPlacement: true,
-          reasons: [`${child.status} ${child.level} split out of release umbrella ${epic.id}: held as an unapplied change for review, never rules-placed`],
-        });
-      } else {
-        plan.change(child, { plannedRelease: release, reasons: [`split out of release umbrella ${epic.id}`] });
-      }
+      plan.change(child, { plannedRelease: release, reasons: [`split out of release umbrella ${epic.id}`] });
       plan.workUnder(child.children, child.id);
     }
     return;
