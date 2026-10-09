@@ -1,9 +1,9 @@
 {
   "model": "claude-sonnet-5",
   "totals": {
-    "surfaces": 37,
-    "perCallTokens": 22925,
-    "uniqueTokens": 14422,
+    "surfaces": 38,
+    "perCallTokens": 23189,
+    "uniqueTokens": 14686,
     "skills": 13,
     "skillTokens": 17604
   },
@@ -102,9 +102,9 @@
   ],
   "byPackage": {
     "rex": {
-      "surfaces": 20,
-      "perCallTokens": 15389,
-      "uniqueTokens": 7367
+      "surfaces": 21,
+      "perCallTokens": 15653,
+      "uniqueTokens": 7631
     },
     "sourcevision": {
       "surfaces": 7,
@@ -581,6 +581,18 @@
     },
     {
       "pkg": "rex",
+      "file": "packages/rex/src/analyze/spec-draft-reason.ts",
+      "builder": "buildSpecDraftEnvelope",
+      "purpose": "Redraft a capability spec in present tense, citing the source item of every criterion.",
+      "inline": false,
+      "literals": 21,
+      "constants": {},
+      "ownTokens": 264,
+      "fixedChars": 1055,
+      "fixedTokens": 264
+    },
+    {
+      "pkg": "rex",
       "file": "packages/rex/src/analyze/rename-resolve.ts",
       "builder": "buildRenameEnvelope",
       "purpose": "Pick the better of two colliding item titles.",
@@ -999,8 +1011,8 @@
       }
     ]
   },
-  "contentHash": "eb19b03709dc4569",
-  "recordedAt": "2026-10-08T23:42:55.980Z",
-  "commit": "8c6112e3182b",
+  "contentHash": "9d5cea4f449b9423",
+  "recordedAt": "2026-10-09T00:37:35.798Z",
+  "commit": "a7d05338fc53",
   "dirty": false
 }
