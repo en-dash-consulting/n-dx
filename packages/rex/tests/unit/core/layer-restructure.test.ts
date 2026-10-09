@@ -78,6 +78,15 @@ describe("draftProductReshape", () => {
     ]);
   });
 
+  it("skips a merge across types, which would drop the merged node's capability criteria", () => {
+    const draft = draftProductReshape(product(), [
+      { id: "p1", action: { action: "merge", survivorId: "area2", mergedIds: ["cap1"], reason: "r" } },
+      { id: "p2", action: { action: "merge", survivorId: "cap1", mergedIds: ["cap1"], reason: "r" } },
+    ]);
+    expect(draft.amends).toEqual([]);
+    expect(draft.skipped.map((s) => s.reason)).toEqual([expect.stringMatching(/a merge keeps one type/), expect.stringMatching(/into itself/)]);
+  });
+
   it("drafts a split as removed plus one added per piece under the same parent", () => {
     const draft = draftProductReshape(
       product(),

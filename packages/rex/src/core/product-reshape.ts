@@ -131,6 +131,13 @@ function amendmentsFor(product: readonly RuleNode[], proposal: ReshapeProposal, 
       const absent = action.mergedIds.find((_, i) => !merged[i]);
       if (absent) return missing(absent);
       const nodes = merged as RuleNode[];
+      // Only a capability carries capability criteria over: a merge across types would drop them.
+      const mismatched = nodes.find((n) => n.type !== survivor.type || n.id === survivor.id);
+      if (mismatched) {
+        return mismatched.id === survivor.id
+          ? `${label(product, survivor.id)} cannot be merged into itself`
+          : `${label(product, mismatched.id)} is a ${mismatched.type} and ${label(product, survivor.id)} a ${survivor.type}; a merge keeps one type`;
+      }
       const nested = nodes.find((n) => liveDescendants(n).length > 0);
       if (nested) return `${label(product, nested.id)} has children; move them before merging it`;
       const carried = survivor.type === "capability" ? nodes.flatMap((n) => criteriaOf(n)) : [];

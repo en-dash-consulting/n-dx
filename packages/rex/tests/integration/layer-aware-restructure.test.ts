@@ -76,9 +76,15 @@ beforeEach(async () => {
     join(rexDir, "product", "checkout", "gift-cards.md"),
     `---\nid: "${GIFT_CARDS}"\ntype: "capability"\ntitle: "Gift cards"\nslug: "gift-cards"\ndisplayId: "A1.2"\nstatement: "A shopper can pay with a gift card."\ncriteria: [{"id":"c1","text":"The balance goes down"}]\n---\n`,
   );
+  // Delivery holds a single capability: reorganize proposes collapsing it (low risk).
+  await mkdir(join(rexDir, "product", "delivery"));
   await writeFile(
-    join(rexDir, "product", "delivery.md"),
+    join(rexDir, "product", "delivery", "index.md"),
     `---\nid: "${DELIVERY}"\ntype: "area"\ntitle: "Delivery"\nslug: "delivery"\ndisplayId: "A2"\n---\n`,
+  );
+  await writeFile(
+    join(rexDir, "product", "delivery", "track-a-parcel.md"),
+    `---\nid: "a0000000-0000-4000-8000-000000000005"\ntype: "capability"\ntitle: "Track a parcel"\nslug: "track-a-parcel"\ndisplayId: "A2.1"\nstatement: "A shopper can see where a parcel is."\n---\n`,
   );
   // A finished change: prune's candidate on the change layer.
   const done = join(rexDir, "changes", "tidy-the-receipt");
@@ -193,6 +199,8 @@ describe("rex reorganize on a v2 tree", () => {
     expect(await productFiles()).toEqual(before);
     const json = JSON.parse(output.find((line) => line.trimStart().startsWith("{"))!);
     expect(json.product).toMatchObject({ proposals: expect.any(Array), stats: expect.any(Object) });
+    // There is something to apply on the product layer, and --accept=all did not apply it.
+    expect(json.product.proposals.length).toBeGreaterThan(0);
   });
 });
 
