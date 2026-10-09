@@ -96,6 +96,11 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
   if (relation !== "amends" && (input.proposed !== undefined || input.criteria !== undefined)) {
     throw new ChangePlacementError(PLACEMENT_CONTENT_NEEDS_AMENDS);
   }
+  const { add, replace, remove } = input.criteria ?? {};
+  // Apply always refuses this, and no tool edits the amendment afterwards: refuse it before it is stored.
+  if (target.type === "constraint" && (add?.length || replace?.length || remove?.length)) {
+    throw new ChangePlacementError(`"${target.title}" is a constraint, which has no criteria; state it in proposed`);
+  }
   const label = change.displayId ?? change.id;
   const amends = (change.amends ?? []).some((a) => index.resolve(a.target) === target);
   const touches = (change.touches ?? []).some((ref) => index.resolve(ref) === target);

@@ -65,6 +65,11 @@ describe("recordPlacement", () => {
     expect(changeIn(next).amends![0].summary).toBe("Wallets count as cards");
   });
 
+  it("records proposed text on an amendment of a constraint", () => {
+    const { tree: next } = recordPlacement(tree(), "ch", { target: "arch", relation: "amends", proposed: "Layers import downward only" }, NOW);
+    expect(changeIn(next).amends![0]).toMatchObject({ target: "arch", delta: "modified", proposed: "Layers import downward only" });
+  });
+
   it("leaves a target it already touches touched once", () => {
     const { tree: next } = recordPlacement(tree({ touches: ["card"] }), "ch", { target: "card", relation: "touches" }, NOW);
     expect(changeIn(next).touches).toEqual(["card"]);
@@ -76,6 +81,8 @@ describe("recordPlacement", () => {
     ["a target it already amends", { amends: [{ target: "card", delta: "modified", summary: "s" }] }, { target: "A1.1", relation: "touches" as const }, /already amends "Pay by card"/],
     ["an applied change", { status: "completed", appliedAt: "2026-10-01T00:00:00.000Z" }, { target: "card" }, /is applied at 2026-10-01/],
     ["a cancelled change", { status: "cancelled" }, { target: "card" }, /is cancelled; only an open change is placed/],
+    ["proposed on a touches placement", {}, { target: "card", relation: "touches" as const, proposed: "x" }, /relation amends/],
+    ["a criteria delta on a constraint", {}, { target: "arch", relation: "amends" as const, criteria: { remove: ["c1"] } }, /constraint, which has no criteria; state it in proposed/],
   ])("refuses %s", (_label, changeFields, input, message) => {
     expect(() => recordPlacement(tree(changeFields), "ch", input, NOW)).toThrow(ChangePlacementError);
     expect(() => recordPlacement(tree(changeFields), "ch", input, NOW)).toThrow(message);
