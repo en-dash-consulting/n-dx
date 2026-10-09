@@ -18,9 +18,22 @@ Pick up a task from the PRD and begin working on it.
 10. Run validation and tests as specified in the workflow
 11. Call `append_log` (rex MCP) with what was done, decisions made, and issues encountered. If the rex MCP server is not connected, run `ndx log <event> --detail="..."` instead (rex CLI, no MCP required)
 12. When done, use `update_task_status` (rex MCP) to mark as `completed`
-13. Record the work in hench run history so it is auditable alongside `ndx work` runs, together with what it cost: run `ndx hench record --task=<id> --status=completed --title="<task title>" --summary="<one-line summary>" .`. Token usage is computed by the CLI as the difference between the mark from step 8 and the session transcript now, per token class, and attributed to the task — several tasks in one session each get exactly their own slice. The run's start time is taken from the mark, so there is no timestamp to pass. Use `--status=cancelled` (or `failed`) instead if the task was not completed, and `--no-tokens` to record without usage.
+13. **Commit.** Run `git status --porcelain` against the project root — this catches the MCP side-effect writes under `.rex/prd_tree/` that `update_task_status` and `append_log` make, as well as the files you edited. If the output is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage everything with `git add -A` and commit the task's work together with its PRD status write, so the two land atomically. Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to a scratch file such as `.git/NDX_COMMIT_MSG`:
 
-> **Assisted run, not a hench run.** This skill drives the task directly through Claude Code, so — unlike `ndx work` — it does not spawn the hench agent. The record written in step 12 is marked `assisted` to keep it distinguishable from an agent run, and its token usage is read from the session transcript that Claude Code writes (located via `CLAUDE_CODE_SESSION_ID`), so `ndx usage` and the dashboard's per-item rollup include this work. If no transcript can be found the record is still written with zero usage — an unrecorded run is worse than one missing its tokens — and the command says which happened.
+    ```
+    <subject>
+
+    N-DX: skill/ndx-work
+    N-DX-Item: <id>
+    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
+    ```
+
+    Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
+
+    Write `<subject>` in whatever commit convention the project's workflow asks for — unlike every other skill, this commit is the task's own work, so it is not prefixed `ndx-work:`. Substitute `<id>` with the task id from step 2, bare and never a dashboard URL: `N-DX-Item` is the only thing that ties this commit to the task it implements, and readers (`rex`'s realized-by edge) parse the trailer, never the subject. Keep all three trailer lines exactly as shown.
+14. Record the work in hench run history so it is auditable alongside `ndx work` runs, together with what it cost: run `ndx hench record --task=<id> --status=completed --title="<task title>" --summary="<one-line summary>" .`. Token usage is computed by the CLI as the difference between the mark from step 8 and the session transcript now, per token class, and attributed to the task — several tasks in one session each get exactly their own slice. The run's start time is taken from the mark, so there is no timestamp to pass. Use `--status=cancelled` (or `failed`) instead if the task was not completed, and `--no-tokens` to record without usage.
+
+> **Assisted run, not a hench run.** This skill drives the task directly through Claude Code, so — unlike `ndx work` — it does not spawn the hench agent: nothing else commits the work, which is why step 13 is this skill's own commit rather than a double-commit of hench's. The record written in step 14 is marked `assisted` to keep it distinguishable from an agent run, and its token usage is read from the session transcript that Claude Code writes (located via `CLAUDE_CODE_SESSION_ID`), so `ndx usage` and the dashboard's per-item rollup include this work. If no transcript can be found the record is still written with zero usage — an unrecorded run is worse than one missing its tokens — and the command says which happened.
 
 ## Done when
 

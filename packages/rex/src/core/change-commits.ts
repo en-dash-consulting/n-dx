@@ -7,8 +7,10 @@
  * of a change are the commits reachable from main, through merge commits and
  * not first-parent only, whose trailer names the change or one of its tasks.
  *
- * Two trailer forms name an item: the dashboard permalink hench writes today
- * (`<publicUrl>/#/rex/item/<id>`, any host) and the bare item id.
+ * Two trailer forms name an item: the bare item id, which is what hench
+ * writes, and the dashboard permalink it used to write
+ * (`<publicUrl>/#/rex/item/<id>`, any host). Both stay supported — history
+ * written before the change must keep attributing.
  *
  * The only part of a commit message read is the `N-DX-Item` trailer, which
  * git extracts (`%(trailers:key=…)`). No subject or body is requested, so

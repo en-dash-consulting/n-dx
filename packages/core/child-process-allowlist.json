@@ -110,10 +110,6 @@
       "reason": "Git operations — need execFileSync/execFile for git CLI calls"
     },
     {
-      "path": "packages/rex/src/cli/commands/backfill-commit-attribution.ts",
-      "reason": "Git operations — need execFileSync/execFile for git CLI calls"
-    },
-    {
       "path": "packages/sourcevision/src/analyzers/branch-work-collector.ts",
       "reason": "Git operations — need execFileSync/execFile for git CLI calls"
     },

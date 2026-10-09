@@ -1,11 +1,11 @@
 {
   "model": "claude-sonnet-5",
   "totals": {
-    "surfaces": 38,
-    "perCallTokens": 23189,
-    "uniqueTokens": 14686,
+    "surfaces": 36,
+    "perCallTokens": 22753,
+    "uniqueTokens": 14250,
     "skills": 13,
-    "skillTokens": 17604
+    "skillTokens": 18043
   },
   "skills": [
     {
@@ -37,6 +37,13 @@
       "tokens": 1486
     },
     {
+      "name": "ndx-work",
+      "file": "packages/core/assistant-assets/skills/ndx-work.md",
+      "shipped": true,
+      "chars": 5073,
+      "tokens": 1269
+    },
+    {
       "name": "dev-link",
       "file": ".claude/skills/dev-link/SKILL.md",
       "shipped": false,
@@ -47,8 +54,8 @@
       "name": "ndx-capture",
       "file": "packages/core/assistant-assets/skills/ndx-capture.md",
       "shipped": true,
-      "chars": 4639,
-      "tokens": 1160
+      "chars": 4815,
+      "tokens": 1204
     },
     {
       "name": "ndx-plan",
@@ -56,13 +63,6 @@
       "shipped": true,
       "chars": 4553,
       "tokens": 1139
-    },
-    {
-      "name": "ndx-work",
-      "file": "packages/core/assistant-assets/skills/ndx-work.md",
-      "shipped": true,
-      "chars": 3495,
-      "tokens": 874
     },
     {
       "name": "ndx-config",
@@ -102,9 +102,9 @@
   ],
   "byPackage": {
     "rex": {
-      "surfaces": 21,
-      "perCallTokens": 15653,
-      "uniqueTokens": 7631
+      "surfaces": 19,
+      "perCallTokens": 15217,
+      "uniqueTokens": 7195
     },
     "sourcevision": {
       "surfaces": 7,
@@ -569,30 +569,6 @@
     },
     {
       "pkg": "rex",
-      "file": "packages/rex/src/analyze/place-reason.ts",
-      "builder": "buildPlacementEnvelope",
-      "purpose": "Place a change on a shortlisted capability or constraint, or propose a new node.",
-      "inline": false,
-      "literals": 15,
-      "constants": {},
-      "ownTokens": 172,
-      "fixedChars": 687,
-      "fixedTokens": 172
-    },
-    {
-      "pkg": "rex",
-      "file": "packages/rex/src/analyze/spec-draft-reason.ts",
-      "builder": "buildSpecDraftEnvelope",
-      "purpose": "Redraft a capability spec in present tense, citing the source item of every criterion.",
-      "inline": false,
-      "literals": 21,
-      "constants": {},
-      "ownTokens": 264,
-      "fixedChars": 1055,
-      "fixedTokens": 264
-    },
-    {
-      "pkg": "rex",
       "file": "packages/rex/src/analyze/rename-resolve.ts",
       "builder": "buildRenameEnvelope",
       "purpose": "Pick the better of two colliding item titles.",
@@ -1011,8 +987,8 @@
       }
     ]
   },
-  "contentHash": "9d5cea4f449b9423",
-  "recordedAt": "2026-10-09T00:37:35.798Z",
-  "commit": "a7d05338fc53",
+  "contentHash": "145ec311b955eb6f",
+  "recordedAt": "2026-10-08T19:46:48.446Z",
+  "commit": "1b4796c4728a",
   "dirty": false
 }
