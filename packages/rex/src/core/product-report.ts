@@ -63,8 +63,20 @@ export function productReport(tree: V2Tree): ProductReportNode[] {
 
 // ── get_capability ───────────────────────────────────────────────
 
+/** Why a report was refused. Each surface words its own hint by kind; the message is the MCP wording. */
+export type ProductReportErrorKind = "not-a-capability" | "no-status" | "bad-cursor";
+
 export class ProductReportError extends Error {
-  constructor(message: string) {
+  /**
+   * @param message MCP-facing text (may name MCP tools).
+   * @param kind Which refusal this is.
+   * @param plain The message without MCP-only wording; defaults to `message`.
+   */
+  constructor(
+    message: string,
+    readonly kind: ProductReportErrorKind,
+    readonly plain: string = message,
+  ) {
     super(message);
     this.name = "ProductReportError";
   }
@@ -135,10 +147,11 @@ export function capabilityReport(tree: V2Tree, ref: string, page: ChangePageOpti
   const node = index.resolve(ref);
   if (!node || (node.type !== "capability" && node.type !== "constraint")) {
     const what = node ? `is ${article(node.type)} ${node.type}, not a capability or constraint` : "names no product node";
-    throw new ProductReportError(`"${ref}" ${what}. Use get_product to see the product layer.`);
+    const plain = `"${ref}" ${what}.`;
+    throw new ProductReportError(`${plain} Use get_product to see the product layer.`, "not-a-capability", plain);
   }
   const status = computeProductStatus(tree)[node.id];
-  if (!status) throw new ProductReportError(`"${ref}" is deleted and no applied change retired it, so it has no status.`);
+  if (!status) throw new ProductReportError(`"${ref}" is deleted and no applied change retired it, so it has no status.`, "no-status");
 
   const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
   const parentChain: CapabilityReport["parentChain"] = [];
@@ -207,7 +220,7 @@ function encodeCursor(cursor: ChangeCursor): string {
 
 function decodeCursor(raw: string, expect: Pick<ChangeCursor, "node" | "status" | "since">): ChangeCursor {
   const refuse = (why: string) =>
-    new ProductReportError(`Cursor "${raw}" ${why}. Restart without a cursor, keeping the same status and since.`);
+    new ProductReportError(`Cursor "${raw}" ${why}. Restart without a cursor, keeping the same status and since.`, "bad-cursor");
   let c: Partial<ChangeCursor>;
   try {
     c = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));

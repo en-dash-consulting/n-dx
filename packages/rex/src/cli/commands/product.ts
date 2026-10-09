@@ -10,7 +10,7 @@
  * moved (`core/product-edit.ts`).
  */
 
-import { capabilityReport, productReport, type ProductReportNode } from "../../core/product-report.js";
+import { capabilityReport, ProductReportError, productReport, type CapabilityReport, type ProductReportNode } from "../../core/product-report.js";
 import { handleProductEdit, type ProductEditResult } from "../../core/product-edit.js";
 import { indexTree, type RuleNode } from "../../schema/v2-rules.js";
 import type { Criterion } from "../../schema/v2.js";
@@ -55,10 +55,22 @@ export async function cmdProduct(
   );
 }
 
+/** The CLI's refusal for an unusable ref: its own wording by kind, never the MCP text. */
+function capabilityOrRefuse(tree: Parameters<typeof capabilityReport>[0], ref: string): CapabilityReport {
+  try {
+    return capabilityReport(tree, ref);
+  } catch (err) {
+    if (err instanceof ProductReportError && err.kind === "not-a-capability") {
+      throw new CLIError(err.plain, "List the live capabilities and constraints with `rex product show`.");
+    }
+    throw err;
+  }
+}
+
 async function showProduct(rexDir: string, ref: string | undefined, flags: Record<string, string>): Promise<void> {
   const model = await loadPrdModel(rexDir);
   if (ref) {
-    const report = capabilityReport(model.tree, ref);
+    const report = capabilityOrRefuse(model.tree, ref);
     if (flags.format === "json") return result(JSON.stringify(report, null, 2));
     const node = report.node as RuleNode & { statement?: string; criteria?: Criterion[] };
     const lines = [

@@ -64,6 +64,15 @@ describe("rex product show", () => {
     expect(text()).toMatch(/CH-1 Add Apple Pay \(amends, in_progress\)/);
   });
 
+  it("refuses an unknown ref naming rex product show, not the MCP tool", async () => {
+    const err = await cmdProduct(tmp, "show", "nope", {}).then(() => undefined, (e: unknown) => e);
+    expect(err).toBeInstanceOf(CLIError);
+    const { message, suggestion } = err as CLIError;
+    expect(message).toContain('"nope" names no product node');
+    expect(suggestion).toContain("`rex product show`");
+    expect(`${message} ${suggestion}`).not.toContain("get_product");
+  });
+
   it("prints JSON with --format=json", async () => {
     await cmdProduct(tmp, "show", undefined, { format: "json" });
     expect(JSON.parse(text()).areas[0].children[0]).toMatchObject({ id: CAPABILITY, status: "changing" });
