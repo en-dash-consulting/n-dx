@@ -51,14 +51,14 @@ export async function handlePlaceChange(store: PRDStore, rexDir: string, args: P
       const placed = recordPlacement(model.tree, args.id, { target, relation, summary, proposed, criteria }, now);
       return { tree: placed.tree, result: placed };
     });
-    const { change, placement } = result;
+    const { change, placement, warnings } = result;
     await store.appendLog({
       timestamp: now.toISOString(),
       event: "change_placed",
       itemId: change,
       detail: `${placement.relation} ${placement.target}`,
     });
-    return textResult(JSON.stringify({ change, ...placement }));
+    return textResult(JSON.stringify({ change, ...placement, ...(warnings.length ? { warnings } : {}) }));
   } catch (err) {
     if (err instanceof ChangePlacementError) return textResult(err.message, true);
     return textResult(`Error: ${(err as Error).message}`, true);

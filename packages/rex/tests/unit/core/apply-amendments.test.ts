@@ -500,30 +500,72 @@ describe("applyAmendmentsProblems", () => {
     const refused = tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]);
     const accepted = tree([{ target: "A1.1", delta: "modified", summary: "s", criteria: { remove: ["c2"] } }]);
     const before = structuredClone([refused, accepted]);
-    expect(applyAmendmentsProblems(refused, CHANGE, NOW)).toEqual([`amendment 1 (modified ${CON}): a constraint has no criteria`]);
-    expect(applyAmendmentsProblems(accepted, CHANGE, NOW)).toEqual([]);
+    expect(applyAmendmentsProblems(refused, CHANGE, NOW)).toEqual({
+      always: [`amendment 1 (modified ${CON}): a constraint has no criteria`],
+      pending: [],
+      blockedBy: [],
+    });
+    expect(applyAmendmentsProblems(accepted, CHANGE, NOW)).toEqual({ always: [], pending: [], blockedBy: [] });
     expect([refused, accepted]).toEqual(before);
   });
 
   it("chains amendments of one capability in order", () => {
     const add = (criteria: Amendment["criteria"]): Amendment => ({ target: CAP, delta: "modified", summary: "s", criteria });
-    expect(applyAmendmentsProblems(tree([add({ add: [{ id: "c3", text: "x" }] }), add({ remove: ["c3"] })]), CHANGE, NOW)).toEqual([]);
-    expect(applyAmendmentsProblems(tree([add({ remove: ["c2"] }), add({ remove: ["c2"] })]), CHANGE, NOW)).toEqual([
+    expect(applyAmendmentsProblems(tree([add({ add: [{ id: "c3", text: "x" }] }), add({ remove: ["c3"] })]), CHANGE, NOW).always).toEqual([]);
+    expect(applyAmendmentsProblems(tree([add({ remove: ["c2"] }), add({ remove: ["c2"] })]), CHANGE, NOW).always).toEqual([
       `amendment 2 (modified ${CAP}): criterion c2 to remove does not exist`,
     ]);
   });
 
   it("counts a summary-only amendment, with the others", () => {
     const bare: Amendment = { target: CAP, delta: "modified", summary: "s" };
-    expect(applyAmendmentsProblems(tree([bare]), CHANGE, NOW)).toEqual([`amendment 1 (modified ${CAP}): ${NOTHING_TO_MODIFY}`]);
-    expect(applyAmendmentsProblems(tree([bare, { target: CON, delta: "modified", summary: "s", criteria: { remove: ["c1"] } }]), CHANGE, NOW)).toEqual([
+    expect(applyAmendmentsProblems(tree([bare]), CHANGE, NOW).always).toEqual([`amendment 1 (modified ${CAP}): ${NOTHING_TO_MODIFY}`]);
+    expect(applyAmendmentsProblems(tree([bare, { target: CON, delta: "modified", summary: "s", criteria: { remove: ["c1"] } }]), CHANGE, NOW).always).toEqual([
       `amendment 1 (modified ${CAP}): ${NOTHING_TO_MODIFY}`,
       `amendment 2 (modified ${CON}): a constraint has no criteria`,
     ]);
   });
 
   it("does not count a stale base, which force applies", () => {
-    expect(applyAmendmentsProblems(tree([{ target: CAP, delta: "modified", summary: "s", proposed: "New", base: "0".repeat(64) }]), CHANGE, NOW)).toEqual([]);
+    expect(applyAmendmentsProblems(tree([{ target: CAP, delta: "modified", summary: "s", proposed: "New", base: "0".repeat(64) }]), CHANGE, NOW).always).toEqual([]);
+  });
+
+  describe("problems only another open change causes", () => {
+    const other = (amends: Amendment[], extra: Partial<RuleNode> = {}): RuleNode =>
+      ({ id: "change-2", displayId: "CH-2", type: "change", title: "Other", slug: "other", status: "pending", amends, ...extra }) as RuleNode;
+    const modifies: Amendment = { target: CON, delta: "modified", summary: "s", proposed: "x" };
+    const removes: Amendment = { target: CON, delta: "removed", summary: "go" };
+
+    it("is pending, naming the other change, when it still amends the removed node", () => {
+      const input = tree([removes]);
+      input.changes.push(other([modifies]));
+      const problems = applyAmendmentsProblems(input, CHANGE, NOW);
+      expect(problems.always).toEqual([]);
+      expect(problems.pending).toEqual([expect.stringMatching(/open-change-refs-live/)]);
+      expect(problems.blockedBy).toEqual(["CH-2"]);
+    });
+
+    it("is pending when the other open change removes the descendants, and always when nobody does", () => {
+      const child = { id: "con-child", type: "constraint", title: "Child", slug: "child", statement: "c", status: "pending" } as RuleNode;
+      const parentRemoval: Amendment = { target: CAP, delta: "removed", summary: "go" };
+      const build = (others: RuleNode[]): V2Tree => {
+        const input = tree([parentRemoval]);
+        get(input, CAP).children = [child];
+        input.changes.push(...others);
+        return input;
+      };
+      const removedElsewhere = applyAmendmentsProblems(build([other([{ target: "con-child", delta: "removed", summary: "go" }])]), CHANGE, NOW);
+      expect(removedElsewhere.always).toEqual([]);
+      expect(removedElsewhere.pending).toEqual([expect.stringMatching(/live descendants con-child/)]);
+      expect(removedElsewhere.blockedBy).toEqual(["CH-2"]);
+      expect(applyAmendmentsProblems(build([]), CHANGE, NOW).always).toEqual([expect.stringMatching(/live descendants con-child/)]);
+    });
+
+    it("keeps a problem the amendment has on its own as always", () => {
+      const input = tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]);
+      input.changes.push(other([modifies]));
+      expect(applyAmendmentsProblems(input, CHANGE, NOW)).toMatchObject({ always: [`amendment 1 (modified ${CON}): a constraint has no criteria`], pending: [] });
+    });
   });
 });
 

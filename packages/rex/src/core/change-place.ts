@@ -25,7 +25,7 @@
  */
 
 import type { Amendment, ChangeNode, CriteriaDelta } from "../schema/v2.js";
-import { applyAmendmentsProblems, NOTHING_TO_MODIFY } from "./apply-amendments.js";
+import { applyAmendmentsProblems, NOTHING_TO_MODIFY, pendingWarnings } from "./apply-amendments.js";
 import { checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import {
   placementRelation,
@@ -85,6 +85,8 @@ export interface RecordPlacementResult {
   tree: V2Tree;
   change: string;
   placement: PlacementTarget;
+  /** Problems only other open changes cause: apply refuses until they close, and the placement is stored anyway. */
+  warnings: string[];
 }
 
 /** Record that the open change `changeRef` amends or touches `input.target`. */
@@ -125,18 +127,24 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
   }
   delete change.needsPlacement;
 
+  let pending: string[] = [];
+  let blockedBy: readonly string[] = [];
   const errors = checkV2Rules(next, { now }).filter((f) => f.nodeId === change.id && f.severity === "error");
   if (errors.length) throw new ChangePlacementError(`Cannot place change ${label}: ${errors.map((f) => f.message).join("; ")}`);
   if (relation === "amends") {
     // Only what the new amendment brings: the change's earlier amendments were judged when they were stored.
-    const before = new Set(applyAmendmentsProblems(tree, change.id, now));
-    const problems = applyAmendmentsProblems(next, change.id, now).filter((p) => !before.has(p));
+    const before = applyAmendmentsProblems(tree, change.id, now);
+    const after = applyAmendmentsProblems(next, change.id, now);
+    const novel = (all: readonly string[], known: readonly string[]): string[] => all.filter((p) => !known.includes(p));
+    const problems = novel(after.always, before.always);
+    pending = novel(after.pending, before.pending);
+    blockedBy = after.blockedBy;
     if (problems.length) {
       const hint = problems.some((p) => p.endsWith(NOTHING_TO_MODIFY)) ? ". Pass proposed or criteria, or use relation touches" : "";
       throw new ChangePlacementError(`Cannot place change ${label}: ${problems.join("; ")}${hint}`);
     }
   }
-  return { tree: next, change: change.id, placement: { target: target.id, relation } };
+  return { tree: next, change: change.id, placement: { target: target.id, relation }, warnings: pendingWarnings(pending, blockedBy) };
 }
 
 /** The open change `ref` names, or a refusal naming why it cannot be placed. */

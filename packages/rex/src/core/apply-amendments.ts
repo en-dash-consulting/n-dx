@@ -52,7 +52,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Requirement } from "../schema/v1.js";
 import { RequirementSchema } from "../schema/validate.js";
-import { isDisplayId, type Amendment, type CriteriaDelta, type Criterion } from "../schema/v2.js";
+import { isDisplayId, type Amendment, type ChangeNode, type CriteriaDelta, type Criterion } from "../schema/v2.js";
 import { checkV2Rules, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { slugifyTitle } from "../store/folder-tree-serializer.js";
 
@@ -65,6 +65,8 @@ export interface ApplyAmendmentsOptions {
   newId?: () => string;
   /** Apply amendments whose `base` no longer matches their target's spec. */
   force?: boolean;
+  /** Ids of live product nodes treated as retired by this change's removals too: a dry run's stand-in for other open changes' removals. */
+  alsoRemoving?: ReadonlySet<string>;
 }
 
 export interface AppliedAmendment {
@@ -113,7 +115,7 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   }
 
   const amends = change.amends ?? [];
-  const context: ApplyContext = { options, removing: removedIds(next.product, amends) };
+  const context: ApplyContext = { options, removing: new Set([...removedIds(next.product, amends), ...(options.alsoRemoving ?? [])]) };
   const date = options.now.toISOString().slice(0, 10);
   const problems: string[] = [];
   const applied: AppliedAmendment[] = [];
@@ -146,23 +148,101 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   return { tree: next, applied };
 }
 
+/** What {@link applyAmendments} would refuse a change with, split by whether another open change causes it. */
+export interface AmendmentProblems {
+  /** Problems the amendments have against the product layer alone: refused now and after any other change closes. */
+  always: readonly string[];
+  /** Problems only other open changes cause: apply refuses until they are applied or closed. */
+  pending: readonly string[];
+  /** The open changes (display id or id) that amend, touch or sit in the way of what this change's amendments target; empty when `pending` is. */
+  blockedBy: readonly string[];
+}
+
+export const NO_PROBLEMS: AmendmentProblems = { always: [], pending: [], blockedBy: [] };
+
+/** Warnings for the `pending` problems of a stored change, naming the open changes in the way. */
+export function pendingWarnings(pending: readonly string[], blockedBy: readonly string[]): string[] {
+  if (pending.length === 0) return [];
+  const who = blockedBy.length ? `Open change ${blockedBy.join(", ")} stands in the way` : "Another open change stands in the way";
+  return [`${who}, so apply_change refuses until it is applied or closed: ${pending.join("; ")}`];
+}
+
 /**
  * The problems {@link applyAmendments} would refuse the change `changeRef`
  * with, or none. A dry run for the write tools that store amendments
  * (add_item, place_change): nothing edits an amendment once stored, so one
- * apply would refuse is refused up front, in apply's own words. Runs with
- * `force`, since a base that goes stale is apply's to judge later, and
- * discards the result, so no stamp (`appliedAt`, `metAt`) reaches the caller's
- * tree, which apply never modifies.
+ * apply would always refuse is refused up front, in apply's own words.
+ *
+ * A problem that goes away when no other open change is in the way (a removal
+ * of a node another open change still amends, or of one whose live descendants
+ * another open change removes) is `pending`, not `always`. It is found by
+ * running apply again on a tree where the other open changes' amends and
+ * touches are gone and their removals count as done. Runs with `force`, since
+ * a base that goes stale is apply's to judge later, and discards the result,
+ * so no stamp (`appliedAt`, `metAt`) reaches the caller's tree.
  */
-export function applyAmendmentsProblems(tree: V2Tree, changeRef: string, now: Date): readonly string[] {
+export function applyAmendmentsProblems(tree: V2Tree, changeRef: string, now: Date): AmendmentProblems {
+  const full = dryRun(tree, changeRef, now);
+  if (full.length === 0) return NO_PROBLEMS;
+  const change = resolve(tree.changes, changeRef) as OpenChange | undefined;
+  if (!change) return { always: full, pending: [], blockedBy: [] };
+
+  const others = otherOpenChanges(tree.changes, change);
+  const alsoRemoving = new Set<string>();
+  for (const other of others) removedIds(tree.product, other.amends ?? []).forEach((id) => alsoRemoving.add(id));
+  const alone = structuredClone(tree);
+  const strip = (nodes: RuleNode[]): void => {
+    for (const node of nodes) {
+      if (node.type === "change" && node.id !== change.id && isOpenChange(node)) {
+        delete node.amends;
+        delete node.touches;
+      }
+      strip(node.children ?? []);
+    }
+  };
+  strip(alone.changes);
+  const always = new Set(dryRun(alone, changeRef, now, alsoRemoving));
+  const pending = full.filter((p) => !always.has(p));
+  return {
+    always: full.filter((p) => always.has(p)),
+    pending,
+    blockedBy: pending.length ? blockingChanges(tree, change, others) : [],
+  };
+}
+
+function dryRun(tree: V2Tree, changeRef: string, now: Date, alsoRemoving?: ReadonlySet<string>): readonly string[] {
   try {
-    applyAmendments(tree, changeRef, { appliedAt: now.toISOString(), now, force: true });
+    applyAmendments(tree, changeRef, { appliedAt: now.toISOString(), now, force: true, ...(alsoRemoving ? { alsoRemoving } : {}) });
     return [];
   } catch (error) {
     if (error instanceof ApplyAmendmentsError) return error.problems;
     throw error;
   }
+}
+
+type OpenChange = ChangeNode & RuleNode;
+
+/** Every open change in `nodes` (and below) other than `change`. */
+function otherOpenChanges(nodes: readonly RuleNode[], change: RuleNode): OpenChange[] {
+  return nodes.flatMap((node) => [
+    ...(node.type === "change" && node.id !== change.id && isOpenChange(node) ? [node as OpenChange] : []),
+    ...otherOpenChanges(node.children ?? [], change),
+  ]);
+}
+
+/** Labels of the `others` that amend or touch a node `change`'s amendments target, or one below it. */
+function blockingChanges(tree: V2Tree, change: OpenChange, others: readonly OpenChange[]): string[] {
+  const hit = new Set<string>();
+  for (const amendment of change.amends ?? []) {
+    const target = resolve(tree.product, amendment.target, { throughDeleted: true });
+    if (target) [target, ...liveDescendants(target)].forEach((n) => hit.add(n.id));
+  }
+  const names = (refs: readonly string[]): boolean =>
+    refs.some((ref) => {
+      const node = resolve(tree.product, ref, { throughDeleted: true });
+      return node !== undefined && hit.has(node.id);
+    });
+  return others.filter((o) => names([...(o.amends ?? []).map((a) => a.target), ...(o.touches ?? [])])).map((o) => o.displayId ?? o.id);
 }
 
 // ── Applied amends ───────────────────────────────────────────────

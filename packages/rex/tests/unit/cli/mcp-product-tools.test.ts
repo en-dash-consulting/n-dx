@@ -167,6 +167,22 @@ describe("place_change", () => {
     expect(json(await handleGetPrdStatus(store(), rexDir))).toEqual(before);
   });
 
+  it("stores a removal that only another open change blocks, with a warning, and apply_change waits for that change", async () => {
+    // CH-1 still amends A1.1, so apply refuses a removal of it until CH-1 is applied.
+    const added = json(await handleAddItem(store(), tmp, rexDir, { title: "Drop cards", amends: [{ target: "A1.1", delta: "removed", summary: "Retire" }] }));
+    expect(added.warnings).toEqual([expect.stringMatching(/Open change CH-1 stands in the way.*open-change-refs-live/)]);
+    expect(json(await handleGetItem(store(), rexDir, { id: added.id })).item.amends).toHaveLength(1);
+
+    expect(error(await handleApplyChange(store(), rexDir, { id: added.id }))).toMatch(/open-change-refs-live/);
+    json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
+    expect(json(await handleApplyChange(store(), rexDir, { id: added.id })).applied).toMatchObject([{ delta: "removed", nodeId: CAPABILITY }]);
+  });
+
+  it("still refuses a removal of a node no open change amends when apply would refuse it anyway", async () => {
+    const result = await handleAddItem(store(), tmp, rexDir, { title: "Drop ghost", amends: [{ target: "A1.404", delta: "removed", summary: "Retire" }] });
+    expect(error(result)).toMatch(/not a live product node|does not resolve|A1\.404/);
+  });
+
   it("refuses proposed or criteria without relation amends, naming it", async () => {
     const id = await inboxChange("Tidy the card form");
     expect(error(await handlePlaceChange(store(), rexDir, { id, target: "A1.1", relation: "touches", proposed: "x" }))).toMatch(/relation amends/);
