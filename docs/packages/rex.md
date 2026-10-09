@@ -80,6 +80,13 @@ rex change place CH-2 --target=A1.1 --relation=amends --capability-criterion="c3
 rex change apply CH-2 .                              # apply its amendments to the product layer
 ```
 
+```sh
+rex tree-diff .                                      # what this branch changed, against the default branch
+rex tree-diff --format=markdown --out=prd-diff.md .  # the pull-request comment, for a CI step to post
+```
+
+When either side of `rex tree-diff` is a v2 tree, a product map section lists the capabilities and constraints added, modified (title, statement or capability criteria) and retired beside the change list; `--json` carries it as `map`. A v1 diff has no such section. `--format=markdown` renders the report as host-neutral CommonMark (headings, lists and inline code only; no HTML, tables or host markers), capped at 50 entries per section. `--out=<file>` writes any format to a file instead of stdout, and is refused inside `.rex/`.
+
 `--criterion` is always a work item's acceptance criteria (done when). A capability's capability criteria use `--capability-criterion="<id>: <text>"` (and `--remove-capability-criterion=<id>`), on `rex product edit` and `rex change place` only. A description passed to `rex add` becomes one change, without LLM decomposition. On a v1 PRD, `rex add` is unchanged and `rex product` / `rex change` refuse.
 
 `rex reshape`, `rex reorganize` and `rex prune` restructure the change layer as they do a v1 PRD, and never write under `product/`. On the product layer, `rex reshape` drafts its accepted proposals as one change with removed and added amendments (a move is a removal plus an added copy) for `rex change apply`; `rex reorganize` only reports; `rex prune` does not apply.

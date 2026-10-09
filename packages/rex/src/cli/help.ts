@@ -736,14 +736,23 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "Because the diff is by id, an item that was reparented is reported once\n" +
       "as 'moved' rather than twice as a removal and an addition. Categories\n" +
       "overlap: a task added and finished on this branch is both added and\n" +
-      "completed.",
+      "completed.\n\n" +
+      "When either side is a v2 tree, a product map section lists the\n" +
+      "capabilities and constraints added, modified (title, statement or\n" +
+      "capability criteria) and retired beside the change list. A v1 tree has no\n" +
+      "product layer and no such section.\n\n" +
+      "--format=markdown writes the report as a pull-request comment: plain\n" +
+      "CommonMark with no host-specific syntax, for any CI to post.",
     options: [
       { flag: "--from=<ref>", description: "Baseline commit (default: the default branch)" },
       { flag: "--to=<ref>", description: "Target commit (default: the working tree)" },
       { flag: "--against=<dir>", description: "Compare against another checkout's tree instead of a commit" },
       { flag: "--json", description: "Machine-readable output (same as --format=json)" },
+      { flag: "--format=markdown", description: "Pull-request comment as host-neutral Markdown" },
+      { flag: "--out=<file>", description: "Write the report to a file instead of stdout (not inside the PRD storage directory)" },
     ],
     examples: [
+      { command: "rex tree-diff --format=markdown --out=prd-diff.md", description: "Write the PR comment for a CI step to post" },
       { command: "rex tree-diff", description: "What this branch changed, against the default branch" },
       { command: "rex tree-diff --from=v0.7.0 --to=HEAD", description: "Compare two commits" },
       { command: "rex tree-diff --against=../main-checkout", description: "Compare this worktree against its anchor" },

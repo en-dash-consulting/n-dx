@@ -456,7 +456,9 @@ describe("isolation", () => {
     // (cli/commands/product.ts, change.ts, add-change.ts and their v2-cli.ts),
     // and the layer-aware restructuring behind `rex reshape`, `rex reorganize`
     // and `rex prune`: the change-layer store, the layer projection, and the
-    // product-layer reshape draft (cli/commands/reshape-product.ts).
+    // product-layer reshape draft (cli/commands/reshape-product.ts), and
+    // `rex tree-diff`, which loads either layout (core/tree-source.ts) and
+    // diffs the product layer (core/map-diff.ts).
     const v2Files = new Set(
       [
         "schema/v2.ts",
@@ -499,6 +501,8 @@ describe("isolation", () => {
         "core/layer-projection.ts",
         "core/product-reshape.ts",
         "cli/commands/reshape-product.ts",
+        "core/tree-source.ts",
+        "core/map-diff.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

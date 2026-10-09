@@ -2,7 +2,7 @@
 id: "523e8231-1e57-468e-b166-c8cd76618b3b"
 level: "task"
 title: "Show the product layer delta in tree-diff and emit the PR comment as Markdown"
-status: "pending"
+status: "in_progress"
 priority: "medium"
 tags:
   - "pr-18"
@@ -12,10 +12,11 @@ tags:
 blockedBy:
   - "08b9e858-4312-4945-9dd5-6c211884d5f6"
 source: "roadmap"
+startedAt: "2026-10-09T07:38:53.008Z"
 acceptanceCriteria:
   - "tree-diff output includes a map delta section (test)"
   - "The comment output is host-neutral Markdown"
-description: "rex tree-diff lists capabilities added, modified and retired beside the change list, and writes the PR comment as Markdown to stdout or a file for any CI to post.\n\nDesign boundary (PR 18, 2026-10-09):\n- v1 trees keep today's behaviour exactly, as PR 17 did for add_item. On a v2 tree, ndx add, smart-add and capture create a change and propose placement; on a v1 tree they add a level-based item as today. rex health on a v1 tree reports exactly what it reports today; the v2 tree rules (f5d8c06e) and the landing check (da151468) run on v2 trees only. This repository's own PRD is v1, and ndx add, rex add, smart-add and rex health are used on it every day.\n- No skill text changes (.claude/, .agents/, packages/core/assistant-assets/skills/). Rewriting the PRD skills for v2 is PR 24 (d5f63839).\n- Write paths go through PR 31's store transaction (store.withTransaction).\n- Lane files: packages/rex/src/cli/ (commands, help), packages/rex/src/core/health.ts and the reshape/reorganize/prune modules, tree-diff, and packages/core for ndx add routing (spawn only, no library imports in orchestration scripts). Do not change web, hench, MCP tool shapes or the v2 schema.\n- Terminology: \"capability criteria\" for a capability's criteria; \"acceptance criteria\" (or \"done when\") for a work item's acceptanceCriteria. Never a bare \"criteria\" in help text or errors."
-lastModified: "2026-10-09T06:30:23.267Z"
+description: "rex tree-diff lists capabilities added, modified and retired beside the change list, and writes the PR comment as Markdown to stdout or a file for any CI to post.\n\nDesign boundary (PR 18, 2026-10-09):\n- v1 trees keep today's behaviour exactly, as PR 17 did for add_item. On a v2 tree, ndx add, smart-add and capture create a change and propose placement; on a v1 tree they add a level-based item as today. rex health on a v1 tree reports exactly what it reports today; the v2 tree rules (f5d8c06e) and the landing check (da151468) run on v2 trees only. This repository's own PRD is v1, and ndx add, rex add, smart-add and rex health are used on it every day.\n- No skill text changes (.claude/, .agents/, packages/core/assistant-assets/skills/). Rewriting the PRD skills for v2 is PR 24 (d5f63839).\n- Write paths go through PR 31's store transaction (store.withTransaction).\n- Lane files: packages/rex/src/cli/ (commands, help), packages/rex/src/core/health.ts and the reshape/reorganize/prune modules, tree-diff, and packages/core for ndx add routing (spawn only, no library imports in orchestration scripts). Do not change web, hench, MCP tool shapes or the v2 schema.\n- Terminology: \"capability criteria\" for a capability's criteria; \"acceptance criteria\" (or \"done when\") for a work item's acceptanceCriteria. Never a bare \"criteria\" in help text or errors.\n\nAttempt 1 (run 577a2b30, Sonnet) stopped before finishing. Commit 2279463da (the review's repairs to tree-diff.ts, tree-source.ts and tests) imports packages/rex/src/core/map-diff.ts and core/tree-diff-markdown.ts, which are still untracked in the working tree; export.ts (assertOutsideRexDir exported) and help.ts are modified but uncommitted. Attempt 2 starts from that working tree: review those files, finish the task (the docs entry in docs/packages/rex.md and a patch changeset for @n-dx/rex for the map section, --format=markdown and --out; this also covers capture 2c480d36), rebuild rex, and commit everything. The rex typecheck and the affected gate must pass."
+lastModified: "2026-10-09T07:45:28.306Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
