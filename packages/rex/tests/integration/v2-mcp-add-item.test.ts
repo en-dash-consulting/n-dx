@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createStore, ensureRexDir } from "../../src/store/index.js";
@@ -59,6 +59,14 @@ describe("add_item on a v2 tree", () => {
     expect({ type, needsPlacement }).toEqual({ type: "change", needsPlacement: true });
     const model = await loadPrdModel(rexDir, quiet);
     expect(model.tree.changes.find((c) => c.id === id)).toMatchObject({ type: "change", title: "Something to sort out", needsPlacement: true });
+  });
+
+  it("accepts a title naming a project release; rex health catches it later", async () => {
+    await writeFile(join(tmp, "package.json"), JSON.stringify({ name: "p", version: "0.9.0" }));
+    const res = await add({ type: "change", title: "0.9.0 release audit", touches: [CAPABILITY] });
+    expect(res.isError).toBeFalsy();
+    const model = await loadPrdModel(rexDir, quiet);
+    expect(model.tree.changes.find((c) => c.id === JSON.parse(text(res)).id)?.title).toBe("0.9.0 release audit");
   });
 
   it("creates a change with acceptanceCriteria that get_item returns", async () => {

@@ -13,7 +13,7 @@
  *   `title`, with `proposed` as its statement and `criteria.add` as its
  *   criteria. With `type: "constraint"` it creates a constraint `under` any
  *   live product node instead, with `proposed` as its statement and the
- *   amendment's `requirements` and `appliesTo`; a constraint has no criteria.
+ *   amendment's `requirements` and `appliesTo`; a constraint has no capability criteria.
  *   `target` names the new node: a display id (`A4.9`) becomes its
  *   `displayId` and the id comes from `newId`; anything else is the id.
  * - **modified** edits a live capability or constraint: `proposed`, when
@@ -54,7 +54,7 @@ import type { Requirement } from "../schema/v1.js";
 import { RequirementSchema } from "../schema/validate.js";
 import { isDisplayId, type Amendment, type ChangeNode, type CriteriaDelta, type Criterion } from "../schema/v2.js";
 import { checkV2Rules, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { slugifyTitle } from "../store/folder-tree-serializer.js";
+import { isUsableFrozenSlug, slugifyTitle } from "../store/folder-tree-serializer.js";
 
 export interface ApplyAmendmentsOptions {
   /** ISO timestamp stamped as the change's `appliedAt`. */
@@ -83,7 +83,7 @@ export interface ApplyAmendmentsResult {
 }
 
 /** The problem a `modified` amendment with neither `proposed` nor a criteria delta reports. */
-export const NOTHING_TO_MODIFY = "nothing to modify: no proposed text or criteria delta";
+export const NOTHING_TO_MODIFY = "nothing to modify: no proposed text or capability criteria delta";
 
 export class ApplyAmendmentsError extends Error {
   readonly problems: readonly string[];
@@ -322,7 +322,7 @@ function checkBase(before: V2Tree, after: V2Tree, amendment: Amendment, { force 
 }
 
 /** Error findings in `after` that `before` did not have, compared by rule, node and message. */
-function newErrors(before: V2Tree, after: V2Tree, now: Date): RuleFinding[] {
+export function newErrors(before: V2Tree, after: V2Tree, now: Date): RuleFinding[] {
   const key = (f: RuleFinding): string => `${f.rule}\0${f.nodeId}\0${f.message}`;
   const errors = (t: V2Tree): RuleFinding[] => checkV2Rules(t, { now }).filter((f) => f.severity === "error");
   const had = new Set(errors(before).map(key));
@@ -387,7 +387,7 @@ const applyAdded: DeltaApply = ({ product, changes }, amendment, { options }, fa
 /** A new capability's criteria, from `criteria.add`; undefined after reporting a problem. */
 function capabilityFields(amendment: Amendment, fail: (message: string) => void): { criteria?: Criterion[] } | undefined {
   if (amendment.criteria?.replace?.length || amendment.criteria?.remove?.length) {
-    return void fail("a new capability has no criteria to replace or remove; use criteria.add");
+    return void fail("a new capability has no capability criteria to replace or remove; use criteria.add");
   }
   const criteria = amendment.criteria?.add ?? [];
   const duplicate = firstDuplicate(criteria.map((c) => c.id));
@@ -403,7 +403,7 @@ function constraintFields(amendment: Amendment, fail: (message: string) => void)
   let ok = true;
   if (criteria?.add?.length || criteria?.replace?.length || criteria?.remove?.length) {
     ok = false;
-    fail("a constraint has no criteria; state it in proposed and list its requirements");
+    fail("a constraint has no capability criteria; state it in proposed and list its requirements");
   }
   const parsedRequirements = z.array(RequirementSchema).optional().safeParse(requirements);
   if (!parsedRequirements.success) {
@@ -423,7 +423,7 @@ function constraintFields(amendment: Amendment, fail: (message: string) => void)
 }
 
 /** Criteria after a delta, and every id that does not fit them. */
-interface CriteriaDeltaResult {
+export interface CriteriaDeltaResult {
   criteria: Criterion[];
   /** One message per misfit id; the delta applies only when empty. */
   problems: string[];
@@ -434,7 +434,7 @@ interface CriteriaDeltaResult {
  * Removing or replacing an id the criteria lack, or adding one they have, is a
  * problem. Pure.
  */
-function applyCriteriaDelta(criteria: readonly Criterion[], delta: CriteriaDelta | undefined): CriteriaDeltaResult {
+export function applyCriteriaDelta(criteria: readonly Criterion[], delta: CriteriaDelta | undefined): CriteriaDeltaResult {
   let next = [...criteria];
   const problems: string[] = [];
   const has = (id: string): boolean => next.some((c) => c.id === id);
@@ -453,6 +453,23 @@ function applyCriteriaDelta(criteria: readonly Criterion[], delta: CriteriaDelta
   return { criteria: next, problems };
 }
 
+/**
+ * The delta that sets each of `set` (replacing an id `current` has, adding a
+ * new one) and removes `remove`, or undefined when both are empty. Ids that do
+ * not fit are left for {@link applyCriteriaDelta} to report. Pure.
+ */
+export function upsertCriteriaDelta(current: readonly Criterion[], set: readonly Criterion[], remove: readonly string[]): CriteriaDelta | undefined {
+  if (!set.length && !remove.length) return undefined;
+  const ids = new Set(current.map((c) => c.id));
+  const add = set.filter((c) => !ids.has(c.id));
+  const replace = set.filter((c) => ids.has(c.id));
+  return {
+    ...(add.length ? { add: [...add] } : {}),
+    ...(replace.length ? { replace: [...replace] } : {}),
+    ...(remove.length ? { remove: [...remove] } : {}),
+  };
+}
+
 const applyModified: DeltaApply =({ product }, amendment, _options, fail) => {
   const node = resolve(product, amendment.target);
   if (!node || (node.type !== "capability" && node.type !== "constraint")) {
@@ -461,7 +478,7 @@ const applyModified: DeltaApply =({ product }, amendment, _options, fail) => {
   const delta = amendment.criteria;
   const hasCriteriaDelta = Boolean(delta?.add?.length || delta?.replace?.length || delta?.remove?.length);
   if (amendment.proposed === undefined && !hasCriteriaDelta) return void fail(NOTHING_TO_MODIFY);
-  if (hasCriteriaDelta && node.type !== "capability") return void fail("a constraint has no criteria");
+  if (hasCriteriaDelta && node.type !== "capability") return void fail("a constraint has no capability criteria");
 
   const { criteria, problems } = applyCriteriaDelta(node.type === "capability" ? node.criteria ?? [] : [], delta);
   if (problems.length) return void problems.forEach(fail);
@@ -531,13 +548,14 @@ export function resolve(
 /**
  * The slug for a new node: its title's slug, or that slug with the first six
  * id characters when a sibling holds it already (compared ignoring case, as
- * the writer does, which refuses any clash left). Existing siblings keep their
- * frozen slugs.
+ * the writer does, which refuses any clash left) or it cannot be frozen
+ * (`con`, `aux`, `nul` on Windows, or `index`: the writer refuses those too). Existing siblings keep
+ * their frozen slugs.
  */
-export function freeSlug(title: string, id: string, siblings: readonly RuleNode[]): string {
+export function freeSlug(title: string, id: string, siblings: readonly { slug: string }[]): string {
   const taken = new Set(siblings.map((s) => s.slug.toLowerCase()));
   const base = slugifyTitle(title);
-  if (!taken.has(base)) return base;
+  if (!taken.has(base) && isUsableFrozenSlug(base)) return base;
   return `${base}-${id.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "item"}`;
 }
 
@@ -574,14 +592,32 @@ export function appendHistory(body: string | undefined, rawLine: string): string
   const line = rawLine.replace(/\s+/g, " ").trim();
   const text = (body ?? "").trimEnd();
   const lines = text === "" ? [] : text.split("\n");
-  const start = lines.findIndex((l) => l.trim() === HISTORY_HEADING);
-  if (start === -1) return [...(lines.length ? [...lines, ""] : []), HISTORY_HEADING, "", line].join("\n");
-  let end = lines.findIndex((l, i) => i > start && /^#{1,2} /.test(l));
-  if (end === -1) end = lines.length;
+  const section = historySection(lines);
+  if (!section) return [...(lines.length ? [...lines, ""] : []), HISTORY_HEADING, "", line].join("\n");
+  const { start, end } = section;
   // Insert after the section's last non-blank line, keeping blank lines before the next heading.
   let at = end;
   while (at > start + 1 && lines[at - 1].trim() === "") at--;
   // A list line straight after prose would join its paragraph.
   const gap = at === start + 1 || !lines[at - 1].startsWith("- ") ? [""] : [];
   return [...lines.slice(0, at), ...gap, line, ...lines.slice(at)].join("\n");
+}
+
+/**
+ * `body` without its History section, trimmed: the notes it holds outside
+ * History. Empty when the body is only History (or none), as one a change's
+ * apply created is.
+ */
+export function bodyNotes(body: string | undefined): string {
+  const lines = (body ?? "").split("\n");
+  const section = historySection(lines);
+  return (section ? [...lines.slice(0, section.start), ...lines.slice(section.end)] : lines).join("\n").trim();
+}
+
+/** The History section of `lines`: its heading's index to the next `#` or `##` heading's (or the end). */
+function historySection(lines: readonly string[]): { start: number; end: number } | undefined {
+  const start = lines.findIndex((l) => l.trim() === HISTORY_HEADING);
+  if (start === -1) return undefined;
+  const end = lines.findIndex((l, i) => i > start && /^#{1,2} /.test(l));
+  return { start, end: end === -1 ? lines.length : end };
 }

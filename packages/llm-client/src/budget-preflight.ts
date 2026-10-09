@@ -27,7 +27,18 @@ const DEFAULT_CONTEXT_WINDOW = 128_000;
 const MAX_UTILIZATION = 0.9;
 
 /** Approximate characters-per-token ratio for English prose. */
-const CHARS_PER_TOKEN = 4;
+export const CHARS_PER_TOKEN = 4;
+
+/**
+ * Tokens a prompt of `charCount` characters is estimated to cost.
+ *
+ * Model-independent on purpose: the ratio is a property of the text, not of the
+ * vendor, so a caller sizing a prompt against its own budget needs no model id.
+ * {@link budgetPreflight} adds the model-specific half (context window, price).
+ */
+export function estimateTokens(charCount: number): number {
+  return Math.ceil(charCount / CHARS_PER_TOKEN);
+}
 
 /** Result returned by budgetPreflight. */
 export interface BudgetPreflightResult {
@@ -63,7 +74,7 @@ export function budgetPreflight(
   modelId: string,
   promptCharCount: number,
 ): BudgetPreflightResult {
-  const tokenEstimate = Math.ceil(promptCharCount / CHARS_PER_TOKEN);
+  const tokenEstimate = estimateTokens(promptCharCount);
   const contextWindow = MODEL_CONTEXT_WINDOWS[modelId] ?? DEFAULT_CONTEXT_WINDOW;
   const utilizationPercent = (tokenEstimate / contextWindow) * 100;
   const fits = tokenEstimate <= contextWindow * MAX_UTILIZATION;

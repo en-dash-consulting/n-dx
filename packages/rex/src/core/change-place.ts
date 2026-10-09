@@ -37,8 +37,28 @@ import {
   type PlacementTarget,
 } from "./placement.js";
 
+/** Why a placement was refused. Each surface words its own hint by kind; the message is the MCP wording. */
+export type ChangePlacementErrorKind =
+  | "not-a-target"
+  | "content-needs-amends"
+  | "already-amends"
+  | "rule-errors"
+  | "nothing-to-modify"
+  | "apply-problems"
+  | "no-such-change"
+  | "change-not-open";
+
 export class ChangePlacementError extends Error {
-  constructor(message: string) {
+  /**
+   * @param message MCP-facing text (may name MCP tools or parameters).
+   * @param kind Which refusal this is.
+   * @param plain The message without MCP-only wording; defaults to `message`.
+   */
+  constructor(
+    message: string,
+    readonly kind: ChangePlacementErrorKind,
+    readonly plain: string = message,
+  ) {
     super(message);
     this.name = "ChangePlacementError";
   }
@@ -46,6 +66,9 @@ export class ChangePlacementError extends Error {
 
 /** Refusal for `proposed` or `criteria` on a placement that is not an amendment. */
 export const PLACEMENT_CONTENT_NEEDS_AMENDS = "proposed and criteria describe an amendment: pass them with target and relation amends";
+
+/** Suffix of the MCP-facing refusal for an amends placement with nothing to modify. */
+const NOTHING_TO_MODIFY_PLACE_HINT = ". Pass proposed or criteria, or use relation touches";
 
 export interface PlacementSuggestion {
   /** Id of the change placed. */
@@ -87,6 +110,10 @@ export interface RecordPlacementResult {
   placement: PlacementTarget;
   /** Problems only other open changes cause: apply refuses until they close, and the placement is stored anyway. */
   warnings: string[];
+  /** The problems behind `warnings`, unworded, for a caller that words them itself. Empty when `warnings` is. */
+  pending: string[];
+  /** The open changes (display id or id) in the way of `pending`; empty when `pending` is. */
+  blockedBy: string[];
 }
 
 /** Record that the open change `changeRef` amends or touches `input.target`. */
@@ -96,18 +123,19 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
   const change = openChange(next, changeRef) as ChangeNode & RuleNode;
   const target = index.resolve(input.target);
   if (!target || (target.type !== "capability" && target.type !== "constraint")) {
-    throw new ChangePlacementError(`"${input.target}" is not a live capability or constraint; a change is placed on one (see get_product)`);
+    const plain = `"${input.target}" is not a live capability or constraint; a change is placed on one`;
+    throw new ChangePlacementError(`${plain} (see get_product)`, "not-a-target", plain);
   }
   const relation = input.relation ?? placementRelation(placementInput(change));
   if (relation !== "amends" && (input.proposed !== undefined || input.criteria !== undefined)) {
-    throw new ChangePlacementError(PLACEMENT_CONTENT_NEEDS_AMENDS);
+    throw new ChangePlacementError(PLACEMENT_CONTENT_NEEDS_AMENDS, "content-needs-amends");
   }
   const label = change.displayId ?? change.id;
   const amends = (change.amends ?? []).some((a) => index.resolve(a.target) === target);
   const touches = (change.touches ?? []).some((ref) => index.resolve(ref) === target);
 
-  // An amendment is the stronger relation; edit it with edit_item rather than downgrading it here.
-  if (amends) throw new ChangePlacementError(`Change ${label} already amends "${target.title}"`);
+  // An amendment is the stronger relation; edit the amendment rather than downgrading it here.
+  if (amends) throw new ChangePlacementError(`Change ${label} already amends "${target.title}"`, "already-amends");
   if (relation === "touches") {
     if (!touches) change.touches = [...(change.touches ?? []), target.id];
   } else {
@@ -130,30 +158,38 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
   let pending: string[] = [];
   let blockedBy: readonly string[] = [];
   const errors = checkV2Rules(next, { now }).filter((f) => f.nodeId === change.id && f.severity === "error");
-  if (errors.length) throw new ChangePlacementError(`Cannot place change ${label}: ${errors.map((f) => f.message).join("; ")}`);
+  if (errors.length) throw new ChangePlacementError(`Cannot place change ${label}: ${errors.map((f) => f.message).join("; ")}`, "rule-errors");
   if (relation === "amends") {
     // Only what the new amendment brings: the change's earlier amendments were judged when they were stored.
     const before = applyAmendmentsProblems(tree, change.id, now);
     const after = applyAmendmentsProblems(next, change.id, now);
     const novel = (all: readonly string[], known: readonly string[]): string[] => all.filter((p) => !known.includes(p));
     const problems = novel(after.always, before.always);
+    // The pending branch is defensive: place writes only `modified` amendments, pending comes only from
+    // removals, and pending that existed before this placement is filtered out here. So it is empty today;
+    // the code goes live if place ever writes a removal. Pinned by the "recordPlacement pending and
+    // blockedBy" tests in tests/unit/core/change-place.test.ts (modify on a capability another change
+    // removes: no problems; modify under a pending removal: refused).
     pending = novel(after.pending, before.pending);
     blockedBy = after.blockedBy;
     if (problems.length) {
-      const hint = problems.some((p) => p.endsWith(NOTHING_TO_MODIFY)) ? ". Pass proposed or criteria, or use relation touches" : "";
-      throw new ChangePlacementError(`Cannot place change ${label}: ${problems.join("; ")}${hint}`);
+      const plain = `Cannot place change ${label}: ${problems.join("; ")}`;
+      if (problems.some((p) => p.endsWith(NOTHING_TO_MODIFY))) {
+        throw new ChangePlacementError(`${plain}${NOTHING_TO_MODIFY_PLACE_HINT}`, "nothing-to-modify", plain);
+      }
+      throw new ChangePlacementError(plain, "apply-problems");
     }
   }
-  return { tree: next, change: change.id, placement: { target: target.id, relation }, warnings: pendingWarnings(pending, blockedBy) };
+  return { tree: next, change: change.id, placement: { target: target.id, relation }, warnings: pendingWarnings(pending, blockedBy), pending, blockedBy: [...blockedBy] };
 }
 
 /** The open change `ref` names, or a refusal naming why it cannot be placed. */
 function openChange(tree: V2Tree, ref: string): RuleNode {
   const node = indexTree(tree).resolve(ref);
-  if (!node || node.type !== "change") throw new ChangePlacementError(`No live change "${ref}"`);
+  if (!node || node.type !== "change") throw new ChangePlacementError(`No live change "${ref}"`, "no-such-change");
   if (!isOpenChange(node)) {
     const state = node.appliedAt ? `applied at ${node.appliedAt}` : node.status;
-    throw new ChangePlacementError(`Change ${node.displayId ?? node.id} is ${state}; only an open change is placed`);
+    throw new ChangePlacementError(`Change ${node.displayId ?? node.id} is ${state}; only an open change is placed`, "change-not-open");
   }
   return node;
 }

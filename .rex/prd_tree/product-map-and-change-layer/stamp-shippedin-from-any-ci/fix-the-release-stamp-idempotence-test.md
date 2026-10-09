@@ -1,0 +1,20 @@
+---
+id: "0039a22e-5f4b-4ca1-adee-4f29b073139c"
+level: "task"
+title: "Fix the release-stamp idempotence test on Windows and give the release checkout full history"
+status: "completed"
+priority: "high"
+source: "ndx-capture"
+startedAt: "2026-10-09T14:41:50.895Z"
+completedAt: "2026-10-09T14:50:42.056Z"
+endedAt: "2026-10-09T14:50:42.056Z"
+resolutionType: "code-change"
+resolutionDetail: "snapshot() keys normalized to forward slashes; release.yml Checkout gets fetch-depth: 0 with comment; release-version-script.test.js asserts it."
+acceptanceCriteria:
+  - "release-stamp.test.ts passes on Windows: snapshot keys are forward-slash relative paths"
+  - "release.yml's Checkout step sets fetch-depth: 0, with a comment naming the stamp"
+  - "release-version-script.test.js fails if the release checkout's fetch-depth: 0 is removed"
+description: "Two follow-ups to PR 22 (#622), decided by Ryan on 2026-10-09.\n\n1. Windows test failure. CLI Smoke (Windows) on #622 fails packages/rex/tests/integration/release-stamp.test.ts > stamping > is idempotent with 'toMatch() expects to receive a string, but got undefined'. snapshot() keys files by relative(rexDir, …), which yields backslash paths on Windows, so stamped[CHANGE_STATE] (\"changes/add-apple-pay/state.yaml\") is undefined. Normalize the snapshot key to forward slashes (split(sep).join(\"/\")). Test-only: the stamp itself behaved correctly on Windows (the stamped-ids assertion before it passed). Check the file's other path-keyed lookups for the same problem.\n\n2. fetch-depth: 0. rex release stamp reads full history and release tags (computeLandings asserts a full clone; firstReleaseContaining reads tags). On a shallow clone the v2 stamp fails, version-packages turns that into a warning, and the release ships with nothing stamped: a silent failure. Add 'with: fetch-depth: 0' to the Checkout step at the top of .github/workflows/release.yml, with a one-line comment saying the stamp needs full history and tags. ci.yml and docs.yml already check out at full depth. Extend tests/unit/release-version-script.test.js to assert the release job's checkout uses fetch-depth: 0.\n\nBoundary: change only those three files. No source change under packages/*/src, no other release.yml step, no changeset (nothing published changes; the PR already carries the @n-dx/rex patch changeset)."
+lastModified: "2026-10-09T14:50:45.509Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

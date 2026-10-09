@@ -362,8 +362,9 @@ async function runBoundaryPhase(dir, info, isJSON) {
 /**
  * Phase: rex PRD checks.
  * Steps: rex validate, structure health, rex status.
+ * Exported for tests, which drive it without the analysis phase.
  */
-async function runRexPhase(dir, info, isJSON, tools, spawnTracked) {
+export async function runRexPhase(dir, info, isJSON, tools, spawnTracked) {
   const steps = [];
   let allOk = true;
 
@@ -412,22 +413,32 @@ async function runRexPhase(dir, info, isJSON, tools, spawnTracked) {
   let healthData = null;
   try {
     healthData = JSON.parse(rexHealth.stdout);
-    if (healthData && healthData.overall < 50) healthOk = false;
   } catch {
     // Could not parse
   }
+  // A v2 tree reports tree rules instead of a score; rex health's exit code gates it.
+  const v2Health = Array.isArray(healthData?.treeRules) ? summarizeTreeHealth(healthData) : null;
+  if (!v2Health && healthData && healthData.overall < 50) healthOk = false;
   if (!healthOk) allOk = false;
+  const healthSummary = v2Health ? v2Health.summary : `score: ${healthData?.overall ?? "?"}`;
   steps.push({
     name: "structure-health",
     ok: healthOk,
-    detail: healthData
-      ? `score: ${healthData.overall}/100${healthData.suggestions?.length ? ` (${healthData.suggestions.length} suggestions)` : ""}`
-      : trimOutput(rexHealth.stdout || rexHealth.stderr),
+    detail: v2Health
+      ? v2Health.summary
+      : healthData
+        ? `score: ${healthData.overall}/100${healthData.suggestions?.length ? ` (${healthData.suggestions.length} suggestions)` : ""}`
+        : trimOutput(rexHealth.stdout || rexHealth.stderr),
   });
   if (healthOk) {
-    info(`  ✓ structure health (score: ${healthData?.overall ?? "?"})`);
+    info(`  ✓ structure health (${healthSummary})`);
+  } else if (v2Health) {
+    info(`  ✗ structure health (${healthSummary})`);
+    if (!isJSON) {
+      for (const line of v2Health.problems) info(`    ✗ ${line}`);
+    }
   } else {
-    info(`  ✗ structure health (score: ${healthData?.overall ?? "?"} — below threshold)`);
+    info(`  ✗ structure health (${healthSummary} — below threshold)`);
     if (!isJSON && healthData?.suggestions) {
       for (const s of healthData.suggestions) info(`    ⚠ ${s}`);
     }
@@ -538,6 +549,28 @@ function computeStats(items) {
   }
   walk(items);
   return stats;
+}
+
+/**
+ * Summarize `rex health --format=json` on a v2 tree: `{ treeRules, warnings }`.
+ * `summary` counts rule errors, rule warnings and skipped nodes; `problems` lists
+ * what makes rex health exit non-zero (rule errors, then reader skips).
+ */
+export function summarizeTreeHealth(data) {
+  const rules = data.treeRules;
+  const readerWarnings = Array.isArray(data.warnings) ? data.warnings : [];
+  const errors = rules.filter((f) => f.severity === "error");
+  const skipped = readerWarnings.filter((w) => w.skipped);
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const parts = [plural(errors.length, "error"), plural(rules.length - errors.length, "warning")];
+  if (skipped.length > 0) parts.push(`${plural(skipped.length, "node")} skipped`);
+  return {
+    summary: `tree rules: ${parts.join(", ")}`,
+    problems: [
+      ...errors.map((f) => `${f.message} [${f.rule}]`),
+      ...skipped.map((w) => `${w.path}: ${w.message}`),
+    ],
+  };
 }
 
 /** Trim output to a reasonable length for report detail fields. */
