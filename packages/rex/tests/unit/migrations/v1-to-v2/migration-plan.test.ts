@@ -278,8 +278,8 @@ describe("classifyV1Tree", () => {
 
     it("a task directly under an area", () => {
       const area = storage();
-      area.children!.push(item("task", "Cache eviction", [], status));
-      held(classifyV1Tree([area]), "Cache eviction");
+      area.children!.push(item("task", "Offline cache eviction", [], status));
+      held(classifyV1Tree([area]), "Offline cache eviction");
     });
 
     it("an epic named for a PR", () => {
@@ -287,7 +287,16 @@ describe("classifyV1Tree", () => {
     });
 
     it("a task at the root", () => {
-      held(classifyV1Tree([storage(), item("task", "Cache eviction", [], status)]), "Cache eviction");
+      held(classifyV1Tree([storage(), item("task", "Offline cache eviction", [], status)]), "Offline cache eviction");
+    });
+
+    it("but keeps a v1 history task on the capability it sat under", () => {
+      const area = storage();
+      const capability = area.children![0];
+      capability.children!.push(item("task", "Try sqlite", [], status));
+      const entry = byTitle(classifyV1Tree([area]).entries, "Try sqlite");
+      expect(entry).toMatchObject({ target: "change", applied: false, placement: capability.id });
+      expect(entry.needsPlacement).toBeUndefined();
     });
   });
 

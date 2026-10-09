@@ -235,14 +235,14 @@ class PlanBuilder {
   }
 
   /**
-   * A change that waits for placement once every product node is known. An abandoned item is
-   * held for review instead, on every path: unapplied, needing placement, never rules-placed.
+   * A change that waits for placement once every product node is known. An abandoned item with no
+   * structural placement is held for review instead, on every path: unapplied, needing placement,
+   * never rules-placed. One whose v1 parent already names its product node keeps that placement.
    */
   change(item: PRDItem, fields: Partial<PlanEntry> & { reasons: string[] }, area?: string): PlanEntry {
-    if (isAbandoned(item)) {
-      const { placement: _placement, relation: _relation, ...kept } = fields;
+    if (isAbandoned(item) && fields.placement === undefined) {
       return this.add(item, "change", {
-        ...kept,
+        ...fields,
         applied: false,
         needsPlacement: true,
         reasons: [...fields.reasons, `${item.status} ${item.level}: held as an unapplied change for review, never rules-placed`],
