@@ -123,6 +123,8 @@ describe("draftProductReshape", () => {
         { proposalId: "move", reason: expect.stringMatching(reason) },
         { proposalId: "split", reason: expect.stringMatching(reason) },
       ]);
+      // A hand-written change would use the same added amendment, so the reason must not send the user there.
+      expect(draft.skipped[0].reason).toMatch(/no amendment moves it whole yet$/);
     }
   });
 

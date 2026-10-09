@@ -249,9 +249,9 @@ function cannotCopy(product: readonly RuleNode[], node: RuleNode): string | unde
     node.type === "capability" && n.requirements?.length ? "requirements" : undefined,
     node.type === "capability" && n.dependsOn?.length ? "dependsOn" : undefined,
   ].filter((k): k is string => k !== undefined);
-  if (dropped.length) return `${name} has ${dropped.join(", ")}, which an added copy would drop; move it with a hand-written change`;
+  if (dropped.length) return `${name} has ${dropped.join(", ")}, which an added copy would drop; no amendment moves it whole yet`;
   const dependent = liveNodes(product).find((other) => other.id !== node.id && names(other, node));
-  if (dependent) return `${label(product, dependent.id)} names ${name}, which a copy with a new id would leave pointing at a retired node; move it with a hand-written change`;
+  if (dependent) return `${label(product, dependent.id)} names ${name}, which a copy with a new id would leave pointing at a retired node; no amendment moves it whole yet`;
   return undefined;
 }
 
