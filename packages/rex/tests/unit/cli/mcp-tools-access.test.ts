@@ -27,8 +27,10 @@ const EXPECTED: Record<string, Access | { args: unknown; access: Access }[]> = {
     { args: {}, access: "write" },
   ],
   reorganize: [
-    { args: { accept: true }, access: "write" },
-    { args: { accept: false }, access: "read" },
+    // `accept` is a string in the schema; cover each form the handler applies.
+    { args: { accept: "low-risk" }, access: "write" },
+    { args: { accept: "all" }, access: "write" },
+    { args: { accept: "1,3" }, access: "write" },
     { args: {}, access: "read" },
   ],
   get_prd_status: "read",
