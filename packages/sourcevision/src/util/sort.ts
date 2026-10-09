@@ -76,7 +76,11 @@ export function sortCrossings(crossings: ZoneCrossing[]): ZoneCrossing[] {
       cmp(a.fromZone, b.fromZone) ||
       cmp(a.toZone, b.toZone) ||
       cmp(a.from, b.from) ||
-      cmp(a.to, b.to)
+      cmp(a.to, b.to) ||
+      // Two sources can draw the same file pair — an npm import between repos
+      // that also talk over HTTP. Without this the pair's order depends on
+      // which computation ran first, and zones.json stops being byte-stable.
+      cmp(a.source ?? "", b.source ?? "")
   );
 }
 

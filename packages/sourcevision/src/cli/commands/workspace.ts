@@ -19,6 +19,7 @@ import {
   resolveMembers,
   writeWorkspaceOutput,
   getWorkspaceStatus,
+  getWorkspaceEdgeCounts,
   toPosix,
 } from "../sourcevision-core.js";
 import type {WorkspaceMember} from "../sourcevision-core.js";
@@ -136,6 +137,32 @@ function showStatus(rootDir: string): void {
     const detailStr = details.length > 0 ? ` (${details.join(", ")})` : "";
     info(`  ${s.name} [${s.path}] — ${status}${detailStr}`);
   }
+
+  showEdgeCounts(rootDir);
+}
+
+/**
+ * Edge counts from the last aggregation, broken down by what produced them.
+ *
+ * The breakdown is the point: a workspace whose repos only ever connect
+ * through npm imports has a different shape from one connected over HTTP and a
+ * shared queue, and a single total hides which.
+ */
+function showEdgeCounts(rootDir: string): void {
+  const counts = getWorkspaceEdgeCounts(rootDir);
+
+  info("");
+  if (!counts) {
+    info("Edges: not aggregated yet — run 'sourcevision workspace'.");
+    return;
+  }
+
+  const total = counts.none + counts.npm + counts.http + counts.infra;
+  info(`Edges: ${total} total`);
+  info(`  intra-repo  ${counts.none}`);
+  info(`  npm         ${counts.npm}`);
+  info(`  http        ${counts.http}`);
+  info(`  infra       ${counts.infra}`);
 }
 
 // ── Aggregate (default) ─────────────────────────────────────────────────────
@@ -160,8 +187,25 @@ function runAggregate(rootDir: string): void {
 
   info(`Aggregated ${result.fileCount} files across ${result.zoneCount} zones`);
   if (result.crossingCount > 0) {
-    info(`Cross-zone crossings: ${result.crossingCount}`);
+    const { none, npm, http, infra } = result.bySource;
+    info(
+      `Cross-zone crossings: ${result.crossingCount} ` +
+      `(intra-repo ${none}, npm ${npm}, http ${http}, infra ${infra})`,
+    );
   }
+
+  // Near-misses are printed, never silently dropped: the usual cause is a
+  // member with no declared baseUrl, which the operator can only fix if they
+  // can see the edge it cost them.
+  if (result.withheld.length > 0) {
+    info("");
+    info(`Withheld ${result.withheld.length} cross-repo edge(s) below the confidence threshold:`);
+    for (const w of result.withheld) {
+      const to = w.toMember ? ` → ${w.toMember}` : "";
+      info(`  [${w.source}] ${w.fromMember}${to}: ${w.reason}`);
+    }
+  }
+
   info("");
   info("Done.");
 }

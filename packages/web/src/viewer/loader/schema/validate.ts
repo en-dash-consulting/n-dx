@@ -135,6 +135,11 @@ const ZoneCrossingSchema = z.object({
   to: z.string(),
   fromZone: z.string(),
   toZone: z.string(),
+  // Cross-repo edges only, from a workspace aggregation. Declared rather than
+  // left to be stripped: `z.object` drops unknown keys, so an undeclared field
+  // does not fail validation — it vanishes, which is the harder bug to find.
+  source: z.enum(["npm", "http", "infra"]).optional(),
+  evidence: z.string().optional(),
 });
 
 const ZoneSchema: z.ZodType<V1.Zone> = z.object({
