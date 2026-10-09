@@ -96,7 +96,7 @@ describe("Inbox change placed with its amendment content, then applied over MCP"
     [
       "replaces a criterion of a capability it adds",
       { target: "A1.9", delta: "added", summary: "s", under: "A1", title: "Refunds", proposed: "Refunds work.", criteria: { replace: [{ id: "c1", text: "x" }] } },
-      "amendment 1 (added A1.9): a new capability has no criteria to replace or remove",
+      "amendment 1 (added A1.9): a new capability has no capability criteria to replace or remove",
     ],
   ])("refuses add_item with an amendment that %s, in apply's words, and writes nothing", async (_label, amendment, message) => {
     const before = await rexFiles();

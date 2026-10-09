@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { readdir, readFile } from "node:fs/promises";
+import { cp, readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { runResult, createTmpDir, removeTmpDir, setupRexDir } from "./e2e-helpers.js";
+
+const V2_FIXTURE = fileURLToPath(new URL("../../packages/rex/tests/fixtures/v2-tree", import.meta.url));
 
 /**
  * Entry for item `slug` (`<slug>.md` for a leaf, `<slug>/index.md` otherwise).
@@ -88,6 +91,20 @@ describe("ndx add CLI delegation", { timeout: 30_000 }, () => {
     const md = lf(await readFile(join(treeDir, entry), "utf-8"));
     expect(md).toMatch(/^source: "?ndx-capture"?$/m);
     expect(md).toMatch(/^acceptanceCriteria:\n\s+- "?Alpha"?\n\s+- "?Beta"?\n(?!\s+- )/m);
+  });
+
+  it("on a v2 tree, creates a change and names its placement", async () => {
+    await rm(join(tmpDir, ".rex"), { recursive: true, force: true });
+    await cp(V2_FIXTURE, join(tmpDir, ".rex"), { recursive: true });
+    const { code, stdout, stderr } = runResult(
+      ["add", "--title=Support refunds when paying by card", "--criterion=A refund reaches the card"],
+      { cwd: tmpDir },
+    );
+    expect(stderr).not.toMatch(/Error/);
+    expect(code).toBe(0);
+    expect(stdout).toContain("Created change: Support refunds when paying by card");
+    expect(stdout).toContain("Placement: Inbox (needs placement)");
+    expect(stdout).toMatch(/--target=A1\.1 --relation=amends/);
   });
 
   it("rejects --criterion in smart mode without waiting on stdin", () => {

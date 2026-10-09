@@ -1,9 +1,9 @@
 {
   "model": "claude-sonnet-5",
   "totals": {
-    "surfaces": 36,
-    "perCallTokens": 22851,
-    "uniqueTokens": 14348,
+    "surfaces": 38,
+    "perCallTokens": 23377,
+    "uniqueTokens": 14874,
     "skills": 13,
     "skillTokens": 20439
   },
@@ -102,9 +102,9 @@
   ],
   "byPackage": {
     "rex": {
-      "surfaces": 19,
-      "perCallTokens": 15217,
-      "uniqueTokens": 7195
+      "surfaces": 21,
+      "perCallTokens": 15743,
+      "uniqueTokens": 7721
     },
     "sourcevision": {
       "surfaces": 7,
@@ -569,6 +569,30 @@
     },
     {
       "pkg": "rex",
+      "file": "packages/rex/src/analyze/place-reason.ts",
+      "builder": "buildPlacementEnvelope",
+      "purpose": "Place a change on a shortlisted capability or constraint, or propose a new node.",
+      "inline": false,
+      "literals": 15,
+      "constants": {},
+      "ownTokens": 172,
+      "fixedChars": 687,
+      "fixedTokens": 172
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/spec-draft-reason.ts",
+      "builder": "buildSpecDraftEnvelope",
+      "purpose": "Redraft a capability spec in present tense, citing the source item of every criterion.",
+      "inline": false,
+      "literals": 22,
+      "constants": {},
+      "ownTokens": 354,
+      "fixedChars": 1414,
+      "fixedTokens": 354
+    },
+    {
+      "pkg": "rex",
       "file": "packages/rex/src/analyze/rename-resolve.ts",
       "builder": "buildRenameEnvelope",
       "purpose": "Pick the better of two colliding item titles.",
@@ -916,13 +940,13 @@
     "hench": {
       "surface": "buildPromptEnvelope",
       "describe": "Full agent envelope (system + brief) for a CLI-provider run.",
-      "chars": 3832,
-      "tokens": 958,
+      "chars": 3662,
+      "tokens": 916,
       "sections": [
         {
           "name": "system",
-          "chars": 3162,
-          "tokens": 791
+          "chars": 2992,
+          "tokens": 748
         },
         {
           "name": "brief",
@@ -932,7 +956,7 @@
       ],
       "fixedTokens": 1478,
       "branchConditional": true,
-      "unreachedTokens": 520
+      "unreachedTokens": 562
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -987,8 +1011,8 @@
       }
     ]
   },
-  "contentHash": "25ae167107e10c32",
-  "recordedAt": "2026-10-09T16:55:32.158Z",
-  "commit": "13c6f41b559e",
+  "contentHash": "ffe50f97285f672a",
+  "recordedAt": "2026-10-09T18:57:56.580Z",
+  "commit": "21cefd26264b",
   "dirty": false
 }

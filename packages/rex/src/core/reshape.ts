@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 import type { PRDItem } from "../schema/index.js";
 import { findItem, removeFromTree, updateInTree, insertChild } from "./tree.js";
 import { moveItem } from "./move.js";
+import { deleteKeepReason, mergeKeepReason } from "./prune.js";
 
 // ── Proposal types ──
 
@@ -143,6 +144,25 @@ export interface ReshapeResult {
 
 // ── Apply logic ──
 
+/**
+ * Why a proposal must be skipped because it would take an item `keepReason`
+ * keeps out of the tree, or undefined. Checked before anything is touched,
+ * so a skipped proposal changes nothing and the rest of the batch applies.
+ */
+export function keptItemRefusal(
+  items: PRDItem[],
+  ids: readonly string[],
+  keepReason: (item: PRDItem) => string | undefined,
+  verb: string,
+): string | undefined {
+  for (const id of ids) {
+    const entry = findItem(items, id);
+    const reason = entry && keepReason(entry.item);
+    if (reason) return `Skipped: cannot ${verb} "${entry.item.title}" (${id}): ${reason}.`;
+  }
+  return undefined;
+}
+
 function applyMerge(
   items: PRDItem[],
   action: MergeAction,
@@ -152,6 +172,11 @@ function applyMerge(
   const survivorEntry = findItem(items, action.survivorId);
   if (!survivorEntry) {
     result.errors.push({ proposal, error: `Survivor item "${action.survivorId}" not found.` });
+    return;
+  }
+  const refusal = keptItemRefusal(items, action.mergedIds.filter((id) => id !== action.survivorId), mergeKeepReason, "merge away");
+  if (refusal) {
+    result.errors.push({ proposal, error: refusal });
     return;
   }
 
@@ -259,6 +284,11 @@ function applySplit(
   const entry = findItem(items, action.sourceId);
   if (!entry) {
     result.errors.push({ proposal, error: `Source item "${action.sourceId}" not found.` });
+    return;
+  }
+  const refusal = keptItemRefusal(items, [action.sourceId], deleteKeepReason, "split and remove");
+  if (refusal) {
+    result.errors.push({ proposal, error: refusal });
     return;
   }
 
@@ -372,6 +402,11 @@ function applyGroup(
  * Proposals are applied in order. Each uses existing tree primitives
  * (updateInTree, removeFromTree, insertChild, moveItem). Failures on
  * individual proposals are collected in `errors` without aborting.
+ *
+ * A proposal that would take a kept change out of the tree is skipped with
+ * the reason in `errors`: a merge never folds away an applied change
+ * ({@link mergeKeepReason}) and a split never removes a subtree holding a
+ * change prune keeps ({@link deleteKeepReason}). v1 items carry neither field.
  *
  * @param items - The mutable items array (modified in place)
  * @param proposals - Accepted reshape proposals to apply

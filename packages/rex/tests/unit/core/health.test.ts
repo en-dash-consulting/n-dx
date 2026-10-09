@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
+  collectReleases,
   computeHealthScore,
   formatHealthScore,
 } from "../../../src/core/health.js";
 import type { PRDItem } from "../../../src/schema/index.js";
+import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -369,5 +371,38 @@ describe("formatHealthScore", () => {
     const output = formatHealthScore(health);
 
     expect(output).toContain("Suggestions:");
+  });
+});
+
+// ── collectReleases ──────────────────────────────────────────────────────────
+
+describe("collectReleases", () => {
+  const node = (id: string, extra: Record<string, unknown> = {}): RuleNode =>
+    ({ id, type: "change", title: `Change ${id}`, ...extra }) as unknown as RuleNode;
+
+  it("reads plannedRelease and shippedIn", () => {
+    const tree: V2Tree = {
+      product: [],
+      changes: [node("a", { plannedRelease: "0.8.0" }), node("b", { shippedIn: "0.7.0" })],
+    };
+    expect(collectReleases(tree)).toEqual(["0.8.0", "0.7.0"]);
+  });
+
+  it("includes a retired node's release, and one under a retired ancestor", () => {
+    const tree: V2Tree = {
+      product: [],
+      changes: [
+        node("gone", { status: "deleted", plannedRelease: "0.6.0", children: [node("kid", { shippedIn: "0.5.0" })] }),
+      ],
+    };
+    expect(collectReleases(tree)).toEqual(["0.6.0", "0.5.0"]);
+  });
+
+  it("deduplicates and lists packageVersion first", () => {
+    const tree: V2Tree = {
+      product: [],
+      changes: [node("a", { plannedRelease: "0.8.0" }), node("b", { shippedIn: "0.8.0" }), node("c", { shippedIn: "0.7.0" })],
+    };
+    expect(collectReleases(tree, "0.7.0")).toEqual(["0.7.0", "0.8.0"]);
   });
 });

@@ -187,6 +187,9 @@ describe("rex cli/commands import surface", () => {
     // dual-read loader parses, and plans its files in its own pure module.
     "../../store/prd-model-reader.js",
     "../../codeowners/plan.js",
+    // `rex release stamp` writes shippedIn (and, under applyOn release, the
+    // applies) to the v2 tree, which only the v2 tree writer writes.
+    "../../store/prd-model-writer.js",
     "../../store/project-config.js",
     // `rex merge-state` is the git merge driver for v2 state.yaml and the only
     // caller of the merge. Routing it through public.ts would hand hench and
@@ -197,6 +200,16 @@ describe("rex cli/commands import surface", () => {
     // bundle envelope through prd-bundle-v2, the one caller of the v2 bundle.
     // Not routed through public.ts for the same reason as state-merge above.
     "../../store/prd-bundle-v2.js",
+    // `rex product`, `rex change` and `rex add` on a v2 tree write the product
+    // and change layers through the v2 store transaction and read v2 node
+    // types. Not routed through public.ts for the same reason as state-merge.
+    "../../store/prd-model-transaction.js",
+    "../../schema/v2.js",
+    "../../schema/v2-rules.js",
+    // `rex reshape`, `rex reorganize` and `rex prune` restructure a v2 tree's
+    // change layer through this PRDStore adapter and read its product layer
+    // for analysis. Not routed through public.ts for the same reason as state-merge.
+    "../../store/change-layer-store.js",
     "../../store/title-to-filename.js",
     "../../workflow/default.js",
   ]);

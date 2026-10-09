@@ -440,8 +440,10 @@ describe("isolation", () => {
     // The v2 modules (schema, rules, state writer, state merge, bundle v2,
     // dual-read loader, tree writer, store transaction, apply engine, apply
     // policy, product-edit handler, computed edges, product status, change
-    // landing, placement and its policy, change selection, change completion)
-    // may import each other; nothing else may import them until the v2 store
+    // landing, placement and its policy, change selection, change completion,
+    // agent brief, migration plan and its specs, code owners and `rex codeowners`,
+    // release stamp and `rex release`) may import each other; nothing else may
+    // import them until the v2 store
     // wires them in. The exceptions are the `rex merge-state` git driver,
     // which imports state-merge (branches merge state.yaml before any rex
     // command reads it),
@@ -450,7 +452,15 @@ describe("isolation", () => {
     // carried, and the MCP tools that dispatch on the tree layout (add_item,
     // get_item, get_prd_status) or serve the v2 tree alone (get_product,
     // get_capability, place_change, apply_change, and the product report and
-    // change placement they read through).
+    // change placement they read through), and `rex health`, which runs the
+    // v2 tree rules on a v2 tree (cli/commands/health.ts, core/health.ts), and
+    // the v2 CLI verbs: `rex product`, `rex change`, and `rex add` on a v2 tree
+    // (cli/commands/product.ts, change.ts, add-change.ts and their v2-cli.ts),
+    // and the layer-aware restructuring behind `rex reshape`, `rex reorganize`
+    // and `rex prune`: the change-layer store, the layer projection, and the
+    // product-layer reshape draft (cli/commands/reshape-product.ts), and
+    // `rex tree-diff`, which loads either layout (core/tree-source.ts) and
+    // diffs the product layer (core/map-diff.ts).
     const v2Files = new Set(
       [
         "schema/v2.ts",
@@ -481,8 +491,27 @@ describe("isolation", () => {
         "cli/mcp-tools/get-capability.ts",
         "cli/mcp-tools/place-change.ts",
         "cli/mcp-tools/apply-change.ts",
+        "core/change-brief.ts",
         "codeowners/plan.ts",
         "cli/commands/codeowners.ts",
+        "cli/commands/health.ts",
+        "core/health.ts",
+        "cli/commands/product.ts",
+        "cli/commands/change.ts",
+        "cli/commands/add-change.ts",
+        "cli/commands/v2-cli.ts",
+        "store/change-layer-store.ts",
+        "core/layer-projection.ts",
+        "core/product-reshape.ts",
+        "cli/commands/reshape-product.ts",
+        "core/tree-source.ts",
+        "core/map-diff.ts",
+        "core/release-stamp.ts",
+        "cli/commands/release.ts",
+        "migrations/v1-to-v2/migration-plan.ts",
+        "migrations/v1-to-v2/capability-spec.ts",
+        "migrations/v1-to-v2/migration-plan-data.ts",
+        "migrations/v1-to-v2/spec-pass.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

@@ -81,7 +81,7 @@ function readStdin(): Promise<string> {
 }
 
 /** Keys that accept multiple values (accumulated into arrays). */
-const MULTI_VALUE_KEYS = new Set(["file", "criterion"]);
+const MULTI_VALUE_KEYS = new Set(["file", "criterion", "capability-criterion", "remove-capability-criterion"]);
 /** Keys that expect a following value when provided as `--key value`. */
 const VALUE_KEYS = new Set([
   "model",
@@ -106,6 +106,12 @@ const VALUE_KEYS = new Set([
   "detail",
   "run",
   "source",
+  "type",
+  "target",
+  "relation",
+  "summary",
+  "proposed",
+  "statement",
   ...MULTI_VALUE_KEYS,
 ]);
 
@@ -160,6 +166,26 @@ function parseArgs(argv: string[]): {
   return { command, positional, flags, multiFlags };
 }
 
+/** Whether the PRD under `dir` uses the v2 layout (product/ and changes/). */
+async function isV2Project(dir: string): Promise<boolean> {
+  const { isV2Dir } = await import("./commands/v2-cli.js");
+  return isV2Dir(dir);
+}
+
+/**
+ * Split `rex product|change <sub> [ref] [dir]` positionals. A trailing
+ * positional that is an existing directory is the project dir.
+ */
+function subcommandArgs(positional: string[]): { sub?: string; ref?: string; dir: string } {
+  const [sub, ...rest] = positional;
+  const last = rest[rest.length - 1];
+  const lastIsDir = last !== undefined && existsSync(last) && statSync(last).isDirectory();
+  const dir = lastIsDir ? resolve(last) : process.cwd();
+  const refs = lastIsDir ? rest.slice(0, -1) : rest;
+  if (refs.length > 1) throw new CLIError(`Unexpected argument: ${refs[1]}`, "Pass one id, then an optional project dir.");
+  return { sub, ref: refs[0], dir };
+}
+
 /**
  * Resolve and dispatch the `add` command.
  *
@@ -200,6 +226,14 @@ async function dispatchAdd(
   // hung forever with no output — including on argv errors, which never got as
   // far as being reported.
   if (isManualMode) {
+    // On a v2 tree every add is a change-layer node, and `change` is a type there.
+    const typed = positionalLevel || firstArg === "change";
+    const v2Dir = positional.length > (typed ? 1 : 0) ? resolve(positional[positional.length - 1]) : process.cwd();
+    if (await isV2Project(v2Dir)) {
+      const { cmdAddChange } = await import("./commands/add-change.js");
+      await cmdAddChange(v2Dir, typed ? firstArg : undefined, flags, multiFlags);
+      return;
+    }
     const level = positionalLevel ? firstArg : flags.level;
     const dir =
       positional.length > (positionalLevel ? 1 : 0)
@@ -231,6 +265,11 @@ async function dispatchAdd(
         "Missing description or --file flag.",
         'Usage: rex add <level> --title="..." or rex add "<description>" ["<desc2>" ...] or rex add --file=ideas.txt or echo "desc" | rex add',
       );
+    }
+    if (await isV2Project(dir)) {
+      const { cmdAddChangesFromDescriptions } = await import("./commands/add-change.js");
+      await cmdAddChangesFromDescriptions(dir, descriptions, flags, multiFlags);
+      return;
     }
     const { cmdSmartAdd } = await import("./commands/smart-add.js");
     await cmdSmartAdd(dir, descriptions, flags, multiFlags);
@@ -357,10 +396,13 @@ async function dispatchCommand(
   // their own dir resolution and requireRexDir check inside the case block.
   const SKIP_DIR_CHECK = new Set([
     "init", "analyze", "import", "update", "move", "add", "reshape", "remove",
-    "log", "parse-md",
+    "log", "parse-md", "product", "change",
     // Invoked by git with temp-file paths (%O %A %B) from any cwd —
     // there is no project dir to check.
     "merge-driver", "merge-state",
+    // `release stamp <version> [dir]`: the dir is third, and a missing rex
+    // directory is the command's no-op, not an error.
+    "release",
   ]);
   if (!SKIP_DIR_CHECK.has(command)) {
     requireRexDir(resolveDir(positional));
@@ -505,6 +547,20 @@ async function dispatchCommand(
       await cmdCodeOwners(resolveDir(positional), flags);
       break;
     }
+    case "product": {
+      const { sub, ref, dir } = subcommandArgs(positional);
+      requireRexDir(dir);
+      const { cmdProduct } = await import("./commands/product.js");
+      await cmdProduct(dir, sub, ref, flags, multiFlags);
+      break;
+    }
+    case "change": {
+      const { sub, ref, dir } = subcommandArgs(positional);
+      requireRexDir(dir);
+      const { cmdChange } = await import("./commands/change.js");
+      await cmdChange(dir, sub, ref, flags, multiFlags);
+      break;
+    }
     case "tree-diff": {
       const { cmdTreeDiff } = await import("./commands/tree-diff.js");
       await cmdTreeDiff(resolveDir(positional), flags);
@@ -526,6 +582,11 @@ async function dispatchCommand(
         ? positional.slice(2)
         : positional.slice(1);
       await cmdClaim(resolveDir(dirArgs), positional, flags);
+      break;
+    }
+    case "release": {
+      const { cmdRelease } = await import("./commands/release.js");
+      await cmdRelease(resolveDir(positional.slice(2)), positional, flags);
       break;
     }
     case "reorganize": {
@@ -606,7 +667,7 @@ async function dispatchCommand(
         "init", "status", "tree", "tree-diff", "next", "add", "update", "move", "remove", "reshape",
         "prune", "restore", "validate", "fix", "usage", "report", "verify", "ready", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "codeowners",
-        "reorganize", "health", "mcp",
+        "release", "reorganize", "health", "product", "change", "mcp",
         "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
         "backfill-commit-attribution",
       ];

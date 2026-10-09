@@ -75,9 +75,13 @@ export interface AddChangeNodeResult {
 }
 
 export class AddChangeNodeError extends Error {
-  constructor(message: string) {
+  /** The rule findings or apply problems behind the refusal, or the message itself. */
+  readonly problems: readonly string[];
+
+  constructor(message: string, problems: readonly string[] = [message]) {
     super(message);
     this.name = "AddChangeNodeError";
+    this.problems = problems;
   }
 }
 
@@ -138,9 +142,10 @@ export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: 
   }
 
   const errors = checkV2Rules(next, { now: options.now }).filter((f) => f.nodeId === id && f.severity === "error");
-  if (errors.length) throw new AddChangeNodeError(`Cannot add ${type} "${input.title}": ${errors.map((f) => f.message).join("; ")}`);
+  const refuse = (problems: readonly string[]) => new AddChangeNodeError(`Cannot add ${type} "${input.title}": ${problems.join("; ")}`, problems);
+  if (errors.length) throw refuse(errors.map((f) => f.message));
   const { always, pending, blockedBy } = input.amends?.length ? applyAmendmentsProblems(next, id, options.now) : NO_PROBLEMS;
-  if (always.length) throw new AddChangeNodeError(`Cannot add ${type} "${input.title}": ${always.join("; ")}`);
+  if (always.length) throw refuse(always);
   return { tree: next, node: indexTree(next).resolve(id)!, split, warnings: pendingWarnings(pending, blockedBy) };
 }
 

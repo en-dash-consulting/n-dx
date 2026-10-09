@@ -63,6 +63,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # rex release stamp needs full history and release tags.
+          fetch-depth: 0
 
       - name: Validate trusted publisher OIDC exchange
         # Runs only when manually dispatched with mode=validate-oidc. Mints
@@ -196,9 +199,16 @@ jobs:
         # push-git-tags=true, push-with-git-cli=false — tags and the version
         # commit are pushed through the GitHub API and signed by GitHub; set
         # push-with-git-cli: true to go back to plain `git push`).
+        #
+        # The version script also runs `rex release stamp <version>`, so the
+        # Version Packages PR carries shippedIn on every change the release
+        # ships. The action runs version-script without a shell, so the
+        # chaining lives in the root `version-packages` script. The stamp never
+        # blocks a release: if it fails, the script prints a warning and
+        # versioning continues (release tags remain the shippedIn fallback).
         uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2 branch head, 2026-10-09 — upstream ships no v2 tag
         with:
-          version-script: pnpm exec changeset version
+          version-script: pnpm run version-packages
           publish-script: pnpm exec changeset publish
           pr-title: "chore: version packages"
           commit-message: "chore: version packages"

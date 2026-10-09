@@ -1,0 +1,16 @@
+---
+id: "ab7b00bb-b362-44d9-917f-23fb0f4e85dd"
+level: "task"
+title: "Give migrations a home: framework and the v1-to-v2 folder"
+status: "completed"
+priority: "high"
+startedAt: "2026-10-08T18:18:29.448Z"
+completedAt: "2026-10-08T18:33:44.786Z"
+endedAt: "2026-10-08T18:33:44.786Z"
+resolutionType: "code-change"
+resolutionDetail: "Added packages/rex/src/migrations/ (migration.ts contract + source adapter, pipeline.ts rules→text→jev with injected seams and answer reuse, plan-file.ts JSON format documented in header with zod reader, registry.ts). Moved the three plan modules and tests to migrations/v1-to-v2/ (rename-detected; git mv needed approval, so mv + add), added v1-to-v2/index.ts (v1TreeSource + v1ToV2). Tests cover round-trip, byte-identical replans, answer reuse with mocked seams, non-PRD stub source. rex suite, root-policy and root-drift pass."
+acceptanceCriteria: []
+description: "PR 13 put the plan modules in packages/rex/src/core/. Migration code runs once per schema change and must be deletable as a unit, while core/ holds live domain logic (PR 16 is open there). Give migrations a home that future schema migrations reuse: plan, then review, then apply.\n\nScope:\n- packages/rex/src/migrations/ (framework): a Migration contract (id, from and to versions, plan(source, context) where the source is an adapter rather than a v1 tree type, so a later bootstrap from the codebase map or a tracker import reuses the same pipeline and plan file, and an apply slot that PR 23 fills; no apply here); a pass pipeline (rules, then an optional text pass, then an optional Jev pass, each with an injected seam); the plan file format with its reader and writer (JSON; a header with migration id, source-tree digest, cutAt, and the passes run with their model ids; entries keyed by v1 item id; recorded model answers keyed by item id plus a content hash, so an unchanged item reuses its answer); a registry of migrations.\n- packages/rex/src/migrations/v1-to-v2/: git mv core/migration-plan.ts, core/capability-spec.ts, core/migration-plan-data.ts and their unit tests, keeping history; update imports and the v2 isolation list in tests/unit/schema/v2.test.ts.\n- Nothing calls the registry yet and nothing writes .rex/ (the command is PR 23; see parked 27e4f378). Do not edit schema/v2.ts, v2-rules.ts, store/, or any other core/ file beyond imports.\n\nAcceptance criteria:\n1. The three modules and their tests live under migrations/v1-to-v2/ and core/ no longer has them (moved with git mv).\n2. The plan file round-trips: writing then reading returns an equal plan (test).\n3. Planning an unchanged fixture tree twice produces byte-identical plan files (test).\n4. Given recorded answers from an earlier plan, an unchanged item reuses its answer without calling the seam, and a changed item is asked again (test, mocked seams).\n5. The plan file format is documented in the module header.\n6. A stub migration whose source is not a PRD tree plans through the same pipeline and writes a valid plan file (test).\n7. The v2 isolation test and the six root policy tests pass."
+lastModified: "2026-10-08T18:33:45.040Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
