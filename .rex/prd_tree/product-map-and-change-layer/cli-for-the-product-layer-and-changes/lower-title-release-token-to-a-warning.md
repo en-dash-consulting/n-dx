@@ -1,0 +1,15 @@
+---
+id: "efb1edb5-6916-4dd6-973e-c95685151e64"
+level: "task"
+title: "Lower title-release-token to a warning so a release-named title does not fail rex health or ndx ci"
+status: "pending"
+priority: "medium"
+source: "ryan-decision"
+acceptanceCriteria:
+  - "title-release-token findings have severity warning (asserted in v2-rules.test.ts)"
+  - "rex health on a v2 tree whose only finding is title-release-token prints the warning and exits 0 (test)"
+  - "Adding a v2 change whose title names a project release is still accepted by rex add and MCP add_item (existing or new test)"
+description: "Decided (Ryan, 2026-10-09). title-release-token (packages/rex/src/schema/v2-rules.ts, severity table) is error-severity. After c9af97e0 makes rex health exit non-zero on v2 tree-rule errors, a change titled for example \"0.9.0 release audit\" would fail ndx ci over its title alone. A title is cosmetic, so the rule becomes a warning: rex health still prints it, and it no longer fails the command or CI. This revises the rule's severity from decision 6ae69b1a; the rule's logic (flag a version token only when it names a project release) is unchanged.\n\nChanging the severity entry is rule configuration, not a v2 schema change. Write paths stay as they are: change-add, change-place and MCP add_item/place_change are not given the project's releases (decided with 36e9ac1d: catch it in rex health, never refuse at capture time), so they keep accepting such titles. Update the v2-rules tests that assert the error severity, and add a patch changeset for @n-dx/rex. v1 trees are unaffected.\n\nTerminology: never a bare \"criteria\" in messages."
+lastModified: "2026-10-09T14:42:54.398Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
