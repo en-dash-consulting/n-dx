@@ -31,8 +31,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [criteria-growth warning says bare "criteria" instead of "capability criteria"](./criteria-growth-warning-says-bare.md) | completed |
 | [Make reshape, reorganize and prune layer-aware](./make-reshape-reorganize-and-prune.md) | completed |
 | [ndx ci passes structure health on a v2 tree with "score: undefined/100", ignoring tree rule errors](./ndx-ci-passes-structure-health-on-a-v2.md) | pending |
+| [No test covers shippedIn or retired-node releases in collectReleases, so dropping either goes unnoticed](./no-test-covers-shippedin-or-retired.md) | pending |
 | [rex health does not report changes that are not landed on main](./rex-health-does-not-report-changes.md) | completed |
-| [rex health never passes the project's releases to the v2 rules, so title-release-token cannot fire](./rex-health-never-passes-the-project-s.md) | pending |
+| [rex health never passes the project's releases to the v2 rules, so title-release-token cannot fire](./rex-health-never-passes-the-project-s.md) | completed |
 | [rex health on a v2 tree drops the reader's parse warnings and reports "no findings" for a tree with skipped nodes](./rex-health-on-a-v2-tree-drops-the.md) | completed |
 | [rex prune on a v2 tree can remove the applied change that marks a product node retired](./rex-prune-on-a-v2-tree-can-remove-the.md) | pending |
 | [rex reshape aborts with no draft when one product proposal places an added node under a node another proposal removes](./rex-reshape-aborts-with-no-draft-when.md) | pending |
