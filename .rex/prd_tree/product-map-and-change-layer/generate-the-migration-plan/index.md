@@ -2,7 +2,7 @@
 id: "8cc70b76-8b1f-4506-8f5e-799cc153468d"
 level: "feature"
 title: "Generate the migration plan"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "product-map"
@@ -15,11 +15,12 @@ blockedBy:
   - "51527b42-cc67-4a5a-83b3-61179298dfaf"
 source: "roadmap"
 startedAt: "2026-10-09T04:22:49.930Z"
-endedAt: "2026-10-09T05:35:22.755Z"
+completedAt: "2026-10-09T15:04:19.464Z"
+endedAt: "2026-10-09T15:04:19.464Z"
 acceptanceCriteria: []
 description: "ndx migrate --plan writes a reviewable plan and moves nothing. It reads the v1 tree only, so it can run early and feed the area review.\n\nRoadmap PR 13 · wave 1 · lane migration."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-09T06:14:58.269Z"
+lastModified: "2026-10-09T15:04:21.835Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -28,7 +29,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A dissolved release epic aliases no child and is listed in the summary](./a-dissolved-release-epic-aliases-no.md) | completed |
-| [A review-sourced epic becomes a standing area with no capabilities](./a-review-sourced-epic-becomes-a.md) | pending |
 | [A seam failure mid-pass discards every model answer the plan already paid for](./a-seam-failure-mid-pass-discards-every.md) | completed |
 | [A spec draft answer with one extra key fails the whole text pass, so no later capability is redrafted and Jev placement does not run](./a-spec-draft-answer-with-one-extra-key.md) | completed |
 | [An incomplete migration plan drops the later passes' recorded answers, so a retry pays for every Jev judgment again](./an-incomplete-migration-plan-drops-the.md) | completed |
@@ -62,4 +62,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Stamp appliedAt and reviewedHash when migrating historical items](./stamp-appliedat-and-reviewedhash-when.md) | completed |
 | [The migration can freeze a Windows-unsafe v1 slug (con, aux, nul) into v2, leaving the tree permanently unwritable](./the-migration-can-freeze-a-windows.md) | completed |
 | [The statement check rejects valid present-tense statements that name a task, change, item or PR, or open with a code span](./the-statement-check-rejects-valid.md) | completed |
-| [The template statement check accepts an imperative after a leading clause and a noun-phrase work note as present-tense statements](./the-template-statement-check-accepts.md) | pending |
