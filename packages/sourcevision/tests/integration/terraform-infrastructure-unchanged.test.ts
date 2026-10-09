@@ -1,9 +1,9 @@
 /**
  * Inventorying Terraform files must not change `infrastructure.json`.
  *
- * `.tf` files are in the inventory now, and `analyze` hands inventory paths to
- * the infrastructure name-literal linker. Without `infrastructureLinkPaths`,
- * a resource's own `.tf` file would be linked as a user of that resource.
+ * `.tf` files are in the inventory now, and `analyze` hands every inventory
+ * path to `computeInfrastructure`. Without its Terraform exclusion, a
+ * resource's own `.tf` file would be linked as a user of that resource.
  * This runs the real analyze command so the wiring in `analyze.ts` is covered,
  * not just the helper.
  */

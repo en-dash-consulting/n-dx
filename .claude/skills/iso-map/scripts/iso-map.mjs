@@ -2979,6 +2979,12 @@ function linkInfrastructure(infrastructure, filePaths, readFile) {
     return { ...infra, usedBy: [...found].sort() };
   });
 }
+function isTerraformPath(path) {
+  const ext = extname2(path).toLowerCase();
+  if (ext === ".tf" || ext === ".tfvars") return true;
+  const name = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
+  return name === "terragrunt.hcl" || name.endsWith(".tftest.hcl");
+}
 function computeInfrastructure(root, filePaths, readFile) {
   const config = readDeclaredConfig(root);
   const iac = discoverFromIaC(root);
@@ -2993,7 +2999,7 @@ function computeInfrastructure(root, filePaths, readFile) {
   });
   const infrastructure = linkInfrastructure(
     [...config.infrastructure, ...iac.infrastructure],
-    filePaths,
+    filePaths.filter((path) => !isTerraformPath(path)),
     read
   );
   return { seams: config.seams, infrastructure, sawIaC: iac.sawIaC };

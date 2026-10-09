@@ -483,6 +483,22 @@ export function linkInfrastructure(
 // ── Assembly ────────────────────────────────────────────────────────────────
 
 /**
+ * Terraform files declare infrastructure; they are never code that uses it.
+ * Linking reads files for resource names, and a resource's own `.tf` file
+ * names it, so a Terraform file would be linked as a user of the resource it
+ * declares (and, in a workspace, become the crossing endpoint instead of the
+ * code that calls it). The set matches what the inventory classifies as
+ * Terraform: `.tf`, `.tfvars`, `terragrunt.hcl` and `*.tftest.hcl`. Kept as a
+ * local path test because this module may import only `node:` builtins.
+ */
+function isTerraformPath(path: string): boolean {
+  const ext = extname(path).toLowerCase();
+  if (ext === ".tf" || ext === ".tfvars") return true;
+  const name = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
+  return name === "terragrunt.hcl" || name.endsWith(".tftest.hcl");
+}
+
+/**
  * Discover everything the import graph does not show, from scratch.
  *
  * The compute path. `export/iso-declared.ts` prefers the persisted
@@ -490,7 +506,9 @@ export function linkInfrastructure(
  * scanned with no analysis, or an analysis made before the file existed.
  *
  * `readFile` lets the scanner reuse contents it already has; when omitted,
- * files are read on demand and only if there is IaC to link.
+ * files are read on demand and only if there is IaC to link. Terraform files
+ * in `filePaths` are never link candidates (see {@link isTerraformPath}), so
+ * every caller can pass the whole inventory.
  */
 export function computeInfrastructure(
   root: string,
@@ -514,7 +532,7 @@ export function computeInfrastructure(
 
   const infrastructure = linkInfrastructure(
     [...config.infrastructure, ...iac.infrastructure],
-    filePaths,
+    filePaths.filter((path) => !isTerraformPath(path)),
     read,
   );
 

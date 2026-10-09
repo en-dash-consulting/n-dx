@@ -45,7 +45,6 @@ import { computeInfrastructure, toInfrastructureData } from "../../analyzers/inf
 import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-profile.js";
 import { computeReadinessScore } from "../../analyzers/readiness-score.js";
 import { detectOutbound } from "../../analyzers/outbound-detection.js";
-import { infrastructureLinkPaths } from "../../analyzers/inventory.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
@@ -740,10 +739,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
       join(ctx.svDir, DATA_FILES.infrastructure),
       toCanonicalJSON(
         toInfrastructureData(
-          computeInfrastructure(
-            ctx.absDir,
-            infrastructureLinkPaths(inventory.files as Array<{ path: string; language?: string }>),
-          ),
+          computeInfrastructure(ctx.absDir, (inventory.files as Array<{ path: string }>).map((f) => f.path)),
         ),
       ),
     );

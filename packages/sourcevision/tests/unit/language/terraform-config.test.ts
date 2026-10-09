@@ -7,7 +7,7 @@ import { detectLanguage, detectLanguages, getLanguageConfig } from "../../../src
 import { terraformConfig } from "../../../src/language/terraform.js";
 import { javaConfig, javaSecondaryConfig } from "../../../src/language/java.js";
 import { typescriptConfig } from "../../../src/language/typescript.js";
-import { analyzeInventory, classifyRole, infrastructureLinkPaths } from "../../../src/analyzers/inventory.js";
+import { analyzeInventory, classifyRole } from "../../../src/analyzers/inventory.js";
 import { computeInfrastructure, toInfrastructureData } from "../../../src/analyzers/infrastructure.js";
 import { GRAMMARS } from "../../../scripts/build-grammars.mjs";
 
@@ -119,7 +119,7 @@ describe("terraform language config", () => {
 
     const inv = await analyzeInventory(dir, { languageConfig: typescriptConfig });
     expect(inv.files.some((f) => f.path.endsWith(".tf"))).toBe(true);
-    const after = render(infrastructureLinkPaths(inv.files));
+    const after = render(inv.files.map((f) => f.path));
 
     expect(after).toBe(before);
     expect(after).toContain("orders-intake-queue");
