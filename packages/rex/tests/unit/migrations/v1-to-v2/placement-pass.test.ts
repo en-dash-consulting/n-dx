@@ -89,6 +89,37 @@ describe("v1-to-v2 placement passes", () => {
     expect(p.answers.jev?.t9?.answer).toMatchObject({ model: "jev-1.0.0", answers: { place: { choice: "f1" } } });
   });
 
+  it("settings given only to planSeams still run Jev and place a confident pick", async () => {
+    const seams = planSeams({
+      settings: { models: "jev", autoAccept: "confident" },
+      jev: { model: JEV_MODEL, judge: judgeSeam("f1", 0.95) },
+      jevAvailable: true,
+    });
+    const p = await v1ToV2.plan(v1TreeSource(tree()), { cutAt: CUT, seams });
+    expect(p.entries.t9).toMatchObject({ placement: "f1", modelPlacement: { pass: "jev", jev: { pick: "f1", confidence: 0.95 } } });
+  });
+
+  it("fails loudly when options.placement disagrees with the settings the seams were built for", async () => {
+    const seams = planSeams({
+      settings: { models: "both", autoAccept: "agree" },
+      text: { model: TEXT_MODEL, place: textSeam("f1") },
+      jev: { model: JEV_MODEL, judge: judgeSeam("f1", 0.9) },
+      jevAvailable: true,
+    });
+    await expect(
+      v1ToV2.plan(v1TreeSource(tree()), { cutAt: CUT, seams, options: { placement: { models: "text", autoAccept: "agree" } } }),
+    ).rejects.toThrow(/placement settings disagree/);
+  });
+
+  it("fails loudly on a placement seam for a tier the settings exclude, never listing a pass that asked nothing", async () => {
+    const seams = {
+      jev: { model: JEV_MODEL, kinds: ["placement"], ask: async () => null },
+    };
+    await expect(
+      v1ToV2.plan(v1TreeSource(tree()), { cutAt: CUT, seams, options: { placement: { models: "text", autoAccept: "agree" } } }),
+    ).rejects.toThrow(/would ask nothing/);
+  });
+
   it("with models jev, a pick below the confidence threshold stays held with needsPlacement", async () => {
     const p = await plan({ models: "jev", autoAccept: "confident" }, { judge: judgeSeam("f1", 0.5) });
     expect(p.entries.t9).toMatchObject({ needsPlacement: true, modelPlacement: { accepted: null, jev: { pick: "f1", confidence: 0.5 } } });

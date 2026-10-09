@@ -18,7 +18,7 @@ import type { PlacementModel } from "../../core/placement.js";
 import type { PassSeam } from "../migration.js";
 import type { ModelPassName } from "../plan-file.js";
 import { askJevBundle, REVIEW_QUESTION_KIND } from "./jev-review-pass.js";
-import { PLACEMENT_QUESTION_KIND, PLACEMENT_TIERS, rawTextAnswer } from "./placement-pass.js";
+import { PLACEMENT_QUESTION_KIND, PLACEMENT_TIERS, rawTextAnswer, type PlacementSeam } from "./placement-pass.js";
 import { isSpecQuestion, SPEC_QUESTION_KIND, type SpecModel } from "./spec-pass.js";
 
 export interface PlanSeamOptions {
@@ -40,11 +40,15 @@ export interface PlanSeamOptions {
   warn?: (message: string) => void;
 }
 
-/** The pipeline seams: a pass gets one only for the question kinds its tier is configured and available for. */
+/**
+ * The pipeline seams: a pass gets one only for the question kinds its tier is configured and available for.
+ * Each seam records its `placement` settings, which the passes read: `options.placement` need not repeat it.
+ */
 export function planSeams(options: PlanSeamOptions): Partial<Record<ModelPassName, PassSeam>> {
   if (options.rulesOnly) return {};
-  const { models } = options.settings ?? DEFAULT_PLACEMENT_SETTINGS;
-  const seams: Partial<Record<ModelPassName, PassSeam>> = {};
+  const placement = options.settings ?? DEFAULT_PLACEMENT_SETTINGS;
+  const { models } = placement;
+  const seams: Partial<Record<ModelPassName, PlacementSeam>> = {};
   const { jev, spec } = options;
   const text = options.text && PLACEMENT_TIERS.text.includes(models) ? options.text : undefined;
 
@@ -56,6 +60,7 @@ export function planSeams(options: PlanSeamOptions): Partial<Record<ModelPassNam
   if (model !== undefined) {
     seams.text = {
       model,
+      placement,
       kinds,
       ask: async (q) => {
         if (isSpecQuestion(q.question)) {
@@ -74,6 +79,7 @@ export function planSeams(options: PlanSeamOptions): Partial<Record<ModelPassNam
     } else if (jev) {
       seams.jev = {
         model: jev.model,
+        placement,
         kinds: [...(jevPlaces ? [PLACEMENT_QUESTION_KIND] : []), REVIEW_QUESTION_KIND],
         ask: (q) => askJevBundle(q.question, jev.judge),
       };

@@ -32,12 +32,12 @@
  */
 
 import type { ChoiceAnswer, JevAnswer, JevRequest, JevResponse, JsonValue, NoulAnswer } from "@n-dx/llm-client";
-import { DEFAULT_PLACEMENT_SETTINGS, PLACEMENT_JEV_MIN_CONFIDENCE, type PlacementJudge } from "../../core/placement-policy.js";
+import { PLACEMENT_JEV_MIN_CONFIDENCE, type PlacementJudge } from "../../core/placement-policy.js";
 import type { ItemLevel, PRDItem } from "../../schema/v1.js";
 import type { ModelPass, ModelQuestion, PlanContext } from "../migration.js";
 import { evidenceNotes, indexItems, linkedTestsOf, type CapabilitySpecDraft, type SpecCriterion } from "./capability-spec.js";
 import type { PlanEntry, ProposedArea } from "./migration-plan.js";
-import { placementJevPass, rawJevAnswer, type PlacementFields, type PlacementPassOptions, type PlacementQuestion } from "./placement-pass.js";
+import { placementJevPass, rawJevAnswer, settingsOf, type PlacementFields, type PlacementPassOptions, type PlacementQuestion } from "./placement-pass.js";
 import type { SpecFields, SpecPassOptions } from "./spec-pass.js";
 
 /** The question kind a Jev seam must list in `kinds` to be asked for review. */
@@ -312,7 +312,7 @@ function mergeReview(entry: Entry, review: ReviewQuestion, answer: JevBundleAnsw
     jevReview.jobShaped = { probability: p, confidence: noulConfidence(p) };
   }
   if (review.capability && entry.spec) {
-    const { autoAccept } = context.options?.placement ?? DEFAULT_PLACEMENT_SETTINGS;
+    const { autoAccept } = settingsOf(context);
     const criteria: Record<string, NoulJudgment> = {};
     const notes: string[] = [];
     for (const c of review.capability.criteria) {

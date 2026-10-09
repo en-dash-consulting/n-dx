@@ -37,7 +37,7 @@ import type {
   PlacementTarget,
 } from "../../core/placement.js";
 import type { PRDItem } from "../../schema/v1.js";
-import type { ModelPass, ModelQuestion, PlanContext } from "../migration.js";
+import type { ModelPass, ModelQuestion, PassSeam, PlanContext } from "../migration.js";
 import type { ModelPassName } from "../plan-file.js";
 import { placementChangeOf, type PlanEntry } from "./migration-plan.js";
 
@@ -92,8 +92,27 @@ type Entry = PlanEntry & PlacementFields;
 /** The `rex.placement.models` values each model pass serves. */
 export const PLACEMENT_TIERS: Record<ModelPassName, readonly PlacementModels[]> = { text: ["text", "both"], jev: ["jev", "both"] };
 
-function settingsOf(context: PlanContext<PlacementPassOptions | undefined>): PlacementSettings {
-  return context.options?.placement ?? DEFAULT_PLACEMENT_SETTINGS;
+/** A seam that records the `rex.placement` it was built for (`planSeams` sets it). */
+export interface PlacementSeam extends PassSeam {
+  placement?: PlacementSettings;
+}
+
+/**
+ * The effective `rex.placement`. A seam records the settings it was built
+ * for, so a caller that passes them only to `planSeams` still gets them;
+ * `options.placement` must then agree with it, or the plan fails rather than
+ * run a pass under settings its seams were not built for.
+ */
+export function settingsOf(context: PlanContext<PlacementPassOptions | undefined>): PlacementSettings {
+  const given = context.options?.placement;
+  const seams: Array<PlacementSeam | undefined> = [context.seams?.text, context.seams?.jev];
+  const recorded = seams.find((s) => s?.placement)?.placement;
+  if (recorded && given && (recorded.models !== given.models || recorded.autoAccept !== given.autoAccept)) {
+    throw new Error(
+      `placement settings disagree: seams were built for models ${recorded.models}/autoAccept ${recorded.autoAccept}, options say ${given.models}/${given.autoAccept}`,
+    );
+  }
+  return recorded ?? given ?? DEFAULT_PLACEMENT_SETTINGS;
 }
 
 function itemsById(items: readonly PRDItem[], out = new Map<string, PRDItem>()): Map<string, PRDItem> {
@@ -127,8 +146,14 @@ function questionsFor(
   items: readonly PRDItem[],
   context: PlanContext<PlacementPassOptions | undefined>,
 ): ModelQuestion[] {
-  if (!PLACEMENT_TIERS[pass].includes(settingsOf(context).models)) return [];
+  const { models } = settingsOf(context);
   const seam = context.seams?.[pass];
+  if (!PLACEMENT_TIERS[pass].includes(models)) {
+    if (seam?.kinds?.includes(PLACEMENT_QUESTION_KIND)) {
+      throw new Error(`the ${pass} seam answers placement but rex.placement.models is ${models}: the pass would ask nothing`);
+    }
+    return [];
+  }
   if (seam?.kinds && !seam.kinds.includes(PLACEMENT_QUESTION_KIND)) return [];
   const byId = itemsById(items);
   const { nodes, areas } = productOf(entries, byId);
