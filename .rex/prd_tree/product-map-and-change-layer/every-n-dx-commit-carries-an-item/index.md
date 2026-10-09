@@ -25,7 +25,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A CRLF commit message drops the agent's own trailers out of the final trailer block](./a-crlf-commit-message-drops-the-agent.md) | pending |
+| [A CRLF commit message drops the agent's own trailers out of the final trailer block](./a-crlf-commit-message-drops-the-agent.md) | completed |
 | [Add the item trailer to skill, PRD-write and operator commits](./add-the-item-trailer-to-skill-prd.md) | completed |
 | [Report commits that carry no item trailer](./report-commits-that-carry-no-item.md) | pending |
 | [Review-repair commits carry the N-DX-Item trailer](./review-repair-commits-carry-the-n-dx.md) | completed |
