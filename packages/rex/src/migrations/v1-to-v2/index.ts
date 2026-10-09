@@ -59,9 +59,18 @@ export interface V1ToV2Entry extends PlanEntry, PlacementFields, JevReviewFields
   spec?: CapabilitySpecDraft;
 }
 
+/** A release epic that dissolved into its changes' `plannedRelease`; its id aliases no child. */
+export interface DissolvedRelease {
+  id: string;
+  title: string;
+  plannedRelease?: string;
+}
+
 export interface V1ToV2Summary {
   areas: MigrationPlan["areas"];
   constraints: MigrationPlan["constraints"];
+  /** Each dissolved release epic, so a lookup of its old id can say what it was. */
+  dissolvedReleases: DissolvedRelease[];
   counts: MigrationPlan["counts"];
   flagCounts: PlanData["flagCounts"];
   legacyLoe: PlanData["legacyLoe"];
@@ -135,6 +144,9 @@ export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Sum
       summary: {
         areas: plan.areas,
         constraints: plan.constraints,
+        dissolvedReleases: plan.entries
+          .filter((e) => e.target === "release")
+          .map((e) => ({ id: e.id, title: e.title, ...(e.plannedRelease !== undefined ? { plannedRelease: e.plannedRelease } : {}) })),
         counts: plan.counts,
         flagCounts: data.flagCounts,
         legacyLoe: data.legacyLoe,

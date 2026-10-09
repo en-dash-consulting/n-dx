@@ -30,11 +30,11 @@ describe("criteria ids and aliases", () => {
     ]);
   });
 
-  it("aliases a dissolved release umbrella to its first child change", () => {
+  it("does not alias a dissolved release umbrella to any child", () => {
     const child = item("feature", "Keep the thing");
     const umbrella = item("epic", "ndx 0.9.0", {}, [child, item("feature", "Other")]);
     const data = dataFor([umbrella]);
-    expect(data.items[child.id]!.aliases).toEqual([umbrella.id]);
+    expect(JSON.stringify(data)).not.toContain(umbrella.id);
   });
 });
 

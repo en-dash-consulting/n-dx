@@ -43,6 +43,13 @@ describe("v1-to-v2 migration", () => {
     expect(plan.summary.legacyLoe).toBe(1);
   });
 
+  it("lists each dissolved release epic in the summary, aliasing no child", async () => {
+    const plan = await v1ToV2.plan(v1TreeSource(tree()), { cutAt: CUT, options });
+    expect(plan.summary.dissolvedReleases).toEqual([{ id: "e2", title: "ndx 0.9.0", plannedRelease: "0.9.0" }]);
+    expect(plan.entries.f3?.data?.criteria).toBeUndefined();
+    expect(JSON.stringify(Object.values(plan.entries).map((e) => e.data))).not.toContain('"e2"');
+  });
+
   it("passes the caller's product names to classification", async () => {
     const acme = [item("a1", "epic", "Acme 2.0", [item("a2", "feature", "Billing", [], "pending")])];
     expect((await v1ToV2.plan(v1TreeSource(acme), { cutAt: CUT })).entries.a1?.target).toBe("area");

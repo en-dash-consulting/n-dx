@@ -10,8 +10,8 @@
  *   capability: its statement and criteria come only from its draft
  *   (`draftCapabilitySpecs`), the source `reviewedHash` is hashed from, so the
  *   plan never holds a second, differently worded list for it.
- * - Aliases: a release umbrella dissolves, so its id is aliased to its first
- *   child change and old references still resolve.
+ * - A release umbrella dissolves and aliases nothing: its id would land on an
+ *   arbitrary child. The plan summary records it (`dissolvedReleases`).
  * - `shippedIn` for completed items: a PR merge's release wins; otherwise the
  *   first release tagged at or after `completedAt`.
  * - Flags, one per problem class: criteria kept in tags, duplicate sibling
@@ -91,7 +91,6 @@ export interface ItemPlanData {
   id: string;
   /** From `acceptanceCriteria`; never set for a capability, whose spec is its draft. */
   criteria?: Criterion[];
-  aliases?: string[];
   /** Present when the v1 directory name (`from`) cannot be frozen (`isUsableFrozenSlug`): the v2 slug to freeze instead (`to`). */
   slug?: { from: string; to: string };
   /** Applied changes only: ISO time the change counts as applied. */
@@ -291,15 +290,6 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
         data.criteria = item.acceptanceCriteria.map((text, i) => ({ id: `c${i + 1}`, text }));
       }
 
-      if (entry?.target === "release") {
-        const first = item.children?.[0];
-        if (first) {
-          const host = result.items[first.id] ?? { id: first.id, flags: [], droppedMeta: 0, droppedLog: 0 };
-          host.aliases = [...(host.aliases ?? []), item.id];
-          result.items[first.id] = host;
-        }
-      }
-
       if (item.status === "completed" && item.completedAt !== undefined) {
         const merged = prMerges[item.id];
         const tagged = firstReleaseAfter(item.completedAt, releases);
@@ -337,13 +327,10 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
       result.corrupt.logEntries += data.droppedLog;
       for (const flag of data.flags) result.flagCounts[flag] += 1;
 
-      const existing = result.items[item.id];
-      const merged = existing ? { ...data, aliases: existing.aliases } : data;
       const interesting =
-        merged.slug ||
-        merged.criteria || merged.aliases || merged.appliedAt || merged.approvedHash || merged.shippedIn || merged.flags.length || merged.legacyLoe || merged.droppedMeta || merged.droppedLog;
-      if (interesting) result.items[item.id] = merged;
-      else delete result.items[item.id];
+        data.slug ||
+        data.criteria || data.appliedAt || data.approvedHash || data.shippedIn || data.flags.length || data.legacyLoe || data.droppedMeta || data.droppedLog;
+      if (interesting) result.items[item.id] = data;
 
       visit(item.children ?? []);
     }
