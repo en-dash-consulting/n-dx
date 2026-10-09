@@ -245,6 +245,8 @@ Two MCP servers provide structured access to project data. They are configured i
 - `get_token_usage`
 - `health`
 - `facets`
+- `get_product`
+- `get_capability`
 
 **Write tools** (modify project state, use with care):
 
@@ -258,6 +260,8 @@ Two MCP servers provide structured access to project data. They are configured i
 - `append_log`
 - `verify_criteria`
 - `reorganize`
+- `place_change`
+- `apply_change`
 
 ### sourcevision
 
