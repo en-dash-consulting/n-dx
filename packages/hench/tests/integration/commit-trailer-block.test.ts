@@ -141,5 +141,9 @@ describe("work commit — one final trailer block", () => {
     const trailers = gitCommitTrailers(projectDir);
     expect(trailers).toContainEqual(["Co-Authored-By", "Claude <noreply@anthropic.com>"]);
     expect(trailers.filter(([key]) => key === "N-DX-Item")).toEqual([["N-DX-Item", TASK_ID]]);
+    // git parses only the final block, so a repeat stranded in the body is
+    // invisible to %(trailers); count over the whole message.
+    const raw = git(projectDir, "log", "-1", "--format=%B");
+    expect(raw.split(`N-DX-Item: ${TASK_ID}`).length - 1).toBe(1);
   });
 });
