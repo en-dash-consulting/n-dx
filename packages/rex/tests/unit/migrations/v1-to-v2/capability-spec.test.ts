@@ -127,6 +127,11 @@ describe("isPresentTenseStatement", () => {
     },
   );
 
+  it("rejects a sentence cut inside a code span", () => {
+    expect(isPresentTenseStatement("`rex add task --title=...")).toBe(false);
+    expect(isPresentTenseStatement("```ts const store = open()")).toBe(false);
+  });
+
   it("rejects an undefined sentence", () => {
     expect(isPresentTenseStatement(undefined)).toBe(false);
   });

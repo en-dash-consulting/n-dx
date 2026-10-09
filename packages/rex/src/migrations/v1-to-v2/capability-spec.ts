@@ -242,6 +242,8 @@ function firstSentence(text: string | undefined): string | undefined {
 export function isPresentTenseStatement(sentence: string | undefined): sentence is string {
   if (sentence === undefined || NOT_A_STATEMENT.test(sentence) || opensWithWorkVerb(sentence)) return false;
   if (WORK_SHAPED.test(sentence)) return false;
+  // An open code span means the sentence was cut inside it ("`rex add task --title=...").
+  if ((sentence.match(/`/g)?.length ?? 0) % 2 === 1) return false;
   return sentence.split(/\s+/).length >= MIN_STATEMENT_WORDS;
 }
 
