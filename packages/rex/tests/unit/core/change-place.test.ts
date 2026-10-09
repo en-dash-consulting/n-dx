@@ -102,6 +102,26 @@ describe("recordPlacement", () => {
     expect(() => recordPlacement(tree(changeFields), "ch", input, NOW)).toThrow(message);
   });
 
+  it.each([
+    ["not-a-target", {}, { target: "nope" }],
+    ["already-amends", { amends: [{ target: "card", delta: "modified", summary: "s" }] }, { target: "A1.1", relation: "touches" as const }],
+    ["change-not-open", { status: "cancelled" }, { target: "card" }],
+    ["content-needs-amends", {}, { target: "card", relation: "touches" as const, proposed: "x" }],
+    ["nothing-to-modify", {}, { target: "card", relation: "amends" as const }],
+    ["apply-problems", {}, { target: "A1.1", relation: "amends" as const, criteria: { remove: ["c7"] } }],
+  ])("tags the %s refusal with its kind", (kind, changeFields, input) => {
+    const err = (() => { try { recordPlacement(tree(changeFields), "ch", input, NOW); } catch (e) { return e as ChangePlacementError; } })();
+    expect(err?.kind).toBe(kind);
+  });
+
+  it("tags an unknown change, and keeps the MCP-only wording out of `plain`", () => {
+    const unknown = (() => { try { recordPlacement(tree(), "zz", { target: "card" }, NOW); } catch (e) { return e as ChangePlacementError; } })();
+    expect(unknown?.kind).toBe("no-such-change");
+    const bad = (() => { try { recordPlacement(tree(), "ch", { target: "nope" }, NOW); } catch (e) { return e as ChangePlacementError; } })()!;
+    expect(bad.message).toMatch(/\(see get_product\)$/);
+    expect(bad.plain).not.toMatch(/get_product/);
+  });
+
   it("names every criterion id that does not fit in one refusal", () => {
     const criteria = { remove: ["c7"], replace: [{ id: "c8", text: "x" }], add: [{ id: "c2", text: "x" }] };
     expect(() => recordPlacement(tree(), "ch", { target: "card", relation: "amends", criteria }, NOW)).toThrow(

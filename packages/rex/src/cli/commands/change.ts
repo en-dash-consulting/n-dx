@@ -10,7 +10,7 @@
  */
 
 import { applyAmendments, ApplyAmendmentsError, NOTHING_TO_MODIFY } from "../../core/apply-amendments.js";
-import { ChangePlacementError, NOTHING_TO_MODIFY_PLACE_HINT, recordPlacement, suggestPlacement } from "../../core/change-place.js";
+import { ChangePlacementError, recordPlacement, suggestPlacement } from "../../core/change-place.js";
 import { indexTree, type RuleNode } from "../../schema/v2-rules.js";
 import type { Criterion } from "../../schema/v2.js";
 import { resolveRexPaths, resolveStore } from "../../store/index.js";
@@ -141,17 +141,33 @@ async function applyChange(rexDir: string, ref: string, flags: Record<string, st
   ].join("\n"));
 }
 
-/** Run a placement; an amends refusal for lack of content names the CLI flags, not the MCP parameters. */
+/** The CLI's message and suggestion for a refusal: its own wording by kind, never the MCP text. */
+function placementRefusal(err: ChangePlacementError): CLIError {
+  switch (err.kind) {
+    case "not-a-target":
+      return new CLIError(err.plain, "List the live capabilities and constraints with `rex product show`.");
+    case "content-needs-amends":
+      return new CLIError("--proposed and capability criteria describe an amendment: pass --relation=amends with them.");
+    case "nothing-to-modify":
+      return new CLIError(
+        err.plain,
+        `Pass --proposed="...", --${CAPABILITY_CRITERION_FLAG}="<id>: <text>" or --${REMOVE_CAPABILITY_CRITERION_FLAG}=<id>, or use --relation=touches.`,
+      );
+    case "already-amends":
+    case "rule-errors":
+    case "apply-problems":
+    case "no-such-change":
+    case "change-not-open":
+      return new CLIError(err.plain);
+  }
+}
+
+/** Run a placement; a refusal is rendered by kind with CLI commands and flags. */
 function placeOrExplain<T>(place: () => T): T {
   try {
     return place();
   } catch (err) {
-    if (err instanceof ChangePlacementError && err.message.endsWith(NOTHING_TO_MODIFY_PLACE_HINT)) {
-      throw new CLIError(
-        err.message.slice(0, -NOTHING_TO_MODIFY_PLACE_HINT.length),
-        `Pass --proposed="...", --${CAPABILITY_CRITERION_FLAG}="<id>: <text>" or --${REMOVE_CAPABILITY_CRITERION_FLAG}=<id>, or use --relation=touches.`,
-      );
-    }
+    if (err instanceof ChangePlacementError) throw placementRefusal(err);
     throw err;
   }
 }

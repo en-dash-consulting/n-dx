@@ -172,6 +172,37 @@ describe("rex change apply", () => {
   });
 });
 
+describe("rex change place refusals", () => {
+  const refuse = async (ref: string, flags: Record<string, string>): Promise<CLIError> =>
+    (await cmdChange(tmp, "place", ref, flags).catch((e: Error) => e)) as CLIError;
+  const MCP_WORDING = /get_product|edit_item|place_change|\bproposed and criteria\b|\bparameter\b|pass proposed/i;
+
+  it("names `rex product show`, not get_product, for a target that is not a capability or constraint", async () => {
+    const id = await addInbox("Refunds by card");
+    const err = await refuse(id, { target: "nope", relation: "touches" });
+    expect(err).toBeInstanceOf(CLIError);
+    expect(err.message).toMatch(/"nope" is not a live capability or constraint/);
+    expect(err.suggestion).toContain("rex product show");
+    expect(`${err.message} ${err.suggestion}`).not.toContain("get_product");
+  });
+
+  it("names no MCP tool or parameter on any refusal path", async () => {
+    const id = await addInbox("Refunds by card");
+    const refusals = [
+      await refuse(id, { target: "nope" }),
+      await refuse(id, { target: "A1.1", relation: "amends" }),
+      await refuse("CH-404", { target: "A1.1" }),
+      await refuse("CH-1", { target: "A1.1", relation: "touches" }), // CH-1 amends A1.1 already: not open once applied below
+    ];
+    await cmdChange(tmp, "apply", "CH-1", {});
+    refusals.push(await refuse("CH-1", { target: "A1.1", relation: "touches" }));
+    for (const err of refusals) {
+      expect(err, String(err)).toBeInstanceOf(Error);
+      expect(`${err.message} ${err.suggestion ?? ""}`).not.toMatch(MCP_WORDING);
+    }
+  });
+});
+
 describe("rex add on a v2 tree", () => {
   it("creates a change in the Inbox and names its suggested placement", async () => {
     await cmdAddChange(tmp, undefined, { title: "Support refunds when paying by card" }, { criterion: ["A refund reaches the card"] });
