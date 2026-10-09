@@ -17,6 +17,7 @@ Commands with dedicated e2e test files:
 | workflow | cli-workflow.test.ts | Workflow transitions |
 | quiet | cli-quiet.test.ts | Quiet mode output |
 | recommend | cli-recommend.test.ts | Recommendation pipeline |
+| release | cli-release.test.ts | Dispatch to the v1 / no-rex-directory no-op |
 
 ## Intentionally Deferred
 

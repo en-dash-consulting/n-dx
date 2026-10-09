@@ -25,4 +25,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add rex release stamp and call it from the Version Packages workflow](./add-rex-release-stamp-and-call-it-from.md) | completed |
-| [No test covers rex release dispatch through the CLI entry, so the v1 never-fail path can regress unseen](./no-test-covers-rex-release-dispatch.md) | pending |
+| [No test covers rex release dispatch through the CLI entry, so the v1 never-fail path can regress unseen](./no-test-covers-rex-release-dispatch.md) | in_progress |
