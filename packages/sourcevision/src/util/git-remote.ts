@@ -4,8 +4,14 @@
  * Two callers need the origin remote for different reasons — the iso export
  * turns it into browsable source links, and the analysis manifest records it
  * as the repository's identity so two analyses can be told apart once they
- * leave their own directory. They must agree on what the remote says, so the
- * parsing lives here and neither owns a second copy of it.
+ * leave their own directory. They must agree on what the remote says, so
+ * reading it lives here and neither owns a second copy of it.
+ *
+ * *Interpreting* the URL is not this module's job: `parseGitRemoteUrl` and
+ * friends live in `@n-dx/llm-client`, the one tier both sourcevision and the
+ * web dashboard can reach, and are re-exported below so this module stays the
+ * single import site for sourcevision. This module owns the process boundary —
+ * running git — and nothing else.
  *
  * Every function is safe on a directory that is not a git repository, has no
  * `origin`, or has no git binary on PATH: they answer `undefined` or `null`
@@ -19,7 +25,20 @@
 
 import { execFileSync } from "node:child_process";
 import { basename, resolve } from "node:path";
+import {
+  parseGitRemoteUrl,
+  remoteToWebUrl,
+  stripRemoteCredentials,
+} from "@n-dx/llm-client";
 import type { RepoIdentity } from "../schema/v1.js";
+
+/**
+ * Re-exported so sourcevision's callers keep one import site for everything to
+ * do with the remote, while there is still only one implementation of the
+ * parsing itself (`@n-dx/llm-client`'s `git-remote-url.ts`).
+ */
+export { parseGitRemoteUrl, remoteToWebUrl, stripRemoteCredentials };
+export type { ParsedGitRemote, RemoteHostKind } from "@n-dx/llm-client";
 
 /**
  * Run a git command in `root`, or answer `undefined`.
@@ -47,24 +66,6 @@ export function isGitWorkTree(root: string): boolean {
 }
 
 /**
- * Drop the userinfo from a scheme-bearing remote URL.
- *
- * A remote such as `https://user:token@github.com/acme/widget.git` carries a
- * live credential, and `.sourcevision/manifest.json` is meant to be committed
- * — so the token must not survive the read. Only URLs with a scheme are
- * touched: scp-like `git@github.com:acme/widget.git` is a bare username with
- * no secret in it, and stripping it would leave a remote nobody recognizes.
- *
- * Anything that is not a URL is returned unchanged; this is a redactor, not a
- * validator.
- */
-export function stripRemoteCredentials(remote: string): string {
-  const trimmed = remote.trim();
-  const match = trimmed.match(/^([A-Za-z][A-Za-z0-9+.\-]*:\/\/)(?:[^/@]*@)?(.*)$/s);
-  return match ? `${match[1]}${match[2]}` : trimmed;
-}
-
-/**
  * The `origin` remote URL, with any embedded credentials removed.
  *
  * Redaction happens here rather than at each call site so no caller can hold
@@ -77,19 +78,6 @@ export function readOriginUrl(root: string): string | undefined {
   return url ? stripRemoteCredentials(url) : undefined;
 }
 
-/**
- * Normalize a git remote to a browsable base URL.
- * Handles `git@host:owner/repo.git` and `https://host/owner/repo.git`.
- */
-export function remoteToWebUrl(remote: string): string | undefined {
-  const cleaned = remote.trim().replace(/\.git$/, "");
-  const ssh = cleaned.match(/^[\w.-]+@([\w.-]+):(.+)$/);
-  if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
-  const https = cleaned.match(/^https?:\/\/(?:[^@/]+@)?([\w.-]+\/.+)$/);
-  if (https) return `https://${https[1]}`;
-  return undefined;
-}
-
 /** A remote split into the host serving it and the path on that host. */
 export interface RemoteParts {
   /** Host only, no scheme or credentials: `github.com`, `bitbucket.org`. */
@@ -99,21 +87,13 @@ export interface RemoteParts {
 }
 
 /**
- * Split a remote into host and path.
- *
- * Host-neutral by construction — the host is whatever the remote names, so
- * GitHub, Bitbucket and a self-hosted GitLab all parse the same way. Any
- * embedded credentials in an https remote are dropped rather than carried
- * into the manifest.
+ * The host-and-path projection of a parsed remote, which is all the manifest
+ * records. `parseGitRemoteUrl` is the parser; this narrows its answer to the
+ * two fields `RepoIdentity` carries.
  */
 export function parseRemote(remote: string): RemoteParts | undefined {
-  const web = remoteToWebUrl(remote);
-  if (!web) return undefined;
-  const match = web.match(/^https:\/\/([\w.-]+)\/(.+)$/);
-  if (!match) return undefined;
-  const path = match[2].replace(/\/+$/, "");
-  if (!path) return undefined;
-  return { host: match[1], path };
+  const parsed = parseGitRemoteUrl(remote);
+  return parsed ? { host: parsed.host, path: parsed.path } : undefined;
 }
 
 /**
