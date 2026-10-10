@@ -15,6 +15,29 @@ import type {
 } from "../../../src/schema/index.js";
 import { makeFileEntry, makeInventory, makeEdge, makeImports, makeZone } from "./zones-helpers.js";
 
+// Mock readMemberPackageInfo by mocking the workspace-crossings module.
+// The real readMemberPackageInfo reads from disk, so buildPackageMap is
+// wrapped with a custom readInfo that returns the test package names.
+// vi.mock is hoisted, so it applies to every test in this file.
+vi.mock("../../../src/analyzers/workspace-crossings.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/analyzers/workspace-crossings.js")>();
+  return {
+    ...actual,
+    buildPackageMap: (members: SubAnalysis[]) => {
+      // Call original but with a custom readInfo
+      return actual.buildPackageMap(members, (member) => {
+        if (member.id === "packages-foundation") {
+          return { name: "@test/foundation", entryFile: "src/public.ts" };
+        }
+        if (member.id === "packages-consumer") {
+          return { name: "@test/consumer", entryFile: "src/agent.ts" };
+        }
+        return null;
+      });
+    },
+  };
+});
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function makeManifest(): Manifest {
@@ -114,31 +137,6 @@ describe("analyzeZones cross-package crossings", () => {
         ],
         summary: { totalFiles: 2, totalLines: 20, byLanguage: {}, byRole: {}, byCategory: {} },
       },
-    });
-
-    // Mock readMemberPackageInfo by mocking the workspace-crossings module
-    // We need to inject the package map. The real readMemberPackageInfo reads
-    // from disk, so we mock it.
-    const { buildPackageMap } = await import("../../../src/analyzers/workspace-crossings.js");
-
-    // Provide a custom readInfo function that returns package names
-    vi.mock("../../../src/analyzers/workspace-crossings.js", async (importOriginal) => {
-      const actual = await importOriginal() as Record<string, unknown>;
-      return {
-        ...actual,
-        buildPackageMap: (members: SubAnalysis[]) => {
-          // Call original but with a custom readInfo
-          return (actual.buildPackageMap as typeof buildPackageMap)(members, (member) => {
-            if (member.id === "packages-foundation") {
-              return { name: "@test/foundation", entryFile: "src/public.ts" };
-            }
-            if (member.id === "packages-consumer") {
-              return { name: "@test/consumer", entryFile: "src/agent.ts" };
-            }
-            return null;
-          });
-        },
-      };
     });
 
     // Root-level analysis has no files of its own (all are sub-analyzed)
