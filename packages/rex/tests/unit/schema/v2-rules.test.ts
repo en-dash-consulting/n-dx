@@ -471,6 +471,14 @@ describe("title-release-token", () => {
     expect(ids(findings)).toEqual([capability.id, task.id]);
     expect(findings[0].message).toContain('"PR 12"');
   });
+
+  it("reports a warning, not an error: a title is cosmetic", () => {
+    expect(RULE_SEVERITY["title-release-token"]).toBe("warning");
+    const task = node("task", { title: "Prep 0.8.0" });
+    const tree: V2Tree = { product: [], changes: [node("change", { touches: ["x"] }, [task])] };
+    const findings = checkV2Rules(tree, { now: NOW, releases: RELEASES }, ["title-release-token"]);
+    expect(findings.map((f) => f.severity)).toEqual(["warning"]);
+  });
 });
 
 describe("layer-nesting", () => {
@@ -718,6 +726,7 @@ describe("capability-criteria", () => {
     const findings = check("capability-criteria", { product: [none, empty] });
     expect(ids(findings)).toEqual([none.id, empty.id]);
     expect(findings[0].severity).toBe("warning");
+    expect(findings[0].message).toBe(`Capability "${none.title}" has no capability criteria`);
   });
 });
 
@@ -744,7 +753,7 @@ describe("criteria-growth", () => {
     const findings = run([cap({ id: "big", title: "Big one", criteria: criteria(16) })]);
     expect(ids(findings)).toEqual(["big"]);
     expect(findings[0].message).toContain("Big one");
-    expect(findings[0].message).toContain("16 criteria");
+    expect(findings[0].message).toContain("16 capability criteria");
     expect(findings[0].severity).toBe("warning");
   });
 

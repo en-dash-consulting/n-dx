@@ -18,8 +18,13 @@
  * @module rex/cli/commands/tree-diff
  */
 
-import { resolve } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { diffTrees } from "../../core/tree-diff.js";
+import { diffProductLayer } from "../../core/map-diff.js";
+import type { MapDiff, MapEntry } from "../../core/map-diff.js";
+import { renderTreeDiffMarkdown } from "../../core/tree-diff-markdown.js";
+import { assertOutsideRexDir } from "./export.js";
 import {
   loadTreeAtRef,
   loadTreeFromDir,
@@ -38,16 +43,59 @@ export async function cmdTreeDiff(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  // Settled before anything is read, so a bad --out fails on the command.
+  const out = outPath(dir, flags);
   const { from, to } = await resolveSides(dir, flags);
 
   const diff = diffTrees(from.items, to.items);
+  // The product layer exists only on a v2 tree. When neither side is one,
+  // there is no map section at all, so a v1 diff reads as it always has.
+  const map =
+    from.v2 || to.v2 ? diffProductLayer(from.v2?.product ?? [], to.v2?.product ?? []) : undefined;
 
-  if (isJson(flags)) {
-    result(JSON.stringify(renderJson(diff, from, to), null, 2));
+  if (isMarkdown(flags)) {
+    await emit(renderTreeDiffMarkdown({ fromLabel: from.label, toLabel: to.label, diff, map }), out);
+    // stdout may be the posted comment: every notice goes to stderr.
+    reportWarnings(from, to, warn);
     return;
   }
 
-  renderText(diff, from, to);
+  if (isJson(flags)) {
+    await emit(JSON.stringify(renderJson(diff, map, from, to), null, 2), out);
+    return;
+  }
+
+  await renderText(diff, map, from, to, out);
+}
+
+/** Write `body` to `out`, or to stdout when there is no file. */
+async function emit(body: string, out: string | undefined): Promise<void> {
+  const text = body.endsWith("\n") ? body.slice(0, -1) : body;
+  if (out === undefined) {
+    result(text);
+    return;
+  }
+  await mkdir(dirname(out), { recursive: true });
+  await writeFile(out, `${text}\n`, "utf-8");
+  info(`Wrote ${out}`);
+}
+
+/**
+ * `--out=<file>`, resolved against the caller's cwd. Refused inside the PRD
+ * storage directory, as `rex export` does: nothing is written there that is
+ * not a PRD mutation.
+ */
+function outPath(dir: string, flags: Record<string, string>): string | undefined {
+  const raw = value(flags, "out");
+  if (raw === undefined) return undefined;
+  const path = resolve(raw);
+  assertOutsideRexDir(path, dir, "tree-diff report", "./prd-diff.md");
+  return path;
+}
+
+/** `--format=markdown` (or `md`): the pull-request comment. */
+function isMarkdown(flags: Record<string, string>): boolean {
+  return flags.format === "markdown" || flags.format === "md";
 }
 
 /** `--json` and `--format=json` both select machine-readable output. */
@@ -141,19 +189,20 @@ function value(flags: Record<string, string>, name: string): string | undefined 
  * consumer can tell "the baseline predates the PRD" from "the baseline was
  * empty" without re-running git.
  */
-function renderJson(diff: TreeDiff, from: ResolvedTree, to: ResolvedTree) {
+function renderJson(diff: TreeDiff, map: MapDiff | undefined, from: ResolvedTree, to: ResolvedTree) {
   return {
     sources: {
       from: { label: from.label, present: from.present, items: diff.totals.from },
       to: { label: to.label, present: to.present, items: diff.totals.to },
     },
-    identical: diff.identical,
+    identical: diff.identical && (map?.identical ?? true),
     counts: diff.counts,
     added: diff.added,
     changed: diff.changed,
     completed: diff.completed,
     moved: diff.moved,
     removed: diff.removed,
+    ...(map ? { map } : {}),
     warnings: [...from.warnings, ...to.warnings].map((w) => ({
       path: w.path,
       message: w.message,
@@ -161,12 +210,36 @@ function renderJson(diff: TreeDiff, from: ResolvedTree, to: ResolvedTree) {
   };
 }
 
-function renderText(diff: TreeDiff, from: ResolvedTree, to: ResolvedTree): void {
+async function renderText(
+  diff: TreeDiff,
+  map: MapDiff | undefined,
+  from: ResolvedTree,
+  to: ResolvedTree,
+  out: string | undefined,
+): Promise<void> {
   const lines: string[] = [`${from.label} → ${to.label}`];
 
+  if (map && !map.identical) {
+    lines.push(
+      "",
+      `Product map: ${map.counts.added} added · ${map.counts.modified} modified · ${map.counts.retired} retired`,
+    );
+    section(lines, "Capabilities added", map.added, describeMap);
+    section(lines, "Capabilities modified", map.modified, (e) => {
+      const details = e.fields.map((f) => `      ${f.field}: ${show(f.from)} → ${show(f.to)}`);
+      if (e.criteria) {
+        const c = e.criteria;
+        details.push(`      capability criteria: +${c.added.length} -${c.removed.length} ~${c.changed.length}`);
+      }
+      return [describeMap(e), ...details].join("\n");
+    });
+    section(lines, "Capabilities retired", map.retired, describeMap);
+  }
+
   if (diff.identical) {
-    lines.push("", "No differences.");
-    result(lines.join("\n"));
+    // Capability changes printed above are differences; say which layer has none.
+    lines.push("", map && !map.identical ? "No changes to the change layer." : "No differences.");
+    await emit(lines.join("\n"), out);
     reportWarnings(from, to);
     return;
   }
@@ -190,11 +263,11 @@ function renderText(diff: TreeDiff, from: ResolvedTree, to: ResolvedTree): void 
       `${diff.counts.removed} removed`,
   );
 
-  result(lines.join("\n"));
+  await emit(lines.join("\n"), out);
   reportWarnings(from, to);
 }
 
-function section<T extends DiffEntry>(
+function section<T>(
   lines: string[],
   heading: string,
   entries: T[],
@@ -210,6 +283,12 @@ function describe(entry: DiffEntry): string {
   const where = path(entry.ancestors);
   const head = `${entry.title}  [${entry.level} ${entry.id.slice(0, 8)}]`;
   return where ? `${head}\n      in: ${where}` : head;
+}
+
+/** `<title>  [<type> <id>]` with the areas and capabilities it sits under beneath. */
+function describeMap(entry: MapEntry): string {
+  const head = `${entry.title}  [${entry.type} ${entry.displayId ?? entry.id.slice(0, 8)}]`;
+  return entry.ancestors.length ? `${head}\n      in: ${entry.ancestors.join(" › ")}` : head;
 }
 
 function path(ancestors: DiffItemRef[]): string {
@@ -237,11 +316,18 @@ function show(v: string | null): string {
  * `present: false` with an empty `warnings` array, since there is no on-disk
  * tree for the parser to have warned about. Keying off the warning text alone
  * left that case silent.
+ *
+ * `notice` carries the absent-tree line: `info` (stdout) for text output,
+ * `warn` (stderr) for the Markdown comment, whose stdout must stay clean.
  */
-function reportWarnings(from: ResolvedTree, to: ResolvedTree): void {
+function reportWarnings(
+  from: ResolvedTree,
+  to: ResolvedTree,
+  notice: (message: string) => void = info,
+): void {
   for (const [side, tree] of [[from.label, from], [to.label, to]] as const) {
     if (!tree.present) {
-      info(`${side}: no PRD tree at this source.`);
+      notice(`${side}: no PRD tree at this source.`);
     }
     for (const w of tree.warnings) {
       if (w.message === "Tree root directory does not exist") continue;

@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
-import { resolveStore, resolveRexPaths } from "../../store/index.js";
-import { findPrunableItems, pruneItems, countSubtree } from "../../core/prune.js";
+import { resolveStore, resolveRexPaths, type PRDStore } from "../../store/index.js";
+import { resolveLayerStore } from "../../store/change-layer-store.js";
+import { findPrunableItems, findKeptItems, pruneItems, countSubtree } from "../../core/prune.js";
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal } from "../../core/reshape.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
@@ -101,6 +102,26 @@ function formatLevelSummary(byLevel: Record<string, number>): string {
   return formatLevels(byLevel);
 }
 
+/**
+ * The store prune reads and writes. On a v2 tree it is the change layer
+ * alone: the product layer is never pruned, since a product node is retired
+ * only by applying a change's `removed` amendment.
+ */
+async function resolvePruneStore(rexDir: string, flags: Record<string, string>): Promise<PRDStore> {
+  const { store, v2 } = await resolveLayerStore(rexDir, await resolveStore(rexDir));
+  if (v2 && flags.format !== "json") {
+    info("Pruning the change layer only. The product layer is not pruned: retire a product node with a change's removed amendment.");
+  }
+  return store;
+}
+
+/** Tell the operator which completed items prune kept, and why. */
+function reportKept(kept: ReturnType<typeof findKeptItems>, flags: Record<string, string>): void {
+  if (flags.format === "json" || kept.length === 0) return;
+  info(`Kept ${kept.length} completed item${kept.length === 1 ? "" : "s"}:`);
+  for (const { item, reason } of kept) info(`  ${item.title} (${reason})`);
+}
+
 export async function cmdPrune(
   dir: string,
   flags: Record<string, string>,
@@ -120,12 +141,14 @@ export async function cmdPrune(
   }
 
   const rexDir = resolveRexPaths(dir).rexDir;
-  const store = await resolveStore(rexDir);
+  const store = await resolvePruneStore(rexDir, flags);
 
   // Snapshot the tree before any mutation so `rex restore` can undo this prune.
   await ensureSnapshot(rexDir, "prune", flags);
   const doc = await store.loadDocument();
 
+  const kept = findKeptItems(doc.items);
+  const keptJson = kept.length > 0 ? { kept: kept.map(({ item, reason }) => ({ ...summarize(item), reason })) } : {};
   const dryRun = flags["dry-run"] === "true";
   const skipConsolidate = flags["no-consolidate"] === "true";
   const accept = flags.accept === "true";
@@ -135,6 +158,7 @@ export async function cmdPrune(
     // Preview mode — show what would be pruned without mutating.
     const prunable = findPrunableItems(doc.items);
     const hasPrunable = prunable.length > 0;
+    reportKept(kept, flags);
 
     if (hasPrunable) {
       if (flags.format !== "json") {
@@ -250,6 +274,7 @@ export async function cmdPrune(
       result(JSON.stringify({
         dryRun: true,
         items: hasPrunable ? prunable.map(summarize) : [],
+        ...keptJson,
         ...(hasPrunable ? { totalItems: formatPrunePreview(prunable).totalItems } : {}),
         ...(consolidationProposals.length > 0 ? {
           consolidation: {
@@ -265,6 +290,7 @@ export async function cmdPrune(
   // Preview what will be pruned before executing
   const prunable = findPrunableItems(doc.items);
 
+  reportKept(kept, flags);
   if (prunable.length === 0) {
     result("Nothing to prune.");
     // Still run consolidation even if nothing was pruned — the PRD may
@@ -348,6 +374,7 @@ export async function cmdPrune(
       pruned: pruneResult.pruned.map(summarize),
       prunedCount: pruneResult.prunedCount,
       archivePath,
+      ...keptJson,
     };
 
     // Run consolidation and include in JSON output
@@ -549,7 +576,7 @@ async function smartPrune(
   flags: Record<string, string>,
 ): Promise<void> {
   const rexDir = resolveRexPaths(dir).rexDir;
-  const store = await resolveStore(rexDir);
+  const store = await resolvePruneStore(rexDir, flags);
   const doc = await store.loadDocument();
 
   if (doc.items.length === 0) {

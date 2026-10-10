@@ -107,6 +107,7 @@ import {
 } from "../../prd/llm-gateway.js";
 import {
   prepareBrief,
+  briefForRun,
   executeDryRun,
   transitionToInProgress,
   initRunRecord,
@@ -118,6 +119,7 @@ import {
   recordClaimLoss,
   handleRunFailure,
   formatModelLabel,
+  commitMsgWatcherOptions,
 } from "./shared.js";
 import type { SharedLoopOptions } from "./shared.js";
 import { executeGateOnlyRetry, planGateOnlyRetry } from "./gate-only-retry.js";
@@ -2001,27 +2003,20 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const adapter = resolveVendorAdapter(vendor);
 
   // Shared: assemble brief, format, build system prompt + envelope, display task info
-  const { brief, taskId, briefText, systemPrompt, envelope: baseEnvelope } = await prepareBrief(
+  // The brief sent to the agent is rebuilt once the run record exists (see
+  // briefForRun): its commit trailers name the run.
+  const { brief, taskId, briefText: selectionBriefText, systemPrompt } = await prepareBrief(
     store, config, opts.taskId,
     { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, assignee: opts.assignee, projectDir, claims: opts.claims, wouldResetIds: opts.wouldResetIds },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
     opts.extraContext,
   );
 
-  // Bound the brief text to the vendor's effective context character limit.
-  // This prevents the combined prompt (system + brief) from exceeding the
-  // vendor's context window.  Use the vendor/model resolver from llm-gateway
-  // to select the appropriate limit rather than a Claude-specific constant.
-  const contextCharLimit = VENDOR_CONTEXT_CHAR_LIMITS[vendor];
-  const boundedBriefText = briefText.length > contextCharLimit
-    ? briefText.slice(0, contextCharLimit)
-    : briefText;
-
   // Shared: dry run path
   if (dryRun) {
     const run = executeDryRun({
       label: "CLI",
-      briefText,
+      briefText: selectionBriefText,
       systemPrompt,
       taskId,
       taskTitle: brief.task.title,
@@ -2079,6 +2074,19 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     criteriaCount: brief.task.acceptanceCriteria?.length,
     permissionMode: opts.permissionMode,
   });
+
+  // The brief as sent: the run's commit trailers included, so the agent's own
+  // commits carry N-DX-Item (the autoCommit path writes no trailers of hench's).
+  const { briefText, envelope: baseEnvelope } = briefForRun(brief, run, config, opts.extraContext);
+
+  // Bound the brief text to the vendor's effective context character limit.
+  // This prevents the combined prompt (system + brief) from exceeding the
+  // vendor's context window.  Use the vendor/model resolver from llm-gateway
+  // to select the appropriate limit rather than a Claude-specific constant.
+  const contextCharLimit = VENDOR_CONTEXT_CHAR_LIMITS[vendor];
+  const boundedBriefText = briefText.length > contextCharLimit
+    ? briefText.slice(0, contextCharLimit)
+    : briefText;
 
   // CLI-specific: load config for CLI path and env resolution
   const cliBinary = resolveVendorCliPath(llmConfig, config);
@@ -2235,13 +2243,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // uncommitted-work gate refuses to record the task done, and the next
   // run's pre-run commit gate offers the leftovers as a checkpoint. Set a
   // positive timeout to restore the timer, knowing it commits unverified.
-  const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 0;
-  const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher({
-    projectDir,
-    timeoutMs: commitMsgTimeoutMs,
-    // RunRecord carries worktreeRoot/branch/startHead under those exact names.
-    origin: run,
-  });
+  const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher(
+    commitMsgWatcherOptions(run, taskId, config, projectDir),
+  );
 
   // Prompt section diagnostics — captured on first attempt, stored on run record.
   let promptSectionDiagnostics: PromptSectionDiagnostic[] | undefined;

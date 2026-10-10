@@ -229,13 +229,14 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "amendment-type": "error",
   "ref-unique": "error",
   "ref-resolves": "error",
-  "title-release-token": "error",
   "layer-nesting": "error",
   "capability-depth": "error",
   "depends-on-acyclic": "error",
   "open-change-refs-live": "error",
   "capability-statement": "error",
   "check-unique": "error",
+  // A title is cosmetic: reported by rex health, never fails it or CI.
+  "title-release-token": "warning",
   "capability-criteria": "warning",
   "long-revised": "warning",
   "area-balance": "warning",
@@ -643,7 +644,7 @@ const capabilityStatement: Rule = ({ entries }) =>
 const capabilityCriteria: Rule = ({ entries }) =>
   entries
     .filter(({ node }) => node.type === "capability" && !node.criteria?.length)
-    .map(({ node }) => finding("capability-criteria", node, `Capability "${node.title}" has no criteria`));
+    .map(({ node }) => finding("capability-criteria", node, `Capability "${node.title}" has no capability criteria`));
 
 /** A node keeps one result per requirement: the last run's. */
 const checkUnique: Rule = ({ entries }) =>
@@ -731,7 +732,7 @@ const criteriaGrowth: Rule = ({ entries }, { maxCriteria = DEFAULT_MAX_CRITERIA 
     totals.set(node, total);
     if (total <= maxCriteria) return [];
     const detail = total > own ? `${own} own + ${total - own} inherited` : `${own}`;
-    return [finding("criteria-growth", node, `Capability "${node.title}" carries ${total} criteria (${detail}; threshold ${maxCriteria}); consolidate them with a modify change, or \`rex product tidy\` once it exists`)];
+    return [finding("criteria-growth", node, `Capability "${node.title}" carries ${total} capability criteria (${detail}; threshold ${maxCriteria}); consolidate them with a modify change, or \`rex product tidy\` once it exists`)];
   });
 };
 
@@ -780,13 +781,13 @@ const RULES: Readonly<Record<V2RuleId, Rule>> = {
   "amendment-type": amendmentType,
   "ref-unique": refUnique,
   "ref-resolves": refResolves,
-  "title-release-token": titleReleaseTokenRule,
   "layer-nesting": layerNesting,
   "capability-depth": capabilityDepth,
   "depends-on-acyclic": dependsOnAcyclic,
   "open-change-refs-live": openChangeRefsLive,
   "capability-statement": capabilityStatement,
   "check-unique": checkUnique,
+  "title-release-token": titleReleaseTokenRule,
   "capability-criteria": capabilityCriteria,
   "long-revised": longRevised,
   "area-balance": areaBalance,

@@ -1,0 +1,64 @@
+# CodeQL static analysis.
+#
+# Free for public repositories. Covers the class of defect that review and the
+# test suite both miss: injection and traversal reachable from a path nobody
+# wrote a test for. It is not a substitute for the architecture and
+# domain-isolation policy tests, which encode rules CodeQL has no way to know.
+#
+# The weekly schedule matters as much as the per-PR run: CodeQL's queries are
+# updated continuously, so a scan finds defects in code that has not changed
+# since the last scan passed.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # No merge_group trigger, deliberately: code-scanning merge protection does
+  # not apply to merge queue groups, so the queue never waits on CodeQL. It
+  # still runs on every PR, on push to main and weekly.
+  # https://docs.github.com/en/code-security/concepts/code-scanning/merge-protection
+  schedule:
+    # Mondays, 09:17 UTC. Off the hour deliberately — scheduled jobs on the
+    # hour queue behind everyone else's.
+    - cron: "17 9 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      # Uploading the SARIF result is the only write this needs.
+      security-events: write
+      contents: read
+      actions: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # `build-mode: none` for both languages. CodeQL does not need a compiled
+      # artifact to analyse JavaScript or TypeScript, and the alternative —
+      # autobuild — would execute this repository's build scripts inside a job
+      # holding `security-events: write`, which is the one job where running
+      # a pull request's own code is worth avoiding.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: "/language:${{ matrix.language }}"

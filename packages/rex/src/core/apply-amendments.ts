@@ -13,7 +13,7 @@
  *   `title`, with `proposed` as its statement and `criteria.add` as its
  *   criteria. With `type: "constraint"` it creates a constraint `under` any
  *   live product node instead, with `proposed` as its statement and the
- *   amendment's `requirements` and `appliesTo`; a constraint has no criteria.
+ *   amendment's `requirements` and `appliesTo`; a constraint has no capability criteria.
  *   `target` names the new node: a display id (`A4.9`) becomes its
  *   `displayId` and the id comes from `newId`; anything else is the id.
  * - **modified** edits a live capability or constraint: `proposed`, when
@@ -52,9 +52,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Requirement } from "../schema/v1.js";
 import { RequirementSchema } from "../schema/validate.js";
-import { isDisplayId, type Amendment, type Criterion } from "../schema/v2.js";
+import { isDisplayId, type Amendment, type ChangeNode, type CriteriaDelta, type Criterion } from "../schema/v2.js";
 import { checkV2Rules, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { slugifyTitle } from "../store/folder-tree-serializer.js";
+import { isUsableFrozenSlug, slugifyTitle } from "../store/folder-tree-serializer.js";
 
 export interface ApplyAmendmentsOptions {
   /** ISO timestamp stamped as the change's `appliedAt`. */
@@ -65,6 +65,8 @@ export interface ApplyAmendmentsOptions {
   newId?: () => string;
   /** Apply amendments whose `base` no longer matches their target's spec. */
   force?: boolean;
+  /** Ids of live product nodes treated as retired by this change's removals too: a dry run's stand-in for other open changes' removals. */
+  alsoRemoving?: ReadonlySet<string>;
 }
 
 export interface AppliedAmendment {
@@ -79,6 +81,9 @@ export interface ApplyAmendmentsResult {
   tree: V2Tree;
   applied: AppliedAmendment[];
 }
+
+/** The problem a `modified` amendment with neither `proposed` nor a criteria delta reports. */
+export const NOTHING_TO_MODIFY = "nothing to modify: no proposed text or capability criteria delta";
 
 export class ApplyAmendmentsError extends Error {
   readonly problems: readonly string[];
@@ -110,7 +115,7 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   }
 
   const amends = change.amends ?? [];
-  const context: ApplyContext = { options, removing: removedIds(next.product, amends) };
+  const context: ApplyContext = { options, removing: new Set([...removedIds(next.product, amends), ...(options.alsoRemoving ?? [])]) };
   const date = options.now.toISOString().slice(0, 10);
   const problems: string[] = [];
   const applied: AppliedAmendment[] = [];
@@ -141,6 +146,109 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
     throw new ApplyAmendmentsError(label, introduced.map((f) => `the result breaks ${f.rule}: ${f.message}`), introduced);
   }
   return { tree: next, applied };
+}
+
+/** What {@link applyAmendments} would refuse a change with, split by whether another open change causes it. */
+export interface AmendmentProblems {
+  /** Problems the amendments have against the product layer alone: refused now and after any other change closes. */
+  always: readonly string[];
+  /** Problems only other open changes cause: apply refuses until they are applied or closed. Empty when `always` is not. */
+  pending: readonly string[];
+  /** The open changes (display id or id) that amend, touch or sit in the way of what this change's amendments target; empty when `pending` is. */
+  blockedBy: readonly string[];
+}
+
+export const NO_PROBLEMS: AmendmentProblems = { always: [], pending: [], blockedBy: [] };
+
+/** Warnings for the `pending` problems of a stored change, naming the open changes in the way. */
+export function pendingWarnings(pending: readonly string[], blockedBy: readonly string[]): string[] {
+  if (pending.length === 0) return [];
+  const who = blockedBy.length ? `Open change ${blockedBy.join(", ")} stands in the way` : "Another open change stands in the way";
+  return [`${who}, so apply_change refuses until it is applied or closed: ${pending.join("; ")}`];
+}
+
+/**
+ * The problems {@link applyAmendments} would refuse the change `changeRef`
+ * with, or none. A dry run for the write tools that store amendments
+ * (add_item, place_change): nothing edits an amendment once stored, so one
+ * apply would always refuse is refused up front, in apply's own words.
+ *
+ * A problem that goes away when no other open change is in the way (a removal
+ * of a node another open change still amends, or of one whose live descendants
+ * another open change removes) is `pending`, not `always`. It is found by
+ * running apply again on a tree where the other open changes' amends and
+ * touches are gone and their removals count as done. Runs with `force`, since
+ * a base that goes stale is apply's to judge later, and discards the result,
+ * so no stamp (`appliedAt`, `metAt`) reaches the caller's tree.
+ */
+export function applyAmendmentsProblems(tree: V2Tree, changeRef: string, now: Date): AmendmentProblems {
+  const full = dryRun(tree, changeRef, now);
+  if (full.length === 0) return NO_PROBLEMS;
+  const change = resolve(tree.changes, changeRef) as OpenChange | undefined;
+  if (!change) return { always: full, pending: [], blockedBy: [] };
+
+  const others = otherOpenChanges(tree.changes, change);
+  const alsoRemoving = new Set<string>();
+  for (const other of others) removedIds(tree.product, other.amends ?? []).forEach((id) => alsoRemoving.add(id));
+  const alone = structuredClone(tree);
+  const strip = (nodes: RuleNode[]): void => {
+    for (const node of nodes) {
+      if (node.type === "change" && node.id !== change.id && isOpenChange(node)) {
+        delete node.amends;
+        delete node.touches;
+      }
+      strip(node.children ?? []);
+    }
+  };
+  strip(alone.changes);
+  // What apply says with the others out of the way: its message can differ from the full run's (fewer descendants listed), so it stands as is.
+  const always = dryRun(alone, changeRef, now, alsoRemoving);
+  // A change that is refused anyway has nothing pending to warn about.
+  const pending = always.length ? [] : full;
+  return {
+    always,
+    pending,
+    blockedBy: pending.length ? blockingChanges(tree, change, others) : [],
+  };
+}
+
+function dryRun(tree: V2Tree, changeRef: string, now: Date, alsoRemoving?: ReadonlySet<string>): readonly string[] {
+  try {
+    applyAmendments(tree, changeRef, { appliedAt: now.toISOString(), now, force: true, ...(alsoRemoving ? { alsoRemoving } : {}) });
+    return [];
+  } catch (error) {
+    if (error instanceof ApplyAmendmentsError) return error.problems;
+    throw error;
+  }
+}
+
+type OpenChange = ChangeNode & RuleNode;
+
+/** Every open change in `nodes` (and below) other than `change`. */
+function otherOpenChanges(nodes: readonly RuleNode[], change: RuleNode): OpenChange[] {
+  return nodes.flatMap((node) => [
+    ...(node.type === "change" && node.id !== change.id && isOpenChange(node) ? [node as OpenChange] : []),
+    ...otherOpenChanges(node.children ?? [], change),
+  ]);
+}
+
+/** Labels of the `others` that amend, add under or touch a node `change`'s amendments target, or one below it. */
+function blockingChanges(tree: V2Tree, change: OpenChange, others: readonly OpenChange[]): string[] {
+  const hit = new Set<string>();
+  for (const amendment of change.amends ?? []) {
+    const target = resolve(tree.product, amendment.target, { throughDeleted: true });
+    if (target) [target, ...liveDescendants(target)].forEach((n) => hit.add(n.id));
+  }
+  const names = (refs: readonly string[]): boolean =>
+    refs.some((ref) => {
+      const node = resolve(tree.product, ref, { throughDeleted: true });
+      return node !== undefined && hit.has(node.id);
+    });
+  const refs = (o: OpenChange): string[] => [
+    ...(o.amends ?? []).flatMap((a) => (a.delta === "added" ? (a.under !== undefined ? [a.under] : []) : [a.target])),
+    ...(o.touches ?? []),
+  ];
+  return others.filter((o) => names(refs(o))).map((o) => o.displayId ?? o.id);
 }
 
 // ── Applied amends ───────────────────────────────────────────────
@@ -214,7 +322,7 @@ function checkBase(before: V2Tree, after: V2Tree, amendment: Amendment, { force 
 }
 
 /** Error findings in `after` that `before` did not have, compared by rule, node and message. */
-function newErrors(before: V2Tree, after: V2Tree, now: Date): RuleFinding[] {
+export function newErrors(before: V2Tree, after: V2Tree, now: Date): RuleFinding[] {
   const key = (f: RuleFinding): string => `${f.rule}\0${f.nodeId}\0${f.message}`;
   const errors = (t: V2Tree): RuleFinding[] => checkV2Rules(t, { now }).filter((f) => f.severity === "error");
   const had = new Set(errors(before).map(key));
@@ -279,7 +387,7 @@ const applyAdded: DeltaApply = ({ product, changes }, amendment, { options }, fa
 /** A new capability's criteria, from `criteria.add`; undefined after reporting a problem. */
 function capabilityFields(amendment: Amendment, fail: (message: string) => void): { criteria?: Criterion[] } | undefined {
   if (amendment.criteria?.replace?.length || amendment.criteria?.remove?.length) {
-    return void fail("a new capability has no criteria to replace or remove; use criteria.add");
+    return void fail("a new capability has no capability criteria to replace or remove; use criteria.add");
   }
   const criteria = amendment.criteria?.add ?? [];
   const duplicate = firstDuplicate(criteria.map((c) => c.id));
@@ -295,7 +403,7 @@ function constraintFields(amendment: Amendment, fail: (message: string) => void)
   let ok = true;
   if (criteria?.add?.length || criteria?.replace?.length || criteria?.remove?.length) {
     ok = false;
-    fail("a constraint has no criteria; state it in proposed and list its requirements");
+    fail("a constraint has no capability criteria; state it in proposed and list its requirements");
   }
   const parsedRequirements = z.array(RequirementSchema).optional().safeParse(requirements);
   if (!parsedRequirements.success) {
@@ -314,36 +422,66 @@ function constraintFields(amendment: Amendment, fail: (message: string) => void)
   };
 }
 
-const applyModified: DeltaApply = ({ product }, amendment, _options, fail) => {
+/** Criteria after a delta, and every id that does not fit them. */
+export interface CriteriaDeltaResult {
+  criteria: Criterion[];
+  /** One message per misfit id; the delta applies only when empty. */
+  problems: string[];
+}
+
+/**
+ * Apply `delta` to a capability's `criteria`: remove, then replace, then add.
+ * Removing or replacing an id the criteria lack, or adding one they have, is a
+ * problem. Pure.
+ */
+export function applyCriteriaDelta(criteria: readonly Criterion[], delta: CriteriaDelta | undefined): CriteriaDeltaResult {
+  let next = [...criteria];
+  const problems: string[] = [];
+  const has = (id: string): boolean => next.some((c) => c.id === id);
+  for (const id of delta?.remove ?? []) {
+    if (!has(id)) problems.push(`criterion ${id} to remove does not exist`);
+    next = next.filter((c) => c.id !== id);
+  }
+  for (const replacement of delta?.replace ?? []) {
+    if (!has(replacement.id)) problems.push(`criterion ${replacement.id} to replace does not exist`);
+    next = next.map((c) => (c.id === replacement.id ? { ...replacement } : c));
+  }
+  for (const added of delta?.add ?? []) {
+    if (has(added.id)) problems.push(`criterion ${added.id} to add already exists`);
+    else next.push({ ...added });
+  }
+  return { criteria: next, problems };
+}
+
+/**
+ * The delta that sets each of `set` (replacing an id `current` has, adding a
+ * new one) and removes `remove`, or undefined when both are empty. Ids that do
+ * not fit are left for {@link applyCriteriaDelta} to report. Pure.
+ */
+export function upsertCriteriaDelta(current: readonly Criterion[], set: readonly Criterion[], remove: readonly string[]): CriteriaDelta | undefined {
+  if (!set.length && !remove.length) return undefined;
+  const ids = new Set(current.map((c) => c.id));
+  const add = set.filter((c) => !ids.has(c.id));
+  const replace = set.filter((c) => ids.has(c.id));
+  return {
+    ...(add.length ? { add: [...add] } : {}),
+    ...(replace.length ? { replace: [...replace] } : {}),
+    ...(remove.length ? { remove: [...remove] } : {}),
+  };
+}
+
+const applyModified: DeltaApply =({ product }, amendment, _options, fail) => {
   const node = resolve(product, amendment.target);
   if (!node || (node.type !== "capability" && node.type !== "constraint")) {
     return void fail("not a live capability or constraint");
   }
   const delta = amendment.criteria;
   const hasCriteriaDelta = Boolean(delta?.add?.length || delta?.replace?.length || delta?.remove?.length);
-  if (amendment.proposed === undefined && !hasCriteriaDelta) return void fail("nothing to modify: no proposed text or criteria delta");
-  if (hasCriteriaDelta && node.type !== "capability") return void fail("a constraint has no criteria");
+  if (amendment.proposed === undefined && !hasCriteriaDelta) return void fail(NOTHING_TO_MODIFY);
+  if (hasCriteriaDelta && node.type !== "capability") return void fail("a constraint has no capability criteria");
 
-  let criteria: Criterion[] = node.type === "capability" ? [...(node.criteria ?? [])] : [];
-  const has = (id: string): boolean => criteria.some((c) => c.id === id);
-  let ok = true;
-  const reject = (message: string): void => {
-    ok = false;
-    fail(message);
-  };
-  for (const id of delta?.remove ?? []) {
-    if (!has(id)) reject(`criterion ${id} to remove does not exist`);
-    criteria = criteria.filter((c) => c.id !== id);
-  }
-  for (const replacement of delta?.replace ?? []) {
-    if (!has(replacement.id)) reject(`criterion ${replacement.id} to replace does not exist`);
-    criteria = criteria.map((c) => (c.id === replacement.id ? { ...replacement } : c));
-  }
-  for (const added of delta?.add ?? []) {
-    if (has(added.id)) reject(`criterion ${added.id} to add already exists`);
-    else criteria.push({ ...added });
-  }
-  if (!ok) return undefined;
+  const { criteria, problems } = applyCriteriaDelta(node.type === "capability" ? node.criteria ?? [] : [], delta);
+  if (problems.length) return void problems.forEach(fail);
 
   if (amendment.proposed !== undefined) node.statement = amendment.proposed;
   if (node.type === "capability" && hasCriteriaDelta) {
@@ -410,13 +548,14 @@ export function resolve(
 /**
  * The slug for a new node: its title's slug, or that slug with the first six
  * id characters when a sibling holds it already (compared ignoring case, as
- * the writer does, which refuses any clash left). Existing siblings keep their
- * frozen slugs.
+ * the writer does, which refuses any clash left) or it cannot be frozen
+ * (`con`, `aux`, `nul` on Windows, or `index`: the writer refuses those too). Existing siblings keep
+ * their frozen slugs.
  */
-export function freeSlug(title: string, id: string, siblings: readonly RuleNode[]): string {
+export function freeSlug(title: string, id: string, siblings: readonly { slug: string }[]): string {
   const taken = new Set(siblings.map((s) => s.slug.toLowerCase()));
   const base = slugifyTitle(title);
-  if (!taken.has(base)) return base;
+  if (!taken.has(base) && isUsableFrozenSlug(base)) return base;
   return `${base}-${id.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "item"}`;
 }
 
@@ -453,14 +592,32 @@ export function appendHistory(body: string | undefined, rawLine: string): string
   const line = rawLine.replace(/\s+/g, " ").trim();
   const text = (body ?? "").trimEnd();
   const lines = text === "" ? [] : text.split("\n");
-  const start = lines.findIndex((l) => l.trim() === HISTORY_HEADING);
-  if (start === -1) return [...(lines.length ? [...lines, ""] : []), HISTORY_HEADING, "", line].join("\n");
-  let end = lines.findIndex((l, i) => i > start && /^#{1,2} /.test(l));
-  if (end === -1) end = lines.length;
+  const section = historySection(lines);
+  if (!section) return [...(lines.length ? [...lines, ""] : []), HISTORY_HEADING, "", line].join("\n");
+  const { start, end } = section;
   // Insert after the section's last non-blank line, keeping blank lines before the next heading.
   let at = end;
   while (at > start + 1 && lines[at - 1].trim() === "") at--;
   // A list line straight after prose would join its paragraph.
   const gap = at === start + 1 || !lines[at - 1].startsWith("- ") ? [""] : [];
   return [...lines.slice(0, at), ...gap, line, ...lines.slice(at)].join("\n");
+}
+
+/**
+ * `body` without its History section, trimmed: the notes it holds outside
+ * History. Empty when the body is only History (or none), as one a change's
+ * apply created is.
+ */
+export function bodyNotes(body: string | undefined): string {
+  const lines = (body ?? "").split("\n");
+  const section = historySection(lines);
+  return (section ? [...lines.slice(0, section.start), ...lines.slice(section.end)] : lines).join("\n").trim();
+}
+
+/** The History section of `lines`: its heading's index to the next `#` or `##` heading's (or the end). */
+function historySection(lines: readonly string[]): { start: number; end: number } | undefined {
+  const start = lines.findIndex((l) => l.trim() === HISTORY_HEADING);
+  if (start === -1) return undefined;
+  const end = lines.findIndex((l, i) => i > start && /^#{1,2} /.test(l));
+  return { start, end: end === -1 ? lines.length : end };
 }

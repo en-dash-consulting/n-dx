@@ -1755,6 +1755,16 @@ export interface RunRecord {
    */
   commits?: RunCommitRecord[];
   /**
+   * Commits in {@link commits} whose `N-DX-Item` trailer, as git parses it,
+   * does not name this run's task — most often an agent-written commit that
+   * dropped the trailer lines its brief gave it. Recorded rather than fixed:
+   * hench never amends or rewrites an agent's commit. Absent when every
+   * commit carries the task id.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  commitsMissingItem?: RunCommitItemMismatch[];
+  /**
    * Set when the task's own work already succeeded but the follow-up PRD
    * "record" commit (completion metadata) could not be committed.
    *
@@ -1902,6 +1912,12 @@ export interface RunCommitRecord {
   subject: string;
 }
 
+/** A run commit whose N-DX-Item does not name the run's task. See {@link RunRecord.commitsMissingItem}. */
+export interface RunCommitItemMismatch extends RunCommitRecord {
+  /** The N-DX-Item values git parsed from the commit; empty when it has none. */
+  items: string[];
+}
+
 export interface TaskBriefTask {
   id: string;
   title: string;
@@ -1978,4 +1994,12 @@ export interface TaskBrief {
     /** Only tasks assigned to this identity were eligible for selection (`ndx work --mine`). */
     assignee?: string;
   };
+  /**
+   * The trailer lines (`N-DX: …`, `N-DX-Item: <taskId>`) the agent ends its
+   * commit messages with. Set once the run record exists, because the `N-DX:`
+   * line names the run; absent in a dry run and in the selection-time brief.
+   * Kept here, not in the system prompt, which is built per project and must
+   * stay task-independent.
+   */
+  commitTrailers?: string[];
 }

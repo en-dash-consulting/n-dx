@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, chmod } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, chmod } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -24,6 +24,7 @@ import {
   TreeSourceError,
 } from "../../src/core/tree-source.js";
 import { writePRD } from "../helpers/rex-dir-test-support.js";
+import { copyV2Fixture, editText } from "../helpers/v2-fixture.js";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
 
 const EPIC = "11111111-1111-4111-8111-111111111111";
@@ -245,6 +246,23 @@ describe("tree-diff against git refs", () => {
     expect(output).toContain(`${firstSha}: no PRD tree at this source.`);
   });
 
+  it("keeps the absent-tree notice out of the Markdown comment on stdout", async () => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (...args: unknown[]) => void out.push(args.join(" "));
+    console.error = (...args: unknown[]) => void err.push(args.join(" "));
+    try {
+      await cmdTreeDiff(dir, { from: firstSha, to: secondSha, format: "markdown" });
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+    expect(out.join("\n")).not.toContain("no PRD tree");
+    expect(err.join("\n")).toContain(`${firstSha}: no PRD tree at this source.`);
+  });
+
   it("leaves the caller's index and working tree untouched", async () => {
     // GIT_INDEX_FILE is what keeps `git checkout -- <path>` from staging the
     // ref's version of every PRD file into the caller's real index. Without
@@ -409,5 +427,70 @@ describe("tree source resolution", () => {
 
     const out = await runJson(dir, {});
     expect(out.sources.from.label).toBe("main");
+  });
+});
+
+describe("tree-diff on a v2 tree", () => {
+  const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "rex-tree-diff-v2-"));
+    initRepo(dir);
+    await copyV2Fixture(join(dir, ".rex"), "lf");
+    commitAll(dir, "v2 tree");
+    // The working tree revises the capability's statement and capability criteria.
+    await editText(join(dir, ".rex", "product", "checkout", "pay-by-card.md"), (text) =>
+      text
+        .replace("A shopper can pay for a basket with a card.", "A shopper can pay with any card.")
+        .replace(',{"id":"c2","text":"A declined card shows why"}', ""),
+    );
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("reports the product map delta beside the change list, from a ref", async () => {
+    const out = await runJson(dir, { from: "HEAD" });
+
+    expect(out.map.counts).toEqual({ added: 0, modified: 1, retired: 0 });
+    expect(out.map.modified[0]).toMatchObject({ id: CAPABILITY, type: "capability", ancestors: ["Checkout"] });
+    expect(out.map.modified[0].criteria.removed).toEqual([{ id: "c2", text: "A declined card shows why" }]);
+    expect(out.identical).toBe(false);
+    expect(out.counts.added).toBe(0);
+  });
+
+  it("does not say 'No differences.' in text when only the product layer changed", async () => {
+    const text = await runText(dir, { from: "HEAD" });
+    expect(text).toContain("Capabilities modified (1)");
+    expect(text).toContain("capability criteria: +0 -1 ~0");
+    expect(text).not.toContain("No differences.");
+  });
+
+  it("writes the pull-request comment as Markdown to a file", async () => {
+    const file = join(dir, "out", "prd-diff.md");
+    await runText(dir, { from: "HEAD", format: "markdown", out: file });
+    const md = await readFile(file, "utf-8");
+    expect(md).toContain("### Product map");
+    expect(md).toContain("#### Capabilities modified (1)");
+    expect(md).toContain("capability criteria: +0 −1 ~0");
+  });
+
+  it("refuses --out inside the PRD storage directory", async () => {
+    await expect(
+      cmdTreeDiff(dir, { from: "HEAD", format: "markdown", out: join(dir, ".rex", "diff.md") }),
+    ).rejects.toThrow(/Refusing to write/);
+  });
+
+  it("has no map key for a v1 tree", async () => {
+    const v1 = await mkdtemp(join(tmpdir(), "rex-tree-diff-v1-"));
+    try {
+      writePRD(v1, before());
+      const out = await runJson(v1, { against: v1 });
+      expect(out).not.toHaveProperty("map");
+    } finally {
+      await rm(v1, { recursive: true, force: true });
+    }
   });
 });

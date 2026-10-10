@@ -194,11 +194,16 @@ export async function assertV2TreeWritable(rexDir: string): Promise<void> {
 
 // ── Entry point ──────────────────────────────────────────────────
 
+/** Which layout {@link loadPrdModel} reads under `rexDir`, without reading the tree. */
+export async function prdLayout(rexDir: string): Promise<PrdModel["layout"]> {
+  return (await isDirectory(join(rexDir, PRODUCT_DIRNAME))) ? "v2" : "v1";
+}
+
 /** Load the PRD under `rexDir` as one model, from whichever layout it uses. */
 export async function loadPrdModel(rexDir: string, options: LoadPrdModelOptions = {}): Promise<PrdModel> {
   const ignore = options.ignoreSchemaSkew ?? ignoreSchemaSkewRequested([], options.env ?? process.env);
   const productDir = join(rexDir, PRODUCT_DIRNAME);
-  const v2 = await isDirectory(productDir);
+  const v2 = (await prdLayout(rexDir)) === "v2";
   const header = v2 ? await readV2Header(productDir) : await readV1Header(rexDir);
 
   let readOnly: SchemaSkewError | undefined;
@@ -243,11 +248,12 @@ async function readV2Header(productDir: string): Promise<Header> {
   const warnings: ParseWarning[] = [];
   const text = await readIfExists(source);
   const fm = text === null ? null : parseFrontmatter(text, source, warnings);
-  if (text === null) warnings.push({ path: source, message: "Missing root index.md" });
+  if (text === null) warnings.push({ path: source, message: "Missing root index.md", skipped: true });
+  else if (!fm) markSkipped(warnings, 0);
   const schema = typeof fm?.schema === "string" ? fm.schema : undefined;
   const parsed = RootHeaderSchema.safeParse(fm ?? {});
   if (!parsed.success && isV2Schema(schema)) {
-    warnings.push({ path: source, message: `Invalid root header: ${issues(parsed.error.issues)}` });
+    warnings.push({ path: source, message: `Invalid root header: ${issues(parsed.error.issues)}`, skipped: true });
   }
   const body = text === null ? undefined : bodyOf(text);
   const fields = { ...fm, ...(body ? { body } : {}) };
@@ -330,7 +336,7 @@ async function readFolder(dir: string, ctx: ReadContext): Promise<FolderRead> {
 async function readFolderNode(dir: string, ctx: ReadContext): Promise<RuleNode | null> {
   const indexPath = join(dir, "index.md");
   if ((await readIfExists(indexPath)) === null) {
-    ctx.warnings.push({ path: dir, message: "Folder has no index.md; skipped with its contents" });
+    ctx.warnings.push({ path: dir, message: "Folder has no index.md; skipped with its contents", skipped: true });
     return null;
   }
   const folder = await readFolder(dir, ctx);
@@ -342,6 +348,11 @@ async function readFolderNode(dir: string, ctx: ReadContext): Promise<RuleNode |
   if (extra) ctx.folderState?.nodes.set(node.id, extra);
   if (folder.children.length) node.children = folder.children;
   return node;
+}
+
+/** Mark the warnings pushed since index `from` as the reason a node was dropped. */
+function markSkipped(warnings: ParseWarning[], from: number): void {
+  for (let i = from; i < warnings.length; i++) warnings[i] = { ...warnings[i], skipped: true };
 }
 
 function warnOrphanRows(dir: string, folder: FolderRead, warnings: ParseWarning[]): void {
@@ -361,14 +372,18 @@ async function readNode(
 ): Promise<RuleNode | null> {
   const { warnings } = ctx;
   const text = (await readIfExists(path)) ?? "";
+  const before = warnings.length;
   const fm = parseFrontmatter(text, path, warnings);
-  if (!fm) return null;
+  if (!fm) {
+    markSkipped(warnings, before);
+    return null;
+  }
   dropNonObjectRun(fm, path, warnings);
   dropStateFields(fm, path, warnings);
   const body = bodyOf(text);
   const intent = NodeIntentSchema.safeParse(body ? { ...fm, body } : fm);
   if (!intent.success) {
-    warnings.push({ path, message: `Invalid node intent, skipped: ${issues(intent.error.issues)}` });
+    warnings.push({ path, message: `Invalid node intent, skipped: ${issues(intent.error.issues)}`, skipped: true });
     return null;
   }
   if (intent.data.slug !== name) {

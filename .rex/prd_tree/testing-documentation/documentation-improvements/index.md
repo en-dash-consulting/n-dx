@@ -2,13 +2,15 @@
 id: "24a05d75-a370-4ebd-a4b9-8e52395b622d"
 level: "feature"
 title: "Documentation improvements"
-status: "pending"
+status: "completed"
 priority: "medium"
 startedAt: "2026-04-13T18:35:49.604Z"
+completedAt: "2026-10-09T04:38:08.626Z"
+endedAt: "2026-10-09T04:38:08.626Z"
 acceptanceCriteria: []
 description: "Docs match the product vision: ndx is the interface, no package internals needed."
-lastModified: "2026-10-06T07:37:44.957Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-09T04:38:09.147Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children

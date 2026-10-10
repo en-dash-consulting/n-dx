@@ -9,9 +9,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { ApplyAmendmentsError, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, resolve } from "../../../src/core/apply-amendments.js";
+import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, bodyNotes, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
 import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
+import { isWindowsSafeSegment } from "../../../src/store/folder-tree-serializer.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
 import { writePrdModel } from "../../../src/store/prd-model-writer.js";
 import { withLock } from "../../../src/store/file-lock.js";
@@ -126,6 +127,18 @@ describe("applyAmendments: added", () => {
     expect(get(out, "abcdef99").slug).toBe("pay-by-card-abcdef");
   });
 
+  it.each(["Con", "AUX", "Nul", "COM1", "lpt9"])("never gives a new node the Windows-unsafe slug for %s", (title) => {
+    const { tree: out } = applyAmendments(tree([{ ...added, title, target: "abcdef99" }]), CHANGE, OPTS);
+    const slug = get(out, "abcdef99").slug;
+    expect(isWindowsSafeSegment(slug)).toBe(true);
+    expect(slug).toBe(`${title.toLowerCase()}-abcdef`);
+  });
+
+  it.each(["Index", "INDEX", "index"])("never gives a new node the slug index for %s", (title) => {
+    const { tree: out } = applyAmendments(tree([{ ...added, title, target: "abcdef99" }]), CHANGE, OPTS);
+    expect(get(out, "abcdef99").slug).toBe("index-abcdef");
+  });
+
   it("refuses a missing or non-container parent, a missing title and a taken id", () => {
     expect(refusal(() => applyAmendments(tree([{ ...added, under: undefined }]), CHANGE, OPTS)).problems[0]).toMatch(/needs under/);
     expect(refusal(() => applyAmendments(tree([{ ...added, under: CON }]), CHANGE, OPTS)).problems[0]).toMatch(/not a live area or capability/);
@@ -189,7 +202,7 @@ describe("applyAmendments: modified", () => {
     expect(refusal(() => applyAmendments(tree([modify({ criteria: { replace: [{ id: "c9", text: "x" }] } })]), CHANGE, OPTS)).problems[0]).toMatch(/c9 to replace/);
     expect(refusal(() => applyAmendments(tree([modify({ criteria: { remove: ["c9"] } })]), CHANGE, OPTS)).problems[0]).toMatch(/c9 to remove/);
     expect(refusal(() => applyAmendments(tree([modify({ criteria: { add: [{ id: "c1", text: "x" }] } })]), CHANGE, OPTS)).problems[0]).toMatch(/c1 to add already exists/);
-    expect(refusal(() => applyAmendments(tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]), CHANGE, OPTS)).problems[0]).toMatch(/constraint has no criteria/);
+    expect(refusal(() => applyAmendments(tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]), CHANGE, OPTS)).problems[0]).toMatch(/constraint has no capability criteria/);
     expect(refusal(() => applyAmendments(tree([modify({})]), CHANGE, OPTS)).problems[0]).toMatch(/nothing to modify/);
   });
 });
@@ -351,7 +364,7 @@ describe("applyAmendments: added constraints", () => {
       applyAmendments(tree([{ ...constraint, criteria: { add: [{ id: "c1", text: "x" }] }, requirements: [{ id: "r1" }], appliesTo: "some" }]), CHANGE, OPTS),
     ).problems;
     expect(problems).toEqual([
-      "amendment 1 (added con-2): a constraint has no criteria; state it in proposed and list its requirements",
+      "amendment 1 (added con-2): a constraint has no capability criteria; state it in proposed and list its requirements",
       "amendment 1 (added con-2): requirements must be a list of requirements",
       'amendment 1 (added con-2): appliesTo must be "all" or a list of product node references',
     ]);
@@ -495,6 +508,99 @@ describe("applyAmendments: rules on the result", () => {
   });
 });
 
+describe("applyAmendmentsProblems", () => {
+  it("returns apply's problems, or none, and never modifies the tree it was given", () => {
+    const refused = tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]);
+    const accepted = tree([{ target: "A1.1", delta: "modified", summary: "s", criteria: { remove: ["c2"] } }]);
+    const before = structuredClone([refused, accepted]);
+    expect(applyAmendmentsProblems(refused, CHANGE, NOW)).toEqual({
+      always: [`amendment 1 (modified ${CON}): a constraint has no capability criteria`],
+      pending: [],
+      blockedBy: [],
+    });
+    expect(applyAmendmentsProblems(accepted, CHANGE, NOW)).toEqual({ always: [], pending: [], blockedBy: [] });
+    expect([refused, accepted]).toEqual(before);
+  });
+
+  it("chains amendments of one capability in order", () => {
+    const add = (criteria: Amendment["criteria"]): Amendment => ({ target: CAP, delta: "modified", summary: "s", criteria });
+    expect(applyAmendmentsProblems(tree([add({ add: [{ id: "c3", text: "x" }] }), add({ remove: ["c3"] })]), CHANGE, NOW).always).toEqual([]);
+    expect(applyAmendmentsProblems(tree([add({ remove: ["c2"] }), add({ remove: ["c2"] })]), CHANGE, NOW).always).toEqual([
+      `amendment 2 (modified ${CAP}): criterion c2 to remove does not exist`,
+    ]);
+  });
+
+  it("counts a summary-only amendment, with the others", () => {
+    const bare: Amendment = { target: CAP, delta: "modified", summary: "s" };
+    expect(applyAmendmentsProblems(tree([bare]), CHANGE, NOW).always).toEqual([`amendment 1 (modified ${CAP}): ${NOTHING_TO_MODIFY}`]);
+    expect(applyAmendmentsProblems(tree([bare, { target: CON, delta: "modified", summary: "s", criteria: { remove: ["c1"] } }]), CHANGE, NOW).always).toEqual([
+      `amendment 1 (modified ${CAP}): ${NOTHING_TO_MODIFY}`,
+      `amendment 2 (modified ${CON}): a constraint has no capability criteria`,
+    ]);
+  });
+
+  it("does not count a stale base, which force applies", () => {
+    expect(applyAmendmentsProblems(tree([{ target: CAP, delta: "modified", summary: "s", proposed: "New", base: "0".repeat(64) }]), CHANGE, NOW).always).toEqual([]);
+  });
+
+  describe("problems only another open change causes", () => {
+    const other = (amends: Amendment[], extra: Partial<RuleNode> = {}): RuleNode =>
+      ({ id: "change-2", displayId: "CH-2", type: "change", title: "Other", slug: "other", status: "pending", amends, ...extra }) as RuleNode;
+    const modifies: Amendment = { target: CON, delta: "modified", summary: "s", proposed: "x" };
+    const removes: Amendment = { target: CON, delta: "removed", summary: "go" };
+
+    it("is pending, naming the other change, when it still amends the removed node", () => {
+      const input = tree([removes]);
+      input.changes.push(other([modifies]));
+      const problems = applyAmendmentsProblems(input, CHANGE, NOW);
+      expect(problems.always).toEqual([]);
+      expect(problems.pending).toEqual([expect.stringMatching(/open-change-refs-live/)]);
+      expect(problems.blockedBy).toEqual(["CH-2"]);
+    });
+
+    it("is pending when the other open change removes the descendants, and always when nobody does", () => {
+      const child = { id: "con-child", type: "constraint", title: "Child", slug: "child", statement: "c", status: "pending" } as RuleNode;
+      const parentRemoval: Amendment = { target: CAP, delta: "removed", summary: "go" };
+      const build = (others: RuleNode[]): V2Tree => {
+        const input = tree([parentRemoval]);
+        get(input, CAP).children = [child];
+        input.changes.push(...others);
+        return input;
+      };
+      const removedElsewhere = applyAmendmentsProblems(build([other([{ target: "con-child", delta: "removed", summary: "go" }])]), CHANGE, NOW);
+      expect(removedElsewhere.always).toEqual([]);
+      expect(removedElsewhere.pending).toEqual([expect.stringMatching(/live descendants con-child/)]);
+      expect(removedElsewhere.blockedBy).toEqual(["CH-2"]);
+      expect(applyAmendmentsProblems(build([]), CHANGE, NOW).always).toEqual([expect.stringMatching(/live descendants con-child/)]);
+    });
+
+    it("is always when a descendant nobody removes stays, even if another open change removes a sibling", () => {
+      const child = (id: string) => ({ id, type: "constraint", title: id, slug: id, statement: "c", status: "pending" }) as RuleNode;
+      const input = tree([{ target: CAP, delta: "removed", summary: "go" }]);
+      get(input, CAP).children = [child("con-a"), child("con-b")];
+      input.changes.push(other([{ target: "con-a", delta: "removed", summary: "go" }]));
+      const problems = applyAmendmentsProblems(input, CHANGE, NOW);
+      expect(problems.always).toEqual([expect.stringMatching(/live descendants con-b would be hidden/)]);
+      expect(problems.pending).toEqual([]);
+    });
+
+    it("names an open change that adds under the removed node", () => {
+      const input = tree([removes]);
+      input.changes.push(other([{ target: "con-new", delta: "added", type: "constraint", under: CON, title: "New", proposed: "n", summary: "s" }]));
+      const problems = applyAmendmentsProblems(input, CHANGE, NOW);
+      expect(problems.always).toEqual([]);
+      expect(problems.pending).toEqual([expect.stringMatching(/open-change-refs-live/)]);
+      expect(problems.blockedBy).toEqual(["CH-2"]);
+    });
+
+    it("keeps a problem the amendment has on its own as always", () => {
+      const input = tree([{ target: CON, delta: "modified", summary: "s", criteria: { add: [{ id: "c1", text: "x" }] } }]);
+      input.changes.push(other([modifies]));
+      expect(applyAmendmentsProblems(input, CHANGE, NOW)).toMatchObject({ always: [`amendment 1 (modified ${CON}): a constraint has no capability criteria`], pending: [] });
+    });
+  });
+});
+
 describe("specHash and the body", () => {
   it("does not change when the capability's prose body is edited", () => {
     const { tree: out } = applyAmendments(tree([{ target: CAP, delta: "modified", summary: "s", proposed: "New" }]), CHANGE, OPTS);
@@ -518,6 +624,16 @@ describe("appendHistory", () => {
     const body = appendHistory("## History\n\n- a", "- b: Typo\n\n## Notes");
     expect(body).toBe("## History\n\n- a\n- b: Typo ## Notes");
     expect(appendHistory(body, "- c")).toBe("## History\n\n- a\n- b: Typo ## Notes\n- c");
+  });
+});
+
+describe("bodyNotes", () => {
+  it("is the body without its History section, empty when History is all there is", () => {
+    expect(bodyNotes(undefined)).toBe("");
+    expect(bodyNotes(appendHistory(undefined, "- a"))).toBe("");
+    expect(bodyNotes("Raised by support.\n\n## History\n\n- a")).toBe("Raised by support.");
+    expect(bodyNotes("## History\n\n- a\n\n## Notes\n\nx")).toBe("## Notes\n\nx");
+    expect(bodyNotes("No history here.")).toBe("No history here.");
   });
 });
 

@@ -219,6 +219,16 @@ describe("per-type intent", () => {
     }
   });
 
+  it("declares acceptanceCriteria on a change as an optional string list, as on a task", () => {
+    const change = { id: ID, type: "change", title: "C", slug: "c" };
+    expect(ChangeIntentSchema.parse(change).acceptanceCriteria).toBeUndefined();
+    expect(ChangeIntentSchema.parse({ ...change, acceptanceCriteria: ["Wallets pay"] }).acceptanceCriteria).toEqual(["Wallets pay"]);
+    expect(ChangeIntentSchema.shape.acceptanceCriteria).toBeDefined();
+    for (const bad of ["Wallets pay", [{ id: "c1", text: "Wallets pay" }]]) {
+      expect(ChangeIntentSchema.safeParse({ ...change, acceptanceCriteria: bad }).success, JSON.stringify(bad)).toBe(false);
+    }
+  });
+
   it("records an optional discoveredFrom item and run on a change", () => {
     const change = { id: ID, type: "change", title: "C", slug: "c" };
     expect(ChangeIntentSchema.parse(change).discoveredFrom).toBeUndefined();
@@ -428,15 +438,29 @@ describe("isolation", () => {
   it("no runtime module imports the v2 modules yet", () => {
     const srcRoot = join(import.meta.dirname, "../../../src");
     // The v2 modules (schema, rules, state writer, state merge, bundle v2,
-    // dual-read loader, tree writer, apply engine, apply policy, product-edit
-    // handler, computed edges, product status, change landing, placement and
-    // its policy, change selection, change completion) may import each other;
-    // nothing else may import them until the v2 store wires them in. The
-    // exceptions are the `rex merge-state` git driver, which imports
-    // state-merge (branches merge state.yaml before any rex command reads it),
+    // dual-read loader, tree writer, store transaction, apply engine, apply
+    // policy, product-edit handler, computed edges, product status, change
+    // landing, placement and its policy, change selection, change completion,
+    // agent brief, migration plan and its specs, code owners and `rex codeowners`,
+    // release stamp and `rex release`) may import each other; nothing else may
+    // import them until the v2 store
+    // wires them in. The exceptions are the `rex merge-state` git driver,
+    // which imports state-merge (branches merge state.yaml before any rex
+    // command reads it),
     // and `rex export` / `rex import-bundle`, which import prd-bundle-v2 to
     // dispatch on the tree layout and the bundle envelope, so a v2 tree can be
-    // carried.
+    // carried, and the MCP tools that dispatch on the tree layout (add_item,
+    // get_item, get_prd_status) or serve the v2 tree alone (get_product,
+    // get_capability, place_change, apply_change, and the product report and
+    // change placement they read through), and `rex health`, which runs the
+    // v2 tree rules on a v2 tree (cli/commands/health.ts, core/health.ts), and
+    // the v2 CLI verbs: `rex product`, `rex change`, and `rex add` on a v2 tree
+    // (cli/commands/product.ts, change.ts, add-change.ts and their v2-cli.ts),
+    // and the layer-aware restructuring behind `rex reshape`, `rex reorganize`
+    // and `rex prune`: the change-layer store, the layer projection, and the
+    // product-layer reshape draft (cli/commands/reshape-product.ts), and
+    // `rex tree-diff`, which loads either layout (core/tree-source.ts) and
+    // diffs the product layer (core/map-diff.ts).
     const v2Files = new Set(
       [
         "schema/v2.ts",
@@ -446,6 +470,7 @@ describe("isolation", () => {
         "store/prd-bundle-v2.ts",
         "store/prd-model-reader.ts",
         "store/prd-model-writer.ts",
+        "store/prd-model-transaction.ts",
         "core/apply-amendments.ts",
         "core/apply-policy.ts",
         "core/product-edit.ts",
@@ -456,14 +481,43 @@ describe("isolation", () => {
         "core/placement-policy.ts",
         "core/change-selection.ts",
         "core/change-completion.ts",
+        "core/change-add.ts",
+        "core/change-place.ts",
+        "core/product-report.ts",
+        "cli/mcp-tools/add-item.ts",
+        "cli/mcp-tools/get-item.ts",
+        "cli/mcp-tools/get-prd-status.ts",
+        "cli/mcp-tools/get-product.ts",
+        "cli/mcp-tools/get-capability.ts",
+        "cli/mcp-tools/place-change.ts",
+        "cli/mcp-tools/apply-change.ts",
+        "core/change-brief.ts",
         "codeowners/plan.ts",
         "cli/commands/codeowners.ts",
+        "cli/commands/health.ts",
+        "core/health.ts",
+        "cli/commands/product.ts",
+        "cli/commands/change.ts",
+        "cli/commands/add-change.ts",
+        "cli/commands/v2-cli.ts",
+        "store/change-layer-store.ts",
+        "core/layer-projection.ts",
+        "core/product-reshape.ts",
+        "cli/commands/reshape-product.ts",
+        "core/tree-source.ts",
+        "core/map-diff.ts",
+        "core/release-stamp.ts",
+        "cli/commands/release.ts",
+        "migrations/v1-to-v2/migration-plan.ts",
+        "migrations/v1-to-v2/capability-spec.ts",
+        "migrations/v1-to-v2/migration-plan-data.ts",
+        "migrations/v1-to-v2/spec-pass.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),
     );
     const v2Import =
-      /from\s+["'][^"']*(?:schema\/v2(?:-rules)?|\/state-writer|\/prd-model-(?:reader|writer))(?:\.js)?["']|from\s+["']\.\/v2(?:-rules)?(?:\.js)?["']/;
+      /from\s+["'][^"']*(?:schema\/v2(?:-rules)?|\/state-writer|\/prd-model-(?:reader|writer|transaction))(?:\.js)?["']|from\s+["']\.\/v2(?:-rules)?(?:\.js)?["']/;
     const offenders: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {

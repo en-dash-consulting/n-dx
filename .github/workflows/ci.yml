@@ -12,6 +12,12 @@
 # Action versions: checkout@v6, setup-node@v6, pnpm/action-setup@v5 all run
 # on Node.js 24. upload-artifact@v4 and download-artifact@v4 are already on
 # Node.js 24 and do not require bumping.
+#
+# Every `uses:` is pinned to a commit SHA with the version in a trailing
+# comment. A version tag is a moving pointer the action's owner can repoint at
+# any commit, so a tag pin re-resolves on every run; a SHA does not. Dependabot
+# (.github/dependabot.yml) opens the PRs that move these pins, which is what
+# keeps pinning from meaning "never updated".
 
 name: CI
 
@@ -19,6 +25,24 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The merge queue builds main + the queued PR on a gh-readonly-queue/main/*
+  # branch and waits for the required checks to report on that merge_group run.
+  # Without this trigger they never report and the queue waits forever. Steps
+  # that read pull_request-only context (head_ref) must stay gated on
+  # github.event_name == 'pull_request'.
+  merge_group:
+
+# Least privilege for every job in this file. CI only ever needs to read the
+# checkout; nothing here writes to the repository, comments on a PR, or mints
+# a token. Without this block the jobs inherit the repository default, which
+# is write — and these jobs run code from the pull request branch, so the
+# token they hold is the blast radius of anything that branch executes.
+#
+# GitHub already downgrades the token to read-only for pull requests from a
+# fork, so this is what covers same-repository branches, which get the
+# repository default.
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -69,18 +93,27 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: ${{ matrix.fetch-depth }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: pnpm
+
+      # Before install: the lockfile decides what install fetches, so a gate
+      # that runs afterwards has already let the thing it is checking for run.
+      # Invoked directly rather than through `pnpm security:lockfile` so the
+      # gate does not depend on pnpm's script runner working against an
+      # uninstalled workspace. The script itself has no dependencies.
+      - name: Check supply-chain integrity
+        if: runner.os == 'Linux'
+        run: node scripts/check-lockfile-integrity.mjs
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -169,7 +202,7 @@ jobs:
       # not an error, so a collector that died before the write is still fine here.
       - name: Upload smoke artifact
         if: always() && matrix.smoke
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ndx-cli-smoke-${{ matrix.smoke }}
           path: ndx-cli-smoke-${{ matrix.smoke }}.json
@@ -245,21 +278,21 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
 
       - name: Download macOS smoke artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ndx-cli-smoke-macos
           path: smoke-macos
 
       - name: Download Windows smoke artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ndx-cli-smoke-windows
           path: smoke-windows

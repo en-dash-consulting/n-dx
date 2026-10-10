@@ -211,7 +211,7 @@ export type {
 } from "./model-pricing.js";
 
 // Budget preflight
-export { budgetPreflight } from "./budget-preflight.js";
+export { budgetPreflight, estimateTokens, CHARS_PER_TOKEN } from "./budget-preflight.js";
 export type { BudgetPreflightResult } from "./budget-preflight.js";
 
 // Token usage parsing
@@ -429,6 +429,11 @@ export {
   createLineRedactor,
 } from "./redact.js";
 export type { RedactionResult, LineRedactor } from "./redact.js";
+
+// The one git-remote-URL parser — sourcevision's manifest and iso export and
+// web's project route all read the same origin and must agree on what it says
+export { parseGitRemoteUrl, remoteToWebUrl, stripRemoteCredentials } from "./git-remote-url.js";
+export type { ParsedGitRemote, RemoteHostKind } from "./git-remote-url.js";
 
 // Per-user dashboard token file (`<ndx home>/auth.token`); the request check lives in web/shared/auth.ts
 export { AUTH_TOKEN_FILENAME, resolveAuthTokenPath, readAuthToken, ensureAuthToken, hasAuthToken } from "./auth-token.js";

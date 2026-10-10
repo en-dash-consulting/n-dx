@@ -2,7 +2,7 @@
 id: "f5d8c06e-1f67-4390-ab65-23b9799c6486"
 level: "task"
 title: "Run the v2 tree rules from rex health and pass structureHealth.maxCriteriaPerCapability to criteria-growth"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -10,11 +10,16 @@ tags:
   - "rex"
   - "pr-11"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-09T06:31:11.629Z"
+completedAt: "2026-10-09T06:47:02.052Z"
+endedAt: "2026-10-09T06:47:02.052Z"
+resolutionType: "code-change"
+resolutionDetail: "cmdHealth runs checkV2Rules on v2 trees with maxCriteria from structureHealth; v1 unchanged; tests in health-v2.test.ts"
 acceptanceCriteria:
   - "rex health on a v2 tree with a capability over 15 own plus inherited criteria prints a warning naming it (test)"
   - "Setting rex.structureHealth.maxCriteriaPerCapability in .n-dx.json changes the threshold rex health uses (test)"
   - "A capability at or under the threshold produces no warning in rex health output (test)"
-description: "checkV2Rules has no caller outside tests, so the criteria-growth warning never reaches `rex health`, and the configured threshold (rex.structureHealth.maxCriteriaPerCapability in .n-dx.json) is never read into RuleOptions.maxCriteria. The task that added the rule met its criteria at rule level only."
-lastModified: "2026-10-08T00:30:08.149Z"
+description: "checkV2Rules has no caller outside tests, so the criteria-growth warning never reaches `rex health`, and the configured threshold (rex.structureHealth.maxCriteriaPerCapability in .n-dx.json) is never read into RuleOptions.maxCriteria. The task that added the rule met its criteria at rule level only.\n\nDesign boundary (PR 18, 2026-10-09):\n- v1 trees keep today's behaviour exactly, as PR 17 did for add_item. On a v2 tree, ndx add, smart-add and capture create a change and propose placement; on a v1 tree they add a level-based item as today. rex health on a v1 tree reports exactly what it reports today; the v2 tree rules (f5d8c06e) and the landing check (da151468) run on v2 trees only. This repository's own PRD is v1, and ndx add, rex add, smart-add and rex health are used on it every day.\n- No skill text changes (.claude/, .agents/, packages/core/assistant-assets/skills/). Rewriting the PRD skills for v2 is PR 24 (d5f63839).\n- Write paths go through PR 31's store transaction (store.withTransaction).\n- Lane files: packages/rex/src/cli/ (commands, help), packages/rex/src/core/health.ts and the reshape/reorganize/prune modules, tree-diff, and packages/core for ndx add routing (spawn only, no library imports in orchestration scripts). Do not change web, hench, MCP tool shapes or the v2 schema.\n- Terminology: \"capability criteria\" for a capability's criteria; \"acceptance criteria\" (or \"done when\") for a work item's acceptanceCriteria. Never a bare \"criteria\" in help text or errors.\n\nAttempt 1 (run 9312fbf1, commit 5ef4660a3) implemented the change but the affected gate failed in rex: tests/unit/schema/v2.test.ts > isolation > \"no runtime module imports the v2 modules yet\" lists cli/commands/health.ts and core/health.ts as offenders. They are now intended v2 consumers: add both to that test's v2Files allowlist (and keep the rest of 5ef4660a3). Then the gate must pass."
+lastModified: "2026-10-09T06:47:02.283Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

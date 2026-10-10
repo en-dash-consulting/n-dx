@@ -28,7 +28,7 @@
  */
 export type CapabilityStatus = "proposed" | "changing" | "met" | "revised" | "retired";
 
-/** Whether a map node is working right now. Computed from open fixes. */
+/** Whether a product node is working right now. Computed from open fixes. */
 export type CapabilityHealth = "ok" | "defective";
 
 /** Display order: unbuilt first, then in flight, then settled. */
@@ -93,7 +93,7 @@ export const CHANGE_STAGE_LABELS: Readonly<Record<ChangeStage, string>> = {
 /** Heading for changes with no `plannedRelease`. */
 export const UNSCHEDULED_RELEASE_LABEL = "Unscheduled";
 
-// ── Map layer ────────────────────────────────────────────────────────
+// ── Product layer ────────────────────────────────────────────────────
 
 /** How a change moves a capability's spec. */
 export type AmendmentDelta = "added" | "modified" | "removed";
@@ -138,7 +138,7 @@ export interface ConstraintRow {
   title: string;
   statement?: string;
   health: CapabilityHealth;
-  /** `"all"` binds every map node; otherwise the titles it binds. */
+  /** `"all"` binds every product node; otherwise the titles it binds. */
   appliesTo: "all" | string[];
 }
 
@@ -169,7 +169,7 @@ export interface AmendedNode {
   delta: AmendmentDelta;
 }
 
-/** A map node a change works on without amending it. */
+/** A product node a change works on without amending it. */
 export interface TouchedNode {
   id: string;
   title: string;

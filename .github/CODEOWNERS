@@ -1,0 +1,49 @@
+# Code owners for n-dx.
+#
+# The `main` ruleset already sets `require_code_owner_review: true`. Until this
+# file existed that rule matched no path and so enforced nothing; every path
+# listed below now needs an approval from @en-dash-consulting/n-devs, which is
+# narrower than the repository's collaborator list.
+#
+# This is deliberately not a catch-all. A `*` owner would make every PR in the
+# repository wait on the same team and train everyone to treat the requirement
+# as noise. Listed here instead are the files where a change decides what the
+# agent may execute, what reaches a credential, or what runs in CI — the places
+# where a review needs someone who knows the threat model rather than whoever
+# is free.
+#
+# Last match wins, so order matters: later entries override earlier ones.
+
+# ── What runs in CI, and with what identity ─────────────────────────────────
+# Workflow files can mint tokens, read secrets, and publish to npm. A change
+# here is a change to the trust boundary, not to the build.
+/.github/                       @en-dash-consulting/n-devs
+/.github/workflows/             @en-dash-consulting/n-devs
+
+# ── Supply chain ────────────────────────────────────────────────────────────
+# `.npmrc` carries ignore-scripts and minimum-release-age; relaxing either
+# re-opens install-time execution and freshly-published-package attacks. The
+# lockfile is where a dependency-confusion swap would land.
+/.npmrc                         @en-dash-consulting/n-devs
+/pnpm-lock.yaml                 @en-dash-consulting/n-devs
+/package.json                   @en-dash-consulting/n-devs
+
+# ── What the agent may execute and read ─────────────────────────────────────
+# The guard decides which commands run and which paths are writable;
+# repo-trust decides whether a checkout's own config is honoured; child-env
+# decides which environment variables reach a child process.
+/packages/hench/src/guard/                      @en-dash-consulting/n-devs
+/packages/llm-client/src/repo-trust.ts          @en-dash-consulting/n-devs
+/packages/llm-client/src/child-env.ts           @en-dash-consulting/n-devs
+
+# ── Policy gates ────────────────────────────────────────────────────────────
+# These are the tests that fail a PR for crossing an architectural or
+# supply-chain boundary. Weakening one is how a later change crosses it quietly.
+/tests/e2e/architecture-policy.test.js          @en-dash-consulting/n-devs
+/tests/e2e/domain-isolation.test.js             @en-dash-consulting/n-devs
+/scripts/check-obfuscated-code.mjs              @en-dash-consulting/n-devs
+/scripts/check-lockfile-integrity.mjs           @en-dash-consulting/n-devs
+
+# ── Security policy ─────────────────────────────────────────────────────────
+/SECURITY.md                    @en-dash-consulting/n-devs
+/.github/CODEOWNERS             @en-dash-consulting/n-devs

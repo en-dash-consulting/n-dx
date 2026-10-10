@@ -1701,6 +1701,119 @@ describe("architecture policy: PRD storage invariant (prd.md migration-helper-on
 });
 
 // ---------------------------------------------------------------------------
+// One git-remote-URL parser
+// ---------------------------------------------------------------------------
+
+/**
+ * Interpreting a git remote URL happens in exactly one module.
+ *
+ * Three readers need the origin remote — the iso export turns it into browsable
+ * source links, `.sourcevision/manifest.json` records it as the repository's
+ * identity, and the dashboard's project header shows the repository's name — and
+ * each had grown its own regex. The copies disagreed: web's split on `[/:]` and
+ * so read `ssh://git@host:7999/PROJ/repo.git` as the repo `repo` with no owner
+ * at all, while sourcevision's `remoteToWebUrl` could not parse that form and
+ * answered undefined. Two surfaces, one repository, two different names.
+ *
+ * The parser lives in `@n-dx/llm-client` because it is the one tier both
+ * sourcevision (domain) and web can reach. The allowlist below is one file.
+ *
+ * `packages/sourcevision/src/util/git-remote.ts` is NOT on it: it runs `git` and
+ * re-exports the parser, but owns no parsing of its own — which is exactly what
+ * this guard is for.
+ */
+const GIT_REMOTE_PARSER_FILES = new Map([
+  [
+    "packages/llm-client/src/git-remote-url.ts",
+    "The one parser: scheme and scp-style splitting, .git stripping, host classification.",
+  ],
+  [
+    "packages/core/export.js",
+    "Orchestration tier — the spawn-only rule forbids importing from packages at all " +
+      "(config.js is the single documented exemption), so `ndx export` cannot reach the " +
+      "parser. Its two sites derive a GitHub Pages base path and a repo name from the " +
+      "origin remote.",
+  ],
+  [
+    "packages/web/src/viewer/components/prd-tree/index-md-sections.ts",
+    "Viewer code — bundled for the browser and limited to viewer/external.ts for imports, " +
+      "so it cannot reach a foundation-tier module. It strips .git from the remote the " +
+      "server sent it to build a commit link. The fix is for the server to send an " +
+      "already-normalized URL, which changes the server→viewer payload and belongs with " +
+      "the dashboard's Bitbucket work rather than here.",
+  ],
+]);
+
+/**
+ * The signature of remote-URL parsing: stripping a `.git` suffix. Every copy
+ * that existed spelled it this way, and nothing else in the monorepo writes an
+ * escaped `\.git` in a regex. The negative lookahead keeps `\.github` — the
+ * workflows directory in sdlc-profile.ts — from reading as a match.
+ */
+const GIT_SUFFIX_STRIP = /\\\.git(?![A-Za-z])/;
+
+describe("architecture policy: one git-remote-URL parser", () => {
+  it("no module outside the allowlist parses a git remote URL", () => {
+    const violations = [];
+
+    for (const file of walk(ROOT)) {
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
+      if (GIT_REMOTE_PARSER_FILES.has(rel)) continue;
+      if (!rel.startsWith("packages/")) continue;
+      if (/\.test\.(ts|js|mjs)$/.test(rel) || /(?:^|\/)tests?\//.test(rel)) continue;
+
+      if (GIT_SUFFIX_STRIP.test(readFileSync(file, "utf-8"))) violations.push(rel);
+    }
+
+    if (violations.length > 0) {
+      expect.fail(
+        [
+          "A module outside the allowlist interprets a git remote URL:",
+          "",
+          ...violations.map((v) => `  - ${v}`),
+          "",
+          "Import parseGitRemoteUrl / remoteToWebUrl / stripRemoteCredentials from",
+          "@n-dx/llm-client instead. A second copy is free to disagree with the first",
+          "about what the same remote names — web's old split on [/:] read",
+          "ssh://git@host:7999/PROJ/repo.git as the repo 'repo' with no owner, while",
+          "sourcevision's could not parse that form at all. One repository, two names,",
+          "on two surfaces of the same product.",
+          "",
+          "If a tier boundary genuinely prevents reaching the parser, add the file to",
+          "GIT_REMOTE_PARSER_FILES with the constraint as its reason.",
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("GIT_REMOTE_PARSER_FILES contains no stale entries", () => {
+    const stale = [...GIT_REMOTE_PARSER_FILES.keys()].filter(
+      (rel) => !existsSync(join(ROOT, rel)),
+    );
+    expect(stale, `Remove deleted paths from GIT_REMOTE_PARSER_FILES: ${stale.join(", ")}`).toEqual(
+      [],
+    );
+  });
+
+  it("every allowlist entry still parses a remote, and gives a reason", () => {
+    // An entry whose parsing has since been removed should leave the list, or
+    // the allowlist slowly becomes permission to add more.
+    const unused = [];
+    for (const [rel, reason] of GIT_REMOTE_PARSER_FILES) {
+      expect(reason?.length, `${rel} needs a reason`).toBeGreaterThan(20);
+      const full = join(ROOT, rel);
+      if (existsSync(full) && !GIT_SUFFIX_STRIP.test(readFileSync(full, "utf-8"))) {
+        unused.push(rel);
+      }
+    }
+    expect(
+      unused,
+      `No longer parse a remote — remove from GIT_REMOTE_PARSER_FILES: ${unused.join(", ")}`,
+    ).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // DEP0190 spawn guard: no shell:true+args in CLI-binary spawn sites
 // ---------------------------------------------------------------------------
 

@@ -151,7 +151,7 @@ export function resolveItemRef(items: PRDItem[], ref: string): ItemRefMatch[] {
  * the preferred legacy path, and the markdown parser throwing on it blocks
  * every rex command. Nothing is ever legitimately exported into `.rex/`.
  */
-function assertOutsideRexDir(outPath: string, dir: string, noun: string, example: string): void {
+export function assertOutsideRexDir(outPath: string, dir: string, noun: string, example: string): void {
   const rexRoot = resolveRexPaths(dir).rexDir;
   const rel = relative(rexRoot, outPath);
   const inside = rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));

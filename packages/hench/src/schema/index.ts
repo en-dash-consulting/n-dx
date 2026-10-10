@@ -46,6 +46,7 @@ export type {
   RunRecord,
   RunTrustRecord,
   RunCommitRecord,
+  RunCommitItemMismatch,
   RunCompletionHold,
   RunGateOnlyRetry,
   RunSessionRecord,
