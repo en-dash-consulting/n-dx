@@ -276,6 +276,14 @@ export function classifyRole(filePath: string, language: string, langConfig?: La
 
   const config = langConfig ?? typescriptConfig;
 
+  // 0. Terraform (.tf, .tfvars, terragrunt.hcl, .tftest.hcl) is config until the
+  //    Terraform structure model lands. Zones, classification and enrichment
+  //    read source and test files, so a Terraform folder in a TypeScript or Go
+  //    repo leaves their output unchanged.
+  if (language === "Terraform") {
+    return "config";
+  }
+
   // 1. Test — language-specific patterns (e.g. _test.go for Go, .test./.spec. for TS)
   if (config.testFilePatterns.some((pat) => pat.test(filePath))) {
     return "test";
