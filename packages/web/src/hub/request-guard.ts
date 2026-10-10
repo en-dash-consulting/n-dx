@@ -99,9 +99,13 @@ function rejectUnauthenticated(res: ServerResponse): true {
  * a header or the cookie, or — for a safe-method navigation — carry it once
  * as `?ndx_token=` and be redirected with the cookie set. Returns true when
  * the request has been answered.
+ *
+ * The redirect fires even when the cookie already authenticates the request
+ * — the printed URL is reopened on every `ndx start` — so the token never
+ * stays in the address bar and the child never sees the parameter.
  */
 export function enforceHubToken(req: IncomingMessage, res: ServerResponse, token: string): boolean {
-  if (isAuthenticated(req.headers, token)) return false;
+  const authenticated = isAuthenticated(req.headers, token);
   const method = (req.method || "GET").toUpperCase();
   if (method === "GET" || method === "HEAD") {
     const { token: fromQuery, location } = splitTokenQuery(req.url ?? "/");
@@ -111,6 +115,7 @@ export function enforceHubToken(req: IncomingMessage, res: ServerResponse, token
       return true;
     }
   }
+  if (authenticated) return false;
   return rejectUnauthenticated(res);
 }
 

@@ -9,11 +9,11 @@ tags:
   - "ndx-adversarial-review"
 source: "ndx-adversarial-review"
 startedAt: "2026-09-11T22:02:06.757Z"
-completedAt: "2026-10-07T19:29:49.247Z"
-endedAt: "2026-10-07T19:29:49.247Z"
+completedAt: "2026-10-10T19:35:16.540Z"
+endedAt: "2026-10-10T19:35:16.540Z"
 description: "Cross-package epic for defects that can leak a user's secrets or project content, or let untrusted input (repo content, prompt injection, a web page open alongside the dashboard) execute or exfiltrate on a user's machine when they run n-dx against their own repository. Groups findings from adversarial security reviews so they are visible as a class rather than scattered under per-package epics.\n\nThreat model assumed by items here: n-dx runs on a developer's machine against a repo they may not fully trust (cloned, forked, or with a PR checked out); the dashboard (`ndx start`) is loopback-only but shares a browser with arbitrary websites; hench may run autonomously (`--auto`) against repo content that can carry prompt injection; anything under `.rex/`, `.hench/`, `.n-dx.json` may end up in `git add -A`."
-lastModified: "2026-10-07T19:29:49.782Z"
-lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+lastModified: "2026-10-10T19:35:16.865Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -22,5 +22,6 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 |-------|--------|
 | [Adversarial review 2026-09-14 — findings against the September security fix branch](./adversarial-review-2026-09-14-findings/index.md) | completed |
 | [Adversarial security review 2026-09-11 — findings](./adversarial-security-review-2026-09-11/index.md) | completed |
+| [Vendor CLI credential filter: follow-ups to #623](./vendor-cli-credential-filter-follow/index.md) | completed |
 | [`/api/hench/adaptive/override` and `/apply` write arbitrary keys into `.hench/config.json`](./api-hench-adaptive-override-and-apply.md) | completed |
 | [Require a per-user token on the hub, dashboard and preview loopback servers](./require-a-per-user-token-on-the-hub.md) | completed |
