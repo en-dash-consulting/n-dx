@@ -26,7 +26,7 @@ The table below is derived from [`packages/core/assistant-assets/manifest.json`]
 | [`ndx-zone`](#ndx-zone) | Deep-dive into an architectural zone's structure and health | `/ndx-zone [zone-id]` |
 | [`ndx-work`](#ndx-work) | Pick up a task from the PRD and begin working on it | `/ndx-work [task-id]` |
 | [`ndx-config`](#ndx-config) | View or change n-dx configuration with guided assistance | `/ndx-config [key] [value]` |
-| [`ndx-reshape`](#ndx-reshape) | Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps | `/ndx-reshape` |
+| [`ndx-reshape`](#ndx-reshape) | Restructure a v1 PRD tree — regroup epics, change levels, merge overlaps | `/ndx-reshape` |
 | [`ndx-feedback`](#ndx-feedback) | Submit feedback, bug reports, or feature requests for n-dx | `/ndx-feedback [description]` |
 | [`ndx-adversarial-review`](#ndx-adversarial-review) | Attack a change or a completion claim, triage what breaks, capture what the user approves | `/ndx-adversarial-review [task-id \| name \| topic]` |
 

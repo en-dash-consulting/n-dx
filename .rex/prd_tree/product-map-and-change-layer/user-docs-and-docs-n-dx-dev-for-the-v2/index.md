@@ -24,5 +24,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [change-management guide tells users to run commands that do not exist and diff a PRD file that is never written](./change-management-guide-tells-users-to.md) | completed |
 | [Correct the concepts pages on apply, Changing, steward enforcement and the evidence path](./correct-the-concepts-pages-on-apply.md) | completed |
 | [Draft the concepts pages for the PRD as product layer plus change layer](./draft-the-concepts-pages-for-the-prd.md) | completed |
-| [Rewrite the guides, package pages and examples for the v2 model](./rewrite-the-guides-package-pages-and.md) | pending |
+| [Rewrite the guides, package pages and examples for the v2 model](./rewrite-the-guides-package-pages-and.md) | in_progress |
 | [Update the docs.n-dx.dev homepage, navigation and the 0.10.0 release note](./update-the-docs-n-dx-dev-homepage.md) | pending |

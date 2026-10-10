@@ -1,383 +1,146 @@
 # Keeping Your PRD Alive
 
-Your PRD starts fresh and accurate. Three months later, completed tasks still sit marked "pending", epics describe features you shipped last quarter, and findings from solved problems keep regenerating. This guide walks through keeping the PRD synchronized with reality — not just at setup, but as your codebase evolves.
+Your PRD starts fresh and accurate. Three months later, finished work still sits open, requirements describe behaviour you changed last quarter, and findings from solved problems keep regenerating. This guide walks through keeping the PRD true as your codebase evolves.
 
-## The scenario
+The PRD is the product's requirements (the product layer: areas, capabilities, constraints) plus the changes being made to them (the change layer: changes, tasks, subtasks). See [The PRD](./concepts/). The two layers drift in different ways, and most of the requirements' drift is computed for you.
 
-You shipped v1.0 six weeks ago. The PRD has 40 tasks — 20 are done, 10 are half-way through, 5 are blocked, and 5 were never relevant. New features went in without updating the PRD. The agent keeps re-proposing fixes for problems you already solved. The PRD has become noise instead of a tool.
+::: info v1 projects
+Until the storage migration ships, `ndx init` creates v1 projects: one tree of epics, features, tasks and subtasks in `.rex/prd_tree/`, with no product layer. A v1 PRD has only work items, so all of its drift is the work drift below. [v1 projects](#v1-projects) at the end covers what is different.
+:::
 
-This guide covers three maintenance loops:
+## What drifts
 
-1. **Post-sprint pruning** — remove completed work, archive what's no longer relevant
-2. **Monthly re-analysis** — surface new drift before it compounds
-3. **Ongoing acknowledgment** — silence resolved findings so proposals stay relevant
+| Layer | Drift | How it shows |
+|-------|-------|--------------|
+| Product | The build broke a requirement | The capability reads **defective**: an open fix touches it, or one of its checks fails |
+| Product | Someone edited a requirement and nothing is building the edit yet | The capability reads **revised**, and rex has drafted a change in the Inbox for it |
+| Product | A requirement nobody wants any more | Still listed, reading *met* or *proposed*. Retire it with a change that removes it |
+| Change | Work that shipped but was never closed | A change or task still open after its code merged |
+| Change | Work that will never happen | A change still open after its idea was dropped |
+| Change | Unplaced work | Changes waiting in the Inbox with `needsPlacement` |
+| Findings | Solved problems keep coming back | `ndx recommend` re-proposes a finding you already fixed |
 
-## Understanding PRD drift
+Status is computed, not set. A capability is *met* when its spec hash matches the one recorded when it was last built and its checks pass, so nobody marks a requirement done and nothing goes stale by being forgotten. Releases are a field on a change (`plannedRelease`, `shippedIn`), so there are no finished release containers to clear away either.
 
-PRD drift happens naturally as codebases evolve. It's not a failure — it's a signal that the PRD needs maintenance.
-
-### Common drift patterns
-
-**Completed work left in the PRD:**
-- Task marked `pending` but the feature shipped 2 sprints ago
-- Epic still shows 3 pending tasks that were actually split and completed piecemeal
-- Subtasks marked `in_progress` because the agent was interrupted and you moved on
-
-**Obsolete items:**
-- Epic for a feature you've since deprecated
-- Epics from RFCs that were rejected or shelved
-- Tasks for refactoring that became unnecessary after a redesign
-
-**Orphaned tasks:**
-- Features completed outside the PRD (manually, by someone without access, or before n-dx was set up)
-- Bugs fixed before they were added to the PRD
-- Design debt resolved during feature work
-
-**Stale findings:**
-- SourceVision suggests splitting a file you've already split
-- Findings from a module you've since rewritten keep regenerating
-- Recommendations for problems you've explicitly decided not to fix
-
-### Detecting drift
-
-**Quick health check:**
+## Detecting drift
 
 ```sh
-ndx status .          # scan for pending/completed mismatches
+rex product show .        # every capability and constraint with status and health
+rex health .              # tree rules, reader warnings and the landing check
+ndx analyze .             # fresh codebase analysis
+ndx recommend --actionable-only .
 ```
 
-Look for clusters of completed tasks from the same epic. If you see 5 completed from one epic and 3 still pending from that same epic, you likely have some stale pending items.
+`rex product show` prints every area, capability and constraint with its status, adding *defective* when it is broken. The rows to look for are *revised* (the spec has moved ahead of the build) and *defective* (it is broken now); the dashboard's Product page will highlight them. `rex health` on a v2 PRD runs the tree rules and checks that completed changes landed; it exits non-zero on a rule error, so it also works as a CI gate.
 
-**Full diagnostic:**
-
-```sh
-rex validate .        # check structural integrity
-ndx ci .              # full analysis pipeline (may take a few minutes)
-```
-
-`rex validate` checks for orphaned items (tasks with no parent, parent-level mismatches, date anomalies).
-
-`ndx ci` runs the full pipeline: re-analyzes the codebase, checks PRD health metrics (completion rate, item age distribution), and generates a report. Read the report for completion percentage, item age stats, and any structural issues flagged.
+From an assistant, the same views are the `get_product`, `get_capability` and `get_prd_status` MCP tools. `get_prd_status` reports the Inbox count.
 
 ## The maintenance loop
 
-### Cycle 1: Mark what's actually done
+### 1. Empty the Inbox
 
-Before pruning, make sure your PRD reflects what's actually shipping.
-
-**Manual sweep (15 minutes per epic):**
-
-For each epic, walk through the pending/in-progress tasks:
+Every new input lands as a change in the Inbox. A change that cannot be placed confidently waits with `needsPlacement`; autonomous runs skip it until someone places it.
 
 ```sh
-ndx status .
+rex change place <change> .                                   # the shortlist, best first
+rex change place <change> --target=<node> --relation=touches . # it works on the capability
+rex change place <change> --target=<node> --relation=amends \
+  --capability-criterion="c3: A refund reaches the card" .    # it changes the requirement
 ```
 
-For each task, ask: "Is this shipped?" If yes, mark it completed with the resolution type:
+A change that only *touches* a capability is a fix or a refactor: it writes nothing to the product layer and needs no steward. A change that *amends* one carries the new statement or capability criteria, and [apply](./concepts/changes-and-apply) writes them when it completes.
+
+### 2. Close finished work, cancel dropped work
+
+For each open change, ask whether its code has merged. If it has, close its remaining tasks; if the idea was dropped, cancel the change rather than leaving it open. A cancelled change no longer counts toward any capability's status. From an assistant, use `update_task_status`; in the dashboard, edit the item's status.
+
+### 3. Resolve the requirements that need attention
+
+- **Revised** capabilities have a drafted change in the Inbox. Place it and schedule it, or edit the requirement back to its built spec, which withdraws the draft.
+- **Defective** capabilities have an open fix or a failing check. Make sure a change touches each one and is on a planned release.
+- **Unwanted** requirements are retired by a change that amends them with a *removed* delta. Applying it marks the node *retired*.
+
+To change a requirement on purpose, edit it directly:
 
 ```sh
-rex update <task-id> --status=completed --resolution-type=code-change
+rex product edit <node> --statement="A shopper pays by card or wallet." .
+rex product edit <node> --capability-criterion="c4: A wallet payment confirms in one step" .
+rex product edit <node> --statement="A shopper pays by card." --editorial .   # wording only
 ```
 
-Resolution types are:
-- `code-change` — you or the agent wrote the code
-- `config-override` — resolved by configuration, not code
-- `acknowledgment` — you decided not to do it (mark these `deferred` instead)
-- `deferred` — explicitly postponed; keep for future reconsideration
+Any edit except an `--editorial` one makes the capability read *revised* and drafts a change to build it. Capability criteria are the requirement's standing spec; they are not the acceptance criteria ("done when") of the change that builds it.
 
-**Batch update via dashboard (if you have `ndx start` running):**
-
-Open the dashboard (typically `http://localhost:3117`), navigate to the PRD tree, and mark items complete through the UI. Changes are written to the folder tree at `.rex/prd_tree/` immediately.
-
-### Cycle 2: Archive completed epics
-
-Once you've marked individual tasks, check if entire epics are done:
-
-```sh
-ndx status .          # find completed epics
-```
-
-An epic is "done" when all its tasks are either `completed` or `deferred`.
-
-For epics that are fully complete and you won't revisit:
-
-```sh
-rex remove <epic-id>
-```
-
-This moves the epic to `.rex/archive.json` — a permanent archive that preserves the completed work for audit trails and recovery if needed.
-
-**Recovering from archive (if you need to revisit):**
-
-```sh
-rex restore <epic-id>
-```
-
-Items in the archive are tagged with their completion timestamp, so you can search the archive for items completed in a specific time window.
-
-### Cycle 3: Re-analyze and surface new drift
-
-Run a fresh analysis to pick up architectural changes:
+### 4. Re-analyze and acknowledge
 
 ```sh
 ndx analyze .
-```
-
-This generates a new `.sourcevision/CONTEXT.md` with updated findings. These findings may be:
-- **New problems** from code that changed since the last analysis
-- **Resolved problems** from work you've completed (but the findings haven't been acknowledged yet)
-- **Persistent problems** that are still there and maybe got worse
-
-Compare the new findings with the old ones. New findings go into the recommendation cycle (see below). Persistent findings that you can't fix belong in the backlog.
-
-### Cycle 4: Propose and acknowledge
-
-Generate recommendations based on the fresh analysis:
-
-```sh
 ndx recommend --actionable-only .
-```
-
-Review the proposals. For each proposed item, decide:
-- **Add it**: accept it into the PRD
-- **Acknowledge it**: mark the finding as resolved (you've made a deliberate choice not to fix it), so it won't keep regenerating
-
-If you've already fixed a problem but the finding persists, acknowledge it:
-
-```sh
 ndx recommend --acknowledge .
 ```
 
-You'll be prompted for which findings are resolved. Select the ones you've already fixed. These are marked in `.sourcevision/acknowledged.json` — the next time you run `ndx recommend`, these findings won't be re-proposed.
+Analysis surfaces new problems, and problems your recent work resolved. Accept the findings that matter as changes; acknowledge the ones you have fixed or have decided to live with, so they stop regenerating. Acknowledgments are kept in `acknowledged-findings.json` in rex's directory (`.rex/` on a v1 project), are gitignored as personal triage notes, and do not expire. See [Self-Heal Loop](./self-heal) for how acknowledged findings are matched.
+
+### 5. Clean up the change layer
+
+`ndx reshape`, `ndx reorganize` and `ndx prune` work on the change layer of a v2 PRD as they do on a v1 tree. They never write the product layer, which changes only through applied changes.
+
+```sh
+ndx reorganize .   # detect and propose structural fixes
+ndx prune .        # remove completed work, keeping applied changes that added or removed a node
+```
+
+`prune`, `reshape` and `reorganize` record what they remove in `archive.json` in rex's directory (100 batches, auto-trimmed). It is an audit trail and a source for recovering an item by hand; no command restores from it.
 
 ### Example maintenance session
 
-Here's a complete cycle from start to finish:
-
 ```sh
-# 0. Create a branch for the maintenance work
 git checkout -b chore/prd-maintenance
 
-# 1. Mark what's actually done
-ndx status .                                    # review the tree
-rex update <task-id> --status=completed --resolution-type=code-change
-rex update <task-id> --status=deferred
-# ... for each task you've completed
-
-# 2. Remove finished epics
-rex remove <epic-id>                            # archive the epic
-git add -A && git commit -m "Archive completed epic: Feature X"
-
-# 3. Re-analyze
+rex product show .                         # what needs attention
+rex health .
+rex change place <change> --target=<node> --relation=touches .
 ndx analyze .
-cat .sourcevision/CONTEXT.md | grep -A 20 "findings"
-
-# 4. Propose and filter
 ndx recommend --actionable-only .
-# Review proposals; accept the ones that matter, skip noisy ones
-
-# 5. Acknowledge resolved findings (don't re-propose them)
 ndx recommend --acknowledge .
+ndx prune .
 
-# 6. Review the cleaned PRD
-ndx status .
-ndx validate .
-
-# 7. Commit
-git add -A && git commit -m "PRD maintenance: updated status, acknowledged findings"
-git push -u origin chore/prd-maintenance
+git add -A && git commit -m "PRD maintenance: placed inbox, closed shipped work"
 ```
 
 ## Recommended cadence
 
-**Post-sprint (weekly or bi-weekly):**
+| When | What | Time |
+|------|------|------|
+| After each sprint | Empty the Inbox; close shipped work; cancel dropped work | 10–15 minutes |
+| Monthly | The whole loop: Inbox, close, requirements, analyze and acknowledge, prune | 45–60 minutes |
+| Before a release | `rex product show` has no unplanned *defective* rows; `rex health` passes | 5 minutes |
 
-Time: 10–15 minutes.
+## Recovering from a mistake
 
-Right after a sprint closes, mark completed tasks and remove finished epics. This is the highest-ROI maintenance — the work is fresh in your mind, and you'll catch "actually done but not marked" items before they stack up.
-
-```sh
-ndx status .
-# (scan and mark)
-rex remove <finished-epic-ids>
-```
-
-**Monthly deep clean:**
-
-Time: 45 minutes to 1 hour.
-
-Once a month, do the full cycle: mark completion, analyze, recommend, acknowledge. This catches drift before it compounds.
+The PRD is files in git, so git is the first recovery tool:
 
 ```sh
-ndx analyze .
-ndx recommend --actionable-only .
-ndx recommend --acknowledge .
-ndx status .
-git status --short .rex/prd_tree/ | wc -l   # how many changes? (includes new items)
+git diff -- .ndx/rex/              # see what changed (.rex/prd_tree/ on v1)
+git checkout -- .ndx/rex/          # discard uncommitted PRD changes
+git revert <commit-hash>           # undo a committed one
 ```
 
-**Quarterly full reset (if PRD drift is high):**
-
-If you go 3+ months without maintenance and the PRD is 50%+ stale, consider a full reset:
+`ndx prd export` writes the whole PRD to a portable JSON bundle outside rex's directory, and `ndx prd import --replace` rebuilds it from one. Take a bundle before a large restructuring:
 
 ```sh
-ndx ci .                                        # full analysis + health report
-ndx plan --accept .                             # re-analyze and accept all proposals
-# This rewrites the PRD from scratch based on current codebase
+ndx prd export --out=./prd-backup.json .
+# restore: ndx prd import --in=./prd-backup.json --replace --yes .
 ```
 
-This is safe — the old PRD goes to archive, and you start fresh with a clean analysis. Archive items are available for recovery if needed.
+## v1 projects
 
-## Identifying and fixing specific drift patterns
+A v1 PRD has no product layer, so there is no computed status to lean on: every item's status is set by hand or by a run, and drift shows only as items left open.
 
-### Pattern 1: Completed work not marked
-
-**Signal:** You remember finishing a feature, but the task still shows `pending`.
-
-**Fix:**
-
-1. Find the task: `ndx status . | grep <feature-name>`
-2. Review its acceptance criteria against the current codebase
-3. If fully met, mark it: `rex update <task-id> --status=completed --resolution-type=code-change`
-4. If partially met, edit the task to reflect what's actually pending: `rex update <task-id> --title="<narrower scope>"`
-
-### Pattern 2: Stale epics
-
-**Signal:** An epic describes work from last quarter that you've moved away from.
-
-**Fix:**
-
-1. List the epic's tasks: `ndx status . | grep -A 10 "Epic Name"`
-2. Mark its completed tasks as complete
-3. If all tasks are done or deferred: `rex remove <epic-id>`
-4. If some tasks are still pending but you're deprioritizing them: move to a "backlog" epic or mark them `deferred`
-
-### Pattern 3: Orphaned tasks
-
-**Signal:** You see a task in the PRD, but the code it describes doesn't exist or is already done.
-
-**Fix:**
-
-1. Verify the current state: read the relevant code, search for the described change
-2. If already done: mark `completed`
-3. If never going to happen: mark `deferred` with a reason, or `remove` entirely
-4. If partially done: narrow the task scope and mark what's completed
-
-### Pattern 4: Regenerating findings
-
-**Signal:** You run `ndx recommend` and see the same finding about a module you've already fixed.
-
-**Fix:**
-
-1. Verify the finding is actually resolved: re-read the module, check imports, verify the anti-pattern is gone
-2. If resolved: run `ndx recommend --acknowledge .` and mark the finding as acknowledged
-3. If not resolved: add the finding to the PRD as a task that didn't get picked up in earlier cycles, or acknowledge that you're living with the anti-pattern deliberately (sometimes acceptable for non-blocking patterns)
-
-## Archive management
-
-Every time you run `rex remove <item-id>`, the item goes into `.rex/archive.json`. The archive serves as an audit trail — you can recover items if you change your mind, and you can see what you decided not to pursue.
-
-### Viewing the archive
-
-```sh
-cat .rex/archive.json | jq '.items | length'        # how many archived items?
-cat .rex/archive.json | jq '.items[] | select(.completedAt != null) | .title' # show completed items
-```
-
-### Recovering from archive
-
-```sh
-rex restore <item-id>     # restore a specific item
-```
-
-The item returns to the PRD tree under its original parent, with all history intact (timestamps, completion status, all metadata).
-
-### Pruning the archive
-
-The archive auto-trims at 100 batches (to prevent unbounded growth). There is no command for pruning the archive by age. Archived items are only used for recovery and audit, so the file is safe to delete (`rm .rex/archive.json`) if it grows large; you lose the ability to restore those items.
-
-## Common pitfalls and recovery
-
-### Pitfall 1: Over-pruning (removed too much)
-
-You ran `rex remove` on an epic and immediately regretted it.
-
-**Recovery:**
-
-```sh
-rex restore <epic-id>
-git diff .rex/prd_tree/                               # see the diff
-```
-
-If you committed already:
-
-```sh
-git revert <commit-hash>
-rex restore <epic-id>
-```
-
-### Pitfall 2: PRD drifted so far it's unusable
-
-You haven't done maintenance for 6+ months. The PRD is 80% stale, and it's not worth trying to salvage item-by-item.
-
-**Recovery:**
-
-```sh
-ndx analyze .
-ndx plan --accept .          # full re-analysis and PRD rewrite
-```
-
-This overwrites your PRD based on the current codebase. All old items go to archive. Start fresh.
-
-If you want to preserve some of the old PRD structure before resetting:
-
-```sh
-ndx prd export --out=./prd-backup.json .   # portable bundle, written outside .rex/
-                                           # restore: ndx prd import --in=./prd-backup.json --replace --yes .
-ndx plan --accept .
-# Now .rex/archive.json contains your old items for recovery
-```
-
-### Pitfall 3: Findings keep regenerating even after acknowledging
-
-You acknowledged a finding, but `ndx recommend` keeps proposing it.
-
-**Cause:** The finding is coming from a different source (e.g., different SourceVision runs with different configurations, or the code genuinely still has the anti-pattern).
-
-**Fix:**
-
-1. Verify the problem is actually fixed: re-read the code, re-run analysis with `ndx analyze --full .`
-2. If fixed: wait for the next `ndx recommend` run — acknowledgment is cached for 30 days before refreshing
-3. If not fixed: either fix it properly, or mark it `deferred` in the PRD with an explanation of why you're living with it
-
-## A complete maintenance checklist
-
-**Weekly (post-sprint):**
-- [ ] `ndx status .` — scan for completed work not marked
-- [ ] `rex update` for each completed task
-- [ ] `rex remove` for finished epics
-- [ ] `git commit -m "PRD maintenance: marked completed work"`
-
-**Monthly (full cycle):**
-- [ ] Run weekly checklist above
-- [ ] `ndx analyze .` — re-analyze codebase
-- [ ] `ndx recommend --actionable-only .` — review proposals
-- [ ] `ndx recommend --acknowledge .` — silence resolved findings
-- [ ] `ndx validate .` — check PRD integrity
-- [ ] `ndx status .` — confirm the PRD is healthy
-- [ ] `git commit -m "PRD maintenance: full cycle re-analysis and acknowledgment"`
-
-**Quarterly (if PRD is heavily drifted):**
-- [ ] `ndx ci .` — full health report
-- [ ] Review drift patterns from the report
-- [ ] Either do a deep-clean maintenance pass, or reset the PRD with `ndx plan --accept .`
-
-## Next steps
-
-Once your PRD is healthy:
-
-- **Run `ndx work --auto --iterations=N .`** to execute a full sprint autonomously
-- **Use `ndx self-heal`** for ongoing improvement between full maintenance cycles
+- **Detect** with `ndx status .` (the item tree) and `rex validate .` (orphaned items, parent-level mismatches, date anomalies). `ndx ci .` adds a health report with completion rate and item age.
+- **Close** shipped work with `rex update <task-id> --status=completed --resolution-type=code-change`. The resolution types are `code-change`, `config-override`, `acknowledgment`, `deferred` and `unclassified`. Mark dropped work `deferred`, or remove it with `rex remove`.
+- **Finished epics** stay in the tree until you remove them: `rex remove epic <epic-id>` removes an epic and everything under it. It does not write `archive.json`; recover with git.
+- **Snapshots.** `ndx add` and `ndx reshape` copy `.rex/prd_tree/` to `.rex/.backups/` before they change it. `rex restore` lists the snapshots, and `rex restore --latest` or `rex restore --id=<snapshot>` rolls the whole tree back to one. It restores a snapshot, not a single item.
+- **`ndx plan --accept`** adds proposals from a fresh analysis, deduplicated against the items already in the tree, and offers to enrich matching ones. It does not rewrite or archive the existing tree.
 
 ## Skills used in this guide
 
@@ -385,11 +148,11 @@ Each skill below is invoked during the maintenance cycles described in this guid
 
 | Skill | Source | Role in this guide |
 |-------|--------|--------------------|
-| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Weekly cycle: detects drift — completed work not yet marked, stale epics, orphaned tasks |
-| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Monthly cycle: re-analyzes the codebase and proposes items for persistent or newly surfaced findings |
-| `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](./skills#ndx-reshape) | Quarterly: restructures a drifted PRD — regroups epics, adjusts levels, merges overlapping items |
-| `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](./skills#ndx-capture) | Throughout: adds newly surfaced requirements to the right place in the PRD hierarchy |
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Detecting drift: PRD progress and codebase health in one report |
+| `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Step 4: re-analyzes the codebase and proposes items for persistent or newly surfaced findings |
+| `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](./skills#ndx-reshape) | v1: restructures a drifted item tree — regroups epics, adjusts levels, merges overlapping items |
+| `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](./skills#ndx-capture) | Throughout: adds newly surfaced requirements to the PRD |
 
-Related guides: [Workflow](./workflow) (the normal development loop this guide maintains), [Self-Heal Loop](./self-heal) (automates the analyze → recommend cycle between full maintenance passes).
+Related guides: [Workflow](./workflow) (the normal development loop this guide maintains), [Self-Heal Loop](./self-heal) (automates the analyze → recommend cycle between full maintenance passes), [Changes and apply](./concepts/changes-and-apply).
 
 For the full skill inventory and customization guidance, see the [Skills Reference](./skills).
