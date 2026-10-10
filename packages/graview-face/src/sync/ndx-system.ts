@@ -48,14 +48,28 @@ function fieldsOf(node: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-export function ndxRemote(options: NdxRemoteOptions): RemoteSystem & { refuse(kind: string): string } {
+/** What the last re-emit said: when it failed, the snapshot a pull read is older than the tree. */
+export interface EmitOutcome {
+  readonly ok: boolean;
+  readonly output: string;
+}
+
+export interface NdxRemote extends RemoteSystem {
+  refuse(kind: string): string;
+  /** Undefined until the first pull. */
+  lastEmit(): EmitOutcome | undefined;
+}
+
+export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
   const doFetch = options.fetch ?? ((input, init) => fetch(input, init));
   const base = options.base ?? "";
   const ttl = options.pullTtlMs ?? 1500;
   let memo: { at: number; result: Pulled } | undefined;
+  let lastEmit: EmitOutcome | undefined;
 
+  const JSON_HEADERS = { "content-type": "application/json" };
   const call = async (name: string, args: Record<string, unknown>): Promise<unknown> => {
-    const response = await doFetch(`${base}/ndx/mcp`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, arguments: args }) });
+    const response = await doFetch(`${base}/ndx/mcp`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name, arguments: args }) });
     if (!response.ok) throw new Error(`rex is not reachable (${response.status})`);
     const body = (await response.json()) as { ok: boolean; result?: unknown; error?: string };
     if (!body.ok) throw new Error(body.error ?? `rex refused ${name}`);
@@ -68,8 +82,10 @@ export function ndxRemote(options: NdxRemoteOptions): RemoteSystem & { refuse(ki
   };
 
   async function pullFresh(cursor?: string): Promise<Pulled> {
-    // A fresh projection first; when the door cannot re-emit, the last emitted snapshot still answers.
-    await doFetch(`${base}/ndx/emit`, { method: "POST" }).catch(() => undefined);
+    // A fresh projection first; when the door cannot re-emit, the last emitted snapshot still answers, and the rail says it is stale.
+    lastEmit = await doFetch(`${base}/ndx/emit`, { method: "POST", headers: JSON_HEADERS, body: "{}" })
+      .then(async (r) => (r.ok ? ((await r.json()) as EmitOutcome) : { ok: false, output: `emit: ${r.status}` }))
+      .catch((error: unknown) => ({ ok: false, output: error instanceof Error ? error.message : String(error) }));
     const response = await doFetch(`${base}/data/snapshot.json`, { cache: "no-store" });
     if (!response.ok) throw new Error(`snapshot: ${response.status}`);
     const snapshot = (await response.json()) as { nodes: SnapshotNode[] };
@@ -123,6 +139,7 @@ export function ndxRemote(options: NdxRemoteOptions): RemoteSystem & { refuse(ki
   return {
     name: SYSTEM,
     refuse: refusal,
+    lastEmit: () => lastEmit,
     async pull(cursor) {
       if (memo && Date.now() - memo.at < ttl) return memo.result;
       const result = await pullFresh(cursor);

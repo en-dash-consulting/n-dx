@@ -46,7 +46,7 @@ export function InboxScreen({ context }: { context: Ctx }) {
           All changes
         </Link>
       </Hero>
-      {inbox.length === 0 ? <Empty command="ndx prd place <change> --amends <capability>">Nothing to place.</Empty> : <Rows>{inbox.map((n, i) => <RecordRow key={n.id} context={context} node={n} i={i} end={<Badge plain>{said(n.priority ?? "")}</Badge>} />)}</Rows>}
+      {inbox.length === 0 ? <Empty command="ndx rex change place <change> --target <capability> --relation amends">Nothing to place.</Empty> : <Rows>{inbox.map((n, i) => <RecordRow key={n.id} context={context} node={n} i={i} end={<Badge plain>{said(n.priority ?? "")}</Badge>} />)}</Rows>}
     </Page>
   );
 }

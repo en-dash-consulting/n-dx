@@ -43,5 +43,6 @@ scripts/            sync-data, make-fixture, a11y, graview link|npm
 UPSTREAM.md         framework workarounds, each with its item in graview's PRD
 ```
 
-The framework comes from npm, pinned. `pnpm graview:link` consumes a sibling
-`../graview` checkout by path instead; `pnpm graview:npm` restores the pin.
+The framework comes from npm, pinned. `pnpm graview:link` consumes a framework
+checkout beside the monorepo (`../../../graview` from here, or `GRAVIEW_CHECKOUT`)
+by path instead; `pnpm graview:npm` restores the pin.

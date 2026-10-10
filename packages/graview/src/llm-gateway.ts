@@ -12,5 +12,5 @@
  * @see ./sourcevision-gateway.ts — sourcevision's output schema
  * @see ./hench-gateway.ts — hench's run record type
  */
-export { resolveLayout, relativeToRoot, resolveNdxHome, spawnTool } from "@n-dx/llm-client";
+export { resolveLayout, relativeToRoot, resolveNdxHome, spawnCli } from "@n-dx/llm-client";
 export type { Layout, SpawnToolResult } from "@n-dx/llm-client";

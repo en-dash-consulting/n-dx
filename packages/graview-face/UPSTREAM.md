@@ -1,7 +1,8 @@
 # Upstream
 
 Framework behaviour this product works around, each with the item it was
-captured as in graview's PRD (`../graview/.ndx/rex/prd_tree`, under the
+captured as in graview's PRD (`../../../graview/.ndx/rex/prd_tree` from this
+package, under the
 "Graview — spatial context-graph framework" epic). Remove the workaround
 when the item closes.
 

@@ -6,15 +6,28 @@
  * (`<ndx home>/auth.token`). Nothing here opens a connection: it names the
  * endpoint and the token file for the product face's own dev-server door,
  * which keeps the token server-side and never in the browser.
+ *
+ * The hub's port is `hub.port` in `<ndx home>/config.json` when the operator
+ * set one, else the port `hub.pid` records for the running hub, else 3117.
+ *
+ * A worktree is a separate workspace to the project's server: its MCP route
+ * writes the tree the request addressed, chosen by the `X-Ndx-Workspace`
+ * header (keys are assigned by the server; `GET /p/<id>/api/workspaces`
+ * lists them with their paths). So an endpoint for a worktree carries the
+ * worktree's root and that listing's URL, and a face must resolve the key
+ * before it writes, or it would write the main checkout's PRD.
  */
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { resolveNdxHome, type Layout } from "./llm-gateway.js";
 
-/** The hub's default port; `ndx start` prints the real one, and `hub.port` under the ndx home records it. */
+/** The hub's default port; `ndx start` prints the real one. */
 export const DEFAULT_HUB_PORT = 3117;
 export const HUB_REGISTRY_FILENAME = "hub.json";
-export const HUB_PORT_FILENAME = "hub.port";
+/** `{ pid, port }` of the running hub. */
+export const HUB_PID_FILENAME = "hub.pid";
+/** The per-user config whose `hub.port` overrides the default. */
+export const HUB_CONFIG_FILENAME = "config.json";
 export const AUTH_TOKEN_FILENAME = "auth.token";
 
 export interface RexEndpoint {
@@ -25,6 +38,14 @@ export interface RexEndpoint {
   tokenFile?: string;
   /** Whether the registry says the project's server was up when last seen. */
   registered: boolean;
+  /**
+   * Set when `layout.root` is a worktree rather than the registered
+   * repository root: the worktree's real path, which a writer must map to a
+   * workspace key through `workspacesUrl` and send as `X-Ndx-Workspace`.
+   */
+  worktree?: string;
+  /** `GET` here (with the token) lists `{ workspaces: [{ key, path, isAnchor }] }`. */
+  workspacesUrl?: string;
 }
 
 interface HubProject {
@@ -50,6 +71,19 @@ function readJson(path: string): unknown {
   }
 }
 
+function isPort(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 && value < 65536;
+}
+
+/** The hub's port as its own files record it: config first, then the running hub, then the default. */
+export function hubPort(home: string): number {
+  const config = readJson(join(home, HUB_CONFIG_FILENAME)) as { hub?: { port?: unknown } } | undefined;
+  if (isPort(config?.hub?.port)) return config.hub.port;
+  const pid = readJson(join(home, HUB_PID_FILENAME)) as { port?: unknown } | undefined;
+  if (isPort(pid?.port)) return pid.port;
+  return DEFAULT_HUB_PORT;
+}
+
 /** The hub's rex MCP endpoint for the project at `layout.root`, or undefined when the hub has never registered it. */
 export function rexMcpEndpoint(layout: Layout, options: { home?: string; env?: NodeJS.ProcessEnv } = {}): RexEndpoint | undefined {
   const home = options.home ?? resolveNdxHome({ env: options.env ?? process.env });
@@ -59,13 +93,14 @@ export function rexMcpEndpoint(layout: Layout, options: { home?: string; env?: N
   const root = real(layout.root);
   const project = projects.find((p) => [p.repoRoot, ...(p.worktrees ?? [])].filter((x): x is string => typeof x === "string").some((dir) => real(dir) === root));
   if (!project?.id) return undefined;
-  const portFile = join(home, HUB_PORT_FILENAME);
-  const port = existsSync(portFile) ? Number.parseInt(readFileSync(portFile, "utf-8").trim(), 10) || DEFAULT_HUB_PORT : DEFAULT_HUB_PORT;
+  const base = `http://localhost:${hubPort(home)}/p/${encodeURIComponent(project.id)}`;
   const tokenFile = join(home, AUTH_TOKEN_FILENAME);
+  const isWorktree = typeof project.repoRoot === "string" && real(project.repoRoot) !== root;
   return {
-    url: `http://localhost:${port}/p/${encodeURIComponent(project.id)}/mcp/rex`,
+    url: `${base}/mcp/rex`,
     projectId: project.id,
     ...(existsSync(tokenFile) ? { tokenFile } : {}),
     registered: typeof project.pid === "number" && project.pid > 0,
+    ...(isWorktree ? { worktree: root, workspacesUrl: `${base}/api/workspaces` } : {}),
   };
 }

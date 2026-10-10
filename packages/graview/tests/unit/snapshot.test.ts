@@ -61,13 +61,16 @@ describe("buildSnapshot", () => {
     const { snapshot } = await buildSnapshot(resolveLayout(root), quiet);
     const ids = new Set(snapshot.nodes.map((n) => n.id));
     const kindOf = new Map(snapshot.nodes.map((n) => [n.id, n.kind]));
-    const declared = declaredEdges(loadDocument());
+    const doc = loadDocument();
+    const declared = declaredEdges(doc);
     for (const edge of snapshot.edges) {
       expect(ids.has(edge.from), `${edge.kind} from ${edge.from}`).toBe(true);
       expect(ids.has(edge.to), `${edge.kind} to ${edge.to}`).toBe(true);
       expect(declared.get(edge.kind)?.has(kindOf.get(edge.from)!), `${kindOf.get(edge.from)} does not declare ${edge.kind}`).toBe(true);
+      // ...and only towards a kind that edge admits: the store refuses an edge to an undeclared target.
+      const to = (doc.kinds[kindOf.get(edge.from)!]?.edges?.[edge.kind] as { to?: string[] } | undefined)?.to ?? [];
+      expect(to, `${kindOf.get(edge.from)}.${edge.kind} does not admit ${kindOf.get(edge.to)}`).toContain(kindOf.get(edge.to));
     }
-    const doc = loadDocument();
     for (const node of snapshot.nodes) {
       const kind = doc.kinds[node.kind]!;
       expect(kind, node.kind).toBeDefined();

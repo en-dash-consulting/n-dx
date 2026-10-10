@@ -631,7 +631,9 @@
           "description": "what this sits inside",
           "inverse": "what sits inside it",
           "to": [
-            "area"
+            "area",
+            "capability",
+            "constraint"
           ]
         }
       },

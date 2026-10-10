@@ -1,4 +1,5 @@
-import { defineConfig } from "vitest/config";
+// From `vite`, not `vitest/config`: bin/serve.js loads this file from an npm install where vitest is absent.
+import { defineConfig } from "vite";
 import { ndxDoor } from "./dev/ndx-door.js";
 
 export default defineConfig({
@@ -28,5 +29,4 @@ export default defineConfig({
     },
   },
   server: { port: 5188, strictPort: true },
-  test: { environment: "node", include: ["tests/**/*.test.ts"] },
 });

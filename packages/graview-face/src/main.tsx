@@ -41,11 +41,12 @@ const root = document.getElementById("root");
 if (!root) throw new Error("no #root");
 
 /*
- * THE STORE IS THE SNAPSHOT, FRESH EVERY LOAD. The projection is read-only
- * and n-dx re-emits it on every `ndx graview` command, so remembering edits
- * in this browser would only keep yesterday's graph. A memory adapter seeded
- * from the snapshot is the honest store until the SyncEngine (the next PR)
- * connects this face to rex through `graview serve`.
+ * THE STORE IS THE SNAPSHOT, FRESH EVERY LOAD. n-dx re-emits the projection
+ * on every `ndx graview` command and the sync loop (src/sync) re-emits as it
+ * pulls, so remembering edits in this browser would only keep yesterday's
+ * graph. A memory adapter seeded from the snapshot is the honest store; what
+ * a person changes here reaches rex through the loop, and comes back as the
+ * next snapshot.
  */
 const scheme = initialScheme();
 const face = inScene() ? import("./faces/scene.js") : import("./faces/pages.js");

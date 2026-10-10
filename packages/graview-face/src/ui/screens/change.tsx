@@ -15,6 +15,8 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
   const id = decodeURIComponent(useParams()["id"] ?? "");
   const node = nodeOf(store, id);
   const facts = recordFacts(store, id, { ...(principal ? { principal } : {}), ...(invariantContext ? { context: invariantContext } : {}) });
+  // Every hook before the early return: the same instance renders a record that a re-emit can take away.
+  const [allWork, setAllWork] = useState(false);
   if (!node || !facts || node.kind !== "change") return <Missing context={context} />;
 
   const page = opening(declaredPage(context, app, node));
@@ -30,7 +32,6 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
   };
   for (const w of work) depthOf.set(w.id, depth(w));
   const spent = runs.reduce((t, r) => t + (Number(r.tokens) || 0), 0);
-  const [allWork, setAllWork] = useState(false);
   const WORK_SHOWN = 30;
   const shownWork = allWork ? work : work.filter(isOpen).concat(work.filter((w) => !isOpen(w))).slice(0, WORK_SHOWN);
   const eyebrow = [node.changeKind, node.level && node.level !== "change" ? `was ${String(node.level)} on v1` : undefined, node.displayId].filter(Boolean).map(String);

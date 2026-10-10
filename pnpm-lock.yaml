@@ -94,6 +94,9 @@ importers:
         specifier: workspace:*
         version: link:../sourcevision
     devDependencies:
+      '@graview/core':
+        specifier: 0.1.19
+        version: 0.1.19
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0

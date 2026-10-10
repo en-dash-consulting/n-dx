@@ -19,7 +19,7 @@
  *
  * ## Configuration
  *
- * The `graview` section of the project config (`bin`, `includeFiles`) is read
+ * The `graview` section of the project config (`bin`, `includeFiles`, `app`) is read
  * by `readGraviewConfig`; there is no default-config factory, because every
  * key is optional and the defaults are the resolver's.
  *
@@ -34,7 +34,7 @@ export type { GraviewDocumentData, DocumentKind, DocumentField, DocumentEdge, Do
 export { resolveGraviewCommand, readGraviewConfig, GRAVIEW_BIN_ENV } from "./graview-bin.js";
 export type { GraviewCommand, GraviewBinSource, GraviewConfig, ResolveGraviewOptions } from "./graview-bin.js";
 export { canonicalJson } from "./canonical.js";
-export { rexMcpEndpoint, DEFAULT_HUB_PORT } from "./hub.js";
+export { rexMcpEndpoint, hubPort, DEFAULT_HUB_PORT } from "./hub.js";
 export type { RexEndpoint } from "./hub.js";
 export type { GraphSnapshot, SnapshotNode, SnapshotEdge } from "./types.js";
 export { releaseId, RELEASE_PREFIX } from "./sources/requirements.js";

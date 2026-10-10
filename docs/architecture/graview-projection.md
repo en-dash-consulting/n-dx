@@ -6,7 +6,9 @@ constraints), the change layer (changes, tasks, releases), the code
 (zones, components, optionally files) and the work (agent runs, commits).
 Graview's declaration names every kind, field, relation, lens and rule once;
 `graview check` holds it, `graview serve` serves it to any Graview face,
-`graview mcp` derives an agent tool surface from it.
+`graview mcp` derives an agent tool surface from it. The face n-dx ships is
+`@n-dx/graview-face`, a separately published package that `ndx graview serve`
+runs when it is installed.
 
 ## The seam: two files, no imports
 
@@ -18,8 +20,10 @@ emits those two files and spawns the `graview` binary on them:
 ndx graview emit .      →  <graviewDir>/document.json + snapshot.json
 ndx graview check .     →  emit, then  graview check document.json
 ndx graview describe .  →  emit, then  graview describe document.json --seed snapshot.json
-ndx graview serve .     →  emit, sync-seed the store, then  graview serve --data <graviewDir>/data
-                           (the store over HTTP plus its live WebSocket wire; a face connects to it)
+ndx graview serve .     →  emit, then the product face's own server on the fresh projection
+                           (or, with --no-face or no face installed: sync-seed the store, then
+                           graview serve --data <graviewDir>/data, the store over HTTP plus its live
+                           WebSocket wire that a Graview face connects to)
 ndx graview mcp .       →  emit, sync-seed the store, then  graview mcp --read-only
 ```
 
@@ -113,11 +117,16 @@ depends on. So:
 - **In n-dx:** changes and tasks carry rex's `lastModified` (and
   `lastModifiedBy`) in the projection: the version a two-way sync agrees on,
   and what makes an echo of the face's own write recognizable. `ndx graview
-  info` names the hub's per-project rex MCP endpoint (`<ndx home>/hub.json`,
-  `hub.port`, `auth.token`), and `ndx graview serve` hands the product face
+  info` names the hub's per-project rex MCP endpoint (`<ndx home>/hub.json`;
+  the port from `config.json`'s `hub.port`, else `hub.pid`, else 3117;
+  `auth.token`), and `ndx graview serve` hands the product face
   `NDX_REX_MCP_URL`, `NDX_TOKEN_FILE`, `NDX_PROJECT_ROOT` and
-  `NDX_GRAVIEW_CLI` beside `NDX_GRAVIEW_DIR`. Nothing in n-dx opens a
-  connection.
+  `NDX_GRAVIEW_CLI` beside `NDX_GRAVIEW_DIR`. A worktree is a separate
+  workspace to the project's server, so for one the endpoint also carries
+  `NDX_WORKTREE` and `NDX_WORKSPACES_URL`: the face resolves its workspace
+  key from that listing and sends it as `X-Ndx-Workspace` on every write,
+  or refuses to sync rather than write the main checkout's PRD. Nothing in
+  n-dx opens a connection.
 - **In `@n-dx/graview-face`:** a Vite dev-server door (`dev/ndx-door.ts`) holds the
   token and one MCP session to the hub, re-emits on `POST /ndx/emit`, and
   serves the fresh projection from the graview dir. The `RemoteSystem`
@@ -136,7 +145,7 @@ depends on. So:
   naming the tool that owns the data. A static build has no door and is
   read-only by construction.
 
-## Deferred
+## The product face
 
 - **A product face** exists: `@n-dx/graview-face` (`packages/graview-face`),
   a workspace package published on its own that no other `@n-dx/*` package
@@ -148,4 +157,6 @@ depends on. So:
   on the fresh projection (`NDX_GRAVIEW_DIR`). The declaration carries
   glance, page groups, brand, the home and per-kind card, row and page
   blocks as data, so the face adds React and nothing about the graph.
+## Deferred
+
 - **Dashboard embed and graview.cloud publishing.**

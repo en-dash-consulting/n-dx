@@ -59,7 +59,7 @@ export function HomeScreen({ context, app }: { context: Ctx; app: App }) {
           <div className="ndx-empty">
             <p>
               This PRD is on the v1 layout: its epics and features read as changes, and there are no areas, capabilities or constraints to stand them on.
-              The map arrives when the PRD migrates (<code>ndx prd migrate</code>) or is bootstrapped from the code.
+              The map arrives when the PRD moves to the v2 layout (rex's migration plan draws the areas and capabilities from the epics and the code).
             </p>
           </div>
         </Section>

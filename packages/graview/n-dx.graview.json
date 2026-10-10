@@ -387,9 +387,7 @@
       },
       "edges": {
         "under": {
-          "to": [
-            "area"
-          ],
+          "to": ["area", "capability", "constraint"],
           "cardinality": "one",
           "description": "what this sits inside",
           "inverse": "what sits inside it"

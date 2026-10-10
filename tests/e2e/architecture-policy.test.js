@@ -2155,3 +2155,47 @@ describe("architecture policy: shell-string and DEP0190 spawn guard", () => {
     }
   });
 });
+
+/**
+ * Graview is a peer tool to n-dx, never a dependency of it: `@n-dx/graview`
+ * emits two JSON files and spawns the `graview` binary, so installing
+ * `@n-dx/core` pulls no `@graview/*` package and no React. The one package
+ * allowed to depend on Graview is the product face, `@n-dx/graview-face`,
+ * which nothing else depends on; the adapter may hold `@graview/core` as a
+ * devDependency, to compile its declaration in its tests.
+ * `packages/graview/AGENTS.md` promises this test.
+ */
+describe("architecture policy: Graview stays a peer tool", () => {
+  const isGraview = (name) => name === "graview" || name.startsWith("@graview/");
+  const packagesDir = join(ROOT, "packages");
+  const manifests = readdirSync(packagesDir)
+    .map((dir) => join(packagesDir, dir, "package.json"))
+    .filter((file) => existsSync(file))
+    .map((file) => ({ file: relative(ROOT, file), pkg: JSON.parse(readFileSync(file, "utf-8")) }));
+
+  it("sees the two graview packages", () => {
+    const names = manifests.map((m) => m.pkg.name);
+    expect(names).toContain("@n-dx/graview");
+    expect(names).toContain("@n-dx/graview-face");
+  });
+
+  for (const { file, pkg } of manifests) {
+    if (pkg.name === "@n-dx/graview-face") continue;
+    it(`${file} has no runtime dependency on graview or @graview/*`, () => {
+      const runtime = { ...(pkg.dependencies ?? {}), ...(pkg.peerDependencies ?? {}), ...(pkg.optionalDependencies ?? {}) };
+      expect(Object.keys(runtime).filter(isGraview)).toEqual([]);
+    });
+    if (pkg.name !== "@n-dx/graview") {
+      it(`${file} has no devDependency on graview or @graview/* either`, () => {
+        expect(Object.keys(pkg.devDependencies ?? {}).filter(isGraview)).toEqual([]);
+      });
+    }
+  }
+
+  it("no @n-dx package depends on the product face", () => {
+    for (const { file, pkg } of manifests) {
+      const all = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}), ...(pkg.peerDependencies ?? {}), ...(pkg.optionalDependencies ?? {}) };
+      expect(Object.keys(all), file).not.toContain("@n-dx/graview-face");
+    }
+  });
+});

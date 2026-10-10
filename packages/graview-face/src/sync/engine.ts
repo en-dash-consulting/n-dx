@@ -12,9 +12,9 @@
  * act (so it lands in the log, authored by the system), and only then lets
  * the engine run. What rex kept is said in the rail, never hidden.
  */
-import { SyncEngine, type AnySchema, type RemoteLink, type RemoteSystem, type Store, type SyncConflict, type SyncReport, type SyncState } from "@graview/core";
+import { SyncEngine, type AnySchema, type RemoteLink, type Store, type SyncConflict, type SyncReport } from "@graview/core";
 import { applyInbound, isSyncedKind, mapping, SYNC_FIELDS } from "./mapping.js";
-import { ndxRemote, type NdxRemoteOptions } from "./ndx-system.js";
+import { ndxRemote, type EmitOutcome, type NdxRemote, type NdxRemoteOptions } from "./ndx-system.js";
 
 export interface SyncStatus {
   readonly running: boolean;
@@ -22,6 +22,8 @@ export interface SyncStatus {
   readonly report?: SyncReport;
   /** Conflicts the last run resolved to rex's value. */
   readonly resolved: readonly SyncConflict[];
+  /** Set when the last pull could not re-emit: what it read is older than the tree. */
+  readonly stale?: string;
   readonly error?: string;
 }
 
@@ -59,19 +61,21 @@ export function seedLinks(store: Store<AnySchema>): Record<string, RemoteLink> {
 
 export interface Sync {
   readonly engine: SyncEngine<AnySchema>;
-  readonly remote: RemoteSystem;
+  readonly remote: NdxRemote;
   /** One pass: pre-empt conflicts to rex's value, then the engine's own run. */
-  run(): Promise<{ report: SyncReport; resolved: readonly SyncConflict[] }>;
+  run(): Promise<{ report: SyncReport; resolved: readonly SyncConflict[]; emit?: EmitOutcome }>;
 }
 
 export function createSync(options: SyncOptions): Sync {
   const remote = ndxRemote(options);
   const engine = new SyncEngine<AnySchema>({ store: options.store, mapping: mapping(), remote, applyInbound }, { links: seedLinks(options.store), outbox: [] });
-  let state: SyncState | undefined;
+  // The engine's own state, always current: `resolve` moves it after a run's report was taken.
+  let ran = false;
 
   const preempt = async (): Promise<SyncConflict[]> => {
-    const links = state?.links ?? seedLinks(options.store);
-    const { changes } = await remote.pull(state?.cursor);
+    const state = engine.snapshot;
+    const links = state.links;
+    const { changes } = await remote.pull(ran ? state.cursor : undefined);
     const resolved: SyncConflict[] = [];
     for (const change of changes) {
       const link = links[change.id];
@@ -103,8 +107,9 @@ export function createSync(options: SyncOptions): Sync {
         engine.resolve(conflict, "theirs");
         resolved.push(conflict);
       }
-      state = report.state;
-      return { report, resolved };
+      ran = true;
+      const emit = remote.lastEmit();
+      return { report, resolved, ...(emit ? { emit } : {}) };
     },
   };
 }
@@ -114,6 +119,8 @@ export function startSync(options: StartSyncOptions): SyncHandle {
   const listeners = new Set<(status: SyncStatus) => void>();
   let status: SyncStatus = { running: false, resolved: [] };
   let inFlight: Promise<SyncStatus> | undefined;
+  // An edit made while a run is in flight runs again right after, not at the next interval.
+  let again = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
 
@@ -123,16 +130,23 @@ export function startSync(options: StartSyncOptions): SyncHandle {
   };
 
   const runNow = (): Promise<SyncStatus> => {
-    if (inFlight) return inFlight;
+    if (inFlight) {
+      again = true;
+      return inFlight;
+    }
     tell({ ...status, running: true, error: undefined });
     inFlight = (async () => {
       try {
-        const { report, resolved } = await sync.run();
-        tell({ running: false, lastRun: new Date(), report, resolved });
+        const { report, resolved, emit } = await sync.run();
+        tell({ running: false, lastRun: new Date(), report, resolved, ...(emit && !emit.ok ? { stale: emit.output.trim().split("\n").pop() ?? "re-emit failed" } : {}) });
       } catch (error) {
         tell({ ...status, running: false, lastRun: new Date(), error: error instanceof Error ? error.message : String(error) });
       } finally {
         inFlight = undefined;
+      }
+      if (again && !stopped) {
+        again = false;
+        return runNow();
       }
       return status;
     })();

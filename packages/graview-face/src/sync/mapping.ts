@@ -23,9 +23,9 @@ export function isSyncedKind(kind: string): kind is SyncedKind {
 }
 
 export const OWNERS: Readonly<Record<string, string>> = {
-  area: "rex's product layer: edit it with ndx prd (rex product edit) until placement arrives here",
-  capability: "rex's product layer: edit it with ndx prd (rex product edit) until placement arrives here",
-  constraint: "rex's product layer: edit it with ndx prd (rex product edit) until placement arrives here",
+  area: "rex's product layer: edit it with ndx rex product edit <node> until placement arrives here",
+  capability: "rex's product layer: edit it with ndx rex product edit <node> until placement arrives here",
+  constraint: "rex's product layer: edit it with ndx rex product edit <node> until placement arrives here",
   release: "a field on each change (plannedRelease, shippedIn); rex stamps shippedIn from CI",
   zone: "sourcevision: re-run ndx analyze . to change the zones",
   component: "sourcevision: re-run ndx analyze . to change the catalogue",

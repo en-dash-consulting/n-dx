@@ -61,6 +61,11 @@ export function SyncStatusLine({ off }: { off?: string }) {
           rex kept its value for {kept} {kept === 1 ? "field" : "fields"} edited on both sides.
         </p>
       ) : null}
+      {status?.stale ? (
+        <p className="ndx-small ndx-muted" data-testid="sync-stale">
+          The projection could not be re-emitted, so this is the last one written: {status.stale}
+        </p>
+      ) : null}
       <button type="button" className="ndx-btn quiet" onClick={() => void current.runNow()} disabled={status?.running}>
         Sync now
       </button>

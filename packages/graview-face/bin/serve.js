@@ -22,7 +22,12 @@ if (args.includes("--help") || args.includes("-h")) {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const portFlag = args.findIndex((a) => a === "--port" || a.startsWith("--port="));
-const port = portFlag === -1 ? 5188 : Number((args[portFlag].includes("=") ? args[portFlag].split("=")[1] : args[portFlag + 1]) ?? 5188);
+const portText = portFlag === -1 ? "5188" : (args[portFlag].includes("=") ? args[portFlag].split("=")[1] : args[portFlag + 1]) ?? "";
+const port = Number(portText);
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  console.error(`ndx-graview-face: --port needs a port number (got ${JSON.stringify(portText)})`);
+  process.exit(2);
+}
 
 // Vite is loaded only once the arguments say we are serving: `--help` answers without it.
 const { createServer } = await import("vite");

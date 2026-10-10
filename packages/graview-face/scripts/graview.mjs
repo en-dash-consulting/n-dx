@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = join(root, "package.json");
 const pinPath = join(root, ".graview-pin");
-const framework = resolve(root, process.env.GRAVIEW_CHECKOUT ?? "../graview");
+const framework = resolve(root, process.env.GRAVIEW_CHECKOUT ?? "../../../graview");
 const mode = process.argv[2];
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));

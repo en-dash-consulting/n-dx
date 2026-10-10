@@ -8,8 +8,11 @@ JSON output and hench's run records. `ndx graview <sub>` then spawns the
 
 - **No `@graview/*` or `graview` dependency, ever.** The binary is a peer tool
   resolved from `graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH,
-  then `npx -y graview@<pinned>` (`src/graview-bin.ts`). A test fails the
-  workspace if a `package.json` lists one.
+  then `npx -y graview@<pinned>` (`src/graview-bin.ts`). `@graview/core` is a
+  devDependency only, so the tests can compile the declaration;
+  `tests/e2e/architecture-policy.test.js` ("Graview stays a peer tool") fails
+  the workspace if any `package.json` but the product face's lists one at
+  runtime.
 - **Read-only.** Nothing is written under the rex, sourcevision or hench
   directories. Output and the trailer cache `computeRealizedBy` keeps go under
   the layout's graview dir (`.ndx/graview` or `.graview`), which `ndx init`

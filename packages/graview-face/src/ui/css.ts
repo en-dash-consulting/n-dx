@@ -188,6 +188,7 @@ a.ndx-card:hover { transform: translateY(-1px); }
 }
 .ndx-find svg { width: 1rem; height: 1rem; color: var(--graview-ink-muted); flex: none; }
 .ndx-find input { border: 0; outline: 0; background: transparent; color: inherit; font: inherit; width: 100%; min-width: 0; }
+.ndx-find:focus-within { outline: 2px solid var(--graview-accent); outline-offset: 2px; }
 .ndx-btn {
   min-height: 2.25rem; padding: 0.4rem 0.75rem; cursor: pointer; display: inline-flex; gap: 0.4rem; align-items: center;
   border: 1px solid var(--graview-edge); border-radius: calc(var(--graview-radius, 10px) - 2px); background: var(--graview-panel);
