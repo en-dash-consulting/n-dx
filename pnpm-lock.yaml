@@ -95,8 +95,8 @@ importers:
         version: link:../sourcevision
     devDependencies:
       '@graview/core':
-        specifier: 0.1.19
-        version: 0.1.19
+        specifier: 0.1.20
+        version: 0.1.20
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
@@ -110,38 +110,38 @@ importers:
   packages/graview-face:
     dependencies:
       '@graview/core':
-        specifier: 0.1.19
-        version: 0.1.19
+        specifier: 0.1.20
+        version: 0.1.20
       '@graview/layout':
-        specifier: 0.1.19
-        version: 0.1.19
+        specifier: 0.1.20
+        version: 0.1.20
       '@graview/pages':
-        specifier: 0.1.19
-        version: 0.1.19(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
+        specifier: 0.1.20
+        version: 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       '@graview/primitives':
-        specifier: 0.1.19
-        version: 0.1.19(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
+        specifier: 0.1.20
+        version: 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       '@graview/react':
-        specifier: 0.1.19
-        version: 0.1.19(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
+        specifier: 0.1.20
+        version: 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       '@graview/render':
-        specifier: 0.1.19
-        version: 0.1.19
+        specifier: 0.1.20
+        version: 0.1.20
       '@graview/ship':
-        specifier: 0.1.19
-        version: 0.1.19(typescript@6.0.3)
+        specifier: 0.1.20
+        version: 0.1.20(typescript@6.0.3)
       '@graview/tools':
-        specifier: 0.1.19
-        version: 0.1.19(typescript@6.0.3)
+        specifier: 0.1.20
+        version: 0.1.20(typescript@6.0.3)
       react:
-        specifier: ^19.2.0
-        version: 19.2.8
+        specifier: ^19.3.0
+        version: 19.3.0
       react-dom:
-        specifier: ^19.2.0
-        version: 19.3.0(react@19.2.8)
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
       react-router-dom:
         specifier: ^7.1.1
-        version: 7.18.4(react-dom@19.3.0(react@19.2.8))(react@19.2.8)
+        version: 7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       vite:
         specifier: ^6.4.3
         version: 6.4.3(@types/node@26.2.0)(yaml@2.9.0)
@@ -159,8 +159,8 @@ importers:
         specifier: ^4.10.2
         version: 4.13.0
       graview:
-        specifier: 0.1.19
-        version: 0.1.19(esbuild@0.25.12)(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
+        specifier: 0.1.20
+        version: 0.1.20(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       playwright:
         specifier: ^1.49.0
         version: 1.62.1
@@ -907,8 +907,8 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@graview/core@0.1.19':
-    resolution: {integrity: sha512-/YfJLp9UmJyT8Ym+uSDxCJ+8vQO47HrDYacVx5msTag4CLo6v4nFrr20fo2JwfrZRSvVEQACg3qEJrnnYiYPNQ==}
+  '@graview/core@0.1.20':
+    resolution: {integrity: sha512-nCPgR2eH7mIH8S78uyQzoOBRazu4H22T5rNLucqsRU02+g/oHFjQq/x1OKzQRutitDPuzyGHWhWfSSwwscuQMQ==}
     engines: {node: '>=22'}
     peerDependencies:
       better-sqlite3: '*'
@@ -916,8 +916,8 @@ packages:
       better-sqlite3:
         optional: true
 
-  '@graview/guest@0.1.19':
-    resolution: {integrity: sha512-q/lsrpSSP9hrkMRDJudAHJRVQ9HWPCIogTIDOe9QAPTUbf8o2RTp+Mb+nLxAvJNpBYMzObcCFblAVmgMpNFuqA==}
+  '@graview/guest@0.1.20':
+    resolution: {integrity: sha512-IfmVwfuYqh9EWARuMP+MS3Pz/GHEGS9FLs88kD67Ta8EBdd/NqppkSzAUuT/cUx4EQDWLQl0zepXEaaJrjSirw==}
     engines: {node: '>=22'}
     peerDependencies:
       esbuild: ^0.25.0
@@ -928,31 +928,31 @@ packages:
       react:
         optional: true
 
-  '@graview/layout@0.1.19':
-    resolution: {integrity: sha512-vQAS1IksCL8WECM+BZcC1p4ZK8CsCy4Z9llzaCA6JDrxtJC/JqU1PE+CfJ38jpUaNNXE+5mHP8fEUBiWUPastw==}
+  '@graview/layout@0.1.20':
+    resolution: {integrity: sha512-l4+A2SzoS6edncdcefxBFuF0jJhLsn5cm63r4EXoSOaMRj/HA/n79cemVneqeuqYPVYYPJG8RTh69rH3wqM+Fw==}
     engines: {node: '>=22'}
 
-  '@graview/pages@0.1.19':
-    resolution: {integrity: sha512-Ree6kq2+odTAoIhSgMaZ2fifLjc+pH+669Jm0jVzsYi2uehvx7BfvDjGmM1bK+hA+XHfOcdtRqtsWvFNPTfrKQ==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      react: '>=18'
-
-  '@graview/primitives@0.1.19':
-    resolution: {integrity: sha512-83GmROYYgh00Ml1O3sHZL0wGSKixxStrbKNY/5qYLRv+ZTIsU9He2HP02aJ4lphz+x8xNKQh9k678o29aNt0Ng==}
+  '@graview/pages@0.1.20':
+    resolution: {integrity: sha512-w8iPjCxpxNpEwNLv0YDR08Rj7NFWMciSTEQfegW0OsvyW1tcKJpDmSFjJOSHfKbKppgSAgGuyirkREQJMKof1w==}
     engines: {node: '>=22'}
     peerDependencies:
       react: '>=18'
 
-  '@graview/react@0.1.19':
-    resolution: {integrity: sha512-X7jGrBoMkJxRmHJP6EDEa8jBOhM+KhGOOj923/iNJ0IbkICbECCB2cOHZw8z1MinngQlcpZ/e40LYHuuXyKXFQ==}
+  '@graview/primitives@0.1.20':
+    resolution: {integrity: sha512-0MeO7oWTTkyqtoU5q9IooWb/MAkXeWxuqE79hn+YA0HB47HBuzrmSzQo/+VzMWIU7sGUsf2lGOBLiHt1LSK4TA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      react: '>=18'
+
+  '@graview/react@0.1.20':
+    resolution: {integrity: sha512-1RY9Gx4cZIzXNYOs8i7t+18LATSD83Y24RI6MQ8fWfkVag7Mu/4QhVJiD3XJi76NKHau4cqXybU0OkjDzdR38Q==}
     engines: {node: '>=22'}
     peerDependencies:
       react: '>=18'
       react-dom: '>=18'
 
-  '@graview/render@0.1.19':
-    resolution: {integrity: sha512-XlGn700RpdpUoY8PKFvHZU0Vzzhor6qYiBZSs1E/1WT2xI2CE3T/ApQ9m6cITCNva4cIDaLhm/PiHIA2DoBzNQ==}
+  '@graview/render@0.1.20':
+    resolution: {integrity: sha512-Mhfa42Fwm3PaIKiopFQGuIESM0xa5NFDehsMsggAI1veK0uxFCRPEVoqLWIVdGwxVDZ3KLFkFnY+om+XBBBSRQ==}
     engines: {node: '>=22'}
     peerDependencies:
       '@webgpu/types': ^0.1.60
@@ -960,8 +960,8 @@ packages:
       '@webgpu/types':
         optional: true
 
-  '@graview/ship@0.1.19':
-    resolution: {integrity: sha512-MelWesXfxjvQcNgKmmJ2C3ESRp4SSX7FZd398m8AACGf5EaJbAGQI8s5Ja55vXG6IuVLPC2qZPy5siAqceCk9w==}
+  '@graview/ship@0.1.20':
+    resolution: {integrity: sha512-WnUF8cawMVDvvtY4kslbMoAsxT99OFo7aS55VUolr2VAp5rrY0X92kO8xPda7rcCE6rMga0+TnqYdkj98e9Ppw==}
     engines: {node: '>=22'}
     peerDependencies:
       typescript: '>=5'
@@ -969,12 +969,12 @@ packages:
       typescript:
         optional: true
 
-  '@graview/skills@0.1.19':
-    resolution: {integrity: sha512-J3OzmXNxe5jvF2FVnsDTOxIkRR5rB1QtJ1DcNnScxpyajqdWr8E68V5K/Z0A44JLfoRwbZA3sLwj4q+7nq0mJA==}
+  '@graview/skills@0.1.20':
+    resolution: {integrity: sha512-g7LMg6Gg5VuHDEGr9FR7LjhLP/wgKZ/DQPwsxCGtWwOeAXQ9aQJqMHAL3dPQNWzXJN7WQJEBM0wqxg1tFj8/+A==}
     engines: {node: '>=22'}
 
-  '@graview/tools@0.1.19':
-    resolution: {integrity: sha512-BTH8UOe+m/Iq31mQVJUuuDZD2eWS9rs30hXCYU4Al1vDtvDb1dQhp9XX7bvojERU2IM1t0FPrMo0X4OOG0v6FQ==}
+  '@graview/tools@0.1.20':
+    resolution: {integrity: sha512-TkGDEsWpw/eirsbOgShdY3fn5573qdoqPylP30sJyAUWwz/4g80iNYUa4/PV7sPLgSdXsE+iPfDDAdOZLZILKw==}
     engines: {node: '>=22'}
 
   '@hono/node-server@1.19.17':
@@ -1815,8 +1815,8 @@ packages:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
     engines: {node: '>= 0.4'}
 
-  graview@0.1.19:
-    resolution: {integrity: sha512-62MAtjcH0dbr3ryJzR0hh27X1hQrQNdYmtXcaFyzobcKXQ7kfyG6cEeLNJ3T5MkHgPyBjBGM3Bp9709u24yb5A==}
+  graview@0.1.20:
+    resolution: {integrity: sha512-pmbvLoXL49n6Sk6EOJIhQsTG6QgGeQtCuEcyMkRLOMLTpTWnY1LoOfZUQQWkyqqxsxzZ3mUlLgHS9aQNjrZY/Q==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -2201,6 +2201,10 @@ packages:
 
   react@19.2.8:
     resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
+    engines: {node: '>=0.10.0'}
+
+  react@19.3.0:
+    resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
     engines: {node: '>=0.10.0'}
 
   regex-recursion@6.0.2:
@@ -3176,19 +3180,19 @@ snapshots:
     optionalDependencies:
       '@noble/hashes': 1.8.0
 
-  '@graview/core@0.1.19':
+  '@graview/core@0.1.20':
     dependencies:
       zod: 4.6.5
 
-  '@graview/guest@0.1.19(esbuild@0.25.12)(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)':
+  '@graview/guest@0.1.20(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
     dependencies:
-      '@graview/core': 0.1.19
-      '@graview/react': 0.1.19(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
+      '@graview/core': 0.1.20
+      '@graview/react': 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       '@remote-dom/core': 1.12.0
       '@remote-dom/polyfill': 1.6.0
     optionalDependencies:
       esbuild: 0.25.12
-      react: 19.2.8
+      react: 19.3.0
     transitivePeerDependencies:
       - '@preact/signals-core'
       - '@webgpu/types'
@@ -3197,75 +3201,75 @@ snapshots:
       - react-dom
       - typescript
 
-  '@graview/layout@0.1.19':
+  '@graview/layout@0.1.20':
     dependencies:
-      '@graview/core': 0.1.19
+      '@graview/core': 0.1.20
     transitivePeerDependencies:
       - better-sqlite3
 
-  '@graview/pages@0.1.19(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)':
+  '@graview/pages@0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
     dependencies:
-      '@graview/core': 0.1.19
-      '@graview/layout': 0.1.19
-      '@graview/primitives': 0.1.19(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
-      '@graview/react': 0.1.19(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
-      '@graview/tools': 0.1.19(typescript@6.0.3)
-      react: 19.2.8
-      react-router-dom: 7.18.4(react-dom@19.3.0(react@19.2.8))(react@19.2.8)
-    transitivePeerDependencies:
-      - '@webgpu/types'
-      - better-sqlite3
-      - react-dom
-      - typescript
-
-  '@graview/primitives@0.1.19(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)':
-    dependencies:
-      '@graview/core': 0.1.19
-      '@graview/layout': 0.1.19
-      '@graview/react': 0.1.19(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
-      '@graview/render': 0.1.19
-      '@graview/tools': 0.1.19(typescript@6.0.3)
-      react: 19.2.8
+      '@graview/core': 0.1.20
+      '@graview/layout': 0.1.20
+      '@graview/primitives': 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/react': 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/tools': 0.1.20(typescript@6.0.3)
+      react: 19.3.0
+      react-router-dom: 7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     transitivePeerDependencies:
       - '@webgpu/types'
       - better-sqlite3
       - react-dom
       - typescript
 
-  '@graview/react@0.1.19(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)':
+  '@graview/primitives@0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
     dependencies:
-      '@graview/core': 0.1.19
-      '@graview/layout': 0.1.19
-      '@graview/render': 0.1.19
-      '@graview/tools': 0.1.19(typescript@6.0.3)
-      react: 19.2.8
-      react-dom: 19.3.0(react@19.2.8)
+      '@graview/core': 0.1.20
+      '@graview/layout': 0.1.20
+      '@graview/react': 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/render': 0.1.20
+      '@graview/tools': 0.1.20(typescript@6.0.3)
+      react: 19.3.0
+    transitivePeerDependencies:
+      - '@webgpu/types'
+      - better-sqlite3
+      - react-dom
+      - typescript
+
+  '@graview/react@0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
+    dependencies:
+      '@graview/core': 0.1.20
+      '@graview/layout': 0.1.20
+      '@graview/render': 0.1.20
+      '@graview/tools': 0.1.20(typescript@6.0.3)
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
     transitivePeerDependencies:
       - '@webgpu/types'
       - better-sqlite3
       - typescript
 
-  '@graview/render@0.1.19':
+  '@graview/render@0.1.20':
     dependencies:
-      '@graview/core': 0.1.19
-      '@graview/layout': 0.1.19
+      '@graview/core': 0.1.20
+      '@graview/layout': 0.1.20
     transitivePeerDependencies:
       - better-sqlite3
 
-  '@graview/ship@0.1.19(typescript@6.0.3)':
+  '@graview/ship@0.1.20(typescript@6.0.3)':
     dependencies:
-      '@graview/core': 0.1.19
+      '@graview/core': 0.1.20
     optionalDependencies:
       typescript: 6.0.3
     transitivePeerDependencies:
       - better-sqlite3
 
-  '@graview/skills@0.1.19': {}
+  '@graview/skills@0.1.20': {}
 
-  '@graview/tools@0.1.19(typescript@6.0.3)':
+  '@graview/tools@0.1.20(typescript@6.0.3)':
     dependencies:
-      '@graview/core': 0.1.19
-      '@graview/ship': 0.1.19(typescript@6.0.3)
+      '@graview/core': 0.1.20
+      '@graview/ship': 0.1.20(typescript@6.0.3)
     transitivePeerDependencies:
       - better-sqlite3
       - typescript
@@ -4105,13 +4109,13 @@ snapshots:
 
   gopd@1.2.0: {}
 
-  graview@0.1.19(esbuild@0.25.12)(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3):
+  graview@0.1.20(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3):
     dependencies:
-      '@graview/core': 0.1.19
-      '@graview/guest': 0.1.19(esbuild@0.25.12)(react-dom@19.3.0(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
-      '@graview/ship': 0.1.19(typescript@6.0.3)
-      '@graview/skills': 0.1.19
-      '@graview/tools': 0.1.19(typescript@6.0.3)
+      '@graview/core': 0.1.20
+      '@graview/guest': 0.1.20(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/ship': 0.1.20(typescript@6.0.3)
+      '@graview/skills': 0.1.20
+      '@graview/tools': 0.1.20(typescript@6.0.3)
     transitivePeerDependencies:
       - '@preact/signals-core'
       - '@webgpu/types'
@@ -4478,9 +4482,9 @@ snapshots:
       iconv-lite: 0.7.3
       unpipe: 1.0.0
 
-  react-dom@19.3.0(react@19.2.8):
+  react-dom@19.3.0(react@19.3.0):
     dependencies:
-      react: 19.2.8
+      react: 19.3.0
       scheduler: 0.28.0
 
   react-reconciler@0.33.0(react@19.2.8):
@@ -4488,21 +4492,23 @@ snapshots:
       react: 19.2.8
       scheduler: 0.27.0
 
-  react-router-dom@7.18.4(react-dom@19.3.0(react@19.2.8))(react@19.2.8):
+  react-router-dom@7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
-      react: 19.2.8
-      react-dom: 19.3.0(react@19.2.8)
-      react-router: 7.18.4(react-dom@19.3.0(react@19.2.8))(react@19.2.8)
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+      react-router: 7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
 
-  react-router@7.18.4(react-dom@19.3.0(react@19.2.8))(react@19.2.8):
+  react-router@7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
       cookie: 1.1.1
-      react: 19.2.8
+      react: 19.3.0
       set-cookie-parser: 2.7.2
     optionalDependencies:
-      react-dom: 19.3.0(react@19.2.8)
+      react-dom: 19.3.0(react@19.3.0)
 
   react@19.2.8: {}
+
+  react@19.3.0: {}
 
   regex-recursion@6.0.2:
     dependencies:

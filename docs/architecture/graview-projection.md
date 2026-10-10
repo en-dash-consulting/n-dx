@@ -29,7 +29,8 @@ ndx graview mcp .       →  emit, sync-seed the store, then  graview mcp --read
 
 No n-dx package depends on `@graview/*`. The binary is a peer tool, the way
 the `claude` and `codex` CLIs are to hench, resolved from `graview.bin` in the
-project config, `NDX_GRAVIEW_BIN`, PATH, then `npx -y graview@0.1.19`
+project config, `NDX_GRAVIEW_BIN`, PATH, the product face's own `graview`
+(it pins the same release), then `npx -y graview@0.1.20`
 (`packages/graview/src/graview-bin.ts`). A `.js` path runs under the current
 Node, so a sibling framework checkout works without a global install.
 

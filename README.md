@@ -253,7 +253,7 @@ ndx config llm.codex.cli_path codex .
 | `ndx which` | Show which n-dx is running: version, `cli.js` path, install kind (registry, global link, checkout) and git ref |
 | `ndx trust [status\|accept\|revoke] [dir]` | Review or accept the execution config a checkout ships (hench guard, test command, `.mcp.json`); `ndx work` runs under the default guard until accepted (`--format=json`) |
 | `ndx iso [dir]` | Render a standalone isometric architecture map (`--source=auto\|sourcevision\|scan`, `--max-nodes=N`, `--no-externals`) |
-| `ndx graview <emit\|check\|describe\|serve\|mcp\|info> [dir]` | Project the PRD, analysis and runs into [Graview](https://graview.dev) and drive the `graview` CLI on the result; `serve` runs the separately published `@n-dx/graview-face` when installed (`--no-face` for the bare store; `--files` adds file nodes; binary from `graview.bin`, `$NDX_GRAVIEW_BIN`, PATH, or `npx -y graview@0.1.19`) |
+| `ndx graview <emit\|check\|describe\|serve\|mcp\|info> [dir]` | Project the PRD, analysis and runs into [Graview](https://graview.dev) and drive the `graview` CLI on the result; `serve` runs the separately published `@n-dx/graview-face` when installed (`--no-face` for the bare store; `--files` adds file nodes; binary from `graview.bin`, `$NDX_GRAVIEW_BIN`, PATH, the face's own `graview`, or `npx -y graview@0.1.20`) |
 | `ndx auth [dir]` | Check and configure LLM provider credentials |
 | `ndx web [dir]` | Dashboard server control (lower-level counterpart to `ndx start`) |
 | `ndx install-sample [dir]` | Install the sandboxed sample app and its PRD items |

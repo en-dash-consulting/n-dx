@@ -16,8 +16,9 @@ ndx graview info .            # where the projection lands, which binary, and th
 ```
 
 Nothing here depends on `@graview/*`. The `graview` binary is resolved from
-`graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH, then
-`npx -y graview@0.1.19`. Install it once with `npm i -g graview` to skip the
+`graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH, the installed
+`@n-dx/graview-face`'s own `graview` (it pins the same release), then
+`npx -y graview@0.1.20`. Install it once with `npm i -g graview` to skip the
 npx round-trip.
 
 Config keys (`.ndx/config.json` or `.n-dx.json`):

@@ -1,9 +1,11 @@
 /**
  * Where the `graview` binary is. In order: `graview.bin` in the project
  * config (shared, then machine-local), `NDX_GRAVIEW_BIN`, a `graview` on PATH,
- * then `npx -y graview@<pinned>`. A path ending in `.js`/`.mjs`/`.cjs` is a
- * CLI entry run under the current Node, so a sibling framework checkout
- * (`../graview/packages/graview/dist/cli.js`) works without a global install.
+ * the product face's own `graview` (it pins the same release this package
+ * checks against), then `npx -y graview@<pinned>`. A path ending in
+ * `.js`/`.mjs`/`.cjs` is a CLI entry run under the current Node, so a sibling
+ * framework checkout (`../graview/packages/graview/dist/cli.js`) works without
+ * a global install.
  *
  * No `@graview/*` package is ever imported or installed by this package; the
  * binary is a peer tool the way the claude and codex CLIs are to hench.
@@ -13,7 +15,7 @@ import { delimiter, isAbsolute, join, resolve } from "node:path";
 import type { Layout } from "./llm-gateway.js";
 import { GRAVIEW_VERSION } from "./document.js";
 
-export type GraviewBinSource = "config" | "env" | "path" | "npx";
+export type GraviewBinSource = "config" | "env" | "path" | "face" | "npx";
 
 export interface GraviewCommand {
   cmd: string;
@@ -94,6 +96,23 @@ function findOnPath(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string |
 export interface ResolveGraviewOptions {
   env?: NodeJS.ProcessEnv;
   platform?: NodeJS.Platform;
+  /**
+   * The product face's checkout or install, when one is known: its own
+   * `node_modules/.bin/graview` is taken before npx. The face pins the release
+   * this package checks against, and npx run from inside a pnpm workspace
+   * that holds that same release skips its install and then finds no bin.
+   */
+  face?: string;
+}
+
+function faceBin(face: string | undefined, platform: NodeJS.Platform): string | undefined {
+  if (!face) return undefined;
+  const names = platform === "win32" ? ["graview.cmd", "graview"] : ["graview"];
+  for (const name of names) {
+    const candidate = join(face, "node_modules", ".bin", name);
+    if (isFile(candidate)) return candidate;
+  }
+  return undefined;
 }
 
 export function resolveGraviewCommand(layout: Layout, options: ResolveGraviewOptions = {}): GraviewCommand {
@@ -108,6 +127,9 @@ export function resolveGraviewCommand(layout: Layout, options: ResolveGraviewOpt
 
   const onPath = findOnPath(env, platform);
   if (onPath) return { cmd: onPath, prefix: [], source: "path", detail: onPath };
+
+  const fromFace = faceBin(options.face, platform);
+  if (fromFace) return { cmd: fromFace, prefix: [], source: "face", detail: fromFace };
 
   const npx = platform === "win32" ? "npx.cmd" : "npx";
   return { cmd: npx, prefix: ["-y", `graview@${GRAVIEW_VERSION}`], source: "npx", detail: `npx -y graview@${GRAVIEW_VERSION}` };

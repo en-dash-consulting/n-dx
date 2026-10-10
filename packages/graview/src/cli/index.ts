@@ -46,7 +46,7 @@ const USAGE = `ndx graview <command> [dir] [flags]
   --quiet    print nothing but errors
 
 The graview binary comes from graview.bin in the project config, $NDX_GRAVIEW_BIN,
-PATH, or npx -y graview@<pinned>, in that order.
+PATH, the installed product face's own graview, or npx -y graview@<pinned>, in that order.
 `;
 
 interface ParsedArgs {
@@ -205,7 +205,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   };
 
   if (parsed.sub === "info") {
-    const command = resolveGraviewCommand(layout);
+    const command = resolveGraviewCommand(layout, { face: config.app ?? findProductFace() });
     const rex = rexMcpEndpoint(layout);
     const info = {
       projectRoot: layout.root,
@@ -231,7 +231,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   say(describeEmit(emitted));
   if (parsed.sub === "emit") return 0;
 
-  const command = resolveGraviewCommand(layout);
+  const command = resolveGraviewCommand(layout, { face: config.app ?? findProductFace() });
   say(`graview: ${command.detail} (${command.source})`);
   const root = emitted.layout.root;
 
