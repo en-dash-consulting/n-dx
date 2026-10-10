@@ -15,9 +15,9 @@ blockedBy:
 source: "roadmap"
 startedAt: "2026-10-08T08:46:03.662Z"
 completedAt: "2026-10-10T05:02:13.677Z"
+endedAt: "2026-10-10T05:02:13.677Z"
 resolutionType: "code-change"
 resolutionDetail: "Code from hench run 4712c053 (adb851c54, a6ea6ecfc). The run failed its gate on a stale dist and the Java golden; after the stack rebase the operator session regenerated the golden (purely additive annotations captures) and verified sourcevision 3058/3059 and the policy suites."
-endedAt: "2026-10-10T05:02:13.677Z"
 acceptanceCriteria:
   - "Java fixtures with @Query, JdbcTemplate and @Table yield table names"
   - "Go fixtures with database/sql, sqlx and sqlc yield table names"
