@@ -15,9 +15,11 @@ import {
   projectRootOf,
   resolveApiKey as sharedResolveApiKey,
   resolveCliPath as sharedResolveCliPath,
+  resolveVendorCliEnv as sharedResolveVendorCliEnv,
 } from "../prd/llm-gateway.js";
 import type { ClaudeConfig, LLMConfig, LLMVendor } from "../prd/llm-gateway.js";
 import type { HenchConfig } from "../schema/index.js";
+import type { EnvPolicyConfig } from "../prd/llm-gateway.js";
 
 // Re-export the shared ClaudeConfig type so existing consumers keep working
 export type { ClaudeConfig, LLMConfig, LLMVendor } from "../prd/llm-gateway.js";
@@ -99,35 +101,14 @@ export function resolveVendorCliPath(llmConfig: LLMConfig, henchConfig?: HenchCo
  * - codex: llm.codex.api_key → OPENAI_API_KEY
  * - claude: llm.claude.api_key → ANTHROPIC_API_KEY
  *
- * Falls back to process.env unchanged when no config-supplied key is present.
+ * Applies the guard policy while retaining the active vendor's authentication.
  */
-export function resolveVendorCliEnv(llmConfig: LLMConfig): NodeJS.ProcessEnv {
-  // Strip CLAUDECODE so spawned claude processes don't think they're nested
-  // inside an interactive Claude Code session (breaks background/server usage).
-  const { CLAUDECODE: _, ...baseEnv } = process.env;
-  const vendor = resolveLLMVendor(llmConfig);
-  if (vendor === LLM_VENDOR.CODEX) {
-    const apiKey = llmConfig.codex?.api_key;
-    if (apiKey) {
-      return { ...baseEnv, OPENAI_API_KEY: apiKey };
-    }
-  } else if (vendor === LLM_VENDOR.GOOGLE) {
-    const apiKey = llmConfig.google?.api_key;
-    if (apiKey) {
-      // Honor the configured env var name; default matches createGoogleApiProvider.
-      const apiKeyEnvVar = llmConfig.google?.apiKeyEnv ?? "GEMINI_API_KEY";
-      return { ...baseEnv, [apiKeyEnvVar]: apiKey };
-    }
-  } else if (vendor === LLM_VENDOR.LOCAL) {
-    // Local server uses an optional bearer token injected directly by the
-    // local-api-provider; no env-variable injection needed here.
-  } else {
-    const apiKey = llmConfig.claude?.api_key;
-    if (apiKey) {
-      return { ...baseEnv, ANTHROPIC_API_KEY: apiKey };
-    }
-  }
-  return baseEnv;
+export function resolveVendorCliEnv(
+  llmConfig: LLMConfig,
+  envConfig?: EnvPolicyConfig,
+  onStripped?: (names: string[]) => void,
+): NodeJS.ProcessEnv {
+  return sharedResolveVendorCliEnv(llmConfig, envConfig, process.env, onStripped);
 }
 
 /**

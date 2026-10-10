@@ -16,8 +16,8 @@
  *   • no test command → skipped with warning
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, chmodSync } from "node:fs";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -117,6 +117,29 @@ function writeMockReviewer(dir, exitCode) {
 // ---------------------------------------------------------------------------
 // readRexTestCommand
 // ---------------------------------------------------------------------------
+
+describe("reviewer credential containment", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    [runReviewerLlm, "claude", "ANTHROPIC_API_KEY"],
+    [runReviewerLlmCapturing, "claude", "ANTHROPIC_API_KEY"],
+    [runReviewerLlm, "codex", "OPENAI_API_KEY"],
+    [runReviewerLlmCapturing, "codex", "OPENAI_API_KEY"],
+  ])("filters %s for %s and applies project credential opt-in", async (run, reviewer, authName) => {
+    vi.stubEnv("FAKE_SERVICE_API_KEY", "fixture-secret");
+    vi.stubEnv("GITHUB_TOKEN", "fixture-github");
+    vi.stubEnv("TYPESAFE_API_KEY", "fixture-jev");
+    vi.stubEnv(authName, "fixture-exported");
+    writeNdxConfig(tmpDir, { llm: { [reviewer]: { api_key: "fixture-configured" } }, hench: { guard: { env: { allow: ["TYPESAFE_API_KEY"] } } } });
+    const envPath = join(tmpDir, "captured-env.json");
+    const cliPath = makeNodeScript(tmpDir, "env-reviewer", `require("node:fs").writeFileSync(${JSON.stringify(envPath)}, JSON.stringify({ fake: process.env.FAKE_SERVICE_API_KEY, github: process.env.GITHUB_TOKEN, jev: process.env.TYPESAFE_API_KEY, auth: process.env[${JSON.stringify(authName)}] }));`);
+    const result = await run({ cliPath, prompt: "review", dir: tmpDir, reviewer });
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(readFileSync(envPath, "utf-8"))).toEqual({ jev: "fixture-jev", auth: "fixture-configured" });
+    expect(process.env.FAKE_SERVICE_API_KEY).toBe("fixture-secret");
+  });
+});
 
 describe("readRexTestCommand", () => {
   it("returns undefined when .rex/config.json does not exist", () => {

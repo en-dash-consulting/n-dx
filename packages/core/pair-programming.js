@@ -26,6 +26,7 @@ import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { relativeToRoot, resolveLayout } from "./layout.js";
+import { loadVendorCliEnv } from "./config.js";
 
 // ---------------------------------------------------------------------------
 // NDX context assembly
@@ -541,7 +542,8 @@ const doNotTrack = (child) => child;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
  */
-export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
+export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
+  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE);
   return new Promise((resolve) => {
     let child;
     try {
@@ -551,6 +553,7 @@ export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_0
       const args = reviewer === REVIEWER_VENDOR.CODEX ? ["exec", "-"] : ["-p", "-"];
       child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
+        env,
         stdio: ["pipe", "inherit", "inherit"],
         // POSIX: makes the CLI a process-group leader so the timeout can signal the
         // group and reach its descendants. No-op on Windows, where taskkill walks
@@ -606,7 +609,8 @@ export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_0
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
  */
-export function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
+export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
+  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE);
   return new Promise((resolve) => {
     let child;
     try {
@@ -614,6 +618,7 @@ export function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeou
       const args = reviewer === REVIEWER_VENDOR.CODEX ? ["exec", "-"] : ["-p", "-"];
       child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
+        env,
         stdio: ["pipe", "pipe", "pipe"],
         // Process-group leader on POSIX; see runReviewerLlm.
         ...treeKillSpawnOptions(),
