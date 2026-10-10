@@ -662,7 +662,8 @@ export interface SpawnWithAdapterOptions {
   adapter: VendorAdapter;
   spawnConfig: SpawnConfig;
   cliBinary: string;
-  cliEnv?: NodeJS.ProcessEnv;
+  /** Filtered by the project's guard.env policy; there is deliberately no default. */
+  cliEnv: NodeJS.ProcessEnv;
   cwd: string;
   tokenMetadata: SpawnTokenMetadata;
   /** When true, use EventAccumulator instead of inline SpawnResult mutation. */
@@ -764,7 +765,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     const proc = spawnCli(cliBinary, [...spawnConfig.args], {
       cwd,
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
-      env: cliEnv ?? resolveVendorCliEnv({ vendor: tokenMetadata.vendor }),
+      env: cliEnv,
     });
 
     // proc.pid is undefined when the spawn failed outright (ENOENT); the
@@ -1318,7 +1319,7 @@ export interface ReviewPassContext {
   adapter: VendorAdapter;
   vendor: LLMVendor;
   cliBinary: string;
-  cliEnv?: NodeJS.ProcessEnv;
+  cliEnv: NodeJS.ProcessEnv;
   policy: ExecutionPolicy;
   henchDir: string;
   /** Resolved review model. Empty string means "send no model flag" (local vendor). */

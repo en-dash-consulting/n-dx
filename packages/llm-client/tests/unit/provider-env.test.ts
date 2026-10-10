@@ -57,7 +57,7 @@ describe("foundation vendor CLI spawn containment", () => {
     vi.stubEnv("GOOGLE_APPLICATION_CREDENTIALS", "/fixture/google.json");
     vi.stubEnv("CLOUD_ML_REGION", "global");
     mockSpawn();
-    const client = createCliClient({ claudeConfig: {}, envPolicy: { allow: ["GITHUB_TOKEN"] }, maxRetries: 0 });
+    const client = createCliClient({ claudeConfig: {}, maxRetries: 0 });
     expect((await client.complete({ prompt: "test", model: "test" })).text).toBe("done");
     const env: NodeJS.ProcessEnv = spawnCli.mock.calls[0][2].env;
     for (const name of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE", "AWS_REGION"]) {
@@ -65,20 +65,20 @@ describe("foundation vendor CLI spawn containment", () => {
     }
     expect(env.GOOGLE_APPLICATION_CREDENTIALS).toBe(mode === "CLAUDE_CODE_USE_VERTEX" ? "/fixture/google.json" : undefined);
     expect(env.CLOUD_ML_REGION).toBe("global");
-    expect(env.GITHUB_TOKEN).toBe("fixture-github");
+    expect(env.GITHUB_TOKEN).toBeUndefined();
     expect(env.FAKE_SERVICE_API_KEY).toBeUndefined();
   });
 
-  it.each(["claude", "codex"] as const)("filters %s spawns and honors explicit allow entries", async (vendor) => {
+  // One-shot completions take no project policy (D1, #623): the default filter applies.
+  it.each(["claude", "codex"] as const)("filters %s spawns with the default policy", async (vendor) => {
     mockSpawn();
-    const envPolicy = { allow: ["GITHUB_TOKEN"] };
     const client = vendor === "claude"
-      ? createCliClient({ claudeConfig: {}, envPolicy, maxRetries: 0 })
-      : createCodexCliClient({ codexConfig: {}, envPolicy, maxRetries: 0 });
+      ? createCliClient({ claudeConfig: {}, maxRetries: 0 })
+      : createCodexCliClient({ codexConfig: {}, maxRetries: 0 });
     expect((await client.complete({ prompt: "test", model: "test" })).text).toBe("done");
     const env: NodeJS.ProcessEnv = spawnCli.mock.calls[0][2].env;
     expect(env.FAKE_SERVICE_API_KEY).toBeUndefined();
-    expect(env.GITHUB_TOKEN).toBe("fixture-github");
+    expect(env.GITHUB_TOKEN).toBeUndefined();
     if (vendor === "claude") {
       expect(env.ANTHROPIC_API_KEY).toBe("fixture-claude");
       expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe("fixture-oauth");

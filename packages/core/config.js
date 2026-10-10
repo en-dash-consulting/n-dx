@@ -2447,7 +2447,7 @@ async function loadAllConfigs(dir) {
     configs.language = projectConfig.language;
   }
 
-  return { configs, rawConfigs };
+  return { configs, rawConfigs, projectConfig };
 }
 
 /**
@@ -2459,8 +2459,7 @@ async function loadAllConfigs(dir) {
  */
 export async function loadVendorCliEnv(dir, vendor) {
   const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
-  const { configs } = await loadAllConfigs(dir);
-  const projectConfig = await loadEffectiveProjectConfig(dir);
+  const { configs, projectConfig } = await loadAllConfigs(dir);
   const envPolicy = configs.hench?.guard?.env ?? projectConfig.hench?.guard?.env;
   const llmConfig = await loadLLMConfig(dir);
   return resolveVendorCliEnv({ ...llmConfig, vendor }, envPolicy);
