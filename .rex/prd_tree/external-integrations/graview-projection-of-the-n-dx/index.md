@@ -22,5 +22,6 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Promote the rex v2 reader and derived-edge computations to the public API](./promote-the-rex-v2-reader-and-derived.md) | pending |
 | [@n-dx/graview adapter: declaration document, snapshot projection and ndx graview spawn commands](./n-dx-graview-adapter-declaration.md) | pending |
+| [Promote the rex v2 reader and derived-edge computations to the public API](./promote-the-rex-v2-reader-and-derived.md) | pending |
+| [Two-way writes through Graview's SyncEngine with rex as the system of record](./two-way-writes-through-graview-s.md) | pending |
