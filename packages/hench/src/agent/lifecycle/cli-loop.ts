@@ -2093,7 +2093,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const cliEnv = resolveVendorCliEnv(llmConfig, config.guard.env, (names, kind) => {
     detail(
       kind === "missing-credentials"
-        ? `CLI environment: cloud mode is on but none of ${names.join(", ")} is set`
+        ? `CLI environment: cloud mode is on but none of ${names.join(", ")} is set; the CLI falls back to default credential files or instance metadata`
         : `CLI environment: stripped ${names.join(", ")}`,
       { captureWhenQuiet: true },
     );
