@@ -195,6 +195,71 @@ export async function computeLandings(tree: V2Tree, options: ChangeCommitsOption
 /** `X.Y.Z`, `vX.Y.Z`, or a changesets monorepo tag `<package>@X.Y.Z`; no prerelease suffix. */
 const RELEASE_TAG = /^(?:\S+@)?v?(\d+\.\d+\.\d+)$/;
 
+export interface ReleaseTag {
+  /** `X.Y.Z`. */
+  version: string;
+  /** The tag's name, the first created for this version. */
+  tag: string;
+  /** The commit the tag points at (the tagged commit, through an annotated tag). */
+  commit: string;
+  /** When the tag was created, ISO 8601. */
+  createdAt: string;
+}
+
+/**
+ * Every release tag (see {@link RELEASE_TAG}) in creation order, one per
+ * version: the earliest-created tag of a version is the one its releases are
+ * read from, so a changesets monorepo's six `<package>@X.Y.Z` tags are one
+ * release.
+ */
+export async function listReleaseTags(repoDir: string): Promise<ReleaseTag[]> {
+  const format = ["%(refname:short)", "%(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end)", "%(creatordate:iso-strict)"].join("%1f");
+  const stdout = await git(repoDir, ["for-each-ref", "--sort=creatordate", `--format=${format}`, "refs/tags"]);
+  const seen = new Set<string>();
+  const out: ReleaseTag[] = [];
+  for (const line of stdout.split("\n")) {
+    if (line === "") continue;
+    const [tag, commit, createdAt] = line.split("\x1f");
+    const version = RELEASE_TAG.exec(tag.trim())?.[1];
+    if (version === undefined || seen.has(version)) continue;
+    seen.add(version);
+    out.push({ version, tag: tag.trim(), commit, createdAt });
+  }
+  return out;
+}
+
+/**
+ * The release each of `commits` first shipped in, by commit SHA: the version
+ * of the earliest-created release tag whose history contains it, as
+ * {@link firstReleaseContaining} answers for one commit, for many in one walk.
+ * Commits in no release are absent. One `rev-list` over every release tag's
+ * history, then each tag in creation order claims the ancestors no earlier
+ * tag has.
+ */
+export async function releasesContaining(repoDir: string, tags: readonly ReleaseTag[], commits: ReadonlySet<string>): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (tags.length === 0 || commits.size === 0) return out;
+  const stdout = await git(repoDir, ["rev-list", "--parents", ...tags.map((t) => t.commit), "--"]);
+  const parentsOf = new Map<string, string[]>();
+  for (const line of stdout.split("\n")) {
+    if (line === "") continue;
+    const [hash, ...parents] = line.split(" ");
+    parentsOf.set(hash, parents);
+  }
+  const claimed = new Set<string>();
+  for (const tag of tags) {
+    const stack = [tag.commit];
+    while (stack.length > 0) {
+      const c = stack.pop() as string;
+      if (claimed.has(c)) continue;
+      claimed.add(c);
+      if (commits.has(c)) out.set(c, tag.version);
+      stack.push(...(parentsOf.get(c) ?? []));
+    }
+  }
+  return out;
+}
+
 /** The version of the earliest-created release tag (see {@link RELEASE_TAG}) whose history contains `commit`, or undefined. */
 export async function firstReleaseContaining(repoDir: string, commit: string): Promise<string | undefined> {
   const tags = await git(repoDir, ["tag", "--contains", commit, "--sort=creatordate"]);

@@ -33,9 +33,9 @@ describe("resolveGraviewCommand", () => {
 
   it("lets the machine-local config override the shared one, and reads includeFiles", () => {
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { bin: "graview", includeFiles: false } }));
-    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ graview: { bin: "/opt/graview/bin/graview", includeFiles: true } }));
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ graview: { bin: "/opt/graview/bin/graview", includeFiles: true, mainRef: " upstream/main ", proposeProductLayer: false } }));
     const layout = resolveLayout(root);
-    expect(readGraviewConfig(layout)).toEqual({ bin: "/opt/graview/bin/graview", includeFiles: true });
+    expect(readGraviewConfig(layout)).toEqual({ bin: "/opt/graview/bin/graview", includeFiles: true, mainRef: "upstream/main", proposeProductLayer: false });
     const command = resolveGraviewCommand(layout, { env: noPath, platform: "linux" });
     expect(command).toMatchObject({ cmd: "/opt/graview/bin/graview", prefix: [], source: "config" });
   });
@@ -58,9 +58,25 @@ describe("resolveGraviewCommand", () => {
     }
   });
 
+  it("takes the product face's own graview before npx, and never before PATH", () => {
+    const face = join(root, "face");
+    mkdirSync(join(face, "node_modules", ".bin"), { recursive: true });
+    writeFileSync(join(face, "node_modules", ".bin", "graview"), "#!/bin/sh\n");
+    const layout = resolveLayout(root);
+    expect(resolveGraviewCommand(layout, { env: noPath, platform: "linux", face })).toMatchObject({ cmd: join(face, "node_modules", ".bin", "graview"), source: "face" });
+    expect(resolveGraviewCommand(layout, { env: noPath, platform: "linux", face: join(root, "nowhere") }).source).toBe("npx");
+    const bin = mkdtempSync(join(tmpdir(), "graview-path-"));
+    writeFileSync(join(bin, "graview"), "#!/bin/sh\n");
+    try {
+      expect(resolveGraviewCommand(layout, { env: { PATH: bin }, platform: "linux", face }).source).toBe("path");
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+    }
+  });
+
   it("resolves graview.app against the project root", () => {
-    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { app: "../n-dx-graview" } }));
-    expect(readGraviewConfig(resolveLayout(root)).app).toBe(join(root, "..", "n-dx-graview"));
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { app: "../my-face" } }));
+    expect(readGraviewConfig(resolveLayout(root)).app).toBe(join(root, "..", "my-face"));
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { app: "/opt/face" } }));
     expect(readGraviewConfig(resolveLayout(root)).app).toBe("/opt/face");
   });

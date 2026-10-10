@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { resolveLayout } from "../../src/llm-gateway.js";
 import { buildSnapshot } from "../../src/snapshot.js";
@@ -61,13 +62,16 @@ describe("buildSnapshot", () => {
     const { snapshot } = await buildSnapshot(resolveLayout(root), quiet);
     const ids = new Set(snapshot.nodes.map((n) => n.id));
     const kindOf = new Map(snapshot.nodes.map((n) => [n.id, n.kind]));
-    const declared = declaredEdges(loadDocument());
+    const doc = loadDocument();
+    const declared = declaredEdges(doc);
     for (const edge of snapshot.edges) {
       expect(ids.has(edge.from), `${edge.kind} from ${edge.from}`).toBe(true);
       expect(ids.has(edge.to), `${edge.kind} to ${edge.to}`).toBe(true);
       expect(declared.get(edge.kind)?.has(kindOf.get(edge.from)!), `${kindOf.get(edge.from)} does not declare ${edge.kind}`).toBe(true);
+      // ...and only towards a kind that edge admits: the store refuses an edge to an undeclared target.
+      const to = (doc.kinds[kindOf.get(edge.from)!]?.edges?.[edge.kind] as { to?: string[] } | undefined)?.to ?? [];
+      expect(to, `${kindOf.get(edge.from)}.${edge.kind} does not admit ${kindOf.get(edge.to)}`).toContain(kindOf.get(edge.to));
     }
-    const doc = loadDocument();
     for (const node of snapshot.nodes) {
       const kind = doc.kinds[node.kind]!;
       expect(kind, node.kind).toBeDefined();
@@ -97,16 +101,46 @@ describe("buildSnapshot", () => {
     expect(withFiles.snapshot.edges).toContainEqual({ kind: "inZone", from: `${FILE_PREFIX}src/catalog/list.ts`, to: "catalog" });
   });
 
-  it("reads a v1 tree as changes only, with no product layer", async () => {
+  it("draws the product layer rex's migration plan proposes for a v1 tree, every node marked proposed", async () => {
     const root = project({ prd: "v1", layout: "ndx" });
-    const { snapshot, layout, counts } = await buildSnapshot(resolveLayout(root), quiet);
+    const { snapshot, layout, productLayer } = await buildSnapshot(resolveLayout(root), quiet);
     expect(layout).toBe("v1");
+    expect(productLayer).toBe("proposed");
+    // The fixture's epic "Auth Platform" is an area; its feature "Login Flow" has completed work
+    // under it, so it is a capability, and the task "Password Login" a change placed on it.
+    const area = snapshot.nodes.find((n) => n.kind === "area");
+    expect(area).toMatchObject({ title: "Auth Platform", proposed: true });
+    const product = snapshot.nodes.filter((n) => n.kind === "area" || n.kind === "capability" || n.kind === "constraint");
+    expect(product.every((n) => n.proposed === true)).toBe(true);
+    const login = snapshot.nodes.find((n) => n.title === "Login Flow");
+    expect(login).toMatchObject({ kind: "capability", proposed: true });
+    expect(snapshot.edges).toContainEqual({ kind: "under", from: login!.id, to: area!.id });
+    const password = snapshot.nodes.find((n) => n.title === "Password Login");
+    expect(password).toMatchObject({ kind: "change" });
+    const placed = snapshot.edges.find((e) => e.from === password!.id && e.to === login!.id);
+    expect(["amends", "touches"]).toContain(placed?.kind);
+    // Changes keep rex's ids and say nothing of being proposed: they are the tree's own items.
+    expect(password!.proposed).toBeUndefined();
+  });
+
+  it("reads a v1 tree as changes only when told not to propose", async () => {
+    const root = project({ prd: "v1", layout: "ndx" });
+    const { snapshot, layout, counts, productLayer } = await buildSnapshot(resolveLayout(root), { ...quiet, proposeProductLayer: false });
+    expect(layout).toBe("v1");
+    expect(productLayer).toBe("none");
     expect(counts.area).toBeUndefined();
     expect(counts.capability).toBeUndefined();
     const changes = snapshot.nodes.filter((n) => n.kind === "change");
     expect(changes.length).toBeGreaterThan(0);
     expect(changes.some((c) => c.level === "epic")).toBe(true);
     expect(snapshot.edges.some((e) => e.kind === "under" && e.from !== e.to)).toBe(true);
+  });
+
+  it("never proposes over a v2 tree", async () => {
+    const root = project();
+    const { productLayer, snapshot } = await buildSnapshot(resolveLayout(root), quiet);
+    expect(productLayer).toBe("stored");
+    expect(snapshot.nodes.filter((n) => n.kind === "capability").every((n) => n.proposed === undefined)).toBe(true);
   });
 
   it("still projects a project with no analysis and no runs", async () => {
@@ -133,10 +167,66 @@ describe("buildSnapshot", () => {
     }
   });
 
-  it("warns and carries on when realized-by needs a git repository it does not have", async () => {
+  it("projects the N-DX-Item commits on main and the release a finished change landed in, from git", async () => {
+    const root = project({ runs: false });
+    const layout = resolveLayout(root);
+    const change = "c0000000-0000-4000-8000-000000000001";
+    const state = join(layout.rexDir, "changes", "add-apple-pay", "state.yaml");
+    writeFileSync(state, readFileSync(state, "utf-8").replace('status: "in_progress"', 'status: "completed"'));
+
+    let clock = 0;
+    const git = (...args: string[]): string => {
+      clock += 1;
+      const date = new Date(Date.UTC(2026, 9, 1, 0, clock)).toISOString();
+      const env = { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date, GIT_AUTHOR_NAME: "Pat", GIT_AUTHOR_EMAIL: "p@test", GIT_COMMITTER_NAME: "Pat", GIT_COMMITTER_EMAIL: "p@test" };
+      return execFileSync("git", args, { cwd: root, encoding: "utf-8", env }).trim();
+    };
+    const commit = (file: string, message: string): string => {
+      writeFileSync(join(root, file), `${file}\n`);
+      writeFileSync(join(root, ".msg"), message);
+      git("add", file);
+      git("commit", "-q", "-F", ".msg");
+      return git("rev-parse", "HEAD");
+    };
+    git("init", "-q", "--initial-branch=main");
+    writeFileSync(join(root, ".gitignore"), ".msg\n");
+    commit("README.md", "start");
+    git("tag", "@shop/core@1.1.0");
+    const landed = commit("pay.ts", `Add Apple Pay\n\nN-DX-Item: ${change}`);
+    git("tag", "@shop/core@1.2.0");
+    git("tag", "@shop/web@1.2.0");
+    const unreleased = commit("later.ts", `Polish\n\nN-DX-Item: ${change}`);
+    commit("nothing.ts", "N-DX-Item: 00000000-0000-4000-8000-00000000dead\n\nN-DX-Item: 00000000-0000-4000-8000-00000000dead");
+
+    const report = await buildSnapshot(layout, quiet);
+    const { nodes, edges } = report.snapshot;
+    expect(report.warnings).toEqual([]);
+    const commits = nodes.filter((n) => n.kind === "commit");
+    expect(commits.map((c) => c.id).sort()).toEqual([landed, unreleased].sort());
+    expect(commits.find((c) => c.id === landed)).toMatchObject({ sha: landed, subject: "Add Apple Pay", author: "Pat", committedAt: expect.stringMatching(/^2026-10-01T/) });
+    expect(edges).toContainEqual({ kind: "landedFor", from: landed, to: change });
+    expect(edges).toContainEqual({ kind: "landedFor", from: unreleased, to: change });
+    // The change landed with its last commit, which no release tag contains yet: not shipped.
+    expect(edges.some((e) => e.kind === "shippedWith" && e.from === change)).toBe(false);
+
+    git("tag", "@shop/core@1.3.0");
+    const shipped = await buildSnapshot(layout, quiet);
+    expect(shipped.snapshot.edges).toContainEqual({ kind: "shippedWith", from: change, to: "release:1.3.0" });
+    const release = shipped.snapshot.nodes.find((n) => n.id === "release:1.3.0");
+    expect(release).toMatchObject({ kind: "release", version: "1.3.0", shippedChanges: 1, plannedChanges: 0, taggedAt: expect.stringMatching(/^2026-10-01T/) });
+    // Every release tag is a release, the monorepo's two 1.2.0 tags one of them, shipped or not.
+    expect(shipped.snapshot.nodes.filter((n) => n.kind === "release").map((n) => n.version).sort()).toEqual(["1.1.0", "1.2.0", "1.3.0"]);
+    // The caches went under the graview dir, not rex's.
+    expect(() => readFileSync(join(layout.rexDir, ".cache", "trailer-commits.json"))).toThrow();
+    expect(readFileSync(join(layout.graviewDir, "cache", "trailer-commits.json"), "utf-8")).toContain(landed);
+  });
+
+  it("warns and carries on when the commits need a git repository it does not have", async () => {
     const root = project();
     const report = await buildSnapshot(resolveLayout(root), quiet);
     expect(report.snapshot.edges.some((e) => e.kind === "realizedIn")).toBe(false);
+    expect(report.snapshot.edges.some((e) => e.kind === "landedFor")).toBe(false);
+    expect(report.warnings.some((w) => w.startsWith("Commits and releases from git skipped"))).toBe(true);
     expect(report.warnings.some((w) => w.startsWith("Realized-by edges skipped"))).toBe(true);
     // And wrote nothing under the rex, sourcevision or hench directories while trying.
     const layout = resolveLayout(root);

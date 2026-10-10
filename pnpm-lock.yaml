@@ -74,7 +74,7 @@ importers:
         version: 3.1.1
       ink:
         specifier: ^7.1.1
-        version: 7.1.1(react@19.2.8)
+        version: 7.1.1(@types/react@19.3.0)(react@19.2.8)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -94,9 +94,76 @@ importers:
         specifier: workspace:*
         version: link:../sourcevision
     devDependencies:
+      '@graview/core':
+        specifier: 0.1.20
+        version: 0.1.20
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@26.2.0)(jsdom@30.0.1(@noble/hashes@1.8.0))(vite@6.4.3(@types/node@26.2.0)(yaml@2.9.0))
+
+  packages/graview-face:
+    dependencies:
+      '@graview/core':
+        specifier: 0.1.20
+        version: 0.1.20
+      '@graview/layout':
+        specifier: 0.1.20
+        version: 0.1.20
+      '@graview/pages':
+        specifier: 0.1.20
+        version: 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/primitives':
+        specifier: 0.1.20
+        version: 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/react':
+        specifier: 0.1.20
+        version: 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/render':
+        specifier: 0.1.20
+        version: 0.1.20
+      '@graview/ship':
+        specifier: 0.1.20
+        version: 0.1.20(typescript@6.0.3)
+      '@graview/tools':
+        specifier: 0.1.20
+        version: 0.1.20(typescript@6.0.3)
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      react-router-dom:
+        specifier: ^7.1.1
+        version: 7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      vite:
+        specifier: ^6.4.3
+        version: 6.4.3(@types/node@26.2.0)(yaml@2.9.0)
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      '@types/react':
+        specifier: ^19.2.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.2.0
+        version: 19.3.0(@types/react@19.3.0)
+      axe-core:
+        specifier: ^4.10.2
+        version: 4.13.0
+      graview:
+        specifier: 0.1.20
+        version: 0.1.20(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      playwright:
+        specifier: ^1.49.0
+        version: 1.62.1
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -133,7 +200,7 @@ importers:
     dependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.117.1
-        version: 0.117.1(zod@3.25.76)
+        version: 0.117.1(zod@4.6.5)
     devDependencies:
       '@types/node':
         specifier: ^26.2.0
@@ -840,6 +907,76 @@ packages:
       '@noble/hashes':
         optional: true
 
+  '@graview/core@0.1.20':
+    resolution: {integrity: sha512-nCPgR2eH7mIH8S78uyQzoOBRazu4H22T5rNLucqsRU02+g/oHFjQq/x1OKzQRutitDPuzyGHWhWfSSwwscuQMQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      better-sqlite3: '*'
+    peerDependenciesMeta:
+      better-sqlite3:
+        optional: true
+
+  '@graview/guest@0.1.20':
+    resolution: {integrity: sha512-IfmVwfuYqh9EWARuMP+MS3Pz/GHEGS9FLs88kD67Ta8EBdd/NqppkSzAUuT/cUx4EQDWLQl0zepXEaaJrjSirw==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      esbuild: ^0.25.0
+      react: '>=18'
+    peerDependenciesMeta:
+      esbuild:
+        optional: true
+      react:
+        optional: true
+
+  '@graview/layout@0.1.20':
+    resolution: {integrity: sha512-l4+A2SzoS6edncdcefxBFuF0jJhLsn5cm63r4EXoSOaMRj/HA/n79cemVneqeuqYPVYYPJG8RTh69rH3wqM+Fw==}
+    engines: {node: '>=22'}
+
+  '@graview/pages@0.1.20':
+    resolution: {integrity: sha512-w8iPjCxpxNpEwNLv0YDR08Rj7NFWMciSTEQfegW0OsvyW1tcKJpDmSFjJOSHfKbKppgSAgGuyirkREQJMKof1w==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      react: '>=18'
+
+  '@graview/primitives@0.1.20':
+    resolution: {integrity: sha512-0MeO7oWTTkyqtoU5q9IooWb/MAkXeWxuqE79hn+YA0HB47HBuzrmSzQo/+VzMWIU7sGUsf2lGOBLiHt1LSK4TA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      react: '>=18'
+
+  '@graview/react@0.1.20':
+    resolution: {integrity: sha512-1RY9Gx4cZIzXNYOs8i7t+18LATSD83Y24RI6MQ8fWfkVag7Mu/4QhVJiD3XJi76NKHau4cqXybU0OkjDzdR38Q==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
+
+  '@graview/render@0.1.20':
+    resolution: {integrity: sha512-Mhfa42Fwm3PaIKiopFQGuIESM0xa5NFDehsMsggAI1veK0uxFCRPEVoqLWIVdGwxVDZ3KLFkFnY+om+XBBBSRQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@webgpu/types': ^0.1.60
+    peerDependenciesMeta:
+      '@webgpu/types':
+        optional: true
+
+  '@graview/ship@0.1.20':
+    resolution: {integrity: sha512-WnUF8cawMVDvvtY4kslbMoAsxT99OFo7aS55VUolr2VAp5rrY0X92kO8xPda7rcCE6rMga0+TnqYdkj98e9Ppw==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      typescript: '>=5'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@graview/skills@0.1.20':
+    resolution: {integrity: sha512-g7LMg6Gg5VuHDEGr9FR7LjhLP/wgKZ/DQPwsxCGtWwOeAXQ9aQJqMHAL3dPQNWzXJN7WQJEBM0wqxg1tFj8/+A==}
+    engines: {node: '>=22'}
+
+  '@graview/tools@0.1.20':
+    resolution: {integrity: sha512-TkGDEsWpw/eirsbOgShdY3fn5573qdoqPylP30sJyAUWwz/4g80iNYUa4/PV7sPLgSdXsE+iPfDDAdOZLZILKw==}
+    engines: {node: '>=22'}
+
   '@hono/node-server@1.19.17':
     resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
     engines: {node: '>=18.14.1'}
@@ -900,6 +1037,22 @@ packages:
   '@pnpm/deps.graph-sequencer@1100.0.1':
     resolution: {integrity: sha512-pOr5+q1fLYKwFN3LAJuGZEnfXDcQ73zqgDHMtGy+K+uIoUqyY+6MeDCWFwfu+4EFuq76I5EPFofoNAI+Bmmq4A==}
     engines: {node: '>=22.13'}
+
+  '@remote-dom/core@1.12.0':
+    resolution: {integrity: sha512-mK+vo7aHLklGWLtFP0zCP8Itb4cNWcvRvErGLJvg/oGBF4ChuLEexdDtbZPQ5plJoRNhkwSDOwZcFmA/A9O/yA==}
+    engines: {node: '>=14.0.0'}
+    peerDependencies:
+      '@preact/signals-core': ^1.3.0
+      preact: '*'
+    peerDependenciesMeta:
+      '@preact/signals-core':
+        optional: true
+      preact:
+        optional: true
+
+  '@remote-dom/polyfill@1.6.0':
+    resolution: {integrity: sha512-o2kb/cgJfqomrVOJLegsiHCIIRGwxlRp3G11gWmlUReDh51uRsI1eJVsyVDyHH3h8j7SxwaLSBZAr191akSGng==}
+    engines: {node: '>=14.0.0'}
 
   '@rollup/rollup-android-arm-eabi@4.62.4':
     resolution: {integrity: sha512-RrPokAb7dmbxFoeO3TloqHyOjgye8RkBhSqmp4aJMIex4c9r46ZstPnleDQOq1t46VOVjwIuwNogIqbodV1Vvg==}
@@ -1107,6 +1260,14 @@ packages:
 
   '@types/pdfkit@0.17.6':
     resolution: {integrity: sha512-tIwzxk2uWKp0Cq9JIluQXJid77lYhF52EsIOwhsMF4iWLA6YneoBR1xVKYYdAysHuepUB0OX4tdwMiUDdGKmig==}
+
+  '@types/react-dom@19.3.0':
+    resolution: {integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==}
+    peerDependencies:
+      '@types/react': ^19.3.0
+
+  '@types/react@19.3.0':
+    resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
@@ -1407,6 +1568,10 @@ packages:
     resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
     engines: {node: '>= 0.6'}
 
+  cookie@1.1.1:
+    resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
+    engines: {node: '>=18'}
+
   copy-anything@4.0.5:
     resolution: {integrity: sha512-7Vv6asjS4gMOuILabD3l739tsaxFQmC+a7pLZm02zyvs8p977bL3zEgq3yDk5rn9B0PbYgIv++jmHcuUab4RhA==}
     engines: {node: '>=18'}
@@ -1649,6 +1814,11 @@ packages:
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
     engines: {node: '>= 0.4'}
+
+  graview@0.1.20:
+    resolution: {integrity: sha512-pmbvLoXL49n6Sk6EOJIhQsTG6QgGeQtCuEcyMkRLOMLTpTWnY1LoOfZUQQWkyqqxsxzZ3mUlLgHS9aQNjrZY/Q==}
+    engines: {node: '>=22'}
+    hasBin: true
 
   has-symbols@1.1.0:
     resolution: {integrity: sha512-1cDNdwJ2Jaohmb3sg4OmKaMBwuC48sYni5HUw2DvsC8LjGTLK9h+eb1X6RyuOHe4hT0ULCW68iomhjUoKUqlPQ==}
@@ -2001,14 +2171,40 @@ packages:
     resolution: {integrity: sha512-K5zQjDllxWkf7Z5xJdV0/B0WTNqx6vxG70zJE4N0kBs4LovmEYWJzQGxC9bS9RAKu3bgM40lrd5zoLJ12MQ5BA==}
     engines: {node: '>= 0.10'}
 
+  react-dom@19.3.0:
+    resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
+    peerDependencies:
+      react: ^19.3.0
+
   react-reconciler@0.33.0:
     resolution: {integrity: sha512-KetWRytFv1epdpJc3J4G75I4WrplZE5jOL7Yq0p34+OVOKF4Se7WrdIdVC45XsSSmUTlht2FM/fM1FZb1mfQeA==}
     engines: {node: '>=0.10.0'}
     peerDependencies:
       react: ^19.2.0
 
+  react-router-dom@7.18.4:
+    resolution: {integrity: sha512-yrfmJHIpDG7taCpqKjT1G5B6q3O2K+RN8/fgNf0lTjCwiPbQ0ei6vXX9ZjQR+7ld8Tr7Z5xmyMnZ8YJrphWQUw==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
+
+  react-router@7.18.4:
+    resolution: {integrity: sha512-PUPQcMhMGRAslLcvtlPz/kmzBEWPhLdgLFrL7pLNepBL6dX0lWj4WD2cUYVgYCuT3jxvghYFg81cDTj44DhetQ==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+
   react@19.2.8:
     resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
+    engines: {node: '>=0.10.0'}
+
+  react@19.3.0:
+    resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
     engines: {node: '>=0.10.0'}
 
   regex-recursion@6.0.2:
@@ -2057,6 +2253,9 @@ packages:
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
 
+  scheduler@0.28.0:
+    resolution: {integrity: sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw==}
+
   search-insights@2.17.3:
     resolution: {integrity: sha512-RQPdCYTa8A68uM2jwxoY842xDhvx3E5LFL1LxvxCNMev4o5mLuokczhzjAgGwUZBAmOKZknArSxLKmXtIi2AxQ==}
 
@@ -2072,6 +2271,9 @@ packages:
   serve-static@2.2.1:
     resolution: {integrity: sha512-xRXBn0pPqQTVQiC8wyQrKs2MOlX24zQ0POGaj0kultvoOCstBQM5yvOhAVSUwOMjQtTvsPWoNCHfPGwaaQJhTw==}
     engines: {node: '>= 18'}
+
+  set-cookie-parser@2.7.2:
+    resolution: {integrity: sha512-oeM1lpU/UvhTxw+g3cIfxXHyJRc/uidd3yK1P242gzHds0udQBYzs3y8j4gCCW+ZJ7ad0yctld8RYO+bdurlvw==}
 
   setprototypeof@1.2.0:
     resolution: {integrity: sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==}
@@ -2471,6 +2673,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
@@ -2599,6 +2804,13 @@ snapshots:
       standardwebhooks: 1.0.0
     optionalDependencies:
       zod: 3.25.76
+
+  '@anthropic-ai/sdk@0.117.1(zod@4.6.5)':
+    dependencies:
+      json-schema-to-ts: 3.1.1
+      standardwebhooks: 1.0.0
+    optionalDependencies:
+      zod: 4.6.5
 
   '@asamuzakjp/css-color@6.0.7':
     dependencies:
@@ -2968,6 +3180,100 @@ snapshots:
     optionalDependencies:
       '@noble/hashes': 1.8.0
 
+  '@graview/core@0.1.20':
+    dependencies:
+      zod: 4.6.5
+
+  '@graview/guest@0.1.20(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
+    dependencies:
+      '@graview/core': 0.1.20
+      '@graview/react': 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@remote-dom/core': 1.12.0
+      '@remote-dom/polyfill': 1.6.0
+    optionalDependencies:
+      esbuild: 0.25.12
+      react: 19.3.0
+    transitivePeerDependencies:
+      - '@preact/signals-core'
+      - '@webgpu/types'
+      - better-sqlite3
+      - preact
+      - react-dom
+      - typescript
+
+  '@graview/layout@0.1.20':
+    dependencies:
+      '@graview/core': 0.1.20
+    transitivePeerDependencies:
+      - better-sqlite3
+
+  '@graview/pages@0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
+    dependencies:
+      '@graview/core': 0.1.20
+      '@graview/layout': 0.1.20
+      '@graview/primitives': 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/react': 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/tools': 0.1.20(typescript@6.0.3)
+      react: 19.3.0
+      react-router-dom: 7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+    transitivePeerDependencies:
+      - '@webgpu/types'
+      - better-sqlite3
+      - react-dom
+      - typescript
+
+  '@graview/primitives@0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
+    dependencies:
+      '@graview/core': 0.1.20
+      '@graview/layout': 0.1.20
+      '@graview/react': 0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/render': 0.1.20
+      '@graview/tools': 0.1.20(typescript@6.0.3)
+      react: 19.3.0
+    transitivePeerDependencies:
+      - '@webgpu/types'
+      - better-sqlite3
+      - react-dom
+      - typescript
+
+  '@graview/react@0.1.20(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)':
+    dependencies:
+      '@graview/core': 0.1.20
+      '@graview/layout': 0.1.20
+      '@graview/render': 0.1.20
+      '@graview/tools': 0.1.20(typescript@6.0.3)
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+    transitivePeerDependencies:
+      - '@webgpu/types'
+      - better-sqlite3
+      - typescript
+
+  '@graview/render@0.1.20':
+    dependencies:
+      '@graview/core': 0.1.20
+      '@graview/layout': 0.1.20
+    transitivePeerDependencies:
+      - better-sqlite3
+
+  '@graview/ship@0.1.20(typescript@6.0.3)':
+    dependencies:
+      '@graview/core': 0.1.20
+    optionalDependencies:
+      typescript: 6.0.3
+    transitivePeerDependencies:
+      - better-sqlite3
+
+  '@graview/skills@0.1.20': {}
+
+  '@graview/tools@0.1.20(typescript@6.0.3)':
+    dependencies:
+      '@graview/core': 0.1.20
+      '@graview/ship': 0.1.20(typescript@6.0.3)
+    transitivePeerDependencies:
+      - better-sqlite3
+      - typescript
+
   '@hono/node-server@1.19.17(hono@4.13.8)':
     dependencies:
       hono: 4.13.8
@@ -3029,6 +3335,13 @@ snapshots:
       playwright: 1.62.1
 
   '@pnpm/deps.graph-sequencer@1100.0.1': {}
+
+  '@remote-dom/core@1.12.0':
+    dependencies:
+      '@remote-dom/polyfill': 1.6.0
+      htm: 3.1.1
+
+  '@remote-dom/polyfill@1.6.0': {}
 
   '@rollup/rollup-android-arm-eabi@4.62.4':
     optional: true
@@ -3190,6 +3503,14 @@ snapshots:
   '@types/pdfkit@0.17.6':
     dependencies:
       '@types/node': 26.2.0
+
+  '@types/react-dom@19.3.0(@types/react@19.3.0)':
+    dependencies:
+      '@types/react': 19.3.0
+
+  '@types/react@19.3.0':
+    dependencies:
+      csstype: 3.2.3
 
   '@types/unist@3.0.3': {}
 
@@ -3490,6 +3811,8 @@ snapshots:
 
   cookie@0.7.2: {}
 
+  cookie@1.1.1: {}
+
   copy-anything@4.0.5:
     dependencies:
       is-what: 5.5.0
@@ -3786,6 +4109,23 @@ snapshots:
 
   gopd@1.2.0: {}
 
+  graview@0.1.20(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3):
+    dependencies:
+      '@graview/core': 0.1.20
+      '@graview/guest': 0.1.20(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
+      '@graview/ship': 0.1.20(typescript@6.0.3)
+      '@graview/skills': 0.1.20
+      '@graview/tools': 0.1.20(typescript@6.0.3)
+    transitivePeerDependencies:
+      - '@preact/signals-core'
+      - '@webgpu/types'
+      - better-sqlite3
+      - esbuild
+      - preact
+      - react
+      - react-dom
+      - typescript
+
   has-symbols@1.1.0: {}
 
   hasown@2.0.4:
@@ -3844,7 +4184,7 @@ snapshots:
 
   inherits@2.0.4: {}
 
-  ink@7.1.1(react@19.2.8):
+  ink@7.1.1(@types/react@19.3.0)(react@19.2.8):
     dependencies:
       '@alcalzone/ansi-tokenize': 0.3.0
       ansi-escapes: 7.3.0
@@ -3872,6 +4212,8 @@ snapshots:
       wrap-ansi: 10.0.1
       ws: 8.21.3
       yoga-layout: 3.2.1
+    optionalDependencies:
+      '@types/react': 19.3.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -4140,12 +4482,33 @@ snapshots:
       iconv-lite: 0.7.3
       unpipe: 1.0.0
 
+  react-dom@19.3.0(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      scheduler: 0.28.0
+
   react-reconciler@0.33.0(react@19.2.8):
     dependencies:
       react: 19.2.8
       scheduler: 0.27.0
 
+  react-router-dom@7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+      react-router: 7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+
+  react-router@7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      cookie: 1.1.1
+      react: 19.3.0
+      set-cookie-parser: 2.7.2
+    optionalDependencies:
+      react-dom: 19.3.0(react@19.3.0)
+
   react@19.2.8: {}
+
+  react@19.3.0: {}
 
   regex-recursion@6.0.2:
     dependencies:
@@ -4223,6 +4586,8 @@ snapshots:
 
   scheduler@0.27.0: {}
 
+  scheduler@0.28.0: {}
+
   search-insights@2.17.3: {}
 
   semver@7.8.5: {}
@@ -4251,6 +4616,8 @@ snapshots:
       send: 1.2.1
     transitivePeerDependencies:
       - supports-color
+
+  set-cookie-parser@2.7.2: {}
 
   setprototypeof@1.2.0: {}
 
@@ -4630,5 +4997,7 @@ snapshots:
       zod: 3.25.76
 
   zod@3.25.76: {}
+
+  zod@4.6.5: {}
 
   zwitch@2.0.4: {}

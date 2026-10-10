@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build/
+public/data/
+*.tsbuildinfo
+.DS_Store
+.graview-pin
+shots/

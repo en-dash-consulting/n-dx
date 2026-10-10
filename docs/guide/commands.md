@@ -71,6 +71,7 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | `ndx refresh [dir]` | Refresh dashboard artifacts |
 | `ndx export [dir]` | Export static deployable dashboard |
 | `ndx web [dir]` | Dashboard server control (lower-level counterpart to `ndx start`) |
+| `ndx graview <emit\|check\|describe\|serve\|mcp> [dir]` | Project the PRD, analysis and runs into [Graview](https://graview.dev) and drive the `graview` CLI on the result |
 
 ## Try it out
 
@@ -221,6 +222,20 @@ ndx start stop .            # stop daemon
 ```
 
 `ndx start` registers the repository with the per-user hub, whose chooser at `http://localhost:3117/hub` lists every registered project. **New project** there creates one that does not exist yet: give it a folder name and the directory to put it in, check the absolute path it previews — resolved by the server as you type, so `..` and a relative parent show as what they really are — and it creates the folder, registers it, and opens the same setup wizard an empty folder gets (assistants, LLM vendor, and whether to create a git repository). A folder that already has content is refused, with a pointer to `ndx start` for registering an existing project instead.
+
+### graview
+
+```sh
+ndx graview emit .          # write document.json and snapshot.json under the graview dir
+ndx graview check .         # re-emit, then graview check on the declaration
+ndx graview describe .      # re-emit, then graview describe: the places and acts the document declares
+ndx graview serve .         # re-emit, then the product face (@n-dx/graview-face) on http://localhost:5188
+ndx graview mcp .           # re-emit, then graview mcp over stdio on the snapshot
+ndx graview info .          # where the projection, the graview binary, the face and the rex endpoint are
+ndx graview emit --files .  # include file nodes (large)
+```
+
+`ndx graview` projects the PRD tree, sourcevision's zones and components and hench's runs into a [Graview](https://graview.dev) declaration and a `{nodes, edges}` snapshot under the layout's graview dir (`.graview/`, or `.ndx/graview/` on the `.ndx` layout), then spawns the `graview` CLI on them. No `@graview/*` package is installed with n-dx: the binary is found through `graview.bin` in the project config, `$NDX_GRAVIEW_BIN`, PATH, the installed `@n-dx/graview-face`'s own `graview`, then `npx -y graview@<pinned>`. `serve` runs the separately published `@n-dx/graview-face` when it is installed or beside the adapter in the monorepo; when the repository is registered with the hub (`ndx start .`), the face writes changes and tasks back to rex through its MCP endpoint. See [Graview projection](../architecture/graview-projection.md).
 
 ### status
 

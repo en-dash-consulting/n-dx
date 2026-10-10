@@ -2998,7 +2998,7 @@ async function handleIso(rest) {
 
 /**
  * Project the PRD, the analysis and the runs into Graview and drive the
- * graview CLI on the result: `ndx graview <emit|check|describe|serve|mcp>
+ * graview CLI on the result: `ndx graview <emit|check|describe|serve|mcp|info>
  * [dir] [flags]`. The adapter resolves the directory and the binary itself
  * (flags such as `--place <slug>` take values, so the positional cannot be
  * picked out here), and says when the project has no PRD.

@@ -1,0 +1,72 @@
+{
+  "name": "@n-dx/graview-face",
+  "version": "0.9.0",
+  "description": "n-dx on Graview: the product layer, the changes, the code and the runs of an n-dx project as one graph, with a face in n-dx's own words. Depends on Graview and React; no other n-dx package depends on it.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Elastic-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/en-dash-consulting/n-dx.git",
+    "directory": "packages/graview-face"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "ndx-graview-face": "./bin/serve.js"
+  },
+  "files": [
+    "bin",
+    "dev",
+    "scripts/sync-data.mjs",
+    "src",
+    "index.html",
+    "vite.config.ts",
+    "tsconfig.json",
+    "UPSTREAM.md"
+  ],
+  "scripts": {
+    "sync": "node scripts/sync-data.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 5189 --strictPort --host 127.0.0.1",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate": "tsc -p tsconfig.json && vitest run",
+    "check": "graview check --document public/data/document.json",
+    "fixture": "node scripts/make-fixture.mjs",
+    "a11y": "node scripts/a11y.mjs",
+    "shots": "node scripts/shots.mjs",
+    "verify": "pnpm typecheck && pnpm test && pnpm build && pnpm check",
+    "graview:link": "node scripts/graview.mjs link",
+    "graview:npm": "node scripts/graview.mjs npm"
+  },
+  "dependencies": {
+    "@graview/core": "0.1.20",
+    "@graview/layout": "0.1.20",
+    "@graview/pages": "0.1.20",
+    "@graview/primitives": "0.1.20",
+    "@graview/react": "0.1.20",
+    "@graview/render": "0.1.20",
+    "@graview/ship": "0.1.20",
+    "@graview/tools": "0.1.20",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.1.1",
+    "vite": "^6.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "axe-core": "^4.10.2",
+    "graview": "0.1.20",
+    "playwright": "^1.49.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

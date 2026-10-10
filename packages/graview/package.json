@@ -44,6 +44,7 @@
     "@n-dx/sourcevision": "workspace:*"
   },
   "devDependencies": {
+    "@graview/core": "0.1.20",
     "@types/node": "^26.2.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"

@@ -46,7 +46,7 @@ export const DEFAULT_MAIN_REFS = ["origin/HEAD", "origin/main", "main"] as const
 export const ITEM_TRAILER_KEY = "N-DX-Item";
 
 /** Bumped when the cached shape changes, so an older file is rebuilt rather than misread. */
-export const CACHE_VERSION = 1;
+export const CACHE_VERSION = 2;
 const GIT_TIMEOUT_MS = 120_000;
 /** A full-history scan prints a line per commit; 1 MiB (the exec default) fits about 10k. */
 const GIT_MAX_BUFFER = 256 * 1024 * 1024;
@@ -61,6 +61,8 @@ export interface TrailerCommit {
   authorEmail: string;
   /** Author date, ISO 8601 (survives a rebase, unlike the committer date). */
   timestamp: string;
+  /** The first line of the message. */
+  subject: string;
   /** Item ids its `N-DX-Item` trailers name, in trailer order. */
   items: string[];
 }
@@ -129,7 +131,7 @@ export async function loadTrailerCommits(options: ChangeCommitsOptions): Promise
 const FS = "\x1f";
 const RS = "\x1e";
 const SCAN_FORMAT = [
-  "%H", "%P", "%an", "%ae", "%aI",
+  "%H", "%P", "%an", "%ae", "%aI", "%s",
   `%(trailers:key=${ITEM_TRAILER_KEY},valueonly,unfold,separator=%x1f)`,
 ].join("%x1f");
 
@@ -142,7 +144,7 @@ export async function scanTrailerCommits(repoDir: string, tip: string): Promise<
   const commits: TrailerCommit[] = [];
   for (const record of stdout.split(RS)) {
     if (record.trim() === "") continue;
-    const [hash, parents, author, authorEmail, timestamp, ...trailers] = record.replace(/\n+$/, "").split(FS);
+    const [hash, parents, author, authorEmail, timestamp, subject, ...trailers] = record.replace(/\n+$/, "").split(FS);
     const items = trailers.map(itemIdFromTrailer).filter((id): id is string => id !== undefined);
     if (items.length === 0) continue;
     commits.push({
@@ -151,6 +153,7 @@ export async function scanTrailerCommits(repoDir: string, tip: string): Promise<
       author,
       authorEmail,
       timestamp,
+      subject,
       items: [...new Set(items)],
     });
   }

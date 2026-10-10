@@ -114,6 +114,11 @@
             "defective"
           ]
         },
+        "proposed": {
+          "type": "boolean",
+          "label": "Proposed",
+          "description": "Drawn from rex's migration plan over a v1 tree, not yet in the PRD"
+        },
         "stewards": {
           "type": "list",
           "of": "string"
@@ -140,6 +145,7 @@
             "fields": [
               "intentStatus",
               "health",
+              "proposed",
               "status"
             ]
           },
@@ -230,6 +236,11 @@
             "defective"
           ]
         },
+        "proposed": {
+          "type": "boolean",
+          "label": "Proposed",
+          "description": "Drawn from rex's migration plan over a v1 tree, not yet in the PRD"
+        },
         "criteriaCount": {
           "type": "integer",
           "label": "Criteria",
@@ -280,6 +291,7 @@
             "fields": [
               "intentStatus",
               "health",
+              "proposed",
               "status",
               "metAt",
               "reviewed"
@@ -376,6 +388,11 @@
             "defective"
           ]
         },
+        "proposed": {
+          "type": "boolean",
+          "label": "Proposed",
+          "description": "Drawn from rex's migration plan over a v1 tree, not yet in the PRD"
+        },
         "appliesToAll": {
           "type": "boolean",
           "label": "Binds everything"
@@ -387,9 +404,7 @@
       },
       "edges": {
         "under": {
-          "to": [
-            "area"
-          ],
+          "to": ["area", "capability", "constraint"],
           "cardinality": "one",
           "description": "what this sits inside",
           "inverse": "what sits inside it"
@@ -411,6 +426,7 @@
             "fields": [
               "intentStatus",
               "health",
+              "proposed",
               "status"
             ]
           },
@@ -543,6 +559,15 @@
         "tags": {
           "type": "list",
           "of": "string"
+        },
+        "lastModified": {
+          "type": "datetime",
+          "label": "Last changed",
+          "description": "When rex last wrote this; the version a two-way sync agrees on."
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "label": "Last changed by"
         }
       },
       "edges": {
@@ -629,7 +654,9 @@
               "plannedRelease",
               "shippedIn",
               "startedAt",
-              "completedAt"
+              "completedAt",
+              "lastModified",
+              "lastModifiedBy"
             ]
           },
           {
@@ -743,6 +770,15 @@
         "tags": {
           "type": "list",
           "of": "string"
+        },
+        "lastModified": {
+          "type": "datetime",
+          "label": "Last changed",
+          "description": "When rex last wrote this; the version a two-way sync agrees on."
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "label": "Last changed by"
         }
       },
       "edges": {
@@ -784,7 +820,9 @@
             "title": "When",
             "fields": [
               "startedAt",
-              "completedAt"
+              "completedAt",
+              "lastModified",
+              "lastModifiedBy"
             ]
           },
           {
@@ -807,7 +845,7 @@
     "release": {
       "noun": "release",
       "plural": "Releases",
-      "description": "A version changes are planned for or shipped in. Never a container: a field on the change, read here as a node so the plan can be drawn.",
+      "description": "A version changes are planned for or shipped in, or that git tagged. Never a container: a field on the change and a tag in git, read here as a node so the plan can be drawn.",
       "figure": "shift",
       "label": "{version}",
       "glance": [
@@ -828,11 +866,16 @@
           "type": "integer",
           "label": "Shipped",
           "min": 0
+        },
+        "taggedAt": {
+          "type": "datetime",
+          "label": "Tagged"
         }
       },
       "page": {
         "fields": [
           "version",
+          "taggedAt",
           "plannedChanges",
           "shippedChanges"
         ]
@@ -1156,11 +1199,12 @@
     "commit": {
       "noun": "commit",
       "plural": "Commits",
-      "description": "A commit whose N-DX-Item trailer ties it to the work it was for.",
+      "description": "A commit on main whose N-DX-Item trailer ties it to the work it was for.",
       "figure": "note",
       "label": "{subject}",
       "glance": [
-        "sha"
+        "committedAt",
+        "author"
       ],
       "fields": {
         "sha": {
@@ -1169,9 +1213,24 @@
         },
         "subject": {
           "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "committedAt": {
+          "type": "datetime",
+          "label": "Committed"
         }
       },
       "edges": {
+        "landedFor": {
+          "to": [
+            "change",
+            "task"
+          ],
+          "description": "the work this commit's trailer names",
+          "inverse": "the commits that landed for it"
+        },
         "realizes": {
           "to": [
             "capability"
@@ -1183,7 +1242,9 @@
       "page": {
         "fields": [
           "subject",
-          "sha"
+          "sha",
+          "author",
+          "committedAt"
         ]
       }
     }
@@ -1391,7 +1452,7 @@
         "list": "all('area')",
         "sort": "title",
         "as": "card",
-        "empty": "No areas yet. The product map arrives when the PRD migrates to v2 (ndx prd migrate) or is bootstrapped from the code."
+        "empty": "No areas yet: nothing in the PRD proposes one. The product map arrives when the PRD migrates to v2, or is bootstrapped from the code."
       },
       {
         "title": "In the Inbox"

@@ -183,7 +183,7 @@ gateway or `public.ts`, or the import should be removed.
 
 ### Naming
 
-All seven packages are published under the `@n-dx/` scope:
+All eight packages are published under the `@n-dx/` scope:
 
 | Package name | Bin aliases |
 |---|---|
@@ -194,6 +194,7 @@ All seven packages are published under the `@n-dx/` scope:
 | `@n-dx/llm-client` | _(library only)_ |
 | `@n-dx/web` | _(library only)_ |
 | `@n-dx/graview` | `ndx-graview` (spawned by `ndx graview`) |
+| `@n-dx/graview-face` | `ndx-graview-face` (the product's dev server; run by `ndx graview serve`) |
 
 The bare `rex` / `sourcevision` / `sv` / `hench` names are **bin aliases declared in
 `package.json`**, not package names — they exist so the CLIs can be invoked directly

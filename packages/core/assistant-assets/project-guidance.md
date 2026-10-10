@@ -8,6 +8,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 - **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state in a slug-based folder tree at `.rex/prd_tree/`: one directory per item with an `index.md` file. No JSON files are written by PRD mutations.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 - **graview** — Graview projection: `ndx graview emit|check|describe|serve|mcp` writes a `graview-document` declaration and a `{nodes, edges}` snapshot of the PRD, the analysis and the runs under the layout's graview dir, then spawns the `graview` CLI on them. No `@graview/*` dependency; the binary is a peer tool.
+- **graview-face** — The product face on Graview: a Vite + React app, published on its own and depended on by no other package, that compiles the emitted document and lays a shell, home and record pages in n-dx's words over the derived ones. `ndx graview serve` runs it.
 
 ### Architecture
 

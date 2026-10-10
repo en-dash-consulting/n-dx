@@ -628,7 +628,7 @@ export const COMMAND_EFFECTS = {
     reads: [PRD_READ, "{sourcevision}/zones.json, components.json (and inventory.json with --files)", "{hench}/runs/", "{config} (graview.*)", "git history (N-DX-Item trailers)"],
     writes: [
       { path: "{graview}/document.json and {graview}/snapshot.json", what: "the declaration and the seed snapshot" },
-      { path: "{graview}/cache/", what: "the N-DX-Item trailer cache" },
+      { path: "{graview}/cache/", what: "the N-DX-Item trailer cache", conditional: true, when: "when the PRD has a product layer and the project is a git repository" },
       { path: "{graview}/data/", what: "graview's own store", conditional: true, when: "for serve and mcp" },
     ],
     llm: [],

@@ -2,7 +2,7 @@
 id: "424ddbbe-f35a-4bff-bdc0-1a89e17ff387"
 level: "task"
 title: "Two-way writes through Graview's SyncEngine with rex as the system of record"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "graview"
@@ -14,6 +14,11 @@ blockedBy:
   - "c03409a5-301c-4b50-a4cf-3c9b416fbf6b"
   - "3cf80a6e-6a1c-4fe5-ae59-29aca43cbaf6"
 source: "ndx-capture"
+startedAt: "2026-10-10T05:02:20.420Z"
+completedAt: "2026-10-10T05:13:00.843Z"
+endedAt: "2026-10-10T05:13:00.843Z"
+resolutionType: "code-change"
+resolutionDetail: "lastModified as the version in the projection, rexMcpEndpoint + ndx graview info and the serve hand-off in n-dx; the door, RemoteSystem, pre-empting loop and rail status in n-dx-graview, tested headless and proved live through the hub"
 acceptanceCriteria:
   - "Changing a change's or task's status, priority or planned release in Graview (an act in the scene, or through graview mcp) lands in the rex tree through rex's write path under the file lock, and .rex/execution-log.jsonl records the entry with the Graview principal as author"
   - "A rex-side edit (rex update, the dashboard, or an ndx work run) appears in the Graview store within one pull interval as a systemAuthor(\"n-dx\") op, not a human op"
@@ -22,6 +27,6 @@ acceptanceCriteria:
   - "No `@n-dx/*` package gains a `@graview/*` runtime dependency, or docs/architecture/graview-projection.md records the written reason it had to"
   - "The design pass's decision on where the RemoteSystem runs is recorded in docs/architecture/graview-projection.md before implementation starts"
 description: "The adapter task leaves the projection read-only: Graview shows n-dx's graph but an act in Graview goes nowhere. This task closes the loop for the requirements side without giving up rex's single-writer rule.\n\nGraview already has the mechanism. `SyncEngine` drives a `RemoteSystem { pull(cursor), push(writes) }` through a `SyncMapping { system, resources: [{ kind, resource, fields, ours?, encode, decode }] }` (graview packages/core/src/sync/types.ts; the Google Calendar mapping is the reference), and anything that arrives from the remote is written as a `systemAuthor(system)` op so the log says where it came from. n-dx is the system of record: build an n-dx `RemoteSystem` whose pull re-projects the snapshot (cursor from the rex tree's mtimes and the execution-log position) and whose push translates Graview acts on requirement kinds (change, task: status, priority, assignee, plannedRelease, tags; add a change into the Inbox) into rex writes. Push goes through rex's own write path only, preferably the hub's HTTP MCP endpoint (`ndx start` serves `/p/<id>/mcp/rex`, token in `~/.ndx/auth.token`) or the rex CLI, never a direct write to the tree, so the file lock, validation and the execution log all apply. Code-side kinds (zone, component, commit, run, release) stay read-only: no push mapping, and an act on them is refused naming the tool that owns them (sourcevision, git, hench).\n\nWhere it runs is the design decision to settle first, in a short pass before tasks are cut: the RemoteSystem implements a Graview interface, so it belongs in the Graview-side app from the views task (which already depends on `@graview/*`), talking to rex over HTTP MCP; that keeps every n-dx package free of `@graview/*`. The alternative, a sync worker inside `@n-dx/graview`, would import `@graview/core` and should only be chosen with a written reason.\n\nConflict rule: a field edited on both sides between pulls resolves to rex's value and surfaces as a Graview notice; nothing in rex is overwritten by stale Graview state. Author attribution: pushes carry the Graview principal into rex's `lastModifiedBy` and the execution log; pulls land as `systemAuthor(\"n-dx\")` ops, never as human ops."
-lastModified: "2026-10-10T03:41:14.832Z"
+lastModified: "2026-10-10T05:13:01.130Z"
 lastModifiedBy: "Nick Daniel <nick@endash.us>"
 ---

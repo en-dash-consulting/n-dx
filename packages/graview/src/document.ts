@@ -86,7 +86,7 @@ export interface GraviewDocumentData {
 export const DOCUMENT_PATH = fileURLToPath(new URL("../n-dx.graview.json", import.meta.url));
 
 /** The graview release the `npx` fallback pins and the document was checked against. */
-export const GRAVIEW_VERSION = "0.1.19";
+export const GRAVIEW_VERSION = "0.1.20";
 
 /** Read the declaration fresh: callers get their own copy to set `name` on. */
 export function loadDocument(): GraviewDocumentData {

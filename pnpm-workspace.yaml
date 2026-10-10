@@ -9,5 +9,9 @@ minimumReleaseAgeStrict: true
 minimumReleaseAge: 4320
 minimumReleaseAgeExclude:
   - '@n-dx/*'
+  # The Graview framework releases often and @n-dx/graview-face follows it closely:
+  # a graview release may be installed the day it ships.
+  - 'graview'
+  - '@graview/*'
 
 trustPolicy: no-downgrade
