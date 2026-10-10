@@ -144,9 +144,14 @@ export function handleStaticRoute(
   assets: StaticAssets,
 ): boolean {
   const url = req.url || "/";
+  // Every match below is on the pathname: a query string must not turn a
+  // known path into a 404. `/?ndx_token=…` is the URL `ndx start` prints, and
+  // a browser that already holds the cookie is let through the token gate
+  // with the parameter still attached.
+  const [pathOnly, queryString] = url.split("?");
 
   // Root: dashboard if initialized, landing page otherwise
-  if (url === "/" || url === "/index.html") {
+  if (pathOnly === "/" || pathOnly === "/index.html") {
     if (isProjectInitialized(ctx)) {
       res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });
       res.end(assets.getViewerHtml());
@@ -165,7 +170,7 @@ export function handleStaticRoute(
   }
 
   // Backward compat: /landing → redirect to /
-  if (url === "/landing" || url === "/landing/") {
+  if (pathOnly === "/landing" || pathOnly === "/landing/") {
     res.writeHead(301, { Location: "/" });
     res.end();
     return true;
@@ -177,7 +182,6 @@ export function handleStaticRoute(
   // are still registered ViewIds so a scoped standalone viewer can keep one as
   // its own page (resolveViewAlias returns null there, and the request falls
   // through unchanged). Any sub-path and query string survive the redirect.
-  const [pathOnly, queryString] = url.split("?");
   const aliasSegment = pathOnly.slice(1).split("/")[0];
   const aliasTarget = resolveViewAlias(aliasSegment, buildValidViews(ctx.scope ?? null));
   if (aliasTarget) {
@@ -196,8 +200,8 @@ export function handleStaticRoute(
   }
 
   // PNG assets (must come before SPA catch-all)
-  if (url.endsWith(".png") && /^\/[\w-]+\.png$/.test(url)) {
-    const filename = url.slice(1);
+  if (pathOnly.endsWith(".png") && /^\/[\w-]+\.png$/.test(pathOnly)) {
+    const filename = pathOnly.slice(1);
     const pngPath = assets.findAssetPath(filename);
     if (pngPath) {
       const content = readFileSync(pngPath);
@@ -212,7 +216,7 @@ export function handleStaticRoute(
 
   // SPA catch-all: known view paths serve the viewer HTML
   // Also match deep-link paths like "hench-runs/RUNID"
-  const segment = url.slice(1).split("?")[0];
+  const segment = pathOnly.slice(1);
   const baseSegment = segment.split("/")[0];
   if (isKnownViewPath(segment) || isKnownViewPath(baseSegment)) {
     res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" });

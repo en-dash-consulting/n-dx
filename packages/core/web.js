@@ -1518,22 +1518,37 @@ async function readHubPid(home = hubHome()) {
   }
 }
 
+/**
+ * The command that opens `url` in the default browser on `platform`.
+ *
+ * No platform goes through a shell: the URL is always its own argv entry, so
+ * nothing in it (quotes, `&`, or a `%NAME%` that cmd.exe would expand inside
+ * the ndx_token or the encoded project id) is interpreted. On win32 that means
+ * rundll32's URL handler rather than `cmd /c start`.
+ *
+ * @param {string} url
+ * @param {NodeJS.Platform} platform
+ * @returns {{ command: string, args: string[], options: import("node:child_process").SpawnOptions }}
+ */
+export function browserOpenCommand(url, platform) {
+  const options = { stdio: "ignore", detached: true };
+  if (platform === "darwin") return { command: "open", args: [url], options };
+  if (platform === "win32") {
+    // windowsHide: rundll32 would otherwise flash a console window.
+    return {
+      command: "rundll32.exe",
+      args: ["url.dll,FileProtocolHandler", url],
+      options: { ...options, windowsHide: true },
+    };
+  }
+  return { command: "xdg-open", args: [url], options };
+}
+
 /** Open a URL in the default browser, best-effort. */
 function openBrowser(url) {
-  const [cmd, args] = process.platform === "darwin"
-    ? ["open", [url]]
-    : process.platform === "win32"
-      ? ["cmd.exe", ["/d", "/s", "/c", `start "" "${url}"`]]
-      : ["xdg-open", [url]];
+  const { command, args, options } = browserOpenCommand(url, process.platform);
   try {
-    const child = spawn(cmd, args, {
-      stdio: "ignore",
-      detached: true,
-      // windowsHide suppresses the cmd.exe console flash; `start` still opens
-      // the browser in its own window regardless.
-      windowsHide: true,
-      ...(process.platform === "win32" ? { windowsVerbatimArguments: true } : {}),
-    });
+    const child = spawn(command, args, options);
     child.on("error", () => {});
     child.unref();
   } catch {
