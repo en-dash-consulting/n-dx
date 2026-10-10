@@ -20,5 +20,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Claude on Bedrock keeps role, container and CA credentials](./claude-on-bedrock-keeps-role-container.md) | pending |
-| [The cross-vendor reviewer degrades to the shell test command when its environment cannot be resolved](./the-cross-vendor-reviewer-degrades-to.md) | pending |
+| [The cross-vendor reviewer degrades to the shell test command when its environment cannot be resolved](./the-cross-vendor-reviewer-degrades-to.md) | completed |
 | [Vendor CLI environments always carry the project's policy, from one per-vendor table](./vendor-cli-environments-always-carry.md) | pending |
