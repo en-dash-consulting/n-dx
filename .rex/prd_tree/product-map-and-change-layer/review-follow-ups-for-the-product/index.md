@@ -45,6 +45,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [rex release stamp runs git tag --contains for every historical unstamped change, on every release](./rex-release-stamp-runs-git-tag.md) | pending |
 | [rex update ignores unknown flags such as --resolution without an error](./rex-update-ignores-unknown-flags-such.md) | pending |
 | [rex usage ignores .n-dx.json rex overrides: token-store passes the wrong dir and key to loadProjectOverrides](./rex-usage-ignores-n-dx-json-rex.md) | pending |
+| [Root README and docs/guide/mcp.md Rex MCP tool lists omit get_token_usage, and no test ties doc lists to the registry](./root-readme-and-docs-guide-mcp-md-rex.md) | pending |
 | [Stop the timed-out test gate test racing its fake gate startup](./stop-the-timed-out-test-gate-test.md) | completed |
 | [The exported computeLanding still reports an open change as landed, because it takes ids rather than the change](./the-exported-computelanding-still.md) | pending |
 | [The .gitignore guide's snippets drift from the ndx.gitignore template](./the-gitignore-guide-s-snippets-drift.md) | pending |
