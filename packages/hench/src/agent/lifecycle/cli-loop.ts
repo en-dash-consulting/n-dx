@@ -2090,8 +2090,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // CLI-specific: load config for CLI path and env resolution
   const cliBinary = resolveVendorCliPath(llmConfig, config);
-  const cliEnv = resolveVendorCliEnv(llmConfig, config.guard.env, (names) => {
-    detail(`CLI environment: stripped ${names.join(", ")}`, { captureWhenQuiet: true });
+  const cliEnv = resolveVendorCliEnv(llmConfig, config.guard.env, (names, kind) => {
+    detail(
+      kind === "missing-credentials"
+        ? `CLI environment: cloud mode is on but none of ${names.join(", ")} is set`
+        : `CLI environment: stripped ${names.join(", ")}`,
+      { captureWhenQuiet: true },
+    );
   });
 
   // Pin the spawned session's MCP servers to *this* project directory, so the

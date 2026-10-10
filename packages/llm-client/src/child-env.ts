@@ -103,12 +103,33 @@ export function strippedEnvNames(env: NodeJS.ProcessEnv, policy: EnvPolicy): str
   return Object.keys(env).filter((name) => env[name] !== undefined && !envNameAllowed(name, policy)).sort();
 }
 
-/** Filter a vendor CLI's environment without exposing unrelated credentials. */
+/** What `onStripped` is reporting: names removed, or a cloud mode whose credentials never arrived. */
+export type EnvReportKind = "stripped" | "missing-credentials";
+
+/** Bedrock names that address or trust-anchor the endpoint but are not credentials. */
+const BEDROCK_PLUMBING = ["AWS_REGION", "AWS_DEFAULT_REGION", "AWS_CA_BUNDLE"];
+/** Bedrock credential names: static keys, profile/config files, bearer token, IRSA and ECS/Fargate. */
+const BEDROCK_CREDENTIALS = [
+  "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE",
+  "AWS_SHARED_CREDENTIALS_FILE", "AWS_CONFIG_FILE", "AWS_BEARER_TOKEN_BEDROCK",
+  "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_ROLE_ARN", "AWS_ROLE_SESSION_NAME",
+  "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+  "AWS_CONTAINER_AUTHORIZATION_TOKEN", "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+];
+const VERTEX_CREDENTIALS = ["GOOGLE_APPLICATION_CREDENTIALS"];
+const VERTEX_PLUMBING = ["CLOUD_ML_REGION"];
+
+/**
+ * Filter a vendor CLI's environment without exposing unrelated credentials.
+ * `onStripped` receives names only, never values: once for the names removed,
+ * and once more (kind `missing-credentials`) when a Bedrock/Vertex mode is on
+ * but none of that mode's credential names reached the child.
+ */
 export function resolveVendorCliEnv(
   config: LLMConfig,
   envConfig?: EnvPolicyConfig,
   source: NodeJS.ProcessEnv = process.env,
-  onStripped?: (names: string[]) => void,
+  onStripped?: (names: string[], kind: EnvReportKind) => void,
 ): NodeJS.ProcessEnv {
   const vendor = config.vendor ?? DEFAULT_LLM_VENDOR;
   const policy = compileEnvPolicy(envConfig);
@@ -122,16 +143,19 @@ export function resolveVendorCliEnv(
     : vendor === LLM_VENDOR.CODEX
       ? ["OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME"]
       : keyName ? [keyName] : [];
+  const cloudModes: string[][] = [];
   if (vendor === LLM_VENDOR.CLAUDE) {
     const modeEnabled = (flag: string): boolean => Object.entries(env).some(([name, value]) =>
       name.toUpperCase() === flag && value !== undefined && ["1", "true", "yes", "on"].includes(value.toLowerCase()));
     // Keep exact cloud authentication names only for the mode the child will use.
-    if (modeEnabled("CLAUDE_CODE_USE_BEDROCK")) authNames.push(
-      "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE",
-      "AWS_REGION", "AWS_DEFAULT_REGION", "AWS_SHARED_CREDENTIALS_FILE", "AWS_CONFIG_FILE",
-      "AWS_BEARER_TOKEN_BEDROCK",
-    );
-    if (modeEnabled("CLAUDE_CODE_USE_VERTEX")) authNames.push("GOOGLE_APPLICATION_CREDENTIALS", "CLOUD_ML_REGION");
+    if (modeEnabled("CLAUDE_CODE_USE_BEDROCK")) {
+      authNames.push(...BEDROCK_CREDENTIALS, ...BEDROCK_PLUMBING);
+      cloudModes.push(BEDROCK_CREDENTIALS);
+    }
+    if (modeEnabled("CLAUDE_CODE_USE_VERTEX")) {
+      authNames.push(...VERTEX_CREDENTIALS, ...VERTEX_PLUMBING);
+      cloudModes.push(VERTEX_CREDENTIALS);
+    }
   }
   const authSet = new Set(authNames.map((name) => name.toUpperCase()));
   for (const [name, value] of Object.entries(source)) {
@@ -152,6 +176,9 @@ export function resolveVendorCliEnv(
     if (name.toUpperCase() === "CLAUDECODE") delete env[name];
   }
   const stripped = strippedEnvNames(source, policy).filter((name) => !authSet.has(name.toUpperCase()));
-  if (stripped.length > 0) onStripped?.(stripped);
+  if (stripped.length > 0) onStripped?.(stripped, "stripped");
+  const present = new Set(Object.keys(env).map((name) => name.toUpperCase()));
+  const missing = cloudModes.filter((names) => !names.some((name) => present.has(name))).flat();
+  if (missing.length > 0) onStripped?.(missing, "missing-credentials");
   return env;
 }

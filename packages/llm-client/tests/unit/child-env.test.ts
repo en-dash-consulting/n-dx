@@ -41,6 +41,39 @@ describe("resolveVendorCliEnv", () => {
     expect(report.mock.calls[0][0]).toContain("AWS_UNRELATED_SECRET");
   });
 
+  const roleNames = [
+    "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_ROLE_ARN", "AWS_ROLE_SESSION_NAME",
+    "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+    "AWS_CONTAINER_AUTHORIZATION_TOKEN", "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE", "AWS_CA_BUNDLE",
+  ];
+  const roleEnv = Object.fromEntries(roleNames.map((name) => [name, `fixture-${name}`]));
+
+  it("keeps IRSA, ECS and CA names in Bedrock mode and strips them otherwise", () => {
+    const on = resolveVendorCliEnv({}, undefined, { ...roleEnv, CLAUDE_CODE_USE_BEDROCK: "1" });
+    for (const name of roleNames) expect(on[name]).toBe(roleEnv[name]);
+    const off = resolveVendorCliEnv({}, undefined, roleEnv);
+    for (const name of roleNames) expect(off[name]).toBeUndefined();
+  });
+
+  it.each([
+    ["CLAUDE_CODE_USE_BEDROCK", { AWS_REGION: "us-east-1", AWS_CA_BUNDLE: "/ca" }, "AWS_ACCESS_KEY_ID"],
+    ["CLAUDE_CODE_USE_VERTEX", { CLOUD_ML_REGION: "global" }, "GOOGLE_APPLICATION_CREDENTIALS"],
+  ])("reports once, names only, when %s is on without credentials", (mode, plumbing, sample) => {
+    const report = vi.fn();
+    resolveVendorCliEnv({}, undefined, { [mode]: "1", ...plumbing, GITHUB_TOKEN: "do-not-print" }, report);
+    const missing = report.mock.calls.filter(([, kind]) => kind === "missing-credentials");
+    expect(missing).toHaveLength(1);
+    expect(missing[0][0]).toContain(sample);
+    expect(JSON.stringify(report.mock.calls)).not.toMatch(/do-not-print|us-east-1|global/);
+  });
+
+  it("does not report missing credentials when one is present, or the mode is off", () => {
+    const report = vi.fn();
+    resolveVendorCliEnv({}, undefined, { CLAUDE_CODE_USE_BEDROCK: "1", AWS_WEB_IDENTITY_TOKEN_FILE: "/t" }, report);
+    resolveVendorCliEnv({}, undefined, { AWS_REGION: "us-east-1" }, report);
+    expect(report.mock.calls.filter(([, kind]) => kind === "missing-credentials")).toEqual([]);
+  });
+
   it.each([undefined, "", "0", "false", "off", "no"])("does not enable cloud exceptions for inactive flags (%s)", (value) => {
     const env = resolveVendorCliEnv({}, undefined, { ...cloud, CLAUDE_CODE_USE_BEDROCK: value, CLAUDE_CODE_USE_VERTEX: value });
     for (const name of [...awsNames, "GOOGLE_APPLICATION_CREDENTIALS"]) expect(env[name]).toBeUndefined();

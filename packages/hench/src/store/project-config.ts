@@ -106,7 +106,7 @@ export function resolveVendorCliPath(llmConfig: LLMConfig, henchConfig?: HenchCo
 export function resolveVendorCliEnv(
   llmConfig: LLMConfig,
   envConfig?: EnvPolicyConfig,
-  onStripped?: (names: string[]) => void,
+  onStripped?: Parameters<typeof sharedResolveVendorCliEnv>[3],
 ): NodeJS.ProcessEnv {
   return sharedResolveVendorCliEnv(llmConfig, envConfig, process.env, onStripped);
 }
