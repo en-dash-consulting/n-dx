@@ -101,16 +101,46 @@ describe("buildSnapshot", () => {
     expect(withFiles.snapshot.edges).toContainEqual({ kind: "inZone", from: `${FILE_PREFIX}src/catalog/list.ts`, to: "catalog" });
   });
 
-  it("reads a v1 tree as changes only, with no product layer", async () => {
+  it("draws the product layer rex's migration plan proposes for a v1 tree, every node marked proposed", async () => {
     const root = project({ prd: "v1", layout: "ndx" });
-    const { snapshot, layout, counts } = await buildSnapshot(resolveLayout(root), quiet);
+    const { snapshot, layout, productLayer } = await buildSnapshot(resolveLayout(root), quiet);
     expect(layout).toBe("v1");
+    expect(productLayer).toBe("proposed");
+    // The fixture's epic "Auth Platform" is an area; its feature "Login Flow" has completed work
+    // under it, so it is a capability, and the task "Password Login" a change placed on it.
+    const area = snapshot.nodes.find((n) => n.kind === "area");
+    expect(area).toMatchObject({ title: "Auth Platform", proposed: true });
+    const product = snapshot.nodes.filter((n) => n.kind === "area" || n.kind === "capability" || n.kind === "constraint");
+    expect(product.every((n) => n.proposed === true)).toBe(true);
+    const login = snapshot.nodes.find((n) => n.title === "Login Flow");
+    expect(login).toMatchObject({ kind: "capability", proposed: true });
+    expect(snapshot.edges).toContainEqual({ kind: "under", from: login!.id, to: area!.id });
+    const password = snapshot.nodes.find((n) => n.title === "Password Login");
+    expect(password).toMatchObject({ kind: "change" });
+    const placed = snapshot.edges.find((e) => e.from === password!.id && e.to === login!.id);
+    expect(["amends", "touches"]).toContain(placed?.kind);
+    // Changes keep rex's ids and say nothing of being proposed: they are the tree's own items.
+    expect(password!.proposed).toBeUndefined();
+  });
+
+  it("reads a v1 tree as changes only when told not to propose", async () => {
+    const root = project({ prd: "v1", layout: "ndx" });
+    const { snapshot, layout, counts, productLayer } = await buildSnapshot(resolveLayout(root), { ...quiet, proposeProductLayer: false });
+    expect(layout).toBe("v1");
+    expect(productLayer).toBe("none");
     expect(counts.area).toBeUndefined();
     expect(counts.capability).toBeUndefined();
     const changes = snapshot.nodes.filter((n) => n.kind === "change");
     expect(changes.length).toBeGreaterThan(0);
     expect(changes.some((c) => c.level === "epic")).toBe(true);
     expect(snapshot.edges.some((e) => e.kind === "under" && e.from !== e.to)).toBe(true);
+  });
+
+  it("never proposes over a v2 tree", async () => {
+    const root = project();
+    const { productLayer, snapshot } = await buildSnapshot(resolveLayout(root), quiet);
+    expect(productLayer).toBe("stored");
+    expect(snapshot.nodes.filter((n) => n.kind === "capability").every((n) => n.proposed === undefined)).toBe(true);
   });
 
   it("still projects a project with no analysis and no runs", async () => {

@@ -2,7 +2,7 @@ import { placesOf } from "@graview/core";
 import { pluralSlug, useStoreTick } from "@graview/pages";
 import { Link } from "react-router-dom";
 import type { App } from "../../app.js";
-import { tokens } from "../../model/graph.js";
+import { nodesOf, tokens } from "../../model/graph.js";
 import { fragileZones } from "../../model/code.js";
 import { spend } from "../../model/spend.js";
 import { attention, standing } from "../../model/work.js";
@@ -25,6 +25,7 @@ export function HomeScreen({ context, app }: { context: Ctx; app: App }) {
   const fragile = fragileZones(store);
   const pictures = placesOf(app).filter((p) => p.lens);
   const hasProduct = s.capabilities > 0 || s.areas > 0;
+  const proposed = hasProduct && nodesOf(store, "area").concat(nodesOf(store, "capability")).every((n) => n.proposed === true);
 
   return (
     <Page testId="home">
@@ -54,6 +55,17 @@ export function HomeScreen({ context, app }: { context: Ctx; app: App }) {
         {needs.defective.length ? <Stat i={5} value={needs.defective.length} label="defective capabilities" tone="bad" /> : null}
       </Stats>
 
+      {proposed ? (
+        <Section title="The product map is proposed, not yet real" i={1} testId="home-proposed">
+          <div className="ndx-empty">
+            <p>
+              This PRD is on the v1 layout. The areas, capabilities and constraints here are what rex's migration plan proposes from its epics and features,
+              by rules alone: an epic is an area, a feature with completed work a capability, the work under them changes placed on them, and what the rules
+              cannot place waits in the Inbox. Nothing is written until the PRD migrates; these nodes are read-only here.
+            </p>
+          </div>
+        </Section>
+      ) : null}
       {!hasProduct ? (
         <Section title="The product map is not drawn yet" i={1}>
           <div className="ndx-empty">

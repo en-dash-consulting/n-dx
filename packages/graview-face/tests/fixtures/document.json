@@ -73,6 +73,11 @@
           ],
           "type": "enum"
         },
+        "proposed": {
+          "description": "Drawn from rex's migration plan over a v1 tree, not yet in the PRD",
+          "label": "Proposed",
+          "type": "boolean"
+        },
         "slug": {
           "description": "The frozen folder name in the rex tree.",
           "type": "string"
@@ -120,6 +125,7 @@
             "fields": [
               "intentStatus",
               "health",
+              "proposed",
               "status"
             ],
             "title": "Standing"
@@ -212,6 +218,11 @@
           "label": "Met",
           "type": "datetime"
         },
+        "proposed": {
+          "description": "Drawn from rex's migration plan over a v1 tree, not yet in the PRD",
+          "label": "Proposed",
+          "type": "boolean"
+        },
         "reviewed": {
           "description": "A person reviewed the current spec.",
           "type": "boolean"
@@ -264,6 +275,7 @@
             "fields": [
               "intentStatus",
               "health",
+              "proposed",
               "status",
               "metAt",
               "reviewed"
@@ -682,6 +694,11 @@
           ],
           "type": "enum"
         },
+        "proposed": {
+          "description": "Drawn from rex's migration plan over a v1 tree, not yet in the PRD",
+          "label": "Proposed",
+          "type": "boolean"
+        },
         "slug": {
           "type": "string"
         },
@@ -730,6 +747,7 @@
             "fields": [
               "intentStatus",
               "health",
+              "proposed",
               "status"
             ],
             "title": "Standing"
@@ -1727,7 +1745,7 @@
       },
       {
         "as": "card",
-        "empty": "No areas yet. The product map arrives when the PRD migrates to v2 (ndx prd migrate) or is bootstrapped from the code.",
+        "empty": "No areas yet: nothing in the PRD proposes one. The product map arrives when the PRD migrates to v2, or is bootstrapped from the code.",
         "list": "all('area')",
         "sort": "title"
       },

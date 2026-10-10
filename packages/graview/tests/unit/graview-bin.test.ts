@@ -33,9 +33,9 @@ describe("resolveGraviewCommand", () => {
 
   it("lets the machine-local config override the shared one, and reads includeFiles", () => {
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { bin: "graview", includeFiles: false } }));
-    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ graview: { bin: "/opt/graview/bin/graview", includeFiles: true, mainRef: " upstream/main " } }));
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ graview: { bin: "/opt/graview/bin/graview", includeFiles: true, mainRef: " upstream/main ", proposeProductLayer: false } }));
     const layout = resolveLayout(root);
-    expect(readGraviewConfig(layout)).toEqual({ bin: "/opt/graview/bin/graview", includeFiles: true, mainRef: "upstream/main" });
+    expect(readGraviewConfig(layout)).toEqual({ bin: "/opt/graview/bin/graview", includeFiles: true, mainRef: "upstream/main", proposeProductLayer: false });
     const command = resolveGraviewCommand(layout, { env: noPath, platform: "linux" });
     expect(command).toMatchObject({ cmd: "/opt/graview/bin/graview", prefix: [], source: "config" });
   });

@@ -27,5 +27,6 @@ Config keys (`.ndx/config.json` or `.n-dx.json`):
 |-----|---------|
 | `graview.bin` | Path to the graview binary or its `cli.js`; a `.js` path runs under the current Node |
 | `graview.includeFiles` | Project file nodes by default (same as `--files`) |
+| `graview.proposeProductLayer` | On a v1 tree, draw the areas, capabilities and constraints rex's migration plan proposes, each marked `proposed` (default `true`); `false` projects the tree as changes only |
 | `graview.mainRef` | The branch commits, landings and releases are read from (`main`, `upstream/main`). Unset, rex's default: the first of `origin/HEAD`, `origin/main`, `main` that resolves |
 | `graview.app` | A product face built from the emitted document; unset, `@n-dx/graview-face` is found beside this package or in `node_modules`. `ndx graview serve` runs it on the fresh projection with `NDX_GRAVIEW_DIR` pointing at the files |

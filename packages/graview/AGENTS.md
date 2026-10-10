@@ -23,6 +23,16 @@ JSON output and hench's run records. `ndx graview <sub>` then spawns the
   package; `packages/core/gateway-rules.json` lists them and
   `tests/e2e/domain-isolation.test.js` enforces it.
 
+### A v1 tree projects the product layer its migration plan proposes
+
+`src/sources/proposed.ts` runs the rules stage of rex's v1-to-v2 migration
+plan (`classifyV1Tree`, `draftCapabilitySpecs`: pure, no model pass) over a v1
+tree and projects the areas, capabilities and constraints it proposes, each
+`proposed: true`, with the tree's changes placed on them. It writes nothing
+and invents no judgement rex has not made: the plan is rex's, and
+`graview.proposeProductLayer: false` turns it off. When the PRD migrates, the
+stored v2 tree takes over on the same code path.
+
 ### The declaration is the schema of record for the projection, not for rex
 
 `n-dx.graview.json` names a kind for every rex v2 node type and an edge for

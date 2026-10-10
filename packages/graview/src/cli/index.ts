@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 import { relativeToRoot, spawnCli } from "../llm-gateway.js";
 import { emitProjection, type EmitResult } from "../emit.js";
 import { readGraviewConfig, resolveGraviewCommand, type GraviewCommand } from "../graview-bin.js";
+import { loadDocument } from "../document.js";
 import { rexMcpEndpoint } from "../hub.js";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -90,11 +91,14 @@ function parse(argv: string[]): ParsedArgs {
 
 function describeEmit(result: EmitResult): string {
   const { counts } = result;
+  const kinds = loadDocument().kinds;
+  const plural = (kind: string): string => kinds[kind]?.plural?.toLowerCase() ?? `${kind}s`;
   const parts = Object.entries(counts)
     .filter(([kind]) => kind !== "edges")
-    .map(([kind, n]) => `${n} ${kind}${n === 1 ? "" : "s"}`);
+    .map(([kind, n]) => `${n} ${n === 1 ? kind : plural(kind)}`);
   const rel = (p: string) => relativeToRoot(result.layout, p);
-  return `Wrote ${rel(result.documentPath)} and ${rel(result.snapshotPath)}: ${parts.join(", ")}; ${counts.edges} edges (PRD layout ${result.prdLayout}).`;
+  const layer = result.productLayer === "proposed" ? "; product layer proposed by rex's migration plan" : "";
+  return `Wrote ${rel(result.documentPath)} and ${rel(result.snapshotPath)}: ${parts.join(", ")}; ${counts.edges} edges (PRD layout ${result.prdLayout}${layer}).`;
 }
 
 /**
@@ -227,6 +231,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   const emitted = await emitProjection(parsed.dir, {
     files: parsed.files || config.includeFiles === true,
     ref: config.mainRef,
+    proposeProductLayer: config.proposeProductLayer,
     warn: (message) => console.error(`warning: ${message}`),
   });
   say(describeEmit(emitted));

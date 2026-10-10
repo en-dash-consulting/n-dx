@@ -27,6 +27,8 @@ export interface EmitResult {
   counts: Record<string, number>;
   warnings: string[];
   prdLayout: "v1" | "v2";
+  /** Where the product layer came from: the v2 tree, rex's migration plan over a v1 tree, or nowhere. */
+  productLayer: "stored" | "proposed" | "none";
 }
 
 function writeAtomically(path: string, text: string): void {
@@ -58,5 +60,6 @@ export async function emitProjection(root: string, options: EmitOptions = {}): P
     counts: report.counts,
     warnings: report.warnings,
     prdLayout: report.layout,
+    productLayer: report.productLayer,
   };
 }

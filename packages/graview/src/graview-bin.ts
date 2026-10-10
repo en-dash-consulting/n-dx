@@ -38,6 +38,12 @@ export interface GraviewConfig {
    */
   mainRef?: string;
   /**
+   * On a v1 tree, draw the product layer rex's migration plan proposes
+   * (areas, capabilities, constraints, each marked `proposed`). Default true;
+   * `false` projects the tree as changes only.
+   */
+  proposeProductLayer?: boolean;
+  /**
    * A product face for this project: the checkout (or built site) of a Graview
    * app built from the emitted document. Unset, `@n-dx/graview-face` is found
    * beside this package or in node_modules. `ndx graview serve` runs the face
@@ -64,10 +70,11 @@ export function readGraviewConfig(layout: Layout): GraviewConfig {
   for (const file of [layout.configFile, layout.localConfigFile]) {
     const section = readConfigFile(file).graview;
     if (section === null || typeof section !== "object") continue;
-    const { bin, includeFiles, app, mainRef } = section as Record<string, unknown>;
+    const { bin, includeFiles, app, mainRef, proposeProductLayer } = section as Record<string, unknown>;
     if (typeof bin === "string" && bin.trim().length > 0) out.bin = bin.trim();
     if (typeof includeFiles === "boolean") out.includeFiles = includeFiles;
     if (typeof mainRef === "string" && mainRef.trim().length > 0) out.mainRef = mainRef.trim();
+    if (typeof proposeProductLayer === "boolean") out.proposeProductLayer = proposeProductLayer;
     if (typeof app === "string" && app.trim().length > 0) out.app = isAbsolute(app.trim()) ? app.trim() : resolve(layout.root, app.trim());
   }
   return out;

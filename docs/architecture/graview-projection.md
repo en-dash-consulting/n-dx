@@ -52,9 +52,18 @@ spawns the package's CLI (`ndx graview` in `cli.js`) and never imports it.
 ## The mapping
 
 The adapter consumes rex's `PrdModel` only. The v2 reader reads a v1 tree as
-changes (epics and features become changes; tasks and subtasks stay tasks),
-so an un-migrated checkout projects its changes, tasks, blockers and releases
-with an empty product layer, through the same code path a v2 repository uses.
+changes (epics and features become changes; tasks and subtasks stay tasks).
+Rather than project that empty product layer, the adapter draws the one rex's
+v1-to-v2 migration plan proposes (`classifyV1Tree`, the plan's rules stage:
+pure, deterministic, no model pass): an epic is an area unless its title names
+a PR or a release, a feature with completed work a capability with a template
+statement (`draftCapabilitySpecs`), a constraint-shaped feature a constraint,
+the work under them changes placed on them by the placement rules, and what
+the rules cannot place a change in the Inbox. Every product node from the plan
+carries `proposed: true`, the face says so on its home, and the sync refuses
+writes to them; `graview.proposeProductLayer: false` projects the tree as
+changes only. The migration (`Migrate this repository`) makes the map real,
+and the same code path then reads the stored v2 tree.
 
 | Graview kind | From | Id |
 |---|---|---|
@@ -83,10 +92,9 @@ with an empty product layer, through the same code path a v2 repository uses.
 | `crosses` | `zones.json` crossings and sub-crossings |
 | `ranFor`, `produced` | `RunRecord.taskId`, `RunRecord.commits` |
 
-A v1 tree gets all of this too: its epics and features are changes with
-`completedAt`, its tasks carry the trailers, and the tags are git's. What it
-cannot get is the product layer, so capabilities, areas, constraints and the
-`realizes` edges arrive with the v2 migration.
+A v1 tree gets all of this too: its changes carry `completedAt`, its tasks
+the trailers, and the tags are git's; with the proposed product layer the
+`realizes` and `realizedIn` edges follow, through the same trailers.
 
 `packages/graview/src/document.ts` holds the two mapping tables
 (`NODE_KINDS`, `PRODUCT_EDGE_SOURCES`) and `tests/unit/document.test.ts` fails

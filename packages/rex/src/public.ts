@@ -107,6 +107,16 @@ export { loadTrailerCommits } from "./core/change-commits.js";
 export type { ChangeCommitsOptions, TrailerCommit } from "./core/change-commits.js";
 export { computeLandings, listReleaseTags, releasesContaining } from "./core/change-landing.js";
 export type { ChangeLanding, ReleaseTag } from "./core/change-landing.js";
+
+// ---- Migrations: the v1-to-v2 plan's rules stage ----------------------------
+// Pure and deterministic: where each v1 item lands in v2 (an epic an area, a
+// feature with completed work a capability, work under them changes placed on
+// them) and the template capability specs. A proposal for review; nothing
+// here writes.
+export { classifyV1Tree, DEFAULT_PRODUCT_NAMES } from "./migrations/v1-to-v2/migration-plan.js";
+export type { MigrationPlan, PlanEntry, PlanTargetType, ProposedArea, ProposedConstraint, ClassifyOptions } from "./migrations/v1-to-v2/migration-plan.js";
+export { draftCapabilitySpecs } from "./migrations/v1-to-v2/capability-spec.js";
+export type { CapabilitySpecDraft, SpecCriterion, SpecDraftOptions } from "./migrations/v1-to-v2/capability-spec.js";
 export { computeProductStatus, INTENT_STATUSES, HEALTH_VALUES } from "./core/product-status.js";
 export type { IntentStatus, Health, ProductStatus } from "./core/product-status.js";
 export { productReport, capabilityReport, prdStatusReport } from "./core/product-report.js";

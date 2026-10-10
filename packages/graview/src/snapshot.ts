@@ -22,6 +22,8 @@ export interface BuildSnapshotOptions {
   files?: boolean;
   /** The branch commits and landings are read from; rex's default (`origin/HEAD`, `origin/main`, `main`) when unset. */
   ref?: string;
+  /** On a v1 tree, draw the product layer rex's migration plan proposes. Default true. */
+  proposeProductLayer?: boolean;
   /**
    * Where `computeRealizedBy` keeps its N-DX-Item trailer cache. Defaults to
    * `<graviewDir>/cache`, never rex's own cache directory: the projection
@@ -36,8 +38,10 @@ export interface SnapshotReport {
   /** Nodes per kind, and `edges` in all. */
   counts: Record<string, number>;
   warnings: string[];
-  /** Which storage rex read: a v1 tree projects no product layer. */
+  /** Which storage rex read. */
   layout: "v1" | "v2";
+  /** Where the product layer came from: the v2 tree, rex's migration plan over a v1 tree, or nowhere. */
+  productLayer: "stored" | "proposed" | "none";
 }
 
 /** Where the projection's own files go: the layout's graview dir. */
@@ -52,7 +56,7 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
     options.warn?.(message);
   };
 
-  const requirements = await readRequirements(layout.rexDir, warn);
+  const requirements = await readRequirements(layout.rexDir, warn, { proposeProductLayer: options.proposeProductLayer });
   const code = readCode(layout.sourcevisionDir, { files: options.files }, warn);
   const runs = readRuns(layout.henchDir, warn);
 
@@ -169,5 +173,6 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
     counts,
     warnings,
     layout: requirements.model.layout,
+    productLayer: requirements.productLayer,
   };
 }
