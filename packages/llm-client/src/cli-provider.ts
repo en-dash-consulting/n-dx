@@ -40,6 +40,7 @@ import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js"
 import { classifyAuthError } from "./llm-error-classifier.js";
 import { printRetryLine } from "./progress-reporter.js";
 import { formatRetryCountdown } from "./rate-limit.js";
+import { resolveVendorCliEnv, type EnvPolicyConfig } from "./child-env.js";
 
 /** Regex patterns for stderr content indicating an auth error. */
 const AUTH_PATTERNS = /auth|unauthorized|api.key|credential|login|not logged in/i;
@@ -67,6 +68,8 @@ const DEFAULT_MAX_DELAY_MS = 10000;
 
 /** Options specific to the CLI provider. */
 export interface CliProviderOptions extends ClaudeClientOptions {
+  /** Child-process credential policy; explicit allow entries override denial. */
+  envPolicy?: EnvPolicyConfig;
   /** Maximum number of retries for transient failures (default: 2). */
   maxRetries?: number;
   /** Base delay in ms for exponential backoff (default: 1000). */
@@ -121,6 +124,7 @@ function spawnOnce(
   cliBinary: string,
   request: CompletionRequest,
   cwd?: string,
+  env?: NodeJS.ProcessEnv,
 ): Promise<CompletionResult> {
   return new Promise((resolve, reject) => {
     const format = request.outputFormat ?? "json";
@@ -131,17 +135,13 @@ function spawnOnce(
       ...(request.cliFlags ?? []),
     ];
 
-    // Strip CLAUDECODE so the spawned claude process doesn't think it's
-    // nested inside an interactive Claude Code session (e.g. when the web
-    // server is launched from within Claude Code).
-    const { CLAUDECODE: _, ...cleanEnv } = process.env;
     const spawnStart = Date.now();
     debugLog(`spawn ${cliBinary} model=${request.model} promptBytes=${request.prompt.length}`);
     // Windows-safe spawn (GH #37/#68/#69): routes .cmd shims through cmd.exe
     // with a self-quoted verbatim command line instead of shell:true+args.
     const proc = spawnCli(cliBinary, args, {
       stdio: ["pipe", "pipe", "pipe"],
-      env: cleanEnv,
+      env: env ?? resolveVendorCliEnv({ vendor: LLM_VENDOR.CLAUDE }),
       cwd,
     });
     proc.stdin!.on("error", () => {/* handled by proc error/close */});
@@ -428,10 +428,11 @@ export function createCliClient(options: CliProviderOptions): ClaudeClient & LLM
 
     async complete(request: CompletionRequest): Promise<CompletionResult> {
       let lastError: Error | undefined;
+      const env = resolveVendorCliEnv({ vendor: LLM_VENDOR.CLAUDE, claude: options.claudeConfig }, options.envPolicy);
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          return await spawnOnce(cliBinary, request, options.cwd);
+          return await spawnOnce(cliBinary, request, options.cwd, env);
         } catch (err) {
           lastError = err as Error;
 

@@ -36,6 +36,7 @@ import { NEWEST_MODELS } from "./config.js";
 import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
 import { printRetryLine } from "./progress-reporter.js";
 import { formatRetryCountdown } from "./rate-limit.js";
+import { resolveVendorCliEnv, type EnvPolicyConfig } from "./child-env.js";
 
 const AUTH_PATTERNS = /unauthorized|invalid api key|api key was rejected|forbidden|not logged in|login required|auth failed|\b401\b/i;
 const RATE_LIMIT_PATTERNS = /rate.limit|429|too many requests|overloaded/i;
@@ -67,6 +68,8 @@ const DEFAULT_CODEX_BINARY = "codex";
 export const DEFAULT_CODEX_MODEL = NEWEST_MODELS.codex;
 
 export interface CodexCliProviderOptions {
+  /** Child-process credential policy; explicit allow entries override denial. */
+  envPolicy?: EnvPolicyConfig;
   codexConfig?: CodexConfig;
   /** Execution policy to compile into Codex CLI flags. Defaults to DEFAULT_EXECUTION_POLICY. */
   policy?: ExecutionPolicy;
@@ -267,7 +270,7 @@ async function spawnOnce(
       // with a self-quoted verbatim command line instead of shell:true+args.
       const proc = spawnCli(cliBinary, args, {
         stdio: ["pipe", "ignore", "pipe"],
-        env: envOverride ?? process.env,
+        env: envOverride ?? resolveVendorCliEnv({ vendor: "codex", codex: codexConfig }),
       });
 
       // No-op stdin error guard: a fast-exiting cmd.exe shim can EPIPE the
@@ -385,6 +388,7 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
 
     async complete(request: CompletionRequest): Promise<CompletionResult> {
       let lastError: Error | undefined;
+      const cliEnv = resolveVendorCliEnv({ vendor: "codex", codex: options.codexConfig }, options.envPolicy);
       const finalRequest: CompletionRequest = {
         ...request,
         model: request.model || defaultModel,
@@ -394,7 +398,7 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         debugLog(`complete attempt=${attempt + 1}/${maxRetries + 1} model="${finalRequest.model}"`);
         try {
-          return await spawnOnce(cliBinary, finalRequest, options.codexConfig, undefined, options.policy);
+          return await spawnOnce(cliBinary, finalRequest, options.codexConfig, cliEnv, options.policy);
         } catch (err) {
           lastError = err as Error;
           if (err instanceof ClaudeClientError) {
@@ -417,7 +421,7 @@ export function createCodexCliClient(options: CodexCliProviderOptions): ClaudeCl
           ) {
             attemptedWithoutApiKey = true;
             debugLog("auth failure with OPENAI_API_KEY present; retrying once with OPENAI_API_KEY removed");
-            const env = { ...process.env };
+            const env = { ...cliEnv };
             delete env.OPENAI_API_KEY;
             try {
               return await spawnOnce(cliBinary, finalRequest, options.codexConfig, env, options.policy);

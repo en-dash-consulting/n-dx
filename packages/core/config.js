@@ -2450,6 +2450,22 @@ async function loadAllConfigs(dir) {
   return { configs, rawConfigs };
 }
 
+/**
+ * Resolve the same filtered environment as hench for cross-vendor reviewers.
+ * Config I/O and foundation loading stay in the spawn-exempt config module.
+ * @param {string} dir
+ * @param {"claude" | "codex"} vendor
+ * @returns {Promise<NodeJS.ProcessEnv>}
+ */
+export async function loadVendorCliEnv(dir, vendor) {
+  const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
+  const { configs } = await loadAllConfigs(dir);
+  const projectConfig = await loadEffectiveProjectConfig(dir);
+  const envPolicy = configs.hench?.guard?.env ?? projectConfig.hench?.guard?.env;
+  const llmConfig = await loadLLMConfig(dir);
+  return resolveVendorCliEnv({ ...llmConfig, vendor }, envPolicy);
+}
+
 // ── Test connection handler ──────────────────────────────────────────────────
 
 /**
