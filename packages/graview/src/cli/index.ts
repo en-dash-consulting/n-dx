@@ -8,6 +8,7 @@
  *   serve     emit, refresh graview's store from the snapshot, then `graview serve` (the store's
  *             HTTP and WebSocket wire; a Graview face such as the n-dx-graview product connects to it)
  *   mcp       emit, refresh the store, then `graview mcp --read-only` over stdio
+ *   info      the graview dir, the binary, and the hub's rex MCP endpoint for a face's two-way sync
  *
  * Every subcommand re-emits first, so what graview shows is never older than
  * the tree on disk. Flags this CLI does not know are passed to graview.
@@ -17,9 +18,11 @@ import { resolve } from "node:path";
 import { relativeToRoot, spawnTool } from "../llm-gateway.js";
 import { emitProjection, type EmitResult } from "../emit.js";
 import { readGraviewConfig, resolveGraviewCommand, type GraviewCommand } from "../graview-bin.js";
+import { rexMcpEndpoint } from "../hub.js";
+import { fileURLToPath } from "node:url";
 import { resolveLayout } from "../llm-gateway.js";
 
-const SUBCOMMANDS = ["emit", "check", "describe", "serve", "mcp"] as const;
+const SUBCOMMANDS = ["emit", "check", "describe", "serve", "mcp", "info"] as const;
 type Subcommand = (typeof SUBCOMMANDS)[number];
 
 const USAGE = `ndx graview <command> [dir] [flags]
@@ -30,6 +33,8 @@ const USAGE = `ndx graview <command> [dir] [flags]
   serve [dir] [--port <n>]        graview serve: the store over HTTP + WebSocket, refreshed from the snapshot;
                                   with graview.app in the config, that product's dev server on the fresh projection
   mcp [dir] [--list]              graview mcp --read-only over stdio on the same store
+  info [dir] [--json]             where the projection lands, which graview binary, and the hub's rex
+                                  endpoint a face writes back through
 
   --files    project every source file as a node (default: zones and components only)
   --quiet    print nothing but errors
@@ -102,8 +107,17 @@ async function serveProductApp(appDir: string, emitted: EmitResult, passthrough:
   const pm = existsSync(resolve(appDir, "pnpm-lock.yaml")) ? "pnpm" : "npm";
   const cmd = process.platform === "win32" ? `${pm}.cmd` : pm;
   const args = pm === "pnpm" ? ["dev", ...(passthrough.length ? ["--", ...passthrough] : [])] : ["run", "dev", ...(passthrough.length ? ["--", ...passthrough] : [])];
-  say(`product face: ${appDir} (${pm} dev)`);
-  const result = await spawnTool(cmd, args, { cwd: appDir, stdio: "inherit", env: { ...process.env, NDX_GRAVIEW_DIR: emitted.graviewDir } });
+  const rex = rexMcpEndpoint(emitted.layout);
+  say(`product face: ${appDir} (${pm} dev)${rex ? `; writes back through ${rex.url}` : "; sync off (run ndx start . to register with the hub)"}`);
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    NDX_GRAVIEW_DIR: emitted.graviewDir,
+    NDX_PROJECT_ROOT: emitted.layout.root,
+    // This CLI's own entry, so the face's dev door can re-emit without `ndx` on its PATH.
+    NDX_GRAVIEW_CLI: fileURLToPath(import.meta.url),
+    ...(rex ? { NDX_REX_MCP_URL: rex.url, ...(rex.tokenFile ? { NDX_TOKEN_FILE: rex.tokenFile } : {}) } : {}),
+  };
+  const result = await spawnTool(cmd, args, { cwd: appDir, stdio: "inherit", env });
   return result.exitCode ?? 1;
 }
 
@@ -140,6 +154,26 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   const say = (line: string) => {
     if (!parsed.quiet) console.log(line);
   };
+
+  if (parsed.sub === "info") {
+    const command = resolveGraviewCommand(layout);
+    const rex = rexMcpEndpoint(layout);
+    const info = {
+      projectRoot: layout.root,
+      graviewDir: layout.graviewDir,
+      graview: { source: command.source, detail: command.detail },
+      app: config.app ?? null,
+      rex: rex ? { url: rex.url, projectId: rex.projectId, tokenFile: rex.tokenFile ?? null, registered: rex.registered } : null,
+    };
+    if (parsed.passthrough.includes("--json")) console.log(JSON.stringify(info, null, 2));
+    else {
+      console.log(`projection: ${relativeToRoot(layout, layout.graviewDir)}/`);
+      console.log(`graview:    ${command.detail} (${command.source})`);
+      console.log(`face:       ${config.app ?? "none (set graview.app)"}`);
+      console.log(rex ? `rex:        ${rex.url}${rex.registered ? "" : " (hub not serving it; run ndx start .)"}` : "rex:        not registered with the hub (run ndx start .)");
+    }
+    return 0;
+  }
 
   const emitted = await emitProjection(parsed.dir, {
     files: parsed.files || config.includeFiles === true,

@@ -1301,7 +1301,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     tool: "ndx",
     command: "graview",
     summary: "project the PRD, analysis and runs into Graview and drive the graview CLI",
-    usage: "ndx graview <emit|check|describe|serve|mcp> [dir] [flags]",
+    usage: "ndx graview <emit|check|describe|serve|mcp|info> [dir] [flags]",
     description:
       "Writes a graview-document declaration (areas, capabilities, constraints,\n" +
       "changes, tasks, releases, zones, components, runs, commits, with every\n" +
@@ -1328,6 +1328,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx graview check .", description: "Validate the declaration with graview check" },
       { command: "ndx graview serve .", description: "Serve the store for a Graview face to connect to" },
       { command: "ndx graview mcp . --list", description: "List the read tools an agent would get" },
+      { command: "ndx graview info .", description: "The projection dir, the binary, and the hub's rex endpoint a face writes back through" },
     ],
     related: ["iso", "analyze", "status"],
   },

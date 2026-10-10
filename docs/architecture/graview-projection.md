@@ -101,12 +101,41 @@ projections of an unchanged checkout are byte-identical.
 Graview's `board` and `plan` lenses are spatial (slots and regions) and do not
 fit this graph; the status board is the `columns` lens.
 
+## Two-way writes: where the RemoteSystem runs, and why
+
+Decided before implementation, as the task asked: **the sync loop runs in
+the product face, not in n-dx.** Graview's `SyncEngine` and `RemoteSystem`
+are Graview interfaces; a worker here would import `@graview/core`, and the
+whole point of the adapter is that no n-dx package does. So:
+
+- **In n-dx:** changes and tasks carry rex's `lastModified` (and
+  `lastModifiedBy`) in the projection: the version a two-way sync agrees on,
+  and what makes an echo of the face's own write recognizable. `ndx graview
+  info` names the hub's per-project rex MCP endpoint (`<ndx home>/hub.json`,
+  `hub.port`, `auth.token`), and `ndx graview serve` hands the product face
+  `NDX_REX_MCP_URL`, `NDX_TOKEN_FILE`, `NDX_PROJECT_ROOT` and
+  `NDX_GRAVIEW_CLI` beside `NDX_GRAVIEW_DIR`. Nothing in n-dx opens a
+  connection.
+- **In `n-dx-graview`:** a Vite dev-server door (`dev/ndx-door.ts`) holds the
+  token and one MCP session to the hub, re-emits on `POST /ndx/emit`, and
+  serves the fresh projection from the graview dir. The `RemoteSystem`
+  (`src/sync/ndx-system.ts`) pulls by re-emitting and reading the snapshot
+  (every change and task, versioned by `lastModified`), and pushes a status
+  through `update_task_status`, the rest through `edit_item`, after reading
+  the item so only what differs is written, then `append_log` with
+  `author=graview:<principal>`. The engine (`src/sync/engine.ts`) seeds its
+  links from the snapshot the store opened with, runs on an interval and a
+  moment after any human or agent op, and resolves every conflict to rex's
+  value, saying so in the rail.
+- **Rex stays the single writer.** Every push is a rex MCP write under the
+  file lock, validation and the execution log; the face never touches the
+  tree. Code-side kinds (area, capability, constraint, release, zone,
+  component, file, run, commit) have no push mapping, and a write is refused
+  naming the tool that owns the data. A static build has no door and is
+  read-only by construction.
+
 ## Deferred
 
-- **Two-way writes.** Graview's `SyncEngine` with a `RemoteSystem` whose push
-  goes through rex's HTTP MCP endpoint, so rex stays the single PRD writer.
-  The RemoteSystem implements a Graview interface and so belongs in the
-  Graview-side product, not here.
 - **A product face** exists: `n-dx-graview`, a sibling repository built from
   the emitted document with `appFromOrCompile`, with a shell, home and record
   pages in n-dx's words over the derived ones. `graview.app` in the project

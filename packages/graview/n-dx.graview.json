@@ -543,6 +543,15 @@
         "tags": {
           "type": "list",
           "of": "string"
+        },
+        "lastModified": {
+          "type": "datetime",
+          "label": "Last changed",
+          "description": "When rex last wrote this; the version a two-way sync agrees on."
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "label": "Last changed by"
         }
       },
       "edges": {
@@ -629,7 +638,9 @@
               "plannedRelease",
               "shippedIn",
               "startedAt",
-              "completedAt"
+              "completedAt",
+              "lastModified",
+              "lastModifiedBy"
             ]
           },
           {
@@ -743,6 +754,15 @@
         "tags": {
           "type": "list",
           "of": "string"
+        },
+        "lastModified": {
+          "type": "datetime",
+          "label": "Last changed",
+          "description": "When rex last wrote this; the version a two-way sync agrees on."
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "label": "Last changed by"
         }
       },
       "edges": {
@@ -784,7 +804,9 @@
             "title": "When",
             "fields": [
               "startedAt",
-              "completedAt"
+              "completedAt",
+              "lastModified",
+              "lastModifiedBy"
             ]
           },
           {

@@ -12,6 +12,7 @@ ndx graview check .           # graview check on the emitted declaration
 ndx graview describe .        # a text readout of the graph, or one place with --place <slug>
 ndx graview serve .           # graview serve: the store over HTTP and its live WebSocket wire, for a Graview face to connect to
 ndx graview mcp .             # graview mcp --read-only: search_graph, get_node, describe_place, …
+ndx graview info .            # where the projection lands, which binary, and the hub's rex endpoint a face writes back through
 ```
 
 Nothing here depends on `@graview/*`. The `graview` binary is resolved from

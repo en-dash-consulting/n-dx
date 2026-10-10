@@ -105,6 +105,9 @@ export async function readRequirements(rexDir: string, warn: Warn): Promise<Requ
         assignee: node.assignee,
         startedAt: node.startedAt,
         completedAt: node.completedAt,
+        // The version a two-way sync agrees on: rex stamps it on every write.
+        lastModified: typeof node.lastModified === "string" ? node.lastModified : undefined,
+        lastModifiedBy: typeof node.lastModifiedBy === "string" ? node.lastModifiedBy : undefined,
       };
       if (node.type === "change") {
         const change = node as RuleNode & ChangeNode;

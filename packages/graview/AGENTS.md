@@ -52,3 +52,13 @@ it set, `ndx graview serve .` emits, then runs that product's dev server with
 nothing). The declaration's `views` (home, per-kind card/row/page blocks),
 `glance`, `page` groups, `computed` fields, `brand` and titled `lenses` are
 what that face draws; keep the data there, and React only in the product.
+
+### Two-way writes live in the product face
+
+`SyncEngine` and `RemoteSystem` are Graview interfaces, so the loop runs in
+`n-dx-graview`, never here. What this package provides is the version
+(`lastModified` on changes and tasks in the projection), the endpoint
+(`rexMcpEndpoint` in `src/hub.ts`, from the hub registry under the ndx
+home), and the hand-off (`ndx graview serve` sets `NDX_REX_MCP_URL`,
+`NDX_TOKEN_FILE`, `NDX_PROJECT_ROOT`, `NDX_GRAVIEW_CLI`). Rex stays the
+single writer: a face pushes through rex's MCP tools, never the tree.

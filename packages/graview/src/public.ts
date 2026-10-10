@@ -34,6 +34,8 @@ export type { GraviewDocumentData, DocumentKind, DocumentField, DocumentEdge, Do
 export { resolveGraviewCommand, readGraviewConfig, GRAVIEW_BIN_ENV } from "./graview-bin.js";
 export type { GraviewCommand, GraviewBinSource, GraviewConfig, ResolveGraviewOptions } from "./graview-bin.js";
 export { canonicalJson } from "./canonical.js";
+export { rexMcpEndpoint, DEFAULT_HUB_PORT } from "./hub.js";
+export type { RexEndpoint } from "./hub.js";
 export type { GraphSnapshot, SnapshotNode, SnapshotEdge } from "./types.js";
 export { releaseId, RELEASE_PREFIX } from "./sources/requirements.js";
 export { COMPONENT_PREFIX, FILE_PREFIX } from "./sources/code.js";
