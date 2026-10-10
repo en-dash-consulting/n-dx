@@ -107,7 +107,11 @@ fit this graph; the status board is the `columns` lens.
   goes through rex's HTTP MCP endpoint, so rex stays the single PRD writer.
   The RemoteSystem implements a Graview interface and so belongs in the
   Graview-side product, not here.
-- **A product face.** The declaration carries glance, page groups, brand,
-  home and per-kind blocks as data; a custom pages face is React and lives in
-  a sibling product repository built from the emitted document.
+- **A product face** exists: `n-dx-graview`, a sibling repository built from
+  the emitted document with `appFromOrCompile`, with a shell, home and record
+  pages in n-dx's words over the derived ones. `graview.app` in the project
+  config names its checkout and `ndx graview serve .` runs its dev server on
+  the fresh projection (`NDX_GRAVIEW_DIR`). The declaration carries glance,
+  page groups, brand, the home and per-kind card, row and page blocks as
+  data, so the face adds React and nothing about the graph.
 - **Dashboard embed and graview.cloud publishing.**

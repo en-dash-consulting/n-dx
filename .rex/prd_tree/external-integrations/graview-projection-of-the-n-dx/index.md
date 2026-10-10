@@ -23,6 +23,6 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | Title | Status |
 |-------|--------|
 | [@n-dx/graview adapter: declaration document, snapshot projection and ndx graview spawn commands](./n-dx-graview-adapter-declaration.md) | completed |
-| [n-dx on Graview: declared design and a custom pages face, in n-dx's own words](./n-dx-on-graview-declared-design-and-a.md) | pending |
+| [n-dx on Graview: declared design and a custom pages face, in n-dx's own words](./n-dx-on-graview-declared-design-and-a.md) | completed |
 | [Promote the rex v2 reader and derived-edge computations to the public API](./promote-the-rex-v2-reader-and-derived.md) | completed |
 | [Two-way writes through Graview's SyncEngine with rex as the system of record](./two-way-writes-through-graview-s.md) | pending |

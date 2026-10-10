@@ -1319,7 +1319,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     options: [
       { flag: "--files", description: "Project every source file as a node (default: zones and components only)" },
       { flag: "--place=<slug>", description: "describe: one place (a titled lens) instead of the whole graph" },
-      { flag: "--port=<n>", description: "serve: the port graview listens on" },
+      { flag: "--port=<n>", description: "serve: the port graview (or the product face named by graview.app) listens on" },
       { flag: "--list", description: "mcp: print the derived tools as tools/list JSON and exit" },
       { flag: "--quiet", description: "Print nothing but errors" },
     ],

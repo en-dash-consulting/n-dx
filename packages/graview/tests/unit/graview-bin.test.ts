@@ -58,6 +58,13 @@ describe("resolveGraviewCommand", () => {
     }
   });
 
+  it("resolves graview.app against the project root", () => {
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { app: "../n-dx-graview" } }));
+    expect(readGraviewConfig(resolveLayout(root)).app).toBe(join(root, "..", "n-dx-graview"));
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { app: "/opt/face" } }));
+    expect(readGraviewConfig(resolveLayout(root)).app).toBe("/opt/face");
+  });
+
   it("ignores a malformed config file", () => {
     writeFileSync(join(root, ".n-dx.json"), "{ not json");
     expect(readGraviewConfig(resolveLayout(root))).toEqual({});

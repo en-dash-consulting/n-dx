@@ -20,7 +20,18 @@
       "run": 95,
       "commit": 0,
       "file": 190
-    }
+    },
+    "logo": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' role='img' aria-label='n-dx'><rect x='2' y='2' width='28' height='28' rx='8' fill='#2669ec'/><rect x='8' y='14.5' width='11' height='3' rx='1.5' fill='#fff'/><circle cx='23' cy='16' r='2.4' fill='#fff'/></svg>",
+    "typography": {
+      "display": "Manrope",
+      "body": "Inter",
+      "mono": "JetBrains Mono"
+    },
+    "shape": {
+      "radius": 10,
+      "density": 1
+    },
+    "scheme": "auto"
   },
   "pages": {
     "order": [
@@ -40,7 +51,9 @@
       "commit",
       "component",
       "file"
-    ]
+    ],
+    "scene": "The map",
+    "pages": "The pages"
   },
   "kinds": {
     "area": {
@@ -118,6 +131,39 @@
           "cardinality": "one",
           "description": "what this sits inside",
           "inverse": "what sits inside it"
+        }
+      },
+      "page": {
+        "groups": [
+          {
+            "title": "Standing",
+            "fields": [
+              "intentStatus",
+              "health",
+              "status"
+            ]
+          },
+          {
+            "title": "About",
+            "fields": [
+              "summary",
+              "stewards",
+              "tags"
+            ]
+          },
+          {
+            "title": "Identity",
+            "fields": [
+              "displayId",
+              "slug"
+            ]
+          }
+        ]
+      },
+      "computed": {
+        "inside": {
+          "expr": "count(in('under'))",
+          "label": "Inside"
         }
       }
     },
@@ -226,6 +272,45 @@
           "description": "the code zones whose commits realized this capability",
           "inverse": "the capabilities realized here"
         }
+      },
+      "page": {
+        "groups": [
+          {
+            "title": "Standing",
+            "fields": [
+              "intentStatus",
+              "health",
+              "status",
+              "metAt",
+              "reviewed"
+            ]
+          },
+          {
+            "title": "Spec",
+            "fields": [
+              "statement",
+              "criteriaCount"
+            ]
+          },
+          {
+            "title": "Identity",
+            "fields": [
+              "displayId",
+              "slug",
+              "tags"
+            ]
+          }
+        ]
+      },
+      "computed": {
+        "openChanges": {
+          "expr": "count(in('amends') where status != 'completed' and status != 'cancelled' and status != 'deleted') + count(in('touches') where status != 'completed' and status != 'cancelled' and status != 'deleted')",
+          "label": "Open changes"
+        },
+        "zones": {
+          "expr": "count(out('realizedIn'))",
+          "label": "Zones realized in"
+        }
       }
     },
     "constraint": {
@@ -318,6 +403,33 @@
           "description": "the product nodes this constraint binds",
           "inverse": "the constraints that bind it"
         }
+      },
+      "page": {
+        "groups": [
+          {
+            "title": "Standing",
+            "fields": [
+              "intentStatus",
+              "health",
+              "status"
+            ]
+          },
+          {
+            "title": "Rule",
+            "fields": [
+              "statement",
+              "appliesToAll"
+            ]
+          },
+          {
+            "title": "Identity",
+            "fields": [
+              "displayId",
+              "slug",
+              "tags"
+            ]
+          }
+        ]
       }
     },
     "change": {
@@ -493,6 +605,65 @@
           "description": "the release this change shipped in",
           "inverse": "the changes that shipped in it"
         }
+      },
+      "page": {
+        "groups": [
+          {
+            "title": "Work",
+            "fields": [
+              "status",
+              "priority",
+              "changeKind",
+              "inbox"
+            ]
+          },
+          {
+            "title": "Intent",
+            "fields": [
+              "intent"
+            ]
+          },
+          {
+            "title": "Plan",
+            "fields": [
+              "plannedRelease",
+              "shippedIn",
+              "startedAt",
+              "completedAt"
+            ]
+          },
+          {
+            "title": "People",
+            "fields": [
+              "assignee"
+            ]
+          },
+          {
+            "title": "Identity",
+            "fields": [
+              "displayId",
+              "slug",
+              "level",
+              "fix",
+              "spike",
+              "tags"
+            ]
+          }
+        ]
+      },
+      "computed": {
+        "openTasks": {
+          "expr": "count(in('under') where status != 'completed' and status != 'cancelled' and status != 'deleted')",
+          "label": "Open tasks"
+        },
+        "runs": {
+          "expr": "count(in('ranFor'))",
+          "label": "Runs"
+        },
+        "spent": {
+          "expr": "sum(in('ranFor'), tokens)",
+          "label": "Tokens spent"
+        }
       }
     },
     "task": {
@@ -592,6 +763,45 @@
           "description": "what has to finish first",
           "inverse": "what is waiting on this"
         }
+      },
+      "page": {
+        "groups": [
+          {
+            "title": "Work",
+            "fields": [
+              "status",
+              "priority",
+              "level"
+            ]
+          },
+          {
+            "title": "About",
+            "fields": [
+              "description"
+            ]
+          },
+          {
+            "title": "When",
+            "fields": [
+              "startedAt",
+              "completedAt"
+            ]
+          },
+          {
+            "title": "People",
+            "fields": [
+              "assignee"
+            ]
+          },
+          {
+            "title": "Identity",
+            "fields": [
+              "displayId",
+              "slug",
+              "tags"
+            ]
+          }
+        ]
       }
     },
     "release": {
@@ -618,6 +828,19 @@
           "type": "integer",
           "label": "Shipped",
           "min": 0
+        }
+      },
+      "page": {
+        "fields": [
+          "version",
+          "plannedChanges",
+          "shippedChanges"
+        ]
+      },
+      "computed": {
+        "open": {
+          "expr": "count(in('plannedFor') where status != 'completed' and status != 'cancelled' and status != 'deleted')",
+          "label": "Still open"
         }
       }
     },
@@ -683,6 +906,36 @@
           "description": "the zones this one imports from",
           "inverse": "the zones that import from it"
         }
+      },
+      "page": {
+        "groups": [
+          {
+            "title": "Shape",
+            "fields": [
+              "cohesion",
+              "coupling",
+              "fileCount",
+              "depth"
+            ]
+          },
+          {
+            "title": "Code",
+            "fields": [
+              "entryPoints",
+              "description"
+            ]
+          }
+        ]
+      },
+      "computed": {
+        "components": {
+          "expr": "count(in('inZone'))",
+          "label": "Components"
+        },
+        "importedBy": {
+          "expr": "count(in('crosses'))",
+          "label": "Imported by"
+        }
       }
     },
     "component": {
@@ -721,6 +974,14 @@
           "description": "the zone this lives in",
           "inverse": "what lives in this zone"
         }
+      },
+      "page": {
+        "fields": [
+          "name",
+          "role",
+          "file",
+          "line"
+        ]
       }
     },
     "file": {
@@ -759,6 +1020,14 @@
           "description": "the zone this lives in",
           "inverse": "what lives in this zone"
         }
+      },
+      "page": {
+        "fields": [
+          "path",
+          "language",
+          "role",
+          "lineCount"
+        ]
       }
     },
     "run": {
@@ -847,6 +1116,41 @@
           "description": "the commits this run made",
           "inverse": "the run that made it"
         }
+      },
+      "page": {
+        "groups": [
+          {
+            "title": "Outcome",
+            "fields": [
+              "status",
+              "turns",
+              "filesChanged"
+            ]
+          },
+          {
+            "title": "Cost",
+            "fields": [
+              "tokens",
+              "inputTokens",
+              "outputTokens"
+            ]
+          },
+          {
+            "title": "Who",
+            "fields": [
+              "vendor",
+              "model",
+              "branch"
+            ]
+          },
+          {
+            "title": "When",
+            "fields": [
+              "startedAt",
+              "finishedAt"
+            ]
+          }
+        ]
       }
     },
     "commit": {
@@ -875,6 +1179,12 @@
           "description": "the capabilities this commit's change amended",
           "inverse": "the commits that realized it"
         }
+      },
+      "page": {
+        "fields": [
+          "subject",
+          "sha"
+        ]
       }
     }
   },
@@ -981,6 +1291,669 @@
           }
         ]
       }
+    },
+    {
+      "name": "coverage",
+      "title": "What binds what",
+      "on": "constraint",
+      "bindings": {
+        "rows": {
+          "kind": "constraint"
+        },
+        "columns": {
+          "kind": "capability"
+        },
+        "link": {
+          "edge": "appliesTo"
+        }
+      }
+    },
+    {
+      "name": "blocks",
+      "title": "Spend",
+      "on": "run",
+      "options": {
+        "blocks": [
+          {
+            "headline": "Spend"
+          },
+          {
+            "text": "{sum(all('run'), tokens)} tokens across {count(all('run'))} runs; {count(all('run') where status == 'running')} running now."
+          },
+          {
+            "title": "Costliest runs"
+          },
+          {
+            "list": "all('run')",
+            "sort": {
+              "by": "tokens",
+              "direction": "desc"
+            },
+            "limit": 10,
+            "as": "row",
+            "empty": "No runs recorded yet."
+          },
+          {
+            "title": "By outcome"
+          },
+          {
+            "list": "all('run')",
+            "group": "status",
+            "sort": {
+              "by": "startedAt",
+              "direction": "desc"
+            },
+            "limit": 40,
+            "as": "row",
+            "empty": "No runs recorded yet."
+          }
+        ]
+      }
     }
-  ]
+  ],
+  "views": {
+    "home": [
+      {
+        "headline": "{count(all('capability') where intentStatus == 'met')} of {count(all('capability'))} capabilities met; {count(all('change') where status != 'completed' and status != 'cancelled' and status != 'deleted')} changes open."
+      },
+      {
+        "text": "{count(all('change') where inbox == true)} in the Inbox, {count(all('change') where status == 'blocked')} blocked, {count(all('run') where status == 'running')} running now."
+      },
+      {
+        "group": [
+          {
+            "figure": "count(all('run'))",
+            "as": "number",
+            "label": "Runs"
+          },
+          {
+            "figure": "sum(all('run'), tokens)",
+            "as": "number",
+            "label": "Tokens spent"
+          },
+          {
+            "figure": "count(all('zone'))",
+            "as": "number",
+            "label": "Zones"
+          },
+          {
+            "figure": "count(all('capability') where health == 'defective')",
+            "as": "number",
+            "label": "Defective"
+          }
+        ],
+        "direction": "row"
+      },
+      {
+        "title": "Areas"
+      },
+      {
+        "list": "all('area')",
+        "sort": "title",
+        "as": "card",
+        "empty": "No areas yet. The product map arrives when the PRD migrates to v2 (ndx prd migrate) or is bootstrapped from the code."
+      },
+      {
+        "title": "In the Inbox"
+      },
+      {
+        "list": "all('change') where inbox == true",
+        "sort": {
+          "by": "priority",
+          "direction": "choices"
+        },
+        "limit": 8,
+        "as": "row",
+        "empty": "Nothing waits in the Inbox."
+      },
+      {
+        "title": "Changing now"
+      },
+      {
+        "list": "all('change') where status == 'in_progress'",
+        "limit": 8,
+        "as": "row",
+        "empty": "Nothing is in progress. ndx work . picks the next task."
+      },
+      {
+        "title": "Recent runs"
+      },
+      {
+        "list": "all('run')",
+        "sort": {
+          "by": "startedAt",
+          "direction": "desc"
+        },
+        "limit": 6,
+        "as": "row",
+        "empty": "No runs recorded yet. The first ndx work . writes one."
+      }
+    ],
+    "capability": {
+      "card": [
+        {
+          "title": "{title}"
+        },
+        {
+          "group": [
+            {
+              "badge": "{intentStatus}",
+              "tone": {
+                "expr": "if(intentStatus == 'met', 'good', if(intentStatus == 'revised', 'warn', if(intentStatus == 'retired', 'neutral', 'accent')))"
+              }
+            },
+            {
+              "badge": "{health}",
+              "tone": {
+                "expr": "if(health == 'defective', 'bad', 'good')"
+              }
+            }
+          ],
+          "direction": "row"
+        },
+        {
+          "field": "openChanges",
+          "as": "count",
+          "label": "Open changes"
+        }
+      ],
+      "row": [
+        {
+          "title": "{title}"
+        },
+        {
+          "badge": "{intentStatus}",
+          "tone": {
+            "expr": "if(intentStatus == 'met', 'good', if(intentStatus == 'revised', 'warn', if(intentStatus == 'retired', 'neutral', 'accent')))"
+          }
+        },
+        {
+          "field": "openChanges",
+          "as": "count",
+          "label": "Open changes"
+        }
+      ],
+      "page": [
+        {
+          "headline": "{title}"
+        },
+        {
+          "when": "statement != null",
+          "show": [
+            {
+              "text": "{statement}"
+            }
+          ]
+        },
+        {
+          "group": [
+            {
+              "figure": "criteriaCount",
+              "as": "number",
+              "label": "Criteria"
+            },
+            {
+              "figure": "openChanges",
+              "as": "number",
+              "label": "Open changes"
+            },
+            {
+              "figure": "zones",
+              "as": "number",
+              "label": "Zones"
+            }
+          ],
+          "direction": "row"
+        },
+        {
+          "title": "Changes rewriting this"
+        },
+        {
+          "list": "in('amends')",
+          "sort": {
+            "by": "status",
+            "direction": "choices"
+          },
+          "as": "row",
+          "empty": "No change has rewritten this yet."
+        },
+        {
+          "title": "Changes working on this"
+        },
+        {
+          "list": "in('touches')",
+          "as": "row",
+          "empty": "Nothing works on this without rewriting it."
+        },
+        {
+          "title": "Realized in"
+        },
+        {
+          "list": "out('realizedIn')",
+          "as": "row",
+          "empty": "No commit with an N-DX-Item trailer has realized this yet."
+        },
+        {
+          "title": "Bound by"
+        },
+        {
+          "list": "in('appliesTo')",
+          "as": "row",
+          "empty": "No constraint binds this."
+        }
+      ]
+    },
+    "change": {
+      "card": [
+        {
+          "title": "{title}"
+        },
+        {
+          "group": [
+            {
+              "badge": "{status}",
+              "tone": {
+                "expr": "if(status == 'completed', 'good', if(status == 'blocked' or status == 'failing', 'bad', if(status == 'in_progress', 'accent', 'neutral')))"
+              }
+            },
+            {
+              "badge": "{priority}"
+            }
+          ],
+          "direction": "row"
+        },
+        {
+          "when": "inbox == true",
+          "show": [
+            {
+              "text": "In the Inbox: a person confirms what it targets.",
+              "tone": "warn"
+            }
+          ]
+        }
+      ],
+      "row": [
+        {
+          "title": "{title}"
+        },
+        {
+          "badge": "{status}",
+          "tone": {
+            "expr": "if(status == 'completed', 'good', if(status == 'blocked' or status == 'failing', 'bad', if(status == 'in_progress', 'accent', 'neutral')))"
+          }
+        },
+        {
+          "when": "plannedRelease != null",
+          "show": [
+            {
+              "field": "plannedRelease",
+              "label": "Planned for"
+            }
+          ]
+        }
+      ],
+      "page": [
+        {
+          "headline": "{title}"
+        },
+        {
+          "when": "intent != null",
+          "show": [
+            {
+              "text": "{intent}"
+            }
+          ]
+        },
+        {
+          "group": [
+            {
+              "figure": "openTasks",
+              "as": "number",
+              "label": "Open tasks"
+            },
+            {
+              "figure": "runs",
+              "as": "number",
+              "label": "Runs"
+            },
+            {
+              "figure": "spent",
+              "as": "number",
+              "label": "Tokens spent"
+            }
+          ],
+          "direction": "row"
+        },
+        {
+          "title": "Rewrites"
+        },
+        {
+          "list": "out('amends')",
+          "as": "row",
+          "empty": "Rewrites nothing in the product layer."
+        },
+        {
+          "title": "Works on"
+        },
+        {
+          "list": "out('touches')",
+          "as": "row",
+          "empty": "Works on nothing without rewriting it."
+        },
+        {
+          "title": "Tasks"
+        },
+        {
+          "list": "in('under')",
+          "sort": {
+            "by": "status",
+            "direction": "asc"
+          },
+          "as": "row",
+          "empty": "No tasks under this change: the change itself is the unit of work."
+        },
+        {
+          "title": "Runs"
+        },
+        {
+          "list": "in('ranFor')",
+          "sort": {
+            "by": "startedAt",
+            "direction": "desc"
+          },
+          "limit": 12,
+          "as": "row",
+          "empty": "No run has worked this yet."
+        },
+        {
+          "title": "Waits for"
+        },
+        {
+          "list": "out('blockedBy')",
+          "as": "row",
+          "empty": "Waits for nothing."
+        }
+      ]
+    },
+    "zone": {
+      "card": [
+        {
+          "title": "{name}"
+        },
+        {
+          "progress": {
+            "value": "cohesion",
+            "max": "1"
+          },
+          "label": "Cohesion"
+        },
+        {
+          "field": "fileCount",
+          "as": "count",
+          "label": "Files"
+        }
+      ],
+      "row": [
+        {
+          "title": "{name}"
+        },
+        {
+          "field": "cohesion",
+          "as": "percent",
+          "label": "Cohesion"
+        },
+        {
+          "field": "coupling",
+          "as": "percent",
+          "label": "Coupling"
+        }
+      ],
+      "page": [
+        {
+          "headline": "{name}"
+        },
+        {
+          "when": "description != null",
+          "show": [
+            {
+              "text": "{description}"
+            }
+          ]
+        },
+        {
+          "group": [
+            {
+              "figure": "cohesion",
+              "as": "percent",
+              "label": "Cohesion"
+            },
+            {
+              "figure": "coupling",
+              "as": "percent",
+              "label": "Coupling"
+            },
+            {
+              "figure": "fileCount",
+              "as": "number",
+              "label": "Files"
+            },
+            {
+              "figure": "components",
+              "as": "number",
+              "label": "Components"
+            }
+          ],
+          "direction": "row"
+        },
+        {
+          "title": "Imports from"
+        },
+        {
+          "list": "out('crosses')",
+          "as": "row",
+          "empty": "Imports from no other zone."
+        },
+        {
+          "title": "Imported by"
+        },
+        {
+          "list": "in('crosses')",
+          "as": "row",
+          "empty": "No zone imports from this one."
+        },
+        {
+          "title": "Capabilities realized here"
+        },
+        {
+          "list": "in('realizedIn')",
+          "as": "row",
+          "empty": "No capability's commits have touched this zone."
+        },
+        {
+          "title": "Inside"
+        },
+        {
+          "list": "in('under')",
+          "as": "row",
+          "empty": "No zones inside this one."
+        }
+      ]
+    },
+    "run": {
+      "card": [
+        {
+          "title": "{taskTitle}"
+        },
+        {
+          "group": [
+            {
+              "badge": "{status}",
+              "tone": {
+                "expr": "if(status == 'completed', 'good', if(status == 'running', 'accent', 'bad'))"
+              }
+            },
+            {
+              "badge": "{vendor}"
+            }
+          ],
+          "direction": "row"
+        },
+        {
+          "field": "tokens",
+          "as": "count",
+          "label": "Tokens"
+        }
+      ],
+      "row": [
+        {
+          "title": "{taskTitle}"
+        },
+        {
+          "badge": "{status}",
+          "tone": {
+            "expr": "if(status == 'completed', 'good', if(status == 'running', 'accent', 'bad'))"
+          }
+        },
+        {
+          "field": "startedAt",
+          "as": "relative",
+          "label": "Started"
+        }
+      ],
+      "page": [
+        {
+          "headline": "{taskTitle}"
+        },
+        {
+          "group": [
+            {
+              "figure": "tokens",
+              "as": "number",
+              "label": "Tokens"
+            },
+            {
+              "figure": "turns",
+              "as": "number",
+              "label": "Turns"
+            },
+            {
+              "figure": "filesChanged",
+              "as": "number",
+              "label": "Files changed"
+            }
+          ],
+          "direction": "row"
+        },
+        {
+          "title": "Worked on"
+        },
+        {
+          "list": "out('ranFor')",
+          "as": "row",
+          "empty": "The work this run was for is no longer in the tree."
+        },
+        {
+          "title": "Commits"
+        },
+        {
+          "list": "out('produced')",
+          "as": "row",
+          "empty": "No commit recorded for this run."
+        }
+      ]
+    },
+    "area": {
+      "card": [
+        {
+          "title": "{title}"
+        },
+        {
+          "group": [
+            {
+              "badge": "{intentStatus}",
+              "tone": {
+                "expr": "if(intentStatus == 'met', 'good', if(intentStatus == 'revised', 'warn', if(intentStatus == 'retired', 'neutral', 'accent')))"
+              }
+            },
+            {
+              "badge": "{health}",
+              "tone": {
+                "expr": "if(health == 'defective', 'bad', 'good')"
+              }
+            }
+          ],
+          "direction": "row"
+        },
+        {
+          "field": "inside",
+          "as": "count",
+          "label": "Inside"
+        }
+      ],
+      "row": [
+        {
+          "title": "{title}"
+        },
+        {
+          "badge": "{intentStatus}",
+          "tone": {
+            "expr": "if(intentStatus == 'met', 'good', if(intentStatus == 'revised', 'warn', if(intentStatus == 'retired', 'neutral', 'accent')))"
+          }
+        },
+        {
+          "field": "inside",
+          "as": "count",
+          "label": "Inside"
+        }
+      ]
+    },
+    "task": {
+      "row": [
+        {
+          "title": "{title}"
+        },
+        {
+          "badge": "{status}",
+          "tone": {
+            "expr": "if(status == 'completed', 'good', if(status == 'blocked' or status == 'failing', 'bad', if(status == 'in_progress', 'accent', 'neutral')))"
+          }
+        },
+        {
+          "badge": "{priority}"
+        }
+      ]
+    },
+    "release": {
+      "card": [
+        {
+          "title": "{version}"
+        },
+        {
+          "group": [
+            {
+              "field": "plannedChanges",
+              "as": "count",
+              "label": "Planned"
+            },
+            {
+              "field": "shippedChanges",
+              "as": "count",
+              "label": "Shipped"
+            }
+          ],
+          "direction": "row"
+        }
+      ],
+      "row": [
+        {
+          "title": "{version}"
+        },
+        {
+          "field": "open",
+          "as": "count",
+          "label": "Still open"
+        }
+      ]
+    }
+  }
 }

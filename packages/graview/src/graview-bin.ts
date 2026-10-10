@@ -25,8 +25,17 @@ export interface GraviewCommand {
 }
 
 export interface GraviewConfig {
+  /** The graview binary or its `cli.js`. */
   bin?: string;
+  /** Project every source file as a node by default. */
   includeFiles?: boolean;
+  /**
+   * A product face for this project: the checkout (or built site) of a Graview
+   * app built from the emitted document, such as n-dx-graview. `ndx graview
+   * serve` runs its dev server on the fresh projection instead of the bare
+   * `graview serve`.
+   */
+  app?: string;
 }
 
 export const GRAVIEW_BIN_ENV = "NDX_GRAVIEW_BIN";
@@ -47,9 +56,10 @@ export function readGraviewConfig(layout: Layout): GraviewConfig {
   for (const file of [layout.configFile, layout.localConfigFile]) {
     const section = readConfigFile(file).graview;
     if (section === null || typeof section !== "object") continue;
-    const { bin, includeFiles } = section as Record<string, unknown>;
+    const { bin, includeFiles, app } = section as Record<string, unknown>;
     if (typeof bin === "string" && bin.trim().length > 0) out.bin = bin.trim();
     if (typeof includeFiles === "boolean") out.includeFiles = includeFiles;
+    if (typeof app === "string" && app.trim().length > 0) out.app = isAbsolute(app.trim()) ? app.trim() : resolve(layout.root, app.trim());
   }
   return out;
 }
