@@ -1,7 +1,7 @@
 # Glossary
 
-::: warning Ships with 1.0.0
-These terms belong to the 1.0.0 model, which is still landing.
+::: warning The v2 model
+These terms belong to the v2 model. Its commands and MCP tools ship from 0.9.0, but `ndx init` creates v1 projects until the storage migration ships (see [v1 projects](../prd-storage#v1-projects)).
 :::
 
 Each term is shown with an example from n-dx's own PRD.

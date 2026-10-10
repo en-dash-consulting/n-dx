@@ -1,7 +1,7 @@
 # Stewards
 
-::: warning Ships with 1.0.0
-This page describes the 1.0.0 model, which is still landing. `ndx init` creates v1 projects (`.rex/prd_tree/`) until the storage migration ships; a v1 PRD has no product layer and so no stewards.
+::: warning The v2 model
+This page describes the v2 model, which ships from 0.9.0 for v2 projects. `ndx init` creates v1 projects (`.rex/prd_tree/`) until the storage migration ships; a v1 PRD has no product layer and so no stewards.
 :::
 
 A steward directs the product by adding, enhancing or removing capabilities. Stewards are declared in the product layer itself and enforced through the host's code-owner file, so one person, a group, or a team with per-area ownership all use the same mechanism.
