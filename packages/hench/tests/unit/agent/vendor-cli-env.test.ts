@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 describe("vendor CLI spawn environment", () => {
-  it.each([false, true])("filters secrets at the spawn boundary (explicit env: %s)", async (explicit) => {
+  it("spawns with the guard-filtered environment it is given", async () => {
     vi.stubEnv("FAKE_SERVICE_API_KEY", "fixture-api");
     vi.stubEnv("GITHUB_TOKEN", "fixture-token");
     vi.stubEnv("ANTHROPIC_API_KEY", "fixture-vendor");
@@ -33,11 +33,11 @@ describe("vendor CLI spawn environment", () => {
       adapter: claudeCliAdapter,
       spawnConfig: { binary: "claude", args: [], env: {}, stdinContent: null, cwd: "." },
       cliBinary: "claude", cwd: ".", tokenMetadata: { vendor: "claude", model: "sonnet" },
-      ...(explicit ? { cliEnv: resolveVendorCliEnv({ vendor: "claude" }) } : {}),
+      cliEnv: resolveVendorCliEnv({ vendor: "claude" }, { allow: ["GITHUB_TOKEN"] }),
     });
     const env: NodeJS.ProcessEnv = spawnCli.mock.calls[0][2].env;
     expect(env.FAKE_SERVICE_API_KEY).toBeUndefined();
-    expect(env.GITHUB_TOKEN).toBeUndefined();
+    expect(env.GITHUB_TOKEN).toBe("fixture-token");
     expect(env.ANTHROPIC_API_KEY).toBe("fixture-vendor");
     expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe("fixture-oauth");
     expect(process.env.GITHUB_TOKEN).toBe("fixture-token");

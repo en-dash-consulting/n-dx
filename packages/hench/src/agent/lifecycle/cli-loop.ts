@@ -662,7 +662,8 @@ export interface SpawnWithAdapterOptions {
   adapter: VendorAdapter;
   spawnConfig: SpawnConfig;
   cliBinary: string;
-  cliEnv?: NodeJS.ProcessEnv;
+  /** Filtered by the project's guard.env policy; there is deliberately no default. */
+  cliEnv: NodeJS.ProcessEnv;
   cwd: string;
   tokenMetadata: SpawnTokenMetadata;
   /** When true, use EventAccumulator instead of inline SpawnResult mutation. */
@@ -764,7 +765,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     const proc = spawnCli(cliBinary, [...spawnConfig.args], {
       cwd,
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
-      env: cliEnv ?? resolveVendorCliEnv({ vendor: tokenMetadata.vendor }),
+      env: cliEnv,
     });
 
     // proc.pid is undefined when the spawn failed outright (ENOENT); the
@@ -1318,7 +1319,7 @@ export interface ReviewPassContext {
   adapter: VendorAdapter;
   vendor: LLMVendor;
   cliBinary: string;
-  cliEnv?: NodeJS.ProcessEnv;
+  cliEnv: NodeJS.ProcessEnv;
   policy: ExecutionPolicy;
   henchDir: string;
   /** Resolved review model. Empty string means "send no model flag" (local vendor). */
@@ -2090,8 +2091,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // CLI-specific: load config for CLI path and env resolution
   const cliBinary = resolveVendorCliPath(llmConfig, config);
-  const cliEnv = resolveVendorCliEnv(llmConfig, config.guard.env, (names) => {
-    detail(`CLI environment: stripped ${names.join(", ")}`, { captureWhenQuiet: true });
+  const cliEnv = resolveVendorCliEnv(llmConfig, config.guard.env, (names, kind) => {
+    detail(
+      kind === "missing-credentials"
+        ? `CLI environment: cloud mode is on but none of ${names.join(", ")} is set; the CLI falls back to default credential files or instance metadata`
+        : `CLI environment: stripped ${names.join(", ")}`,
+      { captureWhenQuiet: true },
+    );
   });
 
   // Pin the spawned session's MCP servers to *this* project directory, so the

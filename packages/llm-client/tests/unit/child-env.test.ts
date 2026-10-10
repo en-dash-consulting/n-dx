@@ -12,6 +12,9 @@ const source: NodeJS.ProcessEnv = Object.freeze({
   AWS_SECRET_ACCESS_KEY: "aws-secret", EXTRA_SETTING: "setting", CLAUDECODE: "nested", UNDEFINED: undefined,
 });
 
+/** Names in `source` that pass the default filter for every vendor (config dirs are paths, not credentials). */
+const PLUMBING = ["CLAUDE_CONFIG_DIR", "CODEX_HOME", "EXTRA_SETTING", "HOME", "HTTPS_PROXY", "NODE_EXTRA_CA_CERTS", "PATH"];
+
 describe("resolveVendorCliEnv", () => {
   const cloud = Object.freeze({
     AWS_ACCESS_KEY_ID: "fixture-access", AWS_SECRET_ACCESS_KEY: "fixture-secret",
@@ -41,18 +44,86 @@ describe("resolveVendorCliEnv", () => {
     expect(report.mock.calls[0][0]).toContain("AWS_UNRELATED_SECRET");
   });
 
+  const roleNames = [
+    "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_ROLE_ARN", "AWS_ROLE_SESSION_NAME",
+    "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+    "AWS_CONTAINER_AUTHORIZATION_TOKEN", "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE", "AWS_CA_BUNDLE",
+  ];
+  const roleEnv = Object.fromEntries(roleNames.map((name) => [name, `fixture-${name}`]));
+
+  it("keeps IRSA, ECS and CA names in Bedrock mode and strips them otherwise", () => {
+    const on = resolveVendorCliEnv({}, undefined, { ...roleEnv, CLAUDE_CODE_USE_BEDROCK: "1" });
+    for (const name of roleNames) expect(on[name]).toBe(roleEnv[name]);
+    const off = resolveVendorCliEnv({}, undefined, roleEnv);
+    for (const name of roleNames) expect(off[name]).toBeUndefined();
+  });
+
+  it.each([
+    ["CLAUDE_CODE_USE_BEDROCK", { AWS_REGION: "us-east-1", AWS_CA_BUNDLE: "/ca" }, "AWS_ACCESS_KEY_ID"],
+    ["CLAUDE_CODE_USE_VERTEX", { CLOUD_ML_REGION: "global" }, "GOOGLE_APPLICATION_CREDENTIALS"],
+  ])("reports once, names only, when %s is on without credentials", (mode, plumbing, sample) => {
+    const report = vi.fn();
+    resolveVendorCliEnv({}, undefined, { [mode]: "1", ...plumbing, GITHUB_TOKEN: "do-not-print" }, report);
+    const missing = report.mock.calls.filter(([, kind]) => kind === "missing-credentials");
+    expect(missing).toHaveLength(1);
+    expect(missing[0][0]).toContain(sample);
+    expect(JSON.stringify(report.mock.calls)).not.toMatch(/do-not-print|us-east-1|global/);
+  });
+
+  it("does not report missing credentials when one is present, or the mode is off", () => {
+    const report = vi.fn();
+    resolveVendorCliEnv({}, undefined, { CLAUDE_CODE_USE_BEDROCK: "1", AWS_WEB_IDENTITY_TOKEN_FILE: "/t" }, report);
+    resolveVendorCliEnv({}, undefined, { AWS_REGION: "us-east-1" }, report);
+    expect(report.mock.calls.filter(([, kind]) => kind === "missing-credentials")).toEqual([]);
+  });
+
   it.each([undefined, "", "0", "false", "off", "no"])("does not enable cloud exceptions for inactive flags (%s)", (value) => {
     const env = resolveVendorCliEnv({}, undefined, { ...cloud, CLAUDE_CODE_USE_BEDROCK: value, CLAUDE_CODE_USE_VERTEX: value });
     for (const name of [...awsNames, "GOOGLE_APPLICATION_CREDENTIALS"]) expect(env[name]).toBeUndefined();
   });
 
-  it.each(["1", "true", "TRUE", "yes", "on"])("recognizes enabled mode flags (%s) case-insensitively", (value) => {
+  it.each(["1", "true", "TRUE", "yes", "on"])("recognizes enabled mode flag values (%s) case-insensitively", (value) => {
     const env = resolveVendorCliEnv({}, undefined, {
-      claude_code_use_bedrock: value, aws_secret_access_key: "fixture-aws",
-      claude_code_use_vertex: value, google_application_credentials: "/fixture/google.json",
+      CLAUDE_CODE_USE_BEDROCK: value, AWS_SECRET_ACCESS_KEY: "fixture-aws",
+      CLAUDE_CODE_USE_VERTEX: value, GOOGLE_APPLICATION_CREDENTIALS: "/fixture/google.json",
     });
-    expect(env.aws_secret_access_key).toBe("fixture-aws");
-    expect(env.google_application_credentials).toBe("/fixture/google.json");
+    expect(env.AWS_SECRET_ACCESS_KEY).toBe("fixture-aws");
+    expect(env.GOOGLE_APPLICATION_CREDENTIALS).toBe("/fixture/google.json");
+  });
+
+  // The vendor CLI reads CLAUDE_CODE_USE_* by exact name, except where the OS folds case.
+  it.each([
+    ["linux", false],
+    ["darwin", false],
+    ["win32", true],
+  ] as const)("matches mode flag names exactly on %s (case folded: %s)", (platform, folded) => {
+    const original = Object.getOwnPropertyDescriptor(process, "platform")!;
+    Object.defineProperty(process, "platform", { value: platform });
+    try {
+      const env = resolveVendorCliEnv({}, undefined, {
+        claude_code_use_bedrock: "1", aws_secret_access_key: "fixture-aws",
+        claude_code_use_vertex: "1", google_application_credentials: "/fixture/google.json",
+      });
+      expect(env.aws_secret_access_key).toBe(folded ? "fixture-aws" : undefined);
+      expect(env.google_application_credentials).toBe(folded ? "/fixture/google.json" : undefined);
+    } finally {
+      Object.defineProperty(process, "platform", original);
+    }
+  });
+
+  it.each([
+    ["claude", ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"]],
+    ["codex", ["CODEX_ACCESS_TOKEN", "CODEX_API_KEY", "OPENAI_API_KEY"]],
+    ["google", ["GEMINI_API_KEY"]],
+    ["local", []],
+  ] as const)("retains exactly %s's authentication names plus plumbing", (vendor, auth) => {
+    const env = resolveVendorCliEnv({ vendor }, undefined, source);
+    expect(Object.keys(env).sort()).toEqual([...auth, ...PLUMBING].sort());
+  });
+
+  it("treats an unrecognised vendor as needing no credentials", () => {
+    const env = resolveVendorCliEnv({ vendor: "other" as never }, undefined, source);
+    expect(Object.keys(env).sort()).toEqual(PLUMBING);
   });
 
   it.each(["codex", "google", "local"] as const)("never grants Claude cloud exceptions to %s", (vendor) => {
