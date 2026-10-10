@@ -14,6 +14,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # No merge_group trigger, deliberately: code-scanning merge protection does
+  # not apply to merge queue groups, so the queue never waits on CodeQL. It
+  # still runs on every PR, on push to main and weekly.
+  # https://docs.github.com/en/code-security/concepts/code-scanning/merge-protection
   schedule:
     # Mondays, 09:17 UTC. Off the hour deliberately — scheduled jobs on the
     # hour queue behind everyone else's.
