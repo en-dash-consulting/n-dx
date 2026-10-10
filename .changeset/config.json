@@ -15,7 +15,8 @@
       "@n-dx/sourcevision",
       "@n-dx/llm-client",
       "@n-dx/web",
-      "@n-dx/graview"
+      "@n-dx/graview",
+      "@n-dx/graview-face"
     ]
   ],
   "linked": [],

@@ -45,7 +45,7 @@ repository this size inside Graview's comfortable scale.
 ### The product face
 
 `graview.app` in the project config names a checkout of a Graview product
-built from the emitted document (the sibling `n-dx-graview` repository). With
+built from the emitted document (`@n-dx/graview-face`, published on its own and depended on by nothing). With
 it set, `ndx graview serve .` emits, then runs that product's dev server with
 `NDX_GRAVIEW_DIR` pointing at the fresh files, instead of the bare
 `graview serve` (which is the store's HTTP and WebSocket wire and draws
@@ -56,7 +56,7 @@ what that face draws; keep the data there, and React only in the product.
 ### Two-way writes live in the product face
 
 `SyncEngine` and `RemoteSystem` are Graview interfaces, so the loop runs in
-`n-dx-graview`, never here. What this package provides is the version
+`@n-dx/graview-face`, never here. What this package provides is the version
 (`lastModified` on changes and tasks in the projection), the endpoint
 (`rexMcpEndpoint` in `src/hub.ts`, from the hub registry under the ndx
 home), and the hand-off (`ndx graview serve` sets `NDX_REX_MCP_URL`,

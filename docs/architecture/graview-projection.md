@@ -104,9 +104,11 @@ fit this graph; the status board is the `columns` lens.
 ## Two-way writes: where the RemoteSystem runs, and why
 
 Decided before implementation, as the task asked: **the sync loop runs in
-the product face, not in n-dx.** Graview's `SyncEngine` and `RemoteSystem`
-are Graview interfaces; a worker here would import `@graview/core`, and the
-whole point of the adapter is that no n-dx package does. So:
+the product face, not in the adapter.** Graview's `SyncEngine` and
+`RemoteSystem` are Graview interfaces; a worker in `@n-dx/graview` would
+import `@graview/core`, and the whole point of the adapter is that no package
+`@n-dx/core` depends on does. The face is its own package that nothing else
+depends on. So:
 
 - **In n-dx:** changes and tasks carry rex's `lastModified` (and
   `lastModifiedBy`) in the projection: the version a two-way sync agrees on,
@@ -116,7 +118,7 @@ whole point of the adapter is that no n-dx package does. So:
   `NDX_REX_MCP_URL`, `NDX_TOKEN_FILE`, `NDX_PROJECT_ROOT` and
   `NDX_GRAVIEW_CLI` beside `NDX_GRAVIEW_DIR`. Nothing in n-dx opens a
   connection.
-- **In `n-dx-graview`:** a Vite dev-server door (`dev/ndx-door.ts`) holds the
+- **In `@n-dx/graview-face`:** a Vite dev-server door (`dev/ndx-door.ts`) holds the
   token and one MCP session to the hub, re-emits on `POST /ndx/emit`, and
   serves the fresh projection from the graview dir. The `RemoteSystem`
   (`src/sync/ndx-system.ts`) pulls by re-emitting and reading the snapshot
@@ -136,11 +138,14 @@ whole point of the adapter is that no n-dx package does. So:
 
 ## Deferred
 
-- **A product face** exists: `n-dx-graview`, a sibling repository built from
-  the emitted document with `appFromOrCompile`, with a shell, home and record
-  pages in n-dx's words over the derived ones. `graview.app` in the project
-  config names its checkout and `ndx graview serve .` runs its dev server on
-  the fresh projection (`NDX_GRAVIEW_DIR`). The declaration carries glance,
-  page groups, brand, the home and per-kind card, row and page blocks as
-  data, so the face adds React and nothing about the graph.
+- **A product face** exists: `@n-dx/graview-face` (`packages/graview-face`),
+  a workspace package published on its own that no other `@n-dx/*` package
+  depends on, so installing n-dx never pulls Graview or React. It is built
+  from the emitted document with `appFromOrCompile`, with a shell, home and
+  record pages in n-dx's words over the derived ones. `ndx graview serve .`
+  finds it beside `@n-dx/graview` in the monorepo or in `node_modules`, or
+  through `graview.app` in the project config, and runs its `bin/serve.js`
+  on the fresh projection (`NDX_GRAVIEW_DIR`). The declaration carries
+  glance, page groups, brand, the home and per-kind card, row and page
+  blocks as data, so the face adds React and nothing about the graph.
 - **Dashboard embed and graview.cloud publishing.**

@@ -31,9 +31,9 @@ export interface GraviewConfig {
   includeFiles?: boolean;
   /**
    * A product face for this project: the checkout (or built site) of a Graview
-   * app built from the emitted document, such as n-dx-graview. `ndx graview
-   * serve` runs its dev server on the fresh projection instead of the bare
-   * `graview serve`.
+   * app built from the emitted document. Unset, `@n-dx/graview-face` is found
+   * beside this package or in node_modules. `ndx graview serve` runs the face
+   * on the fresh projection instead of the bare `graview serve`.
    */
   app?: string;
 }

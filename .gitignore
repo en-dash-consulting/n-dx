@@ -37,6 +37,9 @@ packages/rex/.rex/execution-log*.jsonl
 tests/fixtures/sv-evals/**/.sourcevision/
 ndx-export/
 .graview/
+packages/graview-face/public/data/
+packages/graview-face/build/
+packages/graview-face/shots/
 .ndx-deploy-tmp/
 .claude/settings.local.json
 .claude/worktrees/
