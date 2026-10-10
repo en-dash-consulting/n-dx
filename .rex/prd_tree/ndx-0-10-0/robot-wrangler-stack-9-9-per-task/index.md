@@ -21,5 +21,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add reviewMode and reviewVendor to rex's run block, CLI flags, and hench's per-task precedence](./add-reviewmode-and-reviewvendor-to-rex.md) | pending |
 | [Add review mode and reviewer vendor to the Prepare task modal](./add-review-mode-and-reviewer-vendor-to.md) | pending |
+| [Add reviewMode and reviewVendor to rex's run block, CLI flags, and hench's per-task precedence](./add-reviewmode-and-reviewvendor-to-rex.md) | pending |
