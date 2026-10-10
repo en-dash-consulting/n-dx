@@ -24,5 +24,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Claude on Bedrock keeps role, container and CA credentials](./claude-on-bedrock-keeps-role-container.md) | completed |
 | [ndx start --open opens the dashboard on Windows without cmd.exe](./ndx-start-open-opens-the-dashboard-on.md) | completed |
 | [The cross-vendor reviewer degrades to the shell test command when its environment cannot be resolved](./the-cross-vendor-reviewer-degrades-to.md) | completed |
-| [The reviewer's shell-test fallback runs with a filtered environment](./the-reviewer-s-shell-test-fallback.md) | pending |
+| [The reviewer's shell-test fallback runs with a filtered environment](./the-reviewer-s-shell-test-fallback.md) | in_progress |
 | [Vendor CLI environments always carry the project's policy, from one per-vendor table](./vendor-cli-environments-always-carry.md) | completed |

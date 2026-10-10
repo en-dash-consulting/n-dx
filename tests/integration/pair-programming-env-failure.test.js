@@ -13,7 +13,8 @@ import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-vi.mock("../../packages/core/config.js", () => ({
+vi.mock("../../packages/core/config.js", async (importOriginal) => ({
+  ...(await importOriginal()),
   loadVendorCliEnv: vi.fn(async () => {
     throw new Error("llm config unreadable");
   }),

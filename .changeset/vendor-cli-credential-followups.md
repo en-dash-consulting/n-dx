@@ -15,6 +15,10 @@ Follow-ups to the vendor CLI credential filter:
 - The cross-vendor reviewer falls back to the shell test command when its
   environment cannot be resolved (for example, an unreadable config), instead of
   failing the review.
+- The reviewer's shell test command no longer inherits the raw environment. It
+  gets the project's `hench.guard.env` policy, without the reviewer vendor's
+  authentication variables. If that policy cannot be loaded, the default filter
+  applies and the review banner says so.
 - `ndx start --open` on Windows opens the dashboard without `cmd.exe`, so a
   `%NAME%`-shaped sequence in the URL's token or project id is no longer
   expanded.

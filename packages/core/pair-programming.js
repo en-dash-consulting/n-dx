@@ -26,7 +26,7 @@ import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { relativeToRoot, resolveLayout } from "./layout.js";
-import { loadVendorCliEnv } from "./config.js";
+import { loadShellTestEnv, loadVendorCliEnv } from "./config.js";
 
 // ---------------------------------------------------------------------------
 // NDX context assembly
@@ -822,15 +822,46 @@ export function buildRemediationContext(feedback, description, priorContext) {
  * Always spawns via the system shell so quoted arguments and compound
  * commands (e.g. "pnpm -r test") are handled correctly.
  *
+ * The child never inherits the raw parent environment: it gets `process.env`
+ * filtered by the project's `hench.guard.env` policy (see `loadShellTestEnv`),
+ * or by the default deny policy when the project's cannot be loaded — reported
+ * as `envWarning`. If no filtered environment can be built, nothing is spawned.
+ *
  * @param {string} testCommand  Full shell command (e.g. "pnpm test").
  * @param {string} dir          Working directory.
  * @param {number} [timeout=120000]  Max run time in ms.
+ * @returns {Promise<{ exitCode: number; output: string; envWarning?: string }>}
+ */
+export async function runShellTestCommand(testCommand, dir, timeout = 120_000, registerChild = doNotTrack) {
+  let shellEnv;
+  try {
+    shellEnv = await loadShellTestEnv(dir);
+  } catch (err) {
+    return {
+      exitCode: 1,
+      output: `[pair-programming review: test command not run — could not build a filtered environment: ${err.message}]`,
+    };
+  }
+  const envWarning = shellEnv.policyError === undefined
+    ? undefined
+    : `project guard.env policy could not be loaded (${shellEnv.policyError}); the test command ran with the default environment filter`;
+  const result = await spawnShellTestCommand(testCommand, dir, timeout, registerChild, shellEnv.env);
+  return envWarning === undefined ? result : { ...result, envWarning };
+}
+
+/**
+ * @param {string} testCommand
+ * @param {string} dir
+ * @param {number} timeout
+ * @param {typeof doNotTrack} registerChild
+ * @param {NodeJS.ProcessEnv} env  Already filtered; see `runShellTestCommand`.
  * @returns {Promise<{ exitCode: number; output: string }>}
  */
-export function runShellTestCommand(testCommand, dir, timeout = 120_000, registerChild = doNotTrack) {
+function spawnShellTestCommand(testCommand, dir, timeout, registerChild, env) {
   return new Promise((resolve) => {
     const child = registerChild(spawn(testCommand, [], {
       cwd: dir,
+      env,
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
       // Load-bearing here more than anywhere else in this file: with `shell: true`
@@ -878,6 +909,8 @@ export function runShellTestCommand(testCommand, dir, timeout = 120_000, registe
  * @property {boolean}         [passed]        True when review passed. Present only when !skipped.
  * @property {string}          [command]       The test command run (shell-test-only mode).
  * @property {string}          [output]        Combined stdout + stderr (shell-test-only).
+ * @property {string}          [envWarning]    Set when the test command ran under the default
+ *                                             env filter because the project's could not be loaded.
  * @property {number}          [exitCode]      Exit code of the reviewer process.
  * @property {string[]}        [changedFiles]  Files identified as changed.
  * @property {string[]}        [contextFiles]  Context file paths from the primary run.
@@ -928,7 +961,7 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
   if (llmResult.spawnError) {
     // LLM failed to start — fall back to shell tests when a test command is available
     if (testCommand) {
-      const { exitCode, output } = await runShellTestCommand(testCommand, dir, 120_000, registerChild);
+      const { exitCode, output, envWarning } = await runShellTestCommand(testCommand, dir, 120_000, registerChild);
       return {
         mode: "shell-test-only",
         skipped: false,
@@ -936,6 +969,7 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
         command: testCommand,
         output,
         exitCode,
+        ...(envWarning ? { envWarning } : {}),
         ...ctx,
       };
     }
@@ -994,6 +1028,7 @@ export function formatReviewBanner(reviewer, result) {
       lines.push(`   Exit code: ${result.exitCode}`);
     }
   } else if (result.mode === "shell-test-only") {
+    if (result.envWarning) lines.push(`⚠  ${result.envWarning}`);
     if (result.passed) {
       lines.push("✓  Tests passed (shell-test-only — LLM reviewer unavailable)");
       if (result.command) lines.push(`   Command: ${result.command}`);
