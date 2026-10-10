@@ -371,6 +371,14 @@ const COMMAND_REGISTRY = [
     keywords: ["diff", "compare", "changed", "moved", "added", "removed", "completed", "branch", "worktree", "anchor", "delta"],
     related: ["tree", "status"],
   },
+  // ── Delegated graview commands ──
+  {
+    name: "graview",
+    category: "Manage",
+    summary: "Project the PRD, analysis and runs into Graview and drive the graview CLI",
+    keywords: ["graview", "graph", "projection", "declaration", "snapshot", "lens", "scene", "mcp", "serve", "emit"],
+    related: ["iso", "analyze", "status"],
+  },
   // ── Delegated sourcevision commands ──
   {
     name: "readiness",
@@ -1289,6 +1297,40 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["analyze", "start"],
   },
+  graview: {
+    tool: "ndx",
+    command: "graview",
+    summary: "project the PRD, analysis and runs into Graview and drive the graview CLI",
+    usage: "ndx graview <emit|check|describe|serve|mcp> [dir] [flags]",
+    description:
+      "Writes a graview-document declaration (areas, capabilities, constraints,\n" +
+      "changes, tasks, releases, zones, components, runs, commits, with every\n" +
+      "rex relation as a typed edge) and a {nodes, edges} snapshot of this project\n" +
+      "under the layout's graview dir, then spawns the graview CLI on them:\n" +
+      "check validates the declaration, describe reads the graph out as text,\n" +
+      "serve exposes the store over HTTP and a live WebSocket wire for a Graview\n" +
+      "face to connect to, mcp speaks MCP over stdio read-only.\n" +
+      "\n" +
+      "Every command re-emits first, so the graph is never older than the tree.\n" +
+      "The projection is read-only: nothing is written under the rex,\n" +
+      "sourcevision or hench directories. No @graview/* dependency: the binary\n" +
+      "comes from graview.bin in the project config, $NDX_GRAVIEW_BIN, PATH, or\n" +
+      "npx -y graview@<pinned>.",
+    options: [
+      { flag: "--files", description: "Project every source file as a node (default: zones and components only)" },
+      { flag: "--place=<slug>", description: "describe: one place (a titled lens) instead of the whole graph" },
+      { flag: "--port=<n>", description: "serve: the port graview listens on" },
+      { flag: "--list", description: "mcp: print the derived tools as tools/list JSON and exit" },
+      { flag: "--quiet", description: "Print nothing but errors" },
+    ],
+    examples: [
+      { command: "ndx graview emit .", description: "Write document.json and snapshot.json" },
+      { command: "ndx graview check .", description: "Validate the declaration with graview check" },
+      { command: "ndx graview serve .", description: "Serve the store for a Graview face to connect to" },
+      { command: "ndx graview mcp . --list", description: "List the read tools an agent would get" },
+    ],
+    related: ["iso", "analyze", "status"],
+  },
   export: {
     summary: "export static deployable dashboard",
     description: "Generates a self-contained static directory from the current\nSourceVision and Rex data. Deployable to GitHub Pages, Netlify, S3,\nor any static host. All read-only views work; mutation UI is hidden.",
@@ -1879,6 +1921,7 @@ export function formatMainHelp() {
     ["refresh [dir]", "Refresh dashboard artifacts (--ui-only, --data-only)"],
     ["export [dir]", "Export static deployable dashboard (--deploy=github)"],
     ["iso [dir]", "Render a standalone isometric architecture map"],
+    ["graview <sub> [dir]", "Project the PRD, analysis and runs into Graview (emit|check|describe|serve|mcp)"],
   ], pad);
 
   section("TRACK", [

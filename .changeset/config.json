@@ -2,11 +2,21 @@
   "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
   "changelog": [
     "@changesets/changelog-github",
-    { "repo": "en-dash-consulting/n-dx" }
+    {
+      "repo": "en-dash-consulting/n-dx"
+    }
   ],
   "commit": false,
   "fixed": [
-    ["@n-dx/core", "@n-dx/rex", "@n-dx/hench", "@n-dx/sourcevision", "@n-dx/llm-client", "@n-dx/web"]
+    [
+      "@n-dx/core",
+      "@n-dx/rex",
+      "@n-dx/hench",
+      "@n-dx/sourcevision",
+      "@n-dx/llm-client",
+      "@n-dx/web",
+      "@n-dx/graview"
+    ]
   ],
   "linked": [],
   "access": "public",

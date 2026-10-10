@@ -48,6 +48,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@n-dx/graview':
+        specifier: workspace:*
+        version: link:../graview
       '@n-dx/hench':
         specifier: workspace:*
         version: link:../hench
@@ -75,6 +78,31 @@ importers:
       react:
         specifier: ^19.2.8
         version: 19.2.8
+
+  packages/graview:
+    dependencies:
+      '@n-dx/hench':
+        specifier: workspace:*
+        version: link:../hench
+      '@n-dx/llm-client':
+        specifier: workspace:*
+        version: link:../llm-client
+      '@n-dx/rex':
+        specifier: workspace:*
+        version: link:../rex
+      '@n-dx/sourcevision':
+        specifier: workspace:*
+        version: link:../sourcevision
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@26.2.0)(jsdom@30.0.1(@noble/hashes@1.8.0))(vite@6.4.3(@types/node@26.2.0)(yaml@2.9.0))
 
   packages/hench:
     dependencies:

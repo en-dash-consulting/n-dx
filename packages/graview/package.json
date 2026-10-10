@@ -1,0 +1,51 @@
+{
+  "name": "@n-dx/graview",
+  "version": "0.9.0",
+  "description": "Projects an n-dx project (PRD tree, code analysis, agent runs) into a Graview declaration document and seed snapshot, and drives the graview CLI on them",
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Elastic-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/en-dash-consulting/n-dx.git",
+    "directory": "packages/graview"
+  },
+  "type": "module",
+  "bin": {
+    "ndx-graview": "./dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/public.js",
+      "types": "./dist/public.d.ts"
+    },
+    "./dist/*": "./dist/*"
+  },
+  "files": [
+    "dist",
+    "n-dx.graview.json",
+    "!dist/**/*.map",
+    "!dist/.build-stamp.json"
+  ],
+  "scripts": {
+    "build": "tsc && node ../../scripts/write-build-stamp.mjs",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate": "tsc --noEmit && vitest run",
+    "prepare": "pnpm run build"
+  },
+  "dependencies": {
+    "@n-dx/hench": "workspace:*",
+    "@n-dx/llm-client": "workspace:*",
+    "@n-dx/rex": "workspace:*",
+    "@n-dx/sourcevision": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

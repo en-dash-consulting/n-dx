@@ -1,0 +1,986 @@
+{
+  "format": "graview-document",
+  "formatVersion": 1,
+  "name": "n-dx",
+  "description": "An n-dx project as one graph: what the product promises, what is changing, where it lives in code, and the work that made it.",
+  "version": 1,
+  "brand": {
+    "name": "n-dx",
+    "accent": "#2669ec",
+    "locale": "en-US",
+    "accents": {
+      "area": 210,
+      "capability": 250,
+      "constraint": 330,
+      "change": 30,
+      "task": 60,
+      "release": 290,
+      "zone": 160,
+      "component": 130,
+      "run": 95,
+      "commit": 0,
+      "file": 190
+    }
+  },
+  "pages": {
+    "order": [
+      "area",
+      "capability",
+      "constraint",
+      "change",
+      "task",
+      "release",
+      "zone",
+      "component",
+      "run",
+      "commit",
+      "file"
+    ],
+    "hide": [
+      "commit",
+      "component",
+      "file"
+    ]
+  },
+  "kinds": {
+    "area": {
+      "noun": "area",
+      "plural": "Areas",
+      "description": "A part of the product, named for the job it does. Holds capabilities and constraints.",
+      "figure": "plot",
+      "label": "{title}",
+      "glance": [
+        "intentStatus",
+        "health",
+        "stewards"
+      ],
+      "fields": {
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "slug": {
+          "type": "string",
+          "description": "The frozen folder name in the rex tree."
+        },
+        "displayId": {
+          "type": "string",
+          "label": "Id"
+        },
+        "summary": {
+          "type": "text"
+        },
+        "status": {
+          "type": "enum",
+          "options": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failing",
+            "deferred",
+            "blocked",
+            "cancelled",
+            "deleted"
+          ]
+        },
+        "intentStatus": {
+          "type": "enum",
+          "label": "Standing",
+          "options": [
+            "proposed",
+            "changing",
+            "met",
+            "revised",
+            "retired"
+          ]
+        },
+        "health": {
+          "type": "enum",
+          "options": [
+            "ok",
+            "defective"
+          ]
+        },
+        "stewards": {
+          "type": "list",
+          "of": "string"
+        },
+        "tags": {
+          "type": "list",
+          "of": "string"
+        }
+      },
+      "edges": {
+        "under": {
+          "to": [
+            "area"
+          ],
+          "cardinality": "one",
+          "description": "what this sits inside",
+          "inverse": "what sits inside it"
+        }
+      }
+    },
+    "capability": {
+      "noun": "capability",
+      "plural": "Capabilities",
+      "description": "A standing requirement: what the product does, with the criteria that say when it is met.",
+      "figure": "box",
+      "label": "{title}",
+      "glance": [
+        "intentStatus",
+        "health",
+        "criteriaCount"
+      ],
+      "lifecycle": {
+        "field": "intentStatus",
+        "retired": [
+          "retired"
+        ]
+      },
+      "fields": {
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "slug": {
+          "type": "string"
+        },
+        "displayId": {
+          "type": "string",
+          "label": "Id"
+        },
+        "statement": {
+          "type": "text"
+        },
+        "status": {
+          "type": "enum",
+          "options": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failing",
+            "deferred",
+            "blocked",
+            "cancelled",
+            "deleted"
+          ]
+        },
+        "intentStatus": {
+          "type": "enum",
+          "label": "Standing",
+          "options": [
+            "proposed",
+            "changing",
+            "met",
+            "revised",
+            "retired"
+          ]
+        },
+        "health": {
+          "type": "enum",
+          "options": [
+            "ok",
+            "defective"
+          ]
+        },
+        "criteriaCount": {
+          "type": "integer",
+          "label": "Criteria",
+          "min": 0
+        },
+        "reviewed": {
+          "type": "boolean",
+          "description": "A person reviewed the current spec."
+        },
+        "metAt": {
+          "type": "datetime",
+          "label": "Met"
+        },
+        "tags": {
+          "type": "list",
+          "of": "string"
+        }
+      },
+      "edges": {
+        "under": {
+          "to": [
+            "area",
+            "capability"
+          ],
+          "cardinality": "one",
+          "description": "what this sits inside",
+          "inverse": "what sits inside it"
+        },
+        "dependsOn": {
+          "to": [
+            "capability"
+          ],
+          "description": "the capabilities this one needs",
+          "inverse": "the capabilities that need this one"
+        },
+        "realizedIn": {
+          "to": [
+            "zone"
+          ],
+          "description": "the code zones whose commits realized this capability",
+          "inverse": "the capabilities realized here"
+        }
+      }
+    },
+    "constraint": {
+      "noun": "constraint",
+      "plural": "Constraints",
+      "description": "A standing rule the product must keep, binding the nodes it applies to.",
+      "figure": "rule",
+      "label": "{title}",
+      "glance": [
+        "intentStatus",
+        "health",
+        "appliesToAll"
+      ],
+      "lifecycle": {
+        "field": "intentStatus",
+        "retired": [
+          "retired"
+        ]
+      },
+      "fields": {
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "slug": {
+          "type": "string"
+        },
+        "displayId": {
+          "type": "string",
+          "label": "Id"
+        },
+        "statement": {
+          "type": "text"
+        },
+        "status": {
+          "type": "enum",
+          "options": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failing",
+            "deferred",
+            "blocked",
+            "cancelled",
+            "deleted"
+          ]
+        },
+        "intentStatus": {
+          "type": "enum",
+          "label": "Standing",
+          "options": [
+            "proposed",
+            "changing",
+            "met",
+            "revised",
+            "retired"
+          ]
+        },
+        "health": {
+          "type": "enum",
+          "options": [
+            "ok",
+            "defective"
+          ]
+        },
+        "appliesToAll": {
+          "type": "boolean",
+          "label": "Binds everything"
+        },
+        "tags": {
+          "type": "list",
+          "of": "string"
+        }
+      },
+      "edges": {
+        "under": {
+          "to": [
+            "area"
+          ],
+          "cardinality": "one",
+          "description": "what this sits inside",
+          "inverse": "what sits inside it"
+        },
+        "appliesTo": {
+          "to": [
+            "capability",
+            "area",
+            "constraint"
+          ],
+          "description": "the product nodes this constraint binds",
+          "inverse": "the constraints that bind it"
+        }
+      }
+    },
+    "change": {
+      "noun": "change",
+      "plural": "Changes",
+      "description": "A unit of intent: why something is changing, what it amends or touches, and when it is planned to ship.",
+      "figure": "task",
+      "label": "{title}",
+      "glance": [
+        "status",
+        "priority",
+        "changeKind",
+        "plannedRelease"
+      ],
+      "lifecycle": {
+        "field": "status",
+        "retired": [
+          "completed",
+          "cancelled",
+          "deleted"
+        ]
+      },
+      "fields": {
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "slug": {
+          "type": "string"
+        },
+        "displayId": {
+          "type": "string",
+          "label": "Id"
+        },
+        "intent": {
+          "type": "text"
+        },
+        "status": {
+          "type": "enum",
+          "options": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failing",
+            "deferred",
+            "blocked",
+            "cancelled",
+            "deleted"
+          ]
+        },
+        "priority": {
+          "type": "enum",
+          "options": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "changeKind": {
+          "type": "enum",
+          "label": "Kind",
+          "options": [
+            "feature",
+            "enhancement",
+            "retirement",
+            "fix",
+            "refactor",
+            "policy-change",
+            "spike"
+          ]
+        },
+        "level": {
+          "type": "enum",
+          "description": "What this change was on a v1 tree.",
+          "options": [
+            "epic",
+            "feature",
+            "change"
+          ]
+        },
+        "fix": {
+          "type": "boolean"
+        },
+        "spike": {
+          "type": "boolean"
+        },
+        "inbox": {
+          "type": "boolean",
+          "description": "Waiting for a person to confirm what it targets."
+        },
+        "plannedRelease": {
+          "type": "string",
+          "label": "Planned for"
+        },
+        "shippedIn": {
+          "type": "string",
+          "label": "Shipped in"
+        },
+        "assignee": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "datetime",
+          "label": "Started"
+        },
+        "completedAt": {
+          "type": "datetime",
+          "label": "Closed"
+        },
+        "tags": {
+          "type": "list",
+          "of": "string"
+        }
+      },
+      "edges": {
+        "under": {
+          "to": [
+            "change"
+          ],
+          "cardinality": "one",
+          "description": "what this sits inside",
+          "inverse": "what sits inside it"
+        },
+        "amends": {
+          "to": [
+            "capability",
+            "constraint",
+            "area"
+          ],
+          "description": "the product nodes this change rewrites",
+          "inverse": "the changes that rewrite it"
+        },
+        "touches": {
+          "to": [
+            "capability",
+            "constraint",
+            "area"
+          ],
+          "description": "the product nodes this change works on without rewriting them",
+          "inverse": "the changes that work on it"
+        },
+        "blockedBy": {
+          "to": [
+            "change",
+            "task"
+          ],
+          "description": "what has to finish first",
+          "inverse": "what is waiting on this"
+        },
+        "discoveredFrom": {
+          "to": [
+            "change",
+            "task",
+            "run"
+          ],
+          "description": "the work that surfaced this change",
+          "inverse": "the changes this work surfaced"
+        },
+        "plannedFor": {
+          "to": [
+            "release"
+          ],
+          "cardinality": "one",
+          "description": "the release this change is planned for",
+          "inverse": "the changes planned for it"
+        },
+        "shippedWith": {
+          "to": [
+            "release"
+          ],
+          "cardinality": "one",
+          "description": "the release this change shipped in",
+          "inverse": "the changes that shipped in it"
+        }
+      }
+    },
+    "task": {
+      "noun": "task",
+      "plural": "Tasks",
+      "description": "A piece of a change small enough to run: the unit ndx work picks up.",
+      "figure": "task",
+      "label": "{title}",
+      "glance": [
+        "status",
+        "priority",
+        "level"
+      ],
+      "lifecycle": {
+        "field": "status",
+        "retired": [
+          "completed",
+          "cancelled",
+          "deleted"
+        ]
+      },
+      "fields": {
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "slug": {
+          "type": "string"
+        },
+        "displayId": {
+          "type": "string",
+          "label": "Id"
+        },
+        "description": {
+          "type": "text"
+        },
+        "status": {
+          "type": "enum",
+          "options": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failing",
+            "deferred",
+            "blocked",
+            "cancelled",
+            "deleted"
+          ]
+        },
+        "priority": {
+          "type": "enum",
+          "options": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "level": {
+          "type": "enum",
+          "options": [
+            "task",
+            "subtask"
+          ]
+        },
+        "assignee": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "datetime",
+          "label": "Started"
+        },
+        "completedAt": {
+          "type": "datetime",
+          "label": "Closed"
+        },
+        "tags": {
+          "type": "list",
+          "of": "string"
+        }
+      },
+      "edges": {
+        "under": {
+          "to": [
+            "change",
+            "task"
+          ],
+          "cardinality": "one",
+          "description": "what this sits inside",
+          "inverse": "what sits inside it"
+        },
+        "blockedBy": {
+          "to": [
+            "change",
+            "task"
+          ],
+          "description": "what has to finish first",
+          "inverse": "what is waiting on this"
+        }
+      }
+    },
+    "release": {
+      "noun": "release",
+      "plural": "Releases",
+      "description": "A version changes are planned for or shipped in. Never a container: a field on the change, read here as a node so the plan can be drawn.",
+      "figure": "shift",
+      "label": "{version}",
+      "glance": [
+        "plannedChanges",
+        "shippedChanges"
+      ],
+      "fields": {
+        "version": {
+          "type": "string",
+          "required": true
+        },
+        "plannedChanges": {
+          "type": "integer",
+          "label": "Planned",
+          "min": 0
+        },
+        "shippedChanges": {
+          "type": "integer",
+          "label": "Shipped",
+          "min": 0
+        }
+      }
+    },
+    "zone": {
+      "noun": "zone",
+      "plural": "Zones",
+      "description": "An architectural zone sourcevision found: files that belong together, with how tightly they hold and how much they lean on others.",
+      "figure": "plot",
+      "label": "{name}",
+      "glance": [
+        "cohesion",
+        "coupling",
+        "fileCount"
+      ],
+      "fields": {
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "description": {
+          "type": "text"
+        },
+        "cohesion": {
+          "type": "number",
+          "format": "percent",
+          "min": 0,
+          "max": 1
+        },
+        "coupling": {
+          "type": "number",
+          "format": "percent",
+          "min": 0,
+          "max": 1
+        },
+        "fileCount": {
+          "type": "integer",
+          "label": "Files",
+          "min": 0
+        },
+        "depth": {
+          "type": "integer",
+          "min": 0
+        },
+        "entryPoints": {
+          "type": "list",
+          "of": "string",
+          "label": "Entry points"
+        }
+      },
+      "edges": {
+        "under": {
+          "to": [
+            "zone"
+          ],
+          "cardinality": "one",
+          "description": "what this sits inside",
+          "inverse": "what sits inside it"
+        },
+        "crosses": {
+          "to": [
+            "zone"
+          ],
+          "description": "the zones this one imports from",
+          "inverse": "the zones that import from it"
+        }
+      }
+    },
+    "component": {
+      "noun": "component",
+      "plural": "Components",
+      "description": "A UI component sourcevision catalogued, standing in the zone its file belongs to.",
+      "figure": "box",
+      "label": "{name}",
+      "glance": [
+        "role",
+        "file"
+      ],
+      "fields": {
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "file": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "description": "What sourcevision classified it as."
+        },
+        "line": {
+          "type": "integer",
+          "min": 0
+        }
+      },
+      "edges": {
+        "inZone": {
+          "to": [
+            "zone"
+          ],
+          "cardinality": "one",
+          "description": "the zone this lives in",
+          "inverse": "what lives in this zone"
+        }
+      }
+    },
+    "file": {
+      "noun": "file",
+      "plural": "Files",
+      "description": "A source file. Projected only on request: zones carry the shape of the code without them.",
+      "figure": "note",
+      "label": "{path}",
+      "glance": [
+        "language",
+        "lineCount"
+      ],
+      "fields": {
+        "path": {
+          "type": "string",
+          "required": true
+        },
+        "language": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "lineCount": {
+          "type": "integer",
+          "label": "Lines",
+          "min": 0
+        }
+      },
+      "edges": {
+        "inZone": {
+          "to": [
+            "zone"
+          ],
+          "cardinality": "one",
+          "description": "the zone this lives in",
+          "inverse": "what lives in this zone"
+        }
+      }
+    },
+    "run": {
+      "noun": "run",
+      "plural": "Runs",
+      "description": "One agent run hench recorded: the task it worked, what it cost, and what it committed.",
+      "figure": "shift",
+      "label": "{taskTitle}",
+      "glance": [
+        "status",
+        "vendor",
+        "tokens",
+        "startedAt"
+      ],
+      "fields": {
+        "taskTitle": {
+          "type": "string",
+          "required": true,
+          "label": "Worked on"
+        },
+        "status": {
+          "type": "enum",
+          "options": [
+            "running",
+            "completed",
+            "failed",
+            "timeout",
+            "budget_exceeded",
+            "error_transient",
+            "cancelled"
+          ]
+        },
+        "vendor": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "datetime",
+          "label": "Started"
+        },
+        "finishedAt": {
+          "type": "datetime",
+          "label": "Finished"
+        },
+        "turns": {
+          "type": "integer",
+          "min": 0
+        },
+        "tokens": {
+          "type": "integer",
+          "min": 0
+        },
+        "inputTokens": {
+          "type": "integer",
+          "min": 0
+        },
+        "outputTokens": {
+          "type": "integer",
+          "min": 0
+        },
+        "filesChanged": {
+          "type": "integer",
+          "label": "Files changed",
+          "min": 0
+        },
+        "branch": {
+          "type": "string"
+        }
+      },
+      "edges": {
+        "ranFor": {
+          "to": [
+            "change",
+            "task"
+          ],
+          "cardinality": "one",
+          "description": "the work this run was for",
+          "inverse": "the runs that worked on it"
+        },
+        "produced": {
+          "to": [
+            "commit"
+          ],
+          "description": "the commits this run made",
+          "inverse": "the run that made it"
+        }
+      }
+    },
+    "commit": {
+      "noun": "commit",
+      "plural": "Commits",
+      "description": "A commit whose N-DX-Item trailer ties it to the work it was for.",
+      "figure": "note",
+      "label": "{subject}",
+      "glance": [
+        "sha"
+      ],
+      "fields": {
+        "sha": {
+          "type": "string",
+          "required": true
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "edges": {
+        "realizes": {
+          "to": [
+            "capability"
+          ],
+          "description": "the capabilities this commit's change amended",
+          "inverse": "the commits that realized it"
+        }
+      }
+    }
+  },
+  "rules": {
+    "blocked-change-names-blocker": {
+      "title": "A blocked change names what it waits for",
+      "over": "change",
+      "when": "status == 'blocked'",
+      "require": "count(out('blockedBy')) > 0",
+      "says": "{title} is blocked but names nothing it waits for."
+    },
+    "closed-change-has-no-open-work": {
+      "title": "A closed change has no open work under it",
+      "over": "change",
+      "when": "status == 'completed'",
+      "require": "count(in('under') where status != 'completed' and status != 'cancelled' and status != 'deleted') == 0",
+      "says": "{title} is done but still has open work under it."
+    }
+  },
+  "lenses": [
+    {
+      "name": "columns",
+      "title": "Changes by status",
+      "bindings": {
+        "change": {
+          "column": "status"
+        }
+      }
+    },
+    {
+      "name": "timeline",
+      "title": "Runs, by outcome",
+      "bindings": {
+        "run": {
+          "start": "startedAt",
+          "end": "finishedAt",
+          "column": "status"
+        }
+      }
+    },
+    {
+      "name": "coverage",
+      "title": "Where capabilities live in code",
+      "on": "capability",
+      "bindings": {
+        "rows": {
+          "kind": "capability"
+        },
+        "columns": {
+          "kind": "zone"
+        },
+        "link": {
+          "edge": "realizedIn"
+        }
+      }
+    },
+    {
+      "name": "calendar",
+      "title": "When changes closed",
+      "bindings": {
+        "change": {
+          "start": "completedAt"
+        }
+      },
+      "options": {
+        "range": "month"
+      }
+    },
+    {
+      "name": "blocks",
+      "title": "Needs attention",
+      "on": "change",
+      "options": {
+        "blocks": [
+          {
+            "headline": "Needs attention"
+          },
+          {
+            "text": "{count(all('change') where inbox == true)} in the Inbox, {count(all('change') where status == 'blocked')} blocked, {count(all('capability') where health == 'defective')} capabilities defective."
+          },
+          {
+            "title": "In the Inbox"
+          },
+          {
+            "list": "all('change') where inbox == true",
+            "as": "row",
+            "empty": "Nothing waits in the Inbox."
+          },
+          {
+            "title": "Blocked"
+          },
+          {
+            "list": "all('change') where status == 'blocked'",
+            "as": "row",
+            "empty": "Nothing is blocked."
+          },
+          {
+            "title": "Defective"
+          },
+          {
+            "list": "all('capability') where health == 'defective'",
+            "as": "row",
+            "empty": "Every capability reads ok."
+          }
+        ]
+      }
+    }
+  ]
+}

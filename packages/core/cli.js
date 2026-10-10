@@ -167,6 +167,7 @@ const PKG_NAMES = {
   "packages/hench": "@n-dx/hench",
   "packages/sourcevision": "@n-dx/sourcevision",
   "packages/web": "@n-dx/web",
+  "packages/graview": "@n-dx/graview",
 };
 
 const _require = createRequire(import.meta.url);
@@ -1592,6 +1593,9 @@ async function handleInit(rest) {
   // it produces carries PRD data and run summaries, so it must not be
   // committable by accident.
   ensureGitignoreEntry(dir, "ndx-export/");
+  // The Graview projection is derived from the PRD, the analysis and the runs
+  // and rebuilt by every `ndx graview` command, so it is never committed.
+  ensureGitignoreEntry(dir, `${relativeToRoot(layout, layout.graviewDir)}/`);
   ensureGitattributesRules(dir, layout);
   ensureMergeDriverRegistered(dir);
 
@@ -2990,6 +2994,20 @@ async function handleIso(rest) {
   exitWithCleanup(0);
 }
 
+// ── Delegated graview commands ───────────────────────────────────────────────
+
+/**
+ * Project the PRD, the analysis and the runs into Graview and drive the
+ * graview CLI on the result: `ndx graview <emit|check|describe|serve|mcp>
+ * [dir] [flags]`. The adapter resolves the directory and the binary itself
+ * (flags such as `--place <slug>` take values, so the positional cannot be
+ * picked out here), and says when the project has no PRD.
+ */
+async function handleGraview(rest) {
+  await runOrDie(tools.graview, rest.length > 0 ? rest : ["help"]);
+  exitWithCleanup(0);
+}
+
 // ── Delegated hench commands ─────────────────────────────────────────────────
 
 async function handleShow(rest) {
@@ -3309,6 +3327,8 @@ const COMMAND_DISPATCH = new Map([
   ["reset",             handleReset],
   ["readiness",         handleReadiness],
   ["iso",               handleIso],
+  // ── Delegated graview commands ──
+  ["graview",           handleGraview],
   // ── Delegated hench commands ──
   ["show",              handleShow],
   // ── Renamed: single-command / sc → pair-programming / bicker ──
@@ -3327,6 +3347,7 @@ const tools = {
   sourcevision: resolveToolPath("packages/sourcevision"),
   sv: resolveToolPath("packages/sourcevision"),
   web: resolveToolPath("packages/web"),
+  graview: resolveToolPath("packages/graview"),
 };
 const signalHandlers = installTrackedChildProcessHandlers({
   tracker: childTracker,

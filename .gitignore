@@ -36,6 +36,7 @@ packages/rex/.rex/execution-log*.jsonl
 .sv3/
 tests/fixtures/sv-evals/**/.sourcevision/
 ndx-export/
+.graview/
 .ndx-deploy-tmp/
 .claude/settings.local.json
 .claude/worktrees/

@@ -44,6 +44,7 @@ const LAYOUT_FIELDS = [
   "rexDir",
   "henchDir",
   "sourcevisionDir",
+  "graviewDir",
   "configFile",
   "localConfigFile",
   "webPidFile",
