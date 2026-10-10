@@ -28,5 +28,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Layout-literal wall lets a hardcoded .ndx/rex, .ndx/hench or .ndx/sourcevision path through](./layout-literal-wall-lets-a-hardcoded.md) | completed |
 | [Rewrite the guidance, schema doc, public surface and policies](./rewrite-the-guidance-schema-doc-public.md) | pending |
 | [Rewrite the PRD skills for the v2 model for every vendor](./rewrite-the-prd-skills-for-the-v2.md) | pending |
-| [Rex MCP tool lists in the CLI/UI gap inventory and @n-dx/core README omit claim_task, release_task and get_token_usage](./rex-mcp-tool-lists-in-the-cli-ui-gap.md) | pending |
+| [Rex MCP tool lists in the CLI/UI gap inventory and @n-dx/core README omit claim_task, release_task and get_token_usage](./rex-mcp-tool-lists-in-the-cli-ui-gap.md) | completed |
+| [Root README and docs/guide/mcp.md Rex MCP tool lists omit get_token_usage, and no test ties doc lists to the registry](./root-readme-and-docs-guide-mcp-md-rex.md) | pending |
 | [ZONES.md points at a "Confirmed zone-level cycles" section that exists in no file](./zones-md-points-at-a-confirmed-zone.md) | completed |
