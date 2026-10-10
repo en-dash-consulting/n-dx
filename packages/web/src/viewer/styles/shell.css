@@ -439,7 +439,7 @@
   background: var(--bg);
 }
 .settings-frame-indicator { font-size: 12px; color: var(--text-muted); }
-.settings-frame-indicator--dirty { color: var(--warn, #e0a030); font-weight: 600; }
+.settings-frame-indicator--dirty { color: var(--orange); font-weight: 600; }
 .settings-frame-error { font-size: 12px; color: var(--red); }
 .settings-frame-save {
   margin-left: auto;
