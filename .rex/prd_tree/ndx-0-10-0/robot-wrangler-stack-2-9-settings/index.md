@@ -22,5 +22,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Rebuild robot-wrangler.css on the defined design tokens and fail tests on undefined custom properties](./rebuild-robot-wrangler-css-on-the.md) | pending |
+| [Rebuild robot-wrangler.css on the defined design tokens and fail tests on undefined custom properties](./rebuild-robot-wrangler-css-on-the.md) | completed |
 | [Render the settings overlay's page without waiting for the analysis-data load](./render-the-settings-overlay-s-page.md) | pending |
