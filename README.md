@@ -452,13 +452,20 @@ Two limits to know. With `provider: cli`, the vendor CLI (Claude Code, Codex) ex
 
 Commands the agent runs (shell, git, the test runner) receive `process.env` minus variables whose names look like credentials — `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*_API_KEY`, `AWS_*`, and so on. Values are never inspected. A project whose tests need one of them lists it under `guard.env.allow` in `.hench/config.json`; `guard.env.deny` strips more. The default blocked paths also cover credential files (`.env`, `.env.*`, `*.pem`, `*.key`, `.npmrc`, `.netrc`, `.aws/`, `.ssh/`).
 
-Vendor CLI runs and cross-vendor reviewers use the same filter. Claude retains
-`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, and
-`CLAUDE_CONFIG_DIR`; Codex retains `OPENAI_API_KEY`, `CODEX_API_KEY`,
+Every vendor CLI n-dx launches gets the same filter, plus that vendor's own
+authentication. Claude retains `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`,
+`CLAUDE_CODE_OAUTH_TOKEN`, and `CLAUDE_CONFIG_DIR`, and with
+`CLAUDE_CODE_USE_BEDROCK` or `CLAUDE_CODE_USE_VERTEX` on, that mode's AWS or
+Google credentials; Codex retains `OPENAI_API_KEY`, `CODEX_API_KEY`,
 `CODEX_ACCESS_TOKEN`, and `CODEX_HOME`. Configured API keys override exported
 keys. Google retains its configured `apiKeyEnv` (default `GEMINI_API_KEY`).
 Home, PATH, proxy and CA plumbing still passes unless explicitly denied.
-Cloud-provider credentials and other tokens must be explicitly allowed.
+Other tokens must be explicitly allowed.
+
+The project's `guard.env` policy applies to hench runs (`ndx work`) and the
+cross-vendor reviewer. The one-shot completions rex, sourcevision and the
+dashboard make (analysis, proposals, Ask) need no project credentials and
+always use the default filter; `guard.env.allow` does not reach them.
 
 CLI-started MCP servers inherit this filtered environment. `TYPESAFE_API_KEY`
 is stripped by default: rex placement's `both` mode falls back to text and

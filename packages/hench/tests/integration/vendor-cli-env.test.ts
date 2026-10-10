@@ -32,7 +32,7 @@ describe("cliLoop credential filtering across orientation and recovery", () => {
     await cleanupProjectDir(projectDir);
   });
 
-  it.each([false, true])("uses one filtered snapshot and logs names once (quiet: %s)", async (quiet) => {
+  async function runFixture(quiet: boolean) {
     const config = await loadConfig(henchDir);
     await saveConfig(henchDir, {
       ...config, sessionStrategy: "fork",
@@ -69,6 +69,12 @@ describe("cliLoop credential filtering across orientation and recovery", () => {
     });
     expect(run.status).toBe("completed");
     expect(cli.invocations).toHaveLength(3);
+    if (!run.logPath) throw new Error("Expected a persisted run log");
+    return { envs, log: readFileSync(run.logPath, "utf-8") };
+  }
+
+  it.each([false, true])("uses one filtered snapshot and logs names once (quiet: %s)", async (quiet) => {
+    const { envs, log } = await runFixture(quiet);
     expect(envs).toHaveLength(3);
     for (const env of envs) {
       expect(env.FAKE_SERVICE_API_KEY).toBeUndefined();
@@ -76,8 +82,6 @@ describe("cliLoop credential filtering across orientation and recovery", () => {
       expect(env.TYPESAFE_API_KEY).toBe("fixture-jev-value");
       expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe("fixture-oauth-value");
     }
-    if (!run.logPath) throw new Error("Expected a persisted run log");
-    const log = readFileSync(run.logPath, "utf-8");
     const reports = log.split("\n").filter((line) => line.includes("CLI environment: stripped"));
     expect(reports).toHaveLength(1);
     expect(reports[0]).toContain("FAKE_SERVICE_API_KEY");
@@ -85,5 +89,16 @@ describe("cliLoop credential filtering across orientation and recovery", () => {
     expect(reports[0]).not.toContain("TYPESAFE_API_KEY");
     expect(log).not.toContain("fixture-secret-value");
     expect(log).not.toContain("fixture-github-value");
+    expect(log).not.toContain("cloud mode is on");
+  });
+
+  it("says once that Vertex mode falls back to default credentials when none is set", async () => {
+    vi.stubEnv("CLAUDE_CODE_USE_VERTEX", "1");
+    vi.stubEnv("GOOGLE_APPLICATION_CREDENTIALS", undefined);
+    const { log } = await runFixture(false);
+    const reports = log.split("\n").filter((line) => line.includes("cloud mode is on"));
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toContain("GOOGLE_APPLICATION_CREDENTIALS");
+    expect(reports[0]).toContain("falls back to default credential files");
   });
 });
