@@ -405,6 +405,8 @@ interface Destination {
 
 const PRODUCT_NODE: Destination = { holds: ({ type }) => layerOf(type) === "product", wanted: "a product-layer node" };
 const CHANGE_NODE: Destination = { holds: ({ type }) => layerOf(type) === "changes", wanted: "a change-layer node" };
+/** What a change touches or modifies: a standing requirement, never an area, which only groups them. */
+const REQUIREMENT: Destination = { holds: ({ type }) => type === "capability" || type === "constraint", wanted: "a capability or a constraint" };
 const CAPABILITY: Destination = { holds: ({ type }) => type === "capability", wanted: "a capability" };
 
 /**
@@ -464,8 +466,9 @@ function sameChangeTree(node: RuleNode, added: ReadonlyMap<string, AddedAmendmen
 /**
  * Every reference names a node of the kind its field needs, live or retired:
  * a reference to a tombstone is history, not dangling (an open change's is
- * `open-change-refs-live`'s). touches, a modified or removed amendment's
- * target and appliesTo name product nodes; dependsOn names a capability;
+ * `open-change-refs-live`'s). touches and a modified amendment's target name
+ * a capability or constraint; a removed amendment's target and appliesTo name
+ * any product node, because apply retires an area with its descendants; dependsOn names a capability;
  * blockedBy names a change-layer node; an added amendment's `under` names a
  * node that can hold the added type ({@link HOLDER}).
  * An added amendment's target exists only after apply: in an unapplied change
@@ -500,10 +503,10 @@ const refResolves: Rule = (_index, _options, { entries, resolve }) => {
         const above = added.get(holder.under);
         return { type: holder.type ?? "capability", parentType: above ? (above.type ?? "capability") : resolve(holder.under)?.type };
       };
-      for (const ref of node.touches ?? []) refs.push(["touches", ref, PRODUCT_NODE]);
+      for (const ref of node.touches ?? []) refs.push(["touches", ref, REQUIREMENT]);
       for (const a of node.amends ?? []) {
         if (a.delta !== "added") {
-          refs.push([`${a.delta} amendment target`, a.target, PRODUCT_NODE]);
+          refs.push([`${a.delta} amendment target`, a.target, a.delta === "removed" ? PRODUCT_NODE : REQUIREMENT]);
           continue;
         }
         const taken = tree ? resolve(a.target) : undefined;

@@ -374,7 +374,7 @@ describe("ref-resolves", () => {
       }, [node("task", { id: "task-1", title: "Task one" })]);
       const findings = checkV2Rules({ product: [], changes: [change] }, { now: NOW });
       expect(findings.map((f) => [f.rule, f.message])).toEqual([
-        ["ref-resolves", `change "${change.title}" touches "task-1" names a task "Task one", not a product-layer node`],
+        ["ref-resolves", `change "${change.title}" touches "task-1" names a task "Task one", not a capability or a constraint`],
         ["ref-resolves", `change "${change.title}" added amendment under "task-1" names a task "Task one", not an area or a capability not nested in another, which can hold a capability`],
       ]);
     });
@@ -412,6 +412,25 @@ describe("ref-resolves", () => {
         [change.id, ["added amendment under", "k", "a constraint"]],
         [change.id, ["added amendment under", "t", "a task"]],
       ]);
+    });
+
+    it("fails a change touching or modifying an area; passes removing one or adding under one", () => {
+      const product = [node("area", { id: "area" }, [cap({ id: "a" })]), node("constraint", { id: "k" })];
+      const change = node("change", {
+        touches: ["area", "a", "k"],
+        amends: [
+          { target: "area", delta: "modified", summary: "s" },
+          { target: "a", delta: "modified", summary: "s" },
+          { target: "area", delta: "removed", summary: "s" },
+          { target: "new", delta: "added", summary: "s", under: "area" },
+        ],
+      });
+      const findings = check("ref-resolves", { product, changes: [change] });
+      expect(findings.map((f) => f.message.match(/ (\S+(?: amendment \S+)?) "([^"]+)" names (an? [a-z ]+?) "/)?.slice(1))).toEqual([
+        ["touches", "area", "an area"],
+        ["modified amendment target", "area", "an area"],
+      ]);
+      expect(findings[0].message).toContain("not a capability or a constraint");
     });
 
     it("passes a constraint added under any product node", () => {
