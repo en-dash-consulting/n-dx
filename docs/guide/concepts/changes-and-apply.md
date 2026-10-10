@@ -29,10 +29,10 @@ Apply runs once per change, deterministically, with no model call. For each amen
 | Delta | Writes |
 |-------|--------|
 | added | Creates the capability |
-| modified | Adds, replaces or removes criteria by id |
+| modified | Adds, replaces or removes capability criteria by id |
 | removed | Retires the node |
 
-If the change carries full proposed statement and criteria, written by the author or drafted with a model when the change was written and reviewed in the PR, apply writes that text instead. Each applied change appends a line to the capability's History and stamps the build hash.
+If the change carries a full proposed statement and capability criteria, written by the author or drafted with a model when the change was written and reviewed in the PR, apply writes that text instead. Each applied change appends a line to the capability's History and stamps the build hash.
 
 A touches-only change writes nothing; its history and the capability's health are computed.
 
@@ -57,6 +57,23 @@ Stewards may edit the product layer directly; that is how they say the requireme
 
 ## Releases
 
-A change carries `plannedRelease`; `shippedIn` is stamped when it ships. Release notes follow: group changes by `shippedIn`, then by kind.
+A change carries `plannedRelease`; `shippedIn` is stamped when it ships (`rex release stamp <version>`, which the release pipeline runs). Release notes follow: group changes by `shippedIn`, then by kind.
+
+## The commands
+
+Each step above has a CLI command and an MCP tool. All of them work on a v2 PRD only and refuse a v1 one (`.rex/prd_tree/`).
+
+| Step | CLI | MCP tool |
+|------|-----|----------|
+| See the product layer | `rex product show` | `get_product` |
+| See one capability or constraint, with its changes | `rex product show <node>` | `get_capability` |
+| Create a change (lands in the Inbox) | `ndx add "…"` or `rex add --title="…"` | `add_item` (type `change`) |
+| Add a task or subtask to a change | `rex add task --title="…" --parent=<change>` | `add_item` (type `task` or `subtask`, `parentId`) |
+| See where a change could go | `rex change place <change>` | `place_change` (no target) |
+| Place it | `rex change place <change> --target=<node> --relation=touches\|amends` | `place_change` (with target) |
+| Apply it as a steward | `rex change apply <change>` | `apply_change` |
+| Edit a requirement directly | `rex product edit <node> --statement="…"` or `--capability-criterion="<id>: <text>"` | — |
+
+Two flags look alike and mean different things. `--capability-criterion` edits a capability's capability criteria, its standing spec. `--criterion` on `rex add` sets a change's or task's acceptance criteria, its "done when".
 
 Back to [the PRD](./) · [Glossary](./glossary) · [Skills Reference](../skills)

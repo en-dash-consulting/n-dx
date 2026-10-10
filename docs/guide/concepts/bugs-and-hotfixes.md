@@ -19,7 +19,7 @@ Bugs usually arrive with evidence: a stack trace, a file path, a failing test. L
 | Accepted | The change touches the capability, which reads *defective* while the fix is open |
 | Duplicate | Merged into the open change; the issue is added to its issues list |
 | Actually a feature request | An amendment is added, and the kind becomes Enhancement on its own |
-| Works as intended | Cancelled, usually with a clarifying criterion added to the spec, because the spec was ambiguous |
+| Works as intended | Cancelled, usually with a clarifying capability criterion added to the spec, because the spec was ambiguous |
 | Won't fix | Cancelled with a reason |
 
 ## Spec gaps

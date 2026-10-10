@@ -12,7 +12,7 @@ If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core re
 
 ### Worktree sessions
 
-Claude desktop starts a worktree session's project servers in the main checkout (so `.` resolves there) while the session itself runs in `<repo>/.claude/worktrees/<name>`. The stdio rex and sourcevision servers, and `ndx mcp <server>` when it bridges to the hub, resolve their workspace from the client's MCP roots (`roots/list`) and rebind on `roots/list_changed`, so writes land in the session's own `.rex/prd_tree/`. Clients that advertise no roots keep the launch directory. A root outside the repository, or one that can't be served, refuses writes with an error rather than misrouting them.
+Claude desktop starts a worktree session's project servers in the main checkout (so `.` resolves there) while the session itself runs in `<repo>/.claude/worktrees/<name>`. The stdio rex and sourcevision servers, and `ndx mcp <server>` when it bridges to the hub, resolve their workspace from the client's MCP roots (`roots/list`) and rebind on `roots/list_changed`, so writes land in the session's own PRD. Clients that advertise no roots keep the launch directory. A root outside the repository, or one that can't be served, refuses writes with an error rather than misrouting them.
 
 Verify a session's write target with rex `get_capabilities` — its `workspace` block reports `source` (`roots` when the client's root was used, `startup` for the launch directory), `projectDir` (the tree being written), and `refused` (set while writes are refused). In a desktop worktree session `source` should read `roots`.
 
@@ -80,16 +80,29 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 
 ## Rex MCP Tools
 
+Rex reads the PRD's layout from disk. A v2 PRD is the product layer (`.ndx/rex/product/`) plus the change layer (`.ndx/rex/changes/`); see [The PRD](./concepts/). Until the storage migration ships, `ndx init` creates v1 projects (`.rex/prd_tree/`, one tree of items with levels), and the product-layer tools refuse them.
+
+### Product layer and changes
+
 | Tool | Description |
 |------|-------------|
-| `get_prd_status` | PRD tree with completion stats |
-| `get_next_task` | Next actionable task |
+| `get_product` | The product layer: areas, and the capabilities and constraints under them, each with computed status and health. v2 only |
+| `get_capability` | One capability or constraint: statement, capability criteria, parent chain, status, health, and the changes that amend or touch it. v2 only |
+| `place_change` | Without a target, the shortlist of capabilities and constraints a change could amend or touch; with one, record it (`touches` or `amends`). v2 only |
+| `apply_change` | Apply a change's amendments to the product layer, as a steward. Refused whole, listing every problem, when an amendment does not fit. v2 only |
+
+### Work items
+
+| Tool | Description |
+|------|-------------|
+| `get_prd_status` | PRD overview. v2: change counts, the Inbox count, product status per area and change counts per release. v1: the item tree with completion stats |
+| `get_next_task` | Next actionable task (skips tasks another worktree has claimed) |
 | `claim_task` | Hold a task for this worktree |
 | `release_task` | Give back a claim |
-| `add_item` | Add epic/feature/task/subtask (optional `run` block of saved run settings: portable `tier` plus optional per-vendor `models` pins) |
+| `add_item` | Add an item. v2: pass `type` (`change`, the default, lands in the Inbox; `task` or `subtask` with `parentId`), and optionally `amends` or `touches`. v1: pass `level`. `acceptanceCriteria` is the item's "done when". Optional `run` block of saved run settings: portable `tier` plus optional per-vendor `models` pins |
 | `update_task_status` | Update item status |
 | `edit_item` | Edit item content (title, description, priority, tags, `run`). A `run` object replaces the whole saved block; `null` removes it |
-| `get_item` | Get full item details with parent chain |
+| `get_item` | Full item details with parent chain; on v2, any node by id, display id or alias |
 | `move_item` | Reparent an item |
 | `merge_items` | Consolidate duplicate items |
 | `verify_criteria` | Map acceptance criteria to tests |
@@ -98,7 +111,10 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 | `facets` | List configured facets |
 | `get_recommendations` | SourceVision-based recommendations |
 | `append_log` | Write to the execution log |
+| `get_token_usage` | Hench run token totals per PRD item, with orphans surfaced separately |
 | `get_capabilities` | Server capabilities and configuration, plus the `workspace` block (resolved project dir, source, refusal) |
+
+`get_capabilities` describes the MCP server; `get_capability` reads one capability of the product layer.
 
 ## SourceVision MCP Tools
 
@@ -113,6 +129,7 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 | `get_imports` | Import graph edges |
 | `get_classifications` | File archetype classifications |
 | `get_route_tree` | Route structure (pages, API routes, layouts) |
+| `get_readiness` | SDLC readiness scorecard: whether each practice exists and is wired up, not how good it is |
 | `set_file_archetype` | Override archetype classification for a file |
 
 ## Migrating from stdio to HTTP (Claude)

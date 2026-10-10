@@ -1,221 +1,176 @@
 # PRD storage layout
 
-The PRD lives at `.rex/prd_tree/` in your project. This page is the
-user-facing explanation of how items are laid out on disk, why the layout
-is what it is, and how `ndx` keeps it canonical as you add and reshape
-items.
+The PRD is the product's requirements plus the changes being made to them: a
+**product layer** (areas, capabilities, constraints) and a **change layer**
+(changes, and their tasks and subtasks). [The PRD](./concepts/) explains the
+model; this page explains how it sits on disk.
 
-If you're looking for the normative serializer/parser contract (every
-field, every encoding rule), see
-[`docs/architecture/prd-folder-tree-schema.md`](../architecture/prd-folder-tree-schema.md).
+Both layers are plain Markdown in your repository, so diffs, blame and code
+review work without custom tooling, and people, assistants, MCP clients and
+the dashboard all read and write the same files.
 
-## Why the tree exists
+::: info v1 projects
+Until the storage migration ships, `ndx init` creates **v1** projects. A v1
+PRD is one tree of items in `.rex/prd_tree/` with no product layer; it is
+described under [v1 projects](#v1-projects) below. Rex reads the layout from
+disk: `.ndx/rex/product/` present means v2, otherwise v1. The product-layer
+commands (`rex product`, `rex change`) and MCP tools (`get_product`,
+`get_capability`, `place_change`, `apply_change`) refuse a v1 PRD with a
+message naming the layout.
+:::
 
-The PRD is the project's source of truth. Encoding it as a folder tree of
-plain markdown files means:
+## The v2 layout
 
-- It's a normal git surface — diffs, blame, code review all work without
-  any custom tooling.
-- Every item has a stable, human-readable address (a path under
-  `.rex/prd_tree/`).
-- Tools (Claude, Codex, MCP clients, the dashboard) read and write the
-  same files. There's no separate database to keep in sync.
+```
+.ndx/rex/
+├── product/
+│   ├── index.md                   ← root header: title, schema, stewards
+│   └── checkout/                  ← area
+│       ├── index.md
+│       ├── state.yaml             ← tool state for this folder's nodes
+│       ├── pay-by-card.md         ← capability
+│       └── refunds/               ← capability with sub-capabilities
+│           ├── index.md
+│           ├── state.yaml
+│           └── partial-refunds.md
+└── changes/
+    └── refund-card-payments/      ← change: always a folder
+        ├── index.md
+        ├── state.yaml
+        └── add-refund-endpoint.md ← task
+```
 
-## The three rules
+A project still on the older `.rex/` directory layout keeps the same two
+folders at `.rex/product/` and `.rex/changes/`.
 
-### Rule 1 — folder-per-branch + leaf-as-`.md`
+### Intent in Markdown, state in `state.yaml`
 
-Every PRD item is one of two shapes on disk:
+Every node is stored in two places:
 
-- **Branch item** (has at least one child): a slug-named **folder** containing
-  exactly one `index.md`. The `index.md` holds the item's frontmatter and a
-  `## Children` table linking to its direct children.
-- **Leaf item** (has no children): a single bare **`<slug>.md` file** at the
-  parent level. The leaf file carries only its own frontmatter — no
-  children listing, no inherited parent metadata.
+- **Intent**, what people write, is the node's Markdown file: YAML frontmatter
+  (id, type, title, a capability's statement and capability criteria, a
+  change's amendments and acceptance criteria, and so on) and a prose body.
+- **State**, what tools write, is the folder's committed `state.yaml`, keyed
+  by item id: status, timestamps, a capability's build stamps, a change's
+  `appliedAt` and `shippedIn`. A node with no row reads as pending.
 
-The same rule applies at every level — epic, feature, task, subtask. A
-leaf epic at the project root is `epic-slug.md`; a leaf subtask under a
-task is `subtask-slug.md` next to the task's `index.md`.
+Keeping them apart means a status change never rewrites the file a person is
+editing, and a merge conflict in state is resolved by item id (`rex
+merge-state` is the git merge driver for it).
+
+### Folders and files
+
+- A **change** is always a folder (`<slug>/index.md`), so tasks can be added
+  without moving it.
+- Any other node is a folder only while it has children, and a `<slug>.md`
+  file otherwise.
+- There are no `## Children` tables: the directory tree is the structure.
+- `product/index.md` is the root header. It carries the PRD title, the schema
+  stamp, the slug rule and the default `stewards:` list.
+
+### Frozen slugs
+
+A node's folder or file name comes from its `slug` field, made from the title
+when the node is created and never recomputed. Renaming a capability or a
+change edits its title and leaves its path alone, so links and history stay
+put.
+
+### Display ids
+
+Nodes carry short display ids alongside their UUIDs, such as `A1.1` for a
+capability or `CH-2` for a change. Every command and MCP tool that takes a
+node accepts its id, display id or alias.
+
+### What you can rely on
+
+- **One file per node**, at one path.
+- **Byte-stable round trips.** Reading the tree and writing it back unchanged
+  rewrites nothing; files are rewritten only when their content changes.
+- **Writes under a lock.** Every write holds the PRD lock for the whole
+  read-modify-write. A writer that cannot take it fails and names the holder.
+- **Refused, not guessed.** A node whose frontmatter fails validation is
+  skipped with a warning and never deleted by the next save.
+
+### Editing by hand
+
+Hand-editing intent is supported: keep `id`, `type` and `slug` intact.
+Editing a capability's statement or capability criteria by hand has the same
+effect as `rex product edit`: the capability reads *revised* until a change
+builds the edit. Leave `state.yaml` to the tools. After an edit, run
+`rex health` to check the tree.
+
+## v1 projects
+
+A v1 PRD lives in `.rex/prd_tree/`. Its items have a `level` (epic, feature,
+task, subtask) instead of a layer and type, and there is no product layer.
+The v2 reader reads a v1 tree as changes, tasks and subtasks: epics and
+features read as changes.
+
+The normative serializer and parser contract for this layout is
+[PRD Folder-Tree Schema](../architecture/prd-folder-tree-schema).
+
+### Folder per branch, file per leaf
+
+An item with children is a slug-named folder holding `index.md`, which
+carries the item's frontmatter and a `## Children` table. An item without
+children is a bare `<slug>.md` file next to its siblings.
 
 ```
 .rex/prd_tree/
-├── empty-epic.md                  ← leaf epic
-├── auth/                          ← branch epic
+├── auth/
 │   ├── index.md
-│   ├── login/                     ← branch feature
+│   ├── login/
 │   │   ├── index.md
-│   │   ├── validate-email.md      ← leaf task
-│   │   └── rate-limit.md          ← leaf task
-│   └── signup.md                  ← leaf feature
-└── dashboard/
-    ├── index.md
-    └── charts/
-        ├── index.md
-        ├── render-chart/          ← branch task
-        │   ├── index.md
-        │   ├── pick-colors.md     ← leaf subtask
-        │   └── animate.md         ← leaf subtask
-        └── export-csv.md          ← leaf task
+│   │   └── validate-email.md
+│   └── signup.md
+└── dashboard.md
 ```
 
-The slug comes from the item's title (lowercased, hyphenated, ASCII-only,
-truncated to 40 characters at a hyphen boundary). When titles collide
-between siblings, the colliding items get a six-character suffix derived
-from the item's id.
+Slugs come from the title with an id suffix, and a v1 slug follows the title:
+editing a title renames the folder or file. When a leaf gains its first child
+it becomes a folder on the next save, and a folder whose last child is
+removed collapses back to a file.
 
-### Rule 2 — automatic promotion when a leaf gains children
+### Backups before mutation
 
-When a leaf `<slug>.md` gets its first child (e.g. you
-`ndx add subtask --parent <leaf-id>`, an MCP `add_item`, or any code path
-that calls `store.addItem`), the item is automatically promoted to the
-branch shape on the next save:
+`ndx reshape` and `ndx add` copy `.rex/prd_tree/` to
+`.rex/.backups/prd_tree_<ISO>/` before changing it; the 10 newest snapshots
+are kept. `rex restore` lists them, and `rex restore --latest` rolls back to
+the newest. The same pass normalizes shapes older ndx versions wrote (bare
+`<title>.md` files, `__parent*` fields, phantom `index-<hash>/` folders);
+it leaves ambiguous files in place rather than guessing.
 
-1. The next `saveDocument` sees the in-memory item now has children.
-2. The serializer writes the item in the **branch** shape: it creates
-   `<slug>/` and writes the item's frontmatter into `<slug>/index.md`,
-   exactly preserving every field from the original leaf.
-3. The new child is written next to that `index.md` — as another leaf
-   `<child-slug>.md` if it has no descendants of its own, or as another
-   nested folder if it does.
-4. The serializer's stale-entry sweep removes the original `<slug>.md`
-   file (it is no longer in the expected leaf set at the parent level).
+### Worked example: n-dx's own PRD
 
-The whole transition is one save — there is no separate "promotion"
-operation that can fail halfway. If the save fails before completion you
-still have the snapshot from `.rex/.backups/prd_tree_<ISO>/` (Rule 3)
-and any not-yet-removed source file is rewritten on the next attempt.
+n-dx manages its own work with ndx, and this repository is still a v1
+project, so its PRD is a live example of the v1 layout:
 
-Going the other way — removing the last child of a branch — collapses
-the folder back to a bare `<slug>.md` on the next save by the same
-mechanism: the in-memory item now has zero children, the serializer
-emits the leaf shape, and the now-empty folder is swept up. Branches
-and leaves are fully interchangeable; the on-disk shape always follows
-the in-memory children list.
+| Artifact | What it is |
+|----------|-----------|
+| [`prd.md`](https://github.com/en-dash-consulting/n-dx/blob/main/prd.md) | The hand-written product spec ndx started from: the input `ndx add --file=` and `ndx plan --file=` accept |
+| [`.rex/prd_tree/`](https://github.com/en-dash-consulting/n-dx/tree/main/.rex/prd_tree) | The tree ndx manages: slug-named folders, YAML frontmatter, generated child tables |
 
-This behavior is pinned by
-[`leaf-to-folder-promotion.test.ts`](https://github.com/endash/n-dx/blob/main/packages/rex/tests/integration/leaf-to-folder-promotion.test.ts)
-which exercises both directions plus full frontmatter preservation
-(id, level, title, status, priority, tags, source, timestamps,
-resolution fields, acceptance criteria, multi-paragraph descriptions).
+## Working with the PRD
 
-### Rule 3 — `ndx reshape` and `ndx add` migrate, with backup
-
-Older checkouts can carry legacy shapes from earlier `ndx` versions:
-
-- **Bare `<title>.md` instead of `index.md`** in a folder.
-- **Both `<title>.md` and `index.md`** in the same folder (dual writes).
-- **`__parent*` shim fields** in a child file from the old single-child
-  compaction (where a parent folder was elided to flatten a chain).
-- **Phantom `index-{6hex}/` wrappers** that contain only `index.md` and
-  leave their parent folder with no own content file.
-
-Both `ndx reshape` and `ndx add` handle these automatically:
-
-1. **Snapshot.** A timestamped copy of `.rex/prd_tree/` is written to
-   `.rex/.backups/prd_tree_<ISO>/`. The 10 most-recent snapshots are
-   retained.
-2. **Migrate on disk.** A structural pass detects each legacy shape and
-   normalizes it: phantom wrappers are merged back into their parent,
-   `<title>.md` is renamed to `index.md`, bare files that have child
-   siblings are wrapped into folders.
-3. **Canonicalize.** The PRD is loaded (the parser still reads every
-   legacy shape) and re-saved through the current serializer. The save
-   writes the canonical layout and sweeps up any leftovers via the
-   serializer's stale-entry cleanup.
-
-The migration is **data-preserving**. When intent is ambiguous (e.g. two
-non-`index.md` files in the same folder) the migration leaves the files
-in place rather than guessing — the parser surfaces the ambiguity as a
-warning so you can resolve it manually.
-
-## What you can rely on
-
-- **One file per item.** Every item is reachable at exactly one path —
-  either `.../<slug>.md` (leaf) or `.../<slug>/index.md` (branch). No
-  duplicates, no shadow copies.
-- **No hidden state.** Frontmatter holds the entire item; nothing about
-  the item's identity, parent, or children is encoded outside the file +
-  its directory position. `__parent*` fields are not emitted by the
-  current serializer.
-- **Round-trip stability.** Loading the PRD and saving it again with no
-  in-memory changes is a no-op on disk (incremental file writes mean
-  unchanged files are skipped, reported as `filesSkipped`).
-- **Backup before mutation.** Reshape and add never touch the tree
-  without first copying it. If something goes wrong the backup is in
-  `.rex/.backups/prd_tree_<ISO>/` — restore with
-  `cp -r .rex/.backups/prd_tree_<ISO>/ .rex/prd_tree`.
-
-## Edge cases and FAQ
-
-**Q: I see `__parent*` fields in one of my files. Is that bad?**
-A: It's a legacy shim from the old single-child compaction. The parser
-reads it correctly. The next time `ndx reshape`, `ndx add`, or
-`saveDocument` runs, the file is rewritten without the shim.
-
-**Q: An item has the same id as another. What happened?**
-A: Genuine PRD validation error — usually a manual edit or a faulty
-import. Run `rex validate` to see all duplicates, then resolve with
-`merge_items` (MCP) or `rex remove`.
-
-**Q: Why does my leaf task have a `.md` extension while branch tasks
-don't?**
-A: That is the rule. A leaf is a single `.md` file; a branch is a folder
-containing `index.md`. The folder name has no `.md` suffix because it's
-a directory, not a file.
-
-**Q: Can I edit a `.md` file by hand?**
-A: Yes, but keep the YAML frontmatter intact (id, level, title, status
-are required). The parser warns about missing fields rather than
-crashing. After hand-editing, run `rex status` once to confirm the file
-still parses.
-
-**Q: What about `index-{hash}/` folders I see in old checkouts?**
-A: Phantom wrappers from a buggy intermediate migration. `ndx reshape`
-detects and merges them back into their parent folder.
-
-## Worked example: n-dx's own PRD
-
-n-dx dogfoods its own PRD system, so this repository ships two real artifacts
-worth reading before you build your own. They are the fastest way to see what
-the format looks like in practice and how you are expected to interact with it.
-
-| Artifact | What it is | Read it to learn |
-|----------|-----------|------------------|
-| [`prd.md`](https://github.com/en-dash-consulting/n-dx/blob/main/prd.md) | n-dx's hand-written v1 product spec — vision, then epics broken into features and bullet-level requirements | What a PRD looks like **before** the tool touches it. This is the shape `ndx add --file=` and `ndx plan --file=` expect when you import an existing spec. |
-| [`.rex/prd_tree/`](https://github.com/en-dash-consulting/n-dx/tree/main/.rex/prd_tree) | The live tree the tool actually manages — 42 top-level items covering the work in flight | What the same information looks like **after** ndx structures it: slug-named folders, YAML front-matter, generated child tables. |
-
-Reading them side by side shows the whole loop: `prd.md` is the input a human
-writes, `.rex/prd_tree/` is the state the agent reads from and writes back to.
-
-### How to interact with it
-
-You rarely edit `.rex/prd_tree/` by hand — the point of the tree is that both
-you and the agent can. Pick whichever surface fits:
+You rarely need to touch the files. Use the CLI, an assistant, or the
+dashboard:
 
 ```sh
-ndx status .          # completion tree, top-down
-ndx tree .            # full hierarchy with colour-coded status
+rex product show .    # v2: the product layer with status and health
+ndx add "..." .       # a new change (v2) or smart-add proposal (v1)
+ndx status .          # completion overview
 ndx next .            # the next actionable task
-ndx add "..." .       # add items from a plain-English description
 ndx work .            # let the agent pick up the next task
 ```
 
-From an assistant session, the same operations are available as MCP tools
-(`get_prd_status`, `get_next_task`, `add_item`, `update_task_status`, …) and as
-the `/ndx-plan`, `/ndx-capture`, `/ndx-work` and `/ndx-status` skills. See
+From an assistant session the same operations are MCP tools (`get_product`,
+`get_prd_status`, `get_next_task`, `add_item`, `place_change`, …) and the
+`/ndx-capture`, `/ndx-plan`, `/ndx-work` and `/ndx-status` skills. See
 [MCP Integration](./mcp) and the [Skills Reference](./skills).
-
-Hand-editing is supported and safe — every item is plain Markdown with YAML
-front-matter, so `git diff` and code review work normally. Keep the `id` field
-intact; everything else is fair game.
 
 ## Related references
 
-- Normative schema: [`docs/architecture/prd-folder-tree-schema.md`](../architecture/prd-folder-tree-schema.md)
-- Storage source: `packages/rex/src/store/folder-tree-serializer.ts`,
-  `packages/rex/src/store/folder-tree-parser.ts`
-- Migration source: `packages/rex/src/core/folder-per-task-migration.ts`
-- Backup source: `packages/rex/src/core/backup-snapshots.ts`
-- Workflow skills for interacting with the PRD: [Skills Reference](./skills)
-- Worked example — n-dx's own spec and live tree: [`prd.md`](https://github.com/en-dash-consulting/n-dx/blob/main/prd.md) · [`.rex/prd_tree/`](https://github.com/en-dash-consulting/n-dx/tree/main/.rex/prd_tree)
+- The model: [The PRD](./concepts/) · [Changes and apply](./concepts/changes-and-apply)
+- v1 schema: [PRD Folder-Tree Schema](../architecture/prd-folder-tree-schema)
+- Concurrency: [PRD Write Concurrency](../architecture/prd-write-concurrency)
+- Source: `packages/rex/src/store/prd-model-reader.ts` and `prd-model-writer.ts` (v2), `folder-tree-serializer.ts` and `folder-tree-parser.ts` (v1)
