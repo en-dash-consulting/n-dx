@@ -2,7 +2,7 @@
 id: "ee838683-369f-4dfe-a933-8d3de55cfa36"
 level: "task"
 title: "Promote the rex v2 reader and derived-edge computations to the public API"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "graview"
@@ -10,11 +10,16 @@ tags:
   - "product-map"
   - "public-api"
 source: "ndx-capture"
+startedAt: "2026-10-10T03:52:13.375Z"
+completedAt: "2026-10-10T03:57:49.749Z"
+endedAt: "2026-10-10T03:57:49.749Z"
+resolutionType: "code-change"
+resolutionDetail: "v2 PRD model, index, derived edges/status/realization and report builders exported from @n-dx/rex public.ts; public-prd-model integration test; v2 isolation allowlist admits public.ts"
 acceptanceCriteria:
   - "`@n-dx/rex` public.ts exports loadPrdModel, prdLayout, indexTree, computeEdges, computeProductStatus, computeRealizedBy and deriveChangeKind, plus the PrdModel, V2Tree, RuleNode, V2Node, ProductEdges, Realization, IntentStatus and ChangeKind types, and no Zod schema joins the public surface"
   - "A consumer importing only from `@n-dx/rex` can call loadPrdModel on the n-dx checkout and receive a PrdModel with layout \"v1\" whose epics and features read as change nodes"
   - "tests/e2e/architecture-policy.test.js export ceilings are unchanged or raised with a written justification in docs/architecture/gateways.md, and `pnpm --filter @n-dx/rex test` passes"
 description: "The v2 PRD model and everything derived from it is internal to `@n-dx/rex` today: `loadPrdModel` and `prdLayout` (store/prd-model-reader.ts), `indexTree` (schema/v2-rules.ts), `computeEdges`, `computeRealizedBy` and `deriveChangeKind` (core/product-edges.ts), `computeProductStatus` (core/product-status.ts) and the report builders in core/product-report.ts. None is exported from src/public.ts, so neither the dashboard's unwired Product, Changes and Capability views nor the Graview adapter can reach them without a prohibited `dist/*` import.\n\nExport them from public.ts together with the types a consumer needs (PrdModel, V2Tree, RuleNode, V2Node and its per-type aliases, NodeIntent, ItemState, ProductEdges, Realization, IntentStatus, Health, ChangeKind, TreeIndex). Keep Zod schemas off the public surface per PACKAGE_GUIDELINES.md. Where a gateway (web rex-gateway, hench rex-gateway) later re-exports any of these, raise the ceiling in tests/e2e/architecture-policy.test.js with a written justification in docs/architecture/gateways.md.\n\nConsumers: the Graview projection feature (parent) and \"Dashboard on the v2 model\" (89ecd7f3-ca6a-4833-90a4-7bc7b1017e94)."
-lastModified: "2026-10-10T03:10:23.721Z"
+lastModified: "2026-10-10T03:57:50.100Z"
 lastModifiedBy: "Nick Daniel <nick@endash.us>"
 ---
