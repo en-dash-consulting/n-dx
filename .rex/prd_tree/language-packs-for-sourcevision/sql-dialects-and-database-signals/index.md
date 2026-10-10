@@ -33,7 +33,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add the Terraform model as a database-engine source](./add-the-terraform-model-as-a-database.md) | pending |
 | [Classify SQL dialects with evidence](./classify-sql-dialects-with-evidence.md) | completed |
 | [Detect database engines from dependencies, images and config](./detect-database-engines-from.md) | completed |
-| [Extract table names from embedded SQL in Java and Go](./extract-table-names-from-embedded-sql.md) | pending |
+| [Extract table names from embedded SQL in Java and Go](./extract-table-names-from-embedded-sql.md) | completed |
 | [Find migration and schema files and extract tables with tree-sitter-sql](./find-migration-and-schema-files-and.md) | completed |
 | [Go calls query leaves string arguments of unnamed calls without an owning argument list](./go-calls-query-leaves-string-arguments.md) | completed |
 | [Spring Data JDBC and R2DBC @Query and @Table("name") are read with JPA semantics, so their tables are missed](./spring-data-jdbc-and-r2dbc-query-and.md) | pending |
