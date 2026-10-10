@@ -25,6 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Bundle v2 export blames a missing child when the folder's child was skipped as invalid, and drops the reader warning naming it](./bundle-v2-export-blames-a-missing.md) | pending |
 | [Bundle v2 round trip moves unknown state.yaml keys into node frontmatter](./bundle-v2-round-trip-moves-unknown.md) | completed |
 | [change-management guide says rex remove archives items and rex restore <item-id> recovers them; neither is true](./change-management-guide-says-rex.md) | completed |
+| [Change selection descends into a change nested under another change](./change-selection-descends-into-a.md) | pending |
 | [Code-owner files go stale after a stewards edit until someone re-runs rex codeowners](./code-owner-files-go-stale-after-a.md) | pending |
 | [Codex drops most of packages/web/AGENTS.md: root plus nested AGENTS.md exceeds its 32 KiB combined project-doc budget](./codex-drops-most-of-packages-web.md) | pending |
 | [Codex never sees the per-package governance or the path-scoped rules, because they live only in Claude-loaded files](./codex-never-sees-the-per-package.md) | cancelled |
