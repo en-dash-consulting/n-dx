@@ -528,6 +528,16 @@ describe("layer-nesting", () => {
     expect(check("layer-nesting", { changes })).toEqual([]);
   });
 
+  it("keeps a subtask under a subtask valid, as v1 branch subtasks import", () => {
+    const changes = [node("change", {}, [node("task", {}, [node("subtask", {}, [node("subtask")])])])];
+    expect(check("layer-nesting", { changes })).toEqual([]);
+  });
+
+  it("fails a subtask at the changes root", () => {
+    const subtask = node("subtask");
+    expect(ids(check("layer-nesting", { changes: [subtask] }))).toEqual([subtask.id]);
+  });
+
   it("fails a root loaded under the other layer's root", () => {
     const change = node("change");
     const area = node("area");
