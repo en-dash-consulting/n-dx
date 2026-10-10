@@ -1,20 +1,20 @@
 /* ── Robot Wrangler settings view ─────────────────────────────────── */
 
 .llm-container {
-  padding: var(--spacing-lg);
+  padding: var(--space-4);
   max-width: 680px;
 }
 
 /* ── Header ─────────────────────────────────────────────────────── */
 
 .llm-header {
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: var(--space-6);
 }
 
 .llm-header-brand {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--space-2);
 }
 
 .llm-header-tile {
@@ -29,7 +29,7 @@
 .llm-header-title {
   font-size: 1.15rem;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--text);
 }
 
 .llm-header-subtitle {
@@ -42,12 +42,12 @@
 /* ── Vendor selector (segmented control) ────────────────────────── */
 
 .llm-vendor-selector {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--space-4);
 }
 
 .llm-vendor-tabs {
   display: inline-flex;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
 }
@@ -59,11 +59,11 @@
   padding: 7px 18px;
   background: transparent;
   border: none;
-  border-right: 1px solid var(--color-border);
+  border-right: 1px solid var(--border);
   cursor: pointer;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
   transition: background 0.12s, color 0.12s;
   white-space: nowrap;
 }
@@ -73,13 +73,13 @@
 }
 
 .llm-vendor-tab:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 .llm-vendor-tab-active {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text);
   font-weight: 600;
 }
 
@@ -100,12 +100,12 @@
 }
 
 .llm-tab-conn-ok  { background: #16a34a; }
-.llm-tab-conn-err { background: var(--color-error, #dc2626); }
+.llm-tab-conn-err { background: var(--red); }
 
 .llm-vendor-hint {
-  margin-top: var(--spacing-sm);
+  margin-top: var(--space-2);
   font-size: 0.8125rem;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
 }
 
 /* Vendor color dots (used in the tabs) */
@@ -125,14 +125,14 @@
 /* ── Vendor section card ─────────────────────────────────────────── */
 
 .llm-vendor-section {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: var(--spacing-md);
-  background: var(--color-surface);
+  padding: var(--space-3);
+  background: var(--bg-surface);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 /* ── Form fields ─────────────────────────────────────────────────── */
@@ -144,30 +144,30 @@
 }
 
 .llm-field-dirty .llm-field-label {
-  color: var(--color-accent);
+  color: var(--accent);
 }
 
 .llm-field-label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--text);
 }
 
-.llm-dirty-dot { color: var(--color-accent); }
+.llm-dirty-dot { color: var(--accent); }
 
 .llm-field-desc {
   font-size: 0.8rem;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
   margin: 0;
   line-height: 1.4;
 }
 
 .llm-text-input {
   padding: 6px 9px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--color-input-bg, var(--color-surface));
-  color: var(--color-text-primary);
+  background: var(--bg);
+  color: var(--text);
   font-size: 0.875rem;
   font-family: var(--font-mono, monospace);
   width: 100%;
@@ -175,7 +175,7 @@
 }
 
 .llm-text-input:focus {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-color: transparent;
 }
@@ -183,19 +183,19 @@
 /* Select dropdown */
 .llm-select-input {
   padding: 6px 9px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--color-input-bg, var(--color-surface));
-  color: var(--color-text-primary);
+  background: var(--bg);
+  color: var(--text);
   font-size: 0.875rem;
-  font-family: var(--font-sans, inherit);
+  font-family: inherit;
   width: 100%;
   max-width: 420px;
   cursor: pointer;
 }
 
 .llm-select-input:focus {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-color: transparent;
 }
@@ -203,24 +203,24 @@
 /* ── Toggle switch ───────────────────────────────────────────────── */
 
 .llm-failover-wrap {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--space-4);
 }
 
 .llm-toggle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-border);
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
+  background: var(--bg-surface);
   cursor: pointer;
   user-select: none;
 }
 
 .llm-toggle-row:hover {
-  background: var(--color-surface-hover);
+  background: var(--bg-hover);
 }
 
 .llm-toggle-text {
@@ -234,12 +234,12 @@
 .llm-toggle-name {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--text);
 }
 
 .llm-toggle-desc {
   font-size: 0.8rem;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
   line-height: 1.4;
 }
 
@@ -263,7 +263,7 @@
   width: 36px;
   height: 20px;
   border-radius: 10px;
-  background: var(--color-border-strong, var(--color-border));
+  background: var(--border-strong);
   transition: background 0.18s;
   position: relative;
 }
@@ -283,7 +283,7 @@
 }
 
 .llm-toggle-input:checked ~ .llm-toggle-track {
-  background: var(--color-accent);
+  background: var(--accent);
 }
 
 .llm-toggle-input:checked ~ .llm-toggle-track::after {
@@ -291,7 +291,7 @@
 }
 
 .llm-toggle-input:focus-visible ~ .llm-toggle-track {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -306,8 +306,8 @@
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 500;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
   line-height: 1.5;
 }
 
@@ -316,7 +316,7 @@
   height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--color-text-dim, #888);
+  background: var(--text-muted);
 }
 
 .llm-status-ok {
@@ -328,15 +328,15 @@
 .llm-status-ok .llm-pill-dot { background: #16a34a; }
 
 .llm-status-err {
-  border-color: color-mix(in srgb, var(--color-error, #dc2626) 35%, transparent);
-  background: color-mix(in srgb, var(--color-error, #dc2626) 8%, transparent);
-  color: var(--color-error, #dc2626);
+  border-color: color-mix(in srgb, var(--red) 35%, transparent);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  color: var(--red);
 }
 
-.llm-status-err .llm-pill-dot { background: var(--color-error, #dc2626); }
+.llm-status-err .llm-pill-dot { background: var(--red); }
 
 .llm-status-checking {
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
 }
 
 .llm-pill-url {
@@ -361,38 +361,38 @@
 .llm-pill-refresh:hover { opacity: 1; }
 
 /* Provider, catalog provenance and agent model for the active vendor */
-.llm-agent-section { margin-bottom: var(--spacing-lg); }
+.llm-agent-section { margin-bottom: var(--space-4); }
 
 .llm-provider-fixed {
   display: inline-block;
   font-family: var(--font-mono, monospace);
   font-size: 0.875rem;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
 }
 
 .llm-catalog-status {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-md);
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
   font-size: 0.8125rem;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
 }
 
 .llm-catalog-cli { font-family: var(--font-mono, monospace); }
 
 .llm-catalog-error {
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--space-3);
   font-size: 0.875rem;
-  color: var(--color-error, #dc2626);
+  color: var(--red);
 }
 
 /* Host + port row */
 .llm-conn-row {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  gap: var(--spacing-sm);
+  gap: var(--space-2);
 }
 
 @media (max-width: 480px) {
@@ -406,7 +406,7 @@
 /* Horizontal rule between local sub-sections */
 .llm-rule {
   border: none;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border);
   margin: 0;
 }
 
@@ -416,13 +416,13 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
   margin: 0;
 }
 
 /* Highlight the model sub-label when live models are available */
 .llm-section-sub:first-of-type {
-  color: var(--color-text-primary);
+  color: var(--text);
 }
 
 /* ── Smoke test ──────────────────────────────────────────────────── */
@@ -430,19 +430,19 @@
 .llm-smoke-row {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 .llm-smoke-hint {
   font-size: 0.75rem;
-  color: var(--color-text-tertiary, var(--color-text-secondary));
+  color: var(--text-muted);
   font-style: italic;
 }
 
 .llm-smoke-ok {
   font-size: 0.85rem;
-  color: var(--color-success, #16a34a);
+  color: var(--green);
   display: flex;
   align-items: center;
   gap: 3px;
@@ -450,13 +450,13 @@
 
 .llm-smoke-err {
   font-size: 0.85rem;
-  color: var(--color-error, #dc2626);
+  color: var(--red);
 }
 
-.llm-smoke-meta { color: var(--color-text-secondary); }
+.llm-smoke-meta { color: var(--text-dim); }
 
 .llm-smoke-reply {
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
   font-style: italic;
   max-width: 22ch;
   overflow: hidden;
@@ -469,13 +469,13 @@
 .llm-profiles {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--space-1);
 }
 
 .llm-profiles-bar {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--space-1);
 }
 
 .llm-profiles-new-btn {
@@ -486,7 +486,7 @@
 .llm-profiles-save-row {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--space-1);
   flex: 1;
 }
 
@@ -506,11 +506,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-sm);
-  padding: 5px var(--spacing-sm);
-  border: 1px solid var(--color-border);
+  gap: var(--space-2);
+  padding: 5px var(--space-2);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  background: var(--bg-surface);
 }
 
 .llm-profile-info {
@@ -522,12 +522,12 @@
 .llm-profile-name {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--text);
 }
 
 .llm-profile-meta {
   font-size: 0.75rem;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
   font-family: var(--font-mono, monospace);
   white-space: nowrap;
   overflow: hidden;
@@ -550,7 +550,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--color-text-tertiary, var(--color-text-secondary));
+  color: var(--text-muted);
   font-size: 0.9rem;
   padding: 2px 5px;
   border-radius: var(--radius-sm);
@@ -558,11 +558,11 @@
   transition: color 0.1s;
 }
 
-.llm-profile-del:hover { color: var(--color-error, #dc2626); }
+.llm-profile-del:hover { color: var(--red); }
 
 .llm-profiles-empty {
   font-size: 0.8rem;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
   margin: 0;
 }
 
@@ -570,35 +570,35 @@
 
 .llm-no-vendor {
   font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  padding: var(--spacing-md) 0;
+  color: var(--text-dim);
+  padding: var(--space-3) 0;
   margin: 0;
 }
 
 /* Legacy notice */
 .llm-legacy {
   display: flex;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  border: 1px solid var(--color-border);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  margin-bottom: var(--spacing-lg);
+  background: var(--bg-surface);
+  margin-bottom: var(--space-4);
   font-size: 0.875rem;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
 }
 
 .llm-legacy strong {
   display: block;
   margin-bottom: 2px;
-  color: var(--color-text-primary);
+  color: var(--text);
 }
 
 .llm-legacy p { margin: 0; line-height: 1.4; }
 
 /* Buttons */
 .llm-btn {
-  padding: 5px var(--spacing-md);
+  padding: 5px var(--space-3);
   border-radius: var(--radius-sm);
   font-size: 0.875rem;
   font-weight: 500;
@@ -611,68 +611,68 @@
 .llm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .llm-btn-primary {
-  background: var(--color-accent);
-  color: var(--color-accent-contrast, #fff);
-  border-color: var(--color-accent);
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
 }
 
 .llm-btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
 
 .llm-btn-secondary {
   background: transparent;
-  color: var(--color-text-secondary);
-  border-color: var(--color-border);
+  color: var(--text-dim);
+  border-color: var(--border);
 }
 
-.llm-btn-secondary:hover:not(:disabled) { background: var(--color-surface-hover); }
+.llm-btn-secondary:hover:not(:disabled) { background: var(--bg-hover); }
 
 .llm-btn-loading { opacity: 0.65; cursor: wait; }
 
 /* Error states */
 .llm-error-state {
-  padding: var(--spacing-md);
+  padding: var(--space-3);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-error, #dc2626) 10%, transparent);
-  color: var(--color-error, #dc2626);
-  margin-bottom: var(--spacing-lg);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+  color: var(--red);
+  margin-bottom: var(--space-4);
   font-size: 0.875rem;
 }
 
 .llm-save-hint {
   flex: 1;
   font-size: 0.875rem;
-  color: var(--color-text-secondary);
+  color: var(--text-dim);
 }
 
 /* ── Google API key link ─────────────────────────────────────────── */
 
 .llm-field-desc a {
-  color: var(--color-accent);
+  color: var(--accent);
 }
 
 /* ── Second-model verifier (collapsible, local vendor advanced section) ── */
 
 .llm-verifier-details {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--color-surface);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
 }
 
 .llm-verifier-details > *:not(.llm-verifier-summary) {
-  margin-top: var(--spacing-sm);
+  margin-top: var(--space-2);
 }
 
 .llm-verifier-summary {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--text);
   cursor: pointer;
   user-select: none;
 }
 
 .llm-verifier-details[open] .llm-verifier-summary {
-  margin-bottom: var(--spacing-xs, 4px);
+  margin-bottom: var(--space-1);
 }
 
 /* ── Effective block: what `work` will run, and why it might refuse ── */
