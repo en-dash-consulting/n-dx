@@ -307,7 +307,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     ),
     settingsOpen
       ? h(SettingsOverlay, { view, validViews, onNavigate: handleSidebarNav, onClose: closeSettings, server },
-          loading ? null : renderActiveView(view, viewCtx),
+          renderActiveView(view, viewCtx),
         )
       : null,
     (refreshToast && !isFeatureDisabled("autoRefresh"))
