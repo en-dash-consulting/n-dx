@@ -9,11 +9,11 @@ tags:
   - "v2-rules"
 source: "overnight-side-session"
 acceptanceCriteria:
-  - "checkV2Rules reports an error when a change touches an area, or amends an area other than as the `under` of an added node (test)"
-  - "An area as the `under` of an added amendment stays valid (test)"
+  - "checkV2Rules reports an error when a change touches an area, or names an area as the target of a `modified` amendment (test)"
+  - "A `removed` amendment may name an area, as apply-amendments and rex reshape use it, and an area as the `under` of an added amendment stays valid (test)"
   - "The v2 fixture tree still passes every rule (test)"
   - "The changeset carries one line fit for the release notes, saying this tightens a v2 rule under the soft freeze"
-description: "ref-resolves accepts any product node for a change's touches and for a non-added amends target (packages/rex/src/schema/v2-rules.ts, PRODUCT_NODE), so a change can name an area. Placement already refuses an area (core/change-place.ts recordPlacement). Fix it in the rules, with no schema shape change."
-lastModified: "2026-10-10T05:16:44.405Z"
+description: "ref-resolves accepts any product node for a change's touches and for a non-added amends target (packages/rex/src/schema/v2-rules.ts, PRODUCT_NODE), so a change can name an area. Placement already refuses an area (core/change-place.ts recordPlacement). Fix it in the rules, with no schema shape change.\n\nDecision (2026-10-10, D1): a `removed` amendment on an area stays valid. apply-amendments retires an area together with its descendants (tests/unit/core/apply-amendments.test.ts), and rex reshape drafts a `removed` amendment for an OBSOLETE area (tests/integration/layer-aware-restructure.test.ts). Only `touches` and `modified` must name a capability or constraint. The first run (8611f18d) stopped on this conflict."
+lastModified: "2026-10-10T17:42:28.580Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
