@@ -514,6 +514,20 @@ describe("layer-nesting", () => {
     expect(ids(findings)).toEqual([task.id, capability.id]);
   });
 
+  it("fails a task at the changes root, a subtask under a change, and a task under a task", () => {
+    const rootTask = node("task");
+    const subUnderChange = node("subtask");
+    const inner = node("task");
+    const outer = node("task", {}, [inner]);
+    const changes = [rootTask, node("change", {}, [subUnderChange, outer])];
+    expect(ids(check("layer-nesting", { changes }))).toEqual([rootTask.id, subUnderChange.id, inner.id]);
+  });
+
+  it("keeps a change nested under a change valid", () => {
+    const changes = [node("change", {}, [node("change", {}, [node("task")])])];
+    expect(check("layer-nesting", { changes })).toEqual([]);
+  });
+
   it("fails a root loaded under the other layer's root", () => {
     const change = node("change");
     const area = node("area");
