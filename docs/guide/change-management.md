@@ -213,7 +213,7 @@ ndx analyze .
 ndx recommend --actionable-only .
 ndx recommend --acknowledge .
 ndx status .
-git diff --stat .rex/prd_tree/          # how many changes?
+git status --short .rex/prd_tree/ | wc -l   # how many changes? (includes new items)
 ```
 
 **Quarterly full reset (if PRD drift is high):**
@@ -294,9 +294,7 @@ The item returns to the PRD tree under its original parent, with all history int
 
 ### Pruning the archive
 
-The archive auto-trims at 100 batches (to prevent unbounded growth). You can also manually clear old items:
-
-There is no command for pruning the archive by age. Archived items are only used for recovery and audit, so the file is safe to delete (`rm .rex/archive.json`) if it grows large; you lose the ability to restore those items.
+The archive auto-trims at 100 batches (to prevent unbounded growth). There is no command for pruning the archive by age. Archived items are only used for recovery and audit, so the file is safe to delete (`rm .rex/archive.json`) if it grows large; you lose the ability to restore those items.
 
 ## Common pitfalls and recovery
 
@@ -335,6 +333,7 @@ If you want to preserve some of the old PRD structure before resetting:
 
 ```sh
 ndx prd export --out=./prd-backup.json .   # portable bundle, written outside .rex/
+                                           # restore: ndx prd import --in=./prd-backup.json --replace --yes .
 ndx plan --accept .
 # Now .rex/archive.json contains your old items for recovery
 ```
