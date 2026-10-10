@@ -25,3 +25,4 @@ Config keys (`.ndx/config.json` or `.n-dx.json`):
 |-----|---------|
 | `graview.bin` | Path to the graview binary or its `cli.js`; a `.js` path runs under the current Node |
 | `graview.includeFiles` | Project file nodes by default (same as `--files`) |
+| `graview.app` | A product face built from the emitted document (the `n-dx-graview` checkout); `ndx graview serve` runs its dev server on the fresh projection, with `NDX_GRAVIEW_DIR` pointing at the files |

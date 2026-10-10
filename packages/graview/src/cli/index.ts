@@ -27,7 +27,8 @@ const USAGE = `ndx graview <command> [dir] [flags]
   emit [dir] [--files]            write document.json and snapshot.json under the graview dir
   check [dir] [--json]            graview check on the emitted declaration
   describe [dir] [--place <slug>] graview describe over the emitted snapshot
-  serve [dir] [--port <n>]        graview serve: the store over HTTP + WebSocket, refreshed from the snapshot
+  serve [dir] [--port <n>]        graview serve: the store over HTTP + WebSocket, refreshed from the snapshot;
+                                  with graview.app in the config, that product's dev server on the fresh projection
   mcp [dir] [--list]              graview mcp --read-only over stdio on the same store
 
   --files    project every source file as a node (default: zones and components only)
@@ -86,6 +87,26 @@ async function runGraview(command: GraviewCommand, args: string[], cwd: string):
   return result.exitCode ?? 1;
 }
 
+/**
+ * A product face over the projection (`graview.app` in the config): its dev
+ * server, told where the fresh document and snapshot are through
+ * `NDX_GRAVIEW_DIR`, which its sync step reads. A `--port` goes to it. The
+ * app owns its own package manager and scripts; this only has to be in its
+ * directory and name the data.
+ */
+async function serveProductApp(appDir: string, emitted: EmitResult, passthrough: string[], say: (line: string) => void): Promise<number> {
+  if (!existsSync(appDir)) {
+    console.error(`Error: graview.app names ${appDir}, which does not exist.`);
+    return 1;
+  }
+  const pm = existsSync(resolve(appDir, "pnpm-lock.yaml")) ? "pnpm" : "npm";
+  const cmd = process.platform === "win32" ? `${pm}.cmd` : pm;
+  const args = pm === "pnpm" ? ["dev", ...(passthrough.length ? ["--", ...passthrough] : [])] : ["run", "dev", ...(passthrough.length ? ["--", ...passthrough] : [])];
+  say(`product face: ${appDir} (${pm} dev)`);
+  const result = await spawnTool(cmd, args, { cwd: appDir, stdio: "inherit", env: { ...process.env, NDX_GRAVIEW_DIR: emitted.graviewDir } });
+  return result.exitCode ?? 1;
+}
+
 /** `graview sync-seed --apply --prune` when a store exists, so it mirrors the fresh snapshot. */
 async function refreshStore(command: GraviewCommand, emitted: EmitResult): Promise<number> {
   mkdirSync(emitted.dataDir, { recursive: true });
@@ -137,6 +158,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     case "describe":
       return runGraview(command, ["describe", emitted.documentPath, "--seed", emitted.snapshotPath, ...parsed.passthrough], root);
     case "serve": {
+      if (config.app) return serveProductApp(config.app, emitted, parsed.passthrough, say);
       const refreshed = await refreshStore(command, emitted);
       if (refreshed !== 0) return refreshed;
       return runGraview(command, ["serve", emitted.documentPath, "--data", emitted.dataDir, "--seed", emitted.snapshotPath, ...parsed.passthrough], root);

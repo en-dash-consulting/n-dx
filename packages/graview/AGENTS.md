@@ -41,3 +41,14 @@ carries, never a judgement rex has not made.
 
 File nodes are opt-in (`--files`): zones, components and entry points keep a
 repository this size inside Graview's comfortable scale.
+
+### The product face
+
+`graview.app` in the project config names a checkout of a Graview product
+built from the emitted document (the sibling `n-dx-graview` repository). With
+it set, `ndx graview serve .` emits, then runs that product's dev server with
+`NDX_GRAVIEW_DIR` pointing at the fresh files, instead of the bare
+`graview serve` (which is the store's HTTP and WebSocket wire and draws
+nothing). The declaration's `views` (home, per-kind card/row/page blocks),
+`glance`, `page` groups, `computed` fields, `brand` and titled `lenses` are
+what that face draws; keep the data there, and React only in the product.
