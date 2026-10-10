@@ -176,7 +176,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `hench record` | n/a | — | Plumbing for the assisted-run skills (`/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config`); reads its token usage from the Claude Code session transcript |
 | `hench init` | n/a | — | Covered by `ndx init` |
 
-## Rex MCP tools (16)
+## Rex MCP tools (18)
 
 MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Coverage below records whether an equivalent human surface exists, since a capability reachable by agents but invisible to humans is an observability gap.
 
@@ -184,6 +184,8 @@ MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Cover
 |------|---------------|----------|
 | `get_prd_status` | Rex dashboard stats + PRD tree | full |
 | `get_next_task` | Next-task card | full |
+| `claim_task` | PRD tree shows a "claimed · <worktree>" chip on a claimed row; no control to take a claim | partial |
+| `release_task` | Held claims name the release command in the chip tooltip; no release control | partial |
 | `update_task_status` | Inline status picker / bulk actions | full |
 | `add_item` | Add-item + smart-add | full |
 | `edit_item` | Detail panel editing | full |
