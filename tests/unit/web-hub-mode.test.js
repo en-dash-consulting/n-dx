@@ -10,6 +10,7 @@ import { chmodSync, mkdtempSync, mkdirSync, realpathSync, rmSync, statSync, writ
 import { join } from "node:path";
 import { platform, tmpdir } from "node:os";
 import {
+  browserOpenCommand,
   deriveProjectId,
   ensureAuthTokenFile,
   hubAuthMismatchMessage,
@@ -194,6 +195,33 @@ describe("hubDashboardUrl", () => {
 
   it("is the plain URL when there is no token", () => {
     expect(hubDashboardUrl(3117, "alpha", null)).toBe("http://localhost:3117/p/alpha/");
+  });
+});
+
+describe("browserOpenCommand", () => {
+  const url = "http://localhost:3117/p/my%20app/?ndx_token=a%PATH%b%2F";
+
+  it("opens on win32 through rundll32, with no cmd.exe, shell or verbatim arguments", () => {
+    const { command, args, options } = browserOpenCommand(url, "win32");
+    expect(command).toBe("rundll32.exe");
+    expect(args).toEqual(["url.dll,FileProtocolHandler", url]);
+    expect(options.windowsVerbatimArguments).toBeUndefined();
+    expect(options.shell).toBeUndefined();
+  });
+
+  it("uses open on darwin with the URL as the only argument", () => {
+    expect(browserOpenCommand(url, "darwin")).toMatchObject({ command: "open", args: [url] });
+  });
+
+  it("uses xdg-open elsewhere with the URL as the only argument", () => {
+    expect(browserOpenCommand(url, "linux")).toMatchObject({ command: "xdg-open", args: [url] });
+  });
+
+  it("passes a hub dashboard URL with percent escapes through byte-for-byte", () => {
+    const dashboard = hubDashboardUrl(3117, "my app", "t%PATH%k/en");
+    for (const p of ["win32", "darwin", "linux"]) {
+      expect(browserOpenCommand(dashboard, p).args.at(-1)).toBe(dashboard);
+    }
   });
 });
 
