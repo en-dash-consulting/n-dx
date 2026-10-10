@@ -2447,7 +2447,53 @@ async function loadAllConfigs(dir) {
     configs.language = projectConfig.language;
   }
 
-  return { configs, rawConfigs };
+  return { configs, rawConfigs, projectConfig };
+}
+
+/**
+ * Resolve the same filtered environment as hench for cross-vendor reviewers.
+ * Config I/O and foundation loading stay in the spawn-exempt config module.
+ * @param {string} dir
+ * @param {"claude" | "codex"} vendor
+ * @returns {Promise<NodeJS.ProcessEnv>}
+ */
+export async function loadVendorCliEnv(dir, vendor) {
+  const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
+  const envPolicy = await loadProjectEnvPolicy(dir);
+  const llmConfig = await loadLLMConfig(dir);
+  return resolveVendorCliEnv({ ...llmConfig, vendor }, envPolicy);
+}
+
+/** The project's `hench.guard.env` policy, `.hench/config.json` merged with `.n-dx.json`. */
+async function loadProjectEnvPolicy(dir) {
+  const { configs, projectConfig } = await loadAllConfigs(dir);
+  return configs.hench?.guard?.env ?? projectConfig.hench?.guard?.env;
+}
+
+/**
+ * Environment for the reviewer's shell test command: `process.env` filtered by
+ * the project's `hench.guard.env` policy, with none of a vendor CLI's
+ * authentication exceptions — the test command is not a vendor CLI.
+ *
+ * When the project policy cannot be loaded or compiled, the default deny
+ * policy applies and `policyError` says why, so the caller can report it.
+ * Never returns the unfiltered parent environment.
+ *
+ * @param {string} dir
+ * @returns {Promise<{ env: NodeJS.ProcessEnv; policyError?: string }>}
+ */
+export async function loadShellTestEnv(dir) {
+  const { compileEnvPolicy, sanitizeChildEnv } = await import("@n-dx/llm-client");
+  let policy;
+  let policyError;
+  try {
+    policy = compileEnvPolicy(await loadProjectEnvPolicy(dir));
+  } catch (err) {
+    policy = compileEnvPolicy(undefined);
+    policyError = err instanceof Error ? err.message : String(err);
+  }
+  const env = sanitizeChildEnv(process.env, policy);
+  return policyError === undefined ? { env } : { env, policyError };
 }
 
 // ── Test connection handler ──────────────────────────────────────────────────

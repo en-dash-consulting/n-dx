@@ -5,6 +5,8 @@
  * importing schema modules from higher orchestration layers.
  */
 
+import type { EnvPolicyConfig } from "../prd/llm-gateway.js";
+
 /** Configurable subset of policy limits (all optional, defaults applied at runtime). */
 export interface PolicyLimitsConfig {
   /** Maximum commands per minute (0 = unlimited). */
@@ -25,12 +27,7 @@ export interface PolicyLimitsConfig {
  * see `DEFAULT_ENV_DENY` in `guard/env.ts` — and `allow` punches holes in that
  * list for variables a project's tests genuinely need.
  */
-export interface EnvPolicyConfig {
-  /** Additional variable-name globs to strip. */
-  deny?: string[];
-  /** Variable-name globs to pass through even when a deny glob matches. */
-  allow?: string[];
-}
+export type { EnvPolicyConfig };
 
 export interface GuardConfig {
   blockedPaths: string[];

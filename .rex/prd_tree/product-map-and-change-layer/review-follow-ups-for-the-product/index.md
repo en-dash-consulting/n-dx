@@ -18,7 +18,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A change's touches and amends name a capability or constraint](./a-change-s-touches-and-amends-name-a.md) | pending |
+| [A change's touches and amends name a capability or constraint](./a-change-s-touches-and-amends-name-a.md) | completed |
+| [add_item MCP describes touches as any product node IDs, though an area is now refused](./add-item-mcp-describes-touches-as-any.md) | pending |
 | [An open fix: true change that adds a capability marks the new capability defective while its kind is feature](./an-open-fix-true-change-that-adds-a.md) | completed |
 | [Apply refuses removing one member of a pre-existing dependsOn knot that stays cyclic](./apply-refuses-removing-one-member-of-a.md) | pending |
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | pending |
@@ -52,6 +53,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | pending |
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | pending |
 | [v2 isolation test misses imports of the core v2 modules and dynamic import() of any v2 module](./v2-isolation-test-misses-imports-of.md) | pending |
-| [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | pending |
+| [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
 | [Wire ndx migrate --plan to write the classified plan](./wire-ndx-migrate-plan-to-write-the.md) | pending |
 | [Write Inbox changes to the reserved changes/inbox/ folder, and move them out on placement](./write-inbox-changes-to-the-reserved.md) | pending |

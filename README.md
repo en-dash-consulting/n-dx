@@ -452,6 +452,30 @@ Two limits to know. With `provider: cli`, the vendor CLI (Claude Code, Codex) ex
 
 Commands the agent runs (shell, git, the test runner) receive `process.env` minus variables whose names look like credentials — `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*_API_KEY`, `AWS_*`, and so on. Values are never inspected. A project whose tests need one of them lists it under `guard.env.allow` in `.hench/config.json`; `guard.env.deny` strips more. The default blocked paths also cover credential files (`.env`, `.env.*`, `*.pem`, `*.key`, `.npmrc`, `.netrc`, `.aws/`, `.ssh/`).
 
+Every vendor CLI n-dx launches gets the same filter, plus that vendor's own
+authentication. Claude retains `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`,
+`CLAUDE_CODE_OAUTH_TOKEN`, and `CLAUDE_CONFIG_DIR`, and with
+`CLAUDE_CODE_USE_BEDROCK` or `CLAUDE_CODE_USE_VERTEX` on, that mode's AWS or
+Google credentials; Codex retains `OPENAI_API_KEY`, `CODEX_API_KEY`,
+`CODEX_ACCESS_TOKEN`, and `CODEX_HOME`. Configured API keys override exported
+keys. Google retains its configured `apiKeyEnv` (default `GEMINI_API_KEY`).
+Home, PATH, proxy and CA plumbing still passes unless explicitly denied.
+Other tokens must be explicitly allowed.
+
+The project's `guard.env` policy applies to hench runs (`ndx work`) and the
+cross-vendor reviewer. The one-shot completions rex, sourcevision and the
+dashboard make (analysis, proposals, Ask) need no project credentials and
+always use the default filter; `guard.env.allow` does not reach them.
+
+CLI-started MCP servers inherit this filtered environment. `TYPESAFE_API_KEY`
+is stripped by default: rex placement's `both` mode falls back to text and
+`jev` mode falls back to rules, with the existing unavailable-key warning.
+To opt those MCP calls into Jev, add `TYPESAFE_API_KEY` to
+`hench.guard.env.allow` in `.n-dx.json` (or `guard.env.allow` in the hench
+config). The same opt-in applies to test-suite credentials such as
+`GITHUB_TOKEN`. Allowed credentials are then accessible to the vendor CLI's
+tools too. Each hench run logs stripped names once, never their values.
+
 ### No install-time hooks
 
 All packages use only `prepare` scripts (TypeScript compilation). There are no `preinstall`, `postinstall`, or native code compilation steps.
