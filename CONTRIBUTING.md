@@ -265,8 +265,33 @@ Keep the trailers in one unbroken run of lines at the end of the message. Git
 stops parsing at the first blank line, so a trailer below one is body text.
 
 The same applies to pull requests: `.github/pull_request_template.md` ends in a
-trailer block, because GitHub copies the PR description into the squash-merge
-commit that lands on `main`.
+trailer block. The repository lands with merge commits only, and the merge
+commit's body is the PR description, so the template's trailer block still
+reaches `main`.
+
+---
+
+### Landing a pull request
+
+`main` has a merge queue. To land a PR:
+
+1. **Get the approval.** Where `.github/CODEOWNERS` covers a path you changed,
+   that includes a code-owner approval.
+2. **Click "Merge when ready".** The queue tests `main` plus your PR (or a
+   batch of queued PRs) on a temporary `gh-readonly-queue/main/*` branch and,
+   if the required checks pass, lands it with a merge commit.
+
+Rules:
+
+- **The queue's merge method is merge commit. Never squash or rebase.** rex
+  reads when a change landed from git ancestry and `N-DX-Item` trailers;
+  squashing or rebasing rewrites both. Squash and rebase are disabled for the
+  repository, and the queue setting must stay on merge commit.
+- **A stack lands by queueing its top PR only.** The top PR targets `main` and
+  carries every lower layer. Never queue a lower layer on its own.
+- **Merge `main` into your branch only when it conflicts.** The queue does the
+  up-to-date testing, so routine "Update branch", rebuilds and gate re-runs
+  before landing are no longer needed.
 
 ---
 
