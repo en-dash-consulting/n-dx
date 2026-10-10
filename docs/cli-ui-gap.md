@@ -184,7 +184,7 @@ MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Cover
 |------|---------------|----------|
 | `get_prd_status` | Rex dashboard stats + PRD tree | full |
 | `get_next_task` | Next-task card | full |
-| `claim_task` | PRD tree shows a "claimed · <worktree>" chip on a claimed row; no control to take a claim | partial |
+| `claim_task` | PRD tree shows a `claimed · <worktree>` chip on a claimed row; no control to take a claim | partial |
 | `release_task` | Held claims name the release command in the chip tooltip; no release control | partial |
 | `update_task_status` | Inline status picker / bulk actions | full |
 | `add_item` | Add-item + smart-add | full |
