@@ -80,11 +80,11 @@ describe("terraform language config", () => {
   describe("inventory roles", () => {
     const role = (p: string): string => classifyRole(p, "Terraform", terraformConfig);
 
-    it("classifies roles", () => {
-      expect(role("infra/main.tf")).toBe("source");
+    it("classifies every Terraform file as config until the structure model lands", () => {
+      expect(role("infra/main.tf")).toBe("config");
       expect(role("infra/prod.tfvars")).toBe("config");
       expect(role("live/prod/terragrunt.hcl")).toBe("config");
-      expect(role("infra/tests/basic.tftest.hcl")).toBe("test");
+      expect(role("infra/tests/basic.tftest.hcl")).toBe("config");
     });
 
     it("inventories Terraform files and skips .terraform/", async () => {
@@ -96,7 +96,7 @@ describe("terraform language config", () => {
       const inv = await analyzeInventory(dir, { languageConfig: terraformConfig });
       const byPath = Object.fromEntries(inv.files.map((f) => [f.path, f.role]));
       expect(byPath).toEqual({
-        "main.tf": "source",
+        "main.tf": "config",
         "prod.tfvars": "config",
         "live/terragrunt.hcl": "config",
       });
