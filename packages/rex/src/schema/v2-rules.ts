@@ -543,8 +543,11 @@ const titleReleaseTokenRule: Rule = ({ entries }, { releases }) =>
       : [];
   });
 
-/** Where a change-layer node may sit beyond its own layer. A change may nest under a change. */
-const CHANGE_LAYER_PARENT: Record<string, string> = { task: "change", subtask: "task" };
+/**
+ * Where a change-layer node may sit beyond its own layer. A change may nest
+ * under a change; a subtask under a subtask, as v1 branch subtasks import.
+ */
+const CHANGE_LAYER_PARENT: Record<string, readonly string[]> = { task: ["change"], subtask: ["task", "subtask"] };
 
 const layerNesting: Rule = ({ entries }) =>
   entries.flatMap(({ node, parent, root }) => {
@@ -554,8 +557,8 @@ const layerNesting: Rule = ({ entries }) =>
       return [finding("layer-nesting", node, `${node.type} "${node.title}" sits under ${where}; nodes never nest across the product and change layers`)];
     }
     const wanted = CHANGE_LAYER_PARENT[node.type];
-    if (wanted && parent?.type !== wanted) {
-      return [finding("layer-nesting", node, `${node.type} "${node.title}" sits under ${where}; a ${node.type} belongs directly under a ${wanted}`)];
+    if (wanted && !(parent && wanted.includes(parent.type))) {
+      return [finding("layer-nesting", node, `${node.type} "${node.title}" sits under ${where}; a ${node.type} belongs directly under a ${wanted.join(" or a ")}`)];
     }
     return [];
   });
