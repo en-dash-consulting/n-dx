@@ -52,7 +52,9 @@ A change that only *touches* a capability is a fix or a refactor: it writes noth
 
 ### 2. Close finished work, cancel dropped work
 
-For each open change, ask whether its code has merged. If it has, close its remaining tasks; if the idea was dropped, cancel the change rather than leaving it open. A cancelled change no longer counts toward any capability's status. From an assistant, use `update_task_status`; in the dashboard, edit the item's status.
+For each open change, ask whether its code has merged. If it has, close its remaining tasks; if the idea was dropped, cancel the change rather than leaving it open. A cancelled change no longer counts toward any capability's status.
+
+The status commands (`rex update`, `update_task_status`, `ndx status`) and the dashboard's status editing read the v1 layout only: on a v2 PRD they stop with "Rex directory not found". Until they read v2, there is no command that closes or cancels a v2 change; this step applies to v1 projects (see [v1 projects](#v1-projects)).
 
 ### 3. Resolve the requirements that need attention
 
