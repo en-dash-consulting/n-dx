@@ -226,6 +226,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
 
   const emitted = await emitProjection(parsed.dir, {
     files: parsed.files || config.includeFiles === true,
+    ref: config.mainRef,
     warn: (message) => console.error(`warning: ${message}`),
   });
   say(describeEmit(emitted));

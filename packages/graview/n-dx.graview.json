@@ -827,7 +827,7 @@
     "release": {
       "noun": "release",
       "plural": "Releases",
-      "description": "A version changes are planned for or shipped in. Never a container: a field on the change, read here as a node so the plan can be drawn.",
+      "description": "A version changes are planned for or shipped in, or that git tagged. Never a container: a field on the change and a tag in git, read here as a node so the plan can be drawn.",
       "figure": "shift",
       "label": "{version}",
       "glance": [
@@ -848,11 +848,16 @@
           "type": "integer",
           "label": "Shipped",
           "min": 0
+        },
+        "taggedAt": {
+          "type": "datetime",
+          "label": "Tagged"
         }
       },
       "page": {
         "fields": [
           "version",
+          "taggedAt",
           "plannedChanges",
           "shippedChanges"
         ]
@@ -1176,11 +1181,12 @@
     "commit": {
       "noun": "commit",
       "plural": "Commits",
-      "description": "A commit whose N-DX-Item trailer ties it to the work it was for.",
+      "description": "A commit on main whose N-DX-Item trailer ties it to the work it was for.",
       "figure": "note",
       "label": "{subject}",
       "glance": [
-        "sha"
+        "committedAt",
+        "author"
       ],
       "fields": {
         "sha": {
@@ -1189,9 +1195,24 @@
         },
         "subject": {
           "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "committedAt": {
+          "type": "datetime",
+          "label": "Committed"
         }
       },
       "edges": {
+        "landedFor": {
+          "to": [
+            "change",
+            "task"
+          ],
+          "description": "the work this commit's trailer names",
+          "inverse": "the commits that landed for it"
+        },
         "realizes": {
           "to": [
             "capability"
@@ -1203,7 +1224,9 @@
       "page": {
         "fields": [
           "subject",
-          "sha"
+          "sha",
+          "author",
+          "committedAt"
         ]
       }
     }

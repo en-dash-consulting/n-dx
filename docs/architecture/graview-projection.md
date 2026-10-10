@@ -61,12 +61,12 @@ with an empty product layer, through the same code path a v2 repository uses.
 | `area`, `capability`, `constraint` | rex product layer, with `computeProductStatus` as `intentStatus` and `health` | rex id |
 | `change` | rex change layer; `deriveChangeKind` as `changeKind`; `needsPlacement` as `inbox` | rex id |
 | `task` | rex tasks and subtasks (`level`) | rex id |
-| `release` | every `plannedRelease` and `shippedIn` value | `release:<version>` |
+| `release` | every `plannedRelease` and `shippedIn` value, and every release tag git has (`X.Y.Z`, `vX.Y.Z` or `<package>@X.Y.Z`, dated by the tag; `graview.mainRef` picks the branch) | `release:<version>` |
 | `zone` | `zones.json`, sub-zones included | zone id |
 | `component` | `components.json` | `component:<file>#<name>` |
 | `file` (with `--files`) | `inventory.json` | `file:<path>` |
 | `run` | `<henchDir>/runs/*.json[.gz]` | run id |
-| `commit` | a run's `commits`, and `computeRealizedBy`'s trailer commits | sha |
+| `commit` | every commit on main whose `N-DX-Item` trailer names a change or task (`loadTrailerCommits`: subject, author, date), and a run's `commits` | sha |
 
 | Edge (declared on the kind it leaves) | From |
 |---|---|
@@ -76,11 +76,17 @@ with an empty product layer, through the same code path a v2 repository uses.
 | `amends`, `touches` | `change.amends[].target`, `change.touches` (rex derives `changedBy` and `coChanges` from these) |
 | `blockedBy` | `blockedBy` on changes and tasks |
 | `discoveredFrom` | `change.discoveredFrom.item` / `.run` |
-| `plannedFor`, `shippedWith` | `change.plannedRelease`, `ItemState.shippedIn` |
+| `plannedFor`, `shippedWith` | `change.plannedRelease`, `ItemState.shippedIn`; a finished change with no stamped `shippedIn` ships with the first release tag containing its landing (`computeLandings`, `releasesContaining`: rex's `resolveShippedIn` answer, for every change in one walk) |
+| `landedFor` (commit → change or task) | the commit's `N-DX-Item` trailers |
 | `realizedIn` (capability → zone), `realizes` (commit → capability) | `computeRealizedBy` through N-DX-Item trailers and the zone map |
 | `inZone` | a component's or file's deepest zone |
 | `crosses` | `zones.json` crossings and sub-crossings |
 | `ranFor`, `produced` | `RunRecord.taskId`, `RunRecord.commits` |
+
+A v1 tree gets all of this too: its epics and features are changes with
+`completedAt`, its tasks carry the trailers, and the tags are git's. What it
+cannot get is the product layer, so capabilities, areas, constraints and the
+`realizes` edges arrive with the v2 migration.
 
 `packages/graview/src/document.ts` holds the two mapping tables
 (`NODE_KINDS`, `PRODUCT_EDGE_SOURCES`) and `tests/unit/document.test.ts` fails

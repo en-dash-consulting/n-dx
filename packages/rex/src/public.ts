@@ -103,7 +103,10 @@ export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOption
 
 export { computeEdges, computeRealizedBy, deriveChangeKind, resolveNode, trailerIds, CHANGE_KINDS } from "./core/product-edges.js";
 export type { ProductEdges, CoChange, Realization, RealizedByOptions, ChangeKind } from "./core/product-edges.js";
-export type { ChangeCommitsOptions } from "./core/change-commits.js";
+export { loadTrailerCommits } from "./core/change-commits.js";
+export type { ChangeCommitsOptions, TrailerCommit } from "./core/change-commits.js";
+export { computeLandings, listReleaseTags, releasesContaining } from "./core/change-landing.js";
+export type { ChangeLanding, ReleaseTag } from "./core/change-landing.js";
 export { computeProductStatus, INTENT_STATUSES, HEALTH_VALUES } from "./core/product-status.js";
 export type { IntentStatus, Health, ProductStatus } from "./core/product-status.js";
 export { productReport, capabilityReport, prdStatusReport } from "./core/product-report.js";

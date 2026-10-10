@@ -45,7 +45,7 @@ describe("n-dx.graview.json", () => {
     const edges = declaredEdges(doc);
     for (const edge of [
       "under", "dependsOn", "appliesTo", "amends", "touches", "blockedBy", "discoveredFrom",
-      "plannedFor", "shippedWith", "realizedIn", "realizes", "inZone", "crosses", "ranFor", "produced",
+      "plannedFor", "shippedWith", "realizedIn", "realizes", "landedFor", "inZone", "crosses", "ranFor", "produced",
     ]) {
       expect(edges.has(edge), `edge "${edge}" is emitted but not declared`).toBe(true);
     }

@@ -22,6 +22,7 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
   const page = opening(declaredPage(context, app, node));
   const work = workUnder(store, id);
   const runs = runsFor(store, id);
+  const commits = inward(store, id, "landedFor");
   const waits = out(store, id, "blockedBy");
   const waiting = inward(store, id, "blockedBy");
   const depthOf = new Map<string, number>();
@@ -91,7 +92,21 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
             </Rows>
           )}
         </Section>
-        <Section title={waits.length || waiting.length ? "Order" : "Waits for nothing"} i={8}>
+        <Section title="Commits" i={8} testId="change-commits">
+          {commits.length === 0 ? (
+            <Empty>No commit on main names this change or its tasks in an N-DX-Item trailer.</Empty>
+          ) : (
+            <Rows>
+              {commits.slice(0, 12).map((c, i) => (
+                <RecordRow key={c.id} context={context} node={c} i={i} sub={`${String(c.sha ?? "").slice(0, 10)} · ${when(c.committedAt)}${c.author ? ` · ${String(c.author)}` : ""}`} end={null} />
+              ))}
+            </Rows>
+          )}
+        </Section>
+      </div>
+
+      <div className="ndx-two">
+        <Section title={waits.length || waiting.length ? "Order" : "Waits for nothing"} i={9}>
           {waits.length === 0 && waiting.length === 0 ? (
             <Empty>Nothing has to finish first, and nothing is waiting on this.</Empty>
           ) : (
@@ -113,7 +128,7 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
         </Section>
       </div>
 
-      <Section title="Facts" i={9}>
+      <Section title="Facts" i={10}>
         <Facts fields={facts.fields.filter((f) => f.key !== "intent" && f.key !== "title")} />
       </Section>
     </Page>

@@ -32,6 +32,12 @@ export interface GraviewConfig {
   /** Project every source file as a node by default. */
   includeFiles?: boolean;
   /**
+   * The branch the commits and landings are read from (`main`,
+   * `upstream/main`). Unset, rex's own default: the first of `origin/HEAD`,
+   * `origin/main`, `main` that resolves.
+   */
+  mainRef?: string;
+  /**
    * A product face for this project: the checkout (or built site) of a Graview
    * app built from the emitted document. Unset, `@n-dx/graview-face` is found
    * beside this package or in node_modules. `ndx graview serve` runs the face
@@ -58,9 +64,10 @@ export function readGraviewConfig(layout: Layout): GraviewConfig {
   for (const file of [layout.configFile, layout.localConfigFile]) {
     const section = readConfigFile(file).graview;
     if (section === null || typeof section !== "object") continue;
-    const { bin, includeFiles, app } = section as Record<string, unknown>;
+    const { bin, includeFiles, app, mainRef } = section as Record<string, unknown>;
     if (typeof bin === "string" && bin.trim().length > 0) out.bin = bin.trim();
     if (typeof includeFiles === "boolean") out.includeFiles = includeFiles;
+    if (typeof mainRef === "string" && mainRef.trim().length > 0) out.mainRef = mainRef.trim();
     if (typeof app === "string" && app.trim().length > 0) out.app = isAbsolute(app.trim()) ? app.trim() : resolve(layout.root, app.trim());
   }
   return out;

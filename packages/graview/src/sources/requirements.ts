@@ -4,7 +4,9 @@
  * One reader for both layouts. On a v1 tree the product layer is empty and
  * epics and features arrive as changes (rex's `V1_LEVEL_TYPES`), so an
  * un-migrated checkout still projects: its changes, tasks, blockers and
- * releases, with nothing to amend yet.
+ * releases, with nothing to amend yet. Release nodes themselves are the
+ * builder's: it adds the releases git says finished changes landed in before
+ * it counts what each holds.
  */
 import {
   loadPrdModel,
@@ -35,11 +37,6 @@ export function releaseId(version: string): string {
   return `${RELEASE_PREFIX}${version}`;
 }
 
-interface ReleaseTally {
-  planned: number;
-  shipped: number;
-}
-
 export async function readRequirements(rexDir: string, warn: Warn): Promise<RequirementsSlice> {
   const model = await loadPrdModel(rexDir, { warn });
   const tree = model.tree;
@@ -49,7 +46,6 @@ export async function readRequirements(rexDir: string, warn: Warn): Promise<Requ
   const nodes: SnapshotNode[] = [];
   const edges: SnapshotEdge[] = [];
   const ids = new Set<string>();
-  const releases = new Map<string, ReleaseTally>();
 
   const base = (node: RuleNode): Record<string, unknown> => ({
     title: node.title,
@@ -90,12 +86,6 @@ export async function readRequirements(rexDir: string, warn: Warn): Promise<Requ
     }
   };
 
-  const tally = (version: string): ReleaseTally => {
-    const t = releases.get(version) ?? { planned: 0, shipped: 0 };
-    releases.set(version, t);
-    return t;
-  };
-
   const walkChanges = (list: readonly RuleNode[], parent?: RuleNode): void => {
     for (const node of list) {
       if (node.status === "deleted") continue;
@@ -124,14 +114,8 @@ export async function readRequirements(rexDir: string, warn: Warn): Promise<Requ
         for (const t of change.touches ?? []) edges.push({ kind: "touches", from: node.id, to: t });
         if (change.discoveredFrom?.item) edges.push({ kind: "discoveredFrom", from: node.id, to: change.discoveredFrom.item });
         if (change.discoveredFrom?.run) edges.push({ kind: "discoveredFrom", from: node.id, to: change.discoveredFrom.run });
-        if (change.plannedRelease) {
-          tally(change.plannedRelease).planned += 1;
-          edges.push({ kind: "plannedFor", from: node.id, to: releaseId(change.plannedRelease) });
-        }
-        if (typeof change.shippedIn === "string") {
-          tally(change.shippedIn).shipped += 1;
-          edges.push({ kind: "shippedWith", from: node.id, to: releaseId(change.shippedIn) });
-        }
+        if (change.plannedRelease) edges.push({ kind: "plannedFor", from: node.id, to: releaseId(change.plannedRelease) });
+        if (typeof change.shippedIn === "string") edges.push({ kind: "shippedWith", from: node.id, to: releaseId(change.shippedIn) });
       } else {
         fields.description = typeof node.description === "string" ? node.description : undefined;
         fields.priority = node.priority;
@@ -147,11 +131,6 @@ export async function readRequirements(rexDir: string, warn: Warn): Promise<Requ
 
   walkProduct(tree.product);
   walkChanges(tree.changes);
-
-  for (const [version, t] of releases) {
-    nodes.push({ id: releaseId(version), kind: "release", version, plannedChanges: t.planned, shippedChanges: t.shipped });
-    ids.add(releaseId(version));
-  }
 
   return { model, tree, productEdges, ids, nodes, edges };
 }

@@ -31,6 +31,30 @@
       "title": "Code Health & Dependencies"
     },
     {
+      "assignee": "Ryan Keith <ryan.k@endash.us>",
+      "completedAt": "2026-10-09T19:31:05.384Z",
+      "fix": false,
+      "id": "70443075-8352-48a4-a8ed-799505872d4b",
+      "inbox": false,
+      "kind": "change",
+      "lastModified": "2026-10-09T19:31:05.674Z",
+      "lastModifiedBy": "Ryan Keith <ryan.k@endash.us>",
+      "level": "feature",
+      "priority": "medium",
+      "slug": "cli-for-the-product-layer-and-changes",
+      "spike": false,
+      "startedAt": "2026-10-09T19:31:05.384Z",
+      "status": "completed",
+      "tags": [
+        "product-map",
+        "pr-18",
+        "lane-rex-surface",
+        "rex",
+        "core"
+      ],
+      "title": "CLI for the product layer and changes"
+    },
+    {
       "fix": false,
       "id": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6",
       "inbox": false,
@@ -179,19 +203,100 @@
       "title": "LLM Integration"
     },
     {
-      "completedAt": "2026-09-17T03:46:13.946Z",
-      "fix": false,
-      "id": "bf053fb2-509d-4acf-aa61-7243e66027e5",
-      "inbox": false,
-      "kind": "change",
-      "lastModified": "2026-09-17T03:46:13.952Z",
-      "lastModifiedBy": "sterling.h@endash.us <sterling.h@endash.us>",
-      "level": "epic",
-      "slug": "rex",
-      "spike": false,
-      "startedAt": "2026-03-24T20:09:27.774Z",
-      "status": "completed",
-      "title": "Rex"
+      "author": "Ryan Keith",
+      "committedAt": "2026-10-09T02:31:35-04:00",
+      "id": "dcde245d1a5f546abdf70bfaff5ad75b39bc5aea",
+      "kind": "commit",
+      "sha": "dcde245d1a5f546abdf70bfaff5ad75b39bc5aea",
+      "subject": "chore(prd): capture PR 22's review findings"
+    },
+    {
+      "author": "Sterling H",
+      "committedAt": "2026-10-08T13:11:18-07:00",
+      "id": "009f2a732a208d7edcb2c675c3d7c6adb8383742",
+      "kind": "commit",
+      "sha": "009f2a732a208d7edcb2c675c3d7c6adb8383742",
+      "subject": "chore(prd): commit PRD tree changes (task fbbf2cf6-5391-4f9a-aa32-a92f48bcaed2 completed)"
+    },
+    {
+      "author": "Ryan Keith",
+      "committedAt": "2026-10-09T00:07:28-04:00",
+      "id": "021a6aa64b9e977db6f9f2a2635b6d7809b2fbe5",
+      "kind": "commit",
+      "sha": "021a6aa64b9e977db6f9f2a2635b6d7809b2fbe5",
+      "subject": "chore(prd): commit PRD tree changes (task 67f17f2b-c930-4f62-8a78-40f056e64f4b completed)"
+    },
+    {
+      "author": "Sterling H",
+      "committedAt": "2026-10-08T22:24:48-07:00",
+      "id": "02aa8afe08842e6d56b65f52d3364007485b72c2",
+      "kind": "commit",
+      "sha": "02aa8afe08842e6d56b65f52d3364007485b72c2",
+      "subject": "feat(rex): build the v2 agent brief from the change and the capabilities it affects"
+    },
+    {
+      "author": "Ryan Keith",
+      "committedAt": "2026-10-09T03:08:49-04:00",
+      "id": "0316a48dc8cead39507ed79811a0a0fcba6a2775",
+      "kind": "commit",
+      "sha": "0316a48dc8cead39507ed79811a0a0fcba6a2775",
+      "subject": "feat(rex): rex product and rex change verbs; rex add creates a change on a v2 tree"
+    },
+    {
+      "author": "Ryan Keith",
+      "committedAt": "2026-10-09T11:45:34-04:00",
+      "id": "039ee0c79a06fb4786790f233b79a1a53628ef4b",
+      "kind": "commit",
+      "sha": "039ee0c79a06fb4786790f233b79a1a53628ef4b",
+      "subject": "fix(rex): reshape moves a product node whose body is only History"
+    },
+    {
+      "author": "Ryan Keith",
+      "committedAt": "2026-10-09T12:55:31-04:00",
+      "id": "13c6f41b559edccf1b7a60c76f0ec68d8972d01b",
+      "kind": "commit",
+      "sha": "13c6f41b559edccf1b7a60c76f0ec68d8972d01b",
+      "subject": "fix(core): skill commits name their paths and read unquoted status"
+    },
+    {
+      "author": "Ryan Keith",
+      "committedAt": "2026-10-09T04:26:01-04:00",
+      "id": "15b09f83f8f1f2ad364de8a5ed432a9c9a4269fd",
+      "kind": "commit",
+      "sha": "15b09f83f8f1f2ad364de8a5ed432a9c9a4269fd",
+      "subject": "chore(prd): note 2c49542e attempt 1's boundary-test failure for the retry"
+    },
+    {
+      "author": "Ryan Keith",
+      "committedAt": "2026-10-08T21:05:28-04:00",
+      "id": "15c43c789cf5adfc156038df18edeee9ef4e983e",
+      "kind": "commit",
+      "sha": "15c43c789cf5adfc156038df18edeee9ef4e983e",
+      "subject": "chore(prd): mark PR 25's feature completed"
+    },
+    {
+      "author": "Ryan Keith",
+      "committedAt": "2026-10-09T11:21:36-04:00",
+      "id": "17257acdcd976fae362ee09488bc2ddebebe2992",
+      "kind": "commit",
+      "sha": "17257acdcd976fae362ee09488bc2ddebebe2992",
+      "subject": "fix(rex,core): gate rex health and ndx ci on v2 tree rule errors and reader skips"
+    },
+    {
+      "author": "Ryan Keith",
+      "committedAt": "2026-10-09T15:28:19-04:00",
+      "id": "18f50f5c4a338f4da347308dff02635b701b7799",
+      "kind": "commit",
+      "sha": "18f50f5c4a338f4da347308dff02635b701b7799",
+      "subject": "chore(prd): record Ryan's decision on bffc9f7b (pin get_capability refusal text, test-only)"
+    },
+    {
+      "author": "Ryan Keith",
+      "committedAt": "2026-10-09T01:22:37-04:00",
+      "id": "1d0aab7ef7843153c2602e6f7112c266322b6c66",
+      "kind": "commit",
+      "sha": "1d0aab7ef7843153c2602e6f7112c266322b6c66",
+      "subject": "chore(prd): commit PRD tree changes (task b43e8502-f398-4622-8f30-376c11bd72d8 completed)"
     },
     {
       "file": "packages/sourcevision/tests/fixtures/mixed-go-ts/web/src/components/Header.tsx",
@@ -290,11 +395,99 @@
       "role": "function"
     },
     {
+      "id": "release:0.9.0",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 8,
+      "taggedAt": "2026-10-09T12:15:16-07:00",
+      "version": "0.9.0"
+    },
+    {
       "id": "release:1.0.0",
       "kind": "release",
       "plannedChanges": 1,
       "shippedChanges": 0,
       "version": "1.0.0"
+    },
+    {
+      "id": "release:0.1.8",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 0,
+      "taggedAt": "2026-03-20T03:14:41+00:00",
+      "version": "0.1.8"
+    },
+    {
+      "id": "release:0.1.9",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 0,
+      "taggedAt": "2026-03-30T05:20:12+00:00",
+      "version": "0.1.9"
+    },
+    {
+      "id": "release:0.2.0",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 0,
+      "taggedAt": "2026-03-31T04:25:47+00:00",
+      "version": "0.2.0"
+    },
+    {
+      "id": "release:0.2.1",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 0,
+      "taggedAt": "2026-03-31T15:25:43+00:00",
+      "version": "0.2.1"
+    },
+    {
+      "id": "release:0.2.2",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 0,
+      "taggedAt": "2026-04-08T20:09:50+00:00",
+      "version": "0.2.2"
+    },
+    {
+      "id": "release:0.2.3",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 0,
+      "taggedAt": "2026-04-13T02:05:52+00:00",
+      "version": "0.2.3"
+    },
+    {
+      "id": "release:0.3.0",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 0,
+      "taggedAt": "2026-04-17T13:32:51+00:00",
+      "version": "0.3.0"
+    },
+    {
+      "id": "release:0.3.1",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 0,
+      "taggedAt": "2026-04-18T12:14:28+00:00",
+      "version": "0.3.1"
+    },
+    {
+      "id": "release:0.3.2",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 0,
+      "taggedAt": "2026-05-04T17:10:16+00:00",
+      "version": "0.3.2"
+    },
+    {
+      "id": "release:0.3.3",
+      "kind": "release",
+      "plannedChanges": 0,
+      "shippedChanges": 0,
+      "taggedAt": "2026-05-05T15:09:37+00:00",
+      "version": "0.3.3"
     },
     {
       "filesChanged": 0,
@@ -516,17 +709,6 @@
       "title": "Implement new dashboard pages/sections for uncovered functions"
     },
     {
-      "completedAt": "2026-04-09T14:36:24.994Z",
-      "description": "Apply consistent semantic color conventions and styled separators to hench's run-loop console output, making task completion states, inter-task pause intervals, and loop-iteration boundaries immediately legible when scanning long run transcripts.",
-      "id": "d1d0627e-dc69-4f84-b68b-512bef332fdb",
-      "kind": "task",
-      "level": "task",
-      "slug": "hench-run-loop-visual-output-refinements",
-      "startedAt": "2026-04-09T14:32:47.496Z",
-      "status": "completed",
-      "title": "Hench Run-Loop Visual Output Refinements"
-    },
-    {
       "assignee": "Sterling H <sterling.h@endash.us>",
       "completedAt": "2026-10-08T16:43:27.630Z",
       "description": "SourceVision detects only the provider side of HTTP — `analyzers/server-route-detection.ts` and `go-route-detection.ts` produce inbound `ServerRoute` entries. Without the consumer side, a repo that calls another repo is invisible. Add `analyzers/outbound-detection.ts`, mirroring the shape of the route detectors, producing:\n\n`OutboundDependency { file, line, kind: \"http\" | \"grpc\" | \"queue\" | \"database\" | \"cache\" | \"env\", target: string, targetSource: \"literal\" | \"env\" | \"config\" | \"unknown\", client: string, confidence }`\n\nJS/TS goes through the TypeScript compiler API: `fetch`, axios, got, undici, ky, node-fetch; gRPC clients; SQS/SNS/Kafka/RabbitMQ clients; pg/mysql/mongo/redis clients. Go reuses the existing Go parsing: `net/http`, grpc, aws-sdk, sarama, go-redis, `database/sql`.\n\nRecord URL literals, the `process.env.X` / `os.Getenv(\"X\")` names feeding a client, and OpenAPI or `.proto` files as declared contracts. Deterministic, no LLM, no network. Store as `outbound.json`.\n\n**Resolved: `confidence` is about the call, not the target.** The open question was what `confidence` an env-var-sourced target should carry. The answer is that it should carry the same confidence as any other — because `targetSource` already records that the target is an environment variable name rather than an address. Scoring the env case lower would encode the same fact twice in two fields that can then disagree, which is the defect shape this codebase has been bitten by repeatedly (a count beside the array it counts; a `usedBy` list duplicated into persisted links).\n\nSo `confidence` answers \"how sure are we this is an outbound client call at all\" — lower it for a call reached through an alias, a wrapper, or a dynamic member access — and `targetSource` answers \"do we know where it points\". The downstream matcher (`c28d2b18`, http/infra edge sources for workspace crossings) branches on `targetSource === \"env\"` to look the name up against other members' routes; it needs a category to switch on, not a threshold to guess at.\n\nUse the three-level `\"certain\" | \"likely\" | \"inferred\"` vocabulary rather than a 0–1 number: the numeric sites in this schema (`FileClassification`, `Zone`, `Finding`) are scores a model produced, whereas this is a detector saying how direct the evidence was.\n\n**Where that vocabulary lives.** `schema/v1.ts` declares it as `SdlcConfidence`, landed by the SDLC readiness task `91327de0`. Import it; do not inline the three literals into `OutboundDependency`, which is what lets two definitions drift apart. Nothing else about `SdlcProfile` is needed here — the two features share a vocabulary, not a dependency. The `Sdlc` prefix is a leftover from the union having had exactly one user; if it grates once this record uses it too, rename it to `Confidence` in the same change rather than declaring a second one.\n\n**Scope note.** Twelve JS/TS client families plus six Go families, each needing detection and tests, is more than one sitting. Split into subtasks before starting — by language, or by `kind` — rather than landing one thin pass over everything.",
@@ -540,6 +722,17 @@
       "startedAt": "2026-10-08T16:43:27.630Z",
       "status": "completed",
       "title": "Detect outbound dependencies for JS/TS and Go into outbound.json"
+    },
+    {
+      "completedAt": "2026-04-09T14:36:24.994Z",
+      "description": "Apply consistent semantic color conventions and styled separators to hench's run-loop console output, making task completion states, inter-task pause intervals, and loop-iteration boundaries immediately legible when scanning long run transcripts.",
+      "id": "d1d0627e-dc69-4f84-b68b-512bef332fdb",
+      "kind": "task",
+      "level": "task",
+      "slug": "hench-run-loop-visual-output-refinements",
+      "startedAt": "2026-04-09T14:32:47.496Z",
+      "status": "completed",
+      "title": "Hench Run-Loop Visual Output Refinements"
     },
     {
       "completedAt": "2026-10-01T02:42:09.240Z",
@@ -650,23 +843,24 @@
       "title": "Add one live endpoint listing every running run and job across the repository's worktrees"
     },
     {
-      "completedAt": "2026-10-02T19:25:16.665Z",
-      "description": "Regenerate docs/cli-ui-gap.md, the viewer architecture document and the README command reference; run the navigation contract; compare each shipped page against its wireframe and record the differences in this task rather than dropping them.\n\nImplementation notes: docs/cli-ui-gap.md comes from the command manifest; docs/architecture/viewer-architecture.md and the README command reference (packages/core/readme-generator.js) are regenerated. Constraints that apply to every n-dx change: cross-package imports go only through the package's gateway module (hench: src/prd/rex-gateway.ts and src/prd/llm-gateway.ts; web: src/server/rex-gateway.ts and src/server/domain-gateway.ts) and tests/e2e/architecture-policy.test.js enforces an export ceiling on those gateways; orchestration scripts in packages/core spawn CLIs and never import packages; every user-facing change carries a changeset using the scoped package name (@n-dx/hench, @n-dx/rex, @n-dx/web, @n-dx/core, @n-dx/sourcevision, @n-dx/llm-client) with a patch bump; run pnpm preflight before opening the PR.\n\nWireframe differences (recorded 2026-10-02, release commit candidate on chore/080-b7-docs-nav-contract-parity). Compared the worktree dashboard at 1440x1000 against the 36 boards of the 2026-09-17 wireframe canvas (local export 2026-09-30). One line per page: page | wireframe board | difference | keep or fix.\n- Overall shell | Sidebar, Topbar, NavToday | Top stage tabs (Analysis, Plan, Work, Live) + settings overlay + bottom bar + breadcrumbs replace the product-grouped sidebar; no Sidecar | keep (#425, B4)\n- Home | Main, HomeEmpty | Stage cards, counts and Next up match; no running-now strip; no first-run reads/writes/cost table | deferred (2211ed70)\n- Analysis stage | SourceVision | Map-first hero (#502); no per-enrichment-pass lock/unlock cards | fix next release\n- Analysis stage | SourceVision, SvTerrain | Codebase map shown twice (hero and Terrain section) | fix next release\n- /graph deep link | SvTerrain | Terrain tabs only inside the stage; deep link shows the map without a tab strip | fix next release\n- Files | SvFiles | Table matches; no inventoried/graphed/skipped summary tiles; Export CSV not seen | fix next release\n- Problems | SvProblems | No per-finding Capture to PRD / Acknowledge / Explain / Show on map | fix next release\n- Suggestions | SvSuggestions | No per-item Capture or Dismiss, no Captured/Dismissed filters, no cost on Refresh | fix next release\n- Architecture | SvArchitecture | Zone bars and relationships; no pass-2 lock card; Routes tab not seen on the deep link | fix next release\n- Plan stage | RexPlan, RexTasks | Single describe-and-Generate input instead of Smart add / Import / From analysis; no preflight table | deferred (preflight); fix next release (entry modes)\n- Rex landing | Rex | Not built; the Plan stage replaces it | keep (c2a7f1e7 cancelled)\n- Validation | RexHealth | No health score, reorganize proposals, prunable count or backups | fix next release\n- Requirements | RexRequirements | Coverage and traceability present; no Verify action seen; repo has 0 requirements | keep\n- PRD Graph | RexGraph | Merge graph links 0/42 merges; no Dependencies or Timeline modes | fix next release\n- Runs (under Plan) | HenchRuns | Placed under Plan; lists 226 runs across worktrees while Token Usage and Optimization report no run data in the same worktree; model filter shows claude-sonnet-5-5. | keep placement; fix scope and model id\n- Hench landing, Tuning | Hench, HenchTuning | No Hench landing; Optimization and Adaptive are separate sections without accept/defer/reject | fix next release\n- Live | FlightDeckSystem | Closest match (slots, memory, model, worktrees, spend, Status check, Stop all, Up next); no other-processes or queue panel; Up next lists a feature | keep; db56901f\n- Live task | FlightDeckTask, TaskDone, TaskLog, TaskReview | Not exercised in the audit; finished runs show only a status line | 304ab89a\n- Live analysis | (none) | Phase timeline without a zone or finding change summary | 818f80c9\n- Execution Log, Token Usage, Runs | FlightDeckActivity, Spend, History | Covered by Work sections; Execution Log is per worktree with no actor filter; no budget meter | fix next release (Spend)\n- Robot Wrangler | RobotWrangler | Per-vendor tabs instead of a per-command table; stylesheet uses undefined --spacing-*/--color-* tokens, so spacing collapses | fix next release\n- Workflow | SettingsWorkflow | Layout matches; Token Budget and Loop Pause help text shows NaN when unset | fix next release\n- Project | SettingsProject | Matches | keep\n- Commands (settings) | Commands | Action panel instead of the all-commands effects table with Run buttons | deferred (2211ed70)\n- (none) | Sidecar, SidecarSessions, SidecarPermissions | Not in 0.8.0 | keep (0.9.0)\n- (none) | FlightDeckBranch | No per-branch page; Workspaces under Work is the nearest | fix with the Flight Deck epic\n\nThe full audit with evidence, defects D1-D11 and next-release seeds is in the local design workshop: docs/analysis/0-8-0-release-audit/0-8-0-release-audit.md.",
-      "id": "2d8ffe0a-fcc5-4d75-935d-796143e719ed",
+      "completedAt": "2026-10-08T21:29:58.021Z",
+      "description": "Re-scoped on 2026-10-08. v2 no longer stores a change's commits; it computes them from N-DX-Item trailers (computeChangeCommits in packages/rex/src/core/change-commits.ts). A backfill that writes v1 commits arrays into the tree therefore no longer fits and was unwound from this branch; what remains of the task is a report. rex backfill-commit-attribution becomes a read-only report of commits on the default branch that carry no N-DX-Item or N-DX-Status trailer, grouped by author and month, with totals, so the team can see how complete trailer coverage is before the 1.0.0 freeze. Keep the parser fixes already on this branch (read the whole log through core's git helper, accept every trailer per commit and both arrow forms). Acceptance criteria: the command writes nothing under .rex/; --json prints the same report as machine-readable; a test covers a commit with a trailer, one without, and one with two trailers; docs name the command as a report.",
+      "id": "fbbf2cf6-5391-4f9a-aa32-a92f48bcaed2",
       "kind": "task",
-      "lastModified": "2026-10-02T19:25:17.066Z",
-      "lastModifiedBy": "Ryan Keith <ryan.k@endash.us>",
+      "lastModified": "2026-10-08T21:29:58.585Z",
+      "lastModifiedBy": "Sterling H <sterling.h@endash.us>",
       "level": "task",
-      "priority": "high",
-      "slug": "regenerate-the-0-8-0-documents-run-the",
-      "startedAt": "2026-10-02T19:25:16.665Z",
+      "priority": "medium",
+      "slug": "report-commits-that-carry-no-item",
+      "startedAt": "2026-10-08T19:54:51.931Z",
       "status": "completed",
       "tags": [
-        "0.8.0",
-        "release-readiness",
-        "pr-26"
+        "pr-05",
+        "lane-hench",
+        "hench",
+        "core"
       ],
-      "title": "Regenerate the 0.8.0 documents, run the navigation contract and compare pages against the wireframes"
+      "title": "Report commits that carry no item trailer"
     },
     {
       "cohesion": 0.7,
@@ -1510,9 +1704,24 @@
       "to": "sourcevision/analyzers"
     },
     {
+      "from": "009f2a732a208d7edcb2c675c3d7c6adb8383742",
+      "kind": "landedFor",
+      "to": "fbbf2cf6-5391-4f9a-aa32-a92f48bcaed2"
+    },
+    {
+      "from": "18f50f5c4a338f4da347308dff02635b701b7799",
+      "kind": "landedFor",
+      "to": "70443075-8352-48a4-a8ed-799505872d4b"
+    },
+    {
       "from": "72fe1093-132e-46f1-ad46-af304a453612",
       "kind": "plannedFor",
       "to": "release:1.0.0"
+    },
+    {
+      "from": "70443075-8352-48a4-a8ed-799505872d4b",
+      "kind": "under",
+      "to": "72fe1093-132e-46f1-ad46-af304a453612"
     },
     {
       "from": "8cc70b76-8b1f-4506-8f5e-799cc153468d",

@@ -9,9 +9,9 @@
  * to the same bytes.
  */
 import { join } from "node:path";
-import { computeRealizedBy, type Realization } from "./rex-gateway.js";
+import { computeRealizedBy, loadTrailerCommits, computeLandings, listReleaseTags, releasesContaining, type Realization } from "./rex-gateway.js";
 import type { Layout } from "./llm-gateway.js";
-import { readRequirements } from "./sources/requirements.js";
+import { readRequirements, releaseId, RELEASE_PREFIX } from "./sources/requirements.js";
 import { readCode } from "./sources/code.js";
 import { readRuns } from "./sources/runs.js";
 import { byString } from "./canonical.js";
@@ -20,6 +20,8 @@ import type { GraphSnapshot, SnapshotEdge, SnapshotNode, Warn } from "./types.js
 export interface BuildSnapshotOptions {
   /** Project every file in the inventory as a node. Off by default. */
   files?: boolean;
+  /** The branch commits and landings are read from; rex's default (`origin/HEAD`, `origin/main`, `main`) when unset. */
+  ref?: string;
   /**
    * Where `computeRealizedBy` keeps its N-DX-Item trailer cache. Defaults to
    * `<graviewDir>/cache`, never rex's own cache directory: the projection
@@ -63,16 +65,73 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
   for (const node of runs.nodes) add(node);
 
   const edges: SnapshotEdge[] = [...requirements.edges, ...code.edges, ...runs.edges];
+  const gitOptions = { repoDir: layout.root, cacheDir: options.cacheDir ?? join(graviewDirOf(layout), "cache"), ref: options.ref };
 
-  // Commits realize capabilities through their N-DX-Item trailers; the trailer
-  // cache goes under the graview dir. Needs a git repository; without one the
-  // graph simply has no realizes edges and says why.
+  // What git alone says about the work, through the N-DX-Item trailers on
+  // main: every trailer commit naming a change or task is a commit node that
+  // landed for it, and a finished change that has no stamped `shippedIn`
+  // shipped with the first release tag containing its landing (the same answer
+  // rex's `resolveShippedIn` gives, for every change in one walk). The caches
+  // go under the graview dir. Needs a git repository with full history;
+  // without one the graph has no commits from git and says why.
+  const taggedAt = new Map<string, string>();
+  if (requirements.nodes.some((n) => n.kind === "change" || n.kind === "task")) {
+    try {
+      for (const commit of await loadTrailerCommits(gitOptions)) {
+        const items = commit.items.filter((id) => requirements.ids.has(id));
+        if (items.length === 0) continue;
+        add({
+          id: commit.hash,
+          kind: "commit",
+          sha: commit.hash,
+          subject: commit.subject || runs.commitSubjects.get(commit.hash) || undefined,
+          author: commit.author || undefined,
+          committedAt: commit.timestamp,
+        });
+        for (const id of items) edges.push({ kind: "landedFor", from: commit.hash, to: id });
+      }
+
+      const stamped = new Set(edges.filter((e) => e.kind === "shippedWith").map((e) => e.from));
+      const landingOf = new Map<string, string>();
+      for (const [id, landing] of Object.entries(await computeLandings(requirements.tree, gitOptions))) {
+        if (landing.landed && !stamped.has(id)) landingOf.set(id, landing.commit);
+      }
+      const tags = await listReleaseTags(layout.root);
+      for (const tag of tags) taggedAt.set(tag.version, tag.createdAt);
+      const versionOf = await releasesContaining(layout.root, tags, new Set(landingOf.values()));
+      for (const [id, landing] of landingOf) {
+        const version = versionOf.get(landing);
+        if (version !== undefined) edges.push({ kind: "shippedWith", from: id, to: releaseId(version) });
+      }
+    } catch (error) {
+      warn(`Commits and releases from git skipped: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // A release is a node for every version a change is planned for or shipped
+  // in, and for every release tag git has, counting both and dated by the tag.
+  const tally = new Map<string, { planned: number; shipped: number }>();
+  for (const version of taggedAt.keys()) tally.set(version, { planned: 0, shipped: 0 });
+  for (const edge of edges) {
+    if (edge.kind !== "plannedFor" && edge.kind !== "shippedWith") continue;
+    if (!edge.to.startsWith(RELEASE_PREFIX)) continue;
+    const version = edge.to.slice(RELEASE_PREFIX.length);
+    const t = tally.get(version) ?? { planned: 0, shipped: 0 };
+    if (edge.kind === "plannedFor") t.planned += 1;
+    else t.shipped += 1;
+    tally.set(version, t);
+  }
+  for (const [version, t] of tally) {
+    add({ id: releaseId(version), kind: "release", version, plannedChanges: t.planned, shippedChanges: t.shipped, taggedAt: taggedAt.get(version) });
+  }
+
+  // Commits realize capabilities through their N-DX-Item trailers. Needs the
+  // product layer, so a v1 tree has no realizes edges.
   const hasCapabilities = requirements.nodes.some((n) => n.kind === "capability");
   if (hasCapabilities) {
     try {
       const realized: Record<string, Realization> = await computeRealizedBy(requirements.tree, requirements.productEdges, {
-        repoDir: layout.root,
-        cacheDir: options.cacheDir ?? join(graviewDirOf(layout), "cache"),
+        ...gitOptions,
         zoneOf: code.zoneOf,
       });
       for (const [capabilityId, realization] of Object.entries(realized)) {
