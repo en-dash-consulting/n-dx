@@ -529,6 +529,24 @@ async function terminateTimedOutTree(child) {
 const doNotTrack = (child) => child;
 
 /**
+ * Resolve the reviewer CLI's environment without letting a config failure
+ * escape. Every reviewer failure must reach the caller as `spawnError`:
+ * `runCrossVendorReview` falls back to the shell test command on it, and a
+ * rejection would skip that fallback.
+ *
+ * @param {string} dir
+ * @param {"claude" | "codex" | undefined} reviewer
+ * @returns {Promise<{ env: NodeJS.ProcessEnv } | { spawnError: string }>}
+ */
+async function resolveReviewerEnv(dir, reviewer) {
+  try {
+    return { env: await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE) };
+  } catch (err) {
+    return { spawnError: `could not resolve the reviewer environment: ${err.message}` };
+  }
+}
+
+/**
  * Invoke the reviewer vendor CLI with the given prompt.
  * Inherits the current process's stdio so the user can observe the review
  * in real time. Returns the process exit code and whether it timed out.
@@ -543,7 +561,9 @@ const doNotTrack = (child) => child;
  * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
  */
 export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
-  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE);
+  const resolved = await resolveReviewerEnv(dir, reviewer);
+  if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError };
+  const { env } = resolved;
   return new Promise((resolve) => {
     let child;
     try {
@@ -610,7 +630,9 @@ export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout =
  * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
  */
 export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
-  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE);
+  const resolved = await resolveReviewerEnv(dir, reviewer);
+  if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError, output: "" };
+  const { env } = resolved;
   return new Promise((resolve) => {
     let child;
     try {
