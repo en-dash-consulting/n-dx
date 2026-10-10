@@ -622,6 +622,22 @@ export const COMMAND_EFFECTS = {
   tree: prdReader("tree", "Print the PRD hierarchy.", "ndx next"),
   "tree-diff": prdReader("tree-diff", "Compare the PRD tree between two git refs or directories.", "ndx status", ["git history"]),
 
+  graview: {
+    command: "graview",
+    summary: "Project the PRD, the analysis and the runs into Graview and drive the graview CLI on the result.",
+    reads: [PRD_READ, "{sourcevision}/zones.json, components.json (and inventory.json with --files)", "{hench}/runs/", "{config} (graview.*)", "git history (N-DX-Item trailers)"],
+    writes: [
+      { path: "{graview}/document.json and {graview}/snapshot.json", what: "the declaration and the seed snapshot" },
+      { path: "{graview}/cache/", what: "the N-DX-Item trailer cache" },
+      { path: "{graview}/data/", what: "graview's own store", conditional: true, when: "for serve and mcp" },
+    ],
+    llm: [],
+    network: [{ to: "remote", what: "the npm registry, for graview through npx", when: "when no graview binary is configured or on PATH" }],
+    delegates: "graview",
+    duration: "seconds to emit; serve and mcp run until stopped",
+    next: "ndx graview serve .",
+  },
+
   readiness: {
     command: "readiness",
     summary: "Score how ready this repository is to be worked by an agent.",
@@ -671,6 +687,7 @@ export const LAYOUT_TOKENS = Object.freeze({
   rex: "rexDir",
   hench: "henchDir",
   sourcevision: "sourcevisionDir",
+  graview: "graviewDir",
   config: "configFile",
   localConfig: "localConfigFile",
   webPid: "webPidFile",
