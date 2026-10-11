@@ -450,8 +450,6 @@ export type SettingWarningCode =
   | "saved-review-unsupported"
   /** `permissionMode` is a Claude-only setting on another vendor. */
   | "saved-permission-mode-dropped"
-  /** `hench.review.mode` asked for pair review, which is not built yet. */
-  | "pair-review-unavailable"
   /** `hench.review.mode: "self"` cannot run on the provider this task resolved to. */
   | "configured-review-unsupported";
 
@@ -741,18 +739,13 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
         `resolved to provider="${resolvedProvider.provider}" — running it without a review.`,
     });
   }
-  // Until pair review exists, pair runs no review. Never fall back to self
-  // review: the operator chose a different vendor precisely so the executor
-  // does not mark its own work.
-  if (reviewMode.value === "pair") {
-    warnings.push({
-      code: "pair-review-unavailable",
-      message: 'hench.review.mode is "pair", but pair review is not available yet — running this task without a review.',
-    });
-  }
+  // Pair review is a review pass too. An unusable pair configuration is
+  // refused through `reviewPairError`, never downgraded to self review: the
+  // operator chose a different vendor precisely so the executor does not mark
+  // its own work.
   const review: Resolved<boolean> = selfReviewUnsupported
     ? { value: false, source: "vendor-unsupported" }
-    : { value: reviewMode.value === "self", source: reviewMode.source };
+    : { value: reviewMode.value === "self" || reviewMode.value === "pair", source: reviewMode.source };
 
   const reviewVendor: Resolved<ReviewerVendor | null> =
     config.review?.vendor !== undefined
@@ -764,21 +757,25 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
       : { value: DEFAULT_REVIEW_ROUNDS, source: "built-in" };
   const reviewPairError =
     reviewMode.value === "pair" ? pairReviewerError(vendor, reviewVendor.value, resolvedProvider.provider) : undefined;
-  const vendorDefault = REVIEW_MODELS[vendor] ?? "";
-  const savedReviewModel = saved?.reviewModels?.[vendor]?.trim();
+  // The model belongs to whoever reviews: in pair mode that is the reviewer
+  // vendor, so its `llm.<reviewer>.reviewModel` and saved `reviewModels` apply,
+  // not the executor's.
+  const modelVendor: LLMVendor = reviewMode.value === "pair" && reviewVendor.value ? reviewVendor.value : vendor;
+  const vendorDefault = REVIEW_MODELS[modelVendor] ?? "";
+  const savedReviewModel = saved?.reviewModels?.[modelVendor]?.trim();
   const savedReviewTierModel = saved?.reviewTier
-    ? modelForTier(vendor, llmConfig, saved.reviewTier) || undefined
+    ? modelForTier(modelVendor, llmConfig, saved.reviewTier) || undefined
     : undefined;
   let reviewModel: TaskRunSettings["reviewModel"];
   if (reviewOpts.reviewModel) {
     reviewModel = {
-      value: resolveReviewModel(vendor, llmConfig, reviewOpts.reviewModel),
+      value: resolveReviewModel(modelVendor, llmConfig, reviewOpts.reviewModel),
       source: "cli-flag",
       vendorDefault,
     };
   } else if (savedReviewModel) {
     reviewModel = {
-      value: resolveReviewModel(vendor, llmConfig, savedReviewModel),
+      value: resolveReviewModel(modelVendor, llmConfig, savedReviewModel),
       source: "task.run.reviewModels",
       vendorDefault,
     };
@@ -786,8 +783,8 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     reviewModel = { value: savedReviewTierModel, source: "task.run.reviewTier", vendorDefault };
   } else {
     reviewModel = {
-      value: resolveReviewModel(vendor, llmConfig, undefined),
-      source: reviewModelKey(vendor, reviewModelSource(vendor, llmConfig, undefined)),
+      value: resolveReviewModel(modelVendor, llmConfig, undefined),
+      source: reviewModelKey(modelVendor, reviewModelSource(modelVendor, llmConfig, undefined)),
       vendorDefault,
     };
   }

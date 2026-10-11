@@ -2027,10 +2027,11 @@ Hench git-safety settings (pre-run commit gate):
 Hench review settings (the review pass after a task validates):
   hench.review.mode        string    "off" (default), "self" or "pair". "self" is --review: the
                                      executor's own vendor re-reads its work. "pair" has the other
-                                     vendor review and the executor fix the must-fix findings; it
-                                     is not available yet, and until it is, runs no review and
-                                     says so. --review / --no-review and a task's saved review
-                                     setting still win. Review needs hench.provider "cli".
+                                     vendor review the diff in a fresh session that edits no
+                                     files and writes the findings report; the executor then
+                                     fixes the must-fix findings. --review / --no-review and a
+                                     task's saved review setting still win. Review needs
+                                     hench.provider "cli".
   hench.review.vendor      string    Reviewer for pair mode: "claude" or "codex". Unset means the
                                      other one of the two; it must differ from the executor.
   hench.review.rounds      number    Times the executor may fix must-fix findings in pair mode,

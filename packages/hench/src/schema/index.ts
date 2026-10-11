@@ -48,6 +48,7 @@ export type {
   PersistedRuntimeEvent,
   RunReviewRecord,
   ReviewModelSource,
+  RunReviewMode,
   RunReviewPlan,
   RunReviewSpend,
   RunRecord,

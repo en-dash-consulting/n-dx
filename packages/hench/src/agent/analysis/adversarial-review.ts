@@ -463,9 +463,36 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "",
   );
 
-  lines.push("## Output");
-  lines.push("");
   lines.push(
+    ...reportOutputLines(ctx, {
+      fixesApplied: "Set `fixesApplied` to true only if you actually edited a file.",
+      writeLast: "Write the file last, after every fix and capture is done, so its contents",
+    }),
+  );
+
+  return lines.join("\n");
+}
+
+/** Prose that differs between the self and pair reports; the schema itself is shared. */
+interface ReportOutputWording {
+  /** The sentence about `fixesApplied`. */
+  fixesApplied: string;
+  /** First line of the closing "write the file last" paragraph; the second line is common. */
+  writeLast: string;
+}
+
+/**
+ * The "Output" section of a review brief — the report path, JSON schema and
+ * the rule that every finding is accounted for. Shared by the self and pair
+ * briefs so a change to the report format cannot reach one and miss the other.
+ */
+function reportOutputLines(
+  ctx: Pick<ReviewPromptContext, "taskId" | "reportPath">,
+  wording: ReportOutputWording,
+): string[] {
+  return [
+    "## Output",
+    "",
     `Write your report as JSON to this exact path:`,
     "",
     `    ${ctx.reportPath}`,
@@ -501,12 +528,169 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "nothing; say what you attacked in `summary` so the next reader can judge",
     "whether it was aimed correctly.",
     "",
-    "Set `fixesApplied` to true only if you actually edited a file.",
+    wording.fixesApplied,
     "",
-    "Write the file last, after every fix and capture is done, so its contents",
+    wording.writeLast,
     "describe what happened rather than what you intended.",
-  );
+  ];
+}
 
+// ── Pair review prompts ──────────────────────────────────────────────────
+
+/**
+ * Cap on the diff text embedded in a pair brief. A fresh reviewer has no other
+ * way to see the change, so the diff is inlined; past this size it is cut and
+ * the brief says how to read the rest from git.
+ */
+export const PAIR_REVIEW_DIFF_CHAR_LIMIT = 200_000;
+
+/** Everything {@link buildPairReviewBrief} needs. The reviewer starts with no context at all. */
+export interface PairReviewPromptContext {
+  taskId: string;
+  taskTitle: string;
+  /** The task as the executor was briefed on it: description and acceptance criteria. */
+  taskBrief: string;
+  /** Commit the tree sat at before the run, or undefined when it could not be captured. */
+  startingHead?: string;
+  /** `git diff <startingHead>` (or `git diff HEAD`), untruncated. */
+  diff: string;
+  /** Paths the run changed, including untracked ones. */
+  changedFiles: readonly string[];
+  /** Absolute path the reviewer must write its JSON report to. */
+  reportPath: string;
+  /** Project-relative PRD folder tree, with a trailing slash. */
+  prdTreeDir: string;
+  /** True when no human is attached: the reviewer captures findings itself. */
+  autonomous: boolean;
+  /** True when hench's test gate runs right after this review. */
+  testGateFollows: boolean;
+}
+
+/** The task text a pair reviewer is given: description, then acceptance criteria as a checklist. */
+export function pairTaskBrief(task: { description?: string; acceptanceCriteria?: readonly string[] }): string {
+  const parts: string[] = [];
+  if (task.description?.trim()) parts.push(task.description.trim());
+  if (task.acceptanceCriteria?.length) {
+    parts.push(["Acceptance criteria:", ...task.acceptanceCriteria.map((c) => `- ${c}`)].join("\n"));
+  }
+  return parts.join("\n\n");
+}
+
+/**
+ * System prompt for a pair reviewer: the adversarial posture of
+ * {@link buildReviewSystemPrompt}, plus the rule that defines pair mode — the
+ * reviewer reports and the executor fixes.
+ */
+export function buildPairReviewSystemPrompt(): string {
+  return [
+    buildReviewSystemPrompt(),
+    "",
+    "You are a different assistant from the one that wrote this change, in a",
+    "fresh session, and you did not write any of it. Report only: you MUST NOT",
+    "edit, create, move or delete any file except the JSON report you are told",
+    "to write. Fixing is the executor's job. A file you change is a change nobody",
+    "reviewed.",
+  ].join("\n");
+}
+
+/** Cut `diff` to {@link PAIR_REVIEW_DIFF_CHAR_LIMIT}, reporting whether anything was lost. */
+export function truncatePairDiff(diff: string): { text: string; truncated: boolean } {
+  if (diff.length <= PAIR_REVIEW_DIFF_CHAR_LIMIT) return { text: diff, truncated: false };
+  return { text: diff.slice(0, PAIR_REVIEW_DIFF_CHAR_LIMIT), truncated: true };
+}
+
+/**
+ * The brief for a pair reviewer: the task, the changed files and the diff,
+ * inline, since a different vendor's CLI cannot resume the executor's session.
+ */
+export function buildPairReviewBrief(ctx: PairReviewPromptContext): string {
+  const { text: diffText, truncated } = truncatePairDiff(ctx.diff);
+  const diffCommand = ctx.startingHead ? `git diff ${ctx.startingHead}` : "git diff HEAD";
+  const lines: string[] = [
+    "# Pair review pass",
+    "",
+    "Another assistant just completed the task below and its change is about to be",
+    "committed. Review that change adversarially. You have none of that assistant's",
+    "context: the task, the changed files and the diff are all below.",
+    "",
+    `Task: ${ctx.taskId} — ${ctx.taskTitle}`,
+    "",
+    "## Task as briefed",
+    "",
+    ctx.taskBrief.trim() || "(no description or acceptance criteria)",
+    "",
+    "## Changed files",
+    "",
+    ...(ctx.changedFiles.length > 0 ? ctx.changedFiles.map((f) => `- ${f}`) : ["(none)"]),
+    "",
+    "## Diff",
+    "",
+    `Output of \`${diffCommand}\`:`,
+    "",
+    "```diff",
+    diffText,
+    "```",
+  ];
+  if (truncated) {
+    lines.push(
+      "",
+      `The diff above was cut at ${PAIR_REVIEW_DIFF_CHAR_LIMIT} characters. Read the rest with`,
+      `\`${diffCommand} -- <path>\` for each changed file you have not seen.`,
+    );
+  }
+  if (!ctx.startingHead) {
+    lines.push(
+      "",
+      "The pre-run commit could not be captured, so this is the diff against HEAD and",
+      "may miss work the run already committed. Say so in your summary.",
+    );
+  }
+  lines.push(
+    "",
+    "Untracked files appear in the list above but not in the diff; read them from disk.",
+    "",
+    "## Method",
+    "",
+    "Run the `/ndx-adversarial-review` skill if you have it, otherwise follow its",
+    "method: build ground truth from the code, attack the change, then decide",
+    "necessity. Check the change against the acceptance criteria above.",
+    ctx.testGateFollows
+      ? "Run scoped checks for the files in the diff only; hench's test gate runs the full suite next."
+      : "Read-only project checks (tests, typecheck, lint) are fine.",
+    "",
+    "## Report only",
+    "",
+    "- **Edit no files** except the JSON report below. Do not fix anything, even a",
+    "  one-line must-fix: the executor fixes. `fixed` is never a valid `action` here.",
+    "- Do not commit, reset, checkout or clean, and do not change the task's status.",
+    "  Never run `ndx ci`, `ndx plan`, `ndx analyze` or `ndx refresh`.",
+    "",
+    "## What to do with each finding",
+    "",
+    "| Verdict | Action | Record as | disposition |",
+    "|---|---|---|---|",
+    ctx.autonomous
+      ? "| `must-fix`, `should-fix`, `out-of-scope` | Capture as a PRD task with `add_item` (rex MCP), under the area it belongs to. | `captured` | `offered` |"
+      : "| `must-fix`, `should-fix`, `out-of-scope` | Report it. Do not capture it — the run queues it for the operator. | `dropped` | `offered` |",
+    "| `not-worth-fixing` | Nothing. Report it with the reason. | `dropped` | `dropped` |",
+    "",
+    "Do not write `deferred` as a disposition; the run sets it.",
+    ...(ctx.autonomous
+      ? [
+          "",
+          `Before creating an item, list the directories under \`${ctx.prdTreeDir}\` and read the`,
+          "`index.md` of any whose slug is plausibly related. If the defect is already tracked,",
+          "record the finding as `captured` with that item's id instead of creating a duplicate.",
+          "When you create one, set `priority` to the severity, `tags` to",
+          "`ndx-adversarial-review` and `severity:<level>`, and `source` to `ndx-adversarial-review`.",
+        ]
+      : []),
+    "",
+    ...reportOutputLines(ctx, {
+      fixesApplied: "Set `fixesApplied` to false: you edit nothing.",
+      writeLast: "Write the file last, after every capture is done, so its contents",
+    }),
+  );
   return lines.join("\n");
 }
 

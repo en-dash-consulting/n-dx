@@ -36,6 +36,9 @@ import type { LivelockDetection, LivelockDetector } from "../analysis/livelock.j
 import {
   buildReviewSystemPrompt,
   buildReviewBrief,
+  buildPairReviewSystemPrompt,
+  buildPairReviewBrief,
+  pairTaskBrief,
   readReviewReport,
   reviewReportPath,
   formatReviewSummary,
@@ -52,6 +55,7 @@ import type {
   DeferredFinding,
 } from "../analysis/adversarial-review.js";
 import { snapshotDirtyState, diffDirtyState } from "../analysis/review-repairs.js";
+import { collectPairReviewScope } from "../analysis/review.js";
 import type { DirtySnapshot } from "../analysis/review-repairs.js";
 import { ensureWarmParent, ORIENTATION_LIFT_NOTICE } from "./orientation.js";
 import {
@@ -133,7 +137,7 @@ import {
   type PriorAttemptWork,
 } from "./prior-attempt-work.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
-import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/index.js";
+import type { PromptSectionDiagnostic, PersistedRuntimeEvent, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
 import { startCommitMsgWatcher } from "./commit-msg-watcher.js";
 import {
@@ -1332,6 +1336,14 @@ export interface ReviewPassContext {
   testGateFollows: boolean;
   taskTitle: string;
   /**
+   * `"pair"`: `adapter`, `vendor`, `cliBinary`, `cliEnv` and `reviewModel` are
+   * the other vendor's, and the reviewer starts a fresh report-only session.
+   * Absent means self review, exactly as before.
+   */
+  mode?: RunReviewMode;
+  /** The task's description and acceptance criteria, for a pair reviewer that holds no context. */
+  taskBrief?: string;
+  /**
    * Run-scoped MCP config the reviewer must use. The reviewer resumes the work
    * session and can apply must-fixes, so it reaches the PRD through the same
    * servers and must be pinned to the same worktree.
@@ -1429,13 +1441,15 @@ async function runAdversarialReviewPass(
   ctx: ReviewPassContext,
   inv: ReviewPassInvocation,
 ): Promise<ReviewPassOutcome> {
-  subsection("Adversarial review");
+  const pair = ctx.mode === "pair";
+  subsection(pair ? `Pair review (${ctx.vendor})` : "Adversarial review");
 
   // Resume only when the adapter can actually honor it. Codex, Google, and
   // local have no `--resume` equivalent here, so they get a fresh reviewer
-  // seeded with the full task context instead.
+  // seeded with the full task context instead. A pair reviewer is a different
+  // vendor's CLI and cannot resume the executor's session at all.
   const resumeSessionId =
-    ctx.vendor === LLM_VENDOR.CLAUDE && inv.sessionId ? inv.sessionId : undefined;
+    !pair && ctx.vendor === LLM_VENDOR.CLAUDE && inv.sessionId ? inv.sessionId : undefined;
 
   const reportPath = reviewReportPath(ctx.henchDir, inv.run.id);
   // Remove a stale report from a previous pass at this path before spawning.
@@ -1446,19 +1460,52 @@ async function runAdversarialReviewPass(
   await mkdir(dirname(reportPath), { recursive: true });
 
   const layout = resolveLayout(inv.projectDir);
-  const brief = buildReviewBrief({
-    taskId: inv.taskId,
-    taskTitle: ctx.taskTitle,
-    startingHead: inv.startingHead,
-    reportPath,
-    resumed: !!resumeSessionId,
-    autonomous: ctx.autonomous,
-    testGateFollows: ctx.testGateFollows,
-    prdTreeDir: `${relativeToRoot(layout, layout.rexDir)}/${PRD_TREE_DIRNAME}/`,
-  });
+  const prdTreeDir = `${relativeToRoot(layout, layout.rexDir)}/${PRD_TREE_DIRNAME}/`;
+  const systemPrompt = pair ? buildPairReviewSystemPrompt() : buildReviewSystemPrompt();
+
+  let brief: string;
+  if (pair) {
+    // The pair reviewer holds none of the executor's context, so the change is
+    // put in front of it rather than described.
+    let scope: Awaited<ReturnType<typeof collectPairReviewScope>>;
+    try {
+      scope = await collectPairReviewScope(inv.projectDir, inv.startingHead, BOOKKEEPING_DIR_PREFIXES);
+    } catch (err) {
+      const failed: ReviewPassOutcome & { ok: false } = {
+        ok: false,
+        reason: "spawn-failed",
+        detail: `could not collect the diff for the ${ctx.vendor} reviewer: ${(err as Error).message}`,
+      };
+      reportReviewFailure(inv.run, failed);
+      return failed;
+    }
+    brief = buildPairReviewBrief({
+      taskId: inv.taskId,
+      taskTitle: ctx.taskTitle,
+      taskBrief: ctx.taskBrief ?? "",
+      startingHead: inv.startingHead,
+      diff: scope.diff,
+      changedFiles: scope.changedFiles,
+      reportPath,
+      prdTreeDir,
+      autonomous: ctx.autonomous,
+      testGateFollows: ctx.testGateFollows,
+    });
+  } else {
+    brief = buildReviewBrief({
+      taskId: inv.taskId,
+      taskTitle: ctx.taskTitle,
+      startingHead: inv.startingHead,
+      reportPath,
+      resumed: !!resumeSessionId,
+      autonomous: ctx.autonomous,
+      testGateFollows: ctx.testGateFollows,
+      prdTreeDir,
+    });
+  }
 
   const envelope = createPromptEnvelope([
-    { name: "system" as PromptSectionName, content: buildReviewSystemPrompt() } as PromptSection,
+    { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
     { name: "brief" as PromptSectionName, content: brief } as PromptSection,
   ]);
 
@@ -1471,13 +1518,13 @@ async function runAdversarialReviewPass(
 
   stream(
     "Review",
-    `${resumeSessionId ? "Resuming work session" : "Fresh session"} on ` +
+    `${resumeSessionId ? "Resuming work session" : pair ? `Fresh ${ctx.vendor} session` : "Fresh session"} on ` +
       `${ctx.reviewModel || "the loaded model"}...`,
   );
 
   emitRunEvent(
     "review_started",
-    `Adversarial review started on ${ctx.reviewModel || "the loaded model"}`,
+    `${pair ? `Pair review (${ctx.vendor})` : "Adversarial review"} started on ${ctx.reviewModel || "the loaded model"}`,
     { detail: resumeSessionId ? "resuming the work session" : "fresh session" },
   );
 
@@ -1522,7 +1569,9 @@ async function runAdversarialReviewPass(
 
   let backgroundResumed = false;
   const failReview = (failed: ReviewFailure): ReviewPassOutcome => {
-    reportReviewFailure(inv.run, failed);
+    // Name the reviewer: "spawn-failed" alone does not say it was the other
+    // vendor's CLI that is missing or signed out.
+    reportReviewFailure(inv.run, pair ? { ...failed, detail: `${ctx.vendor} reviewer: ${failed.detail}` } : failed);
     if (backgroundResumed && inv.run.review) inv.run.review.backgroundResumed = true;
     return failed;
   };
@@ -1549,7 +1598,7 @@ async function runAdversarialReviewPass(
         "Resuming it once to write the report now.",
     );
     const resumeEnvelope = createPromptEnvelope([
-      { name: "system" as PromptSectionName, content: buildReviewSystemPrompt() } as PromptSection,
+      { name: "system" as PromptSectionName, content: systemPrompt } as PromptSection,
       { name: "brief" as PromptSectionName, content: buildReviewResumeMessage(reportPath) } as PromptSection,
     ]);
     const resumed = await spawnReviewer(
@@ -1601,7 +1650,24 @@ async function runAdversarialReviewPass(
     }
   }
 
+  // A pair reviewer is told to edit nothing. If the tree changed anyway those
+  // edits are unreviewed, so they are announced and not recorded as repairs:
+  // recording them would stage them into the executor's commit.
+  if (pair) {
+    if (repairedFiles && repairedFiles.length > 0) {
+      info(
+        `⚠ The ${ctx.vendor} reviewer edited ${repairedFiles.length} file(s) despite being told to report only: ` +
+          `${repairedFiles.join(", ")}. Inspect them before committing.`,
+      );
+    }
+    repairedFiles = undefined;
+    if (unresolved.unrepairedMustFix.length > 0) {
+      info("Pair review reports only; the must-fix findings above are captured or queued, not repaired.");
+    }
+  }
+
   inv.run.review = {
+    ...(pair ? { mode: "pair" as const, vendor: ctx.vendor } : {}),
     model: ctx.reviewModel,
     resumedSession: !!resumeSessionId,
     findingCount: report.findings.length,
@@ -2045,15 +2111,24 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // The review the run is launched with, resolved up front so the record
   // carries it from its first save (the Live page shows a Review tab from the
   // start, and says which setting chose the model).
-  const reviewModel = opts.reviewPass ? resolveReviewModel(vendor, llmConfig, opts.reviewModel) : undefined;
+  // Pair review: the other vendor's CLI reviews, so its model, binary and
+  // credentials are resolved for *that* vendor. `run.ts` has already refused
+  // a pair run whose reviewer is missing or the executor's own vendor.
+  const pairVendor = opts.reviewPass && opts.reviewMode === "pair" ? opts.reviewVendor : undefined;
+  if (opts.reviewPass && opts.reviewMode === "pair" && pairVendor === undefined) {
+    throw new Error('reviewMode "pair" needs a reviewVendor');
+  }
+  const reviewVendor: LLMVendor = pairVendor ?? vendor;
+  const reviewModel = opts.reviewPass ? resolveReviewModel(reviewVendor, llmConfig, opts.reviewModel) : undefined;
 
   // Shared: initialize run record + capture start memory snapshot
   const { run, memoryCtx } = await initRunRecord({
     reviewPlan: reviewModel === undefined
       ? undefined
       : {
+        ...(pairVendor ? { mode: "pair" as const, vendor: pairVendor } : {}),
         model: reviewModel,
-        modelSource: reviewModelSource(vendor, llmConfig, opts.reviewModel),
+        modelSource: reviewModelSource(reviewVendor, llmConfig, opts.reviewModel),
         optional: opts.reviewOptional === true,
       },
     taskId,
@@ -2109,11 +2184,16 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   //
   // Claude only: no other adapter honours `--mcp-config`, and the pre-flight
   // warns for those instead.
+  //
+  // A claude pair reviewer captures findings to the PRD too, so it needs the
+  // same pin even when the executor is codex.
   let mcpConfigPath: string | undefined;
-  if (vendor === LLM_VENDOR.CLAUDE) {
+  let reviewerMcpConfigPath: string | undefined;
+  if (vendor === LLM_VENDOR.CLAUDE || reviewVendor === LLM_VENDOR.CLAUDE) {
     const prepared = await prepareAgentMcpConfig({ henchDir, runId: run.id, projectDir });
     if (prepared.ok) {
-      mcpConfigPath = prepared.path;
+      if (vendor === LLM_VENDOR.CLAUDE) mcpConfigPath = prepared.path;
+      if (reviewVendor === LLM_VENDOR.CLAUDE) reviewerMcpConfigPath = prepared.path;
     } else {
       detail(
         `MCP servers: inheriting the session's registrations ` +
@@ -2129,10 +2209,18 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const liveProgress = createLiveSpawnProgress();
   const reviewPassContext: ReviewPassContext | undefined = reviewModel !== undefined
     ? {
-        adapter,
-        vendor,
-        cliBinary,
-        cliEnv,
+        // A pair reviewer is the other vendor's CLI: its own adapter, binary
+        // and environment, so it authenticates as itself and never inherits
+        // the executor's credentials.
+        adapter: pairVendor ? resolveVendorAdapter(pairVendor) : adapter,
+        vendor: reviewVendor,
+        cliBinary: pairVendor ? resolveVendorCliPath({ ...llmConfig, vendor: pairVendor }, config) : cliBinary,
+        cliEnv: pairVendor
+          ? resolveVendorCliEnv({ ...llmConfig, vendor: pairVendor }, config.guard.env, (names) => {
+            detail(`${pairVendor} reviewer environment: stripped ${names.join(", ")}`, { captureWhenQuiet: true });
+          })
+          : cliEnv,
+        ...(pairVendor ? { mode: "pair" as const, taskBrief: pairTaskBrief(brief.task) } : {}),
         policy,
         henchDir,
         reviewModel,
@@ -2145,7 +2233,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         autonomous: autonomous || opts.yes === true || process.stdin.isTTY !== true,
         testGateFollows: config.skipFullTestGate !== true,
         taskTitle: brief.task.title,
-        mcpConfigPath,
+        mcpConfigPath: reviewerMcpConfigPath,
         pidHolder: liveProgress,
       }
     : undefined;

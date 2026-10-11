@@ -361,7 +361,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     label: "Review Mode",
     description:
       "Review pass after a task validates: off, self (the executor re-reads its own work) or pair " +
-      "(a different vendor reviews). Pair review is not available yet and runs no review",
+      "(a different vendor reviews the diff and reports findings; it edits no files)",
     type: "enum",
     enumValues: ["off", "self", "pair"],
     category: "review",
@@ -369,7 +369,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
       v === "self"
         ? "Each task is reviewed by the executor's own vendor, as with --review"
         : v === "pair"
-          ? "Pair review is not available yet: tasks run without a review"
+          ? "Each task is reviewed by the other vendor in a fresh, report-only session"
           : "Tasks run without a review unless --review or the task asks for one",
   },
   {

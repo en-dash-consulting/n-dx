@@ -102,7 +102,7 @@ The dashboard's **Robot Wrangler** settings page (the cog in the bottom bar) edi
 2. **Connection** (**Server** for Local) — CLI or API per provider; for Local, the server profiles, host and port, and a connection test.
 3. **Models** — the model for each tier (Primary, Standard, Light).
 4. **If a run fails** — the failover chain.
-5. **Review** — Off, Self review or Pair review.
+5. **Review** — Off, Self review or Pair review. Pair review has the other vendor's CLI read the diff in a fresh session and report findings without editing any file.
 
 A run card beside the sections shows what a command will use and whether its credentials check out. The save bar at the bottom lists what will change; **Discard** reverts it and **Save** stays disabled until something has. At widths under 768px the vendor cards drop from four columns to two; under 640px tier rows and review cards stack.
 

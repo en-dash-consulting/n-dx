@@ -3,8 +3,8 @@
  *
  * Precedence for the review pass: `--review` / `--no-review` > the task's saved
  * `run.review` > `hench.review.mode` > off. `self` is today's `--review`;
- * `pair` is a recognised value that runs no review until pair review exists,
- * and must never fall back to self review.
+ * `pair` runs the review on the other vendor, with that vendor's model, and
+ * must never fall back to self review.
  *
  * @see packages/hench/src/cli/commands/run-settings.ts — the shared resolver
  */
@@ -28,11 +28,13 @@ function resolveFor(
     flags?: Record<string, string>;
     config?: Partial<HenchConfig>;
     vendor?: LLMVendor;
+    /** Extra `llm.*` config, e.g. a pinned `reviewModel`. */
+    llm?: LLMConfig;
     item?: Pick<PRDItem, "id" | "title" | "run">;
   } = {},
 ): TaskRunSettings {
   const vendor = options.vendor ?? "claude";
-  const llm: LLMConfig = { vendor };
+  const llm: LLMConfig = { ...options.llm, vendor };
   return resolveTaskRunSettings({
     flags: options.flags ?? {},
     config: { ...DEFAULT_HENCH_CONFIG(), ...options.config } as HenchConfig,
@@ -93,13 +95,20 @@ describe("hench.review.mode", () => {
     expect(r.warnings.map((w) => w.code)).toContain("configured-review-unsupported");
   });
 
-  it("pair runs no review, says so once, and never falls back to self review", () => {
-    const r = resolveFor({ config: withReview({ mode: "pair" }) });
+  it("pair runs a review pass, warns of nothing, and resolves the reviewer's model", () => {
+    const r = resolveFor({
+      vendor: "claude",
+      config: withReview({ mode: "pair" }),
+      llm: { claude: { reviewModel: "claude-sonnet-4-6" }, codex: { reviewModel: "gpt-5.2-codex" } },
+    });
     expect(r.reviewMode).toEqual({ value: "pair", source: "hench.review.mode" });
-    expect(r.review.value).toBe(false);
-    expect(r.warnings.filter((w) => w.code === "pair-review-unavailable")).toHaveLength(1);
-    expect(r.warnings[0]!.message).toMatch(/not available yet/);
+    expect(r.review).toEqual({ value: true, source: "hench.review.mode" });
+    expect(r.reviewVendor.value).toBe("codex");
+    expect(r.warnings).toEqual([]);
     expect(r.reviewPairError).toBeUndefined();
+    // The model is the reviewer's (codex), not the executor's (claude).
+    expect(r.reviewModel.value).toBe("gpt-5.2-codex");
+    expect(r.reviewModel.source).toBe("llm.codex.reviewModel");
   });
 });
 

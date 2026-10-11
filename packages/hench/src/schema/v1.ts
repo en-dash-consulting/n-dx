@@ -299,9 +299,8 @@ export const DEFAULT_REVIEW_ROUNDS = 2;
 export interface ReviewConfig {
   /**
    * `"off"` (default) runs no review. `"self"` is `--review`: the executor's
-   * own vendor re-reads the work. `"pair"` has the other vendor review and the
-   * executor fix the must-fix findings; until pair review ships it runs no
-   * review and says so.
+   * own vendor re-reads the work. `"pair"` has the other vendor review the
+   * diff in a fresh session and report only; fixing is the executor's job.
    */
   mode?: ReviewMode;
   /** Reviewer for pair mode. Unset means the other one of claude/codex. */
@@ -1342,6 +1341,10 @@ export interface CleanupTransformationResult {
  */
 export type RunReviewRecord =
   | {
+      /** `"pair"` when a different vendor reviewed. Absent on older records: self. */
+      mode?: RunReviewMode;
+      /** Vendor the reviewer ran on. Absent on older records: the executor's. */
+      vendor?: string;
       /** Model the reviewer ran on. Empty for the local vendor. */
       model: string;
       /** True when the reviewer resumed the work session rather than starting fresh. */
@@ -1437,11 +1440,18 @@ export type RunReviewRecord =
       backgroundResumed?: boolean;
     };
 
+/** Who reviewed a run: the executor's own vendor (`self`) or the other one (`pair`). */
+export type RunReviewMode = Exclude<ReviewMode, "off">;
+
 /** Which setting chose the reviewer's model. */
 export type ReviewModelSource = "flag" | "vendor-config" | "shared-config" | "vendor-default";
 
 /** The review pass a run was launched with. See {@link RunRecord.reviewPlan}. */
 export interface RunReviewPlan {
+  /** `"pair"` when a different vendor reviews. Absent on older records: self. */
+  mode?: RunReviewMode;
+  /** Vendor that runs the review. Absent on older records: the executor's. */
+  vendor?: string;
   /** Resolved reviewer model. Empty for the local vendor. */
   model: string;
   /** `--review-model`, `llm.<vendor>.reviewModel`, `llm.reviewModel` or the vendor default. */
