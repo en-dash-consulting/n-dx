@@ -1,14 +1,11 @@
 /**
- * Terraform files in a TypeScript repo must not change classifications.
+ * Terraform files in a TypeScript repo must not change classifications or zones.
  *
- * Terraform is inventoried with the role `config`, and classification reads
- * only `source` files. This runs the real analyze command on the same fixture
- * with and without `infra/*.tf`.
- *
- * Zones select files by extension, not role, so `infra/*.tf` forms its own
- * zone, as it did before Terraform was recognised (task e052cf8e, decision 2:
- * main's zoning is the baseline). Terraform under a test path keeps the role
- * `test` it had then, so it stays quarantined with the tests.
+ * Terraform is inventoried with the role `config` (or `test` under a test
+ * path), and classification reads only `source` files. Zone detection leaves
+ * Terraform out entirely (task 43a98ad8, decision 3), as main did when it did
+ * not inventory Terraform at all. This runs the real analyze command on the
+ * same fixture with and without the Terraform files.
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -24,15 +21,25 @@ const TS_FILES: Record<string, string> = {
   "src/api/parse.ts": "export const parse = (p: string) => p.split(\"/\");\n",
   "src/db/store.ts": 'import { connect } from "./client.js";\nexport const save = (x: unknown) => connect().put(x);\n',
   "src/db/client.ts": "export const connect = () => ({ put: (x: unknown) => x });\n",
+  "tests/route.test.ts": 'import { route } from "../src/api/route.js";\nroute();\n',
 };
 
+const SQS_QUEUE = 'resource "aws_sqs_queue" "orders" {\n  name = "orders-intake-queue"\n}\n';
+
 const TERRAFORM_FILES: Record<string, string> = {
-  "infra/main.tf": 'resource "aws_sqs_queue" "orders" {\n  name = "orders-intake-queue"\n}\n',
+  "infra/main.tf": SQS_QUEUE,
   "infra/variables.tf": 'variable "region" {\n  default = "us-east-1"\n}\n',
   "infra/prod.tfvars": 'region = "us-west-2"\n',
   "infra/terragrunt.hcl": 'include {\n  path = find_in_parent_folders()\n}\n',
   "infra/tests/main.tftest.hcl": 'run "plan" {\n  command = plan\n}\n',
+  "tests/fixtures/infra/main.tf": SQS_QUEUE,
 };
+
+const isTerraform = (path: string): boolean => path in TERRAFORM_FILES;
+
+interface ZonesOutput {
+  zones: { id: string; description?: string; files: string[] }[];
+}
 
 /** Fields that legitimately differ between two runs, whatever the input. */
 const VOLATILE = new Set(["analyzedAt", "generatedAt", "timestamp", "durationMs"]);
@@ -64,34 +71,45 @@ describe("analyze a TypeScript repo with and without Terraform", () => {
     const mixed = await analyze({ ...TS_FILES, ...TERRAFORM_FILES });
     const inventory = readOutput(mixed, DATA_FILES.inventory) as { files: { path: string; role: string }[] };
     const tfRoles = inventory.files
-      .filter((f) => f.path.startsWith("infra/"))
+      .filter((f) => isTerraform(f.path))
       .map((f) => [f.path, f.role]);
     expect(tfRoles).toEqual(
-      Object.keys(TERRAFORM_FILES).sort().map((p) => [p, p.includes("/tests/") ? "test" : "config"]),
+      Object.keys(TERRAFORM_FILES).sort().map((p) => [p, /(^|\/)tests\//.test(p) ? "test" : "config"]),
     );
   }, 120_000);
 
-  it("quarantines Terraform under tests/ with the tests", async () => {
-    const fixture = "tests/fixtures/infra/main.tf";
-    const mixed = await analyze({
-      ...TS_FILES,
-      ...TERRAFORM_FILES,
-      "tests/route.test.ts": 'import { route } from "../src/api/route.js";\nroute();\n',
-      [fixture]: TERRAFORM_FILES["infra/main.tf"],
-    });
-    const inventory = readOutput(mixed, DATA_FILES.inventory) as { files: { path: string; role: string }[] };
-    const role = new Map(inventory.files.map((f) => [f.path, f.role]));
-    expect(role.get(fixture)).toBe("test");
-
-    const { zones } = readOutput(mixed, DATA_FILES.zones) as { zones: { id: string; files: string[] }[] };
-    const holding = zones.filter((z) => z.files.includes(fixture));
-    expect(holding).toHaveLength(1);
-    expect(holding[0].files.filter((f) => role.get(f) !== "test")).toEqual([]);
+  it("writes identical zones.json, and no zone lists or names Terraform", async () => {
+    const plain = await analyze(TS_FILES);
+    const mixed = await analyze({ ...TS_FILES, ...TERRAFORM_FILES });
+    const zones = readOutput(mixed, DATA_FILES.zones) as ZonesOutput;
+    expect(zones).toEqual(readOutput(plain, DATA_FILES.zones));
+    for (const zone of zones.zones) {
+      expect(zone.files.filter(isTerraform)).toEqual([]);
+      expect(zone.description ?? "").not.toMatch(/terraform/i);
+    }
   }, 120_000);
 
   it("writes identical classifications.json", async () => {
     const plain = await analyze(TS_FILES);
     const mixed = await analyze({ ...TS_FILES, ...TERRAFORM_FILES });
     expect(readOutput(mixed, DATA_FILES.classifications)).toEqual(readOutput(plain, DATA_FILES.classifications));
+  }, 120_000);
+
+  it("analyzes a Terraform-primary repo and zones its other files as before", async () => {
+    const helpers: Record<string, string> = {
+      "scripts/plan.ts": 'import { fmt } from "./fmt.js";\nexport const plan = () => fmt("plan");\n',
+      "scripts/fmt.ts": "export const fmt = (s: string) => s.trim();\n",
+    };
+    const terraform: Record<string, string> = {
+      "main.tf": 'module "queue" {\n  source = "./modules/queue"\n}\n',
+      "variables.tf": 'variable "region" {\n  default = "us-east-1"\n}\n',
+      "modules/queue/main.tf": SQS_QUEUE,
+    };
+    const plain = await analyze(helpers);
+    const mixed = await analyze({ ...helpers, ...terraform });
+    const inventory = readOutput(mixed, DATA_FILES.inventory) as { files: { path: string; language: string }[] };
+    expect(inventory.files.filter((f) => f.language === "Terraform").map((f) => f.path).sort())
+      .toEqual(Object.keys(terraform).sort());
+    expect(readOutput(mixed, DATA_FILES.zones)).toEqual(readOutput(plain, DATA_FILES.zones));
   }, 120_000);
 });
