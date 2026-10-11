@@ -187,7 +187,7 @@ const ArchetypeDefinitionSchema = z.object({
   name: z.string(),
   description: z.string(),
   signals: z.array(ArchetypeSignalSchema),
-  analysisHints: z.record(z.string()).optional(),
+  analysisHints: z.record(z.string(), z.string()).optional(),
 });
 
 const ClassificationEvidenceSchema = z.object({
@@ -282,7 +282,7 @@ export const ZonesSchema = z.object({
   enrichmentMode: z.enum(["cascade", "generative"]).optional(),
   metaEvaluationCount: z.number().int().nonnegative().optional(),
   structureHash: z.string().optional(),
-  zoneContentHashes: z.record(z.string()).optional(),
+  zoneContentHashes: z.record(z.string(), z.string()).optional(),
   lastReset: z.object({ from: z.number().int().positive(), to: z.number().int().positive() }).optional(),
   partitionReview: PartitionReviewSchema.optional(),
   algorithmVersion: z.number().int().positive().optional(),
@@ -498,12 +498,14 @@ const SdlcEvidenceSchema = z.object({
 /**
  * Proof for one detection: at least one piece of evidence.
  *
- * `nonempty()` is what makes the "nothing asserted without proof" rule hold at
- * the boundary. The TypeScript tuple in `v1.ts` stops a detection with no
- * evidence from being written in our own code; this stops one from being read
- * out of a file some other writer produced.
+ * The one-element-plus-rest tuple is what makes the "nothing asserted without
+ * proof" rule hold at the boundary. The TypeScript tuple in `v1.ts` stops a
+ * detection with no evidence from being written in our own code; this stops
+ * one from being read out of a file some other writer produced. (zod 4's
+ * `array().nonempty()` no longer infers the tuple type, so it would not
+ * satisfy `SdlcEvidenceList`.)
  */
-const SdlcEvidenceListSchema = z.array(SdlcEvidenceSchema).nonempty();
+const SdlcEvidenceListSchema = z.tuple([SdlcEvidenceSchema], SdlcEvidenceSchema);
 
 const SdlcCommandSchema = z.object({
   evidence: SdlcEvidenceListSchema,

@@ -314,7 +314,9 @@ describe("Sourcevision MCP server factory", () => {
       expect(result.isError).toBe(true);
       expect(content[0].text).toMatch(/does not match the schema/);
       expect(content[0].text).toContain("sourcevision analyze");
-      expect(content[0].text).not.toMatch(/TypeError|undefined/);
+      // zod 4 words a missing field as "expected array, received undefined",
+      // so match the crash itself rather than the bare word "undefined".
+      expect(content[0].text).not.toMatch(/TypeError|Cannot read propert/);
 
       await client.close();
       await server.close();

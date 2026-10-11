@@ -9,11 +9,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
       "type": "object",
       "properties": {
         "allReleases": {
-          "type": "boolean",
-          "description": "v2 only: list every release, not just those with open changes and the newest closed ones"
+          "description": "v2 only: list every release, not just those with open changes and the newest closed ones",
+          "type": "boolean"
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -27,14 +26,13 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
       "type": "object",
       "properties": {
         "tags": {
+          "description": "Only return tasks that have at least one of these tags. Omit to return any task regardless of tags.",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "description": "Only return tasks that have at least one of these tags. Omit to return any task regardless of tags."
+          }
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -66,14 +64,15 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "description": "New status"
         },
         "force": {
-          "type": "boolean",
-          "description": "Force the transition even if it violates transition rules (e.g. completed → pending)"
+          "description": "Force the transition even if it violates transition rules (e.g. completed → pending)",
+          "type": "boolean"
         },
         "reason": {
-          "type": "string",
-          "description": "Failure reason (used when status is 'failing')"
+          "description": "Failure reason (used when status is 'failing')",
+          "type": "string"
         },
         "resolutionType": {
+          "description": "How the task was resolved (required when status is 'completed')",
           "type": "string",
           "enum": [
             "code-change",
@@ -81,19 +80,17 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             "acknowledgment",
             "deferred",
             "unclassified"
-          ],
-          "description": "How the task was resolved (required when status is 'completed')"
+          ]
         },
         "resolutionDetail": {
-          "type": "string",
-          "description": "Brief description of how the resolution was achieved"
+          "description": "Brief description of how the resolution was achieved",
+          "type": "string"
         }
       },
       "required": [
         "id",
         "status"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -114,7 +111,6 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
       "required": [
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -135,7 +131,6 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
       "required": [
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -153,68 +148,69 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "description": "Item title"
         },
         "type": {
+          "description": "v2: node type, default change. A task's parent is a change, a subtask's a task. On v1, task and subtask stand in for level",
           "type": "string",
           "enum": [
             "change",
             "task",
             "subtask"
-          ],
-          "description": "v2: node type, default change. A task's parent is a change, a subtask's a task. On v1, task and subtask stand in for level"
+          ]
         },
         "level": {
+          "description": "v1 only: item level. Refused on a v2 PRD, which takes type",
           "type": "string",
           "enum": [
             "epic",
             "feature",
             "task",
             "subtask"
-          ],
-          "description": "v1 only: item level. Refused on a v2 PRD, which takes type"
+          ]
         },
         "parentId": {
-          "type": "string",
-          "description": "Parent item ID"
+          "description": "Parent item ID",
+          "type": "string"
         },
         "description": {
-          "type": "string",
-          "description": "Item description (a v2 change's intent)"
+          "description": "Item description (a v2 change's intent)",
+          "type": "string"
         },
         "priority": {
+          "description": "Priority",
           "type": "string",
           "enum": [
             "critical",
             "high",
             "medium",
             "low"
-          ],
-          "description": "Priority"
+          ]
         },
         "acceptanceCriteria": {
+          "description": "Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "description": "Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria"
+          }
         },
         "tags": {
+          "description": "Tags",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "description": "Tags"
+          }
         },
         "source": {
-          "type": "string",
-          "description": "Source of this item"
+          "description": "Source of this item",
+          "type": "string"
         },
         "blockedBy": {
+          "description": "IDs of blocking items",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "description": "IDs of blocking items"
+          }
         },
         "run": {
+          "description": "Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes.",
           "type": "object",
           "properties": {
             "tier": {
@@ -227,6 +223,9 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             },
             "models": {
               "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
               "additionalProperties": {
                 "type": "string"
               }
@@ -250,10 +249,21 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
               "type": "boolean"
             },
             "reviewTier": {
-              "$ref": "#/properties/run/properties/tier"
+              "type": "string",
+              "enum": [
+                "light",
+                "standard",
+                "heavy"
+              ]
             },
             "reviewModels": {
-              "$ref": "#/properties/run/properties/models"
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
             },
             "reviewOptional": {
               "type": "boolean"
@@ -275,10 +285,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
               "type": "string"
             }
           },
-          "additionalProperties": false,
-          "description": "Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."
+          "additionalProperties": false
         },
         "amends": {
+          "description": "v2 change only: product-layer edits the change carries ({target, delta: added|modified|removed, summary, criteria?, proposed?, under?, title?, type?})",
           "type": "array",
           "items": {
             "type": "object",
@@ -318,13 +328,27 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
                         "id",
                         "text"
                       ],
-                      "additionalProperties": true
+                      "additionalProperties": {}
                     }
                   },
                   "replace": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/properties/amends/items/properties/criteria/properties/add/items"
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text"
+                      ],
+                      "additionalProperties": {}
                     }
                   },
                   "remove": {
@@ -334,7 +358,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
                     }
                   }
                 },
-                "additionalProperties": true
+                "additionalProperties": {}
               },
               "proposed": {
                 "type": "string"
@@ -361,18 +385,18 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
               "delta",
               "summary"
             ],
-            "additionalProperties": true
-          },
-          "description": "v2 change only: product-layer edits the change carries ({target, delta: added|modified|removed, summary, criteria?, proposed?, under?, title?, type?})"
+            "additionalProperties": {}
+          }
         },
         "touches": {
+          "description": "v2 change only: product node IDs the change works on without amending them",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "description": "v2 change only: product node IDs the change works on without amending them"
+          }
         },
         "discoveredFrom": {
+          "description": "v2 change only: {item?, run?}, the change or task (and hench run) whose work surfaced this one. Use it for a follow-up to a closed change",
           "type": "object",
           "properties": {
             "item": {
@@ -384,14 +408,12 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
               "minLength": 1
             }
           },
-          "additionalProperties": true,
-          "description": "v2 change only: {item?, run?}, the change or task (and hench run) whose work surfaced this one. Use it for a follow-up to a closed change"
+          "additionalProperties": {}
         }
       },
       "required": [
         "title"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -409,59 +431,60 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "description": "Item ID"
         },
         "title": {
-          "type": "string",
-          "description": "New title"
+          "description": "New title",
+          "type": "string"
         },
         "description": {
-          "type": "string",
-          "description": "New description"
+          "description": "New description",
+          "type": "string"
         },
         "acceptanceCriteria": {
+          "description": "New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "description": "New acceptance criteria (done when) for this item's own work, changes included; replaces the list. Distinct from a capability's capability criteria"
+          }
         },
         "priority": {
+          "description": "New priority",
           "type": "string",
           "enum": [
             "critical",
             "high",
             "medium",
             "low"
-          ],
-          "description": "New priority"
+          ]
         },
         "level": {
+          "description": "New level (epic, feature, task, subtask)",
           "type": "string",
           "enum": [
             "epic",
             "feature",
             "task",
             "subtask"
-          ],
-          "description": "New level (epic, feature, task, subtask)"
+          ]
         },
         "tags": {
+          "description": "New tags",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "description": "New tags"
+          }
         },
         "source": {
-          "type": "string",
-          "description": "New source"
+          "description": "New source",
+          "type": "string"
         },
         "blockedBy": {
+          "description": "New blocked-by IDs",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "description": "New blocked-by IDs"
+          }
         },
         "run": {
+          "description": "Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes.",
           "anyOf": [
             {
               "type": "object",
@@ -476,6 +499,9 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
                 },
                 "models": {
                   "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
                   "additionalProperties": {
                     "type": "string"
                   }
@@ -499,10 +525,21 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
                   "type": "boolean"
                 },
                 "reviewTier": {
-                  "$ref": "#/properties/run/anyOf/0/properties/tier"
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "standard",
+                    "heavy"
+                  ]
                 },
                 "reviewModels": {
-                  "$ref": "#/properties/run/anyOf/0/properties/models"
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
                 },
                 "reviewOptional": {
                   "type": "boolean"
@@ -529,14 +566,12 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             {
               "type": "null"
             }
-          ],
-          "description": "Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."
+          ]
         }
       },
       "required": [
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -554,14 +589,13 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "description": "Item ID to move"
         },
         "parentId": {
-          "type": "string",
-          "description": "New parent ID (omit to move to root)"
+          "description": "New parent ID (omit to move to root)",
+          "type": "string"
         }
       },
       "required": [
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -586,23 +620,22 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "description": "ID of the item that survives (must be in sourceIds)"
         },
         "preview": {
-          "type": "boolean",
-          "description": "If true, return a preview without executing the merge"
+          "description": "If true, return a preview without executing the merge",
+          "type": "boolean"
         },
         "title": {
-          "type": "string",
-          "description": "New title for the merged item (default: keep target's title)"
+          "description": "New title for the merged item (default: keep target's title)",
+          "type": "string"
         },
         "description": {
-          "type": "string",
-          "description": "New description (default: combine all descriptions)"
+          "description": "New description (default: combine all descriptions)",
+          "type": "string"
         }
       },
       "required": [
         "sourceIds",
         "targetId"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -623,7 +656,6 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
       "required": [
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -641,18 +673,17 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "description": "Event name"
         },
         "itemId": {
-          "type": "string",
-          "description": "Related item ID"
+          "description": "Related item ID",
+          "type": "string"
         },
         "detail": {
-          "type": "string",
-          "description": "Event details"
+          "description": "Event details",
+          "type": "string"
         }
       },
       "required": [
         "event"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -678,15 +709,14 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
       "type": "object",
       "properties": {
         "taskId": {
-          "type": "string",
-          "description": "Task ID to verify (omit for all tasks)"
+          "description": "Task ID to verify (omit for all tasks)",
+          "type": "string"
         },
         "runTests": {
-          "type": "boolean",
-          "description": "Execute the test command from .rex/config.json (default: false). Ignored, with a note in the result, while the repository is not trusted."
+          "description": "Execute the test command from .rex/config.json (default: false). Ignored, with a note in the result, while the repository is not trusted.",
+          "type": "boolean"
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -700,23 +730,22 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
       "type": "object",
       "properties": {
         "accept": {
-          "type": "string",
-          "description": "Apply proposals: 'low-risk' (default when set), 'all', or comma-separated IDs like '1,3'"
+          "description": "Apply proposals: 'low-risk' (default when set), 'all', or comma-separated IDs like '1,3'",
+          "type": "string"
         },
         "includeCompleted": {
-          "type": "boolean",
-          "description": "Include completed items in similarity analysis (default: false)"
+          "description": "Include completed items in similarity analysis (default: false)",
+          "type": "boolean"
         },
         "mode": {
+          "description": "Analysis mode: 'fast' (programmatic only) or 'full' (programmatic + LLM, default)",
           "type": "string",
           "enum": [
             "fast",
             "full"
-          ],
-          "description": "Analysis mode: 'fast' (programmatic only) or 'full' (programmatic + LLM, default)"
+          ]
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -742,11 +771,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
       "type": "object",
       "properties": {
         "itemId": {
-          "type": "string",
-          "description": "Item ID to get facet suggestions for (omit for overview)"
+          "description": "Item ID to get facet suggestions for (omit for overview)",
+          "type": "string"
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -760,11 +788,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
       "type": "object",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Optional: only return rollup for this item"
+          "description": "Optional: only return rollup for this item",
+          "type": "string"
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -806,34 +833,33 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "description": "Capability or constraint id, display id (e.g. A1.2) or alias"
         },
         "status": {
+          "description": "Which changes to list. Default recent: open plus the latest applied. all pages through the whole history",
           "type": "string",
           "enum": [
             "recent",
             "open",
             "applied",
             "all"
-          ],
-          "description": "Which changes to list. Default recent: open plus the latest applied. all pages through the whole history"
+          ]
         },
         "since": {
-          "type": "string",
-          "description": "Only changes released (shippedIn, else plannedRelease) in this version or later, e.g. 1.2.0"
+          "description": "Only changes released (shippedIn, else plannedRelease) in this version or later, e.g. 1.2.0",
+          "type": "string"
         },
         "cursor": {
-          "type": "string",
-          "description": "changesPage.nextCursor from the previous call, with the same status and since"
+          "description": "changesPage.nextCursor from the previous call, with the same status and since",
+          "type": "string"
         },
         "limit": {
+          "description": "Changes per page (default 25)",
           "type": "integer",
           "minimum": 1,
-          "maximum": 100,
-          "description": "Changes per page (default 25)"
+          "maximum": 100
         }
       },
       "required": [
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -851,26 +877,27 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "description": "Change id, display id (e.g. CH-12) or alias"
         },
         "target": {
-          "type": "string",
-          "description": "Capability or constraint to place the change on. Omit to get the shortlist without writing"
+          "description": "Capability or constraint to place the change on. Omit to get the shortlist without writing",
+          "type": "string"
         },
         "relation": {
+          "description": "With target: touches (works on it) or amends (edits its requirements). Default: the rules' relation",
           "type": "string",
           "enum": [
             "touches",
             "amends"
-          ],
-          "description": "With target: touches (works on it) or amends (edits its requirements). Default: the rules' relation"
+          ]
         },
         "summary": {
-          "type": "string",
-          "description": "With target and relation amends: the amendment's summary. Default: the change's title"
+          "description": "With target and relation amends: the amendment's summary. Default: the change's title",
+          "type": "string"
         },
         "proposed": {
-          "type": "string",
-          "description": "With target and relation amends: the target's replacement statement. Required with amends unless criteria is given"
+          "description": "With target and relation amends: the target's replacement statement. Required with amends unless criteria is given",
+          "type": "string"
         },
         "criteria": {
+          "description": "With target and relation amends: capability criteria edits ({add?: [{id, text}], replace?: [{id, text}], remove?: [id]}). Required with amends unless proposed is given",
           "type": "object",
           "properties": {
             "add": {
@@ -890,13 +917,27 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
                   "id",
                   "text"
                 ],
-                "additionalProperties": true
+                "additionalProperties": {}
               }
             },
             "replace": {
               "type": "array",
               "items": {
-                "$ref": "#/properties/criteria/properties/add/items"
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "text"
+                ],
+                "additionalProperties": {}
               }
             },
             "remove": {
@@ -906,14 +947,12 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
               }
             }
           },
-          "additionalProperties": true,
-          "description": "With target and relation amends: capability criteria edits ({add?: [{id, text}], replace?: [{id, text}], remove?: [id]}). Required with amends unless proposed is given"
+          "additionalProperties": {}
         }
       },
       "required": [
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
@@ -931,14 +970,13 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "description": "Change id, display id (e.g. CH-12) or alias"
         },
         "force": {
-          "type": "boolean",
-          "description": "Apply amendments whose base no longer matches their target's spec"
+          "description": "Apply amendments whose base no longer matches their target's spec",
+          "type": "boolean"
         }
       },
       "required": [
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
