@@ -75,6 +75,21 @@ interface LlmConfigResponse {
   effectiveProblems: EffectiveProblem[];
   /** Failover chain information; absent from an older server or a partial response. */
   failover?: FailoverInfo;
+  /** The review pass as the server resolved it; absent from an older server or a partial response. */
+  review?: ReviewInfo;
+}
+
+/** Mirrors the server's `ReviewInfo`. */
+interface ReviewInfo {
+  mode: { value: string };
+  /** The pair reviewer; null when unset and the active vendor has no CLI counterpart. */
+  vendor: { value: string | null };
+  rounds: { value: number };
+  /** Each vendor that can review, with its reviewer model and the key that set it. */
+  models: Partial<Record<string, { model: string; source: "vendor-config" | "shared-config" | "vendor-default" }>>;
+  available: boolean;
+  unavailableReason?: string;
+  pairSupported: boolean;
 }
 
 interface EffectiveConfig {
@@ -255,6 +270,8 @@ interface RadioCardItem {
   id: string;
   /** Extra class on the card, e.g. a per-vendor hook. */
   className?: string;
+  /** Shown but not selectable; arrow keys skip it. */
+  disabled?: boolean;
   content: ComponentChildren;
 }
 
@@ -283,7 +300,12 @@ function RadioCards({
       : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
     if (step === 0 || !onSelect) return;
     e.preventDefault();
-    const next = (tabbable + step + items.length) % items.length;
+    let next = tabbable;
+    for (let n = 0; n < items.length; n++) {
+      next = (next + step + items.length) % items.length;
+      if (!items[next].disabled) break;
+    }
+    if (items[next].disabled) return;
     onSelect(items[next].id);
     (e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>("[role=radio]")[next]?.focus();
   };
@@ -296,8 +318,9 @@ function RadioCards({
         role: "radio",
         "aria-checked": String(checked),
         tabIndex: i === tabbable ? 0 : -1,
-        class: `llm-radio-card${checked ? " llm-radio-card-selected" : ""}${item.className ? ` ${item.className}` : ""}`,
-        onClick: onSelect ? () => onSelect(item.id) : undefined,
+        disabled: item.disabled,
+        class: `llm-radio-card${checked ? " llm-radio-card-selected" : ""}${item.disabled ? " llm-radio-card-disabled" : ""}${item.className ? ` ${item.className}` : ""}`,
+        onClick: onSelect && !item.disabled ? () => onSelect(item.id) : undefined,
       },
         checked ? h("span", { class: "llm-radio-card-check", "aria-hidden": "true" }, "✓") : null,
         item.content,
@@ -748,6 +771,253 @@ function FailoverSection({
       ? h("p", { class: "llm-failover-warning", role: "alert" },
           "⚠ ",
           isLocal ? "Failover is not available for local models." : failover?.reason)
+      : null,
+  );
+}
+
+// ── Section 5: review ──────────────────────────────────────────────────
+
+/** editValues keys of the review settings; saved as `hench.review.*`, and `review.model.<vendor>` as `llm.<vendor>.reviewModel`. */
+const REVIEW_MODE_KEY = "review.mode";
+const REVIEW_VENDOR_KEY = "review.vendor";
+const REVIEW_ROUNDS_KEY = "review.rounds";
+const REVIEW_MODEL_KEY_PREFIX = "review.model.";
+const reviewModelKey = (vendor: string): string => `${REVIEW_MODEL_KEY_PREFIX}${vendor}`;
+
+/** The config path an editValues review key saves to. */
+function reviewConfigPath(key: string): string {
+  if (key.startsWith(REVIEW_MODEL_KEY_PREFIX)) return `llm.${key.slice(REVIEW_MODEL_KEY_PREFIX.length)}.reviewModel`;
+  return `hench.${key}`;
+}
+
+const REVIEW_ROUND_CHOICES = ["1", "2", "3"];
+
+/** The reviewer model's saved value, `""` when it is not pinned under `llm.<vendor>.reviewModel`. */
+function savedReviewModel(review: ReviewInfo, vendor: string): string {
+  const entry = review.models[vendor];
+  return entry?.source === "vendor-config" ? entry.model : "";
+}
+
+/** A box in the flow strip: who acts and what they do. */
+function FlowStep({ who, model, action }: { who: string; model?: string; action: string }) {
+  return h("div", { class: "llm-review-step" },
+    h("span", { class: "llm-review-step-who" }, who),
+    model ? h("code", { class: "llm-review-step-model" }, model) : null,
+    h("span", { class: "llm-review-step-action" }, action),
+  );
+}
+
+function FlowStrip({ steps }: { steps: Array<{ who: string; model?: string; action: string }> }) {
+  return h("div", { class: "llm-review-flow", role: "list", "aria-label": "What happens on each task" },
+    steps.map((step, i) => [
+      i > 0 ? h("span", { class: "llm-review-arrow", "aria-hidden": "true" }, "→") : null,
+      h("div", { key: i, role: "listitem" }, h(FlowStep, step)),
+    ]).flat(),
+  );
+}
+
+/**
+ * Off, Self or Pair, with the reviewer's settings. Which modes can run, and
+ * which vendors can review, are the server's answers (`review.available`,
+ * `pairSupported`, the keys of `review.models`); this lays them out.
+ */
+function ReviewSection({
+  review,
+  executor,
+  vendor,
+  executorModel,
+  ready,
+  catalog,
+  editValues,
+  dirtyKeys,
+  onChange,
+}: {
+  review: ReviewInfo;
+  /** The saved vendor review is judged for (the server resolved `review` against it). */
+  executor: ViewerLLMVendor;
+  /** The vendor on screen: differs from `executor` while a vendor change is unsaved. */
+  vendor: ViewerLLMVendor;
+  executorModel: string;
+  /** False while `vendor` is picked but unsaved: the server has no review block for it yet. */
+  ready: boolean;
+  catalog: LlmCatalog | null;
+  editValues: Record<string, string>;
+  dirtyKeys: Set<string>;
+  onChange: (key: string, v: string) => void;
+}) {
+  const cliName = useCliName();
+  const label = (v: string) => VENDORS.find((x) => x.id === v)?.label ?? v;
+  const executorLabel = label(executor);
+  const mode = editValues[REVIEW_MODE_KEY] ?? review.mode.value;
+  const on = review.available && (mode === "self" || mode === "pair");
+  const pair = mode === "pair";
+  const reviewerId = pair ? editValues[REVIEW_VENDOR_KEY] ?? review.vendor.value : executor;
+  const rounds = editValues[REVIEW_ROUNDS_KEY] ?? String(review.rounds.value);
+  const modelKey = reviewerId ? reviewModelKey(reviewerId) : null;
+  const modelValue = reviewerId && modelKey
+    ? editValues[modelKey] ?? savedReviewModel(review, reviewerId)
+    : "";
+  const resolvedModel = modelValue || (reviewerId ? review.models[reviewerId]?.model ?? "" : "");
+  const readiness = reviewerId ? catalog?.[reviewerId as ViewerLLMVendor]?.readiness : undefined;
+  const modeDirty = dirtyKeys.has(REVIEW_MODE_KEY);
+
+  const modes: Array<{ id: string; title: string; description: string; disabled: boolean; badge?: string; soon?: boolean }> = [
+    { id: "off", title: "Off", description: "Commit once the tests pass.", disabled: !review.available },
+    {
+      id: "self",
+      title: "Self review",
+      description: `${executorLabel} re-reads its own work on a stronger model and fixes what it finds.`,
+      disabled: !review.available,
+    },
+    {
+      id: "pair",
+      title: "Pair review",
+      description: `Another vendor reviews. ${executorLabel} fixes the must-fix findings, then the reviewer checks again.`,
+      disabled: !review.available || !review.pairSupported,
+      badge: "Pair",
+      soon: !review.pairSupported,
+    },
+  ];
+
+  const body = !ready
+    ? h("p", { class: "llm-tier-pending" }, `Save the vendor change to set up review for ${label(vendor)}.`)
+    : [
+        review.available ? null : h("p", { class: "llm-review-unavailable", role: "alert" }, review.unavailableReason),
+        h(RadioCards, {
+          label: "Review mode",
+          groupClass: "llm-review-modes",
+          value: review.available ? mode : null,
+          onSelect: (id) => onChange(REVIEW_MODE_KEY, id),
+          items: modes.map((m) => ({
+            id: m.id,
+            className: `llm-review-mode-${m.id}`,
+            disabled: m.disabled,
+            content: [
+              h("span", { class: "llm-review-mode-head" },
+                h("span", { class: "llm-review-mode-title" }, m.title),
+                m.badge ? h("span", { class: "llm-review-badge" }, m.badge) : null,
+                m.soon ? h("span", { class: "llm-review-soon" }, "Coming soon") : null,
+              ),
+              h("span", { class: "llm-review-mode-desc" }, m.description),
+            ],
+          })),
+        }),
+        on ? h(ReviewOptions, {
+          review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog, label,
+          executor, editValues, dirtyKeys, onChange,
+        }) : null,
+        on ? h(FlowStrip, {
+          steps: pair
+            ? [
+                { who: executorLabel, model: executorModel, action: "does the task" },
+                { who: reviewerId ? label(reviewerId) : "Reviewer", model: resolvedModel, action: "reviews" },
+                { who: executorLabel, model: executorModel, action: "fixes findings" },
+                { who: reviewerId ? label(reviewerId) : "Reviewer", model: resolvedModel, action: `checks the fixes · up to ${rounds} rounds` },
+              ]
+            : [
+                { who: executorLabel, model: executorModel, action: "does the task" },
+                { who: executorLabel, model: resolvedModel, action: "reviews and fixes in the same session" },
+              ],
+        }) : null,
+        on && readiness && readiness.state !== "ready"
+          ? h("p", { class: "llm-review-warning", role: "alert" },
+              `⚠ ${label(reviewerId ?? executor)} is not ready (${readiness.summary}). Review is skipped until it is.`)
+          : null,
+        review.available
+          ? h("p", { class: "llm-tier-note" },
+              `Should-fix and lower findings are captured to the PRD instead of blocking the commit. Applies to ${cliName} work and ${cliName} pair-programming; a task's saved run settings can switch review on or off for that task.`)
+          : null,
+      ];
+
+  return h("section", { class: `llm-rw-section${modeDirty ? " llm-field-dirty" : ""}` },
+    h(SectionHeader, { number: 5, title: "Review", subtitle: "A second model checks each task before it commits" }),
+    body,
+  );
+}
+
+/** The options panel: reviewer vendor and fix rounds (pair only) and the reviewer model. */
+function ReviewOptions({
+  review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog, label, executor, editValues, dirtyKeys, onChange,
+}: {
+  review: ReviewInfo;
+  pair: boolean;
+  rounds: string;
+  reviewerId: string | null;
+  modelKey: string | null;
+  modelValue: string;
+  resolvedModel: string;
+  catalog: LlmCatalog | null;
+  label: (v: string) => string;
+  executor: ViewerLLMVendor;
+  editValues: Record<string, string>;
+  dirtyKeys: Set<string>;
+  onChange: (key: string, v: string) => void;
+}) {
+  const modelsFor = reviewerId ? catalog?.[reviewerId as ViewerLLMVendor]?.models ?? [] : [];
+  return h("div", { class: "llm-review-options" },
+    pair
+      ? h("div", { class: `llm-field${dirtyKeys.has(REVIEW_VENDOR_KEY) ? " llm-field-dirty" : ""}` },
+          h("span", { class: "llm-field-label", id: "review-vendor-label" }, "Reviewer vendor"),
+          h("div", { class: "llm-review-chips", role: "radiogroup", "aria-labelledby": "review-vendor-label" },
+            VENDORS.map((v) => {
+              const reason = v.id === executor ? "executor" : v.id in review.models ? null : "no CLI";
+              const readiness = catalog?.[v.id]?.readiness;
+              const checked = v.id === reviewerId;
+              return h("button", {
+                key: v.id,
+                type: "button",
+                role: "radio",
+                "aria-checked": String(checked),
+                disabled: reason !== null,
+                class: `llm-review-chip${checked ? " llm-review-chip-selected" : ""}`,
+                onClick: () => onChange(REVIEW_VENDOR_KEY, v.id),
+              },
+                h("span", { class: `llm-vendor-dot llm-vendor-dot-${v.id}` }),
+                reason ? `${v.label} · ${reason}` : v.label,
+                !reason && readiness
+                  ? h("span", { class: `llm-review-chip-ready llm-vendor-card-ready-${readiness.state === "ready" ? "ok" : "warn"}` },
+                      readiness.state === "ready" ? "ready" : "not ready")
+                  : null,
+              );
+            }),
+          ),
+        )
+      : null,
+    reviewerId && modelKey
+      ? h("div", { class: `llm-field${dirtyKeys.has(modelKey) ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: modelKey },
+            "Reviewer model",
+            dirtyKeys.has(modelKey) ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+          ),
+          h(ModelPicker, {
+            id: modelKey,
+            label: "Reviewer model",
+            value: modelValue,
+            models: modelsFor,
+            unsetLabel: resolvedModel ? `Default (${resolvedModel})` : "Default",
+            set: modelValue !== "",
+            onChange,
+          }),
+          h("p", { class: "llm-field-desc" },
+            pair ? `Saved as llm.${reviewerId}.reviewModel` : "Resumes the work session on this model"),
+        )
+      : null,
+    pair
+      ? h("div", { class: `llm-field${dirtyKeys.has(REVIEW_ROUNDS_KEY) ? " llm-field-dirty" : ""}` },
+          h("span", { class: "llm-field-label", id: "review-rounds-label" }, "Fix rounds"),
+          h("div", { class: "llm-review-rounds", role: "radiogroup", "aria-labelledby": "review-rounds-label" },
+            REVIEW_ROUND_CHOICES.map((n) => h("button", {
+              key: n,
+              type: "button",
+              role: "radio",
+              "aria-checked": String(rounds === n),
+              class: `llm-review-round${rounds === n ? " llm-review-round-selected" : ""}`,
+              onClick: () => onChange(REVIEW_ROUNDS_KEY, n),
+            }, n)),
+          ),
+          h("p", { class: "llm-field-desc" },
+            "How many times the executor may fix must-fix findings before the task fails review."),
+        )
       : null,
   );
 }
@@ -1368,6 +1638,19 @@ export function RobotWranglerView() {
         if (k in editValues && editValues[k] !== savedTierValue(data, effectiveVendor, row)) dirtyKeys.add(k);
       }
     }
+    // Review settings, like the tiers, belong to the saved vendor.
+    const review = data.review;
+    if (tiersShown && review?.available) {
+      const saved: Record<string, string> = {
+        [REVIEW_MODE_KEY]: review.mode.value,
+        [REVIEW_VENDOR_KEY]: review.vendor.value ?? "",
+        [REVIEW_ROUNDS_KEY]: String(review.rounds.value),
+      };
+      for (const v of Object.keys(review.models)) saved[reviewModelKey(v)] = savedReviewModel(review, v);
+      for (const [k, savedValue] of Object.entries(saved)) {
+        if (k in editValues && editValues[k] !== savedValue) dirtyKeys.add(k);
+      }
+    }
     if (effectiveVendor === VIEWER_LLM_VENDOR.LOCAL) {
       if ("local.host" in editValues && editValues["local.host"] !== (data.local.host ?? "")) dirtyKeys.add("local.host");
       if ("local.port" in editValues) {
@@ -1425,6 +1708,7 @@ export function RobotWranglerView() {
         const value = raw.trim() || null;
         // "agent.claude" → hench.models.claude; "claude.model" → llm.claude.model
         if (key.startsWith(AGENT_KEY_PREFIX)) changes[`hench.models.${key.slice(AGENT_KEY_PREFIX.length)}`] = value;
+        else if (key.startsWith("review.")) changes[reviewConfigPath(key)] = value;
         else changes[`llm.${key}`] = value;
       }
       for (const key of dirtyToggles) {
@@ -1607,6 +1891,21 @@ export function RobotWranglerView() {
           enabled: editToggles.autoFailover ?? data.autoFailover ?? false,
           onChange: handleToggle,
           dirty: dirtyToggles.has("autoFailover"),
+        })
+      : null,
+
+    // Section 5: Review. Without the server's block there is nothing to lay out.
+    data?.review && effectiveVendor
+      ? h(ReviewSection, {
+          review: data.review,
+          executor: data.effective.vendor as ViewerLLMVendor,
+          vendor: effectiveVendor as ViewerLLMVendor,
+          executorModel: data.effective.model,
+          ready: tiersShown,
+          catalog,
+          editValues,
+          dirtyKeys,
+          onChange: handleField,
         })
       : null,
 

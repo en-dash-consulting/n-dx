@@ -21,7 +21,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add the Review section: Off, Self review and Pair review, with reviewer vendor, model and fix rounds](./add-the-review-section-off-self-review.md) | pending |
+| [Add the Review section: Off, Self review and Pair review, with reviewer vendor, model and fix rounds](./add-the-review-section-off-self-review.md) | in_progress |
 | [Keep the Robot Wrangler page rendering when the config response has no failover block](./keep-the-robot-wrangler-page-rendering.md) | completed |
 | [Rebuild the failover control as a section that shows the chain and says when failover cannot fire](./rebuild-the-failover-control-as-a.md) | completed |
 | [Replace the agent, project and light model fields with a tier table that shows what each tier is used by](./replace-the-agent-project-and-light.md) | completed |
