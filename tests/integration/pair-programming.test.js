@@ -135,11 +135,11 @@ describe("reviewer credential containment", () => {
     vi.stubEnv(authName, "fixture-exported");
     writeNdxConfig(tmpDir, { llm: { [reviewer]: { api_key: "fixture-configured" } }, hench: { guard: { env: { allow: ["TYPESAFE_API_KEY"] } } } });
     // The allow list is repository-supplied, so it applies only once trusted.
-    vi.stubEnv("NDX_HOME", join(tmpDir, "ndx-home"));
-    recordRepoTrust(tmpDir);
+    const ndxHome = join(tmpDir, "ndx-home");
+    recordRepoTrust(tmpDir, { ndxHome });
     const envPath = join(tmpDir, "captured-env.json");
     const cliPath = makeNodeScript(tmpDir, "env-reviewer", `require("node:fs").writeFileSync(${JSON.stringify(envPath)}, JSON.stringify({ fake: process.env.FAKE_SERVICE_API_KEY, github: process.env.GITHUB_TOKEN, jev: process.env.TYPESAFE_API_KEY, auth: process.env[${JSON.stringify(authName)}] }));`);
-    const result = await run({ cliPath, prompt: "review", dir: tmpDir, reviewer });
+    const result = await run({ cliPath, prompt: "review", dir: tmpDir, reviewer, trust: { ndxHome } });
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(readFileSync(envPath, "utf-8"))).toEqual({ jev: "fixture-jev", auth: "fixture-configured" });
     expect(process.env.FAKE_SERVICE_API_KEY).toBe("fixture-secret");

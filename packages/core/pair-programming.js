@@ -539,9 +539,9 @@ const doNotTrack = (child) => child;
  * @param {"claude" | "codex" | undefined} reviewer
  * @returns {Promise<{ env: NodeJS.ProcessEnv } | { spawnError: string }>}
  */
-async function resolveReviewerEnv(dir, reviewer) {
+async function resolveReviewerEnv(dir, reviewer, trust) {
   try {
-    return { env: await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE) };
+    return { env: await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE, { trust }) };
   } catch (err) {
     return { spawnError: `could not resolve the reviewer environment: ${err.message}` };
   }
@@ -558,11 +558,12 @@ async function resolveReviewerEnv(dir, reviewer) {
  *   dir: string;
  *   reviewer?: "claude" | "codex";
  *   timeout?: number;
+ *   trust?: import("@n-dx/llm-client").RepoTrustStoreOptions;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
  */
-export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
-  const resolved = await resolveReviewerEnv(dir, reviewer);
+export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack, trust }) {
+  const resolved = await resolveReviewerEnv(dir, reviewer, trust);
   if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError };
   const { env } = resolved;
   return new Promise((resolve) => {
@@ -627,11 +628,12 @@ export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout =
  *   dir: string;
  *   reviewer?: "claude" | "codex";
  *   timeout?: number;
+ *   trust?: import("@n-dx/llm-client").RepoTrustStoreOptions;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
  */
-export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
-  const resolved = await resolveReviewerEnv(dir, reviewer);
+export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack, trust }) {
+  const resolved = await resolveReviewerEnv(dir, reviewer, trust);
   if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError, output: "" };
   const { env } = resolved;
   return new Promise((resolve) => {
