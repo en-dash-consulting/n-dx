@@ -250,10 +250,6 @@
           "type": "boolean",
           "description": "A person reviewed the current spec."
         },
-        "metAt": {
-          "type": "datetime",
-          "label": "Met"
-        },
         "tags": {
           "type": "list",
           "of": "string"
@@ -293,7 +289,6 @@
               "health",
               "proposed",
               "status",
-              "metAt",
               "reviewed"
             ]
           },

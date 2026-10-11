@@ -93,7 +93,7 @@ export type {
 
 // ---- Schema: v2 tree index ---------------------------------------------------
 
-export { indexTree, isAppliedChange, isOpenChange, isBuildingChange } from "./schema/v2-rules.js";
+export { indexTree, isAppliedChange, isOpenChange, isBuildingChange, specHash, nodeSpec } from "./schema/v2-rules.js";
 export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOptions } from "./schema/v2-rules.js";
 
 // ---- Core: product edges, status and realization -----------------------------

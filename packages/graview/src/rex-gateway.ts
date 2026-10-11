@@ -29,6 +29,8 @@ export {
   classifyV1Tree,
   draftCapabilitySpecs,
   deriveChangeKind,
+  specHash,
+  nodeSpec,
   NODE_TYPES,
   PRODUCT_NODE_TYPES,
   CHANGE_NODE_TYPES,

@@ -214,10 +214,6 @@
           ],
           "type": "enum"
         },
-        "metAt": {
-          "label": "Met",
-          "type": "datetime"
-        },
         "proposed": {
           "description": "Drawn from rex's migration plan over a v1 tree, not yet in the PRD",
           "label": "Proposed",
@@ -277,7 +273,6 @@
               "health",
               "proposed",
               "status",
-              "metAt",
               "reviewed"
             ],
             "title": "Standing"

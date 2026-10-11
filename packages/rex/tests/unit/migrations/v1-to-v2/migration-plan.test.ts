@@ -364,3 +364,18 @@ describe("classifyV1Tree", () => {
     expect(classifyV1Tree(items)).toEqual(classifyV1Tree(structuredClone(items)));
   });
 });
+
+describe("met product nodes", () => {
+  it("marks a completed capability or constraint met, and leaves one still being built unmarked", () => {
+    const done = item("feature", "Offline cache", [item("task", "Cache the catalogue")]);
+    const building = item("feature", "Receipt archive", [item("task", "Keep receipts")], "in_progress");
+    const rule = item("feature", "Security policy", [item("task", "Rotate keys")]);
+    const plan = classifyV1Tree([item("epic", "Storage", [done, building, rule])]);
+    expect(byTitle(plan.entries, "Offline cache")).toMatchObject({ target: "capability", met: true });
+    expect(byTitle(plan.entries, "Receipt archive").target).toBe("capability");
+    expect(byTitle(plan.entries, "Receipt archive").met).toBeUndefined();
+    expect(byTitle(plan.entries, "Security policy")).toMatchObject({ target: "constraint", met: true });
+    // Only product nodes carry it: a change is applied, never met.
+    expect(plan.entries.filter((e) => e.target === "change").every((e) => e.met === undefined)).toBe(true);
+  });
+});

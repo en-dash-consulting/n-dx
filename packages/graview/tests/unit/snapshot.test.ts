@@ -123,6 +123,54 @@ describe("buildSnapshot", () => {
     expect(password!.proposed).toBeUndefined();
   });
 
+  it("says a proposed capability is met when its v1 feature completed, and proposed while it is still being built", async () => {
+    const root = project({ prd: "v1", layout: "ndx" });
+    // A completed feature beside the fixture's pending "Login Flow", under the same epic: directory nesting is
+    // what the v1 reader trusts, so no Children table is needed.
+    const feature = join(resolveLayout(root).rexDir, "prd_tree", "auth-platform-11111111", "signup-flow-44444444");
+    mkdirSync(join(feature, "email-signup-55555555"), { recursive: true });
+    writeFileSync(
+      join(feature, "index.md"),
+      [
+        "---",
+        'id: "44444444-4444-4444-4444-444444444444"',
+        'level: "feature"',
+        'title: "Signup Flow"',
+        'status: "completed"',
+        'completedAt: "2026-03-01T00:00:00.000Z"',
+        "acceptanceCriteria:",
+        '  - "Users can create an account"',
+        'description: "New users create an account with an email address."',
+        "---",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(feature, "email-signup-55555555", "index.md"),
+      [
+        "---",
+        'id: "55555555-5555-5555-5555-555555555555"',
+        'level: "task"',
+        'title: "Email signup"',
+        'status: "completed"',
+        'completedAt: "2026-03-01T00:00:00.000Z"',
+        'description: "The signup form."',
+        "---",
+        "",
+      ].join("\n"),
+    );
+    const { snapshot } = await buildSnapshot(resolveLayout(root), quiet);
+    const signup = snapshot.nodes.find((n) => n.title === "Signup Flow");
+    expect(signup).toMatchObject({ kind: "capability", proposed: true, intentStatus: "met", status: "completed" });
+    // rex's metAt is a spec hash, said through intentStatus, never projected as a date.
+    expect(signup!.metAt).toBeUndefined();
+    const login = snapshot.nodes.find((n) => n.title === "Login Flow");
+    expect(login).toMatchObject({ kind: "capability", intentStatus: "proposed" });
+    const work = snapshot.nodes.find((n) => n.title === "Email signup");
+    expect(work).toMatchObject({ kind: "change", status: "completed" });
+    expect(snapshot.edges.some((e) => e.from === work!.id && e.to === signup!.id && (e.kind === "amends" || e.kind === "touches"))).toBe(true);
+  });
+
   it("reads a v1 tree as changes only when told not to propose", async () => {
     const root = project({ prd: "v1", layout: "ndx" });
     const { snapshot, layout, counts, productLayer } = await buildSnapshot(resolveLayout(root), { ...quiet, proposeProductLayer: false });

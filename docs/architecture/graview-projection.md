@@ -59,7 +59,10 @@ pure, deterministic, no model pass): an epic is an area unless its title names
 a PR or a release, a feature with completed work a capability with a template
 statement (`draftCapabilitySpecs`), a constraint-shaped feature a constraint,
 the work under them changes placed on them by the placement rules, and what
-the rules cannot place a change in the Inbox. Every product node from the plan
+the rules cannot place a change in the Inbox. A node whose v1 item completed is
+stamped `metAt` with its spec hash, as applying the plan will, so rex's own
+`computeProductStatus` reads it met rather than proposed (an open amending
+change makes it changing). Every product node from the plan
 carries `proposed: true`, the face says so on its home, and the sync refuses
 writes to them; `graview.proposeProductLayer: false` projects the tree as
 changes only. The migration (`Migrate this repository`) makes the map real,

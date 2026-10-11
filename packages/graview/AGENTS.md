@@ -28,8 +28,10 @@ JSON output and hench's run records. `ndx graview <sub>` then spawns the
 `src/sources/proposed.ts` runs the rules stage of rex's v1-to-v2 migration
 plan (`classifyV1Tree`, `draftCapabilitySpecs`: pure, no model pass) over a v1
 tree and projects the areas, capabilities and constraints it proposes, each
-`proposed: true`, with the tree's changes placed on them. It writes nothing
-and invents no judgement rex has not made: the plan is rex's, and
+`proposed: true`, with the tree's changes placed on them. A node the plan
+marks `met` (its v1 item completed) is stamped `metAt` with its spec hash, as
+the apply will, so `computeProductStatus` says met, changing or revised. It
+writes nothing and invents no judgement rex has not made: the plan is rex's, and
 `graview.proposeProductLayer: false` turns it off. When the PRD migrates, the
 stored v2 tree takes over on the same code path.
 
