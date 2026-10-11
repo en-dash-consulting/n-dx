@@ -156,6 +156,10 @@ describe("sqlcPaths", () => {
     ]);
   });
 
+  it("skips a block-list item that is only a comment instead of naming the config directory", () => {
+    expect(sqlcPaths("db/sqlc.yaml", "queries:\n  - # none yet\n  - q.sql\n", "queries")).toEqual(["db/q.sql"]);
+  });
+
   it("keeps a # inside quotes or not preceded by whitespace", () => {
     expect(sqlcPaths("sqlc.yaml", 'schema: "a #b.sql"', "schema")).toEqual(["a #b.sql"]);
     expect(sqlcPaths("sqlc.yaml", "schema: a#b.sql", "schema")).toEqual(["a#b.sql"]);

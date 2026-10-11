@@ -113,7 +113,8 @@ export function sqlcPaths(configPath: string, content: string, key: "queries" | 
     for (let j = i + 1; j < lines.length; j++) {
       const item = /^(\s*)-\s*(.+)$/.exec(lines[j] ?? "");
       if (!item || (item[1] ?? "").length < indent) break;
-      found.push(resolveConfigPath(configDir, unquote(stripYamlComment(item[2] ?? ""))));
+      const path = unquote(stripYamlComment(item[2] ?? ""));
+      if (path !== "") found.push(resolveConfigPath(configDir, path));
     }
   }
   return found;
