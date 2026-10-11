@@ -121,7 +121,7 @@ describe("RobotWranglerView", () => {
       model.value = "claude-sonnet-5";
       model.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("Unsaved changes");
+    expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("1 unsaved change · Standard model → claude-sonnet-5");
 
     await act(async () => { root.querySelector<HTMLButtonElement>(".settings-frame-save")!.click(); });
     await settle();
@@ -247,7 +247,7 @@ describe("RobotWranglerView", () => {
       toggle.checked = true;
       toggle.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("Unsaved changes");
+    expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("1 unsaved change · Auto failover → on");
 
     await act(async () => { root.querySelector<HTMLButtonElement>(".settings-frame-save")!.click(); });
     await settle();

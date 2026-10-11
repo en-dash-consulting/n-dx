@@ -440,7 +440,7 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
       expect(card("codex").getAttribute("aria-checked")).toBe("true");
       expect(card("codex").tabIndex).toBe(0);
       expect(document.activeElement).toBe(card("codex"));
-      expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("Unsaved changes");
+      expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("1 unsaved change · Vendor claude → codex");
 
       await key(card("codex"), "ArrowLeft");
       await key(card("claude"), "ArrowLeft");
@@ -502,7 +502,7 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
       await save();
 
       expect(api.puts()).toHaveLength(2);
-      expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("Unsaved changes");
+      expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("1 unsaved change · Provider → api");
       expect(root.textContent).toContain('Provider "api" is not supported for vendor "codex".');
       expect(root.querySelector(".llm-field-dirty .llm-connection-cards")).not.toBeNull();
       expect(root.querySelector(`.llm-field-dirty select[id="agent.claude"]`)).toBeNull();

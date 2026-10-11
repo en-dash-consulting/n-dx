@@ -129,7 +129,7 @@ describe("Robot Wrangler review section", () => {
   it("saves hench.review.mode when Self is picked", async () => {
     const { puts } = await mount(config());
     await click(modeCard("self"));
-    expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("Unsaved changes");
+    expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("1 unsaved change · Review mode → self");
     await save();
     expect(puts).toEqual([{ changes: { "hench.review.mode": "self" } }]);
   });

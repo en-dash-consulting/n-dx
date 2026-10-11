@@ -806,6 +806,55 @@ function savedReviewModel(review: ReviewInfo, vendor: string): string {
   return entry?.source === "vendor-config" ? entry.model : "";
 }
 
+/** How the save bar names an editValues key that is not a tier row. */
+const FIELD_LABEL: Record<string, string> = {
+  [REVIEW_MODE_KEY]: "Review mode",
+  [REVIEW_VENDOR_KEY]: "Reviewer vendor",
+  [REVIEW_ROUNDS_KEY]: "Review rounds",
+  "local.host": "Local host",
+  "local.port": "Local port",
+  "local.maxContextTokens": "Context budget",
+  "local.timeoutMs": "Request timeout",
+  "local.verifier.host": "Verifier host",
+  "local.verifier.port": "Verifier port",
+  "local.verifier.model": "Verifier model",
+  "local.verifier.maxCycles": "Verifier cycles",
+};
+
+/** One "Label → value" line per pending edit for the save bar, vendor first. */
+function summarizeChanges(
+  data: LlmConfigResponse,
+  vendor: string | null,
+  vendorDirty: boolean,
+  pendingVendor: string | null | undefined,
+  dirtyKeys: Set<string>,
+  editValues: Record<string, string>,
+  dirtyToggles: Set<string>,
+  editToggles: Record<string, boolean>,
+  provider: { value: HenchProvider; dirty: boolean },
+): string[] {
+  const lines: string[] = [];
+  if (vendorDirty) lines.push(`Vendor ${data.vendor ?? "none"} → ${pendingVendor ?? "none"}`);
+  const tierLabels = new Map<string, string>();
+  if (vendor) {
+    for (const row of data.tiers ?? []) {
+      const label = tierLabel(vendor, row.tier);
+      tierLabels.set(tierKey(vendor, row.tier), row.tier === "agent" ? label : `${label} model`);
+    }
+  }
+  for (const key of dirtyKeys) {
+    const label = tierLabels.get(key)
+      ?? FIELD_LABEL[key]
+      ?? (key.startsWith(REVIEW_MODEL_KEY_PREFIX) ? `Reviewer model (${key.slice(REVIEW_MODEL_KEY_PREFIX.length)})` : key);
+    lines.push(`${label} → ${(editValues[key] ?? "").trim() || "default"}`);
+  }
+  for (const key of dirtyToggles) {
+    if (key === "autoFailover") lines.push(`Auto failover → ${editToggles.autoFailover ? "on" : "off"}`);
+  }
+  if (provider.dirty) lines.push(`Provider → ${provider.value}`);
+  return lines;
+}
+
 /** A box in the flow strip: who acts and what they do. */
 function FlowStep({ who, model, action }: { who: string; model?: string; action: string }) {
   return h("div", { class: "llm-review-step" },
@@ -2043,6 +2092,9 @@ export function RobotWranglerView() {
     error,
     onSave: handleSave,
     onDiscard: handleDiscard,
+    changeSummary: data
+      ? summarizeChanges(data, effectiveVendor, vendorDirty, pendingVendor, dirtyKeys, editValues, dirtyToggles, editToggles, provider)
+      : undefined,
   },
    h("div", { class: "llm-container" },
 
