@@ -8,9 +8,8 @@ import {
   deriveCategory,
   isBinary,
   analyzeInventory,
-  IgnoreFilter,
-  loadIgnoreFilter,
 } from "../../../src/analyzers/inventory.js";
+import { IgnoreFilter, loadIgnoreFilter } from "../../../src/util/project-walk.js";
 import type { InventoryResult } from "../../../src/analyzers/inventory.js";
 
 // ── detectLanguage ────────────────────────────────────────────────────────────

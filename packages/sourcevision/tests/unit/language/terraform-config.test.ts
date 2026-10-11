@@ -85,6 +85,44 @@ describe("terraform language config", () => {
       expect(inv.files.map((f) => f.path).sort()).toEqual(["live/prod/prod.tfvars", "live/prod/terragrunt.hcl"]);
     });
 
+    it("detects a Terragrunt leaf deeper than three directories", async () => {
+      await touch("live/root.hcl");
+      await touch("live/prod/us-east-1/vpc/app/terragrunt.hcl");
+      expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+      const inv = await analyzeInventory(dir, { languageConfig: terraformConfig });
+      expect(inv.files.map((f) => f.path)).toEqual(["live/prod/us-east-1/vpc/app/terragrunt.hcl"]);
+    });
+
+    /** Detection says Terraform exactly when the analyze-phase inventory lists a Terraform file. */
+    async function expectAgreement(expected: boolean): Promise<void> {
+      const configs = await detectLanguages(dir);
+      const inv = await analyzeInventory(dir, { languageConfig: mergeLanguageConfigs(configs) });
+      expect(configs.includes(terraformConfig)).toBe(expected);
+      expect(inv.files.some((f) => f.language === "Terraform")).toBe(expected);
+    }
+
+    it.each([
+      "a/b/c/d/vendor/x/main.tf",
+      "a/b/c/d/third_party/x/main.tf",
+      "a/b/c/d/.terraform/modules/x/main.tf",
+      "a/b/c/d/node_modules/x/main.tf",
+      "a/b/c/d/dist/main.tf",
+      "a/b/c/d/ignored/main.tf",
+      "a/b/c/d/extra-skip/main.tf",
+    ])("skips %s in detection and the inventory alike", async (rel) => {
+      await touch("package.json", "{}");
+      await touch(".gitignore", "ignored/\n");
+      await touch(".n-dx.json", JSON.stringify({ sourcevision: { extraSkipDirs: ["extra-skip"] } }));
+      await touch(rel);
+      await expectAgreement(false);
+    });
+
+    it("searches the hidden directories the inventory walks", async () => {
+      await touch("package.json", "{}");
+      await touch(".infra/a/b/c/main.tf");
+      await expectAgreement(true);
+    });
+
     it.each(["live/prod.tfvars", "live/terragrunt.hcl", "live/x.tftest.hcl"])(
       "counts %s as a Terraform marker",
       async (rel) => {
