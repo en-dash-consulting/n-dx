@@ -66,7 +66,7 @@ describe("GET /api/llm/config — review block", () => {
     expect(info.vendor).toEqual({ value: "codex", source: "default" });
     expect(info.available).toBe(true);
     expect(info.unavailableReason).toBeUndefined();
-    expect(info.pairSupported).toBe(false);
+    expect(info.pairSupported).toBe(true);
     expect(info.models.claude?.source).toBe("vendor-default");
     expect(info.models.codex?.source).toBe("vendor-default");
   });

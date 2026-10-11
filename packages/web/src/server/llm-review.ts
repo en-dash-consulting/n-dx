@@ -38,8 +38,12 @@ export interface ReviewInfo {
   available: boolean;
   /** A sentence for the page; present only when `available` is false. */
   unavailableReason?: string;
-  /** Whether pair review (a second vendor reviewing) can run. Constant until it lands. */
-  pairSupported: false;
+  /**
+   * Whether this build has pair review (a second vendor reviewing, the executor
+   * fixing). A constant: web does not depend on hench, so there is no hench
+   * export to derive it from. Whether it can run now is `available`.
+   */
+  pairSupported: true;
 }
 
 function reviewModelFor(vendor: ReviewerVendor, llmConfig: LLMConfig): { model: string; source: ReviewModelSource } {
@@ -83,7 +87,7 @@ export function buildReviewInfo(
     },
     available: reason === undefined,
     ...(reason ? { unavailableReason: reason } : {}),
-    pairSupported: false,
+    pairSupported: true,
   };
 }
 

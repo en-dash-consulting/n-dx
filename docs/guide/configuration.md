@@ -221,6 +221,27 @@ Configuration is stored in `.hench/config.json`.
 
 The test gate can be scoped and its flakes absorbed with `hench.testGate.command` (with `{base}`) and `hench.testGate.rerunCommand` (with `{suites}`). Set them in `.n-dx.json`; see [Completion Waits for the Test Gate](../packages/hench.md#completion-waits-for-the-test-gate).
 
+### Review modes
+
+`hench.review.mode` sets how `ndx work` reviews a task's diff before it is committed.
+
+| Mode | What it does |
+|------|--------------|
+| `off` (default) | No review. |
+| `self` | The executing vendor reviews its own work in a fresh session, as `--review` does. |
+| `pair` | The other vendor's CLI reviews the diff in a fresh session and reports findings without editing any file. |
+
+```sh
+ndx config hench.review.mode pair .       # off, self or pair
+ndx config hench.review.vendor codex .    # the pair reviewer; unset means the other vendor
+ndx config hench.review.rounds 2 .        # fix rounds, 1-3 (default 2)
+ndx config llm.codex.reviewModel <model> . # the reviewer's model, per vendor
+```
+
+Pair review needs a CLI on both sides: the executor and the reviewer must each be `claude` or `codex` running on the CLI provider, and the reviewer must not be the executor's own vendor. Otherwise `ndx config` and the dashboard refuse the setting.
+
+**Findings.** Must-fix findings go back to the executor, whose own session is resumed to fix them. The task's tests re-run, and a fresh reviewer checks again, for up to `hench.review.rounds` rounds. A must-fix finding still open after the last round fails the review. Lesser findings are not fixed: they are captured to the PRD as new items. `--review`, `--no-review` and a task's saved `run.review` outrank the project setting; `ndx work --task=<id> --resolve .` shows which key supplied each value.
+
 ## Web Server
 
 ```sh
