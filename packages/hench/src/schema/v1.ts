@@ -1438,6 +1438,12 @@ export type RunReviewRecord =
       gated?: boolean;
       /** As on the success shape: the reviewer was resumed once, and still wrote nothing usable. */
       backgroundResumed?: boolean;
+      /**
+       * The last report the reviewer wrote, when there was one. Set by a pair
+       * review that ended with must-fix findings still open
+       * (`failed: "must-fix-unresolved"`): the findings are in it.
+       */
+      reportPath?: string;
     };
 
 /** Who reviewed a run: the executor's own vendor (`self`) or the other one (`pair`). */
@@ -1458,6 +1464,31 @@ export interface RunReviewPlan {
   modelSource: ReviewModelSource;
   /** `--review-optional`: a reviewer that cannot start warns instead of refusing completion. */
   optional: boolean;
+}
+
+/**
+ * One pair-review fix round: the executor was handed the reviewer's must-fix
+ * findings, its tests re-ran, and the reviewer checked again. See
+ * {@link RunRecord.reviewRounds}.
+ */
+export interface RunReviewRound {
+  /** 1-based; the first round follows the reviewer's first report. */
+  round: number;
+  /** Must-fix findings the executor was asked to fix. */
+  findingsIn: number;
+  /** Of those, how many the re-review no longer reports. Zero when it never ran. */
+  findingsFixed: number;
+  /** Must-fix findings open after the round, new ones included. */
+  remaining: number;
+  /**
+   * The round's outcome. `pass`: no must-fix finding left. `must-fix`: some
+   * remain. `executor-failed`: the fix session could not run. `validation-failed`:
+   * the task's tests failed after the fix, so no re-review was spent on it.
+   * `reviewer-failed`: the re-review wrote no usable report.
+   */
+  verdict: "pass" | "must-fix" | "executor-failed" | "validation-failed" | "reviewer-failed";
+  /** The report the re-review wrote, when it did. */
+  reportPath?: string;
 }
 
 /** Reviewer spend. See {@link RunRecord.reviewSpend}. */
@@ -1673,6 +1704,12 @@ export interface RunRecord {
    * v1 additive field — records without it load normally.
    */
   reviewPlan?: RunReviewPlan;
+  /**
+   * Pair-review fix rounds, in order. Absent unless the reviewer's first report
+   * held a must-fix finding. The executor's fix sessions are charged to the
+   * run's own token usage; the re-reviews to {@link reviewSpend}.
+   */
+  reviewRounds?: RunReviewRound[];
   /**
    * What the reviewer spent, accumulated as its spawns finish. Already
    * included in {@link tokenUsage}; kept apart so the review's share can be

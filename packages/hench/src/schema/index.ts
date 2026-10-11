@@ -50,6 +50,7 @@ export type {
   ReviewModelSource,
   RunReviewMode,
   RunReviewPlan,
+  RunReviewRound,
   RunReviewSpend,
   RunRecord,
   RunTrustRecord,

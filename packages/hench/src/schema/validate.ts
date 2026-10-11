@@ -447,6 +447,8 @@ export const RunRecordSchema = z.object({
     .passthrough()
     .optional(),
   reviewSpend: z.object({}).passthrough().optional(),
+  // One entry per pair-review fix round; the fields ride along untouched.
+  reviewRounds: z.array(z.object({ round: z.number() }).passthrough()).optional(),
   actor: z.string().optional(),
   host: z.string().optional(),
   logPath: z.string().optional(),

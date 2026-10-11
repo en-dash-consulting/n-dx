@@ -48,7 +48,13 @@ import {
   deferredFindings,
   mergeDispositionsIntoRaw,
   reviewModelSource,
+  buildExecutorFixPrompt,
+  buildExecutorFixSystemPrompt,
+  carryForwardFindings,
 } from "../analysis/adversarial-review.js";
+import type { ReviewFinding } from "../analysis/adversarial-review.js";
+import { runPairReviewRounds } from "./pair-review-rounds.js";
+import type { PairReviewStep } from "./pair-review-rounds.js";
 import type {
   ReviewPassOutcome,
   ReviewReport,
@@ -138,6 +144,7 @@ import {
 } from "./prior-attempt-work.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
 import type { PromptSectionDiagnostic, PersistedRuntimeEvent, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
+import { DEFAULT_REVIEW_ROUNDS } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
 import { startCommitMsgWatcher } from "./commit-msg-watcher.js";
 import {
@@ -1344,6 +1351,11 @@ export interface ReviewPassContext {
   /** The task's description and acceptance criteria, for a pair reviewer that holds no context. */
   taskBrief?: string;
   /**
+   * Pair mode only: how the executor is resumed to fix the reviewer's must-fix
+   * findings. Absent means the reviewer's report is the end of the review.
+   */
+  fix?: PairFixContext;
+  /**
    * Run-scoped MCP config the reviewer must use. The reviewer resumes the work
    * session and can apply must-fixes, so it reaches the PRD through the same
    * servers and must be pinned to the same worktree.
@@ -1351,6 +1363,26 @@ export interface ReviewPassContext {
   mcpConfigPath?: string;
   /** Run's heartbeat-visible pid holder, so the record shows the reviewer's pid. */
   pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
+}
+
+/**
+ * The executor's side of a pair review's fix rounds: the vendor, binary and
+ * environment the work spawn ran with, so a fix session is the same assistant
+ * as the one that wrote the change.
+ */
+export interface PairFixContext {
+  adapter: VendorAdapter;
+  vendor: LLMVendor;
+  cliBinary: string;
+  cliEnv?: NodeJS.ProcessEnv;
+  /** Model label for token accounting. */
+  model: string;
+  /** Model flag the work spawn used, when it sent one. */
+  spawnModel?: string;
+  /** Run-scoped MCP config, so the fix session writes the same worktree. */
+  mcpConfigPath?: string;
+  /** `hench.review.rounds`: fix rounds the executor gets. */
+  rounds: number;
 }
 
 /**
@@ -1377,8 +1409,6 @@ export function chargeReviewToRun(
   result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage">,
   reviewModel: string,
 ): void {
-  run.tokenUsage = addTokenUsage(run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
-
   // The review's own share, kept apart for the Live page's Review tab.
   const spend = run.reviewSpend ?? { turns: 0, input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0 };
   run.reviewSpend = {
@@ -1388,6 +1418,20 @@ export function chargeReviewToRun(
     cacheCreationInput: spend.cacheCreationInput + (result.tokenUsage.cacheCreationInput ?? 0),
     cacheReadInput: spend.cacheReadInput + (result.tokenUsage.cacheReadInput ?? 0),
   };
+  chargeSpawnToRun(run, result, reviewModel);
+}
+
+/**
+ * Add a spawn's tokens to the run's own usage, per turn and in total. The
+ * executor's fix sessions use it directly: they are the run's own work, not
+ * the review's share. {@link chargeReviewToRun} explains why both halves matter.
+ */
+function chargeSpawnToRun(
+  run: RunRecord,
+  result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage">,
+  model: string,
+): void {
+  run.tokenUsage = addTokenUsage(run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
 
   if (result.turnTokenUsage.length === 0) return;
 
@@ -1401,7 +1445,7 @@ export function chargeReviewToRun(
       // The spawn tags these from `tokenMetadata`, but the local vendor sends
       // no model flag and leaves an empty string behind. Normalize it away so
       // the `turn.model ?? run.model` fallback downstream still engages.
-      model: turn.model || reviewModel || undefined,
+      model: turn.model || model || undefined,
     })),
   );
 }
@@ -1421,6 +1465,105 @@ interface ReviewPassInvocation {
    * report for a suite that would never report back.
    */
   inheritedBackgroundWait?: boolean;
+  /**
+   * Re-run the task's validation (its tests) after a fix round. Pair review
+   * only; without it a fix is not re-validated before the re-review.
+   */
+  validate?: () => Promise<{ valid: boolean; reason?: string }>;
+}
+
+/** Report file for a review step: the run's own path first, then one per fix round. */
+function reviewStepReportPath(henchDir: string, runId: string, round: number): string {
+  return reviewReportPath(henchDir, round === 0 ? runId : `${runId}-r${round}`);
+}
+
+/**
+ * Run the review for a completed task: one pass, or in pair mode that pass
+ * followed by the executor's fix rounds and the re-reviews they earn.
+ */
+async function runReview(ctx: ReviewPassContext, inv: ReviewPassInvocation): Promise<ReviewPassOutcome> {
+  const fix = ctx.fix;
+  if (ctx.mode !== "pair" || !fix) return runAdversarialReviewPass(ctx, inv);
+
+  // The handle the next fix session resumes; a fix session reports its own.
+  let session = inv.sessionId;
+  return runPairReviewRounds({
+    run: inv.run,
+    rounds: fix.rounds,
+    review: async (step) => ({
+      outcome: await runAdversarialReviewPass(ctx, inv, step),
+      reportPath: reviewStepReportPath(ctx.henchDir, inv.run.id, step.round),
+    }),
+    fix: async (findings, round) => {
+      const fixed = await runExecutorFix(ctx, fix, inv, session, findings, round);
+      if (fixed.ok && fixed.sessionId) session = fixed.sessionId;
+      return fixed;
+    },
+    validate: inv.validate,
+  });
+}
+
+/**
+ * Resume the executor's session with the reviewer's must-fix findings and let
+ * it fix them. A fresh session stands in when there is none to resume (a
+ * gate-only retry ran no work session), carrying the task brief instead.
+ */
+async function runExecutorFix(
+  ctx: ReviewPassContext,
+  fix: PairFixContext,
+  inv: ReviewPassInvocation,
+  sessionId: string | undefined,
+  findings: readonly ReviewFinding[],
+  round: number,
+): Promise<{ ok: true; sessionId?: string } | { ok: false; detail: string }> {
+  subsection(`Fix round ${round}/${fix.rounds} (${fix.vendor})`);
+  const envelope = createPromptEnvelope([
+    { name: "system" as PromptSectionName, content: buildExecutorFixSystemPrompt() } as PromptSection,
+    {
+      name: "brief" as PromptSectionName,
+      content: buildExecutorFixPrompt({
+        round,
+        rounds: fix.rounds,
+        findings,
+        resumed: sessionId !== undefined,
+        taskBrief: ctx.taskBrief,
+        taskTitle: ctx.taskTitle,
+      }),
+    } as PromptSection,
+  ]);
+  const spawnConfig = fix.adapter.buildSpawnConfig(envelope, ctx.policy, {
+    model: fix.spawnModel,
+    // The executor has to edit; `plan` would leave it able to describe a fix only.
+    permissionMode: "acceptEdits",
+    resumeSessionId: sessionId,
+    mcpConfigPath: fix.mcpConfigPath,
+  });
+  stream("Fix", `${sessionId ? "Resuming the work session" : "Fresh session"} with ${findings.length} finding(s)...`);
+  emitRunEvent("review_started", `Fix round ${round}/${fix.rounds}: ${fix.vendor} fixing ${findings.length} must-fix finding(s)`, {
+    detail: sessionId ? "resuming the work session" : "fresh session",
+  });
+
+  let spawned: SpawnResult;
+  try {
+    spawned = await withHeartbeat(
+      "waiting on fix round",
+      spawnWithAdapter({
+        adapter: fix.adapter,
+        spawnConfig,
+        cliBinary: fix.cliBinary,
+        cliEnv: fix.cliEnv,
+        cwd: inv.projectDir,
+        tokenMetadata: { vendor: fix.vendor, model: fix.model },
+        pidHolder: ctx.pidHolder,
+      }),
+    );
+  } catch (err) {
+    return { ok: false, detail: (err as Error).message };
+  }
+  // The executor's own work: the run's usage, not the review's share.
+  chargeSpawnToRun(inv.run, spawned, fix.model);
+  if (spawned.error) return { ok: false, detail: spawned.error };
+  return { ok: true, sessionId: spawned.sessionId ?? sessionId };
 }
 
 /**
@@ -1440,9 +1583,17 @@ interface ReviewPassInvocation {
 async function runAdversarialReviewPass(
   ctx: ReviewPassContext,
   inv: ReviewPassInvocation,
+  step?: PairReviewStep,
 ): Promise<ReviewPassOutcome> {
   const pair = ctx.mode === "pair";
-  subsection(pair ? `Pair review (${ctx.vendor})` : "Adversarial review");
+  // A pair review before the last one only reports must-fix findings: the
+  // executor is handed them next, so they are not yet captured or queued.
+  const interim = step !== undefined && !step.final;
+  subsection(
+    pair
+      ? `Pair review (${ctx.vendor})${step?.recheck ? ` — re-check after fix round ${step.recheck.round}` : ""}`
+      : "Adversarial review",
+  );
 
   // Resume only when the adapter can actually honor it. Codex, Google, and
   // local have no `--resume` equivalent here, so they get a fresh reviewer
@@ -1451,7 +1602,7 @@ async function runAdversarialReviewPass(
   const resumeSessionId =
     !pair && ctx.vendor === LLM_VENDOR.CLAUDE && inv.sessionId ? inv.sessionId : undefined;
 
-  const reportPath = reviewReportPath(ctx.henchDir, inv.run.id);
+  const reportPath = reviewStepReportPath(ctx.henchDir, inv.run.id, step?.round ?? 0);
   // Remove a stale report from a previous pass at this path before spawning.
   // Without this, a reviewer that dies before writing would leave the old
   // file in place and the run would report the previous pass's findings as
@@ -1490,6 +1641,8 @@ async function runAdversarialReviewPass(
       prdTreeDir,
       autonomous: ctx.autonomous,
       testGateFollows: ctx.testGateFollows,
+      recheck: step?.recheck,
+      executorFixesMustFix: interim,
     });
   } else {
     brief = buildReviewBrief({
@@ -1617,14 +1770,27 @@ async function runAdversarialReviewPass(
 
   if (!outcome.ok) return failReview(outcome);
 
+  // A re-review does not repeat the lesser findings of the round before it, so
+  // they are copied in: the last report is the whole review.
+  let parsed = outcome.report;
+  const earlier = step?.priorReports.at(-1);
+  if (earlier !== undefined) {
+    if (await carryForwardFindings(earlier, reportPath)) {
+      const merged = await readReviewReport(reportPath);
+      if (merged.ok) parsed = merged.report;
+    } else {
+      info(`⚠ Could not carry the earlier round's findings forward from ${earlier}; they remain in that file.`);
+    }
+  }
+
   // Park what nobody ruled on, before anything else reads the report.
-  const { report, deferred } = await resolveReviewDispositions(reportPath, outcome.report);
+  const { report, deferred } = await resolveReviewDispositions(reportPath, parsed);
 
   for (const line of formatReviewSummary(report)) info(line);
 
   const unresolved = classifyUnresolved(report);
-  for (const line of formatUnresolvedWarning(report)) info(line);
-  if (deferred.length > 0) {
+  if (!interim) for (const line of formatUnresolvedWarning(report)) info(line);
+  if (deferred.length > 0 && !interim) {
     info(
       (ctx.autonomous
         ? `${deferred.length} finding(s) deferred — no one was at the capture prompt. `
@@ -1661,7 +1827,7 @@ async function runAdversarialReviewPass(
       );
     }
     repairedFiles = undefined;
-    if (unresolved.unrepairedMustFix.length > 0) {
+    if (unresolved.unrepairedMustFix.length > 0 && !interim) {
       info("Pair review reports only; the must-fix findings above are captured or queued, not repaired.");
     }
   }
@@ -1881,7 +2047,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     // commit prompt, so any must-fix repairs it makes are part of what the
     // human approves and part of the commit the run produces.
     if (ctx.reviewPass) {
-      await runAdversarialReviewPass(ctx.reviewPass, {
+      await runReview(ctx.reviewPass, {
         run,
         taskId,
         projectDir,
@@ -1889,6 +2055,13 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
         sessionId: result.sessionId,
         inheritedBackgroundWait:
           run.backgroundResume !== undefined || result.backgroundWait !== undefined,
+        validate: () =>
+          validateCompletion(projectDir, {
+            testCommand: ctx.testCommand,
+            startingHead: ctx.startingHead,
+            selfHeal: ctx.selfHeal,
+            baselineUntracked: ctx.baselineUntracked,
+          }),
       });
     }
 
@@ -2220,7 +2393,23 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             detail(`${pairVendor} reviewer environment: stripped ${names.join(", ")}`, { captureWhenQuiet: true });
           })
           : cliEnv,
-        ...(pairVendor ? { mode: "pair" as const, taskBrief: pairTaskBrief(brief.task) } : {}),
+        ...(pairVendor
+          ? {
+              mode: "pair" as const,
+              taskBrief: pairTaskBrief(brief.task),
+              // The fix rounds run on the executor's own vendor, binary and environment.
+              fix: {
+                adapter,
+                vendor,
+                cliBinary,
+                cliEnv,
+                model: eventModel,
+                spawnModel: opts.spawnModel,
+                mcpConfigPath,
+                rounds: opts.reviewRounds ?? config.review?.rounds ?? DEFAULT_REVIEW_ROUNDS,
+              },
+            }
+          : {}),
         policy,
         henchDir,
         reviewModel,
@@ -2258,8 +2447,15 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       memoryCtx,
       review: reviewPassContext
         ? async (base) => {
-            await runAdversarialReviewPass(reviewPassContext, {
+            await runReview(reviewPassContext, {
               run, taskId, projectDir, startingHead: base, sessionId: undefined,
+              validate: () =>
+                validateCompletion(projectDir, {
+                  testCommand: brief.project.testCommand,
+                  startingHead: base,
+                  selfHeal: config.selfHeal,
+                  baselineUntracked,
+                }),
             });
           }
         : undefined,

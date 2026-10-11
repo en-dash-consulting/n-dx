@@ -58,7 +58,11 @@ import { formatBudgetExceeded, type TokenBudgetResult } from "./token-budget.js"
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
-import { formatMissingReviewRefusal, reviewNeverRan } from "../analysis/adversarial-review.js";
+import {
+  formatMissingReviewRefusal,
+  formatUnresolvedMustFixRefusal,
+  reviewNeverRan,
+} from "../analysis/adversarial-review.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import { appendTrailerBlock } from "./commit-trailers.js";
@@ -256,6 +260,11 @@ export interface SharedLoopOptions {
   reviewMode?: RunReviewMode;
   /** The pair reviewer's vendor. Required for `reviewMode: "pair"`. */
   reviewVendor?: ReviewerVendor;
+  /**
+   * Fix rounds the executor gets in pair mode (`hench.review.rounds`). When
+   * unset, `config.review.rounds` and then the default decide.
+   */
+  reviewRounds?: number;
   /**
    * Model the review pass runs on (`--review-model`). When unset, resolved
    * from `llm.<vendor>.reviewModel`, `llm.reviewModel`, then the vendor's
@@ -4034,6 +4043,21 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     run.status = "failed";
     run.error = formatMissingReviewRefusal(run.review);
     run.review.gated = true;
+    info(`\n${run.error}`);
+    if (opts.store) {
+      await withdrawCompletionClaim(opts.store, run, run.error);
+    }
+  }
+
+  // A pair review that ran out of fix rounds with a must-fix finding open.
+  // Same machinery as the refusal above (withdraw the claim, keep the work in
+  // the tree), but `--review-optional` does not excuse it — the reviewer ran
+  // and said no — and `gated` stays unset: the task did fail review, so
+  // stuck-task detection should count it.
+  if (run.status === "completed" && run.review?.failed === "must-fix-unresolved") {
+    reviewGateRefused = true;
+    run.status = "failed";
+    run.error = formatUnresolvedMustFixRefusal(run.review);
     info(`\n${run.error}`);
     if (opts.store) {
       await withdrawCompletionClaim(opts.store, run, run.error);

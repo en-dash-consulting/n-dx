@@ -1554,7 +1554,11 @@ async function runOne(
         approveDiff: reviewOpts.approveDiff,
         reviewPass: reviewOpts.reviewPass,
         ...(settings?.reviewMode.value === "pair" && reviewOpts.reviewPass
-          ? { reviewMode: "pair" as const, reviewVendor: settings.reviewVendor.value ?? undefined }
+          ? {
+              reviewMode: "pair" as const,
+              reviewVendor: settings.reviewVendor.value ?? undefined,
+              reviewRounds: settings.reviewRounds.value,
+            }
           : {}),
         reviewModel: reviewOpts.reviewModel,
         reviewOptional: reviewOpts.reviewOptional,
