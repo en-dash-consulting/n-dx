@@ -26,5 +26,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Describe whether failover can fire from GET /api/llm/config](./describe-whether-failover-can-fire.md) | pending |
 | [Report each vendor's readiness from GET /api/llm/catalog](./report-each-vendor-s-readiness-from.md) | completed |
 | [Serve and save the review settings, with a pairSupported flag, through /api/llm/config](./serve-and-save-the-review-settings.md) | pending |
-| [Serve the model tier table, with what each tier is used by, from GET /api/llm/config](./serve-the-model-tier-table-with-what.md) | pending |
+| [Serve the model tier table, with what each tier is used by, from GET /api/llm/config](./serve-the-model-tier-table-with-what.md) | completed |
 | [Stop the tier table from declaring unregistered task classes that fail the task-class registry contract](./stop-the-tier-table-from-declaring.md) | completed |
