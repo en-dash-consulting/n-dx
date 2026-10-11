@@ -22,4 +22,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Report pairSupported from the server, document the review modes, and add the changesets](./report-pairsupported-from-the-server.md) | pending |
-| [Resume the executor with the reviewer's must-fix findings and re-review, up to hench.review.rounds](./resume-the-executor-with-the-reviewer.md) | pending |
+| [Resume the executor with the reviewer's must-fix findings and re-review, up to hench.review.rounds](./resume-the-executor-with-the-reviewer.md) | in_progress |
