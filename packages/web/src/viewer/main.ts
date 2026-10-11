@@ -53,7 +53,7 @@ import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
 import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
 import { installBasePathFetch } from "./base-path.js";
-import { renderActiveView, buildValidViews } from "./views/view-registry.js";
+import { renderActiveView, renderViewContent, buildValidViews } from "./views/view-registry.js";
 import { isLiveView, isSettingsView, stageForView } from "./views/stages.js";
 import { LiveBar } from "./views/domain-live.js";
 import { initScrollReveal } from "./scroll-reveal.js";
@@ -284,9 +284,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
             h(Guide, { view: pageView }),
           ),
         ),
-        loading
-          ? h("div", { class: "loading", role: "status", "aria-live": "polite" }, "Loading...")
-          : renderActiveView(pageView, viewCtx),
+        renderViewContent(pageView, loading, viewCtx),
       ),
       h(StageLinks, { stage, validViews, onNavigate: handleSidebarNav }),
       !isFeatureDisabled("detailPanel")
@@ -307,7 +305,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     ),
     settingsOpen
       ? h(SettingsOverlay, { view, validViews, onNavigate: handleSidebarNav, onClose: closeSettings, server },
-          loading ? null : renderActiveView(view, viewCtx),
+          renderViewContent(view, loading, viewCtx),
         )
       : null,
     (refreshToast && !isFeatureDisabled("autoRefresh"))

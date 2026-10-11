@@ -20,18 +20,13 @@ const STYLES_DIR = join(import.meta.dirname, "../../../src/viewer/styles");
 /**
  * Undefined properties that predate this test.
  *
- * Every one is a real defect — `robot-wrangler.css` in particular is written
- * against a `--color-*` / `--spacing-*` scheme the project never adopted, so
- * most of its declarations do nothing. They are listed rather than fixed
- * because repairing them means choosing replacement values, which is a
- * visual change and wants a designer's eye, not a merge.
+ * Every one is a real defect. They are listed rather than fixed because
+ * repairing them means choosing replacement values, which is a visual change
+ * and wants a designer's eye, not a merge.
  */
 const KNOWN_UNDEFINED = new Set([
   "--accent-bright", "--bg-deep", "--bg-inset", "--bg-raised", "--blue", "--border-light",
-  "--color-accent", "--color-border", "--color-surface", "--color-surface-hover",
-  "--color-text-primary", "--color-text-secondary",
-  "--radius", "--space-0-5", "--spacing-lg", "--spacing-md", "--spacing-sm",
-  "--spacing-xl", "--spacing-xs", "--text-dim-2", "--text-primary",
+  "--radius", "--space-0-5", "--text-dim-2", "--text-primary",
   "--yellow",
   // Set inline per-element from analysis data rather than in a stylesheet.
   "--zone-color",
@@ -55,7 +50,9 @@ function definedProperties(sheets: ReturnType<typeof stylesheets>): Set<string> 
 }
 
 /** Every `var(--x)` with no fallback — the uses that silently vanish. */
-function unguardedUses(sheets: ReturnType<typeof stylesheets>): Array<{ file: string; name: string }> {
+type Sheets = Array<{ file: string; css: string }>;
+
+function unguardedUses(sheets: Sheets): Array<{ file: string; name: string }> {
   const uses: Array<{ file: string; name: string }> = [];
   for (const { file, css } of sheets) {
     for (const m of css.matchAll(/var\(\s*(--[a-z0-9-]+)\s*\)/g)) {
@@ -78,21 +75,36 @@ function allUses(css: string): string[] {
  * Stylesheets with no undefined-token backlog. Fallback-guarded uses are
  * checked here too; add a new sheet to this list rather than the allowlist.
  */
-const STRICT_SHEETS = ["prepare-task.css"];
+const STRICT_SHEETS = ["prepare-task.css", "robot-wrangler.css"];
 
 /** Names that were undefined, are now replaced by theme tokens, and must stay gone. */
 const RETIRED = ["--text-secondary", "--danger"];
 
+/** `file: var(--x)` for every fallback-less use of a property no sheet defines. */
+function undefinedUnguarded(sheets: Sheets, allowed: ReadonlySet<string> = new Set()): string[] {
+  const defined = definedProperties(sheets);
+  const missing = unguardedUses(sheets)
+    .filter(({ name }) => !defined.has(name) && !allowed.has(name))
+    .map(({ file, name }) => `${file}: var(${name})`);
+  return [...new Set(missing)].sort();
+}
+
 describe("viewer design tokens", () => {
   it("defines every token used without a fallback, except a known backlog", () => {
-    const sheets = stylesheets();
-    const defined = definedProperties(sheets);
+    expect(undefinedUnguarded(stylesheets(), KNOWN_UNDEFINED)).toEqual([]);
+  });
 
-    const missing = unguardedUses(sheets)
-      .filter(({ name }) => !defined.has(name) && !KNOWN_UNDEFINED.has(name))
-      .map(({ file, name }) => `${file}: var(${name})`);
+  it("names the file and property of an undefined token used without a fallback", () => {
+    const fixture = [
+      { file: "a.css", css: ":root {\n  --defined: 1px;\n}\n.x { margin: var(--defined); }" },
+      { file: "b.css", css: ".y { color: var(--not-defined); }" },
+    ];
+    expect(undefinedUnguarded(fixture)).toEqual(["b.css: var(--not-defined)"]);
+  });
 
-    expect([...new Set(missing)].sort()).toEqual([]);
+  it("accepts an undefined token that carries a fallback", () => {
+    const fixture = [{ file: "b.css", css: ".y { color: var(--not-defined, red); }" }];
+    expect(undefinedUnguarded(fixture)).toEqual([]);
   });
 
   it("does not reintroduce the tokens that were defined nowhere", () => {
