@@ -36,6 +36,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Extract table names from embedded SQL in Java and Go](./extract-table-names-from-embedded-sql.md) | completed |
 | [Find migration and schema files and extract tables with tree-sitter-sql](./find-migration-and-schema-files-and.md) | completed |
 | [Go calls query leaves string arguments of unnamed calls without an owning argument list](./go-calls-query-leaves-string-arguments.md) | completed |
-| [Spring Data JDBC and R2DBC @Query and @Table("name") are read with JPA semantics, so their tables are missed](./spring-data-jdbc-and-r2dbc-query-and.md) | pending |
+| [Spring Data JDBC and R2DBC @Query and @Table("name") are read with JPA semantics, so their tables are missed](./spring-data-jdbc-and-r2dbc-query-and.md) | completed |
 | [SQL dialect goldens are inline PetClinic-shaped snippets, never checked against PetClinic's real schema files](./sql-dialect-goldens-are-inline.md) | pending |
 | [sqlc detection omits the schema files named by sqlc.yaml's schema: key](./sqlc-detection-omits-the-schema-files.md) | pending |
