@@ -4,7 +4,7 @@
  *
  * Detection reads file names first and file content only where the name is
  * ambiguous (goose and Liquibase SQL changelogs both live in plain `.sql`
- * files). The one config read for its values is sqlc's `queries:` key.
+ * files). The one config read for its values is sqlc's `queries:` and `schema:` keys.
  *
  * @module sourcevision/language/sql-migrations
  */
@@ -15,7 +15,10 @@ export interface MigrationToolFinding {
   readonly tool: MigrationTool;
   /** Project-relative files that identify the tool (markers and migrations), sorted. */
   readonly files: readonly string[];
-  /** The subset of `files` that are `.sql` files holding schema statements, sorted. */
+  /**
+   * The subset of `files` that are `.sql` files holding schema statements, sorted.
+   * For sqlc these are the `schema:` files; its `queries:` files are in `files` only.
+   */
   readonly sqlFiles: readonly string[];
 }
 
@@ -63,19 +66,20 @@ function resolveConfigPath(configDir: string, value: string): string {
 }
 
 /**
- * Paths named by `queries:` in a sqlc config, as a scalar, a flow list or a
- * block list (JSON uses `"queries": "query"`). Resolved against the config's
- * directory; a path is a file or a directory of `.sql` files.
+ * Paths named by `key` (`queries` or `schema`) in a sqlc config, as a scalar,
+ * a flow list or a block list (JSON uses `"queries": "query"`). Resolved
+ * against the config's directory; a path is a file or a directory of `.sql` files.
  */
-export function sqlcQueryPaths(configPath: string, content: string): string[] {
+export function sqlcPaths(configPath: string, content: string, key: "queries" | "schema"): string[] {
+  const keyPattern = new RegExp(`^(\\s*)-?\\s*"?${key}"?\\s*:\\s*(.*)$`);
   const configDir = dirname(configPath);
   const found: string[] = [];
   const lines = content.split("\n");
   const unquote = (raw: string): string => raw.trim().replace(/,$/, "").replace(/^["']|["']$/g, "");
   for (let i = 0; i < lines.length; i++) {
-    const key = /^(\s*)-?\s*"?queries"?\s*:\s*(.*)$/.exec(lines[i] ?? "");
-    if (!key) continue;
-    const value = (key[2] ?? "").trim();
+    const entry = keyPattern.exec(lines[i] ?? "");
+    if (!entry) continue;
+    const value = (entry[2] ?? "").trim();
     if (value !== "") {
       const list = /^\[(.*)\]$/.exec(value);
       for (const item of list ? (list[1] ?? "").split(",") : [value]) {
@@ -84,7 +88,7 @@ export function sqlcQueryPaths(configPath: string, content: string): string[] {
       }
       continue;
     }
-    const indent = (key[1] ?? "").length;
+    const indent = (entry[1] ?? "").length;
     for (let j = i + 1; j < lines.length; j++) {
       const item = /^(\s*)-\s*(.+)$/.exec(lines[j] ?? "");
       if (!item || (item[1] ?? "").length < indent) break;
@@ -159,20 +163,22 @@ export function detectMigrationTools(files: readonly string[], read: ReadProject
     }
   }
 
-  // A sqlc config counts only when it names queries that exist; those are its schema statements.
+  // A sqlc config counts only when it names query or schema files that exist.
+  // Schema files hold the CREATE TABLE statements (sqlFiles); query files are markers only.
   const sqlc = byTool.get("sqlc");
   if (sqlc) {
+    const existing = (paths: readonly string[]): string[] =>
+      sorted.filter((path) => isSql(path) && paths.some((base) => path === base || path.startsWith(`${base}/`)));
     for (const config of [...sqlc.files]) {
       const content = read(config);
-      const queryPaths = content === undefined ? [] : sqlcQueryPaths(config, content);
-      const queries = sorted.filter(
-        (path) => isSql(path) && queryPaths.some((query) => path === query || path.startsWith(`${query}/`)),
-      );
-      if (queries.length === 0) {
+      const queries = content === undefined ? [] : existing(sqlcPaths(config, content, "queries"));
+      const schemas = content === undefined ? [] : existing(sqlcPaths(config, content, "schema"));
+      if (queries.length === 0 && schemas.length === 0) {
         sqlc.files.delete(config);
         continue;
       }
-      for (const query of queries) note("sqlc", query, { sql: true });
+      for (const query of queries) note("sqlc", query, {});
+      for (const schema of schemas) note("sqlc", schema, { sql: true });
     }
     if (sqlc.files.size === 0) byTool.delete("sqlc");
   }
