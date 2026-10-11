@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add the missing changeset for Terraform files entering the inventory](./add-the-missing-changeset-for.md) | completed |
 | [Build the HCL grammar and recognise Terraform files](./build-the-hcl-grammar-and-recognise.md) | completed |
-| [infrastructure.ts keeps a fourth Terraform file set that disagrees with isTerraformFile on name case](./infrastructure-ts-keeps-a-fourth.md) | pending |
+| [infrastructure.ts keeps a fourth Terraform file set that disagrees with isTerraformFile on name case](./infrastructure-ts-keeps-a-fourth.md) | completed |
 | [Inventoried .tf files change zones, classifications and enrichment for TypeScript/Go repos that contain Terraform](./inventoried-tf-files-change-zones.md) | completed |
 | [Keep Terraform files out of zone detection so a Terraform folder leaves a TypeScript repo's zones unchanged](./keep-terraform-files-out-of-zone.md) | completed |
 | [Seed the Terraform drift corpus and measure parse rate](./seed-the-terraform-drift-corpus-and.md) | completed |

@@ -28,3 +28,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Packed-tarball test reads a stale dist, so a newly registered pack fails the gate](./packed-tarball-test-reads-a-stale-dist.md) | completed |
 | [scip-java comparison ignores constructor references and covers only PetClinic](./scip-java-comparison-ignores.md) | pending |
 | [tree-sitter-go 0.25.0 rejects Go 1.26 new(expr) and generic methods](./tree-sitter-go-0-25-0-rejects-go-1-26.md) | pending |
+| [Terraform agreement test checks a fixed name list, so a new config filename can drift from isTerraformPath](./terraform-agreement-test-checks-a.md) | pending |
