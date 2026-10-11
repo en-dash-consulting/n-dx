@@ -173,6 +173,8 @@ interface SmokeTestResult {
   reply: string | null;
   error?: string;
   url: string;
+  /** Models the tested server lists; null when it could not be read, absent from an older server. */
+  modelCount?: number | null;
 }
 
 interface LocalProfile {
@@ -244,6 +246,11 @@ const TIER_LABEL: Record<TierName, string> = {
   heavy: "Heavy",
   free: "Free",
 };
+
+/** A local server runs one loaded model, so its Standard tier reads as the Primary one. */
+function tierLabel(vendor: string, tier: TierName): string {
+  return vendor === VIEWER_LLM_VENDOR.LOCAL && tier === "standard" ? "Primary" : TIER_LABEL[tier];
+}
 
 /** editValues key for the hench provider (saved through PUT /api/hench/config, not the llm route). */
 const PROVIDER_KEY = "provider";
@@ -615,6 +622,7 @@ function TierTable({
   onChange: (key: string, v: string) => void;
 }) {
   const cliName = useCliName();
+  const isLocal = vendor === VIEWER_LLM_VENDOR.LOCAL;
   return h("section", { class: "llm-rw-section llm-tier-section" },
     h(SectionHeader, {
       number: 3,
@@ -628,14 +636,18 @@ function TierTable({
         const key = tierKey(vendor, row.tier);
         const saved = savedTierValue(data, vendor, row);
         const value = editValues[key] ?? saved;
-        const label = TIER_LABEL[row.tier];
+        const label = tierLabel(vendor, row.tier);
         const dirty = dirtyKeys.has(key);
         // An untouched unset row can say what it resolves to; once edited the
         // server has not resolved the new choice, so it says what saving does.
         const resolved = saved === "" && !dirty;
-        const where = value === ""
-          ? (resolved ? `Runs as ${row.model}` : "Unset once saved")
-          : `Set in ${dirty || saved === "" ? tierConfigPath(vendor, row.tier) : row.source}`;
+        // Light on a local server has no model of its own: unset, it runs the Primary one.
+        const fallsBack = isLocal && row.tier === "light" && value === "";
+        const where = fallsBack
+          ? `Falls back to ${tierLabel(vendor, "standard")}`
+          : value === ""
+            ? (resolved ? `Runs as ${row.model}` : "Unset once saved")
+            : `Set in ${dirty || saved === "" ? tierConfigPath(vendor, row.tier) : row.source}`;
         return h("div", {
           key: row.tier,
           class: `llm-tier-row llm-tier-row-${row.tier}${dirty ? " llm-field-dirty" : ""}`,
@@ -654,7 +666,9 @@ function TierTable({
             label: `${label} model`,
             value,
             models,
-            unsetLabel: resolved ? `Default (${row.model})` : "Default",
+            unsetLabel: fallsBack
+              ? `Same as ${tierLabel(vendor, "standard")}`
+              : resolved ? `Default (${row.model})` : "Default",
             set: value !== "",
             onChange,
           }),
@@ -662,8 +676,14 @@ function TierTable({
         );
       }),
     ),
+    isLocal
+      ? h("p", { class: "llm-tier-note" },
+          models.length > 0
+            ? "Choices are the models your server lists right now."
+            : "The server lists no models right now; pick “Other model id…” to enter one.")
+      : null,
     h("p", { class: "llm-tier-note" },
-      `Agent model overrides Standard for ${cliName} work only. A --model flag or a task's saved run settings win for that run.`),
+      `Agent model overrides ${tierLabel(vendor, "standard")} for ${cliName} work only. A --model flag or a task's saved run settings win for that run.`),
   );
 }
 
@@ -1249,19 +1269,32 @@ function runCardFix(problem: EffectiveProblem, vendor: ViewerLLMVendor): string 
     : "Pick a connection in Connection below.";
 }
 
-// ── Smoke test ─────────────────────────────────────────────────────────
+// ── Test connection ────────────────────────────────────────────────────
+
+/** "Connected · 3 models · reply in 412 ms · 38 tok/s", leaving out what the server could not measure. */
+function testSummary(r: SmokeTestResult): string {
+  const parts = ["Connected"];
+  if (typeof r.modelCount === "number") parts.push(`${r.modelCount} model${r.modelCount === 1 ? "" : "s"}`);
+  parts.push(`reply in ${r.latencyMs} ms`);
+  if (r.tokensPerSecond !== null) parts.push(`${r.tokensPerSecond} tok/s`);
+  return parts.join(" · ");
+}
 
 function SmokeTestButton({
   host, port, model, hasDirtyFields,
 }: {
   host: string; port: string; model: string; hasDirtyFields: boolean;
 }) {
-  const [state, setState] = useState<"idle" | "running" | "done">("idle");
-  const [result, setResult] = useState<SmokeTestResult | null>(null);
+  const [running, setRunning] = useState(false);
+  // A result describes the server it ran against, so it is shown only while
+  // host, port and model still name that server.
+  const key = `${host}|${port}|${model}`;
+  const [outcome, setOutcome] = useState<{ key: string; result: SmokeTestResult } | null>(null);
+  const result = outcome?.key === key ? outcome.result : null;
 
   const run = useCallback(async () => {
-    setState("running");
-    setResult(null);
+    setRunning(true);
+    let next: SmokeTestResult;
     try {
       const portNum = parseInt(port, 10);
       const res = await fetch("/api/llm/local-test", {
@@ -1269,36 +1302,29 @@ function SmokeTestButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ host: host || "localhost", port: portNum > 0 ? portNum : 1234, model }),
       });
-      setResult(await res.json() as SmokeTestResult);
+      next = await res.json() as SmokeTestResult;
     } catch (err) {
-      setResult({ ok: false, latencyMs: 0, tokensPerSecond: null, outputTokens: null, reply: null,
-        error: err instanceof Error ? err.message : "Request failed", url: "" });
-    } finally {
-      setState("done");
+      next = { ok: false, latencyMs: 0, tokensPerSecond: null, outputTokens: null, reply: null,
+        error: err instanceof Error ? err.message : "Request failed", url: "" };
     }
-  }, [host, port, model]);
+    setOutcome({ key, result: next });
+    setRunning(false);
+  }, [host, port, model, key]);
 
   return h("div", { class: "llm-smoke-row" },
     h("button", {
-      class: `llm-btn llm-btn-secondary${state === "running" ? " llm-btn-loading" : ""}`,
+      type: "button",
+      class: `llm-btn llm-btn-secondary${running ? " llm-btn-loading" : ""}`,
       onClick: run,
-      disabled: state === "running",
-    }, state === "running" ? "Testing…" : "Test connection"),
-    hasDirtyFields && state !== "running"
+      disabled: running,
+    }, running ? "Testing…" : "Test connection"),
+    hasDirtyFields && !running
       ? h("span", { class: "llm-smoke-hint" }, "using current edits")
       : null,
     result
       ? result.ok
-        ? h("span", { class: "llm-smoke-ok" },
-            `✓ ${result.latencyMs}ms`,
-            result.tokensPerSecond !== null
-              ? h("span", { class: "llm-smoke-meta" }, ` · ${result.tokensPerSecond} tok/s`)
-              : null,
-            result.reply
-              ? h("span", { class: "llm-smoke-reply" }, ` · "${result.reply}"`)
-              : null,
-          )
-        : h("span", { class: "llm-smoke-err" }, `✕ ${result.error ?? "Failed"}`)
+        ? h("span", { class: "llm-smoke-ok", role: "status" }, testSummary(result))
+        : h("span", { class: "llm-smoke-err", role: "alert" }, `✕ ${result.error ?? "Failed"}`)
       : null,
   );
 }
@@ -1358,9 +1384,10 @@ function StatusPill({ status, onRefresh }: { status: LocalStatusResponse | null;
   );
 }
 
-// ── Saved profiles panel ────────────────────────────────────────────────
+// ── Saved profiles ──────────────────────────────────────────────────────
 
-function ProfilesPanel({
+/** A row of chips, one per saved profile, plus the way to save the current server as another. */
+function ProfileChips({
   currentValues,
   onChange,
 }: {
@@ -1371,13 +1398,26 @@ function ProfilesPanel({
   const [saving, setSaving] = useState(false);
   const [newName, setNewName] = useState("");
   const [showInput, setShowInput] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  /** Runs one profiles request and adopts the list it answers with, or says why it could not. */
+  const exchange = useCallback(async (what: string, request: () => Promise<Response>): Promise<boolean> => {
+    try {
+      const res = await request();
+      const body = await res.json() as { profiles?: LocalProfile[]; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+      setProfiles(body.profiles ?? []);
+      setProblem(null);
+      return true;
+    } catch (err) {
+      setProblem(`Could not ${what}: ${err instanceof Error ? err.message : "request failed"}`);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
-    fetch("/api/llm/local-profiles")
-      .then((r) => r.json() as Promise<{ profiles: LocalProfile[] }>)
-      .then((d) => setProfiles(d.profiles ?? []))
-      .catch(() => {});
-  }, []);
+    void exchange("load profiles", () => fetch("/api/llm/local-profiles"));
+  }, [exchange]);
 
   const apply = useCallback((p: LocalProfile) => {
     onChange("local.host", p.host);
@@ -1389,95 +1429,136 @@ function ProfilesPanel({
     const name = newName.trim();
     if (!name) return;
     setSaving(true);
-    try {
-      const res = await fetch("/api/llm/local-profiles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          host: currentValues.host || "localhost",
-          port: parseInt(currentValues.port, 10) || 1234,
-          model: currentValues.model,
-        }),
-      });
-      const d = await res.json() as { profiles: LocalProfile[] };
-      setProfiles(d.profiles ?? []);
+    const saved = await exchange("save the profile", () => fetch("/api/llm/local-profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        host: currentValues.host || "localhost",
+        port: parseInt(currentValues.port, 10) || 1234,
+        model: currentValues.model,
+      }),
+    }));
+    setSaving(false);
+    if (saved) {
       setNewName("");
       setShowInput(false);
-    } catch { /* ignore */ }
-    finally { setSaving(false); }
-  }, [newName, currentValues]);
+    }
+  }, [newName, currentValues, exchange]);
 
-  const del = useCallback(async (name: string) => {
-    try {
-      const res = await fetch(`/api/llm/local-profiles?name=${encodeURIComponent(name)}`, { method: "DELETE" });
-      const d = await res.json() as { profiles: LocalProfile[] };
-      setProfiles(d.profiles ?? []);
-    } catch { /* ignore */ }
-  }, []);
+  const del = useCallback((name: string) => {
+    void exchange("delete the profile", () =>
+      fetch(`/api/llm/local-profiles?name=${encodeURIComponent(name)}`, { method: "DELETE" }));
+  }, [exchange]);
+
+  const cancel = () => { setShowInput(false); setNewName(""); };
 
   return h("div", { class: "llm-profiles" },
-    h("div", { class: "llm-profiles-bar" },
+    h("div", { class: "llm-profile-chips", role: "group", "aria-label": "Saved profiles" },
+      profiles.map((p) => {
+        const selected = p.host === currentValues.host.trim()
+          && String(p.port) === currentValues.port.trim()
+          && p.model === currentValues.model;
+        return h("span", {
+          key: p.name,
+          class: `llm-profile-chip${selected ? " llm-profile-chip-selected" : ""}`,
+        },
+          h("button", {
+            type: "button",
+            class: "llm-profile-chip-apply",
+            "aria-pressed": String(selected),
+            title: `${p.host}:${p.port}${p.model ? ` · ${p.model}` : ""}`,
+            onClick: () => apply(p),
+          }, p.name),
+          h("button", {
+            type: "button",
+            class: "llm-profile-del",
+            onClick: () => del(p.name),
+            title: `Delete "${p.name}"`,
+            "aria-label": `Delete profile "${p.name}"`,
+          }, "✕"),
+        );
+      }),
       showInput
         ? h("div", { class: "llm-profiles-save-row" },
             h("input", {
               class: "llm-text-input",
               type: "text",
               placeholder: "Profile name",
+              "aria-label": "Profile name",
               value: newName,
               autoFocus: true,
               onInput: (e: Event) => setNewName((e.target as HTMLInputElement).value),
               onKeyDown: (e: KeyboardEvent) => {
                 if (e.key === "Enter") void save();
-                if (e.key === "Escape") { setShowInput(false); setNewName(""); }
+                if (e.key === "Escape") cancel();
               },
             }),
             h("button", {
+              type: "button",
               class: "llm-btn llm-btn-primary",
               onClick: () => void save(),
               disabled: saving || !newName.trim(),
             }, saving ? "Saving…" : "Save"),
-            h("button", {
-              class: "llm-btn llm-btn-secondary",
-              onClick: () => { setShowInput(false); setNewName(""); },
-            }, "Cancel"),
+            h("button", { type: "button", class: "llm-btn llm-btn-secondary", onClick: cancel }, "Cancel"),
           )
         : h("button", {
-            class: "llm-btn llm-btn-secondary llm-profiles-new-btn",
+            type: "button",
+            class: "llm-profile-chip llm-profiles-new-btn",
             onClick: () => setShowInput(true),
           }, "+ Save current as profile"),
     ),
-    profiles.length > 0
-      ? h("div", { class: "llm-profiles-list" },
-          profiles.map((p) =>
-            h("div", { key: p.name, class: "llm-profile-row" },
-              h("div", { class: "llm-profile-info" },
-                h("span", { class: "llm-profile-name" }, p.name),
-                h("span", { class: "llm-profile-meta" },
-                  `${p.host}:${p.port}${p.model ? ` · ${p.model.length > 32 ? `…${p.model.slice(-29)}` : p.model}` : ""}`,
-                ),
-              ),
-              h("div", { class: "llm-profile-btns" },
-                h("button", {
-                  class: "llm-btn llm-btn-secondary llm-profile-apply",
-                  onClick: () => apply(p),
-                }, "Apply"),
-                h("button", {
-                  class: "llm-profile-del",
-                  onClick: () => void del(p.name),
-                  title: `Delete "${p.name}"`,
-                  "aria-label": `Delete profile "${p.name}"`,
-                }, "✕"),
-              ),
-            ),
-          ),
-        )
-      : h("p", { class: "llm-profiles-empty" }, "No profiles saved yet."),
+    problem ? h("p", { class: "llm-profiles-problem", role: "alert" }, problem) : null,
   );
 }
 
-// ── Local server section (flat layout) ────────────────────────────────
+// ── Server section (Local vendor) ───────────────────────────────────────
 
+/** A request timeout in ms, as a person would say it. Blank is the 5-minute default; 0 is no limit. */
+function timeoutSummary(raw: string): string {
+  const text = raw.trim();
+  if (text === "") return "5 min (default)";
+  const ms = Number(text);
+  if (!Number.isFinite(ms)) return text;
+  if (ms === 0) return "No limit";
+  if (ms % 3_600_000 === 0) return `${ms / 3_600_000} h`;
+  if (ms % 60_000 === 0) return `${ms / 60_000} min`;
+  if (ms % 1000 === 0) return `${ms / 1000} s`;
+  return `${ms} ms`;
+}
+
+/** The verifier in one line: its endpoint, model and review cycles, or Off when no endpoint is set. */
+function verifierSummary(host: string, port: string, model: string, maxCycles: string): string {
+  if (!host.trim() && !port.trim()) return "Off";
+  const cycles = maxCycles.trim();
+  return [
+    `${host.trim() || "localhost"}${port.trim() ? `:${port.trim()}` : ""}`,
+    model.trim() || null,
+    cycles ? `${cycles} review cycle${cycles === "1" ? "" : "s"}` : null,
+  ].filter(Boolean).join(" · ");
+}
+
+/** One collapsed advanced setting. The summary carries the current value so closed rows still read. */
+function AdvancedRow({
+  name, value, dirty, children,
+}: {
+  name: string;
+  value: string;
+  dirty: boolean;
+  children?: ComponentChildren;
+}) {
+  return h("details", { class: "llm-adv" },
+    h("summary", { class: "llm-adv-summary" },
+      h("span", { class: "llm-adv-name" }, name),
+      " ",
+      h("span", { class: "llm-adv-value" }, value),
+      dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+    ),
+    h("div", { class: "llm-adv-body" }, children),
+  );
+}
+
+/** Section 2 for the Local vendor, in place of Connection: where the models are served, and how to reach them. */
 function LocalSection({
   config, editValues, onChange, dirtyKeys, localStatus, onRefreshStatus,
 }: {
@@ -1504,172 +1585,166 @@ function LocalSection({
     ?? (config.verifier.maxCycles !== null ? String(config.verifier.maxCycles) : "");
   const verifierDirty = dirtyKeys.has("local.verifier.host") || dirtyKeys.has("local.verifier.port")
     || dirtyKeys.has("local.verifier.model") || dirtyKeys.has("local.verifier.maxCycles");
-  const verifierConfigured = config.verifier.host !== null || config.verifier.port !== null;
 
   const connDirty = dirtyKeys.has("local.host") || dirtyKeys.has("local.port");
 
-  return h("div", { class: "llm-vendor-section" },
+  return h("section", { class: "llm-rw-section llm-server-section" },
+    h(SectionHeader, { number: 2, title: "Server", subtitle: "Where your local models are served" }),
 
-    // ── Status pill (always first)
-    h("div", { class: "llm-local-top" },
-      h(StatusPill, { status: localStatus, onRefresh: onRefreshStatus }),
-    ),
+    h(StatusPill, { status: localStatus, onRefresh: onRefreshStatus }),
 
-    h("hr", { class: "llm-rule" }),
+    h(ProfileChips, { currentValues: { host, port, model }, onChange }),
 
-    // ── Connection settings
-    h("p", { class: "llm-section-sub" }, "Connection"),
-    h("div", { class: "llm-conn-row" },
-      h("div", { class: `llm-field${dirtyKeys.has("local.host") ? " llm-field-dirty" : ""}` },
-        h("label", { class: "llm-field-label", htmlFor: "local.host" },
-          "Host",
-          dirtyKeys.has("local.host") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-        ),
-        h("input", {
-          id: "local.host",
-          type: "text",
-          class: "llm-text-input",
-          value: host,
-          placeholder: "localhost",
-          list: "llm-dl-local-host",
-          onInput: (e: Event) => onChange("local.host", (e.target as HTMLInputElement).value),
-        }),
-        h("datalist", { id: "llm-dl-local-host" },
-          h("option", { value: "localhost" }),
-          h("option", { value: "127.0.0.1" }),
-        ),
-      ),
-      h("div", { class: `llm-field${dirtyKeys.has("local.port") ? " llm-field-dirty" : ""}` },
-        h("label", { class: "llm-field-label", htmlFor: "local.port" },
-          "Port",
-          dirtyKeys.has("local.port") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-        ),
-        h("input", {
-          id: "local.port",
-          type: "text",
-          class: "llm-text-input",
-          value: port,
-          placeholder: "1234",
-          list: "llm-dl-local-port",
-          onInput: (e: Event) => onChange("local.port", (e.target as HTMLInputElement).value),
-        }),
-        h("datalist", { id: "llm-dl-local-port" },
-          h("option", { value: "1234" }),
-          h("option", { value: "11434" }),
-          h("option", { value: "8080" }),
-        ),
-      ),
-    ),
-    h(SmokeTestButton, {
-      host, port, model,
-      hasDirtyFields: connDirty || dirtyKeys.has("local.model"),
-    }),
-
-    h("hr", { class: "llm-rule" }),
-
-    // ── Advanced: context budget + second-model verifier
-    h("p", { class: "llm-section-sub" }, "Advanced"),
-    h("div", { class: `llm-field${dirtyKeys.has("local.maxContextTokens") ? " llm-field-dirty" : ""}` },
-      h("label", { class: "llm-field-label", htmlFor: "local.maxContextTokens" },
-        "Max context tokens",
-        dirtyKeys.has("local.maxContextTokens") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-      ),
-      h("p", { class: "llm-field-desc" },
-        "Check that a brief fits before sending it, so an oversized prompt fails fast with a clear error instead of a cryptic HTTP 400. Match your server's \"Context Length\" setting. Leave blank to skip this check.",
-      ),
-      h("input", {
-        id: "local.maxContextTokens",
-        type: "text",
-        inputMode: "numeric",
-        class: "llm-text-input",
-        value: maxContextTokens,
-        placeholder: "e.g. 32768",
-        onInput: (e: Event) => onChange("local.maxContextTokens", (e.target as HTMLInputElement).value),
-      }),
-    ),
-    h("div", { class: `llm-field${dirtyKeys.has("local.timeoutMs") ? " llm-field-dirty" : ""}` },
-      h("label", { class: "llm-field-label", htmlFor: "local.timeoutMs" },
-        "Request timeout (ms)",
-        dirtyKeys.has("local.timeoutMs") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-      ),
-      h("p", { class: "llm-field-desc" },
-        "How long to wait for a single response from the local server. Enter 0 for no limit, or e.g. 7200000 for 2 hours. Leave blank for the 5-minute default. This is per request — the CLI timeouts on the Workflow page bound the whole command instead, so setting those to unlimited does not extend this.",
-      ),
-      h("input", {
-        id: "local.timeoutMs",
-        type: "text",
-        inputMode: "numeric",
-        class: "llm-text-input",
-        value: timeoutMs,
-        placeholder: "e.g. 7200000 (0 = no limit)",
-        onInput: (e: Event) => onChange("local.timeoutMs", (e.target as HTMLInputElement).value),
-      }),
-    ),
-    h("details", { class: "llm-verifier-details", open: verifierConfigured || verifierDirty },
-      h("summary", { class: "llm-verifier-summary" },
-        "Second-model verifier (optional)",
-        verifierDirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-      ),
-      h("p", { class: "llm-field-desc" },
-        "After the primary model finishes, send its solution to a second local endpoint for review before finalizing the run. Good pairing: a smaller/faster model here. Leave all fields blank to disable.",
-      ),
+    h("div", { class: "llm-server-card" },
       h("div", { class: "llm-conn-row" },
-        h("div", { class: `llm-field${dirtyKeys.has("local.verifier.host") ? " llm-field-dirty" : ""}` },
-          h("label", { class: "llm-field-label", htmlFor: "local.verifier.host" }, "Host"),
+        h("div", { class: `llm-field${dirtyKeys.has("local.host") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.host" },
+            "Host",
+            dirtyKeys.has("local.host") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+          ),
           h("input", {
-            id: "local.verifier.host",
+            id: "local.host",
             type: "text",
             class: "llm-text-input",
-            value: verifierHost,
+            value: host,
             placeholder: "localhost",
-            onInput: (e: Event) => onChange("local.verifier.host", (e.target as HTMLInputElement).value),
+            list: "llm-dl-local-host",
+            onInput: (e: Event) => onChange("local.host", (e.target as HTMLInputElement).value),
           }),
+          h("datalist", { id: "llm-dl-local-host" },
+            h("option", { value: "localhost" }),
+            h("option", { value: "127.0.0.1" }),
+          ),
         ),
-        h("div", { class: `llm-field${dirtyKeys.has("local.verifier.port") ? " llm-field-dirty" : ""}` },
-          h("label", { class: "llm-field-label", htmlFor: "local.verifier.port" }, "Port"),
+        h("div", { class: `llm-field${dirtyKeys.has("local.port") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.port" },
+            "Port",
+            dirtyKeys.has("local.port") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+          ),
           h("input", {
-            id: "local.verifier.port",
+            id: "local.port",
+            type: "text",
+            class: "llm-text-input",
+            value: port,
+            placeholder: "1234",
+            list: "llm-dl-local-port",
+            onInput: (e: Event) => onChange("local.port", (e.target as HTMLInputElement).value),
+          }),
+          h("datalist", { id: "llm-dl-local-port" },
+            h("option", { value: "1234" }),
+            h("option", { value: "11434" }),
+            h("option", { value: "8080" }),
+          ),
+        ),
+      ),
+      h(SmokeTestButton, {
+        host, port, model,
+        hasDirtyFields: connDirty || dirtyKeys.has("local.model"),
+      }),
+    ),
+
+    h("div", { class: "llm-adv-list" },
+      h(AdvancedRow, {
+        name: "Context budget",
+        value: maxContextTokens.trim() ? `${maxContextTokens.trim()} tokens` : "Not set",
+        dirty: dirtyKeys.has("local.maxContextTokens"),
+      },
+        h("div", { class: `llm-field${dirtyKeys.has("local.maxContextTokens") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.maxContextTokens" }, "Max context tokens"),
+          h("p", { class: "llm-field-desc" },
+            "Check that a brief fits before sending it, so an oversized prompt fails fast with a clear error instead of a cryptic HTTP 400. Match your server's \"Context Length\" setting. Leave blank to skip this check.",
+          ),
+          h("input", {
+            id: "local.maxContextTokens",
             type: "text",
             inputMode: "numeric",
             class: "llm-text-input",
-            value: verifierPort,
-            placeholder: "1235",
-            onInput: (e: Event) => onChange("local.verifier.port", (e.target as HTMLInputElement).value),
+            value: maxContextTokens,
+            placeholder: "e.g. 32768",
+            onInput: (e: Event) => onChange("local.maxContextTokens", (e.target as HTMLInputElement).value),
           }),
         ),
       ),
-      h(ModelField, {
-        fieldKey: "local.verifier.model",
-        label: "Model",
-        description: "Leave blank to use whichever model is currently loaded on the verifier endpoint.",
-        value: verifierModel,
-        onChange,
-        dirty: dirtyKeys.has("local.verifier.model"),
-        placeholder: "model-id",
-      }),
-      h("div", { class: `llm-field${dirtyKeys.has("local.verifier.maxCycles") ? " llm-field-dirty" : ""}` },
-        h("label", { class: "llm-field-label", htmlFor: "local.verifier.maxCycles" }, "Max review cycles"),
-        h("p", { class: "llm-field-desc" }, "How many FAIL → revise rounds before finalizing regardless (default: 2)."),
-        h("input", {
-          id: "local.verifier.maxCycles",
-          type: "text",
-          inputMode: "numeric",
-          class: "llm-text-input",
-          value: verifierMaxCycles,
-          placeholder: "2",
-          onInput: (e: Event) => onChange("local.verifier.maxCycles", (e.target as HTMLInputElement).value),
+
+      h(AdvancedRow, {
+        name: "Request timeout",
+        value: timeoutSummary(timeoutMs),
+        dirty: dirtyKeys.has("local.timeoutMs"),
+      },
+        h("div", { class: `llm-field${dirtyKeys.has("local.timeoutMs") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.timeoutMs" }, "Request timeout (ms)"),
+          h("p", { class: "llm-field-desc" },
+            "How long to wait for a single response from the local server. Enter 0 for no limit, or e.g. 7200000 for 2 hours. Leave blank for the 5-minute default. This is per request — the CLI timeouts on the Workflow page bound the whole command instead, so setting those to unlimited does not extend this.",
+          ),
+          h("input", {
+            id: "local.timeoutMs",
+            type: "text",
+            inputMode: "numeric",
+            class: "llm-text-input",
+            value: timeoutMs,
+            placeholder: "e.g. 7200000 (0 = no limit)",
+            onInput: (e: Event) => onChange("local.timeoutMs", (e.target as HTMLInputElement).value),
+          }),
+        ),
+      ),
+
+      h(AdvancedRow, {
+        name: "Second-model verifier",
+        value: verifierSummary(verifierHost, verifierPort, verifierModel, verifierMaxCycles),
+        dirty: verifierDirty,
+      },
+        h("p", { class: "llm-field-desc" },
+          "After the primary model finishes, send its solution to a second local endpoint for review before finalizing the run. Good pairing: a smaller/faster model here. Leave all fields blank to disable.",
+        ),
+        h("div", { class: "llm-conn-row" },
+          h("div", { class: `llm-field${dirtyKeys.has("local.verifier.host") ? " llm-field-dirty" : ""}` },
+            h("label", { class: "llm-field-label", htmlFor: "local.verifier.host" }, "Host"),
+            h("input", {
+              id: "local.verifier.host",
+              type: "text",
+              class: "llm-text-input",
+              value: verifierHost,
+              placeholder: "localhost",
+              onInput: (e: Event) => onChange("local.verifier.host", (e.target as HTMLInputElement).value),
+            }),
+          ),
+          h("div", { class: `llm-field${dirtyKeys.has("local.verifier.port") ? " llm-field-dirty" : ""}` },
+            h("label", { class: "llm-field-label", htmlFor: "local.verifier.port" }, "Port"),
+            h("input", {
+              id: "local.verifier.port",
+              type: "text",
+              inputMode: "numeric",
+              class: "llm-text-input",
+              value: verifierPort,
+              placeholder: "1235",
+              onInput: (e: Event) => onChange("local.verifier.port", (e.target as HTMLInputElement).value),
+            }),
+          ),
+        ),
+        h(ModelField, {
+          fieldKey: "local.verifier.model",
+          label: "Model",
+          description: "Leave blank to use whichever model is currently loaded on the verifier endpoint.",
+          value: verifierModel,
+          onChange,
+          dirty: dirtyKeys.has("local.verifier.model"),
+          placeholder: "model-id",
         }),
+        h("div", { class: `llm-field${dirtyKeys.has("local.verifier.maxCycles") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.verifier.maxCycles" }, "Max review cycles"),
+          h("p", { class: "llm-field-desc" }, "How many FAIL → revise rounds before finalizing regardless (default: 2)."),
+          h("input", {
+            id: "local.verifier.maxCycles",
+            type: "text",
+            inputMode: "numeric",
+            class: "llm-text-input",
+            value: verifierMaxCycles,
+            placeholder: "2",
+            onInput: (e: Event) => onChange("local.verifier.maxCycles", (e.target as HTMLInputElement).value),
+          }),
+        ),
       ),
     ),
-
-    h("hr", { class: "llm-rule" }),
-
-    // ── Profiles
-    h("p", { class: "llm-section-sub" }, "Saved profiles"),
-    h(ProfilesPanel, {
-      currentValues: { host, port, model },
-      onChange,
-    }),
   );
 }
 
@@ -2008,16 +2083,32 @@ export function RobotWranglerView() {
       onChange: handleVendorChange,
     }),
 
-    (effectiveVendor && data)
-      ? h(ConnectionCards, {
-          vendor: effectiveVendor as ViewerLLMVendor,
-          choices: providerChoices.length > 0 ? providerChoices : [provider.value],
-          value: provider.value,
-          readiness: vendorCatalog?.readiness,
+    // Section 2. A local server has no CLI or API choice to make: it is reached
+    // at a host and port, so Server takes the slot Connection holds elsewhere.
+    showLocal && data
+      ? h(LocalSection, {
+          key: VIEWER_LLM_VENDOR.LOCAL,
+          config: data.local ?? {
+            model: null, lightModel: null, host: null, port: null,
+            maxContextTokens: null, timeoutMs: null,
+            verifier: { host: null, port: null, model: null, maxCycles: null },
+          },
+          editValues,
           onChange: handleField,
-          dirty: provider.dirty,
+          dirtyKeys,
+          localStatus,
+          onRefreshStatus: refreshLocal,
         })
-      : null,
+      : (effectiveVendor && data)
+        ? h(ConnectionCards, {
+            vendor: effectiveVendor as ViewerLLMVendor,
+            choices: providerChoices.length > 0 ? providerChoices : [provider.value],
+            value: provider.value,
+            readiness: vendorCatalog?.readiness,
+            onChange: handleField,
+            dirty: provider.dirty,
+          })
+        : null,
 
     catalogError
       ? h("p", { class: "llm-catalog-error", role: "alert" },
@@ -2040,21 +2131,6 @@ export function RobotWranglerView() {
         })
       : null,
 
-    showLocal
-      ? h(LocalSection, {
-          key: VIEWER_LLM_VENDOR.LOCAL,
-          config: data!.local ?? {
-            model: null, lightModel: null, host: null, port: null,
-            maxContextTokens: null, timeoutMs: null,
-            verifier: { host: null, port: null, model: null, maxCycles: null },
-          },
-          editValues,
-          onChange: handleField,
-          dirtyKeys,
-          localStatus,
-          onRefreshStatus: refreshLocal,
-        })
-      : null,
     !effectiveVendor
       ? h("p", { class: "llm-no-vendor" }, "Select a vendor above to configure its settings.")
       : null,

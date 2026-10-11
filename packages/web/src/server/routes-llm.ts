@@ -802,6 +802,9 @@ interface SmokeTestResponse {
   url: string;
 }
 
+/** The route's answer: the smoke test plus how many models the tested server lists (null when unreadable). */
+type LocalTestResponse = SmokeTestResponse & { modelCount: number | null };
+
 async function runSmokeTest(
   host: string,
   port: number,
@@ -1298,8 +1301,11 @@ export async function handleLlmRoute(
     } catch {
       // Body is optional — malformed JSON falls back to saved config
     }
-    const result = await runSmokeTest(host, port, model);
-    jsonResponse(res, 200, result);
+    // The model count comes from the same host and port, so it describes the
+    // server under test even when the edits are unsaved.
+    const [result, listing] = await Promise.all([runSmokeTest(host, port, model), probeLocalServer(host, port)]);
+    const body: LocalTestResponse = { ...result, modelCount: listing.ok ? listing.models.length : null };
+    jsonResponse(res, 200, body);
     return true;
   }
 

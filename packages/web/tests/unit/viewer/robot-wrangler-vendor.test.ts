@@ -191,7 +191,11 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     it("offers one connection card per catalog provider, one fixed card with the reason when there is one", async () => {
       stubApi({ config: config(vendor) });
       await mount();
-      const providers = (catalog()[vendor] as { providers: string[] }).providers;
+      // A local server is reached at a host and port, so its Section 2 is Server, not Connection.
+      const providers = vendor === "local" ? [] : (catalog()[vendor] as { providers: string[] }).providers;
+      if (vendor === "local") {
+        expect(root.querySelector(".llm-server-section .llm-rw-section-title")?.textContent).toBe("2Server");
+      }
 
       const cards = Array.from(root.querySelectorAll(".llm-connection-cards [role=radio]"));
       expect(cards.map((c) => c.className.match(/llm-connection-card-(\w+)/)?.[1])).toEqual(providers);
