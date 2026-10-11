@@ -160,7 +160,7 @@ export function resolveEffectiveAgentModel(
  * directly, and a difference here would only surface on a malformed
  * override, which is exactly the case nobody checks by hand.
  */
-async function readHenchAgentSettings(projectDir: string): Promise<{
+export async function readHenchAgentSettings(projectDir: string): Promise<{
   provider: HenchProvider;
   models: Partial<Record<LLMVendor, string>>;
 }> {

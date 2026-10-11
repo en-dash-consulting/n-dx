@@ -13,7 +13,16 @@
  */
 
 import { readFileSync } from "node:fs";
-import { LLM_VENDOR, deepMerge, exec, listVendorModels, loadLLMConfig, resolveLayout } from "@n-dx/llm-client";
+import {
+  LLM_VENDOR,
+  deepMerge,
+  exec,
+  listVendorModels,
+  loadLLMConfig,
+  resolveApiKey,
+  resolveGoogleApiKey,
+  resolveLayout,
+} from "@n-dx/llm-client";
 import type { LLMConfig, ListableVendor } from "@n-dx/llm-client";
 
 /** How long a live list and CLI probe are served before they are fetched again. */
@@ -131,4 +140,53 @@ export async function getLiveVendorProbe(
   const probe = await probeVendor(vendor, projectDir, await loadLLMConfig(projectDir));
   cache.set(key, { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, probe });
   return probe;
+}
+
+/** Whether a vendor can run as configured, with the line its card shows as-is. */
+export interface VendorReadiness {
+  state: "ready" | "needs-setup" | "unreachable";
+  summary: string;
+  /** Whether an API key resolves. Presence only: the key never leaves the server. Omitted where no key applies. */
+  apiKey?: boolean;
+}
+
+const cliReadiness = (cli: CliInfo): VendorReadiness =>
+  cli.found
+    ? { state: "ready", summary: cli.version ? `Ready · CLI ${cli.version}` : "Ready · CLI" }
+    : { state: "needs-setup", summary: "CLI not found" };
+
+const apiKeyReadiness = (hasKey: boolean): VendorReadiness =>
+  hasKey
+    ? { state: "ready", summary: "Ready · API key set", apiKey: true }
+    : { state: "needs-setup", summary: "API key missing", apiKey: false };
+
+/**
+ * Claude's readiness on the provider `ndx work` would run it on: the CLI probe
+ * for `cli`, a resolved API key for `api`. `apiKey` is reported either way.
+ */
+export function claudeReadiness(
+  provider: "cli" | "api",
+  cli: CliInfo,
+  config: LLMConfig,
+): VendorReadiness {
+  const hasKey = Boolean(resolveApiKey(config.claude ?? {}));
+  if (provider === "api") return apiKeyReadiness(hasKey);
+  return { ...cliReadiness(cli), apiKey: hasKey };
+}
+
+/** Codex has no API provider, so only its CLI counts. */
+export function codexReadiness(cli: CliInfo): VendorReadiness {
+  return cliReadiness(cli);
+}
+
+/** Gemini runs on the API alone, from `llm.google.api_key` or `GEMINI_API_KEY` (config never carries an env-var name). */
+export function googleReadiness(config: LLMConfig): VendorReadiness {
+  return apiKeyReadiness(Boolean(resolveGoogleApiKey(config.google)));
+}
+
+/** The local server is ready when it answers; `address` is `host:port`. */
+export function localReadiness(reachable: boolean, address: string): VendorReadiness {
+  return reachable
+    ? { state: "ready", summary: `Ready · ${address}` }
+    : { state: "unreachable", summary: `Not reachable · ${address}` };
 }
