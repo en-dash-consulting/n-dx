@@ -5,8 +5,10 @@
  * only `source` files. This runs the real analyze command on the same fixture
  * with and without `infra/*.tf`.
  *
- * Zones are not covered: zone detection selects files by extension, not role,
- * so `infra/*.tf` still forms its own zone (task e052cf8e, awaiting decision).
+ * Zones select files by extension, not role, so `infra/*.tf` forms its own
+ * zone, as it did before Terraform was recognised (task e052cf8e, decision 2:
+ * main's zoning is the baseline). Terraform under a test path keeps the role
+ * `test` it had then, so it stays quarantined with the tests.
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -58,13 +60,33 @@ describe("analyze a TypeScript repo with and without Terraform", () => {
     return join(dir, ".sourcevision");
   }
 
-  it("inventories every Terraform file as config", async () => {
+  it("inventories Terraform as config, or test under a TypeScript test path", async () => {
     const mixed = await analyze({ ...TS_FILES, ...TERRAFORM_FILES });
     const inventory = readOutput(mixed, DATA_FILES.inventory) as { files: { path: string; role: string }[] };
     const tfRoles = inventory.files
       .filter((f) => f.path.startsWith("infra/"))
       .map((f) => [f.path, f.role]);
-    expect(tfRoles).toEqual(Object.keys(TERRAFORM_FILES).sort().map((p) => [p, "config"]));
+    expect(tfRoles).toEqual(
+      Object.keys(TERRAFORM_FILES).sort().map((p) => [p, p.includes("/tests/") ? "test" : "config"]),
+    );
+  }, 120_000);
+
+  it("quarantines Terraform under tests/ with the tests", async () => {
+    const fixture = "tests/fixtures/infra/main.tf";
+    const mixed = await analyze({
+      ...TS_FILES,
+      ...TERRAFORM_FILES,
+      "tests/route.test.ts": 'import { route } from "../src/api/route.js";\nroute();\n',
+      [fixture]: TERRAFORM_FILES["infra/main.tf"],
+    });
+    const inventory = readOutput(mixed, DATA_FILES.inventory) as { files: { path: string; role: string }[] };
+    const role = new Map(inventory.files.map((f) => [f.path, f.role]));
+    expect(role.get(fixture)).toBe("test");
+
+    const { zones } = readOutput(mixed, DATA_FILES.zones) as { zones: { id: string; files: string[] }[] };
+    const holding = zones.filter((z) => z.files.includes(fixture));
+    expect(holding).toHaveLength(1);
+    expect(holding[0].files.filter((f) => role.get(f) !== "test")).toEqual([]);
   }, 120_000);
 
   it("writes identical classifications.json", async () => {
