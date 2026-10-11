@@ -73,6 +73,12 @@ function config(vendor: Vendor, overrides: Json = {}): Json {
     effective: { vendor, provider: "cli", model: "claude-sonnet-5", modelSource: "default" },
     effectiveProblems: [],
     tiers: tierRows(),
+    failover: {
+      enabled: false,
+      applies: false,
+      reason: "Failover is not available for Claude CLI. Only Claude on the API connection supports failover.",
+      chain: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5", "claude-haiku-4-5"],
+    },
     ...overrides,
   };
 }
@@ -159,6 +165,27 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     await act(async () => { root.querySelector<HTMLButtonElement>(".settings-frame-save")!.click(); });
     await settle();
   }
+
+  describe("a config response missing server-resolved blocks", () => {
+    it("renders the vendor cards and a bare failover toggle when there is no failover block", async () => {
+      stubApi({ config: config("claude", { failover: undefined, autoFailover: true }) });
+      await mount();
+
+      for (const vendor of VENDORS) expect(card(vendor)).toBeTruthy();
+      expect(root.querySelector<HTMLInputElement>('input[id="autoFailover"]')!.checked).toBe(true);
+      expect(root.querySelector(".llm-failover-chain")).toBeNull();
+      expect(root.querySelector(".llm-failover-warning")).toBeNull();
+    });
+
+    it("keeps the rest of the page when the tiers block is missing too", async () => {
+      stubApi({ config: config("claude", { failover: undefined, tiers: undefined }) });
+      await mount();
+
+      for (const vendor of VENDORS) expect(card(vendor)).toBeTruthy();
+      expect(root.querySelector(".llm-tier-row")).toBeNull();
+      expect(root.querySelector('input[id="autoFailover"]')).toBeTruthy();
+    });
+  });
 
   describe.each(VENDORS)("%s", (vendor) => {
     it("offers one connection card per catalog provider, one fixed card with the reason when there is one", async () => {

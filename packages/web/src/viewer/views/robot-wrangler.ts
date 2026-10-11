@@ -70,11 +70,11 @@ interface LlmConfigResponse {
   /** What `ndx work` runs with no flags, resolved server-side. */
   effective: EffectiveConfig;
   /** One row per model tier of `effective.vendor`: its model, the key that set it, and who uses it. */
-  tiers: TierRow[];
+  tiers?: TierRow[];
   /** Why `ndx work` would refuse `effective`; empty when it would run. */
   effectiveProblems: EffectiveProblem[];
-  /** Failover chain information. */
-  failover: FailoverInfo;
+  /** Failover chain information; absent from an older server or a partial response. */
+  failover?: FailoverInfo;
 }
 
 interface EffectiveConfig {
@@ -572,7 +572,7 @@ function TierTable({
     !ready
       ? h("p", { class: "llm-tier-pending" }, `Save the vendor change to choose models for ${vendor}.`)
       : h("div", { class: "llm-tier-table", role: "group", "aria-label": "Model tiers" },
-      data.tiers.map((row) => {
+      (data.tiers ?? []).map((row) => {
         const key = tierKey(vendor, row.tier);
         const saved = savedTierValue(data, vendor, row);
         const value = editValues[key] ?? saved;
@@ -708,7 +708,7 @@ function FailoverSection({
   onChange,
   dirty,
 }: {
-  failover: FailoverInfo;
+  failover: FailoverInfo | undefined;
   vendor: string | null;
   enabled: boolean;
   onChange: (key: string, v: boolean) => void;
@@ -716,7 +716,9 @@ function FailoverSection({
 }) {
   const cliName = useCliName();
   const isLocal = vendor === VIEWER_LLM_VENDOR.LOCAL;
-  const cannotApply = !failover.applies;
+  // Without the server's block there is no chain and no reason: the toggle stands alone.
+  const chain = failover?.chain ?? [];
+  const cannotApply = failover !== undefined && !failover.applies;
 
   return h("section", { class: "llm-rw-section" },
     h(SectionHeader, {
@@ -733,17 +735,19 @@ function FailoverSection({
       dirty,
     }),
     // Show the chain as monospace pills with arrows, dimmed if toggle is off
-    h("div", { class: `llm-failover-chain${!enabled ? " llm-failover-chain-dimmed" : ""}` },
-      failover.chain.map((model, i) => [
-        i > 0 ? h("span", { class: "llm-failover-arrow" }, "→") : null,
-        h("code", { class: "llm-failover-pill" }, model),
-      ]).flat(),
-    ),
+    chain.length > 0
+      ? h("div", { class: `llm-failover-chain${!enabled ? " llm-failover-chain-dimmed" : ""}` },
+          chain.map((model, i) => [
+            i > 0 ? h("span", { class: "llm-failover-arrow" }, "→") : null,
+            h("code", { class: "llm-failover-pill" }, model),
+          ]).flat(),
+        )
+      : null,
     // Show reason when failover cannot fire
     cannotApply
       ? h("p", { class: "llm-failover-warning", role: "alert" },
           "⚠ ",
-          isLocal ? "Failover is not available for local models." : failover.reason)
+          isLocal ? "Failover is not available for local models." : failover?.reason)
       : null,
   );
 }
@@ -1359,7 +1363,7 @@ export function RobotWranglerView() {
     // The tier rows describe the saved vendor; only they are editable, and only
     // while that is the vendor on screen.
     if (tiersShown && effectiveVendor) {
-      for (const row of data.tiers) {
+      for (const row of data.tiers ?? []) {
         const k = tierKey(effectiveVendor, row.tier);
         if (k in editValues && editValues[k] !== savedTierValue(data, effectiveVendor, row)) dirtyKeys.add(k);
       }
