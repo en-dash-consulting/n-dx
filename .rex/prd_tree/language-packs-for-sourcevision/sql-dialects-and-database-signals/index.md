@@ -40,4 +40,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [SQL dialect goldens are inline PetClinic-shaped snippets, never checked against PetClinic's real schema files](./sql-dialect-goldens-are-inline.md) | completed |
 | [sqlc config values with a trailing YAML comment resolve to a bogus path](./sqlc-config-values-with-a-trailing.md) | pending |
 | [sqlc detection omits the schema files named by sqlc.yaml's schema: key](./sqlc-detection-omits-the-schema-files.md) | completed |
-| [sqlc query files lost their route to extractSqlcTables when sqlFiles became schema-only](./sqlc-query-files-lost-their-route-to.md) | pending |
+| [sqlc query files lost their route to extractSqlcTables when sqlFiles became schema-only](./sqlc-query-files-lost-their-route-to.md) | completed |
