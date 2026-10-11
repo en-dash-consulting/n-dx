@@ -62,6 +62,9 @@ export interface PrepResolvedSettings {
   provider: PrepResolved<string>;
   permissionMode: PrepResolved<string | null>;
   review: PrepResolved<boolean>;
+  reviewMode: PrepResolved<string>;
+  /** The pair reviewer; null when the executor has no CLI counterpart. */
+  reviewVendor: PrepResolved<string | null>;
   /** `vendorDefault` is the vendor's built-in reviewer, the target of the modal's "Vendor default" choice. */
   reviewModel: PrepResolved<string> & { vendorDefault: string };
   reviewOptional: PrepResolved<boolean>;
@@ -123,6 +126,9 @@ export interface PrepDefaults {
   provider: string;
   permissionMode: string;
   review: boolean;
+  reviewMode: string;
+  /** `""` stands for "no pair reviewer". */
+  reviewVendor: string;
   reviewModel: string;
   reviewOptional: boolean;
   skipTestGate: boolean;
@@ -140,6 +146,8 @@ export function defaultsOf(prep: PrepResponse): PrepDefaults {
     provider: r.provider.value,
     permissionMode: r.permissionMode.value ?? "",
     review: r.review.value,
+    reviewMode: r.reviewMode.value,
+    reviewVendor: r.reviewVendor.value ?? "",
     reviewModel: r.reviewModel.value,
     reviewOptional: r.reviewOptional.value,
     skipTestGate: r.skipTestGate.value,

@@ -70,7 +70,19 @@ export interface ReviewOptions {
    * configure.
    */
   noReview: boolean;
+  /**
+   * `--review-mode` — who reviews, stated outright. `self` and `off` are what
+   * `--review` and `--no-review` say; `pair` has no shorthand. Flag precedence
+   * applies to it exactly as to those two, so it also sets
+   * {@link reviewPass} / {@link noReview}.
+   */
+  reviewModeFlag?: ReviewMode;
+  /** `--reviewer` — the pair reviewer's vendor, over a saved or configured one. */
+  reviewerFlag?: ReviewerVendor;
 }
+
+const REVIEW_MODE_FLAG_VALUES: readonly ReviewMode[] = ["off", "self", "pair"];
+const REVIEWER_FLAG_VALUES: readonly ReviewerVendor[] = ["claude", "codex"];
 
 /**
  * The model override the command line carries for `vendor`: the
@@ -102,9 +114,39 @@ export function selectCliModelOverride(
  *   without `--review`.
  */
 export function parseReviewOptions(flags: Record<string, string>): ReviewOptions {
-  const reviewPass = flags.review === "true";
-  const noReview = flags["no-review"] === "true";
+  let reviewPass = flags.review === "true";
+  let noReview = flags["no-review"] === "true";
   const approveDiff = flags["approve-diff"] === "true";
+  const reviewModeFlag = parseEnumFlag(flags, "review-mode", REVIEW_MODE_FLAG_VALUES);
+  const reviewerFlag = parseEnumFlag(flags, "reviewer", REVIEWER_FLAG_VALUES);
+  if (reviewModeFlag !== undefined) {
+    // `--review` says "some review" and `--no-review` says "none": a mode that
+    // contradicts either has no obviously right reading. `--review` with
+    // `pair` does not contradict, and the mode says which review.
+    if (reviewPass && reviewModeFlag === "off") {
+      throw new CLIError(
+        "--review was passed with --review-mode=off.",
+        "Keep one: --review-mode=<off|self|pair> says it outright, --review is shorthand for self.",
+      );
+    }
+    if (noReview && reviewModeFlag !== "off") {
+      throw new CLIError(
+        `--no-review was passed with --review-mode=${reviewModeFlag}.`,
+        "Keep one: --review-mode=off is what --no-review says.",
+      );
+    }
+    reviewPass = reviewModeFlag !== "off";
+    noReview = reviewModeFlag === "off";
+  }
+  // The flags state a non-pair review when they ask for none, or for a self
+  // review (`--review` alone). With no review flag at all, the task or the
+  // project may still say pair, so `--reviewer` alone is allowed.
+  if (reviewerFlag !== undefined && (noReview || (reviewPass && reviewModeFlag !== "pair"))) {
+    throw new CLIError(
+      "--reviewer only applies to pair review.",
+      "Add --review-mode=pair, or drop --reviewer. A task that saved reviewMode pair takes --reviewer on its own.",
+    );
+  }
   // Asking for a review and refusing one in the same breath has no reading
   // that is obviously right, and guessing either way silently gives the
   // operator the opposite of half their command line.
@@ -150,9 +192,26 @@ export function parseReviewOptions(flags: Record<string, string>): ReviewOptions
     approveDiff,
     reviewPass,
     noReview,
+    ...(reviewModeFlag ? { reviewModeFlag } : {}),
+    ...(reviewerFlag ? { reviewerFlag } : {}),
     reviewModel: reviewModelFlag?.trim() || undefined,
     reviewOptional,
   };
+}
+
+/** The value of an enum-valued flag, or undefined when absent. @throws {CLIError} On any other value. */
+function parseEnumFlag<T extends string>(
+  flags: Record<string, string>,
+  flag: string,
+  values: readonly T[],
+): T | undefined {
+  const value = flags[flag];
+  if (value === undefined) return undefined;
+  if ((values as readonly string[]).includes(value)) return value as T;
+  throw new CLIError(
+    `--${flag} must be one of ${values.join(", ")}, got "${value}".`,
+    `Example: --${flag}=${values[values.length - 1]}.`,
+  );
 }
 
 /**
@@ -451,7 +510,11 @@ export type SettingWarningCode =
   /** `permissionMode` is a Claude-only setting on another vendor. */
   | "saved-permission-mode-dropped"
   /** `hench.review.mode: "self"` cannot run on the provider this task resolved to. */
-  | "configured-review-unsupported";
+  | "configured-review-unsupported"
+  /** `reviewMode: "pair"` has no usable reviewer or provider here; the next source decides. */
+  | "saved-review-mode-skipped"
+  /** `reviewVendor` is the executor's own vendor, or the executor has no CLI to pair with. */
+  | "saved-review-vendor-skipped";
 
 export interface SettingWarning {
   code: SettingWarningCode;
@@ -478,12 +541,17 @@ export interface TaskRunSettings {
   };
   review: Resolved<boolean>;
   /**
-   * The review mode in force: `--review` is `self`, `--no-review` is `off`, a
-   * task's saved `run.review` is `self` or `off`, and otherwise `hench.review.mode`.
-   * `review.value` is whether a review runs *today*; `pair` runs none yet.
+   * The review mode in force: `--review-mode`, `--review` (`self`) or
+   * `--no-review` (`off`); then a task's saved `run.reviewMode`, then its
+   * saved `run.review` (`self` or `off`); otherwise `hench.review.mode`.
+   * `review.value` is whether any review runs.
    */
   reviewMode: Resolved<ReviewMode>;
-  /** The pair reviewer: `hench.review.vendor`, else the executor's other CLI vendor. Null when there is none. */
+  /**
+   * The pair reviewer: `--reviewer`, the task's saved `run.reviewVendor`,
+   * `hench.review.vendor`, else the executor's other CLI vendor. Null when
+   * there is none.
+   */
   reviewVendor: Resolved<ReviewerVendor | null>;
   /** `hench.review.rounds`: fix rounds the executor gets in pair mode. */
   reviewRounds: Resolved<number>;
@@ -711,14 +779,47 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // merely *saved* `review: true` is asking for an addition, not stating a
   // precondition — dropping it with a warning beats ending the loop. The
   // caller refuses the flag case; this only decides the saved one.
-  // Mode precedence: flag > the task's saved `run.review` > `hench.review.mode`.
-  // `--review` and a saved `review: true` both mean self review; a saved `false`
-  // beats a project that reviews, which is what lets a task opt out.
+  // Mode precedence: flag > the task's saved `run.reviewMode` > its saved
+  // `run.review` > `hench.review.mode`. `--review` and a saved `review: true`
+  // both mean self review; a saved `false` beats a project that reviews, which
+  // is what lets a task opt out. `reviewMode` is the finer statement of the
+  // same thing, so it wins when both are saved.
   const configuredMode = config.review?.mode;
+
+  // The pair reviewer, before any flag: a saved `reviewVendor` that is the
+  // executor itself (self review under another name) or that has no CLI
+  // counterpart to pair with is skipped, then `hench.review.vendor`, then the
+  // executor's other CLI vendor.
+  const defaultReviewer = otherReviewVendor(vendor);
+  const savedReviewer = saved?.reviewVendor;
+  const savedReviewerUsable = savedReviewer !== undefined && defaultReviewer !== null && savedReviewer !== vendor;
+  const unflaggedReviewVendor: Resolved<ReviewerVendor | null> = savedReviewerUsable
+    ? { value: savedReviewer, source: "task.run" }
+    : config.review?.vendor !== undefined
+      ? { value: config.review.vendor, source: "hench.review.vendor" }
+      : { value: defaultReviewer, source: "built-in" };
+
+  // A saved pair review this run cannot honour is skipped, like a saved
+  // self review the provider cannot spawn: a task's saved value must not end a
+  // loop. The operator's own `--review-mode=pair` is refused instead, below.
+  const savedPairError =
+    saved?.reviewMode === "pair"
+      ? pairReviewerError(vendor, unflaggedReviewVendor.value, resolvedProvider.provider)
+      : undefined;
+  if (savedPairError) {
+    warnings.push({
+      code: "saved-review-mode-skipped",
+      message: `Ignoring reviewMode "pair" saved on "${item?.title}": ${savedPairError.message}`,
+    });
+  }
+
   let reviewMode: Resolved<ReviewMode>;
-  if (reviewOpts.reviewPass) reviewMode = { value: "self", source: "cli-flag" };
+  if (reviewOpts.reviewModeFlag) reviewMode = { value: reviewOpts.reviewModeFlag, source: "cli-flag" };
+  else if (reviewOpts.reviewPass) reviewMode = { value: "self", source: "cli-flag" };
   else if (reviewOpts.noReview) reviewMode = { value: "off", source: "cli-flag" };
-  else if (saved?.review !== undefined) reviewMode = { value: saved.review ? "self" : "off", source: "task.run" };
+  else if (saved?.reviewMode !== undefined && !savedPairError) {
+    reviewMode = { value: saved.reviewMode, source: "task.run" };
+  } else if (saved?.review !== undefined) reviewMode = { value: saved.review ? "self" : "off", source: "task.run" };
   else if (configuredMode !== undefined) reviewMode = { value: configuredMode, source: "hench.review.mode" };
   else reviewMode = { value: DEFAULT_REVIEW_MODE, source: "built-in" };
 
@@ -747,10 +848,20 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     ? { value: false, source: "vendor-unsupported" }
     : { value: reviewMode.value === "self" || reviewMode.value === "pair", source: reviewMode.source };
 
-  const reviewVendor: Resolved<ReviewerVendor | null> =
-    config.review?.vendor !== undefined
-      ? { value: config.review.vendor, source: "hench.review.vendor" }
-      : { value: otherReviewVendor(vendor), source: "built-in" };
+  const reviewVendor: Resolved<ReviewerVendor | null> = reviewOpts.reviewerFlag
+    ? { value: reviewOpts.reviewerFlag, source: "cli-flag" }
+    : unflaggedReviewVendor;
+  // Said only when it matters: a saved reviewer is a pair-only setting.
+  if (saved?.reviewVendor !== undefined && !savedReviewerUsable && reviewMode.value === "pair") {
+    warnings.push({
+      code: "saved-review-vendor-skipped",
+      message:
+        `Ignoring reviewVendor "${saved.reviewVendor}" saved on "${item?.title}": ` +
+        (defaultReviewer === null
+          ? `vendor="${vendor}" has no CLI counterpart to pair with.`
+          : `it is the executor's own vendor, which would be self review, not pair review.`),
+    });
+  }
   const reviewRounds: Resolved<number> =
     config.review?.rounds !== undefined
       ? { value: config.review.rounds, source: "hench.review.rounds" }

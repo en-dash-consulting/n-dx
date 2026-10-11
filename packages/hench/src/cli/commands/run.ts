@@ -1379,7 +1379,10 @@ export function formatTaskSettingsLines(taskTitle: string, settings: TaskRunSett
   if (fromTask(settings.model.source)) changed.push(`model ${settings.model.value} (${settings.model.weight} tier)`);
   if (fromTask(settings.provider.source)) changed.push(`provider ${settings.provider.value}`);
   if (fromTask(settings.permissionMode.source)) changed.push(`permission-mode ${settings.permissionMode.value}`);
-  if (fromTask(settings.review.source)) changed.push(`review ${settings.review.value}`);
+  if (fromTask(settings.reviewMode.source)) changed.push(`review-mode ${settings.reviewMode.value}`);
+  if (settings.reviewMode.value === "pair" && fromTask(settings.reviewVendor.source)) {
+    changed.push(`reviewer ${settings.reviewVendor.value}`);
+  }
   if (settings.review.value && fromTask(settings.reviewModel.source)) {
     changed.push(`review-model ${settings.reviewModel.value}`);
   }

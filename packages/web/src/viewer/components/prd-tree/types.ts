@@ -75,6 +75,8 @@ export interface RunSettingsData {
   provider?: "cli" | "api";
   permissionMode?: "default" | "acceptEdits" | "bypassPermissions";
   review?: boolean;
+  reviewMode?: "off" | "self" | "pair";
+  reviewVendor?: "claude" | "codex";
   reviewTier?: "light" | "standard" | "heavy";
   reviewModels?: Partial<Record<"claude" | "codex" | "google" | "local", string>>;
   reviewOptional?: boolean;

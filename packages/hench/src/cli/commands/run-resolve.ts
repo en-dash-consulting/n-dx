@@ -113,6 +113,13 @@ export interface ResolvedSettings {
   provider: Resolved<string>;
   permissionMode: Resolved<string | null>;
   review: Resolved<boolean>;
+  /**
+   * The review mode in force, so `--review` shows as `self` from `cli-flag`.
+   * `review.value` says whether any review runs.
+   */
+  reviewMode: Resolved<string>;
+  /** The pair reviewer; null when the executor has no CLI counterpart to pair with. */
+  reviewVendor: Resolved<string | null>;
   /** Always the reviewer a review would use; `review.value` says whether one runs. `vendorDefault` is the vendor's built-in. */
   reviewModel: Resolved<string> & { vendorDefault: string };
   reviewOptional: Resolved<boolean>;
@@ -144,16 +151,11 @@ export interface RunResolution {
   saved: RunSettings | null;
   resolved: ResolvedSettings;
   /**
-   * The project's review settings (`hench.review.*`), each with the key that
-   * supplied it. Apart from {@link resolved} because that map is one entry per
-   * per-run flag and these have none: they are set with `ndx config`.
-   * `mode` is the mode in force, so `--review` shows as `self` from `cli-flag`;
-   * `resolved.review.value` says whether a review runs today (`pair` runs none).
+   * The review setting that has no per-run flag: `hench.review.rounds`, set
+   * with `ndx config`, with the key that supplied it. The mode and the pair
+   * reviewer have flags and a saved form, so they sit in {@link resolved}.
    */
   review: {
-    mode: Resolved<string>;
-    /** The pair reviewer; null when the executor has no CLI counterpart. */
-    vendor: Resolved<string | null>;
     rounds: Resolved<number>;
   };
   options: RunOption[];
@@ -184,6 +186,8 @@ const RUN_OPTIONS: readonly RunOption[] = [
   { key: "provider", flag: "provider", type: "enum", values: ["cli", "api"], scope: "task", description: "Drive the vendor CLI or call its API directly." },
   { key: "permissionMode", flag: "permission-mode", type: "enum", values: PERMISSION_MODES, scope: "task", description: "Permission mode for the spawned Claude session (Claude only)." },
   { key: "review", flag: "review", negatedFlag: "no-review", type: "boolean", scope: "task", description: "Run the adversarial review pass after the task validates, before the commit (--no-review suppresses one the task saved)." },
+  { key: "reviewMode", flag: "review-mode", type: "enum", values: ["off", "self", "pair"], scope: "task", description: "Who reviews: off, self (this vendor re-reads the work) or pair (another vendor reviews and the executor fixes). --review is self, --no-review is off." },
+  { key: "reviewVendor", flag: "reviewer", type: "enum", values: ["claude", "codex"], scope: "task", description: "The pair reviewer's vendor; it must differ from the executor's (pair review only)." },
   { key: "reviewModel", flag: "review-model", type: "string", scope: "task", description: "Model the reviewer runs on (requires review)." },
   { key: "reviewOptional", flag: "review-optional", type: "boolean", scope: "task", description: "Downgrade the missing-review gate to a warning when the reviewer cannot start (requires review)." },
   { key: "skipTestGate", flag: "skip-test-gate", negatedFlag: "no-skip-test-gate", type: "boolean", scope: "task", description: "Skip the full test suite gate before the commit (--no-skip-test-gate forces it to run)." },
@@ -399,6 +403,8 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       "permissionMode",
     ),
     review: withFallback(settings.review, "review"),
+    reviewMode: withFallback(settings.reviewMode, "reviewMode"),
+    reviewVendor: withFallback(settings.reviewVendor, "reviewVendor"),
     reviewModel: withFallback(settings.reviewModel, "reviewModel"),
     reviewOptional: withFallback(settings.reviewOptional, "reviewOptional"),
     skipTestGate: withFallback(settings.skipTestGate, "skipTestGate"),
@@ -419,11 +425,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     },
     saved: settings.saved ?? null,
     resolved,
-    review: {
-      mode: withFallback(settings.reviewMode, "reviewMode"),
-      vendor: settings.reviewVendor,
-      rounds: settings.reviewRounds,
-    },
+    review: { rounds: settings.reviewRounds },
     options: RUN_OPTIONS.map((option) =>
       option.key === "provider" ? { ...option, values: VENDOR_PROVIDERS[vendor] } : { ...option },
     ),

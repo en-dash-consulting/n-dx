@@ -240,7 +240,9 @@ ndx config llm.codex.reviewModel <model> . # the reviewer's model, per vendor
 
 Pair review needs a CLI on both sides: the executor and the reviewer must each be `claude` or `codex` running on the CLI provider, and the reviewer must not be the executor's own vendor. Otherwise `ndx config` and the dashboard refuse the setting.
 
-**Findings.** Must-fix findings go back to the executor, whose own session is resumed to fix them. The task's tests re-run, and a fresh reviewer checks again, for up to `hench.review.rounds` rounds. A must-fix finding still open after the last round fails the review. Lesser findings are not fixed: they are captured to the PRD as new items. `--review`, `--no-review` and a task's saved `run.review` outrank the project setting; `ndx work --task=<id> --resolve .` shows which key supplied each value.
+**Findings.** Must-fix findings go back to the executor, whose own session is resumed to fix them. The task's tests re-run, and a fresh reviewer checks again, for up to `hench.review.rounds` rounds. A must-fix finding still open after the last round fails the review. Lesser findings are not fixed: they are captured to the PRD as new items. `--review-mode=<off|self|pair>`, `--reviewer=<claude|codex>`, `--review`, `--no-review` and a task's saved `run.reviewMode` / `run.reviewVendor` / `run.review` outrank the project setting, in that order; `ndx work --task=<id> --resolve .` shows which key supplied each value.
+
+**Per task.** A task can save its own `reviewMode` and `reviewVendor` in its `run` block, so one task is pair-reviewed by a chosen vendor whatever the project default is. A saved value that cannot be honoured is skipped with a warning and never stops a loop: a `reviewVendor` equal to the executor's vendor falls back to `hench.review.vendor`, then the executor's other vendor; a `reviewMode` of `pair` on an executor with no CLI counterpart, or on the API provider, falls back to the task's `run.review`, then the project. A reviewer or mode typed on the command line is refused instead.
 
 ## Web Server
 

@@ -203,8 +203,8 @@ describe("ndx work --resolve reports the review settings and their sources", () 
 
   it("names built-in for each, then the hench.review.* key once the project sets it", async () => {
     const before = await resolveRun(projectDir, { task: "t-plain" });
-    expect(before.review.mode).toEqual({ value: "off", source: "built-in" });
-    expect(before.review.vendor).toEqual({ value: "codex", source: "built-in" });
+    expect(before.resolved.reviewMode).toEqual({ value: "off", source: "built-in" });
+    expect(before.resolved.reviewVendor).toEqual({ value: "codex", source: "built-in" });
     expect(before.review.rounds).toEqual({ value: 2, source: "built-in" });
 
     const path = join(henchDir, "config.json");
@@ -213,8 +213,8 @@ describe("ndx work --resolve reports the review settings and their sources", () 
     await writeFile(path, JSON.stringify({ ...config, review: { mode: "self", vendor: "codex", rounds: 3 } }), "utf-8");
 
     const after = await resolveRun(projectDir, { task: "t-plain" });
-    expect(after.review.mode).toEqual({ value: "self", source: "hench.review.mode" });
-    expect(after.review.vendor).toEqual({ value: "codex", source: "hench.review.vendor" });
+    expect(after.resolved.reviewMode).toEqual({ value: "self", source: "hench.review.mode" });
+    expect(after.resolved.reviewVendor).toEqual({ value: "codex", source: "hench.review.vendor" });
     expect(after.review.rounds).toEqual({ value: 3, source: "hench.review.rounds" });
     expect(after.resolved.review).toEqual({ value: true, source: "hench.review.mode" });
   });
