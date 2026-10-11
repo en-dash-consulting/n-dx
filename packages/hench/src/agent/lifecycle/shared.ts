@@ -3600,7 +3600,8 @@ export async function findCommitsMissingItem(
   const missing: RunCommitItemMismatch[] = [];
   for (const commit of commits) {
     const items = itemsBySha.get(commit.sha);
-    if (items && !items.includes(taskId)) missing.push({ ...commit, items });
+    // The report names the commit and what its trailer said, not how the run tied it.
+    if (items && !items.includes(taskId)) missing.push({ sha: commit.sha, subject: commit.subject, items });
   }
   return missing;
 }

@@ -9,6 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -137,7 +138,7 @@ describe("hench backfill-commits", () => {
   }
 
   function commitAt(file: string, message: string, iso: string): string {
-    execFileSync("sh", ["-c", `printf '%s\\n' "${message}" > "${file}"`], { cwd: dir });
+    writeFileSync(join(dir, file), `${message}\n`);
     git("add", file);
     execFileSync("git", ["commit", "-q", "-m", message], { cwd: dir, env: { ...process.env, GIT_AUTHOR_DATE: iso, GIT_COMMITTER_DATE: iso } });
     return git("rev-parse", "HEAD");
