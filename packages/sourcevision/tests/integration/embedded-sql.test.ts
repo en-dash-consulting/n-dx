@@ -205,8 +205,9 @@ describe("sqlc query files", () => {
       "db/schema.sql": "CREATE TABLE authors (id int);",
     };
     const sqlc = detectMigrationTools(Object.keys(project), (path) => project[path]).find((f) => f.tool === "sqlc");
-    expect(sqlc?.sqlFiles).toEqual(["db/query/authors.sql", "db/query/books.sql"]);
-    const tables = sqlc!.sqlFiles.flatMap((path) => extractSqlcTables(path, project[path]!));
+    expect(sqlc?.sqlFiles).toEqual(["db/schema.sql"]);
+    expect(sqlc?.queryFiles).toEqual(["db/query/authors.sql", "db/query/books.sql"]);
+    const tables = sqlc!.queryFiles!.flatMap((path) => extractSqlcTables(path, project[path]!));
     expect(summary(tables)).toEqual([
       "authors sqlc GetAuthor db/query/authors.sql:2",
       "books sqlc ListBooks db/query/books.sql:2",

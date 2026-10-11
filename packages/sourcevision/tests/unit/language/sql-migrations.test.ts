@@ -86,6 +86,17 @@ describe("detectMigrationTools", () => {
     expect(list?.sqlFiles).toEqual(["one.sql"]);
   });
 
+  it("lists sqlc query files for the scalar, directory and list forms of queries:", () => {
+    const q = (queries: string, extra: Record<string, string>) =>
+      detect({ "sqlc.yaml": `sql:\n  - schema: s.sql\n    queries: ${queries}\n`, "s.sql": "CREATE TABLE t (id int);", ...extra })[0];
+    expect(q("a.sql", { "a.sql": "-- name: A :one\nSELECT 1;", "b.sql": "x" })?.queryFiles).toEqual(["a.sql"]);
+    expect(q("q", { "q/b.sql": "x", "q/a.sql": "x", "q/note.txt": "x" })?.queryFiles).toEqual(["q/a.sql", "q/b.sql"]);
+    const list = q("\n      - b.sql\n      - a.sql\n      - missing.sql", { "a.sql": "x", "b.sql": "x" });
+    expect(list?.queryFiles).toEqual(["a.sql", "b.sql"]);
+    expect(list?.sqlFiles).toEqual(["s.sql"]);
+    expect(detect(FIXTURES.flyway!)[0]?.queryFiles).toBeUndefined();
+  });
+
   it("lists Atlas migrations from the directory holding atlas.sum", () => {
     const [atlas] = detect(FIXTURES.atlas!);
     expect(atlas?.sqlFiles).toEqual(["migrations/20240101.sql"]);
