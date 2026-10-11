@@ -43,6 +43,7 @@ export function usage(): void {
           { name: "review pending <run-id>", description: "List findings an autonomous review deferred for capture" },
           { name: "cache [subcommand]", description: "Inspect or clear the session cache (list, clear)" },
           { name: "check-runs [dir]", description: "Audit runs recorded as running in every worktree; --fix ends dead ones" },
+          { name: "backfill-commits [dir]", description: "Fill commits on run records written without one, from the main branch's history" },
           { name: "validate-tokens [dir]", description: "Validate Codex token reporting accuracy" },
         ],
       },

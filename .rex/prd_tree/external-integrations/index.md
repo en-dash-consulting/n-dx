@@ -4,10 +4,10 @@ level: "epic"
 title: "External Integrations"
 status: "completed"
 startedAt: "2026-04-13T18:35:49.604Z"
-completedAt: "2026-10-10T05:13:02.878Z"
-endedAt: "2026-10-10T05:13:02.878Z"
+completedAt: "2026-10-11T04:04:01.829Z"
+endedAt: "2026-10-11T04:04:01.829Z"
 description: "Store adapters, bidirectional sync (Notion, future backends), CI/CD pipeline automation, and external service configuration."
-lastModified: "2026-10-10T05:13:03.129Z"
+lastModified: "2026-10-11T04:04:02.089Z"
 lastModifiedBy: "Nick Daniel <nick@endash.us>"
 ---
 

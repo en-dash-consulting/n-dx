@@ -250,10 +250,6 @@
           "type": "boolean",
           "description": "A person reviewed the current spec."
         },
-        "metAt": {
-          "type": "datetime",
-          "label": "Met"
-        },
         "tags": {
           "type": "list",
           "of": "string"
@@ -280,7 +276,7 @@
           "to": [
             "zone"
           ],
-          "description": "the code zones whose commits realized this capability",
+          "description": "the code zones changed by the work placed on this capability",
           "inverse": "the capabilities realized here"
         }
       },
@@ -293,7 +289,6 @@
               "health",
               "proposed",
               "status",
-              "metAt",
               "reviewed"
             ]
           },
@@ -1199,7 +1194,7 @@
     "commit": {
       "noun": "commit",
       "plural": "Commits",
-      "description": "A commit on main whose N-DX-Item trailer ties it to the work it was for.",
+      "description": "A commit on main tied to the work it was for: by its N-DX-Item trailer, or by the run record that names it.",
       "figure": "note",
       "label": "{subject}",
       "glance": [
@@ -1220,6 +1215,17 @@
         "committedAt": {
           "type": "datetime",
           "label": "Committed"
+        },
+        "attribution": {
+          "type": "enum",
+          "label": "Tied by",
+          "description": "How the commit was tied to its work: trailer, the N-DX-Item trailer names it; start-head, the run that made it recorded it as it ended; subject, trailer or window, hench backfill-commits read it from history.",
+          "options": [
+            "trailer",
+            "start-head",
+            "subject",
+            "window"
+          ]
         }
       },
       "edges": {
@@ -1228,14 +1234,14 @@
             "change",
             "task"
           ],
-          "description": "the work this commit's trailer names",
+          "description": "the work this commit landed for",
           "inverse": "the commits that landed for it"
         },
         "realizes": {
           "to": [
             "capability"
           ],
-          "description": "the capabilities this commit's change amended",
+          "description": "the capabilities the work this commit landed for was placed on",
           "inverse": "the commits that realized it"
         }
       },
@@ -1244,7 +1250,8 @@
           "subject",
           "sha",
           "author",
-          "committedAt"
+          "committedAt",
+          "attribution"
         ]
       }
     }

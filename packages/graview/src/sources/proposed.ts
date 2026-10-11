@@ -8,11 +8,13 @@
  * one a constraint, the work under them changes placed on them, and what the
  * rules cannot place is held in the Inbox. The template capability specs
  * (`draftCapabilitySpecs`, from the feature's own words and criteria) give
- * each capability its statement. Nothing is written: the plan is a proposal
- * for review, every product node the projection draws from it says
- * `proposed`, and the PRD's migration makes it real.
+ * each capability its statement. A product node the plan marks met (its v1
+ * item completed) is stamped `metAt` with its spec hash, as the apply will,
+ * so rex's own status rule says met, changing or revised. Nothing is written:
+ * the plan is a proposal for review, every product node the projection draws
+ * from it says `proposed`, and the PRD's migration makes it real.
  */
-import { classifyV1Tree, draftCapabilitySpecs, type MigrationPlan, type PRDItem, type PrdModel, type RuleNode, type V2Tree } from "../rex-gateway.js";
+import { classifyV1Tree, draftCapabilitySpecs, nodeSpec, specHash, type MigrationPlan, type PRDItem, type PrdModel, type RuleNode, type V2Tree } from "../rex-gateway.js";
 
 export interface ProposedLayer {
   tree: V2Tree;
@@ -56,7 +58,11 @@ export function proposeProductLayer(model: PrdModel): ProposedLayer | undefined 
       if (applies === "all") node.appliesTo = "all";
       else if (applies !== undefined) node.appliesTo = [applies];
       if (typeof fields.description === "string" && fields.description.trim() !== "") node.statement = fields.description.trim();
-    } else if (entry.target === "change") {
+    }
+    if (entry.met && (entry.target === "capability" || entry.target === "constraint")) {
+      node.metAt = specHash(nodeSpec(node as unknown as RuleNode));
+    }
+    if (entry.target === "change") {
       if (entry.placement !== undefined && entry.relation === "amends") {
         node.amends = [{ target: entry.placement, delta: "modified", summary: entry.title }];
       } else if (entry.placement !== undefined) {

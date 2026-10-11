@@ -59,7 +59,10 @@ pure, deterministic, no model pass): an epic is an area unless its title names
 a PR or a release, a feature with completed work a capability with a template
 statement (`draftCapabilitySpecs`), a constraint-shaped feature a constraint,
 the work under them changes placed on them by the placement rules, and what
-the rules cannot place a change in the Inbox. Every product node from the plan
+the rules cannot place a change in the Inbox. A node whose v1 item completed is
+stamped `metAt` with its spec hash, as applying the plan will, so rex's own
+`computeProductStatus` reads it met rather than proposed (an open amending
+change makes it changing). Every product node from the plan
 carries `proposed: true`, the face says so on its home, and the sync refuses
 writes to them; `graview.proposeProductLayer: false` projects the tree as
 changes only. The migration (`Migrate this repository`) makes the map real,
@@ -75,7 +78,7 @@ and the same code path then reads the stored v2 tree.
 | `component` | `components.json` | `component:<file>#<name>` |
 | `file` (with `--files`) | `inventory.json` | `file:<path>` |
 | `run` | `<henchDir>/runs/*.json[.gz]` | run id |
-| `commit` | every commit on main whose `N-DX-Item` trailer names a change or task (`loadTrailerCommits`: subject, author, date), and a run's `commits` | sha |
+| `commit` | every commit on main whose `N-DX-Item` trailer names a change or task (`loadTrailerCommits`), and every commit a run record names (`RunRecord.commits`, filled live or by `hench backfill-commits`); git supplies author and date, and `attribution` says how the commit was tied | sha |
 
 | Edge (declared on the kind it leaves) | From |
 |---|---|
@@ -86,15 +89,20 @@ and the same code path then reads the stored v2 tree.
 | `blockedBy` | `blockedBy` on changes and tasks |
 | `discoveredFrom` | `change.discoveredFrom.item` / `.run` |
 | `plannedFor`, `shippedWith` | `change.plannedRelease`, `ItemState.shippedIn`; a finished change with no stamped `shippedIn` ships with the first release tag containing its landing (`computeLandings`, `releasesContaining`: rex's `resolveShippedIn` answer, for every change in one walk) |
-| `landedFor` (commit → change or task) | the commit's `N-DX-Item` trailers |
-| `realizedIn` (capability → zone), `realizes` (commit → capability) | `computeRealizedBy` through N-DX-Item trailers and the zone map |
+| `landedFor` (commit → change or task) | the commit's `N-DX-Item` trailers, and the run record that names the commit (its task) |
+| `realizedIn` (capability → zone), `realizes` (commit → capability) | every commit that landed for a change placed on the capability (`amends` or `touches`, via `changedBy`) or for the work under it, through `loadCommitFiles` and the zone map |
 | `inZone` | a component's or file's deepest zone |
 | `crosses` | `zones.json` crossings and sub-crossings |
 | `ranFor`, `produced` | `RunRecord.taskId`, `RunRecord.commits` |
 
 A v1 tree gets all of this too: its changes carry `completedAt`, its tasks
 the trailers, and the tags are git's; with the proposed product layer the
-`realizes` and `realizedIn` edges follow, through the same trailers.
+`realizes` and `realizedIn` edges follow, through the same commits. Rex's own
+`computeRealizedBy` reads amending changes and trailers only; the projection
+reads wider, because on a proposed layer the amends/touches relation is a
+lead-verb guess and the hench-era commits reach the graph only through run
+records. Run records are machine-local, so `hench backfill-commits .` on a
+checkout is what gives its graph the history.
 
 `packages/graview/src/document.ts` holds the two mapping tables
 (`NODE_KINDS`, `PRODUCT_EDGE_SOURCES`) and `tests/unit/document.test.ts` fails

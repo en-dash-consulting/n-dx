@@ -1902,12 +1902,25 @@ export interface RunClaimLost {
   holderWorktree: string;
 }
 
+/**
+ * How a commit was tied to its run. `start-head`: it is in `startHead..HEAD`
+ * when the run ended (the live path). The rest are `hench backfill-commits`
+ * reading git for a record written without `startHead`: `subject`, the
+ * commit's subject names the run id; `trailer`, its `N-DX-Item` trailer names
+ * the run's task; `window`, it was authored on the main branch inside the
+ * run's window and no other run's window holds it. Absent on records written
+ * before the field existed, which were all live.
+ */
+export type RunCommitAttribution = "start-head" | "subject" | "trailer" | "window";
+
 /** A single commit a run produced. See {@link RunRecord.commits}. */
 export interface RunCommitRecord {
   /** Full commit SHA. */
   sha: string;
   /** First line of the commit message. */
   subject: string;
+  /** How the commit was tied to the run; see {@link RunCommitAttribution}. */
+  attribution?: RunCommitAttribution;
 }
 
 /** A run commit whose N-DX-Item does not name the run's task. See {@link RunRecord.commitsMissingItem}. */

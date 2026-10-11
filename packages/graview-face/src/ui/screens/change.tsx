@@ -94,7 +94,7 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
         </Section>
         <Section title="Commits" i={8} testId="change-commits">
           {commits.length === 0 ? (
-            <Empty>No commit on main names this change or its tasks in an N-DX-Item trailer.</Empty>
+            <Empty>No commit is tied to this change or its tasks yet: by an N-DX-Item trailer, or by the run that made it.</Empty>
           ) : (
             <Rows>
               {commits.slice(0, 12).map((c, i) => (

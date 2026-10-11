@@ -84,7 +84,6 @@ export async function readRequirements(rexDir: string, warn: Warn, options: Requ
         fields.statement = node.statement;
         fields.criteriaCount = node.criteria?.length ?? 0;
         fields.reviewed = node.reviewedHash !== undefined;
-        fields.metAt = typeof node.metAt === "string" && /^\d{4}-/.test(node.metAt) ? node.metAt : undefined;
         for (const dep of node.dependsOn ?? []) edges.push({ kind: "dependsOn", from: node.id, to: dep });
       } else if (node.type === "constraint") {
         fields.statement = node.statement;

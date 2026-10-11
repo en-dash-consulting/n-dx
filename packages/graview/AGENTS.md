@@ -14,7 +14,7 @@ JSON output and hench's run records. `ndx graview <sub>` then spawns the
   the workspace if any `package.json` but the product face's lists one at
   runtime.
 - **Read-only.** Nothing is written under the rex, sourcevision or hench
-  directories. Output and the trailer cache `computeRealizedBy` keeps go under
+  directories. Output and the trailer and commit-file caches go under
   the layout's graview dir (`.ndx/graview` or `.graview`), which `ndx init`
   gitignores.
 - **One gateway per upstream package.** `src/rex-gateway.ts`,
@@ -28,8 +28,10 @@ JSON output and hench's run records. `ndx graview <sub>` then spawns the
 `src/sources/proposed.ts` runs the rules stage of rex's v1-to-v2 migration
 plan (`classifyV1Tree`, `draftCapabilitySpecs`: pure, no model pass) over a v1
 tree and projects the areas, capabilities and constraints it proposes, each
-`proposed: true`, with the tree's changes placed on them. It writes nothing
-and invents no judgement rex has not made: the plan is rex's, and
+`proposed: true`, with the tree's changes placed on them. A node the plan
+marks `met` (its v1 item completed) is stamped `metAt` with its spec hash, as
+the apply will, so `computeProductStatus` says met, changing or revised. It
+writes nothing and invents no judgement rex has not made: the plan is rex's, and
 `graview.proposeProductLayer: false` turns it off. When the PRD migrates, the
 stored v2 tree takes over on the same code path.
 
@@ -49,7 +51,7 @@ carries, never a judgement rex has not made.
   document.json   the declaration, `name` set to the project
   snapshot.json   {nodes, edges}, canonically sorted — byte-identical on an unchanged checkout
   data/           graview's own store, created by `serve` and `mcp`; refreshed with `sync-seed`
-  cache/          the N-DX-Item trailer cache computeRealizedBy keeps
+  cache/          rex's N-DX-Item trailer cache and commit-file cache, kept here
 ```
 
 File nodes are opt-in (`--files`): zones, components and entry points keep a

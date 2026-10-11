@@ -134,6 +134,7 @@ const HENCH_COMMANDS = [
   "review",
   "cache",
   "check-runs",
+  "backfill-commits",
   "validate-tokens",
 ];
 

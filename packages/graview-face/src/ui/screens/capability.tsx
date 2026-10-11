@@ -39,7 +39,7 @@ export function CapabilityScreen({ context, app }: { context: Ctx; app: App }) {
       <Stats>
         <Stat i={0} value={Number(node.criteriaCount ?? 0)} label="criteria" />
         <Stat i={1} value={Number(node.openChanges ?? 0)} label="open changes" tone={Number(node.openChanges ?? 0) > 0 ? "accent" : undefined} />
-        <Stat i={2} value={Number(node.zones ?? 0)} label="zones realized in" hint={Number(node.zones ?? 0) === 0 ? "no N-DX-Item trailer yet" : undefined} />
+        <Stat i={2} value={Number(node.zones ?? 0)} label="zones realized in" hint={Number(node.zones ?? 0) === 0 ? "no commit tied to its work yet" : undefined} />
         <Stat i={3} value={bound.length} label="constraints binding it" />
       </Stats>
 

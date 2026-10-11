@@ -387,6 +387,7 @@ const OpaqueRunSectionSchema = z.object({}).passthrough();
 const RunCommitRecordSchema = z.object({
   sha: z.string(),
   subject: z.string(),
+  attribution: z.enum(["start-head", "subject", "trailer", "window"]).optional(),
 });
 
 /** See `RunRecord.commitsMissingItem`. */
