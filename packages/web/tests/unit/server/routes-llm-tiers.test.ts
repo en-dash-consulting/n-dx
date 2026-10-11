@@ -51,7 +51,7 @@ const row = (rows: TierRow[], tier: string): TierRow => {
   return found;
 };
 
-const classes = (r: TierRow): string[] => r.usedBy.flatMap((u) => (u.taskClass ? [u.taskClass] : []));
+const classes = (r: TierRow): string[] => r.usedBy.flatMap((u) => u.taskClasses ?? []);
 
 describe("GET /api/llm/config — tiers block", () => {
   it("returns agent, standard, light and heavy, and no free row by default", async () => {
@@ -107,6 +107,31 @@ describe("GET /api/llm/config — tiers block", () => {
     expect(classes(row(rows, "standard"))).not.toContain("agent.execute");
     expect(row(rows, "heavy").usedBy.map((u) => u.label)).toEqual(["tasks set to Heavy in Prepare task"]);
     expect(row(rows, "heavy").usedBy[0]).not.toHaveProperty("taskClass");
+  });
+
+  it("never repeats a label within a tier, and folds suffix-only variants", async () => {
+    for (const config of [{}, { routes: { "prd.*": "heavy" } }]) {
+      const rows = await tiers({ llm: { vendor: "claude", ...config } });
+      for (const r of rows) {
+        const labels = r.usedBy.map((u) => u.label);
+        expect(new Set(labels).size).toBe(labels.length);
+        expect(labels.filter((l) => /\([^)]*\)$/.test(l))).toEqual([]);
+      }
+    }
+  });
+
+  it("folds classes sharing a label into one entry that still names each class", async () => {
+    const rows = await tiers({ llm: { vendor: "claude", routes: { "prd.place": "heavy", "prd.place.judge": "heavy" } } });
+    const heavy = row(rows, "heavy");
+    const place = heavy.usedBy.filter((u) => u.label === "change placement");
+    expect(place).toHaveLength(1);
+    expect(place[0].taskClasses).toEqual(["prd.place", "prd.place.judge"]);
+    expect(place[0].taskClass).toBe("prd.place");
+
+    const light = row(await tiers({ llm: { vendor: "claude" } }), "light");
+    const rename = light.usedBy.filter((u) => u.label === "rename/merge");
+    expect(rename).toHaveLength(1);
+    expect(rename[0].taskClasses).toEqual(["prd.rename", "prd.merge"]);
   });
 
   it("lists rename under heavy, not light, when llm.routes sets it", async () => {

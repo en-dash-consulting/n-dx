@@ -118,8 +118,41 @@ describe("Robot Wrangler run card", () => {
 
     const checks = root.querySelector(".llm-runcard-checks")!.textContent!;
     expect(checks).toContain("Credentials valid");
-    expect(checks).toContain("CLI found2.1.0");
-    expect(checks).toContain("Live list, checked");
+    expect(checks).toContain("CLI 2.1.0");
+    expect(checks).toContain("Live model list");
+  });
+
+  it("keeps each checklist label short and puts the long detail in a tooltip and a second line", async () => {
+    stubApi({ config: config(), auth: { ok: true, output: "claude: credentials OK via llm.claude.api_key", error: null } });
+    await mount();
+
+    const rows = Array.from(root.querySelectorAll<HTMLElement>(".llm-runcard-check"));
+    const label = (i: number) => rows[i].querySelector(".llm-runcard-check-label")?.textContent;
+    expect(label(0)).toBe("Credentials valid");
+    expect(rows[0].title).toBe("claude: credentials OK via llm.claude.api_key");
+    expect(rows[0].querySelector(".llm-runcard-check-detail")?.textContent).toBe("claude: credentials OK via llm.claude.api_key");
+    expect(label(1)).toBe("CLI 2.1.0");
+    expect(label(2)).toBe("Live model list");
+  });
+
+  it("uses the preview's failover block while edits are pending", async () => {
+    stubApi({
+      config: config({ failover: { enabled: false, applies: true, reason: null, chain: ["claude-sonnet-5", "claude-opus-5"] } }),
+      preview: config({
+        vendor: "codex",
+        effective: effective("codex", "gpt-5.6-sol"),
+        failover: { enabled: false, applies: false, reason: "Failover is not available for Codex.", chain: ["gpt-5.6-sol"] },
+      }),
+    });
+    await mount();
+    expect(root.querySelector(".llm-failover-warning")).toBeNull();
+    expect(Array.from(root.querySelectorAll(".llm-failover-pill")).map((p) => p.textContent)).toEqual(["claude-sonnet-5", "claude-opus-5"]);
+
+    await act(async () => { vendorCard("codex").click(); });
+    await settle(350);
+
+    expect(root.querySelector(".llm-failover-warning")?.textContent).toContain("Failover is not available for Codex.");
+    expect(Array.from(root.querySelectorAll(".llm-failover-pill")).map((p) => p.textContent)).toEqual(["gpt-5.6-sol"]);
   });
 
   it("names the pair reviewer and its model", async () => {

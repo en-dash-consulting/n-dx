@@ -208,6 +208,9 @@ describe("RobotWranglerView", () => {
 
     const warning = root.querySelector(".llm-failover-warning")!;
     expect(warning.textContent).toContain("Failover is not available for Claude CLI");
+    // Information, not an error: a status line, not an alert box.
+    expect(warning.getAttribute("role")).toBe("status");
+    expect(warning.querySelector(".llm-note-mark")?.textContent).toBe("!");
   });
 
   it("shows local-specific message when failover applies is false for local vendor", async () => {

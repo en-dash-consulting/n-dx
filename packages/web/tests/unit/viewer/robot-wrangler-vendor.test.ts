@@ -261,7 +261,7 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     await mount();
 
     const status = root.querySelector(".llm-runcard-checks")!;
-    expect(status.textContent).toContain("Live list, checked");
+    expect(status.textContent).toContain("Live model list");
 
     await act(async () => {
       Array.from(status.querySelectorAll("button")).find((b) => b.textContent === "Refresh models")!.click();
@@ -274,13 +274,15 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
   it("names the reason for a built-in list", async () => {
     stubApi({ config: config("codex") });
     await mount();
-    expect(root.querySelector(".llm-runcard-checks")?.textContent).toContain("Built-in list — No OPENAI_API_KEY");
+    const checks = root.querySelector(".llm-runcard-checks")!;
+    expect(checks.textContent).toContain("Built-in model list");
+    expect(checks.textContent).toContain("No OPENAI_API_KEY");
   });
 
   it("reports the installed CLI and its version for claude, and a missing one for codex", async () => {
     stubApi({ config: config("claude") });
     await mount();
-    expect(root.querySelector(".llm-runcard-checks")?.textContent).toContain("CLI found2.1.0");
+    expect(root.querySelector(".llm-runcard-checks")?.textContent).toContain("CLI 2.1.0");
     act(() => { render(null, root); });
 
     stubApi({ config: config("codex", { effective: { vendor: "codex", provider: "cli", model: "gpt-5.5", modelSource: "default" } }) });

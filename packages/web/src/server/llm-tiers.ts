@@ -20,6 +20,8 @@ export type TierName = "agent" | TaskTier;
 export interface TierUse {
   /** Absent for a user that is not a task class, such as Prepare task's Heavy setting. */
   taskClass?: string;
+  /** Every task class folded into this label, `taskClass` first. Absent when `taskClass` is. */
+  taskClasses?: string[];
   label: string;
 }
 
@@ -63,6 +65,21 @@ export const TASK_CLASS_LABELS: Record<string, string> = {
   "zone.judge": "zone review",
   "sourcevision.ask": "Ask",
 };
+
+/**
+ * Add a task class to a tier's used-by list. Classes whose labels are equal, or
+ * differ only by a trailing parenthetical such as " (Jev)", share one entry, shown
+ * under the unsuffixed label and keeping first-seen order.
+ */
+function addUse(list: TierUse[], taskClass: string, label: string): void {
+  const base = label.replace(/\s*\([^)]*\)\s*$/, "") || label;
+  const existing = list.find((use) => use.label === base);
+  if (existing) {
+    existing.taskClasses?.push(taskClass);
+    return;
+  }
+  list.push({ taskClass, taskClasses: [taskClass], label: base });
+}
 
 /** Heavy has a user — a per-task setting that no task class names. */
 const PREPARE_TASK_HEAVY: TierUse = {
@@ -111,7 +128,8 @@ export function buildTierTable(
   for (const taskClass of Object.keys(DEFAULT_ROUTES)) {
     if (taskClass === "agent.execute") continue;
     const { tier } = resolveTaskModel(taskClass, config, { vendor });
-    usedBy.get(tier)?.push({ taskClass, label: TASK_CLASS_LABELS[taskClass] ?? taskClass });
+    const list = usedBy.get(tier);
+    if (list) addUse(list, taskClass, TASK_CLASS_LABELS[taskClass] ?? taskClass);
   }
   usedBy.get("heavy")?.push(PREPARE_TASK_HEAVY);
 
@@ -125,7 +143,7 @@ export function buildTierTable(
       tier: "agent",
       model: effective.model,
       source: agentSource,
-      usedBy: [{ taskClass: "agent.execute", label: TASK_CLASS_LABELS["agent.execute"] ?? "agent.execute" }],
+      usedBy: [{ taskClass: "agent.execute", taskClasses: ["agent.execute"], label: TASK_CLASS_LABELS["agent.execute"] ?? "agent.execute" }],
     },
   ];
   for (const tier of TASK_TIERS) {

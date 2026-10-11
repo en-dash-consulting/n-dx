@@ -285,7 +285,21 @@
   color: var(--text-dim);
 }
 
-.llm-failover-warning,
+/* Information, not an error: a plain line with an orange mark, no box. */
+.llm-failover-warning {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.llm-note-mark {
+  flex-shrink: 0;
+  color: var(--orange);
+  font-weight: var(--weight-semibold);
+}
+
 .llm-review-warning {
   margin-top: var(--space-2);
   padding: var(--space-2) var(--space-3);
@@ -815,7 +829,7 @@
 .llm-runcard-wrap { margin: 0 0 var(--space-4); }
 .llm-runcard {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--border);
@@ -873,7 +887,7 @@
 .llm-runcard-check-bad .llm-runcard-check-dot { background: var(--red); }
 .llm-runcard-check-bad .llm-runcard-check-label { color: var(--red); }
 .llm-runcard-check-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.llm-runcard-check-detail { font-size: 0.8125rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.llm-runcard-check-detail { font-size: 0.8125rem; color: var(--text-muted); overflow-wrap: break-word; }
 .llm-runcard-check .llm-btn { margin-left: auto; flex-shrink: 0; }
 .llm-runcard-placeholder {
   flex: 1;
@@ -904,7 +918,7 @@
   cursor: pointer;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .llm-runcard { grid-template-columns: minmax(0, 1fr); }
 }
 .llm-field-source { font-weight: normal; color: var(--text-muted); }

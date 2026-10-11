@@ -756,8 +756,8 @@ function FailoverSection({
       : null,
     // Show reason when failover cannot fire
     cannotApply
-      ? h("p", { class: "llm-failover-warning", role: "alert" },
-          "⚠ ",
+      ? h("p", { class: "llm-failover-warning", role: "status" },
+          h("span", { class: "llm-note-mark", "aria-hidden": "true" }, "!"),
           isLocal ? "Failover is not available for local models." : failover?.reason)
       : null,
   );
@@ -1035,14 +1035,16 @@ function reviewChipText(review: ReviewInfo | undefined, executor: string, execut
   return null;
 }
 
-/** Where a vendor's model list came from, as a sentence. */
-function catalogOrigin(vendor: ViewerLLMVendor, entry: CatalogEntry): string {
+/** Where a vendor's model list came from: a short label, and the longer detail behind it. */
+function catalogOrigin(vendor: ViewerLLMVendor, entry: CatalogEntry): { label: string; detail: string | null } {
   if (vendor === VIEWER_LLM_VENDOR.LOCAL) {
-    return entry.reachable ? "Live list from the local server" : `Local server unreachable${entry.reason ? ` — ${entry.reason}` : ""}`;
+    return entry.reachable
+      ? { label: "Live model list", detail: "From the local server" }
+      : { label: "Local server unreachable", detail: entry.reason ?? null };
   }
   return entry.source === "live"
-    ? `Live list, checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}`
-    : `Built-in list${entry.reason ? ` — ${entry.reason}` : ""}`;
+    ? { label: "Live model list", detail: `Checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}` }
+    : { label: "Built-in model list", detail: entry.reason ?? null };
 }
 
 type AuthState = "checking" | "ok" | "bad";
@@ -1090,7 +1092,7 @@ function CheckRow({
   detail?: string | null;
   action?: ComponentChildren;
 }) {
-  return h("li", { class: `llm-runcard-check llm-runcard-check-${status}` },
+  return h("li", { class: `llm-runcard-check llm-runcard-check-${status}`, title: detail ?? undefined },
     h("span", { class: "llm-runcard-check-dot", "aria-hidden": "true" }),
     status === "pending"
       ? h("span", { class: "llm-runcard-placeholder", "aria-label": label }, "Checking…")
@@ -1203,15 +1205,14 @@ function RunCard({
                 ? h(CheckRow, {
                     key: "cli",
                     status: entry.cli.found ? "ok" : "bad",
-                    label: entry.cli.found ? "CLI found" : "CLI not found",
-                    detail: entry.cli.found ? entry.cli.version ?? "installed" : null,
+                    label: entry.cli.found ? `CLI ${entry.cli.version ?? "found"}` : "CLI not found",
                   })
                 : null,
               entry
                 ? h(CheckRow, {
                     key: "models",
                     status: vendor === VIEWER_LLM_VENDOR.LOCAL && !entry.reachable ? "bad" : "ok",
-                    label: catalogOrigin(vendor, entry),
+                    ...catalogOrigin(vendor, entry),
                     action: h("button", { class: "llm-btn llm-btn-secondary", onClick: onRefresh, disabled: refreshing },
                       refreshing ? "Refreshing…" : "Refresh models"),
                   })
@@ -2061,7 +2062,8 @@ export function RobotWranglerView() {
     // Section 4: Failover
     data && effectiveVendor
       ? h(FailoverSection, {
-          failover: data.failover,
+          // The preview's answer while edits are pending, so the chain and reason match the run card.
+          failover: preview?.failover ?? data.failover,
           vendor: effectiveVendor,
           enabled: editToggles.autoFailover ?? data.autoFailover ?? false,
           onChange: handleToggle,
