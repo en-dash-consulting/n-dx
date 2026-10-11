@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add the missing changeset for Terraform files entering the inventory](./add-the-missing-changeset-for.md) | completed |
 | [Build the HCL grammar and recognise Terraform files](./build-the-hcl-grammar-and-recognise.md) | completed |
-| [Inventoried .tf files change zones, classifications and enrichment for TypeScript/Go repos that contain Terraform](./inventoried-tf-files-change-zones.md) | pending |
+| [Inventoried .tf files change zones, classifications and enrichment for TypeScript/Go repos that contain Terraform](./inventoried-tf-files-change-zones.md) | completed |
 | [Seed the Terraform drift corpus and measure parse rate](./seed-the-terraform-drift-corpus-and.md) | completed |
 | [Terraform files deeper than three directories are inventoried but not detected](./terraform-files-deeper-than-three.md) | pending |
 | [terragrunt.hcl and .tfvars are inventoried as Terraform in repos where detection finds no Terraform](./terragrunt-hcl-and-tfvars-are.md) | completed |
