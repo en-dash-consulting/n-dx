@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-10-09T18:57:56.580Z
-- **Commit** — `21cefd26264b`
-- **Content hash** — `ffe50f97285f672a` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-10-11T07:52:33.623Z
+- **Commit** — `7c54ef5ac04f`
+- **Content hash** — `cf05efd08ecdaa08` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 38
-- **Per-call total** — 23,377 tokens (what every surface costs, summed)
-- **Unique fixed text** — 14,874 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 23,393 tokens (what every surface costs, summed)
+- **Unique fixed text** — 14,890 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -115,7 +115,7 @@ so a jump is never mistaken for a regression or a win.
 | `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 27 | 119 | — | 119 |
 | `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
-## hench — 4,631 per-call / 4,631 unique, 9 surfaces
+## hench — 4,647 per-call / 4,647 unique, 9 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
@@ -123,7 +123,7 @@ so a jump is never mistaken for a regression or a win.
 | `buildGoLanguageContext` | `packages/hench/src/agent/planning/prompt.ts` | Go toolchain and convention context, added when the project is Go. | 26 | 278 | — | 278 |
 | `formatTaskBrief` | `packages/hench/src/agent/planning/brief.ts` | Render the task brief section — task, parent chain, requirements. | 49 | 292 | — | 292 |
 | `buildReviewSystemPrompt` | `packages/hench/src/agent/analysis/adversarial-review.ts` | System prompt for the adversarial review pass. | 27 | 331 | — | 331 |
-| `buildReviewBrief` | `packages/hench/src/agent/analysis/adversarial-review.ts` | Brief handed to the reviewer — what to attack and where to report. | 149 | 1,831 | — | 1,831 |
+| `buildReviewBrief` | `packages/hench/src/agent/analysis/adversarial-review.ts` | Brief handed to the reviewer — what to attack and where to report. | 110 | 1,494 | 353 | 1,847 |
 | `buildOrientationSystemPrompt` | `packages/hench/src/agent/lifecycle/orientation.ts` | System prompt for the one-off repository orientation pass. | 10 | 147 | — | 147 |
 | `buildOrientationPrompt` | `packages/hench/src/agent/lifecycle/orientation.ts` | Orientation task prompt — what to establish about the repo. | 36 | 391 | — | 391 |
 | `buildRetryNotice` | `packages/hench/src/agent/lifecycle/cli-loop.ts` | Notice appended on retry telling a fresh session what is on disk. | 4 | 55 | — | 55 |
@@ -151,6 +151,7 @@ it. This is the leverage ordering for a rewrite.
 | `placementContent` | rex | 155 | 3 | 465 |
 | `OUTPUT_INSTRUCTION` | rex | 52 | 8 | 416 |
 | `ANTI_PATTERNS` | rex | 61 | 6 | 366 |
+| `reportOutputLines` | hench | 353 | 1 | 353 |
 | `RESHAPE_FEW_SHOT` | rex | 326 | 1 | 326 |
 | `JSON_OBJECT_ONLY` | sourcevision | 16 | 5 | 80 |
 | `formatFileHeaders` | sourcevision | 54 | 1 | 54 |
@@ -171,7 +172,7 @@ reproducible without a model call. Dump any of them with `--dump <package>`.
 |---|---|---|---:|---:|---:|
 | rex | `buildAssessmentEnvelope` | Granularity assessment over one two-task proposal. | 497 | 245 | 742 |
 | sourcevision | `buildPrimerEnvelope` | Primer distillation over a fixed 3-zone CONTEXT.md excerpt. | 229 | 137 | 366 |
-| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,478 | n/a — 562 of the fixed text is on another branch | 916 |
+| hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 1,478 | n/a — 520 of the fixed text is on another branch | 958 |
 | core | `buildReviewerPrompt` | Pair-programming reviewer prompt over three changed files. | 281 | 16 | 297 |
 
 A `fixed` figure above the assembled length is not an error: the fixed column counts
@@ -218,8 +219,8 @@ per section rather than as one literal. These are the same sections
 
 | Section | Chars | Tokens | Share |
 |---|---:|---:|---:|
-| `system` | 2,992 | 748 | 81.7% |
-| `brief` | 668 | 167 | 18.3% |
+| `system` | 3,162 | 791 | 82.6% |
+| `brief` | 668 | 167 | 17.4% |
 
 ## Workflow skills — 20,439 tokens, 13 skills
 
