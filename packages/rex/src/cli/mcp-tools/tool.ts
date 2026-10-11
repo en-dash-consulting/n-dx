@@ -7,7 +7,7 @@
  * no per-tool knowledge of its own.
  */
 
-import type { ZodRawShape, ZodTypeAny, objectOutputType } from "zod";
+import type { z, ZodRawShape } from "zod";
 import type { RexWorkspace } from "../mcp-workspace.js";
 import type { McpResult } from "./result.js";
 
@@ -18,7 +18,7 @@ import type { McpResult } from "./result.js";
 export type Access = "read" | "write";
 
 /** Arguments as the SDK parses them from a tool's own schema. */
-type ArgsOf<S extends ZodRawShape> = objectOutputType<S, ZodTypeAny>;
+type ArgsOf<S extends ZodRawShape> = z.output<z.ZodObject<S>>;
 
 /**
  * A registered tool, with its argument type erased.
