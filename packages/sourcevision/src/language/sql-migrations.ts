@@ -20,6 +20,11 @@ export interface MigrationToolFinding {
    * For sqlc these are the `schema:` files; its `queries:` files are in `files` only.
    */
   readonly sqlFiles: readonly string[];
+  /**
+   * sqlc only: the existing `.sql` files under the config's `queries:`, sorted, a
+   * subset of `files`. Feed these to `extractSqlcTables`. Absent for other tools.
+   */
+  readonly queryFiles?: readonly string[];
 }
 
 /** Reads a project-relative file, or returns undefined when it cannot be read. */
@@ -140,6 +145,7 @@ function classify(path: string, read: ReadProjectFile): Partial<Record<Migration
  */
 export function detectMigrationTools(files: readonly string[], read: ReadProjectFile): MigrationToolFinding[] {
   const byTool = new Map<MigrationTool, { files: Set<string>; sql: Set<string> }>();
+  const sqlcQueries = new Set<string>();
   const note = (tool: MigrationTool, path: string, match: Match): void => {
     const entry = byTool.get(tool) ?? { files: new Set<string>(), sql: new Set<string>() };
     entry.files.add(path);
@@ -177,13 +183,19 @@ export function detectMigrationTools(files: readonly string[], read: ReadProject
         sqlc.files.delete(config);
         continue;
       }
-      for (const query of queries) note("sqlc", query, {});
+      for (const query of queries) {
+        note("sqlc", query, {});
+        sqlcQueries.add(query);
+      }
       for (const schema of schemas) note("sqlc", schema, { sql: true });
     }
     if (sqlc.files.size === 0) byTool.delete("sqlc");
   }
 
   return [...byTool.entries()]
-    .map(([tool, entry]) => ({ tool, files: [...entry.files].sort(), sqlFiles: [...entry.sql].sort() }))
+    .map(([tool, entry]): MigrationToolFinding => {
+      const finding = { tool, files: [...entry.files].sort(), sqlFiles: [...entry.sql].sort() };
+      return tool === "sqlc" ? { ...finding, queryFiles: [...sqlcQueries].sort() } : finding;
+    })
     .sort((a, b) => a.tool.localeCompare(b.tool));
 }
