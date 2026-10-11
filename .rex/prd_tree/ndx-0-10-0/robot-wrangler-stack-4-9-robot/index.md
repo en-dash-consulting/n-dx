@@ -24,6 +24,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Accept Heavy and Free tier model saves through PUT /api/llm/config](./accept-heavy-and-free-tier-model-saves.md) | pending |
 | [Add POST /api/llm/config/preview, which resolves unsaved edits without writing them](./add-post-api-llm-config-preview-which.md) | pending |
 | [Describe whether failover can fire from GET /api/llm/config](./describe-whether-failover-can-fire.md) | pending |
-| [Report each vendor's readiness from GET /api/llm/catalog](./report-each-vendor-s-readiness-from.md) | pending |
+| [Report each vendor's readiness from GET /api/llm/catalog](./report-each-vendor-s-readiness-from.md) | completed |
 | [Serve and save the review settings, with a pairSupported flag, through /api/llm/config](./serve-and-save-the-review-settings.md) | pending |
 | [Serve the model tier table, with what each tier is used by, from GET /api/llm/config](./serve-the-model-tier-table-with-what.md) | pending |
