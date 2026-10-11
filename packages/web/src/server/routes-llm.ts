@@ -39,7 +39,10 @@ import {
   resolveEffectiveAgentModel,
   resolveEffectiveProvider,
   readHenchAgentSettings,
+  readHenchReviewSettings,
 } from "./effective-agent-config.js";
+import { HENCH_REVIEW_PATHS, REVIEW_MODEL_PATH, buildReviewInfo, validateReviewChange } from "./llm-review.js";
+import type { ReviewInfo } from "./llm-review.js";
 import {
   getLiveVendorProbe,
   clearLlmCatalogCache,
@@ -144,6 +147,12 @@ export interface LlmConfigResponse {
    * Failover chain information.
    */
   failover: FailoverInfo;
+  /**
+   * The review pass: its saved settings, each reviewer vendor's model, and
+   * whether review can run for the active vendor and provider. See
+   * `llm-review.ts`.
+   */
+  review: ReviewInfo;
 }
 
 /** Failover information for the active vendor/provider combination. */
@@ -257,7 +266,7 @@ const AGENT_MODEL_PATH = /^hench\.models\.(claude|codex|google|local)$/;
 function modelPathVendor(path: string): LLMVendor | null {
   const agent = AGENT_MODEL_PATH.exec(path);
   if (agent) return agent[1] as LLMVendor;
-  const llm = /^llm\.(claude|codex|google|local)\.(model|lightModel)$/.exec(path);
+  const llm = /^llm\.(claude|codex|google|local)\.(model|lightModel)$/.exec(path) ?? REVIEW_MODEL_PATH.exec(path);
   return llm ? (llm[1] as LLMVendor) : null;
 }
 
@@ -278,6 +287,7 @@ function validateModelForVendor(path: string, value: unknown): string | null {
 function isWritablePath(path: string): boolean {
   if (VALID_PATHS.has(path)) return true;
   if (AGENT_MODEL_PATH.test(path)) return true;
+  if (HENCH_REVIEW_PATHS.has(path) || REVIEW_MODEL_PATH.test(path)) return true;
   return PARAMETERIZED_PREFIXES.some(
     (prefix) => path.startsWith(prefix) && path.length > prefix.length,
   );
@@ -350,6 +360,7 @@ const NUMERIC_PATHS = new Set([
   "llm.local.verifier.port",
   "llm.local.verifier.maxCycles",
   "llm.escalation.maxSteps",
+  "hench.review.rounds",
 ]);
 
 /** Numeric paths validated as a TCP port (1–65535) rather than a plain positive integer. */
@@ -439,17 +450,19 @@ function deleteByPath(obj: Record<string, unknown>, path: string): void {
 }
 
 /**
- * Drop `hench.models` once its last vendor is cleared, and `hench` once that
- * leaves it empty, so "Use project default" leaves no residue in `.n-dx.json`.
- * Only ever removes objects this route emptied itself.
+ * Drop `hench.models` / `hench.review` once their last key is cleared, and
+ * `hench` once that leaves it empty, so "Use project default" leaves no residue
+ * in `.n-dx.json`. Only ever removes objects this route emptied itself.
  */
-function pruneEmptyAgentModels(config: Record<string, unknown>): void {
+function pruneEmptyHenchSections(config: Record<string, unknown>): void {
   const hench = config["hench"];
   if (!hench || typeof hench !== "object") return;
   const henchObj = hench as Record<string, unknown>;
-  const models = henchObj["models"];
-  if (models && typeof models === "object" && Object.keys(models).length === 0) {
-    delete henchObj["models"];
+  for (const section of ["models", "review"]) {
+    const value = henchObj[section];
+    if (value && typeof value === "object" && Object.keys(value).length === 0) {
+      delete henchObj[section];
+    }
   }
   if (Object.keys(henchObj).length === 0) delete config["hench"];
 }
@@ -642,6 +655,7 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
     effectiveProblems: findEffectiveProblems(effective),
     tiers: buildTierTable(effective.vendor, llmConfig, effective),
     failover: buildFailoverInfo(effective, llmConfig),
+    review: buildReviewInfo(effective, llmConfig, await readHenchReviewSettings(projectDir)),
   };
 
   if (typeof llm["autoFailover"] === "boolean") {
@@ -1141,6 +1155,12 @@ export async function handleLlmRoute(
         return true;
       }
 
+      // The vendor a reviewer is checked against is the one this request leaves
+      // active, so saving `llm.vendor` and `hench.review.vendor` together is judged as a pair.
+      const vendorAfterChanges = "llm.vendor" in parsed.changes
+        ? (parsed.changes["llm.vendor"] ? String(parsed.changes["llm.vendor"]) : null)
+        : resolveActiveVendor(ctx.projectDir);
+
       for (const [path, value] of Object.entries(parsed.changes)) {
         // Legacy keys are read until 1.0.0 but never written. Refusing with the
         // replacement named beats the generic "unknown path" below, which would
@@ -1209,6 +1229,11 @@ export async function handleLlmRoute(
           errorResponse(res, 400, modelError);
           return true;
         }
+        const reviewError = validateReviewChange(path, value, vendorAfterChanges);
+        if (reviewError) {
+          errorResponse(res, 400, reviewError);
+          return true;
+        }
       }
 
       const config = readNdxConfig(ctx.projectDir);
@@ -1217,7 +1242,7 @@ export async function handleLlmRoute(
       for (const [path, value] of Object.entries(parsed.changes)) {
         if (value === null || value === "") {
           deleteByPath(config, path);
-          if (AGENT_MODEL_PATH.test(path)) pruneEmptyAgentModels(config);
+          if (AGENT_MODEL_PATH.test(path) || HENCH_REVIEW_PATHS.has(path)) pruneEmptyHenchSections(config);
         } else if (NUMERIC_PATHS.has(path)) {
           // Coerce string port values to numbers before persisting
           setByPath(config, path, Number(value));

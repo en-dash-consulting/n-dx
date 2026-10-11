@@ -143,6 +143,21 @@ export function resolveEffectiveAgentModel(
 }
 
 /**
+ * `.hench/config.json` as parsed, or `{}` when it is missing or unparseable.
+ * hench's own `loadConfig` has no such fallback (a missing file throws there),
+ * but every real project has one — `ndx init` writes it — so this only matters
+ * for a project asked about before init, where an override should still be
+ * reported rather than silently ignored.
+ */
+function readRawHenchConfig(henchDir: string): Record<string, unknown> {
+  try {
+    return JSON.parse(readFileSync(join(henchDir, "config.json"), "utf-8")) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+/**
  * `provider` and `models`: `.hench/config.json` merged with the `hench`
  * sections of `.n-dx.json` and `.n-dx.local.json` (local wins) — the same
  * two override files hench's own `loadConfig` merges in
@@ -166,16 +181,7 @@ export async function readHenchAgentSettings(projectDir: string): Promise<{
 }> {
   const henchDir = resolveLayout(projectDir).henchDir;
 
-  let raw: Record<string, unknown> = {};
-  try {
-    raw = JSON.parse(readFileSync(join(henchDir, "config.json"), "utf-8")) as Record<string, unknown>;
-  } catch {
-    // Missing or unparseable: carry on with `{}` as the base. hench's own
-    // `loadConfig` has no such fallback (a missing file throws there), but
-    // every real project has one — `ndx init` writes it — so this only
-    // matters for a project this route is asked about before init, and an
-    // override should still be reported rather than silently ignored.
-  }
+  const raw = readRawHenchConfig(henchDir);
 
   const baseProvider = parseProvider(raw["provider"]) ?? "cli";
   const baseModels = parseAgentModels(raw["models"]) ?? {};
@@ -274,5 +280,66 @@ export async function resolveEffectiveAgentConfig(
     provider: resolveEffectiveProvider(vendor, hench.provider),
     model,
     modelSource: source,
+  };
+}
+
+/** Where a `hench.review.*` value came from. */
+export type ReviewSettingSource = "default" | "hench-config" | "project-config";
+
+/** `hench.review.*` as saved: each field only when it holds a value hench's schema accepts. */
+export interface HenchReviewSettings {
+  mode?: { value: string; source: ReviewSettingSource };
+  vendor?: { value: string; source: ReviewSettingSource };
+  rounds?: { value: number; source: ReviewSettingSource };
+}
+
+const REVIEW_MODES: readonly string[] = ["off", "self", "pair"];
+const REVIEWERS: readonly string[] = ["claude", "codex"];
+
+function reviewSection(config: Record<string, unknown>): Record<string, unknown> {
+  const review = config["review"];
+  return review && typeof review === "object" && !Array.isArray(review)
+    ? (review as Record<string, unknown>)
+    : {};
+}
+
+/**
+ * `hench.review.*` from `.hench/config.json`, with the `hench` sections of
+ * `.n-dx.json` and `.n-dx.local.json` on top (local wins) — the layering
+ * {@link readHenchAgentSettings} applies. A value hench's schema would refuse
+ * counts as unset for its field, so the page shows what `ndx work` falls back to.
+ */
+export async function readHenchReviewSettings(projectDir: string): Promise<HenchReviewSettings> {
+  const henchDir = resolveLayout(projectDir).henchDir;
+  const base = reviewSection(readRawHenchConfig(henchDir));
+  const overrideSources = await loadProjectOverrideSources(henchDir, "hench");
+  const overrides = reviewSection(
+    overrideSources.reduce(
+      (acc, source) => deepMerge(acc, source.data),
+      {} as Record<string, unknown>,
+    ),
+  );
+
+  const pick = <T>(
+    key: string,
+    accept: (value: unknown) => value is T,
+  ): { value: T; source: ReviewSettingSource } | undefined => {
+    const override = overrides[key];
+    if (accept(override)) return { value: override, source: "project-config" };
+    const saved = base[key];
+    if (accept(saved)) return { value: saved, source: "hench-config" };
+    return undefined;
+  };
+
+  const mode = pick("mode", (v): v is string => typeof v === "string" && REVIEW_MODES.includes(v));
+  const vendor = pick("vendor", (v): v is string => typeof v === "string" && REVIEWERS.includes(v));
+  const rounds = pick(
+    "rounds",
+    (v): v is number => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 3,
+  );
+  return {
+    ...(mode ? { mode } : {}),
+    ...(vendor ? { vendor } : {}),
+    ...(rounds ? { rounds } : {}),
   };
 }
