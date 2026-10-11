@@ -70,6 +70,22 @@ function resolveConfigPath(configDir: string, value: string): string {
   return parts.join("/");
 }
 
+/** Drops a YAML ` #` comment that sits outside quotes, and trims the rest. */
+function stripYamlComment(raw: string): string {
+  let quote: string | undefined;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (quote) {
+      if (ch === quote) quote = undefined;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === "#" && (i === 0 || /\s/.test(raw[i - 1] ?? ""))) {
+      return raw.slice(0, i).trim();
+    }
+  }
+  return raw.trim();
+}
+
 /**
  * Paths named by `key` (`queries` or `schema`) in a sqlc config, as a scalar,
  * a flow list or a block list (JSON uses `"queries": "query"`). Resolved
@@ -84,7 +100,7 @@ export function sqlcPaths(configPath: string, content: string, key: "queries" | 
   for (let i = 0; i < lines.length; i++) {
     const entry = keyPattern.exec(lines[i] ?? "");
     if (!entry) continue;
-    const value = (entry[2] ?? "").trim();
+    const value = stripYamlComment(entry[2] ?? "");
     if (value !== "") {
       const list = /^\[(.*)\]$/.exec(value);
       for (const item of list ? (list[1] ?? "").split(",") : [value]) {
@@ -97,7 +113,7 @@ export function sqlcPaths(configPath: string, content: string, key: "queries" | 
     for (let j = i + 1; j < lines.length; j++) {
       const item = /^(\s*)-\s*(.+)$/.exec(lines[j] ?? "");
       if (!item || (item[1] ?? "").length < indent) break;
-      found.push(resolveConfigPath(configDir, unquote(item[2] ?? "")));
+      found.push(resolveConfigPath(configDir, unquote(stripYamlComment(item[2] ?? ""))));
     }
   }
   return found;
