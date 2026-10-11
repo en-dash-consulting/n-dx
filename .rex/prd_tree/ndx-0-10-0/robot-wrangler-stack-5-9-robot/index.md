@@ -25,4 +25,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Rebuild the failover control as a section that shows the chain and says when failover cannot fire](./rebuild-the-failover-control-as-a.md) | pending |
 | [Replace the agent, project and light model fields with a tier table that shows what each tier is used by](./replace-the-agent-project-and-light.md) | pending |
 | [Replace the credentials chip and the will-run-with block with a run card that previews unsaved edits](./replace-the-credentials-chip-and-the.md) | pending |
-| [Replace the vendor tabs with selectable vendor cards and the provider dropdown with connection cards](./replace-the-vendor-tabs-with.md) | pending |
+| [Replace the vendor tabs with selectable vendor cards and the provider dropdown with connection cards](./replace-the-vendor-tabs-with.md) | completed |
