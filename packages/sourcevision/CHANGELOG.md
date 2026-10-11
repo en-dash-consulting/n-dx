@@ -1,5 +1,15 @@
 # @n-dx/sourcevision
 
+## 0.9.1
+
+### Patch Changes
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`8507518`](https://github.com/en-dash-consulting/n-dx/commit/8507518864af56e93cf8a6c2aad6c3bb9a9236a1) Thanks [@dependabot](https://github.com/apps/dependabot)! - Dev dependencies bumped, including vitest 5. No runtime change: the published packages ship the same code, and the one test that vitest 5 rejected (a `vi.mock` written inside a test body) now declares its mock at module scope.
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`00e7462`](https://github.com/en-dash-consulting/n-dx/commit/00e74627b65fe3bcc453d4330ef5d9969b82d177) Thanks [@dependabot](https://github.com/apps/dependabot)! - Production dependencies bumped: zod 4, ink 8, react 19.3, @anthropic-ai/sdk 0.131, @modelcontextprotocol/sdk 1.32.1 and pdfkit 0.20. TypeScript stays on 6.x because sourcevision parses source with its compiler API, which TypeScript 7 does not ship, and preact stays on 10.x until its web test and leave-guard changes are worked through. Schemas move to zod 4's two-argument `z.record`; reserved and loosely-typed state keys are declared optional, since zod 4 no longer treats a missing `z.unknown()` key as optional; and the SDLC evidence list keeps its at-least-one rule as a tuple so it still infers the non-empty type.
+- Updated dependencies [[`02aa8af`](https://github.com/en-dash-consulting/n-dx/commit/02aa8afe08842e6d56b65f52d3364007485b72c2), [`8507518`](https://github.com/en-dash-consulting/n-dx/commit/8507518864af56e93cf8a6c2aad6c3bb9a9236a1), [`090e111`](https://github.com/en-dash-consulting/n-dx/commit/090e111efc45edac8a0bcdf420fd55b2baabc117), [`65731af`](https://github.com/en-dash-consulting/n-dx/commit/65731afcf429ea011d2bb1ee4e5f537a6739b0e4), [`00e7462`](https://github.com/en-dash-consulting/n-dx/commit/00e74627b65fe3bcc453d4330ef5d9969b82d177), [`e41d31f`](https://github.com/en-dash-consulting/n-dx/commit/e41d31fff91f9599ffc1e85d38cf1fad8da9e162), [`c357d36`](https://github.com/en-dash-consulting/n-dx/commit/c357d364ff0609368c12f8a797e468960fed53f6)]:
+  - @n-dx/llm-client@0.9.1
+
 ## 0.9.0
 
 ### Patch Changes
