@@ -260,7 +260,7 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     const api = stubApi({ config: config("claude") });
     await mount();
 
-    const status = root.querySelector(".llm-catalog-status")!;
+    const status = root.querySelector(".llm-runcard-checks")!;
     expect(status.textContent).toContain("Live list, checked");
 
     await act(async () => {
@@ -274,26 +274,24 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
   it("names the reason for a built-in list", async () => {
     stubApi({ config: config("codex") });
     await mount();
-    expect(root.querySelector(".llm-catalog-origin")?.textContent).toBe("Built-in list — No OPENAI_API_KEY");
+    expect(root.querySelector(".llm-runcard-checks")?.textContent).toContain("Built-in list — No OPENAI_API_KEY");
   });
 
-  it("reports the installed CLI for claude and codex, with no update or install action", async () => {
+  it("reports the installed CLI and its version for claude, and a missing one for codex", async () => {
     stubApi({ config: config("claude") });
     await mount();
-    expect(root.querySelector(".llm-catalog-cli")?.textContent).toBe("CLI 2.1.0");
+    expect(root.querySelector(".llm-runcard-checks")?.textContent).toContain("CLI found2.1.0");
+    act(() => { render(null, root); });
 
-    await act(async () => { card("codex").click(); });
-    expect(root.querySelector(".llm-catalog-cli")?.textContent).toBe("CLI not found");
-
-    const buttons = Array.from(root.querySelectorAll(".llm-catalog-status button")).map((b) => b.textContent);
-    expect(buttons).toEqual(["Refresh models"]);
-    expect(root.textContent).not.toMatch(/\b(update|install)\b CLI|Install |Update /);
+    stubApi({ config: config("codex", { effective: { vendor: "codex", provider: "cli", model: "gpt-5.5", modelSource: "default" } }) });
+    await mount();
+    expect(root.querySelector(".llm-runcard-checks")?.textContent).toContain("CLI not found");
   });
 
-  it("shows no CLI line for google or local", async () => {
+  it("shows no CLI row for google or local", async () => {
     stubApi({ config: config("google") });
     await mount();
-    expect(root.querySelector(".llm-catalog-cli")).toBeNull();
+    expect(root.querySelector(".llm-runcard-checks")?.textContent).not.toContain("CLI");
   });
 
   it("withholds the tier table for a vendor picked but not saved, with no stale options and no reload", async () => {

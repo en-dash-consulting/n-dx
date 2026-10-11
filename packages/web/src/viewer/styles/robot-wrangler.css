@@ -451,24 +451,7 @@
 
 .llm-pill-refresh:hover { opacity: 1; }
 
-/* Model list provenance, right of the Models section header */
-.llm-catalog-status {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  font-size: 0.8125rem;
-  color: var(--text-dim);
-}
-
 /* Section 3: tier table — name + used-by | model select | where it comes from */
-.llm-rw-section-bar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
 
 .llm-tier-table {
   border: 1px solid var(--border);
@@ -534,8 +517,6 @@
 @media (max-width: 640px) {
   .llm-tier-row { grid-template-columns: 1fr; }
 }
-
-.llm-catalog-cli { font-family: var(--font-mono, monospace); }
 
 .llm-catalog-error {
   margin-bottom: var(--space-3);
@@ -830,25 +811,102 @@
   margin-bottom: var(--space-1);
 }
 
-/* ── Effective block: what `work` will run, and why it might refuse ── */
-.llm-effective {
-  margin: 0 0 var(--space-4);
-  padding: var(--space-3);
+/* ── Run card: what the next `work` run will use, and why it might refuse ── */
+.llm-runcard-wrap { margin: 0 0 var(--space-4); }
+.llm-runcard {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-4);
+  padding: var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+  background: var(--bg-surface);
 }
-.llm-effective-refused { border-color: var(--red); }
-.llm-effective-list {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 4px 12px;
-  margin: 0;
+.llm-runcard-preview { border-style: dashed; border-color: var(--accent); }
+.llm-runcard-refused { border-color: var(--red); }
+.llm-runcard-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
 }
-.llm-effective-list dt { color: var(--text-muted); }
-.llm-effective-list dd { margin: 0; }
-.llm-effective-source { color: var(--text-muted); }
-.llm-effective-problems { margin-top: var(--space-2); color: var(--red); }
-.llm-effective-problems ul { margin: var(--space-1) 0 0; padding-left: var(--space-4); }
+.llm-runcard-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg-surface);
+  letter-spacing: 0;
+  font-weight: var(--weight-semibold);
+}
+.llm-runcard-model {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 var(--space-2);
+  font-family: var(--font-mono, monospace);
+  font-size: 1.5rem;
+  overflow-wrap: anywhere;
+}
+.llm-runcard-prev { font-size: 1rem; color: var(--text-muted); }
+.llm-runcard-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.llm-runcard-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+}
+.llm-runcard-chip-review { border-color: #0d9488; color: #0d9488; }
+.llm-runcard-note { margin: var(--space-2) 0 0; font-size: 0.8125rem; color: var(--text-muted); }
+.llm-runcard-edit-problem { color: var(--red); }
+.llm-runcard-main .llm-legacy { margin-top: var(--space-3); }
+
+.llm-runcard-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.llm-runcard-check { display: flex; align-items: center; gap: var(--space-2); font-size: 0.875rem; }
+.llm-runcard-check-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--text-muted); }
+.llm-runcard-check-ok .llm-runcard-check-dot { background: var(--green); }
+.llm-runcard-check-bad .llm-runcard-check-dot { background: var(--red); }
+.llm-runcard-check-bad .llm-runcard-check-label { color: var(--red); }
+.llm-runcard-check-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.llm-runcard-check-detail { font-size: 0.8125rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.llm-runcard-check .llm-btn { margin-left: auto; flex-shrink: 0; }
+.llm-runcard-placeholder {
+  flex: 1;
+  height: 1em;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--bg-hover);
+  color: transparent;
+  animation: llm-runcard-pulse 1.2s ease-in-out infinite;
+}
+@keyframes llm-runcard-pulse { 50% { opacity: 0.45; } }
+
+.llm-runcard-banner {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--red);
+  border-radius: var(--radius-md);
+  color: var(--red);
+}
+.llm-runcard-banner ul { margin: var(--space-1) 0 0; padding-left: var(--space-4); }
+.llm-runcard-fix { display: block; color: var(--text-muted); font-size: 0.8125rem; }
+.llm-link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .llm-runcard { grid-template-columns: minmax(0, 1fr); }
+}
 .llm-field-source { font-weight: normal; color: var(--text-muted); }
 
 /* ── Section 5: review ───────────────────────────────────────────── */

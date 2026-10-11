@@ -7,7 +7,8 @@
  * `effectiveProblems` it would refuse on). Renders on the shared SettingsFrame,
  * which owns Save, the dirty indicator and the leave-with-unsaved-changes prompt.
  *
- * Data: GET /api/llm/config (read) · PUT /api/llm/config (update)
+ * Data: GET /api/llm/config (read) · PUT /api/llm/config (update) ·
+ * POST /api/llm/config/preview (what unsaved edits would resolve to; writes nothing)
  */
 
 import { h } from "preact";
@@ -77,6 +78,13 @@ interface LlmConfigResponse {
   failover?: FailoverInfo;
   /** The review pass as the server resolved it; absent from an older server or a partial response. */
   review?: ReviewInfo;
+}
+
+/** What `POST /api/llm/config/preview` returns: the resolved parts of the config response, plus refused edits. */
+interface LlmPreviewResponse
+  extends Pick<LlmConfigResponse, "effective" | "effectiveProblems" | "tiers" | "failover" | "review"> {
+  /** Edits the server left out of the resolution, each with the reason PUT would refuse it. */
+  editProblems?: Array<{ path: string; message: string }>;
 }
 
 /** Mirrors the server's `ReviewInfo`. */
@@ -341,6 +349,36 @@ function SectionHeader({ number, title, subtitle }: { number: number; title: str
 
 // ── Section 1: vendor ──────────────────────────────────────────────────
 
+const VENDOR_SECTION_ID = "llm-vendor-section";
+
+/** Quiet period after the last edit before the run card asks the server what the edits would resolve to. */
+const PREVIEW_DEBOUNCE_MS = 300;
+
+/** The `changes` body PUT /api/llm/config and the preview both take, from the page's pending edits. */
+function buildChanges(
+  vendorDirty: boolean,
+  pendingVendor: string | null | undefined,
+  dirtyKeys: Set<string>,
+  editValues: Record<string, string>,
+  dirtyToggles: Set<string>,
+  editToggles: Record<string, boolean>,
+): Record<string, string | null | boolean> {
+  const changes: Record<string, string | null | boolean> = {};
+  if (vendorDirty) changes["llm.vendor"] = pendingVendor ?? null;
+  for (const key of dirtyKeys) {
+    const raw = editValues[key] ?? "";
+    const value = raw.trim() || null;
+    // "agent.claude" → hench.models.claude; "claude.model" → llm.claude.model
+    if (key.startsWith(AGENT_KEY_PREFIX)) changes[`hench.models.${key.slice(AGENT_KEY_PREFIX.length)}`] = value;
+    else if (key.startsWith("review.")) changes[reviewConfigPath(key)] = value;
+    else changes[`llm.${key}`] = value;
+  }
+  for (const key of dirtyToggles) {
+    if (key === "autoFailover") changes["llm.autoFailover"] = editToggles.autoFailover;
+  }
+  return changes;
+}
+
 function VendorCards({
   vendor,
   catalog,
@@ -350,7 +388,7 @@ function VendorCards({
   catalog: LlmCatalog | null;
   onChange: (v: string) => void;
 }) {
-  return h("section", { class: "llm-rw-section" },
+  return h("section", { class: "llm-rw-section", id: VENDOR_SECTION_ID },
     h(SectionHeader, { number: 1, title: "Vendor", subtitle: "Who runs your commands" }),
     h(RadioCards, {
       label: "Vendor",
@@ -566,9 +604,6 @@ function TierTable({
   editValues,
   dirtyKeys,
   onChange,
-  catalog,
-  refreshing,
-  onRefresh,
 }: {
   vendor: ViewerLLMVendor;
   /** False while `vendor` is picked but unsaved: the server has no tier table for it yet. */
@@ -578,20 +613,14 @@ function TierTable({
   editValues: Record<string, string>;
   dirtyKeys: Set<string>;
   onChange: (key: string, v: string) => void;
-  catalog: CatalogEntry | null;
-  refreshing: boolean;
-  onRefresh: () => void;
 }) {
   const cliName = useCliName();
   return h("section", { class: "llm-rw-section llm-tier-section" },
-    h("div", { class: "llm-rw-section-bar" },
-      h(SectionHeader, {
-        number: 3,
-        title: "Models",
-        subtitle: "Commands and tasks pick a tier; you pick the model for each",
-      }),
-      catalog ? h(CatalogStatus, { vendor, entry: catalog, refreshing, onRefresh }) : null,
-    ),
+    h(SectionHeader, {
+      number: 3,
+      title: "Models",
+      subtitle: "Commands and tasks pick a tier; you pick the model for each",
+    }),
     !ready
       ? h("p", { class: "llm-tier-pending" }, `Save the vendor change to choose models for ${vendor}.`)
       : h("div", { class: "llm-tier-table", role: "group", "aria-label": "Model tiers" },
@@ -635,47 +664,6 @@ function TierTable({
     ),
     h("p", { class: "llm-tier-note" },
       `Agent model overrides Standard for ${cliName} work only. A --model flag or a task's saved run settings win for that run.`),
-  );
-}
-
-// ── Catalog provenance + CLI status ────────────────────────────────────
-
-/**
- * Where the model list came from, with a Refresh that bypasses the server's
- * cache. For Claude and Codex it also reports the installed CLI — and only
- * reports it: updating or installing a CLI is not something this page does.
- */
-function CatalogStatus({
-  vendor,
-  entry,
-  refreshing,
-  onRefresh,
-}: {
-  vendor: ViewerLLMVendor;
-  entry: CatalogEntry;
-  refreshing: boolean;
-  onRefresh: () => void;
-}) {
-  const origin = vendor === VIEWER_LLM_VENDOR.LOCAL
-    ? (entry.reachable ? "Live list from the local server" : `Local server unreachable${entry.reason ? ` — ${entry.reason}` : ""}`)
-    : entry.source === "live"
-      ? `Live list, checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}`
-      : `Built-in list${entry.reason ? ` — ${entry.reason}` : ""}`;
-  const cli = entry.cli;
-  return h("div", { class: "llm-catalog-status" },
-    h("span", { class: "llm-catalog-origin" }, origin),
-    h("button", {
-      class: "llm-btn llm-btn-secondary",
-      onClick: onRefresh,
-      disabled: refreshing,
-    }, refreshing ? "Refreshing…" : "Refresh models"),
-    cli
-      ? h("span", { class: "llm-catalog-cli" },
-          cli.found
-            ? `CLI ${cli.version ?? "installed"}`
-            : "CLI not found",
-        )
-      : null,
   );
 }
 
@@ -1030,33 +1018,234 @@ const MODEL_SOURCE_LABEL: Record<EffectiveConfig["modelSource"], string> = {
   default: "vendor default",
 };
 
+const CODEX_INSTALL_URL = "https://github.com/openai/codex#readme";
+
+const vendorLabel = (id: string): string => VENDORS.find((v) => v.id === id)?.label ?? id;
+
+/** "Reviewed by Codex · gpt-5.6-sol" or "Self review · <model>"; null when no review pass will run. */
+function reviewChipText(review: ReviewInfo | undefined, executor: string, executorModel: string): string | null {
+  if (!review?.available) return null;
+  const mode = review.mode.value;
+  if (mode === "self") return `Self review · ${review.models[executor]?.model ?? executorModel}`;
+  if (mode === "pair" && review.pairSupported && review.vendor.value) {
+    const reviewer = review.vendor.value;
+    const model = review.models[reviewer]?.model;
+    return `Reviewed by ${vendorLabel(reviewer)}${model ? ` · ${model}` : ""}`;
+  }
+  return null;
+}
+
+/** Where a vendor's model list came from, as a sentence. */
+function catalogOrigin(vendor: ViewerLLMVendor, entry: CatalogEntry): string {
+  if (vendor === VIEWER_LLM_VENDOR.LOCAL) {
+    return entry.reachable ? "Live list from the local server" : `Local server unreachable${entry.reason ? ` — ${entry.reason}` : ""}`;
+  }
+  return entry.source === "live"
+    ? `Live list, checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}`
+    : `Built-in list${entry.reason ? ` — ${entry.reason}` : ""}`;
+}
+
+type AuthState = "checking" | "ok" | "bad";
+
 /**
- * What `ndx work` will run with no flags. The route resolves it and, when it
- * would refuse the result, lists why in `problems` — this component only
- * renders; it applies no rules of its own.
+ * The credential check `<cli> auth` runs, so a missing or invalid key shows here
+ * rather than when an agent command fails later. The plain request is served
+ * from the server's cache; `force` bypasses it.
  */
-function EffectiveBlock({ effective, problems }: { effective: EffectiveConfig; problems: EffectiveProblem[] }) {
+function useAuthCheck(): { state: AuthState; detail: string | null; check: (force?: boolean) => Promise<void> } {
+  const [state, setState] = useState<AuthState>("checking");
+  const [detail, setDetail] = useState<string | null>(null);
+
+  const check = useCallback(async (force = false) => {
+    setState("checking");
+    setDetail(null);
+    try {
+      const res = await fetch(force ? "/api/commands/auth?refresh=true" : "/api/commands/auth");
+      const body = await res.json() as { ok?: boolean; error?: string | null; output?: string };
+      if (body.ok) {
+        setState("ok");
+        setDetail(body.output?.split("\n").filter(Boolean).pop() ?? null);
+      } else {
+        setState("bad");
+        setDetail(body.error ?? "Credential check failed");
+      }
+    } catch (err) {
+      setState("bad");
+      setDetail(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  useEffect(() => { void check(); }, [check]);
+  return { state, detail, check };
+}
+
+function CheckRow({
+  status,
+  label,
+  detail,
+  action,
+}: {
+  status: "ok" | "bad" | "pending";
+  label: string;
+  detail?: string | null;
+  action?: ComponentChildren;
+}) {
+  return h("li", { class: `llm-runcard-check llm-runcard-check-${status}` },
+    h("span", { class: "llm-runcard-check-dot", "aria-hidden": "true" }),
+    status === "pending"
+      ? h("span", { class: "llm-runcard-placeholder", "aria-label": label }, "Checking…")
+      : h("span", { class: "llm-runcard-check-text" },
+          h("span", { class: "llm-runcard-check-label" }, label),
+          detail ? h("span", { class: "llm-runcard-check-detail" }, detail) : null,
+        ),
+    action ?? null,
+  );
+}
+
+/**
+ * What the next `ndx work` run will use. The route resolves it — and, when it
+ * would refuse the result, says why — so this component only renders; it applies
+ * no rules of its own. While edits are unsaved it shows the preview (the route's
+ * answer for those edits) under an "After save" badge, with the saved model
+ * struck through when it differs.
+ */
+function RunCard({
+  saved,
+  preview,
+  previewFailed,
+  catalog,
+  refreshing,
+  onRefresh,
+  legacyFields,
+  onPickVendor,
+}: {
+  saved: LlmConfigResponse;
+  preview: LlmPreviewResponse | null;
+  previewFailed: boolean;
+  catalog: LlmCatalog | null;
+  refreshing: boolean;
+  onRefresh: () => void;
+  legacyFields: string[];
+  onPickVendor: () => void;
+}) {
   const cliName = useCliName();
-  const refused = problems.length > 0;
-  return h("section", {
-    class: `llm-effective${refused ? " llm-effective-refused" : ""}`,
-    "aria-label": `What ${cliName} work will run`,
-  },
-    h("p", { class: "llm-section-sub" }, `${cliName} work will run with`),
-    h("dl", { class: "llm-effective-list" },
-      h("dt", null, "Vendor"), h("dd", null, effective.vendor),
-      h("dt", null, "Provider"), h("dd", null, effective.provider),
-      h("dt", null, "Model"),
-      h("dd", null, effective.model,
-        h("span", { class: "llm-effective-source" }, ` (${MODEL_SOURCE_LABEL[effective.modelSource]})`)),
+  const auth = useAuthCheck();
+  const shown = preview ?? saved;
+  const { effective } = shown;
+  const vendor = effective.vendor as ViewerLLMVendor;
+  const entry = catalog?.[vendor] ?? null;
+  const previousModel = preview && saved.effective.model !== effective.model ? saved.effective.model : null;
+  const sourceKey = shown.tiers?.find((t) => t.tier === "agent")?.source ?? MODEL_SOURCE_LABEL[effective.modelSource];
+  const reviewChip = reviewChipText(shown.review, effective.vendor, effective.model);
+  const problems = shown.effectiveProblems;
+  // The catalog knows the Codex CLI is absent even though the config resolves.
+  const codexCliMissing = vendor === VIEWER_LLM_VENDOR.CODEX && effective.provider === "cli" && entry?.cli?.found === false;
+  const refused = problems.length > 0 || codexCliMissing;
+  const editProblems = preview?.editProblems ?? [];
+
+  return h("section", { class: "llm-runcard-wrap", "aria-label": `What ${cliName} work will run` },
+    h("div", { class: `llm-runcard${preview ? " llm-runcard-preview" : ""}${refused ? " llm-runcard-refused" : ""}` },
+      h("div", { class: "llm-runcard-main" },
+        h("div", { class: "llm-runcard-label" },
+          `NEXT `, h("code", null, `${cliName} work`), ` RUN`,
+          preview ? h("span", { class: "llm-runcard-badge" }, "After save") : null,
+        ),
+        h("div", { class: "llm-runcard-model" },
+          previousModel ? h("s", { class: "llm-runcard-prev" }, previousModel) : null,
+          h("span", { class: "llm-runcard-model-id" }, effective.model),
+        ),
+        h("div", { class: "llm-runcard-chips" },
+          h("span", { class: "llm-runcard-chip llm-runcard-chip-vendor" },
+            h("span", { class: `llm-vendor-dot llm-vendor-dot-${effective.vendor}` }),
+            vendorLabel(effective.vendor)),
+          h("span", { class: "llm-runcard-chip" }, `via ${effective.provider}`),
+          h("span", { class: "llm-runcard-chip" }, `model from ${sourceKey}`),
+          reviewChip ? h("span", { class: "llm-runcard-chip llm-runcard-chip-review" }, reviewChip) : null,
+        ),
+        h("p", { class: "llm-runcard-note" },
+          "A task's saved run settings (Prepare task) or a --model flag can override this for that run."),
+        previewFailed ? h("p", { class: "llm-runcard-note", role: "status" }, "Could not preview the unsaved edits.") : null,
+        editProblems.map((p) => h("p", { key: p.path, class: "llm-runcard-note llm-runcard-edit-problem" }, `Not applied: ${p.message}`)),
+        legacyFields.length > 0
+          ? h("div", { class: "llm-legacy" },
+              h("span", null, "ℹ"),
+              h("div", null,
+                h("strong", null, "Still set under a deprecated key"),
+                h("p", null,
+                  legacyFields.map((f) => `claude.${f}`).join(" and "),
+                  legacyFields.length === 1 ? " is " : " are ",
+                  "read from the legacy top-level key. The value shown above is the one that will run. ",
+                  "Saving writes the modern ",
+                  h("code", null, "llm.claude.*"),
+                  " field and leaves the old key where it is.",
+                ),
+              ),
+            )
+          : null,
+      ),
+      h("ul", { class: "llm-runcard-checks", "aria-label": "Readiness" },
+        auth.state === "checking"
+          ? h(CheckRow, { status: "pending", label: "Credentials" })
+          : h(CheckRow, {
+              status: auth.state,
+              label: auth.state === "ok" ? "Credentials valid" : "Credentials failed",
+              detail: auth.detail,
+              action: h("button", {
+                class: "llm-btn llm-btn-secondary",
+                // Not `onClick: auth.check` — that would pass the MouseEvent as `force`.
+                onClick: () => { void auth.check(true); },
+              }, auth.state === "ok" ? "Re-check" : `Re-run ${cliName} auth`),
+            }),
+        catalog === null
+          ? [h(CheckRow, { key: "cli", status: "pending", label: "CLI" }), h(CheckRow, { key: "models", status: "pending", label: "Model list" })]
+          : [
+              entry?.cli
+                ? h(CheckRow, {
+                    key: "cli",
+                    status: entry.cli.found ? "ok" : "bad",
+                    label: entry.cli.found ? "CLI found" : "CLI not found",
+                    detail: entry.cli.found ? entry.cli.version ?? "installed" : null,
+                  })
+                : null,
+              entry
+                ? h(CheckRow, {
+                    key: "models",
+                    status: vendor === VIEWER_LLM_VENDOR.LOCAL && !entry.reachable ? "bad" : "ok",
+                    label: catalogOrigin(vendor, entry),
+                    action: h("button", { class: "llm-btn llm-btn-secondary", onClick: onRefresh, disabled: refreshing },
+                      refreshing ? "Refreshing…" : "Refresh models"),
+                  })
+                : null,
+            ],
+      ),
     ),
     refused
-      ? h("div", { class: "llm-effective-problems", role: "alert" },
-          h("strong", null, `${cliName} work would refuse this configuration`),
-          h("ul", null, problems.map((p) => h("li", { key: p.field }, p.message))),
+      ? h("div", { class: "llm-runcard-banner", role: "alert" },
+          h("strong", null, `${cliName} work would refuse this.`),
+          h("ul", null,
+            problems.map((p) => h("li", { key: p.field },
+              p.message,
+              h("span", { class: "llm-runcard-fix" }, runCardFix(p, vendor)))),
+            codexCliMissing
+              ? h("li", { key: "codex-cli" },
+                  entry?.readiness?.summary ?? "The Codex CLI was not found.",
+                  h("span", { class: "llm-runcard-fix" },
+                    h("a", { href: CODEX_INSTALL_URL, target: "_blank", rel: "noopener noreferrer" }, "How to install"),
+                    " · ",
+                    h("button", { class: "llm-link-btn", onClick: onPickVendor }, "pick another vendor")))
+              : null,
+          ),
         )
       : null,
   );
+}
+
+/** The fix that applies to a server problem. Codex has no API connection, so it is never offered. */
+function runCardFix(problem: EffectiveProblem, vendor: ViewerLLMVendor): string {
+  if (problem.field === "model") return "Pick a model in Models below.";
+  return vendor === VIEWER_LLM_VENDOR.CODEX
+    ? "Codex runs on its CLI only."
+    : "Pick a connection in Connection below.";
 }
 
 // ── Smoke test ─────────────────────────────────────────────────────────
@@ -1483,60 +1672,6 @@ function LocalSection({
   );
 }
 
-// ── Credential status ─────────────────────────────────────────────────
-
-/**
- * Credential status for the configured provider.
- *
- * Runs the same check as `<cli> auth`, so a missing or invalid key is visible
- * here rather than only when an agent command fails later.
- */
-export function AuthStatusChip() {
-  const cliName = useCliName();
-  const [state, setState] = useState<"checking" | "ok" | "bad">("checking");
-  const [detail, setDetail] = useState<string | null>(null);
-
-  const check = useCallback(async (force = false) => {
-    setState("checking");
-    setDetail(null);
-    try {
-      // Force bypasses the server's cached result; the plain form is served
-      // from cache, so navigating to this page doesn't spawn a subprocess.
-      const res = await fetch(force ? "/api/commands/auth?refresh=true" : "/api/commands/auth");
-      const body = await res.json() as { ok?: boolean; error?: string | null; output?: string };
-      if (body.ok) {
-        setState("ok");
-        setDetail(body.output?.split("\n").filter(Boolean).pop() ?? null);
-      } else {
-        setState("bad");
-        setDetail(body.error ?? "Credential check failed");
-      }
-    } catch (err) {
-      setState("bad");
-      setDetail(err instanceof Error ? err.message : String(err));
-    }
-  }, []);
-
-  useEffect(() => { check(); }, [check]);
-
-  return h("div", { class: `auth-chip auth-chip-${state}`, role: "status", "aria-live": "polite" },
-    h("span", { class: "auth-chip-dot", "aria-hidden": "true" }),
-    h("span", { class: "auth-chip-label" },
-      state === "checking" ? "Checking credentials…"
-        : state === "ok" ? "Credentials OK"
-        : "Credentials not usable",
-    ),
-    detail ? h("span", { class: "auth-chip-detail" }, detail) : null,
-    h("button", {
-      class: "cmd-btn cmd-btn-small",
-      // Not `onClick: check` — that would pass the MouseEvent as `force`.
-      onClick: () => check(true),
-      disabled: state === "checking",
-      title: `Re-run ${cliName} auth`,
-    }, "Re-check"),
-  );
-}
-
 // ── Main view ─────────────────────────────────────────────────────────
 
 export function RobotWranglerView() {
@@ -1695,25 +1830,61 @@ export function RobotWranglerView() {
 
   const hasChanges = dirtyKeys.size > 0 || vendorDirty || dirtyToggles.size > 0 || provider.dirty;
 
+  // What the unsaved edits would resolve to. The body doubles as the effect's
+  // key, so an unchanged set of edits does not re-ask.
+  const previewBody = data && hasChanges
+    ? JSON.stringify({
+        changes: buildChanges(vendorDirty, pendingVendor, dirtyKeys, editValues, dirtyToggles, editToggles),
+        ...(provider.dirty ? { provider: provider.value } : {}),
+      })
+    : null;
+  const [preview, setPreview] = useState<LlmPreviewResponse | null>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  useEffect(() => {
+    if (previewBody === null) {
+      setPreview(null);
+      setPreviewFailed(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/llm/config/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: previewBody,
+        });
+        if (!res.ok) throw new Error(`Preview failed (HTTP ${res.status})`);
+        const json = await res.json() as LlmPreviewResponse;
+        if (!cancelled) {
+          setPreview(json);
+          setPreviewFailed(false);
+        }
+      } catch {
+        // The card falls back to the saved config and says the preview failed.
+        if (!cancelled) {
+          setPreview(null);
+          setPreviewFailed(true);
+        }
+      }
+    }, PREVIEW_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [previewBody]);
+
+  const handlePickVendor = useCallback(() => {
+    document.getElementById(VENDOR_SECTION_ID)?.scrollIntoView?.({ behavior: "smooth" });
+  }, []);
+
   // Two writes, in this order: the hench route validates `provider` against the
   // *saved* vendor, so the llm write (which may change the vendor) goes first.
   const handleSave = useCallback(async () => {
     setSaving(true);
     setError(null);
     try {
-      const changes: Record<string, string | null | boolean> = {};
-      if (vendorDirty) changes["llm.vendor"] = pendingVendor;
-      for (const key of dirtyKeys) {
-        const raw = editValues[key] ?? "";
-        const value = raw.trim() || null;
-        // "agent.claude" → hench.models.claude; "claude.model" → llm.claude.model
-        if (key.startsWith(AGENT_KEY_PREFIX)) changes[`hench.models.${key.slice(AGENT_KEY_PREFIX.length)}`] = value;
-        else if (key.startsWith("review.")) changes[reviewConfigPath(key)] = value;
-        else changes[`llm.${key}`] = value;
-      }
-      for (const key of dirtyToggles) {
-        if (key === "autoFailover") changes["llm.autoFailover"] = editToggles.autoFailover;
-      }
+      const changes = buildChanges(vendorDirty, pendingVendor, dirtyKeys, editValues, dirtyToggles, editToggles);
 
       if (Object.keys(changes).length > 0) {
         const res = await fetch("/api/llm/config", {
@@ -1789,7 +1960,6 @@ export function RobotWranglerView() {
   // above — this notice only explains where it is still stored.
   const legacyFields = (["model", "lightModel"] as const)
     .filter((f) => data?.claudeSources?.[f] === "legacy");
-  const showLegacy = legacyFields.length > 0;
 
   return h(SettingsFrame, {
     dirty: hasChanges,
@@ -1817,11 +1987,19 @@ export function RobotWranglerView() {
       ),
     ),
 
-    // ── Credential status for the configured provider
-    h(AuthStatusChip, null),
-
-    // What `ndx work` will run, per the route (saved config, not pending edits)
-    data ? h(EffectiveBlock, { effective: data.effective, problems: data.effectiveProblems }) : null,
+    // What `ndx work` will run: the saved config, or the preview while edits are pending
+    data
+      ? h(RunCard, {
+          saved: data,
+          preview,
+          previewFailed,
+          catalog,
+          refreshing,
+          onRefresh: () => { void loadCatalog(true); },
+          legacyFields,
+          onPickVendor: handlePickVendor,
+        })
+      : null,
 
     h(VendorCards, {
       vendor: effectiveVendor,
@@ -1858,9 +2036,6 @@ export function RobotWranglerView() {
           editValues,
           dirtyKeys,
           onChange: handleField,
-          catalog: vendorCatalog,
-          refreshing,
-          onRefresh: () => { void loadCatalog(true); },
         })
       : null,
 
@@ -1909,23 +2084,6 @@ export function RobotWranglerView() {
         })
       : null,
 
-    // Legacy notice
-    showLegacy
-      ? h("div", { class: "llm-legacy" },
-          h("span", null, "ℹ"),
-          h("div", null,
-            h("strong", null, "Still set under a deprecated key"),
-            h("p", null,
-              legacyFields.map((f) => `claude.${f}`).join(" and "),
-              legacyFields.length === 1 ? " is " : " are ",
-              "read from the legacy top-level key. The value shown above is the one that will run. ",
-              "Saving writes the modern ",
-              h("code", null, "llm.claude.*"),
-              " field and leaves the old key where it is.",
-            ),
-          ),
-        )
-      : null,
    ),
   );
 }

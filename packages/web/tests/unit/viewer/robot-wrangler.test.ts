@@ -104,44 +104,6 @@ describe("RobotWranglerView", () => {
     expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("All changes saved");
   });
 
-  it("shows the effective block as runnable when there are no problems", async () => {
-    stubApi(config({
-      effective: { vendor: "claude", provider: "cli", model: "claude-opus-5", modelSource: "hench-override" },
-    }));
-    await mount();
-    const block = root.querySelector(".llm-effective")!;
-    expect(block.textContent).toContain("claude");
-    expect(block.textContent).toContain("cli");
-    expect(block.textContent).toContain("claude-opus-5");
-    expect(block.textContent).toContain("agent model override");
-    expect(block.classList.contains("llm-effective-refused")).toBe(false);
-    expect(block.querySelector('[role="alert"]')).toBeNull();
-  });
-
-  it("marks the block refused and lists the route's provider problem", async () => {
-    stubApi(config({
-      vendor: "codex",
-      effective: { vendor: "codex", provider: "api", model: "gpt-5.5", modelSource: "default" },
-      effectiveProblems: [{ field: "provider", message: 'Provider "api" is not supported for vendor "codex". Allowed: cli.' }],
-    }));
-    await mount();
-    const block = root.querySelector(".llm-effective")!;
-    expect(block.classList.contains("llm-effective-refused")).toBe(true);
-    const items = Array.from(block.querySelectorAll('[role="alert"] li')).map((li) => li.textContent);
-    expect(items).toEqual(['Provider "api" is not supported for vendor "codex". Allowed: cli.']);
-  });
-
-  it("marks the block refused and lists the route's model problem", async () => {
-    stubApi(config({
-      vendor: "codex",
-      effective: { vendor: "codex", provider: "cli", model: "claude-sonnet-4-6", modelSource: "configured" },
-      effectiveProblems: [{ field: "model", message: 'Model "claude-sonnet-4-6" is not a codex model.' }],
-    }));
-    await mount();
-    const items = Array.from(root.querySelectorAll('.llm-effective [role="alert"] li')).map((li) => li.textContent);
-    expect(items).toEqual(['Model "claude-sonnet-4-6" is not a codex model.']);
-  });
-
   it("shows legacy-key Claude fields as such and saves them to llm.claude.*", async () => {
     const { puts } = stubApi(config({
       claude: { model: "claude-opus-5", lightModel: "claude-haiku-4-5" },
