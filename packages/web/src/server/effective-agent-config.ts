@@ -48,9 +48,8 @@ import {
   LLM_VENDOR,
   deepMerge,
   isLLMVendor,
-  loadLLMConfig,
-  loadProjectOverrideSources,
   mergeWithOverrides,
+  parseLLMConfig,
   resolveLayout,
   resolveModel,
   resolveTaskModel,
@@ -150,11 +149,82 @@ export function resolveEffectiveAgentModel(
  * reported rather than silently ignored.
  */
 function readRawHenchConfig(henchDir: string): Record<string, unknown> {
+  return readJsonObject(join(henchDir, "config.json"));
+}
+
+function readJsonObject(path: string): Record<string, unknown> {
   try {
-    return JSON.parse(readFileSync(join(henchDir, "config.json"), "utf-8")) as Record<string, unknown>;
+    return JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
   } catch {
     return {};
   }
+}
+
+/**
+ * Every config file the resolution reads, held in memory.
+ *
+ * Resolution runs over this rather than over a directory so that
+ * `GET /api/llm/config` (a snapshot read from disk) and
+ * `POST /api/llm/config/preview` (the same snapshot with unsaved edits applied)
+ * go through one code path. A preview that patched edits onto the output of a
+ * second, file-reading resolver would be a twin of the very thing it previews.
+ */
+export interface ConfigSnapshot {
+  /** `.n-dx.json` merged with the `.n-dx.local.json` overlay (local wins) — what a run sees. */
+  ndx: Record<string, unknown>;
+  /** `.hench/config.json` as saved. */
+  hench: Record<string, unknown>;
+}
+
+/** The two files edits are written to, before the local overlay is merged over the first. */
+export interface EditableSources {
+  /** `.n-dx.json` — where `PUT /api/llm/config` writes. */
+  shared: Record<string, unknown>;
+  /** `.hench/config.json` — where `PUT /api/hench/config` writes. */
+  hench: Record<string, unknown>;
+}
+
+/** `.n-dx.json` deep-merged with the gitignored `.n-dx.local.json` overlay, local winning. */
+export function readEffectiveNdxConfig(projectDir: string): Record<string, unknown> {
+  return readConfigSnapshot(projectDir).ndx;
+}
+
+/**
+ * Read the files {@link ConfigSnapshot} holds.
+ *
+ * `edit` mutates the freshly-read copies before the overlay is merged, which is
+ * how the preview applies unsaved edits: to the file each would be saved to, so
+ * a `.n-dx.local.json` value that shadows an edit still shadows it, as it will
+ * after the save. Nothing is written back.
+ */
+export function readConfigSnapshot(
+  projectDir: string,
+  edit?: (sources: EditableSources) => void,
+): ConfigSnapshot {
+  const layout = resolveLayout(projectDir);
+  const sources: EditableSources = {
+    shared: readJsonObject(layout.configFile),
+    hench: readRawHenchConfig(layout.henchDir),
+  };
+  edit?.(sources);
+  const local = readJsonObject(layout.localConfigFile);
+  return {
+    ndx: Object.keys(local).length === 0 ? sources.shared : deepMerge(sources.shared, local),
+    hench: sources.hench,
+  };
+}
+
+/**
+ * The `hench` section of the merged project config — the override layer both
+ * hench settings readers put on top of `.hench/config.json`. Merging the two
+ * files' sections and then merging that is the same as merging them in turn,
+ * which is what hench's own loader does.
+ */
+function henchOverrides(snapshot: ConfigSnapshot): Record<string, unknown> {
+  const section = snapshot.ndx["hench"];
+  return section && typeof section === "object" && !Array.isArray(section)
+    ? (section as Record<string, unknown>)
+    : {};
 }
 
 /**
@@ -175,26 +245,20 @@ function readRawHenchConfig(henchDir: string): Record<string, unknown> {
  * directly, and a difference here would only surface on a malformed
  * override, which is exactly the case nobody checks by hand.
  */
-export async function readHenchAgentSettings(projectDir: string): Promise<{
+export function readHenchAgentSettings(snapshot: ConfigSnapshot): {
   provider: HenchProvider;
   models: Partial<Record<LLMVendor, string>>;
-}> {
-  const henchDir = resolveLayout(projectDir).henchDir;
-
-  const raw = readRawHenchConfig(henchDir);
+} {
+  const raw = snapshot.hench;
 
   const baseProvider = parseProvider(raw["provider"]) ?? "cli";
   const baseModels = parseAgentModels(raw["models"]) ?? {};
 
-  const overrideSources = await loadProjectOverrideSources(henchDir, "hench");
-  if (overrideSources.length === 0) {
+  const overrides = henchOverrides(snapshot);
+  if (Object.keys(overrides).length === 0) {
     return { provider: baseProvider, models: baseModels };
   }
 
-  const overrides = overrideSources.reduce(
-    (acc, source) => deepMerge(acc, source.data),
-    {} as Record<string, unknown>,
-  );
   // Merge onto the *salvaged* base, not the raw file. hench validates
   // `.hench/config.json` and drops its invalid fields before merging the
   // overrides on top, so a bad entry there is already gone when the override
@@ -263,24 +327,39 @@ function parseAgentModels(rawModels: unknown): Partial<Record<LLMVendor, string>
 }
 
 /**
- * Assemble the `effective` block: what `ndx work` runs in this project with no
- * flags. Reads `.n-dx.json` (+ the `.n-dx.local.json` overlay, local wins) via
- * `loadLLMConfig` — the same loader hench uses — and `.hench/config.json`.
+ * Assemble the `effective` block: what `ndx work` runs with no flags, from a
+ * snapshot of `.n-dx.json` (+ the `.n-dx.local.json` overlay, local wins) and
+ * `.hench/config.json`. The `llm` section goes through `parseLLMConfig`, the
+ * extraction `loadLLMConfig` — the loader hench uses — applies.
+ *
+ * Returns the parsed `llm` config too: the tier table, failover chain and
+ * review block resolve against that same object, so they cannot disagree with
+ * `effective`.
  */
-export async function resolveEffectiveAgentConfig(
-  projectDir: string,
-): Promise<EffectiveAgentConfig> {
-  const llmConfig = await loadLLMConfig(projectDir);
+export function resolveEffectiveAgentConfigFrom(
+  snapshot: ConfigSnapshot,
+): { effective: EffectiveAgentConfig; llmConfig: LLMConfig } {
+  const llmConfig = parseLLMConfig(snapshot.ndx);
   const vendor = llmConfig.vendor ?? DEFAULT_LLM_VENDOR;
-  const hench = await readHenchAgentSettings(projectDir);
+  const hench = readHenchAgentSettings(snapshot);
   const { model, source } = resolveEffectiveAgentModel(vendor, hench.models, llmConfig);
 
   return {
-    vendor,
-    provider: resolveEffectiveProvider(vendor, hench.provider),
-    model,
-    modelSource: source,
+    effective: {
+      vendor,
+      provider: resolveEffectiveProvider(vendor, hench.provider),
+      model,
+      modelSource: source,
+    },
+    llmConfig,
   };
+}
+
+/** {@link resolveEffectiveAgentConfigFrom} over the files on disk. */
+export async function resolveEffectiveAgentConfig(
+  projectDir: string,
+): Promise<EffectiveAgentConfig> {
+  return resolveEffectiveAgentConfigFrom(readConfigSnapshot(projectDir)).effective;
 }
 
 /** Where a `hench.review.*` value came from. */
@@ -309,16 +388,9 @@ function reviewSection(config: Record<string, unknown>): Record<string, unknown>
  * {@link readHenchAgentSettings} applies. A value hench's schema would refuse
  * counts as unset for its field, so the page shows what `ndx work` falls back to.
  */
-export async function readHenchReviewSettings(projectDir: string): Promise<HenchReviewSettings> {
-  const henchDir = resolveLayout(projectDir).henchDir;
-  const base = reviewSection(readRawHenchConfig(henchDir));
-  const overrideSources = await loadProjectOverrideSources(henchDir, "hench");
-  const overrides = reviewSection(
-    overrideSources.reduce(
-      (acc, source) => deepMerge(acc, source.data),
-      {} as Record<string, unknown>,
-    ),
-  );
+export function readHenchReviewSettings(snapshot: ConfigSnapshot): HenchReviewSettings {
+  const base = reviewSection(snapshot.hench);
+  const overrides = reviewSection(henchOverrides(snapshot));
 
   const pick = <T>(
     key: string,
