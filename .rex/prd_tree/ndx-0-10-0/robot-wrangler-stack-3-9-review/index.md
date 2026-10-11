@@ -21,5 +21,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add hench.review.mode, hench.review.vendor and hench.review.rounds as project settings for the review pass](./add-hench-review-mode-hench-review.md) | pending |
+| [Add hench.review.mode, hench.review.vendor and hench.review.rounds as project settings for the review pass](./add-hench-review-mode-hench-review.md) | completed |
 | [Apply repository trust to guard.env and read cli_path from .n-dx.local.json on the cross-vendor reviewer path](./apply-repository-trust-to-guard-env.md) | pending |
