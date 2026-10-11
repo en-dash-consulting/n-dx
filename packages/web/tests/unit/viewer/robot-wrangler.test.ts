@@ -25,6 +25,12 @@ function config(overrides: Json = {}): Json {
     claudeSources: {},
     effective: { vendor: "claude", provider: "cli", model: "claude-sonnet-5", modelSource: "default" },
     effectiveProblems: [],
+    tiers: [
+      { tier: "agent", model: "claude-sonnet-5", source: "catalog default", usedBy: [{ label: "ndx work" }] },
+      { tier: "standard", model: "claude-sonnet-5", source: "catalog default", usedBy: [] },
+      { tier: "light", model: "claude-haiku-4-5", source: "catalog default", usedBy: [] },
+      { tier: "heavy", model: "claude-opus-5", source: "catalog default", usedBy: [] },
+    ],
     ...overrides,
   };
 }
@@ -141,8 +147,7 @@ describe("RobotWranglerView", () => {
     const light = root.querySelector<HTMLSelectElement>('select[id="claude.lightModel"]')!;
     expect(model.value).toBe("claude-opus-5");
     expect(light.value).toBe("claude-haiku-4-5");
-    const sources = Array.from(root.querySelectorAll(".llm-field-source")).map((el) => el.textContent?.trim());
-    expect(sources).toEqual(["from legacy claude.model", "from legacy claude.lightModel"]);
+    expect(root.querySelector(".llm-legacy")?.textContent).toContain("claude.model and claude.lightModel are read from the legacy top-level key");
 
     await act(async () => {
       model.value = "claude-sonnet-5";
@@ -155,12 +160,12 @@ describe("RobotWranglerView", () => {
     expect(puts).toEqual([{ changes: { "llm.claude.model": "claude-sonnet-5" } }]);
   });
 
-  it("shows no legacy marker when the fields come from llm.claude.*", async () => {
+  it("shows no legacy notice when the fields come from llm.claude.*", async () => {
     stubApi(config({
       claude: { model: "claude-opus-5", lightModel: null },
       claudeSources: { model: "llm" },
     }));
     await mount();
-    expect(root.querySelectorAll(".llm-field-source")).toHaveLength(0);
+    expect(root.querySelector(".llm-legacy")).toBeNull();
   });
 });

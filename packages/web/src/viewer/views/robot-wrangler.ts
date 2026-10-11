@@ -58,6 +58,8 @@ interface LlmConfigResponse {
   agentModels: Partial<Record<string, string>>;
   /** What `ndx work` runs with no flags, resolved server-side. */
   effective: EffectiveConfig;
+  /** One row per model tier of `effective.vendor`: its model, the key that set it, and who uses it. */
+  tiers: TierRow[];
   /** Why `ndx work` would refuse `effective`; empty when it would run. */
   effectiveProblems: EffectiveProblem[];
 }
@@ -67,6 +69,18 @@ interface EffectiveConfig {
   provider: string;
   model: string;
   modelSource: "hench-override" | "configured" | "default";
+}
+
+type TierName = "agent" | "standard" | "light" | "heavy" | "free";
+
+/** Mirrors the server's `TierRow`; `free` is present only once it is set. */
+interface TierRow {
+  tier: TierName;
+  /** Fully-qualified model the tier resolves to. */
+  model: string;
+  /** The config key that supplied `model`, or `catalog default`. */
+  source: string;
+  usedBy: Array<{ taskClass?: string; label: string }>;
 }
 
 interface EffectiveProblem {
@@ -142,17 +156,6 @@ const VIEWER_LLM_VENDOR = {
 } as const;
 
 type ViewerLLMVendor = typeof VIEWER_LLM_VENDOR[keyof typeof VIEWER_LLM_VENDOR];
-type CloudViewerVendor =
-  | typeof VIEWER_LLM_VENDOR.CLAUDE
-  | typeof VIEWER_LLM_VENDOR.CODEX
-  | typeof VIEWER_LLM_VENDOR.GOOGLE;
-
-/** Vendors configured through the generic cloud VendorSection (model + lightModel). */
-const CLOUD_VENDORS: ReadonlySet<string> = new Set<string>([
-  VIEWER_LLM_VENDOR.CLAUDE,
-  VIEWER_LLM_VENDOR.CODEX,
-  VIEWER_LLM_VENDOR.GOOGLE,
-]);
 
 const VENDORS = [
   { id: VIEWER_LLM_VENDOR.CLAUDE, label: "Claude", subtitle: "Anthropic" },
@@ -167,6 +170,44 @@ const OTHER_MODEL = "__other__";
 /** editValues key for the agent model override of one vendor (saved as `hench.models.<vendor>`). */
 const AGENT_KEY_PREFIX = "agent.";
 const agentKey = (vendor: string): string => `${AGENT_KEY_PREFIX}${vendor}`;
+
+/**
+ * editValues key of a tier row. Saving writes `llm.<key>` — except the agent
+ * row, whose key is `agent.<vendor>` and saves as `hench.models.<vendor>`.
+ */
+function tierKey(vendor: string, tier: TierName): string {
+  switch (tier) {
+    case "agent": return agentKey(vendor);
+    case "standard": return `${vendor}.model`;
+    case "light": return `${vendor}.lightModel`;
+    default: return `tiers.${vendor}.${tier}`;
+  }
+}
+
+/** The config key a tier row writes, as `Set in …` names it. */
+function tierConfigPath(vendor: string, tier: TierName): string {
+  const key = tierKey(vendor, tier);
+  return tier === "agent" ? `hench.models.${vendor}` : `llm.${key}`;
+}
+
+/** The value saved for a tier row, `""` when unset. */
+function savedTierValue(data: LlmConfigResponse, vendor: string, row: TierRow): string {
+  switch (row.tier) {
+    case "agent": return data.agentModels?.[vendor] ?? "";
+    case "standard": return data[vendor as ViewerLLMVendor]?.model ?? "";
+    case "light": return data[vendor as ViewerLLMVendor]?.lightModel ?? "";
+    // The response carries no raw heavy/free value: the row is set exactly when it names its own key.
+    default: return row.source === tierConfigPath(vendor, row.tier) ? row.model : "";
+  }
+}
+
+const TIER_LABEL: Record<TierName, string> = {
+  agent: "Agent model",
+  standard: "Standard",
+  light: "Light",
+  heavy: "Heavy",
+  free: "Free",
+};
 
 /** editValues key for the hench provider (saved through PUT /api/hench/config, not the llm route). */
 const PROVIDER_KEY = "provider";
@@ -339,94 +380,6 @@ function ModelField({
   );
 }
 
-// ── Catalog-backed model picker ────────────────────────────────────────
-
-/**
- * A dropdown over the server's model catalog for one vendor.
- *
- * `value` is the stored model, `""` when unset. The first option clears it
- * (`unsetLabel`); the last, "Other model…", reveals a text input for an id the
- * catalog does not list. A stored value the list lacks is kept as its own
- * option so it is never silently dropped from view. `defaultModel`, when
- * given, is marked in the list as the project default.
- */
-function CatalogModelPicker({
-  fieldKey,
-  label,
-  description,
-  value,
-  models,
-  unsetLabel,
-  defaultModel,
-  onChange,
-  dirty,
-  legacyKey,
-}: {
-  fieldKey: string;
-  label: string;
-  description: string;
-  value: string;
-  models: string[];
-  unsetLabel: string;
-  defaultModel?: string;
-  onChange: (key: string, v: string) => void;
-  dirty: boolean;
-  /** Deprecated key this value is still read from, when it is not `llm.*`. */
-  legacyKey?: string;
-}) {
-  // Sticky: once the user picks "Other model…" the input stays up while they
-  // type, even though the half-typed id is (rightly) not in the list.
-  const [custom, setCustom] = useState(false);
-  const listed = value === "" || models.includes(value);
-  const options = listed || custom ? models : [value, ...models];
-  const selected = custom ? OTHER_MODEL : value;
-
-  return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
-    h("label", { class: "llm-field-label", htmlFor: fieldKey },
-      label,
-      dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-      legacyKey
-        ? h("span", { class: "llm-field-source", title: "Read from the deprecated key; saving writes the llm.* key" },
-            ` from legacy ${legacyKey}`)
-        : null,
-    ),
-    h("p", { class: "llm-field-desc" }, description),
-    h("select", {
-      id: fieldKey,
-      class: "llm-select-input",
-      value: selected,
-      onChange: (e: Event) => {
-        const next = (e.target as HTMLSelectElement).value;
-        if (next === OTHER_MODEL) {
-          setCustom(true);
-          return;
-        }
-        setCustom(false);
-        onChange(fieldKey, next);
-      },
-    },
-      h("option", { value: "" }, unsetLabel),
-      options.map((m) =>
-        h("option", { key: m, value: m },
-          m === defaultModel ? `${m} (project default)` : m,
-        ),
-      ),
-      h("option", { value: OTHER_MODEL }, "Other model…"),
-    ),
-    custom
-      ? h("input", {
-          id: `${fieldKey}-other`,
-          type: "text",
-          class: "llm-text-input",
-          value,
-          placeholder: "model-id",
-          "aria-label": `${label} — model id`,
-          onInput: (e: Event) => onChange(fieldKey, (e.target as HTMLInputElement).value),
-        })
-      : null,
-  );
-}
-
 // ── Section 2: connection ──────────────────────────────────────────────
 
 /** The environment variable a vendor's API connection reads its key from. */
@@ -499,6 +452,156 @@ function ConnectionCards({
   );
 }
 
+// ── Section 3: models ──────────────────────────────────────────────────
+
+/**
+ * A dropdown over a model list. The first option is the unset choice
+ * (`unsetLabel`); the last, "Other model id…", reveals a text input for an id
+ * the list does not carry. A stored value the list lacks is kept as its own
+ * option so it is never silently dropped from view.
+ */
+function ModelPicker({
+  id,
+  label,
+  value,
+  models,
+  unsetLabel,
+  set,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  /** The stored model, `""` when unset. */
+  value: string;
+  models: string[];
+  unsetLabel: string;
+  /** Whether the shown value is a setting; unset renders dashed and muted. */
+  set: boolean;
+  onChange: (key: string, v: string) => void;
+}) {
+  // Sticky: once the user picks "Other model id…" the input stays up while
+  // they type, even though the half-typed id is (rightly) not in the list.
+  const [custom, setCustom] = useState(false);
+  const listed = value === "" || models.includes(value);
+  const options = listed || custom ? models : [value, ...models];
+  return h("div", { class: "llm-tier-picker" },
+    h("select", {
+      id,
+      class: `llm-select-input ${set ? "llm-select-set" : "llm-select-unset"}`,
+      "aria-label": label,
+      value: custom ? OTHER_MODEL : value,
+      onChange: (e: Event) => {
+        const next = (e.target as HTMLSelectElement).value;
+        if (next === OTHER_MODEL) {
+          setCustom(true);
+          return;
+        }
+        setCustom(false);
+        onChange(id, next);
+      },
+    },
+      h("option", { value: "" }, unsetLabel),
+      options.map((m) => h("option", { key: m, value: m }, m)),
+      h("option", { value: OTHER_MODEL }, "Other model id…"),
+    ),
+    custom
+      ? h("input", {
+          type: "text",
+          class: "llm-text-input",
+          value,
+          placeholder: "model-id",
+          "aria-label": `${label} — model id`,
+          onInput: (e: Event) => onChange(id, (e.target as HTMLInputElement).value),
+        })
+      : null,
+  );
+}
+
+/**
+ * One row per tier the server resolved, each with who uses it, a model select
+ * and where the model comes from. The rows are the server's: this renders them
+ * and decides nothing about which tiers exist or what they resolve to.
+ */
+function TierTable({
+  vendor,
+  ready,
+  data,
+  models,
+  editValues,
+  dirtyKeys,
+  onChange,
+  catalog,
+  refreshing,
+  onRefresh,
+}: {
+  vendor: ViewerLLMVendor;
+  /** False while `vendor` is picked but unsaved: the server has no tier table for it yet. */
+  ready: boolean;
+  data: LlmConfigResponse;
+  models: string[];
+  editValues: Record<string, string>;
+  dirtyKeys: Set<string>;
+  onChange: (key: string, v: string) => void;
+  catalog: CatalogEntry | null;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const cliName = useCliName();
+  return h("section", { class: "llm-rw-section llm-tier-section" },
+    h("div", { class: "llm-rw-section-bar" },
+      h(SectionHeader, {
+        number: 3,
+        title: "Models",
+        subtitle: "Commands and tasks pick a tier; you pick the model for each",
+      }),
+      catalog ? h(CatalogStatus, { vendor, entry: catalog, refreshing, onRefresh }) : null,
+    ),
+    !ready
+      ? h("p", { class: "llm-tier-pending" }, `Save the vendor change to choose models for ${vendor}.`)
+      : h("div", { class: "llm-tier-table", role: "group", "aria-label": "Model tiers" },
+      data.tiers.map((row) => {
+        const key = tierKey(vendor, row.tier);
+        const saved = savedTierValue(data, vendor, row);
+        const value = editValues[key] ?? saved;
+        const label = TIER_LABEL[row.tier];
+        const dirty = dirtyKeys.has(key);
+        // An untouched unset row can say what it resolves to; once edited the
+        // server has not resolved the new choice, so it says what saving does.
+        const resolved = saved === "" && !dirty;
+        const where = value === ""
+          ? (resolved ? `Runs as ${row.model}` : "Unset once saved")
+          : `Set in ${dirty || saved === "" ? tierConfigPath(vendor, row.tier) : row.source}`;
+        return h("div", {
+          key: row.tier,
+          class: `llm-tier-row llm-tier-row-${row.tier}${dirty ? " llm-field-dirty" : ""}`,
+        },
+          h("div", { class: "llm-tier-name" },
+            h("label", { class: "llm-field-label", htmlFor: key },
+              label,
+              dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+            ),
+            row.usedBy.length > 0
+              ? h("span", { class: "llm-tier-used" }, `Used by ${row.usedBy.map((u) => u.label).join(", ")}`)
+              : null,
+          ),
+          h(ModelPicker, {
+            id: key,
+            label: `${label} model`,
+            value,
+            models,
+            unsetLabel: resolved ? `Default (${row.model})` : "Default",
+            set: value !== "",
+            onChange,
+          }),
+          h("span", { class: "llm-tier-source" }, where),
+        );
+      }),
+    ),
+    h("p", { class: "llm-tier-note" },
+      `Agent model overrides Standard for ${cliName} work only. A --model flag or a task's saved run settings win for that run.`),
+  );
+}
+
 // ── Catalog provenance + CLI status ────────────────────────────────────
 
 /**
@@ -540,47 +643,6 @@ function CatalogStatus({
   );
 }
 
-// ── Select-based model picker (local vendor with live model list) ───────
-
-function ModelSelect({
-  fieldKey,
-  label,
-  description,
-  value,
-  models,
-  onChange,
-  dirty,
-}: {
-  fieldKey: string;
-  label: string;
-  description: string;
-  value: string;
-  models: string[];
-  onChange: (key: string, v: string) => void;
-  dirty: boolean;
-}) {
-  // Include current value as an option even if it's no longer in the live list
-  const extra = value && !models.includes(value) ? [value] : [];
-  return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
-    h("label", { class: "llm-field-label", htmlFor: fieldKey },
-      label,
-      dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-    ),
-    h("p", { class: "llm-field-desc" }, description),
-    h("select", {
-      id: fieldKey,
-      class: "llm-select-input",
-      value,
-      onChange: (e: Event) => onChange(fieldKey, (e.target as HTMLSelectElement).value),
-    },
-      h("option", { value: "" }, "Any loaded model"),
-      [...extra, ...models].map((m) =>
-        h("option", { key: m, value: m }, m),
-      ),
-    ),
-  );
-}
-
 // ── Toggle switch ──────────────────────────────────────────────────────
 
 function ToggleSwitch({
@@ -616,58 +678,6 @@ function ToggleSwitch({
       }),
       h("span", { class: "llm-toggle-track" }),
     ),
-  );
-}
-
-// ── Claude / Codex settings card ──────────────────────────────────────
-
-function VendorSection({
-  vendorId,
-  config,
-  catalog,
-  editValues,
-  onChange,
-  dirtyKeys,
-  legacyFields,
-}: {
-  vendorId: CloudViewerVendor;
-  config: VendorConfig;
-  /** This vendor's catalog entry; null until the catalog loads or when it failed. */
-  catalog: CatalogEntry | null;
-  editValues: Record<string, string>;
-  onChange: (key: string, v: string) => void;
-  dirtyKeys: Set<string>;
-  /** Fields still read from the deprecated top-level key (Claude only). */
-  legacyFields: ReadonlyArray<"model" | "lightModel">;
-}) {
-  const cliName = useCliName();
-  const modelKey = `${vendorId}.model`;
-  const lightKey = `${vendorId}.lightModel`;
-  const models = catalog?.models ?? [];
-
-  return h("div", { class: "llm-vendor-section" },
-    h(CatalogModelPicker, {
-      fieldKey: modelKey,
-      label: "Project model",
-      description: `Used by every ${cliName} command that has no agent model of its own. Leave on the vendor default for the CLI's choice.`,
-      value: editValues[modelKey] ?? config.model ?? "",
-      models,
-      unsetLabel: "Vendor default",
-      onChange,
-      dirty: dirtyKeys.has(modelKey),
-      legacyKey: legacyFields.includes("model") ? "claude.model" : undefined,
-    }),
-    h(CatalogModelPicker, {
-      fieldKey: lightKey,
-      label: "Light model",
-      description: "Cheaper model for recommendations and summaries. Falls back to the project model if unset.",
-      value: editValues[lightKey] ?? config.lightModel ?? "",
-      models,
-      unsetLabel: "Same as project model",
-      onChange,
-      dirty: dirtyKeys.has(lightKey),
-      legacyKey: legacyFields.includes("lightModel") ? "claude.lightModel" : undefined,
-    }),
   );
 }
 
@@ -947,12 +957,9 @@ function LocalSection({
   localStatus: LocalStatusResponse | null;
   onRefreshStatus: () => void;
 }) {
-  const liveModels = localStatus?.ok && localStatus.models.length > 0 ? localStatus.models : [];
-
   const host  = editValues["local.host"]       ?? config.host              ?? "localhost";
   const port  = editValues["local.port"]       ?? (config.port !== null ? String(config.port) : "1234");
   const model = editValues["local.model"]      ?? config.model             ?? "";
-  const light = editValues["local.lightModel"] ?? config.lightModel        ?? "";
 
   const maxContextTokens = editValues["local.maxContextTokens"]
     ?? (config.maxContextTokens !== null ? String(config.maxContextTokens) : "");
@@ -970,62 +977,12 @@ function LocalSection({
 
   const connDirty = dirtyKeys.has("local.host") || dirtyKeys.has("local.port");
 
-  // Model field — select when live list available, text input otherwise
-  const primaryField = liveModels.length > 0
-    ? h(ModelSelect, {
-        fieldKey: "local.model",
-        label: "Primary model",
-        description: "Model used for agentic tasks. Leave blank to use any loaded model.",
-        value: model,
-        models: liveModels,
-        onChange,
-        dirty: dirtyKeys.has("local.model"),
-      })
-    : h(ModelField, {
-        fieldKey: "local.model",
-        label: "Primary model",
-        description: "Leave blank to use whichever model is currently loaded.",
-        value: model,
-        onChange,
-        dirty: dirtyKeys.has("local.model"),
-        placeholder: "model-id",
-      });
-
-  const lightField = liveModels.length > 0
-    ? h(ModelSelect, {
-        fieldKey: "local.lightModel",
-        label: "Light model",
-        description: "Cheaper model for briefs and estimates. Falls back to primary if blank.",
-        value: light,
-        models: liveModels,
-        onChange,
-        dirty: dirtyKeys.has("local.lightModel"),
-      })
-    : h(ModelField, {
-        fieldKey: "local.lightModel",
-        label: "Light model",
-        description: "Falls back to primary if blank.",
-        value: light,
-        onChange,
-        dirty: dirtyKeys.has("local.lightModel"),
-        placeholder: "model-id",
-      });
-
   return h("div", { class: "llm-vendor-section" },
 
     // ── Status pill (always first)
     h("div", { class: "llm-local-top" },
       h(StatusPill, { status: localStatus, onRefresh: onRefreshStatus }),
     ),
-
-    // ── Model selection (right after status — most important action when connected)
-    h("p", { class: "llm-section-sub" },
-      liveModels.length > 0
-        ? `Model — select from ${liveModels.length} available`
-        : "Model",
-    ),
-    primaryField,
-    lightField,
 
     h("hr", { class: "llm-rule" }),
 
@@ -1254,6 +1211,9 @@ export function RobotWranglerView() {
 
   const effectiveVendor = pendingVendor !== undefined ? pendingVendor : data?.vendor ?? null;
   const showLocal = effectiveVendor === VIEWER_LLM_VENDOR.LOCAL;
+  // The server resolves the tier table for the saved vendor, so a vendor card
+  // picked but not yet saved has no table of its own to show.
+  const tiersShown = data !== null && effectiveVendor !== null && data.effective.vendor === effectiveVendor;
   const { status: localStatus, refresh: refreshLocal } = useLocalStatus(showLocal);
 
   const loadConfig = useCallback(async () => {
@@ -1329,22 +1289,16 @@ export function RobotWranglerView() {
   // silently included in an unrelated save.
   const dirtyKeys = new Set<string>();
   if (data) {
-    if (effectiveVendor && CLOUD_VENDORS.has(effectiveVendor)) {
-      const vid = effectiveVendor as CloudViewerVendor;
-      for (const f of ["model", "lightModel"] as const) {
-        const k = `${vid}.${f}`;
-        if (k in editValues && editValues[k] !== (data[vid][f] ?? "")) dirtyKeys.add(k);
+    // The tier rows describe the saved vendor; only they are editable, and only
+    // while that is the vendor on screen.
+    if (tiersShown && effectiveVendor) {
+      for (const row of data.tiers) {
+        const k = tierKey(effectiveVendor, row.tier);
+        if (k in editValues && editValues[k] !== savedTierValue(data, effectiveVendor, row)) dirtyKeys.add(k);
       }
-    }
-    if (effectiveVendor) {
-      const k = agentKey(effectiveVendor);
-      if (k in editValues && editValues[k] !== (data.agentModels?.[effectiveVendor] ?? "")) dirtyKeys.add(k);
     }
     if (effectiveVendor === VIEWER_LLM_VENDOR.LOCAL) {
-      for (const f of ["model", "lightModel", "host"] as const) {
-        const k = `local.${f}`;
-        if (k in editValues && editValues[k] !== (data.local[f] ?? "")) dirtyKeys.add(k);
-      }
+      if ("local.host" in editValues && editValues["local.host"] !== (data.local.host ?? "")) dirtyKeys.add("local.host");
       if ("local.port" in editValues) {
         const saved = data.local.port !== null ? String(data.local.port) : "1234";
         if (editValues["local.port"] !== saved) dirtyKeys.add("local.port");
@@ -1531,50 +1485,30 @@ export function RobotWranglerView() {
         })
       : null,
 
-    // Provider and agent model for the active vendor, from the server catalog
     catalogError
       ? h("p", { class: "llm-catalog-error", role: "alert" },
-          `${catalogError}. Model lists are empty; use "Other model…" to enter an id.`)
+          `${catalogError}. Model lists are empty; use "Other model id…" to enter an id.`)
       : null,
+    // The server's tier table, for the vendor it resolved it for. The local
+    // vendor lists what its server reports as loaded rather than a catalog.
     (effectiveVendor && data)
-      ? h("div", { key: `agent-${effectiveVendor}`, class: "llm-vendor-section llm-agent-section" },
-          vendorCatalog
-            ? h(CatalogStatus, {
-                vendor: effectiveVendor as ViewerLLMVendor,
-                entry: vendorCatalog,
-                refreshing,
-                onRefresh: () => { void loadCatalog(true); },
-              })
-            : null,
-          h(CatalogModelPicker, {
-            fieldKey: agentKey(effectiveVendor),
-            label: "Agent model",
-            description: `Model ${cliName} work runs for ${effectiveVendor}. Overrides the project model; --model on the command line still wins.`,
-            value: editValues[agentKey(effectiveVendor)] ?? data.agentModels?.[effectiveVendor] ?? "",
-            models: vendorCatalog?.models ?? [],
-            defaultModel: vendorCatalog?.defaultModel,
-            unsetLabel: vendorCatalog
-              ? `Use project default (${vendorCatalog.defaultModel})`
-              : "Use project default",
-            onChange: handleField,
-            dirty: dirtyKeys.has(agentKey(effectiveVendor)),
-          }),
-        )
-      : null,
-
-    // Active vendor settings
-    (effectiveVendor && CLOUD_VENDORS.has(effectiveVendor))
-      ? h(VendorSection, {
-          key: effectiveVendor,
-          vendorId: effectiveVendor as CloudViewerVendor,
-          config: data![effectiveVendor as CloudViewerVendor] ?? { model: null, lightModel: null },
-          catalog: vendorCatalog,
+      ? h(TierTable, {
+          key: `tiers-${effectiveVendor}`,
+          vendor: effectiveVendor as ViewerLLMVendor,
+          ready: tiersShown,
+          data,
+          models: showLocal && localStatus?.ok && localStatus.models.length > 0
+            ? localStatus.models
+            : vendorCatalog?.models ?? [],
           editValues,
-          onChange: handleField,
           dirtyKeys,
-          legacyFields: effectiveVendor === VIEWER_LLM_VENDOR.CLAUDE ? legacyFields : [],
+          onChange: handleField,
+          catalog: vendorCatalog,
+          refreshing,
+          onRefresh: () => { void loadCatalog(true); },
         })
       : null,
+
     showLocal
       ? h(LocalSection, {
           key: VIEWER_LLM_VENDOR.LOCAL,

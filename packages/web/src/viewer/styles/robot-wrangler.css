@@ -409,17 +409,88 @@
 
 .llm-pill-refresh:hover { opacity: 1; }
 
-/* Provider, catalog provenance and agent model for the active vendor */
-.llm-agent-section { margin-bottom: var(--space-4); }
-
+/* Model list provenance, right of the Models section header */
 .llm-catalog-status {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-bottom: var(--space-3);
   font-size: 0.8125rem;
   color: var(--text-dim);
+}
+
+/* Section 3: tier table — name + used-by | model select | where it comes from */
+.llm-rw-section-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.llm-tier-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.llm-tier-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.llm-tier-row + .llm-tier-row { border-top: 1px solid var(--border); }
+
+.llm-tier-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.llm-tier-used {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.llm-tier-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.llm-tier-picker .llm-select-input,
+.llm-tier-picker .llm-text-input { max-width: none; }
+
+/* Set rows read as a decision; unset rows as the default showing through */
+.llm-select-set { border-style: solid; }
+
+.llm-select-unset {
+  border-style: dashed;
+  color: var(--text-dim);
+}
+
+.llm-tier-source {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.llm-tier-note,
+.llm-tier-pending {
+  margin: var(--space-2) 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+
+@media (max-width: 640px) {
+  .llm-tier-row { grid-template-columns: 1fr; }
 }
 
 .llm-catalog-cli { font-family: var(--font-mono, monospace); }

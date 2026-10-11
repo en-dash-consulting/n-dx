@@ -37,6 +37,7 @@ const LLM_CONFIG = {
   claudeSources: {},
   effective: { vendor: "claude", provider: "cli", model: "claude-sonnet-5", modelSource: "default" },
   effectiveProblems: [],
+  tiers: [{ tier: "agent", model: "claude-sonnet-5", source: "catalog default", usedBy: [{ label: "ndx work" }] }],
 };
 
 const LLM_CATALOG = {

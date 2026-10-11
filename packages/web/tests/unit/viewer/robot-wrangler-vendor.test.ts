@@ -45,6 +45,19 @@ function catalog(overrides: Json = {}): Json {
   };
 }
 
+/** The server's tier table with nothing configured: every tier on the catalog default. */
+function tierRows(model = "claude-sonnet-5"): Json[] {
+  const row = (tier: string, labels: string[]) => ({
+    tier, model, source: "catalog default", usedBy: labels.map((label) => ({ label })),
+  });
+  return [
+    row("agent", ["ndx work"]),
+    row("standard", ["ndx plan", "ndx add"]),
+    row("light", ["commit messages", "summaries"]),
+    row("heavy", ["tasks set to Heavy in Prepare task"]),
+  ];
+}
+
 function config(vendor: Vendor, overrides: Json = {}): Json {
   return {
     vendor,
@@ -59,6 +72,7 @@ function config(vendor: Vendor, overrides: Json = {}): Json {
     agentModels: {},
     effective: { vendor, provider: "cli", model: "claude-sonnet-5", modelSource: "default" },
     effectiveProblems: [],
+    tiers: tierRows(),
     ...overrides,
   };
 }
@@ -130,6 +144,10 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     await act(async () => { connection(provider).click(); });
   }
 
+  /** The select ids of the default tier rows, as the page keys them. */
+  const tierIds = (vendor: Vendor) =>
+    [`agent.${vendor}`, `${vendor}.model`, `${vendor}.lightModel`, `tiers.${vendor}.heavy`];
+
   async function choose(el: HTMLSelectElement, value: string) {
     await act(async () => {
       el.value = value;
@@ -164,31 +182,23 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
       expect(card(vendor).querySelector(".llm-vendor-card-ready")?.textContent).toBe(summary);
     });
 
-    it("lists the catalog models for the agent, project and light model, and nothing else", async () => {
+    it("lists the catalog models for every tier, and nothing else", async () => {
       stubApi({ config: config(vendor) });
       await mount();
       const models = (catalog()[vendor] as { models: string[] }).models;
 
-      const agent = select(`agent.${vendor}`)!;
-      expect(optionValues(agent)).toEqual(["", ...models, "__other__"]);
-
-      if (vendor !== "local") {
-        for (const field of ["model", "lightModel"]) {
-          expect(optionValues(select(`${vendor}.${field}`)!)).toEqual(["", ...models, "__other__"]);
-        }
+      for (const id of tierIds(vendor)) {
+        expect(optionValues(select(id)!)).toEqual(["", ...models, "__other__"]);
       }
     });
 
-    it("marks the project default, offers 'Use project default' first and 'Other model…' last", async () => {
-      stubApi({ config: config(vendor) });
+    it("offers the unset choice first, naming the model it resolves to, and 'Other model id…' last", async () => {
+      stubApi({ config: config(vendor, { tiers: tierRows("resolved-model") }) });
       await mount();
-      const { defaultModel, models } = catalog()[vendor] as { defaultModel: string; models: string[] };
 
       const labels = optionLabels(select(`agent.${vendor}`)!);
-      expect(labels[0]).toBe(`Use project default (${defaultModel})`);
-      expect(labels[labels.length - 1]).toBe("Other model…");
-      expect(labels).toContain(`${defaultModel} (project default)`);
-      expect(labels.filter((l) => l?.includes("(project default)"))).toHaveLength(models.includes(defaultModel) ? 1 : 0);
+      expect(labels[0]).toBe("Default (resolved-model)");
+      expect(labels[labels.length - 1]).toBe("Other model id…");
     });
 
     it("saves the agent model as hench.models.<vendor> and clears it with null", async () => {
@@ -203,12 +213,12 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
       expect(api.puts()[0].body).toEqual({ changes: { [`hench.models.${vendor}`]: null } });
     });
 
-    it("saves a free-entry agent model typed under 'Other model…'", async () => {
+    it("saves a free-entry agent model typed under 'Other model id…'", async () => {
       const api = stubApi({ config: config(vendor) });
       await mount();
 
       await choose(select(`agent.${vendor}`)!, "__other__");
-      const input = root.querySelector<HTMLInputElement>(`input[id="agent.${vendor}-other"]`)!;
+      const input = root.querySelector<HTMLInputElement>(".llm-tier-row-agent input[type=text]")!;
       await act(async () => {
         input.value = "my-custom-model";
         input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -259,16 +269,17 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     expect(root.querySelector(".llm-catalog-cli")).toBeNull();
   });
 
-  it("changes what the page offers when the vendor changes, with no stale options and no reload", async () => {
+  it("withholds the tier table for a vendor picked but not saved, with no stale options and no reload", async () => {
     const api = stubApi({ config: config("claude") });
     await mount();
     expect(optionValues(select("agent.claude")!)).toContain("claude-opus-5");
 
     await act(async () => { card("codex").click(); });
 
+    // The server resolved the table for claude; it has none for codex until saved.
     expect(select("agent.claude")).toBeNull();
-    expect(optionValues(select("agent.codex")!)).toEqual(["", "gpt-5.5", "gpt-5.6-sol", "__other__"]);
-    expect(optionValues(select("agent.codex")!)).not.toContain("claude-opus-5");
+    expect(select("agent.codex")).toBeNull();
+    expect(root.querySelector(".llm-tier-pending")?.textContent).toBe("Save the vendor change to choose models for codex.");
     expect(root.querySelectorAll(".llm-connection-cards [role=radio]")).toHaveLength(1);
     expect(connection("cli").getAttribute("aria-checked")).toBe("true");
     expect(api.calls.filter((c) => c.url.includes("/api/llm/catalog"))).toHaveLength(1);
@@ -280,6 +291,94 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     const el = select("claude.model")!;
     expect(el.value).toBe("claude-legacy-1");
     expect(optionValues(el)).toContain("claude-legacy-1");
+  });
+
+  describe("tier table", () => {
+    const rows = () => Array.from(root.querySelectorAll(".llm-tier-row"));
+    const text = (row: Element, sel: string) => row.querySelector(sel)?.textContent;
+
+    it("renders one row per server tier with its used-by labels, in the server's order", async () => {
+      stubApi({ config: config("claude") });
+      await mount();
+
+      expect(rows().map((r) => text(r, ".llm-field-label"))).toEqual(["Agent model", "Standard", "Light", "Heavy"]);
+      expect(text(rows()[1], ".llm-tier-used")).toBe("Used by ndx plan, ndx add");
+      expect(text(rows()[3], ".llm-tier-used")).toBe("Used by tasks set to Heavy in Prepare task");
+      expect(root.querySelector(".llm-tier-section .llm-rw-section-subtitle")?.textContent)
+        .toBe("Commands and tasks pick a tier; you pick the model for each");
+      expect(root.querySelector(".llm-tier-note")?.textContent).toBe(
+        "Agent model overrides Standard for n-dx work only. A --model flag or a task's saved run settings win for that run.");
+    });
+
+    it("shows the Free row only when the server sends it", async () => {
+      stubApi({ config: config("claude") });
+      await mount();
+      expect(root.querySelector(".llm-tier-row-free")).toBeNull();
+
+      act(() => { render(null, root); });
+      stubApi({ config: config("claude", {
+        tiers: [...tierRows(), { tier: "free", model: "claude-haiku-4-5", source: "llm.tiers.claude.free", usedBy: [] }],
+      }) });
+      await mount();
+      expect(text(root.querySelector(".llm-tier-row-free")!, ".llm-field-label")).toBe("Free");
+      expect(select("tiers.claude.free")!.value).toBe("claude-haiku-4-5");
+    });
+
+    it("tells unset rows from set ones: dashed select and 'Runs as', solid select and 'Set in'", async () => {
+      stubApi({ config: config("claude", {
+        agentModels: { claude: "claude-opus-5" },
+        tiers: tierRows().map((r) => r.tier === "agent"
+          ? { ...r, model: "claude-opus-5", source: "hench.models.claude" } : r),
+      }) });
+      await mount();
+
+      const [agent, standard] = rows();
+      expect(agent.querySelector("select")!.classList.contains("llm-select-set")).toBe(true);
+      expect(text(agent, ".llm-tier-source")).toBe("Set in hench.models.claude");
+      expect(standard.querySelector("select")!.classList.contains("llm-select-unset")).toBe(true);
+      expect(text(standard, ".llm-tier-source")).toBe("Runs as claude-sonnet-5");
+    });
+
+    it("saves Heavy as llm.tiers.<vendor>.heavy and clears it by removing the key", async () => {
+      const api = stubApi({ config: config("claude") });
+      await mount();
+
+      await choose(select("tiers.claude.heavy")!, "claude-opus-5");
+      expect(text(root.querySelector(".llm-tier-row-heavy")!, ".llm-tier-source")).toBe("Set in llm.tiers.claude.heavy");
+      await save();
+      expect(api.puts()[0].body).toEqual({ changes: { "llm.tiers.claude.heavy": "claude-opus-5" } });
+
+      act(() => { render(null, root); });
+      const cleared = stubApi({ config: config("claude", {
+        tiers: tierRows().map((r) => r.tier === "heavy"
+          ? { ...r, model: "claude-opus-5", source: "llm.tiers.claude.heavy" } : r),
+      }) });
+      await mount();
+      expect(select("tiers.claude.heavy")!.value).toBe("claude-opus-5");
+
+      await choose(select("tiers.claude.heavy")!, "");
+      await save();
+      expect(cleared.puts()[0].body).toEqual({ changes: { "llm.tiers.claude.heavy": null } });
+    });
+
+    it("saves Standard and Light as llm.<vendor>.model and .lightModel", async () => {
+      const api = stubApi({ config: config("codex", { effective: { vendor: "codex", provider: "cli", model: "gpt-5.5", modelSource: "default" } }) });
+      await mount();
+
+      await choose(select("codex.model")!, "gpt-5.5");
+      await choose(select("codex.lightModel")!, "gpt-5.6-sol");
+      await save();
+      expect(api.puts()[0].body).toEqual({ changes: { "llm.codex.model": "gpt-5.5", "llm.codex.lightModel": "gpt-5.6-sol" } });
+    });
+
+    it("lists the local server's live models for the Local vendor", async () => {
+      stubApi({
+        config: config("local"),
+        catalog: catalog({ local: { models: [], providers: ["api"], defaultModel: "", reachable: true } }),
+      });
+      await mount();
+      expect(optionValues(select("local.model")!)).toEqual(["", "qwen3-coder-30b", "__other__"]);
+    });
   });
 
   it("uses no model list of its own: the viewer source names no model id", () => {
