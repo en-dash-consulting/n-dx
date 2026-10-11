@@ -18,6 +18,7 @@ acceptanceCriteria:
   - "A v2 tree written by #612, with Inbox changes at the changes root, still reads; the next write through the transaction moves them into changes/inbox/ (test)"
   - "The bundle export/import (PR 15) round-trips a tree with an Inbox folder (test)"
 description: "Decided 2026-10-07 (Sterling H, recorded on fdddee24 via #606) and confirmed 2026-10-09 (Ryan): the Inbox is a reserved folder, not a view. An unplaced change lives at `changes/inbox/<slug>/index.md` with `needsPlacement: true` in that folder's `state.yaml`, and placement later moves it out. The rejected alternative was \"Inbox = anything with needsPlacement, written at the changes root\".\n\nPR 17 (#612) shipped that rejected alternative, because the 10-07 note was on a branch until #606 merged. Ryan chose to merge the #610/#612 stack as is and land this before 0.9.0, which freezes the v2 layout. No v2 trees exist outside fixtures yet, so nothing needs migrating beyond the read-tolerance criterion.\n\nLane: store (prd-model-reader.ts, prd-model-writer.ts, folder layout constants) plus core/change-add.ts and core/change-place.ts, and tests. Coordinate with Sterling (the decision's author) and with PR 15's bundle format."
-lastModified: "2026-10-09T16:37:03.775Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-11T21:01:40.896Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
