@@ -3,8 +3,8 @@
  * model each tier resolves to, which config key supplied it, and which
  * commands run on it.
  *
- * Models come from llm-client's `resolveTaskModel` — probed with a catch-all
- * route to each tier — and the tier → commands grouping from `DEFAULT_ROUTES`
+ * Models come from llm-client's `resolveTaskModel` — with `agent.execute`'s
+ * route forced to each tier — and the tier → commands grouping from `DEFAULT_ROUTES`
  * overlaid with the project's `llm.routes`, resolved through that same
  * function. Nothing here re-implements routing, so the table cannot disagree
  * with what a run uses. The page renders it and applies no rules of its own.
@@ -18,7 +18,8 @@ import type { EffectiveAgentConfig } from "./effective-agent-config.js";
 export type TierName = "agent" | TaskTier;
 
 export interface TierUse {
-  taskClass: string;
+  /** Absent for a user that is not a task class, such as Prepare task's Heavy setting. */
+  taskClass?: string;
   label: string;
 }
 
@@ -65,7 +66,6 @@ export const TASK_CLASS_LABELS: Record<string, string> = {
 
 /** Heavy has a user — a per-task setting that no task class names. */
 const PREPARE_TASK_HEAVY: TierUse = {
-  taskClass: "prepare-task",
   label: "tasks set to Heavy in Prepare task",
 };
 
@@ -84,9 +84,14 @@ function resolveTier(
   vendor: LLMVendor,
   config: LLMConfig,
 ): { model: string; source: string } {
-  // A route on a class nothing else uses picks the tier without disturbing
-  // the config's own `llm.routes`.
-  const probe = resolveTaskModel("tier.probe", { ...config, routes: { "*": tier } }, { vendor });
+  // Force one registered class's route to the tier and leave the other routes
+  // alone, as hench's `modelForTier` does, so `llm.tiers` overrides and vendor
+  // normalisation apply exactly as in a run.
+  const probe = resolveTaskModel(
+    "agent.execute",
+    { ...config, routes: { ...config.routes, "agent.execute": tier } },
+    { vendor },
+  );
   return { model: probe.model, source: describeSource(probe.source) };
 }
 
