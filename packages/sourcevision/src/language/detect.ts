@@ -122,12 +122,22 @@ async function hasJavaMarker(rootDir: string): Promise<boolean> {
   return false;
 }
 
-/** Directories never searched for `.tf` files. */
+/** Directories never searched for Terraform files. */
 const TERRAFORM_SCAN_SKIP = new Set(["node_modules", "vendor", "venv", "site-packages"]);
 
+/** Files `inventory.ts` maps to Terraform; detection must accept the same set. */
+function isTerraformFile(name: string): boolean {
+  return (
+    name.endsWith(".tf") ||
+    name.endsWith(".tfvars") ||
+    name === "terragrunt.hcl" ||
+    name.endsWith(".tftest.hcl")
+  );
+}
+
 /**
- * Terraform marker present? Any `.tf` file within three directory levels of
- * the root. Hidden directories (including `.terraform/`) are not searched.
+ * Terraform marker present? Any `.tf`, `.tfvars`, `terragrunt.hcl` or
+ * `.tftest.hcl` file within three directory levels of the root. Hidden directories (including `.terraform/`) are not searched.
  * `detectLanguage` consults it only when no other marker matched;
  * `detectLanguages` adds Terraform whenever it is present.
  */
@@ -138,7 +148,7 @@ async function hasTerraformMarker(dir: string, depth = 0): Promise<boolean> {
   } catch {
     return false;
   }
-  if (entries.some((e) => e.isFile() && e.name.endsWith(".tf"))) return true;
+  if (entries.some((e) => e.isFile() && isTerraformFile(e.name))) return true;
   if (depth >= 3) return false;
   for (const e of entries) {
     if (!e.isDirectory() || e.name.startsWith(".") || TERRAFORM_SCAN_SKIP.has(e.name)) continue;
