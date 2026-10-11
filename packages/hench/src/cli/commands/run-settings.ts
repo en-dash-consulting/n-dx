@@ -17,8 +17,13 @@ import {
 } from "../../prd/llm-gateway.js";
 import { validateRunSettings } from "../../prd/rex-gateway.js";
 import type { PRDItem, RunSettings } from "../../prd/rex-gateway.js";
-import type { HenchConfig, PermissionMode } from "../../schema/index.js";
-import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
+import type { HenchConfig, PermissionMode, ReviewMode, ReviewerVendor } from "../../schema/index.js";
+import {
+  DEFAULT_REVIEW_MODE,
+  DEFAULT_REVIEW_ROUNDS,
+  PERMISSION_MODES,
+  isPermissionMode,
+} from "../../schema/index.js";
 import { reviewModelSource } from "../../agent/analysis/adversarial-review.js";
 import { CLIError } from "../errors.js";
 import { checkAgentModel } from "./agent-model.js";
@@ -296,6 +301,45 @@ export function reviewProviderError(vendor: LLMVendor, provider: HenchProvider):
   );
 }
 
+/** The CLI vendor that is not `vendor`, or null when `vendor` has no CLI counterpart. */
+function otherReviewVendor(vendor: LLMVendor): ReviewerVendor | null {
+  if (vendor === LLM_VENDOR.CLAUDE) return "codex";
+  if (vendor === LLM_VENDOR.CODEX) return "claude";
+  return null;
+}
+
+/**
+ * Pair review needs a reviewer that is a CLI vendor other than the executor, on
+ * the CLI provider. Anything else is refused: a reviewer that is the executor
+ * is self review under another name, and `google`/`local` have no CLI to spawn.
+ */
+export function pairReviewerError(
+  vendor: LLMVendor,
+  reviewer: ReviewerVendor | null,
+  provider: HenchProvider,
+): CLIError | undefined {
+  const other = otherReviewVendor(vendor);
+  if (other === null) {
+    return new CLIError(
+      `hench.review.mode "pair" needs an executor that is claude or codex, but this project's vendor is "${vendor}".`,
+      "Use 'ndx config hench.review.mode self' or 'off', or switch the vendor with 'ndx config llm.vendor claude'.",
+    );
+  }
+  if (reviewer === null || reviewer === vendor) {
+    return new CLIError(
+      `hench.review.vendor is "${reviewer ?? "unset"}", the same vendor as the executor ("${vendor}"): that is self review, not pair review.`,
+      `Set a different reviewer with 'ndx config hench.review.vendor ${other}', or use 'hench.review.mode self'.`,
+    );
+  }
+  if (provider === "api") {
+    return new CLIError(
+      'hench.review.mode "pair" requires the CLI provider, but this run resolved to provider="api".',
+      "Switch with 'ndx config hench.provider cli', or set 'hench.review.mode off'.",
+    );
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Per-task run settings
 // ---------------------------------------------------------------------------
@@ -405,7 +449,11 @@ export type SettingWarningCode =
   /** `review` cannot run on the provider this task resolved to. */
   | "saved-review-unsupported"
   /** `permissionMode` is a Claude-only setting on another vendor. */
-  | "saved-permission-mode-dropped";
+  | "saved-permission-mode-dropped"
+  /** `hench.review.mode` asked for pair review, which is not built yet. */
+  | "pair-review-unavailable"
+  /** `hench.review.mode: "self"` cannot run on the provider this task resolved to. */
+  | "configured-review-unsupported";
 
 export interface SettingWarning {
   code: SettingWarningCode;
@@ -431,6 +479,18 @@ export interface TaskRunSettings {
     dropped?: PermissionMode;
   };
   review: Resolved<boolean>;
+  /**
+   * The review mode in force: `--review` is `self`, `--no-review` is `off`, a
+   * task's saved `run.review` is `self` or `off`, and otherwise `hench.review.mode`.
+   * `review.value` is whether a review runs *today*; `pair` runs none yet.
+   */
+  reviewMode: Resolved<ReviewMode>;
+  /** The pair reviewer: `hench.review.vendor`, else the executor's other CLI vendor. Null when there is none. */
+  reviewVendor: Resolved<ReviewerVendor | null>;
+  /** `hench.review.rounds`: fix rounds the executor gets in pair mode. */
+  reviewRounds: Resolved<number>;
+  /** Set when `reviewMode` is `pair` and the reviewer cannot be this vendor's; a run refuses on it. */
+  reviewPairError?: CLIError;
   /** Always the reviewer a review would use; `review.value` says whether one runs. */
   reviewModel: Resolved<string> & { vendorDefault: string };
   reviewOptional: Resolved<boolean>;
@@ -653,28 +713,57 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // merely *saved* `review: true` is asking for an addition, not stating a
   // precondition — dropping it with a warning beats ending the loop. The
   // caller refuses the flag case; this only decides the saved one.
-  const savedReviewUnsupported =
-    !reviewOpts.reviewPass
-    && !reviewOpts.noReview
-    && saved?.review === true
+  // Mode precedence: flag > the task's saved `run.review` > `hench.review.mode`.
+  // `--review` and a saved `review: true` both mean self review; a saved `false`
+  // beats a project that reviews, which is what lets a task opt out.
+  const configuredMode = config.review?.mode;
+  let reviewMode: Resolved<ReviewMode>;
+  if (reviewOpts.reviewPass) reviewMode = { value: "self", source: "cli-flag" };
+  else if (reviewOpts.noReview) reviewMode = { value: "off", source: "cli-flag" };
+  else if (saved?.review !== undefined) reviewMode = { value: saved.review ? "self" : "off", source: "task.run" };
+  else if (configuredMode !== undefined) reviewMode = { value: configuredMode, source: "hench.review.mode" };
+  else reviewMode = { value: DEFAULT_REVIEW_MODE, source: "built-in" };
+
+  // Only a flag states a precondition. A saved or configured self review is an
+  // addition, so on the API provider it is dropped with a warning rather than
+  // stopping a loop; the caller refuses the flag case.
+  const selfReviewUnsupported =
+    reviewMode.value === "self"
+    && reviewMode.source !== "cli-flag"
     && reviewProviderError(vendor, resolvedProvider.provider) !== undefined;
-  if (savedReviewUnsupported) {
+  if (selfReviewUnsupported) {
+    const configured = reviewMode.source === "hench.review.mode";
+    const origin = configured ? "set by hench.review.mode" : `saved on "${item?.title}"`;
     warnings.push({
-      code: "saved-review-unsupported",
+      code: configured ? "configured-review-unsupported" : "saved-review-unsupported",
       message:
-        `The review pass saved on "${item?.title}" needs the CLI provider, but this task ` +
+        `The review pass ${origin} needs the CLI provider, but this task ` +
         `resolved to provider="${resolvedProvider.provider}" — running it without a review.`,
     });
   }
-  const review: Resolved<boolean> = reviewOpts.reviewPass
-    ? { value: true, source: "cli-flag" }
-    : reviewOpts.noReview
-      ? { value: false, source: "cli-flag" }
-      : savedReviewUnsupported
-        ? { value: false, source: "vendor-unsupported" }
-        : saved?.review !== undefined
-          ? { value: saved.review, source: "task.run" }
-          : { value: false, source: "built-in" };
+  // Until pair review exists, pair runs no review. Never fall back to self
+  // review: the operator chose a different vendor precisely so the executor
+  // does not mark its own work.
+  if (reviewMode.value === "pair") {
+    warnings.push({
+      code: "pair-review-unavailable",
+      message: 'hench.review.mode is "pair", but pair review is not available yet — running this task without a review.',
+    });
+  }
+  const review: Resolved<boolean> = selfReviewUnsupported
+    ? { value: false, source: "vendor-unsupported" }
+    : { value: reviewMode.value === "self", source: reviewMode.source };
+
+  const reviewVendor: Resolved<ReviewerVendor | null> =
+    config.review?.vendor !== undefined
+      ? { value: config.review.vendor, source: "hench.review.vendor" }
+      : { value: otherReviewVendor(vendor), source: "built-in" };
+  const reviewRounds: Resolved<number> =
+    config.review?.rounds !== undefined
+      ? { value: config.review.rounds, source: "hench.review.rounds" }
+      : { value: DEFAULT_REVIEW_ROUNDS, source: "built-in" };
+  const reviewPairError =
+    reviewMode.value === "pair" ? pairReviewerError(vendor, reviewVendor.value, resolvedProvider.provider) : undefined;
   const vendorDefault = REVIEW_MODELS[vendor] ?? "";
   const savedReviewModel = saved?.reviewModels?.[vendor]?.trim();
   const savedReviewTierModel = saved?.reviewTier
@@ -724,6 +813,10 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
               : permission.origin,
     },
     review,
+    reviewMode,
+    reviewVendor,
+    reviewRounds,
+    ...(reviewPairError ? { reviewPairError } : {}),
     reviewModel,
     // `--no-review` carries the saved companion settings with it: there is no
     // reviewer left for them to relax.

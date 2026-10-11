@@ -1,5 +1,5 @@
 import { z, ZodError } from "zod";
-import { DEFAULT_HENCH_CONFIG, DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MIN_PRUNE_PAIRS } from "./v1.js";
+import { DEFAULT_HENCH_CONFIG, DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MAX_REVIEW_ROUNDS, MIN_PRUNE_PAIRS, MIN_REVIEW_ROUNDS } from "./v1.js";
 import type { HenchConfig } from "./v1.js";
 
 export type ValidationResult<T> =
@@ -185,6 +185,15 @@ export const HenchConfigSchema = z.object({
     .object({
       command: z.string().optional(),
       rerunCommand: z.string().optional(),
+    })
+    .optional(),
+  // No defaults, like testGate: the run-settings resolver applies them so
+  // `--resolve` can say which settings the project actually set.
+  review: z
+    .object({
+      mode: z.enum(["off", "self", "pair"]).optional(),
+      vendor: z.enum(["claude", "codex"]).optional(),
+      rounds: z.number().int().min(MIN_REVIEW_ROUNDS).max(MAX_REVIEW_ROUNDS).optional(),
     })
     .optional(),
   promptCache: z.boolean().optional(),

@@ -1017,8 +1017,42 @@ function getValidator(pkg, settingPath) {
     if (settingPath.startsWith("timeouts.")) return validateTimeoutMs;
   }
   if (pkg === "selfHeal") return SELF_HEAL_VALIDATORS[settingPath] ?? null;
+  if (pkg === "hench") return HENCH_VALIDATORS[settingPath] ?? null;
   return null;
 }
+
+const REVIEW_MODES = ["off", "self", "pair"];
+/** CLI vendors that can review in pair mode. Mirrors hench's `ReviewerVendor`. */
+const REVIEWER_VENDORS = ["claude", "codex"];
+/** Mirrors hench's `MIN_REVIEW_ROUNDS` / `MAX_REVIEW_ROUNDS`; core imports no package. */
+const MIN_REVIEW_ROUNDS = 1;
+const MAX_REVIEW_ROUNDS = 3;
+
+/**
+ * Validators for hench.* keys written to `.hench/config.json`. hench refuses to
+ * start on a file its own schema rejects, so a value that schema would refuse
+ * is stopped here, with a message, rather than at the next `ndx work`. Only the
+ * keys that need more than their type are listed.
+ */
+const HENCH_VALIDATORS = {
+  "review.mode": (value) => {
+    if (!REVIEW_MODES.includes(value)) {
+      throw new Error(`Invalid review mode "${value}". Expected one of: ${REVIEW_MODES.join(", ")}.`);
+    }
+  },
+  "review.vendor": (value) => {
+    if (!REVIEWER_VENDORS.includes(value)) {
+      throw new Error(`Invalid reviewer "${value}". Expected one of: ${REVIEWER_VENDORS.join(", ")}.`);
+    }
+  },
+  "review.rounds": (value) => {
+    if (!Number.isInteger(value) || value < MIN_REVIEW_ROUNDS || value > MAX_REVIEW_ROUNDS) {
+      throw new Error(
+        `Invalid review rounds "${value}". Expected a whole number from ${MIN_REVIEW_ROUNDS} to ${MAX_REVIEW_ROUNDS}.`,
+      );
+    }
+  },
+};
 
 /**
  * Validators for specific claude config keys.
@@ -1935,6 +1969,20 @@ Hench git-safety settings (pre-run commit gate):
                                            attended path — the gate prompts, and so proposes
                                            a subject, solely in an interactive TTY session.
 
+Hench review settings (the review pass after a task validates):
+  hench.review.mode        string    "off" (default), "self" or "pair". "self" is --review: the
+                                     executor's own vendor re-reads its work. "pair" has the other
+                                     vendor review and the executor fix the must-fix findings; it
+                                     is not available yet, and until it is, runs no review and
+                                     says so. --review / --no-review and a task's saved review
+                                     setting still win. Review needs hench.provider "cli".
+  hench.review.vendor      string    Reviewer for pair mode: "claude" or "codex". Unset means the
+                                     other one of the two; it must differ from the executor.
+  hench.review.rounds      number    Times the executor may fix must-fix findings in pair mode,
+                                     1-3 (default: 2)
+                                     The reviewer's model stays llm.<vendor>.reviewModel, then
+                                     llm.reviewModel, then the vendor default.
+
 Hench guard settings (security boundaries):
   hench.guard.blockedPaths       string[]  Glob patterns for blocked file paths
                                            (default: .hench/**, .rex/**, .git/**, node_modules/**)
@@ -2455,15 +2503,47 @@ async function loadAllConfigs(dir) {
  * Config I/O and foundation loading stay in the spawn-exempt config module.
  * @param {string} dir
  * @param {"claude" | "codex"} vendor
+ * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions }} [options]
+ *   `trust` relocates the repository-trust store (e.g. `{ ndxHome }`); callers
+ *   that omit it use the user's real store.
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
-export async function loadVendorCliEnv(dir, vendor) {
+export async function loadVendorCliEnv(dir, vendor, options = {}) {
   const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
   const { configs } = await loadAllConfigs(dir);
   const projectConfig = await loadEffectiveProjectConfig(dir);
   const envPolicy = configs.hench?.guard?.env ?? projectConfig.hench?.guard?.env;
   const llmConfig = await loadLLMConfig(dir);
-  return resolveVendorCliEnv({ ...llmConfig, vendor }, envPolicy);
+  return resolveVendorCliEnv({ ...llmConfig, vendor }, await applyRepoTrustToEnvPolicy(dir, envPolicy, options.trust));
+}
+
+/** Directories already warned about, so a loop of reviews warns once. */
+const warnedUntrustedEnvAllow = new Set();
+
+/**
+ * Drop repository-supplied `guard.env.allow` entries unless the user trusts
+ * this checkout. `deny` is kept: it only narrows. "Not trusted" is
+ * `evaluateRepoTrust(...).restricted` (untrusted or changed), which is also
+ * the state of any checkout with an unaccepted `env-allow-added` finding.
+ * Loaded dynamically: config.js may not import packages statically.
+ */
+async function applyRepoTrustToEnvPolicy(dir, envPolicy, trust) {
+  if (!envPolicy?.allow?.length) return envPolicy;
+  const { evaluateRepoTrust } = await import("@n-dx/llm-client");
+  const evaluation = evaluateRepoTrust(dir, trust);
+  if (!evaluation.restricted) return envPolicy;
+  if (!warnedUntrustedEnvAllow.has(dir)) {
+    warnedUntrustedEnvAllow.add(dir);
+    const finding = evaluation.findings.find((f) => f.code === "env-allow-added");
+    console.warn(
+      `Ignoring repository guard.env.allow (${envPolicy.allow.join(", ")}) for the reviewer CLI: ` +
+      `this checkout is ${evaluation.state}` +
+      (finding ? ` (finding: ${finding.code})` : "") +
+      ". Run 'ndx trust accept .' to apply it.",
+    );
+  }
+  const { allow: _ignored, ...rest } = envPolicy;
+  return rest;
 }
 
 // ── Test connection handler ──────────────────────────────────────────────────
@@ -2867,6 +2947,7 @@ async function handleSetPackageConfig(
   valueArg,
   configs,
   rawConfigs,
+  flags,
 ) {
   if (!PACKAGES[pkg]) {
     console.error(
@@ -2917,6 +2998,19 @@ async function handleSetPackageConfig(
   } catch (err) {
     console.error(`Invalid value for "${keyArg}": ${err.message}`);
     process.exit(1);
+  }
+
+  if (flags.force !== "true") {
+    const validator = getValidator(pkg, settingPath);
+    if (validator) {
+      try {
+        await validator(coerced);
+      } catch (err) {
+        console.error(`Invalid value for "${keyArg}": ${err.message}`);
+        console.error("  Use --force to set this value anyway.");
+        process.exit(1);
+      }
+    }
   }
 
   // Write to raw (un-merged) config so project overrides don't leak
@@ -3150,6 +3244,7 @@ export async function runConfig(args) {
         valueArg,
         configs,
         rawConfigs,
+        flags,
       );
     }
     return;

@@ -122,6 +122,11 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
   { path: "testGate.rerunCommand", label: "Test Gate Re-run Template", description: "Unattended runs re-run only the failed suites once; {suites} becomes their comma-joined labels", type: "string", category: "test-gate" },
   { path: "fullTestTimeoutMs", label: "Full Test Timeout (ms)", description: "How long the test gate may run before it is killed. 0 means no limit", type: "number", integer: true, category: "test-gate", defaultValue: 900000 },
 
+  // ── Review ──
+  { path: "review.mode", label: "Review Mode", description: "Review pass after a task validates: off, self (the executor re-reads its own work) or pair (a different vendor reviews). Pair review is not available yet and runs no review", type: "enum", enumValues: ["off", "self", "pair"], category: "review" },
+  { path: "review.vendor", label: "Pair Reviewer", description: "Vendor that reviews in pair mode. Unset means the other one of claude and codex", type: "enum", enumValues: ["claude", "codex"], category: "review" },
+  { path: "review.rounds", label: "Pair Fix Rounds", description: "How many times the executor may fix must-fix findings in pair mode (1-3, default 2)", type: "number", integer: true, min: 1, max: 3, category: "review" },
+
   // ── Git safety ──
   { path: "rollbackOnFailure", label: "Rollback on Failure", description: "Revert uncommitted changes when a run fails", type: "boolean", category: "git" },
   { path: "autoCommit", label: "Auto Commit", description: "Let the agent commit itself at the end of a run", type: "boolean", category: "git", defaultValue: false },

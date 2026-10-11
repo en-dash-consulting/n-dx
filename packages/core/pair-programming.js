@@ -287,34 +287,35 @@ export function resolveReviewerVendor(primaryVendor) {
 
 /**
  * Resolve the CLI binary path for a given vendor.
- * Reads from .n-dx.json (llm.<vendor>.cli_path) and falls back to
- * the bare vendor name (resolved by PATH lookup).
+ * Reads llm.<vendor>.cli_path from .n-dx.local.json (where every cli_path is
+ * written), then .n-dx.json, and falls back to the bare vendor name
+ * (resolved by PATH lookup).
  *
  * @param {string} dir  Project root directory.
  * @param {"claude" | "codex"} vendor
  * @returns {string}  CLI binary path or name.
  */
 export function resolveVendorCliPath(dir, vendor) {
-  const configPath = resolveLayout(dir).configFile;
-  try {
-    if (existsSync(configPath)) {
-      const data = JSON.parse(readFileSync(configPath, "utf-8"));
-      const configured = data?.llm?.[vendor]?.cli_path;
-      if (typeof configured === "string" && configured.trim().length > 0) {
-        return configured.trim();
-      }
-      // Legacy claude.cli_path key
-      if (vendor === REVIEWER_VENDOR.CLAUDE) {
-        const legacy = data?.claude?.cli_path;
-        if (typeof legacy === "string" && legacy.trim().length > 0) {
-          return legacy.trim();
-        }
-      }
-    }
-  } catch {
-    /* ignore — fall through to default */
+  const layout = resolveLayout(dir);
+  for (const configPath of [layout.localConfigFile, layout.configFile]) {
+    const found = readCliPath(configPath, vendor);
+    if (found) return found;
   }
   return vendor; // "claude" or "codex" — resolved via PATH
+}
+
+/** The trimmed `cli_path` for `vendor` in one config file, or undefined. */
+function readCliPath(configPath, vendor) {
+  try {
+    if (!existsSync(configPath)) return undefined;
+    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    const candidates = [data?.llm?.[vendor]?.cli_path];
+    // Legacy claude.cli_path key
+    if (vendor === REVIEWER_VENDOR.CLAUDE) candidates.push(data?.claude?.cli_path);
+    return candidates.find((c) => typeof c === "string" && c.trim().length > 0)?.trim();
+  } catch {
+    return undefined; // unreadable config — fall through to the next source
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -539,11 +540,12 @@ const doNotTrack = (child) => child;
  *   dir: string;
  *   reviewer?: "claude" | "codex";
  *   timeout?: number;
+ *   trust?: import("@n-dx/llm-client").RepoTrustStoreOptions;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
  */
-export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
-  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE);
+export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack, trust }) {
+  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE, { trust });
   return new Promise((resolve) => {
     let child;
     try {
@@ -606,11 +608,12 @@ export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout =
  *   dir: string;
  *   reviewer?: "claude" | "codex";
  *   timeout?: number;
+ *   trust?: import("@n-dx/llm-client").RepoTrustStoreOptions;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
  */
-export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
-  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE);
+export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack, trust }) {
+  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE, { trust });
   return new Promise((resolve) => {
     let child;
     try {
