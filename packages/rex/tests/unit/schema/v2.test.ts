@@ -460,9 +460,14 @@ describe("isolation", () => {
     // and `rex prune`: the change-layer store, the layer projection, and the
     // product-layer reshape draft (cli/commands/reshape-product.ts), and
     // `rex tree-diff`, which loads either layout (core/tree-source.ts) and
-    // diffs the product layer (core/map-diff.ts).
+    // diffs the product layer (core/map-diff.ts). `public.ts` re-exports the
+    // reader, the node and tree types, the index and the derived product
+    // computations: consumers of the product layer (the dashboard's Product
+    // and Changes views, the Graview projection) read them through the public
+    // surface rather than a dist/* path.
     const v2Files = new Set(
       [
+        "public.ts",
         "schema/v2.ts",
         "schema/v2-rules.ts",
         "store/state-writer.ts",
