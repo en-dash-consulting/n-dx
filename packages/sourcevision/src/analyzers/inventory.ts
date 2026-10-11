@@ -13,6 +13,7 @@ import { toPosix } from "../util/paths.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { typescriptConfig } from "../language/typescript.js";
 import { csharpConfig } from "../language/csharp.js";
+import { terraformConfig } from "../language/terraform.js";
 import type { LanguageConfig } from "../language/registry.js";
 
 // ── Skip patterns ────────────────────────────────────────────────────────────
@@ -276,15 +277,18 @@ export function classifyRole(filePath: string, language: string, langConfig?: La
 
   const config = langConfig ?? typescriptConfig;
 
-  // 0. Terraform (.tf, .tfvars, terragrunt.hcl, .tftest.hcl) is config until the
-  //    Terraform structure model lands. Zones, classification and enrichment
-  //    read source and test files, so a Terraform folder in a TypeScript or Go
-  //    repo leaves their output unchanged.
-  if (language === "Terraform") {
-    return "config";
-  }
-
   // 1. Test — language-specific patterns (e.g. _test.go for Go, .test./.spec. for TS)
+  // 1a. Terraform (.tf, .tfvars, terragrunt.hcl, .tftest.hcl) is config until the
+  //     Terraform structure model lands, unless another language's test pattern
+  //     matches it (tests/fixtures/infra/main.tf in a TS repo), so it stays in
+  //     test quarantine as it was before Terraform was recognised. Terraform's
+  //     own .tftest.hcl pattern alone does not make a file a test.
+  if (language === "Terraform") {
+    const isTest = config.testFilePatterns.some(
+      (pat) => !terraformConfig.testFilePatterns.includes(pat) && pat.test(filePath),
+    );
+    return isTest ? "test" : "config";
+  }
   if (config.testFilePatterns.some((pat) => pat.test(filePath))) {
     return "test";
   }

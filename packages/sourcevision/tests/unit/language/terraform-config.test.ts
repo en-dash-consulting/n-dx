@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { toCanonicalJSON } from "@n-dx/llm-client";
-import { detectLanguage, detectLanguages, getLanguageConfig } from "../../../src/language/detect.js";
+import { detectLanguage, detectLanguages, getLanguageConfig, mergeLanguageConfigs } from "../../../src/language/detect.js";
 import { terraformConfig } from "../../../src/language/terraform.js";
 import { javaConfig, javaSecondaryConfig } from "../../../src/language/java.js";
 import { typescriptConfig } from "../../../src/language/typescript.js";
@@ -96,11 +96,33 @@ describe("terraform language config", () => {
 
   describe("inventory roles", () => {
     const role = (p: string): string => classifyRole(p, "Terraform", terraformConfig);
+    // A TypeScript repo containing Terraform: what inventory receives in practice.
+    const tsWithTerraform = mergeLanguageConfigs([typescriptConfig, terraformConfig]);
+    const tsRole = (p: string): string => classifyRole(p, "Terraform", tsWithTerraform);
 
-    it("classifies every Terraform file as config until the structure model lands", () => {
-      expect(role("infra/main.tf")).toBe("config");
-      expect(role("infra/prod.tfvars")).toBe("config");
-      expect(role("live/prod/terragrunt.hcl")).toBe("config");
+    it("classifies Terraform outside a test path as config until the structure model lands", () => {
+      for (const r of [role, tsRole]) {
+        expect(r("infra/main.tf")).toBe("config");
+        expect(r("infra/prod.tfvars")).toBe("config");
+        expect(r("live/prod/terragrunt.hcl")).toBe("config");
+      }
+    });
+
+    it("keeps Terraform under a TypeScript test path in test quarantine", () => {
+      expect(tsRole("tests/fixtures/infra/main.tf")).toBe("test");
+      expect(tsRole("tests/fixtures/infra/prod.tfvars")).toBe("test");
+      expect(tsRole("src/__tests__/terragrunt.hcl")).toBe("test");
+      expect(tsRole("infra/tests/basic.tftest.hcl")).toBe("test");
+    });
+
+    it("does not make a file a test by Terraform's own .tftest.hcl pattern", () => {
+      expect(role("basic.tftest.hcl")).toBe("config");
+      expect(tsRole("basic.tftest.hcl")).toBe("config");
+      expect(tsRole("infra/basic.tftest.hcl")).toBe("config");
+    });
+
+    it("has no test path of its own in a Terraform-primary repo", () => {
+      expect(role("tests/fixtures/infra/main.tf")).toBe("config");
       expect(role("infra/tests/basic.tftest.hcl")).toBe("config");
     });
 
