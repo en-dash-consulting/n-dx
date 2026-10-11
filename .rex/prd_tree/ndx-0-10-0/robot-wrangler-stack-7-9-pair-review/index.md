@@ -22,4 +22,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Have the other vendor review the diff and write the findings report when the review pass runs in pair mode](./have-the-other-vendor-review-the-diff.md) | pending |
-| [Make ndx pair-programming use the configured reviewer vendor, reviewer model and fix rounds](./make-ndx-pair-programming-use-the.md) | pending |
+| [Make ndx pair-programming use the configured reviewer vendor, reviewer model and fix rounds](./make-ndx-pair-programming-use-the.md) | completed |
