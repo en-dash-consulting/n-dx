@@ -160,6 +160,11 @@ describe("sqlcPaths", () => {
     expect(sqlcPaths("db/sqlc.yaml", "queries:\n  - # none yet\n  - q.sql\n", "queries")).toEqual(["db/q.sql"]);
   });
 
+  it("continues a block list past a comment-only or blank line", () => {
+    expect(sqlcPaths("sqlc.yaml", "queries:\n  # main\n  - q.sql\n", "queries")).toEqual(["q.sql"]);
+    expect(sqlcPaths("sqlc.yaml", "queries:\n  - a.sql\n\n  # more\n  - b.sql\nengine: x\n", "queries")).toEqual(["a.sql", "b.sql"]);
+  });
+
   it("keeps a # inside quotes or not preceded by whitespace", () => {
     expect(sqlcPaths("sqlc.yaml", 'schema: "a #b.sql"', "schema")).toEqual(["a #b.sql"]);
     expect(sqlcPaths("sqlc.yaml", "schema: a#b.sql", "schema")).toEqual(["a#b.sql"]);
