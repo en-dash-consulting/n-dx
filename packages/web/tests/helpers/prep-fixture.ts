@@ -27,6 +27,7 @@ export function prepFixture(overrides: Partial<PrepResponse> = {}): PrepResponse
     // entries a `fallback` as hench does.
     saved: null,
     savedVersion: "none",
+    pairSupported: true,
     options: [{ key: "provider", values: ["cli", "api"] }],
     refusals: [],
     dir: "/repo",

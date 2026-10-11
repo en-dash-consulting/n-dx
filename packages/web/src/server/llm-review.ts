@@ -24,6 +24,13 @@ const MAX_REVIEW_ROUNDS = 3;
 const DEFAULT_REVIEW_MODE = "off";
 const DEFAULT_REVIEW_ROUNDS = 2;
 
+/**
+ * Whether this build has pair review. A constant: web does not depend on hench,
+ * so there is no hench export to derive it from. Reported by `GET /api/llm/config`
+ * and `GET /api/hench/prep/:taskId`, so the two surfaces cannot disagree.
+ */
+export const PAIR_REVIEW_SUPPORTED = true;
+
 /** Which key supplied a reviewer model; same rungs as hench's `reviewModelSource`. */
 export type ReviewModelSource = "vendor-config" | "shared-config" | "vendor-default";
 
@@ -40,10 +47,9 @@ export interface ReviewInfo {
   unavailableReason?: string;
   /**
    * Whether this build has pair review (a second vendor reviewing, the executor
-   * fixing). A constant: web does not depend on hench, so there is no hench
-   * export to derive it from. Whether it can run now is `available`.
+   * fixing); see {@link PAIR_REVIEW_SUPPORTED}. Whether it can run now is `available`.
    */
-  pairSupported: true;
+  pairSupported: boolean;
 }
 
 function reviewModelFor(vendor: ReviewerVendor, llmConfig: LLMConfig): { model: string; source: ReviewModelSource } {
@@ -87,7 +93,7 @@ export function buildReviewInfo(
     },
     available: reason === undefined,
     ...(reason ? { unavailableReason: reason } : {}),
-    pairSupported: true,
+    pairSupported: PAIR_REVIEW_SUPPORTED,
   };
 }
 

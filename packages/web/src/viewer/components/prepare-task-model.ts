@@ -99,6 +99,12 @@ export interface PrepResponse {
    */
   savedVersion?: string;
   resolved: PrepResolvedSettings;
+  /**
+   * Whether this server can run a pair review. The modal disables the Pair
+   * choice unless it is `true`, so a server that predates the field reads as
+   * "not supported" rather than offering a mode it may refuse.
+   */
+  pairSupported?: boolean;
   options: Array<{ key: string; values?: readonly string[] }>;
   refusals: PrepRefusal[];
   /** Absent from a hench that predates warnings. */
@@ -238,6 +244,23 @@ export function isChanged(edits: PrepEdits, key: RunOptionKey): boolean {
   return edits[key] !== undefined;
 }
 
+/**
+ * Who reviews, as the modal's edits state it. The Review field edits
+ * `reviewMode`; a `review` edit (the older on/off switch) reads as `self`,
+ * which is what `--review` means to hench.
+ */
+export function reviewModeOf(defaults: PrepDefaults, edits: PrepEdits): string {
+  if (edits.reviewMode !== undefined) return edits.reviewMode;
+  if (edits.review !== undefined) return edits.review ? "self" : "off";
+  return defaults.reviewMode;
+}
+
+/** Whether a review would run under these edits. */
+function reviewRuns(defaults: PrepDefaults, edits: PrepEdits): boolean {
+  if (edits.reviewMode !== undefined) return edits.reviewMode !== "off";
+  return effective(defaults, edits, "review") === true;
+}
+
 /** Max turns is an API-provider limit; a CLI run ignores it. */
 export function maxTurnsApplies(defaults: PrepDefaults, edits: PrepEdits): boolean {
   return effective(defaults, edits, "provider") !== "cli";
@@ -268,10 +291,17 @@ const NEGATABLE: ReadonlySet<string> = new Set(
  */
 export function runOptionsOf(defaults: PrepDefaults, edits: PrepEdits): RunOptions {
   const options: Record<string, unknown> = { ...edits };
-  if (effective(defaults, edits, "review") !== true) {
+  if (!reviewRuns(defaults, edits)) {
     delete options.reviewModel;
     delete options.reviewOptional;
-  } else if (options.reviewModel !== undefined) options.review = true;
+  } else if (options.reviewModel !== undefined && options.reviewMode === undefined && options.review === undefined) {
+    // A reviewer model needs the run to say a review happens. Where the config
+    // already chose a mode, repeat it rather than `--review`, which means self.
+    if (defaults.reviewMode !== "off") options.reviewMode = defaults.reviewMode;
+    else options.review = true;
+  }
+  // The reviewer vendor belongs to a pair review; it is not sent for another mode.
+  if (reviewModeOf(defaults, edits) !== "pair") delete options.reviewVendor;
   if (!maxTurnsApplies(defaults, edits)) delete options.maxTurns;
   // Notes cleared by hand: a Save drops them, but there is no "no notes" a
   // run can be told, so an empty context file is not sent.
@@ -353,6 +383,14 @@ export function saveBodyOf(
   for (const spec of RUN_OPTION_SPECS) {
     const key = spec.key;
     if (LAUNCH_ONLY.has(key) || key in MODEL_FIELDS) continue;
+    // `reviewMode` is the finer statement of `review`. An edit to the mode
+    // replaces the older boolean; otherwise the block keeps whichever of the two
+    // it had, rather than a Save inventing a `reviewMode` from a resolved `review`.
+    if (key === "review" && edits.reviewMode !== undefined) continue;
+    if (key === "reviewMode" && edits.reviewMode === undefined) {
+      if (saved["reviewMode"] !== undefined) block[key] = saved["reviewMode"];
+      continue;
+    }
     // `effective` reads the edit, else what is resolved now — which already
     // includes whatever the task had saved, so an untouched saved field is
     // carried forward rather than dropped.
@@ -382,11 +420,13 @@ export function saveBodyOf(
   // A reviewer pinned with no review to run is not a setting, it is a leftover.
   // Judged on whether a review would run — a `review: true` the config
   // supplies is omitted from the block above, and the reviewer still applies.
-  if (effective(defaults, edits, "review") !== true) {
+  if (!reviewRuns(defaults, edits)) {
     delete block["reviewTier"];
     delete block["reviewModels"];
     delete block["reviewOptional"];
   }
+  // Likewise a reviewer vendor with no pair review to serve.
+  if (reviewModeOf(defaults, edits) !== "pair") delete block["reviewVendor"];
   return Object.keys(block).length > 0 ? block : null;
 }
 
