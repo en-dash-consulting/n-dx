@@ -12,6 +12,7 @@
  *
  * GET /api/llm/config   — current LLM provider configuration
  * PUT /api/llm/config   — update LLM provider configuration
+ * POST /api/llm/config/preview — resolve unsaved edits in memory; writes nothing
  * GET /api/llm/catalog  — per-vendor model catalog and provider choices hench accepts
  */
 
@@ -23,24 +24,27 @@ import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { invalidateAuthCheckCache } from "./routes-commands.js";
 import {
   LLM_VENDOR,
-  deepMerge,
   TIER_MODELS,
   MODEL_COSTS,
   isModelCompatibleWithVendor,
   resolveClaudeConfig,
-  loadLLMConfig,
+  parseLLMConfig,
   resolveLayout,
   getNextFailoverAttempt,
 } from "@n-dx/llm-client";
-import type { LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
-import { VENDOR_PROVIDERS, validateProviderForVendor } from "./hench-config-fields.js";
+import type { LLMConfig, LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
+import { VENDOR_PROVIDERS, validateConfigKeyValue, validateProviderForVendor } from "./hench-config-fields.js";
 import {
+  readConfigSnapshot,
+  readEffectiveNdxConfig,
   resolveEffectiveAgentConfig,
+  resolveEffectiveAgentConfigFrom,
   resolveEffectiveAgentModel,
   resolveEffectiveProvider,
   readHenchAgentSettings,
   readHenchReviewSettings,
 } from "./effective-agent-config.js";
+import type { ConfigSnapshot } from "./effective-agent-config.js";
 import { HENCH_REVIEW_PATHS, REVIEW_MODEL_PATH, buildReviewInfo, validateReviewChange } from "./llm-review.js";
 import type { ReviewInfo } from "./llm-review.js";
 import {
@@ -397,20 +401,11 @@ function readNdxConfig(projectDir: string): Record<string, unknown> {
   return readJsonFile(resolveLayout(projectDir).configFile);
 }
 
-/**
- * Read the shared config deep-merged with the gitignored `.n-dx.local.json`
- * overlay (local wins) — the same merge `core/config.js`'s
- * `loadEffectiveProjectConfig` and `@n-dx/llm-client`'s config loader apply.
- * Use this for anything the user should *see* (GET responses, status
- * probes); use `readNdxConfig` for anything about to be *written back*, so a
- * write never flattens the local overlay's values into the shared file.
- */
-function readEffectiveNdxConfig(projectDir: string): Record<string, unknown> {
-  const shared = readNdxConfig(projectDir);
-  const local = readJsonFile(resolveLayout(projectDir).localConfigFile);
-  if (Object.keys(local).length === 0) return shared;
-  return deepMerge(shared, local);
-}
+// `readEffectiveNdxConfig` (shared config deep-merged with the gitignored
+// `.n-dx.local.json` overlay, local wins) lives in effective-agent-config.ts
+// beside the snapshot it feeds. Use it for anything the user should *see*; use
+// `readNdxConfig` for anything about to be *written back*, so a write never
+// flattens the local overlay's values into the shared file.
 
 function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
   const configPath = resolveLayout(projectDir).configFile;
@@ -561,7 +556,7 @@ function readAgentModels(config: Record<string, unknown>): Partial<Record<LLMVen
  */
 function buildFailoverInfo(
   effective: EffectiveAgentConfig,
-  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
+  llmConfig: LLMConfig,
 ): FailoverInfo {
   // Failover only applies to Claude + API provider
   const isClaudeApi = effective.vendor === LLM_VENDOR.CLAUDE && effective.provider === "api";
@@ -604,13 +599,32 @@ function buildFailoverInfo(
   };
 }
 
+/** The answers a config adds up to, as opposed to the keys it holds. What the preview returns. */
+export type LlmResolution = Pick<
+  LlmConfigResponse,
+  "effective" | "effectiveProblems" | "tiers" | "failover" | "review"
+>;
+
 /**
- * Async because of `effective`, which resolves through `loadLLMConfig` — the
- * same async loader hench and the Ask endpoint use, rather than a fourth
- * hand-rolled read of the same two files.
+ * Resolve a snapshot to what a run would do. The one function behind both
+ * `GET /api/llm/config` (a snapshot read from disk) and
+ * `POST /api/llm/config/preview` (that snapshot with unsaved edits applied), so
+ * the preview cannot answer differently from the page it previews.
  */
-async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> {
-  const config = readEffectiveNdxConfig(projectDir);
+function resolveLlmConfig(snapshot: ConfigSnapshot): LlmResolution {
+  const { effective, llmConfig } = resolveEffectiveAgentConfigFrom(snapshot);
+  return {
+    effective,
+    effectiveProblems: findEffectiveProblems(effective),
+    tiers: buildTierTable(effective.vendor, llmConfig, effective),
+    failover: buildFailoverInfo(effective, llmConfig),
+    review: buildReviewInfo(effective, llmConfig, readHenchReviewSettings(snapshot)),
+  };
+}
+
+function extractLlmConfig(projectDir: string): LlmConfigResponse {
+  const snapshot = readConfigSnapshot(projectDir);
+  const config = snapshot.ndx;
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmCodex = (llm["codex"] ?? {}) as Record<string, unknown>;
   const llmGoogle = (llm["google"] ?? {}) as Record<string, unknown>;
@@ -621,9 +635,6 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
   // the same resolution `loadLLMConfig` and `GET /api/ndx-config` use, so the
   // dashboard shows the value the next run will actually use.
   const claude = resolveClaudeConfig(llm["claude"], config["claude"]);
-
-  const effective = await resolveEffectiveAgentConfig(projectDir);
-  const llmConfig = await loadLLMConfig(projectDir);
 
   const result: LlmConfigResponse = {
     vendor: typeof llm["vendor"] === "string" ? llm["vendor"] : null,
@@ -658,11 +669,7 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
       ...(claude.sources.lightModel ? { lightModel: claude.sources.lightModel } : {}),
     },
     agentModels: readAgentModels(config),
-    effective,
-    effectiveProblems: findEffectiveProblems(effective),
-    tiers: buildTierTable(effective.vendor, llmConfig, effective),
-    failover: buildFailoverInfo(effective, llmConfig),
-    review: buildReviewInfo(effective, llmConfig, await readHenchReviewSettings(projectDir)),
+    ...resolveLlmConfig(snapshot),
   };
 
   if (typeof llm["autoFailover"] === "boolean") {
@@ -955,8 +962,9 @@ export async function validateCatalogModel(
  * test (see that file's doc comment for why web keeps a copy at all).
  */
 export async function buildLlmCatalog(projectDir: string, refresh: boolean): Promise<LlmCatalogResponse> {
-  const config = readEffectiveNdxConfig(projectDir);
-  const llmConfig = await loadLLMConfig(projectDir);
+  const snapshot = readConfigSnapshot(projectDir);
+  const config = snapshot.ndx;
+  const llmConfig = parseLLMConfig(config);
   // The model `ndx work` would run with no `hench.models.<vendor>` — resolved
   // through the same chain as `effective`, minus the hench override rung.
   const defaultModel = (vendor: LLMVendor): string =>
@@ -965,7 +973,7 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
     getLiveVendorProbe(LLM_VENDOR.CLAUDE, projectDir, { refresh }),
     getLiveVendorProbe(LLM_VENDOR.CODEX, projectDir, { refresh }),
   ]);
-  const henchProvider = (await readHenchAgentSettings(projectDir)).provider;
+  const henchProvider = readHenchAgentSettings(snapshot).provider;
   const cliEntry = (
     vendor: ListableVendor,
     probe: LiveVendorProbe,
@@ -1022,10 +1030,148 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
 }
 
 // ---------------------------------------------------------------------------
+// Edits: validation and application, shared by PUT and the preview
+// ---------------------------------------------------------------------------
+
+/** The vendor a request leaves active, for judging a reviewer saved alongside `llm.vendor` as a pair. */
+function vendorAfter(changes: LlmConfigPutBody["changes"], projectDir: string): string | null {
+  if (!("llm.vendor" in changes)) return resolveActiveVendor(projectDir);
+  return changes["llm.vendor"] ? String(changes["llm.vendor"]) : null;
+}
+
+/**
+ * Why one `changes` entry would be refused, or null when it is acceptable.
+ * PUT answers 400 on the first refusal; the preview reports every one.
+ */
+function validateLlmChange(
+  path: string,
+  value: string | boolean | number | null,
+  vendorAfterChanges: string | null,
+): string | null {
+  // Legacy keys are read until 1.0.0 but never written. Refusing with the
+  // replacement named beats the generic "unknown path" below, which would
+  // leave a caller guessing that the key it can still *read* is not one
+  // it may set.
+  const replacement = DEPRECATED_WRITE_PATHS[path];
+  if (replacement) {
+    return `"${path}" is a deprecated key and is no longer written. Set "${replacement}" instead — ` +
+      `the legacy value is still read until 1.0.0 and is left untouched.`;
+  }
+  if (!isWritablePath(path)) {
+    return `Unknown LLM config path: "${path}". Valid paths: ${[...VALID_PATHS].join(", ")}, or llm.tiers.<vendor>.<tier> / llm.routes.<class> / llm.effort.<class>`;
+  }
+  if (BOOLEAN_PATHS.has(path)) {
+    if (value !== null && typeof value !== "boolean") {
+      return `Value for "${path}" must be a boolean or null, got ${typeof value}`;
+    }
+  } else if (NUMERIC_PATHS.has(path)) {
+    // Accept a number, or a numeric string that we'll coerce to a number
+    if (value !== null && typeof value !== "number" && typeof value !== "string") {
+      return `Value for "${path}" must be a number or null, got ${typeof value}`;
+    }
+    if (value !== null && (PORT_PATHS.has(path) || NON_NEGATIVE_PATHS.has(path))) {
+      const n = Number(value);
+      const isPort = PORT_PATHS.has(path);
+      const valid = isPort
+        ? Number.isInteger(n) && n >= 1 && n <= 65535
+        : Number.isInteger(n) && n >= 0;
+      if (!valid) {
+        const expected = isPort ? "a valid port number (1–65535)" : "a non-negative integer";
+        return `Value for "${path}" must be ${expected}, got ${JSON.stringify(value)}`;
+      }
+    }
+  } else if (value !== null && typeof value !== "string") {
+    return `Value for "${path}" must be a string or null, got ${typeof value}`;
+  }
+  if (path === "llm.vendor" && value !== null && !VALID_VENDORS.has(value.toString())) {
+    return `llm.vendor must be one of: ${[...VALID_VENDORS].join(", ")}; got "${value}"`;
+  }
+  // Routing paths carry their own shape and enum rules. Skipped for a
+  // null/"" value, which is a delete rather than a set.
+  if (value !== null && value !== "") {
+    const routingError = validateRoutingChange(path, value);
+    if (routingError) return routingError;
+  }
+  return validateModelForVendor(path, value) ?? validateReviewChange(path, value, vendorAfterChanges);
+}
+
+/** Apply one validated change to a parsed `.n-dx.json`, in memory. */
+function applyLlmChange(
+  config: Record<string, unknown>,
+  path: string,
+  value: string | boolean | number | null,
+): void {
+  if (value === null || value === "") {
+    deleteByPath(config, path);
+    if (AGENT_MODEL_PATH.test(path) || HENCH_REVIEW_PATHS.has(path)) pruneEmptyHenchSections(config);
+  } else if (NUMERIC_PATHS.has(path)) {
+    // Coerce string port values to numbers before persisting
+    setByPath(config, path, Number(value));
+  } else {
+    setByPath(config, path, value);
+  }
+}
+
+/** Shape expected by POST /api/llm/config/preview: PUT's body, plus the provider the page saves through `/api/hench/config`. */
+interface LlmPreviewBody {
+  changes?: LlmConfigPutBody["changes"];
+  /** `.hench/config.json`'s `provider`; null clears it. */
+  provider?: string | null;
+}
+
+/** An edit the preview did not apply, with the reason PUT (or `/api/hench/config`) would refuse it. */
+export interface EditProblem {
+  path: string;
+  message: string;
+}
+
+/** Shape returned by POST /api/llm/config/preview. */
+export interface LlmPreviewResponse extends LlmResolution {
+  /** Edits that were refused and so are absent from the resolution above. */
+  editProblems: EditProblem[];
+}
+
+/**
+ * Resolve the saved config with unsaved edits applied in memory.
+ *
+ * Refused edits are reported and left out rather than failing the request: the
+ * page is asking what *would* run, and an edit it is still typing is a
+ * question, not an error.
+ */
+function previewLlmConfig(projectDir: string, body: LlmPreviewBody): LlmPreviewResponse {
+  const changes = body.changes ?? {};
+  const vendorAfterChanges = vendorAfter(changes, projectDir);
+
+  const editProblems: EditProblem[] = [];
+  const accepted: Array<[string, string | boolean | number | null]> = [];
+  for (const [path, value] of Object.entries(changes)) {
+    const message = validateLlmChange(path, value, vendorAfterChanges);
+    if (message) editProblems.push({ path, message });
+    else accepted.push([path, value]);
+  }
+  let provider: string | null | undefined;
+  if (body.provider !== undefined) {
+    const message = body.provider === null
+      ? null
+      : validateConfigKeyValue("provider", body.provider, vendorAfterChanges);
+    if (message) editProblems.push({ path: "provider", message });
+    else provider = body.provider;
+  }
+
+  const snapshot = readConfigSnapshot(projectDir, (sources) => {
+    for (const [path, value] of accepted) applyLlmChange(sources.shared, path, value);
+    if (provider === null) delete sources.hench["provider"];
+    else if (provider !== undefined) sources.hench["provider"] = provider;
+  });
+  return { ...resolveLlmConfig(snapshot), editProblems };
+}
+
+// ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
 const LLM_PREFIX = "/api/llm/config";
+const LLM_PREVIEW = "/api/llm/config/preview";
 const LLM_CATALOG = "/api/llm/catalog";
 const LLM_LOCAL_STATUS = "/api/llm/local-status";
 const LLM_LOCAL_TEST = "/api/llm/local-test";
@@ -1140,7 +1286,32 @@ export async function handleLlmRoute(
 
   // GET /api/llm/config
   if (method === "GET" && pathname === LLM_PREFIX) {
-    jsonResponse(res, 200, await extractLlmConfig(ctx.projectDir));
+    jsonResponse(res, 200, extractLlmConfig(ctx.projectDir));
+    return true;
+  }
+
+  // POST /api/llm/config/preview — what would run with these unsaved edits.
+  // Writes nothing; POST only because the body is too structured for a query
+  // string. The request gate treats it like any other POST.
+  if (method === "POST" && pathname === LLM_PREVIEW) {
+    let body: LlmPreviewBody;
+    try {
+      const raw = await readBody(req, res);
+      body = raw.trim() ? JSON.parse(raw) as LlmPreviewBody : {};
+    } catch {
+      errorResponse(res, 400, "Invalid JSON in request body");
+      return true;
+    }
+    const { changes, provider } = body ?? {};
+    if (
+      body === null || typeof body !== "object" || Array.isArray(body) ||
+      (changes !== undefined && (changes === null || typeof changes !== "object" || Array.isArray(changes))) ||
+      (provider !== undefined && provider !== null && typeof provider !== "string")
+    ) {
+      errorResponse(res, 400, "Request body must be an object with an optional 'changes' object and an optional 'provider' string or null");
+      return true;
+    }
+    jsonResponse(res, 200, previewLlmConfig(ctx.projectDir, body));
     return true;
   }
 
@@ -1162,100 +1333,19 @@ export async function handleLlmRoute(
         return true;
       }
 
-      // The vendor a reviewer is checked against is the one this request leaves
-      // active, so saving `llm.vendor` and `hench.review.vendor` together is judged as a pair.
-      const vendorAfterChanges = "llm.vendor" in parsed.changes
-        ? (parsed.changes["llm.vendor"] ? String(parsed.changes["llm.vendor"]) : null)
-        : resolveActiveVendor(ctx.projectDir);
-
+      const vendorAfterChanges = vendorAfter(parsed.changes, ctx.projectDir);
       for (const [path, value] of Object.entries(parsed.changes)) {
-        // Legacy keys are read until 1.0.0 but never written. Refusing with the
-        // replacement named beats the generic "unknown path" below, which would
-        // leave a caller guessing that the key it can still *read* is not one
-        // it may set.
-        const replacement = DEPRECATED_WRITE_PATHS[path];
-        if (replacement) {
-          errorResponse(
-            res,
-            400,
-            `"${path}" is a deprecated key and is no longer written. Set "${replacement}" instead — ` +
-            `the legacy value is still read until 1.0.0 and is left untouched.`,
-          );
-          return true;
-        }
-        if (!isWritablePath(path)) {
-          errorResponse(res, 400, `Unknown LLM config path: "${path}". Valid paths: ${[...VALID_PATHS].join(", ")}, or llm.tiers.<vendor>.<tier> / llm.routes.<class> / llm.effort.<class>`);
-          return true;
-        }
-        if (BOOLEAN_PATHS.has(path)) {
-          if (value !== null && typeof value !== "boolean") {
-            errorResponse(res, 400, `Value for "${path}" must be a boolean or null, got ${typeof value}`);
-            return true;
-          }
-        } else if (NUMERIC_PATHS.has(path)) {
-          // Accept a number, or a numeric string that we'll coerce to a number
-          if (value !== null && typeof value !== "number" && typeof value !== "string") {
-            errorResponse(res, 400, `Value for "${path}" must be a number or null, got ${typeof value}`);
-            return true;
-          }
-          if (value !== null && (PORT_PATHS.has(path) || NON_NEGATIVE_PATHS.has(path))) {
-            const n = Number(value);
-            const isPort = PORT_PATHS.has(path);
-            const valid = isPort
-              ? Number.isInteger(n) && n >= 1 && n <= 65535
-              : Number.isInteger(n) && n >= 0;
-            if (!valid) {
-              const expected = isPort
-                ? "a valid port number (1–65535)"
-                : "a non-negative integer";
-              errorResponse(res, 400, `Value for "${path}" must be ${expected}, got ${JSON.stringify(value)}`);
-              return true;
-            }
-          }
-        } else {
-          if (value !== null && typeof value !== "string") {
-            errorResponse(res, 400, `Value for "${path}" must be a string or null, got ${typeof value}`);
-            return true;
-          }
-        }
-        if (path === "llm.vendor" && value !== null && !VALID_VENDORS.has(value.toString())) {
-          errorResponse(res, 400, `llm.vendor must be one of: ${[...VALID_VENDORS].join(", ")}; got "${value}"`);
-          return true;
-        }
-        // Routing paths carry their own shape and enum rules. Skipped for a
-        // null/"" value, which is a delete rather than a set.
-        if (value !== null && value !== "") {
-          const routingError = validateRoutingChange(path, value);
-          if (routingError) {
-            errorResponse(res, 400, routingError);
-            return true;
-          }
-        }
-        const modelError = validateModelForVendor(path, value);
-        if (modelError) {
-          errorResponse(res, 400, modelError);
-          return true;
-        }
-        const reviewError = validateReviewChange(path, value, vendorAfterChanges);
-        if (reviewError) {
-          errorResponse(res, 400, reviewError);
+        const problem = validateLlmChange(path, value, vendorAfterChanges);
+        if (problem) {
+          errorResponse(res, 400, problem);
           return true;
         }
       }
 
       const config = readNdxConfig(ctx.projectDir);
       const applied: string[] = [];
-
       for (const [path, value] of Object.entries(parsed.changes)) {
-        if (value === null || value === "") {
-          deleteByPath(config, path);
-          if (AGENT_MODEL_PATH.test(path) || HENCH_REVIEW_PATHS.has(path)) pruneEmptyHenchSections(config);
-        } else if (NUMERIC_PATHS.has(path)) {
-          // Coerce string port values to numbers before persisting
-          setByPath(config, path, Number(value));
-        } else {
-          setByPath(config, path, value);
-        }
+        applyLlmChange(config, path, value);
         applied.push(path);
       }
 
@@ -1265,7 +1355,7 @@ export async function handleLlmRoute(
       invalidateAuthCheckCache();
       // A new key, binary path or model changes what the live probe would see.
       clearLlmCatalogCache(ctx.projectDir);
-      jsonResponse(res, 200, { applied, config: await extractLlmConfig(ctx.projectDir) });
+      jsonResponse(res, 200, { applied, config: extractLlmConfig(ctx.projectDir) });
       return true;
     } catch (err) {
       errorResponse(res, 400, err instanceof Error ? err.message : "Invalid request body");
