@@ -51,7 +51,7 @@ const row = (rows: TierRow[], tier: string): TierRow => {
   return found;
 };
 
-const classes = (r: TierRow): string[] => r.usedBy.map((u) => u.taskClass);
+const classes = (r: TierRow): string[] => r.usedBy.flatMap((u) => (u.taskClass ? [u.taskClass] : []));
 
 describe("GET /api/llm/config — tiers block", () => {
   it("returns agent, standard, light and heavy, and no free row by default", async () => {
@@ -69,9 +69,8 @@ describe("GET /api/llm/config — tiers block", () => {
       tiers: { claude: { heavy: "opus" } },
     };
     const rows = await tiers({ llm });
-    const config = { ...llm, routes: undefined } as never;
     for (const tier of ["standard", "light", "heavy"] as const) {
-      const expected = resolveTaskModel("probe", { ...(config as object), routes: { "*": tier } } as never, {
+      const expected = resolveTaskModel("agent.execute", { ...llm, routes: { "agent.execute": tier } } as never, {
         vendor: "claude",
       });
       expect(row(rows, tier).model).toBe(expected.model);
@@ -107,6 +106,7 @@ describe("GET /api/llm/config — tiers block", () => {
     expect(classes(row(rows, "standard"))).toContain("prd.propose");
     expect(classes(row(rows, "standard"))).not.toContain("agent.execute");
     expect(row(rows, "heavy").usedBy.map((u) => u.label)).toEqual(["tasks set to Heavy in Prepare task"]);
+    expect(row(rows, "heavy").usedBy[0]).not.toHaveProperty("taskClass");
   });
 
   it("lists rename under heavy, not light, when llm.routes sets it", async () => {
