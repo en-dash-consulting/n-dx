@@ -1807,6 +1807,42 @@ async function handleMigrateLayout(rest) {
   exitWithCleanup(code);
 }
 
+/** Where `ndx migrate --plan` writes when the operator names no path. */
+const DEFAULT_MIGRATION_PLAN_OUT = "./migration-plan.json";
+
+/**
+ * `ndx migrate --plan` — plan the schema migration and write it out for review.
+ *
+ * Delegates to `rex migrate-plan`, which does the whole job: it reads the PRD,
+ * classifies it into the v2 layers, and writes the JSON plan plus a Markdown
+ * summary. Nothing is written to the PRD.
+ *
+ * `--plan` is required rather than implied. The other half of a migration is
+ * applying a reviewed plan, which does rewrite the PRD; making the read-only
+ * half the one you have to ask for means the bare verb can never grow into
+ * the destructive one by default.
+ *
+ * `--out` defaults here rather than in rex: an orchestrator command an
+ * operator types by hand should produce a file, while the tool CLI stays
+ * explicit about where it writes.
+ */
+async function handleMigrate(rest) {
+  const dir = resolveDir(rest);
+  const flags = extractFlags(rest);
+  if (!flags.includes("--plan")) {
+    console.error("Error: ndx migrate needs --plan.");
+    console.error("Hint: Only planning is implemented — 'ndx migrate --plan .' writes a reviewable plan and changes nothing.");
+    exitWithCleanup(1);
+  }
+  requireInit(dir, ["rex"]);
+  const forwarded = flags.filter((f) => f !== "--plan");
+  if (!forwarded.some((f) => f === "--out" || f.startsWith("--out="))) {
+    forwarded.push(`--out=${DEFAULT_MIGRATION_PLAN_OUT}`);
+  }
+  await runOrDie(tools.rex, ["migrate-plan", ...forwarded, dir]);
+  exitWithCleanup(0);
+}
+
 // ── Preflight banner and run summary ─────────────────────────────────────────
 
 /**
@@ -3289,6 +3325,7 @@ const COMMAND_DISPATCH = new Map([
   ["help",              handleHelp],
   ["init",              handleInit],
   ["migrate-layout",    handleMigrateLayout],
+  ["migrate",           handleMigrate],
   ["analyze",           handleAnalyze],
   ["recommend",         handleRecommend],
   ["plan",              handlePlan],

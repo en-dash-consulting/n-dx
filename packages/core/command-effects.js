@@ -220,6 +220,25 @@ export const COMMAND_EFFECTS = {
     next: "ndx status",
   },
 
+  migrate: {
+    command: "migrate",
+    summary: "Plan the PRD's v1 → v2 migration and write it out for review.",
+    reads: ["{rex}/prd_tree/ (under the PRD lock)", "the plan already at --out, for the answers it recorded", "test files under the project, to link criteria"],
+    writes: [
+      { path: "--out (default ./migration-plan.json)", what: "the plan, keyed by v1 item id" },
+      { path: "--summary (default: --out with .md)", what: "the Markdown summary for review" },
+    ],
+    llm: [
+      { phase: "placement", purpose: "place a change the rules held", calls: "0-N, none with --rules-only" },
+      { phase: "spec draft", purpose: "redraft a capability's statement and criteria", calls: "0-N, none with --rules-only" },
+      { phase: "review", purpose: "Jev reviews the plan", calls: "0-N, none with --rules-only or --no-jev-review" },
+    ],
+    network: [{ ...LLM_PROVIDER, when: "without --rules-only" }],
+    noLlmFlags: ["--rules-only"],
+    duration: "seconds with --rules-only; up to an hour over a large PRD with the model passes",
+    next: "ndx status",
+  },
+
   analyze: {
     command: "analyze",
     summary: "Scan the codebase and rewrite the SourceVision analysis.",

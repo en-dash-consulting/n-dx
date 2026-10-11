@@ -98,6 +98,13 @@ const COMMAND_REGISTRY = [
     related: ["init", "which", "status"],
   },
   {
+    name: "migrate",
+    category: "Orchestration",
+    summary: "Plan the PRD's v1 → v2 migration and write it out for review",
+    keywords: ["migrate", "plan", "v2", "product", "change", "schema", "upgrade", "prd", "review"],
+    related: ["migrate-layout", "status", "validate"],
+  },
+  {
     name: "analyze",
     category: "Orchestration",
     summary: "Run SourceVision codebase analysis",
@@ -1243,6 +1250,39 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["init", "which"],
   },
+  migrate: {
+    summary: "plan the PRD's v1 → v2 migration and write it out for review",
+    description:
+      "Classifies every v1 item into the v2 product and change layers and\n" +
+      "writes the proposal to two files: the JSON plan, keyed by v1 item id,\n" +
+      "which the apply step will read, and a Markdown summary for a person.\n\n" +
+      "Nothing is written to the PRD. Planning is a pure read, and the two\n" +
+      "output files are the only artifacts; they must sit outside the rex\n" +
+      "directory and the command refuses a path inside it.\n\n" +
+      "--plan is required rather than implied. The other half of a migration\n" +
+      "applies a reviewed plan and does rewrite the PRD, so the read-only half\n" +
+      "is the one you ask for by name.\n\n" +
+      "Re-planning reads the plan already at --out and reuses every model\n" +
+      "answer whose item, question and model still match, so an unchanged PRD\n" +
+      "is re-planned into a byte-identical file without asking anything. That\n" +
+      "is also the retry path after a model error: the answers already paid\n" +
+      "for are kept and the next run continues from them.\n\n" +
+      "Delegates to 'rex migrate-plan', which documents the full flag set.",
+    usage: "ndx migrate --plan [options] [dir]",
+    options: [
+      { flag: "--plan", description: "Required: plan the migration (the only mode implemented)" },
+      { flag: "--out=<path>", description: "Where to write the JSON plan (default: ./migration-plan.json)" },
+      { flag: "--summary=<path>", description: "Where to write the Markdown summary (default: --out with .md)" },
+      { flag: "--rules-only", description: "Run the rules alone: no model calls, no cost" },
+      { flag: "--no-jev-review", description: "Skip the Jev review pass" },
+    ],
+    examples: [
+      { command: "ndx migrate --plan --rules-only .", description: "A free, deterministic first look" },
+      { command: "ndx migrate --plan .", description: "Plan with the configured models" },
+      { command: "ndx migrate --plan --out=./plans/v2.json .", description: "Write the plan somewhere else" },
+    ],
+    related: ["migrate-layout", "validate"],
+  },
   ci: {
     summary: "run analysis pipeline and validate PRD health",
     description: "Runs the full CI pipeline: SourceVision analysis followed by PRD\nvalidation. Reports pass/fail status suitable for CI systems.",
@@ -1880,6 +1920,7 @@ export function formatMainHelp() {
   section("SETUP", [
     ["init [dir]", "Initialize project"],
     ["migrate-layout [dir]", "Move existing state into .ndx/ (--dry-run, --no-commit)"],
+    ["migrate --plan [dir]", "Plan the PRD's v1 → v2 migration for review (--rules-only)"],
     ["which [dir]", "Show which n-dx is running (version, path, install, git)"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],
