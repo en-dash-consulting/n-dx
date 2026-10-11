@@ -2,7 +2,9 @@
 id: "c9c18715-b303-411c-b8b0-d44d0e91be57"
 level: "task"
 title: "sqlc detection omits the schema files named by sqlc.yaml's schema: key"
-status: "pending"
+status: "completed"
+resolutionType: "code-change"
+resolutionDetail: "Run a3f6511e-4ba7-4230-ad57-5084e22a110f, commit cb3ce022c: sqlcQueryPaths became sqlcPaths(config, content, key) and reads schema: too; schema files are sqlFiles, query files files only; doc updated. The run failed its gate on a regression in embedded-sql.test.ts, captured as a separate fix task; not re-run."
 priority: "low"
 tags:
   - "ndx-adversarial-review"
@@ -11,11 +13,14 @@ tags:
   - "sql"
   - "sourcevision"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-11T02:32:08.371Z"
+completedAt: "2026-10-11T04:06:56.376Z"
+endedAt: "2026-10-11T04:06:56.376Z"
 acceptanceCriteria:
   - "A sqlc fixture with schema: \"schema.sql\" reports schema.sql in the sqlc finding's sqlFiles"
   - "Schema given as a directory or a list resolves relative to the config like queries does"
   - "MigrationToolFinding.sqlFiles documentation matches what sqlc reports"
 description: "Verdict: should-fix (low). packages/sourcevision/src/language/sql-migrations.ts detectMigrationTools reads only `queries:` from a sqlc config, so a sqlc finding's sqlFiles lists query files (SELECTs) and never the `schema:` files that hold the CREATE TABLE statements. Scenario: sqlc.yaml with `queries: \"query/\"` and `schema: \"schema.sql\"` -> sqlFiles = [\"query/users.sql\"]; schema.sql (the tables) is not reported, so table extraction over a tool's sqlFiles finds no tables for sqlc repositories. The MigrationToolFinding.sqlFiles doc also claims \"files holding schema statements\", which is wrong for sqlc. Reachable once a consumer feeds sqlFiles into extractSqlTables (sibling tasks); no consumer today. Fix: generalise sqlcQueryPaths to take the key name and read `schema:` too (cheap, low risk); record schema files as sqlFiles, and queries separately or as files only. Recommended."
-lastModified: "2026-10-08T08:15:03.778Z"
+lastModified: "2026-10-11T04:06:56.677Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
