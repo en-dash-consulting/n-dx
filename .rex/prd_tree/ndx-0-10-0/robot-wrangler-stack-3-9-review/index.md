@@ -23,4 +23,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add hench.review.mode, hench.review.vendor and hench.review.rounds as project settings for the review pass](./add-hench-review-mode-hench-review.md) | completed |
 | [Apply repository trust to guard.env and read cli_path from .n-dx.local.json on the cross-vendor reviewer path](./apply-repository-trust-to-guard-env.md) | pending |
-| [Inject the trust store location into loadVendorCliEnv so the reviewer-path tests stop setting NDX_HOME on the shared test env](./inject-the-trust-store-location-into.md) | pending |
+| [Inject the trust store location into loadVendorCliEnv so the reviewer-path tests stop setting NDX_HOME on the shared test env](./inject-the-trust-store-location-into.md) | completed |
