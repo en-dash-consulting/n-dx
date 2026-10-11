@@ -145,6 +145,21 @@ describe("sqlcPaths", () => {
     expect(sqlcPaths("sqlc.yaml", yaml, "schema")).toEqual(["s.sql"]);
     expect(sqlcPaths("sqlc.yaml", yaml, "queries")).toEqual(["q"]);
   });
+
+  it("drops a trailing YAML comment outside quotes", () => {
+    expect(sqlcPaths("sqlc.yaml", 'schema: "schema.sql"  # tables', "schema")).toEqual(["schema.sql"]);
+    expect(sqlcPaths("sqlc.yaml", "queries: query/ # sql", "queries")).toEqual(["query"]);
+    expect(sqlcPaths("sqlc.yaml", "queries: [q1, q2] # both", "queries")).toEqual(["q1", "q2"]);
+    expect(sqlcPaths("sqlc.yaml", "queries: # list\n  - one.sql # first\n  - 'two.sql'  # second\n", "queries")).toEqual([
+      "one.sql",
+      "two.sql",
+    ]);
+  });
+
+  it("keeps a # inside quotes or not preceded by whitespace", () => {
+    expect(sqlcPaths("sqlc.yaml", 'schema: "a #b.sql"', "schema")).toEqual(["a #b.sql"]);
+    expect(sqlcPaths("sqlc.yaml", "schema: a#b.sql", "schema")).toEqual(["a#b.sql"]);
+  });
 });
 
 describe("splitSqlName", () => {
