@@ -22,7 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add the Review section: Off, Self review and Pair review, with reviewer vendor, model and fix rounds](./add-the-review-section-off-self-review.md) | pending |
-| [Rebuild the failover control as a section that shows the chain and says when failover cannot fire](./rebuild-the-failover-control-as-a.md) | pending |
+| [Rebuild the failover control as a section that shows the chain and says when failover cannot fire](./rebuild-the-failover-control-as-a.md) | in_progress |
 | [Replace the agent, project and light model fields with a tier table that shows what each tier is used by](./replace-the-agent-project-and-light.md) | completed |
 | [Replace the credentials chip and the will-run-with block with a run card that previews unsaved edits](./replace-the-credentials-chip-and-the.md) | pending |
 | [Replace the vendor tabs with selectable vendor cards and the provider dropdown with connection cards](./replace-the-vendor-tabs-with.md) | completed |

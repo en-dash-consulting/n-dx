@@ -41,6 +41,17 @@ interface LocalVendorConfig {
   verifier: LocalVerifierVendorConfig;
 }
 
+interface FailoverInfo {
+  /** Whether automatic failover is enabled in the config. */
+  enabled: boolean;
+  /** Whether failover can fire for this config (true only for Claude + API). */
+  applies: boolean;
+  /** Why applies is false (empty when applies is true). */
+  reason?: string;
+  /** The effective model followed by the next three models in the failover chain. */
+  chain: string[];
+}
+
 interface LlmConfigResponse {
   vendor: string | null;
   claude: VendorConfig;
@@ -62,6 +73,8 @@ interface LlmConfigResponse {
   tiers: TierRow[];
   /** Why `ndx work` would refuse `effective`; empty when it would run. */
   effectiveProblems: EffectiveProblem[];
+  /** Failover chain information. */
+  failover: FailoverInfo;
 }
 
 interface EffectiveConfig {
@@ -678,6 +691,60 @@ function ToggleSwitch({
       }),
       h("span", { class: "llm-toggle-track" }),
     ),
+  );
+}
+
+// ── Section 4: failover ───────────────────────────────────────────
+
+/**
+ * The failover chain: the effective model plus the next three fallback models.
+ * Shown as monospace pills joined by arrows, dimmed while the toggle is off.
+ * When `failover.applies` is false, shows the reason as a warning instead.
+ */
+function FailoverSection({
+  failover,
+  vendor,
+  enabled,
+  onChange,
+  dirty,
+}: {
+  failover: FailoverInfo;
+  vendor: string | null;
+  enabled: boolean;
+  onChange: (key: string, v: boolean) => void;
+  dirty: boolean;
+}) {
+  const cliName = useCliName();
+  const isLocal = vendor === VIEWER_LLM_VENDOR.LOCAL;
+  const cannotApply = !failover.applies;
+
+  return h("section", { class: "llm-rw-section" },
+    h(SectionHeader, {
+      number: 4,
+      title: "If a run fails",
+      subtitle: "On a retryable error, try the next model in the chain before giving up.",
+    }),
+    h(ToggleSwitch, {
+      fieldKey: "autoFailover",
+      label: "Automatic failover",
+      description: "",
+      value: enabled,
+      onChange,
+      dirty,
+    }),
+    // Show the chain as monospace pills with arrows, dimmed if toggle is off
+    h("div", { class: `llm-failover-chain${!enabled ? " llm-failover-chain-dimmed" : ""}` },
+      failover.chain.map((model, i) => [
+        i > 0 ? h("span", { class: "llm-failover-arrow" }, "→") : null,
+        h("code", { class: "llm-failover-pill" }, model),
+      ]).flat(),
+    ),
+    // Show reason when failover cannot fire
+    cannotApply
+      ? h("p", { class: "llm-failover-warning", role: "alert" },
+          "⚠ ",
+          isLocal ? "Failover is not available for local models." : failover.reason)
+      : null,
   );
 }
 
@@ -1528,17 +1595,16 @@ export function RobotWranglerView() {
       ? h("p", { class: "llm-no-vendor" }, "Select a vendor above to configure its settings.")
       : null,
 
-    // Failover toggle
-    h("div", { class: "llm-failover-wrap" },
-      h(ToggleSwitch, {
-        fieldKey: "autoFailover",
-        label: "Automatic failover",
-        description: "Retry on fallback models before surfacing an error.",
-        value: editToggles.autoFailover ?? data?.autoFailover ?? false,
-        onChange: handleToggle,
-        dirty: dirtyToggles.has("autoFailover"),
-      }),
-    ),
+    // Section 4: Failover
+    data && effectiveVendor
+      ? h(FailoverSection, {
+          failover: data.failover,
+          vendor: effectiveVendor,
+          enabled: editToggles.autoFailover ?? data.autoFailover ?? false,
+          onChange: handleToggle,
+          dirty: dirtyToggles.has("autoFailover"),
+        })
+      : null,
 
     // Legacy notice
     showLegacy
