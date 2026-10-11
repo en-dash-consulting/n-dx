@@ -22,5 +22,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Check the Robot Wrangler layout at phone, tablet and desktop widths, remove dead styles, and update docs and the changeset](./check-the-robot-wrangler-layout-at.md) | pending |
-| [Lay out the Local vendor: server profiles, connection test, live models and collapsed advanced settings](./lay-out-the-local-vendor-server.md) | pending |
+| [Lay out the Local vendor: server profiles, connection test, live models and collapsed advanced settings](./lay-out-the-local-vendor-server.md) | completed |
 | [Show a change summary, a Discard button and a clearly disabled Save in the shared settings save bar](./show-a-change-summary-a-discard-button.md) | pending |
