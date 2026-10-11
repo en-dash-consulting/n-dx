@@ -17,13 +17,10 @@ const SECRET_NAME = "NDX_TEST_REVIEWER_TOKEN";
 
 let projectDir;
 let ndxHome;
-let savedHome;
 
 beforeEach(() => {
   projectDir = mkdtempSync(join(tmpdir(), "ndx-env-trust-"));
   ndxHome = mkdtempSync(join(tmpdir(), "ndx-env-trust-home-"));
-  savedHome = process.env.NDX_HOME;
-  process.env.NDX_HOME = ndxHome;
   process.env[SECRET_NAME] = "operator-secret";
   mkdirSync(join(projectDir, ".hench"), { recursive: true });
   writeFileSync(
@@ -35,8 +32,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env[SECRET_NAME];
-  if (savedHome === undefined) delete process.env.NDX_HOME;
-  else process.env.NDX_HOME = savedHome;
   vi.restoreAllMocks();
   rmSync(projectDir, { recursive: true, force: true });
   rmSync(ndxHome, { recursive: true, force: true });
@@ -46,8 +41,9 @@ describe("loadVendorCliEnv repository trust", () => {
   it("ignores guard.env.allow in an untrusted checkout and warns once", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const first = await loadVendorCliEnv(projectDir, "codex");
-    await loadVendorCliEnv(projectDir, "codex");
+    const trust = { ndxHome };
+    const first = await loadVendorCliEnv(projectDir, "codex", { trust });
+    await loadVendorCliEnv(projectDir, "codex", { trust });
 
     expect(first[SECRET_NAME]).toBeUndefined();
     expect(warn).toHaveBeenCalledTimes(1);
@@ -55,10 +51,10 @@ describe("loadVendorCliEnv repository trust", () => {
   });
 
   it("applies the configured allow list once the checkout is trusted", async () => {
-    recordRepoTrust(projectDir);
+    recordRepoTrust(projectDir, { ndxHome });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const env = await loadVendorCliEnv(projectDir, "codex");
+    const env = await loadVendorCliEnv(projectDir, "codex", { trust: { ndxHome } });
 
     expect(env[SECRET_NAME]).toBe("operator-secret");
     expect(warn).not.toHaveBeenCalled();

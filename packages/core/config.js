@@ -2503,15 +2503,18 @@ async function loadAllConfigs(dir) {
  * Config I/O and foundation loading stay in the spawn-exempt config module.
  * @param {string} dir
  * @param {"claude" | "codex"} vendor
+ * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions }} [options]
+ *   `trust` relocates the repository-trust store (e.g. `{ ndxHome }`); callers
+ *   that omit it use the user's real store.
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
-export async function loadVendorCliEnv(dir, vendor) {
+export async function loadVendorCliEnv(dir, vendor, options = {}) {
   const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
   const { configs } = await loadAllConfigs(dir);
   const projectConfig = await loadEffectiveProjectConfig(dir);
   const envPolicy = configs.hench?.guard?.env ?? projectConfig.hench?.guard?.env;
   const llmConfig = await loadLLMConfig(dir);
-  return resolveVendorCliEnv({ ...llmConfig, vendor }, await applyRepoTrustToEnvPolicy(dir, envPolicy));
+  return resolveVendorCliEnv({ ...llmConfig, vendor }, await applyRepoTrustToEnvPolicy(dir, envPolicy, options.trust));
 }
 
 /** Directories already warned about, so a loop of reviews warns once. */
@@ -2524,10 +2527,10 @@ const warnedUntrustedEnvAllow = new Set();
  * the state of any checkout with an unaccepted `env-allow-added` finding.
  * Loaded dynamically: config.js may not import packages statically.
  */
-async function applyRepoTrustToEnvPolicy(dir, envPolicy) {
+async function applyRepoTrustToEnvPolicy(dir, envPolicy, trust) {
   if (!envPolicy?.allow?.length) return envPolicy;
   const { evaluateRepoTrust } = await import("@n-dx/llm-client");
-  const evaluation = evaluateRepoTrust(dir);
+  const evaluation = evaluateRepoTrust(dir, trust);
   if (!evaluation.restricted) return envPolicy;
   if (!warnedUntrustedEnvAllow.has(dir)) {
     warnedUntrustedEnvAllow.add(dir);

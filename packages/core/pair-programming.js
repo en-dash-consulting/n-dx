@@ -540,11 +540,12 @@ const doNotTrack = (child) => child;
  *   dir: string;
  *   reviewer?: "claude" | "codex";
  *   timeout?: number;
+ *   trust?: import("@n-dx/llm-client").RepoTrustStoreOptions;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
  */
-export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
-  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE);
+export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack, trust }) {
+  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE, { trust });
   return new Promise((resolve) => {
     let child;
     try {
@@ -607,11 +608,12 @@ export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout =
  *   dir: string;
  *   reviewer?: "claude" | "codex";
  *   timeout?: number;
+ *   trust?: import("@n-dx/llm-client").RepoTrustStoreOptions;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
  */
-export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
-  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE);
+export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack, trust }) {
+  const env = await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE, { trust });
   return new Promise((resolve) => {
     let child;
     try {
