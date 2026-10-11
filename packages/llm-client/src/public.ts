@@ -151,7 +151,7 @@ export type {
 export { ClaudeClientError, CLIError, CLI_ERROR_CODES, AuthFailureError } from "./types.js";
 
 // Vendor-neutral config + client factories
-export { loadLLMConfig, resolveClaudeConfig } from "./llm-config.js";
+export { loadLLMConfig, parseLLMConfig, resolveClaudeConfig } from "./llm-config.js";
 export type { ClaudeFieldSource, ResolvedClaudeConfig } from "./llm-config.js";
 export {
   createLLMClient,

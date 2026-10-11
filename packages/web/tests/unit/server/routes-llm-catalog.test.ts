@@ -342,6 +342,99 @@ describe("GET /api/llm/catalog — defaultModel", () => {
   });
 });
 
+describe("GET /api/llm/catalog — readiness", () => {
+  const CLI_OK = { stdout: "2.1.286 (Claude Code)", stderr: "", exitCode: 0, error: null, launched: true };
+
+  beforeEach(() => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+  });
+
+  it("claude on the CLI is ready when the CLI is found, and says which version", async () => {
+    execMock.mockResolvedValue(CLI_OK);
+    const { claude } = await getCatalog();
+    expect(claude.readiness).toEqual({ state: "ready", summary: "Ready · CLI 2.1.286", apiKey: false });
+  });
+
+  it("claude on the CLI needs setup when the CLI is missing", async () => {
+    const { claude } = await getCatalog();
+    expect(claude.readiness).toEqual({ state: "needs-setup", summary: "CLI not found", apiKey: false });
+  });
+
+  it("claude on the API is ready when a key resolves, even with no CLI", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    vendorFetch.mockResolvedValue(jsonOk({ data: [] }));
+    await writeConfig({ hench: { provider: "api" } });
+    const { claude } = await getCatalog();
+    expect(claude.readiness).toEqual({ state: "ready", summary: "Ready · API key set", apiKey: true });
+  });
+
+  it("claude on the API needs setup when no key resolves, even with the CLI installed", async () => {
+    execMock.mockResolvedValue(CLI_OK);
+    await writeConfig({ hench: { provider: "api" } });
+    const { claude } = await getCatalog();
+    expect(claude.readiness).toEqual({ state: "needs-setup", summary: "API key missing", apiKey: false });
+  });
+
+  it("claude on the CLI reports a present key without making it the readiness", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    vendorFetch.mockResolvedValue(jsonOk({ data: [] }));
+    const { claude } = await getCatalog();
+    expect(claude.readiness).toEqual({ state: "needs-setup", summary: "CLI not found", apiKey: true });
+  });
+
+  it("codex is ready when the CLI is found and needs setup when it is not", async () => {
+    execMock.mockImplementation(async (cmd: string) => (cmd === "codex" ? { ...CLI_OK, stdout: "codex-cli 0.46.0" } : MISSING_CLI));
+    expect((await getCatalog()).codex.readiness).toEqual({ state: "ready", summary: "Ready · CLI 0.46.0" });
+
+    execMock.mockResolvedValue(MISSING_CLI);
+    expect((await getCatalog("?refresh=true")).codex.readiness).toEqual({ state: "needs-setup", summary: "CLI not found" });
+  });
+
+  it("google is ready when a key resolves from config or its env var", async () => {
+    await writeConfig({ llm: { google: { api_key: SECRET } } });
+    expect((await getCatalog()).google.readiness).toEqual({ state: "ready", summary: "Ready · API key set", apiKey: true });
+
+    await writeConfig({});
+    vi.stubEnv("GEMINI_API_KEY", SECRET);
+    expect((await getCatalog()).google.readiness.state).toBe("ready");
+  });
+
+  it("google needs setup when no key resolves", async () => {
+    expect((await getCatalog()).google.readiness).toEqual({ state: "needs-setup", summary: "API key missing", apiKey: false });
+  });
+
+  it("local is ready when the server answers", async () => {
+    const fake = createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ data: [{ id: "m" }] }));
+    });
+    await new Promise<void>((resolve) => fake.listen(0, "127.0.0.1", resolve));
+    const addr = fake.address();
+    const port = typeof addr === "object" && addr ? addr.port : 0;
+    try {
+      await writeConfig({ llm: { local: { host: "127.0.0.1", port } } });
+      expect((await getCatalog()).local.readiness).toEqual({ state: "ready", summary: `Ready · 127.0.0.1:${port}` });
+    } finally {
+      await new Promise<void>((resolve) => fake.close(() => resolve()));
+    }
+  });
+
+  it("local is unreachable, naming the address, when nothing answers", async () => {
+    await writeConfig({ llm: { local: { host: "127.0.0.1", port: 1 } } });
+    expect((await getCatalog()).local.readiness).toEqual({ state: "unreachable", summary: "Not reachable · 127.0.0.1:1" });
+  });
+
+  it("never returns a key value", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    vendorFetch.mockResolvedValue(jsonOk({ data: [] }));
+    await writeConfig({ hench: { provider: "api" }, llm: { google: { api_key: `${SECRET}-google` } } });
+    const res = await fetch(`${baseUrl}/api/llm/catalog`);
+    const text = await res.text();
+    expect(text).not.toContain(SECRET);
+    expect(JSON.parse(text).google.readiness.apiKey).toBe(true);
+  });
+});
+
 describe("validateCatalogModel — the execute route's per-run model check", () => {
   it("still accepts a live-only model the modal offered after the catalog cache expires", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
