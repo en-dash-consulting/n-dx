@@ -341,6 +341,31 @@ describe("n-dx config", () => {
       expect(config.maxTurns).toBe(100);
     });
 
+    it("accepts hench.review.mode, vendor and rounds and stores them under review", async () => {
+      run(["hench.review.mode", "pair", tmpDir]);
+      run(["hench.review.vendor", "codex", tmpDir]);
+      run(["hench.review.rounds", "3", tmpDir]);
+
+      const config = JSON.parse(
+        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+      );
+      expect(config.review).toEqual({ mode: "pair", vendor: "codex", rounds: 3 });
+    });
+
+    it.each([
+      ["hench.review.rounds", "4", /Invalid review rounds/],
+      ["hench.review.rounds", "0", /Invalid review rounds/],
+      ["hench.review.mode", "sometimes", /Invalid review mode/],
+      ["hench.review.vendor", "google", /Invalid reviewer/],
+    ])("rejects %s %s with a message", async (key, value, message) => {
+      expect(runFail([key, value, tmpDir])).toMatch(message);
+
+      const config = JSON.parse(
+        await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"),
+      );
+      expect(config.review).toBeUndefined();
+    });
+
     it("sets a nested value", async () => {
       run(["hench.guard.commandTimeout", "60000", tmpDir]);
 
