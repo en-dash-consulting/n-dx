@@ -33,9 +33,21 @@ import {
 } from "@n-dx/llm-client";
 import type { LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
 import { VENDOR_PROVIDERS, validateProviderForVendor } from "./hench-config-fields.js";
-import { resolveEffectiveAgentConfig, resolveEffectiveAgentModel } from "./effective-agent-config.js";
-import { getLiveVendorProbe, clearLlmCatalogCache } from "./llm-catalog.js";
-import type { CliInfo, LiveVendorProbe } from "./llm-catalog.js";
+import {
+  resolveEffectiveAgentConfig,
+  resolveEffectiveAgentModel,
+  resolveEffectiveProvider,
+  readHenchAgentSettings,
+} from "./effective-agent-config.js";
+import {
+  getLiveVendorProbe,
+  clearLlmCatalogCache,
+  claudeReadiness,
+  codexReadiness,
+  googleReadiness,
+  localReadiness,
+} from "./llm-catalog.js";
+import type { CliInfo, LiveVendorProbe, VendorReadiness } from "./llm-catalog.js";
 import type { EffectiveAgentConfig } from "./effective-agent-config.js";
 
 // ---------------------------------------------------------------------------
@@ -765,6 +777,8 @@ export interface VendorCatalogEntry {
   checkedAt: string | null;
   /** Why the built-in list is shown. Present only when `source` is `"built-in"`. */
   reason?: string;
+  /** Whether the vendor can run as configured, judged for the provider it would run on. */
+  readiness: VendorReadiness;
 }
 
 /** A vendor entry whose CLI is installed locally, with what `<binary> --version` reported. */
@@ -784,6 +798,7 @@ export interface LocalCatalogEntry {
   defaultModel: string;
   reachable: boolean;
   reason?: string;
+  readiness: VendorReadiness;
 }
 
 /** Shape returned by GET /api/llm/catalog. */
@@ -853,7 +868,12 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
     getLiveVendorProbe(LLM_VENDOR.CLAUDE, projectDir, { refresh }),
     getLiveVendorProbe(LLM_VENDOR.CODEX, projectDir, { refresh }),
   ]);
-  const cliEntry = (vendor: ListableVendor, probe: LiveVendorProbe): CliVendorCatalogEntry => {
+  const henchProvider = (await readHenchAgentSettings(projectDir)).provider;
+  const cliEntry = (
+    vendor: ListableVendor,
+    probe: LiveVendorProbe,
+    readiness: VendorReadiness,
+  ): CliVendorCatalogEntry => {
     const builtIn = cloudVendorModels(vendor);
     const live = probe.listing.ok;
     return {
@@ -863,6 +883,7 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
       source: live ? "live" : "built-in",
       checkedAt: live ? probe.checkedAt : null,
       ...(probe.listing.ok ? {} : { reason: probe.listing.reason }),
+      readiness,
       cli: probe.cli,
     };
   };
@@ -877,8 +898,12 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
   const localStatus = await probeLocalServer(host, port);
 
   return {
-    claude: cliEntry(LLM_VENDOR.CLAUDE, claudeProbe),
-    codex: cliEntry(LLM_VENDOR.CODEX, codexProbe),
+    claude: cliEntry(
+      LLM_VENDOR.CLAUDE,
+      claudeProbe,
+      claudeReadiness(resolveEffectiveProvider(LLM_VENDOR.CLAUDE, henchProvider), claudeProbe.cli, llmConfig),
+    ),
+    codex: cliEntry(LLM_VENDOR.CODEX, codexProbe, codexReadiness(codexProbe.cli)),
     google: {
       models: cloudVendorModels(LLM_VENDOR.GOOGLE),
       providers: [...VENDOR_PROVIDERS.google],
@@ -886,6 +911,7 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
       source: "built-in",
       checkedAt: null,
       reason: "No live model list for google",
+      readiness: googleReadiness(llmConfig),
     },
     local: {
       models: localStatus.ok ? localStatus.models : [],
@@ -893,6 +919,7 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
       defaultModel: defaultModel(LLM_VENDOR.LOCAL),
       reachable: localStatus.ok,
       ...(localStatus.ok ? {} : { reason: localStatus.error ?? "Local server unreachable" }),
+      readiness: localReadiness(localStatus.ok, `${host}:${port}`),
     },
   };
 }
