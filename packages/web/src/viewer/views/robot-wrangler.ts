@@ -11,6 +11,7 @@
  */
 
 import { h } from "preact";
+import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
@@ -93,6 +94,16 @@ interface CatalogEntry {
   reachable?: boolean;
   reason?: string;
   cli?: CliInfo;
+  /** Whether the vendor can run as configured; `summary` is shown on its card as-is. */
+  readiness?: VendorReadiness;
+}
+
+/** Mirrors the server's `VendorReadiness`: the card shows `summary` and colours by `state`. */
+interface VendorReadiness {
+  state: "ready" | "needs-setup" | "unreachable";
+  summary: string;
+  /** Whether an API key resolves; omitted where no key applies. */
+  apiKey?: boolean;
 }
 
 type LlmCatalog = Record<ViewerLLMVendor, CatalogEntry>;
@@ -184,47 +195,111 @@ function resolveProviderField(
   return { value, dirty: value !== saved && !(forcedApi && picked === undefined) };
 }
 
-// ── Vendor selector (segmented control) ───────────────────────────────
+// ── Radio cards ────────────────────────────────────────────────────────
 
-function VendorSelector({
+interface RadioCardItem {
+  id: string;
+  /** Extra class on the card, e.g. a per-vendor hook. */
+  className?: string;
+  content: ComponentChildren;
+}
+
+/**
+ * A `radiogroup` of cards with a roving tabindex: the selected card (else the
+ * first) is the one in the tab order, and the arrow keys move selection and
+ * focus together, wrapping at the ends. Without `onSelect` the group is fixed.
+ */
+function RadioCards({
+  label,
+  items,
+  value,
+  onSelect,
+  groupClass,
+}: {
+  label: string;
+  items: RadioCardItem[];
+  value: string | null;
+  onSelect?: (id: string) => void;
+  groupClass: string;
+}) {
+  const selected = items.findIndex((i) => i.id === value);
+  const tabbable = selected >= 0 ? selected : 0;
+  const onKeyDown = (e: KeyboardEvent) => {
+    const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1
+      : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (step === 0 || !onSelect) return;
+    e.preventDefault();
+    const next = (tabbable + step + items.length) % items.length;
+    onSelect(items[next].id);
+    (e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>("[role=radio]")[next]?.focus();
+  };
+  return h("div", { class: `llm-radio-cards ${groupClass}`, role: "radiogroup", "aria-label": label, onKeyDown },
+    items.map((item, i) => {
+      const checked = i === selected;
+      return h("button", {
+        key: item.id,
+        type: "button",
+        role: "radio",
+        "aria-checked": String(checked),
+        tabIndex: i === tabbable ? 0 : -1,
+        class: `llm-radio-card${checked ? " llm-radio-card-selected" : ""}${item.className ? ` ${item.className}` : ""}`,
+        onClick: onSelect ? () => onSelect(item.id) : undefined,
+      },
+        checked ? h("span", { class: "llm-radio-card-check", "aria-hidden": "true" }, "✓") : null,
+        item.content,
+      );
+    }),
+  );
+}
+
+function SectionHeader({ number, title, subtitle }: { number: number; title: string; subtitle: string }) {
+  return h("div", { class: "llm-rw-section-header" },
+    h("h2", { class: "llm-rw-section-title" },
+      h("span", { class: "llm-rw-section-number" }, String(number)),
+      title,
+    ),
+    h("p", { class: "llm-rw-section-subtitle" }, subtitle),
+  );
+}
+
+// ── Section 1: vendor ──────────────────────────────────────────────────
+
+function VendorCards({
   vendor,
+  catalog,
   onChange,
-  localStatus,
 }: {
   vendor: string | null;
-  onChange: (v: string | null) => void;
-  localStatus: LocalStatusResponse | null;
+  catalog: LlmCatalog | null;
+  onChange: (v: string) => void;
 }) {
-  const cliName = useCliName();
-  return h("div", { class: "llm-vendor-selector" },
-    h("div", { class: "llm-vendor-tabs" },
-      VENDORS.map((v) => {
-        const active = vendor === v.id;
-        // Connection dot on local tab
-        const connDot =
-          v.id === VIEWER_LLM_VENDOR.LOCAL && localStatus !== null
-            ? h("span", {
-                class: `llm-tab-conn-dot ${localStatus.ok ? "llm-tab-conn-ok" : "llm-tab-conn-err"}`,
-                title: localStatus.ok ? "Server reachable" : "Server unreachable",
-              })
-            : null;
-        return h("button", {
-          key: v.id,
-          class: `llm-vendor-tab${active ? " llm-vendor-tab-active" : ""} llm-vendor-tab-${v.id}`,
-          onClick: () => onChange(v.id),
-          "aria-pressed": String(active),
-        },
-          h("span", { class: `llm-vendor-dot llm-vendor-dot-${v.id}` }),
-          h("span", { class: "llm-tab-name" }, v.label),
-          connDot,
-        );
+  return h("section", { class: "llm-rw-section" },
+    h(SectionHeader, { number: 1, title: "Vendor", subtitle: "Who runs your commands" }),
+    h(RadioCards, {
+      label: "Vendor",
+      groupClass: "llm-vendor-cards",
+      value: vendor,
+      onSelect: onChange,
+      items: VENDORS.map((v) => {
+        const readiness = catalog?.[v.id]?.readiness;
+        return {
+          id: v.id,
+          className: `llm-vendor-card-${v.id}`,
+          content: [
+            h("span", { class: "llm-vendor-card-head" },
+              h("span", { class: `llm-vendor-dot llm-vendor-dot-${v.id}` }),
+              h("span", { class: "llm-vendor-card-name" }, v.label),
+            ),
+            h("span", { class: "llm-vendor-card-org" }, v.subtitle),
+            readiness
+              ? h("span", {
+                  class: `llm-vendor-card-ready llm-vendor-card-ready-${readiness.state === "ready" ? "ok" : "warn"}`,
+                }, readiness.summary)
+              : null,
+          ],
+        };
       }),
-    ),
-    h("p", { class: "llm-vendor-hint" },
-      vendor
-        ? `Using ${VENDORS.find((v) => v.id === vendor)?.subtitle ?? vendor} for all ${cliName} commands.`
-        : `No vendor selected — ${cliName} commands will fall back to defaults.`,
-    ),
+    }),
   );
 }
 
@@ -352,41 +427,75 @@ function CatalogModelPicker({
   );
 }
 
-// ── Provider field ─────────────────────────────────────────────────────
+// ── Section 2: connection ──────────────────────────────────────────────
 
-/** The providers hench accepts for the vendor; one choice is shown as fixed. */
-function ProviderField({
+/** The environment variable a vendor's API connection reads its key from. */
+const API_KEY_ENV: Partial<Record<ViewerLLMVendor, string>> = {
+  [VIEWER_LLM_VENDOR.CLAUDE]: "ANTHROPIC_API_KEY",
+  [VIEWER_LLM_VENDOR.CODEX]: "OPENAI_API_KEY",
+  [VIEWER_LLM_VENDOR.GOOGLE]: "GEMINI_API_KEY",
+};
+
+/** Title and one-line description of one connection a vendor offers. */
+function connectionCopy(
+  vendor: ViewerLLMVendor,
+  provider: HenchProvider,
+  label: string,
+  readiness: VendorReadiness | undefined,
+): { title: string; description: string } {
+  if (provider === "cli") {
+    return {
+      title: `${label} CLI`,
+      description: vendor === VIEWER_LLM_VENDOR.CLAUDE ? "Uses your claude login. Recommended." : `Uses your ${vendor} login.`,
+    };
+  }
+  const keyName = API_KEY_ENV[vendor];
+  const none = readiness?.apiKey === false ? " · none found" : "";
+  return {
+    title: vendor === VIEWER_LLM_VENDOR.CLAUDE ? "Anthropic API" : vendor === VIEWER_LLM_VENDOR.LOCAL ? "Local server" : `${label} API`,
+    description: keyName ? `Needs ${keyName}${none}` : "Talks to the server configured below",
+  };
+}
+
+/** One radio card per provider the catalog offers; a lone provider is shown fixed, with the reason. */
+function ConnectionCards({
+  vendor,
   choices,
   value,
+  readiness,
   onChange,
   dirty,
 }: {
+  vendor: ViewerLLMVendor;
   choices: HenchProvider[];
   value: HenchProvider;
+  readiness: VendorReadiness | undefined;
   onChange: (key: string, v: string) => void;
   dirty: boolean;
 }) {
   const cliName = useCliName();
-  return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
-    h("label", { class: "llm-field-label", htmlFor: "provider" },
-      "Provider",
-      dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-    ),
-    h("p", { class: "llm-field-desc" },
-      choices.length === 1
-        ? `${cliName} work always uses ${choices[0]} for this vendor.`
-        : `How ${cliName} work drives this vendor: through its CLI, or the API directly.`,
-    ),
-    choices.length === 1
-      ? h("span", { id: "provider", class: "llm-provider-fixed" }, choices[0])
-      : h("select", {
-          id: "provider",
-          class: "llm-select-input",
-          value,
-          onChange: (e: Event) => onChange("provider", (e.target as HTMLSelectElement).value),
-        },
-          choices.map((p) => h("option", { key: p, value: p }, p)),
-        ),
+  const label = VENDORS.find((v) => v.id === vendor)?.label ?? vendor;
+  const single = choices.length === 1;
+  return h("section", { class: `llm-rw-section${dirty ? " llm-field-dirty" : ""}` },
+    h(SectionHeader, { number: 2, title: "Connection", subtitle: `How ${cliName} reaches ${label}` }),
+    h(RadioCards, {
+      label: "Connection",
+      groupClass: "llm-connection-cards",
+      value,
+      onSelect: single ? undefined : (id) => onChange(PROVIDER_KEY, id),
+      items: choices.map((p) => {
+        const copy = connectionCopy(vendor, p, label, readiness);
+        return {
+          id: p,
+          className: `llm-connection-card-${p}`,
+          content: [
+            h("span", { class: "llm-connection-card-title" }, copy.title),
+            h("span", { class: "llm-connection-card-desc" },
+              single ? `The only connection ${cliName} supports for ${label}` : copy.description),
+          ],
+        };
+      }),
+    }),
   );
 }
 
@@ -1405,11 +1514,22 @@ export function RobotWranglerView() {
     // What `ndx work` will run, per the route (saved config, not pending edits)
     data ? h(EffectiveBlock, { effective: data.effective, problems: data.effectiveProblems }) : null,
 
-    h(VendorSelector, {
+    h(VendorCards, {
       vendor: effectiveVendor,
+      catalog,
       onChange: handleVendorChange,
-      localStatus: showLocal ? localStatus : null,
     }),
+
+    (effectiveVendor && data)
+      ? h(ConnectionCards, {
+          vendor: effectiveVendor as ViewerLLMVendor,
+          choices: providerChoices.length > 0 ? providerChoices : [provider.value],
+          value: provider.value,
+          readiness: vendorCatalog?.readiness,
+          onChange: handleField,
+          dirty: provider.dirty,
+        })
+      : null,
 
     // Provider and agent model for the active vendor, from the server catalog
     catalogError
@@ -1418,12 +1538,6 @@ export function RobotWranglerView() {
       : null,
     (effectiveVendor && data)
       ? h("div", { key: `agent-${effectiveVendor}`, class: "llm-vendor-section llm-agent-section" },
-          h(ProviderField, {
-            choices: providerChoices.length > 0 ? providerChoices : [provider.value],
-            value: provider.value,
-            onChange: handleField,
-            dirty: provider.dirty,
-          }),
           vendorCatalog
             ? h(CatalogStatus, {
                 vendor: effectiveVendor as ViewerLLMVendor,

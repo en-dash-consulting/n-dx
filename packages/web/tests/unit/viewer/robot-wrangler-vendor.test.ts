@@ -25,16 +25,22 @@ function catalog(overrides: Json = {}): Json {
       models: ["claude-haiku-4-5", "claude-opus-5", "claude-sonnet-5"],
       providers: ["cli", "api"], defaultModel: "claude-sonnet-5",
       source: "live", checkedAt: "2026-10-01T12:00:00.000Z", cli: CLI,
+      readiness: { state: "ready", summary: "Ready · CLI 2.1.0", apiKey: false },
     },
     codex: {
       models: ["gpt-5.5", "gpt-5.6-sol"], providers: ["cli"], defaultModel: "gpt-5.5",
       source: "built-in", checkedAt: null, reason: "No OPENAI_API_KEY", cli: { found: false, version: null, path: null },
+      readiness: { state: "needs-setup", summary: "CLI not found" },
     },
     google: {
       models: ["gemini-2.5-pro", "gemini-3.7-flash"], providers: ["api"], defaultModel: "gemini-2.5-pro",
       source: "built-in", checkedAt: null, reason: "No live model list for google",
+      readiness: { state: "needs-setup", summary: "API key missing", apiKey: false },
     },
-    local: { models: ["qwen3-coder-30b"], providers: ["api"], defaultModel: "qwen3-coder-30b", reachable: true },
+    local: {
+      models: ["qwen3-coder-30b"], providers: ["api"], defaultModel: "qwen3-coder-30b", reachable: true,
+      readiness: { state: "ready", summary: "Ready · localhost:1234" },
+    },
     ...overrides,
   };
 }
@@ -116,6 +122,14 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
   const optionValues = (el: HTMLSelectElement) => Array.from(el.options).map((o) => o.value);
   const optionLabels = (el: HTMLSelectElement) => Array.from(el.options).map((o) => o.textContent);
 
+  const card = (vendor: Vendor) => root.querySelector<HTMLButtonElement>(`.llm-vendor-card-${vendor}`)!;
+  const connection = (provider: string) =>
+    root.querySelector<HTMLButtonElement>(`.llm-connection-card-${provider}`)!;
+
+  async function pickConnection(provider: string) {
+    await act(async () => { connection(provider).click(); });
+  }
+
   async function choose(el: HTMLSelectElement, value: string) {
     await act(async () => {
       el.value = value;
@@ -129,18 +143,25 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
   }
 
   describe.each(VENDORS)("%s", (vendor) => {
-    it("offers exactly the providers the catalog lists, fixed when there is one", async () => {
+    it("offers one connection card per catalog provider, one fixed card with the reason when there is one", async () => {
       stubApi({ config: config(vendor) });
       await mount();
       const providers = (catalog()[vendor] as { providers: string[] }).providers;
 
-      const dropdown = select("provider");
+      const cards = Array.from(root.querySelectorAll(".llm-connection-cards [role=radio]"));
+      expect(cards.map((c) => c.className.match(/llm-connection-card-(\w+)/)?.[1])).toEqual(providers);
+      expect(root.querySelector("select#provider")).toBeNull();
       if (providers.length === 1) {
-        expect(dropdown).toBeNull();
-        expect(root.querySelector("#provider")?.textContent).toBe(providers[0]);
-      } else {
-        expect(optionValues(dropdown!)).toEqual(providers);
+        expect(cards[0].textContent).toContain("The only connection n-dx supports for");
+        expect(cards[0].getAttribute("aria-checked")).toBe("true");
       }
+    });
+
+    it("shows the catalog's readiness summary on the vendor's card", async () => {
+      stubApi({ config: config(vendor) });
+      await mount();
+      const summary = ((catalog()[vendor] as { readiness: { summary: string } }).readiness).summary;
+      expect(card(vendor).querySelector(".llm-vendor-card-ready")?.textContent).toBe(summary);
     });
 
     it("lists the catalog models for the agent, project and light model, and nothing else", async () => {
@@ -224,7 +245,7 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     await mount();
     expect(root.querySelector(".llm-catalog-cli")?.textContent).toBe("CLI 2.1.0");
 
-    await act(async () => { root.querySelector<HTMLButtonElement>(".llm-vendor-tab-codex")!.click(); });
+    await act(async () => { card("codex").click(); });
     expect(root.querySelector(".llm-catalog-cli")?.textContent).toBe("CLI not found");
 
     const buttons = Array.from(root.querySelectorAll(".llm-catalog-status button")).map((b) => b.textContent);
@@ -243,13 +264,13 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     await mount();
     expect(optionValues(select("agent.claude")!)).toContain("claude-opus-5");
 
-    await act(async () => { root.querySelector<HTMLButtonElement>(".llm-vendor-tab-codex")!.click(); });
+    await act(async () => { card("codex").click(); });
 
     expect(select("agent.claude")).toBeNull();
     expect(optionValues(select("agent.codex")!)).toEqual(["", "gpt-5.5", "gpt-5.6-sol", "__other__"]);
     expect(optionValues(select("agent.codex")!)).not.toContain("claude-opus-5");
-    expect(select("provider")).toBeNull();
-    expect(root.querySelector("#provider")?.textContent).toBe("cli");
+    expect(root.querySelectorAll(".llm-connection-cards [role=radio]")).toHaveLength(1);
+    expect(connection("cli").getAttribute("aria-checked")).toBe("true");
     expect(api.calls.filter((c) => c.url.includes("/api/llm/catalog"))).toHaveLength(1);
   });
 
@@ -268,12 +289,49 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
     expect(src).not.toMatch(/["'`](claude-(sonnet|opus|haiku|fable)|gpt-5|gemini-)/);
   });
 
+  describe("radio cards", () => {
+    const key = (el: Element, k: string) =>
+      act(async () => { el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true })); });
+
+    it("forms a radiogroup with a roving tabindex on the selected vendor", async () => {
+      stubApi({ config: config("claude") });
+      await mount();
+      const group = root.querySelector(".llm-vendor-cards")!;
+      expect(group.getAttribute("role")).toBe("radiogroup");
+      const cards = Array.from(group.querySelectorAll<HTMLElement>("[role=radio]"));
+      expect(cards.map((c) => c.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false"]);
+      expect(cards.map((c) => c.tabIndex)).toEqual([0, -1, -1, -1]);
+    });
+
+    it("moves the selection and focus with the arrow keys, wrapping, as an unsaved edit", async () => {
+      const api = stubApi({ config: config("claude") });
+      await mount();
+      await key(card("claude"), "ArrowRight");
+      expect(card("codex").getAttribute("aria-checked")).toBe("true");
+      expect(card("codex").tabIndex).toBe(0);
+      expect(document.activeElement).toBe(card("codex"));
+      expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("Unsaved changes");
+
+      await key(card("codex"), "ArrowLeft");
+      await key(card("claude"), "ArrowLeft");
+      expect(card("local").getAttribute("aria-checked")).toBe("true");
+      expect(api.puts()).toHaveLength(0);
+    });
+
+    it("marks a missing API key on the connection that needs it", async () => {
+      stubApi({ config: config("claude") });
+      await mount();
+      expect(connection("cli").textContent).toContain("Uses your claude login. Recommended.");
+      expect(connection("api").textContent).toContain("Needs ANTHROPIC_API_KEY · none found");
+    });
+  });
+
   describe("save ordering across the two routes", () => {
     it("writes PUT /api/llm/config before PUT /api/hench/config", async () => {
       const api = stubApi({ config: config("claude"), henchProvider: "cli" });
       await mount();
 
-      await choose(select("provider")!, "api");
+      await pickConnection("api");
       await choose(select("agent.claude")!, "claude-opus-5");
       await save();
 
@@ -286,7 +344,7 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
       const api = stubApi({ config: config("claude"), henchProvider: "cli" });
       await mount();
 
-      await choose(select("provider")!, "api");
+      await pickConnection("api");
       await save();
 
       expect(api.puts().map((c) => c.url)).toEqual(["/api/hench/config"]);
@@ -296,7 +354,7 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
       const api = stubApi({ config: config("claude"), henchProvider: "api" });
       await mount();
 
-      await act(async () => { root.querySelector<HTMLButtonElement>(".llm-vendor-tab-codex")!.click(); });
+      await act(async () => { card("codex").click(); });
       await save();
 
       // codex is cli-only and the saved provider is api, so the page moves it to cli.
@@ -309,14 +367,14 @@ describe("Robot Wrangler — vendor provider and model fields", () => {
       const api = stubApi({ config: config("claude"), henchProvider: "cli", failHench: true });
       await mount();
 
-      await choose(select("provider")!, "api");
+      await pickConnection("api");
       await choose(select("agent.claude")!, "claude-opus-5");
       await save();
 
       expect(api.puts()).toHaveLength(2);
       expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("Unsaved changes");
       expect(root.textContent).toContain('Provider "api" is not supported for vendor "codex".');
-      expect(root.querySelector(".llm-field-dirty #provider, .llm-field-dirty select#provider")).not.toBeNull();
+      expect(root.querySelector(".llm-field-dirty .llm-connection-cards")).not.toBeNull();
       expect(root.querySelector(`.llm-field-dirty select[id="agent.claude"]`)).toBeNull();
 
       // A retry sends the provider alone: the model write is not repeated.

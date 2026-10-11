@@ -41,74 +41,123 @@
 
 /* ── Vendor selector (segmented control) ────────────────────────── */
 
-.llm-vendor-selector {
+.llm-rw-section {
   margin-bottom: var(--space-4);
 }
 
-.llm-vendor-tabs {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
+.llm-rw-section-header { margin-bottom: var(--space-2); }
 
-.llm-vendor-tab {
+.llm-rw-section-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 18px;
-  background: transparent;
-  border: none;
-  border-right: 1px solid var(--border);
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-dim);
-  transition: background 0.12s, color 0.12s;
-  white-space: nowrap;
-}
-
-.llm-vendor-tab:last-child {
-  border-right: none;
-}
-
-.llm-vendor-tab:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.llm-vendor-tab-active {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--text);
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 0.9375rem;
   font-weight: 600;
+  color: var(--text);
 }
 
-/* Per-vendor active tint — overrides the generic accent tint */
-.llm-vendor-tab-active.llm-vendor-tab-claude { background: color-mix(in srgb, #d97706 14%, transparent); }
-.llm-vendor-tab-active.llm-vendor-tab-codex  { background: color-mix(in srgb, #2563eb 14%, transparent); }
-.llm-vendor-tab-active.llm-vendor-tab-google { background: color-mix(in srgb, #7c3aed 14%, transparent); }
-.llm-vendor-tab-active.llm-vendor-tab-local  { background: color-mix(in srgb, #16a34a 14%, transparent); }
-
-.llm-tab-name { /* no extra style needed */ }
-
-/* Connection dot shown on the Local tab */
-.llm-tab-conn-dot {
-  width: 6px;
-  height: 6px;
+.llm-rw-section-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  flex-shrink: 0;
+  background: var(--bg-hover);
+  font-size: 0.75rem;
+  color: var(--text-dim);
 }
 
-.llm-tab-conn-ok  { background: #16a34a; }
-.llm-tab-conn-err { background: var(--red); }
-
-.llm-vendor-hint {
-  margin-top: var(--space-2);
+.llm-rw-section-subtitle {
+  margin: 2px 0 0;
   font-size: 0.8125rem;
   color: var(--text-dim);
 }
 
-/* Vendor color dots (used in the tabs) */
+/* Radio cards: vendors (four across) and connections (one per provider) */
+.llm-radio-cards {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.llm-vendor-cards { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.llm-connection-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+.llm-radio-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.llm-radio-card:hover { background: var(--bg-hover); }
+
+.llm-radio-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.llm-radio-card-selected {
+  /* 2px border without shifting layout: swap 1px border for a 1px ring */
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.llm-radio-card-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg-surface);
+  font-size: 0.6875rem;
+  line-height: 1;
+}
+
+.llm-vendor-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.llm-vendor-card-org,
+.llm-connection-card-desc {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+
+.llm-vendor-card-ready {
+  margin-top: var(--space-2);
+  font-size: 0.75rem;
+}
+
+.llm-vendor-card-ready-ok { color: var(--green); }
+.llm-vendor-card-ready-warn { color: var(--orange); }
+
+.llm-connection-card-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Vendor color dots (used on the vendor cards) */
 .llm-vendor-dot {
   display: inline-block;
   width: 7px;
@@ -362,13 +411,6 @@
 
 /* Provider, catalog provenance and agent model for the active vendor */
 .llm-agent-section { margin-bottom: var(--space-4); }
-
-.llm-provider-fixed {
-  display: inline-block;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.875rem;
-  color: var(--text-dim);
-}
 
 .llm-catalog-status {
   display: flex;
