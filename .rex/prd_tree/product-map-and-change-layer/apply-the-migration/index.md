@@ -30,4 +30,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Applying a migration plan does not refuse one whose model pass is marked incomplete](./applying-a-migration-plan-does-not.md) | pending |
 | [Chain layout and schema steps in ndx migrate and refuse legacy projects](./chain-layout-and-schema-steps-in-ndx.md) | pending |
 | [Convert stray v1 files and warn on unreachable apply commits](./convert-stray-v1-files-and-warn-on.md) | pending |
+| [Migrated product nodes read met when their v1 item completed](./migrated-product-nodes-read-met-when.md) | pending |
+| [Placement reads code evidence: commits and zones of a held change rank the capabilities realized in the same zones](./placement-reads-code-evidence-commits.md) | pending |
 | [Remove the prd.md and prd.json read fallbacks and the old migrate commands](./remove-the-prd-md-and-prd-json-read.md) | pending |
