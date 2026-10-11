@@ -3543,7 +3543,7 @@ async function collectRunCommits(projectDir: string, startHead: string | undefin
     if (!trimmed) return [];
     return trimmed.split("\n").map((line) => {
       const [sha, ...rest] = line.split("\x1f");
-      return { sha, subject: rest.join("\x1f") };
+      return { sha, subject: rest.join("\x1f"), attribution: "start-head" as const };
     });
   } catch {
     // Best-effort: a run whose commits cannot be enumerated still reports

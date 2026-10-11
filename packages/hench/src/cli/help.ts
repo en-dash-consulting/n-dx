@@ -509,6 +509,34 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["status", "show"],
   },
+  "backfill-commits": {
+    tool: "hench",
+    command: "backfill-commits",
+    summary: "fill commits on run records written without one",
+    usage: "hench backfill-commits [options] [dir]",
+    description:
+      "A run record's commits tie the run, and so its task, to the code it\n" +
+      "changed. The live path fills them from startHead..HEAD; a record written\n" +
+      "before startHead existed has none. This reads the main branch once and\n" +
+      "ties each commit to at most one run: a subject naming the run id, then\n" +
+      "an N-DX-Item trailer naming the run's task, then the run's time window\n" +
+      "(startedAt to finishedAt plus --pad) when no other run's window holds it.\n" +
+      "Merge and chore(prd) commits are never attributed; a record that has\n" +
+      "commits is left alone, so the command is idempotent. Each commit written\n" +
+      "says how it was tied (attribution: subject, trailer or window).",
+    options: [
+      { flag: "--ref=<branch>", description: "The branch the commits landed on (default: origin/HEAD, origin/main, main, then HEAD)" },
+      { flag: "--pad=<minutes>", description: "How far a run's window reaches past its last recorded time, used only when no window proper holds the commit (default 10)" },
+      { flag: "--max-window=<minutes>", description: "A run whose window is longer than this (a run an audit ended weeks later) attributes nothing by window (default 360)" },
+      { flag: "--dry-run", description: "Report what would be filled without writing" },
+      { flag: "--format=json", description: "Output the plan as JSON for scripting" },
+    ],
+    examples: [
+      { command: "hench backfill-commits --dry-run", description: "See what history can be tied to runs" },
+      { command: "hench backfill-commits --ref=main", description: "Fill from the local main when origin is not the canonical repository" },
+    ],
+    related: ["status", "show"],
+  },
   "validate-tokens": {
     tool: "hench",
     command: "validate-tokens",
