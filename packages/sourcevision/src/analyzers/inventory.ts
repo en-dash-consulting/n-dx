@@ -13,7 +13,7 @@ import { toPosix } from "../util/paths.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { typescriptConfig } from "../language/typescript.js";
 import { csharpConfig } from "../language/csharp.js";
-import { terraformConfig } from "../language/terraform.js";
+import { terraformConfig, isTerraformFile } from "../language/terraform.js";
 import type { LanguageConfig } from "../language/registry.js";
 
 // ── Skip patterns ────────────────────────────────────────────────────────────
@@ -124,8 +124,6 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   ".txt": "Text",
   ".rst": "reStructuredText",
   ".sql": "SQL",
-  ".tf": "Terraform",
-  ".tfvars": "Terraform",
   ".graphql": "GraphQL",
   ".gql": "GraphQL",
   ".proto": "Protobuf",
@@ -144,7 +142,7 @@ export function detectLanguage(filePath: string): string {
   if (name === "Makefile" || name === "GNUmakefile") return "Makefile";
   if (name === "Dockerfile" || name.startsWith("Dockerfile.")) return "Dockerfile";
   if (name === "Vagrantfile") return "Ruby";
-  if (name === "terragrunt.hcl" || name.endsWith(".tftest.hcl")) return "Terraform";
+  if (isTerraformFile(name)) return "Terraform";
   if (name === "Rakefile" || name === "Gemfile") return "Ruby";
   if (name === "Justfile") return "Just";
   if (name === "CMakeLists.txt" || ext === ".cmake") return "CMake";
