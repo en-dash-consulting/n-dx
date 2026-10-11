@@ -15,7 +15,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Robot Wrangler stack 2/9 · Settings fixes the redesign stands on](./robot-wrangler-stack-2-9-settings/index.md) | completed |
 | [Robot Wrangler stack 3/9 · Review settings and a safe cross-vendor reviewer path](./robot-wrangler-stack-3-9-review/index.md) | completed |
-| [Robot Wrangler stack 4/9 · Robot Wrangler server: readiness, tiers, failover, review and preview](./robot-wrangler-stack-4-9-robot/index.md) | completed |
+| [Robot Wrangler stack 4/9 · Robot Wrangler server: readiness, tiers, failover, review and preview](./robot-wrangler-stack-4-9-robot/index.md) | pending |
 | [Robot Wrangler stack 5/9 · Robot Wrangler page: run card, vendors, tiers, failover and review](./robot-wrangler-stack-5-9-robot/index.md) | pending |
 | [Robot Wrangler stack 6/9 · Robot Wrangler finish: local layout, save bar and polish](./robot-wrangler-stack-6-9-robot/index.md) | pending |
 | [Robot Wrangler stack 7/9 · Pair review: configurable reviewer and cross-vendor findings](./robot-wrangler-stack-7-9-pair-review/index.md) | pending |
