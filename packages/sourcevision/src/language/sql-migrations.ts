@@ -111,6 +111,8 @@ export function sqlcPaths(configPath: string, content: string, key: "queries" | 
     }
     const indent = (entry[1] ?? "").length;
     for (let j = i + 1; j < lines.length; j++) {
+      const line = (lines[j] ?? "").trim();
+      if (line === "" || line.startsWith("#")) continue;
       const item = /^(\s*)-\s*(.+)$/.exec(lines[j] ?? "");
       if (!item || (item[1] ?? "").length < indent) break;
       const path = unquote(stripYamlComment(item[2] ?? ""));
