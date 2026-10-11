@@ -22,7 +22,7 @@
  */
 
 import { readFile, readdir, access } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { join, extname, basename } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { GeneratedHeaderRule, LanguageConfig } from "./registry.js";
 import { typescriptConfig } from "./typescript.js";
@@ -32,6 +32,7 @@ import { pythonConfig } from "./python.js";
 import { csharpConfig } from "./csharp.js";
 import { javaConfig, javaSecondaryConfig } from "./java.js";
 import { terraformConfig, isTerraformFile } from "./terraform.js";
+import { loadIgnoreFilter, projectSkipDirs, walkProjectFiles } from "../util/project-walk.js";
 
 // ── Config registry ─────────────────────────────────────────────────────────
 
@@ -122,27 +123,31 @@ async function hasJavaMarker(rootDir: string): Promise<boolean> {
   return false;
 }
 
-/** Directories never searched for Terraform files. */
-const TERRAFORM_SCAN_SKIP = new Set(["node_modules", "vendor", "venv", "site-packages"]);
-
 /**
- * Terraform marker present? Any `.tf`, `.tfvars`, `terragrunt.hcl` or
- * `.tftest.hcl` file within three directory levels of the root. Hidden directories (including `.terraform/`) are not searched.
+ * Terraform marker present? Any file `isTerraformFile` accepts, at any depth,
+ * found by the inventory's own walk: the same skipped directories (base,
+ * vendored, `otherConfigs`' and Terraform's `skipDirectories`, the
+ * user's `extraSkipDirs`) and the same `.gitignore` / `.sourcevisionignore`
+ * filter. `otherConfigs` are the languages detected without Terraform, so the
+ * skip set equals the one the analyze-phase inventory uses with the result.
+ * Stops at the first match.
+ *
  * `detectLanguage` consults it only when no other marker matched;
  * `detectLanguages` adds Terraform whenever it is present.
  */
-async function hasTerraformMarker(dir: string, depth = 0): Promise<boolean> {
-  let entries;
+async function hasTerraformMarker(rootDir: string, otherConfigs: readonly LanguageConfig[]): Promise<boolean> {
+  const { extraSkipDirs } = await loadInventoryConfig(rootDir);
+  const skipDirs = projectSkipDirs(
+    [...otherConfigs, terraformConfig].flatMap((c) => [...c.skipDirectories]),
+    extraSkipDirs,
+  );
+  const ig = await loadIgnoreFilter(rootDir);
   try {
-    entries = await readdir(dir, { withFileTypes: true });
+    for await (const relPath of walkProjectFiles(rootDir, rootDir, ig, skipDirs)) {
+      if (isTerraformFile(basename(relPath))) return true;
+    }
   } catch {
-    return false;
-  }
-  if (entries.some((e) => e.isFile() && isTerraformFile(e.name))) return true;
-  if (depth >= 3) return false;
-  for (const e of entries) {
-    if (!e.isDirectory() || e.name.startsWith(".") || TERRAFORM_SCAN_SKIP.has(e.name)) continue;
-    if (await hasTerraformMarker(join(dir, e.name), depth + 1)) return true;
+    // Unreadable root — no marker, as for the other languages' checks.
   }
   return false;
 }
@@ -367,7 +372,8 @@ export async function detectLanguage(rootDir: string): Promise<LanguageConfig> {
   if (await hasJavaMarker(rootDir)) return javaConfig;
 
   // Terraform is primary only when nothing else matched; Java outranks it.
-  if (await hasTerraformMarker(rootDir)) return terraformConfig;
+  // Searched as the TypeScript fallback would be inventoried.
+  if (await hasTerraformMarker(rootDir, [typescriptConfig])) return terraformConfig;
 
   // Step 6: No markers → fallback to TypeScript/JS
   return typescriptConfig;
@@ -398,7 +404,6 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
   ]);
 
   const hasJava = await hasJavaMarker(rootDir);
-  const hasTerraform = await hasTerraformMarker(rootDir);
   const present: Array<{ config: LanguageConfig; count: number }> = [];
 
   // When any markers are present, count source files so we can order by
@@ -413,9 +418,10 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
   }
 
   // No markers → fallback to TypeScript/JS for backward compatibility.
+  // Terraform is searched with the skip set of what would be returned without it.
   if (present.length === 0) {
-    if (hasJava) return hasTerraform ? [javaConfig, terraformConfig] : [javaConfig];
-    return [hasTerraform ? terraformConfig : typescriptConfig];
+    if (hasJava) return (await hasTerraformMarker(rootDir, [javaConfig])) ? [javaConfig, terraformConfig] : [javaConfig];
+    return [(await hasTerraformMarker(rootDir, [typescriptConfig])) ? terraformConfig : typescriptConfig];
   }
 
   // Stable ordering by descending file count, ties broken by the same
@@ -429,7 +435,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
   // secondary variant keeps Java from skipping or flagging the primary
   // language's `out/` and `generated/` files.
   if (hasJava) configs.push(javaSecondaryConfig);
-  if (hasTerraform) configs.push(terraformConfig);
+  if (await hasTerraformMarker(rootDir, configs)) configs.push(terraformConfig);
   return configs;
 }
 

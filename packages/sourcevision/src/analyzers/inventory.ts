@@ -3,54 +3,19 @@
  * Replaces the Claude-based phase 1 with pure TypeScript.
  */
 
-import { readFile, readdir, stat } from "node:fs/promises";
-import {join, relative, extname, basename} from "node:path";import { createHash } from "node:crypto";
-import { PROJECT_DIRS, isVerbose, verbose } from "@n-dx/llm-client";
+import { readFile, stat } from "node:fs/promises";
+import { join, extname, basename } from "node:path";
+import { createHash } from "node:crypto";
+import { isVerbose, verbose } from "@n-dx/llm-client";
 import type { FileEntry, FileRole, Inventory } from "../schema/index.js";
 import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
-import { toPosix } from "../util/paths.js";
+import { loadIgnoreFilter, projectSkipDirs, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { typescriptConfig } from "../language/typescript.js";
 import { csharpConfig } from "../language/csharp.js";
 import { terraformConfig, isTerraformFile } from "../language/terraform.js";
 import type { LanguageConfig } from "../language/registry.js";
-
-// ── Skip patterns ────────────────────────────────────────────────────────────
-
-/** Always-skipped directories regardless of language config. */
-const BASE_SKIP_DIRS: ReadonlySet<string> = new Set([
-  ".git",
-  // n-dx tooling state, not user source — exclude from the inventory entirely
-  // so generated PRD markdown / logs don't skew the Overview language stats.
-  PROJECT_DIRS.SOURCEVISION,
-  PROJECT_DIRS.REX,
-  PROJECT_DIRS.HENCH,
-]);
-
-/**
- * Vendored third-party dependency directories, excluded from the inventory in
- * every project regardless of detected language. These hold code the project
- * did not author (like `node_modules`), so scanning them inflates language
- * stats and pollutes source-logic analysis. Per-language configs still add
- * their own vendored dirs (e.g. Go's `vendor/`, Python's virtualenvs); this
- * universal set covers cross-language conventions and the JS ecosystem's own
- * vendored dirs, which a non-Go/Python project would otherwise never skip.
- * Matched by exact directory name at any depth, so a plural `vendors/` dir or
- * a `vendor-utils.ts` source file is unaffected.
- */
-const VENDOR_SKIP_DIRS: ReadonlySet<string> = new Set([
-  "vendor",
-  "vendored",
-  "third_party",
-  "third-party",
-  "thirdparty",
-  "bower_components",
-  "jspm_packages",
-  "web_modules",
-  "Godeps",
-  ".yarn",
-]);
 
 // ── Language detection ───────────────────────────────────────────────────────
 
@@ -401,167 +366,6 @@ export function isBinary(buf: Buffer): boolean {
   return check.includes(0);
 }
 
-// ── Ignore filter ────────────────────────────────────────────────────────────
-
-interface IgnoreRule {
-  regex: RegExp;
-  negated: boolean;
-  dirOnly: boolean;
-}
-
-function compilePattern(pattern: string): IgnoreRule {
-  let negated = false;
-  let dirOnly = false;
-
-  // Leading ! means negation
-  if (pattern.startsWith("!")) {
-    negated = true;
-    pattern = pattern.slice(1);
-  }
-
-  // Trailing / means directory-only
-  if (pattern.endsWith("/")) {
-    dirOnly = true;
-    pattern = pattern.slice(0, -1);
-  }
-
-  // Leading / means anchored to root; otherwise matches at any depth
-  const anchored = pattern.startsWith("/");
-  if (anchored) {
-    pattern = pattern.slice(1);
-  }
-
-  // Convert gitignore glob to regex
-  let regex = "";
-  let i = 0;
-  while (i < pattern.length) {
-    const ch = pattern[i];
-    if (ch === "*") {
-      if (pattern[i + 1] === "*") {
-        if (pattern[i + 2] === "/") {
-          // **/ matches zero or more directories
-          regex += "(?:.*/)?";
-          i += 3;
-          continue;
-        }
-        // ** at end or mid-pattern matches everything
-        regex += ".*";
-        i += 2;
-        continue;
-      }
-      regex += "[^/]*";
-      i++;
-    } else if (ch === "?") {
-      regex += "[^/]";
-      i++;
-    } else if (ch === "[") {
-      // Pass through character classes
-      const close = pattern.indexOf("]", i + 1);
-      if (close === -1) {
-        regex += "\\[";
-        i++;
-      } else {
-        regex += pattern.slice(i, close + 1);
-        i = close + 1;
-      }
-    } else if (".+^${}()|\\".includes(ch)) {
-      regex += "\\" + ch;
-      i++;
-    } else {
-      regex += ch;
-      i++;
-    }
-  }
-
-  // If pattern contains a slash, it's always anchored
-  const hasSlash = pattern.includes("/");
-  if (anchored || hasSlash) {
-    regex = "^" + regex;
-  } else {
-    // Matches at any depth: can appear after a /
-    regex = "(?:^|/)" + regex;
-  }
-
-  regex += "$";
-
-  return { regex: new RegExp(regex), negated, dirOnly };
-}
-
-export class IgnoreFilter {
-  private rules: IgnoreRule[] = [];
-
-  add(content: string): void {
-    for (const raw of content.split("\n")) {
-      const line = raw.trim();
-      if (!line || line.startsWith("#")) continue;
-      this.rules.push(compilePattern(line));
-    }
-  }
-
-  ignores(path: string): boolean {
-    const isDir = path.endsWith("/");
-    const testPath = isDir ? path.slice(0, -1) : path;
-
-    let ignored = false;
-    for (const rule of this.rules) {
-      if (rule.dirOnly && !isDir) continue;
-      if (rule.regex.test(testPath)) {
-        ignored = !rule.negated;
-      }
-    }
-    return ignored;
-  }
-}
-
-export async function loadIgnoreFilter(rootDir: string): Promise<IgnoreFilter> {
-  const filter = new IgnoreFilter();
-
-  for (const name of [".gitignore", ".sourcevisionignore"]) {
-    try {
-      const content = await readFile(join(rootDir, name), "utf-8");
-      filter.add(content);
-    } catch {
-      // File doesn't exist — skip
-    }
-  }
-
-  return filter;
-}
-
-// ── File discovery ───────────────────────────────────────────────────────────
-
-async function walkDir(
-  dir: string,
-  rootDir: string,
-  ig: IgnoreFilter,
-  skipDirs: ReadonlySet<string>,
-  acceptFile?: (relPath: string) => boolean,
-): Promise<string[]> {
-  const files: string[] = [];
-  const entries = await readdir(dir, { withFileTypes: true });
-
-  for (const entry of entries) {
-    if (skipDirs.has(entry.name)) continue;
-    if (entry.name === ".gitkeep") continue;
-
-    const fullPath = join(dir, entry.name);
-    const relPath = toPosix(relative(rootDir, fullPath));
-
-    if (entry.isDirectory()) {
-      if (ig.ignores(relPath + "/")) continue;
-      const sub = await walkDir(fullPath, rootDir, ig, skipDirs, acceptFile);
-      files.push(...sub);
-    } else if (entry.isFile()) {
-      if (ig.ignores(relPath)) continue;
-      // Code-only filter — skip non-code files before they are stat'd/read.
-      if (acceptFile && !acceptFile(relPath)) continue;
-      files.push(relPath);
-    }
-  }
-
-  return files;
-}
-
 // ── Incremental types ────────────────────────────────────────────────────────
 
 export interface InventoryOptions {
@@ -617,7 +421,7 @@ export async function analyzeInventory(
   const extraSkipDirs = options?.extraSkipDirs ?? inventoryConfig.extraSkipDirs ?? [];
 
   // Build skip set: always-skipped dirs + vendored deps + language-specific dirs + user extras
-  const skipDirs = new Set([...BASE_SKIP_DIRS, ...VENDOR_SKIP_DIRS, ...langConfig.skipDirectories, ...extraSkipDirs]);
+  const skipDirs = projectSkipDirs(langConfig.skipDirectories, extraSkipDirs);
 
   // Extensions rejected by the code-only filter below, tallied by extension —
   // surfaced on the summary as `skippedExtensions` so a project whose files
@@ -638,7 +442,11 @@ export async function analyzeInventory(
   };
 
   const ig = await loadIgnoreFilter(absDir);
-  const filePaths = await walkDir(absDir, absDir, ig, skipDirs, acceptFile);
+  // Code-only filter applied before files are stat'd/read.
+  const filePaths: string[] = [];
+  for await (const relPath of walkProjectFiles(absDir, absDir, ig, skipDirs)) {
+    if (acceptFile(relPath)) filePaths.push(relPath);
+  }
 
   const prev = options?.previousInventory;
   const prevMap = new Map<string, FileEntry>();
