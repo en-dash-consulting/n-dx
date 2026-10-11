@@ -3,7 +3,8 @@
  * how failover can fire for the active vendor and provider.
  *
  * Failover only applies to Claude + API provider. For all other combinations,
- * `applies` is false with an explanation.
+ * `applies` is false with an explanation, but the chain is still populated
+ * for vendors that support failover (claude, codex, google).
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -51,7 +52,12 @@ async function writeHenchConfig(config: unknown): Promise<void> {
   );
 }
 
-async function failover(): Promise<{ applies: boolean; reason?: string; chain: string[] }> {
+async function failover(): Promise<{
+  enabled: boolean;
+  applies: boolean;
+  reason?: string;
+  chain: string[];
+}> {
   const res = await fetch(`${baseUrl}/api/llm/config`);
   expect(res.status).toBe(200);
   const body = await res.json();
@@ -59,7 +65,7 @@ async function failover(): Promise<{ applies: boolean; reason?: string; chain: s
 }
 
 describe("GET /api/llm/config — failover block", () => {
-  it("applies=true with chain for Claude API", async () => {
+  it("enabled=false by default; applies=true with chain for Claude API", async () => {
     await writeNdxConfig({
       llm: {
         vendor: "claude",
@@ -71,6 +77,7 @@ describe("GET /api/llm/config — failover block", () => {
     });
 
     const info = await failover();
+    expect(info.enabled).toBe(false);
     expect(info.applies).toBe(true);
     expect(info.reason).toBeUndefined();
     // Chain should have 4 entries: the effective model followed by 3 failover attempts
@@ -85,7 +92,26 @@ describe("GET /api/llm/config — failover block", () => {
     expect(info.chain[3]).toContain("gpt-5");
   });
 
-  it("applies=false with reason for Claude CLI", async () => {
+  it("enabled=true when autoFailover is set; applies=true for Claude API", async () => {
+    await writeNdxConfig({
+      llm: {
+        vendor: "claude",
+        autoFailover: true,
+        claude: { model: "claude-3-5-sonnet-20241022" },
+      },
+    });
+    await writeHenchConfig({
+      provider: "api",
+    });
+
+    const info = await failover();
+    expect(info.enabled).toBe(true);
+    expect(info.applies).toBe(true);
+    expect(info.reason).toBeUndefined();
+    expect(info.chain).toHaveLength(4);
+  });
+
+  it("applies=false with reason and full chain for Claude CLI", async () => {
     await writeNdxConfig({
       llm: {
         vendor: "claude",
@@ -97,12 +123,17 @@ describe("GET /api/llm/config — failover block", () => {
     });
 
     const info = await failover();
+    expect(info.enabled).toBe(false);
     expect(info.applies).toBe(false);
+    expect(info.reason).toContain("Claude CLI");
     expect(info.reason).toContain("API connection");
-    expect(info.chain).toEqual([]);
+    // Chain should still have 4 entries even though failover cannot fire
+    expect(info.chain).toHaveLength(4);
+    expect(info.chain[0]).toBe("claude-3-5-sonnet-20241022");
+    expect(info.chain[1]).toContain("haiku");
   });
 
-  it("applies=false with reason for Codex", async () => {
+  it("applies=false with reason and full chain for Codex", async () => {
     await writeNdxConfig({
       llm: {
         vendor: "codex",
@@ -111,12 +142,20 @@ describe("GET /api/llm/config — failover block", () => {
     });
 
     const info = await failover();
+    expect(info.enabled).toBe(false);
     expect(info.applies).toBe(false);
     expect(info.reason).toContain("Codex");
-    expect(info.chain).toEqual([]);
+    expect(info.reason).toContain("API connection");
+    // Chain should have entries for codex failover
+    expect(info.chain).toHaveLength(4);
+    expect(info.chain[0]).toBe("gpt-5.5");
+    // Attempt 1: codex light
+    expect(info.chain[1]).toContain("gpt-5");
+    // Attempt 2: claude standard
+    expect(info.chain[2]).toContain("claude");
   });
 
-  it("applies=false with reason for Google", async () => {
+  it("applies=false with reason and full chain for Google", async () => {
     await writeNdxConfig({
       llm: {
         vendor: "google",
@@ -125,12 +164,20 @@ describe("GET /api/llm/config — failover block", () => {
     });
 
     const info = await failover();
+    expect(info.enabled).toBe(false);
     expect(info.applies).toBe(false);
-    expect(info.reason).toContain("Google");
-    expect(info.chain).toEqual([]);
+    expect(info.reason).toContain("Google Gemini");
+    expect(info.reason).toContain("API connection");
+    // Chain should have entries for google failover
+    expect(info.chain).toHaveLength(4);
+    expect(info.chain[0]).toBe("gemini-3.5-flash");
+    // Attempt 1: google light
+    expect(info.chain[1]).toContain("gemini");
+    // Attempt 2: claude standard
+    expect(info.chain[2]).toContain("claude");
   });
 
-  it("applies=false with reason for local", async () => {
+  it("applies=false with reason and empty chain for local", async () => {
     await writeNdxConfig({
       llm: {
         vendor: "local",
@@ -139,8 +186,10 @@ describe("GET /api/llm/config — failover block", () => {
     });
 
     const info = await failover();
+    expect(info.enabled).toBe(false);
     expect(info.applies).toBe(false);
     expect(info.reason).toContain("local");
+    expect(info.reason).toContain("API connection");
     expect(info.chain).toEqual([]);
   });
 
@@ -149,9 +198,31 @@ describe("GET /api/llm/config — failover block", () => {
     await writeNdxConfig({});
 
     const info = await failover();
+    expect(info.enabled).toBe(false);
     expect(info.applies).toBe(false);
     // When vendor defaults to claude without API provider, the reason is about CLI
+    expect(info.reason).toContain("Claude CLI");
     expect(info.reason).toContain("API connection");
-    expect(info.chain).toEqual([]);
+    // Chain should still be populated for claude
+    expect(info.chain).toHaveLength(4);
+  });
+
+  it("enabled=true with autoFailover for Claude CLI (still applies=false)", async () => {
+    await writeNdxConfig({
+      llm: {
+        vendor: "claude",
+        autoFailover: true,
+        claude: { model: "claude-3-5-sonnet-20241022" },
+      },
+    });
+    await writeHenchConfig({
+      provider: "cli",
+    });
+
+    const info = await failover();
+    expect(info.enabled).toBe(true);
+    expect(info.applies).toBe(false);
+    expect(info.reason).toContain("Claude CLI");
+    expect(info.chain).toHaveLength(4);
   });
 });

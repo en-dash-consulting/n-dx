@@ -161,6 +161,8 @@ export interface LlmConfigResponse {
 
 /** Failover information for the active vendor/provider combination. */
 export interface FailoverInfo {
+  /** Whether automatic failover is enabled in the config. */
+  enabled: boolean;
   /** Whether failover can fire for this config (true only for Claude + API). */
   applies: boolean;
   /** Why applies is false (empty when applies is true). */
@@ -552,50 +554,83 @@ function readAgentModels(config: Record<string, unknown>): Partial<Record<LLMVen
 /**
  * Build the failover chain for the given effective vendor/provider/model.
  * Returns applies=true with a 4-model chain only for Claude + API.
- * For all other combinations, returns applies=false with an explanation.
+ * For claude (cli), codex, and google, builds the chain even though applies=false.
+ * For local, returns applies=false with an empty chain.
  */
 function buildFailoverInfo(
   effective: EffectiveAgentConfig,
   llmConfig: LLMConfig,
 ): FailoverInfo {
+  const enabled = llmConfig.autoFailover === true;
+
   // Failover only applies to Claude + API provider
   const isClaudeApi = effective.vendor === LLM_VENDOR.CLAUDE && effective.provider === "api";
 
-  if (!isClaudeApi) {
-    // Determine the reason why failover doesn't apply
+  // For vendors that support failover (claude, codex, google), build the chain
+  // but only apply=true for Claude + API
+  const supportsFailover =
+    effective.vendor === LLM_VENDOR.CLAUDE ||
+    effective.vendor === LLM_VENDOR.CODEX ||
+    effective.vendor === LLM_VENDOR.GOOGLE;
+
+  if (supportsFailover) {
+    // Build the failover chain
+    const chain: string[] = [effective.model];
+
+    // Attempts 1-3 represent the next three failover attempts
+    // Safe to use vendor directly since we checked supportsFailover above
+    // and effective.vendor is never null (it defaults to "claude")
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const result = getNextFailoverAttempt(
+        attempt,
+        effective.vendor as "claude" | "codex" | "google",
+        llmConfig,
+      );
+      if (result.isExhausted || !result.model) break;
+      chain.push(result.model);
+    }
+
+    if (isClaudeApi) {
+      // Only Claude + API can actually fire failover
+      return {
+        enabled,
+        applies: true,
+        chain,
+      };
+    }
+
+    // For claude (cli), codex, and google, return the chain but applies=false
     let reason: string;
     if (effective.vendor === LLM_VENDOR.CLAUDE) {
-      reason = "Failover only runs when Claude uses the API connection. With Claude CLI this switch has no effect.";
+      reason = "Failover is not available for Claude CLI. Only Claude on the API connection supports failover.";
     } else if (effective.vendor === LLM_VENDOR.CODEX) {
-      reason = "Failover is not available for Codex. Only Claude API support failover.";
-    } else if (effective.vendor === LLM_VENDOR.GOOGLE) {
-      reason = "Failover is not available for Google Gemini. Only Claude API supports failover.";
-    } else if (effective.vendor === LLM_VENDOR.LOCAL) {
-      reason = "Failover is not available for local models. Only Claude API supports failover.";
+      reason = "Failover is not available for Codex. Only Claude on the API connection supports failover.";
     } else {
-      reason = "Failover requires a configured vendor.";
+      // Google
+      reason = "Failover is not available for Google Gemini. Only Claude on the API connection supports failover.";
     }
 
     return {
+      enabled,
       applies: false,
       reason,
-      chain: [],
+      chain,
     };
   }
 
-  // Build the failover chain for Claude + API
-  const chain: string[] = [effective.model];
-
-  // Attempts 1-3 represent the next three failover attempts
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const result = getNextFailoverAttempt(attempt, effective.vendor as LLMVendor, llmConfig);
-    if (result.isExhausted || !result.model) break;
-    chain.push(result.model);
+  // For local and other vendors, return applies=false with empty chain
+  let reason: string;
+  if (effective.vendor === LLM_VENDOR.LOCAL) {
+    reason = "Failover is not available for local models. Only Claude on the API connection supports failover.";
+  } else {
+    reason = "Failover requires a configured vendor.";
   }
 
   return {
-    applies: true,
-    chain,
+    enabled,
+    applies: false,
+    reason,
+    chain: [],
   };
 }
 
