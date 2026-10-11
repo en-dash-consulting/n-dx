@@ -30,6 +30,7 @@ import {
   resolveClaudeConfig,
   loadLLMConfig,
   resolveLayout,
+  getNextFailoverAttempt,
 } from "@n-dx/llm-client";
 import type { LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
 import { VENDOR_PROVIDERS, validateProviderForVendor } from "./hench-config-fields.js";
@@ -139,6 +140,20 @@ export interface LlmConfigResponse {
    * `llm-tiers.ts`.
    */
   tiers: TierRow[];
+  /**
+   * Failover chain information.
+   */
+  failover: FailoverInfo;
+}
+
+/** Failover information for the active vendor/provider combination. */
+export interface FailoverInfo {
+  /** Whether failover can fire for this config (true only for Claude + API). */
+  applies: boolean;
+  /** Why applies is false (empty when applies is true). */
+  reason?: string;
+  /** The effective model followed by the next three models in the failover chain. */
+  chain: string[];
 }
 
 /** One reason the resolved agent config would be refused. */
@@ -520,6 +535,56 @@ function readAgentModels(config: Record<string, unknown>): Partial<Record<LLMVen
 }
 
 /**
+ * Build the failover chain for the given effective vendor/provider/model.
+ * Returns applies=true with a 4-model chain only for Claude + API.
+ * For all other combinations, returns applies=false with an explanation.
+ */
+function buildFailoverInfo(
+  effective: EffectiveAgentConfig,
+  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
+): FailoverInfo {
+  // Failover only applies to Claude + API provider
+  const isClaudeApi = effective.vendor === LLM_VENDOR.CLAUDE && effective.provider === "api";
+
+  if (!isClaudeApi) {
+    // Determine the reason why failover doesn't apply
+    let reason: string;
+    if (effective.vendor === LLM_VENDOR.CLAUDE) {
+      reason = "Failover only runs when Claude uses the API connection. With Claude CLI this switch has no effect.";
+    } else if (effective.vendor === LLM_VENDOR.CODEX) {
+      reason = "Failover is not available for Codex. Only Claude API support failover.";
+    } else if (effective.vendor === LLM_VENDOR.GOOGLE) {
+      reason = "Failover is not available for Google Gemini. Only Claude API supports failover.";
+    } else if (effective.vendor === LLM_VENDOR.LOCAL) {
+      reason = "Failover is not available for local models. Only Claude API supports failover.";
+    } else {
+      reason = "Failover requires a configured vendor.";
+    }
+
+    return {
+      applies: false,
+      reason,
+      chain: [],
+    };
+  }
+
+  // Build the failover chain for Claude + API
+  const chain: string[] = [effective.model];
+
+  // Attempts 1-3 represent the next three failover attempts
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const result = getNextFailoverAttempt(attempt, effective.vendor as LLMVendor, llmConfig);
+    if (result.isExhausted || !result.model) break;
+    chain.push(result.model);
+  }
+
+  return {
+    applies: true,
+    chain,
+  };
+}
+
+/**
  * Async because of `effective`, which resolves through `loadLLMConfig` — the
  * same async loader hench and the Ask endpoint use, rather than a fourth
  * hand-rolled read of the same two files.
@@ -576,6 +641,7 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
     effective,
     effectiveProblems: findEffectiveProblems(effective),
     tiers: buildTierTable(effective.vendor, llmConfig, effective),
+    failover: buildFailoverInfo(effective, llmConfig),
   };
 
   if (typeof llm["autoFailover"] === "boolean") {
