@@ -2509,7 +2509,36 @@ export async function loadVendorCliEnv(dir, vendor) {
   const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
   const envPolicy = await loadProjectEnvPolicy(dir);
   const llmConfig = await loadLLMConfig(dir);
-  return resolveVendorCliEnv({ ...llmConfig, vendor }, envPolicy);
+  return resolveVendorCliEnv({ ...llmConfig, vendor }, await applyRepoTrustToEnvPolicy(dir, envPolicy));
+}
+
+/** Directories already warned about, so a loop of reviews warns once. */
+const warnedUntrustedEnvAllow = new Set();
+
+/**
+ * Drop repository-supplied `guard.env.allow` entries unless the user trusts
+ * this checkout. `deny` is kept: it only narrows. "Not trusted" is
+ * `evaluateRepoTrust(...).restricted` (untrusted or changed), which is also
+ * the state of any checkout with an unaccepted `env-allow-added` finding.
+ * Loaded dynamically: config.js may not import packages statically.
+ */
+async function applyRepoTrustToEnvPolicy(dir, envPolicy) {
+  if (!envPolicy?.allow?.length) return envPolicy;
+  const { evaluateRepoTrust } = await import("@n-dx/llm-client");
+  const evaluation = evaluateRepoTrust(dir);
+  if (!evaluation.restricted) return envPolicy;
+  if (!warnedUntrustedEnvAllow.has(dir)) {
+    warnedUntrustedEnvAllow.add(dir);
+    const finding = evaluation.findings.find((f) => f.code === "env-allow-added");
+    console.warn(
+      `Ignoring repository guard.env.allow (${envPolicy.allow.join(", ")}) for the reviewer CLI: ` +
+      `this checkout is ${evaluation.state}` +
+      (finding ? ` (finding: ${finding.code})` : "") +
+      ". Run 'ndx trust accept .' to apply it.",
+    );
+  }
+  const { allow: _ignored, ...rest } = envPolicy;
+  return rest;
 }
 
 /** The project's `hench.guard.env` policy, `.hench/config.json` merged with `.n-dx.json`. */
