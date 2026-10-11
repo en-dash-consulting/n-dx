@@ -70,11 +70,28 @@ describe("terraform language config", () => {
       expect(await detectLanguages(dir)).toEqual([typescriptConfig]);
     });
 
-    it("leaves repositories without .tf files unchanged", async () => {
+    it("leaves repositories without any Terraform file unchanged", async () => {
       await touch("package.json", "{}");
-      await touch("main.tfvars");
+      await touch("main.hcl");
       expect(await detectLanguages(dir)).toEqual([typescriptConfig]);
     });
+
+    it("detects a Terragrunt-only repository the same way the inventory sees it", async () => {
+      await touch("live/prod/terragrunt.hcl");
+      await touch("live/prod/prod.tfvars");
+      expect(await detectLanguage(dir)).toBe(terraformConfig);
+      expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+      const inv = await analyzeInventory(dir, { languageConfig: terraformConfig });
+      expect(inv.files.map((f) => f.path).sort()).toEqual(["live/prod/prod.tfvars", "live/prod/terragrunt.hcl"]);
+    });
+
+    it.each(["live/prod.tfvars", "live/terragrunt.hcl", "live/x.tftest.hcl"])(
+      "counts %s as a Terraform marker",
+      async (rel) => {
+        await touch(rel);
+        expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+      },
+    );
   });
 
   describe("inventory roles", () => {
