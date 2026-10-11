@@ -38,6 +38,7 @@ export type ConfigFieldCategory =
   | "retry"
   | "prune"
   | "test-gate"
+  | "review"
   | "git"
   | "guard"
   | "general";
@@ -352,6 +353,41 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
       Number(v) === 0
         ? "Test gate runs without a time limit"
         : `Test gate killed after ${Number(v) / 60000} minutes`,
+  },
+
+  // ── Review ──
+  {
+    path: "review.mode",
+    label: "Review Mode",
+    description:
+      "Review pass after a task validates: off, self (the executor re-reads its own work) or pair " +
+      "(a different vendor reviews). Pair review is not available yet and runs no review",
+    type: "enum",
+    enumValues: ["off", "self", "pair"],
+    category: "review",
+    impact: (v) =>
+      v === "self"
+        ? "Each task is reviewed by the executor's own vendor, as with --review"
+        : v === "pair"
+          ? "Pair review is not available yet: tasks run without a review"
+          : "Tasks run without a review unless --review or the task asks for one",
+  },
+  {
+    path: "review.vendor",
+    label: "Pair Reviewer",
+    description: "Vendor that reviews in pair mode. Unset means the other one of claude and codex",
+    type: "enum",
+    enumValues: ["claude", "codex"],
+    category: "review",
+    impact: (v) => `Pair review is done by ${v}; it must differ from the executor's vendor`,
+  },
+  {
+    path: "review.rounds",
+    label: "Pair Fix Rounds",
+    description: "How many times the executor may fix must-fix findings in pair mode (1-3, default 2)",
+    type: "number",
+    category: "review",
+    impact: (v) => `The executor may fix must-fix findings up to ${v} time${Number(v) === 1 ? "" : "s"}`,
   },
 
   // ── Git safety ──
@@ -731,6 +767,7 @@ const CATEGORY_LABELS: Record<ConfigFieldCategory, string> = {
   retry: "Retry Policy",
   prune: "Context Prune",
   "test-gate": "Test Gate",
+  review: "Review",
   git: "Git Safety",
   guard: "Guard Rails",
   general: "General",
@@ -744,6 +781,7 @@ export const CATEGORY_ORDER: ConfigFieldCategory[] = [
   "retry",
   "prune",
   "test-gate",
+  "review",
   "git",
   "guard",
   "general",

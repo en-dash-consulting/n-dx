@@ -143,6 +143,19 @@ export interface RunResolution {
    */
   saved: RunSettings | null;
   resolved: ResolvedSettings;
+  /**
+   * The project's review settings (`hench.review.*`), each with the key that
+   * supplied it. Apart from {@link resolved} because that map is one entry per
+   * per-run flag and these have none: they are set with `ndx config`.
+   * `mode` is the mode in force, so `--review` shows as `self` from `cli-flag`;
+   * `resolved.review.value` says whether a review runs today (`pair` runs none).
+   */
+  review: {
+    mode: Resolved<string>;
+    /** The pair reviewer; null when the executor has no CLI counterpart. */
+    vendor: Resolved<string | null>;
+    rounds: Resolved<number>;
+  };
   options: RunOption[];
   refusals: RunRefusal[];
   warnings: RunWarning[];
@@ -332,6 +345,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   if (provider.error) refuse("provider-unsupported", provider.error);
   const reviewError = settings.review.value ? reviewProviderError(vendor, provider.value) : undefined;
   if (reviewError) refuse("provider-unsupported", reviewError);
+  if (settings.reviewPairError) refuse("provider-unsupported", settings.reviewPairError);
   if (!provider.error && provider.value === "cli" && vendor !== LLM_VENDOR.GOOGLE && vendor !== LLM_VENDOR.LOCAL) {
     // Looks the binary up on disk / PATH; the CLI itself is never started.
     try {
@@ -405,6 +419,11 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     },
     saved: settings.saved ?? null,
     resolved,
+    review: {
+      mode: withFallback(settings.reviewMode, "reviewMode"),
+      vendor: settings.reviewVendor,
+      rounds: settings.reviewRounds,
+    },
     options: RUN_OPTIONS.map((option) =>
       option.key === "provider" ? { ...option, values: VENDOR_PROVIDERS[vendor] } : { ...option },
     ),

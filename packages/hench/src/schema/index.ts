@@ -10,6 +10,10 @@ export {
   DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS,
   DEFAULT_PRUNE_CONFIG,
   MIN_PRUNE_PAIRS,
+  DEFAULT_REVIEW_MODE,
+  DEFAULT_REVIEW_ROUNDS,
+  MIN_REVIEW_ROUNDS,
+  MAX_REVIEW_ROUNDS,
 } from "./v1.js";
 
 export type {
@@ -19,6 +23,9 @@ export type {
   PruneConfig,
   GitSafetyConfig,
   GitCommitMessageSource,
+  ReviewConfig,
+  ReviewMode,
+  ReviewerVendor,
   HenchConfig,
   Provider,
   PermissionMode,

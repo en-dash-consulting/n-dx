@@ -277,6 +277,39 @@ export interface TestGateConfig {
   rerunCommand?: string;
 }
 
+/** Values for {@link ReviewConfig.mode}. */
+export type ReviewMode = "off" | "self" | "pair";
+
+/** Default {@link ReviewConfig.mode}. */
+export const DEFAULT_REVIEW_MODE: ReviewMode = "off";
+
+/** Vendors that can review in pair mode. Narrower than `LLMVendor`: only CLI vendors. */
+export type ReviewerVendor = "claude" | "codex";
+
+/** Bounds and default of {@link ReviewConfig.rounds}. */
+export const MIN_REVIEW_ROUNDS = 1;
+export const MAX_REVIEW_ROUNDS = 3;
+export const DEFAULT_REVIEW_ROUNDS = 2;
+
+/**
+ * `hench.review.*` — the project's review pass, one rung below `--review` /
+ * `--no-review` and a task's saved `run.review`. The reviewer's model is not
+ * set here: it stays `llm.<vendor>.reviewModel`, then `llm.reviewModel`.
+ */
+export interface ReviewConfig {
+  /**
+   * `"off"` (default) runs no review. `"self"` is `--review`: the executor's
+   * own vendor re-reads the work. `"pair"` has the other vendor review and the
+   * executor fix the must-fix findings; until pair review ships it runs no
+   * review and says so.
+   */
+  mode?: ReviewMode;
+  /** Reviewer for pair mode. Unset means the other one of claude/codex. */
+  vendor?: ReviewerVendor;
+  /** Times the executor may fix must-fix findings in pair mode, 1-3. Default 2. */
+  rounds?: number;
+}
+
 export interface HenchConfig {
   schema: string;
   provider: Provider;
@@ -526,6 +559,8 @@ export interface HenchConfig {
    * `fullTestCommand` / auto-detection resolve it.
    */
   testGate?: TestGateConfig;
+  /** The project's review pass. See {@link ReviewConfig}. */
+  review?: ReviewConfig;
   /**
    * Whether the Anthropic API loop marks `cache_control` breakpoints on the
    * request (see `agent/lifecycle/prompt-cache.ts`). Default: true.

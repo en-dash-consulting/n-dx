@@ -1504,6 +1504,7 @@ async function runOne(
     // rather than refusing it — the same split `cmdRun` makes.
     if (!dryRun) {
       if (settings.provider.error) throw settings.provider.error;
+      if (settings.reviewPairError) throw settings.reviewPairError;
       if (reviewPass) {
         const reviewError = reviewProviderError(settingsCtx.vendor, settings.provider.value);
         if (reviewError) throw reviewError;
@@ -1859,11 +1860,14 @@ export async function cmdRun(
   // real run would be.
   if (!dryRun) {
     if (invocationSettings.provider.error) throw invocationSettings.provider.error;
+    if (invocationSettings.reviewPairError) throw invocationSettings.reviewPairError;
     const reviewError = reviewOpts.reviewPass ? reviewProviderError(llmVendor, provider) : undefined;
     if (reviewError) throw reviewError;
   }
 
-  if (reviewOpts.reviewPass) {
+  // The invocation's own answer, so a project that sets hench.review.mode "self"
+  // gets the same notice as --review. A task's saved review still decides per task.
+  if (invocationSettings.review.value) {
     info(
       "\nAdversarial review enabled — a reviewer runs after each task validates, " +
         "before the commit.\n(The diff-approval gate that used to be --review is now --approve-diff.)",
