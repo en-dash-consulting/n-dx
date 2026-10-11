@@ -40,7 +40,7 @@ import { createRequire } from "module";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey, readReviewerSettings } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -136,6 +136,7 @@ import {
   readRexTestCommand,
   resolveReviewerVendor,
   runCrossVendorReview,
+  runReviewRounds,
   formatReviewBanner,
   assembleNdxContext,
   writeNdxContextFile,
@@ -3061,7 +3062,7 @@ async function handlePairProgramming(rest) {
     henchArgs.push(`--context-file=${contextFilePath}`);
   }
 
-  let remediationContextPath = null;
+  const remediationContextPaths = [];
   let createdTaskId = null;
   try {
     // ── Step 0: create temporary task in PRD ────────────────────────────────
@@ -3136,57 +3137,61 @@ async function handlePairProgramming(rest) {
 
     // ── Step 2: cross-vendor review ──────────────────────────────────────────
     if (!isDryRun && !skipReview && primaryVendor) {
-      const reviewer = resolveReviewerVendor(primaryVendor);
-      const testCommand = readRexTestCommand(dir);
-      const reviewResult = await runCrossVendorReview({
-        dir,
-        reviewer,
-        testCommand,
-        contextFiles: contextFilePath ? [contextFilePath] : undefined,
-        // The reviewer CLI and the shell test command are spawned detached so a
-        // timeout can group-signal their descendants; registering them here is what
-        // keeps Ctrl-C working, since a detached child is no longer in this
-        // process's foreground group. See doNotTrack in pair-programming.js.
-        registerChild: childTracker.register,
-      });
-      process.stdout.write(formatReviewBanner(reviewer, reviewResult) + "\n");
-
-      // ── Step 3: feedback loop (at most one remediation pass) ─────────────
-      let finalResult = reviewResult;
-      if (!reviewResult.skipped && !reviewResult.passed && !skipFeedback && reviewResult.feedback) {
-        // Read original context text (if any) to include in remediation context
-        let priorContext;
-        if (contextFilePath) {
-          try { priorContext = readFileSync(contextFilePath, "utf-8"); } catch { /* ignore */ }
-        }
-        const remediationText = buildRemediationContext(reviewResult.feedback, description, priorContext);
-        remediationContextPath = writeNdxContextFile(remediationText);
-
-        const remediationBorder = "─".repeat(60);
-        process.stdout.write(
-          `\n${remediationBorder}\nRemediation Pass — reviewer found issues; invoking primary for corrections\n${remediationBorder}\n\n`,
-        );
-
-        // Build remediation hench args: same as primary but replace context file
-        const remediationArgs = henchArgs
-          .filter((a) => !a.startsWith("--context-file="))
-          .concat(`--context-file=${remediationContextPath}`);
-
-        await run(tools.hench, ["run", `--task=${createdTaskId}`, ...remediationArgs]);
-
-        // ── Step 4: final reviewer pass ──────────────────────────────────
-        process.stdout.write(
-          `\n${remediationBorder}\nFinal Review Pass (${reviewer})\n${remediationBorder}\n\n`,
-        );
-        finalResult = await runCrossVendorReview({
-          dir,
-          reviewer,
-          testCommand,
-          contextFiles: contextFilePath ? [contextFilePath] : undefined,
-          registerChild: childTracker.register,
-        });
-        process.stdout.write(formatReviewBanner(reviewer, finalResult) + "\n");
+      const settings = await readReviewerSettings(dir, primaryVendor);
+      for (const w of settings.warnings) {
+        process.stderr.write(`⚠ pair-programming: ${w}\n`);
       }
+      const reviewer = resolveReviewerVendor(primaryVendor, settings.vendor);
+      const model = settings.modelFor(reviewer);
+      const testCommand = readRexTestCommand(dir);
+      const border = "─".repeat(60);
+
+      // ── Steps 2–3: review, then up to `rounds` remediation cycles ─────────
+      // --skip-feedback reviews once and never remediates.
+      const { result: finalResult } = await runReviewRounds({
+        rounds: skipFeedback ? 0 : settings.rounds,
+        review: async (round) => {
+          if (round > 1) {
+            process.stdout.write(`\n${border}\nReview Round ${round} (${reviewer})\n${border}\n\n`);
+          }
+          const result = await runCrossVendorReview({
+            dir,
+            reviewer,
+            model,
+            testCommand,
+            contextFiles: contextFilePath ? [contextFilePath] : undefined,
+            // The reviewer CLI and the shell test command are spawned detached so a
+            // timeout can group-signal their descendants; registering them here is what
+            // keeps Ctrl-C working, since a detached child is no longer in this
+            // process's foreground group. See doNotTrack in pair-programming.js.
+            registerChild: childTracker.register,
+          });
+          process.stdout.write(formatReviewBanner(reviewer, result) + "\n");
+          return result;
+        },
+        remediate: async (result, pass) => {
+          // Read original context text (if any) to include in remediation context
+          let priorContext;
+          if (contextFilePath) {
+            try { priorContext = readFileSync(contextFilePath, "utf-8"); } catch { /* ignore */ }
+          }
+          const remediationContextPath = writeNdxContextFile(
+            buildRemediationContext(result.feedback, description, priorContext),
+          );
+          remediationContextPaths.push(remediationContextPath);
+
+          process.stdout.write(
+            `\n${border}\nRemediation Pass ${pass} of ${settings.rounds} — reviewer found issues; invoking primary for corrections\n${border}\n\n`,
+          );
+
+          // Build remediation hench args: same as primary but replace context file
+          const remediationArgs = henchArgs
+            .filter((a) => !a.startsWith("--context-file="))
+            .concat(`--context-file=${remediationContextPath}`);
+
+          await run(tools.hench, ["run", `--task=${createdTaskId}`, ...remediationArgs]);
+        },
+      });
 
       if (!finalResult.skipped && !finalResult.passed) {
         exitWithCleanup(finalResult.exitCode ?? 1);
@@ -3195,7 +3200,7 @@ async function handlePairProgramming(rest) {
     }
   } finally {
     // Clean up all temp context files regardless of outcome
-    for (const p of [contextFilePath, remediationContextPath]) {
+    for (const p of [contextFilePath, ...remediationContextPaths]) {
       if (p) { try { rmSync(p, { force: true }); } catch { /* ignore */ } }
     }
   }

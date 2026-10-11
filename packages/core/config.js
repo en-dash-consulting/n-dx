@@ -1028,6 +1028,61 @@ const REVIEWER_VENDORS = ["claude", "codex"];
 const MIN_REVIEW_ROUNDS = 1;
 const MAX_REVIEW_ROUNDS = 3;
 
+/** Mirrors hench's `DEFAULT_REVIEW_ROUNDS`. */
+const DEFAULT_REVIEW_ROUNDS = 2;
+
+/**
+ * Settings `ndx pair-programming` reviews with, read from `hench.review.*`
+ * (`.hench/config.json`) and `llm.*` (`.n-dx.json`). A value that is unset
+ * falls back to its default; a set-but-unusable one also adds a warning.
+ *
+ * @param {string} dir  Project root.
+ * @param {string | undefined} primaryVendor  The vendor doing the work.
+ * @returns {Promise<{
+ *   vendor?: "claude" | "codex";
+ *   modelFor: (reviewer: string) => string | undefined;
+ *   rounds: number;
+ *   warnings: string[];
+ * }>}
+ */
+export async function readReviewerSettings(dir, primaryVendor) {
+  const henchConfig = await loadOptionalJSON(join(resolveLayout(dir).henchDir, "config.json"));
+  const llm = (await loadProjectConfig(dir))?.llm;
+  const review = henchConfig?.review ?? {};
+  const warnings = [];
+
+  let vendor;
+  if (review.vendor !== undefined) {
+    if (!REVIEWER_VENDORS.includes(review.vendor)) {
+      warnings.push(
+        `hench.review.vendor "${review.vendor}" is not one of ${REVIEWER_VENDORS.join(", ")}; using the default reviewer.`,
+      );
+    } else if (review.vendor === primaryVendor) {
+      warnings.push(
+        `hench.review.vendor "${review.vendor}" is the primary vendor; using the default reviewer instead.`,
+      );
+    } else {
+      vendor = review.vendor;
+    }
+  }
+
+  let rounds = DEFAULT_REVIEW_ROUNDS;
+  if (review.rounds !== undefined) {
+    if (Number.isInteger(review.rounds) && review.rounds >= MIN_REVIEW_ROUNDS && review.rounds <= MAX_REVIEW_ROUNDS) {
+      rounds = review.rounds;
+    } else {
+      warnings.push(
+        `hench.review.rounds "${review.rounds}" is not a whole number from ${MIN_REVIEW_ROUNDS} to ${MAX_REVIEW_ROUNDS}; using ${DEFAULT_REVIEW_ROUNDS}.`,
+      );
+    }
+  }
+
+  const pick = (v) => (typeof v === "string" && v.length > 0 ? v : undefined);
+  const modelFor = (reviewer) => pick(llm?.[reviewer]?.reviewModel) ?? pick(llm?.reviewModel);
+
+  return { vendor, modelFor, rounds, warnings };
+}
+
 /**
  * Validators for hench.* keys written to `.hench/config.json`. hench refuses to
  * start on a file its own schema rejects, so a value that schema would refuse
