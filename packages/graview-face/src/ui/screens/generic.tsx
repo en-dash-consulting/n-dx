@@ -3,7 +3,7 @@ import { recordFacts, recordPath, useStoreTick } from "@graview/pages";
 import { useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { App } from "../../app.js";
-import { current, label, node as nodeOf, nodesOf, noun, out, plural, type Node } from "../../model/graph.js";
+import { asKind, current, label, node as nodeOf, nodesOf, noun, out, plural, type Node } from "../../model/graph.js";
 import { DeclaredBlocks, declaredPage, opening } from "../declared.js";
 import { Empty, Facts, Grid, Hero, Icon, KindIcon, Page, RecordCard, RecordRow, Rows, Section, type Ctx } from "../kit.js";
 
@@ -20,7 +20,7 @@ export function KindList({ context, kind }: { context: Ctx; app: App; kind: stri
   const [q, setQ] = useState(params.get("q") ?? "");
   const past = params.get("past") === "1";
   const definition = store.schema.tryDefinition(kind);
-  const all = nodesOf(store, kind);
+  const all: readonly Node[] = nodesOf(store, asKind(kind));
   const live = all.filter((n) => current(store, n));
   const pastCount = all.length - live.length;
   const shown = (past ? all : live)

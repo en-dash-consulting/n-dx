@@ -11,82 +11,28 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { NodeType, ProductEdges } from "./rex-gateway.js";
 
-export interface DocumentField {
-  type: "string" | "text" | "number" | "integer" | "boolean" | "date" | "datetime" | "enum" | "list" | "url" | "email";
-  required?: boolean;
-  description?: string;
-  label?: string;
-  options?: string[];
-  of?: "string" | "number" | "date";
-  default?: unknown;
-  unit?: string;
-  format?: "money" | "percent" | "duration";
-  min?: number;
-  max?: number;
-  step?: number;
-}
-
-export interface DocumentEdge {
-  to: string[] | "*";
-  cardinality?: "one" | "many";
-  description?: string;
-  inverse?: string;
-  appendOnly?: boolean;
-}
-
-export interface DocumentKind {
-  noun?: string;
-  plural?: string;
-  description?: string;
-  fields: Record<string, DocumentField>;
-  label?: string;
-  describe?: string;
-  lifecycle?: { field: string; retired: Array<string | number | boolean> };
-  figure?: string;
-  glance?: string[];
-  page?: { fields?: string[]; groups?: Array<{ title: string; fields: string[] }> };
-  edges?: Record<string, DocumentEdge>;
-  computed?: Record<string, unknown>;
-}
-
-export interface DocumentRule {
-  title?: string;
-  description?: string;
-  over: "graph" | string;
-  when?: string;
-  require: string;
-  says?: string;
-  repairs?: Array<{ act: string; label?: string; args?: Record<string, unknown> }>;
-}
-
-export interface DocumentLens {
-  name: string;
-  title?: string;
-  on?: string;
-  bindings?: Record<string, unknown>;
-  options?: Record<string, unknown>;
-}
-
+/**
+ * The declaration as this package reads it: the keys the mapping tables and
+ * the emit touch, and the rest as data. The format itself is Graview's —
+ * `$schema` names the JSON Schema `@graview/core` publishes per version, so
+ * an editor underlines a wrong key as it is typed, and `graview check` (run
+ * by `tests/unit/declaration.test.ts`) judges the whole document. Nothing
+ * here restates the format.
+ */
 export interface GraviewDocumentData {
+  $schema?: string;
   format: "graview-document";
-  formatVersion: 1;
+  formatVersion: number;
   name: string;
-  description?: string;
-  version?: number;
-  kinds: Record<string, DocumentKind>;
-  acts?: Record<string, unknown>;
-  rules?: Record<string, DocumentRule>;
-  lenses?: DocumentLens[];
-  pages?: { order?: string[]; hide?: string[]; first?: string };
-  views?: Record<string, unknown>;
-  brand?: Record<string, unknown>;
+  kinds: Record<string, { plural?: string; edges?: Record<string, unknown> } & Record<string, unknown>>;
+  [key: string]: unknown;
 }
 
 /** The checked-in declaration, beside `package.json`; the same path from `src/` and from `dist/`. */
 export const DOCUMENT_PATH = fileURLToPath(new URL("../n-dx.graview.json", import.meta.url));
 
 /** The graview release the `npx` fallback pins and the document was checked against. */
-export const GRAVIEW_VERSION = "0.1.20";
+export const GRAVIEW_VERSION = "0.1.22";
 
 /** Read the declaration fresh: callers get their own copy to set `name` on. */
 export function loadDocument(): GraviewDocumentData {

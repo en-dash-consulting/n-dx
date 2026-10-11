@@ -2,7 +2,7 @@ import { placesOf } from "@graview/core";
 import { pluralSlug, useStoreTick } from "@graview/pages";
 import { Link } from "react-router-dom";
 import type { App } from "../../app.js";
-import { nodesOf, tokens } from "../../model/graph.js";
+import { tokens } from "../../model/graph.js";
 import { fragileZones } from "../../model/code.js";
 import { spend } from "../../model/spend.js";
 import { attention, standing } from "../../model/work.js";
@@ -13,7 +13,9 @@ import { Badge, Grid, Hero, Icon, Page, RecordRow, Rows, Section, Stat, Stats, a
  * THE HOME, WRITTEN ONCE. Its sentence and its lists are the declared home
  * from n-dx.graview.json, worked out by Graview; what this screen adds is the
  * figures a product needs at a glance (standing, spend, attention), the
- * pictures, and the zones n-dx's own governance rule flags.
+ * pictures, and the zones n-dx's own governance rule flags. Whether the map
+ * is proposed is the document's fact (`computed.mapProposed`), said by the
+ * declared home where every face reads it.
  */
 export function HomeScreen({ context, app }: { context: Ctx; app: App }) {
   const { store } = context;
@@ -25,7 +27,6 @@ export function HomeScreen({ context, app }: { context: Ctx; app: App }) {
   const fragile = fragileZones(store);
   const pictures = placesOf(app).filter((p) => p.lens);
   const hasProduct = s.capabilities > 0 || s.areas > 0;
-  const proposed = hasProduct && nodesOf(store, "area").concat(nodesOf(store, "capability")).every((n) => n.proposed === true);
 
   return (
     <Page testId="home">
@@ -55,17 +56,6 @@ export function HomeScreen({ context, app }: { context: Ctx; app: App }) {
         {needs.defective.length ? <Stat i={5} value={needs.defective.length} label="defective capabilities" tone="bad" /> : null}
       </Stats>
 
-      {proposed ? (
-        <Section title="The product map is proposed, not yet real" i={1} testId="home-proposed">
-          <div className="ndx-empty">
-            <p>
-              This PRD is on the v1 layout. The areas, capabilities and constraints here are what rex's migration plan proposes from its epics and features,
-              by rules alone: an epic is an area, a feature with completed work a capability, the work under them changes placed on them, and what the rules
-              cannot place waits in the Inbox. Nothing is written until the PRD migrates; these nodes are read-only here.
-            </p>
-          </div>
-        </Section>
-      ) : null}
       {!hasProduct ? (
         <Section title="The product map is not drawn yet" i={1}>
           <div className="ndx-empty">
@@ -101,7 +91,7 @@ export function HomeScreen({ context, app }: { context: Ctx; app: App }) {
           </p>
           <Rows>
             {fragile.slice(0, 6).map((zone, i) => (
-              <RecordRow key={zone.id} context={context} node={zone} i={i} end={<Badge tone="bad">fragile</Badge>} sub={`cohesion ${Math.round(Number(zone.cohesion) * 100)}% · coupling ${Math.round(Number(zone.coupling) * 100)}%`} />
+              <RecordRow key={zone.id} context={context} node={zone} i={i} end={<Badge tone="bad">fragile</Badge>} sub={`cohesion ${Math.round((zone.cohesion ?? 0) * 100)}% · coupling ${Math.round((zone.coupling ?? 0) * 100)}%`} />
             ))}
           </Rows>
         </Section>

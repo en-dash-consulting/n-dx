@@ -7,7 +7,7 @@ import type { AnySchema } from "@graview/core";
 import { recordPath, type PageContext } from "@graview/pages";
 import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { current, glance, label, said, tokens, toneOfStatus, when, type Node, type Tone } from "../model/graph.js";
+import { current, glance, label, raw, said, statusOf, tokens, toneOfStatus, when, type Node, type Tone } from "../model/graph.js";
 
 export type Ctx = PageContext<AnySchema>;
 
@@ -164,7 +164,7 @@ export function RecordRow({ context, node, i = 0, sub, end, depth = 0 }: { conte
         <span className="ndx-title">{label(store, node)}</span>
         <span className="ndx-sub">{sub ?? seen.map((f) => `${f.label}: ${f.value}`).join(" · ")}</span>
       </span>
-      <span className="ndx-row-end">{end ?? <StatusBadge status={node.status} />}</span>
+      <span className="ndx-row-end">{end ?? <StatusBadge status={statusOf(node)} />}</span>
     </Link>
   );
 }
@@ -173,7 +173,8 @@ export function RecordRow({ context, node, i = 0, sub, end, depth = 0 }: { conte
 export function RecordCard({ context, node, i = 0, children }: { context: Ctx; node: Node; i?: number; children?: ReactNode }) {
   const { store } = context;
   const seen = glance(store, node, 3);
-  const tone = node.health === "defective" || node.status === "blocked" || node.status === "failing" ? " bad" : "";
+  const status = statusOf(node);
+  const tone = ("health" in node && node.health === "defective") || status === "blocked" || status === "failing" ? " bad" : "";
   return (
     <Link to={recordPath(store.schema, node.kind, node.id)} className={`ndx-card ndx-rise${tone}`} style={at(i)}>
       <span className="ndx-kindline">
@@ -184,8 +185,8 @@ export function RecordCard({ context, node, i = 0, children }: { context: Ctx; n
       {children ?? (
         <div className="ndx-badges">
           {seen.map((f) => (
-            <Badge key={f.key} tone={f.key === "status" || f.key === "intentStatus" || f.key === "health" ? toneOfStatus(node[f.key]) : undefined} plain={!(f.key === "status" || f.key === "intentStatus" || f.key === "health")}>
-              {f.key === "status" || f.key === "intentStatus" || f.key === "health" ? said(node[f.key]) : `${f.label} ${f.value}`}
+            <Badge key={f.key} tone={f.key === "status" || f.key === "intentStatus" || f.key === "health" ? toneOfStatus(raw(node, f.key)) : undefined} plain={!(f.key === "status" || f.key === "intentStatus" || f.key === "health")}>
+              {f.key === "status" || f.key === "intentStatus" || f.key === "health" ? said(raw(node, f.key)) : `${f.label} ${f.value}`}
             </Badge>
           ))}
         </div>

@@ -34,7 +34,8 @@ export function pages(app: App) {
     if (!own.record.has(kind)) registry = registry.register(kind, "record", page(({ context }) => <KindRecord context={context} app={app} kind={kind} />));
   }
   registry = registry
-    .surface("shell", shell(app), { without: ["undo"] })
+    // Our rail lists the places; the bar keeps the face switch, Find, the standing and the person.
+    .surface("shell", shell(app), { without: ["undo", "places"] })
     .surface("home", page(({ context }) => <HomeScreen context={context} app={app} />))
     .route("/attention", page(({ context }) => <AttentionScreen context={context} />))
     .route("/inbox", page(({ context }) => <InboxScreen context={context} />))

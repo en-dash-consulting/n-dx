@@ -12,9 +12,15 @@ runs when it is installed.
 
 ## The seam: two files, no imports
 
-Graview's CLI accepts a `graview-document` declaration (JSON) and a
-`{nodes, edges}` seed snapshot for every store command. The adapter therefore
-emits those two files and spawns the `graview` binary on them:
+Graview's CLI accepts a `graview-document` declaration (JSON) and a seed
+snapshot for every store command. The adapter therefore emits those two files
+and spawns the `graview` binary on them. The snapshot is written in Graview's
+line format (`@graview/core/snapshot`, format 2, by the adapter's own
+`src/snapshot-file.ts` since it has no runtime Graview dependency): a header
+line saying when it was made and how many records and links of each kind it
+holds, then a record a line with each kind's together, then the links, so a
+reader learns the projection's age from the first line and reads one kind by
+byte range:
 
 ```
 ndx graview emit .      →  <graviewDir>/document.json + snapshot.json
@@ -150,23 +156,29 @@ depends on. So:
   key from that listing and sends it as `X-Ndx-Workspace` on every write,
   or refuses to sync rather than write the main checkout's PRD. Nothing in
   n-dx opens a connection.
-- **In `@n-dx/graview-face`:** a Vite dev-server door (`dev/ndx-door.ts`) holds the
-  token and one MCP session to the hub, re-emits on `POST /ndx/emit`, and
-  serves the fresh projection from the graview dir. The `RemoteSystem`
-  (`src/sync/ndx-system.ts`) pulls by re-emitting and reading the snapshot
-  (every change and task, versioned by `lastModified`), and pushes a status
-  through `update_task_status`, the rest through `edit_item`, after reading
-  the item so only what differs is written, then `append_log` with
-  `author=graview:<principal>`. The engine (`src/sync/engine.ts`) seeds its
-  links from the snapshot the store opened with, runs on an interval and a
-  moment after any human or agent op, and resolves every conflict to rex's
-  value, saying so in the rail.
+- **In `@n-dx/graview-face`:** a Vite dev-server door (`dev/ndx-door.ts`) is
+  Graview's `mcpDoor` over an `mcpClient` to the hub (one session, the token
+  read per call and never sent to the page, only the four tools the sync
+  names), re-emits on `POST /ndx/emit`, and serves the fresh projection from
+  the graview dir by byte range. The remote (`src/sync/ndx-system.ts`) is an
+  `mcpRemote` whose pull re-emits and reads only the changes and the tasks
+  out of the snapshot (versioned by `lastModified`), and whose push writes a
+  status through `update_task_status`, the rest through `edit_item`, after
+  reading the item so only what differs is written, then `append_log` with
+  `author=graview:<principal>`. The engine (`src/sync/engine.ts`) is
+  `SyncEngine` from `@graview/core/sync` with `conflicts: "theirs"`: the
+  mapping's `version` field links every projected record at the version it
+  was made with, so the first run sends nothing; a field edited on both sides
+  takes rex's value through the inbound act, and the report says so in the
+  rail. It runs on an interval and a moment after any human or agent op.
 - **Rex stays the single writer.** Every push is a rex MCP write under the
   file lock, validation and the execution log; the face never touches the
-  tree. Code-side kinds (area, capability, constraint, release, zone,
-  component, file, run, commit) have no push mapping, and a write is refused
-  naming the tool that owns the data. A static build has no door and is
-  read-only by construction.
+  tree. Every kind but change and task is a `readonly` resource whose
+  `because` names the tool that owns the data (area, capability and
+  constraint: rex's product layer; zone and component: sourcevision; run:
+  hench; commit: git), and the engine guards the store, so an act on one is
+  refused with that sentence and never offered. A static build has no door
+  and is read-only by construction.
 
 ## The product face
 

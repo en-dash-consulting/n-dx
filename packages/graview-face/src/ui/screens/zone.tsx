@@ -2,35 +2,38 @@ import { recordFacts, useStoreTick } from "@graview/pages";
 import { useParams } from "react-router-dom";
 import type { App } from "../../app.js";
 import { crossings, isFragile } from "../../model/code.js";
-import { inward, node as nodeOf, out } from "../../model/graph.js";
+import { inward, inwardOf, nodeOf, out, type Of } from "../../model/graph.js";
 import { Badge, Empty, Facts, Hero, Meter, Page, RecordRow, Rows, Section, Stat, Stats, type Ctx } from "../kit.js";
 import { Missing, Under } from "./generic.js";
+
+const shape = (z: Of<"zone">) => `cohesion ${Math.round((z.cohesion ?? 0) * 100)}% · coupling ${Math.round((z.coupling ?? 0) * 100)}%`;
 
 /** A ZONE'S PAGE: how tightly it holds, how much it leans on others, and which capabilities landed here. */
 export function ZoneScreen({ context }: { context: Ctx; app: App }) {
   const { store, principal } = context;
   useStoreTick(store);
   const id = decodeURIComponent(useParams()["id"] ?? "");
-  const node = nodeOf(store, id);
+  const node = nodeOf(store, id, "zone");
   const facts = recordFacts(store, id, principal ? { principal } : {});
-  if (!node || !facts || node.kind !== "zone") return <Missing context={context} />;
+  if (!node || !facts) return <Missing context={context} />;
 
-  const cohesion = Number(node.cohesion) || 0;
-  const coupling = Number(node.coupling) || 0;
+  const cohesion = node.cohesion ?? 0;
+  const coupling = node.coupling ?? 0;
   const fragile = isFragile(node);
-  const { imports, importedBy } = crossings(store, id);
-  const inside = inward(store, id, "under");
-  const components = inward(store, id, "inZone").filter((n) => n.kind === "component");
-  const files = inward(store, id, "inZone").filter((n) => n.kind === "file");
-  const realized = inward(store, id, "realizedIn");
+  const { imports, importedBy } = crossings(store, node);
+  const inside = inward(store, id, "under") as readonly Of<"zone">[];
+  const inZone = inwardOf(store, node, "inZone");
+  const components = inZone.filter((n): n is Of<"component"> => n.kind === "component");
+  const files = inZone.filter((n): n is Of<"file"> => n.kind === "file");
+  const realized = inwardOf(store, node, "realizedIn");
   const parent = out(store, id, "under")[0];
 
   return (
     <Page testId="zone-page">
-      <Hero eyebrow={<Under context={context} node={node} what={`Zone${parent ? "" : " · top level"}`} />} title={facts.label} lede={typeof node.description === "string" ? node.description : undefined}>
+      <Hero eyebrow={<Under context={context} node={node} what={`Zone${parent ? "" : " · top level"}`} />} title={facts.label} lede={node.description}>
         {fragile ? <Badge tone="bad">fragile: cohesion under 0.5 and coupling over 0.5</Badge> : <Badge tone="good">holds together</Badge>}
-        <Badge plain>{Number(node.fileCount ?? 0)} files</Badge>
-        {node.depth ? <Badge plain>depth {String(node.depth)}</Badge> : null}
+        <Badge plain>{node.fileCount ?? 0} files</Badge>
+        {node.depth ? <Badge plain>depth {node.depth}</Badge> : null}
       </Hero>
 
       <Stats>
@@ -45,17 +48,17 @@ export function ZoneScreen({ context }: { context: Ctx; app: App }) {
         <Section title="Shape" i={1}>
           <Meter value={cohesion} label="Cohesion" tone={cohesion < 0.5 ? "warn" : "good"} />
           <Meter value={coupling} label="Coupling" tone={coupling > 0.5 ? "bad" : "good"} />
-          {Array.isArray(node.entryPoints) && node.entryPoints.length > 0 ? (
+          {node.entryPoints && node.entryPoints.length > 0 ? (
             <>
               <h3 className="ndx-h3 ndx-muted">Entry points</h3>
               <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-                {(node.entryPoints as string[]).slice(0, 12).map((p) => (
+                {node.entryPoints.slice(0, 12).map((p) => (
                   <li key={p} className="ndx-mono">
                     {p}
                   </li>
                 ))}
               </ul>
-              {(node.entryPoints as string[]).length > 12 ? <p className="ndx-small ndx-muted">and {(node.entryPoints as string[]).length - 12} more</p> : null}
+              {node.entryPoints.length > 12 ? <p className="ndx-small ndx-muted">and {node.entryPoints.length - 12} more</p> : null}
             </>
           ) : null}
         </Section>
@@ -66,27 +69,27 @@ export function ZoneScreen({ context }: { context: Ctx; app: App }) {
 
       <div className="ndx-two">
         <Section title="Imports from" i={3}>
-          {imports.length === 0 ? <Empty>Imports from no other zone.</Empty> : <Rows>{imports.map((z, i) => <RecordRow key={z.id} context={context} node={z} i={i} sub={`cohesion ${Math.round(Number(z.cohesion) * 100)}% · coupling ${Math.round(Number(z.coupling) * 100)}%`} end={isFragile(z) ? <Badge tone="bad">fragile</Badge> : null} />)}</Rows>}
+          {imports.length === 0 ? <Empty>Imports from no other zone.</Empty> : <Rows>{imports.map((z, i) => <RecordRow key={z.id} context={context} node={z} i={i} sub={shape(z)} end={isFragile(z) ? <Badge tone="bad">fragile</Badge> : null} />)}</Rows>}
         </Section>
         <Section title="Imported by" i={4}>
-          {importedBy.length === 0 ? <Empty>No zone imports from this one.</Empty> : <Rows>{importedBy.map((z, i) => <RecordRow key={z.id} context={context} node={z} i={i} sub={`cohesion ${Math.round(Number(z.cohesion) * 100)}% · coupling ${Math.round(Number(z.coupling) * 100)}%`} end={isFragile(z) ? <Badge tone="bad">fragile</Badge> : null} />)}</Rows>}
+          {importedBy.length === 0 ? <Empty>No zone imports from this one.</Empty> : <Rows>{importedBy.map((z, i) => <RecordRow key={z.id} context={context} node={z} i={i} sub={shape(z)} end={isFragile(z) ? <Badge tone="bad">fragile</Badge> : null} />)}</Rows>}
         </Section>
       </div>
 
       {inside.length > 0 ? (
         <Section title="Zones inside" i={5}>
-          <Rows>{inside.map((z, i) => <RecordRow key={z.id} context={context} node={z} i={i} sub={`${Number(z.fileCount ?? 0)} files · cohesion ${Math.round(Number(z.cohesion) * 100)}%`} end={isFragile(z) ? <Badge tone="bad">fragile</Badge> : null} />)}</Rows>
+          <Rows>{inside.map((z, i) => <RecordRow key={z.id} context={context} node={z} i={i} sub={`${z.fileCount ?? 0} files · cohesion ${Math.round((z.cohesion ?? 0) * 100)}%`} end={isFragile(z) ? <Badge tone="bad">fragile</Badge> : null} />)}</Rows>
         </Section>
       ) : null}
 
 
       <Section title={`Components${components.length ? ` (${components.length})` : ""}`} i={7}>
-        {components.length === 0 ? <Empty command="ndx analyze .">No components catalogued here.</Empty> : <Rows>{components.slice(0, 40).map((c, i) => <RecordRow key={c.id} context={context} node={c} i={i} sub={String(c.file ?? "")} end={<Badge plain>{String(c.role ?? "")}</Badge>} />)}</Rows>}
+        {components.length === 0 ? <Empty command="ndx analyze .">No components catalogued here.</Empty> : <Rows>{components.slice(0, 40).map((c, i) => <RecordRow key={c.id} context={context} node={c} i={i} sub={c.file ?? ""} end={<Badge plain>{c.role ?? ""}</Badge>} />)}</Rows>}
         {components.length > 40 ? <p className="ndx-small ndx-muted">and {components.length - 40} more</p> : null}
       </Section>
       {files.length > 0 ? (
         <Section title={`Files (${files.length})`} i={8}>
-          <Rows>{files.slice(0, 40).map((f, i) => <RecordRow key={f.id} context={context} node={f} i={i} sub={`${String(f.language ?? "")} · ${Number(f.lineCount ?? 0)} lines`} end={null} />)}</Rows>
+          <Rows>{files.slice(0, 40).map((f, i) => <RecordRow key={f.id} context={context} node={f} i={i} sub={`${f.language ?? ""} · ${f.lineCount ?? 0} lines`} end={null} />)}</Rows>
         </Section>
       ) : null}
       <Section title="Facts" i={9}>

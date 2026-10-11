@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/@graview/core/dist/document.schema.json",
   "format": "graview-document",
   "formatVersion": 1,
   "name": "n-dx",
@@ -54,6 +55,13 @@
     ],
     "scene": "The map",
     "pages": "The pages"
+  },
+  "computed": {
+    "mapProposed": {
+      "expr": "count(all('capability')) > 0 and every(all('area') | all('capability'), proposed == true)",
+      "label": "The map is proposed",
+      "description": "Every area and capability is what rex's migration plan proposes over a v1 tree: nothing is written until the PRD migrates"
+    }
   },
   "kinds": {
     "area": {
@@ -134,8 +142,8 @@
             "area"
           ],
           "cardinality": "one",
-          "description": "what this sits inside",
-          "inverse": "what sits inside it"
+          "description": "the area this sits inside",
+          "inverse": "the areas inside it"
         }
       },
       "page": {
@@ -262,8 +270,8 @@
             "capability"
           ],
           "cardinality": "one",
-          "description": "what this sits inside",
-          "inverse": "what sits inside it"
+          "description": "the area or capability this sits inside",
+          "inverse": "the capabilities inside it"
         },
         "dependsOn": {
           "to": [
@@ -401,8 +409,8 @@
         "under": {
           "to": ["area", "capability", "constraint"],
           "cardinality": "one",
-          "description": "what this sits inside",
-          "inverse": "what sits inside it"
+          "description": "what this constraint sits inside",
+          "inverse": "the constraints inside it"
         },
         "appliesTo": {
           "to": [
@@ -571,8 +579,8 @@
             "change"
           ],
           "cardinality": "one",
-          "description": "what this sits inside",
-          "inverse": "what sits inside it"
+          "description": "the change this sits inside",
+          "inverse": "the changes inside it"
         },
         "amends": {
           "to": [
@@ -783,8 +791,8 @@
             "task"
           ],
           "cardinality": "one",
-          "description": "what this sits inside",
-          "inverse": "what sits inside it"
+          "description": "the change or task this runs under",
+          "inverse": "the tasks under it"
         },
         "blockedBy": {
           "to": [
@@ -934,8 +942,8 @@
             "zone"
           ],
           "cardinality": "one",
-          "description": "what this sits inside",
-          "inverse": "what sits inside it"
+          "description": "the zone this sits inside",
+          "inverse": "the zones inside it"
         },
         "crosses": {
           "to": [
@@ -1071,6 +1079,9 @@
     "run": {
       "noun": "run",
       "plural": "Runs",
+      "fieldRoles": {
+        "when": "startedAt"
+      },
       "description": "One agent run hench recorded: the task it worked, what it cost, and what it committed.",
       "figure": "shift",
       "label": "{taskTitle}",
@@ -1194,6 +1205,10 @@
     "commit": {
       "noun": "commit",
       "plural": "Commits",
+      "fieldRoles": {
+        "when": "committedAt",
+        "who": "author"
+      },
       "description": "A commit on main tied to the work it was for: by its N-DX-Item trailer, or by the run record that names it.",
       "figure": "note",
       "label": "{subject}",
@@ -1453,7 +1468,19 @@
         "direction": "row"
       },
       {
-        "title": "Areas"
+        "when": "fact('mapProposed')",
+        "show": [
+          {
+            "text": "The product map is proposed, not yet real. This PRD is on the v1 layout: the areas, capabilities and constraints here are what rex's migration plan proposes from its epics and features, by rules alone."
+          },
+          {
+            "text": "An epic is an area, a feature with completed work a capability, the work under them changes placed on them, and what the rules cannot place waits in the Inbox. Nothing is written until the PRD migrates; these nodes are read-only here."
+          }
+        ]
+      },
+      {
+        "title": "Areas",
+        "key": "areas"
       },
       {
         "list": "all('area')",
@@ -1462,7 +1489,8 @@
         "empty": "No areas yet: nothing in the PRD proposes one. The product map arrives when the PRD migrates to v2, or is bootstrapped from the code."
       },
       {
-        "title": "In the Inbox"
+        "title": "In the Inbox",
+        "key": "inbox"
       },
       {
         "list": "all('change') where inbox == true",
@@ -1475,7 +1503,8 @@
         "empty": "Nothing waits in the Inbox."
       },
       {
-        "title": "Changing now"
+        "title": "Changing now",
+        "key": "changing-now"
       },
       {
         "list": "all('change') where status == 'in_progress'",
@@ -1484,7 +1513,8 @@
         "empty": "Nothing is in progress. ndx work . picks the next task."
       },
       {
-        "title": "Recent runs"
+        "title": "Recent runs",
+        "key": "recent-runs"
       },
       {
         "list": "all('run')",
@@ -1574,7 +1604,8 @@
           "direction": "row"
         },
         {
-          "title": "Changes rewriting this"
+          "title": "Changes rewriting this",
+          "key": "rewriting"
         },
         {
           "list": "in('amends')",
@@ -1586,7 +1617,8 @@
           "empty": "No change has rewritten this yet."
         },
         {
-          "title": "Changes working on this"
+          "title": "Changes working on this",
+          "key": "working-on"
         },
         {
           "list": "in('touches')",
@@ -1594,15 +1626,17 @@
           "empty": "Nothing works on this without rewriting it."
         },
         {
-          "title": "Realized in"
+          "title": "Realized in",
+          "key": "realized-in"
         },
         {
           "list": "out('realizedIn')",
           "as": "row",
-          "empty": "No commit with an N-DX-Item trailer has realized this yet."
+          "empty": "No commit tied to the work placed on this has realized it yet."
         },
         {
-          "title": "Bound by"
+          "title": "Bound by",
+          "key": "bound-by"
         },
         {
           "list": "in('appliesTo')",
@@ -1693,7 +1727,8 @@
           "direction": "row"
         },
         {
-          "title": "Rewrites"
+          "title": "Rewrites",
+          "key": "rewrites"
         },
         {
           "list": "out('amends')",
@@ -1701,7 +1736,8 @@
           "empty": "Rewrites nothing in the product layer."
         },
         {
-          "title": "Works on"
+          "title": "Works on",
+          "key": "works-on"
         },
         {
           "list": "out('touches')",
@@ -1709,19 +1745,21 @@
           "empty": "Works on nothing without rewriting it."
         },
         {
-          "title": "Tasks"
+          "title": "Tasks",
+          "key": "tasks"
         },
         {
           "list": "in('under')",
           "sort": {
             "by": "status",
-            "direction": "asc"
+            "direction": "choices"
           },
           "as": "row",
           "empty": "No tasks under this change: the change itself is the unit of work."
         },
         {
-          "title": "Runs"
+          "title": "Runs",
+          "key": "runs"
         },
         {
           "list": "in('ranFor')",
@@ -1734,7 +1772,8 @@
           "empty": "No run has worked this yet."
         },
         {
-          "title": "Waits for"
+          "title": "Waits for",
+          "key": "waits-for"
         },
         {
           "list": "out('blockedBy')",
@@ -1814,7 +1853,8 @@
           "direction": "row"
         },
         {
-          "title": "Imports from"
+          "title": "Imports from",
+          "key": "imports-from"
         },
         {
           "list": "out('crosses')",
@@ -1822,7 +1862,8 @@
           "empty": "Imports from no other zone."
         },
         {
-          "title": "Imported by"
+          "title": "Imported by",
+          "key": "imported-by"
         },
         {
           "list": "in('crosses')",
@@ -1830,7 +1871,8 @@
           "empty": "No zone imports from this one."
         },
         {
-          "title": "Capabilities realized here"
+          "title": "Capabilities realized here",
+          "key": "realized-here"
         },
         {
           "list": "in('realizedIn')",
@@ -1838,7 +1880,8 @@
           "empty": "No capability's commits have touched this zone."
         },
         {
-          "title": "Inside"
+          "title": "Inside",
+          "key": "inside"
         },
         {
           "list": "in('under')",
@@ -1913,7 +1956,8 @@
           "direction": "row"
         },
         {
-          "title": "Worked on"
+          "title": "Worked on",
+          "key": "worked-on"
         },
         {
           "list": "out('ranFor')",
@@ -1921,7 +1965,8 @@
           "empty": "The work this run was for is no longer in the tree."
         },
         {
-          "title": "Commits"
+          "title": "Commits",
+          "key": "commits"
         },
         {
           "list": "out('produced')",

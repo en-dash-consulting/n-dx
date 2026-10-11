@@ -4,14 +4,15 @@
  * listed from `placesOf` so a lens added in n-dx.graview.json shows up here
  * with no edit to this file. Every kind is reachable — the hidden ones
  * (commits, components, files) under "Everything else". Graview's own bar
- * stays above: the face switch, Find, the standing and the person are its.
+ * stays above without its places (`without: ["places"]`): the face switch,
+ * Find, the standing and the person are its; the places are this rail's.
  */
 import { placesOf } from "@graview/core";
 import { pluralSlug, useStoreTick } from "@graview/pages";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { App } from "../app.js";
-import { count, current, nodesOf, plural } from "../model/graph.js";
+import { asKind, count, current, nodesOf, plural } from "../model/graph.js";
 import { attention } from "../model/work.js";
 import { CSS } from "./css.js";
 import { SyncStatusLine } from "./sync-status.js";
@@ -54,7 +55,7 @@ export function shell(app: App) {
     const hue = (kind: string) => (app.brand?.accents as Record<string, number> | undefined)?.[kind];
     const kinds = store.schema.kinds as readonly string[];
     const named = new Set([...PRODUCT, ...WORK, ...CODE, ...RUNS]);
-    const live = (kind: string) => count(store, kind, (n) => current(store, n));
+    const live = (kind: string) => count(store, asKind(kind), (n) => current(store, n));
     const main = useRef<HTMLElement>(null);
     const [rail, setRail] = useState<HTMLElement | null>(null);
     useLayoutEffect(() => {
@@ -65,7 +66,7 @@ export function shell(app: App) {
     }, [here, rail]);
 
     const kindItem = (kind: string) =>
-      kinds.includes(kind) ? <Item key={kind} to={`/${pluralSlug(store.schema, kind)}`} icon={kind} label={plural(store, kind)} count={nodesOf(store, kind).length ? live(kind) : undefined} here={here} hue={hue(kind)} /> : null;
+      kinds.includes(kind) ? <Item key={kind} to={`/${pluralSlug(store.schema, kind)}`} icon={kind} label={plural(store, kind)} count={nodesOf(store, asKind(kind)).length ? live(kind) : undefined} here={here} hue={hue(kind)} /> : null;
 
     return (
       <div className="ndx">

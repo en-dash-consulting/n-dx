@@ -76,7 +76,7 @@ export function SpendScreen({ context }: { context: Ctx }) {
         </Section>
       </div>
       <Section title="Costliest runs" i={3}>
-        {money.costliest.length === 0 ? <Empty>No runs recorded yet.</Empty> : <Rows>{money.costliest.map((r, i) => <RecordRow key={r.id} context={context} node={r} i={i} sub={`${String(r.vendor ?? "")} ${String(r.model ?? "")} · ${when(r.startedAt)}`} end={<Badge plain>{tokens(Number(r.tokens) || 0)}</Badge>} />)}</Rows>}
+        {money.costliest.length === 0 ? <Empty>No runs recorded yet.</Empty> : <Rows>{money.costliest.map((r, i) => <RecordRow key={r.id} context={context} node={r} i={i} sub={`${r.vendor ?? ""} ${r.model ?? ""} · ${when(r.startedAt)}`} end={<Badge plain>{tokens(r.tokens ?? 0)}</Badge>} />)}</Rows>}
       </Section>
     </Page>
   );

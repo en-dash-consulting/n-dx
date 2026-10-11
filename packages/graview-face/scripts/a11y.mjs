@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { readSnapshot } from "@graview/core/snapshot";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
@@ -21,7 +22,7 @@ if (!existsSync(join(root, "build", "index.html"))) {
   console.error("a11y: no build. Run `pnpm build` first.");
   process.exit(1);
 }
-const snapshot = JSON.parse(readFileSync(join(root, "public", "data", "snapshot.json"), "utf-8"));
+const { snapshot } = readSnapshot(readFileSync(join(root, "public", "data", "snapshot.json"), "utf-8"));
 const first = (kind) => snapshot.nodes.find((n) => n.kind === kind)?.id;
 const encode = (s) => encodeURIComponent(s);
 const routes = ["/pages", "/pages/changes", "/pages/places/changes-by-status", "/pages/attention", "/pages/spend"];

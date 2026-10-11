@@ -1,16 +1,19 @@
 /**
- * THE n-dx REMOTE SYSTEM. Pull is a fresh projection: the door re-emits and
- * the snapshot is read back, every change and task carrying rex's
- * `lastModified` as its version (so our own write coming back is
- * recognizable). Push goes through rex's MCP tools behind the door —
- * `update_task_status` for a status, `edit_item` for the rest — after
+ * THE n-dx REMOTE SYSTEM: Graview's `mcpRemote` over rex's MCP tools, reached
+ * through the dev door (`doorClient` → `dev/ndx-door.ts`), which holds the
+ * token. Pull is a fresh projection: the door re-emits, and the snapshot is
+ * read back a kind at a time — only the changes and the tasks, by the byte
+ * ranges its header gives — every record carrying rex's `lastModified` as its
+ * version, so our own write coming back is recognizable. Push goes through
+ * `update_task_status` for a status and `edit_item` for the rest, after
  * reading the item, so only what differs is written, and an `append_log`
  * entry names the Graview principal that moved it.
  */
-import type { RemoteAck, RemoteChange, RemoteSystem, RemoteWrite } from "@graview/core";
-import { isSyncedKind, refusal, SYNC_FIELDS, SYSTEM } from "./mapping.js";
+import { fetchSnapshot } from "@graview/core/snapshot";
+import { doorClient, mcpRemote, type RemoteChange, type RemoteSystem, type RemoteWrite, type ToolCall } from "@graview/core/sync";
+import { isSyncedKind, SYNC_FIELDS, SYNCED_KINDS, SYSTEM, VERSION_FIELD } from "./mapping.js";
 
-type Fetch = typeof fetch;
+type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface NdxRemoteOptions {
   /** Who is moving things in this face, for the execution log. */
@@ -18,14 +21,6 @@ export interface NdxRemoteOptions {
   readonly fetch?: Fetch;
   /** The door's base: "" in the page, a full origin in a test. */
   readonly base?: string;
-  /** How long a pull's answer is reused, ms: the loop pulls once to pre-empt conflicts and once in the engine. */
-  readonly pullTtlMs?: number;
-}
-
-interface SnapshotNode {
-  id: string;
-  kind: string;
-  [field: string]: unknown;
 }
 
 interface Item {
@@ -36,8 +31,6 @@ interface Item {
   tags?: string[];
   lastModified?: string;
 }
-
-type Pulled = { readonly changes: readonly RemoteChange[]; readonly cursor: string };
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
@@ -55,56 +48,43 @@ export interface EmitOutcome {
 }
 
 export interface NdxRemote extends RemoteSystem {
-  refuse(kind: string): string;
   /** Undefined until the first pull. */
   lastEmit(): EmitOutcome | undefined;
 }
 
 export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
-  const doFetch = options.fetch ?? ((input, init) => fetch(input, init));
+  const doFetch: Fetch = options.fetch ?? ((input, init) => fetch(input, init));
   const base = options.base ?? "";
-  const ttl = options.pullTtlMs ?? 1500;
-  let memo: { at: number; result: Pulled } | undefined;
+  const JSON_HEADERS = { "content-type": "application/json" };
   let lastEmit: EmitOutcome | undefined;
 
-  const JSON_HEADERS = { "content-type": "application/json" };
-  const call = async (name: string, args: Record<string, unknown>): Promise<unknown> => {
-    const response = await doFetch(`${base}/ndx/mcp`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ name, arguments: args }) });
-    if (!response.ok) throw new Error(`rex is not reachable (${response.status})`);
-    const body = (await response.json()) as { ok: boolean; result?: unknown; error?: string };
-    if (!body.ok) throw new Error(body.error ?? `rex refused ${name}`);
-    return body.result;
-  };
-
-  const item = async (id: string): Promise<Item> => {
+  const item = async (call: ToolCall, id: string): Promise<Item> => {
     const got = (await call("get_item", { id })) as { item?: Item } & Item;
     return (got.item ?? got) as Item;
   };
 
-  async function pullFresh(cursor?: string): Promise<Pulled> {
+  async function pull(_call: ToolCall, cursor?: string): Promise<{ changes: RemoteChange[]; cursor: string }> {
     // A fresh projection first; when the door cannot re-emit, the last emitted snapshot still answers, and the rail says it is stale.
     lastEmit = await doFetch(`${base}/ndx/emit`, { method: "POST", headers: JSON_HEADERS, body: "{}" })
       .then(async (r) => (r.ok ? ((await r.json()) as EmitOutcome) : { ok: false, output: `emit: ${r.status}` }))
       .catch((error: unknown) => ({ ok: false, output: error instanceof Error ? error.message : String(error) }));
-    const response = await doFetch(`${base}/data/snapshot.json`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`snapshot: ${response.status}`);
-    const snapshot = (await response.json()) as { nodes: SnapshotNode[] };
+    const file = await fetchSnapshot(`${base}/data/snapshot.json`, { fetch: doFetch, kinds: [...SYNCED_KINDS], init: { cache: "no-store" } });
     const changes: RemoteChange[] = [];
     let newest = "";
-    for (const node of snapshot.nodes) {
+    for (const node of file.snapshot.nodes as Array<Record<string, unknown> & { id: string; kind: string }>) {
       if (!isSyncedKind(node.kind)) continue;
-      const version = typeof node["lastModified"] === "string" ? node["lastModified"] : "";
+      const version = typeof node[VERSION_FIELD] === "string" ? (node[VERSION_FIELD] as string) : "";
       if (version > newest) newest = version;
       changes.push({ resource: node.kind, id: node.id, version, fields: fieldsOf(node) });
     }
-    return { changes, cursor: `${snapshot.nodes.length}:${newest || cursor || ""}` };
+    return { changes, cursor: `${file.header.generatedAt ?? ""}:${newest || cursor || ""}` };
   }
 
-  async function one(write: RemoteWrite): Promise<RemoteAck> {
-    if (!isSyncedKind(write.resource)) throw new Error(refusal(write.resource));
+  async function push(call: ToolCall, write: RemoteWrite): Promise<{ id: string; version: string }> {
+    if (!isSyncedKind(write.resource)) throw new Error(`${write.resource} is not written from here.`);
     if (write.deleted) throw new Error("the projection never deletes: remove an item with ndx prd remove");
     if (!write.id) throw new Error("a change or task is added in n-dx (ndx capture, ndx plan), not from this face");
-    const before = await item(write.id);
+    const before = await item(call, write.id);
     const wanted = write.fields ?? {};
     const wrote: string[] = [];
     if ("status" in wanted && !same(wanted["status"], before.status)) {
@@ -129,33 +109,11 @@ export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
         itemId: write.id,
         detail: `author=graview:${options.principal} wrote ${wrote.join(", ")} through ${SYSTEM}'s face`,
       });
-      // A write changes what the next pull says; a memoized pull would call it an echo of nothing.
-      memo = undefined;
     }
-    const after = wrote.length > 0 ? await item(write.id) : before;
-    return { localId: write.localId, id: write.id, version: after.lastModified ?? before.lastModified ?? "" };
+    const after = wrote.length > 0 ? await item(call, write.id) : before;
+    return { id: write.id, version: after.lastModified ?? before.lastModified ?? "" };
   }
 
-  return {
-    name: SYSTEM,
-    refuse: refusal,
-    lastEmit: () => lastEmit,
-    async pull(cursor) {
-      if (memo && Date.now() - memo.at < ttl) return memo.result;
-      const result = await pullFresh(cursor);
-      memo = { at: Date.now(), result };
-      return result;
-    },
-    async push(writes) {
-      const acks: RemoteAck[] = [];
-      for (const write of writes) {
-        try {
-          acks.push(await one(write));
-        } catch (error) {
-          acks.push({ localId: write.localId, id: write.id ?? "", version: "", error: error instanceof Error ? error.message : String(error) });
-        }
-      }
-      return acks;
-    },
-  };
+  const remote = mcpRemote({ name: SYSTEM, call: doorClient({ path: "/ndx/mcp", base, fetch: doFetch }), pull, push });
+  return { ...remote, lastEmit: () => lastEmit };
 }

@@ -2,8 +2,8 @@
 
 This package turns an n-dx project into the two files Graview's CLI reads: a
 `graview-document` declaration (`n-dx.graview.json`, checked in here) and a
-`{nodes, edges}` seed snapshot built from the rex PRD model, sourcevision's
-JSON output and hench's run records. `ndx graview <sub>` then spawns the
+seed snapshot in Graview's line format (`src/snapshot-file.ts`) built from the
+rex PRD model, sourcevision's JSON output and hench's run records. `ndx graview <sub>` then spawns the
 `graview` binary on those files. Three rules keep that honest:
 
 - **No `@graview/*` or `graview` dependency, ever.** The binary is a peer tool
@@ -49,7 +49,7 @@ carries, never a judgement rex has not made.
 ```
 <graviewDir>/
   document.json   the declaration, `name` set to the project
-  snapshot.json   {nodes, edges}, canonically sorted — byte-identical on an unchanged checkout
+  snapshot.json   Graview's line format: a header saying when it was made and what it holds, then one record per line, keys sorted — the body is byte-identical on an unchanged checkout
   data/           graview's own store, created by `serve` and `mcp`; refreshed with `sync-seed`
   cache/          rex's N-DX-Item trailer cache and commit-file cache, kept here
 ```

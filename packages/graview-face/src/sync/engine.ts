@@ -1,27 +1,33 @@
 /**
  * THE LOOP. Graview's SyncEngine over this face's store and the n-dx remote:
- * inbound first, then what changed here. The links are seeded from the
- * snapshot the store was opened with, so the first run pushes nothing it did
- * not have to.
+ * inbound first, then what changed here. Every change and task is linked at
+ * the version it was projected with (`version: "lastModified"` in the
+ * mapping), so the first run pushes nothing it did not have to. Rex stamps
+ * `lastModified` on every write, so an item it has not written since the
+ * stamp existed carries none: that record is linked at no version
+ * (`unversionedLinks`), where the engine would take it for a record made
+ * here and ask rex to create it. Its first rex write is news; its first edit
+ * here is a push.
  *
- * RULE: rex wins. The engine reports a field edited on both sides as a
- * conflict, but its one pass pushes our value in the same breath — which
- * would overwrite rex with stale state before anyone could resolve it. So
- * every run pre-empts: it pulls first, finds each field both sides changed
- * since they last agreed, takes rex's value through the ordinary inbound
- * act (so it lands in the log, authored by the system), and only then lets
- * the engine run. What rex kept is said in the rail, never hidden.
+ * RULE: rex wins. The engine's policy is `conflicts: "theirs"`: a field
+ * edited on both sides since they last agreed takes rex's value through the
+ * ordinary inbound act (so it lands in the log, authored by the system), and
+ * the report says each one it settled. What rex kept is said in the rail,
+ * never hidden. The engine guards the store while the loop runs, so an act
+ * on a kind another tool owns is refused — and not offered — in the sentence
+ * the mapping declares.
  */
-import { SyncEngine, type AnySchema, type RemoteLink, type Store, type SyncConflict, type SyncReport } from "@graview/core";
-import { applyInbound, isSyncedKind, mapping, SYNC_FIELDS } from "./mapping.js";
+import { SyncEngine, type RemoteLink, type SettledConflict, type SyncReport } from "@graview/core/sync";
+import type { AnySchema, Store } from "@graview/core";
+import { applyInbound, isSyncedKind, mapping, SYNC_FIELDS, VERSION_FIELD } from "./mapping.js";
 import { ndxRemote, type EmitOutcome, type NdxRemote, type NdxRemoteOptions } from "./ndx-system.js";
 
 export interface SyncStatus {
   readonly running: boolean;
   readonly lastRun?: Date;
   readonly report?: SyncReport;
-  /** Conflicts the last run resolved to rex's value. */
-  readonly resolved: readonly SyncConflict[];
+  /** Conflicts the last run settled to rex's value. */
+  readonly resolved: readonly SettledConflict[];
   /** Set when the last pull could not re-emit: what it read is older than the tree. */
   readonly stale?: string;
   readonly error?: string;
@@ -45,77 +51,43 @@ export interface StartSyncOptions extends SyncOptions {
   readonly settle?: number;
 }
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+export interface Sync {
+  readonly engine: SyncEngine<AnySchema>;
+  readonly remote: NdxRemote;
+  /** One pass of the engine: inbound, conflicts settled to rex, then what changed here. */
+  run(): Promise<{ report: SyncReport; resolved: readonly SettledConflict[]; emit?: EmitOutcome }>;
+}
 
-/** Every synced record the store holds, linked at the version it was projected with. */
-export function seedLinks(store: Store<AnySchema>): Record<string, RemoteLink> {
+/** A link at no version for every synced record that carries none: projected by rex, agreed at nothing, never ours to create. */
+export function unversionedLinks(store: Store<AnySchema>): Record<string, RemoteLink> {
   const links: Record<string, RemoteLink> = {};
   for (const node of store.graph.allNodes() as unknown as Array<Record<string, unknown> & { id: string; kind: string }>) {
-    if (!isSyncedKind(node.kind)) continue;
+    if (!isSyncedKind(node.kind) || typeof node[VERSION_FIELD] === "string") continue;
     const fields: Record<string, unknown> = {};
     for (const field of SYNC_FIELDS) fields[field] = node[field];
-    links[node.id] = { resource: node.kind, id: node.id, version: typeof node["lastModified"] === "string" ? node["lastModified"] : "", fields };
+    links[node.id] = { resource: node.kind, id: node.id, version: "", fields };
   }
   return links;
 }
 
-export interface Sync {
-  readonly engine: SyncEngine<AnySchema>;
-  readonly remote: NdxRemote;
-  /** One pass: pre-empt conflicts to rex's value, then the engine's own run. */
-  run(): Promise<{ report: SyncReport; resolved: readonly SyncConflict[]; emit?: EmitOutcome }>;
-}
-
 export function createSync(options: SyncOptions): Sync {
   const remote = ndxRemote(options);
-  const engine = new SyncEngine<AnySchema>({ store: options.store, mapping: mapping(), remote, applyInbound }, { links: seedLinks(options.store), outbox: [] });
-  // The engine's own state, always current: `resolve` moves it after a run's report was taken.
-  let ran = false;
-
-  const preempt = async (): Promise<SyncConflict[]> => {
-    const state = engine.snapshot;
-    const links = state.links;
-    const { changes } = await remote.pull(ran ? state.cursor : undefined);
-    const resolved: SyncConflict[] = [];
-    for (const change of changes) {
-      const link = links[change.id];
-      if (!link || link.version === change.version || !change.fields) continue;
-      const node = options.store.graph.getNode(change.id) as Record<string, unknown> | undefined;
-      if (!node) continue;
-      for (const field of SYNC_FIELDS) {
-        if (!(field in change.fields)) continue;
-        const theirs = change.fields[field];
-        const ours = node[field];
-        const base = link.fields[field];
-        if (same(theirs, base) || same(ours, base) || same(theirs, ours)) continue;
-        const conflict: SyncConflict = { localId: change.id, field, ours, theirs, base };
-        engine.resolve(conflict, "theirs");
-        resolved.push(conflict);
-      }
-    }
-    return resolved;
-  };
-
+  const kinds = options.store.schema.kinds as readonly string[];
+  const engine = new SyncEngine<AnySchema>({ store: options.store, mapping: mapping(kinds), remote, applyInbound, conflicts: "theirs" }, { links: unversionedLinks(options.store), outbox: [] });
   return {
     engine,
     remote,
     async run() {
-      const resolved = await preempt();
       const report = await engine.run();
-      // Anything the engine still reports (a field that changed remotely twice between pulls) is rex's too.
-      for (const conflict of report.conflicts) {
-        engine.resolve(conflict, "theirs");
-        resolved.push(conflict);
-      }
-      ran = true;
       const emit = remote.lastEmit();
-      return { report, resolved, ...(emit ? { emit } : {}) };
+      return { report, resolved: report.resolved, ...(emit ? { emit } : {}) };
     },
   };
 }
 
 export function startSync(options: StartSyncOptions): SyncHandle {
   const sync = createSync(options);
+  const release = sync.engine.guard();
   const listeners = new Set<(status: SyncStatus) => void>();
   let status: SyncStatus = { running: false, resolved: [] };
   let inFlight: Promise<SyncStatus> | undefined;
@@ -175,6 +147,7 @@ export function startSync(options: StartSyncOptions): SyncHandle {
     stop: () => {
       stopped = true;
       unsubscribe();
+      release();
       if (timer) clearTimeout(timer);
       clearInterval(interval);
     },

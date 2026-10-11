@@ -2,9 +2,14 @@
 id: "ddac7e70-2cec-46ae-91af-467e376f972e"
 level: "task"
 title: "The face and the adapter take Graview 0.1.22 and drop the workarounds it answers"
-status: "pending"
+status: "completed"
 priority: "high"
 source: "ndx-capture"
+startedAt: "2026-10-11T12:05:14.826Z"
+completedAt: "2026-10-11T12:26:43.900Z"
+endedAt: "2026-10-11T12:26:43.900Z"
+resolutionType: "code-change"
+resolutionDetail: "Both packages on Graview 0.1.22; the sync, door, resolution, types, snapshot format and declaration moved onto the framework's own features and the workarounds deleted; CI green locally except hench's credential-bound api-effort tests."
 acceptanceCriteria:
   - "Every @graview/* dependency, graview and GRAVIEW_VERSION name 0.1.22, and `graview doctor` passes in packages/graview-face"
   - "The sync engine is imported from @graview/core/sync with conflicts: \"theirs\", a version field on each synced resource and readonly resources with a because sentence; the hand pre-empt, seedLinks and the hand refusal table are gone and the engine guards the store"
@@ -18,6 +23,6 @@ acceptanceCriteria:
   - "shots.mjs, the fixture-drift test, the version-pin test and tests/fixtures/document.json are deleted; tests compile the declaration from its path with compileDocumentFiles; shots run through graview shots"
   - "UPSTREAM.md keeps only the workarounds still needed, and the docs and changeset say what changed"
 description: "Graview 0.1.22 shipped every ask the n-dx run filed (block keys, resolveFor, document facts, field roles, a bar that folds empty kinds and keeps its places out, a JSON Schema and types from the document, graview preview/shots/doctor, a sync conflict policy, readonly resources, an MCP remote and door, a seat, and a snapshot format that says what it holds). Pin every @graview/* package and graview to 0.1.22 together and delete the workarounds in @n-dx/graview-face and @n-dx/graview that stood in for them."
-lastModified: "2026-10-11T12:02:59.909Z"
+lastModified: "2026-10-11T12:26:44.163Z"
 lastModifiedBy: "Nick Daniel <nick@endash.us>"
 ---

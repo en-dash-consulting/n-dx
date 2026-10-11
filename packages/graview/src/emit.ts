@@ -1,5 +1,8 @@
 /**
- * Write the two files Graview reads, under the layout's graview dir.
+ * Write the two files Graview reads, under the layout's graview dir: the
+ * declaration as canonical JSON, the snapshot in Graview's line format
+ * (`snapshot-file.ts`), whose first line says when it was made and what it
+ * holds.
  */
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -7,6 +10,7 @@ import { resolveLayout, type Layout } from "./llm-gateway.js";
 import { documentFor } from "./document.js";
 import { buildSnapshot, graviewDirOf, type BuildSnapshotOptions } from "./snapshot.js";
 import { canonicalJson } from "./canonical.js";
+import { writeSnapshotFile } from "./snapshot-file.js";
 
 export const DOCUMENT_FILENAME = "document.json";
 export const SNAPSHOT_FILENAME = "snapshot.json";
@@ -15,6 +19,8 @@ export const DATA_DIRNAME = "data";
 export interface EmitOptions extends BuildSnapshotOptions {
   /** The document's `name`; defaults to the project directory's name. */
   projectName?: string;
+  /** What the snapshot's header says it was made at; now when unset. */
+  generatedAt?: string | Date;
 }
 
 export interface EmitResult {
@@ -49,7 +55,7 @@ export async function emitProjection(root: string, options: EmitOptions = {}): P
   const snapshotPath = join(graviewDir, SNAPSHOT_FILENAME);
   // Written whole: a face reads these while a re-emit runs, and a half-written file is not JSON.
   writeAtomically(documentPath, canonicalJson(document));
-  writeAtomically(snapshotPath, canonicalJson(report.snapshot));
+  writeAtomically(snapshotPath, writeSnapshotFile(report.snapshot, options.generatedAt ?? new Date()));
 
   return {
     layout,

@@ -1,7 +1,7 @@
 import { createMemoryAdapter } from "@graview/core";
 import { themeCss, type Scheme } from "@graview/primitives";
 import { applySettings } from "@graview/react";
-import { openStore } from "@graview/ship/browser";
+import { openStore, rememberedPrincipal } from "@graview/ship/browser";
 import { loadProjection } from "./app.js";
 
 const sheet = new CSSStyleSheet();
@@ -46,7 +46,9 @@ if (!root) throw new Error("no #root");
  * pulls, so remembering edits in this browser would only keep yesterday's
  * graph. A memory adapter seeded from the snapshot is the honest store; what
  * a person changes here reaches rex through the loop, and comes back as the
- * next snapshot.
+ * next snapshot. The store attributes every act to this page's reader
+ * (`rememberedPrincipal`: the name kept under graview:principal, else
+ * "reader"), so the log and the sync's `append_log` name who moved what.
  */
 const scheme = initialScheme();
 const face = inScene() ? import("./faces/scene.js") : import("./faces/pages.js");
@@ -64,7 +66,7 @@ try {
   };
   applyScheme(scheme);
   applySettings(projection.app.settings ?? []);
-  const opened = await openStore({ app: projection.app, adapter: createMemoryAdapter(), seed: projection.snapshot, fresh: true });
+  const opened = await openStore({ app: projection.app, adapter: createMemoryAdapter(), seed: projection.snapshot, fresh: true, storeOptions: { principal: rememberedPrincipal() } });
   (await face).mount(root, { app: projection.app, store: opened.store, scheme, applyScheme });
   (window as unknown as Record<string, unknown>)["__graviewReady"] = { scheme };
 } catch (error) {

@@ -6,6 +6,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { existsSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { resolveLayout } from "../../src/llm-gateway.js";
+import { readSnapshot } from "@graview/core/snapshot";
 import { emitProjection, DOCUMENT_FILENAME, SNAPSHOT_FILENAME } from "../../src/emit.js";
 import { makeProject } from "../helpers/project.js";
 
@@ -51,7 +52,10 @@ describe("emitProjection", () => {
       const document = JSON.parse(readFileSync(result.documentPath, "utf-8")) as { format: string; name: string };
       expect(document.format).toBe("graview-document");
       expect(document.name).toBe(relative(join(root, ".."), root));
-      const snapshot = JSON.parse(readFileSync(result.snapshotPath, "utf-8")) as { nodes: unknown[]; edges: unknown[] };
+      const file = readSnapshot(readFileSync(result.snapshotPath, "utf-8"));
+      expect(file.header.format).toBe(2);
+      expect(typeof file.header.generatedAt).toBe("string");
+      const snapshot = file.snapshot;
       expect(snapshot.nodes.length).toBe(Object.entries(result.counts).filter(([k]) => k !== "edges").reduce((n, [, c]) => n + c, 0));
       expect(snapshot.edges.length).toBe(result.counts.edges);
 
@@ -61,15 +65,21 @@ describe("emitProjection", () => {
     });
   }
 
-  it("writes the same bytes twice for an unchanged checkout", async () => {
+  it("writes the same bytes twice for an unchanged checkout, the snapshot's header aside", async () => {
     const root = makeProject();
     roots.push(root);
-    const first = await emitProjection(root, { warn: () => {} });
+    const first = await emitProjection(root, { warn: () => {}, generatedAt: "2026-10-11T12:00:00.000Z" });
     const a = [readFileSync(first.documentPath, "utf-8"), readFileSync(first.snapshotPath, "utf-8")];
-    const second = await emitProjection(root, { warn: () => {} });
+    const second = await emitProjection(root, { warn: () => {}, generatedAt: "2026-10-11T12:00:00.000Z" });
     const b = [readFileSync(second.documentPath, "utf-8"), readFileSync(second.snapshotPath, "utf-8")];
     expect(b).toEqual(a);
     expect(a[1]!.endsWith("\n")).toBe(true);
+    // Only the first line moves between two emits made at different times.
+    const third = await emitProjection(root, { warn: () => {}, generatedAt: "2026-10-11T13:00:00.000Z" });
+    const [headerA, ...bodyA] = a[1]!.split("\n");
+    const [headerC, ...bodyC] = readFileSync(third.snapshotPath, "utf-8").split("\n");
+    expect(bodyC).toEqual(bodyA);
+    expect(headerC).not.toBe(headerA);
   });
 
   it("takes an explicit project name", async () => {

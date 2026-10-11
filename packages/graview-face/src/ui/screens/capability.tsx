@@ -1,7 +1,8 @@
 import { recordFacts, recordPath, useStoreTick } from "@graview/pages";
 import { Link, useParams } from "react-router-dom";
 import type { App } from "../../app.js";
-import { inward, label, node as nodeOf, out, said, toneOfStatus } from "../../model/graph.js";
+import { computedValues } from "@graview/core/blocks";
+import { edgesOf, inward, label, nodeOf, said, toneOfStatus } from "../../model/graph.js";
 import { DeclaredBlocks, declaredPage, opening } from "../declared.js";
 import { Badge, Empty, Facts, Hero, KindIcon, Page, RecordRow, Rows, Section, Stat, Stats, type Ctx } from "../kit.js";
 import { Missing, Problems, Under } from "./generic.js";
@@ -16,30 +17,34 @@ export function CapabilityScreen({ context, app }: { context: Ctx; app: App }) {
   const { store, principal, invariantContext } = context;
   useStoreTick(store);
   const id = decodeURIComponent(useParams()["id"] ?? "");
-  const node = nodeOf(store, id);
+  const node = nodeOf(store, id, "capability");
   const facts = recordFacts(store, id, { ...(principal ? { principal } : {}), ...(invariantContext ? { context: invariantContext } : {}) });
-  if (!node || !facts || node.kind !== "capability") return <Missing context={context} />;
+  if (!node || !facts) return <Missing context={context} />;
 
   const page = opening(declaredPage(context, app, node));
-  const depends = out(store, id, "dependsOn");
+  const depends = edgesOf(store, node, "dependsOn");
   const neededBy = inward(store, id, "dependsOn");
   const bound = inward(store, id, "appliesTo");
-  const standing = String(node.intentStatus ?? "proposed");
-  const health = String(node.health ?? "ok");
+  const standing = node.intentStatus ?? "proposed";
+  const health = node.health ?? "ok";
+  // The kind's computed fields (openChanges, zones), worked out as every face works them out.
+  const computed = computedValues(store.schema, store.graph, node as never).values;
+  const openChanges = Number(computed["openChanges"] ?? 0);
+  const zones = Number(computed["zones"] ?? 0);
 
   return (
     <Page testId="capability-page">
-      <Hero eyebrow={<Under context={context} node={node} what="Capability" />} title={facts.label} lede={typeof node.statement === "string" ? node.statement : undefined}>
+      <Hero eyebrow={<Under context={context} node={node} what="Capability" />} title={facts.label} lede={node.statement}>
         <Badge tone={toneOfStatus(standing)}>{said(standing)}</Badge>
         <Badge tone={toneOfStatus(health)}>{health === "defective" ? "defective: an open fix targets this" : "healthy"}</Badge>
         {node.reviewed === true ? <Badge tone="good">spec reviewed</Badge> : <Badge>spec not yet reviewed</Badge>}
-        {node.displayId ? <Badge plain>{String(node.displayId)}</Badge> : null}
+        {node.displayId ? <Badge plain>{node.displayId}</Badge> : null}
       </Hero>
 
       <Stats>
-        <Stat i={0} value={Number(node.criteriaCount ?? 0)} label="criteria" />
-        <Stat i={1} value={Number(node.openChanges ?? 0)} label="open changes" tone={Number(node.openChanges ?? 0) > 0 ? "accent" : undefined} />
-        <Stat i={2} value={Number(node.zones ?? 0)} label="zones realized in" hint={Number(node.zones ?? 0) === 0 ? "no commit tied to its work yet" : undefined} />
+        <Stat i={0} value={node.criteriaCount ?? 0} label="criteria" />
+        <Stat i={1} value={openChanges} label="open changes" tone={openChanges > 0 ? "accent" : undefined} />
+        <Stat i={2} value={zones} label="zones realized in" hint={zones === 0 ? "no commit tied to its work yet" : undefined} />
         <Stat i={3} value={bound.length} label="constraints binding it" />
       </Stats>
 

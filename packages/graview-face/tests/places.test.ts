@@ -1,12 +1,12 @@
 /**
- * Headless: the declaration n-dx emits compiles, every titled lens draws as a
- * place over a real-shaped snapshot, and this face's registry builds over it.
+ * Headless: the declaration n-dx emits compiles from where it lives
+ * (`compileDocumentFiles` reads ../graview/n-dx.graview.json by path, so
+ * there is no copy to drift), every titled lens draws as a place over a
+ * real-shaped snapshot, and this face's registry builds over it.
  */
-import { readFileSync } from "node:fs";
-import { createMemoryAdapter, placesOf, type Principal } from "@graview/core";
-import { compileDocument } from "@graview/core/check";
+import { placesOf, type Principal } from "@graview/core";
 import { describePlace } from "@graview/core/describe";
-import { openStore, type GraphSnapshot } from "@graview/ship";
+import { compileDocumentFiles, type DocumentFiles } from "@graview/core/testing";
 import { describe, expect, it, beforeAll } from "vitest";
 import type { App } from "../src/app.js";
 import { pages } from "../src/ui/pages.js";
@@ -14,23 +14,27 @@ import { views } from "../src/ui/views.js";
 import { attention, standing } from "../src/model/work.js";
 import { spend } from "../src/model/spend.js";
 
-const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf-8")) as unknown;
+export const DECLARATION = new URL("../../graview/n-dx.graview.json", import.meta.url);
+export const SEED = new URL("./fixtures/snapshot.json", import.meta.url);
 const SEAT: Principal = { kind: "human", id: "test", name: "Test" } as Principal;
 
+let files: DocumentFiles;
 let app: App;
-let store: Awaited<ReturnType<typeof openStore>>["store"];
+let store: ReturnType<DocumentFiles["store"]>;
 
-beforeAll(async () => {
-  const compiled = compileDocument(fixture("document.json"));
-  expect(compiled.ok, compiled.ok ? "" : JSON.stringify(compiled.findings, null, 2)).toBe(true);
-  if (!compiled.ok) throw new Error("refused");
-  app = compiled.app as App;
-  store = (await openStore({ app, adapter: createMemoryAdapter(), seed: fixture("snapshot.json") as GraphSnapshot })).store;
+beforeAll(() => {
+  files = compileDocumentFiles(DECLARATION, { seed: SEED });
+  app = files.app as App;
+  store = files.store();
 });
 
 describe("the declaration n-dx emits", () => {
+  it("compiles with nothing the checker calls an error", () => {
+    expect(files.findings.filter((f) => f.severity === "error")).toEqual([]);
+  });
+
   it("names every kind the snapshot carries", () => {
-    const kinds = new Set((fixture("snapshot.json") as GraphSnapshot).nodes.map((n) => n.kind));
+    const kinds = new Set(files.seed!.nodes.map((n) => n.kind));
     for (const kind of kinds) expect(app.schema.kinds as readonly string[]).toContain(kind);
   });
 
@@ -46,6 +50,11 @@ describe("the declaration n-dx emits", () => {
       expect(text.length, place.title).toBeGreaterThan(40);
       expect(text, place.title).not.toMatch(/cannot draw/i);
     }
+  });
+
+  it("says whether the map is proposed as a fact of the whole graph, read by every face", () => {
+    const home = describePlace(store, SEAT, placesOf(app).find((p) => p.slug === "home" || p.kind === undefined && !p.lens)!, { app, today: "2026-10-10" });
+    expect(JSON.stringify(home)).toContain("mapProposed");
   });
 });
 

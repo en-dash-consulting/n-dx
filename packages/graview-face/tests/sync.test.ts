@@ -1,21 +1,23 @@
 /**
- * Two-way sync, headless: the engine over the fixture store and a fake door
- * that behaves like the hub's rex. A local edit lands in rex through
+ * Two-way sync, headless: Graview's engine over the fixture store and a fake
+ * door that behaves like the hub's rex. A local edit lands in rex through
  * update_task_status with the principal in the log; a rex-side edit arrives
- * as a system-authored op; a field edited on both sides resolves to rex's
- * value and is said; a write to a code-side kind is refused naming the owner.
+ * as a system-authored op; a field edited on both sides is settled to rex's
+ * value by the engine's own policy and said; a kind another tool owns is
+ * refused with the owner's sentence before an act is offered.
  */
 import { readFileSync } from "node:fs";
-import { createMemoryAdapter, type Principal } from "@graview/core";
-import { compileDocument } from "@graview/core/check";
-import { openStore, type GraphSnapshot } from "@graview/ship";
+import { PermissionDeniedError, type Principal } from "@graview/core";
+import { readSnapshot } from "@graview/core/snapshot";
+import { compileDocumentFiles } from "@graview/core/testing";
+import type { GraphSnapshot } from "@graview/ship";
+import { writeSnapshot } from "@graview/core/snapshot";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { App } from "../src/app.js";
-import { createSync, seedLinks } from "../src/sync/engine.js";
-import { ndxRemote } from "../src/sync/ndx-system.js";
-import { refusal } from "../src/sync/mapping.js";
+import { createSync } from "../src/sync/engine.js";
+import { because } from "../src/sync/mapping.js";
 
-const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf-8")) as unknown;
+const DECLARATION = new URL("../../graview/n-dx.graview.json", import.meta.url);
+const SEED = new URL("./fixtures/snapshot.json", import.meta.url);
 const SEAT: Principal = { kind: "human", id: "nick", name: "Nick" } as Principal;
 
 interface Item {
@@ -29,12 +31,13 @@ interface Item {
   [k: string]: unknown;
 }
 
-/** A fake door: rex as a map of items, the snapshot as what rex would project, a log. */
+/** A fake door: rex as a map of items, the snapshot as what rex would project (in the line format, served by range), a log. */
 function fakeDoor(snapshot: GraphSnapshot) {
   const rex = new Map<string, Item>();
   for (const node of snapshot.nodes) if (node.kind === "change" || node.kind === "task") rex.set(node.id, { ...(node as Item) });
   const log: { event: string; itemId?: string; detail?: string }[] = [];
   const calls: { name: string; args: Record<string, unknown> }[] = [];
+  const ranges: string[] = [];
   let clock = 0;
   const stamp = () => new Date(Date.UTC(2026, 9, 10, 12, 0, ++clock)).toISOString();
   const touch = (id: string, patch: Partial<Item>) => {
@@ -61,12 +64,20 @@ function fakeDoor(snapshot: GraphSnapshot) {
       return { logged: true };
     },
   };
-  const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+  const fetchImpl = async (input: string, init?: RequestInit): Promise<Response> => {
     const url = String(input);
     if (url.endsWith("/ndx/emit")) return new Response(JSON.stringify({ ok: true, output: "" }), { headers: { "content-type": "application/json" } });
     if (url.endsWith("/data/snapshot.json")) {
       const nodes = snapshot.nodes.map((n) => (rex.has(n.id) ? { ...n, ...rex.get(n.id)! } : n));
-      return new Response(JSON.stringify({ nodes, edges: snapshot.edges }), { headers: { "content-type": "application/json" } });
+      const text = writeSnapshot({ nodes, edges: snapshot.edges }, { generatedAt: "2026-10-10T12:00:00.000Z" });
+      const range = /^bytes=(\d+)-(\d+)$/.exec(String((init?.headers as Record<string, string> | undefined)?.["range"] ?? ""));
+      if (range) {
+        ranges.push(range[0]);
+        const bytes = new TextEncoder().encode(text);
+        const end = Math.min(Number(range[2]), bytes.length - 1);
+        return new Response(bytes.slice(Number(range[1]), end + 1), { status: 206, headers: { "content-range": `bytes ${range[1]}-${end}/${bytes.length}` } });
+      }
+      return new Response(text);
     }
     if (url.endsWith("/ndx/mcp")) {
       const { name, arguments: args } = JSON.parse(String(init?.body ?? "{}")) as { name: string; arguments: Record<string, unknown> };
@@ -78,36 +89,39 @@ function fakeDoor(snapshot: GraphSnapshot) {
       }
     }
     return new Response("not found", { status: 404 });
-  }) as typeof fetch;
-  return { rex, log, calls, touch, fetch: fetchImpl };
+  };
+  return { rex, log, calls, ranges, touch, fetch: fetchImpl };
 }
 
-let app: App;
 let snapshot: GraphSnapshot;
 beforeEach(() => {
-  const compiled = compileDocument(fixture("document.json"));
-  if (!compiled.ok) throw new Error("refused");
-  app = compiled.app as App;
-  snapshot = fixture("snapshot.json") as GraphSnapshot;
+  snapshot = readSnapshot(readFileSync(SEED, "utf-8")).snapshot as GraphSnapshot;
 });
 
 async function setUp() {
   const door = fakeDoor(snapshot);
-  const { store } = await openStore({ app, adapter: createMemoryAdapter(), seed: snapshot });
-  const sync = createSync({ store, principal: "nick", fetch: door.fetch, base: "http://door", pullTtlMs: 0 });
+  const store = compileDocumentFiles(DECLARATION, { seed: SEED }).store();
+  const sync = createSync({ store, principal: "nick", fetch: door.fetch, base: "http://door" });
   const engine = sync.engine;
-  const change = (store.graph.nodesOfKind("change" as never) as unknown as Item[]).find((c) => c.status !== "completed") ?? (store.graph.nodesOfKind("change" as never) as unknown as Item[])[0]!;
+  const changes = store.graph.nodesOfKind("change" as never) as unknown as Item[];
+  const change = changes.find((c) => c.status !== "completed") ?? changes[0]!;
   return { door, store, engine, sync, change };
 }
 
 describe("two-way sync with rex as the system of record", () => {
-  it("links every synced record at the version it was projected with, so the first run pushes nothing", async () => {
-    const { door, store, engine } = await setUp();
-    expect(Object.keys(seedLinks(store)).length).toBeGreaterThan(0);
+  it("links every synced record at the version it was projected with, so the first run pushes nothing, and pulls only the two kinds it syncs", async () => {
+    const { door, engine } = await setUp();
     const report = await engine.run();
     expect(report.pushed).toEqual([]);
     expect(report.applied).toEqual([]);
-    expect(door.calls.filter((c) => c.name !== "get_item")).toEqual([]);
+    // A record rex never stamped is agreed at no version, not asked to be created.
+    expect(snapshot.nodes.some((n) => (n.kind === "change" || n.kind === "task") && typeof (n as Item).lastModified !== "string")).toBe(true);
+    expect(report.refused).toEqual([]);
+    expect(report.queued).toEqual([]);
+    expect(door.calls).toEqual([]);
+    // The header first, then the changes' and the tasks' bytes: never the zones, the runs or the commits.
+    expect(door.ranges.length).toBeGreaterThanOrEqual(2);
+    expect(door.ranges[0]).toBe("bytes=0-65535");
   });
 
   it("sends a change's new status to rex through update_task_status and logs the principal", async () => {
@@ -145,31 +159,41 @@ describe("two-way sync with rex as the system of record", () => {
     expect(door.calls.some((c) => c.name === "edit_item" || c.name === "update_task_status")).toBe(false);
   });
 
-  it("resolves a field edited on both sides between pulls to rex's value, and never overwrites rex", async () => {
+  it("settles a field edited on both sides to rex's value by the engine's own policy, and never overwrites rex", async () => {
     const { door, store, sync, change } = await setUp();
     await sync.run();
     store.apply({ name: "edit-change", args: { id: change.id, priority: "low" } }, { author: SEAT });
     door.touch(change.id, { priority: "high" });
     const writesBefore = door.calls.filter((c) => c.name === "edit_item" || c.name === "update_task_status").length;
     const { report, resolved } = await sync.run();
-    expect(resolved.map((c) => `${c.field}:${String(c.ours)}→${String(c.theirs)}`)).toEqual(["priority:low→high"]);
+    expect(resolved.map((c) => `${c.field}:${String(c.ours)}→${String(c.theirs)}:${c.took}`)).toEqual(["priority:low→high:theirs"]);
     expect((store.graph.getNode(change.id) as unknown as Item).priority).toBe("high");
     expect(door.rex.get(change.id)?.priority).toBe("high");
     // Rex was told nothing: its value stood, and ours was replaced locally through the inbound act.
     expect(door.calls.filter((c) => c.name === "edit_item" || c.name === "update_task_status").length).toBe(writesBefore);
     expect(report.pushed).toEqual([]);
+    expect(report.conflicts).toEqual([]);
     const settled = await sync.run();
     expect(settled.resolved).toEqual([]);
     expect(settled.report.pushed).toEqual([]);
   });
 
-  it("refuses a write to a code-side kind, naming the tool that owns it", async () => {
-    const door = fakeDoor(snapshot);
-    const remote = ndxRemote({ principal: "nick", fetch: door.fetch, base: "http://door" });
-    const acks = await remote.push([{ resource: "zone", id: "checkout", localId: "checkout", fields: { name: "Renamed" } }]);
-    expect(acks[0]?.error).toContain("sourcevision");
-    expect(refusal("run")).toContain("hench");
-    expect(refusal("commit")).toContain("git");
-    expect(door.calls).toEqual([]);
+  it("refuses an act on a kind another tool owns with the owner's sentence, before it is offered and when it is tried", async () => {
+    const { door, store, engine } = await setUp();
+    const zone = (store.graph.nodesOfKind("zone" as never) as unknown as Item[])[0]!;
+    expect(engine.refuses("zone")).toBe(because("zone"));
+    expect(because("zone")).toContain("sourcevision");
+    expect(because("run")).toContain("hench");
+    expect(because("commit")).toContain("git");
+    expect(engine.refuses("change")).toBeUndefined();
+    const release = engine.guard();
+    try {
+      expect(() => store.apply({ name: "edit-zone", args: { id: zone.id, name: "Renamed" } }, { author: SEAT })).toThrow(PermissionDeniedError);
+      expect(store.permits({ name: "edit-zone", args: { id: zone.id, name: "Renamed" } }, SEAT).ok).toBe(false);
+    } finally {
+      release();
+    }
+    await engine.run();
+    expect(door.calls.filter((c) => c.name !== "get_item")).toEqual([]);
   });
 });

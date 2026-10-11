@@ -5,7 +5,12 @@
  * Arrays keep their order; the builder sorts them before they get here.
  */
 export function canonicalJson(value: unknown): string {
-  return `${JSON.stringify(sortKeys(value), null, 2)}\n`;
+  return `${JSON.stringify(canonical(value), null, 2)}\n`;
+}
+
+/** The value with its object keys sorted at every depth and its `undefined` members dropped. */
+export function canonical(value: unknown): unknown {
+  return sortKeys(value);
 }
 
 function sortKeys(value: unknown): unknown {

@@ -2,10 +2,12 @@
  * WHAT SYNCS, AND WHAT NEVER WILL. The requirements side of the graph — a
  * change's and a task's status, priority, title and tags — goes both ways;
  * rex is the system of record, and every push is a rex write under rex's
- * lock, validation and log. Everything else is read-only here because
- * another tool owns it, and an act on it is refused naming that tool.
+ * lock, validation and log. Every other kind is a read-only resource: the
+ * engine lands what rex projects, sends nothing, and once it guards the
+ * store an act on one is refused — and never offered — with the sentence
+ * that names the tool that owns it.
  */
-import type { SyncMapping } from "@graview/core";
+import type { ResourceMapping, SyncMapping } from "@graview/core/sync";
 
 export const SYSTEM = "n-dx";
 export const SYNCED_KINDS = ["change", "task"] as const;
@@ -17,11 +19,14 @@ export type SyncedKind = (typeof SYNCED_KINDS)[number];
  */
 export const SYNC_FIELDS = ["status", "priority", "title", "tags"] as const;
 export type SyncField = (typeof SYNC_FIELDS)[number];
+/** Our field that holds rex's version of a record: what a two-way sync agrees on. */
+export const VERSION_FIELD = "lastModified";
 
 export function isSyncedKind(kind: string): kind is SyncedKind {
   return (SYNCED_KINDS as readonly string[]).includes(kind);
 }
 
+/** Who owns each read-only kind, as the refusal says it. */
 export const OWNERS: Readonly<Record<string, string>> = {
   area: "rex's product layer: on a v1 tree it is what the migration plan proposes, real once the PRD migrates; on v2, edit it with ndx rex product edit <node>",
   capability: "rex's product layer: on a v1 tree it is what the migration plan proposes, real once the PRD migrates; on v2, edit it with ndx rex product edit <node>",
@@ -34,20 +39,21 @@ export const OWNERS: Readonly<Record<string, string>> = {
   commit: "git",
 };
 
-/** The sentence an act on a read-only kind gets back. */
-export function refusal(kind: string): string {
+/** The sentence a read-only kind's resource declares: `engine.refuses(kind)` says it, and a guarded store refuses with it. */
+export function because(kind: string): string {
   return `${kind} is not written from here: it belongs to ${OWNERS[kind] ?? "another tool"}.`;
 }
 
-export function mapping(): SyncMapping {
-  return {
-    system: SYSTEM,
-    resources: SYNCED_KINDS.map((kind) => ({
-      kind,
-      resource: kind,
-      fields: Object.fromEntries(SYNC_FIELDS.map((f) => [f, f])),
-    })),
-  };
+/** The mapping over every kind the schema declares: two synced, the rest read-only. */
+export function mapping(kinds: readonly string[]): SyncMapping {
+  const synced: ResourceMapping[] = SYNCED_KINDS.map((kind) => ({
+    kind,
+    resource: kind,
+    fields: Object.fromEntries(SYNC_FIELDS.map((f) => [f, f])),
+    version: VERSION_FIELD,
+  }));
+  const owned: ResourceMapping[] = kinds.filter((kind) => !isSyncedKind(kind)).map((kind) => ({ kind, resource: kind, fields: {}, readonly: true, because: because(kind) }));
+  return { system: SYSTEM, resources: [...synced, ...owned] };
 }
 
 /** An inbound change lands through the kind's derived edit act, like a person's edit would. */

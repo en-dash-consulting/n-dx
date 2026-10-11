@@ -1,4 +1,4 @@
-import { inward, nodesOf, out, type Node, type Reader } from "./graph.js";
+import { edgesOf, inward, nodesOf, out, type Of, type Reader } from "./graph.js";
 
 /**
  * n-dx's own zone governance, read off the projection: a production zone with
@@ -8,28 +8,28 @@ import { inward, nodesOf, out, type Node, type Reader } from "./graph.js";
 export const FRAGILE_COHESION = 0.5;
 export const FRAGILE_COUPLING = 0.5;
 
-export function isFragile(zone: Node): boolean {
-  return Number(zone.cohesion) < FRAGILE_COHESION && Number(zone.coupling) > FRAGILE_COUPLING;
+export function isFragile(zone: Of<"zone">): boolean {
+  return (zone.cohesion ?? 1) < FRAGILE_COHESION && (zone.coupling ?? 0) > FRAGILE_COUPLING;
 }
 
-export function fragileZones(store: Reader): readonly Node[] {
+export function fragileZones(store: Reader): readonly Of<"zone">[] {
   return nodesOf(store, "zone")
     .filter(isFragile)
-    .sort((a, b) => Number(b.coupling) - Number(b.cohesion) - (Number(a.coupling) - Number(a.cohesion)));
+    .sort((a, b) => (b.coupling ?? 0) - (b.cohesion ?? 0) - ((a.coupling ?? 0) - (a.cohesion ?? 0)));
 }
 
 /** Top-level zones only: those inside no other zone. */
-export function topZones(store: Reader): readonly Node[] {
+export function topZones(store: Reader): readonly Of<"zone">[] {
   return nodesOf(store, "zone").filter((z) => out(store, z.id, "under").length === 0);
 }
 
 export interface Coverage {
-  readonly capabilities: readonly Node[];
-  readonly zones: readonly Node[];
+  readonly capabilities: readonly Of<"capability">[];
+  readonly zones: readonly Of<"zone">[];
   /** capability id → zone ids it is realized in. */
   readonly realized: ReadonlyMap<string, ReadonlySet<string>>;
   /** Capabilities no commit has realized anywhere. */
-  readonly unrealized: readonly Node[];
+  readonly unrealized: readonly Of<"capability">[];
 }
 
 export function coverage(store: Reader): Coverage {
@@ -37,7 +37,7 @@ export function coverage(store: Reader): Coverage {
   const realized = new Map<string, Set<string>>();
   const zoneIds = new Set<string>();
   for (const capability of capabilities) {
-    const zones = out(store, capability.id, "realizedIn");
+    const zones = edgesOf(store, capability, "realizedIn");
     realized.set(capability.id, new Set(zones.map((z) => z.id)));
     for (const z of zones) zoneIds.add(z.id);
   }
@@ -51,6 +51,6 @@ export function coverage(store: Reader): Coverage {
 }
 
 /** Where a zone's imports go and come from, for the zone page's two lists. */
-export function crossings(store: Reader, zoneId: string): { imports: readonly Node[]; importedBy: readonly Node[] } {
-  return { imports: out(store, zoneId, "crosses"), importedBy: inward(store, zoneId, "crosses") };
+export function crossings(store: Reader, zone: Of<"zone">): { imports: readonly Of<"zone">[]; importedBy: readonly Of<"zone">[] } {
+  return { imports: edgesOf(store, zone, "crosses"), importedBy: inward(store, zone.id, "crosses") as readonly Of<"zone">[] };
 }

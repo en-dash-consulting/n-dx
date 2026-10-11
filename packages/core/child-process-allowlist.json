@@ -184,10 +184,6 @@
     {
       "path": "packages/graview-face/scripts/a11y.mjs",
       "reason": "Local harness: starts `vite preview` for the axe-core pass and stops it. Not shipped runtime code, and the package imports no @n-dx/* package by design."
-    },
-    {
-      "path": "packages/graview-face/scripts/shots.mjs",
-      "reason": "Local harness: starts `vite preview` for the screenshots and stops it. Not shipped runtime code, and the package imports no @n-dx/* package by design."
     }
   ]
 }

@@ -2,7 +2,7 @@ import { recordFacts, useStoreTick } from "@graview/pages";
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import type { App } from "../../app.js";
-import { inward, isOpen, label, node as nodeOf, nodesOf, out, said, STATUS_ORDER, toneOfStatus, tokens, when, type Node } from "../../model/graph.js";
+import { inward, inwardOf, isOpen, label, nodeOf, nodesOf, out, said, STATUS_ORDER, statusOf, toneOfStatus, tokens, when, type Node, type Of } from "../../model/graph.js";
 import { orderChanges, runsFor, workUnder } from "../../model/work.js";
 import { DeclaredBlocks, declaredPage, opening } from "../declared.js";
 import { Badge, Empty, Facts, Hero, Icon, Page, RecordRow, Rows, Section, Stat, Stats, StatusBadge, type Ctx } from "../kit.js";
@@ -13,16 +13,16 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
   const { store, principal, invariantContext } = context;
   useStoreTick(store);
   const id = decodeURIComponent(useParams()["id"] ?? "");
-  const node = nodeOf(store, id);
+  const node = nodeOf(store, id, "change");
   const facts = recordFacts(store, id, { ...(principal ? { principal } : {}), ...(invariantContext ? { context: invariantContext } : {}) });
   // Every hook before the early return: the same instance renders a record that a re-emit can take away.
   const [allWork, setAllWork] = useState(false);
-  if (!node || !facts || node.kind !== "change") return <Missing context={context} />;
+  if (!node || !facts) return <Missing context={context} />;
 
   const page = opening(declaredPage(context, app, node));
   const work = workUnder(store, id);
-  const runs = runsFor(store, id);
-  const commits = inward(store, id, "landedFor");
+  const runs = runsFor(store, node);
+  const commits = inwardOf(store, node, "landedFor");
   const waits = out(store, id, "blockedBy");
   const waiting = inward(store, id, "blockedBy");
   const depthOf = new Map<string, number>();
@@ -32,21 +32,21 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
     return (depthOf.get(parent.id) ?? depth(parent)) + 1;
   };
   for (const w of work) depthOf.set(w.id, depth(w));
-  const spent = runs.reduce((t, r) => t + (Number(r.tokens) || 0), 0);
+  const spent = runs.reduce((t, r) => t + (r.tokens ?? 0), 0);
   const WORK_SHOWN = 30;
   const shownWork = allWork ? work : work.filter(isOpen).concat(work.filter((w) => !isOpen(w))).slice(0, WORK_SHOWN);
-  const eyebrow = [node.changeKind, node.level && node.level !== "change" ? `was ${String(node.level)} on v1` : undefined, node.displayId].filter(Boolean).map(String);
+  const eyebrow = [node.changeKind, node.level && node.level !== "change" ? `was ${node.level} on v1` : undefined, node.displayId].filter((s): s is string => Boolean(s));
 
   return (
     <Page testId="change-page">
-      <Hero eyebrow={<Under context={context} node={node} what={`Change${eyebrow.length ? ` · ${eyebrow.join(" · ")}` : ""}`} />} title={facts.label} lede={typeof node.intent === "string" ? node.intent : undefined}>
+      <Hero eyebrow={<Under context={context} node={node} what={`Change${eyebrow.length ? ` · ${eyebrow.join(" · ")}` : ""}`} />} title={facts.label} lede={node.intent}>
         <StatusBadge status={node.status} />
         {node.priority ? <Badge plain>{said(node.priority)} priority</Badge> : null}
         {node.inbox === true ? <Badge tone="warn">in the Inbox: a person confirms what it targets</Badge> : null}
         {node.fix === true ? <Badge tone="warn">fix</Badge> : null}
         {node.spike === true ? <Badge>spike</Badge> : null}
-        {node.plannedRelease ? <Badge plain>planned for {String(node.plannedRelease)}</Badge> : null}
-        {node.shippedIn ? <Badge tone="good">shipped in {String(node.shippedIn)}</Badge> : null}
+        {node.plannedRelease ? <Badge plain>planned for {node.plannedRelease}</Badge> : null}
+        {node.shippedIn ? <Badge tone="good">shipped in {node.shippedIn}</Badge> : null}
       </Hero>
 
       <Stats>
@@ -58,7 +58,8 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
 
       <Problems context={context} violations={facts.violations} />
       <div className="ndx-two">
-        <DeclaredBlocks context={context} blocks={page.rest} from={1} only={(title) => title === "Rewrites" || title === "Works on"} />
+        {/* The declared page's sections this screen does not draw itself, claimed by the keys n-dx.graview.json gives them. */}
+        <DeclaredBlocks context={context} blocks={page.rest} from={1} only={(key) => key === "rewrites" || key === "works-on"} />
       </div>
 
       <Section title="Work under this change" i={6} testId="change-work">
@@ -87,7 +88,7 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
           ) : (
             <Rows>
               {runs.slice(0, 12).map((r, i) => (
-                <RecordRow key={r.id} context={context} node={r} i={i} sub={`${String(r.vendor ?? "")} ${String(r.model ?? "")} · ${when(r.startedAt)} · ${tokens(Number(r.tokens) || 0)} tokens`} />
+                <RecordRow key={r.id} context={context} node={r} i={i} sub={`${r.vendor ?? ""} ${r.model ?? ""} · ${when(r.startedAt)} · ${tokens(r.tokens ?? 0)} tokens`} />
               ))}
             </Rows>
           )}
@@ -98,7 +99,7 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
           ) : (
             <Rows>
               {commits.slice(0, 12).map((c, i) => (
-                <RecordRow key={c.id} context={context} node={c} i={i} sub={`${String(c.sha ?? "").slice(0, 10)} · ${when(c.committedAt)}${c.author ? ` · ${String(c.author)}` : ""}`} end={null} />
+                <RecordRow key={c.id} context={context} node={c} i={i} sub={`${c.sha.slice(0, 10)} · ${when(c.committedAt)}${c.author ? ` · ${c.author}` : ""}`} end={null} />
               ))}
             </Rows>
           )}
@@ -135,7 +136,7 @@ export function ChangeScreen({ context, app }: { context: Ctx; app: App }) {
   );
 }
 
-const FILTERS: { key: string; label: string; test: (n: Node) => boolean }[] = [
+const FILTERS: { key: string; label: string; test: (n: Of<"change">) => boolean }[] = [
   { key: "open", label: "Open", test: isOpen },
   { key: "in_progress", label: "In progress", test: (n) => n.status === "in_progress" },
   { key: "inbox", label: "Inbox", test: (n) => n.inbox === true },
@@ -161,7 +162,7 @@ export function ChangesScreen({ context }: { context: Ctx }) {
     else next.delete(key);
     setParams(next, { replace: true });
   };
-  const groups = filter === "open" || filter === "all" ? [...new Set(shown.map((n) => String(n.status ?? "pending")))].sort((a, b) => STATUS_ORDER.indexOf(a) - STATUS_ORDER.indexOf(b)) : null;
+  const groups = filter === "open" || filter === "all" ? [...new Set(shown.map((n) => n.status ?? "pending"))].sort((a, b) => STATUS_ORDER.indexOf(a) - STATUS_ORDER.indexOf(b)) : null;
 
   return (
     <Page testId="list-change">
@@ -194,13 +195,13 @@ export function ChangesScreen({ context }: { context: Ctx }) {
           <Section key={status} title={`${said(status).replace(/^./, (c) => c.toUpperCase())}`} i={g}>
             <Rows>
               {shown
-                .filter((n) => String(n.status ?? "pending") === status)
+                .filter((n) => (n.status ?? "pending") === status)
                 .slice(0, 60)
                 .map((n, i) => (
                   <RecordRow key={n.id} context={context} node={n} i={i} end={<Badge tone={toneOfStatus(n.priority)} plain>{said(n.priority ?? "")}</Badge>} />
                 ))}
             </Rows>
-            {shown.filter((n) => String(n.status ?? "pending") === status).length > 60 ? <p className="ndx-small ndx-muted">Showing 60; narrow with Find.</p> : null}
+            {shown.filter((n) => (n.status ?? "pending") === status).length > 60 ? <p className="ndx-small ndx-muted">Showing 60; narrow with Find.</p> : null}
           </Section>
         ))
       ) : (

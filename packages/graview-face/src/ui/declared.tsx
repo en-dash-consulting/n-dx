@@ -1,53 +1,30 @@
 /**
  * THE DECLARED HOME AND RECORD PAGES, WORKED OUT BY GRAVIEW AND DRAWN HERE.
  * The words, numbers and lists come from the blocks the n-dx document writes
- * (`views.home`, `views.<kind>.page`), resolved by the framework over what
+ * (`views.home`, `views.<kind>.page`), resolved by `resolveFor` over what
  * this seat may see — the same resolution the scene, `describe_place` and
- * the embed use — so this face can never say a figure the rest disagrees
- * with. Only the look is ours.
+ * the embed use, under a page's budget — so this face can never say a figure
+ * the rest disagrees with. Each resolved block carries the key the document
+ * gave it, and a screen claims a section by that key, never by its words.
+ * Only the look is ours.
  */
-import { compileBlocks, fieldSpecsOf, resolveBlocks, type ResolvedBlock } from "@graview/core/blocks";
-import { shapesOfSchema } from "@graview/core/document";
+import type { ResolvedBlock } from "@graview/core/blocks";
+import { resolveFor } from "@graview/core/describe";
 import type { ReactNode } from "react";
 import type { App } from "../app.js";
-import type { Node } from "../model/graph.js";
+import type { Node, Tone } from "../model/graph.js";
 import { Badge, Empty, Grid, Meter, RecordCard, RecordRow, Rows, Section, Stat, Stats, type Ctx } from "./kit.js";
-import type { Tone } from "../model/graph.js";
-
-/** The steps a block about no one record may take: it sweeps whole kinds, as Graview's own faces allow. */
-const SWEEP = 20_000;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function resolve(context: Ctx, blocks: readonly unknown[], node: Node | null): readonly ResolvedBlock[] {
-  const { store, principal } = context;
-  const seen = principal ? store.seenBy(principal) : store;
-  const schema = seen.schema;
-  const definition = node ? schema.tryDefinition(node.kind) : undefined;
-  return resolveBlocks(compileBlocks(blocks), {
-    node: node as never,
-    graph: seen.graph as never,
-    schema: schema as never,
-    kinds: shapesOfSchema(schema as never) as never,
-    fields: node ? fieldSpecsOf(schema as never, node.kind) : {},
-    ...(definition ? { definition: definition as never } : {}),
-    today: today(),
-    heading: 2,
-    // A record page walks every task under a change and every run that worked it: a card's allowance is not enough.
-    budget: SWEEP,
-    ...(node ? {} : { firstHeading: 1 }),
-  });
-}
-
 export function declaredHome(context: Ctx, app: App): readonly ResolvedBlock[] {
-  return resolve(context, (app.home ?? []) as readonly unknown[], null);
+  return resolveFor(context.store, context.principal ?? null, null, { app, today: today(), firstHeading: 1 });
 }
 
 export function declaredPage(context: Ctx, app: App, node: Node): readonly ResolvedBlock[] {
-  const page = (app.viewSpecs as Record<string, { page?: readonly unknown[] } | undefined> | undefined)?.[node.kind]?.page;
-  return page ? resolve(context, page, node) : [];
+  return resolveFor(context.store, context.principal ?? null, node, { app, today: today() });
 }
 
 /** The opening of a declared view: its first headline and the sentences that follow it. The rest is drawn by `DeclaredBlocks`. */
@@ -67,19 +44,24 @@ export function opening(blocks: readonly ResolvedBlock[]): { headline?: string; 
 
 const TONE: Record<string, Tone | undefined> = { good: "good", warn: "warn", bad: "bad", accent: "accent", neutral: "neutral" };
 
-/** Resolved blocks, in this face's hand. A `title` opens a section that holds what follows until the next title. */
-export function DeclaredBlocks({ context, blocks, from = 0, only }: { context: Ctx; blocks: readonly ResolvedBlock[]; from?: number; only?: (title: string | undefined) => boolean }) {
-  const all: { title?: string; blocks: ResolvedBlock[] }[] = [{ blocks: [] }];
+/**
+ * Resolved blocks, in this face's hand. A `title` opens a section that holds
+ * what follows until the next title, and the section answers to the title's
+ * key (`"key": "rewrites"` in the document); `only` keeps the sections whose
+ * key it says yes to — the leading, untitled run of blocks has none.
+ */
+export function DeclaredBlocks({ context, blocks, from = 0, only }: { context: Ctx; blocks: readonly ResolvedBlock[]; from?: number; only?: (key: string | undefined) => boolean }) {
+  const all: { key?: string; title?: string; blocks: ResolvedBlock[] }[] = [{ blocks: [] }];
   for (const block of blocks) {
-    if (block.t === "title") all.push({ title: block.text, blocks: [] });
+    if (block.t === "title") all.push({ key: block.key, title: block.text, blocks: [] });
     else all[all.length - 1]!.blocks.push(block);
   }
-  const sections = only ? all.filter((s) => only(s.title)) : all;
+  const sections = only ? all.filter((s) => only(s.key)) : all;
   return (
     <>
       {sections.map((section, s) =>
         section.blocks.length === 0 ? null : section.title ? (
-          <Section key={s} title={section.title} i={from + s}>
+          <Section key={section.key ?? s} title={section.title} i={from + s} testId={section.key ? `declared-${section.key}` : undefined}>
             <Blocks context={context} blocks={section.blocks} />
           </Section>
         ) : (
@@ -94,7 +76,7 @@ function Blocks({ context, blocks }: { context: Ctx; blocks: readonly ResolvedBl
   return (
     <>
       {blocks.map((block, k) => (
-        <Block key={k} context={context} block={block} />
+        <Block key={block.key ?? k} context={context} block={block} />
       ))}
     </>
   );
@@ -105,7 +87,7 @@ function Block({ context, block }: { context: Ctx; block: ResolvedBlock }): Reac
     case "headline":
       return <h2 className="ndx-h2">{block.text}</h2>;
     case "text":
-      return <p className={`ndx-prose${block.tone === undefined ? "" : ""}`}>{block.text}</p>;
+      return <p className="ndx-prose">{block.text}</p>;
     case "number":
       return (
         <Stats>
@@ -131,7 +113,7 @@ function Block({ context, block }: { context: Ctx; block: ResolvedBlock }): Reac
       if (numbers) {
         return (
           <Stats>
-            {block.blocks.map((b, i) => (b.t === "number" ? <Stat key={i} value={b.text} label={b.label ?? ""} i={i} /> : null))}
+            {block.blocks.map((b, i) => (b.t === "number" ? <Stat key={b.key ?? i} value={b.text} label={b.label ?? ""} i={i} /> : null))}
           </Stats>
         );
       }
@@ -164,13 +146,13 @@ function DeclaredList({ context, list }: { context: Ctx; list: Extract<ResolvedB
             {list.as === "card" ? (
               <Grid>
                 {group.members.map((member, i) => (
-                  <RecordCard key={member.id} context={context} node={member as Node} i={i} />
+                  <RecordCard key={member.id} context={context} node={member as unknown as Node} i={i} />
                 ))}
               </Grid>
             ) : (
               <Rows>
                 {group.members.map((member, i) => (
-                  <RecordRow key={member.id} context={context} node={member as Node} i={i} />
+                  <RecordRow key={member.id} context={context} node={member as unknown as Node} i={i} />
                 ))}
               </Rows>
             )}

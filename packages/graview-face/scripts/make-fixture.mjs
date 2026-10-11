@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 /**
- * A small, honest fixture for the headless tests: the real declaration and a
- * trimmed snapshot — a dozen records per kind, every edge whose ends survive —
- * so `describePlace` draws every place over data shaped like a real project.
+ * A small, honest seed for the headless tests: the real snapshot trimmed to a
+ * dozen records per kind and every edge whose ends survive, written in
+ * Graview's line format, so `describePlace` draws every place over data
+ * shaped like a real project. The declaration is read from where it lives
+ * (../graview/n-dx.graview.json) and never copied.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readSnapshot, writeSnapshot } from "@graview/core/snapshot";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const from = join(root, "public", "data");
+const from = join(root, "public", "data", "snapshot.json");
 const to = join(root, "tests", "fixtures");
 const PER_KIND = Number(process.env.FIXTURE_PER_KIND ?? 12);
 
-const document = JSON.parse(readFileSync(join(from, "document.json"), "utf-8"));
-const snapshot = JSON.parse(readFileSync(join(from, "snapshot.json"), "utf-8"));
+const { snapshot } = readSnapshot(readFileSync(from, "utf-8"));
 
 // Prefer records that are connected, so the trimmed graph still has edges to walk.
 const degree = new Map();
@@ -33,6 +35,5 @@ const ids = new Set(kept.map((n) => n.id));
 const edges = snapshot.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
 
 mkdirSync(to, { recursive: true });
-writeFileSync(join(to, "document.json"), `${JSON.stringify(document, null, 2)}\n`);
-writeFileSync(join(to, "snapshot.json"), `${JSON.stringify({ nodes: kept, edges }, null, 2)}\n`);
-console.log(`make-fixture: ${kept.length} nodes, ${edges.length} edges → tests/fixtures`);
+writeFileSync(join(to, "snapshot.json"), writeSnapshot({ nodes: kept, edges }, { generatedAt: "2026-10-10T12:00:00.000Z" }));
+console.log(`make-fixture: ${kept.length} nodes, ${edges.length} edges → tests/fixtures/snapshot.json`);

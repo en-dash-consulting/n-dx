@@ -2,29 +2,61 @@
  * READ MODELS: the small sums and walks the rule language stops short of,
  * written once here and read by the screens. Everything is a pure function
  * of the store, so a page cannot say a number another page disagrees with.
+ *
+ * The store is read through the document's own types (`types.ts`, written by
+ * `graview types` from n-dx.graview.json — `pnpm types` refreshes it), so a
+ * kind, a field or a relation renamed in the declaration fails `tsc` here
+ * instead of drawing a blank section.
  */
 import { isCurrent, labelOf, readableFields, type AnySchema, type Store } from "@graview/core";
+import { typedReader } from "@graview/core/typed";
+import type { AnyRecord, Edges, Kinds, Types } from "./types.js";
 
-export type Node = { readonly id: string; readonly kind: string } & Record<string, unknown>;
+export type Node = AnyRecord;
+export type Kind = keyof Kinds & string;
+export type Of<K extends Kind> = Kinds[K];
+/** Every relation some kind declares. */
+export type Edge = { [K in keyof Edges]: keyof Edges[K] & string }[keyof Edges];
 export type Reader = Store<AnySchema>;
 
-export const OPEN = new Set(["pending", "in_progress", "failing", "blocked", "deferred"]);
-export const CLOSED = new Set(["completed", "cancelled", "deleted"]);
+const read = (store: Reader) => typedReader<Types>(store);
 
-export function nodesOf(store: Reader, kind: string): readonly Node[] {
-  return store.graph.nodesOfKind(kind as never) as unknown as readonly Node[];
+/** A kind name the compiled schema lists is one the document declares: the schema and `types.ts` come from the one file. */
+export const asKind = (name: string): Kind => name as Kind;
+
+export const OPEN = new Set<string>(["pending", "in_progress", "failing", "blocked", "deferred"]);
+export const CLOSED = new Set<string>(["completed", "cancelled", "deleted"]);
+
+export function nodesOf<K extends Kind>(store: Reader, kind: K): readonly Of<K>[] {
+  return read(store).nodes(kind);
 }
 
 export function node(store: Reader, id: string): Node | undefined {
-  return store.graph.getNode(id) as Node | undefined;
+  return read(store).node(id);
 }
 
-export function out(store: Reader, id: string, edge: string): readonly Node[] {
+export function nodeOf<K extends Kind>(store: Reader, id: string, kind: K): Of<K> | undefined {
+  return read(store).node(id, kind);
+}
+
+/** The records a relation reaches from a record, by id: for a walk that only has the id. */
+export function out(store: Reader, id: string, edge: Edge): readonly Node[] {
   return store.graph.out(id, edge) as unknown as readonly Node[];
 }
 
-export function inward(store: Reader, id: string, edge: string): readonly Node[] {
+/** The records that reach a record by a relation, by id. */
+export function inward(store: Reader, id: string, edge: Edge): readonly Node[] {
   return store.graph.in(id, edge) as unknown as readonly Node[];
+}
+
+/** The records a relation the record's kind declares reaches, typed by the kinds it points at. */
+export function edgesOf<N extends Node, E extends keyof Edges[N["kind"]] & string>(store: Reader, n: N, edge: E) {
+  return read(store).edgesOf(n, edge as never) as unknown as readonly Of<Extract<Edges[N["kind"]][E], Kind>>[];
+}
+
+/** The records that reach this one by a relation some kind declares toward its kind. */
+export function inwardOf<N extends Node, E extends Edge>(store: Reader, n: N, edge: E) {
+  return read(store).inwardOf(n, edge as never) as unknown as readonly Of<{ [K in Kind]: E extends keyof Edges[K] ? (N["kind"] extends Edges[K][E] ? K : never) : never }[Kind]>[];
 }
 
 export function label(store: Reader, n: Node): string {
@@ -33,6 +65,11 @@ export function label(store: Reader, n: Node): string {
 
 export function current(store: Reader, n: Node): boolean {
   return isCurrent(store.schema.tryDefinition(n.kind), n as never);
+}
+
+/** A field by the name the schema gives it at run time — a glance key, a page group — where no declared type names it. */
+export function raw(n: Node, key: string): unknown {
+  return (n as unknown as Record<string, unknown>)[key];
 }
 
 /** What a glance at the record says: the kind's `glance` fields, said in the declaration's words. */
@@ -44,25 +81,31 @@ export function glance(store: Reader, n: Node, limit = 3): readonly { key: strin
   }[];
 }
 
+/** The record's status, for the kinds that have one. */
+export function statusOf(n: Node): string | undefined {
+  return "status" in n ? n.status : undefined;
+}
+
 export function isOpen(n: Node): boolean {
-  return typeof n.status === "string" ? OPEN.has(n.status) : true;
+  const status = statusOf(n);
+  return status === undefined ? true : OPEN.has(status);
 }
 
 export const plural = (store: Reader, kind: string): string => store.schema.tryDefinition(kind)?.plural ?? `${kind}s`;
 export const noun = (store: Reader, kind: string): string => store.schema.tryDefinition(kind)?.noun ?? kind;
 
-export function count(store: Reader, kind: string, where: (n: Node) => boolean = () => true): number {
+export function count<K extends Kind>(store: Reader, kind: K, where: (n: Of<K>) => boolean = () => true): number {
   return nodesOf(store, kind).filter(where).length;
 }
 
-export function sum(nodes: readonly Node[], field: string): number {
-  return nodes.reduce((total, n) => total + (typeof n[field] === "number" ? (n[field] as number) : 0), 0);
+export function sum<N>(nodes: readonly N[], of: (n: N) => number | undefined): number {
+  return nodes.reduce((total, n) => total + (of(n) ?? 0), 0);
 }
 
-export function byField<T extends string>(nodes: readonly Node[], field: string): Map<T, Node[]> {
-  const groups = new Map<T, Node[]>();
+export function byField<N, T extends string>(nodes: readonly N[], of: (n: N) => T | undefined): Map<T, N[]> {
+  const groups = new Map<T, N[]>();
   for (const n of nodes) {
-    const key = (typeof n[field] === "string" ? n[field] : "—") as T;
+    const key = of(n) ?? ("—" as T);
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(n);
   }
   return groups;
@@ -75,10 +118,10 @@ export function compare(a: string | undefined, b: string | undefined): number {
 export const PRIORITY_ORDER = ["critical", "high", "medium", "low"];
 export const STATUS_ORDER = ["in_progress", "blocked", "failing", "pending", "deferred", "completed", "cancelled", "deleted"];
 
-export function byChoice(order: readonly string[], field: string) {
-  return (a: Node, b: Node): number => {
-    const ia = order.indexOf(String(a[field] ?? ""));
-    const ib = order.indexOf(String(b[field] ?? ""));
+export function byChoice<N>(order: readonly string[], of: (n: N) => string | undefined) {
+  return (a: N, b: N): number => {
+    const ia = order.indexOf(of(a) ?? "");
+    const ib = order.indexOf(of(b) ?? "");
     return (ia === -1 ? order.length : ia) - (ib === -1 ? order.length : ib);
   };
 }

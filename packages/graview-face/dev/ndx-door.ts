@@ -1,15 +1,16 @@
 /**
  * THE DEV-SERVER DOOR TO n-dx. The face runs in a browser; rex runs behind
  * the n-dx hub with a per-user token. This Vite plugin is the only thing
- * that holds that token: it proxies one MCP session to the hub's rex
- * endpoint, re-emits the projection on request, and serves the fresh files
- * straight from the project's graview dir. A production build has no door,
- * so a static face is read-only by construction.
+ * that holds that token: Graview's `mcpDoor` over an `mcpClient` to the hub's
+ * rex endpoint (one session, a JSON or event-stream answer, one retry when
+ * the hub forgot the session, only the four tools the sync calls), a re-emit
+ * on request, and the fresh projection served straight from the project's
+ * graview dir, by byte range when asked, so the loop reads two kinds of a
+ * 3 MB snapshot. A production build has no door, so a static face is
+ * read-only by construction.
  *
- * What the door lets through is as narrow as the sync needs: the four rex
- * tools the RemoteSystem calls, JSON bodies only, and only from this
- * server's own pages (a request another origin fires carries an Origin or
- * Sec-Fetch-Site that is not ours and is refused before it reaches rex).
+ * Every write route answers only this server's own pages (`sameOrigin`: no
+ * foreign Origin or Sec-Fetch-Site, and a Host that is this machine).
  *
  * Environment (what `ndx graview serve .` sets):
  *   NDX_GRAVIEW_DIR    the project's graview dir: document.json and snapshot.json
@@ -22,8 +23,9 @@
  *                      worktree's key from the listing at NDX_WORKSPACES_URL before any write, and
  *                      keeps sync off rather than write the main checkout's PRD when it cannot.
  */
+import { mcpClient, mcpDoor, sameOrigin, type ToolCall } from "@graview/core/sync";
 import { spawn } from "node:child_process";
-import { createReadStream, existsSync, readFileSync, realpathSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import type { Plugin } from "vite";
@@ -33,22 +35,14 @@ const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url),
 /** The rex tools the sync loop uses (src/sync/ndx-system.ts); nothing else passes the door. */
 export const ALLOWED_TOOLS: ReadonlySet<string> = new Set(["get_item", "update_task_status", "edit_item", "append_log"]);
 
-interface McpResponse {
-  result?: { content?: { type: string; text?: string }[]; isError?: boolean };
-  error?: { message?: string };
-}
-
-/** Our own pages only: no Origin/Sec-Fetch-Site header (same-origin fetch, curl), or ones that name this server. */
-export function isOwnRequest(headers: Record<string, string | string[] | undefined>, host: string | undefined): boolean {
-  const site = headers["sec-fetch-site"];
-  if (typeof site === "string" && site !== "same-origin" && site !== "none") return false;
-  const origin = headers["origin"];
-  if (typeof origin !== "string") return true;
-  try {
-    return host !== undefined && new URL(origin).host === host;
-  } catch {
-    return false;
-  }
+/** The one byte range a `Range` header asks for, within a file of `size` bytes; undefined for none, or one that cannot be served. */
+export function rangeOf(header: string | undefined, size: number): { start: number; end: number } | undefined {
+  const m = /^bytes=(\d*)-(\d*)$/.exec(header ?? "");
+  if (!m || (m[1] === "" && m[2] === "")) return undefined;
+  const start = m[1] === "" ? Math.max(0, size - Number(m[2])) : Number(m[1]);
+  const end = m[1] === "" ? size - 1 : m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) return undefined;
+  return { start, end };
 }
 
 export function ndxDoor(): Plugin {
@@ -61,33 +55,8 @@ export function ndxDoor(): Plugin {
   const worktree = env["NDX_WORKTREE"];
   const workspacesUrl = env["NDX_WORKSPACES_URL"];
 
-  let session: string | undefined;
-  let sessionOpening: Promise<string> | undefined;
   let workspaceKey: string | undefined;
-
   const token = () => (tokenFile && existsSync(tokenFile) ? readFileSync(tokenFile, "utf-8").trim() : undefined);
-  const headers = (extra: Record<string, string> = {}) => ({
-    "content-type": "application/json",
-    accept: "application/json, text/event-stream",
-    ...(token() ? { "x-ndx-token": token()! } : {}),
-    ...(workspaceKey ? { "x-ndx-workspace": workspaceKey } : {}),
-    ...extra,
-  });
-
-  /** A JSON-RPC body, from a JSON response or the last `data:` line of an event stream. */
-  const readRpc = async (response: Response): Promise<McpResponse> => {
-    const text = await response.text();
-    if (response.headers.get("content-type")?.includes("text/event-stream")) {
-      const data = text
-        .split("\n")
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trim())
-        .filter(Boolean);
-      return data.length ? (JSON.parse(data[data.length - 1]!) as McpResponse) : {};
-    }
-    return text ? (JSON.parse(text) as McpResponse) : {};
-  };
-
   const real = (p: string) => {
     try {
       return realpathSync(p);
@@ -100,7 +69,7 @@ export function ndxDoor(): Plugin {
   const resolveWorkspace = async (): Promise<void> => {
     if (!worktree || workspaceKey) return;
     if (!workspacesUrl) throw new Error("this is a worktree but no workspace listing was given; sync is off");
-    const response = await fetch(workspacesUrl, { headers: headers() });
+    const response = await fetch(workspacesUrl, { headers: { accept: "application/json", ...(token() ? { "x-ndx-token": token()! } : {}) } });
     if (!response.ok) throw new Error(`workspaces: ${response.status}`);
     const { workspaces } = (await response.json()) as { workspaces?: { key: string; path: string }[] };
     const mine = workspaces?.find((w) => real(w.path) === real(worktree));
@@ -108,45 +77,18 @@ export function ndxDoor(): Plugin {
     workspaceKey = mine.key;
   };
 
-  const openSession = async (): Promise<string> => {
-    if (!rexUrl) throw new Error("NDX_REX_MCP_URL is not set");
+  /** The token and the workspace, read when a call is made and never handed to the page. */
+  const headers = async (): Promise<Record<string, string>> => {
     await resolveWorkspace();
-    const init = await fetch(rexUrl, {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: PKG.name, version: PKG.version } } }),
-    });
-    if (!init.ok) throw new Error(`rex: initialize answered ${init.status}`);
-    const id = init.headers.get("mcp-session-id");
-    if (!id) throw new Error("rex: no Mcp-Session-Id on initialize");
-    await init.text();
-    await fetch(rexUrl, { method: "POST", headers: headers({ "mcp-session-id": id }), body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) });
-    return id;
+    return { ...(token() ? { "x-ndx-token": token()! } : {}), ...(workspaceKey ? { "x-ndx-workspace": workspaceKey } : {}) };
   };
 
-  const call = async (name: string, args: Record<string, unknown>, retry = true): Promise<unknown> => {
-    session ??= await (sessionOpening ??= openSession().finally(() => (sessionOpening = undefined)));
-    const response = await fetch(rexUrl!, {
-      method: "POST",
-      headers: headers({ "mcp-session-id": session }),
-      body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: "tools/call", params: { name, arguments: args } }),
-    });
-    if ((response.status === 404 || response.status === 400) && retry) {
-      // The hub or its child restarted and forgot the session: open another, once.
-      session = undefined;
-      await response.text();
-      return call(name, args, false);
-    }
-    const body = await readRpc(response);
-    if (body.error) throw new Error(body.error.message ?? "rex refused");
-    const text = body.result?.content?.find((c) => c.type === "text")?.text ?? "";
-    if (body.result?.isError) throw new Error(text || `rex: ${name} failed`);
-    try {
-      return JSON.parse(text) as unknown;
-    } catch {
-      return text;
-    }
-  };
+  const rex: ToolCall = rexUrl
+    ? mcpClient({ url: rexUrl, allow: ALLOWED_TOOLS, headers, clientInfo: { name: PKG.name, version: PKG.version } })
+    : async () => {
+        throw new Error("sync is off: no rex endpoint (run ndx start . and ndx graview serve .)");
+      };
+  const door = mcpDoor({ path: "/ndx/mcp", call: rex, allow: ALLOWED_TOOLS });
 
   // One re-emit at a time: the loop, "Sync now" and a second tab all ask, and every asker gets the run in flight.
   let emitting: Promise<{ ok: boolean; output: string }> | undefined;
@@ -166,23 +108,34 @@ export function ndxDoor(): Plugin {
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify(body));
   };
-  const readBody = (req: IncomingMessage): Promise<string> =>
-    new Promise((resolve) => {
-      let text = "";
-      req.on("data", (c) => (text += String(c)));
-      req.on("end", () => resolve(text));
-    });
-  /** A write route takes JSON from our own pages and nothing else; the answer says why when it refuses. */
+  /** The re-emit takes JSON from our own pages and nothing else, as the door does; the answer says why when it refuses. */
   const admit = (req: IncomingMessage, res: ServerResponse): boolean => {
-    if (!isOwnRequest(req.headers, req.headers.host)) {
+    if (!sameOrigin(req.headers)) {
       json(res, 403, { ok: false, error: "refused: not from this face's own origin" });
       return false;
     }
-    if (!(req.headers["content-type"] ?? "").includes("application/json")) {
+    if ((req.headers["content-type"] ?? "").split(";")[0]!.trim() !== "application/json") {
       json(res, 415, { ok: false, error: "refused: send application/json" });
       return false;
     }
     return true;
+  };
+  /** The fresh projection, whole or by the byte range the snapshot reader asks for. */
+  const serveData = (req: IncomingMessage, res: ServerResponse, file: string): void => {
+    const size = statSync(file).size;
+    res.setHeader("content-type", "application/json");
+    res.setHeader("cache-control", "no-store");
+    res.setHeader("accept-ranges", "bytes");
+    const range = rangeOf(typeof req.headers.range === "string" ? req.headers.range : undefined, size);
+    if (range) {
+      res.statusCode = 206;
+      res.setHeader("content-range", `bytes ${range.start}-${range.end}/${size}`);
+      res.setHeader("content-length", String(range.end - range.start + 1));
+      createReadStream(file, range).pipe(res);
+      return;
+    }
+    res.setHeader("content-length", String(size));
+    createReadStream(file).pipe(res);
   };
 
   return {
@@ -194,10 +147,7 @@ export function ndxDoor(): Plugin {
           if (graviewDir && (url === "/data/document.json" || url === "/data/snapshot.json")) {
             const file = join(graviewDir, url.slice("/data/".length));
             if (!existsSync(file)) return next();
-            res.setHeader("content-type", "application/json");
-            res.setHeader("cache-control", "no-store");
-            createReadStream(file).pipe(res);
-            return;
+            return serveData(req, res, file);
           }
           if (url === "/ndx/sync-info") {
             return json(res, 200, { rex: Boolean(rexUrl), emit: Boolean(graviewCli && projectRoot), project: projectRoot ?? null, live: Boolean(graviewDir), worktree: Boolean(worktree) });
@@ -206,18 +156,7 @@ export function ndxDoor(): Plugin {
             if (!admit(req, res)) return;
             return json(res, 200, await emit());
           }
-          if (url === "/ndx/mcp" && req.method === "POST") {
-            if (!admit(req, res)) return;
-            const { name, arguments: args } = JSON.parse((await readBody(req)) || "{}") as { name?: string; arguments?: Record<string, unknown> };
-            if (!name) return json(res, 400, { ok: false, error: "name required" });
-            if (!ALLOWED_TOOLS.has(name)) return json(res, 403, { ok: false, error: `refused: ${name} is not a tool this face uses (${[...ALLOWED_TOOLS].join(", ")})` });
-            if (!rexUrl) return json(res, 503, { ok: false, error: "sync is off: no rex endpoint (run ndx start . and ndx graview serve .)" });
-            try {
-              return json(res, 200, { ok: true, result: await call(name, args ?? {}) });
-            } catch (error) {
-              return json(res, 200, { ok: false, error: error instanceof Error ? error.message : String(error) });
-            }
-          }
+          if (url === "/ndx/mcp") return door(req, res, next);
         } catch (error) {
           return json(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
         }

@@ -1,6 +1,7 @@
 import type { AnySchema, Store } from "@graview/core";
 import { PagesApp } from "@graview/pages";
 import type { Scheme } from "@graview/primitives";
+import { rememberedPrincipal } from "@graview/ship/browser";
 import { createRoot } from "react-dom/client";
 import type { App } from "../app.js";
 import { pages } from "../ui/pages.js";
@@ -25,14 +26,8 @@ async function connect(store: Mount["store"]): Promise<void> {
   try {
     const info = (await (await fetch("/ndx/sync-info")).json()) as { rex?: boolean };
     if (!info.rex) return;
-    const who = (() => {
-      try {
-        return localStorage.getItem("graview:principal") ?? "reader";
-      } catch {
-        return "reader";
-      }
-    })();
-    setSync(startSync({ store, principal: who }));
+    const who = rememberedPrincipal();
+    setSync(startSync({ store, principal: who.name ?? who.id ?? "reader" }));
   } catch {
     // No door (a static build): read-only, and the rail says so.
   }
