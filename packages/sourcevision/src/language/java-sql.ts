@@ -122,8 +122,33 @@ interface Entity {
   readonly table?: { name: string; schema?: string };
 }
 
+/**
+ * Spring Data JDBC and R2DBC `@Query` is always native SQL, and their `@Table`
+ * (Spring Data relational) takes the table name as its value. Only an explicit
+ * single-type import proves which annotation a simple name means; a wildcard
+ * import leaves it ambiguous and the JPA reading stands.
+ */
+const NATIVE_QUERY_IMPORTS: readonly string[] = [
+  "org.springframework.data.jdbc.repository.query.Query",
+  "org.springframework.data.r2dbc.repository.Query",
+];
+const RELATIONAL_TABLE_IMPORT = "org.springframework.data.relational.core.mapping.Table";
+
+/** Fully qualified names of the file's single-type, non-static imports. */
+function readImports(captures: readonly Capture[]): ReadonlySet<string> {
+  const names = new Set<string>();
+  for (const decl of captures.filter((c) => c.name === "import.declaration")) {
+    const inside = captures.filter((c) => c !== decl && contains(decl, c));
+    const name = inside.find((c) => c.name === "import.name");
+    if (!name || inside.some((c) => c.name === "import.static" || c.name === "import.wildcard")) continue;
+    names.add(name.text.replace(/\s+/g, ""));
+  }
+  return names;
+}
+
 interface FileFacts {
   readonly path: string;
+  readonly imports: ReadonlySet<string>;
   readonly annotations: readonly Annotation[];
   readonly entities: readonly Entity[];
   readonly calls: ReadonlyArray<ReturnType<typeof groupCalls>[number]>;
@@ -159,7 +184,7 @@ function readFile(file: ParsedFile): FileFacts {
         : {}),
     });
   }
-  return { path: file.path, annotations, entities, calls: groupCalls(file.captures.calls ?? []) };
+  return { path: file.path, imports: readImports(file.captures.imports ?? []), annotations, entities, calls: groupCalls(file.captures.calls ?? []) };
 }
 
 /**
@@ -179,7 +204,10 @@ export function extractJavaEmbeddedSql(files: readonly ParsedFile[]): JavaEmbedd
   for (const file of facts) {
     for (const annotation of file.annotations) {
       if (annotation.name === "Table") {
-        const name = annotation.strings.get("name");
+        const relational = file.imports.has(RELATIONAL_TABLE_IMPORT);
+        const name =
+          annotation.strings.get("name") ??
+          (relational ? (annotation.strings.get("value") ?? annotation.value) : undefined);
         const schema = annotation.strings.get("schema");
         if (!name) continue;
         tables.push({
@@ -195,7 +223,9 @@ export function extractJavaEmbeddedSql(files: readonly ParsedFile[]): JavaEmbedd
         if (!literal) continue;
         const { text, textBlock } = javaStringValue(literal.text);
         const references = extractSqlTableReferences(text, literal.start.line + (textBlock ? 1 : 0));
-        if (annotation.trueKeys.has("nativeQuery")) {
+        const native =
+          annotation.trueKeys.has("nativeQuery") || NATIVE_QUERY_IMPORTS.some((i) => file.imports.has(i));
+        if (native) {
           for (const ref of references) {
             tables.push({
               name: ref.name,
