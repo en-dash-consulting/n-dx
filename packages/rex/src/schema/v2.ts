@@ -151,7 +151,7 @@ export const WorkRefSchema = z.string().refine(isWorkRef, {
 
 const ItemStatusSchema = z.enum([...VALID_STATUSES] as [ItemStatus, ...ItemStatus[]]);
 const PrioritySchema = z.enum([...VALID_PRIORITIES] as [Priority, ...Priority[]]);
-const ReservedSchema = z.unknown();
+const ReservedSchema = z.unknown().optional();
 /** Engineer-weeks. Frontmatter scalars may arrive as strings ("1.5"), so coerce. */
 const LoeSchema = z.coerce.number().positive().optional();
 
@@ -194,7 +194,7 @@ export type RunSettingKey = (typeof RUN_SETTING_KEYS)[number];
 export type SavedRunSettings = { [K in RunSettingKey]?: unknown };
 
 export const SavedRunSettingsSchema = z
-  .object(Object.fromEntries(RUN_SETTING_KEYS.map((key) => [key, z.unknown()])) as Record<RunSettingKey, z.ZodUnknown>)
+  .object(Object.fromEntries(RUN_SETTING_KEYS.map((key) => [key, z.unknown().optional()])) as Record<RunSettingKey, z.ZodOptional<z.ZodUnknown>>)
   .passthrough();
 
 /** One acceptance criterion with a stable id (`c1`…`cn`) that deltas address. */

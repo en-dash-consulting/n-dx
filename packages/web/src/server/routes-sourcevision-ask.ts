@@ -193,7 +193,7 @@ const AskRequestSchema = z
         // request-security.ts blocks cross-origin browser mutations, so the
         // caller has to be a local process or a hand-crafted request. That
         // makes it a defence-in-depth gap, not an exploit path.
-        labels: z.record(z.string().trim().max(256)).optional(),
+        labels: z.record(z.string(), z.string().trim().max(256)).optional(),
       })
       .strict()
       .optional(),
