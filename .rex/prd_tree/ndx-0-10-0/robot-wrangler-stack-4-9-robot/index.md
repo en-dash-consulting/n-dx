@@ -21,7 +21,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Accept Heavy and Free tier model saves through PUT /api/llm/config](./accept-heavy-and-free-tier-model-saves.md) | pending |
+| [Accept Heavy and Free tier model saves through PUT /api/llm/config](./accept-heavy-and-free-tier-model-saves.md) | completed |
 | [Add POST /api/llm/config/preview, which resolves unsaved edits without writing them](./add-post-api-llm-config-preview-which.md) | pending |
 | [Describe whether failover can fire from GET /api/llm/config](./describe-whether-failover-can-fire.md) | completed |
 | [Report each vendor's readiness from GET /api/llm/catalog](./report-each-vendor-s-readiness-from.md) | completed |
