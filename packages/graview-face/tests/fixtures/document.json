@@ -170,7 +170,7 @@
           ]
         },
         "realizedIn": {
-          "description": "the code zones whose commits realized this capability",
+          "description": "the code zones changed by the work placed on this capability",
           "inverse": "the capabilities realized here",
           "to": [
             "zone"
@@ -542,10 +542,10 @@
       "plural": "Changes"
     },
     "commit": {
-      "description": "A commit on main whose N-DX-Item trailer ties it to the work it was for.",
+      "description": "A commit on main tied to the work it was for: by its N-DX-Item trailer, or by the run record that names it.",
       "edges": {
         "landedFor": {
-          "description": "the work this commit's trailer names",
+          "description": "the work this commit landed for",
           "inverse": "the commits that landed for it",
           "to": [
             "change",
@@ -553,7 +553,7 @@
           ]
         },
         "realizes": {
-          "description": "the capabilities this commit's change amended",
+          "description": "the capabilities the work this commit landed for was placed on",
           "inverse": "the commits that realized it",
           "to": [
             "capability"
@@ -561,6 +561,17 @@
         }
       },
       "fields": {
+        "attribution": {
+          "description": "How the commit was tied to its work: trailer, the N-DX-Item trailer names it; start-head, the run that made it recorded it as it ended; subject, trailer or window, hench backfill-commits read it from history.",
+          "label": "Tied by",
+          "options": [
+            "trailer",
+            "start-head",
+            "subject",
+            "window"
+          ],
+          "type": "enum"
+        },
         "author": {
           "type": "string"
         },
@@ -588,7 +599,8 @@
           "subject",
           "sha",
           "author",
-          "committedAt"
+          "committedAt",
+          "attribution"
         ]
       },
       "plural": "Commits"

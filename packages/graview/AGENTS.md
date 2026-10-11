@@ -14,7 +14,7 @@ JSON output and hench's run records. `ndx graview <sub>` then spawns the
   the workspace if any `package.json` but the product face's lists one at
   runtime.
 - **Read-only.** Nothing is written under the rex, sourcevision or hench
-  directories. Output and the trailer cache `computeRealizedBy` keeps go under
+  directories. Output and the trailer and commit-file caches go under
   the layout's graview dir (`.ndx/graview` or `.graview`), which `ndx init`
   gitignores.
 - **One gateway per upstream package.** `src/rex-gateway.ts`,
@@ -51,7 +51,7 @@ carries, never a judgement rex has not made.
   document.json   the declaration, `name` set to the project
   snapshot.json   {nodes, edges}, canonically sorted — byte-identical on an unchanged checkout
   data/           graview's own store, created by `serve` and `mcp`; refreshed with `sync-seed`
-  cache/          the N-DX-Item trailer cache computeRealizedBy keeps
+  cache/          rex's N-DX-Item trailer cache and commit-file cache, kept here
 ```
 
 File nodes are opt-in (`--files`): zones, components and entry points keep a

@@ -22,6 +22,28 @@ function project(options: Parameters<typeof makeProject>[0] = {}): string {
 
 const quiet = { warn: () => {} };
 
+/** A git repository at `root` with a fixed author and a ticking clock, so every commit is dated and ordered. */
+function repo(root: string): { git: (...args: string[]) => string; commit: (file: string, message: string) => string } {
+  let clock = 0;
+  const git = (...args: string[]): string => {
+    clock += 1;
+    const date = new Date(Date.UTC(2026, 9, 1, 0, clock)).toISOString();
+    const env = { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date, GIT_AUTHOR_NAME: "Pat", GIT_AUTHOR_EMAIL: "p@test", GIT_COMMITTER_NAME: "Pat", GIT_COMMITTER_EMAIL: "p@test" };
+    return execFileSync("git", args, { cwd: root, encoding: "utf-8", env }).trim();
+  };
+  const commit = (file: string, message: string): string => {
+    mkdirSync(join(root, file, ".."), { recursive: true });
+    writeFileSync(join(root, file), `${file}\n`);
+    writeFileSync(join(root, ".msg"), message);
+    git("add", file);
+    git("commit", "-q", "-F", ".msg");
+    return git("rev-parse", "HEAD");
+  };
+  git("init", "-q", "--initial-branch=main");
+  writeFileSync(join(root, ".gitignore"), ".msg\n");
+  return { git, commit };
+}
+
 describe("buildSnapshot", () => {
   it("projects a v2 tree, the code and the runs, with ids n-dx already uses", async () => {
     const root = project();
@@ -159,9 +181,21 @@ describe("buildSnapshot", () => {
         "",
       ].join("\n"),
     );
-    const { snapshot } = await buildSnapshot(resolveLayout(root), quiet);
+    // The work's run made one commit, tied to it by its window: the capability it touches lives where that commit landed.
+    const { commit } = repo(root);
+    const built = commit("src/checkout/pay.ts", "Build the signup form");
+    const layout = resolveLayout(root);
+    mkdirSync(join(layout.henchDir, "runs"), { recursive: true });
+    writeFileSync(join(layout.henchDir, "runs", "run-signup.json"), JSON.stringify(runRecord("run-signup", "55555555-5555-5555-5555-555555555555", { commits: [{ sha: built, subject: "Build the signup form", attribution: "window" }] })));
+
+    const { snapshot, warnings } = await buildSnapshot(layout, quiet);
+    expect(warnings).toEqual([]);
     const signup = snapshot.nodes.find((n) => n.title === "Signup Flow");
     expect(signup).toMatchObject({ kind: "capability", proposed: true, intentStatus: "met", status: "completed" });
+    expect(snapshot.nodes.find((n) => n.id === built)).toMatchObject({ kind: "commit", attribution: "window", author: "Pat" });
+    expect(snapshot.edges).toContainEqual({ kind: "landedFor", from: built, to: "55555555-5555-5555-5555-555555555555" });
+    expect(snapshot.edges).toContainEqual({ kind: "realizes", from: built, to: signup!.id });
+    expect(snapshot.edges).toContainEqual({ kind: "realizedIn", from: signup!.id, to: "checkout" });
     // rex's metAt is a spec hash, said through intentStatus, never projected as a date.
     expect(signup!.metAt).toBeUndefined();
     const login = snapshot.nodes.find((n) => n.title === "Login Flow");
@@ -222,38 +256,39 @@ describe("buildSnapshot", () => {
     const state = join(layout.rexDir, "changes", "add-apple-pay", "state.yaml");
     writeFileSync(state, readFileSync(state, "utf-8").replace('status: "in_progress"', 'status: "completed"'));
 
-    let clock = 0;
-    const git = (...args: string[]): string => {
-      clock += 1;
-      const date = new Date(Date.UTC(2026, 9, 1, 0, clock)).toISOString();
-      const env = { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date, GIT_AUTHOR_NAME: "Pat", GIT_AUTHOR_EMAIL: "p@test", GIT_COMMITTER_NAME: "Pat", GIT_COMMITTER_EMAIL: "p@test" };
-      return execFileSync("git", args, { cwd: root, encoding: "utf-8", env }).trim();
-    };
-    const commit = (file: string, message: string): string => {
-      writeFileSync(join(root, file), `${file}\n`);
-      writeFileSync(join(root, ".msg"), message);
-      git("add", file);
-      git("commit", "-q", "-F", ".msg");
-      return git("rev-parse", "HEAD");
-    };
-    git("init", "-q", "--initial-branch=main");
-    writeFileSync(join(root, ".gitignore"), ".msg\n");
+    const { git, commit } = repo(root);
     commit("README.md", "start");
     git("tag", "@shop/core@1.1.0");
-    const landed = commit("pay.ts", `Add Apple Pay\n\nN-DX-Item: ${change}`);
+    const landed = commit("src/checkout/pay.ts", `Add Apple Pay\n\nN-DX-Item: ${change}`);
     git("tag", "@shop/core@1.2.0");
     git("tag", "@shop/web@1.2.0");
     const unreleased = commit("later.ts", `Polish\n\nN-DX-Item: ${change}`);
     commit("nothing.ts", "N-DX-Item: 00000000-0000-4000-8000-00000000dead\n\nN-DX-Item: 00000000-0000-4000-8000-00000000dead");
+    // A run record names the landing commit too (backfilled by window), plus a commit this clone does not have.
+    const task = "c0000000-0000-4000-8000-000000000002";
+    const lost = "f".repeat(40);
+    mkdirSync(join(layout.henchDir, "runs"), { recursive: true });
+    writeFileSync(join(layout.henchDir, "runs", "run-9.json"), JSON.stringify(runRecord("run-9", task, { commits: [{ sha: landed, subject: "Add Apple Pay", attribution: "window" }, { sha: lost, subject: "Lost", attribution: "window" }] })));
 
     const report = await buildSnapshot(layout, quiet);
     const { nodes, edges } = report.snapshot;
     expect(report.warnings).toEqual([]);
     const commits = nodes.filter((n) => n.kind === "commit");
-    expect(commits.map((c) => c.id).sort()).toEqual([landed, unreleased].sort());
-    expect(commits.find((c) => c.id === landed)).toMatchObject({ sha: landed, subject: "Add Apple Pay", author: "Pat", committedAt: expect.stringMatching(/^2026-10-01T/) });
+    expect(commits.map((c) => c.id).sort()).toEqual([landed, unreleased, lost].sort());
+    // The trailer is the stronger tie, and git supplies the author and date the record lacks.
+    expect(commits.find((c) => c.id === landed)).toMatchObject({ sha: landed, subject: "Add Apple Pay", author: "Pat", committedAt: expect.stringMatching(/^2026-10-01T/), attribution: "trailer" });
+    expect(commits.find((c) => c.id === lost)).toMatchObject({ subject: "Lost", attribution: "window" });
+    expect(commits.find((c) => c.id === lost)!.committedAt).toBeUndefined();
     expect(edges).toContainEqual({ kind: "landedFor", from: landed, to: change });
+    expect(edges).toContainEqual({ kind: "landedFor", from: landed, to: task });
+    expect(edges).toContainEqual({ kind: "landedFor", from: lost, to: task });
     expect(edges).toContainEqual({ kind: "landedFor", from: unreleased, to: change });
+    // The change amends "Pay by card", so its commits realize it, and the one that changed src/checkout/pay.ts puts it in the checkout zone.
+    const capability = "a0000000-0000-4000-8000-000000000002";
+    expect(edges).toContainEqual({ kind: "realizes", from: landed, to: capability });
+    expect(edges).toContainEqual({ kind: "realizes", from: unreleased, to: capability });
+    expect(edges.some((e) => e.kind === "realizes" && e.from === lost)).toBe(false);
+    expect(edges).toContainEqual({ kind: "realizedIn", from: capability, to: "checkout" });
     // The change landed with its last commit, which no release tag contains yet: not shipped.
     expect(edges.some((e) => e.kind === "shippedWith" && e.from === change)).toBe(false);
 

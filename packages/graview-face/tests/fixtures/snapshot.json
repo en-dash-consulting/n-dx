@@ -112,6 +112,18 @@
       "title": "LLM Cost Optimization"
     },
     {
+      "criteriaCount": 6,
+      "health": "ok",
+      "id": "1c8695a6-c31f-4411-8db6-4ba115776617",
+      "intentStatus": "met",
+      "kind": "capability",
+      "proposed": true,
+      "reviewed": false,
+      "slug": "sourcevision-pr-markdown-quality",
+      "status": "completed",
+      "title": "SourceVision PR Markdown Quality & Manual Refresh"
+    },
+    {
       "criteriaCount": 74,
       "health": "ok",
       "id": "70443075-8352-48a4-a8ed-799505872d4b",
@@ -132,25 +144,6 @@
       "title": "CLI for the product layer and changes"
     },
     {
-      "criteriaCount": 94,
-      "health": "ok",
-      "id": "a6a5ac6a-ca47-435e-8749-91505acad43f",
-      "intentStatus": "changing",
-      "kind": "capability",
-      "proposed": true,
-      "reviewed": false,
-      "slug": "live-view-plumbing-stream-running",
-      "statement": "The dashboard cannot show what a running task or analysis is doing.",
-      "status": "pending",
-      "tags": [
-        "live",
-        "hench",
-        "sourcevision",
-        "web-server"
-      ],
-      "title": "Live view plumbing: stream running hench and analyze progress to the dashboard"
-    },
-    {
       "criteriaCount": 41,
       "health": "ok",
       "id": "298f7764-ed49-435a-8e4b-ada4c4c6f5a1",
@@ -169,23 +162,6 @@
         "core"
       ],
       "title": "Every n-dx commit carries an item trailer"
-    },
-    {
-      "criteriaCount": 96,
-      "health": "ok",
-      "id": "ba50eaa7-5f31-4a8d-9e16-6c452882022e",
-      "intentStatus": "met",
-      "kind": "capability",
-      "proposed": true,
-      "reviewed": false,
-      "slug": "live-tab-watch-every-running-task-and",
-      "statement": "The top nav has three stage tabs (Analysis, Plan, Work, defined in `packages/web/src/viewer/views/stages.ts`) and nowhere to watch work that is in progress: running hench tasks show as a floating worktrees pill on Home, a stuck-run count on the bottom bar and the last output line in the job tray.",
-      "status": "completed",
-      "tags": [
-        "live",
-        "web-viewer"
-      ],
-      "title": "Live tab: watch every running task and analysis from one place"
     },
     {
       "criteriaCount": 62,
@@ -219,6 +195,55 @@
       "title": "Analysis Pipeline Optimization"
     },
     {
+      "criteriaCount": 94,
+      "health": "ok",
+      "id": "a6a5ac6a-ca47-435e-8749-91505acad43f",
+      "intentStatus": "changing",
+      "kind": "capability",
+      "proposed": true,
+      "reviewed": false,
+      "slug": "live-view-plumbing-stream-running",
+      "statement": "The dashboard cannot show what a running task or analysis is doing.",
+      "status": "pending",
+      "tags": [
+        "live",
+        "hench",
+        "sourcevision",
+        "web-server"
+      ],
+      "title": "Live view plumbing: stream running hench and analyze progress to the dashboard"
+    },
+    {
+      "criteriaCount": 101,
+      "health": "ok",
+      "id": "ba50eaa7-5f31-4a8d-9e16-6c452882022e",
+      "intentStatus": "met",
+      "kind": "capability",
+      "proposed": true,
+      "reviewed": false,
+      "slug": "live-tab-watch-every-running-task-and",
+      "statement": "The top nav has three stage tabs (Analysis, Plan, Work, defined in `packages/web/src/viewer/views/stages.ts`) and nowhere to watch work that is in progress: running hench tasks show as a floating worktrees pill on Home, a stuck-run count on the bottom bar and the last output line in the job tray.",
+      "status": "completed",
+      "tags": [
+        "live",
+        "web-viewer"
+      ],
+      "title": "Live tab: watch every running task and analysis from one place"
+    },
+    {
+      "criteriaCount": 16,
+      "health": "ok",
+      "id": "508bf0a8-88fb-4c17-a183-d5460b066617",
+      "intentStatus": "met",
+      "kind": "capability",
+      "proposed": true,
+      "reviewed": false,
+      "slug": "codex-cli-token-usage-extraction-from",
+      "statement": "Codex CLI prints token usage statistics to stdout after each invocation.",
+      "status": "completed",
+      "title": "Codex CLI Token Usage Extraction from Run Output"
+    },
+    {
       "criteriaCount": 95,
       "health": "ok",
       "id": "53b3e7da-f618-404b-a69d-d7768fe9546f",
@@ -236,24 +261,6 @@
         "export"
       ],
       "title": "Portable PRD Bundle — Export, Import, and Narrative Rendering"
-    },
-    {
-      "criteriaCount": 132,
-      "health": "ok",
-      "id": "6a8f9616-59f0-458f-8e56-45abbb00a3da",
-      "intentStatus": "proposed",
-      "kind": "capability",
-      "proposed": true,
-      "reviewed": false,
-      "slug": "jev-backed-judgments-in-sourcevision",
-      "statement": "Sourcevision makes five LLM calls.",
-      "status": "pending",
-      "tags": [
-        "sourcevision",
-        "llm",
-        "typesafe"
-      ],
-      "title": "Jev-backed judgments in sourcevision"
     },
     {
       "criteriaCount": 39,
@@ -275,58 +282,40 @@
       "title": "Derived status, health and computed edges"
     },
     {
-      "criteriaCount": 31,
+      "criteriaCount": 132,
       "health": "ok",
-      "id": "6eb227af-ffb2-4f39-8f62-d4afbad09a57",
-      "intentStatus": "met",
+      "id": "6a8f9616-59f0-458f-8e56-45abbb00a3da",
+      "intentStatus": "proposed",
       "kind": "capability",
       "proposed": true,
       "reviewed": false,
-      "slug": "adversarial-review-pass-for-ndx-work",
-      "statement": "After a task's changes pass completion validation and before the commit prompt, a second agent attacks the change, triages each finding for severity and necessity, repairs must-fix findings in-session, and captures the rest to the PRD.",
-      "status": "completed",
-      "title": "Adversarial review pass for ndx work (--review)"
+      "slug": "jev-backed-judgments-in-sourcevision",
+      "statement": "Sourcevision makes five LLM calls.",
+      "status": "pending",
+      "tags": [
+        "sourcevision",
+        "llm",
+        "typesafe"
+      ],
+      "title": "Jev-backed judgments in sourcevision"
     },
     {
       "criteriaCount": 15,
       "health": "ok",
-      "id": "51527b42-cc67-4a5a-83b3-61179298dfaf",
+      "id": "e4868f49-5256-4fb7-a775-ac5bf06dbb47",
       "intentStatus": "met",
       "kind": "capability",
       "proposed": true,
       "reviewed": false,
-      "slug": "placement-engine-for-changes",
-      "statement": "Decides which capabilities a new change amends or touches.",
+      "slug": "analyze-pipeline-improvements",
       "status": "completed",
       "tags": [
-        "product-map",
-        "pr-12",
-        "lane-rex-domain",
+        "prune",
         "rex",
-        "llm-client"
+        "status",
+        "ux"
       ],
-      "title": "Placement engine for changes"
-    },
-    {
-      "criteriaCount": 62,
-      "health": "ok",
-      "id": "00db9d79-324d-4b64-acb7-e65deaa43b06",
-      "intentStatus": "met",
-      "kind": "capability",
-      "proposed": true,
-      "reviewed": false,
-      "slug": "align-os-specific-behavior-in-init-and",
-      "statement": "Three verified places where the same n-dx command delivers a different guarantee depending on the OS, without the difference being surfaced to the user:.",
-      "status": "completed",
-      "tags": [
-        "cross-os",
-        "windows",
-        "security",
-        "reliability",
-        "core",
-        "hench"
-      ],
-      "title": "Align OS-specific behavior in init and regular flows"
+      "title": "Analyze pipeline improvements"
     },
     {
       "changeKind": "refactor",
@@ -582,62 +571,7 @@
       "title": "Hench commit hygiene"
     },
     {
-      "author": "Ryan Keith",
-      "committedAt": "2026-10-09T03:08:49-04:00",
-      "id": "0316a48dc8cead39507ed79811a0a0fcba6a2775",
-      "kind": "commit",
-      "sha": "0316a48dc8cead39507ed79811a0a0fcba6a2775",
-      "subject": "feat(rex): rex product and rex change verbs; rex add creates a change on a v2 tree"
-    },
-    {
-      "author": "Sterling H",
-      "committedAt": "2026-10-08T14:14:10-07:00",
-      "id": "216200452bad035d2b8bcf41287274fe68b44f54",
-      "kind": "commit",
-      "sha": "216200452bad035d2b8bcf41287274fe68b44f54",
-      "subject": "chore(prd): commit PRD tree changes (task 3d7747f6-a22a-41e1-bd4f-491f29f54191 completed)"
-    },
-    {
-      "author": "Sterling H",
-      "committedAt": "2026-10-08T12:47:14-07:00",
-      "id": "38283fe3df6659c0293971edeea98878c71beb33",
-      "kind": "commit",
-      "sha": "38283fe3df6659c0293971edeea98878c71beb33",
-      "subject": "chore: re-record the prompt-token baseline"
-    },
-    {
-      "author": "Sterling H",
-      "committedAt": "2026-10-08T13:26:04-07:00",
-      "id": "6236eaf1a202890bfbacb76983ee632404d76b03",
-      "kind": "commit",
-      "sha": "6236eaf1a202890bfbacb76983ee632404d76b03",
-      "subject": "Drop the readiness status tests main already covers"
-    },
-    {
-      "author": "Ryan Keith",
-      "committedAt": "2026-10-08T21:12:38-04:00",
-      "id": "8eb093be6652abaeb840e585332eb33b2bf740b0",
-      "kind": "commit",
-      "sha": "8eb093be6652abaeb840e585332eb33b2bf740b0",
-      "subject": "feat(rex): add_item takes a type on v2 and defaults to an Inbox change"
-    },
-    {
-      "author": "Ryan Keith",
-      "committedAt": "2026-10-08T21:29:40-04:00",
-      "id": "b03c3a74508c601c2e71596d6fc565a70cc3feb6",
-      "kind": "commit",
-      "sha": "b03c3a74508c601c2e71596d6fc565a70cc3feb6",
-      "subject": "feat(rex): add get_product, get_capability, place_change and apply_change"
-    },
-    {
-      "author": "Ryan Keith",
-      "committedAt": "2026-10-09T03:17:23-04:00",
-      "id": "b9a44266c4468ef36be2f05e0c0273e3a0f62689",
-      "kind": "commit",
-      "sha": "b9a44266c4468ef36be2f05e0c0273e3a0f62689",
-      "subject": "chore(prd): commit PRD tree changes (task 08b9e858-4312-4945-9dd5-6c211884d5f6 completed)"
-    },
-    {
+      "attribution": "trailer",
       "author": "Ryan Keith",
       "committedAt": "2026-10-09T02:31:35-04:00",
       "id": "dcde245d1a5f546abdf70bfaff5ad75b39bc5aea",
@@ -646,36 +580,103 @@
       "subject": "chore(prd): capture PR 22's review findings"
     },
     {
-      "author": "Sterling H",
-      "committedAt": "2026-10-08T12:46:33-07:00",
-      "id": "dfb4a41625498d4756cc99632d26541939b2e17a",
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-03-11T12:10:53-04:00",
+      "id": "022f63e8c86361eafaf8f0831edc9825f891ca7d",
       "kind": "commit",
-      "sha": "dfb4a41625498d4756cc99632d26541939b2e17a",
-      "subject": "feat(core,hench): carry N-DX-Item on every commit made for one PRD item"
+      "sha": "022f63e8c86361eafaf8f0831edc9825f891ca7d",
+      "subject": "Address 26 observation findings: dissolve 3 zones, consolidate 1"
     },
     {
-      "author": "Ryan Keith",
-      "committedAt": "2026-10-07T20:12:46-04:00",
-      "id": "ff842c57c3095f49ed305a19709f7c071c6b5f55",
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-03-08T14:17:19-04:00",
+      "id": "032250625216e8d289c8f85c61072fba3691dca7",
       "kind": "commit",
-      "sha": "ff842c57c3095f49ed305a19709f7c071c6b5f55",
-      "subject": "feat(rex): add the v2 schema fields decided before the freeze"
+      "sha": "032250625216e8d289c8f85c61072fba3691dca7",
+      "subject": "Add machine-enforceable data-layer contract and scheduler integration coverage"
     },
     {
-      "author": "Sterling H",
-      "committedAt": "2026-10-08T13:11:18-07:00",
-      "id": "009f2a732a208d7edcb2c675c3d7c6adb8383742",
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-03-10T22:25:49-04:00",
+      "id": "043b2d8239fd202339d3cf58448919407247aec2",
       "kind": "commit",
-      "sha": "009f2a732a208d7edcb2c675c3d7c6adb8383742",
-      "subject": "chore(prd): commit PRD tree changes (task fbbf2cf6-5391-4f9a-aa32-a92f48bcaed2 completed)"
+      "sha": "043b2d8239fd202339d3cf58448919407247aec2",
+      "subject": "Remove dead duplicate glob.ts from hench shared/"
     },
     {
-      "author": "Ryan Keith",
-      "committedAt": "2026-10-09T00:07:28-04:00",
-      "id": "021a6aa64b9e977db6f9f2a2635b6d7809b2fbe5",
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-03-10T22:39:30-04:00",
+      "id": "06c284df869360da423d4cda9d0a9c906c7345e1",
       "kind": "commit",
-      "sha": "021a6aa64b9e977db6f9f2a2635b6d7809b2fbe5",
-      "subject": "chore(prd): commit PRD tree changes (task 67f17f2b-c930-4f62-8a78-40f056e64f4b completed)"
+      "sha": "06c284df869360da423d4cda9d0a9c906c7345e1",
+      "subject": "Fix 3 architectural violations flagged by observation findings"
+    },
+    {
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-02-28T00:20:40-05:00",
+      "id": "0854f396d42ae6b24dd965a53f9f55ff56aabbc8",
+      "kind": "commit",
+      "sha": "0854f396d42ae6b24dd965a53f9f55ff56aabbc8",
+      "subject": "feat(sourcevision): add architectural risk scoring module"
+    },
+    {
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-03-11T00:43:03-04:00",
+      "id": "08fb552c73f0b7feb43f54ad5f5fd49accea8131",
+      "kind": "commit",
+      "sha": "08fb552c73f0b7feb43f54ad5f5fd49accea8131",
+      "subject": "Gitignore execution-log.jsonl and acknowledge 15 observation findings"
+    },
+    {
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-02-09T09:08:36-05:00",
+      "id": "094e8cadc50b585b03f9b5314c4d92750105f650",
+      "kind": "commit",
+      "sha": "094e8cadc50b585b03f9b5314c4d92750105f650",
+      "subject": "feat(rex): add timestamp and parent-child consistency validation"
+    },
+    {
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-03-11T11:56:00-04:00",
+      "id": "0e10d7e17b68d50c3d6d7f323d0eb5d25a3b7eef",
+      "kind": "commit",
+      "sha": "0e10d7e17b68d50c3d6d7f323d0eb5d25a3b7eef",
+      "subject": "Address 25 suggestion findings: hooks barrel, server build contract, governance updates"
+    },
+    {
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-02-04T08:04:06-05:00",
+      "id": "0e683c8012b2937af736eb7340ebe79bc6399f72",
+      "kind": "commit",
+      "sha": "0e683c8012b2937af736eb7340ebe79bc6399f72",
+      "subject": "feat(rex): add Notion database adapter for PRDStore"
+    },
+    {
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-02-06T09:41:53-05:00",
+      "id": "141c6bc1da36a5d619b288c107f7522886cb1141",
+      "kind": "commit",
+      "sha": "141c6bc1da36a5d619b288c107f7522886cb1141",
+      "subject": "refactor(rex): expose public API barrel and update hench imports"
+    },
+    {
+      "attribution": "window",
+      "author": "Nick Daniel",
+      "committedAt": "2026-03-06T19:06:35-05:00",
+      "id": "16cf6764e2722519f2848272de16d8bca82f3d70",
+      "kind": "commit",
+      "sha": "16cf6764e2722519f2848272de16d8bca82f3d70",
+      "subject": "Add gateway import boundary enforcement to CI pipeline"
     },
     {
       "file": "packages/sourcevision/tests/fixtures/mixed-go-ts/web/src/components/Header.tsx",
@@ -911,32 +912,17 @@
       "version": "0.2.3"
     },
     {
-      "filesChanged": 0,
-      "finishedAt": "2026-02-28T13:36:38.384Z",
-      "id": "01d494a3-22df-40f9-b122-d2611a4e0fb8",
-      "inputTokens": 383,
+      "finishedAt": "2026-02-04T17:21:53.834Z",
+      "id": "c8e36549-b47e-46b0-9821-94a1bb0c024d",
+      "inputTokens": 0,
       "kind": "run",
       "model": "sonnet",
-      "outputTokens": 1616,
-      "startedAt": "2026-02-28T13:27:39.825Z",
+      "outputTokens": 0,
+      "startedAt": "2026-02-04T17:12:50.591Z",
       "status": "completed",
-      "taskTitle": "Address relationship issues (2 findings)",
-      "tokens": 9109919,
-      "turns": 83
-    },
-    {
-      "filesChanged": 0,
-      "finishedAt": "2026-03-11T07:15:07.801Z",
-      "id": "05207bc4-dd36-46b2-8856-09b98d2c163b",
-      "inputTokens": 279,
-      "kind": "run",
-      "model": "sonnet",
-      "outputTokens": 1054,
-      "startedAt": "2026-03-11T07:01:47.595Z",
-      "status": "completed",
-      "taskTitle": "Address suggestion issues (13 findings)",
-      "tokens": 7973580,
-      "turns": 75
+      "taskTitle": "PRD quality",
+      "tokens": 0,
+      "turns": 56
     },
     {
       "filesChanged": 0,
@@ -954,127 +940,139 @@
     },
     {
       "filesChanged": 0,
-      "finishedAt": "2026-02-09T13:56:35.614Z",
-      "id": "09ec5019-ccf1-42c6-9adb-8c61a207ee4d",
-      "inputTokens": 322,
+      "finishedAt": "2026-02-06T14:42:19.236Z",
+      "id": "43213eeb-f0b0-4da6-bf81-b004b493eed6",
+      "inputTokens": 83,
       "kind": "run",
       "model": "sonnet",
-      "outputTokens": 297,
-      "startedAt": "2026-02-09T13:51:31.581Z",
+      "outputTokens": 593,
+      "startedAt": "2026-02-06T14:35:29.881Z",
       "status": "completed",
-      "taskTitle": "Implement token usage tracking, reporting, and budget checking",
-      "tokens": 4558139,
-      "turns": 22
+      "taskTitle": "Refactor rex package to expose proper public API",
+      "tokens": 3136705,
+      "turns": 61
     },
     {
-      "finishedAt": "2026-02-27T18:13:39.604Z",
-      "id": "0dbfb865-6d44-4727-8515-655c7e6b1685",
+      "filesChanged": 0,
+      "finishedAt": "2026-03-06T06:10:09.740Z",
+      "id": "4bd30112-47dd-45b2-a633-d17bb1d2d548",
+      "inputTokens": 68,
+      "kind": "run",
+      "model": "sonnet",
+      "outputTokens": 488,
+      "startedAt": "2026-03-06T06:04:33.872Z",
+      "status": "completed",
+      "taskTitle": "Fix cross-level matching in smart-add duplicate merge",
+      "tokens": 2547887,
+      "turns": 35
+    },
+    {
+      "filesChanged": 0,
+      "finishedAt": "2026-02-09T14:09:06.100Z",
+      "id": "4deaa1aa-83df-45a4-92fb-b1544c2298a2",
+      "inputTokens": 258,
+      "kind": "run",
+      "model": "sonnet",
+      "outputTokens": 692,
+      "startedAt": "2026-02-09T13:56:35.714Z",
+      "status": "completed",
+      "taskTitle": "PRD Validation and Maintenance",
+      "tokens": 6875134,
+      "turns": 70
+    },
+    {
+      "finishedAt": "2026-02-04T06:58:28.006Z",
+      "id": "6b531c61-aa1d-491c-a197-4c4bb3da999a",
       "inputTokens": 0,
       "kind": "run",
       "model": "sonnet",
       "outputTokens": 0,
-      "startedAt": "2026-02-04T05:57:19.038Z",
-      "status": "failed",
-      "taskTitle": "Add model selection for analyze",
+      "startedAt": "2026-02-04T06:54:22.392Z",
+      "status": "completed",
+      "taskTitle": "Analyze pipeline improvements",
       "tokens": 0,
-      "turns": 0
+      "turns": 38
     },
     {
       "filesChanged": 0,
-      "finishedAt": "2026-03-08T04:33:11.031Z",
-      "id": "0e4baa64-4ba6-473a-aa66-e20a7071235b",
-      "inputTokens": 4562,
+      "finishedAt": "2026-03-11T04:43:20.652Z",
+      "id": "6c9d2ad3-4cc5-4cc2-b605-42c76b14ddce",
+      "inputTokens": 5671,
       "kind": "run",
       "model": "sonnet",
-      "outputTokens": 1455,
-      "startedAt": "2026-03-08T04:22:52.421Z",
+      "outputTokens": 903,
+      "startedAt": "2026-03-11T04:33:32.142Z",
       "status": "completed",
-      "taskTitle": "Address anti-pattern issues (12 findings)",
-      "tokens": 10225206,
-      "turns": 1
+      "taskTitle": "Address observation issues (15 findings)",
+      "tokens": 7085942,
+      "turns": 44
     },
     {
       "filesChanged": 0,
-      "finishedAt": "2026-03-11T05:58:42.663Z",
-      "id": "0fb96d64-dcf2-4043-aa9f-e7b47a73491e",
-      "inputTokens": 282,
+      "finishedAt": "2026-02-13T18:28:52.885Z",
+      "id": "94a92b97-f1c5-42fa-8de8-5bbc0f3c902c",
+      "inputTokens": 58,
       "kind": "run",
       "model": "sonnet",
-      "outputTokens": 428,
-      "startedAt": "2026-03-11T05:55:12.898Z",
+      "outputTokens": 365,
+      "startedAt": "2026-02-13T18:25:11.291Z",
       "status": "completed",
-      "taskTitle": "Address observation issues (13 findings)",
-      "tokens": 3925595,
-      "turns": 19
+      "taskTitle": "Add interactive workflow demo and animations",
+      "tokens": 2346768,
+      "turns": 29
     },
     {
-      "finishedAt": "2026-09-22T02:09:13.777Z",
-      "id": "1097e4c2-8d7b-48e3-b347-d2470da43d6f",
-      "inputTokens": 548,
-      "kind": "run",
-      "model": "claude-fable-5-1",
-      "outputTokens": 18953,
-      "startedAt": "2026-09-22T02:05:17.079Z",
-      "status": "completed",
-      "taskTitle": "ndx-capture: Jev-backed judgments in sourcevision",
-      "tokens": 2183758,
-      "turns": 19
-    },
-    {
-      "filesChanged": 0,
-      "finishedAt": "2026-03-11T02:24:13.665Z",
-      "id": "11cf146a-00cd-4e48-8863-fddc3f741cd3",
-      "inputTokens": 31,
+      "finishedAt": "2026-02-04T19:15:31.291Z",
+      "id": "a9d432de-c0d9-43de-a6f1-241aa00db19a",
+      "inputTokens": 0,
       "kind": "run",
       "model": "sonnet",
-      "outputTokens": 158,
-      "startedAt": "2026-03-11T02:19:29.217Z",
+      "outputTokens": 0,
+      "startedAt": "2026-02-04T19:04:20.316Z",
       "status": "completed",
-      "taskTitle": "Integration tests for smart-add cache staleness detection",
-      "tokens": 568774,
-      "turns": 16
+      "taskTitle": "Fail CI on validation errors",
+      "tokens": 0,
+      "turns": 59
     },
     {
-      "filesChanged": 0,
-      "finishedAt": "2026-03-09T19:46:03.045Z",
-      "id": "1300c542-cb62-47f5-ac76-9fd2ba44aeaf",
-      "inputTokens": 175,
+      "finishedAt": "2026-02-04T06:23:50.197Z",
+      "id": "e6aaa2f7-1dd2-4805-be88-5021a72261c8",
+      "inputTokens": 0,
       "kind": "run",
       "model": "sonnet",
-      "outputTokens": 637,
-      "startedAt": "2026-03-09T19:38:04.995Z",
+      "outputTokens": 0,
+      "startedAt": "2026-02-04T06:20:31.175Z",
       "status": "completed",
-      "taskTitle": "Address observation issues (10 findings)",
-      "tokens": 2113666,
-      "turns": 30
+      "taskTitle": "Handle large result sets with chunking",
+      "tokens": 0,
+      "turns": 38
     },
     {
-      "filesChanged": 0,
-      "finishedAt": "2026-03-11T02:45:38.849Z",
-      "id": "13b66fe8-c205-48ec-b8df-936531ee9295",
-      "inputTokens": 2272,
+      "finishedAt": "2026-02-04T17:55:05.978Z",
+      "id": "018fae9a-ceaf-42a6-ad66-e2963249d2a1",
+      "inputTokens": 0,
       "kind": "run",
       "model": "sonnet",
-      "outputTokens": 590,
-      "startedAt": "2026-03-11T02:39:44.963Z",
+      "outputTokens": 0,
+      "startedAt": "2026-02-04T17:47:35.482Z",
       "status": "completed",
-      "taskTitle": "Address pattern issues (1 findings)",
-      "tokens": 3595125,
-      "turns": 31
+      "taskTitle": "Add structured run summaries",
+      "tokens": 0,
+      "turns": 62
     },
     {
       "filesChanged": 0,
-      "finishedAt": "2026-03-07T02:17:00.456Z",
-      "id": "1460ad8a-867a-4c13-84a3-0af42488b462",
-      "inputTokens": 145,
+      "finishedAt": "2026-02-28T13:36:38.384Z",
+      "id": "01d494a3-22df-40f9-b122-d2611a4e0fb8",
+      "inputTokens": 383,
       "kind": "run",
       "model": "sonnet",
-      "outputTokens": 1143,
-      "startedAt": "2026-03-07T02:08:13.735Z",
+      "outputTokens": 1616,
+      "startedAt": "2026-02-28T13:27:39.825Z",
       "status": "completed",
-      "taskTitle": "Address anti-pattern issues (11 findings)",
-      "tokens": 6505660,
-      "turns": 80
+      "taskTitle": "Address relationship issues (2 findings)",
+      "tokens": 9109919,
+      "turns": 83
     },
     {
       "completedAt": "2026-08-18T20:39:03.594Z",
@@ -1294,6 +1292,194 @@
       "title": "Rebase PR #353 onto main and merge it"
     },
     {
+      "cohesion": 1,
+      "coupling": 0,
+      "depth": 0,
+      "description": "141 files, mostly utilities and cli commands; entry points format-loe.ts, index.ts, output.ts; imports Rex Store and Rex Store; imported by Packages and Packages.",
+      "entryPoints": [
+        "packages/rex/src/analyze/acknowledge.ts",
+        "packages/rex/src/analyze/analyze-shared.ts",
+        "packages/rex/src/analyze/consolidation-guard.ts",
+        "packages/rex/src/analyze/decompose.ts",
+        "packages/rex/src/analyze/dedupe.ts",
+        "packages/rex/src/analyze/diff.ts",
+        "packages/rex/src/analyze/escalate.ts",
+        "packages/rex/src/analyze/extract.ts",
+        "packages/rex/src/analyze/file-validation.ts",
+        "packages/rex/src/analyze/guided.ts",
+        "packages/rex/src/analyze/index.ts",
+        "packages/rex/src/analyze/llm-bridge.ts",
+        "packages/rex/src/analyze/modify-reason.ts",
+        "packages/rex/src/analyze/prompt-envelope.ts",
+        "packages/rex/src/analyze/propose-group-renames.ts",
+        "packages/rex/src/analyze/propose.ts",
+        "packages/rex/src/analyze/reason.ts",
+        "packages/rex/src/analyze/reconcile.ts",
+        "packages/rex/src/analyze/rename-resolve.ts",
+        "packages/rex/src/analyze/reshape-reason.ts",
+        "packages/rex/src/analyze/scanners.ts",
+        "packages/rex/src/analyze/validate-modification.ts",
+        "packages/rex/src/cli/commands/add-reshape.ts",
+        "packages/rex/src/cli/commands/add.ts",
+        "packages/rex/src/cli/commands/analyze.ts",
+        "packages/rex/src/cli/commands/backfill-commit-attribution.ts",
+        "packages/rex/src/cli/commands/claim.ts",
+        "packages/rex/src/cli/commands/decomposition-review.ts",
+        "packages/rex/src/cli/commands/export.ts",
+        "packages/rex/src/cli/commands/folder-tree-sync.ts",
+        "packages/rex/src/cli/commands/format-loe.ts",
+        "packages/rex/src/cli/commands/import-bundle.ts",
+        "packages/rex/src/cli/commands/init.ts",
+        "packages/rex/src/cli/commands/log.ts",
+        "packages/rex/src/cli/commands/migrate-folder-tree-filenames.ts",
+        "packages/rex/src/cli/commands/migrate-slugs.ts",
+        "packages/rex/src/cli/commands/migrate-to-folder-tree.ts",
+        "packages/rex/src/cli/commands/migrate-to-md.ts",
+        "packages/rex/src/cli/commands/move.ts",
+        "packages/rex/src/cli/commands/next.ts",
+        "packages/rex/src/cli/commands/prune.ts",
+        "packages/rex/src/cli/commands/ready.ts",
+        "packages/rex/src/cli/commands/recommend.ts",
+        "packages/rex/src/cli/commands/remove.ts",
+        "packages/rex/src/cli/commands/reorganize.ts",
+        "packages/rex/src/cli/commands/report.ts",
+        "packages/rex/src/cli/commands/reshape-detect-duplicates.ts",
+        "packages/rex/src/cli/commands/reshape.ts",
+        "packages/rex/src/cli/commands/smart-add-duplicates.ts",
+        "packages/rex/src/cli/commands/smart-add.ts",
+        "packages/rex/src/cli/commands/status-sections.ts",
+        "packages/rex/src/cli/commands/status-work-cycle.ts",
+        "packages/rex/src/cli/commands/status.ts",
+        "packages/rex/src/cli/commands/sync.ts",
+        "packages/rex/src/cli/commands/token-format.ts",
+        "packages/rex/src/cli/commands/tree-diff.ts",
+        "packages/rex/src/cli/commands/tree.ts",
+        "packages/rex/src/cli/commands/update.ts",
+        "packages/rex/src/cli/commands/usage.ts",
+        "packages/rex/src/cli/commands/validate-interactive.ts",
+        "packages/rex/src/cli/commands/validate.ts",
+        "packages/rex/src/cli/commands/verify.ts",
+        "packages/rex/src/cli/errors.ts",
+        "packages/rex/src/cli/help.ts",
+        "packages/rex/src/cli/llm-error-classifier.ts",
+        "packages/rex/src/cli/mcp-tools.ts",
+        "packages/rex/src/cli/mcp.ts",
+        "packages/rex/src/cli/migration-notification.ts",
+        "packages/rex/src/cli/output.ts",
+        "packages/rex/src/cli/resolve-dir.ts",
+        "packages/rex/src/cli/snapshot-guard.ts",
+        "packages/rex/src/cli/validate-input.ts",
+        "packages/rex/src/core/archive.ts",
+        "packages/rex/src/core/backup-snapshots.ts",
+        "packages/rex/src/core/branch-guard.ts",
+        "packages/rex/src/core/canonical.ts",
+        "packages/rex/src/core/dag.ts",
+        "packages/rex/src/core/durations.ts",
+        "packages/rex/src/core/epic-correlation.ts",
+        "packages/rex/src/core/facets.ts",
+        "packages/rex/src/core/folder-per-task-migration.ts",
+        "packages/rex/src/core/git-utils.ts",
+        "packages/rex/src/core/health.ts",
+        "packages/rex/src/core/identity.ts",
+        "packages/rex/src/core/item-duration-rollup.ts",
+        "packages/rex/src/core/item-token-rollup.ts",
+        "packages/rex/src/core/keywords.ts",
+        "packages/rex/src/core/merge-driver.ts",
+        "packages/rex/src/core/merge.ts",
+        "packages/rex/src/core/move.ts",
+        "packages/rex/src/core/next-task.ts",
+        "packages/rex/src/core/override-escalation.ts",
+        "packages/rex/src/core/parent-completion.ts",
+        "packages/rex/src/core/parent-reset.ts",
+        "packages/rex/src/core/pending-cache.ts",
+        "packages/rex/src/core/post-merge-validate.ts",
+        "packages/rex/src/core/prd-bundle.ts",
+        "packages/rex/src/core/prd-narrative.ts",
+        "packages/rex/src/core/prune.ts",
+        "packages/rex/src/core/ready.ts",
+        "packages/rex/src/core/remove-epic.ts",
+        "packages/rex/src/core/remove-feature.ts",
+        "packages/rex/src/core/remove-task.ts",
+        "packages/rex/src/core/reorganize-executor.ts",
+        "packages/rex/src/core/reorganize.ts",
+        "packages/rex/src/core/requirements.ts",
+        "packages/rex/src/core/reshape.ts",
+        "packages/rex/src/core/slug-migration.ts",
+        "packages/rex/src/core/stats.ts",
+        "packages/rex/src/core/structural.ts",
+        "packages/rex/src/core/sync-engine.ts",
+        "packages/rex/src/core/sync.ts",
+        "packages/rex/src/core/timestamps.ts",
+        "packages/rex/src/core/token-usage.ts",
+        "packages/rex/src/core/transitions.ts",
+        "packages/rex/src/core/tree-diff.ts",
+        "packages/rex/src/core/tree-source.ts",
+        "packages/rex/src/core/tree.ts",
+        "packages/rex/src/core/verify.ts",
+        "packages/rex/src/core/work-item-link.ts",
+        "packages/rex/src/public.ts",
+        "packages/rex/src/recommend/conflict-detection.ts",
+        "packages/rex/src/recommend/create-from-recommendations.ts",
+        "packages/rex/src/recommend/similarity.ts",
+        "packages/rex/src/recommend/tree.ts",
+        "packages/rex/src/recommend/types.ts",
+        "packages/rex/src/schema/index.ts",
+        "packages/rex/src/schema/v1.ts",
+        "packages/rex/src/schema/validate.ts",
+        "packages/rex/src/store/adapter-registry.ts",
+        "packages/rex/src/store/asana-adapter.ts",
+        "packages/rex/src/store/asana-client.ts",
+        "packages/rex/src/store/atomic-write.ts",
+        "packages/rex/src/store/branch-naming.ts",
+        "packages/rex/src/store/claims.ts",
+        "packages/rex/src/store/contracts.ts",
+        "packages/rex/src/store/ensure-legacy-prd-migrated.ts",
+        "packages/rex/src/store/file-adapter.ts",
+        "packages/rex/src/store/file-lock.ts",
+        "packages/rex/src/store/folder-tree-index-generator.ts",
+        "packages/rex/src/store/folder-tree-parser.ts",
+        "packages/rex/src/store/folder-tree-serializer.ts",
+        "packages/rex/src/store/folder-tree-store.ts",
+        "packages/rex/src/store/github-projects-adapter.ts",
+        "packages/rex/src/store/github-projects-client.ts",
+        "packages/rex/src/store/index.ts",
+        "packages/rex/src/store/integration-schema.ts",
+        "packages/rex/src/store/integration-schemas/index.ts",
+        "packages/rex/src/store/integration-schemas/jira.ts",
+        "packages/rex/src/store/integration-schemas/notion.ts",
+        "packages/rex/src/store/jira-adapter.ts",
+        "packages/rex/src/store/jira-client.ts",
+        "packages/rex/src/store/markdown-parser.ts",
+        "packages/rex/src/store/markdown-serializer.ts",
+        "packages/rex/src/store/notion-adapter.ts",
+        "packages/rex/src/store/notion-client.ts",
+        "packages/rex/src/store/notion-map.ts",
+        "packages/rex/src/store/paths.ts",
+        "packages/rex/src/store/prd-discovery.ts",
+        "packages/rex/src/store/prd-md-migration.ts",
+        "packages/rex/src/store/prd-migration.ts",
+        "packages/rex/src/store/project-config.ts",
+        "packages/rex/src/store/self-heal-tag.ts",
+        "packages/rex/src/store/slug-rule-guard.ts",
+        "packages/rex/src/store/title-to-filename.ts",
+        "packages/rex/src/store/tree-meta.ts"
+      ],
+      "fileCount": 197,
+      "id": "rex-cli",
+      "kind": "zone",
+      "name": "Rex"
+    },
+    {
+      "cohesion": 1,
+      "coupling": 0,
+      "depth": 0,
+      "description": "Non-source files in packages: prompt-surfaces.ts, accept-single-transaction.test.ts, acknowledge.test.ts (+199 more)",
+      "fileCount": 202,
+      "id": "tests-rex-unit",
+      "kind": "zone",
+      "name": "Tests Rex Unit"
+    },
+    {
       "cohesion": 0.7,
       "coupling": 0.3,
       "depth": 1,
@@ -1365,6 +1551,39 @@
       "id": "hench/agent",
       "kind": "zone",
       "name": "Agent"
+    },
+    {
+      "cohesion": 0.44,
+      "coupling": 0.56,
+      "depth": 1,
+      "description": "21 files, primarily TypeScript",
+      "entryPoints": [
+        "packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts",
+        "packages/hench/src/agent/planning/brief.ts",
+        "packages/hench/src/agent/planning/cli-identity.ts",
+        "packages/hench/src/agent/planning/context-caps.ts",
+        "packages/hench/src/cli/commands/consecutive-failures.ts",
+        "packages/hench/src/cli/commands/run.ts",
+        "packages/hench/src/cli/slug-migration-offer.ts",
+        "packages/hench/src/prd/rex-gateway.ts",
+        "packages/hench/src/process/agent-mcp-config.ts",
+        "packages/hench/src/process/claude-mcp-registration.ts",
+        "packages/hench/src/process/task-claims.ts",
+        "packages/hench/src/quota/claude-quota.ts",
+        "packages/hench/src/quota/codex-quota.ts",
+        "packages/hench/src/quota/format.ts",
+        "packages/hench/src/quota/google-quota.ts",
+        "packages/hench/src/quota/index.ts",
+        "packages/hench/src/quota/types.ts",
+        "packages/hench/src/store/artifacts.ts",
+        "packages/hench/src/store/paths.ts",
+        "packages/hench/src/tools/rex.ts",
+        "packages/hench/src/validation/changed-files.ts"
+      ],
+      "fileCount": 21,
+      "id": "hench/quota",
+      "kind": "zone",
+      "name": "Quota"
     },
     {
       "cohesion": 0.75,
@@ -1561,6 +1780,47 @@
       "cohesion": 1,
       "coupling": 0,
       "depth": 0,
+      "description": "Non-source files in tests: architecture-policy.test.js, assistant-body-drift.test.js, assistant-integration.test.js (+81 more)",
+      "entryPoints": [
+        "tests/e2e/e2e-helpers.js"
+      ],
+      "fileCount": 84,
+      "id": "tests-e2e",
+      "kind": "zone",
+      "name": "Tests"
+    },
+    {
+      "cohesion": 1,
+      "coupling": 0,
+      "depth": 0,
+      "description": "Non-source files in packages: built-server-guard.test.ts, admission.test.ts, home.test.ts (+275 more)",
+      "fileCount": 278,
+      "id": "tests-web-unit",
+      "kind": "zone",
+      "name": "Packages"
+    },
+    {
+      "cohesion": 0.32,
+      "coupling": 0.68,
+      "depth": 1,
+      "description": "9 files, primarily TypeScript",
+      "entryPoints": [
+        "packages/llm-client/src/json.ts",
+        "packages/llm-client/src/progress-reporter.ts",
+        "packages/llm-client/src/project-config.ts",
+        "packages/llm-client/src/public.ts",
+        "packages/llm-client/src/suggest.ts",
+        "packages/llm-client/src/tool-schema.ts"
+      ],
+      "fileCount": 9,
+      "id": "llm-client/src-4",
+      "kind": "zone",
+      "name": "Src 4"
+    },
+    {
+      "cohesion": 1,
+      "coupling": 0,
+      "depth": 0,
       "description": "45 files, mostly utilities and services; entry points runtime-contract.ts, types.ts, vendor-header.ts; imported by Packages and Packages.",
       "entryPoints": [
         "packages/llm-client/src/api-provider.ts",
@@ -1608,184 +1868,6 @@
       "id": "llm-client",
       "kind": "zone",
       "name": "Llm Client"
-    },
-    {
-      "cohesion": 1,
-      "coupling": 0,
-      "depth": 0,
-      "description": "141 files, mostly utilities and cli commands; entry points format-loe.ts, index.ts, output.ts; imports Rex Store and Rex Store; imported by Packages and Packages.",
-      "entryPoints": [
-        "packages/rex/src/analyze/acknowledge.ts",
-        "packages/rex/src/analyze/analyze-shared.ts",
-        "packages/rex/src/analyze/consolidation-guard.ts",
-        "packages/rex/src/analyze/decompose.ts",
-        "packages/rex/src/analyze/dedupe.ts",
-        "packages/rex/src/analyze/diff.ts",
-        "packages/rex/src/analyze/escalate.ts",
-        "packages/rex/src/analyze/extract.ts",
-        "packages/rex/src/analyze/file-validation.ts",
-        "packages/rex/src/analyze/guided.ts",
-        "packages/rex/src/analyze/index.ts",
-        "packages/rex/src/analyze/llm-bridge.ts",
-        "packages/rex/src/analyze/modify-reason.ts",
-        "packages/rex/src/analyze/prompt-envelope.ts",
-        "packages/rex/src/analyze/propose-group-renames.ts",
-        "packages/rex/src/analyze/propose.ts",
-        "packages/rex/src/analyze/reason.ts",
-        "packages/rex/src/analyze/reconcile.ts",
-        "packages/rex/src/analyze/rename-resolve.ts",
-        "packages/rex/src/analyze/reshape-reason.ts",
-        "packages/rex/src/analyze/scanners.ts",
-        "packages/rex/src/analyze/validate-modification.ts",
-        "packages/rex/src/cli/commands/add-reshape.ts",
-        "packages/rex/src/cli/commands/add.ts",
-        "packages/rex/src/cli/commands/analyze.ts",
-        "packages/rex/src/cli/commands/backfill-commit-attribution.ts",
-        "packages/rex/src/cli/commands/claim.ts",
-        "packages/rex/src/cli/commands/decomposition-review.ts",
-        "packages/rex/src/cli/commands/export.ts",
-        "packages/rex/src/cli/commands/folder-tree-sync.ts",
-        "packages/rex/src/cli/commands/format-loe.ts",
-        "packages/rex/src/cli/commands/import-bundle.ts",
-        "packages/rex/src/cli/commands/init.ts",
-        "packages/rex/src/cli/commands/log.ts",
-        "packages/rex/src/cli/commands/migrate-folder-tree-filenames.ts",
-        "packages/rex/src/cli/commands/migrate-slugs.ts",
-        "packages/rex/src/cli/commands/migrate-to-folder-tree.ts",
-        "packages/rex/src/cli/commands/migrate-to-md.ts",
-        "packages/rex/src/cli/commands/move.ts",
-        "packages/rex/src/cli/commands/next.ts",
-        "packages/rex/src/cli/commands/prune.ts",
-        "packages/rex/src/cli/commands/ready.ts",
-        "packages/rex/src/cli/commands/recommend.ts",
-        "packages/rex/src/cli/commands/remove.ts",
-        "packages/rex/src/cli/commands/reorganize.ts",
-        "packages/rex/src/cli/commands/report.ts",
-        "packages/rex/src/cli/commands/reshape-detect-duplicates.ts",
-        "packages/rex/src/cli/commands/reshape.ts",
-        "packages/rex/src/cli/commands/smart-add-duplicates.ts",
-        "packages/rex/src/cli/commands/smart-add.ts",
-        "packages/rex/src/cli/commands/status-sections.ts",
-        "packages/rex/src/cli/commands/status-work-cycle.ts",
-        "packages/rex/src/cli/commands/status.ts",
-        "packages/rex/src/cli/commands/sync.ts",
-        "packages/rex/src/cli/commands/token-format.ts",
-        "packages/rex/src/cli/commands/tree-diff.ts",
-        "packages/rex/src/cli/commands/tree.ts",
-        "packages/rex/src/cli/commands/update.ts",
-        "packages/rex/src/cli/commands/usage.ts",
-        "packages/rex/src/cli/commands/validate-interactive.ts",
-        "packages/rex/src/cli/commands/validate.ts",
-        "packages/rex/src/cli/commands/verify.ts",
-        "packages/rex/src/cli/errors.ts",
-        "packages/rex/src/cli/help.ts",
-        "packages/rex/src/cli/llm-error-classifier.ts",
-        "packages/rex/src/cli/mcp-tools.ts",
-        "packages/rex/src/cli/mcp.ts",
-        "packages/rex/src/cli/migration-notification.ts",
-        "packages/rex/src/cli/output.ts",
-        "packages/rex/src/cli/resolve-dir.ts",
-        "packages/rex/src/cli/snapshot-guard.ts",
-        "packages/rex/src/cli/validate-input.ts",
-        "packages/rex/src/core/archive.ts",
-        "packages/rex/src/core/backup-snapshots.ts",
-        "packages/rex/src/core/branch-guard.ts",
-        "packages/rex/src/core/canonical.ts",
-        "packages/rex/src/core/dag.ts",
-        "packages/rex/src/core/durations.ts",
-        "packages/rex/src/core/epic-correlation.ts",
-        "packages/rex/src/core/facets.ts",
-        "packages/rex/src/core/folder-per-task-migration.ts",
-        "packages/rex/src/core/git-utils.ts",
-        "packages/rex/src/core/health.ts",
-        "packages/rex/src/core/identity.ts",
-        "packages/rex/src/core/item-duration-rollup.ts",
-        "packages/rex/src/core/item-token-rollup.ts",
-        "packages/rex/src/core/keywords.ts",
-        "packages/rex/src/core/merge-driver.ts",
-        "packages/rex/src/core/merge.ts",
-        "packages/rex/src/core/move.ts",
-        "packages/rex/src/core/next-task.ts",
-        "packages/rex/src/core/override-escalation.ts",
-        "packages/rex/src/core/parent-completion.ts",
-        "packages/rex/src/core/parent-reset.ts",
-        "packages/rex/src/core/pending-cache.ts",
-        "packages/rex/src/core/post-merge-validate.ts",
-        "packages/rex/src/core/prd-bundle.ts",
-        "packages/rex/src/core/prd-narrative.ts",
-        "packages/rex/src/core/prune.ts",
-        "packages/rex/src/core/ready.ts",
-        "packages/rex/src/core/remove-epic.ts",
-        "packages/rex/src/core/remove-feature.ts",
-        "packages/rex/src/core/remove-task.ts",
-        "packages/rex/src/core/reorganize-executor.ts",
-        "packages/rex/src/core/reorganize.ts",
-        "packages/rex/src/core/requirements.ts",
-        "packages/rex/src/core/reshape.ts",
-        "packages/rex/src/core/slug-migration.ts",
-        "packages/rex/src/core/stats.ts",
-        "packages/rex/src/core/structural.ts",
-        "packages/rex/src/core/sync-engine.ts",
-        "packages/rex/src/core/sync.ts",
-        "packages/rex/src/core/timestamps.ts",
-        "packages/rex/src/core/token-usage.ts",
-        "packages/rex/src/core/transitions.ts",
-        "packages/rex/src/core/tree-diff.ts",
-        "packages/rex/src/core/tree-source.ts",
-        "packages/rex/src/core/tree.ts",
-        "packages/rex/src/core/verify.ts",
-        "packages/rex/src/core/work-item-link.ts",
-        "packages/rex/src/public.ts",
-        "packages/rex/src/recommend/conflict-detection.ts",
-        "packages/rex/src/recommend/create-from-recommendations.ts",
-        "packages/rex/src/recommend/similarity.ts",
-        "packages/rex/src/recommend/tree.ts",
-        "packages/rex/src/recommend/types.ts",
-        "packages/rex/src/schema/index.ts",
-        "packages/rex/src/schema/v1.ts",
-        "packages/rex/src/schema/validate.ts",
-        "packages/rex/src/store/adapter-registry.ts",
-        "packages/rex/src/store/asana-adapter.ts",
-        "packages/rex/src/store/asana-client.ts",
-        "packages/rex/src/store/atomic-write.ts",
-        "packages/rex/src/store/branch-naming.ts",
-        "packages/rex/src/store/claims.ts",
-        "packages/rex/src/store/contracts.ts",
-        "packages/rex/src/store/ensure-legacy-prd-migrated.ts",
-        "packages/rex/src/store/file-adapter.ts",
-        "packages/rex/src/store/file-lock.ts",
-        "packages/rex/src/store/folder-tree-index-generator.ts",
-        "packages/rex/src/store/folder-tree-parser.ts",
-        "packages/rex/src/store/folder-tree-serializer.ts",
-        "packages/rex/src/store/folder-tree-store.ts",
-        "packages/rex/src/store/github-projects-adapter.ts",
-        "packages/rex/src/store/github-projects-client.ts",
-        "packages/rex/src/store/index.ts",
-        "packages/rex/src/store/integration-schema.ts",
-        "packages/rex/src/store/integration-schemas/index.ts",
-        "packages/rex/src/store/integration-schemas/jira.ts",
-        "packages/rex/src/store/integration-schemas/notion.ts",
-        "packages/rex/src/store/jira-adapter.ts",
-        "packages/rex/src/store/jira-client.ts",
-        "packages/rex/src/store/markdown-parser.ts",
-        "packages/rex/src/store/markdown-serializer.ts",
-        "packages/rex/src/store/notion-adapter.ts",
-        "packages/rex/src/store/notion-client.ts",
-        "packages/rex/src/store/notion-map.ts",
-        "packages/rex/src/store/paths.ts",
-        "packages/rex/src/store/prd-discovery.ts",
-        "packages/rex/src/store/prd-md-migration.ts",
-        "packages/rex/src/store/prd-migration.ts",
-        "packages/rex/src/store/project-config.ts",
-        "packages/rex/src/store/self-heal-tag.ts",
-        "packages/rex/src/store/slug-rule-guard.ts",
-        "packages/rex/src/store/title-to-filename.ts",
-        "packages/rex/src/store/tree-meta.ts"
-      ],
-      "fileCount": 197,
-      "id": "rex-cli",
-      "kind": "zone",
-      "name": "Rex"
     },
     {
       "cohesion": 1,
@@ -1891,104 +1973,6 @@
       "name": "Sourcevision"
     },
     {
-      "cohesion": 1,
-      "coupling": 0,
-      "depth": 0,
-      "description": "46 files, mostly utilities and entry points; entry points assistant-assets.js, assistant-integration.js, claude-integration.js; imported by Tests and Tests.",
-      "entryPoints": [
-        "packages/core/assistant-assets.js",
-        "packages/core/assistant-integration.js",
-        "packages/core/child-lifecycle.js",
-        "packages/core/claude-integration.js",
-        "packages/core/cli-brand.js",
-        "packages/core/cli-identity.js",
-        "packages/core/cli-log.js",
-        "packages/core/cli-timeout.js",
-        "packages/core/codex-integration.js",
-        "packages/core/command-effects.js",
-        "packages/core/commit-trailers.js",
-        "packages/core/config.js",
-        "packages/core/export.js",
-        "packages/core/file-permissions.js",
-        "packages/core/git-preflight.js",
-        "packages/core/gitattributes-pins.js",
-        "packages/core/help.js",
-        "packages/core/init-llm.js",
-        "packages/core/install-identity.js",
-        "packages/core/layout.js",
-        "packages/core/llm-model-catalog.js",
-        "packages/core/mcp-shim.js",
-        "packages/core/migrate-layout.js",
-        "packages/core/narration-status.js",
-        "packages/core/pair-programming.js",
-        "packages/core/refresh-artifacts.js",
-        "packages/core/refresh-plan.js",
-        "packages/core/refresh-validate.js",
-        "packages/core/resolve-existing-dir.js",
-        "packages/core/run-summary.js",
-        "packages/core/self-heal-confirm.js",
-        "packages/core/stale-check.js",
-        "packages/core/update-check.js",
-        "packages/core/web.js",
-        "packages/core/win-spawn.js"
-      ],
-      "fileCount": 46,
-      "id": "core",
-      "kind": "zone",
-      "name": "Core"
-    },
-    {
-      "cohesion": 0.44,
-      "coupling": 0.56,
-      "depth": 1,
-      "description": "21 files, primarily TypeScript",
-      "entryPoints": [
-        "packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts",
-        "packages/hench/src/agent/planning/brief.ts",
-        "packages/hench/src/agent/planning/cli-identity.ts",
-        "packages/hench/src/agent/planning/context-caps.ts",
-        "packages/hench/src/cli/commands/consecutive-failures.ts",
-        "packages/hench/src/cli/commands/run.ts",
-        "packages/hench/src/cli/slug-migration-offer.ts",
-        "packages/hench/src/prd/rex-gateway.ts",
-        "packages/hench/src/process/agent-mcp-config.ts",
-        "packages/hench/src/process/claude-mcp-registration.ts",
-        "packages/hench/src/process/task-claims.ts",
-        "packages/hench/src/quota/claude-quota.ts",
-        "packages/hench/src/quota/codex-quota.ts",
-        "packages/hench/src/quota/format.ts",
-        "packages/hench/src/quota/google-quota.ts",
-        "packages/hench/src/quota/index.ts",
-        "packages/hench/src/quota/types.ts",
-        "packages/hench/src/store/artifacts.ts",
-        "packages/hench/src/store/paths.ts",
-        "packages/hench/src/tools/rex.ts",
-        "packages/hench/src/validation/changed-files.ts"
-      ],
-      "fileCount": 21,
-      "id": "hench/quota",
-      "kind": "zone",
-      "name": "Quota"
-    },
-    {
-      "cohesion": 0.32,
-      "coupling": 0.68,
-      "depth": 1,
-      "description": "9 files, primarily TypeScript",
-      "entryPoints": [
-        "packages/llm-client/src/json.ts",
-        "packages/llm-client/src/progress-reporter.ts",
-        "packages/llm-client/src/project-config.ts",
-        "packages/llm-client/src/public.ts",
-        "packages/llm-client/src/suggest.ts",
-        "packages/llm-client/src/tool-schema.ts"
-      ],
-      "fileCount": 9,
-      "id": "llm-client/src-4",
-      "kind": "zone",
-      "name": "Src 4"
-    },
-    {
       "cohesion": 0.41,
       "coupling": 0.59,
       "depth": 1,
@@ -2013,29 +1997,6 @@
       "id": "sourcevision/cli",
       "kind": "zone",
       "name": "Cli"
-    },
-    {
-      "cohesion": 1,
-      "coupling": 0,
-      "depth": 0,
-      "description": "Non-source files in tests: architecture-policy.test.js, assistant-body-drift.test.js, assistant-integration.test.js (+81 more)",
-      "entryPoints": [
-        "tests/e2e/e2e-helpers.js"
-      ],
-      "fileCount": 84,
-      "id": "tests-e2e",
-      "kind": "zone",
-      "name": "Tests"
-    },
-    {
-      "cohesion": 1,
-      "coupling": 0,
-      "depth": 0,
-      "description": "Non-source files in packages: built-server-guard.test.ts, admission.test.ts, home.test.ts (+275 more)",
-      "fileCount": 278,
-      "id": "tests-web-unit",
-      "kind": "zone",
-      "name": "Packages"
     }
   ],
   "edges": [
@@ -2063,11 +2024,6 @@
       "from": "5ca97c50-6fd3-4d97-99cd-42f7638eacfb",
       "kind": "blockedBy",
       "to": "298f7764-ed49-435a-8e4b-ada4c4c6f5a1"
-    },
-    {
-      "from": "8cc70b76-8b1f-4506-8f5e-799cc153468d",
-      "kind": "blockedBy",
-      "to": "51527b42-cc67-4a5a-83b3-61179298dfaf"
     },
     {
       "from": "94acd4e9-e113-461f-af0e-769c7c357996",
@@ -2102,10 +2058,10 @@
     {
       "from": "tests-e2e",
       "kind": "crosses",
-      "to": "core"
+      "to": "rex-cli"
     },
     {
-      "from": "tests-e2e",
+      "from": "tests-rex-unit",
       "kind": "crosses",
       "to": "rex-cli"
     },
@@ -2140,9 +2096,64 @@
       "to": "release:0.7.1"
     },
     {
-      "from": "1097e4c2-8d7b-48e3-b347-d2470da43d6f",
+      "from": "43213eeb-f0b0-4da6-bf81-b004b493eed6",
+      "kind": "produced",
+      "to": "141c6bc1da36a5d619b288c107f7522886cb1141"
+    },
+    {
+      "from": "4deaa1aa-83df-45a4-92fb-b1544c2298a2",
+      "kind": "produced",
+      "to": "094e8cadc50b585b03f9b5314c4d92750105f650"
+    },
+    {
+      "from": "6c9d2ad3-4cc5-4cc2-b605-42c76b14ddce",
+      "kind": "produced",
+      "to": "08fb552c73f0b7feb43f54ad5f5fd49accea8131"
+    },
+    {
+      "from": "6b531c61-aa1d-491c-a197-4c4bb3da999a",
       "kind": "ranFor",
-      "to": "6a8f9616-59f0-458f-8e56-45abbb00a3da"
+      "to": "e4868f49-5256-4fb7-a775-ac5bf06dbb47"
+    },
+    {
+      "from": "1c8695a6-c31f-4411-8db6-4ba115776617",
+      "kind": "realizedIn",
+      "to": "hench/quota"
+    },
+    {
+      "from": "1c8695a6-c31f-4411-8db6-4ba115776617",
+      "kind": "realizedIn",
+      "to": "rex-cli"
+    },
+    {
+      "from": "1c8695a6-c31f-4411-8db6-4ba115776617",
+      "kind": "realizedIn",
+      "to": "sourcevision/cli"
+    },
+    {
+      "from": "1c8695a6-c31f-4411-8db6-4ba115776617",
+      "kind": "realizedIn",
+      "to": "tests-e2e"
+    },
+    {
+      "from": "1c8695a6-c31f-4411-8db6-4ba115776617",
+      "kind": "realizedIn",
+      "to": "tests-rex-unit"
+    },
+    {
+      "from": "1c8695a6-c31f-4411-8db6-4ba115776617",
+      "kind": "realizedIn",
+      "to": "tests-web-unit"
+    },
+    {
+      "from": "298f7764-ed49-435a-8e4b-ada4c4c6f5a1",
+      "kind": "realizedIn",
+      "to": "hench/quota"
+    },
+    {
+      "from": "298f7764-ed49-435a-8e4b-ada4c4c6f5a1",
+      "kind": "realizedIn",
+      "to": "rex-cli"
     },
     {
       "from": "298f7764-ed49-435a-8e4b-ada4c4c6f5a1",
@@ -2150,9 +2161,54 @@
       "to": "tests-e2e"
     },
     {
+      "from": "3bf3754c-c0d0-4fb7-9cbd-5ebbddb85d51",
+      "kind": "realizedIn",
+      "to": "rex-cli"
+    },
+    {
+      "from": "3bf3754c-c0d0-4fb7-9cbd-5ebbddb85d51",
+      "kind": "realizedIn",
+      "to": "tests-rex-unit"
+    },
+    {
+      "from": "4cd7c27a-13d3-4fd3-85b4-9f309a4237fd",
+      "kind": "realizedIn",
+      "to": "rex-cli"
+    },
+    {
+      "from": "508bf0a8-88fb-4c17-a183-d5460b066617",
+      "kind": "realizedIn",
+      "to": "llm-client/src-4"
+    },
+    {
+      "from": "508bf0a8-88fb-4c17-a183-d5460b066617",
+      "kind": "realizedIn",
+      "to": "rex-cli"
+    },
+    {
+      "from": "508bf0a8-88fb-4c17-a183-d5460b066617",
+      "kind": "realizedIn",
+      "to": "tests-e2e"
+    },
+    {
+      "from": "508bf0a8-88fb-4c17-a183-d5460b066617",
+      "kind": "realizedIn",
+      "to": "tests-rex-unit"
+    },
+    {
+      "from": "508bf0a8-88fb-4c17-a183-d5460b066617",
+      "kind": "realizedIn",
+      "to": "tests-web-unit"
+    },
+    {
       "from": "5cfa1d83-839a-47a1-ae42-4353cd1acf83",
       "kind": "realizedIn",
       "to": "tests-e2e"
+    },
+    {
+      "from": "5cfa1d83-839a-47a1-ae42-4353cd1acf83",
+      "kind": "realizedIn",
+      "to": "tests-rex-unit"
     },
     {
       "from": "70443075-8352-48a4-a8ed-799505872d4b",
@@ -2165,34 +2221,69 @@
       "to": "tests-e2e"
     },
     {
-      "from": "0316a48dc8cead39507ed79811a0a0fcba6a2775",
-      "kind": "realizes",
-      "to": "70443075-8352-48a4-a8ed-799505872d4b"
+      "from": "70443075-8352-48a4-a8ed-799505872d4b",
+      "kind": "realizedIn",
+      "to": "tests-rex-unit"
     },
     {
-      "from": "38283fe3df6659c0293971edeea98878c71beb33",
-      "kind": "realizes",
-      "to": "298f7764-ed49-435a-8e4b-ada4c4c6f5a1"
+      "from": "e4868f49-5256-4fb7-a775-ac5bf06dbb47",
+      "kind": "realizedIn",
+      "to": "rex-cli"
     },
     {
-      "from": "8eb093be6652abaeb840e585332eb33b2bf740b0",
-      "kind": "realizes",
-      "to": "5cfa1d83-839a-47a1-ae42-4353cd1acf83"
+      "from": "e4868f49-5256-4fb7-a775-ac5bf06dbb47",
+      "kind": "realizedIn",
+      "to": "tests-rex-unit"
     },
     {
-      "from": "b03c3a74508c601c2e71596d6fc565a70cc3feb6",
+      "from": "022f63e8c86361eafaf8f0831edc9825f891ca7d",
       "kind": "realizes",
-      "to": "5cfa1d83-839a-47a1-ae42-4353cd1acf83"
+      "to": "1c8695a6-c31f-4411-8db6-4ba115776617"
     },
     {
-      "from": "b9a44266c4468ef36be2f05e0c0273e3a0f62689",
+      "from": "032250625216e8d289c8f85c61072fba3691dca7",
       "kind": "realizes",
-      "to": "70443075-8352-48a4-a8ed-799505872d4b"
+      "to": "1c8695a6-c31f-4411-8db6-4ba115776617"
     },
     {
-      "from": "dfb4a41625498d4756cc99632d26541939b2e17a",
+      "from": "043b2d8239fd202339d3cf58448919407247aec2",
       "kind": "realizes",
-      "to": "298f7764-ed49-435a-8e4b-ada4c4c6f5a1"
+      "to": "1c8695a6-c31f-4411-8db6-4ba115776617"
+    },
+    {
+      "from": "06c284df869360da423d4cda9d0a9c906c7345e1",
+      "kind": "realizes",
+      "to": "1c8695a6-c31f-4411-8db6-4ba115776617"
+    },
+    {
+      "from": "0854f396d42ae6b24dd965a53f9f55ff56aabbc8",
+      "kind": "realizes",
+      "to": "1c8695a6-c31f-4411-8db6-4ba115776617"
+    },
+    {
+      "from": "08fb552c73f0b7feb43f54ad5f5fd49accea8131",
+      "kind": "realizes",
+      "to": "1c8695a6-c31f-4411-8db6-4ba115776617"
+    },
+    {
+      "from": "0e10d7e17b68d50c3d6d7f323d0eb5d25a3b7eef",
+      "kind": "realizes",
+      "to": "1c8695a6-c31f-4411-8db6-4ba115776617"
+    },
+    {
+      "from": "16cf6764e2722519f2848272de16d8bca82f3d70",
+      "kind": "realizes",
+      "to": "1c8695a6-c31f-4411-8db6-4ba115776617"
+    },
+    {
+      "from": "dcde245d1a5f546abdf70bfaff5ad75b39bc5aea",
+      "kind": "realizes",
+      "to": "508bf0a8-88fb-4c17-a183-d5460b066617"
+    },
+    {
+      "from": "bcd3ec61-7d2f-40b7-96dd-80f864fe3c13",
+      "kind": "touches",
+      "to": "1c8695a6-c31f-4411-8db6-4ba115776617"
     },
     {
       "from": "0734e6b6-9223-4669-8df7-058cf683f10d",
@@ -2210,6 +2301,11 @@
       "to": "738f6000-aa94-41a0-86da-1d505e2674dd"
     },
     {
+      "from": "1c8695a6-c31f-4411-8db6-4ba115776617",
+      "kind": "under",
+      "to": "ebe4c082-7e93-44ee-a286-cf01c05dd907"
+    },
+    {
       "from": "298f7764-ed49-435a-8e4b-ada4c4c6f5a1",
       "kind": "under",
       "to": "72fe1093-132e-46f1-ad46-af304a453612"
@@ -2225,9 +2321,9 @@
       "to": "72fe1093-132e-46f1-ad46-af304a453612"
     },
     {
-      "from": "51527b42-cc67-4a5a-83b3-61179298dfaf",
+      "from": "508bf0a8-88fb-4c17-a183-d5460b066617",
       "kind": "under",
-      "to": "72fe1093-132e-46f1-ad46-af304a453612"
+      "to": "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3"
     },
     {
       "from": "53b3e7da-f618-404b-a69d-d7768fe9546f",
@@ -2243,11 +2339,6 @@
       "from": "6a8f9616-59f0-458f-8e56-45abbb00a3da",
       "kind": "under",
       "to": "ebe4c082-7e93-44ee-a286-cf01c05dd907"
-    },
-    {
-      "from": "6eb227af-ffb2-4f39-8f62-d4afbad09a57",
-      "kind": "under",
-      "to": "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
     },
     {
       "from": "70443075-8352-48a4-a8ed-799505872d4b",
@@ -2268,6 +2359,11 @@
       "from": "ba50eaa7-5f31-4a8d-9e16-6c452882022e",
       "kind": "under",
       "to": "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7"
+    },
+    {
+      "from": "e4868f49-5256-4fb7-a775-ac5bf06dbb47",
+      "kind": "under",
+      "to": "ebe4c082-7e93-44ee-a286-cf01c05dd907"
     },
     {
       "from": "hench/agent",

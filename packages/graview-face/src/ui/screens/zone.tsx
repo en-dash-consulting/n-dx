@@ -60,7 +60,7 @@ export function ZoneScreen({ context }: { context: Ctx; app: App }) {
           ) : null}
         </Section>
         <Section title="Capabilities realized here" i={2}>
-          {realized.length === 0 ? <Empty>No capability's commits have touched this zone, or no commit carries an N-DX-Item trailer yet.</Empty> : <Rows>{realized.map((c, i) => <RecordRow key={c.id} context={context} node={c} i={i} />)}</Rows>}
+          {realized.length === 0 ? <Empty>No commit tied to a capability's work has touched this zone yet.</Empty> : <Rows>{realized.map((c, i) => <RecordRow key={c.id} context={context} node={c} i={i} />)}</Rows>}
         </Section>
       </div>
 

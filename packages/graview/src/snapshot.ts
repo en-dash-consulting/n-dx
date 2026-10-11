@@ -9,8 +9,8 @@
  * to the same bytes.
  */
 import { join } from "node:path";
-import { computeRealizedBy, loadTrailerCommits, computeLandings, listReleaseTags, releasesContaining, type Realization } from "./rex-gateway.js";
-import type { Layout } from "./llm-gateway.js";
+import { loadTrailerCommits, loadCommitFiles, computeLandings, listReleaseTags, releasesContaining, resolveNode, trailerIds } from "./rex-gateway.js";
+import { execStdout, type Layout } from "./llm-gateway.js";
 import { readRequirements, releaseId, RELEASE_PREFIX } from "./sources/requirements.js";
 import { readCode } from "./sources/code.js";
 import { readRuns } from "./sources/runs.js";
@@ -49,6 +49,34 @@ export function graviewDirOf(layout: Layout): string {
   return layout.graviewDir;
 }
 
+/** Shas per git call: well inside every platform's argument limit. */
+const DESCRIBE_BATCH = 400;
+
+/**
+ * Author, date and subject for every commit node git can see, one call per
+ * batch, filling only what the node lacks; returns the shas git knows. A run
+ * record may name a commit this clone does not have, and `--ignore-missing`
+ * drops it without failing the rest.
+ */
+async function describeCommits(repoDir: string, nodes: Map<string, SnapshotNode>): Promise<Set<string>> {
+  const known = new Set<string>();
+  const wanted = [...nodes.values()].filter((n) => n.kind === "commit").map((n) => n.id);
+  for (let i = 0; i < wanted.length; i += DESCRIBE_BATCH) {
+    const batch = wanted.slice(i, i + DESCRIBE_BATCH);
+    const log = await execStdout("git", ["log", "--no-walk=unsorted", "--ignore-missing", "--format=%H%x1f%an%x1f%aI%x1f%s", ...batch], { cwd: repoDir, timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
+    for (const line of log.split("\n")) {
+      const [sha, author, at, subject] = line.split("\x1f");
+      const node = sha ? nodes.get(sha) : undefined;
+      if (!node) continue;
+      known.add(sha!);
+      node.author ??= author || undefined;
+      node.committedAt ??= at || undefined;
+      if (!node.subject) node.subject = subject || undefined;
+    }
+  }
+  return known;
+}
+
 export async function buildSnapshot(layout: Layout, options: BuildSnapshotOptions = {}): Promise<SnapshotReport> {
   const warnings: string[] = [];
   const warn: Warn = (message) => {
@@ -79,21 +107,31 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
   // go under the graview dir. Needs a git repository with full history;
   // without one the graph has no commits from git and says why.
   const taggedAt = new Map<string, string>();
+  // Where each change or task's work landed: the commits the run records name
+  // (seeded here), and the trailer commits (added below). Both tie a commit to
+  // an item; the realization reads them alike.
+  const landings = new Map<string, string[]>();
+  for (const [taskId, shas] of runs.commitsFor) if (requirements.ids.has(taskId)) landings.set(taskId, [...shas]);
+  // The commit shas git can see, once it has been asked; a record may name a commit this clone does not have.
+  let known: Set<string> | undefined;
   if (requirements.nodes.some((n) => n.kind === "change" || n.kind === "task")) {
     try {
       for (const commit of await loadTrailerCommits(gitOptions)) {
         const items = commit.items.filter((id) => requirements.ids.has(id));
         if (items.length === 0) continue;
-        add({
-          id: commit.hash,
-          kind: "commit",
-          sha: commit.hash,
-          subject: commit.subject || runs.commitSubjects.get(commit.hash) || undefined,
-          author: commit.author || undefined,
-          committedAt: commit.timestamp,
-        });
-        for (const id of items) edges.push({ kind: "landedFor", from: commit.hash, to: id });
+        // A run record may already name this commit: the trailer is the stronger tie, and git knows the author and date.
+        const node = nodes.get(commit.hash) ?? { id: commit.hash, kind: "commit", sha: commit.hash };
+        node.subject = commit.subject || node.subject || runs.commitSubjects.get(commit.hash) || undefined;
+        node.author = commit.author || undefined;
+        node.committedAt = commit.timestamp;
+        node.attribution = "trailer";
+        nodes.set(commit.hash, node);
+        for (const id of items) {
+          edges.push({ kind: "landedFor", from: commit.hash, to: id });
+          landings.set(id, [...(landings.get(id) ?? []), commit.hash]);
+        }
       }
+      known = await describeCommits(layout.root, nodes);
 
       const stamped = new Set(edges.filter((e) => e.kind === "shippedWith").map((e) => e.from));
       const landingOf = new Map<string, string>();
@@ -129,24 +167,43 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
     add({ id: releaseId(version), kind: "release", version, plannedChanges: t.planned, shippedChanges: t.shipped, taggedAt: taggedAt.get(version) });
   }
 
-  // Commits realize capabilities through their N-DX-Item trailers. Needs the
-  // product layer, so a v1 tree has no realizes edges.
-  const hasCapabilities = requirements.nodes.some((n) => n.kind === "capability");
-  if (hasCapabilities) {
-    try {
-      const realized: Record<string, Realization> = await computeRealizedBy(requirements.tree, requirements.productEdges, {
-        ...gitOptions,
-        zoneOf: code.zoneOf,
-      });
-      for (const [capabilityId, realization] of Object.entries(realized)) {
-        for (const zone of realization.zones) edges.push({ kind: "realizedIn", from: capabilityId, to: zone });
-        for (const sha of realization.commits) {
-          add({ id: sha, kind: "commit", sha, subject: runs.commitSubjects.get(sha) || undefined });
-          edges.push({ kind: "realizes", from: sha, to: capabilityId });
+  // Where a capability lives in code: the zones of the files changed by every
+  // commit that landed for a change placed on it (amends or touches) or for
+  // the work under that change, whether a trailer or a run record tied the
+  // commit to the work. Wider than rex's own `computeRealizedBy` (amending
+  // changes, trailers only), because on a proposed product layer the relation
+  // is a lead-verb guess and the hench-era commits come only from run records.
+  const capabilities = requirements.nodes.filter((n) => n.kind === "capability");
+  if (capabilities.length > 0) {
+    if (known === undefined) {
+      warn("Realized-by edges skipped: the commits that realize a capability need a git repository with full history");
+    } else {
+      try {
+        const shasOf = new Map<string, Set<string>>();
+        for (const capability of capabilities) {
+          const shas = new Set<string>();
+          for (const changeId of requirements.productEdges.changedBy[capability.id] ?? []) {
+            const change = resolveNode(requirements.tree, changeId);
+            if (!change) continue;
+            for (const item of trailerIds(change)) for (const sha of landings.get(item) ?? []) if (known.has(sha)) shas.add(sha);
+          }
+          if (shas.size > 0) shasOf.set(capability.id, shas);
         }
+        const files = await loadCommitFiles(gitOptions.repoDir, gitOptions.cacheDir, [...shasOf.values()].flatMap((s) => [...s]));
+        for (const [capabilityId, shas] of shasOf) {
+          const zones = new Set<string>();
+          for (const sha of shas) {
+            edges.push({ kind: "realizes", from: sha, to: capabilityId });
+            for (const file of files.get(sha) ?? []) {
+              const zone = code.zoneOf(file);
+              if (zone !== undefined) zones.add(zone);
+            }
+          }
+          for (const zone of zones) edges.push({ kind: "realizedIn", from: capabilityId, to: zone });
+        }
+      } catch (error) {
+        warn(`Realized-by edges skipped: ${error instanceof Error ? error.message : String(error)}`);
       }
-    } catch (error) {
-      warn(`Realized-by edges skipped: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
