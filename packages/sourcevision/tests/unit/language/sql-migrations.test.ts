@@ -6,7 +6,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { detectMigrationTools, sqlcQueryPaths } from "../../../src/language/sql-migrations.js";
+import { detectMigrationTools, sqlcPaths } from "../../../src/language/sql-migrations.js";
 import { extractSqlTables, splitSqlName, sqlTarget } from "../../../src/language/sql-schema.js";
 import { createTreeSitterRunner, type TreeSitterRunner } from "../../../src/language/runner.js";
 import { grammarWasmPath } from "../../../scripts/build-grammars.mjs";
@@ -68,8 +68,22 @@ describe("detectMigrationTools", () => {
       "src/main/resources/db/migration/V2.1__add_pets.sql",
     ]);
     const [sqlc] = detect(FIXTURES.sqlc!);
-    expect(sqlc?.files).toEqual(["query/users.sql", "sqlc.yaml"]);
-    expect(sqlc?.sqlFiles).toEqual(["query/users.sql"]);
+    expect(sqlc?.files).toEqual(["query/users.sql", "schema.sql", "sqlc.yaml"]);
+    expect(sqlc?.sqlFiles).toEqual(["schema.sql"]);
+  });
+
+  it("resolves a sqlc schema directory or list relative to the config", () => {
+    const [dir] = detect({
+      "db/sqlc.yaml": 'sql:\n  - schema: "./schema"\n    queries: "q"\n',
+      "db/schema/a.sql": "CREATE TABLE a (id int);",
+      "db/q/a.sql": "-- name: A :one\nSELECT 1;",
+    });
+    expect(dir?.sqlFiles).toEqual(["db/schema/a.sql"]);
+    const [list] = detect({
+      "sqlc.yaml": "sql:\n  - schema:\n      - one.sql\n      - ../two.sql\n",
+      "one.sql": "CREATE TABLE one (id int);",
+    });
+    expect(list?.sqlFiles).toEqual(["one.sql"]);
   });
 
   it("lists Atlas migrations from the directory holding atlas.sum", () => {
@@ -104,15 +118,21 @@ describe("detectMigrationTools", () => {
   });
 });
 
-describe("sqlcQueryPaths", () => {
+describe("sqlcPaths", () => {
   it("reads scalar, flow-list and block-list forms relative to the config", () => {
-    expect(sqlcQueryPaths("a/sqlc.yaml", 'queries: "./q"')).toEqual(["a/q"]);
-    expect(sqlcQueryPaths("sqlc.yaml", "queries: [q1, 'q2']")).toEqual(["q1", "q2"]);
-    expect(sqlcQueryPaths("sqlc.yaml", "sql:\n  - queries:\n      - one.sql\n      - ../two.sql\n")).toEqual([
+    expect(sqlcPaths("a/sqlc.yaml", 'queries: "./q"', "queries")).toEqual(["a/q"]);
+    expect(sqlcPaths("sqlc.yaml", "queries: [q1, 'q2']", "queries")).toEqual(["q1", "q2"]);
+    expect(sqlcPaths("sqlc.yaml", "sql:\n  - queries:\n      - one.sql\n      - ../two.sql\n", "queries")).toEqual([
       "one.sql",
       "two.sql",
     ]);
-    expect(sqlcQueryPaths("sqlc.json", '{\n  "sql": [{\n    "queries": "db/q",\n    "engine": "postgresql"\n  }]\n}')).toEqual(["db/q"]);
+    expect(sqlcPaths("sqlc.json", '{\n  "sql": [{\n    "queries": "db/q",\n    "engine": "postgresql"\n  }]\n}', "queries")).toEqual(["db/q"]);
+  });
+
+  it("reads the schema key and ignores the other", () => {
+    const yaml = 'queries: "q"\nschema: "s.sql"\n';
+    expect(sqlcPaths("sqlc.yaml", yaml, "schema")).toEqual(["s.sql"]);
+    expect(sqlcPaths("sqlc.yaml", yaml, "queries")).toEqual(["q"]);
   });
 });
 
