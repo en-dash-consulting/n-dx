@@ -94,6 +94,18 @@ Example `.n-dx.json` after init:
 }
 ```
 
+### Robot Wrangler (dashboard)
+
+The dashboard's **Robot Wrangler** settings page (the cog in the bottom bar) edits the same LLM keys. It reads top to bottom:
+
+1. **Vendor** — Claude, Codex, Gemini or Local, with each vendor's readiness.
+2. **Connection** (**Server** for Local) — CLI or API per provider; for Local, the server profiles, host and port, and a connection test.
+3. **Models** — the model for each tier (Primary, Standard, Light).
+4. **If a run fails** — the failover chain.
+5. **Review** — Off, Self review or Pair review.
+
+A run card beside the sections shows what a command will use and whether its credentials check out. The save bar at the bottom lists what will change; **Discard** reverts it and **Save** stays disabled until something has. At widths under 768px the vendor cards drop from four columns to two; under 640px tier rows and review cards stack.
+
 ::: tip .codex/config.toml remains MCP-only
 Model configuration lives in `.n-dx.json`, not in `.codex/config.toml`. The Codex config file is used exclusively for MCP server definitions (stdio transport). `ndx init` does not write model or vendor settings to `.codex/config.toml`.
 :::

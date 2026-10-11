@@ -81,8 +81,12 @@
   gap: var(--space-3);
 }
 
-.llm-vendor-cards { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.llm-vendor-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .llm-connection-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+@media (max-width: 768px) {
+  .llm-vendor-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .llm-radio-card {
   position: relative;
@@ -739,12 +743,6 @@ button.llm-profile-chip:focus-visible {
   font-size: 0.875rem;
 }
 
-.llm-save-hint {
-  flex: 1;
-  font-size: 0.875rem;
-  color: var(--text-dim);
-}
-
 /* ── Google API key link ─────────────────────────────────────────── */
 
 .llm-field-desc a {
@@ -889,11 +887,14 @@ button.llm-profile-chip:focus-visible {
 @media (max-width: 900px) {
   .llm-runcard { grid-template-columns: minmax(0, 1fr); }
 }
-.llm-field-source { font-weight: normal; color: var(--text-muted); }
 
 /* ── Section 5: review ───────────────────────────────────────────── */
 
 .llm-review-modes { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+@media (max-width: 640px) {
+  .llm-review-modes { grid-template-columns: minmax(0, 1fr); }
+}
 
 .llm-radio-card-disabled {
   opacity: 0.55;

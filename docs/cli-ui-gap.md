@@ -123,7 +123,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 
 ### `ndx config` — Robot Wrangler view detail
 
-- **Local vendor (full):** the Robot Wrangler view (`packages/web/src/viewer/views/robot-wrangler.ts`) adds a "local" vendor alongside Claude/Codex — host/port/model fields, a live status probe, a connection smoke test (latency + tokens/sec), and saved server profiles. Backed by GET/PUT `/api/llm/config` plus GET `/api/llm/local-status`, POST `/api/llm/local-test`, and GET/POST/DELETE `/api/llm/local-profiles` (`packages/web/src/server/routes-llm.ts`).
+- **Local vendor (full):** the Robot Wrangler view (`packages/web/src/viewer/views/robot-wrangler.ts`) adds a "local" vendor alongside Claude/Codex — a Server section with a live status probe, saved server profile chips, host/port fields, and a connection test (model count, latency, tokens/sec); context budget, request timeout and the second-model verifier sit in collapsed advanced rows. Backed by GET/PUT `/api/llm/config` plus GET `/api/llm/local-status`, POST `/api/llm/local-test`, and GET/POST/DELETE `/api/llm/local-profiles` (`packages/web/src/server/routes-llm.ts`).
 - **Providers and models (full):** each vendor offers only the providers hench accepts and a model dropdown over the server's catalog (GET `/api/llm/catalog`, `?refresh=true` to re-fetch). The agent model saves as `hench.models.<vendor>` through PUT `/api/llm/config`; the provider saves through PUT `/api/hench/config`. The page shows the installed CLI version for Claude and Codex but offers no update or install action.
 
 ## rex package CLI
