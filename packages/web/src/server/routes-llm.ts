@@ -48,6 +48,8 @@ import {
   localReadiness,
 } from "./llm-catalog.js";
 import type { CliInfo, LiveVendorProbe, VendorReadiness } from "./llm-catalog.js";
+import { buildTierTable } from "./llm-tiers.js";
+import type { TierRow } from "./llm-tiers.js";
 import type { EffectiveAgentConfig } from "./effective-agent-config.js";
 
 // ---------------------------------------------------------------------------
@@ -131,6 +133,12 @@ export interface LlmConfigResponse {
    * own, so the rules live only here, beside the validators they come from.
    */
   effectiveProblems: EffectiveProblem[];
+  /**
+   * The model tier table for the active vendor: the model each tier resolves
+   * to, the key that supplied it, and the commands that run on it. See
+   * `llm-tiers.ts`.
+   */
+  tiers: TierRow[];
 }
 
 /** One reason the resolved agent config would be refused. */
@@ -530,6 +538,7 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
   const claude = resolveClaudeConfig(llm["claude"], config["claude"]);
 
   const effective = await resolveEffectiveAgentConfig(projectDir);
+  const llmConfig = await loadLLMConfig(projectDir);
 
   const result: LlmConfigResponse = {
     vendor: typeof llm["vendor"] === "string" ? llm["vendor"] : null,
@@ -566,6 +575,7 @@ async function extractLlmConfig(projectDir: string): Promise<LlmConfigResponse> 
     agentModels: readAgentModels(config),
     effective,
     effectiveProblems: findEffectiveProblems(effective),
+    tiers: buildTierTable(effective.vendor, llmConfig, effective),
   };
 
   if (typeof llm["autoFailover"] === "boolean") {
