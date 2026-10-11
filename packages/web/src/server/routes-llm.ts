@@ -261,13 +261,19 @@ const AGENT_MODEL_PATH = /^hench\.models\.(claude|codex|google|local)$/;
 
 /**
  * The vendor a model-valued path is scoped to, or null for any other path:
- * `llm.<vendor>.model`, `llm.<vendor>.lightModel` and `hench.models.<vendor>`.
+ * `llm.<vendor>.model`, `llm.<vendor>.lightModel`, `llm.tiers.<vendor>.<tier>`, and
+ * `hench.models.<vendor>`.
  */
 function modelPathVendor(path: string): LLMVendor | null {
   const agent = AGENT_MODEL_PATH.exec(path);
   if (agent) return agent[1] as LLMVendor;
   const llm = /^llm\.(claude|codex|google|local)\.(model|lightModel)$/.exec(path) ?? REVIEW_MODEL_PATH.exec(path);
-  return llm ? (llm[1] as LLMVendor) : null;
+  if (llm) return llm[1] as LLMVendor;
+  const tier = /^llm\.(claude|codex|google|local)\.tiers\.(light|standard|heavy|free)$/.exec(path);
+  if (tier) return tier[1] as LLMVendor;
+  const tierPath = /^llm\.tiers\.(claude|codex|google|local)\./.exec(path);
+  if (tierPath) return tierPath[1] as LLMVendor;
+  return null;
 }
 
 /**
@@ -321,8 +327,9 @@ function validateRoutingChange(path: string, value: unknown): string | null {
     if (!TASK_TIERS.has(tier)) {
       return `Unknown tier "${tier}" in "${path}". Expected one of: ${[...TASK_TIERS].join(", ")}.`;
     }
-    if (typeof value !== "string" || !value.trim()) {
-      return `Value for "${path}" must be a non-empty model ID.`;
+    // Model ID validation is performed by validateModelForVendor, called after this path check
+    if (typeof value !== "string") {
+      return `Value for "${path}" must be a model ID string.`;
     }
     return null;
   }
