@@ -118,6 +118,41 @@ describe("Java embedded SQL", () => {
     ]);
   });
 
+  it("reads Spring Data JDBC @Query as native and relational @Table by its value", async (ctx) => {
+    const files = await parseAll(ctx, "java", {
+      "OwnerRepository.java": `package org.example.repo;
+
+import org.springframework.data.jdbc.repository.query.Query;
+
+public interface OwnerRepository {
+  @Query("SELECT * FROM owners")
+  List<Owner> all();
+}
+`,
+      "Owner.java": `package org.example.model;
+
+import org.springframework.data.relational.core.mapping.Table;
+
+@Table("owners")
+public class Owner {}
+`,
+      "Vet.java": `package org.example.model;
+
+import org.springframework.data.relational.core.mapping.Table;
+
+@Table(value = "vets", schema = "clinic")
+public class Vet {}
+`,
+    });
+    const { tables, unresolved } = extractJavaEmbeddedSql(files);
+    expect(summary(tables)).toEqual([
+      "owners @Query (native) OwnerRepository.java:6",
+      "owners @Table Owner.java:5",
+      "clinic.vets @Table Vet.java:5",
+    ]);
+    expect(unresolved).toEqual([]);
+  });
+
   it("reads JdbcTemplate calls, text blocks included, and only direct SQL arguments", async (ctx) => {
     const files = await parseAll(ctx, "java", { "Dao.java": JDBC });
     expect(summary(extractJavaEmbeddedSql(files).tables)).toEqual([
