@@ -87,7 +87,7 @@ Resolution types are:
 
 **Batch update via dashboard (if you have `ndx start` running):**
 
-Open the dashboard (typically `http://localhost:3117`), navigate to the PRD tree, and mark items complete through the UI. Changes sync to `.rex/prd.json` immediately.
+Open the dashboard (typically `http://localhost:3117`), navigate to the PRD tree, and mark items complete through the UI. Changes are written to the folder tree at `.rex/prd_tree/` immediately.
 
 ### Cycle 2: Archive completed epics
 
@@ -213,7 +213,7 @@ ndx analyze .
 ndx recommend --actionable-only .
 ndx recommend --acknowledge .
 ndx status .
-git diff .rex/prd.json | wc -l          # how many changes?
+git status --short .rex/prd_tree/ | wc -l   # how many changes? (includes new items)
 ```
 
 **Quarterly full reset (if PRD drift is high):**
@@ -294,14 +294,7 @@ The item returns to the PRD tree under its original parent, with all history int
 
 ### Pruning the archive
 
-The archive auto-trims at 100 batches (to prevent unbounded growth). You can also manually clear old items:
-
-```sh
-# Clear items archived more than 6 months ago
-rex archive-prune --before="6m" .
-```
-
-This is safe — archived items are only used for recovery/audit, and they're tagged with timestamps for audit purposes. You rarely need to prune unless the archive file gets very large.
+The archive auto-trims at 100 batches (to prevent unbounded growth). There is no command for pruning the archive by age. Archived items are only used for recovery and audit, so the file is safe to delete (`rm .rex/archive.json`) if it grows large; you lose the ability to restore those items.
 
 ## Common pitfalls and recovery
 
@@ -313,7 +306,7 @@ You ran `rex remove` on an epic and immediately regretted it.
 
 ```sh
 rex restore <epic-id>
-git diff .rex/prd.json                                # see the diff
+git diff .rex/prd_tree/                               # see the diff
 ```
 
 If you committed already:
@@ -339,7 +332,8 @@ This overwrites your PRD based on the current codebase. All old items go to arch
 If you want to preserve some of the old PRD structure before resetting:
 
 ```sh
-cp .rex/prd.json .rex/prd.backup.json
+ndx prd export --out=./prd-backup.json .   # portable bundle, written outside .rex/
+                                           # restore: ndx prd import --in=./prd-backup.json --replace --yes .
 ndx plan --accept .
 # Now .rex/archive.json contains your old items for recovery
 ```
@@ -383,7 +377,6 @@ You acknowledged a finding, but `ndx recommend` keeps proposing it.
 Once your PRD is healthy:
 
 - **Run `ndx work --auto --iterations=N .`** to execute a full sprint autonomously
-- **Schedule a recurring maintenance task** with `ndx schedule` to remind yourself to prune monthly
 - **Use `ndx self-heal`** for ongoing improvement between full maintenance cycles
 
 ## Skills used in this guide

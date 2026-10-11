@@ -413,7 +413,7 @@ const CYCLE_EXCEPTIONS = new Map([
   ["web-2", "Small viewer utility cluster; current SourceVision split still routes shared types through the web hub."],
   ["web-4", "Small viewer data-loading cluster; cycles with the multi-package 'web' zone for the same packageFamily mismatch reason as 'polling'."],
   ["web-server", "Web server cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch."],
-  ["web-viewer-search-overlay", "Search overlay component zone; confirmed genuine cycle with web-viewer — search-overlay.ts imports getLevelEmoji (runtime) and NavigateTo (type) from web-viewer while components/index.ts imports back. Tracked in CLAUDE.md 'Confirmed zone-level cycles' table."],
+  ["web-viewer-search-overlay", "Search overlay component zone; confirmed genuine cycle with web-viewer — search-overlay.ts imports the NavigateTo type from ../api.js while components/index.ts re-exports SearchOverlay back. Also described in ZONES.md."],
   ["web-viewer", "Viewer facade cluster; cohesion now meets threshold but still cycles with the multi-package 'web' zone due to the packageFamily mismatch (web zone first file is rex)."],
 ]);
 

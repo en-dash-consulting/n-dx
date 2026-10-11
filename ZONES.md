@@ -166,7 +166,7 @@ Files pinned to eliminate phantom cross-zone edges from Louvain misclassificatio
   expect Louvain to absorb this zone — the pin is retained because the
   `sourcevision-` prefix misclassification it guards against is still possible.
 
-**web-viewer-search-overlay zone** — Search overlay component and its dedicated test. Pinned to replace the misleading `web-helpers` zone name (which implied a general utility bucket) with a bounded, intent-revealing ID. The component participates in a confirmed zone-level cycle with `web-viewer`; see "Confirmed zone-level cycles" in the root `AGENTS.md`.
+**web-viewer-search-overlay zone** — Search overlay component and its dedicated test. Pinned to replace the misleading `web-helpers` zone name (which implied a general utility bucket) with a bounded, intent-revealing ID. The component participates in a zone-level cycle with `web-viewer`: `search-overlay.ts` imports the `NavigateTo` type from `../api.js`, while `components/index.ts` re-exports `SearchOverlay` back. It is recorded in `CYCLE_EXCEPTIONS` in `tests/e2e/architecture-policy.test.js`, which exempts it from the zone-cycle check.
 - `packages/web/src/viewer/components/search-overlay.ts` → `web-viewer-search-overlay` — sole production file in the zone; anchor for cycle documentation
 - `packages/web/tests/unit/viewer/search-overlay.test.ts` → `web-viewer-search-overlay` — dedicated component test
 - `packages/web/tests/helpers/preact-test-support.ts` → `web-viewer` — test utility used by multiple viewer tests (tree-view, search-overlay); belongs in viewer zone, not search-overlay satellite

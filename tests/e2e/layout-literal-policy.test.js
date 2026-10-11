@@ -103,14 +103,16 @@ const PATHS_MODULE = /\/src\/(?:[^/]+\/)?paths\.ts$/;
 
 /**
  * A path-shaped literal naming something the layout owns: the three tool
- * directories, or one of the loose `.n-dx*` files that moved with them.
+ * directories, or one of the loose `.n-dx*` files that moved with them — in
+ * either layout. The `.ndx/<tool>` spelling is the same decision taken for the
+ * new layout, and breaks just as silently on a legacy project.
  *
  * One pattern for both, because the rule is now one wall. The detector did not
  * change when the config half stopped being a ratchet — only what the suite
  * does with what it finds.
  */
 const LAYOUT_LITERAL =
-  /(["'`])(\.(?:rex|hench|sourcevision)(?:\/[^"'`\s]*)?|\.n-dx(?:\.local)?\.json|\.n-dx-web[^"'`\s]*)\1/g;
+  /(["'`])(\.(?:rex|hench|sourcevision)(?:\/[^"'`\s]*)?|\.n-dx(?:\.local)?\.json|\.n-dx-web[^"'`\s]*|\.ndx\/(?:(?:rex|hench|sourcevision)(?:\/[^"'`\s]*)?|config(?:\.local)?\.json|web[^"'`\s]*))\1/g;
 
 /**
  * Blank out comment bodies, preserving newlines so line numbers still line up
@@ -359,6 +361,26 @@ describe("layout-literal policy", () => {
       '  packages/web/src/server/example.ts:1  ".n-dx.json"',
       '  packages/web/src/server/example.ts:3  ".n-dx.local.json"',
       '  packages/web/src/server/example.ts:4  ".n-dx-web.port"',
+    ]);
+  });
+
+  it("reports a hardcoded .ndx/ layout path with its line (wall self-test)", () => {
+    const sites = findSites(
+      [
+        'const p = join(root, ".ndx/rex/prd_tree");',
+        'const c = ".ndx/config.json";',
+        'const l = ".ndx/config.local.json";',
+        'const w = ".ndx/web/port";',
+        "const ok = NDX_CONTAINER_DIRNAME;",
+        'info(".ndx/rex is already set up");',
+      ].join("\n"),
+    );
+
+    expect(sites.map((s) => [s.line, s.text])).toEqual([
+      [1, '".ndx/rex/prd_tree"'],
+      [2, '".ndx/config.json"'],
+      [3, '".ndx/config.local.json"'],
+      [4, '".ndx/web/port"'],
     ]);
   });
 
