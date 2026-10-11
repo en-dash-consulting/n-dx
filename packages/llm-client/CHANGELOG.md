@@ -1,5 +1,60 @@
 # @n-dx/llm-client
 
+## 0.9.1
+
+### Patch Changes
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`02aa8af`](https://github.com/en-dash-consulting/n-dx/commit/02aa8afe08842e6d56b65f52d3364007485b72c2) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 agent brief is built from the change and the product nodes it affects. `buildChangeBrief` renders the work, the change's intent and amendments (proposed text included), each amended or touched capability with its own and inherited capability criteria, requirements, health and whether its spec was reviewed, the constraints that bind them, depends-on neighbours one hop out, where the capabilities live in code, the last three changes to those nodes, and the project's commands, workflow and log.
+  
+  One measured 4,000-token budget covers the whole brief. Sections are admitted capabilities-and-constraints first; a list that does not fit is trimmed in place — falling back to a compact form that still names every capability — rather than dropped, and every trim says what it left out. Nothing takes a vendor or model, and the sectioned and flat renders are byte-identical, so a CLI run and an API run send the same brief.
+  
+  `@n-dx/llm-client` exports `estimateTokens` and `CHARS_PER_TOKEN`, the model-independent half of `budgetPreflight`, so a caller sizing text against its own budget needs no model id.
+  
+  The two sections the budget never trims, `task` and `change`, bound every free-text field and every list they render — description, failure reason, done-when criteria, tags, blockers, an amendment's summary, proposed text and criteria, and the touched-without-amending list. An unbounded one would not have made the brief long, it would have made the brief exceed its budget and drop the capabilities section the budget exists to protect.
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`8507518`](https://github.com/en-dash-consulting/n-dx/commit/8507518864af56e93cf8a6c2aad6c3bb9a9236a1) Thanks [@dependabot](https://github.com/apps/dependabot)! - Dev dependencies bumped, including vitest 5. No runtime change: the published packages ship the same code, and the one test that vitest 5 rejected (a `vi.mock` written inside a test body) now declares its mock at module scope.
+
+- [#623](https://github.com/en-dash-consulting/n-dx/pull/623) [`090e111`](https://github.com/en-dash-consulting/n-dx/commit/090e111efc45edac8a0bcdf420fd55b2baabc117) Thanks [@mikemikimike](https://github.com/mikemikimike)! - Filter credential-shaped environment variables before launching vendor CLIs,
+  including retries and cross-vendor reviewers, while retaining the active
+  vendor's authentication, including Claude's active Bedrock and Vertex modes.
+  An explicit `hench.guard.env.allow` entry permits the matching variables to
+  reach hench runs and the cross-vendor reviewer; projects that need additional
+  credentials for tests or MCP servers must opt in there. One-shot completions
+  from rex, sourcevision and the dashboard always use the default filter.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`65731af`](https://github.com/en-dash-consulting/n-dx/commit/65731afcf429ea011d2bb1ee4e5f537a6739b0e4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 migration plan can have Jev review it. Review runs when `rex.placement.models` is `jev` or `both`, or the `jevReview` option is set, and needs a TypeSafe key. Without a key the pass is skipped with one warning. Each item gets one Jev request (task class `prd.migrate.judge`) that batches its questions: a held item's kind and placement, whether an area's title names a job a user does, whether each criterion states product behaviour, and whether each linked test exercises its criterion. Each judged entry records its lowest confidence. The plan summary gains a review queue (held items first, then entries by ascending confidence) and counts of what Jev flagged and dropped. A test link Jev judges irrelevant is dropped only under `autoAccept: confident`. Otherwise it is flagged. A different kind or a process criterion is flagged, never applied. After Jev drops a link, review is re-checked against the approved spec hash, as after any redraft. Migrations may define `summarize`, which rebuilds the summary after every pass.
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`00e7462`](https://github.com/en-dash-consulting/n-dx/commit/00e74627b65fe3bcc453d4330ef5d9969b82d177) Thanks [@dependabot](https://github.com/apps/dependabot)! - Production dependencies bumped: zod 4, ink 8, react 19.3, @anthropic-ai/sdk 0.131, @modelcontextprotocol/sdk 1.32.1 and pdfkit 0.20. TypeScript stays on 6.x because sourcevision parses source with its compiler API, which TypeScript 7 does not ship, and preact stays on 10.x until its web test and leave-guard changes are worked through. Schemas move to zod 4's two-argument `z.record`; reserved and loosely-typed state keys are declared optional, since zod 4 no longer treats a missing `z.unknown()` key as optional; and the SDLC evidence list keeps its at-least-one rule as a tuple so it still infers the non-empty type.
+
+- [#625](https://github.com/en-dash-consulting/n-dx/pull/625) [`e41d31f`](https://github.com/en-dash-consulting/n-dx/commit/e41d31fff91f9599ffc1e85d38cf1fad8da9e162) Thanks [@endash-shal](https://github.com/endash-shal)! - Repository trust now covers `guard.env.allow`. A tracked `.hench/config.json`
+  (or a `.n-dx.json` hench override) that passes credential-shaped environment
+  variables through to the agent's processes changes the trust digest and raises
+  an `env-allow-added` warning in the trust review, instead of taking effect
+  unseen on an already-trusted checkout. `guard.env.deny` is not collected — it
+  can only remove variables, so it never widens what the agent can read.
+  
+  A repository that ships no `guard.env.allow` keeps the digest it already had,
+  so the upgrade does not re-open trust on checkouts the user has approved.
+
+- [#658](https://github.com/en-dash-consulting/n-dx/pull/658) [`c357d36`](https://github.com/en-dash-consulting/n-dx/commit/c357d364ff0609368c12f8a797e468960fed53f6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Follow-ups to the vendor CLI credential filter:
+  
+  - Claude on Bedrock keeps its role and container credentials: the IRSA names
+    (`AWS_WEB_IDENTITY_TOKEN_FILE`, `AWS_ROLE_ARN`, `AWS_ROLE_SESSION_NAME`), the
+    ECS/Fargate `AWS_CONTAINER_*` names and `AWS_CA_BUNDLE` reach the CLI when
+    `CLAUDE_CODE_USE_BEDROCK` is on, and are stripped when it is off. When Bedrock
+    or Vertex mode is on and none of its credential variables are set, `ndx work`
+    says so once, by name only.
+  - The cross-vendor reviewer falls back to the shell test command when its
+    environment cannot be resolved (for example, an unreadable config), instead of
+    failing the review.
+  - The reviewer's shell test command no longer inherits the raw environment. It
+    gets the project's `hench.guard.env` policy, without the reviewer vendor's
+    authentication variables. If that policy cannot be loaded, the default filter
+    applies and the review banner says so.
+  - `ndx start --open` on Windows opens the dashboard without `cmd.exe`, so a
+    `%NAME%`-shaped sequence in the URL's token or project id is no longer
+    expanded.
+
 ## 0.9.0
 
 ### Patch Changes
