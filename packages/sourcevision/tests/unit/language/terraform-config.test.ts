@@ -4,10 +4,10 @@ import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { toCanonicalJSON } from "@n-dx/llm-client";
 import { detectLanguage, detectLanguages, getLanguageConfig, mergeLanguageConfigs } from "../../../src/language/detect.js";
-import { terraformConfig } from "../../../src/language/terraform.js";
+import { terraformConfig, isTerraformFile } from "../../../src/language/terraform.js";
 import { javaConfig, javaSecondaryConfig } from "../../../src/language/java.js";
 import { typescriptConfig } from "../../../src/language/typescript.js";
-import { analyzeInventory, classifyRole } from "../../../src/analyzers/inventory.js";
+import { analyzeInventory, classifyRole, detectLanguage as inventoryLanguage } from "../../../src/analyzers/inventory.js";
 import { computeInfrastructure, toInfrastructureData } from "../../../src/analyzers/infrastructure.js";
 import { GRAMMARS } from "../../../scripts/build-grammars.mjs";
 
@@ -92,6 +92,21 @@ describe("terraform language config", () => {
         expect(await detectLanguages(dir)).toEqual([terraformConfig]);
       },
     );
+  });
+
+  describe("one Terraform file set", () => {
+    const names = [
+      "main.tf", "MAIN.TF", "prod.tfvars", "terragrunt.hcl", "Terragrunt.hcl", "plan.tftest.hcl",
+      "main.tf.json", "prod.tfvars.json", "main.tf.bak", "foo.hcl", "tftest.hcl", "terragrunt.hcl.bak",
+      "main.ts", "README.md",
+    ];
+
+    it.each(names)("inventory and detection agree on %s", async (name) => {
+      await touch(name);
+      const inventoried = inventoryLanguage(name) === "Terraform";
+      expect(inventoried).toBe(isTerraformFile(name));
+      expect((await detectLanguages(dir)).includes(terraformConfig)).toBe(inventoried);
+    });
   });
 
   describe("inventory roles", () => {

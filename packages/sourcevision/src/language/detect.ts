@@ -31,7 +31,7 @@ import { swiftConfig } from "./swift.js";
 import { pythonConfig } from "./python.js";
 import { csharpConfig } from "./csharp.js";
 import { javaConfig, javaSecondaryConfig } from "./java.js";
-import { terraformConfig } from "./terraform.js";
+import { terraformConfig, isTerraformFile } from "./terraform.js";
 
 // ── Config registry ─────────────────────────────────────────────────────────
 
@@ -124,16 +124,6 @@ async function hasJavaMarker(rootDir: string): Promise<boolean> {
 
 /** Directories never searched for Terraform files. */
 const TERRAFORM_SCAN_SKIP = new Set(["node_modules", "vendor", "venv", "site-packages"]);
-
-/** Files `inventory.ts` maps to Terraform; detection must accept the same set. */
-function isTerraformFile(name: string): boolean {
-  return (
-    name.endsWith(".tf") ||
-    name.endsWith(".tfvars") ||
-    name === "terragrunt.hcl" ||
-    name.endsWith(".tftest.hcl")
-  );
-}
 
 /**
  * Terraform marker present? Any `.tf`, `.tfvars`, `terragrunt.hcl` or
