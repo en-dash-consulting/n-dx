@@ -487,14 +487,16 @@ export function linkInfrastructure(
  * Linking reads files for resource names, and a resource's own `.tf` file
  * names it, so a Terraform file would be linked as a user of the resource it
  * declares (and, in a workspace, become the crossing endpoint instead of the
- * code that calls it). The set matches what the inventory classifies as
- * Terraform: `.tf`, `.tfvars`, `terragrunt.hcl` and `*.tftest.hcl`. Kept as a
- * local path test because this module may import only `node:` builtins.
+ * code that calls it). Decides by the rules of `isTerraformFile` in
+ * `language/terraform.ts`: `.tf` and `.tfvars` by lowercased extension,
+ * `terragrunt.hcl` and `*.tftest.hcl` by exact, case-sensitive name. Kept as a
+ * local copy because this module may import only `node:` builtins;
+ * `terraform-config.test.ts` fails if the two disagree.
  */
-function isTerraformPath(path: string): boolean {
+export function isTerraformPath(path: string): boolean {
   const ext = extname(path).toLowerCase();
   if (ext === ".tf" || ext === ".tfvars") return true;
-  const name = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
+  const name = path.slice(path.lastIndexOf("/") + 1);
   return name === "terragrunt.hcl" || name.endsWith(".tftest.hcl");
 }
 
