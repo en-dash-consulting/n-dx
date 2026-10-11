@@ -19,5 +19,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Robot Wrangler stack 5/9 · Robot Wrangler page: run card, vendors, tiers, failover and review](./robot-wrangler-stack-5-9-robot/index.md) | completed |
 | [Robot Wrangler stack 6/9 · Robot Wrangler finish: local layout, save bar and polish](./robot-wrangler-stack-6-9-robot/index.md) | completed |
 | [Robot Wrangler stack 7/9 · Pair review: configurable reviewer and cross-vendor findings](./robot-wrangler-stack-7-9-pair-review/index.md) | completed |
-| [Robot Wrangler stack 8/9 · Pair review: the executor fixes findings, and Pair turns on](./robot-wrangler-stack-8-9-pair-review/index.md) | pending |
+| [Robot Wrangler stack 8/9 · Pair review: the executor fixes findings, and Pair turns on](./robot-wrangler-stack-8-9-pair-review/index.md) | completed |
 | [Robot Wrangler stack 9/9 · Per-task reviewer settings](./robot-wrangler-stack-9-9-per-task/index.md) | pending |
