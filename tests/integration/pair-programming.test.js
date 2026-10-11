@@ -21,6 +21,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, chmodSync 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+const { recordRepoTrust } = await import("../../packages/llm-client/dist/public.js");
+
 // Import from built dist/ so we test the compiled module boundary, not source.
 // The test runner is invoked after `pnpm build` (see globalSetup).
 const {
@@ -132,6 +134,9 @@ describe("reviewer credential containment", () => {
     vi.stubEnv("TYPESAFE_API_KEY", "fixture-jev");
     vi.stubEnv(authName, "fixture-exported");
     writeNdxConfig(tmpDir, { llm: { [reviewer]: { api_key: "fixture-configured" } }, hench: { guard: { env: { allow: ["TYPESAFE_API_KEY"] } } } });
+    // The allow list is repository-supplied, so it applies only once trusted.
+    vi.stubEnv("NDX_HOME", join(tmpDir, "ndx-home"));
+    recordRepoTrust(tmpDir);
     const envPath = join(tmpDir, "captured-env.json");
     const cliPath = makeNodeScript(tmpDir, "env-reviewer", `require("node:fs").writeFileSync(${JSON.stringify(envPath)}, JSON.stringify({ fake: process.env.FAKE_SERVICE_API_KEY, github: process.env.GITHUB_TOKEN, jev: process.env.TYPESAFE_API_KEY, auth: process.env[${JSON.stringify(authName)}] }));`);
     const result = await run({ cliPath, prompt: "review", dir: tmpDir, reviewer });
@@ -207,6 +212,23 @@ describe("resolveVendorCliPath", () => {
       claude: { cli_path: "/old/claude" },
     });
     expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/new/claude");
+  });
+
+  it("uses a cli_path set only in .n-dx.local.json", () => {
+    writeFileSync(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { codex: { cli_path: "/local/codex" } } }), "utf-8");
+    expect(resolveVendorCliPath(tmpDir, "codex")).toBe("/local/codex");
+  });
+
+  it("prefers .n-dx.local.json over .n-dx.json", () => {
+    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/shared/claude" } } });
+    writeFileSync(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { claude: { cli_path: "/local/claude" } } }), "utf-8");
+    expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/local/claude");
+  });
+
+  it("falls through to .n-dx.json when the local file has no cli_path for the vendor", () => {
+    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/shared/claude" } } });
+    writeFileSync(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { codex: { cli_path: "/local/codex" } } }), "utf-8");
+    expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/shared/claude");
   });
 });
 
