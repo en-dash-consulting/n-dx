@@ -38,6 +38,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Go calls query leaves string arguments of unnamed calls without an owning argument list](./go-calls-query-leaves-string-arguments.md) | completed |
 | [Spring Data JDBC and R2DBC @Query and @Table("name") are read with JPA semantics, so their tables are missed](./spring-data-jdbc-and-r2dbc-query-and.md) | completed |
 | [SQL dialect goldens are inline PetClinic-shaped snippets, never checked against PetClinic's real schema files](./sql-dialect-goldens-are-inline.md) | completed |
-| [sqlc config values with a trailing YAML comment resolve to a bogus path](./sqlc-config-values-with-a-trailing.md) | pending |
+| [sqlc block lists stop at a comment-only or blank line, dropping the items after it](./sqlc-block-lists-stop-at-a-comment.md) | pending |
+| [sqlc config values with a trailing YAML comment resolve to a bogus path](./sqlc-config-values-with-a-trailing.md) | completed |
 | [sqlc detection omits the schema files named by sqlc.yaml's schema: key](./sqlc-detection-omits-the-schema-files.md) | completed |
 | [sqlc query files lost their route to extractSqlcTables when sqlFiles became schema-only](./sqlc-query-files-lost-their-route-to.md) | completed |
