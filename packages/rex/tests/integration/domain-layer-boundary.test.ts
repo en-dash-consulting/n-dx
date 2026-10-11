@@ -212,6 +212,18 @@ describe("rex cli/commands import surface", () => {
     "../../store/change-layer-store.js",
     "../../store/title-to-filename.js",
     "../../workflow/default.js",
+    // `rex migrate-plan` (ndx migrate --plan) classifies a v1 tree and writes
+    // the plan out for review. The migrations registry, the plan file format
+    // and the v1-to-v2 source, seams and summary renderer are the machinery it
+    // drives, and it is their only caller. Not routed through public.ts for the
+    // same reason as state-merge: the v1-to-v2 modules are v2 machinery, and
+    // exporting them would hand hench and web a v2 module before the v2 store
+    // is wired in (see the isolation test in tests/unit/schema/v2.test.ts).
+    "../../migrations/registry.js",
+    "../../migrations/plan-file.js",
+    "../../migrations/v1-to-v2/index.js",
+    "../../migrations/v1-to-v2/seams.js",
+    "../../migrations/v1-to-v2/plan-summary.js",
   ]);
 
   /**
