@@ -28,7 +28,7 @@ If the last six months were vibe-coded, use the [vibe-cleanup guide](./vibe-clea
 
 **AWS Kiro** is an agentic IDE, not a CLI you add to an existing editor. A prompt becomes requirements, design, and tasks, then its agents implement. Typical files: `requirements.md`, `design.md`, `tasks.md`. Commercial AWS product. Formal requirement checks and Agent Hooks are on the public pitch. The workflow lives in Kiro.
 
-**n-dx** is a CLI-first toolkit from En Dash. Install `@n-dx/core`, then `ndx analyze`, `ndx recommend`, `ndx work`, and `ndx start`. Built for Claude Code and Codex. PRD in `.rex/`. Rex and SourceVision expose MCP. License is Elastic 2.0 (source-available, not OSI). Hosted-service limits differ from MIT. GitHub listed 16 stars on 21 Aug 2026.
+**n-dx** is a CLI-first toolkit from En Dash. Install `@n-dx/core`, then `ndx analyze`, `ndx recommend`, `ndx work`, and `ndx start`. Built for Claude Code and Codex. PRD in `.ndx/rex/` (`.rex/prd_tree/` on the v1 projects `ndx init` creates until the storage migration ships). Rex and SourceVision expose MCP. License is Elastic 2.0 (source-available, not OSI). Hosted-service limits differ from MIT. GitHub listed 16 stars on 21 Aug 2026.
 
 ## Comparison
 
@@ -39,7 +39,7 @@ Rows stay as words. "Unknown" means we haven't verified it from public docs.
 | Form | CLI plus optional dashboard | CLI plus agent slash commands | CLI | Agentic IDE |
 | License | Elastic 2.0 | MIT | MIT (commonly cited) | AWS commercial |
 | Starts from | Existing codebase scan | Spec and constitution | Change delta | Prompt to spec set |
-| Living spec | Rex PRD, re-analyzed each cycle | Markdown artifacts. Code auto-sync: unknown | Archive merges deltas into the source-of-truth spec | Spec then implement. Code auto-sync: unknown |
+| Living spec | Rex PRD: requirements with a computed build status; completed changes apply their amendments | Markdown artifacts. Code auto-sync: unknown | Archive merges deltas into the source-of-truth spec | Spec then implement. Code auto-sync: unknown |
 | Static analysis | SourceVision: files, imports, zones, React catalog | Not the product | Not the product | Not the product pitch |
 | Execution | Hench tool-use loop | `/speckit.implement` via your agent | Apply via your agent | Built-in agents |
 | Agents | Claude Code and Codex | Many (Copilot, Claude, Gemini, Cursor, others) | Agent-agnostic | Built-in |
@@ -59,21 +59,21 @@ ndx self-heal
 ```
 
 1. `ndx analyze .` runs sourcevision and writes AI-readable context (`.sourcevision/CONTEXT.md`).
-2. `ndx recommend .` proposes epics and tasks from findings. You accept or reject them.
+2. `ndx recommend .` proposes PRD items from findings. You accept or reject them.
 3. `ndx work .` (or `--auto`) has hench pick the next task, brief it with codebase context, and execute.
 4. `ndx self-heal` re-analyzes, recommends, executes, and acknowledges completed findings so they do not regenerate. Fuzzy matching covers renames.
 
-The PRD stays current because it is derived from the code and updated when the code changes.
+The PRD stays current because it is two layers (see [The PRD](./concepts/)): the product's requirements, each with a build status computed from the repository, and the changes being made to them. A completed change applies its amendments to the requirements, and analysis surfaces what still needs a change.
 
 ## Who should pick which
 
 **Pick Spec Kit** if you'll write the spec before the code, you switch agents, and you want the portable SDD workflow most teams already recognize. MIT is what most open-source buyers expect.
 
-**Pick OpenSpec** if you're changing an existing system one slice at a time and want a thin delta layer, not a codebase analyzer or a full PRD tree.
+**Pick OpenSpec** if you're changing an existing system one slice at a time and want a thin delta layer, not a codebase analyzer or a full PRD.
 
 **Pick Kiro** if you want SDD inside an IDE, you're fine on AWS, and you want agent, editor, and spec as one product.
 
-**Pick n-dx** if the repo already exists, the plan drifted from the code, or a prototype became production without a spec. Analyze the tree, keep a PRD that can be re-derived, then execute. Having people on that repo with you is consulting, not a CLI flag.
+**Pick n-dx** if the repo already exists, the plan drifted from the code, or a prototype became production without a spec. Analyze the tree, keep a PRD of requirements that completed work keeps current, then execute. Having people on that repo with you is consulting, not a CLI flag.
 
 ## When not to pick n-dx
 

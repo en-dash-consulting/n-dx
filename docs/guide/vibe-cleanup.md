@@ -91,9 +91,15 @@ With the analysis done, generate PRD proposals from the findings:
 ndx recommend .
 ```
 
-This reads the SourceVision findings and proposes actionable PRD items — epics, features, tasks — organized by priority. The proposals are shown for review before anything is written to the PRD.
+This reads the SourceVision findings and proposes actionable PRD items, organized by priority. The proposals are shown for review before anything is written to the PRD.
 
-The output looks like:
+Cleanup work changes the code without changing what the product must do. In the PRD's terms (see [The PRD](./concepts/)), each cleanup is a **change** that *touches* a constraint such as architecture integrity rather than amending a capability. It reads as a refactor, writes nothing to the product layer, and needs no steward.
+
+::: info v1 projects
+Until the storage migration ships, `ndx init` creates v1 projects, and on a v1 project the proposals are grouped into epics with tasks under them, as in the output below.
+:::
+
+The output on a v1 project looks like:
 
 ```
 Proposals (12 items):
@@ -132,13 +138,13 @@ You don't have to accept everything. Vibe-coded codebases often have 30+ finding
 
 ### Accepting a subset
 
-Review each proposed epic and decide: **now**, **next sprint**, or **defer indefinitely**. Then accept only what's in scope for now:
+Review each proposed group and decide: **now**, **next sprint**, or **defer indefinitely**. Then accept only what's in scope for now:
 
 ```sh
-ndx recommend --accept .    # prompts for each epic individually
+ndx recommend --accept .    # prompts for each proposed group individually
 ```
 
-At the epic level, you can accept some and skip others. Tasks within an accepted epic can also be removed after acceptance:
+You can accept some groups and skip others. Tasks within an accepted group can also be removed after acceptance:
 
 ```sh
 ndx status .                            # see what was accepted
@@ -196,7 +202,10 @@ A task like "clean up the auth module" will fail silently — the agent won't kn
 
 ```sh
 rex update <task-id> --title="Extract JWT verification logic from auth/index.ts into auth/jwt.ts"
-rex update <task-id> --criteria="jwt.ts exports verifyToken and signToken; auth/index.ts has no JWT logic; all existing tests pass"
+rex update <task-id> \
+  --criterion="jwt.ts exports verifyToken and signToken" \
+  --criterion="auth/index.ts has no JWT logic" \
+  --criterion="All existing tests pass"
 ```
 
 Or delete it and re-add with better definition:
@@ -257,7 +266,7 @@ If you've curated the PRD carefully and trust the scope, run the full cleanup sp
 ndx work --auto --iterations=10 --epic="Code Structure Cleanup" .
 ```
 
-This picks tasks only from the named epic, up to 10 iterations. When the epic is exhausted or the iteration limit is hit, it stops cleanly.
+This picks tasks only from the named top-level item (an epic on a v1 project), up to 10 iterations. When its tasks are exhausted or the iteration limit is hit, it stops cleanly.
 
 See the [overnight operation guide](./overnight.md) for token budgets and safety guardrails before running unattended.
 
@@ -318,9 +327,11 @@ If `ndx recommend` generates 40 proposals and most look like low-value cleanup, 
 
 For cleanup work, always run tests in the agent's task definition. A refactoring task without "all existing tests pass" in the acceptance criteria will produce structurally correct but functionally broken code. Include test commands in acceptance criteria:
 
+```sh
+rex update <task-id> --criterion="Module extracted" --criterion="Imports updated" --criterion="pnpm test passes"
 ```
-rex update <task-id> --criteria="Module extracted; imports updated; pnpm test passes"
-```
+
+`--criterion` replaces the task's whole acceptance-criteria list, one criterion per flag.
 
 ### Findings keep regenerating
 
@@ -351,7 +362,7 @@ Each skill below maps to a step in this guide. Edit the linked file in your proj
 | `/ndx-zone` | [`.agents/skills/ndx-zone/SKILL.md`](./skills#ndx-zone) | Step 2: deep-dives into zone cohesion/coupling scores and cross-zone dependency edges |
 | `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Step 3: translates SourceVision anti-pattern findings into a prioritized remediation PRD |
 | `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](./skills#ndx-capture) | Step 4: adds your own tech-debt items as structured tasks with acceptance criteria |
-| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Step 5: validates plan integrity and shows per-epic task counts before execution |
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Step 5: validates plan integrity and shows task counts before execution |
 | `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](./skills#ndx-work) | Step 6: executes cleanup tasks one at a time with test-passing acceptance criteria |
 
 Related guides: [Run While You Sleep](./overnight) (for unattended cleanup runs), [Self-Heal Loop](./self-heal) (ongoing post-cleanup improvement), [Workflow](./workflow) (the base loop), [n-dx vs Spec Kit](./n-dx-vs-spec-kit) (how n-dx differs from Spec Kit, OpenSpec, and Kiro).

@@ -2,32 +2,42 @@
 
 # Rex
 
-PRD management with hierarchical epics, features, tasks, and subtasks. LLM-powered analysis turns codebase findings into structured work items.
+PRD management. The PRD is the product's requirements plus the changes being made to them; rex stores both, computes each requirement's build status, and turns codebase findings and ideas into changes. The model is explained in [The PRD](/guide/concepts/).
 
 ## Data Model
 
+Two layers, stored side by side in `.ndx/rex/`:
+
 ```
-Epic
-  └── Feature
-        └── Task
-              └── Subtask
+product/                      changes/
+  Area                          Change
+    Capability                    Task
+      Capability (one deeper)       Subtask
+    Constraint
 ```
 
-Each item has: `id`, `title`, `status`, `priority`, `description`, `acceptanceCriteria`, `tags`, `blockedBy`, timestamps.
+| Layer | Nodes | Each carries |
+|-------|-------|--------------|
+| Product | area, capability, constraint | A statement, and for a capability its **capability criteria** (the standing spec). Status (*proposed*, *changing*, *met*, *revised*, *retired*) and health (*ok*, *defective*) are computed, never set |
+| Change | change, task, subtask | Title, description, **acceptance criteria** (done when), priority, `blockedBy`, a work status. A change also names what it **amends** (with an added, modified or removed delta) or **touches**, and its `plannedRelease` / `shippedIn` |
 
-**Status:** `pending` | `in-progress` | `completed` | `failed`
+**Work status:** `pending` | `in_progress` | `completed` | `failing` | `deferred` | `blocked` | `cancelled` | `deleted`
 
 **Priority:** `critical` | `high` | `medium` | `low`
+
+::: info v1 projects
+Until the storage migration ships, `ndx init` creates v1 projects. A v1 PRD (`.rex/prd_tree/`) has no product layer: it is one tree of work items, each with a `level` (epic › feature › task › subtask) instead of a type. The commands below say where they differ.
+:::
 
 ## CLI
 
 ```sh
 rex init .                           # initialize .rex/
-rex status .                         # PRD tree with completion stats
+rex status .                         # PRD tree with completion stats (v1)
 rex next .                           # next actionable task
-rex add "description" .              # smart add via LLM
+rex add "description" .              # a change in the Inbox (v1: smart add via LLM)
 rex add --file=ideas.txt .           # import from file
-rex add task --title="..." --criterion="..." --criterion="..." --source="..." .  # add with criteria and source
+rex add task --title="..." --criterion="..." --criterion="..." --source="..." .  # add with acceptance criteria and source
 rex update <id> --status=completed . # update item
 rex update <id> --criterion="..." --criterion="..." .  # replace acceptance criteria
 rex update <id> --criterion= .       # clear acceptance criteria
@@ -37,6 +47,7 @@ rex move <id> --parent=<parent-id> . # reparent item
 rex remove <id> .                    # remove item and descendants
 rex reshape .                        # LLM-powered PRD restructuring
 rex prune .                          # remove completed subtrees
+rex restore .                        # list tree snapshots; --latest or --id=<snapshot> rolls back (v1)
 rex validate .                       # check PRD integrity
 rex fix .                            # auto-fix common PRD issues
 rex usage .                          # token usage analytics
@@ -50,19 +61,21 @@ rex health .                         # PRD structure health score
 rex mcp .                            # start MCP server (stdio)
 ```
 
-## Smart Add
+## Smart Add (v1)
 
-`rex add` uses an LLM to decompose natural language descriptions into structured proposals:
+On a v1 PRD, `rex add` uses an LLM to decompose natural language descriptions into structured proposals:
 
 ```sh
 rex add "Add SSO support with Google and Okta, admin config UI, audit logs" .
 ```
 
-Produces structured epic/feature/task proposals with duplicate detection. When duplicates are found:
+Produces epic/feature/task proposals with duplicate detection. When duplicates are found:
 
 - **Cancel** — write nothing
 - **Merge** — update matched items, add only non-duplicates
 - **Proceed** — create duplicates with override markers
+
+On a v2 PRD a description becomes one change, with no LLM call; see below.
 
 ## Product Layer and Changes (v2 PRD)
 
@@ -103,26 +116,30 @@ rex recommend --acknowledge=1,2 .    # skip specific findings
 rex recommend --acknowledge-completed .  # acknowledge completed tasks' findings
 ```
 
-## Baseline Detection
+## Baseline Detection (v1)
 
-When scanning an existing codebase for the first time (empty PRD), Rex detects this as a baseline scan. The LLM marks:
+When scanning an existing codebase for the first time (empty v1 PRD), Rex detects this as a baseline scan. The LLM marks:
 
 - **Completed** — functionality already implemented in the code
 - **Pending** — gaps and improvements to build
 
-This prevents existing code from appearing as a wall of pending tasks.
+This prevents existing code from appearing as a wall of pending tasks. On a v2 PRD, functionality the code already has belongs in the product layer as capabilities that read *met*.
 
 ## Files
 
+Rex's directory is `.ndx/rex/` on the `.ndx/` layout and `.rex/` on the older one; paths below use `.rex/`.
+
 | File | Purpose |
 |------|---------|
-| `.rex/prd_tree/` | PRD folder tree (epics → features → tasks; subtasks are sections in the parent task's `index.md`) |
+| `product/` and `changes/` | v2 PRD: the product layer and the change layer. Intent in each node's Markdown, tool state in each folder's committed `state.yaml`. See [PRD Storage Layout](/guide/prd-storage) |
+| `.rex/prd_tree/` | v1 PRD folder tree: a folder per item with children, a `<slug>.md` file per item without |
 | `.rex/config.json` | Project configuration |
 | `.rex/execution-log.jsonl` | Execution history (append-only, auto-rotated at 1 MB) |
 | `.rex/workflow.md` | Human-readable workflow state |
 | `.rex/acknowledged-findings.json` | Acknowledged SourceVision findings |
 | `.rex/pending-proposals.json` | Proposals awaiting acceptance |
-| `.rex/archive.json` | Pruned/reshaped item archive |
+| `.rex/archive.json` | Items removed by `prune`, `reshape` and `reorganize` (audit only; no command restores from it) |
+| `.rex/.backups/` | v1 tree snapshots taken before `add` and `reshape`; `rex restore` rolls back to one |
 
 ## MCP Tools
 
@@ -130,12 +147,16 @@ Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes 
 
 | Tool | Description |
 |------|-------------|
-| `get_prd_status` | PRD title, overall stats, and per-epic stats |
+| `get_product` | v2: the product layer, each node with computed status and health |
+| `get_capability` | v2: one capability or constraint with its capability criteria and the changes on it |
+| `place_change` | v2: a change's placement shortlist, or record a placement (`touches` or `amends`) |
+| `apply_change` | v2: apply a change's amendments to the product layer, as a steward |
+| `get_prd_status` | PRD title and stats. v2: change counts, Inbox count, product status per area, changes per release. v1: per-epic stats |
 | `get_next_task` | Next actionable task based on priority and dependencies (skips tasks claimed by another worktree) |
 | `claim_task` | Hold a task for this worktree so other worktrees skip it |
 | `release_task` | Give back a claim without changing the task's status |
 | `update_task_status` | Update item status. While a `hench run` in this worktree holds the task, `completed` is recorded for the run to apply after its test gate rather than written |
-| `add_item` | Add epic/feature/task/subtask (optional `run` block of saved run settings: portable `tier` plus optional per-vendor `models` pins) |
+| `add_item` | Add an item: v2 `type` (change, task, subtask), v1 `level` (epic, feature, task, subtask). Optional `run` block of saved run settings: portable `tier` plus optional per-vendor `models` pins |
 | `edit_item` | Edit item content (title, description, priority, tags, `run`). A `run` object replaces the whole saved block; `null` removes it |
 | `get_item` | Full item details with parent chain |
 | `move_item` | Reparent an item in the PRD tree |

@@ -1,7 +1,7 @@
 # Glossary
 
-::: warning Ships with 1.0.0
-These terms belong to the 1.0.0 model, which is still landing.
+::: warning The v2 model
+These terms belong to the v2 model. Its commands and MCP tools ship from 0.9.0, but `ndx init` creates v1 projects until the storage migration ships (see [v1 projects](../prd-storage#v1-projects)).
 :::
 
 Each term is shown with an example from n-dx's own PRD.
@@ -10,11 +10,11 @@ Each term is shown with an example from n-dx's own PRD.
 |------|-------|--------------|
 | **Product layer** | The product's standing requirements: what the app must do, each with a computed build status. Shown on the Product page. Not the codebase map, which shows how the code is structured | The list of n-dx's areas and capabilities |
 | **Area** | A durable part of the product, named for the job it serves. Areas do not nest | Execute work |
-| **Capability** | One thing the product does: a one-sentence statement plus acceptance criteria. May hold sub-capabilities one level deep | Execute work › Session strategy: "A forked task session edits like a fresh one" |
+| **Capability** | One thing the product does: a one-sentence statement plus its capability criteria, the standing spec it is met against. May hold sub-capabilities one level deep | Execute work › Session strategy: "A forked task session edits like a fresh one" |
 | **Constraint** | A rule that applies across capabilities, checked by a test | Architecture integrity (gateways, spawn-only), checked by `architecture-policy.test.js` |
 | **Change** | A bounded piece of work that adds, modifies, removes or fixes capabilities. Ticket-shaped; its release is a field, not a folder | "Forked sessions recover from a read-only refusal" (#473): touches Session strategy, planned for 1.0.1 |
 | **Task, subtask** | The steps of a change; what `ndx work` runs. A change with no tasks is itself the unit of work | "Tell the forked session that orientation is over" |
-| **Apply** | The step that writes a change's amendments into the product layer when it completes. Deterministic; no model is called | A change that modifies a Session strategy criterion completes; apply rewrites the criterion, restamps the spec hash and adds a History line. (A touches-only fix such as #473 is never applied: its history and health are computed) |
+| **Apply** | The step that writes a change's amendments into the product layer when it completes. Deterministic; no model is called | A change that modifies a Session strategy capability criterion completes; apply rewrites it, restamps the spec hash and adds a History line. (A touches-only fix such as #473 is never applied: its history and health are computed) |
 | **Evidence** | What machines record as work happens | Commits with `N-DX-Item` trailers, hench run records, test results |
 | **Status** | Where a capability stands against intent (see below). Computed | Session strategy reads *changing* while an amendment to it is unapplied |
 | **Health** | Whether it is broken right now: *ok* or *defective*. Computed | Session strategy reads *defective* while #473 is open |
@@ -33,7 +33,7 @@ Nobody sets either by hand. Both are computed from files and state.
 | Health | OK | Nothing below |
 | Health | Defective | An open fix touches it, or one of its checks fails |
 
-**Revised** is the signal a task board cannot show: the requirement has moved ahead of the build. The spec hash covers only the statement and criteria, so editing a capability's prose body never changes its status. Constraints carry health too.
+**Revised** is the signal a task board cannot show: the requirement has moved ahead of the build. The spec hash covers only the statement and capability criteria (never a change's acceptance criteria), so editing a capability's prose body never changes its status. Constraints carry health too.
 
 ## Relationships
 

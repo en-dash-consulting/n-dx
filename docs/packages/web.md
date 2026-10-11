@@ -5,7 +5,7 @@
 ## Features
 
 - **SourceVision zone maps** — interactive visualization of architectural zones
-- **PRD status** — tree view of epics, features, tasks with completion stats
+- **PRD** — the product's requirements and the changes being made to them (see [The PRD](/guide/concepts/)). The **Product** page lists each capability with its computed status and health and the open changes against it, highlighting *revised* and *defective* rows; the **Changes** page groups changes by planned release and stage. Both pages are built and land in the navigation with the v2 store. Until then, and on the v1 projects `ndx init` creates until the storage migration ships, the PRD page shows the v1 item tree (epics, features, tasks) with completion stats
 - **Unified MCP server** — single HTTP endpoint serving both Rex and SourceVision MCP tools
 - **Live reload** — updates automatically when data changes (via `ndx refresh`)
 
@@ -136,7 +136,7 @@ Saves or clears a task's run settings.
   workspace** (`/w/<key>/` or `X-Ndx-Workspace`), taking that worktree's PRD
   lock and rewriting that worktree's tree alone. A lock it cannot acquire is a
   `409` naming the holder's PID.
-- A missing task is `404`, a container (epic or feature) is a `400` — only
+- A missing task is `404`, a container (an epic or feature on a v1 PRD) is a `400` — only
   tasks and subtasks carry run settings — and a workspace with no PRD is `404`.
   A foreign-site request is refused before anything is written.
 

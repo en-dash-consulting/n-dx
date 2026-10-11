@@ -39,15 +39,15 @@ Reasonable starting values for overnight runs:
 
 If you're using the API (not CLI mode), you can also set a hard spend limit in your provider's dashboard — this is your last line of defense.
 
-### 3. Scope to an epic (optional but recommended)
+### 3. Scope the run (optional but recommended)
 
-Rather than letting the agent pick any pending task, scope it to one epic. This keeps changes coherent and limits blast radius:
+Rather than letting the agent pick any pending task, scope it to one top-level item and its tasks. This keeps changes coherent and limits blast radius:
 
 ```sh
 ndx work --epic="Auth System" --auto --iterations=10 .
 ```
 
-The agent will only pick tasks from the "Auth System" epic (matched by substring). If that epic runs out of tasks before the iteration limit, it stops cleanly.
+The agent will only pick tasks under the item whose title contains "Auth System" (or whose id matches). If it runs out of tasks before the iteration limit, it stops cleanly. The flag keeps its v1 name: on the v1 projects `ndx init` creates until the storage migration ships, the top-level items are epics.
 
 ## Launch: the overnight command
 

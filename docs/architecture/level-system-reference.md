@@ -1,5 +1,9 @@
 # Rex Level System Reference
 
+::: warning v1 PRDs only
+Levels belong to the v1 PRD (`.rex/prd_tree/`), which `ndx init` creates until the storage migration ships. A v2 PRD has no levels: it is a product layer (areas, capabilities, constraints) plus a change layer (changes, tasks, subtasks), each node with a `type`. See [The PRD](../guide/concepts/).
+:::
+
 Reference document for the item level hierarchy used across n-dx. Intent: refactor from hardcoded `"epic" | "feature" | "task" | "subtask"` to generic depth levels (L1/L2/L3/L4) with user-configurable labels.
 
 ---
