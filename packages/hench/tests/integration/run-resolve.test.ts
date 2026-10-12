@@ -501,6 +501,46 @@ describe("refusals are reported, not thrown", () => {
   });
 });
 
+describe("on a v2 tree", () => {
+  const FIXTURE = join(import.meta.dirname, "../../../rex/tests/fixtures/v2-tree");
+  /** The fixture's change CH-1, which `--task=CH-1` runs. */
+  const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
+
+  beforeEach(async () => {
+    await rm(join(rexDir, PRD_TREE_DIRNAME), { recursive: true, force: true });
+    await cp(FIXTURE, rexDir, { recursive: true });
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "v2 tree");
+  });
+
+  it("reports the unit a display id runs, by its real id", async () => {
+    const r = await resolve({ task: "CH-1" });
+    expect(codes(r)).toEqual([]);
+    expect(r.task?.id).toBe(CHANGE_ID);
+  });
+
+  it("checks the claim on the real id, not the display id", async () => {
+    const other = `${projectDir}-wt`;
+    extraDirs.push(other);
+    git(projectDir, "worktree", "add", "-q", "-b", "other", other);
+    const claims = TaskClaims.forProject(other);
+    expect(await claims.claim(CHANGE_ID)).toBeNull();
+    try {
+      const r = await resolve({ task: "CH-1" });
+      expect(codes(r)).toEqual(["claimed-elsewhere"]);
+      expect(r.task?.claimedBy?.worktree).toBe(gitToplevel(other));
+    } finally {
+      await claims.releaseAll();
+    }
+  });
+
+  it("still refuses a ref that names nothing", async () => {
+    const r = await resolve({ task: "CH-404" });
+    expect(r.task).toBeNull();
+    expect(codes(r)).toEqual(["task-not-found"]);
+  });
+});
+
 describe("resolving acts on nothing", () => {
   async function snapshot(dir: string): Promise<Map<string, string>> {
     const out = new Map<string, string>();

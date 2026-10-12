@@ -19,7 +19,7 @@
 
 import { dirname, join } from "node:path";
 import { resolveStore, findItem, matchesAssignee, resolveActor } from "../../prd/rex-gateway.js";
-import type { PRDItem, RunSettings } from "../../prd/rex-gateway.js";
+import type { PRDItem, RunSettings, V2Tree } from "../../prd/rex-gateway.js";
 import { LLM_VENDOR, getGitCommonDir } from "../../prd/llm-gateway.js";
 import type { LLMVendor } from "../../prd/llm-gateway.js";
 import { PERMISSION_MODES } from "../../schema/index.js";
@@ -30,6 +30,7 @@ import { resolveHenchPaths } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal } from "../../agent/planning/brief.js";
+import { findV2Entry, loadV2Tree } from "../../agent/planning/work-selection.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
 import { CLIError, requireLLMCLI } from "../errors.js";
@@ -240,9 +241,14 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   // ── Task ────────────────────────────────────────────────────────────────
   // A PRD that cannot be parsed is a refusal the dashboard can show, not a crash
   // that leaves it with no JSON.
+  // On a v2 tree `--task` takes a display id or alias, as a run does
+  // (findV2Entry); the report and the claim check use the real id it names.
   let prdItems: PRDItem[] | null = null;
+  let v2Tree: V2Tree | undefined;
   try {
-    prdItems = (await (await resolveStore(rexDir)).loadDocument()).items;
+    const store = await resolveStore(rexDir);
+    prdItems = (await store.loadDocument()).items;
+    v2Tree = await loadV2Tree(store);
   } catch (err) {
     refuse(
       "prd-unreadable",
@@ -252,14 +258,14 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       ),
     );
   }
-  const entry = prdItems ? findItem(prdItems, taskId) : null;
+  const entry = !prdItems ? null : v2Tree ? findV2Entry(v2Tree, prdItems, taskId) : findItem(prdItems, taskId);
   let task: RunResolution["task"] = null;
   if (!prdItems) {
     // Already refused above; there is no task to describe.
   } else if (!entry) {
     refuse("task-not-found", new CLIError(`Task not found: ${taskId}`, "Check the id with 'ndx status'."));
   } else {
-    const claim = await TaskClaims.forProject(dir, { readOnly: true }).heldElsewhere(taskId);
+    const claim = await TaskClaims.forProject(dir, { readOnly: true }).heldElsewhere(entry.item.id);
     task = {
       id: entry.item.id,
       title: entry.item.title,
@@ -272,7 +278,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       const notActionable = explicitTaskRefusal(entry.item);
       if (notActionable) refuse("not-actionable", notActionable);
     }
-    if (claim) refuse("claimed-elsewhere", new TaskClaimedElsewhereError(taskId, claim, entry.item.title));
+    if (claim) refuse("claimed-elsewhere", new TaskClaimedElsewhereError(entry.item.id, claim, entry.item.title));
   }
 
   const treeRefusal = prdItems ? await readTreeConformanceRefusal(rexDir) : null;
