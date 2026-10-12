@@ -644,3 +644,39 @@ export type {
   RecordedCommitFacts,
   RepointRule,
 } from "./core/repoint-commits.js";
+
+// ---- v2 runtime (product/change layers) -------------------------------------
+//
+// What hench (stack B) and the dashboard (D1) need to read, select, brief and
+// complete v2 work without re-implementing what the MCP tools run. The reader
+// (prdLayout, loadPrdModel, PrdModel, LoadPrdModelOptions) and the tree types
+// (V2Tree, RuleNode) are exported above with #648's v2 model; they are not
+// repeated here, because a second re-export of a name is a duplicate export.
+
+// Reader and transaction
+export { withPrdModelTransaction, PrdLayoutError } from "./store/prd-model-transaction.js";
+export type { PrdModelEdit, PrdModelTransactionOptions, PrdModelTransactionResult } from "./store/prd-model-transaction.js";
+
+// Selection
+export { findNextWork, findActionableWork, resolveWorkById } from "./core/change-selection.js";
+export type { WorkUnit, WorkKind, WorkSelectionOptions } from "./core/change-selection.js";
+export { findNextWorkTask, completedWorkIds } from "./core/change-next-task.js";
+export type { NextWorkTask, NextWorkOptions } from "./core/change-next-task.js";
+
+// Completion and apply-on-complete
+export { completeTask, completeChange, completeWork, ChangeCompletionError } from "./core/change-completion.js";
+export type {
+  ChangeCompletionOptions,
+  ChangeCompletionResult,
+  CompleteWorkOptions,
+  CompleteWorkResult,
+} from "./core/change-completion.js";
+export { loadApplyOn } from "./core/apply-policy.js";
+export type { ApplyOn } from "./core/apply-policy.js";
+export { completeV2Work } from "./cli/v2-completion.js";
+export type { V2Completion, V2CompletionOptions } from "./cli/v2-completion.js";
+export { ChangeLayerStore, isChangeLayerStore } from "./store/change-layer-store.js";
+
+// Brief
+export { buildChangeBrief, renderChangeBrief } from "./core/change-brief.js";
+export type { ChangeBrief, ChangeBriefOptions, BriefCommands, BriefLogEntry } from "./core/change-brief.js";

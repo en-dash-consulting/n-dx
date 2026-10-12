@@ -28,6 +28,21 @@ When a package imports from another package at runtime, all imports are concentr
 
 Within the web package, `src/viewer/external.ts` concentrates all viewer-side imports from `src/viewer/messaging/`, `src/shared/`, and `src/schema/`. `RequestDedup` is canonically located in `src/viewer/messaging/request-dedup.ts` and re-exported through `external.ts` for viewer consumers.
 
+## Rex v2 runtime surface
+
+`packages/rex/src/public.ts` exports the v2 (product/change layer) runtime so hench and the dashboard reach it through their rex gateways instead of re-implementing it. The functions are the ones the MCP tools and CLI call. This surface is deliberately narrow; a wider one is Nick's #648, and the names match the modules' own so the two merge cleanly. No gateway has been edited to re-export it yet (hench stack B and web D1 do that).
+
+| Concern | Exports |
+|---------|---------|
+| Reader | `prdLayout`, `loadPrdModel`; types `PrdModel`, `LoadPrdModelOptions`, `V2Tree`, `RuleNode` |
+| Transaction | `withPrdModelTransaction` (PRD lock held across load, mutate, write; refuses a v1 tree with `PrdLayoutError`); types `PrdModelEdit`, `PrdModelTransactionOptions`, `PrdModelTransactionResult` |
+| Selection | `findNextWork`, `findActionableWork`, `resolveWorkById`; `findNextWorkTask` (v1-shaped answer `get_next_task` returns), `completedWorkIds`; types `WorkUnit`, `WorkKind`, `WorkSelectionOptions`, `NextWorkTask`, `NextWorkOptions` |
+| Completion | `completeTask`, `completeChange`, `completeWork` (pure, on a `V2Tree`), `ChangeCompletionError`; `completeV2Work` (the transaction `update_task_status` runs: completes, applies per `rex.applyOn`, logs), `loadApplyOn`; types `ChangeCompletionOptions`, `ChangeCompletionResult`, `CompleteWorkOptions`, `CompleteWorkResult`, `V2Completion`, `V2CompletionOptions`, `ApplyOn` |
+| Brief | `buildChangeBrief`, `renderChangeBrief`; types `ChangeBrief`, `ChangeBriefOptions`, `BriefCommands`, `BriefLogEntry` |
+| Store | `ChangeLayerStore`, `isChangeLayerStore` (what `resolveStore` returns on a v2 tree) |
+
+Covered by `packages/rex/tests/integration/public-v2-runtime.test.ts`, which imports only `public.ts`.
+
 ## Injection Seams
 
 Some cross-zone dependencies use callback injection rather than gateway imports. These seams are invisible to static analysis:
