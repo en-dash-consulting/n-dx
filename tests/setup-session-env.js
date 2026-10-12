@@ -64,11 +64,34 @@ delete process.env.CLAUDE_CONFIG_DIR;
 // Written to a stable path and only when the content differs, through a
 // rename, so the thousands of worker processes a run forks do not each leave
 // a file behind and do not race each other writing the same one.
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 
-const gitTestDir = join(tmpdir(), "ndx-test-git");
+/**
+ * A per-user segment for the directory below.
+ *
+ * `tmpdir()` is one shared directory on Linux (`/tmp`). Without this the first
+ * user to run a suite owns `ndx-test-git/`, and the next user's staging write
+ * into it fails with EACCES before the rename is even reached — taking down
+ * every worker's setup, not one test. macOS and Windows give each user their
+ * own tmpdir, where the segment is simply redundant.
+ *
+ * `uid` is -1 on Windows, so the username is used there; `userInfo()` itself
+ * throws when the user has no passwd entry (some containers), and the pid
+ * keeps those runs working at the cost of a directory per run.
+ */
+function userSegment() {
+  try {
+    const { uid, username } = userInfo();
+    if (uid >= 0) return String(uid);
+    return username.replace(/[^A-Za-z0-9_-]/g, "_") || `pid-${process.pid}`;
+  } catch {
+    return `pid-${process.pid}`;
+  }
+}
+
+const gitTestDir = join(tmpdir(), `ndx-test-git-${userSegment()}`);
 const gitHooksDir = join(gitTestDir, "no-hooks");
 const gitConfigPath = join(gitTestDir, "gitconfig");
 
@@ -102,6 +125,13 @@ if (current !== gitConfigContent) {
     renameSync(staging, gitConfigPath);
   } catch (err) {
     // Another worker renamed its identical copy in between; theirs is fine.
+    // The staging file is this worker's own, and a failed rename leaves it
+    // behind — one per worker per run, in a directory nothing else cleans.
+    try {
+      unlinkSync(staging);
+    } catch {
+      // Gone already, or never written; nothing to clean up.
+    }
     if (!existsSync(gitConfigPath)) throw err;
   }
 }

@@ -22,6 +22,9 @@
  *   `completedAt`, else the plan's cut time. Without it the change would read
  *   as changing forever. `appliedIn` and `specReviewed` are retired and never
  *   written.
+ * - `metAt` on each capability the plan marks met (its v1 feature completed):
+ *   the `specHash` of its drafted spec, so the node reads met, not proposed.
+ *   A constraint's statement is the apply's to write, so the apply stamps it.
  * - `reviewedHash` on each capability the caller lists as reviewed, only while
  *   its drafted spec's `specHash` is the hash the reviewer approved
  *   (`stampReview`). A draft that changed since approval stays unreviewed, with
@@ -95,6 +98,8 @@ export interface ItemPlanData {
   slug?: { from: string; to: string };
   /** Applied changes only: ISO time the change counts as applied. */
   appliedAt?: string;
+  /** Met capabilities only: the `specHash` of the drafted spec, which `metAt` holds once applied. */
+  metAt?: string;
   /** Listed capabilities only: the `specHash` the reviewer approved. Plan-only; never written to v2. */
   approvedHash?: string;
   /** Set only while the migrated spec's `specHash` is `approvedHash`. */
@@ -305,6 +310,7 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
         data.appliedAt = done !== undefined && !Number.isNaN(Date.parse(done)) ? done : cutAt;
       }
       const draft = specById.get(item.id);
+      if (entry?.target === "capability" && entry.met && draft) data.metAt = specHash(draft);
       const approvedHash = approved.get(item.id);
       if (entry?.target === "capability" && approvedHash !== undefined && draft) {
         Object.assign(data, stampReview({ ...data, approvedHash }, draft));
@@ -329,7 +335,7 @@ export function buildPlanData(items: readonly PRDItem[], plan: MigrationPlan, op
 
       const interesting =
         data.slug ||
-        data.criteria || data.appliedAt || data.approvedHash || data.shippedIn || data.flags.length || data.legacyLoe || data.droppedMeta || data.droppedLog;
+        data.criteria || data.appliedAt || data.metAt || data.approvedHash || data.shippedIn || data.flags.length || data.legacyLoe || data.droppedMeta || data.droppedLog;
       if (interesting) result.items[item.id] = data;
 
       visit(item.children ?? []);

@@ -15,6 +15,9 @@
  *   capability-shaped one with completed work becomes a capability, and each
  *   of its tasks a change that touches or amends it. A fix- or work-shaped
  *   feature becomes a change (applied when completed) with its tasks kept.
+ *   A completed feature's node is `met`: applying the plan stamps `metAt` with
+ *   its spec hash, as `appliedAt` stamps a completed change, or every migrated
+ *   capability would read proposed forever.
  * - A change is placed on a capability or constraint by the placement rules
  *   (`rankPlacementCandidates`) only on a clear leader; otherwise it is held
  *   with `needsPlacement`, as is any item the rules cannot shape. The model
@@ -54,6 +57,8 @@ export interface PlanEntry {
   plannedRelease?: string;
   /** Changes: completed in v1, so its effect is already in the product layer. */
   applied?: boolean;
+  /** Product nodes: the v1 item completed, so the spec drafted from it is met when the plan is applied. */
+  met?: boolean;
   /** Changes: how the change relates to its product node. */
   relation?: PlacementRelation;
   /** Changes: the capability or constraint (v1 id) it touches or amends. */
@@ -219,6 +224,11 @@ function isAbandoned(item: PRDItem): boolean {
   return item.status === "cancelled" || item.status === "deleted";
 }
 
+/** A completed v1 item's product node is met at migration: the apply stamps `metAt` with its spec hash. */
+function metOf(item: PRDItem): Pick<PlanEntry, "met"> {
+  return item.status === "completed" ? { met: true } : {};
+}
+
 /** Completed work that still stands: does not descend into abandoned items, whose finished parts were abandoned with them. */
 function hasCompletedWork(item: PRDItem): boolean {
   if (isAbandoned(item)) return false;
@@ -345,7 +355,7 @@ function classifyUnderArea(item: PRDItem, area: string, plan: PlanBuilder, produ
   }
 
   if (isConstraintShaped(item.title)) {
-    plan.add(item, "constraint", { parent: area, reasons: ["constraint-shaped feature: a constraint"] });
+    plan.add(item, "constraint", { parent: area, ...metOf(item), reasons: ["constraint-shaped feature: a constraint"] });
     plan.constraints.push({ source: item.id, title: item.title, appliesTo: area });
     plan.productNodes.push({ id: item.id, type: "constraint", title: item.title, tags: item.tags, area });
     for (const child of item.children ?? []) historyOf(child, item.id, area, plan);
@@ -363,7 +373,7 @@ function classifyUnderArea(item: PRDItem, area: string, plan: PlanBuilder, produ
     return;
   }
 
-  plan.add(item, "capability", { parent: area, reasons: ["capability-shaped feature with completed work: a capability"] });
+  plan.add(item, "capability", { parent: area, ...metOf(item), reasons: ["capability-shaped feature with completed work: a capability"] });
   plan.productNodes.push({ id: item.id, title: item.title, tags: item.tags, area });
   for (const child of item.children ?? []) historyOf(child, item.id, area, plan);
 }

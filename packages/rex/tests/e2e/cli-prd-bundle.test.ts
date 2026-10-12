@@ -230,7 +230,6 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
   let sourceDir: string;
   let targetDir: string;
   let bundlePath: string;
-  let fixturePath: string;
 
   beforeAll(async () => {
     templateDir = await mkdtemp(join(tmpdir(), "rex-bundle-template-"));
@@ -258,7 +257,6 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
     sourceDir = await mkdtemp(join(tmpdir(), "rex-bundle-src-"));
     targetDir = await mkdtemp(join(tmpdir(), "rex-bundle-dst-"));
     bundlePath = join(sourceDir, "prd-bundle.json");
-    fixturePath = join(sourceDir, "fixture-bundle.json");
     await cp(templateDir, sourceDir, { recursive: true });
   });
 

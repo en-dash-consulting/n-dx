@@ -3563,7 +3563,13 @@ async function collectRunCommits(projectDir: string, startHead: string | undefin
       // Subject last and joined back: a subject may contain the separator,
       // the fields before it cannot.
       const [sha, authorDate, authorEmail, ...rest] = line.split("\x1f");
-      return { sha, subject: rest.join("\x1f"), authorDate, authorEmail };
+      return {
+        sha,
+        subject: rest.join("\x1f"),
+        authorDate,
+        authorEmail,
+        attribution: "start-head" as const,
+      };
     });
   } catch {
     // Best-effort: a run whose commits cannot be enumerated still reports
@@ -3620,7 +3626,11 @@ export async function findCommitsMissingItem(
   const missing: RunCommitItemMismatch[] = [];
   for (const commit of commits) {
     const items = itemsBySha.get(commit.sha);
-    if (items && !items.includes(taskId)) missing.push({ ...commit, items });
+    // The report names the commit, its facts and what its trailer said, not how the run tied it.
+    if (items && !items.includes(taskId)) {
+      const { attribution: _attribution, ...facts } = commit;
+      missing.push({ ...facts, items });
+    }
   }
   return missing;
 }
