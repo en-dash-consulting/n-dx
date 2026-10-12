@@ -32,10 +32,40 @@
 // Task usage aggregation
 // ---------------------------------------------------------------------------
 
-/** Aggregated token usage for a single task. */
+/**
+ * Aggregated token usage for a single task.
+ *
+ * `totalTokens` is every billed token, cache reads included. On an agent
+ * workload that term dominates the other three by an order of magnitude, so it
+ * is a size, not a price — see {@link costUsd} for what the work actually
+ * cost, and the per-class fields for where the tokens went.
+ */
 export interface TaskUsageAccumulator {
   totalTokens: number;
   runCount: number;
+  /** Fresh (uncached) input tokens. */
+  inputTokens: number;
+  /** Output tokens. */
+  outputTokens: number;
+  /** Input tokens written to the prompt cache. Billed above the input rate. */
+  cacheCreationTokens: number;
+  /** Input tokens served from the prompt cache. Billed at roughly a tenth. */
+  cacheReadTokens: number;
+  /**
+   * USD cost of these tokens, priced per run at the model that run recorded.
+   *
+   * Summed from per-run figures rather than computed from the totals above,
+   * because one task's runs can span models whose rates differ by more than
+   * a factor of ten.
+   */
+  costUsd: number;
+  /**
+   * False when at least one contributing run named a model absent from the
+   * price table, so its share of {@link costUsd} was priced at the fallback
+   * model's rates. Lets the UI mark the figure as an estimate instead of
+   * quoting a guess as a measurement.
+   */
+  costFullyAttributed: boolean;
 }
 
 // ---------------------------------------------------------------------------

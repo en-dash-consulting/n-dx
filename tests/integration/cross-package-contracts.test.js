@@ -229,6 +229,7 @@ describe("hench → rex gateway contract", () => {
     "acknowledgeFinding",
     "resolveActor",
     "validateRunSettings",
+    "repointCommits",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -363,6 +364,7 @@ describe("hench → llm-client gateway contract", () => {
     "readAvailableMemory",
     "getAvailableMemory",
     "createAvailableMemoryReader",
+    "resolveClaudeCliEffort",
   ];
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
@@ -775,7 +777,7 @@ describe("gateway export auto-detection", () => {
         "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding", "resolveActor",
-        "validateRunSettings"],
+        "validateRunSettings", "repointCommits"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "TREE_META_FILENAME", "PRD_CACHE_DIRNAME",
         "SELF_HEAL_TAG", "checkTreeConformance"],
     ]);
@@ -823,10 +825,14 @@ describe("gateway export auto-detection", () => {
         "parseApiTokenUsage", "parseApiTokenUsageWithDiagnostic", "parseStreamTokenUsage",
         "parseStreamTokenUsageWithDiagnostic", "mapCodexUsageToTokenUsage",
         "accumulateTokenUsage", "emptyAggregateTokenUsage",
+        "usageMessageId", "UsageMessageFilter",
         "resolveModel", "resolveVendorModel", "resolveReviewModel", "resolveTaskModel",
         // Claude API effort: hench's turn loop must apply the same rule the
         // llm-client API provider applies, so it shares the one resolver.
         "resolveClaudeApiEffort",
+        // The CLI loop's counterpart: `--effort` on a spawned Claude Code run
+        // follows the same llm.effort rule as the API turn loop.
+        "resolveClaudeCliEffort",
         "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
         "formatUsage", "createPromptEnvelope", "assemblePrompt", "assemblePromptText",
         // Prompt section measurement. Lives in llm-client rather than hench so

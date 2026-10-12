@@ -136,9 +136,10 @@ describe("finalizeRun reports commits git cannot tie to the task", () => {
 
     expect(run.commits?.map((c) => c.sha)).toEqual([tagged, bare, split, other]);
     expect(run.commitsMissingItem).toEqual([
-      { sha: bare, subject: "feat: untagged", items: [] },
-      { sha: split, subject: "feat: split", items: [] },
-      { sha: other, subject: "feat: other item", items: ["some-other-task"] },
+      // authorDate comes from the commit facts every run record now carries.
+      { sha: bare, subject: "feat: untagged", items: [], authorDate: expect.any(String) },
+      { sha: split, subject: "feat: split", items: [], authorDate: expect.any(String) },
+      { sha: other, subject: "feat: other item", items: ["some-other-task"], authorDate: expect.any(String) },
     ]);
 
     const lines = formatCommitsMissingItem(run);

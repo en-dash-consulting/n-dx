@@ -24,7 +24,6 @@
 import { join } from "node:path";
 
 import {
-  NDX_CONTAINER_DIRNAME,
   relativeToRoot,
   resolveLayout,
   type LayoutMode,
@@ -64,30 +63,77 @@ export function stateDirNameUnder(which: StateDirKey, mode: LayoutMode): string 
 }
 
 /**
- * Where hench's and rex's state sits, in **both** layouts, as path prefixes
- * with a trailing slash — `.rex/`, `.hench/`, `.ndx/`.
+ * What rex writes inside its state directory that is bookkeeping rather than
+ * project content, relative to that directory.
  *
- * A path under one of these is bookkeeping rather than work: the agent's own
- * `rex_update_status` write, hench's completion commit, a run record, a
- * reviewer report. Two gates ask that question — `validation/changed-files.ts`
- * (is the full-suite gate worth running?) and the reviewer-diff filter in
- * `agent/lifecycle/cli-loop.ts` (did the reviewer repair anything?) — and
- * before this list was shared they each spelled the three prefixes out, so the
- * two could disagree about what counts as work.
+ * Entries ending in `/` are directories; the rest are exact file names. Both
+ * are matched by `matchesProjectPath` in `store/artifacts.ts`, which is why
+ * this is one flat list rather than two.
  *
- * One entry covers the new layout: everything n-dx owns is inside the
- * container, so `.ndx/` subsumes `.ndx/rex` and `.ndx/hench` both.
+ * `prd_tree/` is here because hench dirties the task's `index.md` itself: the
+ * `rex_update_status` write lands before the agent has done anything, so a run
+ * that produced nothing would otherwise always look like it had changed a
+ * file. The rest are rex's own records — the execution log and its one
+ * rotation, the derived cache the dashboard's watcher rewrites, the tree
+ * metadata, the prune/reshape archive, queued proposals, and the findings the
+ * reviewer has acknowledged.
  *
- * Deliberately **not** including sourcevision. Analysis output is not hench's
- * bookkeeping, and on the legacy layout a run that rewrote `.sourcevision/`
- * has changed something the gates should see. (The container entry does sweep
- * `.ndx/sourcevision` in with the rest on the new layout — an asymmetry that
- * predates this constant and is not changed here.)
+ * What is deliberately **absent** is the point of the list. `workflow.md` goes
+ * into every agent brief and `config.json` is project configuration: both are
+ * content a task can legitimately be about, and under the blanket `.rex/`
+ * prefix this replaced, a run whose only change was one of them was read as
+ * "no changes", skipped the test gate, and could never complete.
  */
-export const BOOKKEEPING_DIR_PREFIXES: readonly string[] = [
-  `${stateDirNameUnder("rex", "legacy")}/`,
-  `${stateDirNameUnder("hench", "legacy")}/`,
-  `${NDX_CONTAINER_DIRNAME}/`,
+const REX_BOOKKEEPING_ENTRIES: readonly string[] = [
+  "prd_tree/",
+  ".cache/",
+  "execution-log.jsonl",
+  // `core/execution-log.ts` rotates at 1 MB and keeps exactly one generation.
+  // Listed rather than glob-matched: `matchesProjectPath` compares literals,
+  // and a second generation would be a change in rex, not a silent gap here.
+  "execution-log.1.jsonl",
+  "tree-meta.json",
+  "archive.json",
+  "pending-proposals.json",
+  "acknowledged-findings.json",
+];
+
+/**
+ * @param mode Layout to spell the paths for.
+ * @returns Bookkeeping paths under that layout, project-relative.
+ */
+function bookkeepingPathsUnder(mode: LayoutMode): string[] {
+  const rexDir = stateDirNameUnder("rex", mode);
+  return [
+    // All of hench's own state is bookkeeping: run records, locks, usage
+    // cursors, reviewer reports. Nothing in there is ever a work product.
+    `${stateDirNameUnder("hench", mode)}/`,
+    ...REX_BOOKKEEPING_ENTRIES.map((entry) => `${rexDir}/${entry}`),
+  ];
+}
+
+/**
+ * Every path, in **both** layouts, that is hench's or rex's bookkeeping rather
+ * than a run's work.
+ *
+ * Two gates ask that question — `validation/changed-files.ts` (is the
+ * full-suite gate worth running?) and the reviewer-diff filter in
+ * `agent/lifecycle/cli-loop.ts` (did the reviewer repair anything?) — and the
+ * diff summary in `validation/completion.ts` builds its git pathspec excludes
+ * from the same list, so none of the three can disagree about what counts as
+ * work.
+ *
+ * This used to be three directory prefixes: `.rex/`, `.hench/` and `.ndx/`.
+ * That was too blunt in both directions. Under `.rex/` it swallowed
+ * `workflow.md` and `config.json`, which are project content — a task that
+ * only edits the workflow could never complete through `ndx work` (#539).
+ * Under `.ndx/` it swallowed the whole container, including
+ * `.ndx/sourcevision/`, while the legacy layout counted `.sourcevision/` as a
+ * change; the two layouts now agree, and analysis output is a change in both.
+ */
+export const BOOKKEEPING_PATHS: readonly string[] = [
+  ...bookkeepingPathsUnder("legacy"),
+  ...bookkeepingPathsUnder("ndx"),
 ];
 
 /** Hench's config file inside its state directory. */

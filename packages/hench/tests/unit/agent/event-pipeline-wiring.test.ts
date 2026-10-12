@@ -22,6 +22,7 @@ import { checkTokenBudget } from "../../../src/agent/lifecycle/token-budget.js";
 import { validateConfig } from "../../../src/schema/validate.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
 import type { RuntimeEvent } from "../../../src/prd/llm-gateway.js";
+import { UsageMessageFilter } from "../../../src/prd/llm-gateway.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -137,6 +138,75 @@ describe("rawJsonToTokenUsageEvent", () => {
   it("returns null when no usage data is present", () => {
     const event = rawJsonToTokenUsageEvent({ type: "assistant" }, 1, metadata);
     expect(event).toBeNull();
+  });
+
+  describe("content-block repeats", () => {
+    // Claude stream-json emits one `assistant` line per content block and
+    // repeats the whole finished message on each, `usage` included. Counting
+    // every line charged a turn once per block — a 4.27x over-count on a
+    // measured session, and the reason the dashboard read millions of tokens
+    // for work that cost a few dollars.
+    const blockLine = (id: string) => ({
+      type: "assistant",
+      message: {
+        id,
+        usage: {
+          input_tokens: 2,
+          output_tokens: 7,
+          cache_creation_input_tokens: 34_530,
+          cache_read_input_tokens: 29_573,
+        },
+      },
+    });
+
+    it("emits one event for a message repeated across blocks", () => {
+      const seen = new UsageMessageFilter();
+      const events = [blockLine("msg_01"), blockLine("msg_01"), blockLine("msg_01")]
+        .map((line) => rawJsonToTokenUsageEvent(line, 1, metadata, seen))
+        .filter((e) => e !== null);
+
+      expect(events).toHaveLength(1);
+      expect(events[0]!.tokenUsage!.cacheReadInput).toBe(29_573);
+    });
+
+    it("still emits an event per distinct message", () => {
+      const seen = new UsageMessageFilter();
+      const events = [blockLine("msg_01"), blockLine("msg_02")]
+        .map((line) => rawJsonToTokenUsageEvent(line, 1, metadata, seen))
+        .filter((e) => e !== null);
+
+      expect(events).toHaveLength(2);
+    });
+
+    it("counts every payload when no filter is supplied", () => {
+      // The parameter is optional so a test can feed a single payload, and
+      // omitting it must not silently change what the function returns.
+      const first = rawJsonToTokenUsageEvent(blockLine("msg_01"), 1, metadata);
+      const second = rawJsonToTokenUsageEvent(blockLine("msg_01"), 1, metadata);
+      expect(first).not.toBeNull();
+      expect(second).not.toBeNull();
+    });
+
+    it("counts usage that carries no message id", () => {
+      // Codex stamps no message id. Suppressing its usage would trade an
+      // over-count for a total loss.
+      const seen = new UsageMessageFilter();
+      const anonymous = { usage: { input_tokens: 5, output_tokens: 5 } };
+      expect(rawJsonToTokenUsageEvent(anonymous, 1, metadata, seen)).not.toBeNull();
+      expect(rawJsonToTokenUsageEvent(anonymous, 1, metadata, seen)).not.toBeNull();
+    });
+
+    it("accumulates a repeated message once through the accumulator", () => {
+      const seen = new UsageMessageFilter();
+      const acc = new EventAccumulator();
+      for (const line of [blockLine("msg_01"), blockLine("msg_01"), blockLine("msg_02")]) {
+        const event = rawJsonToTokenUsageEvent(line, 1, metadata, seen);
+        if (event) acc.push(event);
+      }
+
+      expect(acc.tokenUsage.total.cacheReadInput).toBe(29_573 * 2);
+      expect(acc.tokenUsage.perTurn).toHaveLength(2);
+    });
   });
 
   it("returns null when usage is not an object", () => {

@@ -33,6 +33,7 @@ describe("IncrementalTaskUsageAggregator", () => {
     filename: string,
     taskId: string,
     tokens: { input?: number; output?: number; cacheCreationInput?: number; cacheReadInput?: number } = {},
+    model?: string,
   ): Promise<void> {
     await writeFile(
       join(runsDir, filename),
@@ -41,6 +42,7 @@ describe("IncrementalTaskUsageAggregator", () => {
         taskId,
         startedAt: new Date().toISOString(),
         status: "completed",
+        ...(model ? { model } : {}),
         tokenUsage: {
           input: tokens.input ?? 0,
           output: tokens.output ?? 0,
@@ -65,8 +67,8 @@ describe("IncrementalTaskUsageAggregator", () => {
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
       const usage = await aggregator.getTaskUsage();
 
-      expect(usage["task-a"]).toEqual({ totalTokens: 225, runCount: 2 });
-      expect(usage["task-b"]).toEqual({ totalTokens: 300, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 225, runCount: 2 });
+      expect(usage["task-b"]).toMatchObject({ totalTokens: 300, runCount: 1 });
     });
 
     it("returns empty object when no run files exist", async () => {
@@ -93,7 +95,99 @@ describe("IncrementalTaskUsageAggregator", () => {
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
       const usage = await aggregator.getTaskUsage();
 
-      expect(usage["task-a"]).toEqual({ totalTokens: 200, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 200, runCount: 1 });
+    });
+
+    it("keeps the four billed classes apart, not just their sum", async () => {
+      // The aggregator used to collapse every run to one `totalTokens` and
+      // report zeros for the breakdown, which left the dashboard unable to
+      // separate cache reads — the dominant term — from newly processed
+      // tokens, and unable to price anything at all.
+      await writeRun("run-1.json", "task-a", {
+        input: 100,
+        output: 50,
+        cacheCreationInput: 30,
+        cacheReadInput: 20,
+      });
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      const usage = await aggregator.getTaskUsage();
+
+      expect(usage["task-a"]).toMatchObject({
+        totalTokens: 200,
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheCreationTokens: 30,
+        cacheReadTokens: 20,
+        runCount: 1,
+      });
+    });
+
+    it("carries the breakdown through to file contributions", async () => {
+      await writeRun("run-1.json", "task-a", {
+        input: 100,
+        output: 50,
+        cacheCreationInput: 30,
+        cacheReadInput: 20,
+      });
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      await aggregator.getTaskUsage();
+
+      expect(aggregator.getFileContributions()).toEqual([
+        {
+          itemId: "task-a",
+          tokens: {
+            input: 100,
+            output: 50,
+            cacheCreation: 30,
+            cacheRead: 20,
+            total: 200,
+            costUsd: expect.any(Number),
+          },
+        },
+      ]);
+    });
+
+    it("prices each run at the model that run recorded", async () => {
+      // Opus output bills far above Haiku output. Pricing both at one blended
+      // rate is the error this per-file pricing exists to avoid, so the two
+      // runs must not come out equal despite identical token counts.
+      await writeRun("cheap.json", "task-a", { input: 0, output: 1_000_000 }, "claude-haiku-4-5");
+      await writeRun("dear.json", "task-b", { input: 0, output: 1_000_000 }, "claude-opus-5");
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      const usage = await aggregator.getTaskUsage();
+
+      expect(usage["task-a"].costUsd).toBeGreaterThan(0);
+      expect(usage["task-b"].costUsd).toBeGreaterThan(usage["task-a"].costUsd);
+      expect(usage["task-a"].costFullyAttributed).toBe(true);
+      expect(usage["task-b"].costFullyAttributed).toBe(true);
+    });
+
+    it("flags a run whose model is not in the price table", async () => {
+      await writeRun("run-1.json", "task-a", { input: 10, output: 10 }, "some-model-we-never-shipped");
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      const usage = await aggregator.getTaskUsage();
+
+      // Priced at the fallback rather than at zero — a zero would read as
+      // "this was free" — but marked so the UI can say it is an estimate.
+      expect(usage["task-a"].costUsd).toBeGreaterThan(0);
+      expect(usage["task-a"].costFullyAttributed).toBe(false);
+    });
+
+    it("prices cache reads far below fresh input", async () => {
+      // The whole reason the token total is a bad headline: the same count of
+      // cache reads costs roughly a tenth of what fresh input costs.
+      await writeRun("fresh.json", "task-a", { input: 1_000_000 }, "claude-sonnet-5");
+      await writeRun("cached.json", "task-b", { cacheReadInput: 1_000_000 }, "claude-sonnet-5");
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      const usage = await aggregator.getTaskUsage();
+
+      expect(usage["task-a"].totalTokens).toBe(usage["task-b"].totalTokens);
+      expect(usage["task-b"].costUsd).toBeLessThan(usage["task-a"].costUsd / 2);
     });
 
     it("skips files without a taskId", async () => {
@@ -115,7 +209,7 @@ describe("IncrementalTaskUsageAggregator", () => {
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
       const usage = await aggregator.getTaskUsage();
 
-      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
       expect(Object.keys(usage)).toHaveLength(1);
     });
 
@@ -131,7 +225,7 @@ describe("IncrementalTaskUsageAggregator", () => {
       const usage = await aggregator.getTaskUsage();
 
       expect(Object.keys(usage)).toHaveLength(1);
-      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
     });
   });
 
@@ -147,14 +241,14 @@ describe("IncrementalTaskUsageAggregator", () => {
 
       // Initial aggregation
       const first = await aggregator.getTaskUsage();
-      expect(first["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(first["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
 
       // Add a new file
       await writeRun("run-2.json", "task-a", { input: 200, output: 100 });
 
       // Incremental update
       const second = await aggregator.getTaskUsage();
-      expect(second["task-a"]).toEqual({ totalTokens: 450, runCount: 2 });
+      expect(second["task-a"]).toMatchObject({ totalTokens: 450, runCount: 2 });
     });
 
     it("handles new files for new tasks", async () => {
@@ -167,8 +261,8 @@ describe("IncrementalTaskUsageAggregator", () => {
       await writeRun("run-2.json", "task-b", { input: 300, output: 200 });
 
       const usage = await aggregator.getTaskUsage();
-      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
-      expect(usage["task-b"]).toEqual({ totalTokens: 500, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-b"]).toMatchObject({ totalTokens: 500, runCount: 1 });
     });
   });
 
@@ -182,13 +276,13 @@ describe("IncrementalTaskUsageAggregator", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
       const first = await aggregator.getTaskUsage();
-      expect(first["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(first["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
 
       // Modify the file with different token counts (changes size → detected)
       await writeRun("run-1.json", "task-a", { input: 500, output: 250 });
 
       const second = await aggregator.getTaskUsage();
-      expect(second["task-a"]).toEqual({ totalTokens: 750, runCount: 1 });
+      expect(second["task-a"]).toMatchObject({ totalTokens: 750, runCount: 1 });
     });
 
     it("handles task ID change in a modified file", async () => {
@@ -202,7 +296,7 @@ describe("IncrementalTaskUsageAggregator", () => {
 
       const usage = await aggregator.getTaskUsage();
       expect(usage["task-a"]).toBeUndefined();
-      expect(usage["task-b"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-b"]).toMatchObject({ totalTokens: 150, runCount: 1 });
     });
 
     it("detects a same-size rewrite whose mtime did not advance", async () => {
@@ -238,7 +332,7 @@ describe("IncrementalTaskUsageAggregator", () => {
       await utimes(runFile, pinned, pinned);
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
-      expect((await aggregator.getTaskUsage())["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect((await aggregator.getTaskUsage())["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
 
       const before = await stat(runFile);
       await writeRun("run-1.json", "task-b", { input: 100, output: 50 });
@@ -251,7 +345,7 @@ describe("IncrementalTaskUsageAggregator", () => {
 
       const usage = await aggregator.getTaskUsage();
       expect(usage["task-a"]).toBeUndefined();
-      expect(usage["task-b"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-b"]).toMatchObject({ totalTokens: 150, runCount: 1 });
     });
   });
 
@@ -266,13 +360,13 @@ describe("IncrementalTaskUsageAggregator", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
       const first = await aggregator.getTaskUsage();
-      expect(first["task-a"]).toEqual({ totalTokens: 450, runCount: 2 });
+      expect(first["task-a"]).toMatchObject({ totalTokens: 450, runCount: 2 });
 
       // Delete one run
       await unlink(join(runsDir, "run-1.json"));
 
       const second = await aggregator.getTaskUsage();
-      expect(second["task-a"]).toEqual({ totalTokens: 300, runCount: 1 });
+      expect(second["task-a"]).toMatchObject({ totalTokens: 300, runCount: 1 });
     });
 
     it("removes task entry when all runs are deleted", async () => {
@@ -312,11 +406,11 @@ describe("IncrementalTaskUsageAggregator", () => {
       const usage = await aggregator.getTaskUsage();
 
       // task-a: only run-3 remains (75 tokens)
-      expect(usage["task-a"]).toEqual({ totalTokens: 75, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 75, runCount: 1 });
       // task-b: run-2 updated (500 tokens)
-      expect(usage["task-b"]).toEqual({ totalTokens: 500, runCount: 1 });
+      expect(usage["task-b"]).toMatchObject({ totalTokens: 500, runCount: 1 });
       // task-c: run-4 added (600 tokens)
-      expect(usage["task-c"]).toEqual({ totalTokens: 600, runCount: 1 });
+      expect(usage["task-c"]).toMatchObject({ totalTokens: 600, runCount: 1 });
     });
   });
 
@@ -465,7 +559,7 @@ describe("IncrementalTaskUsageAggregator", () => {
       await utimes(runFile, pinned, pinned);
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
-      expect((await aggregator.getTaskUsage())["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect((await aggregator.getTaskUsage())["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
 
       // Precondition: a hash really is being carried, so this exercises the
       // branch it is meant to rather than passing vacuously.
@@ -484,7 +578,7 @@ describe("IncrementalTaskUsageAggregator", () => {
       const usage = await aggregator.getTaskUsage();
 
       // The tokens are still there, and no re-read was attempted at all.
-      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
       expect(readSpy).not.toHaveBeenCalled();
     });
 
@@ -520,7 +614,7 @@ describe("IncrementalTaskUsageAggregator", () => {
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
       const first = await aggregator.getTaskUsage();
-      expect(first["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(first["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
 
       // Delete run-1 and add run-2, then reset so the aggregator
       // processes all files fresh
@@ -531,7 +625,7 @@ describe("IncrementalTaskUsageAggregator", () => {
 
       const usage = await aggregator.getTaskUsage();
       expect(usage["task-a"]).toBeUndefined();
-      expect(usage["task-b"]).toEqual({ totalTokens: 500, runCount: 1 });
+      expect(usage["task-b"]).toMatchObject({ totalTokens: 500, runCount: 1 });
     });
   });
 
@@ -553,7 +647,7 @@ describe("IncrementalTaskUsageAggregator", () => {
       expect(pruned).toBe(2);
 
       const usage = await aggregator.getTaskUsage();
-      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
       expect(usage["task-b"]).toBeUndefined();
       expect(usage["task-c"]).toBeUndefined();
       expect(Object.keys(usage)).toHaveLength(1);
@@ -600,7 +694,7 @@ describe("IncrementalTaskUsageAggregator", () => {
       // because the file snapshot is preserved (no mtime/size change)
       const usage = await aggregator.getTaskUsage();
       expect(usage["deleted-task"]).toBeUndefined();
-      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
     });
 
     it("works correctly with multiple runs per pruned task", async () => {
@@ -616,7 +710,7 @@ describe("IncrementalTaskUsageAggregator", () => {
       expect(pruned).toBe(1); // 1 task ID pruned (even though 2 files)
 
       const usage = await aggregator.getTaskUsage();
-      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
       expect(usage["task-b"]).toBeUndefined();
     });
 
@@ -633,7 +727,7 @@ describe("IncrementalTaskUsageAggregator", () => {
       await writeRun("run-3.json", "task-a", { input: 50, output: 25 });
 
       const usage = await aggregator.getTaskUsage();
-      expect(usage["task-a"]).toEqual({ totalTokens: 225, runCount: 2 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 225, runCount: 2 });
       expect(usage["deleted-task"]).toBeUndefined();
     });
   });
@@ -652,23 +746,23 @@ describe("IncrementalTaskUsageAggregator", () => {
       await writeRun("run-3.json", "task-b", { input: 300, output: 150 });
 
       let usage = await aggregator.getTaskUsage();
-      expect(usage["task-a"]).toEqual({ totalTokens: 450, runCount: 2 });
-      expect(usage["task-b"]).toEqual({ totalTokens: 450, runCount: 1 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 450, runCount: 2 });
+      expect(usage["task-b"]).toMatchObject({ totalTokens: 450, runCount: 1 });
 
       // Step 2: add a run
       await writeRun("run-4.json", "task-a", { input: 50, output: 25 });
       usage = await aggregator.getTaskUsage();
-      expect(usage["task-a"]).toEqual({ totalTokens: 525, runCount: 3 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 525, runCount: 3 });
 
       // Step 3: delete a run
       await unlink(join(runsDir, "run-2.json"));
       usage = await aggregator.getTaskUsage();
-      expect(usage["task-a"]).toEqual({ totalTokens: 225, runCount: 2 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 225, runCount: 2 });
 
       // Step 4: modify a run
       await writeRun("run-1.json", "task-a", { input: 1000, output: 500 });
       usage = await aggregator.getTaskUsage();
-      expect(usage["task-a"]).toEqual({ totalTokens: 1575, runCount: 2 });
+      expect(usage["task-a"]).toMatchObject({ totalTokens: 1575, runCount: 2 });
 
       // Step 5: no changes
       const cached = await aggregator.getTaskUsage();

@@ -143,10 +143,32 @@ export interface TaskUsageSummary {
   utilization?: TaskUtilizationSummary;
 }
 
-/** Bucketed token totals. */
+/**
+ * Bucketed token totals for one item, plus what they cost.
+ *
+ * `totalTokens` counts every billed class, cache reads included. On an agent
+ * loop cache reads outweigh the other three by roughly an order of magnitude
+ * while costing about a tenth as much per token, so `totalTokens` answers "how
+ * much context moved", not "what did this cost". {@link costUsd} answers the
+ * second question and is what the tree leads with.
+ *
+ * Every field but `totalTokens` and `runCount` is optional, because a server
+ * built before the per-class wire shape sends only those two and the tree must
+ * still render against it.
+ */
 export interface ItemUsageBucket {
   totalTokens: number;
   runCount: number;
+  /** Fresh (uncached) input tokens. */
+  inputTokens?: number;
+  /** Output tokens. */
+  outputTokens?: number;
+  /** Input tokens written to the prompt cache. Billed above the input rate. */
+  cacheCreationTokens?: number;
+  /** Input tokens served from the prompt cache. Billed at roughly a tenth. */
+  cacheReadTokens?: number;
+  /** USD cost, summed from per-run figures priced at each run's own model. */
+  costUsd?: number;
 }
 
 /**

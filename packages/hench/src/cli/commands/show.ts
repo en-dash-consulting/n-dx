@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { PersistedRuntimeEvent } from "../../schema/index.js";
-import { loadRun } from "../../store/runs.js";
+import { loadRun, saveRun } from "../../store/runs.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { info, result } from "../output.js";
 import { colorStatus } from "../../prd/llm-gateway.js";
@@ -8,6 +8,7 @@ import { lookupTaskInRex, formatTaskLine } from "./task-lookup.js";
 import { formatTokenReport } from "../token-logging.js";
 import { formatSessionDecision } from "../session-report.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
+import { repointRun, formatRunRepointReport } from "../../store/repoint-runs.js";
 
 export async function cmdShow(
   dir: string,
@@ -35,6 +36,34 @@ export async function cmdShow(
 
   if (flags.format === "json") {
     result(JSON.stringify(run, null, 2));
+    return;
+  }
+
+  // --repoint mode: find where this run's commits went after a rewrite.
+  // Read-only unless --write is passed, so the default answers "what moved?"
+  // without touching the record.
+  if (flags.repoint !== undefined) {
+    const { run: updated, report } = await repointRun(run, {
+      repoDir: dir,
+      ...(flags.ref ? { ref: flags.ref } : {}),
+    });
+
+    if (flags.format === "json") {
+      result(JSON.stringify(report, null, 2));
+    } else {
+      for (const line of formatRunRepointReport(report)) result(line);
+    }
+
+    if (flags.write === undefined) {
+      if (report.moved.length > 0) info("\nNothing written. Re-run with --write to update the record.");
+      return;
+    }
+    if (report.moved.length === 0) {
+      info("\nNothing to write.");
+      return;
+    }
+    await saveRun(henchDir, updated);
+    info(`\nUpdated ${report.moved.length} SHA(s) on run ${run.id}.`);
     return;
   }
 

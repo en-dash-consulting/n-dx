@@ -476,17 +476,11 @@ describe("package instruction surfaces", () => {
  * is. The canonical copy of each one now sits in the owning package's
  * AGENTS.md.
  *
- * The rule files themselves are meant to shrink to path-scoped pointers, which
- * would leave one copy. They have not yet: `.claude/` is a protected path that
- * only an interactive approval can write, so the migration that moved these
- * registries into AGENTS.md could not also rewrite them. Until that follow-up
- * lands there are two copies, and the drift guard below is what keeps them from
- * becoming two *different* registries — a rule file's table rows must match the
- * rows of its section in the owning AGENTS.md, in both directions. It compares
- * tables only; prose in the two copies can still drift.
- *
- * When the rule files are reduced to pointers, delete `pinnedAgainstDrift` and
- * assert instead that each file contains no table row at all.
+ * The rule files are now path-scoped pointers, so there is one copy of each
+ * registry. The assertions below hold them that way, and they apply to every
+ * file in the directory rather than to a fixed list: a new
+ * `.claude/rules/rex-zone-policy.md` carrying a policy table is the same defect
+ * as the two-copy state this replaced, and a name-based guard would miss it.
  */
 describe("path-scoped injection seam rules", () => {
   const RULES_DIR = join(ROOT, ".claude/rules");
@@ -494,16 +488,17 @@ describe("path-scoped injection seam rules", () => {
   /** The only two packages whose seam registry predates the AGENTS.md rule. */
   const ALLOWED_SEAM_RULES = ["core-injection-seams.md", "web-injection-seams.md"];
 
+  const ruleFiles = readdirSync(RULES_DIR).filter((name) => name.endsWith(".md"));
+
   /**
-   * The table rows of a Markdown document, for comparing two copies of a table.
+   * The table rows of a Markdown document.
    *
    * Splits on `\r?\n`, not on a bare line feed. `.gitattributes` pins AGENTS.md
    * to LF but says nothing about `.claude/rules/`, so a Windows checkout with
    * `core.autocrlf=true` gets the rule files in CRLF. Splitting on `\n` alone
-   * leaves a trailing `\r` on every rule row, none of which then equals its LF
-   * twin from AGENTS.md — which failed the drift guard on Windows while it
-   * passed everywhere else. The fix belongs here rather than in
-   * `.gitattributes`: the guard reads files it does not control the checkout
+   * leaves a trailing `\r` on every row, which once made a row comparison fail
+   * on Windows while it passed everywhere else. The fix belongs here rather
+   * than in `.gitattributes`: this reads files it does not control the checkout
    * of, so it must cope with either line ending.
    */
   const rowsOf = (text) =>
@@ -511,20 +506,12 @@ describe("path-scoped injection seam rules", () => {
       .split(/\r?\n/)
       .filter((line) => line.startsWith("| ") && !/^\|[\s|-]+\|$/.test(line));
 
-  /** Rule file → the AGENTS.md that holds the canonical copy of its content. */
-  const pinnedAgainstDrift = [
-    { rule: "core-injection-seams.md", pkg: "core" },
-    { rule: "web-injection-seams.md", pkg: "web" },
-    { rule: "web-gateway-boundary.md", pkg: "web" },
-  ];
-
-  const seamRules = readdirSync(RULES_DIR).filter((name) =>
-    name.endsWith("-injection-seams.md"),
-  );
+  const seamRules = ruleFiles.filter((name) => name.endsWith("-injection-seams.md"));
 
   it("reads the same rows from a CRLF rule file as from an LF one", () => {
-    // A Windows checkout hands the drift guard CRLF rule text while AGENTS.md
-    // stays LF, so the two row lists have to come out identical regardless.
+    // A Windows checkout hands this CRLF rule text, so a table row has to be
+    // recognised as one regardless of line ending — otherwise the no-table
+    // guard below passes vacuously on exactly the platform that needs it.
     const lf = ["# Seams", "", "| Target | Seam |", "|---|---|", "| a.js | registerChild |"].join(
       "\n",
     );
@@ -545,61 +532,54 @@ describe("path-scoped injection seam rules", () => {
     ).toEqual([]);
   });
 
-  it.each(pinnedAgainstDrift)(
-    "$rule names a section that packages/$pkg/AGENTS.md actually has",
-    ({ rule, pkg }) => {
-      // Covers the prose-only rule, which has no table row for the drift guard
-      // below to compare. Renaming the AGENTS.md section without renaming the
-      // rule leaves the pointer dangling.
-      const title = readFileSync(join(RULES_DIR, rule), "utf-8")
-        .split("\n")
-        .find((line) => line.startsWith("# "))
-        ?.slice(2)
-        .trim();
-      expect(title, `${rule} has no title heading`).toBeTruthy();
-      expect(
-        readFileSync(join(ROOT, "packages", pkg, "AGENTS.md"), "utf-8"),
-        `packages/${pkg}/AGENTS.md has no "## ${title}" section for ` +
-          `.claude/rules/${rule} to point at.`,
-      ).toContain(`## ${title}`);
-    },
-  );
+  it.each(ruleFiles)("%s carries no table of its own", (rule) => {
+    // Whatever the file is named. A policy table here is readable by Claude
+    // Code alone, so it is a second, divergent copy of something — or worse,
+    // the only copy, which Codex never sees.
+    expect(
+      rowsOf(readFileSync(join(RULES_DIR, rule), "utf-8")),
+      `.claude/rules/${rule} holds a table. .claude/ is read by Claude Code ` +
+        `and nothing else, so this registry or policy is invisible to Codex ` +
+        `and every other assistant. Move the table into the owning ` +
+        `packages/<pkg>/AGENTS.md and leave a pointer here.`,
+    ).toEqual([]);
+  });
 
-  it.each(pinnedAgainstDrift)(
-    "$rule has the same table rows as its section in packages/$pkg/AGENTS.md",
-    ({ rule, pkg }) => {
-      // Both directions, and scoped to the owning section. The docs tell
-      // authors to edit the AGENTS.md copy, so the drift that actually happens
-      // is a row added there and not here: a one-way "rule ⊆ AGENTS" check
-      // stays green on exactly that edit, while Claude Code — which loads both
-      // copies under these paths — reads two registries that disagree.
-      // Prose (rules lists, exemptions) is not compared; only table rows are.
-      const ruleText = readFileSync(join(RULES_DIR, rule), "utf-8");
-      const title = ruleText
-        .split("\n")
-        .find((line) => line.startsWith("# "))
-        .slice(2)
-        .trim();
-      const agents = readFileSync(join(ROOT, "packages", pkg, "AGENTS.md"), "utf-8");
-      const start = agents.indexOf(`## ${title}`);
-      const next = agents.indexOf("\n## ", start + 1);
-      const section = agents.slice(start, next === -1 ? undefined : next);
+  it.each(ruleFiles)("%s points at an AGENTS.md section that exists", (rule) => {
+    // A pointer has to name both halves — which AGENTS.md, and which section of
+    // it — or renaming the section leaves it dangling with nothing to catch it.
+    const text = readFileSync(join(RULES_DIR, rule), "utf-8");
+    const title = text
+      .split(/\r?\n/)
+      .find((line) => line.startsWith("# "))
+      ?.slice(2)
+      .trim();
+    expect(title, `.claude/rules/${rule} has no title heading`).toBeTruthy();
 
-      const ruleRows = rowsOf(ruleText);
-      const agentsRows = rowsOf(section);
+    const target = text.match(/packages\/[a-z-]+\/AGENTS\.md/)?.[0];
+    expect(
+      target,
+      `.claude/rules/${rule} names no packages/<pkg>/AGENTS.md to point at. A ` +
+        `rule file exists only for its paths: scoping — its body belongs in the ` +
+        `owning package's AGENTS.md, which it must name.`,
+    ).toBeTruthy();
 
-      const fix =
-        `.claude/rules/${rule} still holds a second copy of this table, so the ` +
-        `two must match row for row until it is reduced to a pointer (task ` +
-        `f2d64d8a). Make the same edit in both files.`;
-      expect(
-        ruleRows.filter((row) => !agentsRows.includes(row)),
-        `rows in .claude/rules/${rule} missing from packages/${pkg}/AGENTS.md. ${fix}`,
-      ).toEqual([]);
-      expect(
-        agentsRows.filter((row) => !ruleRows.includes(row)),
-        `rows in packages/${pkg}/AGENTS.md missing from .claude/rules/${rule}. ${fix}`,
-      ).toEqual([]);
-    },
-  );
+    expect(
+      readFileSync(join(ROOT, target), "utf-8"),
+      `${target} has no "## ${title}" section for .claude/rules/${rule} to ` +
+        `point at — either the section was renamed or the pointer is stale.`,
+    ).toContain(`## ${title}`);
+  });
+
+  it.each(ruleFiles)("%s does not send a new package's registry back here", (rule) => {
+    // The old files ended by telling authors to create an analogous
+    // .claude/rules/<package>-injection-seams.md, which is how the
+    // Claude-Code-only state reproduces itself.
+    expect(
+      readFileSync(join(RULES_DIR, rule), "utf-8"),
+      `.claude/rules/${rule} tells authors to add another .claude/rules ` +
+        `registry. A new package's registry goes in its own AGENTS.md with ` +
+        `CLAUDE.md reduced to @AGENTS.md — packages/llm-client/ is the pair.`,
+    ).not.toMatch(/<package>-injection-seams\.md/);
+  });
 });
