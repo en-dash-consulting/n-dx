@@ -451,6 +451,23 @@ describe("writePrdModel", () => {
     expect(Object.keys(await snapshot(rexDir))).toContain("changes/add-apple-pay/wire-the-button.md");
   });
 
+  it("refuses to turn a folder into a leaf while its state.yaml holds keys this build does not know", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    const task = find(all(model), TASK);
+    task.children = [{ id: "s1", type: "subtask", title: "Hide on Chrome", slug: "hide-on-chrome" } as RuleNode];
+    await write(rexDir, model);
+    const statePath = join(rexDir, "changes/add-apple-pay/wire-the-button/state.yaml");
+    await writeFile(statePath, 'schema: "rex/v2"\nitems: {}\nfutureKey: 1\n');
+    const before = await snapshot(rexDir);
+
+    task.children = [];
+    await expect(write(rexDir, model, { removed: new Set(["s1"]) })).rejects.toThrow(
+      new RegExp(`${TASK} would become a leaf.*wire-the-button.*futureKey`),
+    );
+    expect(await snapshot(rexDir)).toEqual(before);
+  });
+
   it("removes a stale folder that held only tree files", async () => {
     const rexDir = await copyFixture();
     const model = await loadPrdModel(rexDir, quiet);
