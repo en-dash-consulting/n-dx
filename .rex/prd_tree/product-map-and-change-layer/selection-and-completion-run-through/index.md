@@ -27,6 +27,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [get_next_task and rex next pick v2 work with findNextWork](./get-next-task-and-rex-next-pick-v2.md) | completed |
 | [get_prd_status on v2 drops capabilities and open changes under a nested area](./get-prd-status-on-v2-drops.md) | pending |
 | [resolveWorkById and claim_task treat a change that holds a nested change as a runnable unit](./resolveworkbyid-and-claim-task-treat-a.md) | pending |
-| [rex exports the v2 runtime for hench and the dashboard](./rex-exports-the-v2-runtime-for-hench.md) | pending |
+| [rex exports the v2 runtime for hench and the dashboard](./rex-exports-the-v2-runtime-for-hench.md) | completed |
 | [update_task_status completes and applies a change that holds an open nested change](./update-task-status-completes-and.md) | pending |
 | [update_task_status completes v2 work through change-completion and apply](./update-task-status-completes-v2-work.md) | completed |
