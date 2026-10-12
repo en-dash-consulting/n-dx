@@ -2,8 +2,11 @@
 id: "468a2c2f-ab25-48a3-9d75-a85fe22ce178"
 level: "task"
 title: "scip-java comparison counts constructor references as references to their type"
-status: "pending"
+status: "completed"
 priority: "low"
+startedAt: "2026-10-12T03:24:13.613Z"
+completedAt: "2026-10-12T03:27:13.420Z"
+endedAt: "2026-10-12T03:27:13.420Z"
 acceptanceCriteria:
   - "scipEdges turns a non-definition `<T>#`<init>`(...).` occurrence in file A into the edge A -> the file defining `<T>#`"
   - "An overloaded constructor symbol (`<init>`(+1).) maps the same way"
@@ -13,6 +16,6 @@ acceptanceCriteria:
   - "java-scip-compare.md says constructor references count as references to their type"
   - "java-scip-compare.mjs reports spring-petclinic at precision 100.0% and recall 100.0%"
 description: "From gate G2 (2026-10-08): packages/sourcevision/scripts/java-scip.mjs scipEdges keeps only type symbols (descriptor ending in `#`). scip-java records `new PetValidator()` as the constructor method symbol `...PetValidator#`<init>`().`, so the real edge PetController -> PetValidator counts as a resolver false positive and PetClinic reports precision 98.9% instead of 100%.\nFix: before the definedIn lookup, map a constructor occurrence (`<type>#`<init>`(<disambiguator>).`, including overloads such as `(+1)`) to its owning type symbol `<type>#`. All other method and field symbols stay ignored. Update the 'How the numbers are defined' section of scripts/java-scip-compare.md to say constructor references count as references to their type.\nScope: java-scip.mjs, its unit test and java-scip-compare.md only. The build-output and indexed-file corrections to the compare script belong to the sibling task 'Widen gate G2 to junit-framework and thingsboard', not this one. No clone, build, index or network access is needed: ~/.cache/ndx-java-corpus already has spring-petclinic/index.scip and thingsboard/index.scip.\nBefore (measured 2026-10-11 on PR 10 at 18e828c1d):\n  pnpm --filter @n-dx/sourcevision exec vitest run tests/unit/language/java-scip.test.ts  -> passes, no constructor case\n  node packages/sourcevision/scripts/java-scip-compare.mjs  -> spring-petclinic: resolver 91, scip-java 90, matched 90, precision 98.9%, recall 100.0%, one resolver-only edge PetController.java -> PetValidator.java (about 20 s, 1.2 GB; the thingsboard block also prints and is not judged here)\nAfter:\n  the same vitest command passes with the new constructor cases\n  the same compare command -> spring-petclinic: scip-java 91, matched 91, precision 100.0%, recall 100.0%, no resolver-only edges"
-lastModified: "2026-10-12T01:54:12.889Z"
+lastModified: "2026-10-12T03:27:13.696Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
