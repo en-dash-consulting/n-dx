@@ -260,6 +260,34 @@ describe("applyV1ToV2", () => {
     expect(model.tree.changes.some((n) => n.title === CUT_CHANGE_TITLE && isAppliedChange(n))).toBe(true);
   });
 
+  it.each([
+    ["prd.json", "{}"],
+    ["prd.md", "# Shop\n"],
+    ["prd_main_2026-01-01.json", "{}"],
+  ])("refuses, writing nothing, while legacy %s sits beside the tree", async (name, body) => {
+    const plan = await planOf((await load()).items);
+    writeFileSync(join(rexDir, name), body);
+    const before = snapshot(rexDir);
+    await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(/Legacy PRD source.*Nothing was written/s);
+    await expect(rehearseV1ToV2(rexDir, plan, { load })).rejects.toThrow(MigrationApplyError);
+    expect(snapshot(rexDir)).toEqual(before);
+    expect(existsSync(join(rexDir, "product"))).toBe(false);
+  });
+
+  it("applies when prd.json was already renamed to prd.json.migrated", async () => {
+    const plan = await planOf((await load()).items);
+    writeFileSync(join(rexDir, "prd.json.migrated"), "{}");
+    expect((await applyV1ToV2(rexDir, plan, { load })).status).toBe("applied");
+  });
+
+  it("leaves no way for a PRD-touching command to recreate prd_tree/ after apply", async () => {
+    const plan = await planOf((await load()).items);
+    await applyV1ToV2(rexDir, plan, { load });
+    const { ensureLegacyPrdMigrated } = await import("../../../../src/store/ensure-legacy-prd-migrated.js");
+    expect((await ensureLegacyPrdMigrated(repo)).migrated).toBe(false);
+    expect(existsSync(join(rexDir, "prd_tree"))).toBe(false);
+  });
+
   it("is a no-op on the migrated tree", async () => {
     const plan = await planOf((await load()).items);
     await applyV1ToV2(rexDir, plan, { load });
