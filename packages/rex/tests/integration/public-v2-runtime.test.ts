@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import {
   prdLayout,
@@ -26,6 +26,7 @@ import {
   buildChangeBrief,
   renderChangeBrief,
   resolveStore,
+  PRD_TREE_DIRNAME,
   ChangeLayerStore,
   isChangeLayerStore,
   type PrdModel,
@@ -36,6 +37,7 @@ import { copyV2Fixture } from "../helpers/v2-fixture.js";
 
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
 const TASK = "c0000000-0000-4000-8000-000000000002";
+const V1_FIXTURE = resolve(import.meta.dirname, "../fixtures/folder-tree/known-prd");
 const NOW = new Date("2026-10-12T00:00:00.000Z");
 const OPTS = { applyOn: "review" as const, appliedAt: NOW.toISOString(), now: NOW };
 const quiet ={ env: {}, warn: () => {} };
@@ -113,8 +115,9 @@ describe("v2 runtime exported from public.ts", () => {
     expect(completedWorkIds(await tree()).has(TASK)).toBe(true);
 
     const v1Dir = join(tmp, "v1", ".rex");
-    await expect(withPrdModelTransaction(v1Dir, (model) => ({ tree: model.tree, result: 0 }))).rejects.toThrow();
-    expect(new PrdLayoutError(v1Dir, "v1").name).toBe("PrdLayoutError");
+    await cp(V1_FIXTURE, join(v1Dir, PRD_TREE_DIRNAME), { recursive: true });
+    expect(await prdLayout(v1Dir)).toBe("v1");
+    await expect(withPrdModelTransaction(v1Dir, (model) => ({ tree: model.tree, result: 0 }))).rejects.toBeInstanceOf(PrdLayoutError);
   });
 
   it("loadApplyOn defaults to complete; completeV2Work completes through a resolved store", async () => {
