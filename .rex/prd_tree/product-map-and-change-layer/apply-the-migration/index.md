@@ -34,7 +34,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Applying a migration plan does not refuse one whose model pass is marked incomplete](./applying-a-migration-plan-does-not.md) | completed |
 | [Chain layout and schema steps in ndx migrate and refuse legacy projects](./chain-layout-and-schema-steps-in-ndx.md) | completed |
 | [Convert stray v1 files and warn on unreachable apply commits](./convert-stray-v1-files-and-warn-on.md) | pending |
-| [Merge stack C layer 2 into layer 3 and resolve the cli-migrate-apply e2e conflict](./merge-stack-c-layer-2-into-layer-3-and.md) | in_progress |
+| [Merge stack C layer 2 into layer 3 and resolve the cli-migrate-apply e2e conflict](./merge-stack-c-layer-2-into-layer-3-and.md) | blocked |
 | [ndx commands that spawn rex several times print the v1 deprecation notice once per spawn](./ndx-commands-that-spawn-rex-several.md) | completed |
 | [ndx init scaffolds a v2 project (product/index.md, never prd_tree/)](./ndx-init-scaffolds-a-v2-project.md) | pending |
 | [ndx migrate --apply --dry-run says what moves and what is dropped](./ndx-migrate-apply-dry-run-says-what.md) | completed |
