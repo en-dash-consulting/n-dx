@@ -495,18 +495,41 @@ async function handleBulkUpdate(
     // savePRDSync.
     const store = await resolveStore(ctx.rexDir);
     const results: Array<{ id: string; ok: boolean; error?: string }> = [];
-    const updatedDoc = await store.withTransaction(async (doc) => {
+    // As the single PATCH: on a v2 tree "completed" goes through rex's
+    // completion (closes a change with its last task, applies amendments to the
+    // product layer); any other field or status goes through the store.
+    const completing = input.updates.status === "completed" && isChangeLayerStore(store);
+    const fieldUpdates = { ...input.updates };
+    if (completing) delete fieldUpdates.status;
+    const writeFields = !completing || Object.keys(fieldUpdates).length > 0;
+    let updatedDoc = await store.withTransaction(async (doc) => {
       for (const id of input.ids) {
-        // Clone updates for each item to get independent timestamps
-        const itemUpdates = { ...input.updates };
-        if (updateInTree(doc.items, id, itemUpdates)) {
+        if (!writeFields) {
+          results.push({ id, ok: Boolean(findItemById(doc.items, id)) });
+        } else if (updateInTree(doc.items, id, { ...fieldUpdates })) {
+          // Cloned per item to get independent timestamps
           results.push({ id, ok: true });
         } else {
-          results.push({ id, ok: false, error: "not found" });
+          results.push({ id, ok: false });
         }
       }
       return doc;
     });
+    if (completing) {
+      for (const result of results) {
+        if (!result.ok) continue;
+        try {
+          await completeV2Work(store, result.id);
+        } catch (err) {
+          result.ok = false;
+          result.error = err instanceof Error ? err.message : String(err);
+        }
+      }
+      updatedDoc = await store.loadDocument();
+    }
+    for (const result of results) {
+      if (!result.ok && !result.error) result.error = "not found";
+    }
     refreshPRDCache(ctx.rexDir, updatedDoc);
 
     // Log the bulk update

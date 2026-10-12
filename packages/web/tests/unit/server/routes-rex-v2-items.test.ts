@@ -91,6 +91,25 @@ describe("Rex item routes on a v2 project", () => {
     expect(readFileSync(join(rexDir, "product", "checkout", "pay-by-card.md"), "utf-8")).toContain("Apple Pay is offered on Safari");
   });
 
+  it("bulk PATCH completed applies the change's amendments through rex", async () => {
+    expect((await send("PATCH", "items/bulk", { ids: [TASK_ID], updates: { status: "completed" } })).status).toBe(200);
+    const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID, "nope"], updates: { status: "completed" } });
+    expect(res.status).toBe(200);
+    const { results } = await res.json();
+    expect(results).toEqual([
+      { id: CHANGE_ID, ok: true },
+      { id: "nope", ok: false, error: "not found" },
+    ]);
+    expect((await (await resolveStore(rexDir)).getItem(CHANGE_ID))?.status).toBe("completed");
+    expect(readFileSync(join(rexDir, "product", "checkout", "pay-by-card.md"), "utf-8")).toContain("Apple Pay is offered on Safari");
+  });
+
+  it("bulk PATCH to another status still goes through the store", async () => {
+    const res = await send("PATCH", "items/bulk", { ids: [TASK_ID], updates: { status: "in_progress" } });
+    expect(res.status).toBe(200);
+    expect((await (await resolveStore(rexDir)).getItem(TASK_ID))?.status).toBe("in_progress");
+  });
+
   it("PATCH of an unknown id on v2 is a 404", async () => {
     const res = await send("PATCH", "items/nope", { status: "in_progress" });
     expect(res.status).toBe(404);
