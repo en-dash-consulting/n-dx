@@ -21,7 +21,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | pending |
 | [Resolve the store by layout, and refuse a split tree](./resolve-the-store-by-layout-and-refuse.md) | completed |
 | [rex migrate-to-folder-tree, migrate-to-md and migrate-folder-tree-filenames do not refuse a v2 tree](./rex-migrate-to-folder-tree-migrate-to.md) | pending |
 | [The rex CLI serves a v2 tree, and refuses what it cannot yet do](./the-rex-cli-serves-a-v2-tree-and.md) | pending |
