@@ -4,8 +4,9 @@
  *
  * The node completes through `completeWork` (core/change-completion.ts)
  * inside one {@link withPrdModelTransaction}: completing the last live task
- * of a `pending` change completes the change, and under `rex.applyOn:
- * complete` (read with {@link loadApplyOn}) the change's amendments apply in
+ * of a `pending` change completes the change (and each `pending` enclosing
+ * change whose work is then all done), and under `rex.applyOn: complete`
+ * (read with {@link loadApplyOn}) their amendments apply, innermost first, in
  * the same write. A v1 tree never comes here; it keeps the cascade in
  * `core/parent-completion.ts`.
  *
@@ -79,17 +80,20 @@ export async function completeV2Work(store: ChangeLayerStore, id: string, option
     });
   }
 
+  // `apply` and `reason` describe the node's own change; an enclosing change completed with it is logged only.
   const applied = out.apply?.applied === true;
-  if (out.apply?.applied) {
-    const amendments = out.apply.result.applied;
+  for (const { changeId, apply } of out.applies) {
+    if (!apply.applied) continue;
+    const amendments = apply.result.applied;
     await store.appendLog({
       timestamp,
       event: "change_applied",
-      itemId: out.changeId,
+      itemId: changeId,
       detail: amendments.length ? amendments.map((a) => `${a.delta} ${a.nodeId}`).join(", ") : "no amendments",
     });
   }
-  const reason = out.held?.reason ?? (out.apply && !out.apply.applied ? out.apply.reason : undefined);
+  const held = out.held?.changeId === out.changeId ? out.held : null;
+  const reason = held?.reason ?? (out.apply && !out.apply.applied ? out.apply.reason : undefined);
   return {
     autoCompleted,
     ...(out.changeId ? { changeId: out.changeId } : {}),

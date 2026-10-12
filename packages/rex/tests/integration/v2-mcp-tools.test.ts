@@ -409,6 +409,27 @@ describe("rex MCP tools on a v2 tree", () => {
     expect((await ws.store.readLog()).some((e) => e.event === "status_changed" && e.itemId === inbox)).toBe(false);
   });
 
+  it("update_task_status refuses a change holding an open nested change and writes nothing; its last nested task completes and applies both", async () => {
+    const outer = await addChange("Wallets");
+    const inner = await addChange("Google Pay");
+    expect((await call("move_item", { id: inner, parentId: outer })).isError).toBe(false);
+    const task = json(await call("add_item", { type: "task", title: "Wire it", parentId: inner })).id;
+
+    const refused = await call("update_task_status", { id: outer, status: "completed" });
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toContain(`change ${inner}`);
+    expect(await node(outer)).toMatchObject({ status: "pending" });
+    expect((await node(outer))?.appliedAt).toBeUndefined();
+    expect((await ws.store.readLog()).some((e) => e.itemId === outer && e.event !== "item_added")).toBe(false);
+
+    const body = json(await call("update_task_status", { id: task, status: "completed" }));
+    expect(body).toMatchObject({ changeId: inner, changeCompleted: true, applied: true });
+    expect(body.autoCompleted.map((i: { id: string }) => i.id)).toEqual([inner, outer]);
+    expect(await node(outer)).toMatchObject({ status: "completed", appliedAt: expect.any(String) });
+    const applied = (await ws.store.readLog()).filter((e) => e.event === "change_applied").map((e) => e.itemId);
+    expect(applied).toEqual([inner, outer]);
+  });
+
   it("get_next_task and update_task_status do not crash on the store", async () => {
     expect((await call("get_next_task")).isError).toBe(false);
     const res = await call("update_task_status", { id: TASK, status: "in_progress" });
