@@ -23,7 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [hench briefs a v2 task from its change](./hench-briefs-a-v2-task-from-its-change.md) | pending |
+| [hench briefs a v2 task from its change](./hench-briefs-a-v2-task-from-its-change.md) | completed |
 | [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | pending |
 | [hench selects v2 work and finds a task by id](./hench-selects-v2-work-and-finds-a-task.md) | completed |
 | [hench writes status, completion and claims through the v2 transaction](./hench-writes-status-completion-and.md) | pending |
