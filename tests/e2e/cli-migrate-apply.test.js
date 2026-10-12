@@ -77,6 +77,19 @@ describe("ndx migrate --apply", () => {
     expect(existsSync(join(dir, ".rex", "prd_tree"))).toBe(false);
   });
 
+  it("refuses, exits non-zero and writes nothing while .rex/prd.json sits beside the tree", () => {
+    const prdJson = join(dir, ".rex", "prd.json");
+    expect(existsSync(prdJson)).toBe(false);
+    renameSync(`${prdJson}.migrated`, prdJson);
+    const before = snapshot(dir);
+
+    const result = runResult(["migrate", "--apply", dir]);
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain(`Legacy PRD source beside the tree: ${prdJson}`);
+    expect(snapshot(dir)).toEqual(before);
+  });
+
   it("still needs --plan or --apply", () => {
     const result = runResult(["migrate", dir]);
     expect(result.code).toBe(1);
