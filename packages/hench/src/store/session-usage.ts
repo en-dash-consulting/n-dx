@@ -135,16 +135,44 @@ export interface MarkedUsageDelta extends SessionUsageDelta {
 interface TranscriptEntry {
   uuid?: string;
   timestamp?: string;
-  message?: { model?: string; usage?: Record<string, unknown> };
+  message?: { id?: string; model?: string; usage?: Record<string, unknown> };
+  /**
+   * False when an earlier entry already carried this `message.id`.
+   *
+   * Claude Code writes one transcript line per *content block*, and every one
+   * of them repeats the finished message in full — `usage` included. Summing
+   * line by line therefore charges a turn once per block. Measured on a real
+   * session: 234 usage-bearing lines carrying 57 distinct messages, a 4.27x
+   * over-count that put 23.5M cache-read tokens against the 5.5M actually read.
+   *
+   * The repeats are kept in the list rather than filtered out, because the
+   * cursor and the marks address positions by the *entry* uuid — which is
+   * distinct per line — so dropping lines would move every boundary and
+   * invalidate every cursor file already on disk. Only {@link sumUsage}
+   * consults this flag, which fixes the arithmetic without touching the
+   * addressing.
+   *
+   * Computed over the whole transcript, so a message whose blocks straddle a
+   * cursor boundary is counted in the segment holding its first block and in
+   * no other.
+   */
+  firstOfMessage?: boolean;
 }
 
 function numeric(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-/** Every usage-bearing transcript line, parsed. A half-written tail line is skipped. */
+/**
+ * Every usage-bearing transcript line, parsed, each flagged with whether it is
+ * the first sighting of its message. A half-written tail line is skipped.
+ *
+ * See {@link TranscriptEntry.firstOfMessage} for why repeats are flagged
+ * rather than dropped.
+ */
 function parseUsageEntries(transcript: string): TranscriptEntry[] {
   const entries: TranscriptEntry[] = [];
+  const seen = new Set<string>();
   for (const line of transcript.split(/\r?\n/)) {
     if (!line.trim()) continue;
     let parsed: TranscriptEntry;
@@ -155,7 +183,14 @@ function parseUsageEntries(transcript: string): TranscriptEntry[] {
       // land mid-write; the partial line is the next read's problem.
       continue;
     }
-    if (parsed?.message?.usage) entries.push(parsed);
+    if (!parsed?.message?.usage) continue;
+    const id = parsed.message.id;
+    // An entry with no message id is always counted: a vendor that stamps no
+    // identity would otherwise lose its usage entirely, which is a worse
+    // failure than the over-count this guards against.
+    parsed.firstOfMessage = !id || !seen.has(id);
+    if (id) seen.add(id);
+    entries.push(parsed);
   }
   return entries;
 }
@@ -164,17 +199,24 @@ function zeroUsage(): Required<TokenUsage> {
   return { input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0 };
 }
 
-/** Sum the usage of some entries, and note the last model seen. */
+/**
+ * Sum the usage of some entries, and note the last model seen.
+ *
+ * Repeat sightings of a message contribute no tokens — they are one turn
+ * written out once per content block — but still update the model, since a
+ * repeat witnesses which model produced the turn as well as the first does.
+ */
 function sumUsage(entries: TranscriptEntry[]): { totals: Required<TokenUsage>; model?: string } {
   const totals = zeroUsage();
   let model: string | undefined;
   for (const entry of entries) {
+    if (entry.message?.model) model = entry.message.model;
+    if (entry.firstOfMessage === false) continue;
     const usage = entry.message?.usage ?? {};
     totals.input += numeric(usage.input_tokens);
     totals.output += numeric(usage.output_tokens);
     totals.cacheCreationInput += numeric(usage.cache_creation_input_tokens);
     totals.cacheReadInput += numeric(usage.cache_read_input_tokens);
-    if (entry.message?.model) model = entry.message.model;
   }
   return { totals, model };
 }

@@ -570,3 +570,19 @@ export type { AppendLogArgs } from "./core/execution-log.js";
 // text rather than a hand-copied fixture.
 
 export { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "./workflow/default.js";
+
+// ---- Commit re-pointing ------------------------------------------------------
+// A rebase or squash rewrites the SHAs other tools recorded. This maps a
+// recorded SHA to the commit it became on main, and names the rule that
+// matched. Rex's own v2 state stores no SHAs, so the consumers are the tools
+// that do — hench run records are the first.
+
+export { repointCommits } from "./core/repoint-commits.js";
+export type {
+  CommitHost,
+  RepointMatch,
+  RepointMiss,
+  RepointOptions,
+  RepointResult,
+  RepointRule,
+} from "./core/repoint-commits.js";

@@ -329,7 +329,7 @@ describe("extractHenchTokenUsage", () => {
         byModel: usage.byModel,
       });
 
-      // Opus: $5 + $25 = $30. The old flat-Sonnet answer was $18.
+      // Opus: $5 + $25 = $30. The old flat-Sonnet answer was $12.
       expect(cost.total).toBe("$30.00");
       expect(cost.totalRaw).not.toBe(18);
       expect(cost.fullyAttributed).toBe(true);

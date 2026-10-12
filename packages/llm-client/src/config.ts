@@ -276,6 +276,11 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
     inputPerMToken: 5.00, outputPerMToken: 25.00,
     cacheWritePerMToken: 6.25, cacheReadPerMToken: 0.50,
   },
+  // Sonnet 5 is cheaper than Sonnet 4.6, not the same price. This row carried
+  // 4.6's $3/$15 — the rates of the model it replaced — which overstated every
+  // Sonnet 5 figure by 50%, and Sonnet is both the toolkit's standard tier and
+  // the fallback every unrecognised model is priced at, so the error reached
+  // far more surfaces than the runs that actually named this model.
   "claude-sonnet-5": {
     inputPerMToken: 2.00, outputPerMToken: 10.00,
     cacheWritePerMToken: 2.50, cacheReadPerMToken: 0.20,

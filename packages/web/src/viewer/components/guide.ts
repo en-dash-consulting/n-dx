@@ -118,9 +118,9 @@ const GUIDE_CONTENT: Partial<Record<ViewId, { description: string; lookFor: stri
     actions: "Expand a requirement to see its acceptance criteria and the status of every item it applies to. Add or edit requirements from the item detail panel in the Tasks view.",
   },
   "hench-adaptive": {
-    description: "Monitors run history and proposes workflow-parameter adjustments (turn limits, token budgets, retry settings) as the project evolves. Adjustments can be applied, dismissed, or auto-applied when adaptive mode is on.",
+    description: "Monitors run history and proposes workflow-parameter adjustments (turn limits, token budgets, retry settings) as the project evolves. Adjustments are recommendations: each one is written to the config only when you apply it.",
     lookFor: "High-priority adjustments with strong rationale. Trends moving the wrong way (falling success rate, rising token usage). Config keys you never want auto-tuned.",
-    actions: "Apply or dismiss each recommendation. Lock keys you manage manually. Enable adaptive mode to auto-apply safe adjustments; review the history to audit past changes.",
+    actions: "Apply or dismiss each recommendation. Lock keys you manage manually. Adaptive mode decides whether proposals are made at all, not whether they are applied — nothing reaches the config until you apply it. Review the history to audit past changes.",
   },
   "command-reference": {
     description: "Server-driven reference of every CLI command for this project, grouped by workflow stage, with the project's resolved CLI name and per-command availability.",
