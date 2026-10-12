@@ -516,16 +516,34 @@ async function handleBulkUpdate(
       return doc;
     });
     if (completing) {
+      // A change selected with its tasks is refused while a task listed after
+      // it is still open, so a refused id is retried after any pass that
+      // completed something.
+      let pending = results.filter((r) => r.ok);
+      while (pending.length > 0) {
+        const refused: typeof pending = [];
+        for (const result of pending) {
+          try {
+            await completeV2Work(store, result.id);
+            delete result.error;
+          } catch (err) {
+            result.error = err instanceof Error ? err.message : String(err);
+            refused.push(result);
+          }
+        }
+        if (refused.length === pending.length) break;
+        pending = refused;
+      }
+      for (const result of pending) result.ok = !result.error;
+      updatedDoc = await store.loadDocument();
+      // A change that closed with its last task refuses its own call (not
+      // open). Report the outcome, not the call: completed is what was asked.
       for (const result of results) {
-        if (!result.ok) continue;
-        try {
-          await completeV2Work(store, result.id);
-        } catch (err) {
-          result.ok = false;
-          result.error = err instanceof Error ? err.message : String(err);
+        if (!result.ok && result.error && findItemById(updatedDoc.items, result.id)?.status === "completed") {
+          result.ok = true;
+          delete result.error;
         }
       }
-      updatedDoc = await store.loadDocument();
     }
     for (const result of results) {
       if (!result.ok && !result.error) result.error = "not found";

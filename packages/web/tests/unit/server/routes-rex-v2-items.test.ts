@@ -104,6 +104,24 @@ describe("Rex item routes on a v2 project", () => {
     expect(readFileSync(join(rexDir, "product", "checkout", "pay-by-card.md"), "utf-8")).toContain("Apple Pay is offered on Safari");
   });
 
+  it("bulk PATCH completed of a change with its tasks completes both when the change is listed first", async () => {
+    const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID, TASK_ID], updates: { status: "completed" } });
+    expect((await res.json()).results).toEqual([
+      { id: CHANGE_ID, ok: true },
+      { id: TASK_ID, ok: true },
+    ]);
+    expect((await (await resolveStore(rexDir)).getItem(CHANGE_ID))?.status).toBe("completed");
+  });
+
+  it("bulk PATCH completed reports a refused completion as not ok", async () => {
+    // Completing the change while its task is open is refused by rex.
+    const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID], updates: { status: "completed" } });
+    const [result] = (await res.json()).results;
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("not completed");
+    expect((await (await resolveStore(rexDir)).getItem(CHANGE_ID))?.status).not.toBe("completed");
+  });
+
   it("bulk PATCH to another status still goes through the store", async () => {
     const res = await send("PATCH", "items/bulk", { ids: [TASK_ID], updates: { status: "in_progress" } });
     expect(res.status).toBe(200);
