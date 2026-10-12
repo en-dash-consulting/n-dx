@@ -40,6 +40,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Layout-literal wall misses a segmented join(root, ".ndx", "rex") path](./layout-literal-wall-misses-a-segmented.md) | pending |
 | [MCP Integration guide still says HTTP MCP is single-project until a 0.7.0 hub](./mcp-integration-guide-still-says-http.md) | pending |
 | [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | completed |
+| [Placing an Inbox change strands non-tree files in changes/inbox/<slug>/ and leaves a skipped-folder warning](./placing-an-inbox-change-strands-non.md) | pending |
 | [Record review decisions as calibration records on the run record](./record-review-decisions-as-calibration.md) | pending |
 | [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | deferred |
 | [Replace the v1 terminal screenshots in quickstart and existing-project with v2 ones](./replace-the-v1-terminal-screenshots-in.md) | pending |
