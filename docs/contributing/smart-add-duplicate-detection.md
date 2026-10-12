@@ -1,5 +1,9 @@
 # Rex Smart Add: Duplicate Detection and Resolution
 
+::: info v1 PRDs only
+Smart add runs on a v1 PRD (`.rex/prd_tree/`). On a v2 PRD, `rex add` turns each description into one change in the Inbox with no LLM call, so none of this applies.
+:::
+
 ## Overview
 
 Rex smart add generates structured PRD proposals from natural language descriptions using LLM reasoning. Before this feature, if a smart add prompt overlapped with existing PRD items, the system had no mechanism to detect or address the collision. This could result in silent creation of duplicates, scope overlap, or — in some configurations — outright failure when the overlap was significant enough to confuse proposal placement logic.

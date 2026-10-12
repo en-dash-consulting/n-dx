@@ -1,5 +1,9 @@
 # PRD Steward Vision
 
+::: warning Historical roadmap
+This vision predates the v2 PRD model and is written against the v1 epic/feature/task tree. The model being built is described in [The PRD](../guide/concepts/), and "steward" now names a person who approves changes to the requirements: see [Stewards](../guide/concepts/stewards).
+:::
+
 Rex today is a PRD tracker — it stores items, validates structure, and surfaces next tasks. The goal is to evolve it into a **PRD steward**: an intelligent curator that actively maintains, reorganizes, and improves the requirements document as the project evolves.
 
 ---

@@ -108,7 +108,7 @@ const PassRecordSchema = z
   .refine((p) => p.name !== "rules" || p.incomplete === undefined, "the rules pass cannot be incomplete");
 
 const RecordedAnswerSchema = z
-  .object({ hash: z.string().min(1), model: z.string().min(1), answer: z.unknown() })
+  .object({ hash: z.string().min(1), model: z.string().min(1), answer: z.unknown().optional() })
   .strict()
   .refine((a) => "answer" in a, "a recorded answer holds an answer");
 
@@ -126,7 +126,7 @@ const PlanFileSchema = z
         passes: z.array(PassRecordSchema).refine((p) => p[0]?.name === "rules", "the rules pass runs first"),
       })
       .strict(),
-    summary: z.unknown(),
+    summary: z.unknown().optional(),
     entries: z.record(z.string(), z.unknown()),
     answers: z
       .object({

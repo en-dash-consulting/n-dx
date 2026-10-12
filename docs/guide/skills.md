@@ -26,9 +26,13 @@ The table below is derived from [`packages/core/assistant-assets/manifest.json`]
 | [`ndx-zone`](#ndx-zone) | Deep-dive into an architectural zone's structure and health | `/ndx-zone [zone-id]` |
 | [`ndx-work`](#ndx-work) | Pick up a task from the PRD and begin working on it | `/ndx-work [task-id]` |
 | [`ndx-config`](#ndx-config) | View or change n-dx configuration with guided assistance | `/ndx-config [key] [value]` |
-| [`ndx-reshape`](#ndx-reshape) | Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps | `/ndx-reshape` |
+| [`ndx-reshape`](#ndx-reshape) | Restructure a v1 PRD tree — regroup epics, change levels, merge overlaps | `/ndx-reshape` |
 | [`ndx-feedback`](#ndx-feedback) | Submit feedback, bug reports, or feature requests for n-dx | `/ndx-feedback [description]` |
 | [`ndx-adversarial-review`](#ndx-adversarial-review) | Attack a change or a completion claim, triage what breaks, capture what the user approves | `/ndx-adversarial-review [task-id \| name \| topic]` |
+
+::: info The PRD skills target v1 PRDs today
+`/ndx-capture`, `/ndx-plan` and `/ndx-reshape` are written for the v1 PRD that `ndx init` creates until the storage migration ships: one tree of items, each with a level (epic, feature, task, subtask) and a parent. On a v2 PRD, where every new item enters as a change in the Inbox (see [Changes and apply](./concepts/changes-and-apply)), add changes with `ndx add` or `add_item` and place them with `rex change place` or `place_change`. The skills' v2 versions ship with the migration.
+:::
 
 ---
 
@@ -40,9 +44,10 @@ and `/ndx-adversarial-review` once you approve its findings — finishes with tw
 they all share:
 
 1. **Commit**, using `git status --porcelain` first. This matters because rex MCP
-   writes are side effects: `add_item` and `edit_item` write to
-   `.rex/prd_tree/<slug>/index.md` even when no file was edited directly, so a
-   skill that only called MCP tools still has changes to commit.
+   writes are side effects: `add_item` and `edit_item` write the PRD's files
+   (under `.rex/prd_tree/` on a v1 PRD, `.ndx/rex/` on a v2 one) even when no
+   file was edited directly, so a skill that only called MCP tools still has
+   changes to commit.
 2. **Record the run** with `ndx hench record`, so skill-driven work is auditable
    next to `ndx work` runs. Token usage comes from the Claude Code session
    transcript, counting only the spend since the previous record — so several
@@ -76,7 +81,7 @@ they all share:
 1. Calls `get_overview` and `get_findings` (sourcevision MCP) to assess current state
 2. Calls `get_prd_status` (rex MCP) to avoid duplicating existing items
 3. Calls `get_next_steps` for prioritized recommendations
-4. Proposes new epics/features/tasks and creates them via `add_item` after approval
+4. Proposes new items (on a v1 PRD: epics, features and tasks) and creates them via `add_item` after approval
 
 **Customization:** Edit `.claude/skills/ndx-plan/SKILL.md` to focus proposals on specific product areas or add domain-specific analysis steps. Note that `ndx init` will overwrite this file — see [Adding your own skill](#adding-your-own-skill) for a durable approach.
 
@@ -101,14 +106,14 @@ they all share:
 
 ### ndx-capture
 
-**Purpose:** Turn a freeform description — from the conversation or as an argument — into a structured PRD item placed in the right spot in the hierarchy.
+**Purpose:** Turn a freeform description — from the conversation or as an argument — into a PRD item with a title, description and acceptance criteria, placed under the right parent.
 
 **When it triggers:** Invoke with `/ndx-capture` or `/ndx-capture <description>`. Use it whenever you want to quickly log a requirement without leaving the chat.
 
 **What it does:**
 1. Uses the provided description or reviews recent conversation for captured requirements
 2. Calls `get_prd_status` (rex MCP) to understand current structure
-3. Determines level (epic / feature / task) and finds an appropriate parent
+3. Determines the v1 level (epic / feature / task) and finds an appropriate parent
 4. Drafts the item with title, description, and acceptance criteria
 5. Presents to the user for confirmation, then creates via `add_item`
 6. Wires `blockedBy` edges if ordering relationships exist
@@ -171,11 +176,11 @@ they all share:
 
 ### ndx-reshape
 
-**Purpose:** LLM-assisted PRD cleanup: regroup scattered epics, fix wrong levels, merge overlapping items, and normalize naming.
+**Purpose:** LLM-assisted cleanup of a v1 PRD tree: regroup scattered epics, fix wrong levels, merge overlapping items, and normalize naming. A v2 PRD has no levels to fix: its structure is the product layer's areas and capabilities, which change only through applied changes.
 
 **When it triggers:** Invoke with `/ndx-reshape` when the PRD has grown organically and needs structural cleanup. Typically run after a long feature sprint or after multiple `ndx plan --accept` cycles.
 
-**What it does:**
+**What it does (v1 PRD):**
 1. Calls `get_prd_status` (rex MCP) to assess the current epic/feature structure
 2. Detects problems: too many epics, wrong levels, overlapping areas, orphaned items
 3. Proposes a target structure (7-12 top-level epics, 3-15 features each)

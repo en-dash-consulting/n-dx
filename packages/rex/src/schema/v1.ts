@@ -319,6 +319,14 @@ export interface RunSettings {
   provider?: "cli" | "api";
   permissionMode?: "default" | "acceptEdits" | "bypassPermissions";
   review?: boolean;
+  /**
+   * How the task is reviewed: `off`, `self` (the executor's vendor reviews) or
+   * `pair` (another vendor reviews and the executor fixes). Outranks `review`
+   * when both are saved.
+   */
+  reviewMode?: RunSettingReviewMode;
+  /** The pair reviewer. Must differ from the executor's vendor at run time. */
+  reviewVendor?: RunSettingReviewVendor;
   /** Portable model weight for the reviewer. */
   reviewTier?: RunSettingTier;
   /** Exact reviewer model per vendor; same bounds as `models`. */
@@ -338,6 +346,14 @@ export interface RunSettings {
 export const RUN_SETTING_TIERS = ["light", "standard", "heavy"] as const satisfies ReadonlyArray<TaskWeight>;
 export type RunSettingTier = (typeof RUN_SETTING_TIERS)[number];
 
+/** Review modes a task may save; the same three `hench.review.mode` takes. */
+export const RUN_SETTING_REVIEW_MODES = ["off", "self", "pair"] as const;
+export type RunSettingReviewMode = (typeof RUN_SETTING_REVIEW_MODES)[number];
+
+/** Vendors that can review: those with a CLI to spawn. */
+export const RUN_SETTING_REVIEW_VENDORS = ["claude", "codex"] as const satisfies ReadonlyArray<LLMVendor>;
+export type RunSettingReviewVendor = (typeof RUN_SETTING_REVIEW_VENDORS)[number];
+
 /** Model ids keyed by vendor name (`LLM_VENDORS`); at least one entry when present. */
 export type RunSettingModels = Partial<Record<LLMVendor, string>>;
 
@@ -348,6 +364,8 @@ export const RUN_SETTING_KEYS = [
   "provider",
   "permissionMode",
   "review",
+  "reviewMode",
+  "reviewVendor",
   "reviewTier",
   "reviewModels",
   "reviewOptional",

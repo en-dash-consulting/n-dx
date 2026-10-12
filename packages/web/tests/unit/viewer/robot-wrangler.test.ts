@@ -25,6 +25,18 @@ function config(overrides: Json = {}): Json {
     claudeSources: {},
     effective: { vendor: "claude", provider: "cli", model: "claude-sonnet-5", modelSource: "default" },
     effectiveProblems: [],
+    tiers: [
+      { tier: "agent", model: "claude-sonnet-5", source: "catalog default", usedBy: [{ label: "ndx work" }] },
+      { tier: "standard", model: "claude-sonnet-5", source: "catalog default", usedBy: [] },
+      { tier: "light", model: "claude-haiku-4-5", source: "catalog default", usedBy: [] },
+      { tier: "heavy", model: "claude-opus-5", source: "catalog default", usedBy: [] },
+    ],
+    failover: {
+      enabled: false,
+      applies: false,
+      reason: "Failover is not available for Claude CLI. Only Claude on the API connection supports failover.",
+      chain: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5", "claude-haiku-4-5"],
+    },
     ...overrides,
   };
 }
@@ -92,44 +104,6 @@ describe("RobotWranglerView", () => {
     expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("All changes saved");
   });
 
-  it("shows the effective block as runnable when there are no problems", async () => {
-    stubApi(config({
-      effective: { vendor: "claude", provider: "cli", model: "claude-opus-5", modelSource: "hench-override" },
-    }));
-    await mount();
-    const block = root.querySelector(".llm-effective")!;
-    expect(block.textContent).toContain("claude");
-    expect(block.textContent).toContain("cli");
-    expect(block.textContent).toContain("claude-opus-5");
-    expect(block.textContent).toContain("agent model override");
-    expect(block.classList.contains("llm-effective-refused")).toBe(false);
-    expect(block.querySelector('[role="alert"]')).toBeNull();
-  });
-
-  it("marks the block refused and lists the route's provider problem", async () => {
-    stubApi(config({
-      vendor: "codex",
-      effective: { vendor: "codex", provider: "api", model: "gpt-5.5", modelSource: "default" },
-      effectiveProblems: [{ field: "provider", message: 'Provider "api" is not supported for vendor "codex". Allowed: cli.' }],
-    }));
-    await mount();
-    const block = root.querySelector(".llm-effective")!;
-    expect(block.classList.contains("llm-effective-refused")).toBe(true);
-    const items = Array.from(block.querySelectorAll('[role="alert"] li')).map((li) => li.textContent);
-    expect(items).toEqual(['Provider "api" is not supported for vendor "codex". Allowed: cli.']);
-  });
-
-  it("marks the block refused and lists the route's model problem", async () => {
-    stubApi(config({
-      vendor: "codex",
-      effective: { vendor: "codex", provider: "cli", model: "claude-sonnet-4-6", modelSource: "configured" },
-      effectiveProblems: [{ field: "model", message: 'Model "claude-sonnet-4-6" is not a codex model.' }],
-    }));
-    await mount();
-    const items = Array.from(root.querySelectorAll('.llm-effective [role="alert"] li')).map((li) => li.textContent);
-    expect(items).toEqual(['Model "claude-sonnet-4-6" is not a codex model.']);
-  });
-
   it("shows legacy-key Claude fields as such and saves them to llm.claude.*", async () => {
     const { puts } = stubApi(config({
       claude: { model: "claude-opus-5", lightModel: "claude-haiku-4-5" },
@@ -141,26 +115,142 @@ describe("RobotWranglerView", () => {
     const light = root.querySelector<HTMLSelectElement>('select[id="claude.lightModel"]')!;
     expect(model.value).toBe("claude-opus-5");
     expect(light.value).toBe("claude-haiku-4-5");
-    const sources = Array.from(root.querySelectorAll(".llm-field-source")).map((el) => el.textContent?.trim());
-    expect(sources).toEqual(["from legacy claude.model", "from legacy claude.lightModel"]);
+    expect(root.querySelector(".llm-legacy")?.textContent).toContain("claude.model and claude.lightModel are read from the legacy top-level key");
 
     await act(async () => {
       model.value = "claude-sonnet-5";
       model.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("Unsaved changes");
+    expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("1 unsaved change · Standard model → claude-sonnet-5");
 
     await act(async () => { root.querySelector<HTMLButtonElement>(".settings-frame-save")!.click(); });
     await settle();
     expect(puts).toEqual([{ changes: { "llm.claude.model": "claude-sonnet-5" } }]);
   });
 
-  it("shows no legacy marker when the fields come from llm.claude.*", async () => {
+  it("shows no legacy notice when the fields come from llm.claude.*", async () => {
     stubApi(config({
       claude: { model: "claude-opus-5", lightModel: null },
       claudeSources: { model: "llm" },
     }));
     await mount();
-    expect(root.querySelectorAll(".llm-field-source")).toHaveLength(0);
+    expect(root.querySelector(".llm-legacy")).toBeNull();
+  });
+
+  it("renders the failover section with header and chain", async () => {
+    stubApi(config({
+      vendor: "claude",
+      effective: { vendor: "claude", provider: "api", model: "claude-sonnet-5", modelSource: "default" },
+      failover: {
+        enabled: false,
+        applies: true,
+        chain: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5"],
+      },
+    }));
+    await mount();
+    // Find all sections and filter to the one with "If a run fails"
+    const sections = Array.from(root.querySelectorAll(".llm-rw-section"));
+    const failoverSection = sections.find((s) => s.textContent?.includes("If a run fails"));
+    expect(failoverSection).toBeTruthy();
+    expect(failoverSection?.textContent).toContain("Automatic failover");
+    expect(root.querySelector(".llm-failover-chain")).toBeTruthy();
+  });
+
+  it("renders failover chain as pills joined by arrows when toggle is on", async () => {
+    const { puts } = stubApi(config({
+      vendor: "claude",
+      autoFailover: true,
+      effective: { vendor: "claude", provider: "api", model: "claude-sonnet-5", modelSource: "default" },
+      failover: {
+        enabled: true,
+        applies: true,
+        chain: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5"],
+      },
+    }));
+    await mount();
+
+    const toggle = root.querySelector<HTMLInputElement>('input[id="autoFailover"]')!;
+    const chain = root.querySelector(".llm-failover-chain")!;
+    const pills = Array.from(chain.querySelectorAll(".llm-failover-pill")).map((p) => p.textContent);
+    expect(pills).toEqual(["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5"]);
+    expect(toggle.checked).toBe(true);
+    expect(chain.classList.contains("llm-failover-chain-dimmed")).toBe(false);
+  });
+
+  it("dims the chain when failover toggle is off", async () => {
+    stubApi(config({
+      vendor: "claude",
+      effective: { vendor: "claude", provider: "api", model: "claude-sonnet-5", modelSource: "default" },
+      failover: {
+        enabled: false,
+        applies: true,
+        chain: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5"],
+      },
+    }));
+    await mount();
+
+    const chain = root.querySelector(".llm-failover-chain")!;
+    expect(chain.classList.contains("llm-failover-chain-dimmed")).toBe(true);
+  });
+
+  it("shows warning when failover cannot apply", async () => {
+    stubApi(config({
+      vendor: "claude",
+      effective: { vendor: "claude", provider: "cli", model: "claude-sonnet-5", modelSource: "default" },
+      failover: {
+        enabled: false,
+        applies: false,
+        reason: "Failover is not available for Claude CLI. Only Claude on the API connection supports failover.",
+        chain: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5"],
+      },
+    }));
+    await mount();
+
+    const warning = root.querySelector(".llm-failover-warning")!;
+    expect(warning.textContent).toContain("Failover is not available for Claude CLI");
+    // Information, not an error: a status line, not an alert box.
+    expect(warning.getAttribute("role")).toBe("status");
+    expect(warning.querySelector(".llm-note-mark")?.textContent).toBe("!");
+  });
+
+  it("shows local-specific message when failover applies is false for local vendor", async () => {
+    stubApi(config({
+      vendor: "local",
+      effective: { vendor: "local", provider: "api", model: "llama-2", modelSource: "default" },
+      failover: {
+        enabled: false,
+        applies: false,
+        reason: "Failover is not available for local models. Only Claude on the API connection supports failover.",
+        chain: ["llama-2"],
+      },
+    }));
+    await mount();
+
+    const warning = root.querySelector(".llm-failover-warning")!;
+    expect(warning.textContent).toContain("Failover is not available for local models");
+  });
+
+  it("saves autoFailover toggle when changed", async () => {
+    const { puts } = stubApi(config({
+      vendor: "claude",
+      effective: { vendor: "claude", provider: "api", model: "claude-sonnet-5", modelSource: "default" },
+      failover: {
+        enabled: false,
+        applies: true,
+        chain: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5"],
+      },
+    }));
+    await mount();
+
+    const toggle = root.querySelector<HTMLInputElement>('input[id="autoFailover"]')!;
+    await act(async () => {
+      toggle.checked = true;
+      toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(root.querySelector(".settings-frame-indicator")?.textContent).toBe("1 unsaved change · Auto failover → on");
+
+    await act(async () => { root.querySelector<HTMLButtonElement>(".settings-frame-save")!.click(); });
+    await settle();
+    expect(puts).toEqual([{ changes: { "llm.autoFailover": true } }]);
   });
 });

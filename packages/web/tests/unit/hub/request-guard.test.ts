@@ -205,6 +205,16 @@ describe("guardHubRequest — per-user token", () => {
     expect(out.headers["location"]).toBe("/p/alpha/");
   });
 
+  it("still strips the query token from a navigation the cookie already authenticates", () => {
+    // Reopening the printed URL must not proxy "/?ndx_token=…" to the child.
+    const r = req("GET", { cookie: `ndx_token=${TOKEN}` }) as IncomingMessage & { url: string };
+    r.url = `/p/alpha/?ndx_token=${TOKEN}`;
+    const out = res();
+    expect(guardHubRequest(r, out.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(out.statusCode).toBe(302);
+    expect(out.headers["location"]).toBe("/p/alpha/");
+  });
+
   it("still applies the Host and Origin rules to an authenticated request", () => {
     const foreignHost = res();
     expect(guardHubRequest(req("GET", { host: "attacker.example:3117", "x-ndx-token": TOKEN }), foreignHost.res, HUB_PORT, TOKEN)).toBe(true);

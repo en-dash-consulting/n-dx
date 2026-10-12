@@ -26,6 +26,7 @@ import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { relativeToRoot, resolveLayout } from "./layout.js";
+import { loadShellTestEnv, loadVendorCliEnv } from "./config.js";
 
 // ---------------------------------------------------------------------------
 // NDX context assembly
@@ -273,6 +274,8 @@ export function readRexTestCommand(dir) {
  * Determine which vendor should act as reviewer given the primary vendor.
  *
  * @param {"claude" | "codex"} primaryVendor
+ * @param {string} [configured]  `hench.review.vendor`; used when it is a
+ *   reviewer vendor other than the primary, otherwise the default applies.
  * @returns {"claude" | "codex"}
  */
 const REVIEWER_VENDOR = {
@@ -280,40 +283,47 @@ const REVIEWER_VENDOR = {
   CODEX: "codex",
 };
 
-export function resolveReviewerVendor(primaryVendor) {
+export function resolveReviewerVendor(primaryVendor, configured) {
+  if (
+    (configured === REVIEWER_VENDOR.CLAUDE || configured === REVIEWER_VENDOR.CODEX) &&
+    configured !== primaryVendor
+  ) {
+    return configured;
+  }
   return primaryVendor === REVIEWER_VENDOR.CLAUDE ? REVIEWER_VENDOR.CODEX : REVIEWER_VENDOR.CLAUDE;
 }
 
 /**
  * Resolve the CLI binary path for a given vendor.
- * Reads from .n-dx.json (llm.<vendor>.cli_path) and falls back to
- * the bare vendor name (resolved by PATH lookup).
+ * Reads llm.<vendor>.cli_path from .n-dx.local.json (where every cli_path is
+ * written), then .n-dx.json, and falls back to the bare vendor name
+ * (resolved by PATH lookup).
  *
  * @param {string} dir  Project root directory.
  * @param {"claude" | "codex"} vendor
  * @returns {string}  CLI binary path or name.
  */
 export function resolveVendorCliPath(dir, vendor) {
-  const configPath = resolveLayout(dir).configFile;
-  try {
-    if (existsSync(configPath)) {
-      const data = JSON.parse(readFileSync(configPath, "utf-8"));
-      const configured = data?.llm?.[vendor]?.cli_path;
-      if (typeof configured === "string" && configured.trim().length > 0) {
-        return configured.trim();
-      }
-      // Legacy claude.cli_path key
-      if (vendor === REVIEWER_VENDOR.CLAUDE) {
-        const legacy = data?.claude?.cli_path;
-        if (typeof legacy === "string" && legacy.trim().length > 0) {
-          return legacy.trim();
-        }
-      }
-    }
-  } catch {
-    /* ignore — fall through to default */
+  const layout = resolveLayout(dir);
+  for (const configPath of [layout.localConfigFile, layout.configFile]) {
+    const found = readCliPath(configPath, vendor);
+    if (found) return found;
   }
   return vendor; // "claude" or "codex" — resolved via PATH
+}
+
+/** The trimmed `cli_path` for `vendor` in one config file, or undefined. */
+function readCliPath(configPath, vendor) {
+  try {
+    if (!existsSync(configPath)) return undefined;
+    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    const candidates = [data?.llm?.[vendor]?.cli_path];
+    // Legacy claude.cli_path key
+    if (vendor === REVIEWER_VENDOR.CLAUDE) candidates.push(data?.claude?.cli_path);
+    return candidates.find((c) => typeof c === "string" && c.trim().length > 0)?.trim();
+  } catch {
+    return undefined; // unreadable config — fall through to the next source
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -528,6 +538,40 @@ async function terminateTimedOutTree(child) {
 const doNotTrack = (child) => child;
 
 /**
+ * Resolve the reviewer CLI's environment without letting a config failure
+ * escape. Every reviewer failure must reach the caller as `spawnError`:
+ * `runCrossVendorReview` falls back to the shell test command on it, and a
+ * rejection would skip that fallback.
+ *
+ * @param {string} dir
+ * @param {"claude" | "codex" | undefined} reviewer
+ * @returns {Promise<{ env: NodeJS.ProcessEnv } | { spawnError: string }>}
+ */
+async function resolveReviewerEnv(dir, reviewer, trust) {
+  try {
+    return { env: await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE, { trust }) };
+  } catch (err) {
+    return { spawnError: `could not resolve the reviewer environment: ${err.message}` };
+  }
+}
+
+/**
+ * Argv for a reviewer CLI that reads its prompt from stdin.
+ * claude: `-p -`; codex: `exec -` (matches codex-cli-adapter). `--model` is
+ * added only when a model is given, so the CLI's own default stays the default.
+ *
+ * @param {"claude" | "codex"} reviewer
+ * @param {string} [model]
+ * @returns {string[]}
+ */
+export function buildReviewerArgs(reviewer, model) {
+  const modelArgs = model ? ["--model", model] : [];
+  return reviewer === REVIEWER_VENDOR.CODEX
+    ? ["exec", ...modelArgs, "-"]
+    : ["-p", "-", ...modelArgs];
+}
+
+/**
  * Invoke the reviewer vendor CLI with the given prompt.
  * Inherits the current process's stdio so the user can observe the review
  * in real time. Returns the process exit code and whether it timed out.
@@ -537,20 +581,26 @@ const doNotTrack = (child) => child;
  *   prompt: string;
  *   dir: string;
  *   reviewer?: "claude" | "codex";
+ *   model?: string;
  *   timeout?: number;
+ *   trust?: import("@n-dx/llm-client").RepoTrustStoreOptions;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
  */
-export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
+export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {
+  const resolved = await resolveReviewerEnv(dir, reviewer, trust);
+  if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError };
+  const { env } = resolved;
   return new Promise((resolve) => {
     let child;
     try {
       // Deliver the prompt via stdin to avoid newline injection on Windows cmd.exe.
       // claude: `-p -` reads the full prompt from stdin.
       // codex:  `exec -` reads the prompt from stdin (matches codex-cli-adapter).
-      const args = reviewer === REVIEWER_VENDOR.CODEX ? ["exec", "-"] : ["-p", "-"];
+      const args = buildReviewerArgs(reviewer, model);
       child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
+        env,
         stdio: ["pipe", "inherit", "inherit"],
         // POSIX: makes the CLI a process-group leader so the timeout can signal the
         // group and reach its descendants. No-op on Windows, where taskkill walks
@@ -602,18 +652,24 @@ export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_0
  *   prompt: string;
  *   dir: string;
  *   reviewer?: "claude" | "codex";
+ *   model?: string;
  *   timeout?: number;
+ *   trust?: import("@n-dx/llm-client").RepoTrustStoreOptions;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
  */
-export function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
+export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {
+  const resolved = await resolveReviewerEnv(dir, reviewer, trust);
+  if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError, output: "" };
+  const { env } = resolved;
   return new Promise((resolve) => {
     let child;
     try {
       // Deliver the prompt via stdin — same rationale as runReviewerLlm.
-      const args = reviewer === REVIEWER_VENDOR.CODEX ? ["exec", "-"] : ["-p", "-"];
+      const args = buildReviewerArgs(reviewer, model);
       child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
+        env,
         stdio: ["pipe", "pipe", "pipe"],
         // Process-group leader on POSIX; see runReviewerLlm.
         ...treeKillSpawnOptions(),
@@ -795,15 +851,46 @@ export function buildRemediationContext(feedback, description, priorContext) {
  * Always spawns via the system shell so quoted arguments and compound
  * commands (e.g. "pnpm -r test") are handled correctly.
  *
+ * The child never inherits the raw parent environment: it gets `process.env`
+ * filtered by the project's `hench.guard.env` policy (see `loadShellTestEnv`),
+ * or by the default deny policy when the project's cannot be loaded — reported
+ * as `envWarning`. If no filtered environment can be built, nothing is spawned.
+ *
  * @param {string} testCommand  Full shell command (e.g. "pnpm test").
  * @param {string} dir          Working directory.
  * @param {number} [timeout=120000]  Max run time in ms.
+ * @returns {Promise<{ exitCode: number; output: string; envWarning?: string }>}
+ */
+export async function runShellTestCommand(testCommand, dir, timeout = 120_000, registerChild = doNotTrack) {
+  let shellEnv;
+  try {
+    shellEnv = await loadShellTestEnv(dir);
+  } catch (err) {
+    return {
+      exitCode: 1,
+      output: `[pair-programming review: test command not run — could not build a filtered environment: ${err.message}]`,
+    };
+  }
+  const envWarning = shellEnv.policyError === undefined
+    ? undefined
+    : `project guard.env policy could not be loaded (${shellEnv.policyError}); the test command ran with the default environment filter`;
+  const result = await spawnShellTestCommand(testCommand, dir, timeout, registerChild, shellEnv.env);
+  return envWarning === undefined ? result : { ...result, envWarning };
+}
+
+/**
+ * @param {string} testCommand
+ * @param {string} dir
+ * @param {number} timeout
+ * @param {typeof doNotTrack} registerChild
+ * @param {NodeJS.ProcessEnv} env  Already filtered; see `runShellTestCommand`.
  * @returns {Promise<{ exitCode: number; output: string }>}
  */
-export function runShellTestCommand(testCommand, dir, timeout = 120_000, registerChild = doNotTrack) {
+function spawnShellTestCommand(testCommand, dir, timeout, registerChild, env) {
   return new Promise((resolve) => {
     const child = registerChild(spawn(testCommand, [], {
       cwd: dir,
+      env,
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
       // Load-bearing here more than anywhere else in this file: with `shell: true`
@@ -851,6 +938,8 @@ export function runShellTestCommand(testCommand, dir, timeout = 120_000, registe
  * @property {boolean}         [passed]        True when review passed. Present only when !skipped.
  * @property {string}          [command]       The test command run (shell-test-only mode).
  * @property {string}          [output]        Combined stdout + stderr (shell-test-only).
+ * @property {string}          [envWarning]    Set when the test command ran under the default
+ *                                             env filter because the project's could not be loaded.
  * @property {number}          [exitCode]      Exit code of the reviewer process.
  * @property {string[]}        [changedFiles]  Files identified as changed.
  * @property {string[]}        [contextFiles]  Context file paths from the primary run.
@@ -871,17 +960,21 @@ export function runShellTestCommand(testCommand, dir, timeout = 120_000, registe
  * @param {{
  *   dir: string;
  *   reviewer: "claude" | "codex";
+ *   model?: string;
  *   testCommand?: string;
  *   timeout?: number;
  *   contextFiles?: string[];
  * }} options
  * @returns {Promise<ReviewResult>}
  */
-export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout, contextFiles, registerChild = doNotTrack }) {
+export async function runCrossVendorReview({ dir, reviewer, model, testCommand, timeout, contextFiles, registerChild = doNotTrack }) {
   const cliPath = resolveVendorCliPath(dir, reviewer);
   const { available } = checkReviewerAvailability(cliPath);
 
-  const ctx = contextFiles?.length ? { contextFiles } : {};
+  const ctx = {
+    ...(contextFiles?.length ? { contextFiles } : {}),
+    ...(model ? { model } : {}),
+  };
 
   if (!available) {
     return {
@@ -896,12 +989,12 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
   const prompt = buildReviewerPrompt({ changedFiles, testCommand });
   const llmTimeout = timeout ?? 300_000;
 
-  const llmResult = await runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout: llmTimeout, registerChild });
+  const llmResult = await runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, model, timeout: llmTimeout, registerChild });
 
   if (llmResult.spawnError) {
     // LLM failed to start — fall back to shell tests when a test command is available
     if (testCommand) {
-      const { exitCode, output } = await runShellTestCommand(testCommand, dir, 120_000, registerChild);
+      const { exitCode, output, envWarning } = await runShellTestCommand(testCommand, dir, 120_000, registerChild);
       return {
         mode: "shell-test-only",
         skipped: false,
@@ -909,6 +1002,7 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
         command: testCommand,
         output,
         exitCode,
+        ...(envWarning ? { envWarning } : {}),
         ...ctx,
       };
     }
@@ -934,6 +1028,40 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
 }
 
 // ---------------------------------------------------------------------------
+// Review rounds
+// ---------------------------------------------------------------------------
+
+/**
+ * Run up to `rounds` review → remediation cycles, stopping as soon as a review
+ * passes, is skipped, or has no feedback to act on; then return the final
+ * verdict. With `rounds` = 2 and reviews that keep failing: review, fix,
+ * review, fix, review — two remediation passes at most.
+ *
+ * @template R
+ * @param {{
+ *   rounds: number;
+ *   review: (round: number) => Promise<R>;
+ *   remediate: (result: R, pass: number) => Promise<void>;
+ * }} options  `round` and `pass` count from 1; round 1 is the first review.
+ * @returns {Promise<{ result: R; remediationPasses: number }>}
+ */
+export async function runReviewRounds({ rounds, review, remediate }) {
+  let result = await review(1);
+  let remediationPasses = 0;
+  while (
+    remediationPasses < rounds &&
+    !result.skipped &&
+    !result.passed &&
+    result.feedback
+  ) {
+    remediationPasses += 1;
+    await remediate(result, remediationPasses);
+    result = await review(remediationPasses + 1);
+  }
+  return { result, remediationPasses };
+}
+
+// ---------------------------------------------------------------------------
 // Formatter
 // ---------------------------------------------------------------------------
 
@@ -952,7 +1080,7 @@ const BORDER = "─".repeat(60);
  * @returns {string}
  */
 export function formatReviewBanner(reviewer, result) {
-  const lines = ["", BORDER, `Reviewer (${reviewer})`, BORDER];
+  const lines = ["", BORDER, `Reviewer (${reviewer}${result.model ? `, ${result.model}` : ""})`, BORDER];
 
   if (result.skipped) {
     lines.push(`⚠  Review skipped: ${result.reason}`);
@@ -967,6 +1095,7 @@ export function formatReviewBanner(reviewer, result) {
       lines.push(`   Exit code: ${result.exitCode}`);
     }
   } else if (result.mode === "shell-test-only") {
+    if (result.envWarning) lines.push(`⚠  ${result.envWarning}`);
     if (result.passed) {
       lines.push("✓  Tests passed (shell-test-only — LLM reviewer unavailable)");
       if (result.command) lines.push(`   Command: ${result.command}`);

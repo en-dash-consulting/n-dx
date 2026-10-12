@@ -82,7 +82,9 @@ async function cmdReviewPending(
       "Only runs started with --review have findings to defer.",
     );
   }
-  if (run.review.failed !== undefined) {
+  // A failed review that kept its report (a pair review that ended with must-fix
+  // findings open) still has findings to list.
+  if (run.review.failed !== undefined && !run.review.reportPath) {
     throw new CLIError(
       `Run ${run.id} has no review report (${run.review.failed}).`,
       run.review.detail,

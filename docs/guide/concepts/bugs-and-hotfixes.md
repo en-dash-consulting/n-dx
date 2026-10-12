@@ -1,7 +1,7 @@
 # Bugs and hotfixes
 
-::: warning Ships with 1.0.0
-This page describes the 1.0.0 model, which is still landing.
+::: warning The v2 model
+This page describes the v2 model, which ships from 0.9.0 for v2 projects. `ndx init` creates v1 projects until the storage migration ships (see [v1 projects](../prd-storage#v1-projects)).
 :::
 
 A bug is the build drifting from an unchanged spec. So a **fix** is a change that *touches* a capability without amending it. Engineers own fixes; stewards are pulled in only when a fix needs the spec to say something new.
@@ -19,7 +19,7 @@ Bugs usually arrive with evidence: a stack trace, a file path, a failing test. L
 | Accepted | The change touches the capability, which reads *defective* while the fix is open |
 | Duplicate | Merged into the open change; the issue is added to its issues list |
 | Actually a feature request | An amendment is added, and the kind becomes Enhancement on its own |
-| Works as intended | Cancelled, usually with a clarifying criterion added to the spec, because the spec was ambiguous |
+| Works as intended | Cancelled, usually with a clarifying capability criterion added to the spec, because the spec was ambiguous |
 | Won't fix | Cancelled with a reason |
 
 ## Spec gaps
@@ -36,6 +36,6 @@ A hotfix is not a type. It is a fix with a patch `plannedRelease` and critical p
 
 ### Example: #473
 
-Before the 1.0.0 model, #473 (forked task sessions refuse to edit) was a top-level epic named "Hotfix · #473 …", holding one feature. In the new model it is one change touching Session strategy, with `plannedRelease: 1.0.1` and critical priority. While it is open, Session strategy reads *defective*. When it merges, the capability returns to *ok*; when 1.0.1 publishes, the release pipeline stamps `shippedIn` on the change. Nothing is left behind.
+Before the v2 model, #473 (forked task sessions refuse to edit) was a top-level epic named "Hotfix · #473 …", holding one feature. In the new model it is one change touching Session strategy, with `plannedRelease: 1.0.1` and critical priority. While it is open, Session strategy reads *defective*. When it merges, the capability returns to *ok*; when 1.0.1 publishes, the release pipeline stamps `shippedIn` on the change. Nothing is left behind.
 
 Back to [the PRD](./) · [Changes and apply](./changes-and-apply) · [Skills Reference](../skills)

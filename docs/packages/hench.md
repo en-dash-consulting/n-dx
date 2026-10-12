@@ -21,6 +21,7 @@ hench run --auto --iterations=4 .    # run 4 tasks sequentially
 hench run --dry-run .                # preview brief without executing
 hench run --model=claude-opus-5-5 .        # override model
 hench run --task=abc123 --no-review .      # skip a review the task saved
+hench run --task=abc123 --review-mode=pair --reviewer=codex .  # pair review by codex
 hench run --task=abc123 --resolve .        # print the settings a run would use
 hench config .                       # view workflow configuration
 hench config hench.maxTurns 30 .     # edit a config value
@@ -57,6 +58,12 @@ optional exact `models` pins per vendor. On vendor V the agent model resolves as
 `--model` > `models[V]` > `tier` > `hench.models.V` > `llm.*` > default, and the
 reviewer as `--review-model` > `reviewModels[V]` > `reviewTier` >
 `llm.V.reviewModel` / `llm.reviewModel` > the vendor default.
+
+Who reviews follows the same chain: `--review-mode` (`--review` is self,
+`--no-review` is off) > the task's `reviewMode` > its `review` > `hench.review.mode`,
+and the pair reviewer is `--reviewer` > `reviewVendor` > `hench.review.vendor` >
+the executor's other CLI vendor. A saved `reviewVendor` that is the executor's
+own vendor is skipped with a warning (that would be self review).
 
 **A saved value that cannot be honoured never stops a run.** It is skipped with
 a warning naming the task, and resolution continues down the chain — a model the

@@ -374,7 +374,7 @@ describe("ref-resolves", () => {
       }, [node("task", { id: "task-1", title: "Task one" })]);
       const findings = checkV2Rules({ product: [], changes: [change] }, { now: NOW });
       expect(findings.map((f) => [f.rule, f.message])).toEqual([
-        ["ref-resolves", `change "${change.title}" touches "task-1" names a task "Task one", not a product-layer node`],
+        ["ref-resolves", `change "${change.title}" touches "task-1" names a task "Task one", not a capability or a constraint`],
         ["ref-resolves", `change "${change.title}" added amendment under "task-1" names a task "Task one", not an area or a capability not nested in another, which can hold a capability`],
       ]);
     });
@@ -412,6 +412,25 @@ describe("ref-resolves", () => {
         [change.id, ["added amendment under", "k", "a constraint"]],
         [change.id, ["added amendment under", "t", "a task"]],
       ]);
+    });
+
+    it("fails a change touching or modifying an area; passes removing one or adding under one", () => {
+      const product = [node("area", { id: "area" }, [cap({ id: "a" })]), node("constraint", { id: "k" })];
+      const change = node("change", {
+        touches: ["area", "a", "k"],
+        amends: [
+          { target: "area", delta: "modified", summary: "s" },
+          { target: "a", delta: "modified", summary: "s" },
+          { target: "area", delta: "removed", summary: "s" },
+          { target: "new", delta: "added", summary: "s", under: "area" },
+        ],
+      });
+      const findings = check("ref-resolves", { product, changes: [change] });
+      expect(findings.map((f) => f.message.match(/ (\S+(?: amendment \S+)?) "([^"]+)" names (an? [a-z ]+?) "/)?.slice(1))).toEqual([
+        ["touches", "area", "an area"],
+        ["modified amendment target", "area", "an area"],
+      ]);
+      expect(findings[0].message).toContain("not a capability or a constraint");
     });
 
     it("passes a constraint added under any product node", () => {
@@ -493,6 +512,30 @@ describe("layer-nesting", () => {
     const capability = cap();
     const findings = check("layer-nesting", { product: [node("area", {}, [task])], changes: [node("change", {}, [capability])] });
     expect(ids(findings)).toEqual([task.id, capability.id]);
+  });
+
+  it("fails a task at the changes root, a subtask under a change, and a task under a task", () => {
+    const rootTask = node("task");
+    const subUnderChange = node("subtask");
+    const inner = node("task");
+    const outer = node("task", {}, [inner]);
+    const changes = [rootTask, node("change", {}, [subUnderChange, outer])];
+    expect(ids(check("layer-nesting", { changes }))).toEqual([rootTask.id, subUnderChange.id, inner.id]);
+  });
+
+  it("keeps a change nested under a change valid", () => {
+    const changes = [node("change", {}, [node("change", {}, [node("task")])])];
+    expect(check("layer-nesting", { changes })).toEqual([]);
+  });
+
+  it("keeps a subtask under a subtask valid, as v1 branch subtasks import", () => {
+    const changes = [node("change", {}, [node("task", {}, [node("subtask", {}, [node("subtask")])])])];
+    expect(check("layer-nesting", { changes })).toEqual([]);
+  });
+
+  it("fails a subtask at the changes root", () => {
+    const subtask = node("subtask");
+    expect(ids(check("layer-nesting", { changes: [subtask] }))).toEqual([subtask.id]);
   });
 
   it("fails a root loaded under the other layer's root", () => {

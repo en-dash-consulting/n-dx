@@ -34,7 +34,7 @@ After merging PRs with changeset files to `main`:
 1. The release workflow opens (or updates) a **"Version Packages"** PR
 2. That PR bumps `version` in all packages, writes `CHANGELOG.md`, and removes consumed changeset files. The version step (`pnpm run version-packages`) then runs `rex release stamp <version>`, which records `shippedIn` on the changes the release ships; on a v1 PRD tree it has nothing to stamp. A failed stamp prints a warning and never blocks the release
 3. Review the PR — it shows exactly what version bump and changelog entries will be created
-4. **Merge the "Version Packages" PR** → the workflow runs `changeset publish`, which:
+4. **Land the "Version Packages" PR** through the merge queue like any other PR (approve, then "Merge when ready"; see [Landing a pull request](CONTRIBUTING.md#landing-a-pull-request)). Publishing still starts from the push to `main` that the queue's merge commit makes, and the workflow runs `changeset publish`, which:
    - Publishes all packages to npm (using `pnpm publish`, which resolves `workspace:*` to real versions)
    - Creates git tags on the runner and reports them to `changesets/action@v2` through the `CHANGESETS_OUTPUT` NDJSON file
 5. `changesets/action@v2` pushes every reported tag to origin and creates one **GitHub release per package** (`@n-dx/core@0.7.0`, `@n-dx/rex@0.7.0`, …), using that package's `CHANGELOG.md` section as the release body

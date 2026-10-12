@@ -294,6 +294,11 @@ describe("hench → llm-client gateway contract", () => {
   const GATEWAY_FUNCTIONS = [
     "loadClaudeConfig",
     "loadLLMConfig",
+    "compileEnvPolicy",
+    "envNameAllowed",
+    "sanitizeChildEnv",
+    "strippedEnvNames",
+    "resolveVendorCliEnv",
     "resolveApiKey",
     "resolveCliPath",
     "loadProjectOverrides",
@@ -362,7 +367,7 @@ describe("hench → llm-client gateway contract", () => {
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
 
-  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS"];
+  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS", "DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"];
   const GATEWAY_STRING_CONSTANTS = ["NDX_CONTAINER_DIRNAME"];
 
   for (const name of GATEWAY_FUNCTIONS) {
@@ -797,6 +802,7 @@ describe("gateway export auto-detection", () => {
 
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
+        "compileEnvPolicy", "envNameAllowed", "sanitizeChildEnv", "strippedEnvNames", "resolveVendorCliEnv",
         "deepMerge", "loadProjectOverrides", "loadProjectOverrideSources", "mergeWithOverrides", "toCanonicalJSON",
         // Repository trust: the guard baseline and the per-user trust store
         // are one evaluation shared by hench, the dashboard and ndx init.
@@ -855,6 +861,7 @@ describe("gateway export auto-detection", () => {
         "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS",
         "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE", "SECRET_PATH_PATTERNS",
         "NDX_CONTAINER_DIRNAME"],
+      ...["DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));

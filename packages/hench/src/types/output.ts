@@ -367,8 +367,11 @@ export function stream(
  * In rolling-window mode: pushed into the 10-line in-place window.
  * In non-TTY or NO_COLOR mode: printed directly via console.log.
  */
-export function detail(text: string): void {
-  if (isQuiet()) return;
+export function detail(text: string, options: { captureWhenQuiet?: boolean } = {}): void {
+  if (isQuiet()) {
+    if (options.captureWhenQuiet) capture(`           ${text}`);
+    return;
+  }
   const indented = `           ${text}`;
 
   if (isRollingMode()) {

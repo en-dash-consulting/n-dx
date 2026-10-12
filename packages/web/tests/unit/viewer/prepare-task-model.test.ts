@@ -85,6 +85,42 @@ describe("prepare task model", () => {
     expect(runOptionsOf(defaults, cli)).toEqual({ provider: "cli" });
   });
 
+  describe("review mode and reviewer vendor", () => {
+    it("sends the mode, and the reviewer only for a pair review", () => {
+      const pair = setField(defaults, setField(defaults, {}, "reviewMode", "pair"), "reviewVendor", "claude");
+      expect(runOptionsOf(defaults, pair)).toEqual({ reviewMode: "pair", reviewVendor: "claude" });
+      expect(commandLine(prep, "task-1", defaults, pair)).toContain("--review-mode=pair --reviewer=claude");
+      expect(optionsProblem(defaults, pair)).toBeNull();
+
+      const self = setField(defaults, pair, "reviewMode", "self");
+      expect(runOptionsOf(defaults, self)).toEqual({ reviewMode: "self" });
+    });
+
+    it("repeats a configured mode with a review model instead of forcing self", () => {
+      const configured = prepFixture();
+      configured.resolved.review = { value: true, source: "hench.review.mode" };
+      configured.resolved.reviewMode = { value: "pair", source: "hench.review.mode" };
+      const d = defaultsOf(configured);
+      expect(runOptionsOf(d, setField(d, {}, "reviewModel", "claude-opus")))
+        .toEqual({ reviewMode: "pair", reviewModel: "claude-opus" });
+    });
+
+    it("saves the mode and reviewer, and replaces a saved review boolean with the mode", () => {
+      const pair = setField(defaults, setField(defaults, {}, "reviewMode", "pair"), "reviewVendor", "claude");
+      expect(saveBodyOf(prep, defaults, pair)).toEqual({ reviewMode: "pair", reviewVendor: "claude" });
+
+      const legacy = prepFixture({ saved: { review: true } });
+      legacy.resolved.review = { value: true, source: "task.run", fallback: { value: false, source: "built-in" } };
+      legacy.resolved.reviewMode = { value: "self", source: "task.run", fallback: { value: "off", source: "built-in" } };
+      const d = defaultsOf(legacy);
+      // Untouched, the block keeps exactly what it had.
+      expect(saveBodyOf(legacy, d, {})).toEqual({ review: true });
+      expect(saveBodyOf(legacy, d, setField(d, {}, "reviewMode", "pair"))).toEqual({ reviewMode: "pair" });
+      // Back to the project's mode stops overriding it.
+      expect(saveBodyOf(legacy, d, setField(d, {}, "reviewMode", "off"))).toBeNull();
+    });
+  });
+
   it("reports a value the shared table refuses", () => {
     expect(optionsProblem(defaults, setField(defaults, {}, "maxTurns", Number.NaN))?.key).toBe("maxTurns");
     expect(optionsProblem(defaults, setField(defaults, {}, "maxTurns", 9))).toBeNull();

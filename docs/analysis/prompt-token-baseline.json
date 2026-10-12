@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 38,
-    "perCallTokens": 23377,
-    "uniqueTokens": 14874,
+    "perCallTokens": 23393,
+    "uniqueTokens": 14890,
     "skills": 13,
     "skillTokens": 20439
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4631,
-      "uniqueTokens": 4631
+      "perCallTokens": 4647,
+      "uniqueTokens": 4647
     },
     "core": {
       "surfaces": 1,
@@ -230,6 +230,14 @@
         "buildMultiAddEnvelope",
         "buildIdeasEnvelope",
         "buildModifyEnvelope"
+      ]
+    },
+    {
+      "pkg": "hench",
+      "name": "reportOutputLines",
+      "tokens": 353,
+      "usedBy": [
+        "buildReviewBrief"
       ]
     },
     {
@@ -799,11 +807,13 @@
       "builder": "buildReviewBrief",
       "purpose": "Brief handed to the reviewer — what to attack and where to report.",
       "inline": false,
-      "literals": 149,
-      "constants": {},
-      "ownTokens": 1831,
-      "fixedChars": 7323,
-      "fixedTokens": 1831
+      "literals": 110,
+      "constants": {
+        "reportOutputLines": 353
+      },
+      "ownTokens": 1494,
+      "fixedChars": 7387,
+      "fixedTokens": 1847
     },
     {
       "pkg": "hench",
@@ -940,13 +950,13 @@
     "hench": {
       "surface": "buildPromptEnvelope",
       "describe": "Full agent envelope (system + brief) for a CLI-provider run.",
-      "chars": 3662,
-      "tokens": 916,
+      "chars": 3832,
+      "tokens": 958,
       "sections": [
         {
           "name": "system",
-          "chars": 2992,
-          "tokens": 748
+          "chars": 3162,
+          "tokens": 791
         },
         {
           "name": "brief",
@@ -956,7 +966,7 @@
       ],
       "fixedTokens": 1478,
       "branchConditional": true,
-      "unreachedTokens": 562
+      "unreachedTokens": 520
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -1011,8 +1021,8 @@
       }
     ]
   },
-  "contentHash": "ffe50f97285f672a",
-  "recordedAt": "2026-10-09T18:57:56.580Z",
-  "commit": "21cefd26264b",
+  "contentHash": "cf05efd08ecdaa08",
+  "recordedAt": "2026-10-11T07:52:33.623Z",
+  "commit": "7c54ef5ac04f",
   "dirty": false
 }

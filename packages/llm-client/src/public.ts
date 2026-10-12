@@ -151,7 +151,7 @@ export type {
 export { ClaudeClientError, CLIError, CLI_ERROR_CODES, AuthFailureError } from "./types.js";
 
 // Vendor-neutral config + client factories
-export { loadLLMConfig, resolveClaudeConfig } from "./llm-config.js";
+export { loadLLMConfig, parseLLMConfig, resolveClaudeConfig } from "./llm-config.js";
 export type { ClaudeFieldSource, ResolvedClaudeConfig } from "./llm-config.js";
 export {
   createLLMClient,
@@ -705,3 +705,13 @@ export type {
 // this module has no opinion about where a package keeps its state. Only the
 // switch is public — askJev does the lookups and stores itself.
 export { configureJudgmentCache } from "./judgment-cache.js";
+export {
+  DEFAULT_ENV_DENY,
+  DEFAULT_ENV_ALLOW,
+  compileEnvPolicy,
+  envNameAllowed,
+  sanitizeChildEnv,
+  strippedEnvNames,
+  resolveVendorCliEnv,
+} from "./child-env.js";
+export type { EnvPolicy, EnvPolicyConfig } from "./child-env.js";

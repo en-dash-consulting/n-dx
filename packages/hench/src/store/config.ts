@@ -58,13 +58,13 @@ export interface LoadConfigOptions {
  */
 function salvageConfig(
   data: Record<string, unknown>,
-  issues: Array<{ path: Array<string | number> }>,
+  issues: Array<{ path: Array<PropertyKey> }>,
 ): { config: HenchConfig; replacedFields: string[] } | null {
   return revertInvalidFields(data, issues, DEFAULT_HENCH_CONFIG() as unknown as Record<string, unknown>);
 }
 
 /** The top-level field names a set of validation issues implicates, sorted. */
-function topLevelKeys(issues: Array<{ path: Array<string | number> }>): string[] {
+function topLevelKeys(issues: Array<{ path: Array<PropertyKey> }>): string[] {
   const keys = new Set<string>();
   for (const issue of issues) {
     const key = issue.path[0];

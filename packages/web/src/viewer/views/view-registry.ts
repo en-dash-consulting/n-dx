@@ -57,7 +57,7 @@ import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import { PrepareTaskModal } from "../components/index.js";
-import type { StageId } from "./stages.js";
+import { isSettingsView, type StageId } from "./stages.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 
 import {
@@ -248,6 +248,18 @@ const REGISTRY: Record<string, ViewRenderer> = {
 export function renderActiveView(view: ViewId, ctx: ViewRenderContext): ComponentChild {
   const renderer = REGISTRY[view];
   return renderer ? renderer(ctx) : null;
+}
+
+/**
+ * What a view shows while the analysis data may still be loading. Settings
+ * views read none of that data, so they render at once; every other view waits
+ * behind the loading state.
+ */
+export function renderViewContent(view: ViewId, loading: boolean, ctx: ViewRenderContext): ComponentChild {
+  if (loading && !isSettingsView(view)) {
+    return h("div", { class: "loading", role: "status", "aria-live": "polite" }, "Loading...");
+  }
+  return renderActiveView(view, ctx);
 }
 
 export { buildValidViews } from "../external.js";
