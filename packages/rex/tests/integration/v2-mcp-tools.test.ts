@@ -266,6 +266,63 @@ describe("rex MCP tools on a v2 tree", () => {
     expect(json(await call("get_token_usage")).items.map((i: { id: string }) => i.id)).toEqual(expect.arrayContaining([CHANGE, TASK]));
   });
 
+  it("get_next_task selects through findNextWork, keeping the v1 fields and adding type and changeId", async () => {
+    const next = json(await call("get_next_task"));
+    expect(next.item).toMatchObject({ id: TASK, title: "Wire the button", level: "task", status: "pending", type: "task" });
+    expect(next.item.acceptanceCriteria).toEqual(["The button appears on Safari only"]);
+    expect(next.parentChain).toEqual([{ id: CHANGE, title: "Add Apple Pay", level: "epic", type: "change" }]);
+    expect(next.changeId).toBe(CHANGE);
+    expect(next.explanation).toMatchObject({
+      reason: "priority",
+      priority: { itemPriority: "high", higherPriorityBlocked: 0 },
+      dependencies: { status: "none", resolvedBlockers: [] },
+      traversalPath: ["Add Apple Pay"],
+    });
+    expect(next.explanation.summary).toMatch(/"Wire the button" selected at high priority via Add Apple Pay/);
+  });
+
+  it("get_next_task selects a task-less change as the unit and never the Inbox", async () => {
+    const inbox = json(await call("add_item", { type: "change", title: "Unplaced idea", priority: "critical" })).id;
+    expect((await node(inbox))?.needsPlacement).toBe(true);
+    expect(json(await call("get_next_task")).item.id).toBe(TASK);
+
+    await call("update_task_status", { id: TASK, status: "completed" });
+    const solo = await addChange("Add Google Pay");
+    const next = json(await call("get_next_task"));
+    expect(next.item).toMatchObject({ id: solo, level: "epic", type: "change" });
+    expect(next.changeId).toBe(solo);
+    expect(next.parentChain).toEqual([]);
+  });
+
+  it("get_next_task skips work another worktree has claimed", async () => {
+    const elsewhere = join(tmp, "other-worktree");
+    expect((await ws.claims.store.claim(TASK, { worktreeRoot: elsewhere })).ok).toBe(true);
+    const solo = await addChange("Add Google Pay");
+    const next = json(await call("get_next_task"));
+    expect(next.item.id).toBe(solo);
+    expect(next.skippedClaimed).toEqual([expect.objectContaining({ taskId: TASK, worktreeRoot: elsewhere })]);
+
+    expect((await ws.claims.store.claim(solo, { worktreeRoot: elsewhere })).ok).toBe(true);
+    expect(json(await call("get_next_task"))).toMatchObject({ next: null, message: expect.stringMatching(/2 claimed elsewhere/) });
+  });
+
+  it("get_next_task filters by the unit's own tags", async () => {
+    const tagged = json(await call("add_item", { type: "change", title: "Tagged", touches: ["a0000000-0000-4000-8000-000000000002"], tags: ["wallets"] })).id;
+    expect(json(await call("get_next_task", { tags: ["wallets"] })).item.id).toBe(tagged);
+    expect(json(await call("get_next_task", { tags: ["nothing"] })).next).toBeNull();
+  });
+
+  it("get_next_task descends into a change nested under another change", async () => {
+    const outer = json(await call("add_item", { type: "change", title: "Wallets", touches: ["a0000000-0000-4000-8000-000000000002"], priority: "critical" })).id;
+    const inner = json(await call("add_item", { type: "change", title: "Google Pay", touches: ["a0000000-0000-4000-8000-000000000002"], priority: "critical" })).id;
+    const moved = await call("move_item", { id: inner, parentId: outer });
+    expect(moved.isError, moved.text).toBe(false);
+    const next = json(await call("get_next_task"));
+    expect(next.item).toMatchObject({ id: inner, level: "feature", type: "change" });
+    expect(next.changeId).toBe(inner);
+    expect(next.parentChain.map((p: { id: string }) => p.id)).toEqual([outer]);
+  });
+
   it("get_next_task and update_task_status do not crash on the store", async () => {
     expect((await call("get_next_task")).isError).toBe(false);
     const res = await call("update_task_status", { id: TASK, status: "in_progress" });

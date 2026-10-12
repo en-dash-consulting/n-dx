@@ -28,6 +28,38 @@ describe("findNextWork", () => {
   });
 });
 
+describe("nested changes", () => {
+  it("never selects a change that holds a change; selects within the nested one", () => {
+    expect(ids(tree(change("outer", { children: [change("inner")] })))).toEqual(["inner"]);
+    expect(ids(tree(change("outer", { children: [change("inner", { children: [task("t")] })] })))).toEqual(["t"]);
+    expect(findNextWork(tree(change("outer", { children: [change("inner", { children: [task("t")] })] })))).toMatchObject({
+      kind: "task",
+      node: { id: "t" },
+      change: { id: "inner" },
+    });
+  });
+
+  it("selects an outer change's own tasks beside its nested change", () => {
+    expect(ids(tree(change("outer", { children: [task("own"), change("inner")] })))).toEqual(["own", "inner"]);
+  });
+
+  it("treats an outer change whose nested changes are all deleted as task-less", () => {
+    expect(ids(tree(change("outer", { children: [change("inner", { status: "deleted" })] })))).toEqual(["outer"]);
+  });
+
+  it("gates nested work on every enclosing change", () => {
+    expect(ids(tree(change("outer", { needsPlacement: true, children: [change("inner", { children: [task("t")] })] })))).toEqual([]);
+    expect(ids(tree(change("outer", { status: "deferred", children: [change("inner")] })))).toEqual([]);
+    expect(ids(tree(change("outer", { blockedBy: ["nowhere"], children: [change("inner")] })))).toEqual([]);
+  });
+
+  it("resolveWorkById resolves a task under a nested change to the nested change", () => {
+    const t = tree(change("outer", { children: [change("inner", { children: [task("t")] })] }));
+    expect(resolveWorkById(t, "t")).toMatchObject({ kind: "task", node: { id: "t" }, change: { id: "inner" } });
+    expect(resolveWorkById(t, "inner")).toMatchObject({ kind: "change", node: { id: "inner" }, change: { id: "inner" } });
+  });
+});
+
 describe("needsPlacement", () => {
   const inbox = tree(change("inbox", { needsPlacement: true, children: [task("inbox-task")] }), change("inbox-solo", { needsPlacement: true }));
 

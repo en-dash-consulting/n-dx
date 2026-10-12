@@ -23,8 +23,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Change selection descends into a change nested under another change](./change-selection-descends-into-a.md) | pending |
-| [get_next_task and rex next pick v2 work with findNextWork](./get-next-task-and-rex-next-pick-v2.md) | pending |
+| [Change selection descends into a change nested under another change](./change-selection-descends-into-a.md) | completed |
+| [get_next_task and rex next pick v2 work with findNextWork](./get-next-task-and-rex-next-pick-v2.md) | in_progress |
 | [get_prd_status on v2 drops capabilities and open changes under a nested area](./get-prd-status-on-v2-drops.md) | pending |
 | [rex exports the v2 runtime for hench and the dashboard](./rex-exports-the-v2-runtime-for-hench.md) | pending |
 | [update_task_status completes v2 work through change-completion and apply](./update-task-status-completes-v2-work.md) | pending |

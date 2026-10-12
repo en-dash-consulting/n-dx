@@ -469,10 +469,11 @@ describe("isolation", () => {
     // move_item, merge_items and claim_task, with the type-based parent rule
     // and merge rules they use (core/move.ts, core/merge.ts, which the
     // reorganize executor merges changes through: core/reorganize-executor.ts),
-    // and the legacy
-    // prd.json migration, which never migrates beside a v2 tree
+    // and the legacy prd.json migration, which never migrates beside a v2 tree
     // (store/ensure-legacy-prd-migrated.ts), and the snapshot restore, which
-    // refuses a v2 tree (core/backup-snapshots.ts).
+    // refuses a v2 tree (core/backup-snapshots.ts), and v2 selection behind
+    // get_next_task and `rex next`, in get_next_task's v1 shape
+    // (core/change-next-task.ts).
     // `public.ts` re-exports the reader, the node and tree types, the index
     // and the derived product computations: consumers of the product layer
     // (the dashboard's Product and Changes views, the Graview projection) read
@@ -541,6 +542,7 @@ describe("isolation", () => {
         "core/reorganize-executor.ts",
         "store/ensure-legacy-prd-migrated.ts",
         "core/backup-snapshots.ts",
+        "core/change-next-task.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

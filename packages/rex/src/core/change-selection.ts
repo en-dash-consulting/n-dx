@@ -4,9 +4,12 @@
  *
  * ## Units of work
  *
- * A task is a unit. A change with no live tasks is itself the unit; a change
- * with tasks is worked through them and is never selected while it has any
- * (completing it is the completion path's job). Subtasks belong to their task.
+ * A task is a unit. A change with no live tasks and no live nested changes is
+ * itself the unit; a change with tasks is worked through them and is never
+ * selected while it has any (completing it is the completion path's job). A
+ * change holding a change is a container: selection descends into it, and the
+ * enclosing change's gates apply to everything inside. Subtasks belong to
+ * their task.
  *
  * ## Autonomous selection
  *
@@ -65,6 +68,16 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
     (node.blockedBy ?? []).some((ref) => index.resolve(ref)?.status !== "completed");
   const runnable = (node: RuleNode): boolean => ACTIONABLE.has(node.status ?? "pending") && !blockerOpen(node);
 
+  // Whether a change may yield work: its own gates and every enclosing change's.
+  const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
+  const workable = new Map<RuleNode, boolean>();
+  const changeWorkable = (node: RuleNode): boolean => {
+    const parent = parentOf.get(node);
+    const ok = isOpenChange(node) && !node.needsPlacement && runnable(node) && (parent?.type !== "change" || workable.get(parent) === true);
+    workable.set(node, ok);
+    return ok;
+  };
+
   const order = new Map<RuleNode, number>();
   const dependents = new Map<RuleNode, number>();
   const units: WorkUnit[] = [];
@@ -74,11 +87,13 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
       const target = index.resolve(ref);
       if (target) dependents.set(target, (dependents.get(target) ?? 0) + 1);
     }
-    if (node.type !== "change") return;
-    if (!isOpenChange(node) || node.needsPlacement || !runnable(node)) return;
-    const tasks = (node.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
+    // Entries are in tree order, so an enclosing change is judged before what it holds.
+    if (node.type !== "change" || !changeWorkable(node)) return;
+    const live = (node.children ?? []).filter((c) => c.status !== "deleted");
+    const tasks = live.filter((c) => c.type === "task");
     const change = node as ChangeRule;
-    if (tasks.length === 0) units.push({ kind: "change", node: change, change });
+    // A change holding a change is a container: its work is its tasks and the nested changes.
+    if (tasks.length === 0 && !live.some((c) => c.type === "change")) units.push({ kind: "change", node: change, change });
     for (const task of tasks) if (runnable(task)) units.push({ kind: "task", node: task as TaskRule, change });
   });
 

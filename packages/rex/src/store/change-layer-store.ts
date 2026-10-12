@@ -26,7 +26,7 @@ import { newErrors } from "../core/apply-amendments.js";
 import { changeLayerFromItems, changeLayerItems, productLayerItems } from "../core/layer-projection.js";
 import { pruneKeepReason } from "../core/prune.js";
 import { findItem, insertChild, removeFromTree, updateInTree, walkTree } from "../core/tree.js";
-import type { RuleNode } from "../schema/v2-rules.js";
+import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
 import type { PRDStore, StoreCapabilities } from "./contracts.js";
 import { loadPrdModel, prdLayout } from "./prd-model-reader.js";
 import { withPrdModelTransaction } from "./prd-model-transaction.js";
@@ -50,6 +50,11 @@ export class ChangeLayerStore implements PRDStore {
   async loadDocument(): Promise<PRDDocument> {
     const model = await loadPrdModel(this.rexDir);
     return { schema: SCHEMA_VERSION, title: model.title, items: changeLayerItems(model.tree.changes) };
+  }
+
+  /** The v2 tree itself, for the code that works on change-layer nodes rather than projected items. */
+  async loadTree(): Promise<V2Tree> {
+    return (await loadPrdModel(this.rexDir)).tree;
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
