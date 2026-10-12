@@ -25,14 +25,15 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A claim on a task-less change covers the task it splits into](./a-claim-on-a-task-less-change-covers.md) | pending |
+| [A claim on a task-less change covers the task it splits into](./a-claim-on-a-task-less-change-covers.md) | completed |
 | [Change selection descends into a change nested under another change](./change-selection-descends-into-a.md) | completed |
 | [ChangeLayerStore writes return a save report of the paths written and deleted](./changelayerstore-writes-return-a-save.md) | pending |
 | [Export the product computations the dashboard views need, under #648's names](./export-the-product-computations-the.md) | pending |
 | [get_next_task and rex next pick v2 work with findNextWork](./get-next-task-and-rex-next-pick-v2.md) | completed |
 | [get_prd_status on v2 drops capabilities and open changes under a nested area](./get-prd-status-on-v2-drops.md) | completed |
+| [Pin rex update's v2 order: complete first, write the other fields only if the completion succeeded](./pin-rex-update-s-v2-order-complete.md) | pending |
 | [resolveWorkById and claim_task treat a change that holds a nested change as a runnable unit](./resolveworkbyid-and-claim-task-treat-a.md) | completed |
+| [rex does not export enclosingChangeIds, so hench's explicit --task on v2 can claim a task inside a change another worktree holds](./rex-does-not-export-enclosingchangeids.md) | pending |
 | [rex exports the v2 runtime for hench and the dashboard](./rex-exports-the-v2-runtime-for-hench.md) | completed |
 | [update_task_status completes and applies a change that holds an open nested change](./update-task-status-completes-and.md) | completed |
 | [update_task_status completes v2 work through change-completion and apply](./update-task-status-completes-v2-work.md) | completed |
-| [Pin rex update's v2 order: complete first, write the other fields only if the completion succeeded](./pin-rex-update-s-v2-order-complete.md) | pending |
