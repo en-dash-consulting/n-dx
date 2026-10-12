@@ -4,8 +4,9 @@ import { validateTransition } from "../../core/transitions.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
 import { findAutoCompletions } from "../../core/parent-completion.js";
 import { holdCompletionForRun, describeHeldCompletion } from "../completion-hold.js";
-import type { PRDItem, ItemStatus } from "../../schema/index.js";
-import type { PRDStore, TaskClaim } from "../../store/index.js";
+import { completeV2Work } from "../v2-completion.js";
+import type { PRDItem, ItemStatus, ResolutionType } from "../../schema/index.js";
+import { isChangeLayerStore, type PRDStore, type TaskClaim } from "../../store/index.js";
 import {
   acquireClaim,
   describeHeldClaim,
@@ -13,6 +14,7 @@ import {
   type ClaimsContext,
 } from "./claims.js";
 import { textResult, type McpResult } from "./result.js";
+import { systemClock, type Clock } from "./clock.js";
 import { defineTool } from "./tool.js";
 
 export async function handleUpdateTaskStatus(
@@ -20,6 +22,8 @@ export async function handleUpdateTaskStatus(
   projectDir: string,
   args: { id: string; status: string; force?: boolean; reason?: string; resolutionType?: string; resolutionDetail?: string },
   claims?: ClaimsContext,
+  /** Clock for a v2 completion, read inside the PRD lock. */
+  clock: Clock = systemClock,
 ): Promise<McpResult> {
   try {
     const { id, status, force, reason, resolutionType, resolutionDetail } = args;
@@ -97,6 +101,35 @@ export async function handleUpdateTaskStatus(
           deleted: true,
           removedCount: deletedIds.length,
           removedIds: deletedIds,
+        }),
+      );
+    }
+
+    // On a v2 tree completion follows the change layer's rules, applying a
+    // completed change per rex.applyOn, in one transaction (cli/v2-completion.ts).
+    if (status === "completed" && isChangeLayerStore(store)) {
+      const done = await completeV2Work(store, id, {
+        resolutionType: resolutionType as ResolutionType | undefined,
+        resolutionDetail,
+        clock,
+      });
+      if (claims) await claims.store.release(id, { worktreeRoot: claims.worktreeRoot });
+      await store.appendLog({
+        timestamp: new Date().toISOString(),
+        event: "status_changed",
+        itemId: id,
+        detail: `${existing.status} → ${status}${force ? " (forced)" : ""}`,
+      });
+      const { autoCompleted, warnings, ...v2Fields } = done;
+      return textResult(
+        JSON.stringify({
+          id,
+          title: existing.title,
+          previousStatus: existing.status,
+          newStatus: status,
+          ...(autoCompleted.length > 0 ? { autoCompleted } : {}),
+          ...v2Fields,
+          ...(warnings.length > 0 ? { warnings } : {}),
         }),
       );
     }

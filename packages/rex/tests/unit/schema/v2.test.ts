@@ -473,7 +473,9 @@ describe("isolation", () => {
     // (store/ensure-legacy-prd-migrated.ts), and the snapshot restore, which
     // refuses a v2 tree (core/backup-snapshots.ts), and v2 selection behind
     // get_next_task and `rex next`, in get_next_task's v1 shape
-    // (core/change-next-task.ts).
+    // (core/change-next-task.ts), and v2 completion and apply-on-complete
+    // behind update_task_status and `rex update --status`
+    // (cli/v2-completion.ts).
     // `public.ts` re-exports the reader, the node and tree types, the index
     // and the derived product computations: consumers of the product layer
     // (the dashboard's Product and Changes views, the Graview projection) read
@@ -543,6 +545,7 @@ describe("isolation", () => {
         "store/ensure-legacy-prd-migrated.ts",
         "core/backup-snapshots.ts",
         "core/change-next-task.ts",
+        "cli/v2-completion.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

@@ -46,6 +46,7 @@ type ExistingFields = Pick<
  * @param from    - Current item status.
  * @param to      - New target status.
  * @param existing - Optional existing timestamp fields on the item.
+ * @param at      - The time stamped; defaults to now.
  * @returns Object with timestamp fields to merge into the item update.
  *          Only includes keys that should change; empty object means no
  *          timestamp updates are needed.
@@ -54,11 +55,12 @@ export function computeTimestampUpdates(
   from: ItemStatus,
   to: ItemStatus,
   existing?: ExistingFields,
+  at: Date = new Date(),
 ): TimestampUpdates {
   if (from === to) return {};
 
   const updates: TimestampUpdates = {};
-  const now = new Date().toISOString();
+  const now = at.toISOString();
 
   const enteringInProgress = to === "in_progress";
   const leavingInProgress = from === "in_progress" && to !== "in_progress";

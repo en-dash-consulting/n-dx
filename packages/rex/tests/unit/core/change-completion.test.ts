@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addTask, ChangeCompletionError, ClosedChangeError, completeChange, completeTask } from "../../../src/core/change-completion.js";
+import { addTask, ChangeCompletionError, ClosedChangeError, completeChange, completeTask, completeWork } from "../../../src/core/change-completion.js";
 import type { ApplyOn } from "../../../src/core/apply-policy.js";
 import { isOpenChange, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import { ChangeIntentSchema, TaskIntentSchema } from "../../../src/schema/v2.js";
@@ -105,6 +105,56 @@ describe("completeChange", () => {
 
   it("refuses while a live task is not completed", () => {
     expect(() => completeChange(tree(change({ children: [task("t", { status: "cancelled" })] })), "ch", opts())).toThrow(/task t is not completed/);
+  });
+});
+
+describe("completeWork", () => {
+  const STARTED = "2026-10-08T09:00:00.000Z";
+  const subtask = (id: string, extra: Record<string, unknown> = {}) => node({ id, type: "subtask", ...extra });
+
+  it("completes a task, its change and applies, stamping both as a v1 status update does", () => {
+    const input = tree(change({ children: [task("t", { status: "in_progress", startedAt: STARTED, activeIntervals: [{ start: STARTED }] })] }));
+    const result = completeWork(input, "t", { ...opts(), resolutionType: "code-change", resolutionDetail: "wired" });
+    expect(result.completed).toEqual(["t", "ch"]);
+    expect(result.changeId).toBe("ch");
+    expect(result.apply?.applied).toBe(true);
+    const done = theChange(result.tree);
+    expect(done.children?.[0]).toMatchObject({
+      status: "completed",
+      completedAt: NOW.toISOString(),
+      endedAt: NOW.toISOString(),
+      startedAt: STARTED,
+      activeIntervals: [{ start: STARTED, end: NOW.toISOString() }],
+      resolutionType: "code-change",
+      resolutionDetail: "wired",
+    });
+    expect(done).toMatchObject({ status: "completed", startedAt: NOW.toISOString(), endedAt: NOW.toISOString(), appliedAt: NOW.toISOString() });
+    expect(done.resolutionType).toBeUndefined();
+  });
+
+  it("completes a change through completeChange", () => {
+    const result = completeWork(tree(change({ status: "in_progress" })), "ch", opts());
+    expect(result).toMatchObject({ completed: ["ch"], changeId: "ch", apply: { applied: true } });
+  });
+
+  it("completes a subtask, and its pending task with it when it was the last live subtask", () => {
+    const open = tree(change({ children: [task("t", { children: [subtask("s1"), subtask("s2")] })] }));
+    expect(completeWork(open, "s1", opts()).completed).toEqual(["s1"]);
+    const last = tree(change({ children: [task("t", { children: [subtask("s1", { status: "completed" }), subtask("s2")] })] }));
+    const result = completeWork(last, "s2", opts());
+    expect(result.completed).toEqual(["s2", "t", "ch"]);
+    expect(result.changeId).toBe("ch");
+    expect(result.apply?.applied).toBe(true);
+  });
+
+  it("does not complete an in_progress task with its last subtask (#368)", () => {
+    const input = tree(change({ children: [task("t", { status: "in_progress", children: [subtask("s")] })] }));
+    expect(completeWork(input, "s", opts()).completed).toEqual(["s"]);
+  });
+
+  it("refuses a product node or an unknown ref", () => {
+    expect(() => completeWork(tree(change()), "cap", opts())).toThrow(ChangeCompletionError);
+    expect(() => completeWork(tree(change()), "nope", opts())).toThrow(/No live task, change or subtask "nope"/);
   });
 });
 

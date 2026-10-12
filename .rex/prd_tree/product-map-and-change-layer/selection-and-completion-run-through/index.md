@@ -28,4 +28,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [get_prd_status on v2 drops capabilities and open changes under a nested area](./get-prd-status-on-v2-drops.md) | pending |
 | [resolveWorkById and claim_task treat a change that holds a nested change as a runnable unit](./resolveworkbyid-and-claim-task-treat-a.md) | pending |
 | [rex exports the v2 runtime for hench and the dashboard](./rex-exports-the-v2-runtime-for-hench.md) | pending |
-| [update_task_status completes v2 work through change-completion and apply](./update-task-status-completes-v2-work.md) | pending |
+| [update_task_status completes v2 work through change-completion and apply](./update-task-status-completes-v2-work.md) | in_progress |

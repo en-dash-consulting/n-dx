@@ -16,10 +16,11 @@ import { applyReshape, type ReshapeProposal } from "../../src/core/reshape.js";
 import { ChangeLayerStore } from "../../src/store/change-layer-store.js";
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 import { indexTree } from "../../src/schema/v2-rules.js";
-import { copyV2Fixture } from "../helpers/v2-fixture.js";
+import { copyV2Fixture, editText } from "../helpers/v2-fixture.js";
 
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
 const TASK = "c0000000-0000-4000-8000-000000000002";
+const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
 const quiet = { env: {}, warn: () => {} };
 
 let tmp: string;
@@ -49,6 +50,11 @@ const json = (r: { text: string }) => JSON.parse(r.text);
 async function node(id: string) {
   const model = await loadPrdModel(rexDir, quiet);
   return indexTree(model.tree, { includeTombstones: true }).resolve(id);
+}
+
+/** The fixture's change is in_progress, which completing its last task never sweeps (#368). */
+async function makeChangePending(): Promise<void> {
+  await editText(join(rexDir, "changes", "add-apple-pay", "state.yaml"), (t) => t.replace('status: "in_progress"', 'status: "pending"'));
 }
 
 /** A second change, so moves and merges have somewhere to go. */
@@ -321,6 +327,61 @@ describe("rex MCP tools on a v2 tree", () => {
     expect(next.item).toMatchObject({ id: inner, level: "feature", type: "change" });
     expect(next.changeId).toBe(inner);
     expect(next.parentChain.map((p: { id: string }) => p.id)).toEqual([outer]);
+  });
+
+  it("update_task_status completing the last task completes the change and applies it in the same write", async () => {
+    await makeChangePending();
+    const res = await call("update_task_status", { id: TASK, status: "completed", resolutionType: "code-change" });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({
+      id: TASK,
+      previousStatus: "pending",
+      newStatus: "completed",
+      autoCompleted: [{ id: CHANGE, title: "Add Apple Pay" }],
+      changeId: CHANGE,
+      changeCompleted: true,
+      applied: true,
+    });
+    expect(await node(TASK)).toMatchObject({ status: "completed", resolutionType: "code-change" });
+    expect(await node(CHANGE)).toMatchObject({ status: "completed", appliedAt: expect.any(String) });
+    expect((await node(CAPABILITY))?.criteria?.map((c) => c.id)).toEqual(["c1", "c2", "c3"]);
+    const events = (await ws.store.readLog()).map((e) => [e.event, e.itemId]);
+    expect(events).toEqual(expect.arrayContaining([["auto_completed", CHANGE], ["change_applied", CHANGE], ["status_changed", TASK]]));
+  });
+
+  it("update_task_status completes but leaves the change unapplied under rex.applyOn review", async () => {
+    await makeChangePending();
+    await writeFile(join(tmp, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "review" } }));
+    const body = json(await call("update_task_status", { id: TASK, status: "completed" }));
+    expect(body).toMatchObject({ changeId: CHANGE, changeCompleted: true, applied: false, reason: expect.stringMatching(/"review"/) });
+    expect((await node(CHANGE))?.appliedAt).toBeUndefined();
+    expect((await node(CAPABILITY))?.criteria?.map((c) => c.id)).toEqual(["c1", "c2"]);
+  });
+
+  it("update_task_status never sweeps an in_progress change (#368)", async () => {
+    const body = json(await call("update_task_status", { id: TASK, status: "completed" }));
+    expect(body).toMatchObject({ changeId: CHANGE, changeCompleted: false, applied: false });
+    expect(body.autoCompleted).toBeUndefined();
+    expect((await node(CHANGE))?.status).toBe("in_progress");
+  });
+
+  it("update_task_status completes a change that was split when it gained its first task", async () => {
+    const solo = await addChange("Add Google Pay");
+    expect(json(await call("update_task_status", { id: solo, status: "in_progress" })).newStatus).toBe("in_progress");
+    const task = json(await call("add_item", { type: "task", title: "Wire it", parentId: solo })).id;
+    expect(await node(task)).toMatchObject({ status: "in_progress" });
+    expect((await node(solo))?.status).toBe("pending");
+
+    const body = json(await call("update_task_status", { id: task, status: "completed" }));
+    expect(body).toMatchObject({ changeId: solo, changeCompleted: true, applied: true });
+    expect(await node(solo)).toMatchObject({ status: "completed", appliedAt: expect.any(String) });
+  });
+
+  it("update_task_status completes a task-less change on its own", async () => {
+    const solo = await addChange("Add Google Pay");
+    const body = json(await call("update_task_status", { id: solo, status: "completed" }));
+    expect(body).toMatchObject({ id: solo, newStatus: "completed", changeId: solo, changeCompleted: true, applied: true });
+    expect(body.autoCompleted).toBeUndefined();
   });
 
   it("get_next_task and update_task_status do not crash on the store", async () => {

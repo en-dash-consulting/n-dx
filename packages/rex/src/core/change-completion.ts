@@ -19,6 +19,10 @@
  * refused apply (`ApplyAmendmentsError`) is reported, and the change stays
  * completed and unapplied for a steward.
  *
+ * {@link completeWork} is what a status update to `completed` runs on a v2
+ * tree (`update_task_status`, `rex update --status`): it dispatches on the
+ * node's type and stamps every node it completes as a v1 status update does.
+ *
  * ## Split
  *
  * When an `in_progress` change with no live task gains its first task, the
@@ -39,7 +43,9 @@
  */
 
 import { indexTree, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
+import type { ResolutionType } from "../schema/index.js";
+import { AUTO_COMPLETABLE_STATUSES, SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
+import { computeTimestampUpdates } from "./timestamps.js";
 import { applyOnTrigger, type ApplyOnTriggerOptions, type ApplyOnTriggerResult } from "./apply-policy.js";
 import { ApplyAmendmentsError } from "./apply-amendments.js";
 
@@ -116,6 +122,67 @@ export function completeChange(tree: V2Tree, changeRef: string, options: ChangeC
   return closeChange(result, change, options);
 }
 
+export interface CompleteWorkOptions extends ChangeCompletionOptions {
+  /** Recorded on the completed node itself, not on a node completed with it. */
+  resolutionType?: ResolutionType;
+  resolutionDetail?: string;
+}
+
+export interface CompleteWorkResult extends ChangeCompletionResult {
+  /** The change `ref` belongs to (itself when `ref` is a change). */
+  changeId: string | undefined;
+}
+
+/**
+ * Complete the task, change or subtask `ref`: what a status update to
+ * `completed` does on a v2 tree. A task goes through {@link completeTask} and
+ * a change through {@link completeChange}. A subtask completes on its own, and
+ * when it was the last live subtask of a `pending` task, the task completes
+ * through {@link completeTask}, as v1 auto-completes a parent. Every node
+ * completed also gets the timestamps a v1 status update writes
+ * (`computeTimestampUpdates`): `startedAt` when unset, `endedAt`, and its
+ * open active interval closed.
+ */
+export function completeWork(tree: V2Tree, ref: string, options: CompleteWorkOptions): CompleteWorkResult {
+  const node = indexTree(tree).resolve(ref);
+  let out: ChangeCompletionResult;
+  if (node?.type === "change") out = completeChange(tree, node.id, options);
+  else if (node?.type === "task") out = completeTask(tree, node.id, options);
+  else if (node?.type === "subtask") out = completeSubtask(tree, node.id, options);
+  else throw new ChangeCompletionError(`No live task, change or subtask "${ref}"`);
+
+  const before = indexTree(tree);
+  const after = indexTree(out.tree);
+  for (const id of out.completed) {
+    const prior = before.resolve(id)!;
+    const done = after.resolve(id)!;
+    const stamps = computeTimestampUpdates(prior.status ?? "pending", "completed", prior, options.now);
+    delete stamps.completedAt; // stamped by markCompleted
+    Object.assign(done, stamps);
+  }
+  const target = after.resolve(node.id)!;
+  if (options.resolutionType) target.resolutionType = options.resolutionType;
+  if (options.resolutionDetail) target.resolutionDetail = options.resolutionDetail;
+  return { ...out, changeId: node.type === "change" ? node.id : locate(tree, node.id, node.type).change?.id };
+}
+
+function completeSubtask(tree: V2Tree, subtaskRef: string, options: ChangeCompletionOptions): ChangeCompletionResult {
+  const next = structuredClone(tree);
+  const index = indexTree(next);
+  const subtask = index.resolve(subtaskRef)!;
+  if (subtask.status === "completed") return emptyResult(next, []);
+  markCompleted(subtask, options.now);
+  const task = index.entries.find((e) => e.node === subtask)?.parent;
+  const subtasks = (task?.children ?? []).filter((c) => c.type === "subtask" && c.status !== "deleted");
+  const taskCompletes =
+    task?.type === "task" &&
+    AUTO_COMPLETABLE_STATUSES.has(task.status ?? "pending") &&
+    subtasks.every((s) => SUCCESSFUL_CHILD_STATUSES.has(s.status ?? "pending"));
+  if (!taskCompletes) return emptyResult(next, [subtask.id]);
+  const out = completeTask(next, task.id, options);
+  return { ...out, completed: [subtask.id, ...out.completed] };
+}
+
 /** Why a change takes no new task: work found after it closed is a follow-up change. */
 export type ClosedChangeState = "completed" | "applied" | "cancelled" | "deleted";
 
@@ -184,7 +251,7 @@ export function addTask(tree: V2Tree, changeRef: string, task: RuleNode, now: Da
   return result;
 }
 
-function locate(tree: V2Tree, ref: string, type: "change" | "task"): { node: RuleNode; change?: RuleNode } {
+function locate(tree: V2Tree, ref: string, type: "change" | "task" | "subtask"): { node: RuleNode; change?: RuleNode } {
   const index = indexTree(tree);
   const node = index.resolve(ref);
   if (node?.type !== type) throw new ChangeCompletionError(`No live ${type} "${ref}"`);

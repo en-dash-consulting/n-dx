@@ -41,7 +41,7 @@ export class ChangeLayerWriteError extends Error {
 
 export class ChangeLayerStore implements PRDStore {
   constructor(
-    private readonly rexDir: string,
+    readonly rexDir: string,
     /** The v1 store, for config, log and workflow. */
     private readonly base: PRDStore,
     private readonly now: () => Date = () => new Date(),
