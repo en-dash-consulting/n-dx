@@ -39,12 +39,15 @@ ndx graview mcp .       →  emit, sync-seed the store, then  graview mcp --read
 No n-dx package depends on `@graview/*`. The binary is a peer tool, the way
 the `claude` and `codex` CLIs are to hench, resolved from `graview.bin` in the
 project config, `NDX_GRAVIEW_BIN`, PATH, the product face's own `graview`
-(it pins the same release), then `npx -y graview@0.1.20`
-(`packages/graview/src/graview-bin.ts`). A `.js` path runs under the current
-Node, so a sibling framework checkout works without a global install. npx
-runs in `<ndx home>/graview/npx`, an empty private package n-dx owns, never
-the checkout, so a `graview` the repository installs in its `node_modules` and
-the repository's `.npmrc` are not used.
+(it pins the same release), then, only when the user opts in with
+`graview.allowNpx: true` or `NDX_GRAVIEW_NPX=1`, `npx -y graview@<pinned>`
+(`packages/graview/src/graview-bin.ts`). Without the opt-in nothing is
+downloaded: every command but `emit` stops with a sentence on how to install
+graview, and `ndx graview info` says the source is `none`. A `.js` path runs
+under the current Node, so a sibling framework checkout works without a global
+install. npx runs in `<ndx home>/graview/npx`, an empty private package n-dx
+owns, never the checkout, so a `graview` the repository installs in its
+`node_modules` and the repository's `.npmrc` are not used.
 
 `graviewDir` is a field of the layout resolver (`.ndx/graview` or
 `.graview`), gitignored by `ndx init`. Nothing is written under the rex,

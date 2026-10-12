@@ -47,7 +47,8 @@ const USAGE = `ndx graview <command> [dir] [flags]
   --quiet    print nothing but errors
 
 The graview binary comes from graview.bin in the project config, $NDX_GRAVIEW_BIN,
-PATH, the installed product face's own graview, or npx -y graview@<pinned>, in that order.
+PATH or the installed product face's own graview, in that order; npx -y graview@<pinned>
+only when graview.allowNpx is true or $NDX_GRAVIEW_NPX=1. Nothing is downloaded unasked.
 `;
 
 interface ParsedArgs {
@@ -282,6 +283,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   }
 
   const command = resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(root)) });
+  // Everything past a product face needs a graview binary, and none is downloaded unasked.
+  if (command.source === "none") {
+    console.error(`ndx graview ${parsed.sub}: ${command.detail}`);
+    return 1;
+  }
   say(`graview: ${command.detail} (${command.source})`);
 
   switch (parsed.sub) {
