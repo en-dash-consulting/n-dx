@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { cp, mkdtemp, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -23,11 +23,27 @@ function run(args: string[]): string {
 }
 
 describe("rex prune", { timeout: 120_000 }, () => {
+  /**
+   * `rex init` runs once, into a template that each test copies: the spawn
+   * cost about a second here and three on the Windows CI runner, per test.
+   * The init output names nothing about its directory, so a copy is the same
+   * project a fresh init would give.
+   */
+  let templateDir: string;
   let tmpDir: string;
+
+  beforeAll(async () => {
+    templateDir = await mkdtemp(join(tmpdir(), "rex-e2e-prune-template-"));
+    run(["init", templateDir]);
+  });
+
+  afterAll(async () => {
+    await rm(templateDir, { recursive: true, force: true });
+  });
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-e2e-prune-"));
-    run(["init", tmpDir]);
+    await cp(templateDir, tmpDir, { recursive: true });
   });
 
   afterEach(async () => {
