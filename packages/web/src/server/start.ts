@@ -405,13 +405,27 @@ function registerSourcevisionWatcher(
   }
 }
 
-function registerRexWatcher(
+/**
+ * Watch the PRD: `.rex/` itself (non-recursive) plus each PRD folder
+ * recursively. A folder that does not exist yet — rex's v2 writer creates
+ * `changes/` with the first change — is picked up when its name appears under
+ * `.rex/`, so a write made after boot still refreshes the cache. `.rex/` is
+ * deliberately not watched recursively: the refresh's own output lands in
+ * `.rex/.cache/` and would loop.
+ *
+ * Watchers are appended to `into`, the caller's list, so ones added later are
+ * closed with the rest.
+ *
+ * @internal exported for integration testing only
+ */
+export function registerRexWatcher(
   scope: ViewerScope | undefined,
   rexDir: string,
   watcher: ReturnType<typeof createDataWatcher>,
   ws: Broadcasting,
-): FSWatcher[] {
-  if (!isInScope(scope, "rex") || !existsSync(rexDir)) return [];
+  into: FSWatcher[],
+): void {
+  if (!isInScope(scope, "rex") || !existsSync(rexDir)) return;
   const debouncedRefresh = debounce(() => {
     // A changed tree stales every PRD delta it takes part in, as anchor or
     // as the compared worktree.
@@ -425,15 +439,33 @@ function registerRexWatcher(
     });
   }, WATCHER_DEBOUNCE_MS);
 
-  const watchers: FSWatcher[] = [];
+  const prdDirNames = [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME];
+  const watched = new Set<string>();
+  const watchPrdFolder = (dirName: string): void => {
+    const root = join(rexDir, dirName);
+    if (watched.has(dirName) || !existsSync(root)) return;
+    try {
+      into.push(watch(root, { recursive: true }, () => {
+        debouncedRefresh();
+      }));
+      watched.add(dirName);
+    } catch {
+      // fs.watch recursive may not be supported on every platform — non-fatal
+    }
+  };
 
-  // Watch .rex/ for legacy prd.md and tree-meta.json changes
+  // Watch .rex/ for legacy prd.md and tree-meta.json changes, and for a PRD
+  // folder appearing after boot.
   try {
-    watchers.push(watch(rexDir, (_eventType, filename) => {
-      if (
-        filename === "prd.md" ||
-        filename === "tree-meta.json" ||
-        (typeof filename === "string" && /^prd_.*\.md$/.test(filename))
+    into.push(watch(rexDir, (_eventType, filename) => {
+      const name = filename === null ? "" : String(filename);
+      if (prdDirNames.includes(name)) {
+        watchPrdFolder(name);
+        debouncedRefresh();
+      } else if (
+        name === "prd.md" ||
+        name === "tree-meta.json" ||
+        /^prd_.*\.md$/.test(name)
       ) {
         debouncedRefresh();
       }
@@ -442,20 +474,7 @@ function registerRexWatcher(
     // ignore
   }
 
-  // Watch the PRD folders recursively: the v1 tree, and the v2 layers.
-  for (const dirName of [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME]) {
-    const root = join(rexDir, dirName);
-    if (!existsSync(root)) continue;
-    try {
-      watchers.push(watch(root, { recursive: true }, () => {
-        debouncedRefresh();
-      }));
-    } catch {
-      // fs.watch recursive may not be supported on every platform — non-fatal
-    }
-  }
-
-  return watchers;
+  for (const dirName of prdDirNames) watchPrdFolder(dirName);
 }
 
 /**
@@ -533,9 +552,7 @@ function registerWatchers(
   const watchers: FSWatcher[] = [];
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
   if (sv) watchers.push(sv);
-  for (const w of registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws)) {
-    watchers.push(w);
-  }
+  registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws, watchers);
   const hench = registerHenchWatcher(ctx.scope, henchRunsDir, ws);
   if (hench) watchers.push(hench);
   const dev = registerDevViewerWatcher(ctx.dev, viewerPath, watcher, ws);
@@ -610,9 +627,7 @@ function reregisterProjectWatchers(
   // key is null) drops those.
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
   if (sv) handles.watchers.push(sv);
-  for (const w of registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws)) {
-    handles.watchers.push(w);
-  }
+  registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws, handles.watchers);
   const hench = registerHenchWatcher(ctx.scope, handles.henchRunsDir, ws);
   if (hench) handles.watchers.push(hench);
 }
