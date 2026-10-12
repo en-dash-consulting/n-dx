@@ -81,6 +81,16 @@ describe("rex on a v2 tree", () => {
     expect(run(["tree", tmp], tmp)).toMatch(/Tidy the card form[\s\S]*Wire the button/);
   });
 
+  // The level rule refuses this (a root change reads as an epic); the type rule allows it.
+  it("move nests a change under another change", async () => {
+    const added = JSON.parse(run(["add", "change", "--title=Tidy the card form", "--format=json", tmp], tmp));
+    const id = (Array.isArray(added) ? added[0] : added).id as string;
+    run(["move", id, `--parent=${CHANGE}`, tmp], tmp);
+    const changes = join(tmp, ".rex", "changes");
+    expect(existsSync(join(changes, "tidy-the-card-form"))).toBe(false);
+    expect(existsSync(join(changes, "add-apple-pay", "tidy-the-card-form"))).toBe(true);
+  });
+
   it("move refuses to put a change under a task, and leaves the tree alone", async () => {
     run(["move", CHANGE, `--parent=${TASK}`, tmp], tmp, true);
     expect(existsSync(taskFile())).toBe(true);

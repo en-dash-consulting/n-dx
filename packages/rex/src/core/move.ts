@@ -184,6 +184,14 @@ export const changeLayerParentRule: ParentRule = (item, parent) => {
  * @param rule - Which parents the item may take (default: the level hierarchy)
  * @returns The move result, or throws on validation failure
  */
+/** Append `child` under `parentId` without a level check; false when the parent is missing. */
+function appendChild(items: PRDItem[], parentId: string, child: PRDItem): boolean {
+  const parent = findItem(items, parentId)?.item;
+  if (!parent) return false;
+  (parent.children ??= []).push(child);
+  return true;
+}
+
 export function moveItem(
   items: PRDItem[],
   itemId: string,
@@ -210,7 +218,11 @@ export function moveItem(
 
   // Insert at new position
   if (newParentId) {
-    const inserted = insertChild(items, newParentId, removed);
+    // insertChild re-checks the level hierarchy; any other rule was checked
+    // above, and a change nested under a change still reads as an epic.
+    const inserted = rule === levelParentRule
+      ? insertChild(items, newParentId, removed)
+      : appendChild(items, newParentId, removed);
     if (!inserted) {
       // Rollback: try to restore to original position
       if (previousParentId) {
