@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { isolationProjects } from "../../tests/vitest-isolation.mjs";
 import { resolve } from "node:path";
 
 const rexRoot = resolve(import.meta.dirname, "../rex");
@@ -41,5 +42,9 @@ export default defineConfig({
     // a loaded Windows CI runner that exceeds 10s, which is what produced
     // "Hook timed out in 10000ms" in the integration suites.
     hookTimeout: 30_000,
+    // Two projects over the same files: the ones that mock modules or globals
+    // get a worker each, everything else shares workers. See
+    // tests/vitest-isolation.mjs for the split and the numbers behind it.
+    projects: isolationProjects({ root: import.meta.dirname, name: "hench" }),
   },
 });

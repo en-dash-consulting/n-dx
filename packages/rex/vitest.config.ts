@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { isolationProjects } from "../../tests/vitest-isolation.mjs";
 import { resolve } from "node:path";
 
 const claudeClientRoot = resolve(import.meta.dirname, "../claude-client");
@@ -29,5 +30,9 @@ export default defineConfig({
     // Never below testTimeout — Vitest's 10s default would give a setup hook
     // less time than the test it prepares. See the root vitest.config.js.
     hookTimeout: 30000,
+    // Two projects over the same files: the ones that mock modules or globals
+    // get a worker each, everything else shares workers. See
+    // tests/vitest-isolation.mjs for the split and the numbers behind it.
+    projects: isolationProjects({ root: import.meta.dirname, name: "rex" }),
   },
 });
