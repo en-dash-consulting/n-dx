@@ -1,0 +1,17 @@
+---
+"@n-dx/rex": patch
+---
+
+Every PRD tool opens a v2 tree, and none can split it.
+
+- Store resolution is layout-aware. On a v2 PRD (`product/` present) `resolveStore` returns the change-layer store, so commands that open the PRD through it read and write the change layer instead of failing with "Rex directory not found". The new `resolveV1Store` keeps `migrate-slugs` v1-only. The v1 store refuses to read or write a v2 tree, with an error naming the v2 layout. The "Run 'n-dx init'" hint appears only when the project has no PRD in either layout.
+- Nothing splits a v2 tree: `rex init` no longer scaffolds `prd_tree/` beside `product/`, and `rex migrate-to-folder-tree`, `migrate-to-md` and `migrate-folder-tree-filenames` refuse on a v2 tree, writing nothing.
+- The rex MCP tools serve a v2 PRD: `edit_item`, `move_item`, `merge_items`, `claim_task`, `release_task`, `verify_criteria`, `facets`, `health`, `reorganize` and `get_token_usage`. On a v2 tree `move_item` follows node types (a task moves between changes; a change never goes under a task), `merge_items` merges sibling changes only (carrying their `touches`, and refusing to absorb a change that carries amendments), `edit_item` refuses `level`, and `claim_task` claims a task or a change with no tasks.
+- The rex CLI serves a v2 tree: `status`, `tree`, `update`, `move`, `remove`, `ready`, `verify`, `fix`, `validate` and `report`. `rex move` and MCP `move_item` can nest a change under another change. `rex analyze`, `rex recommend --accept` and `rex restore` refuse on a v2 tree with a sentence naming what to use instead. `ndx status` and `ndx ci` pass on a v2 project.
+- v1 trees behave as before.
+
+MCP fields added on a v2 tree (optional, absent on v1; MCP tool shapes are soft-frozen since 0.9.0):
+
+- `edit_item`: `item.type`, `item.displayId` and the item's other v2 fields (`slug`, `touches`, `amends`, …), as stored.
+- `move_item`: `type`.
+- `claim_task`: `type`.
