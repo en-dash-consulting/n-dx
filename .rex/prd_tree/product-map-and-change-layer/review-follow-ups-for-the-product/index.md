@@ -58,7 +58,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Wire ndx migrate --plan to write the classified plan](./wire-ndx-migrate-plan-to-write-the.md) | completed |
 | [Write Inbox changes to the reserved changes/inbox/ folder, and move them out on placement](./write-inbox-changes-to-the-reserved.md) | completed |
 | [hench task-lookup.ts imports @n-dx/rex directly, bypassing rex-gateway](./hench-task-lookup-ts-imports-n-dx-rex.md) | pending |
-| [hench reopens an applied v2 change when it withdraws a bypassed completion](./hench-reopens-an-applied-v2-change.md) | pending |
 | [ndx work --task on a v2 change with tasks claims the change while another worktree holds one of its tasks](./ndx-work-task-on-a-v2-change-with.md) | pending |
-| [On a v2 tree hench's completion commit stages product/ and changes/ wholesale, sweeping in operator edits](./on-a-v2-tree-hench-s-completion-commit.md) | pending |
 | [On a v2 tree, --resolve reports a subtask or container-change ref as "Task not found" instead of the run's reason](./on-a-v2-tree-resolve-reports-a-subtask.md) | pending |
