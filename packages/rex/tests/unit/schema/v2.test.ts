@@ -460,7 +460,8 @@ describe("isolation", () => {
     // and `rex prune`: the change-layer store, the layer projection, and the
     // product-layer reshape draft (cli/commands/reshape-product.ts), and
     // `rex tree-diff`, which loads either layout (core/tree-source.ts) and
-    // diffs the product layer (core/map-diff.ts).
+    // diffs the product layer (core/map-diff.ts), and the v1 deprecation
+    // notice, which reads the product folder name (cli/legacy-layout-notice.ts).
     const v2Files = new Set(
       [
         "schema/v2.ts",
@@ -513,6 +514,7 @@ describe("isolation", () => {
         "migrations/v1-to-v2/migration-plan-data.ts",
         "migrations/v1-to-v2/spec-pass.ts",
         "migrations/v1-to-v2/apply.ts",
+        "cli/legacy-layout-notice.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

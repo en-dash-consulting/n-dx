@@ -207,11 +207,13 @@ export const COMMAND_EFFECTS = {
 
   migrate: {
     command: "migrate",
-    summary: "Plan the v1 → v2 PRD migration and write the plan file for review, or apply the plan.",
-    reads: ["{rex}/ PRD folder tree", "test files in the repository", ".ndx-migration/plan.json with --apply"],
+    summary: "Run every migration step the project needs (layout, folder tree, v1 → v2 plan and apply), or one of the plan and apply steps alone.",
+    reads: ["{rex}/ PRD folder tree", "test files in the repository", ".ndx-migration/plan.json with --apply", "git status, when the layout step runs"],
     writes: [
-      { path: ".ndx-migration/plan.json", what: "the migration plan (or the --out path); .ndx-migration/ carries its own .gitignore", conditional: true, when: "with --plan" },
-      { path: "{rex}/", what: "the v2 tree replaces prd_tree/ and tree-meta.json in one transaction", conditional: true, when: "with --apply and without --dry-run" },
+      { path: ".ndx/", what: "the moved tool directories and config, committed unless --no-commit (as migrate-layout)", conditional: true, when: "without --plan or --apply, on a legacy layout and without --dry-run" },
+      { path: "{rex}/prd_tree/", what: "the folder tree converted from prd.md / prd.json", conditional: true, when: "without --plan or --apply, on a flat-file PRD and without --dry-run" },
+      { path: ".ndx-migration/plan.json", what: "the migration plan (or the --out path); .ndx-migration/ carries its own .gitignore", conditional: true, when: "with --plan, or without --plan or --apply on a v1 tree" },
+      { path: "{rex}/", what: "the v2 tree replaces prd_tree/ and tree-meta.json in one transaction", conditional: true, when: "with --apply, or without --plan or --apply on a v1 tree, and without --dry-run" },
     ],
     llm: [
       { phase: "placement and spec drafting", purpose: "the text model places held changes and drafts capability specs", calls: "one per held change and capability", conditional: true, when: "without --rules-only" },

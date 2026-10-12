@@ -8,6 +8,7 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 |---------|-------------|
 | `ndx init [dir]` | Initialize a project for n-dx |
 | `ndx migrate-layout [dir]` | Move an existing project's state into `.ndx/` |
+| `ndx migrate [--dry-run] [--rules-only] [dir]` | Run every migration step the project still needs: the layout move into `.ndx/`, the `prd.md` / `prd.json` conversion, then the v1 → v2 plan and apply. Steps already done are skipped |
 | `ndx migrate --apply [--plan <path>] [--dry-run] [dir]` | Apply the migration plan (`--dry-run` shows what moves and what is dropped, writes nothing) |
 | `ndx migrate --plan [dir]` | Plan the v1 → v2 PRD migration: writes `.ndx-migration/plan.json` (gitignored), nothing in `.rex/` |
 | `ndx config [key] [value]` | View or edit settings |

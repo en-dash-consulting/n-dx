@@ -100,7 +100,7 @@ const COMMAND_REGISTRY = [
   {
     name: "migrate",
     category: "Orchestration",
-    summary: "Plan the v1 → v2 PRD migration and write the plan file",
+    summary: "Migrate a project to the current layout and PRD schema",
     keywords: ["migrate", "migration", "plan", "v2", "upgrade", "product", "prd", "schema"],
     related: ["migrate-layout", "plan", "status"],
   },
@@ -1241,9 +1241,15 @@ const ORCHESTRATOR_HELP_DEFS = {
     related: ["init", "which"],
   },
   migrate: {
-    summary: "plan or apply the v1 → v2 PRD migration",
+    summary: "migrate to the current layout and PRD schema",
     description:
-      "Classifies every v1 PRD item, proposes the areas and constraints, drafts\n" +
+      "With neither --plan nor --apply, runs every step the project still\n" +
+      "needs, in order: the layout move into .ndx/ (as migrate-layout), the\n" +
+      "prd.md / prd.json conversion to the folder tree, then the v1 → v2 plan\n" +
+      "and apply. A step already done is skipped, so a failed run resumes where\n" +
+      "it stopped. --dry-run rehearses each step that can, and stops before\n" +
+      "the first that cannot.\n\n" +
+      "--plan classifies every v1 PRD item, proposes the areas and constraints, drafts\n" +
       "the capability specs and writes the plan for review. Writes nothing in\n" +
       ".rex/: the plan goes to .ndx-migration/plan.json, which is gitignored.\n\n" +
       "Defaults: the text model places held changes and drafts specs (a pick is\n" +
@@ -1256,17 +1262,20 @@ const ORCHESTRATOR_HELP_DEFS = {
       "tree-meta.json in one transaction. With --dry-run it prints, per v1 kind,\n" +
       "what its items become, how many are held for the Inbox and how many\n" +
       "metadata values are dropped, and writes nothing.",
-    usage: "ndx migrate --plan [options] [dir], or ndx migrate --apply [options] [dir]",
+    usage: "ndx migrate [options] [dir], ndx migrate --plan [options] [dir], or ndx migrate --apply [options] [dir]",
     options: [
       { flag: "--plan", description: "Write the migration plan (with --apply: --plan <path> names the plan to apply)" },
       { flag: "--apply", description: "Apply the plan: write the v2 tree and remove the v1 tree" },
-      { flag: "--dry-run", description: "With --apply: print what would move and what is dropped; write nothing" },
+      { flag: "--dry-run", description: "Print what would move and what is dropped; write nothing (the chain still writes the plan file)" },
+      { flag: "--no-commit", description: "Without --plan or --apply: move the layout without committing the move" },
       { flag: "--out <path>", description: "Plan file path (default .ndx-migration/plan.json); not inside the rex directory" },
       { flag: "--rules-only", description: "Run no model pass" },
       { flag: "--model <id>", description: "Model for text placement and spec drafting" },
       { flag: "--cut-at <iso>", description: "Cut time recorded in the plan (default: the earlier plan's, else now)" },
     ],
     examples: [
+      { command: "ndx migrate .", description: "Run every step the project needs" },
+      { command: "ndx migrate --dry-run --rules-only .", description: "Rehearse the steps without a model pass" },
       { command: "ndx migrate --plan .", description: "Plan with the default passes" },
       { command: "ndx migrate --plan --rules-only .", description: "Plan from the rules alone" },
       { command: "ndx migrate --apply --dry-run .", description: "Rehearse the apply" },
@@ -1871,7 +1880,7 @@ export function formatMainHelp() {
   section("SETUP", [
     ["init [dir]", "Initialize project"],
     ["migrate-layout [dir]", "Move existing state into .ndx/ (--dry-run, --no-commit)"],
-    ["migrate --plan|--apply [dir]", "Plan or apply the v1 → v2 PRD migration (--out, --rules-only, --dry-run)"],
+    ["migrate [--plan|--apply] [dir]", "Migrate layout and PRD schema, or plan or apply v1 → v2 (--rules-only, --dry-run)"],
     ["which [dir]", "Show which n-dx is running (version, path, install, git)"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],

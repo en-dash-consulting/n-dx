@@ -11,6 +11,7 @@ import { isItemLevel } from "../schema/index.js";
 import { join } from "node:path";
 import { resolveDir } from "./resolve-dir.js";
 import { resolveRexPaths } from "../store/index.js";
+import { noteLegacyLayout } from "./legacy-layout-notice.js";
 
 suppressKnownDeprecations();
 
@@ -707,6 +708,7 @@ async function main(): Promise<void> {
   setDebug(flags.debug === "true");
 
   try {
+    noteLegacyLayout(command, positional);
     await dispatchCommand(command, positional, flags, multiFlags);
   } catch (err) {
     handleCLIError(err, flags.debug === "true");
