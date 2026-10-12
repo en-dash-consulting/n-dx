@@ -28,6 +28,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [hench selects v2 work and finds a task by id](./hench-selects-v2-work-and-finds-a-task.md) | completed |
 | [hench writes status, completion and claims through the v2 transaction](./hench-writes-status-completion-and.md) | completed |
 | [ndx work --task=<display id> --resolve reports "Task not found" on a v2 tree](./ndx-work-task-display-id-resolve.md) | completed |
-| [On a v2 tree hench's brief can drop workflow.md whole when rex's 4,000-token budget runs out](./on-a-v2-tree-hench-s-brief-can-drop.md) | pending |
+| [On a v2 tree hench's brief can drop workflow.md whole when rex's 4,000-token budget runs out](./on-a-v2-tree-hench-s-brief-can-drop.md) | in_progress |
 | [Re-record the prompt-census baseline for hench's v2 brief](./re-record-the-prompt-census-baseline.md) | completed |
 | [The completion gate and review captures understand v2](./the-completion-gate-and-review.md) | completed |
