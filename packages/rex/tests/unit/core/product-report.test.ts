@@ -115,6 +115,14 @@ describe("prdStatusReport", () => {
     ]);
   });
 
+  it("rolls a capability and an open change under a nested area into the top-level area's row", () => {
+    const t = tree();
+    t.product.push(node({ id: "outer", type: "area", children: [node({ id: "inner", type: "area", children: [cap("deep")] })] }));
+    t.changes.push(change("amend-deep", { amends: [{ target: "deep", delta: "modified", summary: "s" }] }));
+    const outer = prdStatusReport(t).areas.find((a) => a.id === "outer")!;
+    expect(outer).toMatchObject({ capabilities: 1, status: { changing: 1 }, openChanges: 1 });
+  });
+
   it("groups changes by shippedIn, else plannedRelease, nearest first and unscheduled last", () => {
     expect(report.releases.map((r) => [r.release, r.changes.total])).toEqual([
       ["1.0.0", 1],
