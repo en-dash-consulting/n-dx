@@ -42,7 +42,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [UI Density Toggle (Small / Medium / Large)](./ui-density-toggle-small-medium-large/index.md) | completed |
 | [Web Dashboard Accessibility (a11y)](./web-dashboard-accessibility-a11y/index.md) | completed |
 | [Changes view: time-ordered default with recency desaturation](./changes-view-time-ordered-default-with.md) | deferred |
-| [Dashboard file watchers have no 'error' listener, so a watcher error crashes ndx start](./dashboard-file-watchers-have-no-error.md) | pending |
 | [findAvailablePort reports a requested port of 0 as "in use"](./findavailableport-reports-a-requested.md) | completed |
 | [Fix undefined design tokens and standardize buttons on General and analyze/plan settings pages](./fix-undefined-design-tokens-and.md) | completed |
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http.md) | completed |
