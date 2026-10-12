@@ -52,7 +52,14 @@ export const PLACEMENT_NONE_OF_THESE = "__none_of_these__";
 const REX_CONFIG_KEY = "rex";
 
 const MODELS: readonly PlacementModels[] = ["text", "jev", "both"];
-const AUTO_ACCEPT: readonly PlacementAutoAccept[] = ["none", "agree", "confident"];
+
+/**
+ * Every value `rex.placement.autoAccept` accepts, in the order a chooser
+ * should offer them: least automatic first. Exported so a settings surface
+ * offers exactly what {@link parsePlacementSettings} accepts rather than
+ * keeping its own list.
+ */
+export const PLACEMENT_AUTO_ACCEPT: readonly PlacementAutoAccept[] = ["none", "agree", "confident"];
 
 /** Injected Jev seam, same shape as `askJev` in @n-dx/llm-client. */
 export type PlacementJudge = (request: JevRequest, opts?: { taskClass?: string }) => Promise<JevResponse>;
@@ -77,7 +84,7 @@ export function parsePlacementSettings(rexSection: Record<string, unknown>): {
   return {
     settings: {
       models: pick("models", MODELS, DEFAULT_PLACEMENT_SETTINGS.models),
-      autoAccept: pick("autoAccept", AUTO_ACCEPT, DEFAULT_PLACEMENT_SETTINGS.autoAccept),
+      autoAccept: pick("autoAccept", PLACEMENT_AUTO_ACCEPT, DEFAULT_PLACEMENT_SETTINGS.autoAccept),
     },
     warnings,
   };

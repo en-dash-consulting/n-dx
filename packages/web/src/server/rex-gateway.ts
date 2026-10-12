@@ -164,6 +164,18 @@ export type { BackupSnapshot } from "@n-dx/rex";
 export { validateRunSettings } from "@n-dx/rex";
 export type { RunSettings } from "@n-dx/rex";
 
+// ---- Project settings rex owns (`rex.*` in .n-dx.json) ----------------------
+// The Workflow page edits `rex.applyOn` and `rex.placement.autoAccept`, which
+// the CLI reads from the same file. The dashboard already holds `.n-dx.json`
+// parsed, so it validates the section through rex's own parsers rather than a
+// second copy of the rule — and offers exactly the values those parsers accept.
+// A web-local list is how a chooser comes to write a setting the CLI silently
+// falls back from, which looks like a save that did nothing.
+export { APPLY_ON, DEFAULT_APPLY_ON, parseApplyOn } from "@n-dx/rex";
+export type { ApplyOn } from "@n-dx/rex";
+export { PLACEMENT_AUTO_ACCEPT, DEFAULT_PLACEMENT_SETTINGS, parsePlacementSettings } from "@n-dx/rex";
+export type { PlacementAutoAccept, PlacementSettings } from "@n-dx/rex";
+
 // ---- Rex proposal types (consumed by viewer analyze-panel) ------------------
 export type { Proposal, ProposalFeature, ProposalTask } from "@n-dx/rex";
 

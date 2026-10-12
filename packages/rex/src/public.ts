@@ -628,6 +628,20 @@ export type { AppendLogArgs } from "./core/execution-log.js";
 
 export { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "./workflow/default.js";
 
+// ---- Project settings rex owns (`rex.*` in .n-dx.json) -----------------------
+// When a change's amendments reach the product layer, and when a placement is
+// accepted without a human. Both are read from the same `rex` config section by
+// `loadApplyOn` / `loadPlacementSettings`, which the CLI uses; the parsers below
+// are pure, so a surface that already holds the parsed section (the dashboard
+// reads `.n-dx.json` itself) validates against rex's rule rather than its own.
+// The accepted-value lists come with them for the same reason: a chooser that
+// offers a value the parser would reject is a chooser that silently writes a
+// setting the CLI then ignores.
+
+export { APPLY_ON, DEFAULT_APPLY_ON, parseApplyOn } from "./core/apply-policy.js";
+export { PLACEMENT_AUTO_ACCEPT, DEFAULT_PLACEMENT_SETTINGS, parsePlacementSettings } from "./core/placement-policy.js";
+export type { PlacementAutoAccept, PlacementSettings } from "./core/placement-policy.js";
+
 // ---- Commit re-pointing ------------------------------------------------------
 // A rebase or squash rewrites the SHAs other tools recorded. This maps a
 // recorded SHA to the commit it became on main, and names the rule that

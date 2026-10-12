@@ -7,21 +7,30 @@
  * amended it. "Where it lives" is the answer a map gives that a task list
  * cannot: the code that makes the statement true.
  *
+ * The spec can be edited in place, with an editorial checkbox saying the
+ * wording moved and nothing was asked for. The page submits the edit and
+ * renders the capability it is handed back; what an edit *does* to a node's
+ * status is rex's to decide, like every other computed field here.
+ *
  * Driven entirely by its `capability` prop: `product-pages.ts` fetches it
  * from `GET /api/rex/product/capability/<id>`, and tests render it from a
- * fixture.
+ * fixture. `onEdit` is the seam the page wires a direct edit to.
  */
 
 import { h } from "preact";
+import { useCallback, useMemo, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import { CRITERIA_LABEL } from "../external.js";
 import {
   CAPABILITY_HEALTH_LABELS,
   CAPABILITY_STATUS_LABELS,
   CHANGE_STAGE_LABELS,
+  editorialBlockedReason,
+  isEditable,
   needsAttention,
   type CapabilityDetail,
   type CapabilityHistoryEntry,
+  type ProductEdit,
 } from "./product-model.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -104,12 +113,124 @@ function WhereItLives({ capability }: { capability: CapabilityDetail }) {
   );
 }
 
+// ── Direct edit ──────────────────────────────────────────────────────
+
+/**
+ * Edit the spec in place.
+ *
+ * The statement and the capability's own criteria are editable; inherited
+ * criteria are not, because they belong to the capability they come from and
+ * editing one here would be editing a node other than the one this page names.
+ *
+ * The **editorial** checkbox is the whole point of the form. Checked, it says
+ * the wording moved and nothing was asked for: the node stays met and the edit
+ * is recorded as history. Unchecked, the spec has moved ahead of the build and
+ * a change is drafted to build the difference. Only the author can tell those
+ * apart, so the form asks rather than guessing — and says which one is about to
+ * happen before the edit is submitted.
+ */
+function EditForm({ capability, onEdit }: {
+  capability: CapabilityDetail;
+  onEdit: (edit: ProductEdit) => void;
+}) {
+  const own = useMemo(() => capability.criteria.filter((c) => !c.inheritedFrom), [capability.criteria]);
+
+  const [statement, setStatement] = useState(capability.statement ?? "");
+  const [criteria, setCriteria] = useState<Record<string, string>>(
+    () => Object.fromEntries(own.map((c) => [c.id, c.text])),
+  );
+  const [editorial, setEditorial] = useState(false);
+
+  const blocked = editorialBlockedReason(capability);
+  const editorialChecked = editorial && blocked === null;
+
+  const changed =
+    statement !== (capability.statement ?? "") ||
+    own.some((c) => criteria[c.id] !== c.text);
+
+  const submit = useCallback((event: Event) => {
+    event.preventDefault();
+    onEdit({
+      id: capability.id,
+      statement,
+      criteria: own.map((c) => ({ id: c.id, text: criteria[c.id] ?? c.text })),
+      editorial: editorialChecked,
+    });
+  }, [onEdit, capability.id, statement, criteria, own, editorialChecked]);
+
+  return h("section", { class: "cap-edit", "aria-label": "Edit this capability" },
+    h("h3", { class: "section-header" }, "Edit"),
+    h("form", { class: "cap-edit-form", onSubmit: submit },
+      h("label", { class: "cap-edit-label", for: "cap-edit-statement" }, "Statement"),
+      h("textarea", {
+        id: "cap-edit-statement",
+        class: "cap-edit-statement",
+        rows: 3,
+        value: statement,
+        onInput: (e: Event) => setStatement((e.target as HTMLTextAreaElement).value),
+      }),
+
+      own.length > 0
+        ? h("fieldset", { class: "cap-edit-criteria" },
+            h("legend", null, CRITERIA_LABEL.capability),
+            own.map((criterion) =>
+              h("input", {
+                key: criterion.id,
+                type: "text",
+                class: "cap-edit-criterion",
+                "data-criterion-id": criterion.id,
+                "aria-label": `${CRITERIA_LABEL.capability}: ${criterion.text}`,
+                value: criteria[criterion.id] ?? criterion.text,
+                onInput: (e: Event) =>
+                  setCriteria((prev) => ({ ...prev, [criterion.id]: (e.target as HTMLInputElement).value })),
+              }),
+            ),
+          )
+        : null,
+
+      h("div", { class: "cap-edit-editorial" },
+        h("label", { class: `cap-edit-editorial-label${blocked ? " cap-edit-editorial-blocked" : ""}` },
+          h("input", {
+            type: "checkbox",
+            class: "cap-edit-editorial-check",
+            checked: editorialChecked,
+            disabled: blocked !== null,
+            onChange: (e: Event) => setEditorial((e.target as HTMLInputElement).checked),
+          }),
+          " Editorial — wording only, nothing to build",
+        ),
+        blocked
+          ? h("p", { class: "cap-edit-editorial-reason" }, blocked)
+          : null,
+      ),
+
+      // What is about to happen, in the words the outcome will be recorded in.
+      h("p", { class: "cap-edit-outcome" },
+        editorialChecked
+          ? "It stays met. A History line records the edit, and no change is drafted."
+          : "The spec moves ahead of the build: a change is drafted in the Inbox to build the difference.",
+      ),
+
+      h("button", {
+        type: "submit",
+        class: "cap-edit-submit",
+        disabled: !changed,
+      }, "Save edit"),
+    ),
+  );
+}
+
 // ── View ─────────────────────────────────────────────────────────────
 
-export function CapabilityPage({ capability, onBack }: {
+export function CapabilityPage({ capability, onBack, onEdit }: {
   capability: CapabilityDetail;
   /** Returns to the Product page. Omitted, no back control renders. */
   onBack?: () => void;
+  /**
+   * Submits a direct edit to the spec. Omitted, the page is read-only and no
+   * form renders — the Product page's own rows have nowhere to send one.
+   */
+  onEdit?: (edit: ProductEdit) => void;
 }) {
   const attention = needsAttention(capability);
 
@@ -153,6 +274,10 @@ export function CapabilityPage({ capability, onBack }: {
     ),
 
     h(Criteria, { capability }),
+
+    onEdit && isEditable(capability)
+      ? h(EditForm, { capability, onEdit })
+      : null,
 
     capability.openChanges.length > 0
       ? h("section", { class: "cap-open-changes", "aria-label": "Open changes" },

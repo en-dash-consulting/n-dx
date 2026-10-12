@@ -53,6 +53,7 @@ import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
+import { handleRexSettingsRoute } from "./routes-rex-settings.js";
 import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { ALL_DATA_FILES, stripWorkspaceSlot, urlWithToken } from "../shared/index.js";
@@ -822,6 +823,9 @@ async function handleApiRoutes(
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;
   if (await handleProjectSettingsRoute(req, res, ctx)) return true;
+  // Before the generic /api/rex/ router below, which would answer its own 404
+  // for a path it does not know.
+  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexSettingsRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleCommandsRoute(req, res, ctx, broadcast, {
     onProjectInitialized: () => {
       clearStatusCache();

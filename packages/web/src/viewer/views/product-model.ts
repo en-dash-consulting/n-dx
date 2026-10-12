@@ -251,6 +251,66 @@ export interface CapabilityDetail extends Omit<CapabilityRow, "criteriaCount"> {
   code: CodeSite[];
 }
 
+/**
+ * A direct edit to a product node, as the capability page submits it.
+ *
+ * Mirrors what `rex product edit` sends: the spec as the author now wants it,
+ * plus whether the move is **editorial**. Editorial means the wording moved
+ * and nothing was asked for — the node stays met and the edit is recorded as
+ * history. Anything else leaves the node revised and drafts a change to build
+ * the difference, so the two are not interchangeable and the author is the
+ * only one who can tell them apart.
+ *
+ * The outcome is not decided here. The page submits the edit and renders the
+ * capability it is given back, the same way every other derived field on this
+ * page arrives already computed.
+ */
+export interface ProductEdit {
+  /** Id of the node being edited. */
+  id: string;
+  /** The statement as edited. */
+  statement: string;
+  /**
+   * Criteria as edited, by id. Inherited criteria are not included: they
+   * belong to the capability they come from, and editing one here would be
+   * editing a different node than the page says it is editing.
+   */
+  criteria: Array<{ id: string; text: string }>;
+  /** Wording only, nothing to build: the node stays met. */
+  editorial: boolean;
+}
+
+/**
+ * Whether a product node can be edited directly at all.
+ *
+ * A retired node is no longer live, and rex refuses an edit to one outright
+ * rather than editing part of it — so the form does not render instead of
+ * offering an edit that would be refused on submit.
+ */
+export function isEditable(capability: Pick<CapabilityRow, "status">): boolean {
+  return capability.status !== "retired";
+}
+
+/**
+ * Why "editorial" is unavailable for this node, or null when it is offered.
+ *
+ * Both cases are rex's, not the page's. `revised` is the one rex refuses
+ * outright: the spec has already moved ahead of the build, so re-stamping
+ * would mark the unbuilt revision met. `proposed` has never been met, so
+ * there is no met spec to re-stamp and the flag changes nothing. Saying so
+ * beside a disabled checkbox is the difference between knowing before typing
+ * and being refused afterwards.
+ */
+export function editorialBlockedReason(capability: Pick<CapabilityRow, "status">): string | null {
+  if (capability.status === "revised") {
+    return "Already revised: the spec has moved ahead of the build, so re-stamping it would mark the unbuilt revision met.";
+  }
+  if (capability.status === "proposed") {
+    return "Not met yet: there is no met spec to re-stamp, so an edit here is just the spec changing.";
+  }
+  return null;
+}
+
 // ── Grouping and ordering ────────────────────────────────────────────
 
 /** Changes at one stage, within one release group. */

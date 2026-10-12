@@ -42,6 +42,9 @@ describe("repository name comes from the shared parser", () => {
       "https://github.com/user/my-repo",
       "git@github.com:user/my-repo.git",
       "https://github.com/user/my-repo/",
+      "https://user@bitbucket.org/workspace/my-repo.git",
+      "git@bitbucket.org:workspace/my-repo.git",
+      "https://bitbucket.example.com/scm/proj/my-repo.git",
       "ssh://git@bitbucket.example.com:7999/PROJ/my-repo.git",
     ]) {
       expect(parseGitRemoteUrl(remote)?.repo, remote).toBe("my-repo");
@@ -150,6 +153,26 @@ describe("extractProjectMetadata", () => {
     const meta = await extractProjectMetadata(tmpDir);
     expect(meta.git).not.toBeNull();
     expect(meta.git!.remoteUrl).toBe("https://github.com/user/test-repo.git");
+    expect(meta.git!.repoName).toBe("test-repo");
+  });
+
+  // The route's own read, not just the parser: this is the path a real remote
+  // travels, and the ssh-with-port form is the one a hand-rolled splitter is
+  // most likely to mis-segment.
+  it("names the repository from a Bitbucket Data Center remote", async () => {
+    execSync("git init", { cwd: tmpDir, stdio: "ignore" });
+    execSync("git config user.email test@test.com", { cwd: tmpDir, stdio: "ignore" });
+    execSync("git config user.name Test", { cwd: tmpDir, stdio: "ignore" });
+    await writeFile(join(tmpDir, "README.md"), "# Test");
+    execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["remote", "add", "origin", "ssh://git@bitbucket.example.com:7999/PROJ/test-repo.git"], {
+      cwd: tmpDir,
+      stdio: "ignore",
+    });
+
+    const meta = await extractProjectMetadata(tmpDir);
+    expect(meta.git!.remoteUrl).toBe("ssh://git@bitbucket.example.com:7999/PROJ/test-repo.git");
     expect(meta.git!.repoName).toBe("test-repo");
   });
 

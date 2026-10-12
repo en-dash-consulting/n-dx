@@ -24,7 +24,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add direct map editing, workflow settings and Bitbucket remote parsing](./add-direct-map-editing-workflow.md) | pending |
+| [Add direct map editing, workflow settings and Bitbucket remote parsing](./add-direct-map-editing-workflow.md) | in_progress |
 | [Add one host-neutral remote-URL helper in llm-client](./add-one-host-neutral-remote-url-helper.md) | completed |
 | [Dashboard Quick Add and batch import show an empty preview on a v2 tree](./dashboard-quick-add-and-batch-import.md) | completed |
 | [Make item routes type-aware and remap views that use level](./make-item-routes-type-aware-and-remap.md) | completed |
