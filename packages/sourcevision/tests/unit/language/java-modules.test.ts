@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { discoverJavaModules } from "../../../src/language/java-modules.js";
@@ -183,4 +183,21 @@ project(':c').projectDir = new File(settingsDir, 'vendor/c')`,
     await file("README.md", "hi");
     expect(await discoverJavaModules(dir)).toEqual({ buildSystem: "none", modules: [] });
   });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "skips a subdirectory it cannot list when there is no build file, and reports it",
+    async () => {
+      await file("src/app/A.java", "package app;\nclass A {}");
+      await dirs("locked");
+      await chmod(join(dir, "locked"), 0o000);
+      try {
+        const layout = await discoverJavaModules(dir);
+        expect(layout.buildSystem).toBe("none");
+        expect(layout.modules[0].sourceRoots).toEqual(["src"]);
+        expect(layout.notices).toEqual(["locked is unreadable (EACCES); skipped"]);
+      } finally {
+        await chmod(join(dir, "locked"), 0o755);
+      }
+    },
+  );
 });
