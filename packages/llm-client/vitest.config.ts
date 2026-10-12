@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { isolationProjects } from "../../tests/vitest-isolation.mjs";
 
 export default defineConfig({
   resolve: {
@@ -24,5 +25,9 @@ export default defineConfig({
       "../../tests/setup-judgment-env.js",
     ],
     include: ["tests/**/*.test.ts"],
+    // Two projects over the same files: the ones that mock modules or globals
+    // get a worker each, everything else shares workers. See
+    // tests/vitest-isolation.mjs for the split and the numbers behind it.
+    projects: isolationProjects({ root: import.meta.dirname, name: "llm-client" }),
   },
 });
