@@ -96,6 +96,14 @@ export interface VendorSpawnOptions {
    */
   readonly permissionMode?: PermissionMode;
   /**
+   * Effort level for the spawned session, already validated for this model.
+   *
+   * Currently only honored by the Claude CLI adapter, which forwards it as
+   * `--effort <level>`. Other adapters silently ignore it. Undefined means no
+   * `llm.effort` rule matched, and the vendor picks its own default.
+   */
+  readonly effort?: string;
+  /**
    * Resume an existing vendor session instead of starting a fresh one.
    *
    * Set by the adversarial review pass so the reviewer re-enters the session

@@ -397,6 +397,9 @@ const RunCommitRecordSchema = z.object({
   sha: z.string(),
   subject: z.string(),
   attribution: z.enum(["start-head", "subject", "trailer", "window"]).optional(),
+  // Optional so a record written before commit facts were stored still
+  // validates; see the field doc on RunCommitRecord.
+  authorDate: z.string().optional(),
 });
 
 /** See `RunRecord.commitsMissingItem`. */
@@ -429,6 +432,7 @@ export const RunRecordSchema = z.object({
   worktreeRoot: z.string().optional(),
   branch: z.string().optional(),
   startHead: z.string().optional(),
+  startHeadCommit: RunCommitRecordSchema.optional(),
   ndxVersion: z.string().optional(),
   cliPath: z.string().optional(),
   assisted: z.boolean().optional(),

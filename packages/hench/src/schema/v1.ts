@@ -1585,6 +1585,19 @@ export interface RunRecord {
    */
   startHead?: string;
   /**
+   * {@link startHead}'s own subject and author date, so the baseline can be
+   * re-pointed after a rewrite like any commit the run produced.
+   *
+   * A separate field rather than a change to `startHead` because `startHead`
+   * is read as a bare SHA in a dozen places (the diff baseline, the gate, the
+   * reviewer's scope); widening it would touch all of them to record a fact
+   * only the re-point uses. `sha` here always equals `startHead`.
+   *
+   * Absent outside a git repository, for a record written before this field
+   * existed, or when the commit could not be read. v1 additive field.
+   */
+  startHeadCommit?: RunCommitRecord;
+  /**
    * Version of the `@n-dx/hench` build that executed this run, or the
    * `NDX_VERSION` the orchestrator exported. Together with {@link cliPath} this
    * is what tells several active checkouts apart in token and outcome reports.
@@ -2005,6 +2018,19 @@ export interface RunCommitRecord {
   subject: string;
   /** How the commit was tied to the run; see {@link RunCommitAttribution}. */
   attribution?: RunCommitAttribution;
+  /**
+   * Author date, ISO 8601 with offset, as git prints `%aI`.
+   *
+   * Recorded because the SHA alone stops identifying the commit the moment a
+   * stack rebase or squash merge rewrites it — on 2026-10-07 every commit
+   * cited in the PR 27/8 and #548/#549 run records left main at once. A rebase
+   * preserves author email, author date and subject, so those three are what
+   * find the twin; see `store/repoint-runs.ts`.
+   *
+   * Optional: records written before this existed are still valid, and a
+   * re-point simply has one fewer rule available for them.
+   */
+  authorDate?: string;
 }
 
 /** A run commit whose N-DX-Item does not name the run's task. See {@link RunRecord.commitsMissingItem}. */

@@ -77,6 +77,10 @@ const EXPECTED_EXPORTS = [
   // same validator every writer (MCP, `rex update --run`, the dashboard) gates
   // on, so what `ndx work` honours cannot drift from what may be saved.
   "validateRunSettings",
+  // Commit re-pointing — a run record's SHAs are rewritten by a rebase or a
+  // squash merge, and which commit one became is decided by rex's rules, not
+  // a second set here.
+  "repointCommits",
 ] as const;
 
 describe("rex-gateway compatibility", () => {
