@@ -11,7 +11,7 @@ import { changeLayerType } from "../../core/layer-projection.js";
 import type { PRDItem } from "../../schema/index.js";
 import type { ChangeNodeType } from "../../schema/v2.js";
 import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
-import { acquireClaim, describeHeldClaim, type ClaimsContext } from "./claims.js";
+import { acquireWorkClaim, describeHeldClaim, type ClaimsContext } from "./claims.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
 
@@ -38,7 +38,7 @@ export async function handleClaimTask(
     if (!claims) {
       return textResult(JSON.stringify({ id: args.id, claimed: false, reason: "not a git repository — claims are a no-op here" }));
     }
-    const attempt = await acquireClaim(claims, args.id);
+    const attempt = await acquireWorkClaim(store, claims, args.id);
     if (!attempt.ok) return textResult(describeHeldClaim(args.id, attempt.heldBy), true);
     return textResult(JSON.stringify({
       id: args.id,

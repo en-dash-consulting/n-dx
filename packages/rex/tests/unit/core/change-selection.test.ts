@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { changeWorkShape, compareReleases, findActionableWork, findNextWork, resolveWorkById } from "../../../src/core/change-selection.js";
+import { addTask } from "../../../src/core/change-completion.js";
+import { changeWorkShape, compareReleases, enclosingChangeIds, findActionableWork, findNextWork, resolveWorkById } from "../../../src/core/change-selection.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ title: fields.id as string, slug: fields.id as string, ...fields }) as RuleNode;
@@ -180,6 +181,27 @@ describe("opt-in filters", () => {
 
   it("excludeIds passes over claimed units", () => {
     expect(ids(t, { excludeIds: new Set(["inherits"]) })).toEqual(["not-ready", "unready"]);
+  });
+});
+
+describe("an excluded change covers the work inside it", () => {
+  it("skips the task an in-flight task-less change splits into while the change is excluded", () => {
+    const split = addTask(tree(change("C", { status: "in_progress" }), change("other")), "C", task("T"), new Date("2026-10-12T00:00:00Z")).tree;
+    expect(findNextWork(split)?.node.id).toBe("T");
+    expect(findNextWork(split, { excludeIds: new Set(["C"]) })?.node.id).toBe("other");
+  });
+
+  it("skips units under an excluded change at any depth", () => {
+    const t = tree(change("outer", { children: [task("own"), change("mid", { children: [change("inner", { children: [task("deep")] })] })] }), change("free"));
+    expect(ids(t, { excludeIds: new Set(["outer"]) })).toEqual(["free"]);
+    expect(ids(t, { excludeIds: new Set(["mid"]) })).toEqual(["own", "free"]);
+  });
+
+  it("enclosingChangeIds lists the changes around a node, innermost first", () => {
+    const t = tree(change("outer", { children: [change("inner", { children: [task("t")] })] }));
+    expect(enclosingChangeIds(t, "t")).toEqual(["inner", "outer"]);
+    expect(enclosingChangeIds(t, "outer")).toEqual([]);
+    expect(enclosingChangeIds(t, "nope")).toEqual([]);
   });
 });
 

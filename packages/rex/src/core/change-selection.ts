@@ -52,7 +52,11 @@ export interface WorkUnit {
 }
 
 export interface WorkSelectionOptions {
-  /** Ids to pass over, e.g. units another worktree has claimed. */
+  /**
+   * Ids to pass over, e.g. units another worktree has claimed. A change's id
+   * also passes over everything inside it, at any depth: a claim on a
+   * task-less change covers the task it later splits into.
+   */
   excludeIds?: ReadonlySet<string>;
   /** Only units marked `ready` (`--ready-only`). */
   readyOnly?: boolean;
@@ -95,6 +99,11 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
     return ok;
   };
 
+  // Whether a change or one enclosing it is excluded, which excludes all it holds.
+  const exclude = options.excludeIds ?? new Set<string>();
+  const held = (change: RuleNode): boolean =>
+    exclude.size > 0 && [change, ...enclosingChanges(change, parentOf)].some((c) => exclude.has(c.id));
+
   const order = new Map<RuleNode, number>();
   const dependents = new Map<RuleNode, number>();
   const units: WorkUnit[] = [];
@@ -116,7 +125,8 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
 
   const candidates = units.filter(
     (u) =>
-      !options.excludeIds?.has(u.node.id) &&
+      !exclude.has(u.node.id) &&
+      !held(u.change) &&
       (!options.readyOnly || (u.node.ready ?? u.change.ready) === true) &&
       (!options.assignee || u.node.assignee === options.assignee || u.change.assignee === options.assignee),
   );
@@ -148,10 +158,25 @@ export function resolveWorkById(tree: V2Tree, ref: string): WorkUnit | null {
   if (node?.type === "change" && changeWorkShape(node) === "container") return null;
   if (node?.type === "change") return { kind: "change", node: node as ChangeRule, change: node as ChangeRule };
   if (node?.type !== "task") return null;
-  const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
-  let change = parentOf.get(node);
-  while (change && change.type !== "change") change = parentOf.get(change);
+  const [change] = enclosingChanges(node, new Map(index.entries.map((e) => [e.node, e.parent])));
   return change ? { kind: "task", node: node as TaskRule, change: change as ChangeRule } : null;
+}
+
+/**
+ * Ids of the changes enclosing the node a ref names, innermost first, not the
+ * node itself: a claim on any of them covers the node. `[]` when the ref names
+ * nothing.
+ */
+export function enclosingChangeIds(tree: V2Tree, ref: string): string[] {
+  const index = indexTree(tree);
+  const node = index.resolve(ref);
+  return node ? enclosingChanges(node, new Map(index.entries.map((e) => [e.node, e.parent]))).map((c) => c.id) : [];
+}
+
+function enclosingChanges(node: RuleNode, parentOf: ReadonlyMap<RuleNode, RuleNode | undefined>): RuleNode[] {
+  const out: RuleNode[] = [];
+  for (let p = parentOf.get(node); p; p = parentOf.get(p)) if (p.type === "change") out.push(p);
+  return out;
 }
 
 function urgency(node: RuleNode): number {

@@ -8,7 +8,7 @@ import { completeV2Work } from "../v2-completion.js";
 import type { PRDItem, ItemStatus, ResolutionType } from "../../schema/index.js";
 import { isChangeLayerStore, type PRDStore, type TaskClaim } from "../../store/index.js";
 import {
-  acquireClaim,
+  acquireWorkClaim,
   describeHeldClaim,
   CLAIM_RELEASING_STATUSES,
   type ClaimsContext,
@@ -68,7 +68,7 @@ export async function handleUpdateTaskStatus(
     // claim held by another worktree — that is the double-pick this prevents.
     let claimed: TaskClaim | null = null;
     if (status === "in_progress") {
-      const attempt = await acquireClaim(claims, id);
+      const attempt = await acquireWorkClaim(store, claims, id);
       if (!attempt.ok) {
         if (!force) return textResult(describeHeldClaim(id, attempt.heldBy), true);
       } else {

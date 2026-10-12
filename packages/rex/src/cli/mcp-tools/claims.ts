@@ -7,7 +7,8 @@
  * side, which reads `collectForeignClaims` for the same skip.
  */
 
-import type { ClaimsStore, TaskClaim } from "../../store/index.js";
+import { enclosingChangeIds } from "../../core/change-selection.js";
+import { isChangeLayerStore, type ClaimsStore, type PRDStore, type TaskClaim } from "../../store/index.js";
 
 /**
  * Where the caller's claims live and which worktree it is: selection passes
@@ -66,8 +67,33 @@ export async function acquireClaim(
   return result.ok ? { ok: true, claim: result.claim } : { ok: false, heldBy: result.heldBy };
 }
 
-/** How a held claim reads to the caller that could not take it. */
+/**
+ * {@link acquireClaim}, refused also when another worktree claims a change
+ * enclosing the item (v2 only). Such a claim covers the work inside: a
+ * task-less change claimed at `in_progress` keeps its claim when `add_item`
+ * splits its work into a task, and that task must not be free to others.
+ */
+export async function acquireWorkClaim(
+  store: PRDStore,
+  claims: ClaimsContext | undefined,
+  id: string,
+): ReturnType<typeof acquireClaim> {
+  if (claims && isChangeLayerStore(store)) {
+    const enclosing = enclosingChangeIds(await store.loadTree(), id);
+    if (enclosing.length > 0) {
+      const elsewhere = await claims.store.claimedElsewhere(claims.worktreeRoot);
+      const heldBy = enclosing.map((c) => elsewhere.get(c)).find((c) => c !== undefined);
+      if (heldBy) return { ok: false, heldBy };
+    }
+  }
+  return acquireClaim(claims, id);
+}
+
+/** How a held claim reads to the caller that could not take it; `heldBy` may be on a change enclosing the task. */
 export function describeHeldClaim(taskId: string, heldBy: TaskClaim): string {
-  return `Task "${taskId}" is claimed by another worktree: ${heldBy.worktreeRoot} (PID ${heldBy.pid}, expires ${heldBy.expiresAt}). `
+  const held = heldBy.taskId === taskId
+    ? `Task "${taskId}" is claimed`
+    : `Task "${taskId}" is inside change "${heldBy.taskId}", which is claimed`;
+  return `${held} by another worktree: ${heldBy.worktreeRoot} (PID ${heldBy.pid}, expires ${heldBy.expiresAt}). `
     + `Pick another task, or pass force: true if that run is finished.`;
 }

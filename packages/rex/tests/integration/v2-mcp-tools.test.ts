@@ -10,7 +10,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { openRexWorkspace, type RexWorkspace } from "../../src/cli/mcp-workspace.js";
-import { REX_MCP_TOOLS } from "../../src/cli/mcp-tools/index.js";
+import { REX_MCP_TOOLS, handleUpdateTaskStatus } from "../../src/cli/mcp-tools/index.js";
 import { DEFAULT_CONFIG } from "../../src/schema/index.js";
 import { applyReshape, type ReshapeProposal } from "../../src/core/reshape.js";
 import { ChangeLayerStore } from "../../src/store/change-layer-store.js";
@@ -326,6 +326,26 @@ describe("rex MCP tools on a v2 tree", () => {
 
     expect((await ws.claims.store.claim(solo, { worktreeRoot: elsewhere })).ok).toBe(true);
     expect(json(await call("get_next_task"))).toMatchObject({ next: null, message: expect.stringMatching(/2 claimed elsewhere/) });
+  });
+
+  it("a claim on a task-less change covers the task add_item splits it into", async () => {
+    // Worktree A starts task-less change C, which claims it, then breaks the work down.
+    const worktreeA = { store: ws.claims.store, worktreeRoot: join(tmp, "worktree-a") };
+    const solo = await addChange("Add Google Pay");
+    const started = await handleUpdateTaskStatus(ws.store, tmp, { id: solo, status: "in_progress" }, worktreeA);
+    expect(started.isError, started.content[0].text).not.toBe(true);
+    const split = json(await call("add_item", { type: "task", title: "Wire the wallet", parentId: solo })).id;
+    expect(await node(split)).toMatchObject({ status: "in_progress" });
+
+    // Worktree B (this workspace) is not handed C's work, and cannot start or claim it.
+    const next = json(await call("get_next_task"));
+    expect(next.item.id).toBe(TASK);
+    expect(next.skippedClaimed).toEqual([expect.objectContaining({ taskId: solo, worktreeRoot: worktreeA.worktreeRoot })]);
+    for (const [tool, args] of [["update_task_status", { id: split, status: "in_progress" }], ["claim_task", { id: split }]] as const) {
+      const refused = await call(tool, args);
+      expect(refused.isError, `${tool}: ${refused.text}`).toBe(true);
+      expect(refused.text).toMatch(new RegExp(`inside change "${solo}", which is claimed by another worktree`));
+    }
   });
 
   it("get_next_task filters by the unit's own tags", async () => {

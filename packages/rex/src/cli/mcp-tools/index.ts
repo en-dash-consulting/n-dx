@@ -16,6 +16,7 @@ export { textResult, type McpResult } from "./result.js";
 export {
   collectForeignClaims,
   acquireClaim,
+  acquireWorkClaim,
   describeHeldClaim,
   CLAIM_RELEASING_STATUSES,
   type ClaimsContext,
