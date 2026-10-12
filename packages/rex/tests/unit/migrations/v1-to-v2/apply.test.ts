@@ -17,6 +17,8 @@ import {
   buildV2Tree,
   everyV1Id,
   MigrationApplyError,
+  rehearseV1ToV2,
+  V1_KINDS,
   type V1ToV2Plan,
 } from "../../../../src/migrations/v1-to-v2/apply.js";
 
@@ -261,6 +263,63 @@ describe("applyV1ToV2", () => {
     };
     await expect(applyV1ToV2(rexDir, plan, { load: loadWithDuplicate })).rejects.toThrow(/holds 1 id more than once \(t1\)/);
     expect(snapshot(rexDir)).toEqual(before);
+  });
+
+  describe("rehearseV1ToV2", () => {
+    it("writes nothing, not even the lock", async () => {
+      const plan = await planOf((await load()).items);
+      const before = snapshot(rexDir);
+      const entries = readdirSync(rexDir).sort();
+      const outcome = await rehearseV1ToV2(rexDir, plan, { load });
+      expect(outcome.status).toBe("rehearsed");
+      expect(snapshot(rexDir)).toEqual(before);
+      expect(readdirSync(rexDir).sort()).toEqual(entries);
+    });
+
+    it("counts per kind what becomes each v2 type, summing to the v1 total", async () => {
+      const plan = await planOf((await load()).items);
+      const outcome = await rehearseV1ToV2(rexDir, plan, { load });
+      if (outcome.status !== "rehearsed") throw new Error("expected a rehearsal");
+      const total = V1_KINDS.reduce((n, k) => n + outcome.kinds[k].total, 0);
+      expect(total).toBe(walkItems(TREE).length);
+      for (const kind of V1_KINDS) {
+        const t = outcome.kinds[kind];
+        expect(Object.values(t.become).reduce((n, c) => n + c, 0)).toBe(t.total);
+      }
+      // e1 is an area; e3 and e2 are a release umbrella and a review container.
+      expect(outcome.kinds.epic.become).toMatchObject({ area: 1, release: 2 });
+      // Held changes are the Inbox changes the real apply writes.
+      const held = V1_KINDS.reduce((n, k) => n + outcome.kinds[k].held, 0);
+      expect(held).toBe(outcome.built.inbox);
+    });
+
+    it("counts dropped metadata and log values", async () => {
+      const tree = structuredClone(TREE);
+      tree[0]!.children![0]!.recommendationMeta = { a: "[object Object]", b: "ok" } as never;
+      tree[0]!.children![0]!.children![0]!.log = ["[object Object]", "[object Object]", "kept"] as never;
+      const plan = await planOf(tree);
+      const outcome = await rehearseV1ToV2(rexDir, plan, { load: async () => ({ title: "Shop", items: tree }) });
+      if (outcome.status !== "rehearsed") throw new Error("expected a rehearsal");
+      expect(outcome.kinds.feature.droppedMeta).toBe(1);
+      expect(outcome.kinds.task.droppedLog).toBe(2);
+      expect(outcome.kinds.epic).toMatchObject({ droppedMeta: 0, droppedLog: 0 });
+    });
+
+    it("refuses what apply refuses: a plan whose model pass stopped, and no plan", async () => {
+      const plan = await planOf((await load()).items);
+      const stopped: PlanFile = { ...plan, header: { ...plan.header, passes: [...plan.header.passes, { name: "text", model: "m", incomplete: { error: "rate limited" } }] } };
+      await expect(rehearseV1ToV2(rexDir, stopped, { load })).rejects.toThrow(/text pass stopped \(rate limited\)/);
+      await expect(rehearseV1ToV2(rexDir, undefined, { load })).rejects.toThrow(MigrationApplyError);
+    });
+
+    it("on a migrated tree reports nothing to apply and lists what apply would remove", async () => {
+      const plan = await planOf((await load()).items);
+      await applyV1ToV2(rexDir, plan, { load });
+      mkdirSync(join(rexDir, "prd_tree"));
+      const outcome = await rehearseV1ToV2(rexDir, plan, { load });
+      expect(outcome).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree")] });
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+    });
   });
 
   it("refuses a plan whose model pass stopped, and writes nothing", async () => {

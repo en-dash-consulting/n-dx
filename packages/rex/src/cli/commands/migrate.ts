@@ -34,7 +34,15 @@ import { createTextSpecModel } from "../../analyze/spec-draft-reason.js";
 import { findTestFiles } from "../../core/verify.js";
 import type { PlacementSettings } from "../../core/placement-policy.js";
 import { findMigration } from "../../migrations/registry.js";
-import { applyV1ToV2, MigrationApplyError, type ApplyV1ToV2Result } from "../../migrations/v1-to-v2/apply.js";
+import {
+  applyV1ToV2,
+  MigrationApplyError,
+  rehearseV1ToV2,
+  V1_KINDS,
+  type ApplyV1ToV2Result,
+  type KindTally,
+  type RehearseV1ToV2Result,
+} from "../../migrations/v1-to-v2/apply.js";
 import { incompletePasses, isPlanComplete, readPlanFile, writePlanFile, type PlanFile } from "../../migrations/plan-file.js";
 import { planSeams } from "../../migrations/v1-to-v2/seams.js";
 import { v1TreeSource, type V1ToV2Entry, type V1ToV2Summary } from "../../migrations/v1-to-v2/index.js";
@@ -54,7 +62,7 @@ const PLAN_PLACEMENT: PlacementSettings = { models: "text", autoAccept: "none" }
 /** The model name recorded for Jev: a plan is reused only while the recorded model matches. */
 const JEV_MODEL_NAME = "jev-latest";
 
-const USAGE = "Usage: rex migrate --plan [--out <path>] [--rules-only] [dir], or rex migrate --apply [--plan=<path>] [dir]";
+const USAGE = "Usage: rex migrate --plan [--out <path>] [--rules-only] [dir], or rex migrate --apply [--plan=<path>] [--dry-run] [dir]";
 
 export async function cmdMigrate(dir: string, flags: Record<string, string>): Promise<void> {
   if (flags.apply === "true") return applyPlan(dir, flags);
@@ -124,7 +132,9 @@ export async function cmdMigrate(dir: string, flags: Record<string, string>): Pr
  * `rex migrate --apply`: write the v2 tree from the plan at `--plan=<path>`
  * (default `.ndx-migration/plan.json`) and remove the v1 tree, in one PRD
  * transaction (`migrations/v1-to-v2/apply.ts`). On a v2 tree it reports so and
- * exits zero.
+ * exits zero. With `--dry-run` it runs the same refusals, prints per v1 kind
+ * what its items become, the Inbox holds and the dropped values, and writes
+ * nothing.
  */
 async function applyPlan(dir: string, flags: Record<string, string>): Promise<void> {
   const projectDir = resolve(dir);
@@ -143,6 +153,17 @@ async function applyPlan(dir: string, flags: Record<string, string>): Promise<vo
   }
 
   const store = await resolveStore(rexDir);
+  if (flags["dry-run"] === "true") {
+    let rehearsal: RehearseV1ToV2Result;
+    try {
+      rehearsal = await rehearseV1ToV2(rexDir, plan, { load: () => store.loadDocument() });
+    } catch (err) {
+      if (err instanceof MigrationApplyError) throw new CLIError(err.message);
+      throw err;
+    }
+    reportRehearsal(rehearsal);
+    return;
+  }
   let outcome: ApplyV1ToV2Result;
   try {
     outcome = await applyV1ToV2(rexDir, plan, { load: () => store.loadDocument() });
@@ -164,6 +185,29 @@ async function applyPlan(dir: string, flags: Record<string, string>): Promise<vo
   if (built.refitted.length > 0) info(`Moved since the plan, re-fitted: ${built.refitted.length}`);
   if (built.gone.length > 0) info(`In the plan but no longer in the tree: ${built.gone.length}`);
   info(`Removed ${PRD_TREE_DIRNAME}/ and its tree-meta.json. Review the result with 'rex health' and place the Inbox.`);
+}
+
+/** What `rex migrate --apply --dry-run` prints: per v1 kind what its items become, what is held, what is dropped. */
+function reportRehearsal(rehearsal: RehearseV1ToV2Result): void {
+  if (rehearsal.status === "already-v2") {
+    result("Dry run: this project already uses the v2 layout: nothing to apply.");
+    if (rehearsal.removed.length > 0) info(`Apply would remove what an interrupted apply left: ${rehearsal.removed.join(", ")}`);
+    return;
+  }
+  const { kinds, built, nodes, v1Items } = rehearsal;
+  result(`Dry run: apply would migrate ${v1Items} v1 items to the v2 layout (${nodes} nodes, the cut change ${built.cut} included). Nothing was written.`);
+  for (const kind of V1_KINDS) {
+    const t = kinds[kind];
+    if (t.total === 0) continue;
+    const become = Object.entries(t.become).filter(([, n]) => n > 0).map(([type, n]) => `${n} ${type === "release" ? "dissolved release" : type}`);
+    info(`${kind} (${t.total}): ${become.join(", ")}; held for the Inbox ${t.held}; dropped ${t.droppedMeta} droppedMeta, ${t.droppedLog} droppedLog`);
+  }
+  const sum = (pick: (t: KindTally) => number): number => V1_KINDS.reduce((n, k) => n + pick(kinds[k]), 0);
+  info(`Total (${sum((t) => t.total)}): held for the Inbox ${sum((t) => t.held)}; dropped ${sum((t) => t.droppedMeta)} droppedMeta, ${sum((t) => t.droppedLog)} droppedLog`);
+  if (built.containers.length > 0) info(`Delivery containers listed on the cut change: ${built.containers.length}`);
+  if (built.late.length > 0) info(`Newer than the plan: ${built.late.length}`);
+  if (built.refitted.length > 0) info(`Moved since the plan, re-fitted: ${built.refitted.length}`);
+  if (built.gone.length > 0) info(`In the plan but no longer in the tree: ${built.gone.length}`);
 }
 
 /** The plan already at the output path, when it is one for this migration; any other file there is not overwritten. */

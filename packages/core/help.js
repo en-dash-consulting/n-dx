@@ -1241,7 +1241,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     related: ["init", "which"],
   },
   migrate: {
-    summary: "plan the v1 → v2 PRD migration and write the plan file",
+    summary: "plan or apply the v1 → v2 PRD migration",
     description:
       "Classifies every v1 PRD item, proposes the areas and constraints, drafts\n" +
       "the capability specs and writes the plan for review. Writes nothing in\n" +
@@ -1251,10 +1251,16 @@ const ORCHESTRATOR_HELP_DEFS = {
       "plan only when TYPESAFE_API_KEY is set, otherwise that pass is skipped\n" +
       "with a warning. Re-running reuses the earlier plan's answers and cut time.\n" +
       "A model pass that stops on an error is reported and the command exits\n" +
-      "non-zero after writing the plan.",
-    usage: "ndx migrate --plan [options] [dir]",
+      "non-zero after writing the plan.\n\n" +
+      "--apply writes the v2 tree from the plan and removes prd_tree/ and\n" +
+      "tree-meta.json in one transaction. With --dry-run it prints, per v1 kind,\n" +
+      "what its items become, how many are held for the Inbox and how many\n" +
+      "metadata values are dropped, and writes nothing.",
+    usage: "ndx migrate --plan [options] [dir], or ndx migrate --apply [options] [dir]",
     options: [
-      { flag: "--plan", description: "Write the migration plan (required)" },
+      { flag: "--plan", description: "Write the migration plan (with --apply: --plan <path> names the plan to apply)" },
+      { flag: "--apply", description: "Apply the plan: write the v2 tree and remove the v1 tree" },
+      { flag: "--dry-run", description: "With --apply: print what would move and what is dropped; write nothing" },
       { flag: "--out <path>", description: "Plan file path (default .ndx-migration/plan.json); not inside the rex directory" },
       { flag: "--rules-only", description: "Run no model pass" },
       { flag: "--model <id>", description: "Model for text placement and spec drafting" },
@@ -1263,6 +1269,8 @@ const ORCHESTRATOR_HELP_DEFS = {
     examples: [
       { command: "ndx migrate --plan .", description: "Plan with the default passes" },
       { command: "ndx migrate --plan --rules-only .", description: "Plan from the rules alone" },
+      { command: "ndx migrate --apply --dry-run .", description: "Rehearse the apply" },
+      { command: "ndx migrate --apply .", description: "Apply the plan" },
     ],
     related: ["migrate-layout", "plan", "status"],
   },
@@ -1863,7 +1871,7 @@ export function formatMainHelp() {
   section("SETUP", [
     ["init [dir]", "Initialize project"],
     ["migrate-layout [dir]", "Move existing state into .ndx/ (--dry-run, --no-commit)"],
-    ["migrate --plan [dir]", "Plan the v1 → v2 PRD migration (--out, --rules-only)"],
+    ["migrate --plan|--apply [dir]", "Plan or apply the v1 → v2 PRD migration (--out, --rules-only, --dry-run)"],
     ["which [dir]", "Show which n-dx is running (version, path, install, git)"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],

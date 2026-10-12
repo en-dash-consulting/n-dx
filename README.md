@@ -241,6 +241,7 @@ ndx config llm.codex.cli_path codex .
 |---------|-------------|
 | `ndx plan [dir]` | Analyze codebase and generate PRD proposals (`--guided`, `--accept`) |
 | `ndx migrate-layout [dir]` | Move an existing project's state into `.ndx/` (`--dry-run`, `--no-commit`) |
+| `ndx migrate --apply [--plan <path>] [--dry-run] [dir]` | Apply the plan: writes the v2 tree and removes `prd_tree/` and `tree-meta.json` in one transaction. `--dry-run` prints per v1 kind what becomes what, how many are held for the Inbox and how many metadata values are dropped, and writes nothing |
 | `ndx migrate --plan [dir]` | Plan the v1 → v2 PRD migration. Writes `.ndx-migration/plan.json` (gitignored; `--out <path>` overrides, never inside `.rex/`), nothing in `.rex/`. `--rules-only` skips every model pass; a pass that stops on an error exits non-zero after the plan is written |
 | `ndx status [dir]` | Show PRD status (`--format=json`, `--since`, `--until`) |
 | `ndx readiness [dir]` | Score SDLC readiness for autonomous agent work — tests, CI, CD, rollback, migrations, quality gates, observability, agent safety (`--json`). Heuristic: detects whether a practice exists, not whether it is good |

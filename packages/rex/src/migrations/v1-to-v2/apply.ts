@@ -57,7 +57,7 @@ import { CHANGES_DIRNAME, PRODUCT_DIRNAME, loadPrdModel, type PrdModel } from ".
 import { writePrdModel } from "../../store/prd-model-writer.js";
 import { incompletePasses, type PlanFile } from "../plan-file.js";
 import type { V1ToV2Entry, V1ToV2Summary } from "./index.js";
-import { dropCorrupt, legacyLoeBucket, legacyLoeRationale, v2Slugs, type SlugEntry } from "./migration-plan-data.js";
+import { countCorrupt, dropCorrupt, legacyLoeBucket, legacyLoeRationale, v2Slugs, type SlugEntry } from "./migration-plan-data.js";
 
 export type V1ToV2Plan = PlanFile<V1ToV2Entry, V1ToV2Summary>;
 
@@ -492,6 +492,98 @@ export type ApplyV1ToV2Result =
   | { status: "already-v2"; removed: string[] }
   | { status: "applied"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; nodes: number; v1Items: number; files: number };
 
+interface Prepared {
+  v1: { title: string; items: PRDItem[] };
+  built: BuiltV2Tree;
+  v1Items: number;
+}
+
+/** The refusals, the build and the id check shared by apply and its rehearsal; writes nothing. */
+async function prepare(plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load">): Promise<Prepared> {
+  if (!plan) throw new MigrationApplyError("No migration plan to apply.");
+  assertApplicable(plan);
+  const v1 = await options.load();
+  assertUniqueV1Ids(v1.items);
+  const built = buildV2Tree(v1.items, plan);
+  const v1Items = fingerprintTree(v1.items).size;
+  assertEveryV1Id(everyV1Id(v1.items, built.tree, built.containers, built.cut), v1Items, "v2 tree");
+  return { v1, built, v1Items };
+}
+
+// ── Rehearsal ────────────────────────────────────────────────────
+
+export type V1Kind = "epic" | "feature" | "task" | "subtask";
+export const V1_KINDS: readonly V1Kind[] = ["epic", "feature", "task", "subtask"];
+
+/** What the v1 items of one kind become. The `become` counts add up to `total`. */
+export interface KindTally {
+  total: number;
+  /** By v2 type; `release` is a delivery container that becomes no node. */
+  become: Record<NodeType | "release", number>;
+  /** Changes held for the Inbox (also counted under `change`). */
+  held: number;
+  /** Metadata values dropped: corrupt `[object Object]` strings in `recommendationMeta`. */
+  droppedMeta: number;
+  /** Log values dropped, likewise. */
+  droppedLog: number;
+}
+
+const emptyTally = (): KindTally => ({
+  total: 0,
+  become: { area: 0, capability: 0, constraint: 0, change: 0, task: 0, subtask: 0, release: 0 },
+  held: 0,
+  droppedMeta: 0,
+  droppedLog: 0,
+});
+
+/** Per v1 kind, what its items become in `built`. Pure; the cut change has no v1 item and is not counted. */
+export function tallyV1ToV2(items: readonly PRDItem[], built: Pick<BuiltV2Tree, "tree" | "containers">): Record<V1Kind, KindTally> {
+  const nodes = new Map<string, RuleNode>();
+  const index = (list: readonly RuleNode[]): void => {
+    for (const node of list) {
+      nodes.set(node.id, node);
+      index(node.children ?? []);
+    }
+  };
+  index([...built.tree.product, ...built.tree.changes]);
+  const containers = new Set(built.containers.map((c) => c.id));
+
+  const out = Object.fromEntries(V1_KINDS.map((k) => [k, emptyTally()])) as Record<V1Kind, KindTally>;
+  for (const { item } of flatten(items, undefined, [])) {
+    const tally = out[item.level as V1Kind];
+    tally.total++;
+    tally.droppedMeta += countCorrupt(item.recommendationMeta);
+    tally.droppedLog += countCorrupt(item.log);
+    if (containers.has(item.id)) {
+      tally.become.release++;
+      continue;
+    }
+    const node = nodes.get(item.id)!;
+    tally.become[node.type]++;
+    if (node.needsPlacement === true) tally.held++;
+  }
+  return out;
+}
+
+export type RehearseV1ToV2Result =
+  | { status: "already-v2"; removed: string[] }
+  | { status: "rehearsed"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; kinds: Record<V1Kind, KindTally>; nodes: number; v1Items: number };
+
+/**
+ * {@link applyV1ToV2} up to the write: the same refusals and id check, then the
+ * tally in place of the write. Writes nothing and does not take the PRD lock.
+ * On a v2 tree, `removed` lists the v1 files apply would remove.
+ */
+export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load">): Promise<RehearseV1ToV2Result> {
+  if (existsSync(join(rexDir, PRODUCT_DIRNAME))) {
+    return { status: "already-v2", removed: [join(rexDir, PRD_TREE_DIRNAME), join(rexDir, TREE_META_FILENAME)].filter((path) => existsSync(path)) };
+  }
+  if (!existsSync(join(rexDir, PRD_TREE_DIRNAME))) throw new MigrationApplyError(`No PRD folder tree at ${join(rexDir, PRD_TREE_DIRNAME)}: nothing to apply.`);
+  const { v1, built, v1Items } = await prepare(plan, options);
+  const { tree, stateKeys: _keys, ...summary } = built;
+  return { status: "rehearsed", built: summary, kinds: tallyV1ToV2(v1.items, built), nodes: idsOf([...tree.product, ...tree.changes], new Set()).size, v1Items };
+}
+
 /**
  * Apply `plan` to the v1 tree under `rexDir`, holding the PRD lock throughout.
  * A tree already v2 is left as is, apart from v1 files an interrupted apply
@@ -518,11 +610,7 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
       // Without product/ the tree reads as v1, so a changes/ here is what an interrupted apply moved in.
       await rm(changesDir, { recursive: true, force: true });
 
-      const v1 = await options.load();
-      assertUniqueV1Ids(v1.items);
-      const built = buildV2Tree(v1.items, plan);
-      const v1Items = fingerprintTree(v1.items).size;
-      assertEveryV1Id(everyV1Id(v1.items, built.tree, built.containers, built.cut), v1Items, "v2 tree");
+      const { v1, built, v1Items } = await prepare(plan, options);
 
       const model: PrdModel = { layout: "v2", schema: SCHEMA_VERSION_V2, title: v1.title, tree: built.tree, warnings: [] };
       let files: number;

@@ -1808,21 +1808,28 @@ const MIGRATE_VALUE_FLAGS = new Set(["--out", "--cut-at", "--model"]);
 /**
  * `ndx migrate --plan` — spawn `rex migrate --plan`, which writes the plan
  * file (default `.ndx-migration/plan.json`) and touches nothing in `.rex/`.
+ *
+ * `ndx migrate --apply [--plan <path>] [--dry-run]` — spawn
+ * `rex migrate --apply` with the same flags. With `--apply`, `--plan` names the
+ * plan file, so `--plan p` is rewritten to `--plan=p`, the one form rex reads
+ * a path in. rex's exit code is forwarded.
  */
 async function handleMigrate(rest) {
+  const apply = rest.includes("--apply");
+  const valueFlags = apply ? new Set([...MIGRATE_VALUE_FLAGS, "--plan"]) : MIGRATE_VALUE_FLAGS;
   const args = [];
   for (let i = 0; i < rest.length; i++) {
     const next = rest[i + 1];
-    if (MIGRATE_VALUE_FLAGS.has(rest[i]) && next !== undefined && !next.startsWith("-")) {
+    if (valueFlags.has(rest[i]) && next !== undefined && !next.startsWith("-")) {
       args.push(`${rest[i]}=${next}`);
       i++;
     } else {
       args.push(rest[i]);
     }
   }
-  if (!args.includes("--plan")) {
-    console.error("Error: ndx migrate needs --plan.");
-    console.error("Hint: Usage: ndx migrate --plan [--out <path>] [--rules-only] [dir]");
+  if (!apply && !args.includes("--plan")) {
+    console.error("Error: ndx migrate needs --plan or --apply.");
+    console.error("Hint: Usage: ndx migrate --plan [--out <path>] [--rules-only] [dir], or ndx migrate --apply [--plan <path>] [--dry-run] [dir]");
     exitWithCleanup(1);
     return;
   }

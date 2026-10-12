@@ -207,10 +207,11 @@ export const COMMAND_EFFECTS = {
 
   migrate: {
     command: "migrate",
-    summary: "Plan the v1 → v2 PRD migration and write the plan file for review.",
-    reads: ["{rex}/ PRD folder tree", "test files in the repository"],
+    summary: "Plan the v1 → v2 PRD migration and write the plan file for review, or apply the plan.",
+    reads: ["{rex}/ PRD folder tree", "test files in the repository", ".ndx-migration/plan.json with --apply"],
     writes: [
-      { path: ".ndx-migration/plan.json", what: "the migration plan (or the --out path); .ndx-migration/ carries its own .gitignore" },
+      { path: ".ndx-migration/plan.json", what: "the migration plan (or the --out path); .ndx-migration/ carries its own .gitignore", conditional: true, when: "with --plan" },
+      { path: "{rex}/", what: "the v2 tree replaces prd_tree/ and tree-meta.json in one transaction", conditional: true, when: "with --apply and without --dry-run" },
     ],
     llm: [
       { phase: "placement and spec drafting", purpose: "the text model places held changes and drafts capability specs", calls: "one per held change and capability", conditional: true, when: "without --rules-only" },
