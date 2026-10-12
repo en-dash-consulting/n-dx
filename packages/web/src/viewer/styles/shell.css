@@ -438,26 +438,39 @@
   border-top: 1px solid var(--border);
   background: var(--bg);
 }
-.settings-frame-indicator { font-size: 12px; color: var(--text-muted); }
-.settings-frame-indicator--dirty { color: var(--warn, #e0a030); font-weight: 600; }
+.settings-frame-dot { flex: none; width: 8px; height: 8px; margin-right: calc(-1 * var(--space-2)); border-radius: 50%; background: var(--orange); }
+.settings-frame-indicator { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-muted); }
+.settings-frame-indicator--dirty { color: var(--orange); font-weight: 600; }
 .settings-frame-error { font-size: 12px; color: var(--red); }
+.settings-frame-actions { display: flex; flex: none; gap: var(--space-2); margin-left: auto; }
+.settings-frame-discard,
 .settings-frame-save {
-  margin-left: auto;
   padding: 7px 16px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--bg);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
+.settings-frame-save { background: var(--accent); color: var(--bg); }
 .settings-frame-save:hover:not(:disabled), .settings-frame-save:focus-visible {
   filter: brightness(1.08);
   outline: none;
 }
-.settings-frame-save:disabled { opacity: .5; cursor: default; }
+.settings-frame-discard { background: transparent; border-color: var(--border); color: var(--text); }
+.settings-frame-discard:hover:not(:disabled), .settings-frame-discard:focus-visible {
+  background: var(--bg-active);
+  outline: none;
+}
+/* A muted surface and muted text, not half-opacity on the accent fill — that still reads as enabled. */
+.settings-frame-save:disabled,
+.settings-frame-discard:disabled {
+  background: var(--bg-active);
+  border-color: var(--border);
+  color: var(--text-muted);
+  cursor: default;
+}
 
 /* Leave-with-unsaved-changes prompt — modelled on .delete-modal-*. */
 .leave-guard-backdrop {

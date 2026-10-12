@@ -61,6 +61,47 @@ describe("SettingsFrame: dirty indicator", () => {
   });
 });
 
+describe("SettingsFrame: change summary", () => {
+  it("shows the count and the first summary beside a dirty dot", async () => {
+    await mount(frame({ dirty: true, changeSummary: ["Vendor claude → codex", "Heavy model → claude-opus-5"] }));
+    expect(indicator()?.textContent).toBe("2 unsaved changes · Vendor claude → codex");
+    expect(root.querySelector(".settings-frame-dot")).not.toBeNull();
+  });
+
+  it("uses the singular for one change", async () => {
+    await mount(frame({ dirty: true, changeSummary: ["Vendor claude → codex"] }));
+    expect(indicator()?.textContent).toBe("1 unsaved change · Vendor claude → codex");
+  });
+
+  it("falls back to the plain label with no summary, and hides the dot when clean", async () => {
+    await mount(frame({ dirty: true, changeSummary: [] }));
+    expect(indicator()?.textContent).toBe("Unsaved changes");
+    await act(async () => { render(frame({ dirty: false, changeSummary: ["ignored"] }), root); });
+    expect(indicator()?.textContent).toBe("All changes saved");
+    expect(root.querySelector(".settings-frame-dot")).toBeNull();
+  });
+});
+
+describe("SettingsFrame: Discard", () => {
+  const discardBtn = () => root.querySelector<HTMLButtonElement>(".settings-frame-discard");
+
+  it("renders no Discard button when the page passes no onDiscard", async () => {
+    await mount(frame({ dirty: true }));
+    expect(discardBtn()).toBeNull();
+  });
+
+  it("is disabled when clean or saving, and calls onDiscard when dirty", async () => {
+    const onDiscard = vi.fn();
+    await mount(frame({ dirty: false, onDiscard }));
+    expect(discardBtn()!.disabled).toBe(true);
+    await act(async () => { render(frame({ dirty: true, saving: true, onDiscard }), root); });
+    expect(discardBtn()!.disabled).toBe(true);
+    await act(async () => { render(frame({ dirty: true, onDiscard }), root); });
+    act(() => { discardBtn()!.click(); });
+    expect(onDiscard).toHaveBeenCalledOnce();
+  });
+});
+
 describe("SettingsFrame: Save", () => {
   it("disables Save when clean, and enables it once dirty", async () => {
     await mount(frame({ dirty: false }));

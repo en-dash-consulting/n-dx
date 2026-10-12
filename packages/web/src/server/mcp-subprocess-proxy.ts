@@ -59,14 +59,14 @@ export async function createSubprocessMcpProxy(
     const toolName = tool.name;
     const toolDescription = tool.description ?? "";
 
-    // Use z.record(z.unknown()) so the handler receives all arguments that the
+    // Use z.record(z.string(), z.unknown()) so the handler receives all arguments that the
     // caller supplies, without stripping unknown keys. Real validation is
     // performed by the real server inside the subprocess.
     server.registerTool(
       toolName,
       {
         description: toolDescription,
-        inputSchema: z.record(z.unknown()),
+        inputSchema: z.record(z.string(), z.unknown()),
       },
       async (args: Record<string, unknown>) => {
         const result = await client.callTool({

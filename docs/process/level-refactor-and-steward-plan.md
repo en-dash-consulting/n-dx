@@ -1,5 +1,9 @@
 # Level Refactoring + PRD Steward: Implementation Plan
 
+::: warning Historical plan
+This plan predates the v2 PRD model and is written against the v1 epic/feature/task tree. The model being built is described in [The PRD](../guide/concepts/).
+:::
+
 This plan combines two interrelated efforts:
 1. **Level system refactoring** — replace hardcoded epic/feature/task/subtask with configurable depth levels
 2. **PRD steward** — intelligent reorganization, faceted classification, and structural quality

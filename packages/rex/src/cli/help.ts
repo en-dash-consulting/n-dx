@@ -243,7 +243,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--criterion=\"...\"", description: "Acceptance criterion; repeat per criterion. Replaces the whole list; --criterion= on its own clears it" },
       { flag: "--source=\"...\"", description: "Where the item came from; --source= removes it" },
       { flag: "--reason=\"...\"", description: "Failure reason (when setting status to failing)" },
-      { flag: "--run='<json>'", description: "Saved run settings (replaces the whole block): tier (light|standard|heavy), models (per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes. --run= or --run=null clears it" },
+      { flag: "--run='<json>'", description: "Saved run settings (replaces the whole block): tier (light|standard|heavy), models (per-vendor pins), provider, permissionMode, review, reviewMode (off|self|pair), reviewVendor (claude|codex), reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes. --run= or --run=null clears it" },
       { flag: "--force", description: "Override status transition rules" },
     ],
     examples: [

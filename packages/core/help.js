@@ -1009,6 +1009,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
       { flag: "--resolve", description: "With --task: print, as JSON, the settings an autonomous run would use, the config key behind each, and every reason it would refuse to start. Runs nothing, and works without a configured vendor (reported as a refusal). See 'hench run --help'" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
+      { flag: "--review-mode=<off|self|pair>", description: "Who reviews: self (this vendor), pair (another vendor reviews, the executor fixes) or off. --review is self, --no-review is off; overrides a task's saved reviewMode" },
+      { flag: "--reviewer=<claude|codex>", description: "The pair reviewer's vendor, over the task's saved reviewVendor and hench.review.vendor. Must differ from the executor's vendor; refused with --review or --no-review" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
       { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
       { flag: "--no-review", description: "No review pass for this run, even when the task saved review:true. Refused with --review, --review-model or --review-optional" },

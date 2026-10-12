@@ -221,9 +221,13 @@ async function loadJSONFile(filePath: string): Promise<Record<string, unknown> |
 }
 
 /**
- * Extract an LLMConfig from a merged root object.
+ * Extract an LLMConfig from an already-merged `.n-dx.json` root object.
+ *
+ * The in-memory half of {@link loadLLMConfig}: a caller holding a config it has
+ * not written to disk (the dashboard's preview of unsaved edits) resolves
+ * through this, so it gets the same whitelist and normalisation as a load.
  */
-function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
+export function parseLLMConfig(root: Record<string, unknown>): LLMConfig {
   const llm = asRecord(root.llm);
   const llmVendor = extractVendor(llm?.vendor);
   const claude = resolveClaudeConfig(llm?.claude, root.claude).config;
@@ -294,5 +298,5 @@ export async function loadLLMConfig(dir: string): Promise<LLMConfig> {
   }
 
   if (!merged) return {};
-  return extractLLMConfig(merged);
+  return parseLLMConfig(merged);
 }
