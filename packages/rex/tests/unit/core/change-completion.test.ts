@@ -152,6 +152,13 @@ describe("completeWork", () => {
     expect(completeWork(input, "s", opts()).completed).toEqual(["s"]);
   });
 
+  it("refuses a change that still needs placement, but completes its task and holds the change", () => {
+    expect(() => completeWork(tree(change({ needsPlacement: true })), "ch", opts())).toThrow(/Cannot complete change ch: it still needs placement/);
+    const result = completeWork(tree(change({ needsPlacement: true, children: [task("t")] })), "t", opts());
+    expect(result.completed).toEqual(["t"]);
+    expect(result.held?.changeId).toBe("ch");
+  });
+
   it("refuses a product node or an unknown ref", () => {
     expect(() => completeWork(tree(change()), "cap", opts())).toThrow(ChangeCompletionError);
     expect(() => completeWork(tree(change()), "nope", opts())).toThrow(/No live task, change or subtask "nope"/);

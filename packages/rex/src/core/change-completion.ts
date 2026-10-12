@@ -141,7 +141,8 @@ export interface CompleteWorkResult extends ChangeCompletionResult {
  * through {@link completeTask}, as v1 auto-completes a parent. Every node
  * completed also gets the timestamps a v1 status update writes
  * (`computeTimestampUpdates`): `startedAt` when unset, `endedAt`, and its
- * open active interval closed.
+ * open active interval closed. A change that still needs placement is
+ * refused rather than reported held, because it is the node asked for.
  */
 export function completeWork(tree: V2Tree, ref: string, options: CompleteWorkOptions): CompleteWorkResult {
   const node = indexTree(tree).resolve(ref);
@@ -150,6 +151,10 @@ export function completeWork(tree: V2Tree, ref: string, options: CompleteWorkOpt
   else if (node?.type === "task") out = completeTask(tree, node.id, options);
   else if (node?.type === "subtask") out = completeSubtask(tree, node.id, options);
   else throw new ChangeCompletionError(`No live task, change or subtask "${ref}"`);
+  // A held change is not completed: refuse, so no caller reports a completion that was not written.
+  if (out.held?.changeId === node.id) {
+    throw new ChangeCompletionError(`Cannot complete change ${node.displayId ?? node.id}: ${out.held.reason}`);
+  }
 
   const before = indexTree(tree);
   const after = indexTree(out.tree);

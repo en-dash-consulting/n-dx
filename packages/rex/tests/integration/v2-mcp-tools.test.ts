@@ -384,6 +384,15 @@ describe("rex MCP tools on a v2 tree", () => {
     expect(body.autoCompleted).toBeUndefined();
   });
 
+  it("update_task_status refuses to complete an Inbox change and writes nothing", async () => {
+    const inbox = json(await call("add_item", { type: "change", title: "Unplaced idea" })).id;
+    const res = await call("update_task_status", { id: inbox, status: "completed" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toMatch(/still needs placement/);
+    expect((await node(inbox))?.status ?? "pending").toBe("pending");
+    expect((await ws.store.readLog()).some((e) => e.event === "status_changed" && e.itemId === inbox)).toBe(false);
+  });
+
   it("get_next_task and update_task_status do not crash on the store", async () => {
     expect((await call("get_next_task")).isError).toBe(false);
     const res = await call("update_task_status", { id: TASK, status: "in_progress" });
