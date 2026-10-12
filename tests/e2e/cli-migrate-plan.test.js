@@ -60,11 +60,12 @@ describe("ndx migrate --plan", () => {
     const result = runResult(["migrate", "--plan", "--rules-only", "--out", inside, dir]);
 
     expect(result.code).not.toBe(0);
-    expect(result.stderr).toContain("migration plan");
+    expect(result.stderr).toContain("Refusing to write a migration plan inside .rex/");
     expect(existsSync(inside)).toBe(false);
   });
 
-  it("exits non-zero when the model pass stops, keeping the plan for a re-run", () => {
+  // The stub is a POSIX shell script; Windows would resolve a real `claude` past it.
+  it.skipIf(process.platform === "win32")("exits non-zero when the model pass stops, keeping the plan for a re-run", () => {
     // A `claude` that always fails, ahead of any real one on PATH.
     const bin = join(outDir, "bin");
     mkdirSync(bin);
@@ -73,12 +74,15 @@ describe("ndx migrate --plan", () => {
     chmodSync(stub, 0o755);
     const plan = join(outDir, "plan.json");
 
-    const result = runResult(["migrate", "--plan", "--out", plan, dir], {
-      env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` },
-    });
+    // Without these keys the client takes the CLI path (the stub) and Jev stays off,
+    // so nothing reaches a paid API.
+    const env = { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` };
+    for (const key of ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "TYPESAFE_API_KEY"]) delete env[key];
+    const result = runResult(["migrate", "--plan", "--out", plan, dir], { env });
 
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain("The plan is incomplete");
+    expect(result.stderr).toContain("stub claude: unavailable");
     expect(existsSync(plan)).toBe(true);
   });
 });
