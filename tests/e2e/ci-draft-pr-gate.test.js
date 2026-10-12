@@ -9,7 +9,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "../..");
-const read = (name) => readFileSync(join(ROOT, ".github/workflows", name), "utf-8");
+// Windows runners check the workflows out with CRLF; every match below is line-exact.
+const read = (name) =>
+  readFileSync(join(ROOT, ".github/workflows", name), "utf-8").replace(/\r\n/g, "\n");
 
 /** Lines of the top-level `on:` block (up to the next top-level key). */
 function onBlock(text) {
