@@ -9,8 +9,17 @@
  * 3 MB snapshot. A production build has no door, so a static face is
  * read-only by construction.
  *
- * Every write route answers only this server's own pages (`sameOrigin`: no
- * foreign Origin or Sec-Fetch-Site, and a Host that is this machine).
+ * Every write route answers only this server's own pages: `sameOrigin` (no
+ * foreign Origin or Sec-Fetch-Site, and a Host that is this machine), and
+ * the key this launch writes into the page (`<meta name="ndx-door">`) sent
+ * back as `x-ndx-door`. Same-origin alone admits a request with no browser
+ * headers at all, which any process on the host can send; the hub's token
+ * exists because loopback is shared by every account on a host, so the door
+ * must not hand its four write tools to whoever asks.
+ *
+ * A re-emit runs only when something the projection reads has changed since
+ * the last one (`projectStamp`): the loop asks every 30 s and after each
+ * edit, and a full emit reads the whole PRD and git.
  *
  * Environment (what `ndx graview serve .` sets):
  *   NDX_GRAVIEW_DIR    the project's graview dir: document.json and snapshot.json
@@ -24,8 +33,9 @@
  *                      keeps sync off rather than write the main checkout's PRD when it cannot.
  */
 import { mcpClient, mcpDoor, sameOrigin, type ToolCall } from "@graview/core/sync";
-import { spawn } from "node:child_process";
-import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { createReadStream, existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import type { Plugin } from "vite";
@@ -43,6 +53,45 @@ export function rangeOf(header: string | undefined, size: number): { start: numb
   const end = m[1] === "" ? size - 1 : m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
   if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) return undefined;
   return { start, end };
+}
+
+/** The header a page sends the door's key in, and the meta tag the key is written to. */
+export const DOOR_KEY_HEADER = "x-ndx-door";
+export const DOOR_KEY_META = "ndx-door";
+
+/** What the projection reads, under either layout, relative to the project. */
+const READS = [".rex", ".ndx/rex", ".hench/runs", ".ndx/hench/runs", ".sourcevision", ".ndx/sourcevision", ".n-dx.json", ".n-dx.local.json", ".ndx/config.json"];
+
+/**
+ * A stamp of everything a projection reads: the newest modification time and
+ * the number of entries under the PRD, the runs and the analysis (so an edit,
+ * an addition and a removal all move it), and every ref git has (a commit, a
+ * tag, a fetch). Equal stamps mean an emit would write the same files.
+ */
+export function projectStamp(root: string): string {
+  let newest = 0;
+  let entries = 0;
+  const walk = (path: string): void => {
+    let stat;
+    try {
+      stat = statSync(path);
+    } catch {
+      return;
+    }
+    entries += 1;
+    newest = Math.max(newest, stat.mtimeMs);
+    if (!stat.isDirectory()) return;
+    for (const name of readdirSync(path)) if (name !== ".cache") walk(join(path, name));
+  };
+  for (const rel of READS) walk(join(root, rel));
+  let refs = "";
+  try {
+    refs = execFileSync("git", ["for-each-ref", "--format=%(objectname) %(refname)"], { cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
+    refs += execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
+  } catch {
+    // Not a repository: the files alone decide.
+  }
+  return `${newest}:${entries}:${refs}`;
 }
 
 export function ndxDoor(): Plugin {
@@ -89,17 +138,26 @@ export function ndxDoor(): Plugin {
         throw new Error("sync is off: no rex endpoint (run ndx start . and ndx graview serve .)");
       };
   const door = mcpDoor({ path: "/ndx/mcp", call: rex, allow: ALLOWED_TOOLS });
+  const key = randomBytes(24).toString("hex");
+  const keyed = (req: IncomingMessage) => req.headers[DOOR_KEY_HEADER] === key;
 
   // One re-emit at a time: the loop, "Sync now" and a second tab all ask, and every asker gets the run in flight.
   let emitting: Promise<{ ok: boolean; output: string }> | undefined;
+  // The stamp of the last emit that succeeded: an ask with nothing new answers from the files already written.
+  let emitted: string | undefined;
   const emit = (): Promise<{ ok: boolean; output: string }> =>
     (emitting ??= new Promise<{ ok: boolean; output: string }>((resolve) => {
       if (!graviewCli || !projectRoot) return resolve({ ok: false, output: "no NDX_GRAVIEW_CLI / NDX_PROJECT_ROOT" });
+      const stamp = projectStamp(projectRoot);
+      if (stamp === emitted) return resolve({ ok: true, output: "" });
       const child = spawn(process.execPath, [graviewCli, "emit", projectRoot, "--quiet"], { stdio: ["ignore", "pipe", "pipe"] });
       let output = "";
       child.stdout.on("data", (c) => (output += String(c)));
       child.stderr.on("data", (c) => (output += String(c)));
-      child.on("exit", (code) => resolve({ ok: code === 0, output }));
+      child.on("exit", (code) => {
+        emitted = code === 0 ? stamp : undefined;
+        resolve({ ok: code === 0, output });
+      });
       child.on("error", (error) => resolve({ ok: false, output: String(error) }));
     }).finally(() => (emitting = undefined)));
 
@@ -110,8 +168,8 @@ export function ndxDoor(): Plugin {
   };
   /** The re-emit takes JSON from our own pages and nothing else, as the door does; the answer says why when it refuses. */
   const admit = (req: IncomingMessage, res: ServerResponse): boolean => {
-    if (!sameOrigin(req.headers)) {
-      json(res, 403, { ok: false, error: "refused: not from this face's own origin" });
+    if (!sameOrigin(req.headers) || !keyed(req)) {
+      json(res, 403, { ok: false, error: "refused: not from this face's own pages" });
       return false;
     }
     if ((req.headers["content-type"] ?? "").split(";")[0]!.trim() !== "application/json") {
@@ -140,6 +198,8 @@ export function ndxDoor(): Plugin {
 
   return {
     name: "ndx-door",
+    // The key reaches the page in its HTML, which only a reader of this origin sees.
+    transformIndexHtml: () => [{ tag: "meta", attrs: { name: DOOR_KEY_META, content: key }, injectTo: "head" }],
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = (req.url ?? "").split("?")[0] ?? "";
@@ -156,7 +216,10 @@ export function ndxDoor(): Plugin {
             if (!admit(req, res)) return;
             return json(res, 200, await emit());
           }
-          if (url === "/ndx/mcp") return door(req, res, next);
+          if (url === "/ndx/mcp") {
+            if (!keyed(req)) return json(res, 403, { ok: false, error: "refused: not from this face's own pages" });
+            return door(req, res, next);
+          }
         } catch (error) {
           return json(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
         }

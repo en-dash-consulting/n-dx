@@ -5,9 +5,12 @@
  * read back a kind at a time — only the changes and the tasks, by the byte
  * ranges its header gives — every record carrying rex's `lastModified` as its
  * version, so our own write coming back is recognizable. Push goes through
- * `update_task_status` for a status and `edit_item` for the rest, after
+ * `edit_item` for the fields and `update_task_status` for a status, after
  * reading the item, so only what differs is written, and an `append_log`
- * entry names the Graview principal that moved it.
+ * entry names the Graview principal that moved it. A status rex will not
+ * take — `deleted`, which removes the item and its children, or a completion
+ * rex holds for a hench run's test gate — is a refusal, never a write: the
+ * loop then puts rex's value back here (`engine.ts`).
  */
 import { fetchSnapshot } from "@graview/core/snapshot";
 import { doorClient, mcpRemote, type RemoteChange, type RemoteSystem, type RemoteWrite, type ToolCall } from "@graview/core/sync";
@@ -21,6 +24,14 @@ export interface NdxRemoteOptions {
   readonly fetch?: Fetch;
   /** The door's base: "" in the page, a full origin in a test. */
   readonly base?: string;
+  /** The door's key; in the page, read from the `<meta name="ndx-door">` the dev server writes. */
+  readonly key?: string;
+}
+
+/** The key the dev server wrote into this page, if it is one. */
+function pageKey(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  return document.querySelector('meta[name="ndx-door"]')?.getAttribute("content") ?? undefined;
 }
 
 interface Item {
@@ -31,6 +42,9 @@ interface Item {
   tags?: string[];
   lastModified?: string;
 }
+
+/** Why a delete, or the status that deletes, is refused. */
+export const NEVER_DELETES = "the projection never deletes: remove an item with ndx prd remove";
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
@@ -53,7 +67,15 @@ export interface NdxRemote extends RemoteSystem {
 }
 
 export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
-  const doFetch: Fetch = options.fetch ?? ((input, init) => fetch(input, init));
+  const send: Fetch = options.fetch ?? ((input, init) => fetch(input, init));
+  const key = options.key ?? pageKey();
+  // A call to the door carries its key; the snapshot is a plain read, sent as it was asked.
+  const doFetch: Fetch = (input, init) => {
+    if (!key || !String(input).includes("/ndx/")) return send(input, init);
+    const headers = new Headers(init?.headers);
+    headers.set("x-ndx-door", key);
+    return send(input, { ...init, headers });
+  };
   const base = options.base ?? "";
   const JSON_HEADERS = { "content-type": "application/json" };
   let lastEmit: EmitOutcome | undefined;
@@ -82,19 +104,11 @@ export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
 
   async function push(call: ToolCall, write: RemoteWrite): Promise<{ id: string; version: string }> {
     if (!isSyncedKind(write.resource)) throw new Error(`${write.resource} is not written from here.`);
-    if (write.deleted) throw new Error("the projection never deletes: remove an item with ndx prd remove");
+    if (write.deleted || write.fields?.["status"] === "deleted") throw new Error(NEVER_DELETES);
     if (!write.id) throw new Error("a change or task is added in n-dx (ndx capture, ndx plan), not from this face");
     const before = await item(call, write.id);
     const wanted = write.fields ?? {};
     const wrote: string[] = [];
-    if ("status" in wanted && !same(wanted["status"], before.status)) {
-      await call("update_task_status", {
-        id: write.id,
-        status: wanted["status"],
-        ...(wanted["status"] === "completed" ? { resolutionType: "acknowledgment", resolutionDetail: `marked done in Graview by ${options.principal}` } : {}),
-      });
-      wrote.push("status");
-    }
     const edits: Record<string, unknown> = {};
     for (const field of ["priority", "title", "tags"] as const) {
       if (field in wanted && !same(wanted[field], before[field])) edits[field] = wanted[field];
@@ -103,6 +117,17 @@ export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
       await call("edit_item", { id: write.id, ...edits });
       wrote.push(...Object.keys(edits));
     }
+    // A completion rex holds for a run's test gate is not written: rex keeps its status, so the face must too.
+    let held: string | undefined;
+    if ("status" in wanted && !same(wanted["status"], before.status)) {
+      const answer = (await call("update_task_status", {
+        id: write.id,
+        status: wanted["status"],
+        ...(wanted["status"] === "completed" ? { resolutionType: "acknowledgment", resolutionDetail: `marked done in Graview by ${options.principal}` } : {}),
+      })) as { completionHeld?: boolean; message?: string } | undefined;
+      if (answer?.completionHeld === true) held = answer.message ?? `rex holds ${write.id}'s completion until its run's test gate passes`;
+      else wrote.push("status");
+    }
     if (wrote.length > 0) {
       await call("append_log", {
         event: "graview_sync",
@@ -110,6 +135,7 @@ export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
         detail: `author=graview:${options.principal} wrote ${wrote.join(", ")} through ${SYSTEM}'s face`,
       });
     }
+    if (held) throw new Error(held);
     const after = wrote.length > 0 ? await item(call, write.id) : before;
     return { id: write.id, version: after.lastModified ?? before.lastModified ?? "" };
   }

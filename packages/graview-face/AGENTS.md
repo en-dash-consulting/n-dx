@@ -36,8 +36,13 @@ Rules that keep that honest:
   `mcpClient` in `dev/ndx-door.ts`, which holds the token; the browser never
   sees it). Every kind but change and task is a read-only resource whose
   `because` names the tool that owns it, and the engine guards the store, so
-  such an act is refused and never offered. A static build has no door and
-  is read-only by construction.
+  such an act is refused and never offered. A write rex refuses (a
+  transition its table forbids, a completion it holds for a run's test gate)
+  is put back to rex's value after the run, and `status: deleted` is never
+  sent. The door admits only requests carrying the key it writes into the
+  page (`<meta name="ndx-door">`), and re-emits only when the PRD, runs,
+  analysis or git refs changed. A static build has no door and is read-only
+  by construction.
 - **Framework workarounds go in `UPSTREAM.md`** with the graview PRD item
   each was captured as, and come out when the item closes.
 

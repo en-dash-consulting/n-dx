@@ -75,12 +75,16 @@ function isPort(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0 && value < 65536;
 }
 
-/** The hub's port as its own files record it: config first, then the running hub, then the default. */
+/**
+ * The hub's port as its own files record it: the running hub first, since
+ * `ndx start --port` overrides the config and the hub writes the port it
+ * really bound to `hub.pid`; then the config; then the default.
+ */
 export function hubPort(home: string): number {
-  const config = readJson(join(home, HUB_CONFIG_FILENAME)) as { hub?: { port?: unknown } } | undefined;
-  if (isPort(config?.hub?.port)) return config.hub.port;
   const pid = readJson(join(home, HUB_PID_FILENAME)) as { port?: unknown } | undefined;
   if (isPort(pid?.port)) return pid.port;
+  const config = readJson(join(home, HUB_CONFIG_FILENAME)) as { hub?: { port?: unknown } } | undefined;
+  if (isPort(config?.hub?.port)) return config.hub.port;
   return DEFAULT_HUB_PORT;
 }
 

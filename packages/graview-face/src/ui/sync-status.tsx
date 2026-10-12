@@ -61,6 +61,11 @@ export function SyncStatusLine({ off }: { off?: string }) {
           rex kept its value for {kept} {kept === 1 ? "field" : "fields"} edited on both sides.
         </p>
       ) : null}
+      {refused > 0 && r ? (
+        <p className="ndx-small ndx-muted" data-testid="sync-refused">
+          rex refused {refused === 1 ? "a change" : `${refused} changes`} and kept its value: {r.refused[0]!.error}
+        </p>
+      ) : null}
       {status?.stale ? (
         <p className="ndx-small ndx-muted" data-testid="sync-stale">
           The projection could not be re-emitted, so this is the last one written: {status.stale}

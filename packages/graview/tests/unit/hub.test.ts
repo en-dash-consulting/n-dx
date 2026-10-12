@@ -49,14 +49,16 @@ describe("rexMcpEndpoint", () => {
     expect(endpoint?.workspacesUrl).toBeUndefined();
   });
 
-  it("reads the hub's port from config.json, then hub.pid, then the default", () => {
+  it("reads the hub's port from hub.pid (the port it bound, --port included), then config.json, then the default", () => {
     expect(hubPort(home)).toBe(DEFAULT_HUB_PORT);
-    writeFileSync(join(home, "hub.pid"), JSON.stringify({ pid: 4321, port: 4242 }));
-    expect(hubPort(home)).toBe(4242);
     writeFileSync(join(home, "config.json"), JSON.stringify({ hub: { port: 5151 } }));
     expect(hubPort(home)).toBe(5151);
-    writeFileSync(join(home, "config.json"), JSON.stringify({ hub: { port: "not a port" } }));
+    // ndx start --port 4242 overrode the config: the running hub says where it really is.
+    writeFileSync(join(home, "hub.pid"), JSON.stringify({ pid: 4321, port: 4242 }));
     expect(hubPort(home)).toBe(4242);
+    writeFileSync(join(home, "hub.pid"), JSON.stringify({ pid: 4321, port: "not a port" }));
+    expect(hubPort(home)).toBe(5151);
+    writeFileSync(join(home, "hub.pid"), JSON.stringify({ pid: 4321, port: 4242 }));
     writeFileSync(join(home, "hub.json"), JSON.stringify({ version: 1, projects: [{ id: "p", repoRoot: root, worktrees: [root], pid: 1 }] }));
     expect(rexMcpEndpoint(resolveLayout(root), { home })?.url).toBe("http://localhost:4242/p/p/mcp/rex");
   });

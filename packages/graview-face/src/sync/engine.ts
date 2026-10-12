@@ -9,6 +9,14 @@
  * here and ask rex to create it. Its first rex write is news; its first edit
  * here is a push.
  *
+ * A WRITE REX REFUSES IS UNDONE HERE. The engine drops a refused write and
+ * leaves the record as edited, but the link still holds what rex and the
+ * face last agreed, and rex's version has not moved, so no pull would ever
+ * correct it: the record would show a value rex does not hold and be
+ * re-sent, and refused, every run. After each run the refused records take
+ * the link's fields back through the inbound act, authored by the system,
+ * and the rail says the refusal once.
+ *
  * RULE: rex wins. The engine's policy is `conflicts: "theirs"`: a field
  * edited on both sides since they last agreed takes rex's value through the
  * ordinary inbound act (so it lands in the log, authored by the system), and
@@ -17,9 +25,9 @@
  * on a kind another tool owns is refused — and not offered — in the sentence
  * the mapping declares.
  */
-import { SyncEngine, type RemoteLink, type SettledConflict, type SyncReport } from "@graview/core/sync";
+import { SyncEngine, systemAuthor, type RemoteLink, type SettledConflict, type SyncReport } from "@graview/core/sync";
 import type { AnySchema, Store } from "@graview/core";
-import { applyInbound, isSyncedKind, mapping, SYNC_FIELDS, VERSION_FIELD } from "./mapping.js";
+import { applyInbound, isSyncedKind, mapping, SYNC_FIELDS, SYSTEM, VERSION_FIELD } from "./mapping.js";
 import { ndxRemote, type EmitOutcome, type NdxRemote, type NdxRemoteOptions } from "./ndx-system.js";
 
 export interface SyncStatus {
@@ -70,6 +78,22 @@ export function unversionedLinks(store: Store<AnySchema>): Record<string, Remote
   return links;
 }
 
+/** Put rex's last agreed values back on every record whose write rex refused. */
+export function restoreRefused(store: Store<AnySchema>, report: SyncReport): void {
+  for (const { localId } of report.refused) {
+    const link = report.state.links[localId];
+    const node = store.graph.getNode(localId) as unknown as Record<string, unknown> | undefined;
+    if (!link || !node || !isSyncedKind(String(node["kind"]))) continue;
+    const fields: Record<string, unknown> = {};
+    for (const field of SYNC_FIELDS) {
+      const agreed = link.fields[field];
+      if (agreed !== undefined && JSON.stringify(agreed) !== JSON.stringify(node[field] ?? null)) fields[field] = agreed;
+    }
+    if (Object.keys(fields).length === 0) continue;
+    store.apply(applyInbound({ localId, kind: String(node["kind"]), fields }), { author: systemAuthor(SYSTEM), intent: `${SYSTEM} refused: ${Object.keys(fields).join(", ")}` });
+  }
+}
+
 export function createSync(options: SyncOptions): Sync {
   const remote = ndxRemote(options);
   const kinds = options.store.schema.kinds as readonly string[];
@@ -79,6 +103,7 @@ export function createSync(options: SyncOptions): Sync {
     remote,
     async run() {
       const report = await engine.run();
+      restoreRefused(options.store, report);
       const emit = remote.lastEmit();
       return { report, resolved: report.resolved, ...(emit ? { emit } : {}) };
     },

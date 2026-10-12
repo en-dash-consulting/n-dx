@@ -15,6 +15,7 @@ import { writeSnapshot } from "@graview/core/snapshot";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createSync } from "../src/sync/engine.js";
 import { because } from "../src/sync/mapping.js";
+import { NEVER_DELETES } from "../src/sync/ndx-system.js";
 
 const DECLARATION = new URL("../../graview/n-dx.graview.json", import.meta.url);
 const SEED = new URL("./fixtures/snapshot.json", import.meta.url);
@@ -38,6 +39,8 @@ function fakeDoor(snapshot: GraphSnapshot) {
   const log: { event: string; itemId?: string; detail?: string }[] = [];
   const calls: { name: string; args: Record<string, unknown> }[] = [];
   const ranges: string[] = [];
+  // Rex's rules the fake keeps: a completed item only moves to failing or deleted, and a hench run may hold a completion.
+  const held = new Set<string>();
   let clock = 0;
   const stamp = () => new Date(Date.UTC(2026, 9, 10, 12, 0, ++clock)).toISOString();
   const touch = (id: string, patch: Partial<Item>) => {
@@ -52,6 +55,13 @@ function fakeDoor(snapshot: GraphSnapshot) {
       return { item };
     },
     update_task_status: ({ id, status }) => {
+      const item = rex.get(String(id));
+      if (item?.status === "completed" && status !== "failing" && status !== "deleted") throw new Error(`Cannot move from completed to ${String(status)}. Pass force: true to override.`);
+      if (status === "deleted") {
+        rex.delete(String(id));
+        return { id, status };
+      }
+      if (status === "completed" && held.has(String(id))) return { id, newStatus: item?.status, completionHeld: true, message: `Completion of ${String(id)} is held for the hench run in this worktree until its test gate passes.` };
       touch(String(id), { status: String(status) });
       return { id, status };
     },
@@ -90,7 +100,7 @@ function fakeDoor(snapshot: GraphSnapshot) {
     }
     return new Response("not found", { status: 404 });
   };
-  return { rex, log, calls, ranges, touch, fetch: fetchImpl };
+  return { rex, log, calls, ranges, touch, held, fetch: fetchImpl };
 }
 
 let snapshot: GraphSnapshot;
@@ -195,5 +205,47 @@ describe("two-way sync with rex as the system of record", () => {
     }
     await engine.run();
     expect(door.calls.filter((c) => c.name !== "get_item")).toEqual([]);
+  });
+
+  it("puts rex's value back when rex refuses a write, says why once, and does not ask again", async () => {
+    const { door, store, sync } = await setUp();
+    const done = (store.graph.nodesOfKind("change" as never) as unknown as Item[]).find((c) => c.status === "completed")!;
+    await sync.run();
+    store.apply({ name: "edit-change", args: { id: done.id, status: "in_progress" } }, { author: SEAT });
+    const { report } = await sync.run();
+    expect(report.refused.map((r) => r.localId)).toEqual([done.id]);
+    expect(report.refused[0]!.error).toContain("Cannot move from completed");
+    expect((store.graph.getNode(done.id) as unknown as Item).status).toBe("completed");
+    expect(door.rex.get(done.id)?.status).toBe("completed");
+    const statusCalls = () => door.calls.filter((c) => c.name === "update_task_status").length;
+    const before = statusCalls();
+    const again = await sync.run();
+    expect(again.report.refused).toEqual([]);
+    expect(statusCalls()).toBe(before);
+  });
+
+  it("never sends the status that deletes: rex keeps the item and its children, and the face keeps rex's status", async () => {
+    const { door, store, sync, change } = await setUp();
+    await sync.run();
+    const was = (store.graph.getNode(change.id) as unknown as Item).status;
+    store.apply({ name: "edit-change", args: { id: change.id, status: "deleted" } }, { author: SEAT });
+    const { report } = await sync.run();
+    expect(report.refused[0]?.error).toBe(NEVER_DELETES);
+    expect(door.rex.has(change.id)).toBe(true);
+    expect(door.calls.some((c) => c.name === "update_task_status")).toBe(false);
+    expect((store.graph.getNode(change.id) as unknown as Item).status).toBe(was);
+  });
+
+  it("treats a completion rex holds for a run's test gate as not written: no log entry, rex's status kept, its sentence said", async () => {
+    const { door, store, sync, change } = await setUp();
+    await sync.run();
+    const was = (store.graph.getNode(change.id) as unknown as Item).status;
+    door.held.add(change.id);
+    store.apply({ name: "edit-change", args: { id: change.id, status: "completed" } }, { author: SEAT });
+    const { report } = await sync.run();
+    expect(report.refused[0]?.error).toContain("held for the hench run");
+    expect(door.log.some((l) => l.itemId === change.id)).toBe(false);
+    expect(door.rex.get(change.id)?.status).toBe(was);
+    expect((store.graph.getNode(change.id) as unknown as Item).status).toBe(was);
   });
 });
