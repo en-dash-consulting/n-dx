@@ -19,6 +19,7 @@
 
 import type { PRDItem, ItemLevel } from "../schema/index.js";
 import { findItem, removeFromTree, walkTree } from "./tree.js";
+import { changeLayerType } from "./layer-projection.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -122,6 +123,40 @@ export function validateMerge(
   }
 
   return { valid: true };
+}
+
+/**
+ * The extra rules for a merge on a v2 change layer, checked before
+ * {@link validateMerge}: only changes merge, and an absorbed change may not
+ * carry amendments, which have no target-side home and would be lost.
+ */
+export function validateChangeLayerMerge(
+  items: PRDItem[],
+  sourceIds: string[],
+  targetId: string,
+): MergeValidation {
+  for (const id of sourceIds) {
+    const item = findItem(items, id)?.item;
+    if (!item) continue;
+    const type = changeLayerType(item);
+    if (type !== "change") {
+      return { valid: false, error: `This PRD uses the v2 layout, where merge_items merges changes only: "${id}" is a ${type ?? item.level}.` };
+    }
+    if (id !== targetId && Array.isArray(item.amends) && item.amends.length > 0) {
+      return { valid: false, error: `"${id}" carries amendments, which a merge would lose. Make it the target, or move its amendments first.` };
+    }
+  }
+  return { valid: true };
+}
+
+/** Carry the absorbed changes' `touches` onto the target (v2), deduplicated; call before {@link mergeItems}. */
+export function carryTouches(items: PRDItem[], sourceIds: string[], targetId: string): void {
+  const touches = new Set<string>();
+  for (const id of [targetId, ...sourceIds]) {
+    const item = findItem(items, id)?.item;
+    if (Array.isArray(item?.touches)) for (const t of item.touches) touches.add(String(t));
+  }
+  if (touches.size > 0) findItem(items, targetId)!.item.touches = [...touches];
 }
 
 // ── Preview ─────────────────────────────────────────────────────────

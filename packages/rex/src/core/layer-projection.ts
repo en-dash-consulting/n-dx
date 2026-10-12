@@ -50,6 +50,11 @@ function changeItem(node: RuleNode, parent: RuleNode | undefined): PRDItem {
   return item;
 }
 
+/** The change-layer type of an item {@link changeLayerItems} projected; undefined for a v1 item. */
+export function changeLayerType(item: PRDItem): ChangeNodeType | undefined {
+  return item.type === "change" || item.type === "task" || item.type === "subtask" ? item.type : undefined;
+}
+
 export interface ChangeLayerWriteBack {
   /** The change layer the items describe. */
   changes: RuleNode[];

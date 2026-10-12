@@ -464,7 +464,10 @@ describe("isolation", () => {
     // resolution: the v1 store's refusal of a v2 tree (store/file-adapter.ts),
     // `rex init`, which never scaffolds prd_tree/ beside product/
     // (cli/commands/init.ts), and the CLI error hints, which never send a
-    // project with a PRD in either layout to `n-dx init` (cli/errors.ts).
+    // project with a PRD in either layout to `n-dx init` (cli/errors.ts), and
+    // the MCP tools that follow the change-layer types on a v2 tree: edit_item,
+    // move_item, merge_items and claim_task, with the type-based parent rule
+    // and merge rules they use (core/move.ts, core/merge.ts).
     // `public.ts` re-exports the reader, the node and tree types, the index
     // and the derived product computations: consumers of the product layer
     // (the dashboard's Product and Changes views, the Graview projection) read
@@ -524,6 +527,12 @@ describe("isolation", () => {
         "store/file-adapter.ts",
         "cli/commands/init.ts",
         "cli/errors.ts",
+        "cli/mcp-tools/edit-item.ts",
+        "cli/mcp-tools/move-item.ts",
+        "cli/mcp-tools/merge-items.ts",
+        "cli/mcp-tools/claim-task.ts",
+        "core/move.ts",
+        "core/merge.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

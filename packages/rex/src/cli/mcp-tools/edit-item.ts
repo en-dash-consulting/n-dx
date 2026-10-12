@@ -3,7 +3,8 @@ import { findItem } from "../../core/tree.js";
 import { validateDAG } from "../../core/dag.js";
 import { validateRunSettings, RunSettingsSchema } from "../../schema/validate.js";
 import type { PRDItem, Priority } from "../../schema/index.js";
-import type { PRDStore } from "../../store/index.js";
+import { changeLayerType } from "../../core/layer-projection.js";
+import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
 
@@ -39,7 +40,15 @@ export async function handleEditItem(
     if (args.description !== undefined) updates.description = args.description;
     if (args.acceptanceCriteria !== undefined) updates.acceptanceCriteria = args.acceptanceCriteria;
     if (args.priority !== undefined) updates.priority = args.priority as Priority;
+    const v2 = isChangeLayerStore(store);
     if (args.level !== undefined) {
+      // A v2 node's type is fixed, and a level maps to no type.
+      if (v2) {
+        return textResult(
+          `This PRD uses the v2 layout, where an item has a type (${changeLayerType(existing)}), not a level, and the type cannot be changed. Leave level out.`,
+          true,
+        );
+      }
       if (!VALID_LEVELS.includes(args.level)) {
         return textResult(`Invalid level "${args.level}". Must be one of: ${VALID_LEVELS.join(", ")}`, true);
       }
@@ -87,7 +96,7 @@ export async function handleEditItem(
       timestamp: new Date().toISOString(),
       event: "item_edited",
       itemId: args.id,
-      detail: `Edited ${existing.level} "${existing.title}": ${changedFields.join(", ")}`,
+      detail: `Edited ${(v2 && changeLayerType(existing)) || existing.level} "${existing.title}": ${changedFields.join(", ")}`,
     });
 
     const updated = await store.getItem(args.id);

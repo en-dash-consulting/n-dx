@@ -129,6 +129,11 @@ export class ChangeLayerStore implements PRDStore {
   }
 }
 
+/** Whether `store` serves the change layer of a v2 tree. */
+export function isChangeLayerStore(store: PRDStore): store is ChangeLayerStore {
+  return store instanceof ChangeLayerStore;
+}
+
 /**
  * A problem for each removed change prune keeps ({@link pruneKeepReason}): the
  * backstop behind the restructure guards, so no write path can delete the
