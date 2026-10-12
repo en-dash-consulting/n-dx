@@ -1,7 +1,8 @@
 /**
  * The change layer of a v2 tree behind the {@link PRDStore} interface, so the
  * level-based restructuring commands (`rex reshape`, `rex reorganize`,
- * `rex prune`) run on it as they run on a v1 tree.
+ * `rex prune`) run on it as they run on a v1 tree. `resolveStore` returns it
+ * on a v2 tree, so every `PRDStore` caller opens the change layer there.
  *
  * The document is the change layer projected as v1 items
  * (`core/layer-projection.ts`). Every write goes through
@@ -142,9 +143,14 @@ function keptRemovals(changes: readonly RuleNode[], removed: ReadonlySet<string>
   return problems;
 }
 
-/** The store the restructuring commands write: the change layer on a v2 tree, `base` itself on a v1 tree. */
+/**
+ * The change layer on a v2 tree, `base` itself on a v1 tree. A `base` that is
+ * already the change layer (what `resolveStore` returns on a v2 tree) is
+ * returned as it is.
+ */
 export async function resolveLayerStore(rexDir: string, base: PRDStore): Promise<{ store: PRDStore; v2: boolean }> {
   if ((await prdLayout(rexDir)) !== "v2") return { store: base, v2: false };
+  if (base instanceof ChangeLayerStore) return { store: base, v2: true };
   return { store: new ChangeLayerStore(rexDir, base), v2: true };
 }
 

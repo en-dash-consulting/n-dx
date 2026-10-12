@@ -460,11 +460,15 @@ describe("isolation", () => {
     // and `rex prune`: the change-layer store, the layer projection, and the
     // product-layer reshape draft (cli/commands/reshape-product.ts), and
     // `rex tree-diff`, which loads either layout (core/tree-source.ts) and
-    // diffs the product layer (core/map-diff.ts). `public.ts` re-exports the
-    // reader, the node and tree types, the index and the derived product
-    // computations: consumers of the product layer (the dashboard's Product
-    // and Changes views, the Graview projection) read them through the public
-    // surface rather than a dist/* path.
+    // diffs the product layer (core/map-diff.ts), and the layout-aware store
+    // resolution: the v1 store's refusal of a v2 tree (store/file-adapter.ts),
+    // `rex init`, which never scaffolds prd_tree/ beside product/
+    // (cli/commands/init.ts), and the CLI error hints, which never send a
+    // project with a PRD in either layout to `n-dx init` (cli/errors.ts).
+    // `public.ts` re-exports the reader, the node and tree types, the index
+    // and the derived product computations: consumers of the product layer
+    // (the dashboard's Product and Changes views, the Graview projection) read
+    // them through the public surface rather than a dist/* path.
     const v2Files = new Set(
       [
         "public.ts",
@@ -517,6 +521,9 @@ describe("isolation", () => {
         "migrations/v1-to-v2/capability-spec.ts",
         "migrations/v1-to-v2/migration-plan-data.ts",
         "migrations/v1-to-v2/spec-pass.ts",
+        "store/file-adapter.ts",
+        "cli/commands/init.ts",
+        "cli/errors.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

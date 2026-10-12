@@ -40,6 +40,7 @@
  * @module rex/store/prd-model-reader
  */
 
+import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { ItemLevel, PRDItem } from "../schema/index.js";
@@ -213,6 +214,15 @@ export async function assertV2TreeWritable(rexDir: string): Promise<void> {
 /** Which layout {@link loadPrdModel} reads under `rexDir`, without reading the tree. */
 export async function prdLayout(rexDir: string): Promise<PrdModel["layout"]> {
   return (await isDirectory(join(rexDir, PRODUCT_DIRNAME))) ? "v2" : "v1";
+}
+
+/**
+ * Whether `rexDir` holds a PRD in either layout: a v2 `product/`, a v1
+ * `prd_tree/`, or a legacy `prd.md` / `prd.json`. Synchronous, for error
+ * formatting, which has no async path.
+ */
+export function rexDirHoldsPrd(rexDir: string): boolean {
+  return [PRODUCT_DIRNAME, PRD_TREE_DIRNAME, "prd.md", "prd.json"].some((entry) => existsSync(join(rexDir, entry)));
 }
 
 /** Load the PRD under `rexDir` as one model, from whichever layout it uses. */
