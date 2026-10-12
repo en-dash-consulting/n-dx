@@ -24,7 +24,12 @@ name: CI
 on:
   push:
     branches: [main]
+  # opened, synchronize and reopened are GitHub's default set. ready_for_review
+  # starts the full run the moment a draft is marked ready; converted_to_draft
+  # starts a run whose jobs all skip, so the concurrency group cancels the
+  # in-flight full run.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   # The merge queue builds main + the queued PR on a gh-readonly-queue/main/*
   # branch and waits for the required checks to report on that merge_group run.
   # Without this trigger they never report and the queue waits forever. Steps
@@ -65,6 +70,12 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    # Drafts cannot merge, so a draft PR run buys nothing; a job skipped by a
+    # job-level `if:` gets no runner and is not billed. Do NOT write
+    # `pull_request.draft == false` alone: on push and merge_group the PR
+    # context is null, the expression is false, and main CI and the merge
+    # queue would stop running.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
@@ -272,6 +283,9 @@ jobs:
   smoke-parity:
     name: CLI Smoke Parity
     runs-on: ubuntu-latest
+    # Same gate as `build` (see the comment there). Redundant with `needs:`
+    # today, but it keeps the intent readable and survives `if: always()`.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     needs:
       - build
     timeout-minutes: 10
