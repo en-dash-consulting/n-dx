@@ -352,17 +352,20 @@ export async function selectTaskEntry(
  * The project's validate and test commands are left out for the reason the v1
  * brief has no project block: the system prompt states them, and both reach
  * the model in one call.
+ *
+ * workflow.md is left out too: it is execution policy, and rex's budget drops
+ * it whole once a change fills the brief. {@link formatChangeBrief} renders it
+ * outside that budget, as v1 does.
  */
 function changeBriefSections(
   tree: V2Tree,
   unitId: string,
-  workflow: string,
   recentLog: readonly TaskBriefLogEntry[],
 ): TaskBriefChangeSection[] {
   // Selection resolved this id to a unit a moment ago, through the same tree.
   const unit = resolveWorkById(tree, unitId);
   if (!unit) throw new Error(`Cannot brief ${unitId}: it is not a unit of work on this v2 tree.`);
-  const { sections } = buildChangeBrief({ tree, unit, workflow, recentLog });
+  const { sections } = buildChangeBrief({ tree, unit, recentLog });
   return sections.map(({ name, text }) => ({ name, text }));
 }
 
@@ -423,7 +426,7 @@ export async function assembleTaskBrief(
   }));
 
   const brief: TaskBrief = {
-    ...(tree ? { changeBrief: changeBriefSections(tree, entry.item.id, workflow, recentLog) } : {}),
+    ...(tree ? { changeBrief: changeBriefSections(tree, entry.item.id, recentLog) } : {}),
     task: itemToTaskBrief(entry.item),
     parentChain: entry.parents.map(itemToParent),
     siblings: getSiblings(entry, doc),
@@ -554,15 +557,30 @@ function sessionFiltersBlock(brief: TaskBrief): string | undefined {
 }
 
 /**
+ * workflow.md — trimmed at a line boundary. This file states rules, so a
+ * mid-line cut would leave a truncated rule reading as a complete one.
+ */
+function workflowBlock(brief: TaskBrief): string | undefined {
+  if (!brief.workflow) return undefined;
+  return `## Workflow\n${trimDocument(brief.workflow, MAX_WORKFLOW_CHARS, "workflow.md")}`;
+}
+
+/**
  * The v2 brief: rex's change brief, with hench's own blocks inserted — the
- * commit trailers and session filters, right after the task section (rex
- * never drops it). Rex already bounded and budgeted every section.
+ * commit trailers and session filters right after the task section (rex
+ * never drops it), and workflow.md before the log and the trimmed note.
+ * Rex bounded and budgeted every section of its own; workflow is outside that
+ * budget, as on v1, because the project's execution rules must always arrive.
  */
 function formatChangeBrief(brief: TaskBrief, changeBrief: readonly TaskBriefChangeSection[]): string {
   const own = [commitTrailersBlock(brief), sessionFiltersBlock(brief)].filter((b): b is string => b !== undefined);
-  return changeBrief
-    .flatMap((section) => (section.name === "task" ? [section.text, ...own] : [section.text]))
-    .join("\n\n");
+  const blocks = changeBrief.flatMap((section) => (section.name === "task" ? [section.text, ...own] : [section.text]));
+  const workflow = workflowBlock(brief);
+  if (workflow) {
+    const tail = changeBrief.findIndex((section) => section.name === "log" || section.name === "trimmed");
+    blocks.splice(tail === -1 ? blocks.length : tail + own.length, 0, workflow);
+  }
+  return blocks.join("\n\n");
 }
 
 export function formatTaskBrief(brief: TaskBrief): string {
@@ -667,12 +685,8 @@ export function formatTaskBrief(brief: TaskBrief): string {
   // whether a solution satisfies the task's acceptance criteria, which the
   // project's name and command list do not bear on.
 
-  // Workflow — trimmed at a line boundary. This file states rules, so a
-  // mid-line cut would leave a truncated rule reading as a complete one.
-  if (brief.workflow) {
-    sections.push("\n## Workflow");
-    sections.push(trimDocument(brief.workflow, MAX_WORKFLOW_CHARS, "workflow.md"));
-  }
+  const workflow = workflowBlock(brief);
+  if (workflow) sections.push(`\n${workflow}`);
 
   // Recent log
   if (brief.recentLog.length > 0) {

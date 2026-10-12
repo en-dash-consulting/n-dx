@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildChangeBrief, resolveStore, resolveWorkById, isChangeLayerStore } from "@n-dx/rex";
@@ -49,19 +49,15 @@ afterEach(async () => {
 });
 
 describe("v2 brief", () => {
-  it("is rex's buildChangeBrief for the selected unit", async () => {
+  it("is rex's buildChangeBrief for the selected unit, without workflow.md", async () => {
     const s = await store();
     const { brief, taskId } = await assembleTaskBrief(s, WIRE_ID);
     expect(taskId).toBe(WIRE_ID);
 
+    // workflow.md is hench's to render, outside rex's budget.
     const tree = await loadV2Tree(s);
     const unit = resolveWorkById(tree!, WIRE_ID)!;
-    const expected = buildChangeBrief({
-      tree: tree!,
-      unit,
-      workflow: "Write the test first.\n",
-      recentLog: await s.readLog(20),
-    });
+    const expected = buildChangeBrief({ tree: tree!, unit, recentLog: await s.readLog(20) });
     expect(brief.changeBrief).toEqual(expected.sections.map((sec) => ({ name: sec.name, text: sec.text })));
   });
 
@@ -90,6 +86,36 @@ describe("v2 brief", () => {
     expect(trailers).toBeGreaterThan(task.text.length - 1);
     expect(trailers).toBeLessThan(text.indexOf("Add Apple Pay", task.text.length));
     expect(text).toContain(`N-DX-Item: ${WIRE_ID}`);
+  });
+
+  it("keeps workflow.md when the change fills rex's budget", async () => {
+    // Twelve long amendments, each adding ten long criteria: far past rex's
+    // budget, so rex would drop an atomic workflow section whole.
+    const long = (n: string) => `${n} ${"criterion detail ".repeat(17)}`.trim();
+    const amends = Array.from({ length: 12 }, (_, a) => ({
+      target: "a0000000-0000-4000-8000-000000000002",
+      delta: "modified",
+      summary: long(`Amendment ${a}`),
+      criteria: { add: Array.from({ length: 10 }, (_, c) => ({ id: `x${a}-${c}`, text: long(`A${a}C${c}`) })) },
+    }));
+    const changeFile = join(rexDir, "changes/add-apple-pay/index.md");
+    const original = await readFile(changeFile, "utf8");
+    await writeFile(changeFile, original.replace(/^amends: .*$/m, `amends: ${JSON.stringify(amends)}`));
+    const workflow = "Write the test first.\nPROHIBITED CHANGES: no @ts-ignore.\n";
+    await writeFile(join(rexDir, "workflow.md"), workflow);
+
+    const s = await store();
+    const tree = await loadV2Tree(s);
+    const unfitted = buildChangeBrief({ tree: tree!, unit: resolveWorkById(tree!, WIRE_ID)!, workflow, recentLog: [] });
+    expect(unfitted.omitted).toContain("workflow");
+
+    const { brief } = await assembleTaskBrief(s, WIRE_ID);
+    const text = formatTaskBrief(brief);
+    expect(text).toContain("## Workflow\nWrite the test first.\nPROHIBITED CHANGES: no @ts-ignore.");
+    expect(text.match(/## Workflow/g)).toHaveLength(1);
+    // Rex's note no longer names workflow, and still closes the brief.
+    expect(text).not.toMatch(/Sections not shown:[^\n]*workflow/);
+    expect(text.indexOf("## Workflow")).toBeLessThan(text.indexOf("_Trimmed to fit"));
   });
 
   it("keeps the session filters", async () => {
