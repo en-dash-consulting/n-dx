@@ -663,3 +663,105 @@ describe("Confidence indicator", () => {
     expect(root.querySelector(".smart-add-confidence-low")).toBeTruthy();
   });
 });
+
+/**
+ * On a v2 PRD the preview answers with changes, not proposals. Rendering only
+ * the proposal list left the panel empty and the user with nothing to accept.
+ */
+describe("SmartAddInput on a v2 PRD", () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  const v2Preview = {
+    preview: true,
+    proposals: [],
+    confidence: 0,
+    qualityIssues: [],
+    changes: [
+      {
+        id: "01J9CHANGE0000000000000000",
+        type: "change",
+        title: "Support refunds when paying by card",
+        needsPlacement: true,
+        placement: {
+          relation: "amends",
+          shortlist: [
+            { target: "01J9CAP00000000000000000000", relation: "amends", title: "Pay by card", displayId: "A1.1" },
+          ],
+        },
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  async function generate(root: HTMLElement) {
+    await typeAndGenerate(root, "Support refunds when paying by card");
+    await vi.runAllTimersAsync();
+    await flush();
+  }
+
+  it("renders each change with its suggested placement", async () => {
+    fetchSpy.mockResolvedValue({ ok: true, json: () => Promise.resolve(v2Preview) });
+
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    await generate(root);
+
+    expect(root.textContent).toContain("Support refunds when paying by card");
+    expect(root.textContent).toContain("Suggested placement");
+    expect(root.textContent).toContain("A1.1 Pay by card");
+    expect(root.textContent).toContain("Inbox");
+    expect(root.textContent).toContain("1 change");
+    // The v1 empty state must not claim nothing was generated.
+    expect(root.textContent).not.toContain("No proposals generated");
+  });
+
+  it("accepts through smart-add-accept with the text that was previewed", async () => {
+    fetchSpy.mockImplementation(async (url: string) =>
+      url === "/api/rex/smart-add-accept"
+        ? { ok: true, json: () => Promise.resolve({ ok: true, changes: v2Preview.changes }) }
+        : { ok: true, json: () => Promise.resolve(v2Preview) },
+    );
+    const onPrdChanged = vi.fn();
+
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged }));
+    await generate(root);
+
+    root.querySelector<HTMLButtonElement>(".smart-add-btn-accept")!.click();
+    await vi.runAllTimersAsync();
+    await flush();
+
+    const call = fetchSpy.mock.calls.find((c) => c[0] === "/api/rex/smart-add-accept");
+    expect(call).toBeTruthy();
+    expect(JSON.parse(call![1].body)).toEqual({ text: "Support refunds when paying by card" });
+    // No v1 accept: that path writes epics, features and tasks.
+    expect(fetchSpy.mock.calls.some((c) => c[0] === "/api/rex/proposals/accept-edited")).toBe(false);
+    expect(onPrdChanged).toHaveBeenCalled();
+  });
+
+  it("surfaces an accept failure and keeps the preview on screen", async () => {
+    fetchSpy.mockImplementation(async (url: string) =>
+      url === "/api/rex/smart-add-accept"
+        ? { ok: false, status: 500, json: () => Promise.resolve({ error: "lock held by pid 42" }) }
+        : { ok: true, json: () => Promise.resolve(v2Preview) },
+    );
+
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn() }));
+    await generate(root);
+
+    root.querySelector<HTMLButtonElement>(".smart-add-btn-accept")!.click();
+    await vi.runAllTimersAsync();
+    await flush();
+
+    expect(root.textContent).toContain("lock held by pid 42");
+    expect(root.textContent).toContain("Support refunds when paying by card");
+  });
+});

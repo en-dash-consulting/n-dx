@@ -37,6 +37,29 @@ interface QualityIssue {
   message: string;
 }
 
+/** One ranked capability or constraint the change could be placed on. */
+interface PlacementCandidate {
+  /** Id of the target; `title` names it when the server could resolve it. */
+  target: string;
+  relation: string;
+  title?: string;
+  displayId?: string;
+}
+
+/**
+ * A change `rex add` would create on a v2 PRD, as the preview forwards it.
+ *
+ * A v2 tree has no levels, so there is nothing to render as an epic/feature/task
+ * proposal: every add is one change, landing in the Inbox until it is placed.
+ */
+export interface PreviewChange {
+  id: string;
+  type: string;
+  title: string;
+  needsPlacement?: boolean;
+  placement?: { relation: string; shortlist: PlacementCandidate[] };
+}
+
 type PreviewState = "idle" | "loading" | "done" | "error";
 
 /** Flattened scope option for the context dropdown. */
@@ -66,6 +89,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
   const [input, setInput] = useState("");
   const [state, setState] = useState<PreviewState>("idle");
   const [proposals, setProposals] = useState<RawProposal[]>([]);
+  const [changes, setChanges] = useState<PreviewChange[]>([]);
   const [confidence, setConfidence] = useState(0);
   const [qualityIssues, setQualityIssues] = useState<QualityIssue[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +106,11 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
 
   // Abort controller for cancelling in-flight requests
   const abortRef = useRef<AbortController | null>(null);
+
+  // What the last preview was generated from. A v2 accept re-runs the same
+  // request with --accept, so it must replay what was previewed rather than
+  // whatever the input and scope hold by the time Add is clicked.
+  const previewedRef = useRef<{ text: string; parentId?: string } | null>(null);
 
   // ── Load scope options (epics & features) ─────────────────────────
 
@@ -168,9 +197,11 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
       if (reqId !== requestIdRef.current) return;
 
       setProposals(data.proposals ?? []);
+      // A v2 PRD previews changes instead of proposals.
+      setChanges(data.preview ? (data.changes ?? []) : []);
       setConfidence(data.confidence ?? 0);
       setQualityIssues(data.qualityIssues ?? []);
-      setState(data.proposals?.length > 0 ? "done" : "done");
+      setState("done");
     } catch (err) {
       // Ignore abort errors
       if (err instanceof DOMException && err.name === "AbortError") return;
@@ -193,7 +224,9 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
     const reqId = ++requestIdRef.current;
     // The bar layout hides the scope selector, so a scope picked before
     // switching to it must not silently apply.
-    triggerPreview(text, reqId, (!bar && selectedScope) || undefined);
+    const parentId = (!bar && selectedScope) || undefined;
+    previewedRef.current = { text, ...(parentId ? { parentId } : {}) };
+    triggerPreview(text, reqId, parentId);
   }, [input, triggerPreview, selectedScope, bar]);
 
   // Cleanup on unmount
@@ -265,6 +298,38 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
       setAccepting(false);
     }
   }, [proposals, onPrdChanged, refreshScopes]);
+
+  // ── Accept changes (v2 PRD) ──────────────────────────────────────
+
+  const handleAcceptChanges = useCallback(async () => {
+    const previewed = previewedRef.current;
+    if (changes.length === 0 || !previewed) return;
+
+    setAccepting(true);
+    try {
+      const res = await fetch("/api/rex/smart-add-accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(previewed),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
+        throw new Error(errBody.error || `HTTP ${res.status}`);
+      }
+
+      setInput("");
+      setChanges([]);
+      setState("idle");
+      previewedRef.current = null;
+      refreshScopes();
+      onPrdChanged();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setAccepting(false);
+    }
+  }, [changes, onPrdChanged, refreshScopes]);
 
   // ── Editor callbacks ─────────────────────────────────────────────
 
@@ -431,8 +496,39 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
         )
       : null,
 
+    // Results: v2 change preview — one change per description, each with the
+    // placement the rules suggest. Accepting creates them in the Inbox.
+    state === "done" && changes.length > 0
+      ? h(Fragment, null,
+          h("div", { class: "smart-add-stats" },
+            h("span", { class: "smart-add-stat" },
+              h("span", { class: "smart-add-stat-count" }, String(changes.length)),
+              ` change${changes.length !== 1 ? "s" : ""}`,
+            ),
+          ),
+
+          h("div", { class: "smart-add-preview" },
+            changes.map((change, ci) =>
+              h(ChangePreviewCard, { key: change.id ?? ci, change }),
+            ),
+          ),
+
+          h("div", { class: "smart-add-actions" },
+            h("button", {
+              class: "cmd-btn cmd-btn-primary smart-add-btn-accept",
+              onClick: handleAcceptChanges,
+              disabled: accepting,
+              type: "button",
+            }, accepting
+              ? "Adding..."
+              : `Add ${changes.length} change${changes.length !== 1 ? "s" : ""}`,
+            ),
+          ),
+        )
+      : null,
+
     // Results: proposal preview
-    state === "done" && proposals.length === 0
+    state === "done" && proposals.length === 0 && changes.length === 0
       ? h("div", { class: "smart-add-empty" },
           h("p", null, "No proposals generated."),
           h("p", { class: "smart-add-empty-hint" },
@@ -538,6 +634,50 @@ function ConfidenceBar({ confidence }: ConfidenceBarProps) {
         "aria-valuemax": 100,
         "aria-label": `Confidence: ${confidence}%`,
       }),
+    ),
+  );
+}
+
+// ── Change Preview Card (v2 PRD) ────────────────────────────────────
+
+interface ChangePreviewCardProps {
+  change: PreviewChange;
+}
+
+function ChangePreviewCard({ change }: ChangePreviewCardProps) {
+  const shortlist = change.placement?.shortlist ?? [];
+
+  return h(
+    "div",
+    { class: "smart-add-preview-card" },
+
+    h("div", { class: "smart-add-preview-epic" },
+      h("span", { class: "prd-level-badge prd-level-epic" }, "Change"),
+      h("span", { class: "smart-add-preview-title" }, change.title),
+      change.needsPlacement
+        ? h("span", { class: "smart-add-preview-count" }, "Inbox")
+        : null,
+    ),
+
+    h("div", { class: "smart-add-preview-body" },
+      shortlist.length > 0
+        ? h(Fragment, null,
+            h("p", { class: "smart-add-preview-desc" }, "Suggested placement"),
+            h("div", { class: "smart-add-preview-tasks" },
+              shortlist.map((candidate, ci) =>
+                h("div", { key: ci, class: "smart-add-preview-task" },
+                  h("span", { class: "smart-add-preview-ac-badge" }, candidate.relation),
+                  h("span", { class: "smart-add-preview-task-title" },
+                    [candidate.displayId, candidate.title ?? candidate.target]
+                      .filter(Boolean).join(" "),
+                  ),
+                ),
+              ),
+            ),
+          )
+        : h("p", { class: "smart-add-preview-desc" },
+            "No placement suggested — it waits in the Inbox until one is recorded.",
+          ),
     ),
   );
 }

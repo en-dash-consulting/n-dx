@@ -148,13 +148,29 @@ async function addChanges(dir: string, inputs: AddChangeNodeInput[]): Promise<Ad
 }
 
 function jsonRows(added: Added[]) {
-  return added.map(({ node, suggestion }) => ({
+  return added.map(({ node, suggestion, targets }) => ({
     id: node.id,
     type: node.type,
     title: node.title,
     ...(node.needsPlacement ? { needsPlacement: true } : {}),
-    ...(suggestion ? { placement: { relation: suggestion.relation, shortlist: suggestion.shortlist } } : {}),
+    ...(suggestion
+      ? {
+          placement: {
+            relation: suggestion.relation,
+            // Each candidate carries its target's label, as the text report
+            // already resolves it. A JSON consumer — the dashboard's Quick Add
+            // — has no tree to resolve `target` against, and a bare id names
+            // nothing to the reader.
+            shortlist: suggestion.shortlist.map((c) => ({ ...c, ...labelOf(targets?.[c.target]) })),
+          },
+        }
+      : {}),
   }));
+}
+
+function labelOf(target: Pick<RuleNode, "id" | "displayId" | "title"> | undefined) {
+  if (!target) return {};
+  return { title: target.title, ...(target.displayId ? { displayId: target.displayId } : {}) };
 }
 
 function report(added: Added[], json: boolean): void {
