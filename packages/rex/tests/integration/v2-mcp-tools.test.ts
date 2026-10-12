@@ -127,6 +127,13 @@ describe("rex MCP tools on a v2 tree", () => {
     expect((await call("claim_task", { id: lone })).isError).toBe(false);
   });
 
+  it("claim_task claims a change whose only task is deleted, as selection treats it", async () => {
+    await ws.store.updateItem(TASK, { status: "deleted" });
+    const res = await call("claim_task", { id: CHANGE });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({ id: CHANGE, claimed: true, type: "change" });
+  });
+
   it("release_task gives back a claim on a v2 task", async () => {
     await call("claim_task", { id: TASK });
     const res = await call("release_task", { id: TASK });

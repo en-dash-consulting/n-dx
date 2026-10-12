@@ -55,7 +55,8 @@ export async function handleClaimTask(
 /** On a v2 tree the unit of work is a task, or a change with no tasks: a subtask or a change with tasks is refused. */
 function changeLayerClaimRefusal(item: PRDItem, type: ChangeNodeType): string | undefined {
   if (type === "subtask") return `"${item.id}" is a subtask: claim its task instead.`;
-  const hasTasks = item.children?.some((c) => changeLayerType(c) === "task") ?? false;
+  // A deleted task is a tombstone: change selection does not count it, so neither does the claim.
+  const hasTasks = item.children?.some((c) => changeLayerType(c) === "task" && c.status !== "deleted") ?? false;
   if (type === "change" && hasTasks) return `"${item.id}" is a change with tasks: claim one of its tasks instead.`;
   return undefined;
 }
