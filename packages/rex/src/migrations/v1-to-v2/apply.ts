@@ -52,6 +52,7 @@ import type { PRDItem } from "../../schema/v1.js";
 import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
 import { nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
 import { withLock, type LockOptions } from "../../store/file-lock.js";
+import { discoverPRDFiles } from "../../store/prd-discovery.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "../../store/paths.js";
 import { CHANGES_DIRNAME, PRODUCT_DIRNAME, loadPrdModel, type PrdModel } from "../../store/prd-model-reader.js";
 import { writePrdModel } from "../../store/prd-model-writer.js";
@@ -519,6 +520,28 @@ export function assertApplicable(plan: PlanFile): asserts plan is V1ToV2Plan {
   }
 }
 
+/**
+ * Legacy PRD sources beside the tree: `prd.md`, a `prd.json` not yet renamed
+ * to `prd.json.migrated`, and branch-scoped `prd_<branch>_<date>.json`. With
+ * the tree gone, v1 reads fall back to them and recreate `prd_tree/` beside
+ * the v2 tree, so apply refuses while any is present.
+ */
+async function legacySources(rexDir: string): Promise<string[]> {
+  const found = [join(rexDir, "prd.md")];
+  if (!existsSync(join(rexDir, "prd.json.migrated"))) found.push(join(rexDir, "prd.json"));
+  found.push(...(await discoverPRDFiles(rexDir)).map((name) => join(rexDir, name)));
+  return found.filter((path) => existsSync(path));
+}
+
+async function assertNoLegacySources(rexDir: string): Promise<void> {
+  const found = await legacySources(rexDir);
+  if (found.length === 0) return;
+  const them = found.length > 1 ? "them" : "it";
+  throw new MigrationApplyError(
+    `Legacy PRD source${found.length > 1 ? "s" : ""} beside the tree: ${found.join(", ")}. Applying would leave ${them} to be migrated back into a new prd_tree/ next to the v2 tree. Move or delete ${them}, after checking nothing is missing from the tree, then apply again. Nothing was written.`,
+  );
+}
+
 export interface ApplyV1ToV2Options {
   /** Reads the v1 tree; called under the PRD lock. */
   load: () => Promise<{ title: string; items: PRDItem[] }>;
@@ -616,6 +639,7 @@ export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined,
     return { status: "already-v2", removed: [join(rexDir, PRD_TREE_DIRNAME), join(rexDir, TREE_META_FILENAME)].filter((path) => existsSync(path)) };
   }
   if (!existsSync(join(rexDir, PRD_TREE_DIRNAME))) throw new MigrationApplyError(`No PRD folder tree at ${join(rexDir, PRD_TREE_DIRNAME)}: nothing to apply.`);
+  await assertNoLegacySources(rexDir);
   const { v1, built, v1Items } = await prepare(plan, options);
   const { tree, stateKeys: _keys, ...summary } = built;
   return { status: "rehearsed", built: summary, kinds: tallyV1ToV2(v1.items, built), nodes: idsOf([...tree.product, ...tree.changes], new Set()).size, v1Items };
@@ -642,6 +666,7 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
         return { status: "already-v2", removed };
       }
       if (!existsSync(v1Files[0]!)) throw new MigrationApplyError(`No PRD folder tree at ${v1Files[0]}: nothing to apply.`);
+      await assertNoLegacySources(rexDir);
       if (!plan) throw new MigrationApplyError("No migration plan to apply.");
       assertApplicable(plan);
       // Without product/ the tree reads as v1, so a changes/ here is what an interrupted apply moved in.
