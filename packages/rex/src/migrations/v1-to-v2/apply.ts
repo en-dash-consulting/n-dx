@@ -44,7 +44,8 @@
 
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, rename, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { amendsHash, freeChangeSlug } from "../../core/apply-amendments.js";
 import { diffFingerprints, fingerprintTree, isLossless, type FingerprintDiff } from "../../core/slug-migration.js";
@@ -52,6 +53,7 @@ import type { PRDItem } from "../../schema/v1.js";
 import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
 import { nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
 import { withLock, type LockOptions } from "../../store/file-lock.js";
+import { discoverPRDFiles } from "../../store/prd-discovery.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "../../store/paths.js";
 import { CHANGES_DIRNAME, PRODUCT_DIRNAME, loadPrdModel, type PrdModel } from "../../store/prd-model-reader.js";
 import { writePrdModel } from "../../store/prd-model-writer.js";
@@ -209,6 +211,7 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
     if (retired.length > 0) stateKeys.set(node.id, new Set(retired));
     nodes.set(node.id, node);
   }
+  repointDissolvedBlockers(nodes, containers, flat);
   const releaseOf = new Map(containers.filter((c) => c.plannedRelease !== undefined).map((c) => [c.id, c.plannedRelease!]));
   const parentById = new Map(flat.map(({ item, parent }) => [item.id, parent?.id]));
   const tree: V2Tree = { product: [], changes: [] };
@@ -241,6 +244,42 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
     inbox: tree.changes.filter((n) => n.needsPlacement === true).length,
     stateKeys,
   };
+}
+
+/**
+ * A `blockedBy` ref to a dissolved container names no node, and selection reads an
+ * unresolved ref as an open blocker. Replace it with the nodes the container split
+ * into (its v1 children, through any nested container), so the ordering survives and
+ * resolves; a node never blocks itself. A container completed in v1 already satisfied
+ * the dependency, so its ref is dropped; a cancelled or deleted child never completes,
+ * so it is never a blocker.
+ */
+function repointDissolvedBlockers(
+  nodes: ReadonlyMap<string, RuleNode>,
+  containers: readonly DeliveryContainer[],
+  flat: ReadonlyArray<{ item: PRDItem; parent?: PRDItem }>,
+): void {
+  if (containers.length === 0) return;
+  const dissolved = new Set(containers.map((c) => c.id));
+  const statusOf = new Map(flat.map(({ item }) => [item.id, item.status]));
+  const childrenOf = new Map<string, string[]>();
+  for (const { item, parent } of flat) {
+    if (parent && dissolved.has(parent.id)) childrenOf.set(parent.id, [...(childrenOf.get(parent.id) ?? []), item.id]);
+  }
+  const expand = (id: string, seen: Set<string>): string[] => {
+    const status = statusOf.get(id);
+    if (status === "cancelled" || status === "deleted") return [];
+    if (nodes.has(id)) return [id];
+    if (!dissolved.has(id) || seen.has(id) || status === "completed") return [];
+    seen.add(id);
+    return (childrenOf.get(id) ?? []).flatMap((child) => expand(child, seen));
+  };
+  for (const node of nodes.values()) {
+    if (!node.blockedBy?.some((ref) => dissolved.has(ref))) continue;
+    const refs = [...new Set(node.blockedBy.flatMap((ref) => (dissolved.has(ref) ? expand(ref, new Set()) : [ref])))].filter((ref) => ref !== node.id);
+    if (refs.length > 0) node.blockedBy = refs;
+    else delete node.blockedBy;
+  }
 }
 
 /** The Inbox change an item becomes when its planned place no longer exists. */
@@ -482,6 +521,28 @@ export function assertApplicable(plan: PlanFile): asserts plan is V1ToV2Plan {
   }
 }
 
+/**
+ * Legacy PRD sources beside the tree: `prd.md`, `prd.json` and branch-scoped
+ * `prd_<branch>_<date>.json` — the files `FileAdapter.loadLegacyDocument`
+ * reads once the tree is gone, and a v1 save then turns into a new
+ * `prd_tree/` beside the v2 tree. A `prd.json.migrated` marker does not make
+ * `prd.json` safe: that read ignores it. So apply refuses while any is present.
+ */
+async function legacySources(rexDir: string): Promise<string[]> {
+  const found = [join(rexDir, "prd.md"), join(rexDir, "prd.json")];
+  found.push(...(await discoverPRDFiles(rexDir)).map((name) => join(rexDir, name)));
+  return found.filter((path) => existsSync(path));
+}
+
+async function assertNoLegacySources(rexDir: string): Promise<void> {
+  const found = await legacySources(rexDir);
+  if (found.length === 0) return;
+  const them = found.length > 1 ? "them" : "it";
+  throw new MigrationApplyError(
+    `Legacy PRD source${found.length > 1 ? "s" : ""} beside the tree: ${found.join(", ")}. Applying would leave ${them} to be migrated back into a new prd_tree/ next to the v2 tree. Move or delete ${them}, after checking nothing is missing from the tree, then apply again. Nothing was written.`,
+  );
+}
+
 export interface ApplyV1ToV2Options {
   /** Reads the v1 tree; called under the PRD lock. */
   load: () => Promise<{ title: string; items: PRDItem[] }>;
@@ -508,6 +569,24 @@ async function prepare(plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Opti
   const v1Items = fingerprintTree(v1.items).size;
   assertEveryV1Id(everyV1Id(v1.items, built.tree, built.containers, built.cut), v1Items, "v2 tree");
   return { v1, built, v1Items };
+}
+
+/**
+ * Write the built model into `dir` and read it back, refusing what apply refuses:
+ * a writer error, a skipped warning on read-back, or a v1 id the read-back lost.
+ * `dir` must exist; the caller owns it and cleans up.
+ */
+async function writeAndVerify(dir: string, prepared: Prepared, lock: LockOptions | undefined): Promise<{ files: number; nodes: number }> {
+  const { v1, built, v1Items } = prepared;
+  const model: PrdModel = { layout: "v2", schema: SCHEMA_VERSION_V2, title: v1.title, tree: built.tree, warnings: [] };
+  const written = await withLock(prdLockPath(dir), () => writePrdModel(dir, model, { stateKeys: built.stateKeys }), lock);
+  const back = await loadPrdModel(dir, { ignoreSchemaSkew: false });
+  const skipped = back.warnings.filter((w) => w.skipped);
+  if (skipped.length > 0) {
+    throw new MigrationApplyError(`The written v2 tree does not read back: ${skipped.map((w) => `${w.path}: ${w.message}`).join("; ")}. Nothing was written.`);
+  }
+  assertEveryV1Id(everyV1Id(v1.items, back.tree, built.containers, built.cut), v1Items, "v2 tree read back");
+  return { files: written.written.length, nodes: idsOf([...back.tree.product, ...back.tree.changes], new Set()).size };
 }
 
 // ── Rehearsal ────────────────────────────────────────────────────
@@ -567,11 +646,12 @@ export function tallyV1ToV2(items: readonly PRDItem[], built: Pick<BuiltV2Tree, 
 
 export type RehearseV1ToV2Result =
   | { status: "already-v2"; removed: string[] }
-  | { status: "rehearsed"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; kinds: Record<V1Kind, KindTally>; nodes: number; v1Items: number };
+  | { status: "rehearsed"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; kinds: Record<V1Kind, KindTally>; nodes: number; files: number; v1Items: number };
 
 /**
- * {@link applyV1ToV2} up to the write: the same refusals and id check, then the
- * tally in place of the write. Writes nothing and does not take the PRD lock.
+ * {@link applyV1ToV2} without the swap: the same refusals, id check, write and
+ * read-back, the write going to an OS temp directory that is removed afterwards.
+ * Writes nothing under `rexDir` and does not take its PRD lock.
  * On a v2 tree, `removed` lists the v1 files apply would remove.
  */
 export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load">): Promise<RehearseV1ToV2Result> {
@@ -579,9 +659,18 @@ export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined,
     return { status: "already-v2", removed: [join(rexDir, PRD_TREE_DIRNAME), join(rexDir, TREE_META_FILENAME)].filter((path) => existsSync(path)) };
   }
   if (!existsSync(join(rexDir, PRD_TREE_DIRNAME))) throw new MigrationApplyError(`No PRD folder tree at ${join(rexDir, PRD_TREE_DIRNAME)}: nothing to apply.`);
-  const { v1, built, v1Items } = await prepare(plan, options);
-  const { tree, stateKeys: _keys, ...summary } = built;
-  return { status: "rehearsed", built: summary, kinds: tallyV1ToV2(v1.items, built), nodes: idsOf([...tree.product, ...tree.changes], new Set()).size, v1Items };
+  await assertNoLegacySources(rexDir);
+  const prepared = await prepare(plan, options);
+  const { v1, built, v1Items } = prepared;
+  const scratch = await mkdtemp(join(tmpdir(), "rex-migrate-rehearsal-"));
+  let verified: { files: number; nodes: number };
+  try {
+    verified = await writeAndVerify(scratch, prepared, undefined);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+  const { tree: _tree, stateKeys: _keys, ...summary } = built;
+  return { status: "rehearsed", built: summary, kinds: tallyV1ToV2(v1.items, built), ...verified, v1Items };
 }
 
 /**
@@ -605,27 +694,20 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
         return { status: "already-v2", removed };
       }
       if (!existsSync(v1Files[0]!)) throw new MigrationApplyError(`No PRD folder tree at ${v1Files[0]}: nothing to apply.`);
+      await assertNoLegacySources(rexDir);
       if (!plan) throw new MigrationApplyError("No migration plan to apply.");
       assertApplicable(plan);
       // Without product/ the tree reads as v1, so a changes/ here is what an interrupted apply moved in.
       await rm(changesDir, { recursive: true, force: true });
 
-      const { v1, built, v1Items } = await prepare(plan, options);
+      const prepared = await prepare(plan, options);
+      const { built, v1Items } = prepared;
 
-      const model: PrdModel = { layout: "v2", schema: SCHEMA_VERSION_V2, title: v1.title, tree: built.tree, warnings: [] };
       let files: number;
       let nodes: number;
       try {
         await mkdir(staging, { recursive: true });
-        const written = await withLock(prdLockPath(staging), () => writePrdModel(staging, model, { stateKeys: built.stateKeys }), options.lock);
-        files = written.written.length;
-        const back = await loadPrdModel(staging, { ignoreSchemaSkew: false });
-        const skipped = back.warnings.filter((w) => w.skipped);
-        if (skipped.length > 0) {
-          throw new MigrationApplyError(`The written v2 tree does not read back: ${skipped.map((w) => `${w.path}: ${w.message}`).join("; ")}. Nothing was written.`);
-        }
-        assertEveryV1Id(everyV1Id(v1.items, back.tree, built.containers, built.cut), v1Items, "v2 tree read back");
-        nodes = idsOf([...back.tree.product, ...back.tree.changes], new Set()).size;
+        ({ files, nodes } = await writeAndVerify(staging, prepared, options.lock));
         if (existsSync(join(staging, CHANGES_DIRNAME))) await rename(join(staging, CHANGES_DIRNAME), changesDir);
         await rename(join(staging, PRODUCT_DIRNAME), productDir);
       } catch (err) {

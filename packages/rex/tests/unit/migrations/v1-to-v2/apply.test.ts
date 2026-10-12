@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { computeProductStatus } from "../../../../src/core/product-status.js";
+import { findActionableWork } from "../../../../src/core/change-selection.js";
 import { isLossless } from "../../../../src/core/slug-migration.js";
 import type { PRDItem } from "../../../../src/schema/v1.js";
 import { isAppliedChange, type RuleNode, type V2Tree } from "../../../../src/schema/v2-rules.js";
@@ -21,6 +22,21 @@ import {
   V1_KINDS,
   type V1ToV2Plan,
 } from "../../../../src/migrations/v1-to-v2/apply.js";
+
+// A model the reader cannot read back is a writer or reader defect, not something a v1 tree can
+// provoke on demand, so the read-back is made to report a skipped file when a test asks.
+const readBack = vi.hoisted(() => ({ skip: false }));
+vi.mock("../../../../src/store/prd-model-reader.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../../../src/store/prd-model-reader.js")>();
+  return {
+    ...real,
+    loadPrdModel: async (...args: Parameters<typeof real.loadPrdModel>) => {
+      const model = await real.loadPrdModel(...args);
+      if (!readBack.skip) return model;
+      return { ...model, warnings: [...model.warnings, { path: "product/area/index.md", message: "unreadable", skipped: true }] };
+    },
+  };
+});
 
 const CUT_AT = "2026-10-12T00:00:00.000Z";
 
@@ -110,6 +126,56 @@ describe("buildV2Tree", () => {
     expect(byId(tree, "e2")).toBeUndefined();
   });
 
+  describe("blockedBy a dissolved container", () => {
+    // Containers still open in v1, so the dependency is repointed rather than dropped.
+    const WITH_BLOCKER: PRDItem[] = [
+      ...TREE.map((i) => (i.id === "e2" || i.id === "e3" ? { ...i, status: "pending" as const } : i)),
+      item("e4", "epic", "Follow-ups", [item("f6", "feature", "Tidy the cache", [], { status: "pending", blockedBy: ["e3", "e2"] })]),
+    ];
+
+    it("names the container's children, not the container", async () => {
+      const { tree, containers } = buildV2Tree(WITH_BLOCKER, await planOf(WITH_BLOCKER));
+      const dissolved = new Set(containers.map((c) => c.id));
+      expect(dissolved).toEqual(new Set(["e2", "e3"]));
+      for (const node of all(tree)) {
+        for (const ref of node.blockedBy ?? []) expect(dissolved.has(ref)).toBe(false);
+      }
+      expect(byId(tree, "f6")!.blockedBy).toEqual(["f5", "f3"]);
+    });
+
+    it("is selectable once every child of the container is completed", async () => {
+      const items: PRDItem[] = [
+        // Every child completed, the epic itself never marked so: the repointed refs all resolve to completed nodes.
+        item("r1", "epic", "ndx 0.9.0", [item("f7", "feature", "Shipped thing", [item("t7", "task", "Ship it")])], { status: "pending" }),
+        item("f8", "feature", "Next thing", [item("t8", "task", "Do it", [], { status: "pending", blockedBy: ["r1"] })], { status: "pending" }),
+      ];
+      const { tree } = buildV2Tree(items, await planOf(items));
+      const blocked = byId(tree, "t8")!;
+      expect(blocked.blockedBy).toEqual(["f7"]);
+      // Pending v1 work lands in the Inbox; placing it is the operator's step, not this one's.
+      for (const n of all(tree)) delete n.needsPlacement;
+      expect(findActionableWork(tree).map((u) => u.node.id)).toContain("t8");
+    });
+
+    it("drops a completed container's ref and never repoints at a cancelled or deleted child", async () => {
+      const items: PRDItem[] = [
+        item("r2", "epic", "ndx 0.8.0", [
+          item("f9", "feature", "Shipped", []),
+          item("f10", "feature", "Cut from the release", [], { status: "cancelled" }),
+        ]),
+        item("r3", "epic", "ndx 1.0.0", [
+          item("f11", "feature", "Still open", [], { status: "pending" }),
+          item("f12", "feature", "Withdrawn", [], { status: "deleted" }),
+        ], { status: "pending" }),
+        item("f13", "feature", "After 0.8.0", [], { status: "pending", blockedBy: ["r2"] }),
+        item("f14", "feature", "After 1.0.0", [], { status: "pending", blockedBy: ["r3"] }),
+      ];
+      const { tree } = buildV2Tree(items, await planOf(items));
+      expect(byId(tree, "f13")!.blockedBy).toBeUndefined();
+      expect(byId(tree, "f14")!.blockedBy).toEqual(["f11"]);
+    });
+  });
+
   it("starts capabilities met or proposed, never revised", async () => {
     const { tree } = buildV2Tree(TREE, await planOf(TREE));
     const statuses = Object.values(computeProductStatus(tree)).map((s) => s.status);
@@ -169,7 +235,10 @@ describe("applyV1ToV2", () => {
     await store().saveDocument({ schema: "rex/v1", title: "Shop", items: TREE });
   });
 
-  afterEach(() => rmSync(repo, { recursive: true }));
+  afterEach(() => {
+    readBack.skip = false;
+    rmSync(repo, { recursive: true });
+  });
 
   it("writes the v2 tree and removes prd_tree/ and tree-meta.json in the same transaction", async () => {
     const plan = await planOf((await load()).items);
@@ -207,6 +276,42 @@ describe("applyV1ToV2", () => {
     expect(written.written).toEqual([]);
     expect(snapshot(rexDir)).toEqual(before);
     expect(model.tree.changes.some((n) => n.title === CUT_CHANGE_TITLE && isAppliedChange(n))).toBe(true);
+  });
+
+  it.each([
+    ["prd.json", "{}"],
+    ["prd.md", "# Shop\n"],
+    ["prd_main_2026-01-01.json", "{}"],
+  ])("refuses, writing nothing, while legacy %s sits beside the tree", async (name, body) => {
+    const plan = await planOf((await load()).items);
+    writeFileSync(join(rexDir, name), body);
+    const before = snapshot(rexDir);
+    await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(/Legacy PRD source.*Nothing was written/s);
+    await expect(rehearseV1ToV2(rexDir, plan, { load })).rejects.toThrow(MigrationApplyError);
+    expect(snapshot(rexDir)).toEqual(before);
+    expect(existsSync(join(rexDir, "product"))).toBe(false);
+  });
+
+  it("refuses a prd.json even beside a prd.json.migrated marker, which the v1 read fallback ignores", async () => {
+    const plan = await planOf((await load()).items);
+    writeFileSync(join(rexDir, "prd.json.migrated"), "{}");
+    writeFileSync(join(rexDir, "prd.json"), "{}");
+    await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(/prd\.json\. Applying/);
+    expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+  });
+
+  it("applies when only a prd.json.migrated marker is left", async () => {
+    const plan = await planOf((await load()).items);
+    writeFileSync(join(rexDir, "prd.json.migrated"), "{}");
+    expect((await applyV1ToV2(rexDir, plan, { load })).status).toBe("applied");
+  });
+
+  it("leaves no way for a PRD-touching command to recreate prd_tree/ after apply", async () => {
+    const plan = await planOf((await load()).items);
+    await applyV1ToV2(rexDir, plan, { load });
+    const { ensureLegacyPrdMigrated } = await import("../../../../src/store/ensure-legacy-prd-migrated.js");
+    expect((await ensureLegacyPrdMigrated(repo)).migrated).toBe(false);
+    expect(existsSync(join(rexDir, "prd_tree"))).toBe(false);
   });
 
   it("is a no-op on the migrated tree", async () => {
@@ -272,6 +377,38 @@ describe("applyV1ToV2", () => {
       const entries = readdirSync(rexDir).sort();
       const outcome = await rehearseV1ToV2(rexDir, plan, { load });
       expect(outcome.status).toBe("rehearsed");
+      expect(snapshot(rexDir)).toEqual(before);
+      expect(readdirSync(rexDir).sort()).toEqual(entries);
+    });
+
+    it("reports the files it wrote to a temporary directory and removes the directory", async () => {
+      const plan = await planOf((await load()).items);
+      // A private temp root, so another process's rehearsal cannot make this pass or fail.
+      const scratchRoot = join(repo, "tmp");
+      mkdirSync(scratchRoot);
+      const vars = ["TMPDIR", "TEMP", "TMP"] as const;
+      const saved = vars.map((v) => process.env[v]);
+      for (const v of vars) process.env[v] = scratchRoot;
+      let outcome: Awaited<ReturnType<typeof rehearseV1ToV2>>;
+      try {
+        expect(tmpdir()).toBe(scratchRoot);
+        outcome = await rehearseV1ToV2(rexDir, plan, { load });
+      } finally {
+        vars.forEach((v, i) => (saved[i] === undefined ? delete process.env[v] : (process.env[v] = saved[i])));
+      }
+      if (outcome.status !== "rehearsed") throw new Error("expected a rehearsal");
+      expect(outcome.files).toBeGreaterThan(0);
+      expect(readdirSync(scratchRoot)).toEqual([]);
+    });
+
+    it("refuses a model that does not read back, as apply does, and writes nothing under the project", async () => {
+      const plan = await planOf((await load()).items);
+      const before = snapshot(rexDir);
+      const entries = readdirSync(rexDir).sort();
+      readBack.skip = true;
+      const message = /The written v2 tree does not read back: product\/area\/index\.md: unreadable\. Nothing was written\./;
+      await expect(rehearseV1ToV2(rexDir, plan, { load })).rejects.toThrow(message);
+      await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(message);
       expect(snapshot(rexDir)).toEqual(before);
       expect(readdirSync(rexDir).sort()).toEqual(entries);
     });
