@@ -21,9 +21,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Consolidate the duplicate go.mod parser (rex parseGoMod and sourcevision go-build)](./consolidate-the-duplicate-go-mod.md) | pending |
 | [Go build reader drops the unlistable-directory notice when no go.mod or go.work is found](./go-build-reader-drops-the-unlistable.md) | pending |
 | [Go resolver lets a go.mod versioned replace beat the go.work replace for the same module](./go-resolver-lets-a-go-mod-versioned.md) | pending |
+| [Java discovery rejects when a .java or pom.xml file is unreadable](./java-discovery-rejects-when-a-java-or.md) | pending |
 | [Java entry points are guessed from file names, not detected from public static void main](./java-entry-points-are-guessed-from.md) | pending |
 | [Java pack grammar version is not tied to the build pin](./java-pack-grammar-version-is-not-tied.md) | pending |
-| [Java packageDeclarationRoots throws when a project subdirectory cannot be listed](./java-packagedeclarationroots-throws.md) | pending |
+| [Java packageDeclarationRoots throws when a project subdirectory cannot be listed](./java-packagedeclarationroots-throws.md) | completed |
 | [Maven build model collapses dependencies that differ only by type or classifier](./maven-build-model-collapses.md) | completed |
 | [Packed-tarball test reads a stale dist, so a newly registered pack fails the gate](./packed-tarball-test-reads-a-stale-dist.md) | completed |
 | [scip-java comparison counts constructor references as references to their type](./scip-java-comparison-counts.md) | pending |
