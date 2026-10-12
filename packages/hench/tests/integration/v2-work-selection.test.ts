@@ -10,10 +10,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { appendFile, cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { findNextWork, resolveStore, isChangeLayerStore } from "@n-dx/rex";
+import { collectCompletedIds, findNextTask, findNextWork, resolveStore, isChangeLayerStore } from "@n-dx/rex";
 import type { PRDStore } from "@n-dx/rex";
 import { assembleTaskBrief, getActionableTasks, selectTaskEntry } from "../../src/agent/planning/brief.js";
 import { loadV2Tree } from "../../src/agent/planning/work-selection.js";
@@ -28,6 +28,9 @@ const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
 const WIRE_ID = "c0000000-0000-4000-8000-000000000002";
 /** A second task this suite adds to CH-1. */
 const DOCS_ID = "c0000000-0000-4000-8000-0000000000d0";
+/** An Inbox change (needsPlacement) and its task, added by one test. */
+const INBOX_ID = "c0000000-0000-4000-8000-0000000000e0";
+const INBOX_TASK_ID = "c0000000-0000-4000-8000-0000000000e1";
 
 let root: string;
 let rexDir: string;
@@ -83,6 +86,32 @@ describe("v2 autoselection", () => {
     const { taskId, brief } = await assembleTaskBrief(s);
     expect(taskId).toBe(expected);
     expect(brief.parentChain.map((p) => p.id)).toEqual([CHANGE_ID]);
+  });
+
+  it("passes over an Inbox change the v1 selector over the projection would run", async () => {
+    // A critical change awaiting placement, with a pending task. The projection
+    // reads it as a critical epic; only v2 selection knows the Inbox is not run.
+    const inbox = join(rexDir, "changes", "triage-me");
+    await mkdir(inbox);
+    await writeFile(join(inbox, "index.md"), [
+      "---", `id: "${INBOX_ID}"`, 'type: "change"', 'title: "Triage me"', 'slug: "triage-me"',
+      'priority: "critical"', "---", "",
+    ].join("\n"));
+    await writeFile(join(inbox, "do-it.md"), [
+      "---", `id: "${INBOX_TASK_ID}"`, 'type: "task"', 'title: "Do it"', 'slug: "do-it"', "---", "",
+    ].join("\n"));
+    await writeFile(join(inbox, "state.yaml"), `schema: "rex/v2"\nitems:\n  "${INBOX_ID}":\n    needsPlacement: true\n`);
+
+    const s = await store();
+    const items = (await s.loadDocument()).items;
+    // Guard: the projection alone would pick the Inbox task.
+    expect(findNextTask(items, collectCompletedIds(items))?.item.id).toBe(INBOX_TASK_ID);
+
+    const { taskId } = await assembleTaskBrief(s);
+    expect(taskId).toBe(WIRE_ID);
+    expect(taskId).toBe(findNextWork((await loadV2Tree(s))!)!.node.id);
+    // Asked for by name, an Inbox task still runs.
+    expect((await assembleTaskBrief(s, INBOX_TASK_ID)).taskId).toBe(INBOX_TASK_ID);
   });
 
   it("honours --tags and --mine with rex's own rules", async () => {
