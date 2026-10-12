@@ -52,8 +52,10 @@ describe("v2 PRD cache", () => {
   });
 
   it("prdMaxMtimeMs follows edits under changes/", () => {
-    const future = new Date(Date.now() + 60_000);
-    utimesSync(join(rexDir, "changes", "add-apple-pay", "index.md"), future, future);
-    expect(prdMaxMtimeMs(rexDir)).toBeGreaterThanOrEqual(future.getTime() - 1000);
+    // A fixed mtime set here, far past any copied fixture file's, so the
+    // verdict is exact equality and reads no clock.
+    const stamped = new Date("2100-01-01T00:00:00Z");
+    utimesSync(join(rexDir, "changes", "add-apple-pay", "index.md"), stamped, stamped);
+    expect(prdMaxMtimeMs(rexDir)).toBe(stamped.getTime());
   });
 });
