@@ -186,3 +186,49 @@ describe("cmdMigrate --plan", () => {
     expect(plan.entries.t3.target).toBe("task");
   });
 });
+
+describe("cmdMigrate --apply", () => {
+  let repo: string;
+  let spies: Array<ReturnType<typeof vi.spyOn>>;
+  const rexDir = () => join(repo, ".rex");
+
+  beforeEach(async () => {
+    repo = realpathSync(mkdtempSync(join(tmpdir(), "rex-migrate-apply-")));
+    mkdirSync(rexDir());
+    writeFileSync(join(rexDir(), "config.json"), JSON.stringify({ schema: "rex/v1", project: "shop", adapter: "file" }));
+    await new FileStore(rexDir()).saveDocument({ schema: "rex/v1", title: "Shop", items: TREE });
+    vi.clearAllMocks();
+    spies = [vi.spyOn(console, "log").mockImplementation(() => {}), vi.spyOn(console, "error").mockImplementation(() => {})];
+  });
+
+  afterEach(() => {
+    for (const spy of spies) spy.mockRestore();
+    rmSync(repo, { recursive: true });
+  });
+
+  it("applies the plan at the default path, then is a no-op on the v2 tree", async () => {
+    await cmdMigrate(repo, { plan: "true", "rules-only": "true" });
+    await cmdMigrate(repo, { apply: "true" });
+    expect(existsSync(join(rexDir(), "product", "index.md"))).toBe(true);
+    expect(existsSync(join(rexDir(), "prd_tree"))).toBe(false);
+
+    const before = snapshot(rexDir());
+    await cmdMigrate(repo, { apply: "true" });
+    rmSync(join(repo, ".ndx-migration"), { recursive: true });
+    await cmdMigrate(repo, { apply: "true" });
+    expect(snapshot(rexDir())).toEqual(before);
+  });
+
+  it("reads the plan from --plan=<path>", async () => {
+    const out = join(repo, "elsewhere.json");
+    await cmdMigrate(repo, { plan: "true", "rules-only": "true", out });
+    await cmdMigrate(repo, { apply: "true", plan: out });
+    expect(existsSync(join(rexDir(), "product", "index.md"))).toBe(true);
+  });
+
+  it("needs a plan on a v1 tree, and writes nothing without one", async () => {
+    const before = snapshot(rexDir());
+    await expect(cmdMigrate(repo, { apply: "true" })).rejects.toThrow(/No migration plan/);
+    expect(snapshot(rexDir())).toEqual(before);
+  });
+});

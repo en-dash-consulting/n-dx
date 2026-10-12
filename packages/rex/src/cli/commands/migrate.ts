@@ -18,6 +18,10 @@
  * that stopped on an error is reported after the plan is written, with a
  * non-zero exit: the answers paid for are kept for the retry.
  *
+ * `rex migrate --apply [--plan=<path>] [dir]` applies the plan: see
+ * {@link applyPlan}. `--plan` takes its path only in the `=` form, so a bare
+ * `--plan` still means plan mode.
+ *
  * @module rex/cli/commands/migrate
  */
 
@@ -30,6 +34,7 @@ import { createTextSpecModel } from "../../analyze/spec-draft-reason.js";
 import { findTestFiles } from "../../core/verify.js";
 import type { PlacementSettings } from "../../core/placement-policy.js";
 import { findMigration } from "../../migrations/registry.js";
+import { applyV1ToV2, MigrationApplyError, type ApplyV1ToV2Result } from "../../migrations/v1-to-v2/apply.js";
 import { incompletePasses, isPlanComplete, readPlanFile, writePlanFile, type PlanFile } from "../../migrations/plan-file.js";
 import { planSeams } from "../../migrations/v1-to-v2/seams.js";
 import { v1TreeSource, type V1ToV2Entry, type V1ToV2Summary } from "../../migrations/v1-to-v2/index.js";
@@ -49,10 +54,11 @@ const PLAN_PLACEMENT: PlacementSettings = { models: "text", autoAccept: "none" }
 /** The model name recorded for Jev: a plan is reused only while the recorded model matches. */
 const JEV_MODEL_NAME = "jev-latest";
 
+const USAGE = "Usage: rex migrate --plan [--out <path>] [--rules-only] [dir], or rex migrate --apply [--plan=<path>] [dir]";
+
 export async function cmdMigrate(dir: string, flags: Record<string, string>): Promise<void> {
-  if (flags.plan !== "true") {
-    throw new CLIError("Nothing to do: pass --plan.", "Usage: rex migrate --plan [--out <path>] [--rules-only] [dir]");
-  }
+  if (flags.apply === "true") return applyPlan(dir, flags);
+  if (flags.plan !== "true") throw new CLIError("Nothing to do: pass --plan or --apply.", USAGE);
   const projectDir = resolve(dir);
   const rexDir = resolveRexPaths(projectDir).rexDir;
   if (hasV2Tree(rexDir)) throw new CLIError("This project already uses the v2 layout: nothing to plan.");
@@ -112,6 +118,52 @@ export async function cmdMigrate(dir: string, flags: Record<string, string>): Pr
       "The answers so far are kept in the plan file: run the command again to continue. Do not apply this plan.",
     );
   }
+}
+
+/**
+ * `rex migrate --apply`: write the v2 tree from the plan at `--plan=<path>`
+ * (default `.ndx-migration/plan.json`) and remove the v1 tree, in one PRD
+ * transaction (`migrations/v1-to-v2/apply.ts`). On a v2 tree it reports so and
+ * exits zero.
+ */
+async function applyPlan(dir: string, flags: Record<string, string>): Promise<void> {
+  const projectDir = resolve(dir);
+  const rexDir = resolveRexPaths(projectDir).rexDir;
+  const planPath = flags.plan !== undefined && flags.plan !== "true" ? resolve(flags.plan) : join(projectDir, PLAN_DIRNAME, PLAN_FILENAME);
+
+  let plan: PlanFile | undefined;
+  if (existsSync(planPath)) {
+    try {
+      plan = await readPlanFile(planPath);
+    } catch (err) {
+      throw new CLIError(`${planPath} is not a migration plan: ${(err as Error).message}`);
+    }
+  } else if (!hasV2Tree(rexDir)) {
+    throw new CLIError(`No migration plan at ${planPath}.`, "Run 'rex migrate --plan' first, or name the plan with --plan=<path>.");
+  }
+
+  const store = await resolveStore(rexDir);
+  let outcome: ApplyV1ToV2Result;
+  try {
+    outcome = await applyV1ToV2(rexDir, plan, { load: () => store.loadDocument() });
+  } catch (err) {
+    if (err instanceof MigrationApplyError) throw new CLIError(err.message);
+    throw err;
+  }
+
+  if (outcome.status === "already-v2") {
+    result("This project already uses the v2 layout: nothing to apply.");
+    if (outcome.removed.length > 0) info(`Removed what an interrupted apply left: ${outcome.removed.join(", ")}`);
+    return;
+  }
+  const { built, nodes, v1Items } = outcome;
+  result(`Migrated ${v1Items} v1 items to the v2 layout (${nodes} nodes, the cut change ${built.cut} included).`);
+  info(`Inbox (needs placement): ${built.inbox}`);
+  if (built.containers.length > 0) info(`Delivery containers listed on the cut change: ${built.containers.length}`);
+  if (built.late.length > 0) info(`Newer than the plan: ${built.late.length}`);
+  if (built.refitted.length > 0) info(`Moved since the plan, re-fitted: ${built.refitted.length}`);
+  if (built.gone.length > 0) info(`In the plan but no longer in the tree: ${built.gone.length}`);
+  info(`Removed ${PRD_TREE_DIRNAME}/ and its tree-meta.json. Review the result with 'rex health' and place the Inbox.`);
 }
 
 /** The plan already at the output path, when it is one for this migration; any other file there is not overwritten. */

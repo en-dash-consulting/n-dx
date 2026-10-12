@@ -846,16 +846,20 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
   migrate: {
     tool: "rex",
     command: "migrate",
-    summary: "plan the v1 → v2 migration and write the plan file for review",
-    usage: "rex migrate --plan [--out <path>] [--rules-only] [--model <id>] [--cut-at <iso>] [dir]",
+    summary: "plan the v1 → v2 migration for review, then apply the plan",
+    usage: "rex migrate (--plan [--out <path>] [--rules-only] [--model <id>] [--cut-at <iso>] | --apply [--plan=<path>]) [dir]",
     description:
       "Classifies every v1 item (area, capability, constraint, change, task), proposes the areas and constraints, drafts the capability specs and writes the plan.\n" +
       "Writes nothing in the rex directory: the plan goes to .ndx-migration/plan.json (gitignored) unless --out names another path outside it.\n\n" +
       "Defaults: the text model places held changes and drafts specs; a pick is only a suggestion, the change stays held for the Inbox.\n" +
       "Jev reviews the plan only when TYPESAFE_API_KEY is set; otherwise that pass is skipped with a warning.\n\n" +
-      "Re-running reuses the answers and cut time of the plan already at the output path. A model pass that stops on an error is reported and the command exits non-zero after writing the plan.",
+      "Re-running reuses the answers and cut time of the plan already at the output path. A model pass that stops on an error is reported and the command exits non-zero after writing the plan.\n\n" +
+      "--apply writes the v2 tree (product/ and changes/) from the plan and removes prd_tree/ and tree-meta.json, in one PRD transaction.\n" +
+      "Items newer than the plan land in the Inbox; every v1 id is checked before anything is written. On a v2 tree it reports so and exits zero.",
     options: [
-      { flag: "--plan", description: "Write the migration plan (required)" },
+      { flag: "--plan", description: "Write the migration plan" },
+      { flag: "--apply", description: "Apply the plan to the v1 tree" },
+      { flag: "--plan=<path>", description: "With --apply: the plan to apply (default .ndx-migration/plan.json)" },
       { flag: "--out <path>", description: "Plan file path (default .ndx-migration/plan.json)" },
       { flag: "--rules-only", description: "Run no model pass" },
       { flag: "--model <id>", description: "Model for text placement and spec drafting" },
@@ -864,6 +868,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     examples: [
       { command: "rex migrate --plan", description: "Plan with the default passes" },
       { command: "rex migrate --plan --rules-only --out=/tmp/plan.json", description: "Rules only, to another path" },
+      { command: "rex migrate --apply", description: "Apply the reviewed plan" },
     ],
     related: ["migrate-to-folder-tree", "validate"],
   },
