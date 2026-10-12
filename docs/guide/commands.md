@@ -248,7 +248,7 @@ ndx graview check .         # re-emit, then graview check on the declaration
 ndx graview describe .      # re-emit, then graview describe: the places and acts the document declares
 ndx graview serve .         # re-emit, then the product face (@n-dx/graview-face) on http://localhost:5188
 ndx graview mcp .           # re-emit, then graview mcp over stdio on the snapshot
-ndx graview info .          # where the projection, the graview binary, the face and the rex endpoint are
+ndx graview info .          # where the projection, the graview binary, the face and rex's MCP endpoint are
 ndx graview emit --files .  # include file nodes (large)
 ```
 
