@@ -25,6 +25,7 @@ import { rexMcpEndpoint } from "../hub.js";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
+import { describeMisfits } from "../fit.js";
 import { resolveLayout } from "../llm-gateway.js";
 
 const SUBCOMMANDS = ["emit", "check", "describe", "serve", "mcp", "info"] as const;
@@ -237,6 +238,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     warn: (message) => console.error(`warning: ${message}`),
   });
   say(describeEmit(emitted));
+  // A snapshot the declaration does not admit fails later, in the face; say so now, and refuse it in check.
+  if (emitted.misfits.length > 0) console.error(`${parsed.sub === "check" ? "error" : "warning"}: ${describeMisfits(emitted.misfits)}`);
   if (parsed.sub === "emit") return 0;
 
   const command = resolveGraviewCommand(layout, { face: config.app ?? findProductFace() });
@@ -244,8 +247,10 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   const root = emitted.layout.root;
 
   switch (parsed.sub) {
-    case "check":
-      return runGraview(command, ["check", emitted.documentPath, ...parsed.passthrough], root);
+    case "check": {
+      const checked = await runGraview(command, ["check", emitted.documentPath, ...parsed.passthrough], root);
+      return checked !== 0 ? checked : emitted.misfits.length > 0 ? 1 : 0;
+    }
     case "describe":
       return runGraview(command, ["describe", emitted.documentPath, "--seed", emitted.snapshotPath, ...parsed.passthrough], root);
     case "serve": {

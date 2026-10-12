@@ -28,10 +28,10 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Migration review: project a migration plan file into Graview for people to approve](./migration-review-project-a-migration.md) | pending |
 | [@n-dx/graview adapter: declaration document, snapshot projection and ndx graview spawn commands](./n-dx-graview-adapter-declaration.md) | completed |
 | [n-dx on Graview: declared design and a custom pages face, in n-dx's own words](./n-dx-on-graview-declared-design-and-a.md) | completed |
-| [ndx graview check fits the emitted snapshot to the declaration, not only the declaration](./ndx-graview-check-fits-the-emitted.md) | pending |
+| [ndx graview check fits the emitted snapshot to the declaration, not only the declaration](./ndx-graview-check-fits-the-emitted.md) | completed |
 | [Promote the rex v2 reader and derived-edge computations to the public API](./promote-the-rex-v2-reader-and-derived.md) | completed |
 | [Reproducible graview checks and documented naming divergences from rex](./reproducible-graview-checks-and.md) | pending |
+| [Revisit: refuse ndx graview on a v1 PRD once n-dx's own tree has migrated](./revisit-refuse-ndx-graview-on-a-v1-prd.md) | pending |
 | [The face and the adapter take Graview 0.1.22 and drop the workarounds it answers](./the-face-and-the-adapter-take-graview.md) | completed |
 | [The graview binary never downloads silently: npx only on explicit opt-in, otherwise an install hint](./the-graview-binary-never-downloads.md) | pending |
 | [Two-way writes through Graview's SyncEngine with rex as the system of record](./two-way-writes-through-graview-s.md) | completed |
-| [Revisit: refuse ndx graview on a v1 PRD once n-dx's own tree has migrated](./revisit-refuse-ndx-graview-on-a-v1-prd.md) | pending |
