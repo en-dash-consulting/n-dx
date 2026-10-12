@@ -11,6 +11,7 @@ import {
   saveUsageMark,
   snapshotTranscriptUsage,
   takeUsageMark,
+  withClaimExcluded,
   EMPTY_CURSOR,
 } from "../../../src/store/session-usage.js";
 
@@ -572,6 +573,101 @@ describe("usage marks", () => {
     expect(delta.tokenUsage.output).toBe(11);
     expect(delta.messages).toBe(2);
     expect(delta.resynced).toBe(false);
+  });
+
+  /**
+   * Nested marks. A record consumed inside an outstanding mark's window is
+   * charged to that mark, so the mark's own record claims its window minus the
+   * inner one — not the whole thing a second time.
+   */
+  describe("withClaimExcluded", () => {
+    const transcript = ["a", "b", "c", "d", "e"].map((id, i) => assistantLine(id, u(10 * (i + 1)))).join("\n");
+
+    it("charges only the part of a claim that falls inside the mark's window", () => {
+      // Mark after b; a record claims c..e. All three are inside the window.
+      const mark = takeUsageMark([assistantLine("a", u(10)), assistantLine("b", u(20))].join("\n"), "T1");
+      const [updated] = Object.values(
+        withClaimExcluded(transcript, { T1: mark }, { from: { lastUuid: "b", consumed: 2 }, to: { lastUuid: "e", consumed: 5 } }),
+      );
+      expect(updated.excludedMessages).toBe(3);
+      expect(updated.excluded!.output).toBe(30 + 40 + 50);
+    });
+
+    it("ignores a claim that ended before the mark was taken", () => {
+      const mark = takeUsageMark(transcript, "T1"); // after e
+      const [updated] = Object.values(
+        withClaimExcluded(transcript, { T1: mark }, { from: { consumed: 0 }, to: { lastUuid: "b", consumed: 2 } }),
+      );
+      expect(updated.excluded).toBeUndefined();
+      expect(updated.excludedMessages).toBeUndefined();
+    });
+
+    it("charges only the overlap when the mark sits inside the claimed span", () => {
+      // Three levels: a claim spanning b..e, against a mark taken after c.
+      const mark = takeUsageMark(["a", "b", "c"].map((id, i) => assistantLine(id, u(10 * (i + 1)))).join("\n"), "T1");
+      const [updated] = Object.values(
+        withClaimExcluded(transcript, { T1: mark }, { from: { lastUuid: "a", consumed: 1 }, to: { lastUuid: "e", consumed: 5 } }),
+      );
+      expect(updated.excludedMessages).toBe(2);
+      expect(updated.excluded!.output).toBe(40 + 50);
+    });
+
+    it("accumulates across several inner records", () => {
+      const mark = takeUsageMark(assistantLine("a", u(10)), "T1");
+      const once = withClaimExcluded(transcript, { T1: mark }, { from: { lastUuid: "a", consumed: 1 }, to: { lastUuid: "c", consumed: 3 } });
+      const twice = withClaimExcluded(transcript, once, { from: { lastUuid: "c", consumed: 3 }, to: { lastUuid: "e", consumed: 5 } });
+      expect(twice.T1.excludedMessages).toBe(4);
+      expect(twice.T1.excluded!.output).toBe(20 + 30 + 40 + 50);
+    });
+
+    it("readUsageSinceMark subtracts what was charged to the mark", () => {
+      const mark = takeUsageMark(assistantLine("a", u(10)), "T1");
+      const charged = withClaimExcluded(transcript, { T1: mark }, { from: { lastUuid: "b", consumed: 2 }, to: { lastUuid: "d", consumed: 4 } });
+
+      const delta = readUsageSinceMark(transcript, charged.T1);
+      // Window is b..e; c and d were claimed by the inner record.
+      expect(delta.messages).toBe(2);
+      expect(delta.tokenUsage.output).toBe(20 + 50);
+      expect(delta.excludedMessages).toBe(2);
+      expect(delta.from).toEqual({ lastUuid: "a", consumed: 1 });
+    });
+
+    it("leaves an unnested mark's delta exactly as it was", () => {
+      const mark = takeUsageMark(assistantLine("a", u(10)), "T1");
+      const delta = readUsageSinceMark(transcript, mark);
+      expect(delta.messages).toBe(4);
+      expect(delta.tokenUsage.output).toBe(20 + 30 + 40 + 50);
+      expect(delta.excludedMessages).toBe(0);
+      expect(delta.excluded).toEqual({ input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0 });
+    });
+
+    it("never reports negative usage when an exclusion outruns the window", () => {
+      // A compacted transcript can leave a mark charged more than its window
+      // now holds. Zero, not a negative number.
+      const mark = {
+        ...takeUsageMark(assistantLine("a", u(10)), "T1"),
+        excluded: { input: 9999, output: 9999, cacheCreationInput: 9999, cacheReadInput: 9999 },
+        excludedMessages: 9999,
+      };
+      const delta = readUsageSinceMark(transcript, mark);
+      expect(delta.tokenUsage).toEqual({ input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0 });
+      expect(delta.messages).toBe(0);
+    });
+
+    it("survives a cursor-file round trip", async () => {
+      const henchDir = await mkdtemp(join(tmpdir(), "hench-excluded-"));
+      try {
+        const mark = takeUsageMark(assistantLine("a", u(10)), "T1");
+        const charged = withClaimExcluded(transcript, { T1: mark }, { from: { lastUuid: "a", consumed: 1 }, to: { lastUuid: "c", consumed: 3 } });
+        await saveUsageCursor(henchDir, "s1", { consumed: 3, marks: charged });
+
+        const loaded = await loadUsageCursor(henchDir, "s1");
+        expect(loaded.marks!.T1.excludedMessages).toBe(2);
+        expect(loaded.marks!.T1.excluded!.output).toBe(20 + 30);
+      } finally {
+        await rm(henchDir, { recursive: true, force: true });
+      }
+    });
   });
 
   it("falls back to snapshot arithmetic, clamped at zero, when the marked message is gone", () => {

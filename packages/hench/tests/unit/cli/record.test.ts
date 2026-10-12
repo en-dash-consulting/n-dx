@@ -236,6 +236,97 @@ describe("hench record", () => {
       expect(cursor.consumed).toBe(2);
     });
 
+    /**
+     * The nesting case, as observed on 2026-10-06: `/ndx-work` marks a task and
+     * records it at the end, and an `/ndx-adversarial-review` run inside that
+     * window marks and records too. The review is recorded first, so the task's
+     * window still contains it — and used to claim it again. Measured then: a
+     * review of 10,898,780 tokens, and the task reporting 25,341,772 of which
+     * those were a part, corrected by hand to 14,442,992.
+     */
+    it("a mark consumed inside another mark's window is claimed once, by the inner record", async () => {
+      // a,b unrelated | mark A | c,d task work | mark R | e,f review | record R
+      // | g wrap-up | record A.
+      const v1 = await writeTranscript("t.jsonl", [message("a", 1), message("b", 1)]);
+      await markNow("A", v1, "s-nest");
+
+      const v2 = await writeTranscript("t.jsonl", [
+        message("a", 1), message("b", 1), message("c", 10), message("d", 20),
+      ]);
+      await markNow("skill:review", v2, "s-nest");
+
+      const v3 = await writeTranscript("t.jsonl", [
+        message("a", 1), message("b", 1), message("c", 10), message("d", 20),
+        message("e", 100), message("f", 200),
+      ]);
+      await cmdRecord(projectDir, { task: "R", mark: "skill:review", transcript: v3, session: "s-nest" });
+
+      const v4 = await writeTranscript("t.jsonl", [
+        message("a", 1), message("b", 1), message("c", 10), message("d", 20),
+        message("e", 100), message("f", 200), message("g", 30),
+      ]);
+      await cmdRecord(projectDir, { task: "A", transcript: v4, session: "s-nest" });
+
+      const byTask = Object.fromEntries((await listRuns(henchDir)).map((r) => [r.taskId, r]));
+      // The review claims its own window, e+f.
+      expect(byTask.R.tokenUsage.output).toBe(300);
+      expect(byTask.R.turns).toBe(2);
+      // The task claims c,d and g — its own work on both sides of the review —
+      // and not e,f. Before this fix it claimed c..g, so e+f were counted twice.
+      expect(byTask.A.tokenUsage.output).toBe(60);
+      expect(byTask.A.turns).toBe(3);
+
+      // The two together are exactly the outer window c..g: nothing double
+      // -counted, and nothing lost either.
+      const outerWindow = 10 + 20 + 100 + 200 + 30;
+      expect(byTask.A.tokenUsage.output + byTask.R.tokenUsage.output).toBe(outerWindow);
+      expect(byTask.A.turns + byTask.R.turns).toBe(5);
+      // Every class, not just output: one input and two cache-creation per message.
+      expect(byTask.A.tokenUsage.input + byTask.R.tokenUsage.input).toBe(5);
+      expect(byTask.A.tokenUsage.cacheCreationInput + byTask.R.tokenUsage.cacheCreationInput).toBe(10);
+
+      // The exclusion is stated, not silent.
+      expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toMatch(
+        /was excluded: a record taken inside this window already claimed it/,
+      );
+    });
+
+    it("an unnested mark claims its whole window — nothing is excluded", async () => {
+      const before = await writeTranscript("t.jsonl", [message("a", 100, 9000)]);
+      await markNow("T1", before, "s-solo");
+      const after = await writeTranscript("t.jsonl", [
+        message("a", 100, 9000), message("b", 7, 500), message("c", 3, 500),
+      ]);
+
+      await cmdRecord(projectDir, { task: "T1", transcript: after, session: "s-solo" });
+
+      const [run] = await listRuns(henchDir);
+      expect(run.tokenUsage).toEqual({ input: 2, output: 10, cacheCreationInput: 4, cacheReadInput: 1000 });
+      expect(run.turns).toBe(2);
+      expect(vi.mocked(console.log).mock.calls.flat().join("\n")).not.toMatch(/was excluded/);
+    });
+
+    it("charges a markless record to the marks that enclose it", async () => {
+      // No mark for the inner work at all — it records off the watermark. The
+      // task's mark must still not re-claim what that record took.
+      const v1 = await writeTranscript("t.jsonl", [message("a", 5)]);
+      await markNow("A", v1, "s-markless");
+      const v2 = await writeTranscript("t.jsonl", [message("a", 5), message("b", 40)]);
+
+      await cmdRecord(projectDir, { task: "other", transcript: v2, session: "s-markless" });
+      const v3 = await writeTranscript("t.jsonl", [message("a", 5), message("b", 40), message("c", 9)]);
+      await cmdRecord(projectDir, { task: "A", transcript: v3, session: "s-markless" });
+
+      const byTask = Object.fromEntries((await listRuns(henchDir)).map((r) => [r.taskId, r]));
+      // 45, not 40: with no mark and no watermark this record claims the whole
+      // transcript — the documented fallback, and it warns. What matters here is
+      // the next line.
+      expect(byTask.other.tokenUsage.output).toBe(45);
+      // A claims c alone. Both a and b were charged to its mark by the record
+      // above, so neither is attributed twice.
+      expect(byTask.A.tokenUsage.output).toBe(9);
+    });
+
     it("reports an approximate delta when the marked message was compacted away", async () => {
       const before = await writeTranscript("t.jsonl", [message("a", 100), message("b", 50)]);
       await markNow("T1", before, "s-compact");

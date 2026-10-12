@@ -217,6 +217,15 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "watermark, then zeros. A missing transcript never fails the record — an\n" +
       "unrecorded run is worse than one missing its tokens.\n" +
       "\n" +
+      "A mark outranks the watermark, so marks nest: a review marked and\n" +
+      "recorded inside a task's still-open window is recorded first. Each\n" +
+      "record charges the span it claimed to the marks still outstanding that\n" +
+      "enclose it, and a mark's window is read less whatever was charged to it.\n" +
+      "The nested records therefore sum to the outer window rather than\n" +
+      "overlapping it — the inner span is attributed to the inner record, and\n" +
+      "the task keeps its own work from before and after. The record's note\n" +
+      "says how much was excluded and why.\n" +
+      "\n" +
       "--startedAt is the run's start time and nothing more: it never selects\n" +
       "usage. Omit it when a mark exists — the mark knows when the task began.\n" +
       "--since is an explicit time window for the rare case that needs one.\n" +
