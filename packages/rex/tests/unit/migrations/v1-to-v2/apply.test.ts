@@ -112,8 +112,9 @@ describe("buildV2Tree", () => {
   });
 
   describe("blockedBy a dissolved container", () => {
+    // Containers still open in v1, so the dependency is repointed rather than dropped.
     const WITH_BLOCKER: PRDItem[] = [
-      ...TREE,
+      ...TREE.map((i) => (i.id === "e2" || i.id === "e3" ? { ...i, status: "pending" as const } : i)),
       item("e4", "epic", "Follow-ups", [item("f6", "feature", "Tidy the cache", [], { status: "pending", blockedBy: ["e3", "e2"] })]),
     ];
 
@@ -129,15 +130,34 @@ describe("buildV2Tree", () => {
 
     it("is selectable once every child of the container is completed", async () => {
       const items: PRDItem[] = [
-        item("r1", "epic", "ndx 0.9.0", [item("f7", "feature", "Shipped thing", [item("t7", "task", "Ship it")])]),
+        // Every child completed, the epic itself never marked so: the repointed refs all resolve to completed nodes.
+        item("r1", "epic", "ndx 0.9.0", [item("f7", "feature", "Shipped thing", [item("t7", "task", "Ship it")])], { status: "pending" }),
         item("f8", "feature", "Next thing", [item("t8", "task", "Do it", [], { status: "pending", blockedBy: ["r1"] })], { status: "pending" }),
       ];
       const { tree } = buildV2Tree(items, await planOf(items));
       const blocked = byId(tree, "t8")!;
-      expect(blocked.blockedBy).not.toContain("r1");
+      expect(blocked.blockedBy).toEqual(["f7"]);
       // Pending v1 work lands in the Inbox; placing it is the operator's step, not this one's.
       for (const n of all(tree)) delete n.needsPlacement;
       expect(findActionableWork(tree).map((u) => u.node.id)).toContain("t8");
+    });
+
+    it("drops a completed container's ref and never repoints at a cancelled or deleted child", async () => {
+      const items: PRDItem[] = [
+        item("r2", "epic", "ndx 0.8.0", [
+          item("f9", "feature", "Shipped", []),
+          item("f10", "feature", "Cut from the release", [], { status: "cancelled" }),
+        ]),
+        item("r3", "epic", "ndx 1.0.0", [
+          item("f11", "feature", "Still open", [], { status: "pending" }),
+          item("f12", "feature", "Withdrawn", [], { status: "deleted" }),
+        ], { status: "pending" }),
+        item("f13", "feature", "After 0.8.0", [], { status: "pending", blockedBy: ["r2"] }),
+        item("f14", "feature", "After 1.0.0", [], { status: "pending", blockedBy: ["r3"] }),
+      ];
+      const { tree } = buildV2Tree(items, await planOf(items));
+      expect(byId(tree, "f13")!.blockedBy).toBeUndefined();
+      expect(byId(tree, "f14")!.blockedBy).toEqual(["f11"]);
     });
   });
 
