@@ -79,7 +79,22 @@ export function hasCacheWrites(runs: CountableRun[]): boolean {
  * A run pays its initial context write before it does any work, so a budget
  * below that write fails every run on arrival. Returns 0 only when no run in
  * the set wrote cache.
+ *
+ * The second step is an upper estimate of arrival cost, not a lower bound:
+ * `cacheCreationInput` sums a run's cache writes over every turn. It is safe
+ * to raise a budget to and unsafe to floor a reduction with — ask
+ * {@link contextWriteFloorFromCompletedRun} before using it that way. Kept in
+ * step with hench's copy by tests/e2e/token-cost-parity.test.js.
  */
+export function contextWriteFloorFromCompletedRun(runs: CountableRun[]): boolean {
+  return runs.some(
+    (run) =>
+      run.status === "completed" &&
+      (run.tokenUsage?.cacheCreationInput ?? 0) > 0 &&
+      runBudgetedTokens(run) > 0,
+  );
+}
+
 export function contextWriteFloor(runs: CountableRun[]): number {
   let completedFloor = 0;
   let cacheWriteFloor = 0;

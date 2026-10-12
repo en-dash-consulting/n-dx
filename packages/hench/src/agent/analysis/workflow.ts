@@ -8,6 +8,7 @@
 import type { RunRecord, RunStatus, HenchConfig } from "../../schema/index.js";
 import {
   contextWriteFloor,
+  contextWriteFloorFromCompletedRun,
   hasCacheWrites,
   highConsumptionThreshold,
   runBudgetedTokens,
@@ -65,6 +66,15 @@ export interface WorkflowStats {
    * See {@link contextWriteFloor}.
    */
   contextWriteFloor: number;
+
+  /**
+   * Whether {@link contextWriteFloor} came from a run that completed.
+   *
+   * When it did not, the number is the cheapest failed run's cache writes
+   * summed over every turn — an upper estimate of arrival cost. Safe to raise
+   * a budget to, unsafe to floor a reduction with.
+   */
+  contextWriteFloorFromCompletedRun: boolean;
   /**
    * Whether any run in the set wrote cache, whatever its status, and so
    * whether `avgTokensPerRun` carries cache writes. Separate from
@@ -119,6 +129,7 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
       avgTurns: 0,
       avgTokensPerRun: 0,
       contextWriteFloor: 0,
+      contextWriteFloorFromCompletedRun: false,
       promptCached: false,
       avgDurationMs: 0,
       failuresByStatus: {},
@@ -173,6 +184,7 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
     avgTurns,
     avgTokensPerRun,
     contextWriteFloor: contextWriteFloor(runs),
+    contextWriteFloorFromCompletedRun: contextWriteFloorFromCompletedRun(runs),
     promptCached: hasCacheWrites(runs),
     avgDurationMs,
     failuresByStatus,
@@ -210,9 +222,13 @@ function suggestTokenEfficiency(
       impact: "Reduces wasted tokens on tasks that are unlikely to succeed.",
       configChanges: config?.tokenBudget === 0
         ? {
+            // Only a floor measured from a completed run may raise this cap.
+            // The fallback is an upper estimate of arrival cost, and flooring
+            // a cap that exists to curb waste with it lifts the cap to the
+            // cheapest runaway's whole cache-write total.
             tokenBudget: Math.max(
               Math.round(stats.avgTokensPerRun * 0.7),
-              stats.contextWriteFloor,
+              stats.contextWriteFloorFromCompletedRun ? stats.contextWriteFloor : 0,
             ),
           }
         : undefined,

@@ -89,9 +89,14 @@ export function hasCacheWrites(runs: RunRecord[]): boolean {
  *    because a failed run's total also carries whatever work it managed
  *    before failing, which is not arrival cost.
  *
- * Step 2 is a weaker floor than step 1 and that is correct: it is a lower
- * bound on the arrival cost, so it under-constrains rather than proposing a
- * budget a run could not have survived.
+ * Step 2 is weaker than step 1, and not in the direction the first version of
+ * this comment claimed. `cacheCreationInput` is a run's cache writes summed
+ * over every turn, not the arrival write alone, so the cheapest failed run is
+ * at least the arrival cost and can be far above it: an upper estimate, not a
+ * lower bound. It is safe to raise a budget to, and unsafe to floor a
+ * *reduction* with — flooring the high-usage cap with it lifts the cap meant
+ * to curb waste up to the cheapest runaway's whole cache-write total. Ask
+ * {@link contextWriteFloorFromCompletedRun} before using it that way.
  *
  * Both steps are restricted to prompt-cached runs, because a run with no cache
  * writes never paid a context write; including the pre-caching records (one
@@ -103,6 +108,15 @@ export function hasCacheWrites(runs: RunRecord[]): boolean {
  * over-constrain it. Ask {@link hasCacheWrites}, not this, to find out whether
  * a run set is prompt-cached.
  */
+export function contextWriteFloorFromCompletedRun(runs: RunRecord[]): boolean {
+  return runs.some(
+    (run) =>
+      run.status === "completed" &&
+      (run.tokenUsage?.cacheCreationInput ?? 0) > 0 &&
+      runBudgetedTokens(run) > 0,
+  );
+}
+
 export function contextWriteFloor(runs: RunRecord[]): number {
   let completedFloor = 0;
   let cacheWriteFloor = 0;

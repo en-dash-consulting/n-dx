@@ -344,6 +344,35 @@ describe("neither tuner proposes a budget below the arrival cost", () => {
     expect(highUsage).toBeDefined();
     expect(highUsage!.configChanges?.["tokenBudget"]).toBe(floor);
   });
+
+  it("does not raise the cap to the fallback floor when no run completed", () => {
+    // Review finding on #677. With no completed run the floor is the cheapest
+    // failed run's cache writes summed over every turn — an upper estimate of
+    // arrival cost. Flooring the cap with it lifts the cap that exists to curb
+    // waste up to the cheapest runaway's whole cache-write total.
+    const runs = [
+      makeRun("r1", "failed", "2026-09-01T00:00:00Z",
+        { input: 900, output: 200_000, cacheCreationInput: 3_000_000, cacheReadInput: 40_000_000 }, 70),
+      makeRun("r2", "failed", "2026-09-02T00:00:00Z",
+        { input: 900, output: 210_000, cacheCreationInput: 3_400_000, cacheReadInput: 42_000_000 }, 72),
+      makeRun("r3", "failed", "2026-09-03T00:00:00Z",
+        { input: 900, output: 190_000, cacheCreationInput: 3_200_000, cacheReadInput: 41_000_000 }, 68),
+    ];
+    const stats = computeStats(runs);
+    expect(stats.contextWriteFloorFromCompletedRun).toBe(false);
+    expect(stats.contextWriteFloor).toBe(3_000_000);
+    expect(stats.successRate).toBeLessThan(0.5);
+
+    const analysis = analyzeWorkflow(runs, makeConfig({ tokenBudget: 0 }));
+    const highUsage = analysis.suggestions.find(
+      (s) => s.category === "token-efficiency" && s.priority === "high",
+    );
+    expect(highUsage).toBeDefined();
+    const proposed = highUsage!.configChanges?.["tokenBudget"] as number;
+    // The reduction the cap intends, not the floor.
+    expect(proposed).toBe(Math.round(stats.avgTokensPerRun * 0.7));
+    expect(proposed).toBeLessThan(stats.contextWriteFloor);
+  });
 });
 
 // ── High-usage threshold depends on whether cache writes were counted ──

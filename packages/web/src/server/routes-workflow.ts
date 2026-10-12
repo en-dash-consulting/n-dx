@@ -17,7 +17,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { completeConfigGroups, validateConfigConstraints } from "./hench-config-fields.js";
-import { contextWriteFloor, hasCacheWrites, highConsumptionThreshold, runBudgetedTokens } from "./token-cost.js";
+import { contextWriteFloor, contextWriteFloorFromCompletedRun, hasCacheWrites, highConsumptionThreshold, runBudgetedTokens } from "./token-cost.js";
 
 const WORKFLOW_PREFIX = "/api/hench/workflow/";
 
@@ -58,6 +58,7 @@ interface WorkflowStats {
    * clear. 0 only when no run wrote cache.
    */
   contextWriteFloor: number;
+  contextWriteFloorFromCompletedRun: boolean;
   /** Whether any run wrote cache, and so whether `avgTokensPerRun` carries writes. */
   promptCached: boolean;
   avgDurationMs: number;
@@ -196,6 +197,7 @@ function computeStats(runs: RunData[], config?: HenchConfigData | null): Workflo
   if (runs.length === 0) {
     return {
       successRate: 0, avgTurns: 0, avgTokensPerRun: 0, contextWriteFloor: 0,
+      contextWriteFloorFromCompletedRun: false,
       promptCached: false, avgDurationMs: 0,
       failuresByStatus: {}, troubleTaskIds: [], turnLimitHits: 0, budgetExceededCount: 0,
     };
@@ -233,7 +235,9 @@ function computeStats(runs: RunData[], config?: HenchConfigData | null): Workflo
 
   return {
     successRate, avgTurns, avgTokensPerRun,
-    contextWriteFloor: contextWriteFloor(runs), promptCached: hasCacheWrites(runs),
+    contextWriteFloor: contextWriteFloor(runs),
+    contextWriteFloorFromCompletedRun: contextWriteFloorFromCompletedRun(runs),
+    promptCached: hasCacheWrites(runs),
     avgDurationMs,
     failuresByStatus, troubleTaskIds, turnLimitHits, budgetExceededCount,
   };
@@ -269,7 +273,8 @@ function generateSuggestions(
         ? {
             tokenBudget: Math.max(
               Math.round(stats.avgTokensPerRun * 0.7),
-              stats.contextWriteFloor,
+              // Only a completed-run floor may raise this cap; see the hench copy.
+              stats.contextWriteFloorFromCompletedRun ? stats.contextWriteFloor : 0,
             ),
           }
         : undefined,
