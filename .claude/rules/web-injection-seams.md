@@ -5,26 +5,17 @@ paths:
 
 # Web injection seam registry
 
-Some cross-zone dependencies inside the web package use callback injection rather than
-gateway imports. These seams are invisible to static analysis tools
-(`boundary-check.test.ts`, `domain-isolation.test.js`) and must be listed explicitly to
-prevent future contributors from replacing injection with direct imports.
+The registry lives in the **"Web injection seam registry"** section of
+`packages/web/AGENTS.md`, which `packages/web/CLAUDE.md` imports — so Claude
+Code already has it loaded under this path. Read it there. It lists the
+callback-injection seams inside the web package that static analysis cannot
+see (`boundary-check.test.ts`, `domain-isolation.test.js` are blind to them),
+and the rules for adding one.
 
-| Injection site | Target module | Injected callbacks | Interface type |
-|----------------|---------------|---------------------|-----------------|
-| `src/server/start.ts` | `src/server/task-usage.ts` (barrel facade — re-exports from `task-usage/register-scheduler.ts`; import through the facade, not the subdirectory file directly) | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
-| `src/server/start.ts` | `src/server/workspaces.ts` (`WorkspaceRegistry`) | `setup(ctx)` → watchers + PRD cache for a worktree, `teardown(handles)` — built by `createWorkspaceHooks` in start.ts, which owns the watcher registration helpers; the registry must not import start.ts | `WorkspaceHooks` |
-| `src/server/start.ts` | `src/server/routes-live.ts` (also passed to `routes-live-analyze.ts`, which imports the type from routes-live) | `listWorkspaces()` → every worktree in the registry, `memoryFloorBytes()` (optional; defaults to the hub config) — built by `liveSourcesOf` in start.ts so the Live routes never import the workspace registry | `LiveSources` |
+This file exists only for its `paths:` scoping. Keep it a pointer: `.claude/`
+is read by Claude Code and by nothing else, so content kept here is invisible
+to Codex and every other assistant.
 
-Rules:
-- **Prefer injection over import** when the target module would otherwise need to import
-  from a higher-tier zone (e.g., scheduler importing from dashboard wiring).
-- **Document the interface type** — every injection seam must have a named TypeScript
-  interface (not inline parameter types) so that refactoring either side triggers a type
-  error.
-- **New seams** require an entry in this table and a named interface type in the target
-  module.
-
-If a package other than web adds an injection seam, create an analogous
-`.claude/rules/<package>-injection-seams.md` following this template — the pattern
-itself (and the "why" above) is not web-specific, only today's single instance is.
+A new package's seam registry goes in that package's own `AGENTS.md`, with its
+`CLAUDE.md` reduced to the `@AGENTS.md` import — `packages/llm-client/` is the
+reference pair. Do not add a `.claude/rules/` registry for it.

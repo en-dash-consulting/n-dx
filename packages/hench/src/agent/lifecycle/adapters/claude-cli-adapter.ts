@@ -111,6 +111,15 @@ export interface ClaudeCliInput {
   allowedTools: string[];
   modelOverride?: string;
   /**
+   * Effort level for the spawned session (`--effort <level>`).
+   *
+   * Already resolved by the caller through `resolveClaudeCliEffort`, which
+   * drops an unknown level or a model that does not accept one. Undefined
+   * when no `llm.effort` rule matched, and the flag is then omitted so Claude
+   * Code uses its own per-model default rather than one of ours.
+   */
+  effort?: string;
+  /**
    * Permission posture for the spawned session.
    *
    * When present, appended as `--permission-mode <mode>` to the CLI args.
@@ -193,6 +202,7 @@ export function buildClaudeCliArgs(
     // is the sole quoting authority — no manual wrapping here.
     ...(isWindows ? [input.allowedTools.join(",")] : input.allowedTools),
     ...(input.modelOverride ? ["--model", input.modelOverride] : []),
+    ...(input.effort ? ["--effort", input.effort] : []),
     ...(input.permissionMode ? ["--permission-mode", input.permissionMode] : []),
     // A file path, never inline JSON: an inline document would have to survive
     // cmd.exe quoting on Windows, the hazard the isWindows branches above work
@@ -471,6 +481,7 @@ export const claudeCliAdapter: VendorAdapter = {
       promptText: taskPrompt,
       allowedTools,
       modelOverride: opts.model,
+      effort: opts.effort,
       permissionMode: opts.permissionMode,
       resumeSessionId: opts.resumeSessionId,
       forkSession: opts.forkSession,

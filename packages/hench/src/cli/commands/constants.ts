@@ -39,7 +39,7 @@ export function usage(): void {
           { name: "config [key] [value]", description: "View or edit workflow configuration" },
           { name: "template [subcommand]", description: "Manage workflow templates (list, show, apply, save, delete)" },
           { name: "status [dir]", description: "Show recent run history" },
-          { name: "show <run-id> [dir]", description: "Show full details of a specific run" },
+          { name: "show <run-id> [dir]", description: "Show full details of a specific run; --repoint finds where its commits went after a rebase (--write applies)" },
           { name: "review pending <run-id>", description: "List findings an autonomous review deferred for capture" },
           { name: "cache [subcommand]", description: "Inspect or clear the session cache (list, clear)" },
           { name: "check-runs [dir]", description: "Audit runs recorded as running in every worktree; --fix ends dead ones" },

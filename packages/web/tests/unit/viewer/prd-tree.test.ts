@@ -298,6 +298,86 @@ describe("PRDTree", () => {
     expect(root.textContent).toContain("(1,000 self)");
   });
 
+  it("leads with cost, not the raw token total, when the rollup is priced", () => {
+    // The raw total counts cache reads, which bill at roughly a tenth of the
+    // input rate and outnumber everything else by an order of magnitude, so
+    // it reported tens of millions for runs that cost a few dollars.
+    const root = renderToDiv(h(PRDTree, {
+      document: sampleDoc,
+      defaultExpandDepth: 3,
+      showTokenBudget: true,
+      rollupById: {
+        "epic-1": {
+          self: { totalTokens: 1_000_000, runCount: 1, costUsd: 0.5 },
+          descendants: { totalTokens: 17_000_000, runCount: 3, costUsd: 3.75 },
+          total: {
+            totalTokens: 18_000_000,
+            runCount: 4,
+            inputTokens: 344,
+            outputTokens: 77_917,
+            cacheCreationTokens: 1_038_002,
+            cacheReadTokens: 16_928_230,
+            costUsd: 4.25,
+          },
+        },
+      },
+    }));
+
+    expect(root.textContent).toContain("$4.25");
+    expect(root.textContent).not.toContain("18,000,000 tokens");
+    expect(root.textContent).toContain("($0.50 self)");
+  });
+
+  it("puts the token accounting in the cell tooltip", () => {
+    const root = renderToDiv(h(PRDTree, {
+      document: sampleDoc,
+      defaultExpandDepth: 3,
+      showTokenBudget: true,
+      rollupById: {
+        "epic-1": {
+          self: { totalTokens: 0, runCount: 0, costUsd: 0 },
+          descendants: { totalTokens: 18_000_000, runCount: 4, costUsd: 4.25 },
+          total: {
+            totalTokens: 18_000_000,
+            runCount: 4,
+            inputTokens: 344,
+            outputTokens: 77_917,
+            cacheCreationTokens: 1_038_002,
+            cacheReadTokens: 16_928_230,
+            costUsd: 4.25,
+          },
+        },
+      },
+    }));
+
+    const badge = root.querySelector(".prd-token-badge");
+    const title = badge?.getAttribute("title") ?? "";
+    expect(title).toContain("$4.25 across 4 runs");
+    // New tokens and cache reads are reported apart, so the headline price
+    // and the token figure can be reconciled without leaving the row.
+    expect(title).toContain("1,116,263 new tokens");
+    expect(title).toContain("16,928,230 cache reads");
+  });
+
+  it("falls back to the token label when the rollup carries no cost", () => {
+    // A payload from a server built before the priced wire shape.
+    const root = renderToDiv(h(PRDTree, {
+      document: sampleDoc,
+      defaultExpandDepth: 3,
+      showTokenBudget: true,
+      rollupById: {
+        "epic-1": {
+          self: { totalTokens: 1000, runCount: 1 },
+          descendants: { totalTokens: 9000, runCount: 3 },
+          total: { totalTokens: 10_000, runCount: 4 },
+        },
+      },
+    }));
+
+    expect(root.textContent).toContain("10,000 tokens");
+    expect(root.textContent).not.toContain("$");
+  });
+
   it("does not render a duration cell on the tree row (duration lives in the detail flyout)", () => {
     const doc: PRDDocumentData = {
       schema: "rex/v1",

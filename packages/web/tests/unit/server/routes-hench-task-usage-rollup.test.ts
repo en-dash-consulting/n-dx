@@ -74,6 +74,30 @@ async function writePRD(
   await writeFile(join(rexDir, "prd.json"), JSON.stringify(doc), "utf-8");
 }
 
+/**
+ * Build an expected wire bucket.
+ *
+ * `costUsd` is asserted as "a number" rather than a literal: the exact figure
+ * depends on the price table, and pinning it here would turn a rate change
+ * into a failure in a test about rollup arithmetic. The pricing itself is
+ * covered in `incremental-task-usage.test.ts`.
+ */
+function bucket(
+  totalTokens: number,
+  runCount: number,
+  parts: { input?: number; output?: number; cacheCreation?: number; cacheRead?: number } = {},
+) {
+  return {
+    totalTokens,
+    runCount,
+    inputTokens: parts.input ?? 0,
+    outputTokens: parts.output ?? 0,
+    cacheCreationTokens: parts.cacheCreation ?? 0,
+    cacheReadTokens: parts.cacheRead ?? 0,
+    costUsd: expect.any(Number),
+  };
+}
+
 describe("GET /api/hench/task-usage — rollup", () => {
   let tmpDir: string;
   let runsDir: string;
@@ -137,37 +161,46 @@ describe("GET /api/hench/task-usage — rollup", () => {
     // Leaves carry only self attribution. Duration is zero because none of
     // these items have startedAt / activeIntervals recorded on the PRD.
     expect(data.rollup["task-a"]).toEqual({
-      self: { totalTokens: 225, runCount: 2 },
-      descendants: { totalTokens: 0, runCount: 0 },
-      total: { totalTokens: 225, runCount: 2 },
+      self: bucket(225, 2, { input: 150, output: 75 }),
+      descendants: bucket(0, 0),
+      total: bucket(225, 2, { input: 150, output: 75 }),
       duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
     expect(data.rollup["task-b"]).toEqual({
-      self: { totalTokens: 400, runCount: 1 },
-      descendants: { totalTokens: 0, runCount: 0 },
-      total: { totalTokens: 400, runCount: 1 },
+      self: bucket(400, 1, { input: 300, output: 100 }),
+      descendants: bucket(0, 0),
+      total: bucket(400, 1, { input: 300, output: 100 }),
       duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
 
     // Feature rolls up both tasks.
     expect(data.rollup["feature"]).toEqual({
-      self: { totalTokens: 0, runCount: 0 },
-      descendants: { totalTokens: 625, runCount: 3 },
-      total: { totalTokens: 625, runCount: 3 },
+      self: bucket(0, 0),
+      descendants: bucket(625, 3, { input: 450, output: 175 }),
+      total: bucket(625, 3, { input: 450, output: 175 }),
       duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
 
     // Epic rolls up the feature.
     expect(data.rollup["epic"]).toEqual({
-      self: { totalTokens: 0, runCount: 0 },
-      descendants: { totalTokens: 625, runCount: 3 },
-      total: { totalTokens: 625, runCount: 3 },
+      self: bucket(0, 0),
+      descendants: bucket(625, 3, { input: 450, output: 175 }),
+      total: bucket(625, 3, { input: 450, output: 175 }),
       duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
 
     // Flat taskUsage is still present for backward compatibility.
-    expect(data.taskUsage["task-a"]).toEqual({ totalTokens: 225, runCount: 2 });
-    expect(data.taskUsage["task-b"]).toEqual({ totalTokens: 400, runCount: 1 });
+    expect(data.taskUsage["task-a"]).toMatchObject({ totalTokens: 225, runCount: 2 });
+    expect(data.taskUsage["task-b"]).toMatchObject({ totalTokens: 400, runCount: 1 });
+
+    // Cost rolls up the same way tokens do: a container's total is its own
+    // plus every descendant's, to the cent.
+    const epic = data.rollup["epic"];
+    expect(epic.total.costUsd).toBeCloseTo(
+      data.rollup["task-a"].total.costUsd + data.rollup["task-b"].total.costUsd,
+      10,
+    );
+    expect(epic.total.costUsd).toBeGreaterThan(0);
   });
 
   it("includes self and descendant counts when a container also has its own runs", async () => {
@@ -188,9 +221,9 @@ describe("GET /api/hench/task-usage — rollup", () => {
     const data = await res.json();
 
     expect(data.rollup["feature"]).toEqual({
-      self: { totalTokens: 20, runCount: 1 },
-      descendants: { totalTokens: 50, runCount: 1 },
-      total: { totalTokens: 70, runCount: 2 },
+      self: bucket(20, 1, { input: 10, output: 10 }),
+      descendants: bucket(50, 1, { input: 30, output: 20 }),
+      total: bucket(70, 2, { input: 40, output: 30 }),
       duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
   });
@@ -202,9 +235,9 @@ describe("GET /api/hench/task-usage — rollup", () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/task-usage`);
     const data = await res.json();
     expect(data.rollup["lonely"]).toEqual({
-      self: { totalTokens: 0, runCount: 0 },
-      descendants: { totalTokens: 0, runCount: 0 },
-      total: { totalTokens: 0, runCount: 0 },
+      self: bucket(0, 0),
+      descendants: bucket(0, 0),
+      total: bucket(0, 0),
       duration: { totalMs: 0, runningMs: 0, isRunning: false },
     });
   });

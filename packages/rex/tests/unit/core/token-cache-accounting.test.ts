@@ -3,7 +3,7 @@
  *
  * Run records carry four token fields — input, output, cacheCreationInput,
  * cacheReadInput — but every rollup summed only the first two. Measured on
- * this repo before the fix: `ndx usage` reported 1,212,931 tokens and $18.00
+ * this repo before the fix: `ndx usage` reported 1,212,931 tokens and $12.00
  * across 1,024 runs while a single run record held 22,785,751 cacheReadInput
  * tokens, 99.5% of that run's usage. `hench record` printed the cache-inclusive
  * total, so two surfaces disagreed ~50x on identical data.

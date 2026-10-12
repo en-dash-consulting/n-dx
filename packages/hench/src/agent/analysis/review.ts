@@ -1,5 +1,6 @@
 import { createInterface } from "node:readline";
 import { execStdout } from "../../process/exec.js";
+import { matchesProjectPath } from "../../store/artifacts.js";
 import { section, subsection, info } from "../../types/output.js";
 
 /**
@@ -58,25 +59,27 @@ export interface PairReviewScope {
  * commit the run started at, or `HEAD` when it could not be captured) and the
  * list of changed files, untracked ones included.
  *
- * Paths under the run's own bookkeeping directories (`.rex/`, `.hench/`,
- * `.ndx/`) are left out: the task's status flip and the review report live
- * there, and neither is the change under review.
+ * Paths in `bookkeepingPaths` — hench's own state and rex's records, see
+ * `BOOKKEEPING_PATHS` in `store/paths.ts` — are left out: the task's status
+ * flip and the review report live there, and neither is the change under
+ * review. Matched through {@link matchesProjectPath}: an entry with a trailing
+ * slash covers everything beneath it, the rest are exact files.
  */
 export async function collectPairReviewScope(
   projectDir: string,
   base: string | undefined,
-  bookkeepingPrefixes: readonly string[],
+  bookkeepingPaths: readonly string[],
   timeout = DEFAULT_TIMEOUT,
 ): Promise<PairReviewScope> {
   const ref = base ?? "HEAD";
-  const exclude = bookkeepingPrefixes.map((prefix) => `:(exclude)${prefix}`);
+  const exclude = bookkeepingPaths.map((path) => `:(exclude)${path.replace(/\/$/, "")}`);
   const pathspec = ["--", ".", ...exclude];
   const [diff, names, untracked] = await Promise.all([
     execStdout("git", ["diff", ref, ...pathspec], { cwd: projectDir, timeout }),
     execStdout("git", ["diff", "--name-only", ref, ...pathspec], { cwd: projectDir, timeout }),
     listUntrackedPaths(projectDir, timeout),
   ]);
-  const isBookkeeping = (path: string): boolean => bookkeepingPrefixes.some((prefix) => path.startsWith(prefix));
+  const isBookkeeping = (path: string): boolean => matchesProjectPath(path, bookkeepingPaths);
   const changedFiles = [
     ...new Set([...names.split("\n").map((l) => l.trim()).filter(Boolean), ...untracked.filter((p) => !isBookkeeping(p))]),
   ].sort();

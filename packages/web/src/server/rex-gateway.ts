@@ -89,11 +89,11 @@ export { computeTimestampUpdates } from "@n-dx/rex";
 
 // ---- Rex per-item token rollup ----------------------------------------------
 // Only the symbols actively consumed by the web server route handler
-// are re-exported through the gateway. ItemTokenTuple, ItemRunTokens, and
-// ItemTokenAggregation live in rex's public API but are not (yet)
-// consumed by web — if a future route needs them, add the re-export here.
+// are re-exported through the gateway. ItemTokenAggregation lives in rex's
+// public API but is not (yet) consumed by web — if a future route needs it,
+// add the re-export here.
 export { aggregateItemTokenUsage } from "@n-dx/rex";
-export type { ItemTokenTotals } from "@n-dx/rex";
+export type { ItemTokenTotals, ItemTokenTuple, ItemRunTokens } from "@n-dx/rex";
 
 // ---- Rex per-model cost estimation -------------------------------------------
 // The dashboard keeps its own event aggregation (it has a `web` bucket rex's
