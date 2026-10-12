@@ -93,9 +93,13 @@ export interface CompletionRequest {
   timeoutMs?: number;
   /**
    * The `llm.effort` value matched for this call's task class
-   * (`TaskModelResolution.effort`). Only the Claude API provider reads it,
-   * through `resolveClaudeApiEffort`, which validates it and applies the
-   * per-model default; other providers ignore it.
+   * (`TaskModelResolution.effort`).
+   *
+   * The Claude API provider reads it through `resolveClaudeApiEffort`, which
+   * validates it and applies the per-model default. The Claude CLI provider
+   * reads it through `resolveClaudeCliEffort` and passes `--effort`, sharing
+   * the validation but not the default — Claude Code picks its own. Other
+   * providers ignore it.
    */
   effort?: string;
   /** Task class of the call, named in effort warnings. */

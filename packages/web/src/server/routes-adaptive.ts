@@ -31,6 +31,7 @@ import {
   setConfigValue as setNestedValue,
 } from "./hench-config-fields.js";
 import { resolveActiveVendor } from "./routes-llm.js";
+import { contextWriteFloor, runBudgetedTokens } from "./token-cost.js";
 
 const ADAPTIVE_PREFIX = "/api/hench/adaptive/";
 
@@ -50,7 +51,16 @@ interface ProjectMetrics {
   totalRuns: number;
   recentSuccessRate: number;
   recentAvgTurns: number;
+  /**
+   * Average tokens per run over the recent window, in the units
+   * `checkTokenBudget` enforces (uncached input + cache writes + output).
+   */
   recentAvgTokens: number;
+  /**
+   * Lowest observed arrival cost in the window — the floor a proposed
+   * `tokenBudget` must clear. 0 only when no run in the window wrote cache.
+   */
+  contextWriteFloor: number;
   recentAvgDurationMs: number;
   recentTaskCount: number;
   runsPerDay: number;
@@ -202,13 +212,18 @@ function saveAdaptiveState(projectDir: string, state: AdaptiveState): void {
   );
 }
 
-// ── Analysis engine (self-contained) ─────────────────────────────────
+// ── Analysis engine ──────────────────────────────────────────────────
+//
+// The counting rule, the arrival-cost floor and the high-consumption
+// thresholds come from ./token-cost.js — a deliberate port of hench's
+// token-cost.ts, kept honest by tests/e2e/token-cost-parity.test.js. This
+// engine used to count `input + output`, which on a prompt-cached run is
+// roughly a twelfth of what `checkTokenBudget` enforces, so every proposal
+// below was in different units from the budget it was proposing.
 
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded"]);
 
-function totalTokens(run: RunData): number {
-  return (run.tokenUsage.input ?? 0) + (run.tokenUsage.output ?? 0);
-}
+const totalTokens = runBudgetedTokens;
 
 function runDurationMs(run: RunData): number {
   if (!run.finishedAt) return 0;
@@ -221,7 +236,7 @@ function collectMetrics(runs: RunData[], windowSize: number = 20): ProjectMetric
   if (runs.length === 0) {
     return {
       timestamp: now, totalRuns: 0, recentSuccessRate: 0, recentAvgTurns: 0,
-      recentAvgTokens: 0, recentAvgDurationMs: 0, recentTaskCount: 0,
+      recentAvgTokens: 0, contextWriteFloor: 0, recentAvgDurationMs: 0, recentTaskCount: 0,
       runsPerDay: 0, successRateTrend: 0, tokenUsageTrend: 0,
     };
   }
@@ -273,7 +288,7 @@ function collectMetrics(runs: RunData[], windowSize: number = 20): ProjectMetric
 
   return {
     timestamp: now, totalRuns: runs.length, recentSuccessRate, recentAvgTurns,
-    recentAvgTokens, recentAvgDurationMs, recentTaskCount, runsPerDay,
+    recentAvgTokens, contextWriteFloor: contextWriteFloor(recent), recentAvgDurationMs, recentTaskCount, runsPerDay,
     successRateTrend, tokenUsageTrend,
   };
 }
@@ -327,7 +342,9 @@ function generateAdjustments(
     tokenBudget > 0 &&
     !settings.lockedKeys.includes("tokenBudget")
   ) {
-    const proposed = Math.round(tokenBudget * 1.3);
+    // Never below the measured arrival cost: a budget under the context
+    // write fails every run before it does any work.
+    const proposed = Math.max(Math.round(tokenBudget * 1.3), metrics.contextWriteFloor);
     adjustments.push({
       id: nextId("complexity-scaling"),
       category: "complexity-scaling",
@@ -420,7 +437,10 @@ function generateAdjustments(
     metrics.recentSuccessRate > 0.7 &&
     !settings.lockedKeys.includes("tokenBudget")
   ) {
-    const proposed = Math.round(metrics.recentAvgTokens * 2.5);
+    const proposed = Math.max(
+      Math.round(metrics.recentAvgTokens * 2.5),
+      metrics.contextWriteFloor,
+    );
     if (proposed < tokenBudget) {
       adjustments.push({
         id: nextId("efficiency-tuning"),
@@ -532,7 +552,15 @@ export function handleAdaptiveRoute(
     const notifications: AdjustmentNotification[] = adjustments.map((adj) => ({
       id: `notif-${adj.id}`,
       timestamp: now,
-      type: state.settings.enabled && adj.autoApplicable ? "auto-applied" as const : "recommended" as const,
+      // Always "recommended". Nothing in this server applies an adjustment:
+      // the config is written only when the operator presses Apply, which
+      // posts /api/hench/adaptive/apply with `automatic: false`
+      // (viewer/views/adaptive-optimization.ts). Labelling a proposal
+      // "auto-applied" because adaptive mode is enabled — which it is by
+      // default — presented an unapplied number as already vetted and in
+      // force, and these proposals are exactly the ones an operator needs to
+      // look at before applying.
+      type: "recommended" as const,
       adjustment: adj,
       reason: adj.rationale,
     }));

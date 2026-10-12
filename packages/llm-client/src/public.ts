@@ -192,6 +192,7 @@ export {
   isClaudeEffort,
   supportsClaudeEffort,
   resolveClaudeApiEffort,
+  resolveClaudeCliEffort,
   resetClaudeEffortWarnings,
 } from "./claude-effort.js";
 export type { ClaudeEffort } from "./claude-effort.js";
@@ -229,6 +230,9 @@ export type {
   TokenParseResult,
   CodexTokenMapping,
 } from "./token-usage.js";
+
+// Usage de-duplication — one vendor message counted once
+export { usageMessageId, UsageMessageFilter } from "./usage-dedup.js";
 
 // Token usage accumulation (shared by rex and hench)
 export {

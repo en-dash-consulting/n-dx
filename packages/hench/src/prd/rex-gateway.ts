@@ -189,8 +189,17 @@ export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "@n-dx/re
 // act on ones it would refuse.
 export { validateRunSettings } from "@n-dx/rex";
 
+// ---- Commit re-pointing -----------------------------------------------------
+// Run records store SHAs (`commits[].sha`, `startHead`, the review's
+// `repairCommit`) and a stack rebase or a squash merge rewrites every one of
+// them. Rex owns the matching rules — on-main, author-date-subject, patch-id,
+// trailer-subject, and an optional host lookup — because a change's own
+// commits need the same treatment. Reimplementing them here would be a second
+// set of rules that could disagree with rex's about which commit a SHA became.
+export { repointCommits } from "@n-dx/rex";
+
 // ---- Type re-exports --------------------------------------------------------
 // All type imports from rex must flow through this gateway to prevent
 // type-import promotion erosion (a type import can be promoted to a
 // runtime import during refactoring, silently bypassing the gateway).
-export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason, SaveFileReport, TraversalBlock, RunSettings } from "@n-dx/rex";
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason, SaveFileReport, TraversalBlock, RunSettings, RepointMatch, RepointMiss, RepointResult } from "@n-dx/rex";
