@@ -210,7 +210,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           }
         },
         "run": {
-          "description": "Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes.",
+          "description": "Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewMode (off|self|pair), reviewVendor (claude|codex: the pair reviewer), reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes.",
           "type": "object",
           "properties": {
             "tier": {
@@ -247,6 +247,21 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
             },
             "review": {
               "type": "boolean"
+            },
+            "reviewMode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "self",
+                "pair"
+              ]
+            },
+            "reviewVendor": {
+              "type": "string",
+              "enum": [
+                "claude",
+                "codex"
+              ]
             },
             "reviewTier": {
               "type": "string",
@@ -484,7 +499,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           }
         },
         "run": {
-          "description": "Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes.",
+          "description": "Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewMode (off|self|pair), reviewVendor (claude|codex: the pair reviewer), reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes.",
           "anyOf": [
             {
               "type": "object",
@@ -523,6 +538,21 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
                 },
                 "review": {
                   "type": "boolean"
+                },
+                "reviewMode": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "self",
+                    "pair"
+                  ]
+                },
+                "reviewVendor": {
+                  "type": "string",
+                  "enum": [
+                    "claude",
+                    "codex"
+                  ]
                 },
                 "reviewTier": {
                   "type": "string",

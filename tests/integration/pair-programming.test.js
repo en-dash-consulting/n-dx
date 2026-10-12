@@ -21,6 +21,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, chmodSync 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+const { recordRepoTrust } = await import("../../packages/llm-client/dist/public.js");
+
 // Import from built dist/ so we test the compiled module boundary, not source.
 // The test runner is invoked after `pnpm build` (see globalSetup).
 const {
@@ -41,9 +43,12 @@ const {
   writeNdxContextFile,
   parseReviewerOutput,
   buildRemediationContext,
+  buildReviewerArgs,
+  runReviewRounds,
 } = await import(
   "../../packages/core/pair-programming.js"
 );
+const { readReviewerSettings } = await import("../../packages/core/config.js");
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -132,9 +137,12 @@ describe("reviewer credential containment", () => {
     vi.stubEnv("TYPESAFE_API_KEY", "fixture-jev");
     vi.stubEnv(authName, "fixture-exported");
     writeNdxConfig(tmpDir, { llm: { [reviewer]: { api_key: "fixture-configured" } }, hench: { guard: { env: { allow: ["TYPESAFE_API_KEY"] } } } });
+    // The allow list is repository-supplied, so it applies only once trusted.
+    const ndxHome = join(tmpDir, "ndx-home");
+    recordRepoTrust(tmpDir, { ndxHome });
     const envPath = join(tmpDir, "captured-env.json");
     const cliPath = makeNodeScript(tmpDir, "env-reviewer", `require("node:fs").writeFileSync(${JSON.stringify(envPath)}, JSON.stringify({ fake: process.env.FAKE_SERVICE_API_KEY, github: process.env.GITHUB_TOKEN, jev: process.env.TYPESAFE_API_KEY, auth: process.env[${JSON.stringify(authName)}] }));`);
-    const result = await run({ cliPath, prompt: "review", dir: tmpDir, reviewer });
+    const result = await run({ cliPath, prompt: "review", dir: tmpDir, reviewer, trust: { ndxHome } });
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(readFileSync(envPath, "utf-8"))).toEqual({ jev: "fixture-jev", auth: "fixture-configured" });
     expect(process.env.FAKE_SERVICE_API_KEY).toBe("fixture-secret");
@@ -207,6 +215,23 @@ describe("resolveVendorCliPath", () => {
       claude: { cli_path: "/old/claude" },
     });
     expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/new/claude");
+  });
+
+  it("uses a cli_path set only in .n-dx.local.json", () => {
+    writeFileSync(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { codex: { cli_path: "/local/codex" } } }), "utf-8");
+    expect(resolveVendorCliPath(tmpDir, "codex")).toBe("/local/codex");
+  });
+
+  it("prefers .n-dx.local.json over .n-dx.json", () => {
+    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/shared/claude" } } });
+    writeFileSync(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { claude: { cli_path: "/local/claude" } } }), "utf-8");
+    expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/local/claude");
+  });
+
+  it("falls through to .n-dx.json when the local file has no cli_path for the vendor", () => {
+    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/shared/claude" } } });
+    writeFileSync(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { codex: { cli_path: "/local/codex" } } }), "utf-8");
+    expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/shared/claude");
   });
 });
 
@@ -1187,5 +1212,140 @@ describe("runCrossVendorReview — feedback in llm-review result", () => {
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "claude" });
     expect(result.feedback.passed).toBe(false);
     expect(result.feedback.errors).toContain("broken import");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Configured reviewer vendor, model and rounds
+// ---------------------------------------------------------------------------
+
+function writeHenchConfig(dir, config) {
+  const henchDir = join(dir, ".hench");
+  mkdirSync(henchDir, { recursive: true });
+  writeFileSync(join(henchDir, "config.json"), JSON.stringify(config), "utf-8");
+}
+
+describe("resolveReviewerVendor — configured reviewer", () => {
+  it("uses the configured vendor when it is not the primary", () => {
+    expect(resolveReviewerVendor("claude", "codex")).toBe("codex");
+    expect(resolveReviewerVendor("codex", "claude")).toBe("claude");
+  });
+
+  it("falls back to the default when the configured vendor is the primary, unset or unknown", () => {
+    expect(resolveReviewerVendor("claude", "claude")).toBe("codex");
+    expect(resolveReviewerVendor("codex", undefined)).toBe("claude");
+    expect(resolveReviewerVendor("codex", "gemini")).toBe("claude");
+  });
+});
+
+describe("buildReviewerArgs", () => {
+  it("adds --model for codex only when a model is given", () => {
+    expect(buildReviewerArgs("codex", "gpt-5-codex")).toEqual(["exec", "--model", "gpt-5-codex", "-"]);
+    expect(buildReviewerArgs("codex")).toEqual(["exec", "-"]);
+  });
+
+  it("adds --model for claude only when a model is given", () => {
+    expect(buildReviewerArgs("claude", "opus")).toEqual(["-p", "-", "--model", "opus"]);
+    expect(buildReviewerArgs("claude")).toEqual(["-p", "-"]);
+  });
+
+  it("spawns the reviewer with --model when a model is passed", async () => {
+    const argvFile = join(tmpDir, "argv.json");
+    const script = makeNodeScript(
+      tmpDir,
+      "argv-reviewer",
+      `if (process.argv[2] === '--version') { console.log('mock 1.0.0'); process.exit(0); }\n` +
+        `require('node:fs').writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify(process.argv.slice(2)));\n` +
+        `process.exit(0);\n`,
+    );
+    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: script } } });
+
+    const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "codex", model: "gpt-5-codex" });
+
+    expect(JSON.parse(readFileSync(argvFile, "utf-8"))).toEqual(["exec", "--model", "gpt-5-codex", "-"]);
+    expect(result.model).toBe("gpt-5-codex");
+    expect(formatReviewBanner("codex", result)).toContain("Reviewer (codex, gpt-5-codex)");
+  });
+});
+
+describe("readReviewerSettings", () => {
+  it("reads vendor and rounds from hench.review and the model from llm.<reviewer>.reviewModel", async () => {
+    writeHenchConfig(tmpDir, { review: { vendor: "codex", rounds: 3 } });
+    writeNdxConfig(tmpDir, { llm: { reviewModel: "shared", codex: { reviewModel: "gpt-5-codex" } } });
+
+    const s = await readReviewerSettings(tmpDir, "claude");
+
+    expect(s).toMatchObject({ vendor: "codex", rounds: 3, warnings: [] });
+    expect(s.modelFor("codex")).toBe("gpt-5-codex");
+    expect(s.modelFor("claude")).toBe("shared");
+  });
+
+  it("defaults to 2 rounds, no vendor and no model", async () => {
+    const s = await readReviewerSettings(tmpDir, "claude");
+
+    expect(s).toMatchObject({ vendor: undefined, rounds: 2, warnings: [] });
+    expect(s.modelFor("codex")).toBeUndefined();
+  });
+
+  it("warns and falls back when the vendor is the primary", async () => {
+    writeHenchConfig(tmpDir, { review: { vendor: "claude" } });
+
+    const s = await readReviewerSettings(tmpDir, "claude");
+
+    expect(s.vendor).toBeUndefined();
+    expect(s.warnings).toHaveLength(1);
+    expect(s.warnings[0]).toContain("hench.review.vendor");
+  });
+
+  it("warns and falls back on an unknown vendor or out-of-range rounds", async () => {
+    writeHenchConfig(tmpDir, { review: { vendor: "gemini", rounds: 9 } });
+
+    const s = await readReviewerSettings(tmpDir, "claude");
+
+    expect(s).toMatchObject({ vendor: undefined, rounds: 2 });
+    expect(s.warnings).toHaveLength(2);
+  });
+});
+
+describe("runReviewRounds", () => {
+  const failing = { skipped: false, passed: false, feedback: { passed: false } };
+  const passing = { skipped: false, passed: true, feedback: { passed: true } };
+
+  it("with 2 rounds and reviews that keep failing: two remediation passes, then the final verdict", async () => {
+    const reviews = [];
+    const remediations = [];
+    const { result, remediationPasses } = await runReviewRounds({
+      rounds: 2,
+      review: async (round) => { reviews.push(round); return failing; },
+      remediate: async (_r, pass) => { remediations.push(pass); },
+    });
+
+    expect(reviews).toEqual([1, 2, 3]);
+    expect(remediations).toEqual([1, 2]);
+    expect(remediationPasses).toBe(2);
+    expect(result).toBe(failing);
+  });
+
+  it("stops early when a review passes", async () => {
+    const outcomes = [failing, passing];
+    const remediations = [];
+    const { result, remediationPasses } = await runReviewRounds({
+      rounds: 3,
+      review: async (round) => outcomes[round - 1],
+      remediate: async (_r, pass) => { remediations.push(pass); },
+    });
+
+    expect(remediations).toEqual([1]);
+    expect(remediationPasses).toBe(1);
+    expect(result).toBe(passing);
+  });
+
+  it("never remediates with 0 rounds, or when the review is skipped or has no feedback", async () => {
+    for (const [rounds, first] of [[0, failing], [2, { skipped: true }], [2, { skipped: false, passed: false }]]) {
+      const remediate = vi.fn();
+      const { remediationPasses } = await runReviewRounds({ rounds, review: async () => first, remediate });
+      expect(remediate).not.toHaveBeenCalled();
+      expect(remediationPasses).toBe(0);
+    }
   });
 });

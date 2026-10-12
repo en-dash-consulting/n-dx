@@ -11,6 +11,8 @@ export function prepFixture(overrides: Partial<PrepResponse> = {}): PrepResponse
       provider: { value: "api", source: "hench.provider" },
       permissionMode: { value: "acceptEdits", source: "autonomous-default" },
       review: { value: false, source: "built-in" },
+      reviewMode: { value: "off", source: "built-in" },
+      reviewVendor: { value: "codex", source: "built-in" },
       reviewModel: { value: "claude-sonnet", source: "llm.claude.reviewModel", vendorDefault: "claude-opus" },
       reviewOptional: { value: false, source: "built-in" },
       skipTestGate: { value: false, source: "built-in" },
@@ -25,6 +27,7 @@ export function prepFixture(overrides: Partial<PrepResponse> = {}): PrepResponse
     // entries a `fallback` as hench does.
     saved: null,
     savedVersion: "none",
+    pairSupported: true,
     options: [{ key: "provider", values: ["cli", "api"] }],
     refusals: [],
     dir: "/repo",

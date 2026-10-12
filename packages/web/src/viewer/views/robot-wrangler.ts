@@ -7,10 +7,12 @@
  * `effectiveProblems` it would refuse on). Renders on the shared SettingsFrame,
  * which owns Save, the dirty indicator and the leave-with-unsaved-changes prompt.
  *
- * Data: GET /api/llm/config (read) · PUT /api/llm/config (update)
+ * Data: GET /api/llm/config (read) · PUT /api/llm/config (update) ·
+ * POST /api/llm/config/preview (what unsaved edits would resolve to; writes nothing)
  */
 
 import { h } from "preact";
+import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { PixelIcon, SettingsFrame } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
@@ -40,6 +42,17 @@ interface LocalVendorConfig {
   verifier: LocalVerifierVendorConfig;
 }
 
+interface FailoverInfo {
+  /** Whether automatic failover is enabled in the config. */
+  enabled: boolean;
+  /** Whether failover can fire for this config (true only for Claude + API). */
+  applies: boolean;
+  /** Why applies is false (empty when applies is true). */
+  reason?: string;
+  /** The effective model followed by the next three models in the failover chain. */
+  chain: string[];
+}
+
 interface LlmConfigResponse {
   vendor: string | null;
   claude: VendorConfig;
@@ -57,8 +70,34 @@ interface LlmConfigResponse {
   agentModels: Partial<Record<string, string>>;
   /** What `ndx work` runs with no flags, resolved server-side. */
   effective: EffectiveConfig;
+  /** One row per model tier of `effective.vendor`: its model, the key that set it, and who uses it. */
+  tiers?: TierRow[];
   /** Why `ndx work` would refuse `effective`; empty when it would run. */
   effectiveProblems: EffectiveProblem[];
+  /** Failover chain information; absent from an older server or a partial response. */
+  failover?: FailoverInfo;
+  /** The review pass as the server resolved it; absent from an older server or a partial response. */
+  review?: ReviewInfo;
+}
+
+/** What `POST /api/llm/config/preview` returns: the resolved parts of the config response, plus refused edits. */
+interface LlmPreviewResponse
+  extends Pick<LlmConfigResponse, "effective" | "effectiveProblems" | "tiers" | "failover" | "review"> {
+  /** Edits the server left out of the resolution, each with the reason PUT would refuse it. */
+  editProblems?: Array<{ path: string; message: string }>;
+}
+
+/** Mirrors the server's `ReviewInfo`. */
+interface ReviewInfo {
+  mode: { value: string };
+  /** The pair reviewer; null when unset and the active vendor has no CLI counterpart. */
+  vendor: { value: string | null };
+  rounds: { value: number };
+  /** Each vendor that can review, with its reviewer model and the key that set it. */
+  models: Partial<Record<string, { model: string; source: "vendor-config" | "shared-config" | "vendor-default" }>>;
+  available: boolean;
+  unavailableReason?: string;
+  pairSupported: boolean;
 }
 
 interface EffectiveConfig {
@@ -66,6 +105,18 @@ interface EffectiveConfig {
   provider: string;
   model: string;
   modelSource: "hench-override" | "configured" | "default";
+}
+
+type TierName = "agent" | "standard" | "light" | "heavy" | "free";
+
+/** Mirrors the server's `TierRow`; `free` is present only once it is set. */
+interface TierRow {
+  tier: TierName;
+  /** Fully-qualified model the tier resolves to. */
+  model: string;
+  /** The config key that supplied `model`, or `catalog default`. */
+  source: string;
+  usedBy: Array<{ taskClass?: string; label: string }>;
 }
 
 interface EffectiveProblem {
@@ -93,6 +144,16 @@ interface CatalogEntry {
   reachable?: boolean;
   reason?: string;
   cli?: CliInfo;
+  /** Whether the vendor can run as configured; `summary` is shown on its card as-is. */
+  readiness?: VendorReadiness;
+}
+
+/** Mirrors the server's `VendorReadiness`: the card shows `summary` and colours by `state`. */
+interface VendorReadiness {
+  state: "ready" | "needs-setup" | "unreachable";
+  summary: string;
+  /** Whether an API key resolves; omitted where no key applies. */
+  apiKey?: boolean;
 }
 
 type LlmCatalog = Record<ViewerLLMVendor, CatalogEntry>;
@@ -112,6 +173,8 @@ interface SmokeTestResult {
   reply: string | null;
   error?: string;
   url: string;
+  /** Models the tested server lists; null when it could not be read, absent from an older server. */
+  modelCount?: number | null;
 }
 
 interface LocalProfile {
@@ -131,17 +194,6 @@ const VIEWER_LLM_VENDOR = {
 } as const;
 
 type ViewerLLMVendor = typeof VIEWER_LLM_VENDOR[keyof typeof VIEWER_LLM_VENDOR];
-type CloudViewerVendor =
-  | typeof VIEWER_LLM_VENDOR.CLAUDE
-  | typeof VIEWER_LLM_VENDOR.CODEX
-  | typeof VIEWER_LLM_VENDOR.GOOGLE;
-
-/** Vendors configured through the generic cloud VendorSection (model + lightModel). */
-const CLOUD_VENDORS: ReadonlySet<string> = new Set<string>([
-  VIEWER_LLM_VENDOR.CLAUDE,
-  VIEWER_LLM_VENDOR.CODEX,
-  VIEWER_LLM_VENDOR.GOOGLE,
-]);
 
 const VENDORS = [
   { id: VIEWER_LLM_VENDOR.CLAUDE, label: "Claude", subtitle: "Anthropic" },
@@ -156,6 +208,49 @@ const OTHER_MODEL = "__other__";
 /** editValues key for the agent model override of one vendor (saved as `hench.models.<vendor>`). */
 const AGENT_KEY_PREFIX = "agent.";
 const agentKey = (vendor: string): string => `${AGENT_KEY_PREFIX}${vendor}`;
+
+/**
+ * editValues key of a tier row. Saving writes `llm.<key>` — except the agent
+ * row, whose key is `agent.<vendor>` and saves as `hench.models.<vendor>`.
+ */
+function tierKey(vendor: string, tier: TierName): string {
+  switch (tier) {
+    case "agent": return agentKey(vendor);
+    case "standard": return `${vendor}.model`;
+    case "light": return `${vendor}.lightModel`;
+    default: return `tiers.${vendor}.${tier}`;
+  }
+}
+
+/** The config key a tier row writes, as `Set in …` names it. */
+function tierConfigPath(vendor: string, tier: TierName): string {
+  const key = tierKey(vendor, tier);
+  return tier === "agent" ? `hench.models.${vendor}` : `llm.${key}`;
+}
+
+/** The value saved for a tier row, `""` when unset. */
+function savedTierValue(data: LlmConfigResponse, vendor: string, row: TierRow): string {
+  switch (row.tier) {
+    case "agent": return data.agentModels?.[vendor] ?? "";
+    case "standard": return data[vendor as ViewerLLMVendor]?.model ?? "";
+    case "light": return data[vendor as ViewerLLMVendor]?.lightModel ?? "";
+    // The response carries no raw heavy/free value: the row is set exactly when it names its own key.
+    default: return row.source === tierConfigPath(vendor, row.tier) ? row.model : "";
+  }
+}
+
+const TIER_LABEL: Record<TierName, string> = {
+  agent: "Agent model",
+  standard: "Standard",
+  light: "Light",
+  heavy: "Heavy",
+  free: "Free",
+};
+
+/** A local server runs one loaded model, so its Standard tier reads as the Primary one. */
+function tierLabel(vendor: string, tier: TierName): string {
+  return vendor === VIEWER_LLM_VENDOR.LOCAL && tier === "standard" ? "Primary" : TIER_LABEL[tier];
+}
 
 /** editValues key for the hench provider (saved through PUT /api/hench/config, not the llm route). */
 const PROVIDER_KEY = "provider";
@@ -184,47 +279,149 @@ function resolveProviderField(
   return { value, dirty: value !== saved && !(forcedApi && picked === undefined) };
 }
 
-// ── Vendor selector (segmented control) ───────────────────────────────
+// ── Radio cards ────────────────────────────────────────────────────────
 
-function VendorSelector({
+interface RadioCardItem {
+  id: string;
+  /** Extra class on the card, e.g. a per-vendor hook. */
+  className?: string;
+  /** Shown but not selectable; arrow keys skip it. */
+  disabled?: boolean;
+  content: ComponentChildren;
+}
+
+/**
+ * A `radiogroup` of cards with a roving tabindex: the selected card (else the
+ * first) is the one in the tab order, and the arrow keys move selection and
+ * focus together, wrapping at the ends. Without `onSelect` the group is fixed.
+ */
+function RadioCards({
+  label,
+  items,
+  value,
+  onSelect,
+  groupClass,
+}: {
+  label: string;
+  items: RadioCardItem[];
+  value: string | null;
+  onSelect?: (id: string) => void;
+  groupClass: string;
+}) {
+  const selected = items.findIndex((i) => i.id === value);
+  const tabbable = selected >= 0 ? selected : 0;
+  const onKeyDown = (e: KeyboardEvent) => {
+    const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1
+      : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (step === 0 || !onSelect) return;
+    e.preventDefault();
+    let next = tabbable;
+    for (let n = 0; n < items.length; n++) {
+      next = (next + step + items.length) % items.length;
+      if (!items[next].disabled) break;
+    }
+    if (items[next].disabled) return;
+    onSelect(items[next].id);
+    (e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>("[role=radio]")[next]?.focus();
+  };
+  return h("div", { class: `llm-radio-cards ${groupClass}`, role: "radiogroup", "aria-label": label, onKeyDown },
+    items.map((item, i) => {
+      const checked = i === selected;
+      return h("button", {
+        key: item.id,
+        type: "button",
+        role: "radio",
+        "aria-checked": String(checked),
+        tabIndex: i === tabbable ? 0 : -1,
+        disabled: item.disabled,
+        class: `llm-radio-card${checked ? " llm-radio-card-selected" : ""}${item.disabled ? " llm-radio-card-disabled" : ""}${item.className ? ` ${item.className}` : ""}`,
+        onClick: onSelect && !item.disabled ? () => onSelect(item.id) : undefined,
+      },
+        checked ? h("span", { class: "llm-radio-card-check", "aria-hidden": "true" }, "✓") : null,
+        item.content,
+      );
+    }),
+  );
+}
+
+function SectionHeader({ number, title, subtitle }: { number: number; title: string; subtitle: string }) {
+  return h("div", { class: "llm-rw-section-header" },
+    h("h2", { class: "llm-rw-section-title" },
+      h("span", { class: "llm-rw-section-number" }, String(number)),
+      title,
+    ),
+    h("p", { class: "llm-rw-section-subtitle" }, subtitle),
+  );
+}
+
+// ── Section 1: vendor ──────────────────────────────────────────────────
+
+const VENDOR_SECTION_ID = "llm-vendor-section";
+
+/** Quiet period after the last edit before the run card asks the server what the edits would resolve to. */
+const PREVIEW_DEBOUNCE_MS = 300;
+
+/** The `changes` body PUT /api/llm/config and the preview both take, from the page's pending edits. */
+function buildChanges(
+  vendorDirty: boolean,
+  pendingVendor: string | null | undefined,
+  dirtyKeys: Set<string>,
+  editValues: Record<string, string>,
+  dirtyToggles: Set<string>,
+  editToggles: Record<string, boolean>,
+): Record<string, string | null | boolean> {
+  const changes: Record<string, string | null | boolean> = {};
+  if (vendorDirty) changes["llm.vendor"] = pendingVendor ?? null;
+  for (const key of dirtyKeys) {
+    const raw = editValues[key] ?? "";
+    const value = raw.trim() || null;
+    // "agent.claude" → hench.models.claude; "claude.model" → llm.claude.model
+    if (key.startsWith(AGENT_KEY_PREFIX)) changes[`hench.models.${key.slice(AGENT_KEY_PREFIX.length)}`] = value;
+    else if (key.startsWith("review.")) changes[reviewConfigPath(key)] = value;
+    else changes[`llm.${key}`] = value;
+  }
+  for (const key of dirtyToggles) {
+    if (key === "autoFailover") changes["llm.autoFailover"] = editToggles.autoFailover;
+  }
+  return changes;
+}
+
+function VendorCards({
   vendor,
+  catalog,
   onChange,
-  localStatus,
 }: {
   vendor: string | null;
-  onChange: (v: string | null) => void;
-  localStatus: LocalStatusResponse | null;
+  catalog: LlmCatalog | null;
+  onChange: (v: string) => void;
 }) {
-  const cliName = useCliName();
-  return h("div", { class: "llm-vendor-selector" },
-    h("div", { class: "llm-vendor-tabs" },
-      VENDORS.map((v) => {
-        const active = vendor === v.id;
-        // Connection dot on local tab
-        const connDot =
-          v.id === VIEWER_LLM_VENDOR.LOCAL && localStatus !== null
-            ? h("span", {
-                class: `llm-tab-conn-dot ${localStatus.ok ? "llm-tab-conn-ok" : "llm-tab-conn-err"}`,
-                title: localStatus.ok ? "Server reachable" : "Server unreachable",
-              })
-            : null;
-        return h("button", {
-          key: v.id,
-          class: `llm-vendor-tab${active ? " llm-vendor-tab-active" : ""} llm-vendor-tab-${v.id}`,
-          onClick: () => onChange(v.id),
-          "aria-pressed": String(active),
-        },
-          h("span", { class: `llm-vendor-dot llm-vendor-dot-${v.id}` }),
-          h("span", { class: "llm-tab-name" }, v.label),
-          connDot,
-        );
+  return h("section", { class: "llm-rw-section", id: VENDOR_SECTION_ID },
+    h(SectionHeader, { number: 1, title: "Vendor", subtitle: "Who runs your commands" }),
+    h(RadioCards, {
+      label: "Vendor",
+      groupClass: "llm-vendor-cards",
+      value: vendor,
+      onSelect: onChange,
+      items: VENDORS.map((v) => {
+        const readiness = catalog?.[v.id]?.readiness;
+        return {
+          id: v.id,
+          className: `llm-vendor-card-${v.id}`,
+          content: [
+            h("span", { class: "llm-vendor-card-head" },
+              h("span", { class: `llm-vendor-dot llm-vendor-dot-${v.id}` }),
+              h("span", { class: "llm-vendor-card-name" }, v.label),
+            ),
+            h("span", { class: "llm-vendor-card-org" }, v.subtitle),
+            readiness
+              ? h("span", {
+                  class: `llm-vendor-card-ready llm-vendor-card-ready-${readiness.state === "ready" ? "ok" : "warn"}`,
+                }, readiness.summary)
+              : null,
+          ],
+        };
       }),
-    ),
-    h("p", { class: "llm-vendor-hint" },
-      vendor
-        ? `Using ${VENDORS.find((v) => v.id === vendor)?.subtitle ?? vendor} for all ${cliName} commands.`
-        : `No vendor selected — ${cliName} commands will fall back to defaults.`,
-    ),
+    }),
   );
 }
 
@@ -264,62 +461,116 @@ function ModelField({
   );
 }
 
-// ── Catalog-backed model picker ────────────────────────────────────────
+// ── Section 2: connection ──────────────────────────────────────────────
+
+/** The environment variable a vendor's API connection reads its key from. */
+const API_KEY_ENV: Partial<Record<ViewerLLMVendor, string>> = {
+  [VIEWER_LLM_VENDOR.CLAUDE]: "ANTHROPIC_API_KEY",
+  [VIEWER_LLM_VENDOR.CODEX]: "OPENAI_API_KEY",
+  [VIEWER_LLM_VENDOR.GOOGLE]: "GEMINI_API_KEY",
+};
+
+/** Title and one-line description of one connection a vendor offers. */
+function connectionCopy(
+  vendor: ViewerLLMVendor,
+  provider: HenchProvider,
+  label: string,
+  readiness: VendorReadiness | undefined,
+): { title: string; description: string } {
+  if (provider === "cli") {
+    return {
+      title: `${label} CLI`,
+      description: vendor === VIEWER_LLM_VENDOR.CLAUDE ? "Uses your claude login. Recommended." : `Uses your ${vendor} login.`,
+    };
+  }
+  const keyName = API_KEY_ENV[vendor];
+  const none = readiness?.apiKey === false ? " · none found" : "";
+  return {
+    title: vendor === VIEWER_LLM_VENDOR.CLAUDE ? "Anthropic API" : vendor === VIEWER_LLM_VENDOR.LOCAL ? "Local server" : `${label} API`,
+    description: keyName ? `Needs ${keyName}${none}` : "Talks to the server configured below",
+  };
+}
+
+/** One radio card per provider the catalog offers; a lone provider is shown fixed, with the reason. */
+function ConnectionCards({
+  vendor,
+  choices,
+  value,
+  readiness,
+  onChange,
+  dirty,
+}: {
+  vendor: ViewerLLMVendor;
+  choices: HenchProvider[];
+  value: HenchProvider;
+  readiness: VendorReadiness | undefined;
+  onChange: (key: string, v: string) => void;
+  dirty: boolean;
+}) {
+  const cliName = useCliName();
+  const label = VENDORS.find((v) => v.id === vendor)?.label ?? vendor;
+  const single = choices.length === 1;
+  return h("section", { class: `llm-rw-section${dirty ? " llm-field-dirty" : ""}` },
+    h(SectionHeader, { number: 2, title: "Connection", subtitle: `How ${cliName} reaches ${label}` }),
+    h(RadioCards, {
+      label: "Connection",
+      groupClass: "llm-connection-cards",
+      value,
+      onSelect: single ? undefined : (id) => onChange(PROVIDER_KEY, id),
+      items: choices.map((p) => {
+        const copy = connectionCopy(vendor, p, label, readiness);
+        return {
+          id: p,
+          className: `llm-connection-card-${p}`,
+          content: [
+            h("span", { class: "llm-connection-card-title" }, copy.title),
+            h("span", { class: "llm-connection-card-desc" },
+              single ? `The only connection ${cliName} supports for ${label}` : copy.description),
+          ],
+        };
+      }),
+    }),
+  );
+}
+
+// ── Section 3: models ──────────────────────────────────────────────────
 
 /**
- * A dropdown over the server's model catalog for one vendor.
- *
- * `value` is the stored model, `""` when unset. The first option clears it
- * (`unsetLabel`); the last, "Other model…", reveals a text input for an id the
- * catalog does not list. A stored value the list lacks is kept as its own
- * option so it is never silently dropped from view. `defaultModel`, when
- * given, is marked in the list as the project default.
+ * A dropdown over a model list. The first option is the unset choice
+ * (`unsetLabel`); the last, "Other model id…", reveals a text input for an id
+ * the list does not carry. A stored value the list lacks is kept as its own
+ * option so it is never silently dropped from view.
  */
-function CatalogModelPicker({
-  fieldKey,
+function ModelPicker({
+  id,
   label,
-  description,
   value,
   models,
   unsetLabel,
-  defaultModel,
+  set,
   onChange,
-  dirty,
-  legacyKey,
 }: {
-  fieldKey: string;
+  id: string;
   label: string;
-  description: string;
+  /** The stored model, `""` when unset. */
   value: string;
   models: string[];
   unsetLabel: string;
-  defaultModel?: string;
+  /** Whether the shown value is a setting; unset renders dashed and muted. */
+  set: boolean;
   onChange: (key: string, v: string) => void;
-  dirty: boolean;
-  /** Deprecated key this value is still read from, when it is not `llm.*`. */
-  legacyKey?: string;
 }) {
-  // Sticky: once the user picks "Other model…" the input stays up while they
-  // type, even though the half-typed id is (rightly) not in the list.
+  // Sticky: once the user picks "Other model id…" the input stays up while
+  // they type, even though the half-typed id is (rightly) not in the list.
   const [custom, setCustom] = useState(false);
   const listed = value === "" || models.includes(value);
   const options = listed || custom ? models : [value, ...models];
-  const selected = custom ? OTHER_MODEL : value;
-
-  return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
-    h("label", { class: "llm-field-label", htmlFor: fieldKey },
-      label,
-      dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-      legacyKey
-        ? h("span", { class: "llm-field-source", title: "Read from the deprecated key; saving writes the llm.* key" },
-            ` from legacy ${legacyKey}`)
-        : null,
-    ),
-    h("p", { class: "llm-field-desc" }, description),
+  return h("div", { class: "llm-tier-picker" },
     h("select", {
-      id: fieldKey,
-      class: "llm-select-input",
-      value: selected,
+      id,
+      class: `llm-select-input ${set ? "llm-select-set" : "llm-select-unset"}`,
+      "aria-label": label,
+      value: custom ? OTHER_MODEL : value,
       onChange: (e: Event) => {
         const next = (e.target as HTMLSelectElement).value;
         if (next === OTHER_MODEL) {
@@ -327,148 +578,112 @@ function CatalogModelPicker({
           return;
         }
         setCustom(false);
-        onChange(fieldKey, next);
+        onChange(id, next);
       },
     },
       h("option", { value: "" }, unsetLabel),
-      options.map((m) =>
-        h("option", { key: m, value: m },
-          m === defaultModel ? `${m} (project default)` : m,
-        ),
-      ),
-      h("option", { value: OTHER_MODEL }, "Other model…"),
+      options.map((m) => h("option", { key: m, value: m }, m)),
+      h("option", { value: OTHER_MODEL }, "Other model id…"),
     ),
     custom
       ? h("input", {
-          id: `${fieldKey}-other`,
           type: "text",
           class: "llm-text-input",
           value,
           placeholder: "model-id",
           "aria-label": `${label} — model id`,
-          onInput: (e: Event) => onChange(fieldKey, (e.target as HTMLInputElement).value),
+          onInput: (e: Event) => onChange(id, (e.target as HTMLInputElement).value),
         })
       : null,
   );
 }
 
-// ── Provider field ─────────────────────────────────────────────────────
-
-/** The providers hench accepts for the vendor; one choice is shown as fixed. */
-function ProviderField({
-  choices,
-  value,
-  onChange,
-  dirty,
-}: {
-  choices: HenchProvider[];
-  value: HenchProvider;
-  onChange: (key: string, v: string) => void;
-  dirty: boolean;
-}) {
-  const cliName = useCliName();
-  return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
-    h("label", { class: "llm-field-label", htmlFor: "provider" },
-      "Provider",
-      dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-    ),
-    h("p", { class: "llm-field-desc" },
-      choices.length === 1
-        ? `${cliName} work always uses ${choices[0]} for this vendor.`
-        : `How ${cliName} work drives this vendor: through its CLI, or the API directly.`,
-    ),
-    choices.length === 1
-      ? h("span", { id: "provider", class: "llm-provider-fixed" }, choices[0])
-      : h("select", {
-          id: "provider",
-          class: "llm-select-input",
-          value,
-          onChange: (e: Event) => onChange("provider", (e.target as HTMLSelectElement).value),
-        },
-          choices.map((p) => h("option", { key: p, value: p }, p)),
-        ),
-  );
-}
-
-// ── Catalog provenance + CLI status ────────────────────────────────────
-
 /**
- * Where the model list came from, with a Refresh that bypasses the server's
- * cache. For Claude and Codex it also reports the installed CLI — and only
- * reports it: updating or installing a CLI is not something this page does.
+ * One row per tier the server resolved, each with who uses it, a model select
+ * and where the model comes from. The rows are the server's: this renders them
+ * and decides nothing about which tiers exist or what they resolve to.
  */
-function CatalogStatus({
+function TierTable({
   vendor,
-  entry,
-  refreshing,
-  onRefresh,
+  ready,
+  data,
+  models,
+  editValues,
+  dirtyKeys,
+  onChange,
 }: {
   vendor: ViewerLLMVendor;
-  entry: CatalogEntry;
-  refreshing: boolean;
-  onRefresh: () => void;
-}) {
-  const origin = vendor === VIEWER_LLM_VENDOR.LOCAL
-    ? (entry.reachable ? "Live list from the local server" : `Local server unreachable${entry.reason ? ` — ${entry.reason}` : ""}`)
-    : entry.source === "live"
-      ? `Live list, checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}`
-      : `Built-in list${entry.reason ? ` — ${entry.reason}` : ""}`;
-  const cli = entry.cli;
-  return h("div", { class: "llm-catalog-status" },
-    h("span", { class: "llm-catalog-origin" }, origin),
-    h("button", {
-      class: "llm-btn llm-btn-secondary",
-      onClick: onRefresh,
-      disabled: refreshing,
-    }, refreshing ? "Refreshing…" : "Refresh models"),
-    cli
-      ? h("span", { class: "llm-catalog-cli" },
-          cli.found
-            ? `CLI ${cli.version ?? "installed"}`
-            : "CLI not found",
-        )
-      : null,
-  );
-}
-
-// ── Select-based model picker (local vendor with live model list) ───────
-
-function ModelSelect({
-  fieldKey,
-  label,
-  description,
-  value,
-  models,
-  onChange,
-  dirty,
-}: {
-  fieldKey: string;
-  label: string;
-  description: string;
-  value: string;
+  /** False while `vendor` is picked but unsaved: the server has no tier table for it yet. */
+  ready: boolean;
+  data: LlmConfigResponse;
   models: string[];
+  editValues: Record<string, string>;
+  dirtyKeys: Set<string>;
   onChange: (key: string, v: string) => void;
-  dirty: boolean;
 }) {
-  // Include current value as an option even if it's no longer in the live list
-  const extra = value && !models.includes(value) ? [value] : [];
-  return h("div", { class: `llm-field${dirty ? " llm-field-dirty" : ""}` },
-    h("label", { class: "llm-field-label", htmlFor: fieldKey },
-      label,
-      dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+  const cliName = useCliName();
+  const isLocal = vendor === VIEWER_LLM_VENDOR.LOCAL;
+  return h("section", { class: "llm-rw-section llm-tier-section" },
+    h(SectionHeader, {
+      number: 3,
+      title: "Models",
+      subtitle: "Commands and tasks pick a tier; you pick the model for each",
+    }),
+    !ready
+      ? h("p", { class: "llm-tier-pending" }, `Save the vendor change to choose models for ${vendor}.`)
+      : h("div", { class: "llm-tier-table", role: "group", "aria-label": "Model tiers" },
+      (data.tiers ?? []).map((row) => {
+        const key = tierKey(vendor, row.tier);
+        const saved = savedTierValue(data, vendor, row);
+        const value = editValues[key] ?? saved;
+        const label = tierLabel(vendor, row.tier);
+        const dirty = dirtyKeys.has(key);
+        // An untouched unset row can say what it resolves to; once edited the
+        // server has not resolved the new choice, so it says what saving does.
+        const resolved = saved === "" && !dirty;
+        // Light on a local server has no model of its own: unset, it runs the Primary one.
+        const fallsBack = isLocal && row.tier === "light" && value === "";
+        const where = fallsBack
+          ? `Falls back to ${tierLabel(vendor, "standard")}`
+          : value === ""
+            ? (resolved ? `Runs as ${row.model}` : "Unset once saved")
+            : `Set in ${dirty || saved === "" ? tierConfigPath(vendor, row.tier) : row.source}`;
+        return h("div", {
+          key: row.tier,
+          class: `llm-tier-row llm-tier-row-${row.tier}${dirty ? " llm-field-dirty" : ""}`,
+        },
+          h("div", { class: "llm-tier-name" },
+            h("label", { class: "llm-field-label", htmlFor: key },
+              label,
+              dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+            ),
+            row.usedBy.length > 0
+              ? h("span", { class: "llm-tier-used" }, `Used by ${row.usedBy.map((u) => u.label).join(", ")}`)
+              : null,
+          ),
+          h(ModelPicker, {
+            id: key,
+            label: `${label} model`,
+            value,
+            models,
+            unsetLabel: fallsBack
+              ? `Same as ${tierLabel(vendor, "standard")}`
+              : resolved ? `Default (${row.model})` : "Default",
+            set: value !== "",
+            onChange,
+          }),
+          h("span", { class: "llm-tier-source" }, where),
+        );
+      }),
     ),
-    h("p", { class: "llm-field-desc" }, description),
-    h("select", {
-      id: fieldKey,
-      class: "llm-select-input",
-      value,
-      onChange: (e: Event) => onChange(fieldKey, (e.target as HTMLSelectElement).value),
-    },
-      h("option", { value: "" }, "Any loaded model"),
-      [...extra, ...models].map((m) =>
-        h("option", { key: m, value: m }, m),
-      ),
-    ),
+    isLocal
+      ? h("p", { class: "llm-tier-note" },
+          models.length > 0
+            ? "Choices are the models your server lists right now."
+            : "The server lists no models right now; pick “Other model id…” to enter one.")
+      : null,
+    h("p", { class: "llm-tier-note" },
+      `Agent model overrides ${tierLabel(vendor, "standard")} for ${cliName} work only. A --model flag or a task's saved run settings win for that run.`),
   );
 }
 
@@ -510,55 +725,357 @@ function ToggleSwitch({
   );
 }
 
-// ── Claude / Codex settings card ──────────────────────────────────────
+// ── Section 4: failover ───────────────────────────────────────────
 
-function VendorSection({
-  vendorId,
-  config,
-  catalog,
-  editValues,
+/**
+ * The failover chain: the effective model plus the next three fallback models.
+ * Shown as monospace pills joined by arrows, dimmed while the toggle is off.
+ * When `failover.applies` is false, shows the reason as a warning instead.
+ */
+function FailoverSection({
+  failover,
+  vendor,
+  enabled,
   onChange,
-  dirtyKeys,
-  legacyFields,
+  dirty,
 }: {
-  vendorId: CloudViewerVendor;
-  config: VendorConfig;
-  /** This vendor's catalog entry; null until the catalog loads or when it failed. */
-  catalog: CatalogEntry | null;
-  editValues: Record<string, string>;
-  onChange: (key: string, v: string) => void;
-  dirtyKeys: Set<string>;
-  /** Fields still read from the deprecated top-level key (Claude only). */
-  legacyFields: ReadonlyArray<"model" | "lightModel">;
+  failover: FailoverInfo | undefined;
+  vendor: string | null;
+  enabled: boolean;
+  onChange: (key: string, v: boolean) => void;
+  dirty: boolean;
 }) {
   const cliName = useCliName();
-  const modelKey = `${vendorId}.model`;
-  const lightKey = `${vendorId}.lightModel`;
-  const models = catalog?.models ?? [];
+  const isLocal = vendor === VIEWER_LLM_VENDOR.LOCAL;
+  // Without the server's block there is no chain and no reason: the toggle stands alone.
+  const chain = failover?.chain ?? [];
+  const cannotApply = failover !== undefined && !failover.applies;
 
-  return h("div", { class: "llm-vendor-section" },
-    h(CatalogModelPicker, {
-      fieldKey: modelKey,
-      label: "Project model",
-      description: `Used by every ${cliName} command that has no agent model of its own. Leave on the vendor default for the CLI's choice.`,
-      value: editValues[modelKey] ?? config.model ?? "",
-      models,
-      unsetLabel: "Vendor default",
-      onChange,
-      dirty: dirtyKeys.has(modelKey),
-      legacyKey: legacyFields.includes("model") ? "claude.model" : undefined,
+  return h("section", { class: "llm-rw-section" },
+    h(SectionHeader, {
+      number: 4,
+      title: "If a run fails",
+      subtitle: "On a retryable error, try the next model in the chain before giving up.",
     }),
-    h(CatalogModelPicker, {
-      fieldKey: lightKey,
-      label: "Light model",
-      description: "Cheaper model for recommendations and summaries. Falls back to the project model if unset.",
-      value: editValues[lightKey] ?? config.lightModel ?? "",
-      models,
-      unsetLabel: "Same as project model",
+    h(ToggleSwitch, {
+      fieldKey: "autoFailover",
+      label: "Automatic failover",
+      description: "",
+      value: enabled,
       onChange,
-      dirty: dirtyKeys.has(lightKey),
-      legacyKey: legacyFields.includes("lightModel") ? "claude.lightModel" : undefined,
+      dirty,
     }),
+    // Show the chain as monospace pills with arrows, dimmed if toggle is off
+    chain.length > 0
+      ? h("div", { class: `llm-failover-chain${!enabled ? " llm-failover-chain-dimmed" : ""}` },
+          chain.map((model, i) => [
+            i > 0 ? h("span", { class: "llm-failover-arrow" }, "→") : null,
+            h("code", { class: "llm-failover-pill" }, model),
+          ]).flat(),
+        )
+      : null,
+    // Show reason when failover cannot fire
+    cannotApply
+      ? h("p", { class: "llm-failover-warning", role: "status" },
+          h("span", { class: "llm-note-mark", "aria-hidden": "true" }, "!"),
+          isLocal ? "Failover is not available for local models." : failover?.reason)
+      : null,
+  );
+}
+
+// ── Section 5: review ──────────────────────────────────────────────────
+
+/** editValues keys of the review settings; saved as `hench.review.*`, and `review.model.<vendor>` as `llm.<vendor>.reviewModel`. */
+const REVIEW_MODE_KEY = "review.mode";
+const REVIEW_VENDOR_KEY = "review.vendor";
+const REVIEW_ROUNDS_KEY = "review.rounds";
+const REVIEW_MODEL_KEY_PREFIX = "review.model.";
+const reviewModelKey = (vendor: string): string => `${REVIEW_MODEL_KEY_PREFIX}${vendor}`;
+
+/** The config path an editValues review key saves to. */
+function reviewConfigPath(key: string): string {
+  if (key.startsWith(REVIEW_MODEL_KEY_PREFIX)) return `llm.${key.slice(REVIEW_MODEL_KEY_PREFIX.length)}.reviewModel`;
+  return `hench.${key}`;
+}
+
+const REVIEW_ROUND_CHOICES = ["1", "2", "3"];
+
+/** The reviewer model's saved value, `""` when it is not pinned under `llm.<vendor>.reviewModel`. */
+function savedReviewModel(review: ReviewInfo, vendor: string): string {
+  const entry = review.models[vendor];
+  return entry?.source === "vendor-config" ? entry.model : "";
+}
+
+/** How the save bar names an editValues key that is not a tier row. */
+const FIELD_LABEL: Record<string, string> = {
+  [REVIEW_MODE_KEY]: "Review mode",
+  [REVIEW_VENDOR_KEY]: "Reviewer vendor",
+  [REVIEW_ROUNDS_KEY]: "Review rounds",
+  "local.host": "Local host",
+  "local.port": "Local port",
+  "local.maxContextTokens": "Context budget",
+  "local.timeoutMs": "Request timeout",
+  "local.verifier.host": "Verifier host",
+  "local.verifier.port": "Verifier port",
+  "local.verifier.model": "Verifier model",
+  "local.verifier.maxCycles": "Verifier cycles",
+};
+
+/** One "Label → value" line per pending edit for the save bar, vendor first. */
+function summarizeChanges(
+  data: LlmConfigResponse,
+  vendor: string | null,
+  vendorDirty: boolean,
+  pendingVendor: string | null | undefined,
+  dirtyKeys: Set<string>,
+  editValues: Record<string, string>,
+  dirtyToggles: Set<string>,
+  editToggles: Record<string, boolean>,
+  provider: { value: HenchProvider; dirty: boolean },
+): string[] {
+  const lines: string[] = [];
+  if (vendorDirty) lines.push(`Vendor ${data.vendor ?? "none"} → ${pendingVendor ?? "none"}`);
+  const tierLabels = new Map<string, string>();
+  if (vendor) {
+    for (const row of data.tiers ?? []) {
+      const label = tierLabel(vendor, row.tier);
+      tierLabels.set(tierKey(vendor, row.tier), row.tier === "agent" ? label : `${label} model`);
+    }
+  }
+  for (const key of dirtyKeys) {
+    const label = tierLabels.get(key)
+      ?? FIELD_LABEL[key]
+      ?? (key.startsWith(REVIEW_MODEL_KEY_PREFIX) ? `Reviewer model (${key.slice(REVIEW_MODEL_KEY_PREFIX.length)})` : key);
+    lines.push(`${label} → ${(editValues[key] ?? "").trim() || "default"}`);
+  }
+  for (const key of dirtyToggles) {
+    if (key === "autoFailover") lines.push(`Auto failover → ${editToggles.autoFailover ? "on" : "off"}`);
+  }
+  if (provider.dirty) lines.push(`Provider → ${provider.value}`);
+  return lines;
+}
+
+/** A box in the flow strip: who acts and what they do. */
+function FlowStep({ who, model, action }: { who: string; model?: string; action: string }) {
+  return h("div", { class: "llm-review-step" },
+    h("span", { class: "llm-review-step-who" }, who),
+    model ? h("code", { class: "llm-review-step-model" }, model) : null,
+    h("span", { class: "llm-review-step-action" }, action),
+  );
+}
+
+function FlowStrip({ steps }: { steps: Array<{ who: string; model?: string; action: string }> }) {
+  return h("div", { class: "llm-review-flow", role: "list", "aria-label": "What happens on each task" },
+    steps.map((step, i) => [
+      i > 0 ? h("span", { class: "llm-review-arrow", "aria-hidden": "true" }, "→") : null,
+      h("div", { key: i, role: "listitem" }, h(FlowStep, step)),
+    ]).flat(),
+  );
+}
+
+/**
+ * Off, Self or Pair, with the reviewer's settings. Which modes can run, and
+ * which vendors can review, are the server's answers (`review.available`,
+ * `pairSupported`, the keys of `review.models`); this lays them out.
+ */
+function ReviewSection({
+  review,
+  executor,
+  vendor,
+  executorModel,
+  ready,
+  catalog,
+  editValues,
+  dirtyKeys,
+  onChange,
+}: {
+  review: ReviewInfo;
+  /** The saved vendor review is judged for (the server resolved `review` against it). */
+  executor: ViewerLLMVendor;
+  /** The vendor on screen: differs from `executor` while a vendor change is unsaved. */
+  vendor: ViewerLLMVendor;
+  executorModel: string;
+  /** False while `vendor` is picked but unsaved: the server has no review block for it yet. */
+  ready: boolean;
+  catalog: LlmCatalog | null;
+  editValues: Record<string, string>;
+  dirtyKeys: Set<string>;
+  onChange: (key: string, v: string) => void;
+}) {
+  const cliName = useCliName();
+  const label = (v: string) => VENDORS.find((x) => x.id === v)?.label ?? v;
+  const executorLabel = label(executor);
+  const mode = editValues[REVIEW_MODE_KEY] ?? review.mode.value;
+  const on = review.available && (mode === "self" || mode === "pair");
+  const pair = mode === "pair";
+  const reviewerId = pair ? editValues[REVIEW_VENDOR_KEY] ?? review.vendor.value : executor;
+  const rounds = editValues[REVIEW_ROUNDS_KEY] ?? String(review.rounds.value);
+  const modelKey = reviewerId ? reviewModelKey(reviewerId) : null;
+  const modelValue = reviewerId && modelKey
+    ? editValues[modelKey] ?? savedReviewModel(review, reviewerId)
+    : "";
+  const resolvedModel = modelValue || (reviewerId ? review.models[reviewerId]?.model ?? "" : "");
+  const readiness = reviewerId ? catalog?.[reviewerId as ViewerLLMVendor]?.readiness : undefined;
+  const modeDirty = dirtyKeys.has(REVIEW_MODE_KEY);
+
+  const modes: Array<{ id: string; title: string; description: string; disabled: boolean; badge?: string; soon?: boolean }> = [
+    { id: "off", title: "Off", description: "Commit once the tests pass.", disabled: !review.available },
+    {
+      id: "self",
+      title: "Self review",
+      description: `${executorLabel} re-reads its own work on a stronger model and fixes what it finds.`,
+      disabled: !review.available,
+    },
+    {
+      id: "pair",
+      title: "Pair review",
+      description: `Another vendor reviews. ${executorLabel} fixes the must-fix findings, then the reviewer checks again.`,
+      disabled: !review.available || !review.pairSupported,
+      badge: "Pair",
+      soon: !review.pairSupported,
+    },
+  ];
+
+  const body = !ready
+    ? h("p", { class: "llm-tier-pending" }, `Save the vendor change to set up review for ${label(vendor)}.`)
+    : [
+        review.available ? null : h("p", { class: "llm-review-unavailable", role: "alert" }, review.unavailableReason),
+        h(RadioCards, {
+          label: "Review mode",
+          groupClass: "llm-review-modes",
+          value: review.available ? mode : null,
+          onSelect: (id) => onChange(REVIEW_MODE_KEY, id),
+          items: modes.map((m) => ({
+            id: m.id,
+            className: `llm-review-mode-${m.id}`,
+            disabled: m.disabled,
+            content: [
+              h("span", { class: "llm-review-mode-head" },
+                h("span", { class: "llm-review-mode-title" }, m.title),
+                m.badge ? h("span", { class: "llm-review-badge" }, m.badge) : null,
+                m.soon ? h("span", { class: "llm-review-soon" }, "Coming soon") : null,
+              ),
+              h("span", { class: "llm-review-mode-desc" }, m.description),
+            ],
+          })),
+        }),
+        on ? h(ReviewOptions, {
+          review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog, label,
+          executor, editValues, dirtyKeys, onChange,
+        }) : null,
+        on ? h(FlowStrip, {
+          steps: pair
+            ? [
+                { who: executorLabel, model: executorModel, action: "does the task" },
+                { who: reviewerId ? label(reviewerId) : "Reviewer", model: resolvedModel, action: "reviews" },
+                { who: executorLabel, model: executorModel, action: "fixes findings" },
+                { who: reviewerId ? label(reviewerId) : "Reviewer", model: resolvedModel, action: `checks the fixes · up to ${rounds} rounds` },
+              ]
+            : [
+                { who: executorLabel, model: executorModel, action: "does the task" },
+                { who: executorLabel, model: resolvedModel, action: "reviews and fixes in the same session" },
+              ],
+        }) : null,
+        on && readiness && readiness.state !== "ready"
+          ? h("p", { class: "llm-review-warning", role: "alert" },
+              `⚠ ${label(reviewerId ?? executor)} is not ready (${readiness.summary}). Review is skipped until it is.`)
+          : null,
+        review.available
+          ? h("p", { class: "llm-tier-note" },
+              `Should-fix and lower findings are captured to the PRD instead of blocking the commit. Applies to ${cliName} work and ${cliName} pair-programming; a task's saved run settings can switch review on or off for that task.`)
+          : null,
+      ];
+
+  return h("section", { class: `llm-rw-section${modeDirty ? " llm-field-dirty" : ""}` },
+    h(SectionHeader, { number: 5, title: "Review", subtitle: "A second model checks each task before it commits" }),
+    body,
+  );
+}
+
+/** The options panel: reviewer vendor and fix rounds (pair only) and the reviewer model. */
+function ReviewOptions({
+  review, pair, rounds, reviewerId, modelKey, modelValue, resolvedModel, catalog, label, executor, editValues, dirtyKeys, onChange,
+}: {
+  review: ReviewInfo;
+  pair: boolean;
+  rounds: string;
+  reviewerId: string | null;
+  modelKey: string | null;
+  modelValue: string;
+  resolvedModel: string;
+  catalog: LlmCatalog | null;
+  label: (v: string) => string;
+  executor: ViewerLLMVendor;
+  editValues: Record<string, string>;
+  dirtyKeys: Set<string>;
+  onChange: (key: string, v: string) => void;
+}) {
+  const modelsFor = reviewerId ? catalog?.[reviewerId as ViewerLLMVendor]?.models ?? [] : [];
+  return h("div", { class: "llm-review-options" },
+    pair
+      ? h("div", { class: `llm-field${dirtyKeys.has(REVIEW_VENDOR_KEY) ? " llm-field-dirty" : ""}` },
+          h("span", { class: "llm-field-label", id: "review-vendor-label" }, "Reviewer vendor"),
+          h("div", { class: "llm-review-chips", role: "radiogroup", "aria-labelledby": "review-vendor-label" },
+            VENDORS.map((v) => {
+              const reason = v.id === executor ? "executor" : v.id in review.models ? null : "no CLI";
+              const readiness = catalog?.[v.id]?.readiness;
+              const checked = v.id === reviewerId;
+              return h("button", {
+                key: v.id,
+                type: "button",
+                role: "radio",
+                "aria-checked": String(checked),
+                disabled: reason !== null,
+                class: `llm-review-chip${checked ? " llm-review-chip-selected" : ""}`,
+                onClick: () => onChange(REVIEW_VENDOR_KEY, v.id),
+              },
+                h("span", { class: `llm-vendor-dot llm-vendor-dot-${v.id}` }),
+                reason ? `${v.label} · ${reason}` : v.label,
+                !reason && readiness
+                  ? h("span", { class: `llm-review-chip-ready llm-vendor-card-ready-${readiness.state === "ready" ? "ok" : "warn"}` },
+                      readiness.state === "ready" ? "ready" : "not ready")
+                  : null,
+              );
+            }),
+          ),
+        )
+      : null,
+    reviewerId && modelKey
+      ? h("div", { class: `llm-field${dirtyKeys.has(modelKey) ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: modelKey },
+            "Reviewer model",
+            dirtyKeys.has(modelKey) ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+          ),
+          h(ModelPicker, {
+            id: modelKey,
+            label: "Reviewer model",
+            value: modelValue,
+            models: modelsFor,
+            unsetLabel: resolvedModel ? `Default (${resolvedModel})` : "Default",
+            set: modelValue !== "",
+            onChange,
+          }),
+          h("p", { class: "llm-field-desc" },
+            pair ? `Saved as llm.${reviewerId}.reviewModel` : "Resumes the work session on this model"),
+        )
+      : null,
+    pair
+      ? h("div", { class: `llm-field${dirtyKeys.has(REVIEW_ROUNDS_KEY) ? " llm-field-dirty" : ""}` },
+          h("span", { class: "llm-field-label", id: "review-rounds-label" }, "Fix rounds"),
+          h("div", { class: "llm-review-rounds", role: "radiogroup", "aria-labelledby": "review-rounds-label" },
+            REVIEW_ROUND_CHOICES.map((n) => h("button", {
+              key: n,
+              type: "button",
+              role: "radio",
+              "aria-checked": String(rounds === n),
+              class: `llm-review-round${rounds === n ? " llm-review-round-selected" : ""}`,
+              onClick: () => onChange(REVIEW_ROUNDS_KEY, n),
+            }, n)),
+          ),
+          h("p", { class: "llm-field-desc" },
+            "How many times the executor may fix must-fix findings before the task fails review."),
+        )
+      : null,
   );
 }
 
@@ -570,48 +1087,263 @@ const MODEL_SOURCE_LABEL: Record<EffectiveConfig["modelSource"], string> = {
   default: "vendor default",
 };
 
+const CODEX_INSTALL_URL = "https://github.com/openai/codex#readme";
+
+const vendorLabel = (id: string): string => VENDORS.find((v) => v.id === id)?.label ?? id;
+
+/** "Reviewed by Codex · gpt-5.6-sol" or "Self review · <model>"; null when no review pass will run. */
+function reviewChipText(review: ReviewInfo | undefined, executor: string, executorModel: string): string | null {
+  if (!review?.available) return null;
+  const mode = review.mode.value;
+  if (mode === "self") return `Self review · ${review.models[executor]?.model ?? executorModel}`;
+  if (mode === "pair" && review.pairSupported && review.vendor.value) {
+    const reviewer = review.vendor.value;
+    const model = review.models[reviewer]?.model;
+    return `Reviewed by ${vendorLabel(reviewer)}${model ? ` · ${model}` : ""}`;
+  }
+  return null;
+}
+
+/** Where a vendor's model list came from: a short label, and the longer detail behind it. */
+function catalogOrigin(vendor: ViewerLLMVendor, entry: CatalogEntry): { label: string; detail: string | null } {
+  if (vendor === VIEWER_LLM_VENDOR.LOCAL) {
+    return entry.reachable
+      ? { label: "Live model list", detail: "From the local server" }
+      : { label: "Local server unreachable", detail: entry.reason ?? null };
+  }
+  return entry.source === "live"
+    ? { label: "Live model list", detail: `Checked ${entry.checkedAt ? new Date(entry.checkedAt).toLocaleString() : "just now"}` }
+    : { label: "Built-in model list", detail: entry.reason ?? null };
+}
+
+type AuthState = "checking" | "ok" | "bad";
+
 /**
- * What `ndx work` will run with no flags. The route resolves it and, when it
- * would refuse the result, lists why in `problems` — this component only
- * renders; it applies no rules of its own.
+ * The credential check `<cli> auth` runs, so a missing or invalid key shows here
+ * rather than when an agent command fails later. The plain request is served
+ * from the server's cache; `force` bypasses it.
  */
-function EffectiveBlock({ effective, problems }: { effective: EffectiveConfig; problems: EffectiveProblem[] }) {
+function useAuthCheck(): { state: AuthState; detail: string | null; check: (force?: boolean) => Promise<void> } {
+  const [state, setState] = useState<AuthState>("checking");
+  const [detail, setDetail] = useState<string | null>(null);
+
+  const check = useCallback(async (force = false) => {
+    setState("checking");
+    setDetail(null);
+    try {
+      const res = await fetch(force ? "/api/commands/auth?refresh=true" : "/api/commands/auth");
+      const body = await res.json() as { ok?: boolean; error?: string | null; output?: string };
+      if (body.ok) {
+        setState("ok");
+        setDetail(body.output?.split("\n").filter(Boolean).pop() ?? null);
+      } else {
+        setState("bad");
+        setDetail(body.error ?? "Credential check failed");
+      }
+    } catch (err) {
+      setState("bad");
+      setDetail(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  useEffect(() => { void check(); }, [check]);
+  return { state, detail, check };
+}
+
+function CheckRow({
+  status,
+  label,
+  detail,
+  action,
+}: {
+  status: "ok" | "bad" | "pending";
+  label: string;
+  detail?: string | null;
+  action?: ComponentChildren;
+}) {
+  return h("li", { class: `llm-runcard-check llm-runcard-check-${status}`, title: detail ?? undefined },
+    h("span", { class: "llm-runcard-check-dot", "aria-hidden": "true" }),
+    status === "pending"
+      ? h("span", { class: "llm-runcard-placeholder", "aria-label": label }, "Checking…")
+      : h("span", { class: "llm-runcard-check-text" },
+          h("span", { class: "llm-runcard-check-label" }, label),
+          detail ? h("span", { class: "llm-runcard-check-detail" }, detail) : null,
+        ),
+    action ?? null,
+  );
+}
+
+/**
+ * What the next `ndx work` run will use. The route resolves it — and, when it
+ * would refuse the result, says why — so this component only renders; it applies
+ * no rules of its own. While edits are unsaved it shows the preview (the route's
+ * answer for those edits) under an "After save" badge, with the saved model
+ * struck through when it differs.
+ */
+function RunCard({
+  saved,
+  preview,
+  previewFailed,
+  catalog,
+  refreshing,
+  onRefresh,
+  legacyFields,
+  onPickVendor,
+}: {
+  saved: LlmConfigResponse;
+  preview: LlmPreviewResponse | null;
+  previewFailed: boolean;
+  catalog: LlmCatalog | null;
+  refreshing: boolean;
+  onRefresh: () => void;
+  legacyFields: string[];
+  onPickVendor: () => void;
+}) {
   const cliName = useCliName();
-  const refused = problems.length > 0;
-  return h("section", {
-    class: `llm-effective${refused ? " llm-effective-refused" : ""}`,
-    "aria-label": `What ${cliName} work will run`,
-  },
-    h("p", { class: "llm-section-sub" }, `${cliName} work will run with`),
-    h("dl", { class: "llm-effective-list" },
-      h("dt", null, "Vendor"), h("dd", null, effective.vendor),
-      h("dt", null, "Provider"), h("dd", null, effective.provider),
-      h("dt", null, "Model"),
-      h("dd", null, effective.model,
-        h("span", { class: "llm-effective-source" }, ` (${MODEL_SOURCE_LABEL[effective.modelSource]})`)),
+  const auth = useAuthCheck();
+  const shown = preview ?? saved;
+  const { effective } = shown;
+  const vendor = effective.vendor as ViewerLLMVendor;
+  const entry = catalog?.[vendor] ?? null;
+  const previousModel = preview && saved.effective.model !== effective.model ? saved.effective.model : null;
+  const sourceKey = shown.tiers?.find((t) => t.tier === "agent")?.source ?? MODEL_SOURCE_LABEL[effective.modelSource];
+  const reviewChip = reviewChipText(shown.review, effective.vendor, effective.model);
+  const problems = shown.effectiveProblems;
+  // The catalog knows the Codex CLI is absent even though the config resolves.
+  const codexCliMissing = vendor === VIEWER_LLM_VENDOR.CODEX && effective.provider === "cli" && entry?.cli?.found === false;
+  const refused = problems.length > 0 || codexCliMissing;
+  const editProblems = preview?.editProblems ?? [];
+
+  return h("section", { class: "llm-runcard-wrap", "aria-label": `What ${cliName} work will run` },
+    h("div", { class: `llm-runcard${preview ? " llm-runcard-preview" : ""}${refused ? " llm-runcard-refused" : ""}` },
+      h("div", { class: "llm-runcard-main" },
+        h("div", { class: "llm-runcard-label" },
+          `NEXT `, h("code", null, `${cliName} work`), ` RUN`,
+          preview ? h("span", { class: "llm-runcard-badge" }, "After save") : null,
+        ),
+        h("div", { class: "llm-runcard-model" },
+          previousModel ? h("s", { class: "llm-runcard-prev" }, previousModel) : null,
+          h("span", { class: "llm-runcard-model-id" }, effective.model),
+        ),
+        h("div", { class: "llm-runcard-chips" },
+          h("span", { class: "llm-runcard-chip llm-runcard-chip-vendor" },
+            h("span", { class: `llm-vendor-dot llm-vendor-dot-${effective.vendor}` }),
+            vendorLabel(effective.vendor)),
+          h("span", { class: "llm-runcard-chip" }, `via ${effective.provider}`),
+          h("span", { class: "llm-runcard-chip" }, `model from ${sourceKey}`),
+          reviewChip ? h("span", { class: "llm-runcard-chip llm-runcard-chip-review" }, reviewChip) : null,
+        ),
+        h("p", { class: "llm-runcard-note" },
+          "A task's saved run settings (Prepare task) or a --model flag can override this for that run."),
+        previewFailed ? h("p", { class: "llm-runcard-note", role: "status" }, "Could not preview the unsaved edits.") : null,
+        editProblems.map((p) => h("p", { key: p.path, class: "llm-runcard-note llm-runcard-edit-problem" }, `Not applied: ${p.message}`)),
+        legacyFields.length > 0
+          ? h("div", { class: "llm-legacy" },
+              h("span", null, "ℹ"),
+              h("div", null,
+                h("strong", null, "Still set under a deprecated key"),
+                h("p", null,
+                  legacyFields.map((f) => `claude.${f}`).join(" and "),
+                  legacyFields.length === 1 ? " is " : " are ",
+                  "read from the legacy top-level key. The value shown above is the one that will run. ",
+                  "Saving writes the modern ",
+                  h("code", null, "llm.claude.*"),
+                  " field and leaves the old key where it is.",
+                ),
+              ),
+            )
+          : null,
+      ),
+      h("ul", { class: "llm-runcard-checks", "aria-label": "Readiness" },
+        auth.state === "checking"
+          ? h(CheckRow, { status: "pending", label: "Credentials" })
+          : h(CheckRow, {
+              status: auth.state,
+              label: auth.state === "ok" ? "Credentials valid" : "Credentials failed",
+              detail: auth.detail,
+              action: h("button", {
+                class: "llm-btn llm-btn-secondary",
+                // Not `onClick: auth.check` — that would pass the MouseEvent as `force`.
+                onClick: () => { void auth.check(true); },
+              }, auth.state === "ok" ? "Re-check" : `Re-run ${cliName} auth`),
+            }),
+        catalog === null
+          ? [h(CheckRow, { key: "cli", status: "pending", label: "CLI" }), h(CheckRow, { key: "models", status: "pending", label: "Model list" })]
+          : [
+              entry?.cli
+                ? h(CheckRow, {
+                    key: "cli",
+                    status: entry.cli.found ? "ok" : "bad",
+                    label: entry.cli.found ? `CLI ${entry.cli.version ?? "found"}` : "CLI not found",
+                  })
+                : null,
+              entry
+                ? h(CheckRow, {
+                    key: "models",
+                    status: vendor === VIEWER_LLM_VENDOR.LOCAL && !entry.reachable ? "bad" : "ok",
+                    ...catalogOrigin(vendor, entry),
+                    action: h("button", { class: "llm-btn llm-btn-secondary", onClick: onRefresh, disabled: refreshing },
+                      refreshing ? "Refreshing…" : "Refresh models"),
+                  })
+                : null,
+            ],
+      ),
     ),
     refused
-      ? h("div", { class: "llm-effective-problems", role: "alert" },
-          h("strong", null, `${cliName} work would refuse this configuration`),
-          h("ul", null, problems.map((p) => h("li", { key: p.field }, p.message))),
+      ? h("div", { class: "llm-runcard-banner", role: "alert" },
+          h("strong", null, `${cliName} work would refuse this.`),
+          h("ul", null,
+            problems.map((p) => h("li", { key: p.field },
+              p.message,
+              h("span", { class: "llm-runcard-fix" }, runCardFix(p, vendor)))),
+            codexCliMissing
+              ? h("li", { key: "codex-cli" },
+                  entry?.readiness?.summary ?? "The Codex CLI was not found.",
+                  h("span", { class: "llm-runcard-fix" },
+                    h("a", { href: CODEX_INSTALL_URL, target: "_blank", rel: "noopener noreferrer" }, "How to install"),
+                    " · ",
+                    h("button", { class: "llm-link-btn", onClick: onPickVendor }, "pick another vendor")))
+              : null,
+          ),
         )
       : null,
   );
 }
 
-// ── Smoke test ─────────────────────────────────────────────────────────
+/** The fix that applies to a server problem. Codex has no API connection, so it is never offered. */
+function runCardFix(problem: EffectiveProblem, vendor: ViewerLLMVendor): string {
+  if (problem.field === "model") return "Pick a model in Models below.";
+  return vendor === VIEWER_LLM_VENDOR.CODEX
+    ? "Codex runs on its CLI only."
+    : "Pick a connection in Connection below.";
+}
+
+// ── Test connection ────────────────────────────────────────────────────
+
+/** "Connected · 3 models · reply in 412 ms · 38 tok/s", leaving out what the server could not measure. */
+function testSummary(r: SmokeTestResult): string {
+  const parts = ["Connected"];
+  if (typeof r.modelCount === "number") parts.push(`${r.modelCount} model${r.modelCount === 1 ? "" : "s"}`);
+  parts.push(`reply in ${r.latencyMs} ms`);
+  if (r.tokensPerSecond !== null) parts.push(`${r.tokensPerSecond} tok/s`);
+  return parts.join(" · ");
+}
 
 function SmokeTestButton({
   host, port, model, hasDirtyFields,
 }: {
   host: string; port: string; model: string; hasDirtyFields: boolean;
 }) {
-  const [state, setState] = useState<"idle" | "running" | "done">("idle");
-  const [result, setResult] = useState<SmokeTestResult | null>(null);
+  const [running, setRunning] = useState(false);
+  // A result describes the server it ran against, so it is shown only while
+  // host, port and model still name that server.
+  const key = `${host}|${port}|${model}`;
+  const [outcome, setOutcome] = useState<{ key: string; result: SmokeTestResult } | null>(null);
+  const result = outcome?.key === key ? outcome.result : null;
 
   const run = useCallback(async () => {
-    setState("running");
-    setResult(null);
+    setRunning(true);
+    let next: SmokeTestResult;
     try {
       const portNum = parseInt(port, 10);
       const res = await fetch("/api/llm/local-test", {
@@ -619,36 +1351,29 @@ function SmokeTestButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ host: host || "localhost", port: portNum > 0 ? portNum : 1234, model }),
       });
-      setResult(await res.json() as SmokeTestResult);
+      next = await res.json() as SmokeTestResult;
     } catch (err) {
-      setResult({ ok: false, latencyMs: 0, tokensPerSecond: null, outputTokens: null, reply: null,
-        error: err instanceof Error ? err.message : "Request failed", url: "" });
-    } finally {
-      setState("done");
+      next = { ok: false, latencyMs: 0, tokensPerSecond: null, outputTokens: null, reply: null,
+        error: err instanceof Error ? err.message : "Request failed", url: "" };
     }
-  }, [host, port, model]);
+    setOutcome({ key, result: next });
+    setRunning(false);
+  }, [host, port, model, key]);
 
   return h("div", { class: "llm-smoke-row" },
     h("button", {
-      class: `llm-btn llm-btn-secondary${state === "running" ? " llm-btn-loading" : ""}`,
+      type: "button",
+      class: `llm-btn llm-btn-secondary${running ? " llm-btn-loading" : ""}`,
       onClick: run,
-      disabled: state === "running",
-    }, state === "running" ? "Testing…" : "Test connection"),
-    hasDirtyFields && state !== "running"
+      disabled: running,
+    }, running ? "Testing…" : "Test connection"),
+    hasDirtyFields && !running
       ? h("span", { class: "llm-smoke-hint" }, "using current edits")
       : null,
     result
       ? result.ok
-        ? h("span", { class: "llm-smoke-ok" },
-            `✓ ${result.latencyMs}ms`,
-            result.tokensPerSecond !== null
-              ? h("span", { class: "llm-smoke-meta" }, ` · ${result.tokensPerSecond} tok/s`)
-              : null,
-            result.reply
-              ? h("span", { class: "llm-smoke-reply" }, ` · "${result.reply}"`)
-              : null,
-          )
-        : h("span", { class: "llm-smoke-err" }, `✕ ${result.error ?? "Failed"}`)
+        ? h("span", { class: "llm-smoke-ok", role: "status" }, testSummary(result))
+        : h("span", { class: "llm-smoke-err", role: "alert" }, `✕ ${result.error ?? "Failed"}`)
       : null,
   );
 }
@@ -708,9 +1433,10 @@ function StatusPill({ status, onRefresh }: { status: LocalStatusResponse | null;
   );
 }
 
-// ── Saved profiles panel ────────────────────────────────────────────────
+// ── Saved profiles ──────────────────────────────────────────────────────
 
-function ProfilesPanel({
+/** A row of chips, one per saved profile, plus the way to save the current server as another. */
+function ProfileChips({
   currentValues,
   onChange,
 }: {
@@ -721,13 +1447,26 @@ function ProfilesPanel({
   const [saving, setSaving] = useState(false);
   const [newName, setNewName] = useState("");
   const [showInput, setShowInput] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  /** Runs one profiles request and adopts the list it answers with, or says why it could not. */
+  const exchange = useCallback(async (what: string, request: () => Promise<Response>): Promise<boolean> => {
+    try {
+      const res = await request();
+      const body = await res.json() as { profiles?: LocalProfile[]; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+      setProfiles(body.profiles ?? []);
+      setProblem(null);
+      return true;
+    } catch (err) {
+      setProblem(`Could not ${what}: ${err instanceof Error ? err.message : "request failed"}`);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
-    fetch("/api/llm/local-profiles")
-      .then((r) => r.json() as Promise<{ profiles: LocalProfile[] }>)
-      .then((d) => setProfiles(d.profiles ?? []))
-      .catch(() => {});
-  }, []);
+    void exchange("load profiles", () => fetch("/api/llm/local-profiles"));
+  }, [exchange]);
 
   const apply = useCallback((p: LocalProfile) => {
     onChange("local.host", p.host);
@@ -739,95 +1478,136 @@ function ProfilesPanel({
     const name = newName.trim();
     if (!name) return;
     setSaving(true);
-    try {
-      const res = await fetch("/api/llm/local-profiles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          host: currentValues.host || "localhost",
-          port: parseInt(currentValues.port, 10) || 1234,
-          model: currentValues.model,
-        }),
-      });
-      const d = await res.json() as { profiles: LocalProfile[] };
-      setProfiles(d.profiles ?? []);
+    const saved = await exchange("save the profile", () => fetch("/api/llm/local-profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        host: currentValues.host || "localhost",
+        port: parseInt(currentValues.port, 10) || 1234,
+        model: currentValues.model,
+      }),
+    }));
+    setSaving(false);
+    if (saved) {
       setNewName("");
       setShowInput(false);
-    } catch { /* ignore */ }
-    finally { setSaving(false); }
-  }, [newName, currentValues]);
+    }
+  }, [newName, currentValues, exchange]);
 
-  const del = useCallback(async (name: string) => {
-    try {
-      const res = await fetch(`/api/llm/local-profiles?name=${encodeURIComponent(name)}`, { method: "DELETE" });
-      const d = await res.json() as { profiles: LocalProfile[] };
-      setProfiles(d.profiles ?? []);
-    } catch { /* ignore */ }
-  }, []);
+  const del = useCallback((name: string) => {
+    void exchange("delete the profile", () =>
+      fetch(`/api/llm/local-profiles?name=${encodeURIComponent(name)}`, { method: "DELETE" }));
+  }, [exchange]);
+
+  const cancel = () => { setShowInput(false); setNewName(""); };
 
   return h("div", { class: "llm-profiles" },
-    h("div", { class: "llm-profiles-bar" },
+    h("div", { class: "llm-profile-chips", role: "group", "aria-label": "Saved profiles" },
+      profiles.map((p) => {
+        const selected = p.host === currentValues.host.trim()
+          && String(p.port) === currentValues.port.trim()
+          && p.model === currentValues.model;
+        return h("span", {
+          key: p.name,
+          class: `llm-profile-chip${selected ? " llm-profile-chip-selected" : ""}`,
+        },
+          h("button", {
+            type: "button",
+            class: "llm-profile-chip-apply",
+            "aria-pressed": String(selected),
+            title: `${p.host}:${p.port}${p.model ? ` · ${p.model}` : ""}`,
+            onClick: () => apply(p),
+          }, p.name),
+          h("button", {
+            type: "button",
+            class: "llm-profile-del",
+            onClick: () => del(p.name),
+            title: `Delete "${p.name}"`,
+            "aria-label": `Delete profile "${p.name}"`,
+          }, "✕"),
+        );
+      }),
       showInput
         ? h("div", { class: "llm-profiles-save-row" },
             h("input", {
               class: "llm-text-input",
               type: "text",
               placeholder: "Profile name",
+              "aria-label": "Profile name",
               value: newName,
               autoFocus: true,
               onInput: (e: Event) => setNewName((e.target as HTMLInputElement).value),
               onKeyDown: (e: KeyboardEvent) => {
                 if (e.key === "Enter") void save();
-                if (e.key === "Escape") { setShowInput(false); setNewName(""); }
+                if (e.key === "Escape") cancel();
               },
             }),
             h("button", {
+              type: "button",
               class: "llm-btn llm-btn-primary",
               onClick: () => void save(),
               disabled: saving || !newName.trim(),
             }, saving ? "Saving…" : "Save"),
-            h("button", {
-              class: "llm-btn llm-btn-secondary",
-              onClick: () => { setShowInput(false); setNewName(""); },
-            }, "Cancel"),
+            h("button", { type: "button", class: "llm-btn llm-btn-secondary", onClick: cancel }, "Cancel"),
           )
         : h("button", {
-            class: "llm-btn llm-btn-secondary llm-profiles-new-btn",
+            type: "button",
+            class: "llm-profile-chip llm-profiles-new-btn",
             onClick: () => setShowInput(true),
           }, "+ Save current as profile"),
     ),
-    profiles.length > 0
-      ? h("div", { class: "llm-profiles-list" },
-          profiles.map((p) =>
-            h("div", { key: p.name, class: "llm-profile-row" },
-              h("div", { class: "llm-profile-info" },
-                h("span", { class: "llm-profile-name" }, p.name),
-                h("span", { class: "llm-profile-meta" },
-                  `${p.host}:${p.port}${p.model ? ` · ${p.model.length > 32 ? `…${p.model.slice(-29)}` : p.model}` : ""}`,
-                ),
-              ),
-              h("div", { class: "llm-profile-btns" },
-                h("button", {
-                  class: "llm-btn llm-btn-secondary llm-profile-apply",
-                  onClick: () => apply(p),
-                }, "Apply"),
-                h("button", {
-                  class: "llm-profile-del",
-                  onClick: () => void del(p.name),
-                  title: `Delete "${p.name}"`,
-                  "aria-label": `Delete profile "${p.name}"`,
-                }, "✕"),
-              ),
-            ),
-          ),
-        )
-      : h("p", { class: "llm-profiles-empty" }, "No profiles saved yet."),
+    problem ? h("p", { class: "llm-profiles-problem", role: "alert" }, problem) : null,
   );
 }
 
-// ── Local server section (flat layout) ────────────────────────────────
+// ── Server section (Local vendor) ───────────────────────────────────────
 
+/** A request timeout in ms, as a person would say it. Blank is the 5-minute default; 0 is no limit. */
+function timeoutSummary(raw: string): string {
+  const text = raw.trim();
+  if (text === "") return "5 min (default)";
+  const ms = Number(text);
+  if (!Number.isFinite(ms)) return text;
+  if (ms === 0) return "No limit";
+  if (ms % 3_600_000 === 0) return `${ms / 3_600_000} h`;
+  if (ms % 60_000 === 0) return `${ms / 60_000} min`;
+  if (ms % 1000 === 0) return `${ms / 1000} s`;
+  return `${ms} ms`;
+}
+
+/** The verifier in one line: its endpoint, model and review cycles, or Off when no endpoint is set. */
+function verifierSummary(host: string, port: string, model: string, maxCycles: string): string {
+  if (!host.trim() && !port.trim()) return "Off";
+  const cycles = maxCycles.trim();
+  return [
+    `${host.trim() || "localhost"}${port.trim() ? `:${port.trim()}` : ""}`,
+    model.trim() || null,
+    cycles ? `${cycles} review cycle${cycles === "1" ? "" : "s"}` : null,
+  ].filter(Boolean).join(" · ");
+}
+
+/** One collapsed advanced setting. The summary carries the current value so closed rows still read. */
+function AdvancedRow({
+  name, value, dirty, children,
+}: {
+  name: string;
+  value: string;
+  dirty: boolean;
+  children?: ComponentChildren;
+}) {
+  return h("details", { class: "llm-adv" },
+    h("summary", { class: "llm-adv-summary" },
+      h("span", { class: "llm-adv-name" }, name),
+      " ",
+      h("span", { class: "llm-adv-value" }, value),
+      dirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+    ),
+    h("div", { class: "llm-adv-body" }, children),
+  );
+}
+
+/** Section 2 for the Local vendor, in place of Connection: where the models are served, and how to reach them. */
 function LocalSection({
   config, editValues, onChange, dirtyKeys, localStatus, onRefreshStatus,
 }: {
@@ -838,12 +1618,9 @@ function LocalSection({
   localStatus: LocalStatusResponse | null;
   onRefreshStatus: () => void;
 }) {
-  const liveModels = localStatus?.ok && localStatus.models.length > 0 ? localStatus.models : [];
-
   const host  = editValues["local.host"]       ?? config.host              ?? "localhost";
   const port  = editValues["local.port"]       ?? (config.port !== null ? String(config.port) : "1234");
   const model = editValues["local.model"]      ?? config.model             ?? "";
-  const light = editValues["local.lightModel"] ?? config.lightModel        ?? "";
 
   const maxContextTokens = editValues["local.maxContextTokens"]
     ?? (config.maxContextTokens !== null ? String(config.maxContextTokens) : "");
@@ -857,276 +1634,166 @@ function LocalSection({
     ?? (config.verifier.maxCycles !== null ? String(config.verifier.maxCycles) : "");
   const verifierDirty = dirtyKeys.has("local.verifier.host") || dirtyKeys.has("local.verifier.port")
     || dirtyKeys.has("local.verifier.model") || dirtyKeys.has("local.verifier.maxCycles");
-  const verifierConfigured = config.verifier.host !== null || config.verifier.port !== null;
 
   const connDirty = dirtyKeys.has("local.host") || dirtyKeys.has("local.port");
 
-  // Model field — select when live list available, text input otherwise
-  const primaryField = liveModels.length > 0
-    ? h(ModelSelect, {
-        fieldKey: "local.model",
-        label: "Primary model",
-        description: "Model used for agentic tasks. Leave blank to use any loaded model.",
-        value: model,
-        models: liveModels,
-        onChange,
-        dirty: dirtyKeys.has("local.model"),
-      })
-    : h(ModelField, {
-        fieldKey: "local.model",
-        label: "Primary model",
-        description: "Leave blank to use whichever model is currently loaded.",
-        value: model,
-        onChange,
-        dirty: dirtyKeys.has("local.model"),
-        placeholder: "model-id",
-      });
+  return h("section", { class: "llm-rw-section llm-server-section" },
+    h(SectionHeader, { number: 2, title: "Server", subtitle: "Where your local models are served" }),
 
-  const lightField = liveModels.length > 0
-    ? h(ModelSelect, {
-        fieldKey: "local.lightModel",
-        label: "Light model",
-        description: "Cheaper model for briefs and estimates. Falls back to primary if blank.",
-        value: light,
-        models: liveModels,
-        onChange,
-        dirty: dirtyKeys.has("local.lightModel"),
-      })
-    : h(ModelField, {
-        fieldKey: "local.lightModel",
-        label: "Light model",
-        description: "Falls back to primary if blank.",
-        value: light,
-        onChange,
-        dirty: dirtyKeys.has("local.lightModel"),
-        placeholder: "model-id",
-      });
+    h(StatusPill, { status: localStatus, onRefresh: onRefreshStatus }),
 
-  return h("div", { class: "llm-vendor-section" },
+    h(ProfileChips, { currentValues: { host, port, model }, onChange }),
 
-    // ── Status pill (always first)
-    h("div", { class: "llm-local-top" },
-      h(StatusPill, { status: localStatus, onRefresh: onRefreshStatus }),
-    ),
-
-    // ── Model selection (right after status — most important action when connected)
-    h("p", { class: "llm-section-sub" },
-      liveModels.length > 0
-        ? `Model — select from ${liveModels.length} available`
-        : "Model",
-    ),
-    primaryField,
-    lightField,
-
-    h("hr", { class: "llm-rule" }),
-
-    // ── Connection settings
-    h("p", { class: "llm-section-sub" }, "Connection"),
-    h("div", { class: "llm-conn-row" },
-      h("div", { class: `llm-field${dirtyKeys.has("local.host") ? " llm-field-dirty" : ""}` },
-        h("label", { class: "llm-field-label", htmlFor: "local.host" },
-          "Host",
-          dirtyKeys.has("local.host") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-        ),
-        h("input", {
-          id: "local.host",
-          type: "text",
-          class: "llm-text-input",
-          value: host,
-          placeholder: "localhost",
-          list: "llm-dl-local-host",
-          onInput: (e: Event) => onChange("local.host", (e.target as HTMLInputElement).value),
-        }),
-        h("datalist", { id: "llm-dl-local-host" },
-          h("option", { value: "localhost" }),
-          h("option", { value: "127.0.0.1" }),
-        ),
-      ),
-      h("div", { class: `llm-field${dirtyKeys.has("local.port") ? " llm-field-dirty" : ""}` },
-        h("label", { class: "llm-field-label", htmlFor: "local.port" },
-          "Port",
-          dirtyKeys.has("local.port") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-        ),
-        h("input", {
-          id: "local.port",
-          type: "text",
-          class: "llm-text-input",
-          value: port,
-          placeholder: "1234",
-          list: "llm-dl-local-port",
-          onInput: (e: Event) => onChange("local.port", (e.target as HTMLInputElement).value),
-        }),
-        h("datalist", { id: "llm-dl-local-port" },
-          h("option", { value: "1234" }),
-          h("option", { value: "11434" }),
-          h("option", { value: "8080" }),
-        ),
-      ),
-    ),
-    h(SmokeTestButton, {
-      host, port, model,
-      hasDirtyFields: connDirty || dirtyKeys.has("local.model"),
-    }),
-
-    h("hr", { class: "llm-rule" }),
-
-    // ── Advanced: context budget + second-model verifier
-    h("p", { class: "llm-section-sub" }, "Advanced"),
-    h("div", { class: `llm-field${dirtyKeys.has("local.maxContextTokens") ? " llm-field-dirty" : ""}` },
-      h("label", { class: "llm-field-label", htmlFor: "local.maxContextTokens" },
-        "Max context tokens",
-        dirtyKeys.has("local.maxContextTokens") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-      ),
-      h("p", { class: "llm-field-desc" },
-        "Check that a brief fits before sending it, so an oversized prompt fails fast with a clear error instead of a cryptic HTTP 400. Match your server's \"Context Length\" setting. Leave blank to skip this check.",
-      ),
-      h("input", {
-        id: "local.maxContextTokens",
-        type: "text",
-        inputMode: "numeric",
-        class: "llm-text-input",
-        value: maxContextTokens,
-        placeholder: "e.g. 32768",
-        onInput: (e: Event) => onChange("local.maxContextTokens", (e.target as HTMLInputElement).value),
-      }),
-    ),
-    h("div", { class: `llm-field${dirtyKeys.has("local.timeoutMs") ? " llm-field-dirty" : ""}` },
-      h("label", { class: "llm-field-label", htmlFor: "local.timeoutMs" },
-        "Request timeout (ms)",
-        dirtyKeys.has("local.timeoutMs") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-      ),
-      h("p", { class: "llm-field-desc" },
-        "How long to wait for a single response from the local server. Enter 0 for no limit, or e.g. 7200000 for 2 hours. Leave blank for the 5-minute default. This is per request — the CLI timeouts on the Workflow page bound the whole command instead, so setting those to unlimited does not extend this.",
-      ),
-      h("input", {
-        id: "local.timeoutMs",
-        type: "text",
-        inputMode: "numeric",
-        class: "llm-text-input",
-        value: timeoutMs,
-        placeholder: "e.g. 7200000 (0 = no limit)",
-        onInput: (e: Event) => onChange("local.timeoutMs", (e.target as HTMLInputElement).value),
-      }),
-    ),
-    h("details", { class: "llm-verifier-details", open: verifierConfigured || verifierDirty },
-      h("summary", { class: "llm-verifier-summary" },
-        "Second-model verifier (optional)",
-        verifierDirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-      ),
-      h("p", { class: "llm-field-desc" },
-        "After the primary model finishes, send its solution to a second local endpoint for review before finalizing the run. Good pairing: a smaller/faster model here. Leave all fields blank to disable.",
-      ),
+    h("div", { class: "llm-server-card" },
       h("div", { class: "llm-conn-row" },
-        h("div", { class: `llm-field${dirtyKeys.has("local.verifier.host") ? " llm-field-dirty" : ""}` },
-          h("label", { class: "llm-field-label", htmlFor: "local.verifier.host" }, "Host"),
+        h("div", { class: `llm-field${dirtyKeys.has("local.host") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.host" },
+            "Host",
+            dirtyKeys.has("local.host") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+          ),
           h("input", {
-            id: "local.verifier.host",
+            id: "local.host",
             type: "text",
             class: "llm-text-input",
-            value: verifierHost,
+            value: host,
             placeholder: "localhost",
-            onInput: (e: Event) => onChange("local.verifier.host", (e.target as HTMLInputElement).value),
+            list: "llm-dl-local-host",
+            onInput: (e: Event) => onChange("local.host", (e.target as HTMLInputElement).value),
           }),
+          h("datalist", { id: "llm-dl-local-host" },
+            h("option", { value: "localhost" }),
+            h("option", { value: "127.0.0.1" }),
+          ),
         ),
-        h("div", { class: `llm-field${dirtyKeys.has("local.verifier.port") ? " llm-field-dirty" : ""}` },
-          h("label", { class: "llm-field-label", htmlFor: "local.verifier.port" }, "Port"),
+        h("div", { class: `llm-field${dirtyKeys.has("local.port") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.port" },
+            "Port",
+            dirtyKeys.has("local.port") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+          ),
           h("input", {
-            id: "local.verifier.port",
+            id: "local.port",
+            type: "text",
+            class: "llm-text-input",
+            value: port,
+            placeholder: "1234",
+            list: "llm-dl-local-port",
+            onInput: (e: Event) => onChange("local.port", (e.target as HTMLInputElement).value),
+          }),
+          h("datalist", { id: "llm-dl-local-port" },
+            h("option", { value: "1234" }),
+            h("option", { value: "11434" }),
+            h("option", { value: "8080" }),
+          ),
+        ),
+      ),
+      h(SmokeTestButton, {
+        host, port, model,
+        hasDirtyFields: connDirty || dirtyKeys.has("local.model"),
+      }),
+    ),
+
+    h("div", { class: "llm-adv-list" },
+      h(AdvancedRow, {
+        name: "Context budget",
+        value: maxContextTokens.trim() ? `${maxContextTokens.trim()} tokens` : "Not set",
+        dirty: dirtyKeys.has("local.maxContextTokens"),
+      },
+        h("div", { class: `llm-field${dirtyKeys.has("local.maxContextTokens") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.maxContextTokens" }, "Max context tokens"),
+          h("p", { class: "llm-field-desc" },
+            "Check that a brief fits before sending it, so an oversized prompt fails fast with a clear error instead of a cryptic HTTP 400. Match your server's \"Context Length\" setting. Leave blank to skip this check.",
+          ),
+          h("input", {
+            id: "local.maxContextTokens",
             type: "text",
             inputMode: "numeric",
             class: "llm-text-input",
-            value: verifierPort,
-            placeholder: "1235",
-            onInput: (e: Event) => onChange("local.verifier.port", (e.target as HTMLInputElement).value),
+            value: maxContextTokens,
+            placeholder: "e.g. 32768",
+            onInput: (e: Event) => onChange("local.maxContextTokens", (e.target as HTMLInputElement).value),
           }),
         ),
       ),
-      h(ModelField, {
-        fieldKey: "local.verifier.model",
-        label: "Model",
-        description: "Leave blank to use whichever model is currently loaded on the verifier endpoint.",
-        value: verifierModel,
-        onChange,
-        dirty: dirtyKeys.has("local.verifier.model"),
-        placeholder: "model-id",
-      }),
-      h("div", { class: `llm-field${dirtyKeys.has("local.verifier.maxCycles") ? " llm-field-dirty" : ""}` },
-        h("label", { class: "llm-field-label", htmlFor: "local.verifier.maxCycles" }, "Max review cycles"),
-        h("p", { class: "llm-field-desc" }, "How many FAIL → revise rounds before finalizing regardless (default: 2)."),
-        h("input", {
-          id: "local.verifier.maxCycles",
-          type: "text",
-          inputMode: "numeric",
-          class: "llm-text-input",
-          value: verifierMaxCycles,
-          placeholder: "2",
-          onInput: (e: Event) => onChange("local.verifier.maxCycles", (e.target as HTMLInputElement).value),
+
+      h(AdvancedRow, {
+        name: "Request timeout",
+        value: timeoutSummary(timeoutMs),
+        dirty: dirtyKeys.has("local.timeoutMs"),
+      },
+        h("div", { class: `llm-field${dirtyKeys.has("local.timeoutMs") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.timeoutMs" }, "Request timeout (ms)"),
+          h("p", { class: "llm-field-desc" },
+            "How long to wait for a single response from the local server. Enter 0 for no limit, or e.g. 7200000 for 2 hours. Leave blank for the 5-minute default. This is per request — the CLI timeouts on the Workflow page bound the whole command instead, so setting those to unlimited does not extend this.",
+          ),
+          h("input", {
+            id: "local.timeoutMs",
+            type: "text",
+            inputMode: "numeric",
+            class: "llm-text-input",
+            value: timeoutMs,
+            placeholder: "e.g. 7200000 (0 = no limit)",
+            onInput: (e: Event) => onChange("local.timeoutMs", (e.target as HTMLInputElement).value),
+          }),
+        ),
+      ),
+
+      h(AdvancedRow, {
+        name: "Second-model verifier",
+        value: verifierSummary(verifierHost, verifierPort, verifierModel, verifierMaxCycles),
+        dirty: verifierDirty,
+      },
+        h("p", { class: "llm-field-desc" },
+          "After the primary model finishes, send its solution to a second local endpoint for review before finalizing the run. Good pairing: a smaller/faster model here. Leave all fields blank to disable.",
+        ),
+        h("div", { class: "llm-conn-row" },
+          h("div", { class: `llm-field${dirtyKeys.has("local.verifier.host") ? " llm-field-dirty" : ""}` },
+            h("label", { class: "llm-field-label", htmlFor: "local.verifier.host" }, "Host"),
+            h("input", {
+              id: "local.verifier.host",
+              type: "text",
+              class: "llm-text-input",
+              value: verifierHost,
+              placeholder: "localhost",
+              onInput: (e: Event) => onChange("local.verifier.host", (e.target as HTMLInputElement).value),
+            }),
+          ),
+          h("div", { class: `llm-field${dirtyKeys.has("local.verifier.port") ? " llm-field-dirty" : ""}` },
+            h("label", { class: "llm-field-label", htmlFor: "local.verifier.port" }, "Port"),
+            h("input", {
+              id: "local.verifier.port",
+              type: "text",
+              inputMode: "numeric",
+              class: "llm-text-input",
+              value: verifierPort,
+              placeholder: "1235",
+              onInput: (e: Event) => onChange("local.verifier.port", (e.target as HTMLInputElement).value),
+            }),
+          ),
+        ),
+        h(ModelField, {
+          fieldKey: "local.verifier.model",
+          label: "Model",
+          description: "Leave blank to use whichever model is currently loaded on the verifier endpoint.",
+          value: verifierModel,
+          onChange,
+          dirty: dirtyKeys.has("local.verifier.model"),
+          placeholder: "model-id",
         }),
+        h("div", { class: `llm-field${dirtyKeys.has("local.verifier.maxCycles") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.verifier.maxCycles" }, "Max review cycles"),
+          h("p", { class: "llm-field-desc" }, "How many FAIL → revise rounds before finalizing regardless (default: 2)."),
+          h("input", {
+            id: "local.verifier.maxCycles",
+            type: "text",
+            inputMode: "numeric",
+            class: "llm-text-input",
+            value: verifierMaxCycles,
+            placeholder: "2",
+            onInput: (e: Event) => onChange("local.verifier.maxCycles", (e.target as HTMLInputElement).value),
+          }),
+        ),
       ),
     ),
-
-    h("hr", { class: "llm-rule" }),
-
-    // ── Profiles
-    h("p", { class: "llm-section-sub" }, "Saved profiles"),
-    h(ProfilesPanel, {
-      currentValues: { host, port, model },
-      onChange,
-    }),
-  );
-}
-
-// ── Credential status ─────────────────────────────────────────────────
-
-/**
- * Credential status for the configured provider.
- *
- * Runs the same check as `<cli> auth`, so a missing or invalid key is visible
- * here rather than only when an agent command fails later.
- */
-export function AuthStatusChip() {
-  const cliName = useCliName();
-  const [state, setState] = useState<"checking" | "ok" | "bad">("checking");
-  const [detail, setDetail] = useState<string | null>(null);
-
-  const check = useCallback(async (force = false) => {
-    setState("checking");
-    setDetail(null);
-    try {
-      // Force bypasses the server's cached result; the plain form is served
-      // from cache, so navigating to this page doesn't spawn a subprocess.
-      const res = await fetch(force ? "/api/commands/auth?refresh=true" : "/api/commands/auth");
-      const body = await res.json() as { ok?: boolean; error?: string | null; output?: string };
-      if (body.ok) {
-        setState("ok");
-        setDetail(body.output?.split("\n").filter(Boolean).pop() ?? null);
-      } else {
-        setState("bad");
-        setDetail(body.error ?? "Credential check failed");
-      }
-    } catch (err) {
-      setState("bad");
-      setDetail(err instanceof Error ? err.message : String(err));
-    }
-  }, []);
-
-  useEffect(() => { check(); }, [check]);
-
-  return h("div", { class: `auth-chip auth-chip-${state}`, role: "status", "aria-live": "polite" },
-    h("span", { class: "auth-chip-dot", "aria-hidden": "true" }),
-    h("span", { class: "auth-chip-label" },
-      state === "checking" ? "Checking credentials…"
-        : state === "ok" ? "Credentials OK"
-        : "Credentials not usable",
-    ),
-    detail ? h("span", { class: "auth-chip-detail" }, detail) : null,
-    h("button", {
-      class: "cmd-btn cmd-btn-small",
-      // Not `onClick: check` — that would pass the MouseEvent as `force`.
-      onClick: () => check(true),
-      disabled: state === "checking",
-      title: `Re-run ${cliName} auth`,
-    }, "Re-check"),
   );
 }
 
@@ -1145,6 +1812,9 @@ export function RobotWranglerView() {
 
   const effectiveVendor = pendingVendor !== undefined ? pendingVendor : data?.vendor ?? null;
   const showLocal = effectiveVendor === VIEWER_LLM_VENDOR.LOCAL;
+  // The server resolves the tier table for the saved vendor, so a vendor card
+  // picked but not yet saved has no table of its own to show.
+  const tiersShown = data !== null && effectiveVendor !== null && data.effective.vendor === effectiveVendor;
   const { status: localStatus, refresh: refreshLocal } = useLocalStatus(showLocal);
 
   const loadConfig = useCallback(async () => {
@@ -1220,22 +1890,29 @@ export function RobotWranglerView() {
   // silently included in an unrelated save.
   const dirtyKeys = new Set<string>();
   if (data) {
-    if (effectiveVendor && CLOUD_VENDORS.has(effectiveVendor)) {
-      const vid = effectiveVendor as CloudViewerVendor;
-      for (const f of ["model", "lightModel"] as const) {
-        const k = `${vid}.${f}`;
-        if (k in editValues && editValues[k] !== (data[vid][f] ?? "")) dirtyKeys.add(k);
+    // The tier rows describe the saved vendor; only they are editable, and only
+    // while that is the vendor on screen.
+    if (tiersShown && effectiveVendor) {
+      for (const row of data.tiers ?? []) {
+        const k = tierKey(effectiveVendor, row.tier);
+        if (k in editValues && editValues[k] !== savedTierValue(data, effectiveVendor, row)) dirtyKeys.add(k);
       }
     }
-    if (effectiveVendor) {
-      const k = agentKey(effectiveVendor);
-      if (k in editValues && editValues[k] !== (data.agentModels?.[effectiveVendor] ?? "")) dirtyKeys.add(k);
+    // Review settings, like the tiers, belong to the saved vendor.
+    const review = data.review;
+    if (tiersShown && review?.available) {
+      const saved: Record<string, string> = {
+        [REVIEW_MODE_KEY]: review.mode.value,
+        [REVIEW_VENDOR_KEY]: review.vendor.value ?? "",
+        [REVIEW_ROUNDS_KEY]: String(review.rounds.value),
+      };
+      for (const v of Object.keys(review.models)) saved[reviewModelKey(v)] = savedReviewModel(review, v);
+      for (const [k, savedValue] of Object.entries(saved)) {
+        if (k in editValues && editValues[k] !== savedValue) dirtyKeys.add(k);
+      }
     }
     if (effectiveVendor === VIEWER_LLM_VENDOR.LOCAL) {
-      for (const f of ["model", "lightModel", "host"] as const) {
-        const k = `local.${f}`;
-        if (k in editValues && editValues[k] !== (data.local[f] ?? "")) dirtyKeys.add(k);
-      }
+      if ("local.host" in editValues && editValues["local.host"] !== (data.local.host ?? "")) dirtyKeys.add("local.host");
       if ("local.port" in editValues) {
         const saved = data.local.port !== null ? String(data.local.port) : "1234";
         if (editValues["local.port"] !== saved) dirtyKeys.add("local.port");
@@ -1278,24 +1955,61 @@ export function RobotWranglerView() {
 
   const hasChanges = dirtyKeys.size > 0 || vendorDirty || dirtyToggles.size > 0 || provider.dirty;
 
+  // What the unsaved edits would resolve to. The body doubles as the effect's
+  // key, so an unchanged set of edits does not re-ask.
+  const previewBody = data && hasChanges
+    ? JSON.stringify({
+        changes: buildChanges(vendorDirty, pendingVendor, dirtyKeys, editValues, dirtyToggles, editToggles),
+        ...(provider.dirty ? { provider: provider.value } : {}),
+      })
+    : null;
+  const [preview, setPreview] = useState<LlmPreviewResponse | null>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  useEffect(() => {
+    if (previewBody === null) {
+      setPreview(null);
+      setPreviewFailed(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/llm/config/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: previewBody,
+        });
+        if (!res.ok) throw new Error(`Preview failed (HTTP ${res.status})`);
+        const json = await res.json() as LlmPreviewResponse;
+        if (!cancelled) {
+          setPreview(json);
+          setPreviewFailed(false);
+        }
+      } catch {
+        // The card falls back to the saved config and says the preview failed.
+        if (!cancelled) {
+          setPreview(null);
+          setPreviewFailed(true);
+        }
+      }
+    }, PREVIEW_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [previewBody]);
+
+  const handlePickVendor = useCallback(() => {
+    document.getElementById(VENDOR_SECTION_ID)?.scrollIntoView?.({ behavior: "smooth" });
+  }, []);
+
   // Two writes, in this order: the hench route validates `provider` against the
   // *saved* vendor, so the llm write (which may change the vendor) goes first.
   const handleSave = useCallback(async () => {
     setSaving(true);
     setError(null);
     try {
-      const changes: Record<string, string | null | boolean> = {};
-      if (vendorDirty) changes["llm.vendor"] = pendingVendor;
-      for (const key of dirtyKeys) {
-        const raw = editValues[key] ?? "";
-        const value = raw.trim() || null;
-        // "agent.claude" → hench.models.claude; "claude.model" → llm.claude.model
-        if (key.startsWith(AGENT_KEY_PREFIX)) changes[`hench.models.${key.slice(AGENT_KEY_PREFIX.length)}`] = value;
-        else changes[`llm.${key}`] = value;
-      }
-      for (const key of dirtyToggles) {
-        if (key === "autoFailover") changes["llm.autoFailover"] = editToggles.autoFailover;
-      }
+      const changes = buildChanges(vendorDirty, pendingVendor, dirtyKeys, editValues, dirtyToggles, editToggles);
 
       if (Object.keys(changes).length > 0) {
         const res = await fetch("/api/llm/config", {
@@ -1371,7 +2085,6 @@ export function RobotWranglerView() {
   // above — this notice only explains where it is still stored.
   const legacyFields = (["model", "lightModel"] as const)
     .filter((f) => data?.claudeSources?.[f] === "legacy");
-  const showLegacy = legacyFields.length > 0;
 
   return h(SettingsFrame, {
     dirty: hasChanges,
@@ -1379,6 +2092,9 @@ export function RobotWranglerView() {
     error,
     onSave: handleSave,
     onDiscard: handleDiscard,
+    changeSummary: data
+      ? summarizeChanges(data, effectiveVendor, vendorDirty, pendingVendor, dirtyKeys, editValues, dirtyToggles, editToggles, provider)
+      : undefined,
   },
    h("div", { class: "llm-container" },
 
@@ -1399,72 +2115,32 @@ export function RobotWranglerView() {
       ),
     ),
 
-    // ── Credential status for the configured provider
-    h(AuthStatusChip, null),
-
-    // What `ndx work` will run, per the route (saved config, not pending edits)
-    data ? h(EffectiveBlock, { effective: data.effective, problems: data.effectiveProblems }) : null,
-
-    h(VendorSelector, {
-      vendor: effectiveVendor,
-      onChange: handleVendorChange,
-      localStatus: showLocal ? localStatus : null,
-    }),
-
-    // Provider and agent model for the active vendor, from the server catalog
-    catalogError
-      ? h("p", { class: "llm-catalog-error", role: "alert" },
-          `${catalogError}. Model lists are empty; use "Other model…" to enter an id.`)
-      : null,
-    (effectiveVendor && data)
-      ? h("div", { key: `agent-${effectiveVendor}`, class: "llm-vendor-section llm-agent-section" },
-          h(ProviderField, {
-            choices: providerChoices.length > 0 ? providerChoices : [provider.value],
-            value: provider.value,
-            onChange: handleField,
-            dirty: provider.dirty,
-          }),
-          vendorCatalog
-            ? h(CatalogStatus, {
-                vendor: effectiveVendor as ViewerLLMVendor,
-                entry: vendorCatalog,
-                refreshing,
-                onRefresh: () => { void loadCatalog(true); },
-              })
-            : null,
-          h(CatalogModelPicker, {
-            fieldKey: agentKey(effectiveVendor),
-            label: "Agent model",
-            description: `Model ${cliName} work runs for ${effectiveVendor}. Overrides the project model; --model on the command line still wins.`,
-            value: editValues[agentKey(effectiveVendor)] ?? data.agentModels?.[effectiveVendor] ?? "",
-            models: vendorCatalog?.models ?? [],
-            defaultModel: vendorCatalog?.defaultModel,
-            unsetLabel: vendorCatalog
-              ? `Use project default (${vendorCatalog.defaultModel})`
-              : "Use project default",
-            onChange: handleField,
-            dirty: dirtyKeys.has(agentKey(effectiveVendor)),
-          }),
-        )
-      : null,
-
-    // Active vendor settings
-    (effectiveVendor && CLOUD_VENDORS.has(effectiveVendor))
-      ? h(VendorSection, {
-          key: effectiveVendor,
-          vendorId: effectiveVendor as CloudViewerVendor,
-          config: data![effectiveVendor as CloudViewerVendor] ?? { model: null, lightModel: null },
-          catalog: vendorCatalog,
-          editValues,
-          onChange: handleField,
-          dirtyKeys,
-          legacyFields: effectiveVendor === VIEWER_LLM_VENDOR.CLAUDE ? legacyFields : [],
+    // What `ndx work` will run: the saved config, or the preview while edits are pending
+    data
+      ? h(RunCard, {
+          saved: data,
+          preview,
+          previewFailed,
+          catalog,
+          refreshing,
+          onRefresh: () => { void loadCatalog(true); },
+          legacyFields,
+          onPickVendor: handlePickVendor,
         })
       : null,
-    showLocal
+
+    h(VendorCards, {
+      vendor: effectiveVendor,
+      catalog,
+      onChange: handleVendorChange,
+    }),
+
+    // Section 2. A local server has no CLI or API choice to make: it is reached
+    // at a host and port, so Server takes the slot Connection holds elsewhere.
+    showLocal && data
       ? h(LocalSection, {
           key: VIEWER_LLM_VENDOR.LOCAL,
-          config: data!.local ?? {
+          config: data.local ?? {
             model: null, lightModel: null, host: null, port: null,
             maxContextTokens: null, timeoutMs: null,
             verifier: { host: null, port: null, model: null, maxCycles: null },
@@ -1475,40 +2151,69 @@ export function RobotWranglerView() {
           localStatus,
           onRefreshStatus: refreshLocal,
         })
+      : (effectiveVendor && data)
+        ? h(ConnectionCards, {
+            vendor: effectiveVendor as ViewerLLMVendor,
+            choices: providerChoices.length > 0 ? providerChoices : [provider.value],
+            value: provider.value,
+            readiness: vendorCatalog?.readiness,
+            onChange: handleField,
+            dirty: provider.dirty,
+          })
+        : null,
+
+    catalogError
+      ? h("p", { class: "llm-catalog-error", role: "alert" },
+          `${catalogError}. Model lists are empty; use "Other model id…" to enter an id.`)
       : null,
+    // The server's tier table, for the vendor it resolved it for. The local
+    // vendor lists what its server reports as loaded rather than a catalog.
+    (effectiveVendor && data)
+      ? h(TierTable, {
+          key: `tiers-${effectiveVendor}`,
+          vendor: effectiveVendor as ViewerLLMVendor,
+          ready: tiersShown,
+          data,
+          models: showLocal && localStatus?.ok && localStatus.models.length > 0
+            ? localStatus.models
+            : vendorCatalog?.models ?? [],
+          editValues,
+          dirtyKeys,
+          onChange: handleField,
+        })
+      : null,
+
     !effectiveVendor
       ? h("p", { class: "llm-no-vendor" }, "Select a vendor above to configure its settings.")
       : null,
 
-    // Failover toggle
-    h("div", { class: "llm-failover-wrap" },
-      h(ToggleSwitch, {
-        fieldKey: "autoFailover",
-        label: "Automatic failover",
-        description: "Retry on fallback models before surfacing an error.",
-        value: editToggles.autoFailover ?? data?.autoFailover ?? false,
-        onChange: handleToggle,
-        dirty: dirtyToggles.has("autoFailover"),
-      }),
-    ),
-
-    // Legacy notice
-    showLegacy
-      ? h("div", { class: "llm-legacy" },
-          h("span", null, "ℹ"),
-          h("div", null,
-            h("strong", null, "Still set under a deprecated key"),
-            h("p", null,
-              legacyFields.map((f) => `claude.${f}`).join(" and "),
-              legacyFields.length === 1 ? " is " : " are ",
-              "read from the legacy top-level key. The value shown above is the one that will run. ",
-              "Saving writes the modern ",
-              h("code", null, "llm.claude.*"),
-              " field and leaves the old key where it is.",
-            ),
-          ),
-        )
+    // Section 4: Failover
+    data && effectiveVendor
+      ? h(FailoverSection, {
+          // The preview's answer while edits are pending, so the chain and reason match the run card.
+          failover: preview?.failover ?? data.failover,
+          vendor: effectiveVendor,
+          enabled: editToggles.autoFailover ?? data.autoFailover ?? false,
+          onChange: handleToggle,
+          dirty: dirtyToggles.has("autoFailover"),
+        })
       : null,
+
+    // Section 5: Review. Without the server's block there is nothing to lay out.
+    data?.review && effectiveVendor
+      ? h(ReviewSection, {
+          review: data.review,
+          executor: data.effective.vendor as ViewerLLMVendor,
+          vendor: effectiveVendor as ViewerLLMVendor,
+          executorModel: data.effective.model,
+          ready: tiersShown,
+          catalog,
+          editValues,
+          dirtyKeys,
+          onChange: handleField,
+        })
+      : null,
+
    ),
   );
 }

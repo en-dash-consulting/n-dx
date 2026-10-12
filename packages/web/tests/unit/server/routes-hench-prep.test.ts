@@ -123,6 +123,7 @@ describe("hench prep routes", () => {
       expect(body.command).toBe(RESOLVE_JSON.command);
       expect(body.resolved).toEqual(RESOLVE_JSON.resolved);
       expect(body.recommendation).toBeNull();
+      expect(body.pairSupported).toBe(true);
       // The catalog entry of the vendor hench resolved, not every vendor's.
       expect(body.catalog.vendor).toBe("claude");
       expect(body.catalog.providers).toEqual(expect.arrayContaining(["cli"]));

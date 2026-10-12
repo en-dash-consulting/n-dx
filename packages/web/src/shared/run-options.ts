@@ -46,6 +46,8 @@ export interface RunOptions {
   provider?: "cli" | "api";
   permissionMode?: "default" | "acceptEdits" | "bypassPermissions";
   review?: boolean;
+  reviewMode?: "off" | "self" | "pair";
+  reviewVendor?: "claude" | "codex";
   reviewModel?: string;
   reviewOptional?: boolean;
   skipTestGate?: boolean;
@@ -74,6 +76,8 @@ export const RUN_OPTION_SPECS: readonly RunOptionSpec[] = [
   { key: "provider", flag: "provider", type: "enum", values: ["cli", "api"] },
   { key: "permissionMode", flag: "permission-mode", type: "enum", values: ["default", "acceptEdits", "bypassPermissions"] },
   { key: "review", flag: "review", negatedFlag: "no-review", type: "boolean" },
+  { key: "reviewMode", flag: "review-mode", type: "enum", values: ["off", "self", "pair"] },
+  { key: "reviewVendor", flag: "reviewer", type: "enum", values: ["claude", "codex"] },
   { key: "reviewModel", flag: "review-model", type: "string", maxBytes: MODEL_ID_MAX_BYTES },
   { key: "reviewOptional", flag: "review-optional", type: "boolean" },
   { key: "skipTestGate", flag: "skip-test-gate", negatedFlag: "no-skip-test-gate", type: "boolean" },
@@ -150,11 +154,23 @@ export function checkRunOptions(input: unknown): RunOptionsCheck {
     if (problem) return { ok: false, key, error: `Run option "${key}" ${problem}` };
     options[key] = value;
   }
-  if (options.reviewModel !== undefined && options.review !== true) {
+  // `review` says "some review" or "none"; `reviewMode` says which. hench
+  // refuses a mode that contradicts the boolean, so the launch does too.
+  const { review, reviewMode } = options;
+  if (reviewMode !== undefined && review !== undefined && (reviewMode === "off") === review) {
+    return { ok: false, key: "reviewMode", error: `Run option "reviewMode" contradicts "review": ${review}` };
+  }
+  // A reviewer with no review stated is fine: the task may have saved pair.
+  const statesNonPair = reviewMode !== undefined ? reviewMode !== "pair" : review !== undefined;
+  if (options.reviewVendor !== undefined && statesNonPair) {
+    return { ok: false, key: "reviewVendor", error: 'Run option "reviewVendor" only applies to "reviewMode": "pair"' };
+  }
+  const reviewOn = review === true || reviewMode === "self" || reviewMode === "pair";
+  if (options.reviewModel !== undefined && !reviewOn) {
     return { ok: false, key: "reviewModel", error: 'Run option "reviewModel" requires "review": true' };
   }
-  // hench refuses --review-optional without --review; only a true value does.
-  if (options.reviewOptional === true && options.review !== true) {
+  // hench refuses --review-optional without a review; only a true value does.
+  if (options.reviewOptional === true && !reviewOn) {
     return { ok: false, key: "reviewOptional", error: 'Run option "reviewOptional" requires "review": true' };
   }
   return { ok: true, options: options as RunOptions };
