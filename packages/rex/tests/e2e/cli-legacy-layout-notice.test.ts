@@ -67,7 +67,10 @@ describe("rex on a v1 PRD", () => {
   });
 
   it("finds the project when the last positional is an id, not a dir", () => {
-    const out = spawnSync("node", [cliPath, "next"], { cwd: dir, encoding: "utf-8", timeout: 20_000 });
+    const id = JSON.parse(rex(["status", "--format=json", dir]).stdout).items[0].id as string;
+    // From the project dir, `update <id>` has no dir positional: resolving the id as a path would find no PRD.
+    const out = spawnSync("node", [cliPath, "update", id, "--priority=high"], { cwd: dir, encoding: "utf-8", timeout: 20_000 });
+    expect(out.status, out.stderr).toBe(0);
     expect(count(out.stderr)).toBe(1);
   });
 
