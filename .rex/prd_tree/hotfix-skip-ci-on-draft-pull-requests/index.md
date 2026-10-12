@@ -24,4 +24,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Gate ci.yml build and smoke-parity jobs on non-draft pull requests](./gate-ci-yml-build-and-smoke-parity.md) | completed |
 | [Gate CodeQL and Dependency Review on non-draft pull requests](./gate-codeql-and-dependency-review-on.md) | completed |
 | [Policy test: PR-triggered workflow jobs skip drafts without skipping main or the merge queue](./policy-test-pr-triggered-workflow-jobs.md) | completed |
-| [Run CI once on a draft PR when the ci:run label is added](./run-ci-once-on-a-draft-pr-when-the-ci.md) | pending |
+| [Manual CI for draft PRs: a one-shot ci:run label and a Run workflow button](./manual-ci-for-draft-prs-a-one-shot-ci.md) | pending |
