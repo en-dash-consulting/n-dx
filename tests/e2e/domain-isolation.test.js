@@ -345,7 +345,7 @@ describe("architecture policy: orchestration tier boundary", () => {
     "packages/core/claude-integration.js",
   ];
 
-  const DOMAIN_PACKAGES = ["@n-dx/rex", "@n-dx/sourcevision", "@n-dx/hench", "@n-dx/web"];
+  const DOMAIN_PACKAGES = ["@n-dx/rex", "@n-dx/sourcevision", "@n-dx/hench", "@n-dx/web", "@n-dx/graview"];
 
   for (const file of ORCHESTRATION_FILES) {
     it(`${file} must not have runtime imports from domain/execution packages`, () => {
@@ -726,6 +726,7 @@ describe("architecture policy: gateway enforcement", () => {
       ...walk(join(ROOT, "packages/hench/src")),
       ...walk(join(ROOT, "packages/web/src")),
       ...walk(join(ROOT, "packages/llm-client/src")),
+      ...walk(join(ROOT, "packages/graview/src")),
     ];
 
     for (const dataDir of DATA_DIRS) {
@@ -1035,6 +1036,7 @@ describe("architecture policy: production → test boundary", () => {
     "packages/hench/src",
     "packages/web/src",
     "packages/llm-client/src",
+    "packages/graview/src",
   ];
 
   it("no production source file imports from test directories", () => {

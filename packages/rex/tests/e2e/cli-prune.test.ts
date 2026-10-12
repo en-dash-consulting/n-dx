@@ -26,8 +26,11 @@ describe("rex prune", { timeout: 120_000 }, () => {
   /**
    * `rex init` runs once, into a template that each test copies: the spawn
    * cost about a second here and three on the Windows CI runner, per test.
-   * The init output names nothing about its directory, so a copy is the same
-   * project a fresh init would give.
+   * The copies do carry the template's name: `rex init` writes the directory's
+   * basename into `.rex/config.json` as `project`, and into the prd_tree
+   * heading. Nothing here asserts on either, so a copy behaves as a fresh init
+   * would for these tests — but a test that did assert on the project name
+   * would need its own init rather than a copy.
    */
   let templateDir: string;
   let tmpDir: string;

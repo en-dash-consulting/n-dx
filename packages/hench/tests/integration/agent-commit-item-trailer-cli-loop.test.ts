@@ -91,6 +91,23 @@ describe("cliLoop — agent commit N-DX-Item", () => {
 
     const workCommit = run.commits?.find((c) => c.subject === "feat: the feature");
     expect(workCommit).toBeDefined();
-    expect(run.commitsMissingItem).toEqual([{ ...workCommit, items: [] }]);
+    // The report names the commit and what it lacks, not how the run tied it.
+    // authorDate and authorEmail are pinned against git rather than asserted as
+    // shapes: they are what rex's twin rule keys on, so a wrong value is as
+    // bad as a missing one and expect.any would accept both.
+    const factOf = (fmt: string): string =>
+      execFileSync("git", ["log", "-1", `--format=${fmt}`, workCommit!.sha], {
+        cwd: projectDir,
+        encoding: "utf-8",
+      }).trim();
+    expect(run.commitsMissingItem).toEqual([
+      {
+        sha: workCommit!.sha,
+        subject: workCommit!.subject,
+        authorDate: factOf("%aI"),
+        authorEmail: factOf("%ae"),
+        items: [],
+      },
+    ]);
   });
 });

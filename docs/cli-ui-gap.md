@@ -41,7 +41,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 
 _Generated from `packages/core/command-effects.js` — the same declarations the terminal preflight banner prints and `GET /api/commands/manifest` serves. Edit the declarations, then run `node scripts/build-cli-ui-gap.mjs`._
 
-Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the .ndx layout), `{hench}` = `.hench` (`.ndx/hench` on the .ndx layout), `{sourcevision}` = `.sourcevision` (`.ndx/sourcevision` on the .ndx layout), `{config}` = `.n-dx.json` (`.ndx/config.json` on the .ndx layout), `{localConfig}` = `.n-dx.local.json` (`.ndx/config.local.json` on the .ndx layout), `{webPid}` = `.n-dx-web.pid` (`.ndx/web.pid` on the .ndx layout), `{webPort}` = `.n-dx-web.port` (`.ndx/web.port` on the .ndx layout).
+Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the .ndx layout), `{hench}` = `.hench` (`.ndx/hench` on the .ndx layout), `{sourcevision}` = `.sourcevision` (`.ndx/sourcevision` on the .ndx layout), `{graview}` = `.graview` (`.ndx/graview` on the .ndx layout), `{config}` = `.n-dx.json` (`.ndx/config.json` on the .ndx layout), `{localConfig}` = `.n-dx.local.json` (`.ndx/config.local.json` on the .ndx layout), `{webPid}` = `.n-dx-web.pid` (`.ndx/web.pid` on the .ndx layout), `{webPort}` = `.n-dx-web.port` (`.ndx/web.port` on the .ndx layout).
 
 | Command | Writes | LLM phases (calls) | Network | Takes |
 |---------|--------|--------------------|---------|-------|
@@ -86,6 +86,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `ndx next` | nothing (read-only) | none | none | seconds |
 | `ndx tree` | nothing (read-only) | none | none | seconds |
 | `ndx tree-diff` | nothing (read-only) | none | none | seconds |
+| `ndx graview` | `{graview}/document.json and {graview}/snapshot.json`<br>`{graview}/cache/` (only when the PRD has a product layer and the project is a git repository)<br>`{graview}/data/` (only for serve and mcp) | none | remote (only when no graview binary is configured or on PATH) | seconds to emit; serve and mcp run until stopped |
 | `ndx readiness` | nothing (read-only) | none | none | seconds |
 | `ndx reset` | `{sourcevision}/` | none | none | seconds |
 | `ndx show` | nothing (read-only) | none | none | seconds |

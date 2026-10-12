@@ -12,7 +12,10 @@
 name: Dependency Review
 
 on:
+  # ready_for_review starts the review the moment a draft is marked ready;
+  # converted_to_draft starts a run whose job skips.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 
 permissions:
   contents: read
@@ -21,6 +24,9 @@ jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
+    # Skip drafts (they cannot merge). The event_name half is redundant here
+    # but keeps one pattern across workflows.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 10
 
     steps:
