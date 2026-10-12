@@ -12,13 +12,15 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 
 const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 const TIMEOUT = 30_000;
+/** rex's v2 tree fixture; copied into each temp project, never written in place. */
+const V2_FIXTURE = join(import.meta.dirname, "../../../rex/tests/fixtures/v2-tree");
 
 function runResult(args: string[]): { stdout: string; stderr: string; code: number } {
   try {
@@ -69,5 +71,16 @@ describe("hench run — flag conflict refusals", () => {
     // is not this test's business, only that it is not the --mine refusal.
     const { stderr } = runResult(["run", "--epic-by-epic", "--dry-run", tmpDir]);
     expect(stderr).not.toContain("Cannot use --mine with --epic-by-epic");
+  });
+
+  // A v2 tree (product/ + changes/) has no epic level, so --epic-by-epic would
+  // select nothing (or everything) while reporting it ran by epic.
+  it.each([["--epic-by-epic"], ["--epic=anything"]])("refuses %s on a v2 PRD, naming the reason", async (flag) => {
+    await cp(V2_FIXTURE, join(tmpDir, ".rex"), { recursive: true });
+    const { stderr, code } = runResult(["run", flag, "--dry-run", tmpDir]);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain(`Cannot use ${flag.split("=")[0]} on this PRD`);
+    expect(stderr).toContain("no epic level");
   });
 });

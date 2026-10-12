@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
-import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor, traversalBlock } from "../../prd/rex-gateway.js";
+import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor, traversalBlock, prdLayout } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore, TraversalBlock } from "../../prd/rex-gateway.js";
 import { collectEpicTaskIds as collectEpicTasks, selectTaskEntry } from "../../agent/planning/brief.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
@@ -29,6 +29,7 @@ import {
 } from "../../process/claude-mcp-registration.js";
 import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
+import { actionableV2Entries, findV2Entry, loadV2Tree, nextV2Entry, V2_HAS_NO_EPICS } from "../../agent/planning/work-selection.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 import { safeParseInt } from "./constants.js";
@@ -792,6 +793,8 @@ async function countActionableIgnoringAssignee(
   epicId?: string,
 ): Promise<number> {
   const doc = await store.loadDocument();
+  const tree = await loadV2Tree(store);
+  if (tree) return actionableV2Entries(tree, doc.items).length;
   const completedIds = collectCompletedIds(doc.items);
   const entries = findActionable(doc.items, completedIds, Infinity);
   if (!epicId) return entries.length;
@@ -983,10 +986,11 @@ export async function peekNextTaskPriority(
   assignee?: string,
 ): Promise<TaskPriority> {
   const doc = await store.loadDocument();
+  const tree = await loadV2Tree(store);
 
   // If explicit task ID, look it up directly
   if (taskId) {
-    const entry = findItem(doc.items, taskId);
+    const entry = tree ? findV2Entry(tree, doc.items, taskId) : findItem(doc.items, taskId);
     if (entry) {
       return resolveSchedulingPriority({
         taskPriority: entry.item.priority,
@@ -1008,7 +1012,22 @@ export async function peekNextTaskPriority(
     ? { ...(tags?.length ? { tags } : {}), ...(assignee ? { assignee } : {}) }
     : undefined;
 
-  if (epicId) {
+  if (tree) {
+    // The same selection runOne makes on a v2 tree (no epic level to scope to).
+    const next = nextV2Entry(tree, {
+      ...(excludeTaskIds ? { excludeIds: excludeTaskIds } : {}),
+      ...(tags?.length ? { tags } : {}),
+      ...(assignee ? { assignee } : {}),
+    });
+    if (next) {
+      return resolveSchedulingPriority({
+        // A task without its own priority runs at its change's, as selection ranked it.
+        taskPriority: next.explanation.priority.itemPriority,
+        tags: next.item.tags,
+        cliOverride,
+      });
+    }
+  } else if (epicId) {
     // Use the same logic as assembleTaskBrief for epic-scoped selection
     const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
     const allActionable = findActionable(doc.items, skipIds, Infinity, selectOptions);
@@ -1471,7 +1490,9 @@ async function runOne(
   //
   // Its "No actionable tasks" error is the sentinel `--loop` reads as "done",
   // and is deliberately left to propagate exactly as it did from the brief.
+  const selectionTree = await loadV2Tree(store);
   const selected = await selectTaskEntry((await store.loadDocument()).items, {
+    ...(selectionTree ? { tree: selectionTree } : {}),
     ...(taskId ? { taskId } : {}),
     ...(excludeTaskIds ? { excludeTaskIds } : {}),
     ...(epicId ? { epicId } : {}),
@@ -1677,6 +1698,25 @@ async function runOne(
   return { status: run.status, taskTitle: run.taskTitle, selectedTaskId: run.taskId, ...(model ? { model } : {}) };
 }
 
+/**
+ * The refusal for `--epic-by-epic` or `--epic` on a v2 tree, which has no epic
+ * level; `undefined` when neither flag is set or the tree is v1. Refused
+ * rather than mapped onto changes: how epics map to changes is not decided,
+ * and an accepted flag that selected nothing (or everything) would be the
+ * silent no-op the other flag refusals exist to prevent.
+ */
+export async function refuseEpicFlagsOnV2(
+  rexDir: string,
+  flags: Record<string, string>,
+): Promise<CLIError | undefined> {
+  const flag = flags["epic-by-epic"] === "true" ? "--epic-by-epic" : flags.epic ? "--epic" : undefined;
+  if (!flag || (await prdLayout(rexDir)) !== "v2") return undefined;
+  return new CLIError(
+    `Cannot use ${flag} on this PRD: ${V2_HAS_NO_EPICS}.`,
+    `Drop ${flag}: --loop works through every change, and --task=<id> runs one change or task.`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // No-more-tasks sentinel
 // ---------------------------------------------------------------------------
@@ -1694,6 +1734,8 @@ function isNoTasksError(err: unknown): boolean {
 /** Returns true if there are still actionable tasks matching the given tags. */
 async function hasPendingTaggedTasks(rexDir: string, tags: string[]): Promise<boolean> {
   const store = await resolveStore(rexDir);
+  const tree = await loadV2Tree(store);
+  if (tree) return nextV2Entry(tree, { tags }) !== null;
   const doc = await store.loadDocument();
   const completedIds = collectCompletedIds(doc.items);
   const remaining = findActionable(doc.items, completedIds, 1, { tags });
@@ -1861,6 +1903,8 @@ export async function cmdRun(
         "Drop --mine, or run without --epic-by-epic.",
     );
   }
+  const epicRefusal = await refuseEpicFlagsOnV2(rexDir, flags);
+  if (epicRefusal) throw epicRefusal;
   const assignee = mine ? await resolveActor(dir) : undefined;
 
   // Provider support per vendor, and the review pass's need for the CLI

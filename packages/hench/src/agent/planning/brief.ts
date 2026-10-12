@@ -7,7 +7,15 @@ import {
   collectRequirements,
   isWorkItem,
 } from "../../prd/rex-gateway.js";
-import type { PRDStore, PRDItem, TreeEntry } from "../../prd/rex-gateway.js";
+import type { PRDStore, PRDItem, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
+import {
+  actionableV2Entries,
+  loadV2Tree,
+  nextV2Entry,
+  readTreeAsReset,
+  resolveV2Entry,
+  V2_HAS_NO_EPICS,
+} from "./work-selection.js";
 import { resolveProjectCliName, DEFAULT_CLI_NAME } from "./cli-identity.js";
 import type {
   TaskBrief,
@@ -236,6 +244,12 @@ export interface SelectTaskOptions {
    * untransformed tree.
    */
   wouldResetIds?: ReadonlySet<string>;
+  /**
+   * The v2 tree `rawItems` were projected from ({@link loadV2Tree}). When set,
+   * selection is rex's v2 selection (`findNextWorkTask`, `resolveWorkById`) and
+   * `rawItems` only supply the entry; there is no epic level to scope to.
+   */
+  tree?: V2Tree;
 }
 
 /**
@@ -263,17 +277,22 @@ export async function selectTaskEntry(
   const { taskId, excludeTaskIds: excludeIds, epicId, tags, assignee, claims } = options;
   const cliName = options.cliName ?? DEFAULT_CLI_NAME;
   const items = options.wouldResetIds?.size ? readAsReset(rawItems, options.wouldResetIds) : rawItems;
+  const tree = options.tree && options.wouldResetIds?.size
+    ? readTreeAsReset(options.tree, options.wouldResetIds)
+    : options.tree;
+  if (tree && epicId) throw new Error(`Cannot scope selection to an epic: ${V2_HAS_NO_EPICS}.`);
 
   if (taskId) {
-    const entry = findItem(items, taskId);
+    // On v2 the ref may be a display id or alias; the entry carries the real id.
+    const entry = tree ? resolveV2Entry(tree, items, taskId) : findItem(items, taskId);
     if (!entry) throw new Error(`Task not found: ${taskId}`);
     const notActionable = explicitTaskRefusal(entry.item, cliName);
     if (notActionable) throw notActionable;
     // An explicit task another worktree is working on is refused, not stolen.
     // Claiming is the check: the store answers atomically under its lock.
     if (claims) {
-      const refusedBy = await claims.claim(taskId);
-      if (refusedBy) throw new TaskClaimedElsewhereError(taskId, refusedBy, entry.item.title);
+      const refusedBy = await claims.claim(entry.item.id);
+      if (refusedBy) throw new TaskClaimedElsewhereError(entry.item.id, refusedBy, entry.item.title);
     }
     return entry;
   }
@@ -292,7 +311,14 @@ export async function selectTaskEntry(
       ...(claimedElsewhere.size > 0 ? { excludeIds: claimedElsewhere } : {}),
     };
     let candidate: TreeEntry | null;
-    if (epicId) {
+    if (tree) {
+      candidate = nextV2Entry(tree, {
+        excludeIds: new Set([...(excludeIds ?? []), ...claimedElsewhere]),
+        ...(tags?.length ? { tags } : {}),
+        ...(assignee ? { assignee } : {}),
+      });
+      if (!candidate) throw new Error("No actionable tasks found in PRD");
+    } else if (epicId) {
       // Epic filter active: get all actionable tasks and filter to the epic.
       const epicTaskIds = collectEpicTaskIds(items, epicId);
       const allActionable = findActionableTasks(items, skipIds, Infinity, selectOptions);
@@ -333,7 +359,9 @@ export async function assembleTaskBrief(
     ? resolveProjectCliName(options.projectDir)
     : DEFAULT_CLI_NAME;
 
+  const tree = await loadV2Tree(store);
   const entry = await selectTaskEntry(doc.items, {
+    ...(tree ? { tree: resetIds?.size ? readTreeAsReset(tree, resetIds) : tree } : {}),
     ...(taskId ? { taskId } : {}),
     ...(excludeIds ? { excludeTaskIds: excludeIds } : {}),
     ...(options?.epicId ? { epicId: options.epicId } : {}),
@@ -424,12 +452,15 @@ export async function getActionableTasks(
     ...(claimedElsewhere?.size ? { excludeIds: claimedElsewhere } : {}),
     ...(assignee ? { assignee } : {}),
   };
-  const entries = findActionableTasks(
-    doc.items,
-    completedIds,
-    limit,
-    Object.keys(selectOptions).length > 0 ? selectOptions : undefined,
-  );
+  const tree = await loadV2Tree(store);
+  const entries = tree
+    ? actionableV2Entries(tree, doc.items, selectOptions).slice(0, limit)
+    : findActionableTasks(
+        doc.items,
+        completedIds,
+        limit,
+        Object.keys(selectOptions).length > 0 ? selectOptions : undefined,
+      );
 
   return entries.map((e) => ({
     id: e.item.id,

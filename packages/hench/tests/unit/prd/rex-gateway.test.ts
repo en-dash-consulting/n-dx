@@ -50,6 +50,12 @@ const EXPECTED_EXPORTS = [
   // an epic has nothing selectable when its tasks all read "pending".
   "traversalBlock",
   "matchesAssignee",
+  // v2 work selection — the entry points get_next_task uses on a v2 tree
+  "prdLayout",
+  "isChangeLayerStore",
+  "findNextWorkTask",
+  "findActionableWork",
+  "resolveWorkById",
   // Cross-worktree task claims
   "openClaimsStore",
   "resolveClaimHolder",

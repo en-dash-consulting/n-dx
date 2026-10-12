@@ -60,6 +60,9 @@
  * - Task selection (findNextTask, findActionableTasks, collectCompletedIds,
  *   matchesAssignee — selection's own `--mine` rule, for the non-selection
  *   operations hench also has to scope to it)
+ * - v2 work selection (prdLayout, isChangeLayerStore, findNextWorkTask,
+ *   findActionableWork, resolveWorkById — what `get_next_task` runs on a v2
+ *   tree, so `ndx work` picks the same unit)
  * - Cross-worktree task claims (openClaimsStore, resolveClaimHolder — the
  *   run claims the task it selected so other worktrees pass over it)
  * - Timestamp computation (status change timestamps)
@@ -135,6 +138,23 @@ export {
   traversalBlock,
 } from "@n-dx/rex";
 
+// ---- v2 work selection --------------------------------------------------------
+// On a v2 tree (product/ + changes/) `resolveStore` returns the change-layer
+// store, whose document is the change layer projected as v1 items. Selecting
+// from that projection with the v1 selector would run Inbox changes and
+// ignore change gates, so hench selects with rex's v2 selector instead — the
+// entry point `get_next_task` uses on v2 (findNextWorkTask), the ranked list
+// behind it (findActionableWork, for the menu and `--mine`), and the explicit
+// `--task` resolver (resolveWorkById: id, display id or alias). `prdLayout`
+// answers "is this tree v2" without reading it, for the flags v2 refuses.
+export {
+  prdLayout,
+  isChangeLayerStore,
+  findNextWorkTask,
+  findActionableWork,
+  resolveWorkById,
+} from "@n-dx/rex";
+
 // `matchesAssignee` is selection's own `--mine` rule (own field, or inherited
 // from any ancestor). Anything hench scopes to `--mine` that is *not* selection
 // — the deferred/failing reset offer, the counts behind an empty menu — has to
@@ -202,4 +222,4 @@ export { repointCommits } from "@n-dx/rex";
 // All type imports from rex must flow through this gateway to prevent
 // type-import promotion erosion (a type import can be promoted to a
 // runtime import during refactoring, silently bypassing the gateway).
-export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason, SaveFileReport, TraversalBlock, RunSettings, RepointMatch, RepointMiss, RepointResult, RecordedCommitFacts } from "@n-dx/rex";
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, SelectionReasonCode, ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason, SaveFileReport, TraversalBlock, RunSettings, RepointMatch, RepointMiss, RepointResult, RecordedCommitFacts, V2Tree } from "@n-dx/rex";
