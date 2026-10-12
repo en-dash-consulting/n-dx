@@ -18,7 +18,7 @@ plannedRelease: "1.0.0"
 
 | Title | Status |
 |-------|--------|
-| [Agent brief from the product layer](./agent-brief-from-the-product-layer/index.md) | pending |
+| [Agent brief from the product layer](./agent-brief-from-the-product-layer/index.md) | completed |
 | [Apply engine for change amendments](./apply-engine-for-change-amendments/index.md) | completed |
 | [Apply the migration](./apply-the-migration/index.md) | pending |
 | [Bootstrap the product layer from an established codebase](./bootstrap-the-product-layer-from-an/index.md) | pending |
@@ -57,3 +57,4 @@ plannedRelease: "1.0.0"
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
 | [v2 schema and rules before the freeze](./v2-schema-and-rules-before-the-freeze/index.md) | completed |
 | [v2 store transaction for the product and change layers](./v2-store-transaction-for-the-product/index.md) | completed |
+
