@@ -65,7 +65,10 @@ export interface SourcePosition {
 
 /** One node captured by a pack query. */
 export interface Capture {
-  /** Capture name as written in the query, without the `@`. */
+  /**
+   * Capture name as written in the query, without the `@`. Names starting
+   * with `_` are predicate-only and never reach a `Capture`.
+   */
   readonly name: string;
   /** Tree-sitter node type, e.g. `"class_declaration"`. */
   readonly nodeType: string;

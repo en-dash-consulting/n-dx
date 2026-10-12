@@ -121,6 +121,20 @@ describe("tree-sitter runner", () => {
     expect(result.captures.structure[0].end).toEqual({ line: 9, column: 1 });
   });
 
+  it("applies text predicates and omits the _-prefixed captures they test", async (ctx) => {
+    skipUnlessGrammar(ctx, JAVA_WASM);
+    const pack = makePack([
+      {
+        name: "named",
+        scm: `(method_declaration name: (identifier) @_name (#eq? @_name "open")) @method`,
+      },
+    ]);
+    const source = "class A {\n  void open() {}\n  void close() {}\n}\n";
+    const result = await runner.parseSource({ grammarPath: JAVA_WASM, pack }, "A.java", source);
+    if (result.status !== "parsed") throw new Error("expected a parsed file");
+    expect(result.captures.named.map((c) => [c.name, c.text])).toEqual([["method", "void open() {}"]]);
+  });
+
   it("counts columns in UTF-16 code units, as JavaScript strings do", async (ctx) => {
     skipUnlessGrammar(ctx, JAVA_WASM);
     const pack = makePack([{ name: "fields", scm: "(variable_declarator name: (identifier) @field)" }]);
