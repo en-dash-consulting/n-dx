@@ -300,6 +300,37 @@ describe("classifyV1Tree", () => {
     });
   });
 
+  describe("an epic filed by an adversarial review", () => {
+    const review = () =>
+      item("epic", "Review findings", [item("feature", "Offline cache", [item("task", "Do it")]), item("task", "Loose finding")], "completed", {
+        source: "ndx-adversarial-review",
+      });
+
+    it("proposes no area: it is a delivery container, like a dissolved release", () => {
+      const plan = classifyV1Tree([review()]);
+      expect(plan.areas).toEqual([]);
+      expect(byTitle(plan.entries, "Review findings").target).toBe("release");
+      expect(plan.counts.area).toBe(0);
+    });
+
+    it("places or holds its children like other changes, never as capabilities", () => {
+      const plan = classifyV1Tree([review()]);
+      expect(byTitle(plan.entries, "Offline cache")).toMatchObject({ target: "change", applied: true });
+      expect(byTitle(plan.entries, "Loose finding")).toMatchObject({ target: "change" });
+      expect(byTitle(plan.entries, "Do it").target).toBe("task");
+      expect(plan.entries.some((e) => e.target === "capability")).toBe(false);
+    });
+
+    it("lets a child land on a capability of another area when the rules find one", () => {
+      const storage = item("epic", "Storage", [item("feature", "Offline cache", [item("task", "Write the cache")])]);
+      const plan = classifyV1Tree([storage, review()]);
+      expect(byTitle(plan.entries, "Offline cache").target).toBe("capability");
+      const finding = plan.entries.filter((e) => e.title === "Offline cache" && e.target === "change");
+      expect(finding).toHaveLength(1);
+      expect(finding[0]).toMatchObject({ placement: byTitle(plan.entries, "Offline cache").id });
+    });
+  });
+
   describe("a completed review finding is a fix change, not a capability", () => {
     const done = () => [item("task", "Do it")];
     const classify = (feature: PRDItem, epicExtra: Partial<PRDItem> = {}) =>

@@ -205,6 +205,22 @@ export const COMMAND_EFFECTS = {
     next: "ndx plan",
   },
 
+  migrate: {
+    command: "migrate",
+    summary: "Plan the v1 → v2 PRD migration and write the plan file for review.",
+    reads: ["{rex}/ PRD folder tree", "test files in the repository"],
+    writes: [
+      { path: ".ndx-migration/plan.json", what: "the migration plan (or the --out path); .ndx-migration/ carries its own .gitignore" },
+    ],
+    llm: [
+      { phase: "placement and spec drafting", purpose: "the text model places held changes and drafts capability specs", calls: "one per held change and capability", conditional: true, when: "without --rules-only" },
+      { phase: "plan review", purpose: "Jev reviews the plan", calls: "one per judged item", conditional: true, when: "when TYPESAFE_API_KEY is set and --rules-only is not" },
+    ],
+    network: [{ ...LLM_PROVIDER, when: "without --rules-only" }],
+    duration: "seconds with --rules-only; tens of minutes on a large tree",
+    next: "ndx status",
+  },
+
   "migrate-layout": {
     command: "migrate-layout",
     summary: "Move the project's n-dx state into .ndx/ and commit the move.",

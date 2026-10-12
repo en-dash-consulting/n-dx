@@ -178,6 +178,16 @@ export function parsePlanFile(text: string): PlanFile {
   return parsed.data as PlanFile;
 }
 
+/** The passes that stopped on a seam error: their answers are partial. */
+export function incompletePasses(plan: Pick<PlanFile, "header">): Array<PassRecord & { incomplete: { error: string } }> {
+  return plan.header.passes.filter((p): p is PassRecord & { incomplete: { error: string } } => p.incomplete !== undefined);
+}
+
+/** True when every pass finished: a plan with a stopped pass must not be applied. */
+export function isPlanComplete(plan: Pick<PlanFile, "header">): boolean {
+  return incompletePasses(plan).length === 0;
+}
+
 export async function writePlanFile(path: string, plan: PlanFile): Promise<void> {
   await writeFile(path, formatPlanFile(plan), "utf8");
 }

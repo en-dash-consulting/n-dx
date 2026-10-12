@@ -1802,6 +1802,36 @@ async function handleMigrateLayout(rest) {
   exitWithCleanup(code);
 }
 
+/** Flags of `ndx migrate --plan` that take a value; `--out p` is rewritten to `--out=p` so `p` is not read as the project dir. */
+const MIGRATE_VALUE_FLAGS = new Set(["--out", "--cut-at", "--model"]);
+
+/**
+ * `ndx migrate --plan` — spawn `rex migrate --plan`, which writes the plan
+ * file (default `.ndx-migration/plan.json`) and touches nothing in `.rex/`.
+ */
+async function handleMigrate(rest) {
+  const args = [];
+  for (let i = 0; i < rest.length; i++) {
+    const next = rest[i + 1];
+    if (MIGRATE_VALUE_FLAGS.has(rest[i]) && next !== undefined && !next.startsWith("-")) {
+      args.push(`${rest[i]}=${next}`);
+      i++;
+    } else {
+      args.push(rest[i]);
+    }
+  }
+  if (!args.includes("--plan")) {
+    console.error("Error: ndx migrate needs --plan.");
+    console.error("Hint: Usage: ndx migrate --plan [--out <path>] [--rules-only] [dir]");
+    exitWithCleanup(1);
+    return;
+  }
+  const dir = resolveDir(args);
+  requireInit(dir, ["rex"]);
+  await runOrDie(tools.rex, ["migrate", ...extractFlags(args), dir]);
+  exitWithCleanup(0);
+}
+
 // ── Preflight banner and run summary ─────────────────────────────────────────
 
 /**
@@ -3266,6 +3296,7 @@ const COMMAND_DISPATCH = new Map([
   ["help",              handleHelp],
   ["init",              handleInit],
   ["migrate-layout",    handleMigrateLayout],
+  ["migrate",           handleMigrate],
   ["analyze",           handleAnalyze],
   ["recommend",         handleRecommend],
   ["plan",              handlePlan],

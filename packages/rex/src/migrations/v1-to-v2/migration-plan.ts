@@ -185,8 +185,8 @@ export function isDeliveryEpic(title: string, productNames: readonly string[] = 
   return releaseToken(title, productNames) !== undefined || hasWorkToken(title);
 }
 
-function isFixShaped(item: PRDItem, areaSource?: string): boolean {
-  if (areaSource === REVIEW_SOURCE || isReviewFinding(item) || FINDING_WORDING.test(item.title)) return true;
+function isFixShaped(item: PRDItem): boolean {
+  if (isReviewFinding(item) || FINDING_WORDING.test(item.title)) return true;
   const lead = leadWord(item.title);
   if (lead !== undefined && FIX_WORDS.has(lead)) return true;
   if ((item.tags ?? []).some((t) => FIX_WORDS.has(t.toLowerCase()))) return true;
@@ -283,6 +283,15 @@ class PlanBuilder {
 }
 
 function classifyEpic(epic: PRDItem, plan: PlanBuilder, productNames: readonly string[]): void {
+  if (epic.source === REVIEW_SOURCE) {
+    // Findings are not a part of the product: the epic is a delivery container, like a dissolved release.
+    plan.add(epic, "release", { reasons: ["epic filed by an adversarial review: a delivery container, proposes no area"] });
+    for (const child of epic.children ?? []) {
+      plan.change(child, { reasons: [`a finding split out of review container ${epic.id}`] });
+      plan.workUnder(child.children, child.id);
+    }
+    return;
+  }
   const release = releaseToken(epic.title, productNames);
   if (hasWorkToken(epic.title)) {
     plan.change(epic, {
@@ -315,17 +324,17 @@ function classifyEpic(epic: PRDItem, plan: PlanBuilder, productNames: readonly s
   if (isConstraintShaped(epic.title)) {
     plan.constraints.push({ source: epic.id, title: epic.title, appliesTo: "all" });
   }
-  for (const child of epic.children ?? []) classifyUnderArea(child, epic.id, plan, productNames, epic.source);
+  for (const child of epic.children ?? []) classifyUnderArea(child, epic.id, plan, productNames);
 }
 
-function classifyUnderArea(item: PRDItem, area: string, plan: PlanBuilder, productNames: readonly string[], areaSource?: string): void {
+function classifyUnderArea(item: PRDItem, area: string, plan: PlanBuilder, productNames: readonly string[]): void {
   if (item.level !== "feature") {
     plan.change(item, { reasons: [`a v1 ${item.level} directly under an area: its own change`] }, area);
     plan.workUnder(item.children, item.id);
     return;
   }
 
-  const fix = isFixShaped(item, areaSource);
+  const fix = isFixShaped(item);
   const work = isWorkShaped(item, productNames);
   if (fix || work) {
     const release = releaseToken(item.title, productNames);

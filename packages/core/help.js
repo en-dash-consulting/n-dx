@@ -98,6 +98,13 @@ const COMMAND_REGISTRY = [
     related: ["init", "which", "status"],
   },
   {
+    name: "migrate",
+    category: "Orchestration",
+    summary: "Plan the v1 → v2 PRD migration and write the plan file",
+    keywords: ["migrate", "migration", "plan", "v2", "upgrade", "product", "prd", "schema"],
+    related: ["migrate-layout", "plan", "status"],
+  },
+  {
     name: "analyze",
     category: "Orchestration",
     summary: "Run SourceVision codebase analysis",
@@ -1233,6 +1240,32 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["init", "which"],
   },
+  migrate: {
+    summary: "plan the v1 → v2 PRD migration and write the plan file",
+    description:
+      "Classifies every v1 PRD item, proposes the areas and constraints, drafts\n" +
+      "the capability specs and writes the plan for review. Writes nothing in\n" +
+      ".rex/: the plan goes to .ndx-migration/plan.json, which is gitignored.\n\n" +
+      "Defaults: the text model places held changes and drafts specs (a pick is\n" +
+      "only a suggestion; the change stays held for the Inbox). Jev reviews the\n" +
+      "plan only when TYPESAFE_API_KEY is set, otherwise that pass is skipped\n" +
+      "with a warning. Re-running reuses the earlier plan's answers and cut time.\n" +
+      "A model pass that stops on an error is reported and the command exits\n" +
+      "non-zero after writing the plan.",
+    usage: "ndx migrate --plan [options] [dir]",
+    options: [
+      { flag: "--plan", description: "Write the migration plan (required)" },
+      { flag: "--out <path>", description: "Plan file path (default .ndx-migration/plan.json); not inside the rex directory" },
+      { flag: "--rules-only", description: "Run no model pass" },
+      { flag: "--model <id>", description: "Model for text placement and spec drafting" },
+      { flag: "--cut-at <iso>", description: "Cut time recorded in the plan (default: the earlier plan's, else now)" },
+    ],
+    examples: [
+      { command: "ndx migrate --plan .", description: "Plan with the default passes" },
+      { command: "ndx migrate --plan --rules-only .", description: "Plan from the rules alone" },
+    ],
+    related: ["migrate-layout", "plan", "status"],
+  },
   ci: {
     summary: "run analysis pipeline and validate PRD health",
     description: "Runs the full CI pipeline: SourceVision analysis followed by PRD\nvalidation. Reports pass/fail status suitable for CI systems.",
@@ -1830,6 +1863,7 @@ export function formatMainHelp() {
   section("SETUP", [
     ["init [dir]", "Initialize project"],
     ["migrate-layout [dir]", "Move existing state into .ndx/ (--dry-run, --no-commit)"],
+    ["migrate --plan [dir]", "Plan the v1 → v2 PRD migration (--out, --rules-only)"],
     ["which [dir]", "Show which n-dx is running (version, path, install, git)"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],

@@ -112,6 +112,7 @@ const VALUE_KEYS = new Set([
   "summary",
   "proposed",
   "statement",
+  "cut-at",
   ...MULTI_VALUE_KEYS,
 ]);
 
@@ -619,6 +620,11 @@ async function dispatchCommand(
       await cmdMigrateFolderTreeFilenames(resolveDir(positional), flags);
       break;
     }
+    case "migrate": {
+      const { cmdMigrate } = await import("./commands/migrate.js");
+      await cmdMigrate(resolveDir(positional), flags);
+      break;
+    }
     case "migrate-slugs": {
       const { cmdMigrateSlugs } = await import("./commands/migrate-slugs.js");
       await cmdMigrateSlugs(resolveDir(positional), flags);
@@ -668,7 +674,7 @@ async function dispatchCommand(
         "prune", "restore", "validate", "fix", "usage", "report", "verify", "ready", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "codeowners",
         "release", "reorganize", "health", "product", "change", "mcp",
-        "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
+        "migrate", "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
         "backfill-commit-attribution",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");

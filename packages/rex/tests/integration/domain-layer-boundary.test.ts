@@ -211,6 +211,15 @@ describe("rex cli/commands import surface", () => {
     // for analysis. Not routed through public.ts for the same reason as state-merge.
     "../../store/change-layer-store.js",
     "../../store/title-to-filename.js",
+    // `rex migrate --plan` is the one caller of the migration framework and its
+    // model seams. Migration code runs once per schema change and is deleted as
+    // a unit (migrations/migration.ts), so it is deliberately not public API.
+    "../../analyze/place-reason.js",
+    "../../analyze/spec-draft-reason.js",
+    "../../migrations/registry.js",
+    "../../migrations/plan-file.js",
+    "../../migrations/v1-to-v2/seams.js",
+    "../../migrations/v1-to-v2/index.js",
     "../../workflow/default.js",
   ]);
 
