@@ -86,6 +86,16 @@ function hasV1Tree(root) {
   return existsSync(join(rexDirOf(root), PRD_TREE_DIRNAME));
 }
 
+/**
+ * Whether the project at `root` keeps a v1 tree and no v2 one: the state
+ * rex's deprecation notice and the `schema-v2` link both key on.
+ *
+ * @param {string} root
+ */
+export function isLegacyV1Project(root) {
+  return !hasV2Tree(root) && hasV1Tree(root);
+}
+
 /** @param {string} root */
 function hasFlatPrd(root) {
   const rexDir = rexDirOf(root);
@@ -120,7 +130,7 @@ export const MIGRATION_LINKS = [
     id: "schema-v2",
     from: "rex/v1",
     to: "rex/v2",
-    needed: (root) => !hasV2Tree(root) && hasV1Tree(root),
+    needed: isLegacyV1Project,
     rehearses: true,
     run: async (root, flags, deps) => {
       const planFlags = pick(flags, PLAN_FLAGS);
