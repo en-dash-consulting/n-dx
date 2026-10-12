@@ -54,9 +54,14 @@ export const DEFAULT_CLEANUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
  *
  * Returns entries from `taskUsage` whose task IDs are not in `validTaskIds`.
  * Pure function — no side effects.
+ *
+ * Takes only the two fields it reports rather than a whole
+ * {@link TaskUsageAccumulator}: cleanup is about identity, not accounting, so
+ * widening the accumulator with per-class tokens and cost should not force
+ * every caller to produce them.
  */
 export function identifyOrphanedEntries(
-  taskUsage: Record<string, TaskUsageAccumulator>,
+  taskUsage: Record<string, Pick<TaskUsageAccumulator, "totalTokens" | "runCount">>,
   validTaskIds: Set<string>,
 ): OrphanedEntry[] {
   const orphaned: OrphanedEntry[] = [];

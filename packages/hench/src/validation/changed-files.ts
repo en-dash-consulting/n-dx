@@ -46,36 +46,40 @@ import {
   repoRelativePrefix,
   splitPorcelainLines,
 } from "../store/artifacts.js";
-import { BOOKKEEPING_DIR_PREFIXES } from "../store/paths.js";
+import { BOOKKEEPING_PATHS } from "../store/paths.js";
 
 const GIT_TIMEOUT = 10_000;
 
 /**
  * Paths that are never the run's work product, excluded from the result.
  *
- * `.rex/` is bookkeeping hench itself writes on every run — the task-status
- * update dirties the task's `index.md` before the agent has done anything —
- * and `.hench/` holds run records and review reports. The agent's own prompt
- * forbids modifying either directly, and the reviewer's repaired-files set
- * already filters them (see cli-loop.ts). Left in, they make every run look
- * like it changed files, so the full-suite gate fires for runs that produced
- * no code at all — and a pre-existing failure anywhere in the workspace then
- * fails the run and resets a task that was never the cause.
+ * The PRD tree is bookkeeping hench itself writes on every run — the
+ * task-status update dirties the task's `index.md` before the agent has done
+ * anything — and all of `.hench/` holds run records and review reports. The
+ * agent's own prompt forbids modifying either directly, and the reviewer's
+ * repaired-files set already filters them (see cli-loop.ts). Left in, they
+ * make every run look like it changed files, so the full-suite gate fires for
+ * runs that produced no code at all — and a pre-existing failure anywhere in
+ * the workspace then fails the run and resets a task that was never the cause.
  *
- * Project-relative with a trailing slash, matched through
- * {@link matchesProjectPath} rather than a bare `startsWith`. Git reports
- * porcelain and diff paths relative to the *repository* root, so in a project
- * nested below that root the real lines read `sub/.rex/…` and a bare prefix
- * test misses every one of them — every run then "changed files" on its own
- * status write alone, which is exactly the vacuous gate this list exists to
- * prevent.
+ * It is a list of specific paths rather than `.rex/` whole, because not
+ * everything in there is bookkeeping: `workflow.md` goes into every agent
+ * brief and `config.json` is project configuration. See
+ * {@link BOOKKEEPING_PATHS}.
+ *
+ * Project-relative, matched through {@link matchesProjectPath} rather than a
+ * bare `startsWith`. Git reports porcelain and diff paths relative to the
+ * *repository* root, so in a project nested below that root the real lines
+ * read `sub/.rex/…` and a bare prefix test misses every one of them — every
+ * run then "changed files" on its own status write alone, which is exactly the
+ * vacuous gate this list exists to prevent.
  */
-const BOOKKEEPING_PREFIXES = BOOKKEEPING_DIR_PREFIXES;
+const BOOKKEEPING_PREFIXES = BOOKKEEPING_PATHS;
 
 /**
  * Decide, for one repository, whether a path is hench's own bookkeeping.
  *
- * Combines the PRD/run-record directories above with
+ * Combines the PRD/run-record paths above with
  * {@link isHenchRuntimeArtifact}, hench's shared runtime-artifact list. The
  * second is not redundant: `.hench-commit-msg.txt` is the commit-message
  * handoff hench writes at the repository *root*, so it is under neither

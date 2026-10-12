@@ -57,6 +57,8 @@ import { join } from "node:path";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
+import { priceTokens, resolveModelPricing } from "@n-dx/llm-client";
+import type { ItemRunTokens } from "../rex-gateway.js";
 import type { TaskUsageAccumulator } from "../shared-types.js";
 
 export type { TaskUsageAccumulator } from "../shared-types.js";
@@ -104,6 +106,33 @@ interface FileSnapshot {
 interface FileContribution {
   taskId: string;
   totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  /**
+   * What this run cost, priced at the model the run recorded.
+   *
+   * Priced here, per file, because this is the last place the model is known:
+   * everything downstream aggregates across runs, and an item's runs can span
+   * models whose output rates differ twelvefold. Pricing after the sum would
+   * have to pick one rate for all of them.
+   */
+  costUsd: number;
+  /** False when the run's model was absent from the price table. */
+  costKnown: boolean;
+}
+
+/** The four billed classes, zeroed. */
+function zeroClasses(): Omit<TaskUsageAccumulator, "runCount" | "costFullyAttributed"> {
+  return {
+    totalTokens: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    costUsd: 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -160,21 +189,29 @@ export class IncrementalTaskUsageAggregator {
    * Return one entry per cached run-file contribution, shaped for
    * `aggregateItemTokenUsage` (rex's pure rollup function).
    *
-   * Only `tokens.total` is populated from cache (input/output/cached
-   * breakdowns aren't retained by the incremental aggregator — they
-   * aren't needed for the per-item rollup totals the dashboard consumes).
-   * Run count is reflected by the number of returned entries since each
-   * contribution corresponds to one run file.
+   * Every class is populated, plus the run's priced cost. The breakdown used
+   * to be dropped here and reported as zeros, on the grounds that the rollup
+   * only needed the total — which left the dashboard with no way to separate
+   * cache reads from new tokens, and no way to quote a price at all. Run count
+   * is reflected by the number of returned entries, since each contribution
+   * corresponds to one run file.
    *
    * The caller MUST `await getTaskUsage()` first (or call `refresh()`
    * indirectly) to ensure the cache reflects the current filesystem.
    */
-  getFileContributions(): Array<{ itemId: string; tokens: { input: number; output: number; cacheCreation: number; cacheRead: number; total: number } }> {
-    const out: Array<{ itemId: string; tokens: { input: number; output: number; cacheCreation: number; cacheRead: number; total: number } }> = [];
+  getFileContributions(): ItemRunTokens[] {
+    const out: ItemRunTokens[] = [];
     for (const c of this.fileContributions.values()) {
       out.push({
         itemId: c.taskId,
-        tokens: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: c.totalTokens },
+        tokens: {
+          input: c.inputTokens,
+          output: c.outputTokens,
+          cacheCreation: c.cacheCreationTokens,
+          cacheRead: c.cacheReadTokens,
+          total: c.totalTokens,
+          costUsd: c.costUsd,
+        },
       });
     }
     return out;
@@ -345,22 +382,60 @@ export class IncrementalTaskUsageAggregator {
     const current = this.taskUsage.get(contribution.taskId);
     if (current) {
       current.totalTokens -= contribution.totalTokens;
+      current.inputTokens -= contribution.inputTokens;
+      current.outputTokens -= contribution.outputTokens;
+      current.cacheCreationTokens -= contribution.cacheCreationTokens;
+      current.cacheReadTokens -= contribution.cacheReadTokens;
+      current.costUsd -= contribution.costUsd;
       current.runCount -= 1;
       if (current.runCount <= 0) {
         this.taskUsage.delete(contribution.taskId);
       }
     }
     this.fileContributions.delete(file);
+    // `costFullyAttributed` is a property of the surviving set, not an
+    // arithmetic term, so it cannot be subtracted — it is recomputed from the
+    // remaining contributions below.
+    this.recomputeAttribution(contribution.taskId);
   }
 
   /** Add a file's contribution to the task total. */
   private applyContribution(file: string, contribution: FileContribution): void {
     this.fileContributions.set(file, contribution);
 
-    const current = this.taskUsage.get(contribution.taskId) ?? { totalTokens: 0, runCount: 0 };
+    const current =
+      this.taskUsage.get(contribution.taskId) ??
+      { ...zeroClasses(), runCount: 0, costFullyAttributed: true };
     current.totalTokens += contribution.totalTokens;
+    current.inputTokens += contribution.inputTokens;
+    current.outputTokens += contribution.outputTokens;
+    current.cacheCreationTokens += contribution.cacheCreationTokens;
+    current.cacheReadTokens += contribution.cacheReadTokens;
+    current.costUsd += contribution.costUsd;
     current.runCount += 1;
+    if (!contribution.costKnown) current.costFullyAttributed = false;
     this.taskUsage.set(contribution.taskId, current);
+  }
+
+  /**
+   * Recompute whether a task's cost is fully attributed from the run
+   * contributions still on file.
+   *
+   * Needed only on removal: adding a run can only ever turn the flag off, but
+   * removing the one run with an unknown model should turn it back on, and a
+   * boolean has no inverse to subtract.
+   */
+  private recomputeAttribution(taskId: string): void {
+    const current = this.taskUsage.get(taskId);
+    if (!current) return;
+    let known = true;
+    for (const c of this.fileContributions.values()) {
+      if (c.taskId === taskId && !c.costKnown) {
+        known = false;
+        break;
+      }
+    }
+    current.costFullyAttributed = known;
   }
 
   // ---- File I/O ------------------------------------------------------------
@@ -406,13 +481,32 @@ export class IncrementalTaskUsageAggregator {
       if (typeof taskId !== "string" || !taskId) return null;
 
       const tokenUsage = data.tokenUsage as Record<string, number> | undefined;
-      const totalTokens =
-        (tokenUsage?.input ?? 0) +
-        (tokenUsage?.output ?? 0) +
-        (tokenUsage?.cacheCreationInput ?? 0) +
-        (tokenUsage?.cacheReadInput ?? 0);
+      const inputTokens = tokenUsage?.input ?? 0;
+      const outputTokens = tokenUsage?.output ?? 0;
+      const cacheCreationTokens = tokenUsage?.cacheCreationInput ?? 0;
+      const cacheReadTokens = tokenUsage?.cacheReadInput ?? 0;
+      const totalTokens = inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens;
 
-      return { taskId, totalTokens };
+      // The run record stamps the model it ran on. Pricing here — while that
+      // is still in hand — is what lets one item's Haiku and Opus runs be
+      // billed at their own rates instead of a single blended guess.
+      const model = typeof data.model === "string" ? data.model : undefined;
+      const { pricing, known } = resolveModelPricing(model);
+      const { totalRaw } = priceTokens(
+        { inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens },
+        pricing,
+      );
+
+      return {
+        taskId,
+        totalTokens,
+        inputTokens,
+        outputTokens,
+        cacheCreationTokens,
+        cacheReadTokens,
+        costUsd: totalRaw,
+        costKnown: known,
+      };
     } catch {
       return null;
     }

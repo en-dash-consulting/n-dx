@@ -103,9 +103,12 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
+import { UsageMessageFilter } from "../../prd/llm-gateway.js";
 import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
 import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
-import { BOOKKEEPING_DIR_PREFIXES } from "../../store/paths.js";
+import { resolveAgentCliEffort } from "./agent-effort.js";
+import { BOOKKEEPING_PATHS } from "../../store/paths.js";
+import { matchesProjectPath } from "../../store/artifacts.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -517,12 +520,18 @@ export function toPersistedEvent(event: RuntimeEvent): PersistedRuntimeEvent {
  * (`event.usage`, `event.message.usage`) and returns a RuntimeEvent
  * for accumulation, or `null` if no usage was found.
  *
+ * `seen` is what keeps one vendor message from being counted once per content
+ * block — Claude's stream-json repeats the whole `message`, `usage` included,
+ * on every block of a turn. Omit it only in tests that feed a single payload;
+ * every production caller passes the spawn's filter.
+ *
  * @internal Exported for testing.
  */
 export function rawJsonToTokenUsageEvent(
   rawJson: Record<string, unknown>,
   turn: number,
   metadata: SpawnTokenMetadata,
+  seen?: UsageMessageFilter,
 ): RuntimeEvent | null {
   let usage: Record<string, unknown> | undefined;
 
@@ -536,6 +545,10 @@ export function rawJsonToTokenUsageEvent(
   }
 
   if (!usage) return null;
+
+  // A repeat of a message already counted. Dropping it here rather than at the
+  // call site means every consumer of this function inherits the rule.
+  if (seen && !seen.accept(rawJson)) return null;
 
   // Carry the parser's verdict on the event. Dropping it here is what forced
   // the event pipeline to re-infer both values from the parsed numbers, and
@@ -568,6 +581,7 @@ function extractTokenUsage(
   result: SpawnResult,
   turnCounter: { value: number },
   tokenMetadata: SpawnTokenMetadata,
+  seen: UsageMessageFilter,
 ): void {
   let usage: Record<string, unknown> | undefined;
 
@@ -584,6 +598,10 @@ function extractTokenUsage(
   }
 
   if (!usage) return;
+
+  // See {@link rawJsonToTokenUsageEvent}: the same message arrives once per
+  // content block, each copy carrying the finished turn's full usage.
+  if (!seen.accept(rawJson)) return;
 
   const { usage: parsed, diagnosticStatus, cacheProvenance } = parseTokenUsageWithDiagnostic(usage);
 
@@ -797,6 +815,10 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
     };
 
     const turnCounter = { value: 0 };
+    // One per spawn: usage identity is only meaningful within a single
+    // vendor conversation, and a filter shared across spawns would suppress a
+    // retry's legitimately re-sent opening message.
+    const usageFilter = new UsageMessageFilter();
     let lineBuffer = "";
     let stderr = "";
     let fullStdout = "";
@@ -1188,7 +1210,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
           try {
             const rawJson = JSON.parse(line);
             captureSessionId(rawJson);
-            const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata);
+            const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata, usageFilter);
             if (tokenEvent) {
               accumulator.push(tokenEvent);
               // Mirror the accumulator's own arithmetic (a plain sum over token
@@ -1240,7 +1262,7 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
           try {
             const rawJson = JSON.parse(line);
             captureSessionId(rawJson);
-            extractTokenUsage(rawJson, result, turnCounter, tokenMetadata);
+            extractTokenUsage(rawJson, result, turnCounter, tokenMetadata, usageFilter);
 
             // Extract completion metadata (num_turns, cost_usd, fallback usage)
             const type = rawJson.type as string | undefined;
@@ -1620,7 +1642,7 @@ async function runAdversarialReviewPass(
     // put in front of it rather than described.
     let scope: Awaited<ReturnType<typeof collectPairReviewScope>>;
     try {
-      scope = await collectPairReviewScope(inv.projectDir, inv.startingHead, BOOKKEEPING_DIR_PREFIXES);
+      scope = await collectPairReviewScope(inv.projectDir, inv.startingHead, BOOKKEEPING_PATHS);
     } catch (err) {
       const failed: ReviewPassOutcome & { ok: false } = {
         ok: false,
@@ -1799,17 +1821,18 @@ async function runAdversarialReviewPass(
     );
   }
 
-  // What the reviewer actually changed, from the snapshot pair. Rex's state is
-  // the completion-metadata commit's territory and hench's holds the report
-  // itself; neither is a repair — see `BOOKKEEPING_DIR_PREFIXES`. Computed even
-  // when the report claims `fixesApplied: false` — the tree, not the report, is
-  // the authority.
+  // What the reviewer actually changed, from the snapshot pair. Rex's own
+  // records are the completion-metadata commit's territory and hench's state
+  // holds the report itself; neither is a repair — see `BOOKKEEPING_PATHS`. A
+  // reviewer edit to `.rex/workflow.md`, which is project content rather than
+  // bookkeeping, is one. Computed even when the report claims
+  // `fixesApplied: false` — the tree, not the report, is the authority.
   let repairedFiles: string[] | undefined;
   if (preReviewState) {
     try {
       const postReviewState = await snapshotDirtyState(inv.projectDir);
       repairedFiles = diffDirtyState(preReviewState, postReviewState).filter(
-        (path) => !BOOKKEEPING_DIR_PREFIXES.some((prefix) => path.startsWith(prefix)),
+        (path) => !matchesProjectPath(path, BOOKKEEPING_PATHS),
       );
     } catch {
       repairedFiles = undefined;
@@ -2832,6 +2855,10 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // Use the adapter to build the vendor-specific spawn configuration
         const spawnConfig = adapter.buildSpawnConfig(envelope, policy, {
           model: opts.spawnModel,
+          // A matching llm.effort rule for agent.execute, validated against
+          // this model. Undefined leaves the flag off so the vendor applies
+          // its own default; non-Claude adapters ignore it either way.
+          effort: resolveAgentCliEffort(opts.spawnModel ?? model, llmConfig),
           permissionMode: currentPermissionMode,
           // Fork the orientation session rather than continuing it, so the
           // parent stays reusable by the next task and this spawn gets its

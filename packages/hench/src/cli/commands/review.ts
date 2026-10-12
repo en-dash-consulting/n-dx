@@ -91,25 +91,45 @@ async function cmdReviewPending(
     );
   }
 
-  // TODO(prd 77a603ad-sibling c7585f76, PR C follow-up): this preference is
-  // backwards. The stored reportPath is absolute, so after a project moves on
-  // disk it is exactly the stale path — the comment below claims the opposite
-  // of what the code does. Resolve from the current project's
-  // .hench/reviews/ (reviewReportPath) first and fall back to the stored
-  // reportPath only when that file is absent; fix this comment and add a
-  // moved-project unit test when picking it up.
+  // Resolve from the project in hand first, and use the path the run recorded
+  // only when nothing is there.
   //
-  // Prefer the path the run recorded: a project moved on disk since the run
-  // would otherwise be told its findings are gone when they are merely
-  // somewhere else. Fall back to the canonical location for a record written
-  // before the path was stored.
-  const reportPath = run.review.reportPath || reviewReportPath(henchDir, run.id);
+  // The preference used to run the other way, on the reasoning that a stored
+  // path protects a project that has moved on disk. It does the opposite:
+  // `reportPath` is absolute, so a move is precisely the case where it is
+  // stale, and the command failed with "Could not read the review report" for
+  // a report sitting in the new `.hench/reviews/` under its own name. Reports
+  // are keyed by run id in a fixed subdirectory, so the canonical location is
+  // derivable wherever the project now lives.
+  //
+  // The stored path is still worth a fallback: it is the only way to find a
+  // report a future layout or an operator moved somewhere else, and it costs
+  // one `readFile` on a path that was going to be read anyway.
+  const canonicalPath = reviewReportPath(henchDir, run.id);
+  let reportPath = canonicalPath;
+  let outcome = await readReviewReport(reportPath);
+  // Why both details are kept: the canonical read is tried first, so when it
+  // misses and the stored path holds a *malformed* report, reporting only the
+  // first outcome says "no report" and sends the operator looking for a file
+  // that is sitting right there, unusable. The two reads fail for different
+  // reasons at different paths, and only naming both says which is which.
+  let storedDetail: string | undefined;
+  if (!outcome.ok && run.review.reportPath && run.review.reportPath !== canonicalPath) {
+    const stored = await readReviewReport(run.review.reportPath);
+    if (stored.ok) {
+      reportPath = run.review.reportPath;
+      outcome = stored;
+    } else {
+      storedDetail = stored.detail;
+    }
+  }
 
-  const outcome = await readReviewReport(reportPath);
   if (!outcome.ok) {
     throw new CLIError(
       `Could not read the review report for run ${run.id}.`,
-      outcome.detail,
+      // Each detail already names its own path and reason, so the two read as
+      // one account of what was tried.
+      storedDetail ? `${outcome.detail} ${storedDetail}` : outcome.detail,
     );
   }
 

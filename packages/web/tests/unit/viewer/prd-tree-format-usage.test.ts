@@ -11,6 +11,8 @@ import { describe, it, expect } from "vitest";
 import {
   formatTokensExact,
   formatDuration,
+  formatUsd,
+  newTokens,
   EMPTY_DASH,
 } from "../../../src/viewer/components/prd-tree/format-usage.js";
 
@@ -73,5 +75,68 @@ describe("formatDuration", () => {
     expect(formatDuration(undefined)).toBe(EMPTY_DASH);
     expect(formatDuration(Number.NaN)).toBe(EMPTY_DASH);
     expect(formatDuration(-1)).toBe(EMPTY_DASH);
+  });
+});
+
+describe("formatUsd", () => {
+  it("renders zero as a real answer, not an empty state", () => {
+    // `$0.00` means "no priced runs". The dash is for "no runs at all".
+    expect(formatUsd(0)).toBe("$0.00");
+  });
+
+  it("does not round a sub-cent run down to free", () => {
+    // A one-turn check costs a fraction of a cent. Rendering it as `$0.00`
+    // would say it was free, which is the same failure as the token column
+    // reading as millions: a number that tells you nothing.
+    expect(formatUsd(0.0004)).toBe("<$0.01");
+    expect(formatUsd(0.009)).toBe("<$0.01");
+  });
+
+  it("keeps cents on everyday figures", () => {
+    expect(formatUsd(0.01)).toBe("$0.01");
+    expect(formatUsd(1.234)).toBe("$1.23");
+    expect(formatUsd(9.999)).toBe("$10.00");
+  });
+
+  it("drops a digit of precision as the figure grows", () => {
+    expect(formatUsd(42.57)).toBe("$42.6");
+    expect(formatUsd(1234.5)).toBe("$1,235");
+  });
+
+  it("renders missing and nonsensical values as the dash", () => {
+    expect(formatUsd(null)).toBe(EMPTY_DASH);
+    expect(formatUsd(undefined)).toBe(EMPTY_DASH);
+    expect(formatUsd(-1)).toBe(EMPTY_DASH);
+    expect(formatUsd(Number.NaN)).toBe(EMPTY_DASH);
+  });
+});
+
+describe("newTokens", () => {
+  it("sums the classes that were newly processed", () => {
+    expect(newTokens({ inputTokens: 100, outputTokens: 50, cacheCreationTokens: 30 })).toBe(180);
+  });
+
+  it("excludes cache reads, which re-read tokens already counted", () => {
+    // A cache read is by construction a re-read of tokens counted when they
+    // were written. Including them charges the same tokens once per turn,
+    // which is why a run's face-value total runs tens of times its real size.
+    const bucket = {
+      inputTokens: 344,
+      outputTokens: 77_917,
+      cacheCreationTokens: 1_038_002,
+      cacheReadTokens: 16_928_230,
+    };
+    expect(newTokens(bucket)).toBe(1_116_263);
+  });
+
+  it("treats a missing class as zero", () => {
+    expect(newTokens({ outputTokens: 5 })).toBe(5);
+  });
+
+  it("returns null when the bucket carries no breakdown at all", () => {
+    // A payload from a server predating the per-class wire shape. Returning
+    // 0 would print a wrong number; null lets the caller fall back.
+    expect(newTokens({})).toBeNull();
+    expect(newTokens({ cacheReadTokens: 10 })).toBeNull();
   });
 });

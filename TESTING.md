@@ -167,16 +167,14 @@ two files side by side without the import — or that has a `CLAUDE.md` with no
 
 `.claude/rules/` is read by Claude Code and nothing else, so it is for
 path-scoped *pointers* into a package's `AGENTS.md`, never for the table itself.
-The same test fails a new `.claude/rules/*-injection-seams.md` for any package
-beyond core and web. Those two, plus `web-gateway-boundary.md`, still hold a
-full second copy of content that now also lives in `packages/core/AGENTS.md` and
-`packages/web/AGENTS.md`: `.claude/` is a protected path, so reducing them to
-pointers needs an interactive approval and has not happened yet. Until it does,
-the test requires each rule file's table rows to match its section in the owning
-AGENTS.md row for row, in both directions, so a seam added to one copy fails
-until it is added to the other. Prose is not compared. **Edit the AGENTS.md
-copy first** — it is the one every assistant reads — and make the same edit in
-the rule file.
+Each file there is frontmatter plus a short pointer naming the `AGENTS.md` and
+the section that holds the real content. The same test enforces that, for every
+file in the directory whatever its name: it fails one that carries a table row,
+one that names no `packages/<pkg>/AGENTS.md`, one whose title has no matching
+`## ` section in the file it names, and one that tells authors to add another
+`.claude/rules` registry. It also fails a new `*-injection-seams.md` for any
+package beyond core and web. **There is one copy of each registry, in
+`AGENTS.md`** — edit it there.
 
 **Rule:** Every new row added to either table requires a corresponding
 integration test in the same PR. Never widen the gap between table entries and
