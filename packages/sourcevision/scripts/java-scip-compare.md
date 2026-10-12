@@ -59,7 +59,9 @@ Exit 2 means a prerequisite is missing and the script printed what.
 
 - **SCIP edges:** every non-definition occurrence of a *type* symbol (descriptor
   ending in `#`) in file A whose definition is in another repository `.java`
-  file B gives edge A→B. Method and field symbols are ignored: the resolver
+  file B gives edge A→B. A constructor symbol (`T#`<init>`(...).`, including
+  overloads) counts as a reference to its type `T#`, since `new T()` is
+  recorded that way. Other method and field symbols are ignored: the resolver
   models type references. Symbols defined outside the repository (JDK,
   dependencies) and `local` symbols never produce an edge.
 - **Resolver edges:** `buildPackImportGraph` over the same `.java` files,

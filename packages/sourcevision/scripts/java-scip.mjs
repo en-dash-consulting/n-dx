@@ -78,12 +78,24 @@ function isTypeSymbol(symbol) {
   return symbol.length > 0 && !symbol.startsWith("local ") && symbol.endsWith("#");
 }
 
+/** `<type>#`<init>`(<disambiguator>).` (any overload) is a constructor of `<type>#`. */
+const CONSTRUCTOR = /^(.+#)`<init>`\([^)]*\)\.$/;
+
+/** The type symbol a reference counts toward: itself, its owner for a constructor, else undefined. */
+function referencedType(symbol) {
+  if (symbol.startsWith("local ")) return undefined;
+  const type = CONSTRUCTOR.exec(symbol)?.[1] ?? symbol;
+  return isTypeSymbol(type) ? type : undefined;
+}
+
 export const edgeKey = (from, to) => `${from}\0${to}`;
 
 /**
  * Reduce documents to file-to-file reference edges. Only type symbols count
- * (descriptor ends in `#`): the resolver models type references, so method and
- * field symbols would score its design, not its accuracy. Edges are limited to
+ * (descriptor ends in `#`), plus constructor symbols, which count as references
+ * to their type (`new T()` is recorded as `T#`<init>`().`): the resolver models
+ * type references, so other method and field symbols would score its design,
+ * not its accuracy. Edges are limited to
  * `files` (the repository's own `.java` files) and drop self-references.
  *
  * @returns {Set<string>} {@link edgeKey} values
@@ -101,8 +113,9 @@ export function scipEdges(documents, files) {
   for (const doc of documents) {
     if (!inRepo.has(doc.path)) continue;
     for (const occ of doc.occurrences) {
-      if (occ.definition || !isTypeSymbol(occ.symbol)) continue;
-      const target = definedIn.get(occ.symbol);
+      if (occ.definition) continue;
+      const type = referencedType(occ.symbol);
+      const target = type === undefined ? undefined : definedIn.get(type);
       if (target !== undefined && target !== doc.path) edges.add(edgeKey(doc.path, target));
     }
   }
