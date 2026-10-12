@@ -521,14 +521,14 @@ export function assertApplicable(plan: PlanFile): asserts plan is V1ToV2Plan {
 }
 
 /**
- * Legacy PRD sources beside the tree: `prd.md`, a `prd.json` not yet renamed
- * to `prd.json.migrated`, and branch-scoped `prd_<branch>_<date>.json`. With
- * the tree gone, v1 reads fall back to them and recreate `prd_tree/` beside
- * the v2 tree, so apply refuses while any is present.
+ * Legacy PRD sources beside the tree: `prd.md`, `prd.json` and branch-scoped
+ * `prd_<branch>_<date>.json` — the files `FileAdapter.loadLegacyDocument`
+ * reads once the tree is gone, and a v1 save then turns into a new
+ * `prd_tree/` beside the v2 tree. A `prd.json.migrated` marker does not make
+ * `prd.json` safe: that read ignores it. So apply refuses while any is present.
  */
 async function legacySources(rexDir: string): Promise<string[]> {
-  const found = [join(rexDir, "prd.md")];
-  if (!existsSync(join(rexDir, "prd.json.migrated"))) found.push(join(rexDir, "prd.json"));
+  const found = [join(rexDir, "prd.md"), join(rexDir, "prd.json")];
   found.push(...(await discoverPRDFiles(rexDir)).map((name) => join(rexDir, name)));
   return found.filter((path) => existsSync(path));
 }

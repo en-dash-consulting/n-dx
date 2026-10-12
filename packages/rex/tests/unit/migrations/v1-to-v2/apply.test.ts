@@ -274,7 +274,15 @@ describe("applyV1ToV2", () => {
     expect(existsSync(join(rexDir, "product"))).toBe(false);
   });
 
-  it("applies when prd.json was already renamed to prd.json.migrated", async () => {
+  it("refuses a prd.json even beside a prd.json.migrated marker, which the v1 read fallback ignores", async () => {
+    const plan = await planOf((await load()).items);
+    writeFileSync(join(rexDir, "prd.json.migrated"), "{}");
+    writeFileSync(join(rexDir, "prd.json"), "{}");
+    await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(/prd\.json\. Applying/);
+    expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+  });
+
+  it("applies when only a prd.json.migrated marker is left", async () => {
     const plan = await planOf((await load()).items);
     writeFileSync(join(rexDir, "prd.json.migrated"), "{}");
     expect((await applyV1ToV2(rexDir, plan, { load })).status).toBe("applied");
