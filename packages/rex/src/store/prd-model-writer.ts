@@ -310,7 +310,20 @@ async function planFolder(
     }
     seen.set(key, node.id);
     // Checked against this folder's slugs before the split: placement moves a node out of the Inbox into it.
-    if (reserve?.(node)) {
+    const held = reserve?.(node) ?? false;
+    // The Inbox is addressed by folder name, so a placed change that slugs to
+    // it is read back as the Inbox itself: the change vanishes from the model
+    // and its children are promoted to top-level changes, with nothing but an
+    // orphan state row to show for it. Refuse rather than write a tree that
+    // cannot be read back. Case-folded like the clash check above, because the
+    // reader matches the directory name the filesystem actually hands it.
+    if (reserve && !held && key === INBOX_DIRNAME) {
+      throw new Error(
+        `Node ${node.id} in ${dir} has the slug "${node.slug}", which is reserved for the Inbox folder. ` +
+          `Rename it: a change written there reads back as the Inbox, not as a change.`,
+      );
+    }
+    if (held) {
       reserved.push(node);
       continue;
     }

@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { loadPrdModel, type PrdModel } from "../../../src/store/prd-model-reader.js";
+import { INBOX_DIRNAME, loadPrdModel, type PrdModel } from "../../../src/store/prd-model-reader.js";
 import { writePrdModel, type WritePrdModelOptions } from "../../../src/store/prd-model-writer.js";
 import { withLock } from "../../../src/store/file-lock.js";
 import { prdLockPath } from "../../../src/store/paths.js";
@@ -643,6 +643,19 @@ describe("writePrdModel and the reserved Inbox folder", () => {
     const before = await snapshot(rexDir);
 
     await expect(write(rexDir, model)).rejects.toThrow(/share the slug "add-apple-pay"/);
+    expect(await snapshot(rexDir)).toEqual(before);
+  });
+
+  it("refuses a placed change whose slug is the reserved Inbox name", async () => {
+    // Written, it would be read back as the Inbox folder: the change vanishes
+    // from the model and its children are promoted to top-level changes, with
+    // only an orphan state row left behind.
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    find(all(model), CHANGE).slug = INBOX_DIRNAME;
+    const before = await snapshot(rexDir);
+
+    await expect(write(rexDir, model)).rejects.toThrow(/reserved for the Inbox folder/);
     expect(await snapshot(rexDir)).toEqual(before);
   });
 
