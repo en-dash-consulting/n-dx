@@ -51,5 +51,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The exported computeLanding still reports an open change as landed, because it takes ids rather than the change](./the-exported-computelanding-still.md) | pending |
 | [The .gitignore guide's snippets drift from the ndx.gitignore template](./the-gitignore-guide-s-snippets-drift.md) | pending |
 | [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | pending |
+| [The v2 writer drops a moved folder node's top-level state.yaml keys](./the-v2-writer-drops-a-moved-folder.md) | pending |
 | [v2 isolation test misses imports of the core v2 modules and dynamic import() of any v2 module](./v2-isolation-test-misses-imports-of.md) | pending |
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
