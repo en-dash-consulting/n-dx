@@ -23,6 +23,13 @@
  * correct by construction; the cost is one synchronous read of each test
  * file when vitest starts, about 50 ms for the largest package.
  *
+ * THE ESCAPE HATCH. A file can ask for a worker of its own by writing
+ * `@vitest-isolate` in a comment, with the reason. The patterns above infer
+ * isolation from a call the file makes, which covers mocks and `chdir` but not
+ * a file whose correctness rests on process-wide state it only *reads* — the
+ * inherited cwd, a module-level setter with no reset, a lock it races. Those
+ * have no call to key on, and before the marker there was no way to say so.
+ *
  * WHAT THE SCAN DOES NOT SEE. It reads each test file's own source and nothing
  * it imports, so a file that reaches these APIs only through a helper is read
  * as safe and lands in the shared project. `tests/helpers/viewer-boot.ts` calls
@@ -59,7 +66,8 @@ import { join, relative, sep } from "node:path";
  * worker's cwd, which every later relative path in that worker would resolve
  * against.
  */
-const NEEDS_ISOLATION = /\bvi\.(mock|doMock|resetModules|stubGlobal|stubEnv|hoisted)\(|\bprocess\.chdir\(/;
+const NEEDS_ISOLATION =
+  /\bvi\.(mock|doMock|resetModules|stubGlobal|stubEnv|hoisted)\(|\bprocess\.chdir\(|@vitest-isolate\b/;
 
 /** Whether one test file's source asks for a worker of its own. */
 export function needsIsolation(source) {

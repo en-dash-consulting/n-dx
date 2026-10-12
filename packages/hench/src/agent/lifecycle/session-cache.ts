@@ -257,8 +257,17 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
  */
 async function withCacheLock<T>(henchDir: string, fn: () => Promise<T>): Promise<T> {
   const path = lockPath(henchDir);
+  // Before the lock, not inside the work it guards. `open(path, "wx")` fails
+  // with ENOENT when `.hench/` does not exist yet, and the old code treated
+  // that as "could not lock" and ran the write anyway — so the first write to
+  // a fresh directory was never serialised at all, and the mkdir that fixed
+  // it lived in `updateCacheFileLocked`, after the lock had already been
+  // skipped.
+  await mkdir(henchDir, { recursive: true });
   const deadline = Date.now() + LOCK_TIMEOUT_MS;
   let held = false;
+  /** A non-EEXIST failure, kept so the throw below can say what went wrong. */
+  let failure;
 
   while (Date.now() < deadline) {
     try {
@@ -270,7 +279,10 @@ async function withCacheLock<T>(henchDir: string, fn: () => Promise<T>): Promise
       held = true;
       break;
     } catch (err) {
-      if ((err as NodeJS.ErrnoException)?.code !== "EEXIST") break;
+      if ((err as NodeJS.ErrnoException)?.code !== "EEXIST") {
+        failure = err as Error;
+        break;
+      }
       const age = await stat(path).then(
         (s) => Date.now() - s.mtimeMs,
         () => Number.POSITIVE_INFINITY,
@@ -283,10 +295,25 @@ async function withCacheLock<T>(henchDir: string, fn: () => Promise<T>): Promise
     }
   }
 
+  // Refusing is the whole point of the lock. Running the read-modify-write
+  // without it does not degrade gracefully — it loses another writer's update
+  // silently, which is the exact failure `withCacheLock` exists to stop and
+  // the one the concurrent-mutation tests race to catch. Every caller already
+  // treats a cache write as best effort (`settleBatchChain` swallows it and
+  // the next task starts a fresh chain), so a throw costs a cache entry where
+  // proceeding costs a miscount nothing reports.
+  if (!held) {
+    throw new Error(
+      failure
+        ? `Could not take the session cache lock at ${path}: ${failure.message}`
+        : `Could not take the session cache lock at ${path} within ${LOCK_TIMEOUT_MS}ms.`,
+    );
+  }
+
   try {
     return await fn();
   } finally {
-    if (held) await unlink(path).catch(() => { /* already gone */ });
+    await unlink(path).catch(() => { /* already gone */ });
   }
 }
 
