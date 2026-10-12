@@ -274,6 +274,8 @@ export function readRexTestCommand(dir) {
  * Determine which vendor should act as reviewer given the primary vendor.
  *
  * @param {"claude" | "codex"} primaryVendor
+ * @param {string} [configured]  `hench.review.vendor`; used when it is a
+ *   reviewer vendor other than the primary, otherwise the default applies.
  * @returns {"claude" | "codex"}
  */
 const REVIEWER_VENDOR = {
@@ -281,40 +283,47 @@ const REVIEWER_VENDOR = {
   CODEX: "codex",
 };
 
-export function resolveReviewerVendor(primaryVendor) {
+export function resolveReviewerVendor(primaryVendor, configured) {
+  if (
+    (configured === REVIEWER_VENDOR.CLAUDE || configured === REVIEWER_VENDOR.CODEX) &&
+    configured !== primaryVendor
+  ) {
+    return configured;
+  }
   return primaryVendor === REVIEWER_VENDOR.CLAUDE ? REVIEWER_VENDOR.CODEX : REVIEWER_VENDOR.CLAUDE;
 }
 
 /**
  * Resolve the CLI binary path for a given vendor.
- * Reads from .n-dx.json (llm.<vendor>.cli_path) and falls back to
- * the bare vendor name (resolved by PATH lookup).
+ * Reads llm.<vendor>.cli_path from .n-dx.local.json (where every cli_path is
+ * written), then .n-dx.json, and falls back to the bare vendor name
+ * (resolved by PATH lookup).
  *
  * @param {string} dir  Project root directory.
  * @param {"claude" | "codex"} vendor
  * @returns {string}  CLI binary path or name.
  */
 export function resolveVendorCliPath(dir, vendor) {
-  const configPath = resolveLayout(dir).configFile;
-  try {
-    if (existsSync(configPath)) {
-      const data = JSON.parse(readFileSync(configPath, "utf-8"));
-      const configured = data?.llm?.[vendor]?.cli_path;
-      if (typeof configured === "string" && configured.trim().length > 0) {
-        return configured.trim();
-      }
-      // Legacy claude.cli_path key
-      if (vendor === REVIEWER_VENDOR.CLAUDE) {
-        const legacy = data?.claude?.cli_path;
-        if (typeof legacy === "string" && legacy.trim().length > 0) {
-          return legacy.trim();
-        }
-      }
-    }
-  } catch {
-    /* ignore — fall through to default */
+  const layout = resolveLayout(dir);
+  for (const configPath of [layout.localConfigFile, layout.configFile]) {
+    const found = readCliPath(configPath, vendor);
+    if (found) return found;
   }
   return vendor; // "claude" or "codex" — resolved via PATH
+}
+
+/** The trimmed `cli_path` for `vendor` in one config file, or undefined. */
+function readCliPath(configPath, vendor) {
+  try {
+    if (!existsSync(configPath)) return undefined;
+    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    const candidates = [data?.llm?.[vendor]?.cli_path];
+    // Legacy claude.cli_path key
+    if (vendor === REVIEWER_VENDOR.CLAUDE) candidates.push(data?.claude?.cli_path);
+    return candidates.find((c) => typeof c === "string" && c.trim().length > 0)?.trim();
+  } catch {
+    return undefined; // unreadable config — fall through to the next source
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -538,12 +547,28 @@ const doNotTrack = (child) => child;
  * @param {"claude" | "codex" | undefined} reviewer
  * @returns {Promise<{ env: NodeJS.ProcessEnv } | { spawnError: string }>}
  */
-async function resolveReviewerEnv(dir, reviewer) {
+async function resolveReviewerEnv(dir, reviewer, trust) {
   try {
-    return { env: await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE) };
+    return { env: await loadVendorCliEnv(dir, reviewer ?? REVIEWER_VENDOR.CLAUDE, { trust }) };
   } catch (err) {
     return { spawnError: `could not resolve the reviewer environment: ${err.message}` };
   }
+}
+
+/**
+ * Argv for a reviewer CLI that reads its prompt from stdin.
+ * claude: `-p -`; codex: `exec -` (matches codex-cli-adapter). `--model` is
+ * added only when a model is given, so the CLI's own default stays the default.
+ *
+ * @param {"claude" | "codex"} reviewer
+ * @param {string} [model]
+ * @returns {string[]}
+ */
+export function buildReviewerArgs(reviewer, model) {
+  const modelArgs = model ? ["--model", model] : [];
+  return reviewer === REVIEWER_VENDOR.CODEX
+    ? ["exec", ...modelArgs, "-"]
+    : ["-p", "-", ...modelArgs];
 }
 
 /**
@@ -556,12 +581,14 @@ async function resolveReviewerEnv(dir, reviewer) {
  *   prompt: string;
  *   dir: string;
  *   reviewer?: "claude" | "codex";
+ *   model?: string;
  *   timeout?: number;
+ *   trust?: import("@n-dx/llm-client").RepoTrustStoreOptions;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
  */
-export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
-  const resolved = await resolveReviewerEnv(dir, reviewer);
+export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {
+  const resolved = await resolveReviewerEnv(dir, reviewer, trust);
   if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError };
   const { env } = resolved;
   return new Promise((resolve) => {
@@ -570,7 +597,7 @@ export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout =
       // Deliver the prompt via stdin to avoid newline injection on Windows cmd.exe.
       // claude: `-p -` reads the full prompt from stdin.
       // codex:  `exec -` reads the prompt from stdin (matches codex-cli-adapter).
-      const args = reviewer === REVIEWER_VENDOR.CODEX ? ["exec", "-"] : ["-p", "-"];
+      const args = buildReviewerArgs(reviewer, model);
       child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
         env,
@@ -625,19 +652,21 @@ export async function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout =
  *   prompt: string;
  *   dir: string;
  *   reviewer?: "claude" | "codex";
+ *   model?: string;
  *   timeout?: number;
+ *   trust?: import("@n-dx/llm-client").RepoTrustStoreOptions;
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
  */
-export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
-  const resolved = await resolveReviewerEnv(dir, reviewer);
+export async function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, model, timeout = 300_000, registerChild = doNotTrack, trust }) {
+  const resolved = await resolveReviewerEnv(dir, reviewer, trust);
   if ("spawnError" in resolved) return { exitCode: 1, timedOut: false, spawnError: resolved.spawnError, output: "" };
   const { env } = resolved;
   return new Promise((resolve) => {
     let child;
     try {
       // Deliver the prompt via stdin — same rationale as runReviewerLlm.
-      const args = reviewer === REVIEWER_VENDOR.CODEX ? ["exec", "-"] : ["-p", "-"];
+      const args = buildReviewerArgs(reviewer, model);
       child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
         env,
@@ -931,17 +960,21 @@ function spawnShellTestCommand(testCommand, dir, timeout, registerChild, env) {
  * @param {{
  *   dir: string;
  *   reviewer: "claude" | "codex";
+ *   model?: string;
  *   testCommand?: string;
  *   timeout?: number;
  *   contextFiles?: string[];
  * }} options
  * @returns {Promise<ReviewResult>}
  */
-export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout, contextFiles, registerChild = doNotTrack }) {
+export async function runCrossVendorReview({ dir, reviewer, model, testCommand, timeout, contextFiles, registerChild = doNotTrack }) {
   const cliPath = resolveVendorCliPath(dir, reviewer);
   const { available } = checkReviewerAvailability(cliPath);
 
-  const ctx = contextFiles?.length ? { contextFiles } : {};
+  const ctx = {
+    ...(contextFiles?.length ? { contextFiles } : {}),
+    ...(model ? { model } : {}),
+  };
 
   if (!available) {
     return {
@@ -956,7 +989,7 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
   const prompt = buildReviewerPrompt({ changedFiles, testCommand });
   const llmTimeout = timeout ?? 300_000;
 
-  const llmResult = await runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout: llmTimeout, registerChild });
+  const llmResult = await runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, model, timeout: llmTimeout, registerChild });
 
   if (llmResult.spawnError) {
     // LLM failed to start — fall back to shell tests when a test command is available
@@ -995,6 +1028,40 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
 }
 
 // ---------------------------------------------------------------------------
+// Review rounds
+// ---------------------------------------------------------------------------
+
+/**
+ * Run up to `rounds` review → remediation cycles, stopping as soon as a review
+ * passes, is skipped, or has no feedback to act on; then return the final
+ * verdict. With `rounds` = 2 and reviews that keep failing: review, fix,
+ * review, fix, review — two remediation passes at most.
+ *
+ * @template R
+ * @param {{
+ *   rounds: number;
+ *   review: (round: number) => Promise<R>;
+ *   remediate: (result: R, pass: number) => Promise<void>;
+ * }} options  `round` and `pass` count from 1; round 1 is the first review.
+ * @returns {Promise<{ result: R; remediationPasses: number }>}
+ */
+export async function runReviewRounds({ rounds, review, remediate }) {
+  let result = await review(1);
+  let remediationPasses = 0;
+  while (
+    remediationPasses < rounds &&
+    !result.skipped &&
+    !result.passed &&
+    result.feedback
+  ) {
+    remediationPasses += 1;
+    await remediate(result, remediationPasses);
+    result = await review(remediationPasses + 1);
+  }
+  return { result, remediationPasses };
+}
+
+// ---------------------------------------------------------------------------
 // Formatter
 // ---------------------------------------------------------------------------
 
@@ -1013,7 +1080,7 @@ const BORDER = "─".repeat(60);
  * @returns {string}
  */
 export function formatReviewBanner(reviewer, result) {
-  const lines = ["", BORDER, `Reviewer (${reviewer})`, BORDER];
+  const lines = ["", BORDER, `Reviewer (${reviewer}${result.model ? `, ${result.model}` : ""})`, BORDER];
 
   if (result.skipped) {
     lines.push(`⚠  Review skipped: ${result.reason}`);

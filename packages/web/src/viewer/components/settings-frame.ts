@@ -27,11 +27,23 @@ export interface SettingsFrameProps {
   onSave: () => Promise<void> | void;
   /** Restore the last-saved values, called when the user discards. */
   onDiscard?: () => void;
+  /**
+   * One line per unsaved change, e.g. "Vendor claude → codex". While dirty the
+   * footer shows the count and the first line. Omit it and the footer says
+   * only "Unsaved changes".
+   */
+  changeSummary?: string[];
   /** The page's own fields. */
   children?: ComponentChildren;
 }
 
-export function SettingsFrame({ dirty, saving, error = null, onSave, onDiscard, children }: SettingsFrameProps) {
+function dirtyLabel(changeSummary: string[] | undefined): string {
+  if (!changeSummary || changeSummary.length === 0) return "Unsaved changes";
+  const n = changeSummary.length;
+  return `${n} unsaved change${n === 1 ? "" : "s"} · ${changeSummary[0]}`;
+}
+
+export function SettingsFrame({ dirty, saving, error = null, onSave, onDiscard, changeSummary, children }: SettingsFrameProps) {
   const { promptOpen, keepEditing, discardChanges } = useLeaveGuard(dirty, onDiscard);
   const modalRef = useRef<HTMLElement | null>(null);
   const keepRef = useRef<HTMLButtonElement>(null);
@@ -75,17 +87,28 @@ export function SettingsFrame({ dirty, saving, error = null, onSave, onDiscard, 
   return h("div", { class: "settings-frame" },
     h("div", { class: "settings-frame-body" }, children),
     h("div", { class: "settings-frame-footer" },
+      dirty ? h("span", { class: "settings-frame-dot", "aria-hidden": "true" }) : null,
       h("span", {
         class: `settings-frame-indicator${dirty ? " settings-frame-indicator--dirty" : ""}`,
         role: "status",
-      }, dirty ? "Unsaved changes" : "All changes saved"),
+      }, dirty ? dirtyLabel(changeSummary) : "All changes saved"),
       error ? h("span", { class: "settings-frame-error", role: "alert" }, error) : null,
-      h("button", {
-        type: "button",
-        class: "settings-frame-save",
-        disabled: !dirty || saving,
-        onClick: handleSave,
-      }, saving ? "Saving…" : "Save"),
+      h("div", { class: "settings-frame-actions" },
+        onDiscard
+          ? h("button", {
+              type: "button",
+              class: "settings-frame-discard",
+              disabled: !dirty || saving,
+              onClick: onDiscard,
+            }, "Discard")
+          : null,
+        h("button", {
+          type: "button",
+          class: "settings-frame-save",
+          disabled: !dirty || saving,
+          onClick: handleSave,
+        }, saving ? "Saving…" : "Save"),
+      ),
     ),
     promptOpen
       ? h("div", {

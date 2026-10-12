@@ -4,6 +4,7 @@
  * GET  /api/hench/prep/:taskId          — `ndx work --task=<id> --resolve`'s JSON (hench's
  *                                         defaults and where each came from, refusals, the
  *                                         equivalent command) plus the vendor's model catalog,
+ *                                         whether pair review is supported (`pairSupported`),
  *                                         the hub's admission state, the worktree's state, the
  *                                         run's directory (`dir`), the item's header fields
  *                                         (`detail`), and `recommendation: null` (reserved for
@@ -44,6 +45,7 @@ import { collectHeldRuns, loadHenchConfig } from "./routes-hench.js";
 import { loadStuckTaskIds, maxFailedAttemptsOf } from "./stuck-tasks.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { validateProviderForVendor } from "./hench-config-fields.js";
+import { PAIR_REVIEW_SUPPORTED } from "./llm-review.js";
 import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
 import {
   collectCompletedIds,
@@ -528,6 +530,8 @@ async function handlePrep(req: IncomingMessage, res: ServerResponse, ctx: Server
     // loaded this" from "someone else saved in between".
     savedVersion: savedRunVersion(entry?.item.run as RunSettings | undefined),
     catalog,
+    // The modal disables its Pair choice on this, as the Robot Wrangler page does.
+    pairSupported: PAIR_REVIEW_SUPPORTED,
     admission: admissionOf(req),
     workspace: { ...(resolved["workspace"] as object | undefined), ...workspace },
     recommendation: null,

@@ -204,6 +204,8 @@ run: {"tier":"heavy","models":{"claude":"claude-opus-5-5","codex":"gpt-5.6-sol"}
 | `provider` | `cli` \| `api` |
 | `permissionMode` | `default` \| `acceptEdits` \| `bypassPermissions` |
 | `review` | boolean |
+| `reviewMode` | `off` \| `self` \| `pair`; outranks `review` when both are saved |
+| `reviewVendor` | `claude` \| `codex` — the pair reviewer; must differ from the executor's vendor at run time |
 | `reviewTier` | same values as `tier`, for the reviewer |
 | `reviewModels` | same shape as `models`, for the reviewer |
 | `reviewOptional` | boolean |

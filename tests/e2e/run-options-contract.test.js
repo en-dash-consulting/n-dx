@@ -149,6 +149,8 @@ describe("run options contract: dashboard allow-list vs ndx work --resolve", () 
       provider: "cli",
       permissionMode: "acceptEdits",
       review: true,
+      reviewMode: "pair",
+      reviewVendor: "codex",
       reviewModel: TIER_MODELS.claude.standard,
       skipTestGate: true,
       maxTurns: 9,
