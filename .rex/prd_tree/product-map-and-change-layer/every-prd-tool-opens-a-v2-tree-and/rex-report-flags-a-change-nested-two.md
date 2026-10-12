@@ -2,7 +2,7 @@
 id: "e2354ac9-99e4-4bf6-9eed-112ef6ff7951"
 level: "task"
 title: "rex report flags a change nested two deep as a hierarchy-placement error on v2"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -11,12 +11,15 @@ tags:
   - "lane-rex-store"
   - "review-2026-10-12"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-12T19:44:06.991Z"
+completedAt: "2026-10-12T19:56:16.475Z"
+endedAt: "2026-10-12T19:56:16.475Z"
 acceptanceCriteria:
   - "On a v2 copy with a change nested under a change under a change, `rex report --fail-on-error .` exits 0 and its JSON has ok: true with no hierarchy-placement check failing (test)"
   - "A task-less change on v2 raises no empty-containers warning in rex report (test)"
   - "v1 rex report output is unchanged; existing report tests pass unedited"
 description: "Found by adversarial review of 517cc0de (commit 58885d37a). Verdict: out-of-scope (pre-existing; same defect class as 517cc0de, which fixed only validate and reorganize).\n\npackages/rex/src/cli/commands/report.ts:137-170 carries its own copy of validate's structural checks: validateStructure → \"hierarchy placement\" (error) and \"empty containers\" (warn). On a v2 tree the change layer projects a nested change as `feature`, so after `rex move <tidy> --parent=<CH-1>` then `rex move <second> --parent=<tidy>`, `rex report .` returns ok:false with `feature at under feature, expected under epic`, and `rex report --fail-on-error` exits 1. A task-less change also raises the empty-container warning.\n\nReachable: `rex report` and anything consuming its JSON (ok flag). cli-v2-serve \"report passes\" runs only on the one-change fixture.\n\nOptions: (a) mirror validate.ts — skip both checks when isChangeLayerStore(store) (cheap, matches 517cc0de; recommended). (b) extract one shared structural-checks builder used by validate and report, so the two cannot drift again (bigger diff, removes the duplication that caused this)."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-12T19:02:47.505Z"
+lastModified: "2026-10-12T19:56:16.825Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

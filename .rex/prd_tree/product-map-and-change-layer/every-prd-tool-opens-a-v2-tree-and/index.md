@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Resolve the store by layout, and refuse a split tree](./resolve-the-store-by-layout-and-refuse.md) | completed |
 | [restoreFromBackup and the backups listing refuse a v2 tree inside rex](./restorefrombackup-and-the-backups.md) | completed |
 | [rex migrate-to-folder-tree, migrate-to-md and migrate-folder-tree-filenames do not refuse a v2 tree](./rex-migrate-to-folder-tree-migrate-to.md) | completed |
-| [rex report flags a change nested two deep as a hierarchy-placement error on v2](./rex-report-flags-a-change-nested-two.md) | pending |
+| [rex report flags a change nested two deep as a hierarchy-placement error on v2](./rex-report-flags-a-change-nested-two.md) | completed |
 | [rex validate and MCP reorganize accept a change nested two deep](./rex-validate-and-mcp-reorganize-accept.md) | completed |
 | [rex validate runs the prd_tree/ slug and identity checks on a v2 tree](./rex-validate-runs-the-prd-tree-slug.md) | completed |
 | [The rex CLI serves a v2 tree, and refuses what it cannot yet do](./the-rex-cli-serves-a-v2-tree-and.md) | completed |
