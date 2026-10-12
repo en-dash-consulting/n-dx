@@ -17,6 +17,7 @@ import { info, result, warn } from "../output.js";
 
 import { getAvailableBackups, restoreFromBackup } from "../../core/backup-snapshots.js";
 import { resolveRexPaths } from "../../store/index.js";
+import { refuseOnV2 } from "./v2-cli.js";
 
 /** Render a snapshot id back into a readable timestamp. */
 function formatSnapshotId(id: string): string {
@@ -57,6 +58,11 @@ export async function cmdRestore(
 ): Promise<void> {
   requireRexDir(dir);
   const rexDir = resolveRexPaths(dir).rexDir;
+  await refuseOnV2(
+    rexDir,
+    "restore",
+    "Restore is v1-only until after the v2 cut; recover a v2 tree from git history.",
+  );
   const backupsDir = join(rexDir, ".backups");
   const isJson = flags.format === "json";
 

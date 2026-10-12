@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 // (tests/integration/domain-layer-boundary.test.ts), and the barrel is already
 // on it, so this needs no new tracked exception.
 import { resolveStore, ensureLegacyPrdMigrated, withSelfHealTag, resolveRexPaths } from "../../store/index.js";
+import { refuseOnV2 } from "./v2-cli.js";
 import { stampModified } from "../../core/sync.js";
 
 import { CLIError, BudgetExceededError } from "../errors.js";
@@ -483,6 +484,11 @@ async function runAnalyze(
   flags: Record<string, string>,
   multiFlags: Record<string, string[]>,
 ): Promise<void> {
+  await refuseOnV2(
+    resolveRexPaths(dir).rexDir,
+    "analyze",
+    "Capture work with 'rex add' (a new change) or 'rex change place' (place a change on the product map).",
+  );
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading/writing PRD
   await ensureLegacyPrdMigrated(dir);
 

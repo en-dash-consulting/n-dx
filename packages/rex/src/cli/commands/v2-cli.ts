@@ -34,6 +34,12 @@ export async function requireV2(rexDir: string, verb: string): Promise<void> {
   );
 }
 
+/** Refuse a v1-only verb on a v2 tree, naming what to use instead. */
+export async function refuseOnV2(rexDir: string, verb: string, instead: string): Promise<void> {
+  if ((await prdLayout(rexDir)) !== "v2") return;
+  throw new CLIError(`rex ${verb} does not run on a v2 PRD (product/ and changes/).`, instead);
+}
+
 /** How a node is named in output: its display id when it has one. */
 export function nodeLabel(node: Pick<RuleNode, "id" | "displayId">): string {
   return node.displayId ?? node.id;

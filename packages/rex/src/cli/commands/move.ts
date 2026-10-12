@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
-import { validateMove, moveItem } from "../../core/move.js";
+import { resolveStore, isChangeLayerStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
+import { validateMove, moveItem, levelParentRule, changeLayerParentRule } from "../../core/move.js";
 
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -22,15 +22,17 @@ export async function cmdMove(
   const doc = await store.loadDocument();
 
   const newParentId = flags.parent || undefined;
+  // A v2 tree has no levels: a change, task and subtask are told apart by type.
+  const rule = isChangeLayerStore(store) ? changeLayerParentRule : levelParentRule;
 
   // Validate before mutating
-  const validation = validateMove(doc.items, id, newParentId);
+  const validation = validateMove(doc.items, id, newParentId, rule);
   if (!validation.valid) {
     throw new CLIError(validation.error!, validation.suggestion);
   }
 
   // Perform the move
-  const moveResult = moveItem(doc.items, id, newParentId);
+  const moveResult = moveItem(doc.items, id, newParentId, rule);
 
   // Persist the modified tree
   await store.saveDocument(doc);
