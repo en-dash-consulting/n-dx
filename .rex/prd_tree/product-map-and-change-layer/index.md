@@ -56,3 +56,4 @@ plannedRelease: "1.0.0"
 | [v2 schema and rules before the freeze](./v2-schema-and-rules-before-the-freeze/index.md) | completed |
 | [v2 store transaction for the product and change layers](./v2-store-transaction-for-the-product/index.md) | completed |
 | [hench selects, briefs and completes work on a v2 tree](./hench-selects-briefs-and-completes/index.md) | pending |
+| [Dashboard renders a v2 project](./dashboard-renders-a-v2-project/index.md) | pending |
