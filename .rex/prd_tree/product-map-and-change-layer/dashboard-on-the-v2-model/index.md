@@ -2,7 +2,7 @@
 id: "89ecd7f3-ca6a-4833-90a4-7bc7b1017e94"
 level: "feature"
 title: "Dashboard on the v2 model"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "product-map"
@@ -13,10 +13,13 @@ blockedBy:
   - "5cfa1d83-839a-47a1-ae42-4353cd1acf83"
   - "2e233c46-e4fb-49d1-81e7-6e0fd58fc683"
 source: "roadmap"
+startedAt: "2026-10-12T05:41:21.589Z"
+completedAt: "2026-10-12T05:41:21.589Z"
+endedAt: "2026-10-12T05:41:21.589Z"
 acceptanceCriteria: []
 description: "Wire the new views and remap existing ones; nothing in Plan, Work or Live may break.\n\nRoadmap PR 21 · wave 2 · lane web."
 assignee: "Sterling H <sterling.h@endash.us>"
-lastModified: "2026-10-06T15:51:47.411Z"
+lastModified: "2026-10-12T05:41:22.116Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -24,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add direct map editing, workflow settings and Bitbucket remote parsing](./add-direct-map-editing-workflow.md) | in_progress |
+| [Add direct map editing, workflow settings and Bitbucket remote parsing](./add-direct-map-editing-workflow.md) | completed |
 | [Add one host-neutral remote-URL helper in llm-client](./add-one-host-neutral-remote-url-helper.md) | completed |
 | [Dashboard Quick Add and batch import show an empty preview on a v2 tree](./dashboard-quick-add-and-batch-import.md) | completed |
 | [Make item routes type-aware and remap views that use level](./make-item-routes-type-aware-and-remap.md) | completed |
