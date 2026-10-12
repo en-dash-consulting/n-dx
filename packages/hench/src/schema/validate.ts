@@ -396,6 +396,7 @@ const OpaqueRunSectionSchema = z.object({}).passthrough();
 const RunCommitRecordSchema = z.object({
   sha: z.string(),
   subject: z.string(),
+  attribution: z.enum(["start-head", "subject", "trailer", "window"]).optional(),
   // Optional so a record written before commit facts were stored still
   // validates; see the field doc on RunCommitRecord.
   authorDate: z.string().optional(),

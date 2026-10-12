@@ -84,6 +84,7 @@ export default defineConfig({
             { text: "Viewer Architecture", link: "/architecture/viewer-architecture" },
             { text: "PRD Folder-Tree Schema", link: "/architecture/prd-folder-tree-schema" },
             { text: "PRD Write Concurrency", link: "/architecture/prd-write-concurrency" },
+            { text: "Graview Projection", link: "/architecture/graview-projection" },
           ],
         },
         {

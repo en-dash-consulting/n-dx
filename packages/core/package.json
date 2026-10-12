@@ -93,6 +93,7 @@
     "build": "echo '@n-dx/core: plain JS, no build needed'"
   },
   "dependencies": {
+    "@n-dx/graview": "workspace:*",
     "@n-dx/hench": "workspace:*",
     "@n-dx/llm-client": "workspace:*",
     "@n-dx/rex": "workspace:*",

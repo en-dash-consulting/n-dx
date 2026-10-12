@@ -38,6 +38,29 @@ function runResult(args) {
 }
 
 /**
+ * Parse an `ndx ci --format=json` run, or fail saying which run and why.
+ *
+ * These parses happen in `beforeAll`, so a run that crashed or timed out gives
+ * an empty stdout and every test in the block fails with "Unexpected end of
+ * JSON input" — naming neither the case nor the reason. The argv, exit code
+ * and stderr are what identify it.
+ */
+function parseReport(result, args) {
+  try {
+    return JSON.parse(result.stdout);
+  } catch (err) {
+    throw new Error(
+      [
+        `ndx ci ${args.join(" ")} produced no parseable JSON (exit ${result.code}).`,
+        `parse error: ${err.message}`,
+        `stdout: ${result.stdout ? JSON.stringify(result.stdout.slice(0, 400)) : "(empty)"}`,
+        `stderr: ${result.stderr ? result.stderr.slice(0, 1200) : "(empty)"}`,
+      ].join("\n"),
+    );
+  }
+}
+
+/**
  * Set up a minimal project with .sourcevision and .rex dirs,
  * enough for ci to validate against.
  */
@@ -88,7 +111,7 @@ describe("n-dx ci", () => {
       quiet = runResult(["--quiet", tmpDir]);
       shortQuiet = runResult(["-q", tmpDir]);
       json = runResult(["--format=json", "--quiet", tmpDir]);
-      report = JSON.parse(json.stdout);
+      report = parseReport(json, ["--format=json", "--quiet", tmpDir]);
     });
 
     afterAll(async () => {
@@ -234,7 +257,10 @@ describe("n-dx ci", () => {
         join(tmpDir, "scripts", "release.js"),
         'import { execFileSync } from "node:child_process";\nexecFileSync("true");\n',
       );
-      report = JSON.parse(runResult(["--format=json", "--quiet", tmpDir]).stdout);
+      report = parseReport(
+        runResult(["--format=json", "--quiet", tmpDir]),
+        ["--format=json", "--quiet", tmpDir],
+      );
     });
 
     afterAll(async () => {
@@ -317,7 +343,9 @@ describe("n-dx ci", () => {
         const dir = await freshProject("ndx-ci-secrets-");
         await setup(dir);
         const result = runResult(["--format=json", "--quiet", dir]);
-        const report = JSON.parse(result.stdout);
+        // Named by case: six fixtures share this hook, and without the name a
+        // failure here says only that some JSON was unparseable.
+        const report = parseReport(result, ["--format=json", "--quiet", name]);
         results.set(name, {
           dir,
           code: result.code,
@@ -325,7 +353,11 @@ describe("n-dx ci", () => {
           step: report.steps.find((s) => s.name === "config-secrets"),
         });
       }
-    });
+      // Six fixtures, about sixteen git spawns and six `ndx ci` runs in one
+      // hook, measured at 9-11 s per run locally. The 120 s default leaves no
+      // room on a loaded runner, and the failure it produces is a hook timeout
+      // rather than anything about the case that was slow.
+    }, 300_000);
 
     afterAll(async () => {
       for (const { dir } of results.values()) await removeTmpDir(dir);

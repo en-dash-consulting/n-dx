@@ -1948,6 +1948,7 @@ const EFFECTS_LAYOUT_TOKENS = {
   sourcevision: "sourcevisionDir",
   config: "configFile",
   localConfig: "localConfigFile",
+  graview: "graviewDir",
   webPid: "webPidFile",
   webPort: "webPortFile",
 } as const satisfies Record<string, keyof ReturnType<typeof resolveLayout>>;

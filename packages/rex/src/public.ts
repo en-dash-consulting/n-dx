@@ -72,6 +72,59 @@ export type { ClaimsStore, ClaimsStoreOptions, ClaimOptions, ClaimResult, ClaimH
 export type { PRDStore, SaveFileReport } from "./store/contracts.js";
 export { takeSaveFileReport } from "./store/contracts.js";
 
+// ---- Store: the PRD model (product + change layers) --------------------------
+// One reader for both layouts. A v1 tree reads as changes only (V1_LEVEL_TYPES:
+// epics and features become changes), so a consumer such as the dashboard's
+// Product and Changes views or the Graview projection holds one code path over
+// any repository. Zod schemas for the v2 node shapes stay internal.
+
+export { loadPrdModel, prdLayout, V1_LEVEL_TYPES, NEWEST_SCHEMA, SchemaSkewError } from "./store/prd-model-reader.js";
+export type { PrdModel, LoadPrdModelOptions, FolderStateKeys } from "./store/prd-model-reader.js";
+
+// ---- Schema: v2 node types ---------------------------------------------------
+
+export { SCHEMA_VERSION_V2, PRODUCT_NODE_TYPES, CHANGE_NODE_TYPES, NODE_TYPES } from "./schema/v2.js";
+export type {
+  NodeType, ProductNodeType, ChangeNodeType, Layer,
+  NodeIntent, AreaIntent, CapabilityIntent, ConstraintIntent, ChangeIntent, TaskIntent, SubtaskIntent,
+  ItemState, V2Node, AreaNode, CapabilityNode, ConstraintNode, ChangeNode, TaskNode, SubtaskNode,
+  Amendment, AmendmentDelta, Criterion, DiscoveredFrom, CheckResult,
+} from "./schema/v2.js";
+
+// ---- Schema: v2 tree index ---------------------------------------------------
+
+export { indexTree, isAppliedChange, isOpenChange, isBuildingChange, specHash, nodeSpec } from "./schema/v2-rules.js";
+export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOptions } from "./schema/v2-rules.js";
+
+// ---- Core: product edges, status and realization -----------------------------
+// The derived relations a v2 tree implies: which changes touch a product node,
+// which constraints bind it, what it shares changes with, and (through the
+// N-DX-Item trailers) which commits, files and zones realize a capability.
+
+export { computeEdges, computeRealizedBy, deriveChangeKind, resolveNode, trailerIds, CHANGE_KINDS } from "./core/product-edges.js";
+export type { ProductEdges, CoChange, Realization, RealizedByOptions, ChangeKind } from "./core/product-edges.js";
+export { loadTrailerCommits, loadCommitFiles } from "./core/change-commits.js";
+export type { ChangeCommitsOptions, TrailerCommit } from "./core/change-commits.js";
+export { computeLandings, listReleaseTags, releasesContaining } from "./core/change-landing.js";
+export type { ChangeLanding, ReleaseTag } from "./core/change-landing.js";
+
+// ---- Migrations: the v1-to-v2 plan's rules stage ----------------------------
+// Pure and deterministic: where each v1 item lands in v2 (an epic an area, a
+// feature with completed work a capability, work under them changes placed on
+// them) and the template capability specs. A proposal for review; nothing
+// here writes.
+export { classifyV1Tree, DEFAULT_PRODUCT_NAMES } from "./migrations/v1-to-v2/migration-plan.js";
+export type { MigrationPlan, PlanEntry, PlanTargetType, ProposedArea, ProposedConstraint, ClassifyOptions } from "./migrations/v1-to-v2/migration-plan.js";
+export { draftCapabilitySpecs } from "./migrations/v1-to-v2/capability-spec.js";
+export type { CapabilitySpecDraft, SpecCriterion, SpecDraftOptions } from "./migrations/v1-to-v2/capability-spec.js";
+export { computeProductStatus, INTENT_STATUSES, HEALTH_VALUES } from "./core/product-status.js";
+export type { IntentStatus, Health, ProductStatus } from "./core/product-status.js";
+export { productReport, capabilityReport, prdStatusReport } from "./core/product-report.js";
+export type {
+  ProductReportNode, CapabilityReport, RelatedChange, ChangePageOptions,
+  PrdStatusReport, ChangeCounts, AreaStatus, ReleaseStatus,
+} from "./core/product-report.js";
+
 // ---- Markdown serializer / parser ------------------------------------------
 
 export { serializeDocument } from "./store/markdown-serializer.js";
