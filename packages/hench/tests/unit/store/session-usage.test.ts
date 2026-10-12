@@ -53,6 +53,118 @@ function userLine(uuid: string): string {
   return JSON.stringify({ type: "user", uuid, message: { content: "hi" } });
 }
 
+/**
+ * One transcript line for a message that spans several content blocks.
+ *
+ * Claude Code writes one line per block and repeats the finished message —
+ * `usage` and all — on every one of them. The lines are distinct entries with
+ * distinct uuids; only `message.id` says they are the same turn.
+ */
+function blockLine(
+  uuid: string,
+  messageId: string,
+  usage: Partial<{
+    input_tokens: number;
+    output_tokens: number;
+    cache_creation_input_tokens: number;
+    cache_read_input_tokens: number;
+  }>,
+): string {
+  return JSON.stringify({
+    type: "assistant",
+    uuid,
+    timestamp: new Date(0).toISOString(),
+    message: { id: messageId, model: "claude-opus-5", usage },
+  });
+}
+
+describe("content-block repeats", () => {
+  it("counts a multi-block message once", () => {
+    // Four lines, one turn. Summing them line by line is what put 23.5M
+    // cache-read tokens on a task that read 5.5M.
+    const usage = {
+      input_tokens: 2,
+      output_tokens: 7,
+      cache_creation_input_tokens: 34_530,
+      cache_read_input_tokens: 29_573,
+    };
+    const transcript = [
+      blockLine("l1", "msg_01", usage),
+      blockLine("l2", "msg_01", usage),
+      blockLine("l3", "msg_01", usage),
+      blockLine("l4", "msg_01", usage),
+    ].join("\n");
+
+    const delta = readUsageDelta(transcript, EMPTY_CURSOR);
+
+    expect(delta.tokenUsage).toEqual({
+      input: 2,
+      output: 7,
+      cacheCreationInput: 34_530,
+      cacheReadInput: 29_573,
+    });
+  });
+
+  it("still counts distinct messages separately", () => {
+    const transcript = [
+      blockLine("l1", "msg_01", { input_tokens: 1, output_tokens: 10 }),
+      blockLine("l2", "msg_01", { input_tokens: 1, output_tokens: 10 }),
+      blockLine("l3", "msg_02", { input_tokens: 2, output_tokens: 20 }),
+    ].join("\n");
+
+    const delta = readUsageDelta(transcript, EMPTY_CURSOR);
+
+    expect(delta.tokenUsage.input).toBe(3);
+    expect(delta.tokenUsage.output).toBe(30);
+  });
+
+  it("keeps repeats addressable so cursors still land on them", () => {
+    // Repeats are flagged, not dropped: the cursor addresses positions by the
+    // per-line uuid, so removing lines would move every boundary and
+    // invalidate cursor files already on disk.
+    const transcript = [
+      blockLine("l1", "msg_01", { output_tokens: 10 }),
+      blockLine("l2", "msg_01", { output_tokens: 10 }),
+      blockLine("l3", "msg_02", { output_tokens: 20 }),
+    ].join("\n");
+
+    const delta = readUsageDelta(transcript, { lastUuid: "l2", consumed: 2 });
+
+    expect(delta.resynced).toBe(false);
+    expect(delta.tokenUsage.output).toBe(20);
+  });
+
+  it("counts a straddling message in the segment holding its first block", () => {
+    // msg_01's blocks sit on both sides of the cursor. The earlier record
+    // already claimed that turn, so the later one must not claim it again.
+    const transcript = [
+      blockLine("l1", "msg_01", { output_tokens: 10 }),
+      blockLine("l2", "msg_01", { output_tokens: 10 }),
+      blockLine("l3", "msg_02", { output_tokens: 20 }),
+    ].join("\n");
+
+    const delta = readUsageDelta(transcript, { lastUuid: "l1", consumed: 1 });
+
+    expect(delta.tokenUsage.output).toBe(20);
+  });
+
+  it("reports the whole transcript's distinct usage in a snapshot", () => {
+    const transcript = [
+      blockLine("l1", "msg_01", { output_tokens: 10 }),
+      blockLine("l2", "msg_01", { output_tokens: 10 }),
+      blockLine("l3", "msg_01", { output_tokens: 10 }),
+    ].join("\n");
+
+    const snapshot = snapshotTranscriptUsage(transcript);
+
+    expect(snapshot.totals.output).toBe(10);
+    // Positions still count lines — that is what the cursor addresses.
+    expect(snapshot.messages).toBe(3);
+    expect(snapshot.lastUuid).toBe("l3");
+    expect(snapshot.model).toBe("claude-opus-5");
+  });
+});
+
 describe("readUsageDelta", () => {
   it("maps the four usage fields onto TokenUsage", () => {
     const transcript = [

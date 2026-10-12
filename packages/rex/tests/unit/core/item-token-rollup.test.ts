@@ -52,7 +52,7 @@ function run(
 }
 
 function zeroTuple() {
-  return { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: 0 };
+  return { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: 0, costUsd: 0 };
 }
 
 function get(
@@ -97,7 +97,7 @@ describe("aggregateItemTokenUsage", () => {
     const prd: PRDItem[] = [item("epic1", [item("task1")])];
     const { totals } = aggregateItemTokenUsage(prd, [run("task1", 100, 50, 10)]);
     const task = get(totals, "task1");
-    expect(task.self).toEqual({ input: 100, output: 50, cacheCreation: 10, cacheRead: 0, total: 160 });
+    expect(task.self).toEqual({ input: 100, output: 50, cacheCreation: 10, cacheRead: 0, total: 160, costUsd: 0 });
     expect(task.descendants).toEqual(zeroTuple());
     expect(task.total).toEqual(task.self);
   });
@@ -106,7 +106,7 @@ describe("aggregateItemTokenUsage", () => {
     const prd: PRDItem[] = [item("epic1", [item("task1")])];
     const { totals } = aggregateItemTokenUsage(prd, [run("task1", 100, 50, 200, 5000)]);
     const task = get(totals, "task1");
-    expect(task.self).toEqual({ input: 100, output: 50, cacheCreation: 200, cacheRead: 5000, total: 5350 });
+    expect(task.self).toEqual({ input: 100, output: 50, cacheCreation: 200, cacheRead: 5000, total: 5350, costUsd: 0 });
     expect(task.total).toEqual(task.self);
   });
 
@@ -149,7 +149,7 @@ describe("aggregateItemTokenUsage", () => {
       run("task1", 5, 6),
     ]);
     const t = get(totals, "task1");
-    expect(t.self).toEqual({ input: 9, output: 12, cacheCreation: 0, cacheRead: 0, total: 21 });
+    expect(t.self).toEqual({ input: 9, output: 12, cacheCreation: 0, cacheRead: 0, total: 21, costUsd: 0 });
     expect(t.runCount).toBe(3);
   });
 
@@ -182,7 +182,7 @@ describe("aggregateItemTokenUsage", () => {
     expect(orphans[0]).toEqual(stray);
     // Orphan tokens MUST NOT leak into any item's totals
     const task = get(totals, "task1");
-    expect(task.total).toEqual({ input: 1, output: 1, cacheCreation: 0, cacheRead: 0, total: 2 });
+    expect(task.total).toEqual({ input: 1, output: 1, cacheCreation: 0, cacheRead: 0, total: 2, costUsd: 0 });
   });
 
   it("treats archived/pruned items (not in tree) as orphan attribution targets", () => {
@@ -257,11 +257,12 @@ describe("aggregateItemTokenUsage", () => {
             input: acc.input + ct.total.input,
             output: acc.output + ct.total.output,
             cacheCreation: acc.cacheCreation + ct.total.cacheCreation,
+            costUsd: (acc.costUsd ?? 0) + (ct.total.costUsd ?? 0),
             cacheRead: acc.cacheRead + ct.total.cacheRead,
             total: acc.total + ct.total.total,
           };
         },
-        { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: 0 },
+        { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: 0, costUsd: 0 },
       );
       expect(t.descendants).toEqual(childSum);
       expect(t.total.input).toBe(t.self.input + childSum.input);

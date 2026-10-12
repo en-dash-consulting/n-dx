@@ -14,13 +14,44 @@ const GITHUB = "ghp_" + "b".repeat(36);
 const AWS = "AKIA" + "C".repeat(16);
 const JWT = `eyJ${"a".repeat(10)}.${"b".repeat(20)}.${"c".repeat(20)}`;
 
-// Atlassian stamps a fixed prefix on each credential kind and ends the newer
-// ones with `=` plus an 8-character checksum. The rules key on the prefix, so
-// the filler here only has to clear the length floor.
-const BB_APP_PASSWORD = "ATBB" + "k".repeat(28) + "A1B2C3D4";
-const BB_ACCESS_TOKEN = "ATCTT3xFfGF0" + "m".repeat(40) + "=9F8E7D6C";
-const ATLASSIAN_API_TOKEN = "ATATT3xFfGF0" + "n".repeat(40) + "=1A2B3C4D";
-const BB_DC_TOKEN = "BBDC-" + "p".repeat(40);
+// Atlassian credential fixtures.
+//
+// These are shaped after published detector rulesets, not after the regexes
+// in redact.ts. That distinction is the point: the previous fixtures were
+// runs of a single letter chosen to clear the length floor, so they matched
+// whatever class the rule happened to declare and could never show that a
+// real credential would not. Every fixture below therefore carries the body
+// characters its ruleset documents — `-`, `_`, `+`, `/`, `.`, `=` — and
+// `ATLASSIAN_BODY_CHARACTERS` drives a test that fails if any of them is left
+// behind.
+//
+// Sources, one per kind:
+//   ATBB   trufflehog pkg/detectors/bitbucketapppassword — `ATBB[A-Za-z0-9_=.-]+`,
+//          fixture `ATBBa9iO-tyg7u_op`
+//   ATCTT  trufflehog pkg/detectors/atlassian/v2 —
+//          `ATCTT3xFfG[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8}`
+//   ATATT  gitleaks atlassian-api-token — `ATATT3[A-Za-z0-9_\-=]{186}`, 192 all told
+//   BBDC-  GitGuardian bitbucket_http_access_token_prefixed (prefixed since
+//          Bitbucket Data Center 8); glsec `BBDC-[A-Za-z0-9+/=]{32,}`
+
+/** Body characters the rulesets above document, across all four kinds. */
+const ATLASSIAN_BODY_CHARACTERS = ["-", "_", "+", "/", ".", "="];
+
+/** A base64url-ish body of `length` characters that exercises `extra`. */
+function body(length: number, extra: string): string {
+  const alphabet = `ABCdef123${extra}`;
+  return Array.from({ length }, (_, i) => alphabet[i % alphabet.length]).join("");
+}
+
+// Real app passwords are short — trufflehog's fixture has a 13-character body
+// — and carry `-` and `_`, which is what the old `[A-Za-z0-9]` class missed.
+const BB_APP_PASSWORD = "ATBB" + body(16, "-_.=");
+// 192 characters all told, ending in `=` plus 8 hex of CRC32, with `+` and
+// `/` in the body as trufflehog's sample has.
+const BB_ACCESS_TOKEN = "ATCTT3xFfGN0" + body(171, "-_+/") + "=366BFE3A";
+const ATLASSIAN_API_TOKEN = "ATATT3xFfGF0" + body(171, "-_+/") + "=C63992E6";
+// Plain base64, per glsec's fixture of `Ab+/` repeated.
+const BB_DC_TOKEN = "BBDC-" + body(44, "+/=");
 
 describe("redactSecrets — well-known shapes", () => {
   it("replaces vendor tokens wherever they appear", () => {
@@ -52,6 +83,49 @@ describe("redactSecrets — Bitbucket and Atlassian credentials", () => {
       expect(out).not.toContain(secret);
       expect(out).toBe(`remote: rejected\nusing ${REDACTED_TOKEN} for bitbucket.org`);
     }
+  });
+
+  it("leaves no fragment of a body behind, whichever documented character it contains", () => {
+    // The failure these patterns actually had: a body character outside the
+    // class ends the match, the prefix is replaced, and the tail stays in the
+    // record in plain text. A test that only asserts `not.toContain(secret)`
+    // passes on exactly that — the whole token is indeed gone — so this
+    // checks each *suffix* instead, which is what would survive.
+    for (const secret of [BB_APP_PASSWORD, BB_ACCESS_TOKEN, ATLASSIAN_API_TOKEN, BB_DC_TOKEN]) {
+      const out = redactSecrets(`using ${secret} for bitbucket.org`);
+      for (const char of ATLASSIAN_BODY_CHARACTERS) {
+        const at = secret.indexOf(char);
+        if (at === -1) continue;
+        const tail = secret.slice(at + 1);
+        // 8+ characters so the check cannot pass on a tail short enough to
+        // occur by chance in the surrounding sentence.
+        if (tail.length < 8) continue;
+        expect(
+          out,
+          `the body after ${JSON.stringify(char)} in ${secret.slice(0, 12)}… survived redaction`,
+        ).not.toContain(tail.slice(0, 16));
+      }
+    }
+  });
+
+  it("redacts a credential shaped exactly like the ruleset fixtures it was checked against", () => {
+    // Verbatim from trufflehog's bitbucketapppassword and atlassian/v2
+    // fixtures. Keeping them as literals is the one thing a generated fixture
+    // cannot do: these came from the ruleset, not from this file's idea of
+    // the format.
+    const truffleAppPassword = "ATBBa9iO-tyg7u_op";
+    const truffleAccessToken =
+      "ATCTT3xFfGN0GsZNgOGrQSHSnxiJVi00oHlRicyM0yMNuKCBfw6qOHVcCy4Hm89GnclGb_W-1qAkxqCn5Xbuyo" +
+      "X54bNhpK5yFKGFR7ocV6FByvL_P9Sb3tFnbUg3T3I3S_RGCBLMSN7Nsa4GJv8JEJ6bzvDmX-oJ8AnrazMU-zZ5" +
+      "hb-u3t2ERew=366BFE3A";
+
+    // Bare text, deliberately: `password: …` and `token=…` are caught by the
+    // key/value rule before the token pattern is reached, so an assignment-form
+    // fixture reports [redacted:value] and passes against the narrow classes
+    // this test exists to catch. Bare, the old ATBB class stopped at the first
+    // `-` and left `tyg7u_op` in the clear.
+    expect(redactSecrets(`got ${truffleAppPassword} here`)).toBe(`got ${REDACTED_TOKEN} here`);
+    expect(redactSecrets(`got ${truffleAccessToken} here`)).toBe(`got ${REDACTED_TOKEN} here`);
   });
 
   it("redacts the assignment forms a pipeline uses", () => {

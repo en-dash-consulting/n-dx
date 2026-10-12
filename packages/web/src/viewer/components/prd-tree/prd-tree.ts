@@ -36,7 +36,7 @@ import { flattenVisibleTree, useVirtualScroll, findFlatNodeIndex } from "./virtu
 import type { FlatNode } from "./virtual-scroll.js";
 import { highlightSearchText, buildBranchVisibleSet } from "./tree-search.js";
 import { getTaskDuration } from "./durations.js";
-import { formatTokensExact, formatDuration, EMPTY_DASH } from "./format-usage.js";
+import { formatTokensExact, formatDuration, formatUsd, newTokens, EMPTY_DASH } from "./format-usage.js";
 import { useLiveTick } from "./use-live-tick.js";
 
 /** Levels that can have children added via inline form. */
@@ -220,6 +220,14 @@ function renderUsageCell(args: UsageCellArgs) {
   const descendantTokens = usageRollup ? usageRollup.descendants.totalTokens : 0;
   const hasAnyRuns = totalRunCount > 0;
 
+  // What the work cost, and how much of the token total was genuinely new.
+  // Both are absent on a payload from a server that predates the per-class
+  // wire shape, and the cell falls back to the old token-only label there.
+  const totalCost = usageRollup?.total.costUsd;
+  const freshTokens = usageRollup ? newTokens(usageRollup.total) : null;
+  const cacheReadTokens = usageRollup?.total.cacheReadTokens;
+  const hasCostDetail = totalCost !== undefined;
+
   if (!hasAnyRuns) {
     return h(
       "span",
@@ -239,11 +247,32 @@ function renderUsageCell(args: UsageCellArgs) {
     usageRollup && descendantTokens > 0,
   );
   const runPlural = totalRunCount === 1 ? "run" : "runs";
-  const breakdownTitle = hasDescendantBreakdown
-    ? `${formatTokensExact(selfTokens)} self · ${formatTokensExact(descendantTokens)} descendants · ${totalRunCount} ${runPlural}`
-    : `${formatTokensExact(totalTokens)} tokens · ${totalRunCount} ${runPlural}`;
 
-  const mainLabel = `${formatTokensExact(totalTokens)} tokens`;
+  // The tooltip is where the full accounting lives. It separates the tokens
+  // that were newly processed from the cache reads that dominate the raw
+  // total, so the headline price and the token figure can be reconciled
+  // without leaving the row.
+  const titleParts: string[] = [];
+  if (hasCostDetail) titleParts.push(`${formatUsd(totalCost)} across ${totalRunCount} ${runPlural}`);
+  else titleParts.push(`${formatTokensExact(totalTokens)} tokens · ${totalRunCount} ${runPlural}`);
+  if (freshTokens !== null) titleParts.push(`${formatTokensExact(freshTokens)} new tokens`);
+  if (cacheReadTokens !== undefined) {
+    titleParts.push(`${formatTokensExact(cacheReadTokens)} cache reads`);
+  }
+  if (hasDescendantBreakdown) {
+    titleParts.push(
+      `${formatTokensExact(selfTokens)} self · ${formatTokensExact(descendantTokens)} descendant tokens`,
+    );
+  }
+  const breakdownTitle = titleParts.join(" · ");
+
+  // Lead with the price. The raw token total counts cache reads, which bill at
+  // roughly a tenth of the input rate and outnumber everything else by an
+  // order of magnitude, so it reported tens of millions for runs that cost a
+  // few dollars — a number no one could act on.
+  const mainLabel = hasCostDetail
+    ? formatUsd(totalCost)
+    : `${formatTokensExact(totalTokens)} tokens`;
 
   // When the token-budget feature toggle is on AND this is a leaf work
   // item (the historic scope of the budget chip), render the chip with
@@ -256,7 +285,7 @@ function renderUsageCell(args: UsageCellArgs) {
         "data-utilization-reason": utilization.reason,
         title: `${breakdownTitle} · ${utilization.label} weekly utilization`,
       },
-      `${formatTokensExact(totalTokens)} tokens | ${utilization.label}`,
+      `${mainLabel} | ${utilization.label}`,
     );
   }
 
@@ -274,7 +303,9 @@ function renderUsageCell(args: UsageCellArgs) {
             class: "prd-usage-breakdown",
             "aria-hidden": "true",
           },
-          ` (${formatTokensExact(selfTokens)} self)`,
+          hasCostDetail
+            ? ` (${formatUsd(usageRollup?.self.costUsd)} self)`
+            : ` (${formatTokensExact(selfTokens)} self)`,
         )
       : null,
   );

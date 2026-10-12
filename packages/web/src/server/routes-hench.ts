@@ -85,6 +85,7 @@ import {
 import { resolveActiveVendor } from "./routes-llm.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { IncrementalTaskUsageAggregator } from "./task-usage.js";
+import type { ItemTokenTuple, ItemRunTokens } from "./rex-gateway.js";
 import {
   collectAllIds,
   aggregateItemTokenUsage,
@@ -1661,14 +1662,49 @@ async function runTreeMigration(
  * subset the dashboard actually renders; keeping the wire shape narrow
  * lets viewer-side types stay small and makes the contract explicit.
  */
+interface ItemUsageBucketWire {
+  totalTokens: number;
+  runCount: number;
+  /** Fresh (uncached) input tokens. */
+  inputTokens: number;
+  /** Output tokens. */
+  outputTokens: number;
+  /** Input tokens written to the prompt cache. */
+  cacheCreationTokens: number;
+  /** Input tokens served from the prompt cache. */
+  cacheReadTokens: number;
+  /**
+   * USD cost of this bucket, summed from per-run figures priced at each run's
+   * own model.
+   *
+   * The dashboard leads with this rather than with `totalTokens`, which is
+   * dominated by cache reads — billed at about a tenth of the input rate — and
+   * so reads as tens of millions for work that cost a few dollars.
+   */
+  costUsd: number;
+}
+
 interface ItemUsageRollupWire {
-  self: { totalTokens: number; runCount: number };
-  descendants: { totalTokens: number; runCount: number };
-  total: { totalTokens: number; runCount: number };
+  self: ItemUsageBucketWire;
+  descendants: ItemUsageBucketWire;
+  total: ItemUsageBucketWire;
   duration: {
     totalMs: number;
     runningMs: number;
     isRunning: boolean;
+  };
+}
+
+/** Project one rollup tuple onto the wire bucket shape. */
+function projectBucket(t: ItemTokenTuple, runCount: number): ItemUsageBucketWire {
+  return {
+    totalTokens: t.total,
+    runCount,
+    inputTokens: t.input,
+    outputTokens: t.output,
+    cacheCreationTokens: t.cacheCreation,
+    cacheReadTokens: t.cacheRead,
+    costUsd: t.costUsd ?? 0,
   };
 }
 
@@ -1680,9 +1716,9 @@ function projectRollup(
   const totalRunCount = t.runCount;
   const descendantRunCount = totalRunCount - selfRunCount;
   return {
-    self: { totalTokens: t.self.total, runCount: selfRunCount },
-    descendants: { totalTokens: t.descendants.total, runCount: descendantRunCount },
-    total: { totalTokens: t.total.total, runCount: totalRunCount },
+    self: projectBucket(t.self, selfRunCount),
+    descendants: projectBucket(t.descendants, descendantRunCount),
+    total: projectBucket(t.total, totalRunCount),
     duration: {
       totalMs: duration.totalMs,
       runningMs: duration.runningMs,
@@ -1693,7 +1729,7 @@ function projectRollup(
 
 function buildItemRollup(
   items: PRDDocument["items"],
-  contributions: Array<{ itemId: string; tokens: { input: number; output: number; cacheCreation: number; cacheRead: number; total: number } }>,
+  contributions: ItemRunTokens[],
 ): Record<string, ItemUsageRollupWire> {
   const aggregation = aggregateItemTokenUsage(items, contributions);
   const { durations } = aggregateItemDurations(items);

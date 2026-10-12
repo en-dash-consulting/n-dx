@@ -32,6 +32,54 @@ export function formatTokensExact(n: number | null | undefined): string {
 }
 
 /**
+ * Format a USD cost for display.
+ *
+ * Agent runs land across four orders of magnitude — a one-turn status check
+ * costs a fraction of a cent, a long autonomous loop costs dollars — so the
+ * precision follows the magnitude rather than being fixed. A sub-cent figure
+ * that rounded to `$0.00` would read as free, which is the same failure as
+ * the token column reading as millions: a number that tells you nothing.
+ *
+ * Negative or non-finite inputs render as `EMPTY_DASH`. Exactly zero renders
+ * as `$0.00`, which is a real answer (no priced runs), not an empty state.
+ */
+export function formatUsd(n: number | null | undefined): string {
+  if (n === null || n === undefined) return EMPTY_DASH;
+  if (!Number.isFinite(n) || n < 0) return EMPTY_DASH;
+  if (n === 0) return "$0.00";
+  if (n < 0.01) return `<$0.01`;
+  if (n < 10) return `$${n.toFixed(2)}`;
+  if (n < 1000) return `$${n.toFixed(1)}`;
+  return `$${THOUSANDS_FORMATTER.format(Math.round(n))}`;
+}
+
+/**
+ * Tokens the run caused to be newly processed: uncached input, cache writes,
+ * and output. Cache reads are excluded.
+ *
+ * This is hench's `countBudgetedTokens` measure, restated for display. A cache
+ * read is by construction a re-read of tokens already counted when they were
+ * written, so including it charges the same tokens once per turn — which is
+ * why a run's face-value total runs tens of times its real size.
+ *
+ * Returns null when the bucket predates the per-class wire shape and carries
+ * no breakdown, so callers can fall back rather than print a wrong zero.
+ */
+export function newTokens(bucket: {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationTokens?: number;
+  /** Accepted and ignored, so a whole usage bucket can be passed straight in. */
+  cacheReadTokens?: number;
+}): number | null {
+  const { inputTokens, outputTokens, cacheCreationTokens } = bucket;
+  if (inputTokens === undefined && outputTokens === undefined && cacheCreationTokens === undefined) {
+    return null;
+  }
+  return (inputTokens ?? 0) + (outputTokens ?? 0) + (cacheCreationTokens ?? 0);
+}
+
+/**
  * Format a duration (milliseconds) in human-readable form:
  *   - `< 1s`  → dash
  *   - `< 60s` → `1.2s`    (one decimal; `1.0s` normalized to `1s`)

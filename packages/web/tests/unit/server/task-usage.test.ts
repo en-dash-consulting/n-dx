@@ -124,14 +124,14 @@ describe("task-usage facade: API behavior", () => {
     const aggregator = new IncrementalTaskUsageAggregator(runsDir);
     const usage = await aggregator.getTaskUsage();
 
-    expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
-    expect(usage["task-b"]).toEqual({ totalTokens: 300, runCount: 1 });
+    expect(usage["task-a"]).toMatchObject({ totalTokens: 150, runCount: 1 });
+    expect(usage["task-b"]).toMatchObject({ totalTokens: 300, runCount: 1 });
   });
 
   // -- identifyOrphanedEntries through facade --
 
   it("identifyOrphanedEntries finds entries not in valid set", () => {
-    const usage: Record<string, TaskUsageAccumulator> = {
+    const usage: Record<string, Pick<TaskUsageAccumulator, "totalTokens" | "runCount">> = {
       "task-a": { totalTokens: 100, runCount: 1 },
       "task-b": { totalTokens: 200, runCount: 2 },
       "task-c": { totalTokens: 50, runCount: 1 },
@@ -145,7 +145,7 @@ describe("task-usage facade: API behavior", () => {
   });
 
   it("identifyOrphanedEntries returns empty when all valid", () => {
-    const usage: Record<string, TaskUsageAccumulator> = {
+    const usage: Record<string, Pick<TaskUsageAccumulator, "totalTokens" | "runCount">> = {
       "task-a": { totalTokens: 100, runCount: 1 },
     };
     const orphans = identifyOrphanedEntries(usage, new Set(["task-a"]));
