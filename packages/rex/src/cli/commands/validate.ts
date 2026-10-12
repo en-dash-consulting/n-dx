@@ -175,14 +175,15 @@ export async function cmdValidate(
     }
   }
 
+  // The change layer's placement rule is changeLayerParentRule, enforced at
+  // write time; the v1 level hierarchy, "a container needs a child" and the
+  // prd_tree/ checks do not describe it (a change nests under a change, and may
+  // hold no task).
+  const changeLayer = store !== null && isChangeLayerStore(store);
+
   // Structural validation: orphans, cycles, stuck tasks
   if (doc) {
     const structural = validateStructure(doc.items);
-
-    // The change layer's placement rule is changeLayerParentRule, enforced at
-    // write time; the v1 level hierarchy and "a container needs a child" do
-    // not describe it (a change nests under a change, and may hold no task).
-    const changeLayer = store !== null && isChangeLayerStore(store);
 
     if (!changeLayer) {
       checks.push({
@@ -252,6 +253,11 @@ export async function cmdValidate(
       });
     }
 
+  }
+
+  // prd_tree/ is a v1 backend. On the change layer a stray one is not the PRD,
+  // and rex migrate-slugs would be wrong advice, so its checks do not run.
+  if (doc && !changeLayer) {
     // Tree identity: the merge guard that the title-only slug rule relies on.
     // Paths no longer carry an id, so two same-titled items created on
     // divergent branches derive the same path and a merge can silently unify

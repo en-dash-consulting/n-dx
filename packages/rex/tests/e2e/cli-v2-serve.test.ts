@@ -230,10 +230,18 @@ describe("rex on a v2 tree with a stray same-id prd_tree/", () => {
     expect(out).not.toContain("COMPLETE");
   });
 
+  it("validate does not judge a stray tree named from other titles", async () => {
+    await strayTree(staleItems("completed", "completed"));
+    const out = run(["validate", tmp], tmp);
+    expect(out).not.toContain("tree slug convention");
+    expect(out).not.toContain("tree slug rule marker");
+    expect(out).not.toContain("tree identity");
+    expect(out).not.toContain("migrate-slugs");
+  });
+
   it("validate checks the change layer's statuses, not the stray tree's", async () => {
-    // The v2 titles, so the stray paths pass the slug checks (which inspect
-    // prd_tree/ on their own); overlaid, the stale statuses would make the
-    // in-progress change a completed parent of a pending task.
+    // Overlaid, the stale statuses would make the in-progress change a
+    // completed parent of a pending task.
     const [change] = staleItems("completed", "pending");
     await strayTree([{ ...change, title: "Add Apple Pay", children: [{ ...change.children![0], title: "Wire the button" }] }]);
     const out = run(["validate", tmp], tmp);

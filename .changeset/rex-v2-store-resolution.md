@@ -22,3 +22,5 @@ MCP fields added on a v2 tree (optional, absent on v1; MCP tool shapes are soft-
 MCP values changed on a v2 tree (the field is unchanged and v1 answers as before):
 
 - `get_capabilities`: `adapter` reads `"v2-change-layer"` and `supportsWatch` reads `false`, the change-layer store's values.
+
+`rex validate` on a v2 tree no longer runs the `tree identity`, `tree slug convention` and `tree slug rule marker` checks against a stray `.rex/prd_tree/`.
