@@ -364,6 +364,7 @@ describe("hench → llm-client gateway contract", () => {
     "readAvailableMemory",
     "getAvailableMemory",
     "createAvailableMemoryReader",
+    "resolveClaudeCliEffort",
   ];
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
@@ -828,6 +829,9 @@ describe("gateway export auto-detection", () => {
         // Claude API effort: hench's turn loop must apply the same rule the
         // llm-client API provider applies, so it shares the one resolver.
         "resolveClaudeApiEffort",
+        // The CLI loop's counterpart: `--effort` on a spawned Claude Code run
+        // follows the same llm.effort rule as the API turn loop.
+        "resolveClaudeCliEffort",
         "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
         "formatUsage", "createPromptEnvelope", "assemblePrompt", "assemblePromptText",
         // Prompt section measurement. Lives in llm-client rather than hench so
