@@ -11,8 +11,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { SCHEMA_VERSION } from "../../src/schema/index.js";
+import { SCHEMA_VERSION, type ItemStatus, type PRDItem } from "../../src/schema/index.js";
 import { toCanonicalJSON } from "../../src/core/canonical.js";
+import { serializeFolderTree } from "../../src/store/index.js";
 import { copyV2Fixture } from "../helpers/v2-fixture.js";
 
 const cliPath = join(fileURLToPath(import.meta.url), "..", "..", "..", "dist", "cli", "index.js");
@@ -152,5 +153,77 @@ describe("rex on a v2 tree", () => {
     const out = run(["migrate-folder-tree-filenames", tmp], tmp, true);
     expect(out).toContain("v2");
     expect(existsSync(join(tmp, ".rex", "prd_tree"))).toBe(false);
+  });
+});
+
+/** The v2 change and task as v1 items, with stale titles and the given statuses. */
+const staleItems = (changeStatus: ItemStatus, taskStatus: ItemStatus): PRDItem[] => [
+  {
+    id: CHANGE,
+    title: "STALE v1 title",
+    level: "epic",
+    status: changeStatus,
+    children: [{ id: TASK, title: "STALE task", level: "task", status: taskStatus }],
+  },
+];
+
+/** The read commands, as [name, args] rows. */
+const READS: [string, string[]][] = [["status"], ["status", "--all"], ["tree"]].map((args) => [args.join(" "), args]);
+
+describe("rex on a v2 tree with a stray same-id prd.json", () => {
+  beforeEach(async () => {
+    await writeFile(
+      join(tmp, ".rex", "prd.json"),
+      JSON.stringify({ schema: SCHEMA_VERSION, title: "stale", items: staleItems("completed", "completed") }),
+    );
+  });
+  const expectNoSplit = () => {
+    expect(existsSync(join(tmp, ".rex", "prd_tree"))).toBe(false);
+    expect(existsSync(join(tmp, ".rex", "prd.json.migrated"))).toBe(false);
+  };
+
+  it.each(READS)("%s shows the v2 titles and scaffolds no prd_tree/", (_name, args) => {
+    const out = run([...args, tmp], tmp);
+    expect(out).toContain("Add Apple Pay");
+    expect(out).toContain("Wire the button");
+    expect(out).not.toContain("STALE");
+    expectNoSplit();
+  });
+
+  it("next answers the pending v2 task and scaffolds no prd_tree/", () => {
+    const out = run(["next", tmp], tmp);
+    expect(out).toContain("Wire the button");
+    expect(out).not.toContain("COMPLETE");
+    expectNoSplit();
+  });
+});
+
+describe("rex on a v2 tree with a stray same-id prd_tree/", () => {
+  const strayTree = (items: PRDItem[]) => serializeFolderTree(items, join(tmp, ".rex", "prd_tree"));
+
+  it.each(READS)("%s shows the v2 titles", async (_name, args) => {
+    await strayTree(staleItems("completed", "completed"));
+    const out = run([...args, tmp], tmp);
+    expect(out).toContain("Add Apple Pay");
+    expect(out).toContain("Wire the button");
+    expect(out).not.toContain("STALE");
+  });
+
+  it("next answers the pending v2 task", async () => {
+    await strayTree(staleItems("completed", "completed"));
+    const out = run(["next", tmp], tmp);
+    expect(out).toContain("Wire the button");
+    expect(out).not.toContain("COMPLETE");
+  });
+
+  it("validate checks the change layer's statuses, not the stray tree's", async () => {
+    // The v2 titles, so the stray paths pass the slug checks (which inspect
+    // prd_tree/ on their own); overlaid, the stale statuses would make the
+    // in-progress change a completed parent of a pending task.
+    const [change] = staleItems("completed", "pending");
+    await strayTree([{ ...change, title: "Add Apple Pay", children: [{ ...change.children![0], title: "Wire the button" }] }]);
+    const out = run(["validate", tmp], tmp);
+    expect(out).not.toContain("parent-child status consistency");
+    expect(out).toContain(`"${CHANGE}": in_progress`);
   });
 });

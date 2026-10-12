@@ -8,6 +8,7 @@
  * Migration flow:
  * 1. Detect if `.rex/prd.json` exists — if not, return no-op
  * 2. Check for `.rex/prd.json.migrated` marker — if present, already migrated, return no-op
+ *    Then skip a v2 tree (`product/` present): prd.json is never migrated beside it
  * 3. Check if `.rex/<PRD_TREE_DIRNAME>/` exists and contains items — if yes, already migrated, return no-op
  * 4. Acquire file lock (`.rex/prd.json.lock`) to prevent concurrent races
  * 5. Create timestamped backup (`.rex/prd.json.backup-YYYYMMDD-HHMMSS`)
@@ -28,6 +29,7 @@ import { serializeFolderTree } from "./index.js";
 import { atomicWriteJSON } from "./atomic-write.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, resolveRexPaths } from "./paths.js";
+import { prdLayout } from "./prd-model-reader.js";
 import type { z } from "zod";
 
 /** Result of a legacy-PRD migration attempt. */
@@ -40,7 +42,8 @@ export interface LegacyPrdMigrationResult {
     | "already-migrated"
     | "tree-exists"
     | "prd-json-invalid"
-    | "branch-scoped-files-present";
+    | "branch-scoped-files-present"
+    | "v2-layout";
   /** Path to the backup file when `migrated` is `true`. */
   backupPath?: string;
   /** Number of items migrated when `migrated` is `true`. */
@@ -163,6 +166,13 @@ export async function ensureLegacyPrdMigrated(dir: string): Promise<LegacyPrdMig
   // This check comes first because prd.json may have been renamed to prd.json.migrated
   if (await fileExists(prdJsonMigratedMarker)) {
     return { migrated: false, reason: "already-migrated" };
+  }
+
+  // Step 1b: A v2 tree (`product/` present) is never a migration target. A
+  // stray prd.json beside it would otherwise be serialized into prd_tree/,
+  // splitting the PRD into two trees.
+  if ((await prdLayout(rexDir)) === "v2") {
+    return { migrated: false, reason: "v2-layout" };
   }
 
   // Step 2: Check if prd.json exists

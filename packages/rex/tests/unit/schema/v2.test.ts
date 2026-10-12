@@ -467,7 +467,9 @@ describe("isolation", () => {
     // project with a PRD in either layout to `n-dx init` (cli/errors.ts), and
     // the MCP tools that follow the change-layer types on a v2 tree: edit_item,
     // move_item, merge_items and claim_task, with the type-based parent rule
-    // and merge rules they use (core/move.ts, core/merge.ts).
+    // and merge rules they use (core/move.ts, core/merge.ts), and the legacy
+    // prd.json migration, which never migrates beside a v2 tree
+    // (store/ensure-legacy-prd-migrated.ts).
     // `public.ts` re-exports the reader, the node and tree types, the index
     // and the derived product computations: consumers of the product layer
     // (the dashboard's Product and Changes views, the Graview projection) read
@@ -533,6 +535,7 @@ describe("isolation", () => {
         "cli/mcp-tools/claim-task.ts",
         "core/move.ts",
         "core/merge.ts",
+        "store/ensure-legacy-prd-migrated.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),
