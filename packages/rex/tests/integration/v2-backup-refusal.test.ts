@@ -5,13 +5,14 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, realpathSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   V2RestoreRefusedError,
   V2_RESTORE_REFUSAL,
   getAvailableBackups,
+  pruneBackups,
   restoreFromBackup,
 } from "../../src/core/backup-snapshots.js";
 import { copyV2Fixture } from "../helpers/v2-fixture.js";
@@ -42,6 +43,17 @@ describe("v2 tree", () => {
 
   it("getAvailableBackups refuses", async () => {
     await expect(getAvailableBackups(rexDir)).rejects.toBeInstanceOf(V2RestoreRefusedError);
+  });
+
+  it("pruneBackups still enforces retention", async () => {
+    for (let i = 0; i < 3; i++) {
+      await mkdir(join(rexDir, ".backups", `prd_tree_2026-08-2${i}T00-00-00.000Z`), { recursive: true });
+    }
+    await pruneBackups(rexDir, 2);
+    expect((await readdir(join(rexDir, ".backups"))).sort()).toEqual([
+      "prd_tree_2026-08-22T00-00-00.000Z",
+      `prd_tree_${SNAPSHOT}`,
+    ]);
   });
 
   it("uses the wording `rex restore` prints", () => {

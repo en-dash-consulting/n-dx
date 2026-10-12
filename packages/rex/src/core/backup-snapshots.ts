@@ -383,6 +383,11 @@ export async function restoreFromBackup(rexDir: string, id: string): Promise<voi
  */
 export async function getAvailableBackups(rexDir: string): Promise<string[]> {
   await refuseOnV2Layout(rexDir);
+  return listSnapshotIds(rexDir);
+}
+
+/** Snapshot ids, newest first, in either layout (retention runs on v2 too). */
+async function listSnapshotIds(rexDir: string): Promise<string[]> {
   const backupsDir = join(rexDir, ".backups");
 
   const backupDirExists = await dirExists(backupsDir);
@@ -426,7 +431,7 @@ export async function pruneBackups(rexDir: string, retentionCap: number = 10): P
   }
 
   // Get all available backups (newest first)
-  const backups = await getAvailableBackups(rexDir);
+  const backups = await listSnapshotIds(rexDir);
 
   // If we're under the cap, nothing to prune
   if (backups.length <= retentionCap) {
