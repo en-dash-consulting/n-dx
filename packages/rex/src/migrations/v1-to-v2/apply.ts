@@ -248,7 +248,9 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
  * A `blockedBy` ref to a dissolved container names no node, and selection reads an
  * unresolved ref as an open blocker. Replace it with the nodes the container split
  * into (its v1 children, through any nested container), so the ordering survives and
- * resolves; a node never blocks itself.
+ * resolves; a node never blocks itself. A container completed in v1 already satisfied
+ * the dependency, so its ref is dropped; a cancelled or deleted child never completes,
+ * so it is never a blocker.
  */
 function repointDissolvedBlockers(
   nodes: ReadonlyMap<string, RuleNode>,
@@ -257,13 +259,16 @@ function repointDissolvedBlockers(
 ): void {
   if (containers.length === 0) return;
   const dissolved = new Set(containers.map((c) => c.id));
+  const statusOf = new Map(flat.map(({ item }) => [item.id, item.status]));
   const childrenOf = new Map<string, string[]>();
   for (const { item, parent } of flat) {
     if (parent && dissolved.has(parent.id)) childrenOf.set(parent.id, [...(childrenOf.get(parent.id) ?? []), item.id]);
   }
   const expand = (id: string, seen: Set<string>): string[] => {
+    const status = statusOf.get(id);
+    if (status === "cancelled" || status === "deleted") return [];
     if (nodes.has(id)) return [id];
-    if (!dissolved.has(id) || seen.has(id)) return [];
+    if (!dissolved.has(id) || seen.has(id) || status === "completed") return [];
     seen.add(id);
     return (childrenOf.get(id) ?? []).flatMap((child) => expand(child, seen));
   };
