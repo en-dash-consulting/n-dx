@@ -2,7 +2,7 @@
 id: "2898acbe-09f4-4c01-a791-0eb500c11491"
 level: "task"
 title: "Write Inbox changes to the reserved changes/inbox/ folder, and move them out on placement"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "rex"
@@ -12,6 +12,10 @@ tags:
   - "lane-migration"
 source: "decision"
 startedAt: "2026-10-12T07:52:34.478Z"
+completedAt: "2026-10-12T08:08:27.588Z"
+endedAt: "2026-10-12T08:08:27.588Z"
+resolutionType: "code-change"
+resolutionDetail: "Writer routes top-level needsPlacement changes to reserved changes/inbox/; reader folds it back as top-level Inbox changes; placement moves them out; inbox slug reserved; tests cover all six criteria."
 acceptanceCriteria:
   - "add_item on a v2 tree writes an unplaced change (no amends, no touches) to changes/inbox/<slug>/index.md, with needsPlacement: true in that folder's state.yaml (test)"
   - "The v2 reader treats changes/inbox/ as a reserved folder, not a change: its children are top-level changes in the Inbox (test)"
@@ -21,6 +25,6 @@ acceptanceCriteria:
   - "The bundle export/import (PR 15) round-trips a tree with an Inbox folder (test)"
 description: "Decided 2026-10-07 (Sterling H, recorded on fdddee24 via #606) and confirmed 2026-10-09 (Ryan): the Inbox is a reserved folder, not a view. An unplaced change lives at `changes/inbox/<slug>/index.md` with `needsPlacement: true` in that folder's `state.yaml`, and placement later moves it out. The rejected alternative was \"Inbox = anything with needsPlacement, written at the changes root\".\n\nPR 17 (#612) shipped that rejected alternative, because the 10-07 note was on a branch until #606 merged. Ryan chose to merge the #610/#612 stack as is and land this before 0.9.0, which freezes the v2 layout. No v2 trees exist outside fixtures yet, so nothing needs migrating beyond the read-tolerance criterion.\n\nLane: store (prd-model-reader.ts, prd-model-writer.ts, folder layout constants) plus core/change-add.ts and core/change-place.ts, and tests. Coordinate with Sterling (the decision's author) and with PR 15's bundle format.\n\nIn apply's path (stack C, layer C2). Ryan owns it by decision (D7, 2026-10-12); Hal's open #684 assigns it to Hal, so that assignment is superseded here.\n\nLane for this task, within stack C's boundary: the reader and writer's handling of the reserved changes/inbox/ folder (store/prd-model-reader.ts, store/prd-model-writer.ts), core/change-add.ts and core/change-place.ts, and tests. The MCP tools' shapes do not change; their behaviour on a v2 tree is tested, not edited. Apply (11c88bce) writes held changes through this path.\n\nFirst pass (decided 2026-10-12; v2 migration path, decisions D1-D7):\n- Every v1 item lands in v2, checked by count and id. The migration drops or cancels nothing.\n- Changes the rules placed land on their capability. Changes the rules could not place (held) land in the Inbox with needsPlacement, in changes/inbox/. A text-model pick is recorded as a suggestion only.\n- Areas keep their v1 epic names, except a review-sourced epic (source \"ndx-adversarial-review\"), which proposes no area (#631 finding 1). Its children are placed or held like other changes.\n- Capability specs ship as drafted and stay flagged as unreviewed.\n- The cut is recorded as the first change, as 11c88bce describes.\n- Apply removes prd_tree/ and tree-meta.json in the same PRD transaction that writes the v2 tree, so the two layouts never exist side by side.\n- No decisions file and no area-renaming pass: those come after the cut.\n\nBoundary (stack C, roadmap PR 23):\n- Lane files: packages/rex/src/migrations/; one new rex CLI command for plan and apply, in its own module under packages/rex/src/cli/commands/ plus one dispatch line in packages/rex/src/cli/ (keep edits to the shared CLI files minimal: another stack is changing rex's store resolution and CLI error mapping in the same files, so a merge conflict is expected later); store/prd-model-writer.ts (c0dc9b3f); core/change-add.ts or the Inbox writer (2898acbe); packages/core for ndx migrate (spawn only, no library imports) and ndx init; tests.\n- Not hench, not web, not the v2 schema shape (schema/v2.ts), and not the MCP tools.\n- v1 trees keep working exactly as today, apart from the one-line deprecation notice in ad842166.\n- Each newly wired module that imports a v2 module is added to the v2 isolation allowlist in packages/rex/tests/unit/schema/v2.test.ts."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-12T07:52:34.744Z"
+lastModified: "2026-10-12T08:08:27.873Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
