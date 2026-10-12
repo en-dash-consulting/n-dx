@@ -27,9 +27,11 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Java entry points are guessed from file names, not detected from public static void main](./java-entry-points-are-guessed-from.md) | completed |
 | [Java pack grammar version is not tied to the build pin](./java-pack-grammar-version-is-not-tied.md) | completed |
 | [Java packageDeclarationRoots throws when a project subdirectory cannot be listed](./java-packagedeclarationroots-throws.md) | completed |
+| [Java resolver misses a type nested in an inherited supertype when used by simple name](./java-resolver-misses-a-type-nested-in.md) | pending |
 | [Maven build model collapses dependencies that differ only by type or classifier](./maven-build-model-collapses.md) | completed |
 | [Packed-tarball test reads a stale dist, so a newly registered pack fails the gate](./packed-tarball-test-reads-a-stale-dist.md) | completed |
 | [scip-java comparison counts constructor references as references to their type](./scip-java-comparison-counts.md) | completed |
 | [Terraform agreement test checks a fixed name list, so a new config filename can drift from isTerraformPath](./terraform-agreement-test-checks-a.md) | pending |
 | [tree-sitter-go 0.25.0 rejects Go 1.26 new(expr) and generic methods](./tree-sitter-go-0-25-0-rejects-go-1-26.md) | pending |
-| [Widen gate G2 to junit-framework and thingsboard](./widen-gate-g2-to-junit-framework-and.md) | pending |
+| [Widen gate G2 to junit-framework and thingsboard](./widen-gate-g2-to-junit-framework-and.md) | in_progress |
+| [Java resolver misses the type in a method reference qualifier (Type::method)](./java-resolver-misses-the-type-in-a.md) | pending |

@@ -88,7 +88,38 @@ function referencedType(symbol) {
   return isTypeSymbol(type) ? type : undefined;
 }
 
-export const edgeKey = (from, to) => `${from}\0${to}`;
+/**
+ * Whether a directory is build output: `target` beside a `pom.xml`, or `build`
+ * beside a Gradle build file. The sibling check keeps a source package that
+ * happens to be named `build` or `target`.
+ *
+ * @param {string} name directory name
+ * @param {Iterable<string>} siblings names of the entries in its parent directory
+ */
+export function isBuildOutputDir(name, siblings) {
+  const names = new Set(siblings);
+  if (name === "target") return names.has("pom.xml");
+  if (name === "build") return ["build.gradle", "build.gradle.kts"].some((f) => names.has(f));
+  return false;
+}
+
+/**
+ * Restrict the walked `.java` files to those the SCIP index has a document for.
+ * scip-java only indexes what the build compiled, so a file outside the index
+ * (a module behind an inactive profile) would count every resolver edge from it
+ * as a false positive. Both edge sets are then built over the returned files.
+ *
+ * @param {string[]} walked repository-relative paths, build output already excluded
+ * @param {{ path: string }[]} documents from {@link readScipDocuments}
+ * @returns {{ files: string[], notIndexed: number }}
+ */
+export function selectComparedFiles(walked, documents) {
+  const indexed = new Set(documents.map((d) => d.path));
+  const files = walked.filter((f) => indexed.has(f));
+  return { files, notIndexed: walked.length - files.length };
+}
+
+export const edgeKey =(from, to) => `${from}\0${to}`;
 
 /**
  * Reduce documents to file-to-file reference edges. Only type symbols count

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 // The helpers behind scripts/java-scip-compare.mjs (a manual measurement tool).
-import { compareEdges, edgeKey, proposeThreshold, readScipDocuments, scipEdges } from "../../../scripts/java-scip.mjs";
+import { compareEdges, edgeKey, isBuildOutputDir, proposeThreshold, readScipDocuments, scipEdges, selectComparedFiles } from "../../../scripts/java-scip.mjs";
 
 const varint = (n: number): number[] => {
   const out: number[] = [];
@@ -73,6 +73,38 @@ describe("readScipDocuments / scipEdges", () => {
 
   it("rejects a truncated buffer", () => {
     expect(() => readScipDocuments(buf.subarray(0, buf.length - 3))).toThrow();
+  });
+});
+
+describe("isBuildOutputDir", () => {
+  it("treats target beside pom.xml and build beside a Gradle file as build output", () => {
+    expect(isBuildOutputDir("target", ["pom.xml", "src", "target"])).toBe(true);
+    expect(isBuildOutputDir("build", ["build.gradle.kts", "build"])).toBe(true);
+    expect(isBuildOutputDir("build", ["build.gradle", "build"])).toBe(true);
+  });
+
+  it("keeps a source package named target or build", () => {
+    expect(isBuildOutputDir("target", ["Foo.java", "target"])).toBe(false);
+    expect(isBuildOutputDir("build", ["pom.xml", "build"])).toBe(false);
+    expect(isBuildOutputDir("target", ["build.gradle"])).toBe(false);
+  });
+
+  it("ignores other directory names", () => {
+    expect(isBuildOutputDir("src", ["pom.xml", "src"])).toBe(false);
+  });
+});
+
+describe("selectComparedFiles", () => {
+  it("keeps only files with a SCIP document and counts the rest", () => {
+    const docs = [{ path: "a/A.java" }, { path: "a/B.java" }, { path: "gen/Z.java" }];
+    expect(selectComparedFiles(["a/A.java", "a/B.java", "msa/T.java"], docs)).toEqual({
+      files: ["a/A.java", "a/B.java"],
+      notIndexed: 1,
+    });
+  });
+
+  it("leaves everything out of an empty index", () => {
+    expect(selectComparedFiles(["a/A.java"], [])).toEqual({ files: [], notIndexed: 1 });
   });
 });
 
