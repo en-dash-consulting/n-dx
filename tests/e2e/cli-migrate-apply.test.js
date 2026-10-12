@@ -7,7 +7,7 @@
  * @see packages/core/cli.js handleMigrate
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { createTmpDir, removeTmpDir, run, runResult, setupHenchDir, setupRexDir, setupSourcevisionDir } from "./e2e-helpers.js";
@@ -56,7 +56,9 @@ describe("ndx migrate --apply", () => {
   });
 
   it("rewrites --plan <path> to --plan=<path> and applies that plan", () => {
-    const plan = join(dir, ".ndx-migration", "plan.json");
+    // Away from the default path, so a bare --plan (the path dropped) would find no plan.
+    const plan = join(dir, "elsewhere.json");
+    renameSync(join(dir, ".ndx-migration", "plan.json"), plan);
     const out = run(["migrate", "--apply", "--plan", plan, "--dry-run", dir]);
     expect(out).toContain("apply would migrate 3 v1 items");
   });
