@@ -35,7 +35,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Diff two migration plans in words](./diff-two-migration-plans-in-words.md) | pending |
 | [FileStore and FolderTreeStore save reports are relative to .ndx/, not the project root, on the .ndx/ layout](./filestore-and-foldertreestore-save.md) | pending |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
-| [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | pending |
 | [Install the sv analyze stop handlers before the progress file says running](./install-the-sv-analyze-stop-handlers.md) | completed |
 | [Layout-literal wall misses a segmented join(root, ".ndx", "rex") path](./layout-literal-wall-misses-a-segmented.md) | pending |
 | [MCP Integration guide still says HTTP MCP is single-project until a 0.7.0 hub](./mcp-integration-guide-still-says-http.md) | pending |
