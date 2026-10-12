@@ -108,18 +108,28 @@ async function cmdReviewPending(
   const canonicalPath = reviewReportPath(henchDir, run.id);
   let reportPath = canonicalPath;
   let outcome = await readReviewReport(reportPath);
+  // Why both details are kept: the canonical read is tried first, so when it
+  // misses and the stored path holds a *malformed* report, reporting only the
+  // first outcome says "no report" and sends the operator looking for a file
+  // that is sitting right there, unusable. The two reads fail for different
+  // reasons at different paths, and only naming both says which is which.
+  let storedDetail: string | undefined;
   if (!outcome.ok && run.review.reportPath && run.review.reportPath !== canonicalPath) {
     const stored = await readReviewReport(run.review.reportPath);
     if (stored.ok) {
       reportPath = run.review.reportPath;
       outcome = stored;
+    } else {
+      storedDetail = stored.detail;
     }
   }
 
   if (!outcome.ok) {
     throw new CLIError(
       `Could not read the review report for run ${run.id}.`,
-      outcome.detail,
+      // Each detail already names its own path and reason, so the two read as
+      // one account of what was tried.
+      storedDetail ? `${outcome.detail} ${storedDetail}` : outcome.detail,
     );
   }
 

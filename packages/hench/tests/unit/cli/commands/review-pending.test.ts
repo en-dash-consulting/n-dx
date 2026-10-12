@@ -229,6 +229,25 @@ describe("hench review pending", () => {
     expect(payload.deferred).toHaveLength(1);
   });
 
+  it("names both failures when neither the canonical nor the stored report can be read", async () => {
+    // The canonical read is tried first, so reporting only its outcome says
+    // "no report" while a malformed one sits at the stored path — sending the
+    // operator to look for a file that is already there and unusable.
+    const elsewhere = join(projectDir, "archived-reviews");
+    await mkdir(elsewhere, { recursive: true });
+    const storedPath = join(elsewhere, "run-001.json");
+    await writeFile(storedPath, "{ not a review report", "utf-8");
+    await saveRun(henchDir, makeRun(cleanReview({ deferredCount: 1, reportPath: storedPath })));
+    // Nothing at .hench/reviews/run-001.json.
+
+    const { cmdReview } = await import("../../../../src/cli/commands/review.js");
+    const err = await cmdReview(projectDir, ["pending", "run-001"], {}).catch((e) => e);
+
+    expect(err.suggestion).toContain("No review report at");
+    expect(err.suggestion).toContain(storedPath);
+    expect(err.suggestion).toContain("not a usable report");
+  });
+
   it("requires a run id", async () => {
     const { cmdReview } = await import("../../../../src/cli/commands/review.js");
     await expect(cmdReview(projectDir, ["pending"], {})).rejects.toThrow(/Missing run ID/);
