@@ -20,8 +20,8 @@ import { handleValidationRoute } from "./routes-validation.js";
 import { settleContextNotesRemovals, sweepStaleContextNotes } from "./run-options.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, closeWorktreeRunWatchers, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
-import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
-import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION } from "./rex-gateway.js";
+import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME } from "./prd-io.js";
+import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION, prdLayout, resolveStore } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
@@ -323,7 +323,14 @@ export async function refreshPRDCache(rexDir: string): Promise<void> {
 
   let doc: { schema: string; title: string; items: unknown[] } | null = null;
 
-  if (existsSync(treeRoot)) {
+  if (await prdLayout(rexDir) === "v2") {
+    // v2: the cache is the change layer projected as v1 items.
+    try {
+      doc = await (await resolveStore(rexDir)).loadDocument();
+    } catch (err) {
+      console.warn(`[prd-cache] v2 projection error: ${(err as Error).message}`);
+    }
+  } else if (existsSync(treeRoot)) {
     try {
       const { items, warnings } = await parseFolderTree(treeRoot);
       let title = "PRD";
@@ -435,11 +442,12 @@ function registerRexWatcher(
     // ignore
   }
 
-  // Watch .rex/prd_tree/ recursively for folder-tree changes
-  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
-  if (existsSync(treeRoot)) {
+  // Watch the PRD folders recursively: the v1 tree, and the v2 layers.
+  for (const dirName of [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME]) {
+    const root = join(rexDir, dirName);
+    if (!existsSync(root)) continue;
     try {
-      watchers.push(watch(treeRoot, { recursive: true }, () => {
+      watchers.push(watch(root, { recursive: true }, () => {
         debouncedRefresh();
       }));
     } catch {
