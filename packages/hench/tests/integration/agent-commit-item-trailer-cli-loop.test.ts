@@ -92,6 +92,6 @@ describe("cliLoop — agent commit N-DX-Item", () => {
     const workCommit = run.commits?.find((c) => c.subject === "feat: the feature");
     expect(workCommit).toBeDefined();
     // The report names the commit and what it lacks, not how the run tied it.
-    expect(run.commitsMissingItem).toEqual([{ sha: workCommit!.sha, subject: workCommit!.subject, items: [] }]);
+    expect(run.commitsMissingItem).toEqual([{ sha: workCommit!.sha, subject: workCommit!.subject, authorDate: expect.any(String), items: [] }]);
   });
 });
