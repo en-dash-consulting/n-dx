@@ -38,6 +38,7 @@ const TREE: PRDItem[] = [
   item("e1", "epic", "Storage", [
     item("f1", "feature", "Offline cache", [item("t1", "task", "Write the cache")]),
     item("f2", "feature", "Sync conflicts", [item("t2", "task", "Resolve conflicts")], { status: "pending" }),
+    item("f4", "feature", "Cache eviction", [item("t4", "task", "Evict entries", [], { status: "pending" })], { status: "pending" }),
   ]),
   item("e2", "epic", "Review findings", [item("f3", "feature", "Lock is never released", [item("t3", "task", "Release it")])], { source: "ndx-adversarial-review" }),
 ];
@@ -90,7 +91,7 @@ describe("cmdMigrate --plan", () => {
     const plan = readPlan();
     expect(plan.header).toMatchObject({ migration: "v1-to-v2", passes: [{ name: "rules" }] });
     // Every v1 item has an entry with its target.
-    expect(Object.keys(plan.entries).sort()).toEqual(["e1", "e2", "f1", "f2", "f3", "t1", "t2", "t3"]);
+    expect(Object.keys(plan.entries).sort()).toEqual(["e1", "e2", "f1", "f2", "f3", "f4", "t1", "t2", "t3", "t4"]);
     expect(plan.entries.f1.target).toBe("capability");
     expect(plan.summary.areas.map((a: { id: string }) => a.id)).toEqual(["e1"]);
   });
@@ -143,13 +144,13 @@ describe("cmdMigrate --plan", () => {
     });
 
     it("never places a change on the text model's pick alone: it stays held as a suggestion", async () => {
+      // f4 "Cache eviction" shares one word with the capability f1 "Offline cache": too weak for
+      // the rules to place, but a clear leader, so under autoAccept "agree" a text pick of f1 would place it.
       mocks.place.mockResolvedValue("f1");
       await cmdMigrate(repo, { plan: "true" });
-      const held = Object.values(readPlan().entries as Record<string, { needsPlacement?: boolean; placement?: string; modelPlacement?: unknown }>).filter(
-        (e) => e.modelPlacement !== undefined,
-      );
-      expect(held.length).toBeGreaterThan(0);
-      for (const e of held) expect(e).toMatchObject({ needsPlacement: true, modelPlacement: { accepted: null, text: { pick: "f1" } } });
+      expect(mocks.place).toHaveBeenCalled();
+      expect(readPlan().entries.f4).toMatchObject({ needsPlacement: true, modelPlacement: { accepted: null, text: { pick: "f1" } } });
+      expect(readPlan().entries.f4.placement).toBeUndefined();
     });
 
     it("runs the Jev review pass when a TypeSafe key is set", async () => {
