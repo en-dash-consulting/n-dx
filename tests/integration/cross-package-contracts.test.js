@@ -528,6 +528,11 @@ describe("web → rex gateway contract", () => {
     "isValidSnapshotId",
     "V2RestoreRefusedError",
     "validateRunSettings",
+    // The Workflow page validates rex.applyOn and rex.placement.autoAccept
+    // through rex's own parsers, so the chooser cannot offer a value the CLI
+    // would silently fall back from.
+    "parseApplyOn",
+    "parsePlacementSettings",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -537,6 +542,10 @@ describe("web → rex gateway contract", () => {
     "VALID_VALIDATION_TYPES",
     "PRD_TREE_DIRNAME",
     "PRD_CACHE_DIRNAME",
+    "APPLY_ON",
+    "DEFAULT_APPLY_ON",
+    "PLACEMENT_AUTO_ACCEPT",
+    "DEFAULT_PLACEMENT_SETTINGS",
   ];
 
   for (const name of GATEWAY_FUNCTIONS) {
@@ -950,8 +959,13 @@ describe("gateway export auto-detection", () => {
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
         "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "PRD_CACHE_DIRNAME",
-        "estimateCostFromTotals", "validateRunSettings"],
-      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance"],
+        "estimateCostFromTotals", "validateRunSettings",
+        // rex-owned project settings the Workflow page edits, validated with
+        // rex's own parsers so the chooser cannot offer a value the CLI would
+        // silently fall back from.
+        "parseApplyOn", "parsePlacementSettings"],
+      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",
+        "APPLY_ON", "DEFAULT_APPLY_ON", "PLACEMENT_AUTO_ACCEPT", "DEFAULT_PLACEMENT_SETTINGS"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));
