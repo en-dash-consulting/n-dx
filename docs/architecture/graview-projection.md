@@ -114,6 +114,28 @@ lead-verb guess and the hench-era commits reach the graph only through run
 records. Run records are machine-local, so `hench backfill-commits .` on a
 checkout is what gives its graph the history.
 
+### Where the projection's names differ from rex's
+
+An agent reads the same graph over `graview mcp` and over rex's MCP tools, so
+every name the projection uses that rex does not is listed here.
+`tests/unit/document.test.ts` fails when the declaration gains a kind or a
+relation rex does not have and this table does not name it.
+
+| Projection | Rex | Why |
+|---|---|---|
+| `task` with `level: "subtask"` | `subtask` node type | One kind of work reads better in Graview's places; a subtask is a smaller task |
+| `under` | the folder tree's parent (rex v2 says *part of*) | One relation for every containment, in both layers and between zones |
+| `release` | `plannedRelease` and `shippedIn` fields on a change | A release is a place work gathers; Graview draws it as a record |
+| `plannedFor`, `shippedWith` | the same two fields | The fields as relations to the `release` records |
+| `zone`, `component`, `file` | none (sourcevision's output) | Where the work lives in code |
+| `run`, `commit` | none (hench run records, git) | The work that made it |
+| `inZone`, `crosses` | none (sourcevision) | A component's or file's zone; imports between zones |
+| `ranFor`, `produced` | `RunRecord.taskId`, `RunRecord.commits` | A run's task and its commits |
+| `landedFor` | the `N-DX-Item` trailer | A commit's work |
+| `realizes`, `realizedIn` | `computeRealizedBy` (wider here: touches and run commits count) | Where a capability lives in code |
+| `changed`, `livesIn` | none (git's file lists) | A commit's files, and a capability's |
+| `blockedBy`, `ranFor`, `landedFor` reaching a capability or area | a v1 feature or epic id | On a v1 tree's proposed layer, the work named an item the plan turned into a product node |
+
 `packages/graview/src/document.ts` holds the two mapping tables
 (`NODE_KINDS`, `PRODUCT_EDGE_SOURCES`) and `tests/unit/document.test.ts` fails
 when a rex `NodeType` or `ProductEdges` key has no kind or edge in the
