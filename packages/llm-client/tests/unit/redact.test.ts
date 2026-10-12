@@ -119,8 +119,13 @@ describe("redactSecrets — Bitbucket and Atlassian credentials", () => {
       "X54bNhpK5yFKGFR7ocV6FByvL_P9Sb3tFnbUg3T3I3S_RGCBLMSN7Nsa4GJv8JEJ6bzvDmX-oJ8AnrazMU-zZ5" +
       "hb-u3t2ERew=366BFE3A";
 
-    expect(redactSecrets(`password: ${truffleAppPassword}`)).not.toContain("tyg7u_op");
-    expect(redactSecrets(`token=${truffleAccessToken}`)).not.toContain("366BFE3A");
+    // Bare text, deliberately: `password: …` and `token=…` are caught by the
+    // key/value rule before the token pattern is reached, so an assignment-form
+    // fixture reports [redacted:value] and passes against the narrow classes
+    // this test exists to catch. Bare, the old ATBB class stopped at the first
+    // `-` and left `tyg7u_op` in the clear.
+    expect(redactSecrets(`got ${truffleAppPassword} here`)).toBe(`got ${REDACTED_TOKEN} here`);
+    expect(redactSecrets(`got ${truffleAccessToken} here`)).toBe(`got ${REDACTED_TOKEN} here`);
   });
 
   it("redacts the assignment forms a pipeline uses", () => {
