@@ -383,10 +383,22 @@ describe("applyV1ToV2", () => {
 
     it("reports the files it wrote to a temporary directory and removes the directory", async () => {
       const plan = await planOf((await load()).items);
-      const outcome = await rehearseV1ToV2(rexDir, plan, { load });
+      // A private temp root, so another process's rehearsal cannot make this pass or fail.
+      const scratchRoot = join(repo, "tmp");
+      mkdirSync(scratchRoot);
+      const vars = ["TMPDIR", "TEMP", "TMP"] as const;
+      const saved = vars.map((v) => process.env[v]);
+      for (const v of vars) process.env[v] = scratchRoot;
+      let outcome: Awaited<ReturnType<typeof rehearseV1ToV2>>;
+      try {
+        expect(tmpdir()).toBe(scratchRoot);
+        outcome = await rehearseV1ToV2(rexDir, plan, { load });
+      } finally {
+        vars.forEach((v, i) => (saved[i] === undefined ? delete process.env[v] : (process.env[v] = saved[i])));
+      }
       if (outcome.status !== "rehearsed") throw new Error("expected a rehearsal");
       expect(outcome.files).toBeGreaterThan(0);
-      expect(readdirSync(tmpdir()).filter((name) => name.startsWith("rex-migrate-rehearsal-"))).toEqual([]);
+      expect(readdirSync(scratchRoot)).toEqual([]);
     });
 
     it("refuses a model that does not read back, as apply does, and writes nothing under the project", async () => {
