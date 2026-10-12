@@ -354,13 +354,6 @@ jobs:
             runner: Windows
             timeout: 20
 
-    env:
-      # Node 22's on-disk compile cache. Hundreds of e2e tests each spawn a
-      # fresh CLI process that loads the same dist/ trees; with the cache every
-      # spawn after the first reuses the compiled bytecode. Measured locally:
-      # the sourcevision CLI's startup halved, hench's trimmed, rex's unchanged.
-      NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
-
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -392,7 +385,18 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Node 22's on-disk compile cache. Hundreds of e2e tests each spawn a
+      # fresh CLI process that loads the same dist/ trees; with the cache every
+      # spawn after the first reuses the compiled bytecode. Measured locally:
+      # the sourcevision CLI's startup halved, hench's trimmed, rex's unchanged.
+      #
+      # Set on the step, not the job: a job-level `env` may use only the
+      # github, needs, strategy, matrix, vars, secrets and inputs contexts, and
+      # `runner` is not among them. With it at job level the workflow file was
+      # rejected outright and no job of the run started (run 38266552069).
       - name: Run ${{ matrix.suites }}
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
         run: node scripts/run-all-tests.mjs ${{ matrix.suites }}
 
   smoke-parity:
