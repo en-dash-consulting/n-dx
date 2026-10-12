@@ -1828,6 +1828,20 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     expect(execMock.mock.calls[0][1] as string[]).toContain("auth");
   });
 
+  it("auth strips ANSI colour codes from the output and the error", async () => {
+    execMock.mockResolvedValueOnce({
+      stdout: "\u001b[32m✓ Credentials valid\u001b[39m\n", stderr: "", error: null, exitCode: 0,
+    });
+    const ok = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+    expect(ok.output).toBe("✓ Credentials valid");
+
+    execMock.mockResolvedValueOnce({
+      stdout: "", stderr: "\u001b[31mNo API key found\u001b[39m", error: new Error("exit 1"), exitCode: 1,
+    });
+    const bad = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth?refresh=true`)).json();
+    expect(bad.error).toBe("No API key found");
+  });
+
   it("auth reports not-ok with the failure text when credentials are missing", async () => {
     execMock.mockResolvedValue({
       stdout: "", stderr: "No API key found for vendor claude",

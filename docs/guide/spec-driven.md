@@ -6,6 +6,30 @@ You have a product spec, a requirements doc, or a design document. This guide ta
 
 You've written a 200-line `spec.md` describing a new feature set: API design, data models, acceptance criteria, edge cases. You want to turn that into a structured backlog and start executing — without manually translating each requirement into a PRD item.
 
+## Where a spec lands in the PRD
+
+The PRD is the product's requirements plus the changes being made to them (see [The PRD](./concepts/)). A spec feeds both layers:
+
+| In the spec | In the PRD |
+|-------------|-----------|
+| What the product must do ("a shopper can pay by card") | A **capability** in the product layer: a statement plus its **capability criteria**, the standing spec it is checked against |
+| Rules that hold everywhere ("all card data stays server-side") | A **constraint** in the product layer |
+| The work to build it | A **change** that adds or amends those capabilities, split into tasks. Each change and task has its own **acceptance criteria**: when that piece of work is done |
+
+New capabilities are never written straight into the product layer. They arrive as changes that *add* them, and [apply](./concepts/changes-and-apply) writes them in when the change completes. Until then they read as *proposed*.
+
+On a v2 PRD, `ndx add --file=spec.md` creates one change from the file, with no LLM call. Place it, then record what it adds or amends:
+
+```sh
+rex change place <change>                 # the shortlist of capabilities it could amend or touch
+rex change place <change> --target=<node> --relation=amends \
+  --capability-criterion="c3: A refund reaches the card"
+```
+
+::: info v1 projects
+Until the storage migration ships, `ndx init` creates v1 projects, which have no product layer. On a v1 project an LLM decomposes the spec into a tree of epics, features, tasks and subtasks, and the steps below walk through that path.
+:::
+
 ## Step 1: Initialize (if you haven't)
 
 ```sh
@@ -26,7 +50,7 @@ Use this when your spec is self-contained and you don't need architectural findi
 ndx add --file=spec.md .
 ```
 
-The LLM reads the spec, decomposes it into epics, features, tasks, and subtasks, and adds them to your PRD. Duplicate detection runs automatically — if your PRD already has overlapping items, you'll be prompted to merge, skip, or proceed.
+On a v1 project, the LLM reads the spec, decomposes it into a tree of items, and adds them to your PRD. Duplicate detection runs automatically — if your PRD already has overlapping items, you'll be prompted to merge, skip, or proceed.
 
 You can import multiple files in one pass:
 
@@ -37,7 +61,7 @@ ndx add --file=spec.md --file=api-contracts.md .
 Or combine with freeform descriptions:
 
 ```sh
-ndx add --file=spec.md "Also add rate limiting as a separate epic" .
+ndx add --file=spec.md "Also add rate limiting as a separate item" .
 ```
 
 ### Option B: `ndx plan --file` (spec + codebase analysis)
@@ -80,7 +104,7 @@ If the import missed something:
 
 ```sh
 ndx add "Implement webhook signature verification" .
-ndx add "Webhook verification" --parent=<epic-id> .    # under specific epic
+ndx add "Webhook verification" --parent=<item-id> .    # under an existing item
 ```
 
 For larger gaps, add another file:
@@ -105,19 +129,19 @@ Or use the dashboard (if `ndx start .` is running) to drag and drop items or edi
 Tasks with vague scope are risky. Before accepting, audit your task descriptions for effort signals. If a task says "Build the authentication system," that's too large — break it down:
 
 ```sh
-ndx add "Implement JWT token generation" --parent=<auth-feature-id> .
-ndx add "Add session refresh logic" --parent=<auth-feature-id> .
-ndx add "Write auth middleware tests" --parent=<auth-feature-id> .
+ndx add "Implement JWT token generation" --parent=<auth-item-id> .
+ndx add "Add session refresh logic" --parent=<auth-item-id> .
+ndx add "Write auth middleware tests" --parent=<auth-item-id> .
 ```
 
 A well-scoped task has:
 - A single verb in the title ("Implement", "Add", "Write", "Fix")
-- 2–5 concrete acceptance criteria
+- 2–5 concrete acceptance criteria (its "done when")
 - Enough context that an agent with codebase access can succeed without asking questions
 
 ### Structural cleanup
 
-If the LLM created a flat list when you expected hierarchy, or mixed concerns into a single epic:
+If the LLM created a flat list when you expected nesting, or mixed concerns into a single item:
 
 ```sh
 ndx reshape .   # LLM-powered restructuring — proposes reorganization
@@ -143,7 +167,7 @@ If you used `ndx add --file`, the items are already in the PRD — no acceptance
 ndx validate .
 ```
 
-This checks for orphaned items, missing acceptance criteria, empty epics, and broken parent references. Fix any flagged issues before proceeding.
+This checks for orphaned items, missing acceptance criteria, empty containers, and broken parent references. Fix any flagged issues before proceeding.
 
 ## Step 5: Preview before executing
 
@@ -168,7 +192,7 @@ With the PRD shaped and validated, run the agent:
 ```sh
 ndx work --auto .                          # execute the highest-priority task
 ndx work --auto --iterations=5 .           # run 5 tasks back-to-back
-ndx work --epic="Auth System" --auto .     # scope to one epic
+ndx work --epic="Auth System" --auto .     # scope to one top-level item
 ```
 
 The agent picks the next pending task, builds a brief with codebase context and acceptance criteria, runs a tool-use loop to implement it, commits the changes, and marks the task complete.
@@ -189,9 +213,9 @@ Shows the full PRD tree with per-item status (`pending`, `in_progress`, `complet
 ndx start .
 ```
 
-Open `http://localhost:3117`. The PRD view shows the hierarchy with completion percentages per epic. Use this to track spec coverage over time without running commands.
+Open `http://localhost:3117`. On a v1 project the PRD view shows the item tree with completion percentages per top-level item. Use this to track spec coverage over time without running commands.
 
-Filter by epic to see how a specific spec section is progressing. The status updates in real time as the agent completes tasks (the dashboard polls and self-corrects within seconds of each task completion).
+Filter to one top-level item to see how a specific spec section is progressing. The status updates in real time as the agent completes tasks (the dashboard polls and self-corrects within seconds of each task completion).
 
 ### Coverage at a glance
 
@@ -230,12 +254,14 @@ If a spec item changed and an existing task needs updating:
 rex update <task-id> --title="New title"
 ```
 
-For acceptance criteria changes, use the CLI, MCP tools (if the server is running), or the dashboard:
+For changes to a task's acceptance criteria, use the CLI, MCP tools (if the server is running), or the dashboard:
 
 ```sh
-rex update <task-id> --criterion="Criterion 1" --criterion="Criterion 2"  # replace all criteria
-rex update <task-id> --criterion=                                       # clear all criteria
+rex update <task-id> --criterion="Criterion 1" --criterion="Criterion 2"  # replace all acceptance criteria
+rex update <task-id> --criterion=                                       # clear all acceptance criteria
 ```
+
+On a v2 PRD, a changed *requirement* is an edit to the capability, not to a task: `rex product edit <node> --statement="…"` or `--capability-criterion="<id>: <text>"`. The capability then reads *revised* and rex drafts a change in the Inbox to build the edit.
 
 Or use the dashboard task editor — click any task to open its detail panel and edit in-place.
 
@@ -260,7 +286,7 @@ ndx validate .
 ndx health .      # PRD health score + structure warnings
 ```
 
-If the structure has become unbalanced (epics with 20 tasks and no features, orphaned items, etc.):
+If the structure has become unbalanced (a top-level item with 20 tasks and nothing between, orphaned items, etc.):
 
 ```sh
 ndx reorganize .  # auto-detect and propose structural fixes
@@ -272,7 +298,7 @@ The key discipline of spec-driven development is that the PRD is the single plac
 
 - Adding tasks directly to a ticket system without a PRD entry
 - Marking things done in your head without updating the PRD
-- Running `ndx add` and `ndx plan` concurrently (concurrent writes corrupt `.rex/prd.json`)
+- Running `ndx add` and `ndx plan` concurrently (both write the PRD; the lock serializes the writes, but the last writer's version wins)
 
 After each working session:
 
@@ -325,9 +351,9 @@ Each skill below maps to a step in this guide. Edit the linked file in your proj
 |-------|--------|--------------------|
 | `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Step 2B & 4: runs analysis alongside spec import and generates a unified proposal for review |
 | `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](./skills#ndx-capture) | Step 3: adds missing spec items as structured PRD entries with correct parent placement |
-| `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](./skills#ndx-reshape) | Step 3 structural cleanup: regroups items when the LLM generates a flat list instead of a hierarchy |
+| `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](./skills#ndx-reshape) | Step 3 structural cleanup (v1): regroups items when the LLM generates a flat list instead of a nested one |
 | `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](./skills#ndx-work) | Step 6: picks the next spec task and executes it autonomously |
-| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Tracking spec coverage: shows per-epic completion and next recommended task |
+| `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Tracking spec coverage: shows PRD completion and the next recommended task |
 
 Related guides: [Workflow](./workflow) (the core loop this guide extends), [Run While You Sleep](./overnight) (for multi-iteration overnight runs), [n-dx vs Spec Kit](./n-dx-vs-spec-kit) (how n-dx differs from Spec Kit, OpenSpec, and Kiro).
 

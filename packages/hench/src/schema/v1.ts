@@ -1,5 +1,5 @@
 import { PROJECT_DIRS, guardBaselineForLanguage } from "../prd/llm-gateway.js";
-import type { LLMVendor } from "../prd/llm-gateway.js";
+import type { LLMVendor, EnvPolicyConfig } from "../prd/llm-gateway.js";
 export type { MemoryThrottleConfig } from "../process/memory-throttle.js";
 export type { MemoryMonitorConfig } from "../process/memory-monitor.js";
 export type { RuntimePoolConfig } from "../process/pool.js";
@@ -47,6 +47,8 @@ export interface PolicyLimitsConfig {
 export interface GuardConfig {
   blockedPaths: string[];
   allowedCommands: string[];
+  /** Credential filtering shared by tool processes and vendor CLIs. */
+  env?: EnvPolicyConfig;
   commandTimeout: number;
   maxFileSize: number;
   /** Timeout in ms for spawn-based execution (spawnTool/spawnManaged). 0 = no timeout. */
@@ -273,6 +275,38 @@ export interface TestGateConfig {
    * no re-run.
    */
   rerunCommand?: string;
+}
+
+/** Values for {@link ReviewConfig.mode}. */
+export type ReviewMode = "off" | "self" | "pair";
+
+/** Default {@link ReviewConfig.mode}. */
+export const DEFAULT_REVIEW_MODE: ReviewMode = "off";
+
+/** Vendors that can review in pair mode. Narrower than `LLMVendor`: only CLI vendors. */
+export type ReviewerVendor = "claude" | "codex";
+
+/** Bounds and default of {@link ReviewConfig.rounds}. */
+export const MIN_REVIEW_ROUNDS = 1;
+export const MAX_REVIEW_ROUNDS = 3;
+export const DEFAULT_REVIEW_ROUNDS = 2;
+
+/**
+ * `hench.review.*` — the project's review pass, one rung below `--review` /
+ * `--no-review` and a task's saved `run.review`. The reviewer's model is not
+ * set here: it stays `llm.<vendor>.reviewModel`, then `llm.reviewModel`.
+ */
+export interface ReviewConfig {
+  /**
+   * `"off"` (default) runs no review. `"self"` is `--review`: the executor's
+   * own vendor re-reads the work. `"pair"` has the other vendor review the
+   * diff in a fresh session and report only; fixing is the executor's job.
+   */
+  mode?: ReviewMode;
+  /** Reviewer for pair mode. Unset means the other one of claude/codex. */
+  vendor?: ReviewerVendor;
+  /** Times the executor may fix must-fix findings in pair mode, 1-3. Default 2. */
+  rounds?: number;
 }
 
 export interface HenchConfig {
@@ -524,6 +558,8 @@ export interface HenchConfig {
    * `fullTestCommand` / auto-detection resolve it.
    */
   testGate?: TestGateConfig;
+  /** The project's review pass. See {@link ReviewConfig}. */
+  review?: ReviewConfig;
   /**
    * Whether the Anthropic API loop marks `cache_control` breakpoints on the
    * request (see `agent/lifecycle/prompt-cache.ts`). Default: true.
@@ -1305,6 +1341,10 @@ export interface CleanupTransformationResult {
  */
 export type RunReviewRecord =
   | {
+      /** `"pair"` when a different vendor reviewed. Absent on older records: self. */
+      mode?: RunReviewMode;
+      /** Vendor the reviewer ran on. Absent on older records: the executor's. */
+      vendor?: string;
       /** Model the reviewer ran on. Empty for the local vendor. */
       model: string;
       /** True when the reviewer resumed the work session rather than starting fresh. */
@@ -1398,19 +1438,57 @@ export type RunReviewRecord =
       gated?: boolean;
       /** As on the success shape: the reviewer was resumed once, and still wrote nothing usable. */
       backgroundResumed?: boolean;
+      /**
+       * The last report the reviewer wrote, when there was one. Set by a pair
+       * review that ended with must-fix findings still open
+       * (`failed: "must-fix-unresolved"`): the findings are in it.
+       */
+      reportPath?: string;
     };
+
+/** Who reviewed a run: the executor's own vendor (`self`) or the other one (`pair`). */
+export type RunReviewMode = Exclude<ReviewMode, "off">;
 
 /** Which setting chose the reviewer's model. */
 export type ReviewModelSource = "flag" | "vendor-config" | "shared-config" | "vendor-default";
 
 /** The review pass a run was launched with. See {@link RunRecord.reviewPlan}. */
 export interface RunReviewPlan {
+  /** `"pair"` when a different vendor reviews. Absent on older records: self. */
+  mode?: RunReviewMode;
+  /** Vendor that runs the review. Absent on older records: the executor's. */
+  vendor?: string;
   /** Resolved reviewer model. Empty for the local vendor. */
   model: string;
   /** `--review-model`, `llm.<vendor>.reviewModel`, `llm.reviewModel` or the vendor default. */
   modelSource: ReviewModelSource;
   /** `--review-optional`: a reviewer that cannot start warns instead of refusing completion. */
   optional: boolean;
+}
+
+/**
+ * One pair-review fix round: the executor was handed the reviewer's must-fix
+ * findings, its tests re-ran, and the reviewer checked again. See
+ * {@link RunRecord.reviewRounds}.
+ */
+export interface RunReviewRound {
+  /** 1-based; the first round follows the reviewer's first report. */
+  round: number;
+  /** Must-fix findings the executor was asked to fix. */
+  findingsIn: number;
+  /** Of those, how many the re-review no longer reports. Zero when it never ran. */
+  findingsFixed: number;
+  /** Must-fix findings open after the round, new ones included. */
+  remaining: number;
+  /**
+   * The round's outcome. `pass`: no must-fix finding left. `must-fix`: some
+   * remain. `executor-failed`: the fix session could not run. `validation-failed`:
+   * the task's tests failed after the fix, so no re-review was spent on it.
+   * `reviewer-failed`: the re-review wrote no usable report.
+   */
+  verdict: "pass" | "must-fix" | "executor-failed" | "validation-failed" | "reviewer-failed";
+  /** The report the re-review wrote, when it did. */
+  reportPath?: string;
 }
 
 /** Reviewer spend. See {@link RunRecord.reviewSpend}. */
@@ -1626,6 +1704,12 @@ export interface RunRecord {
    * v1 additive field — records without it load normally.
    */
   reviewPlan?: RunReviewPlan;
+  /**
+   * Pair-review fix rounds, in order. Absent unless the reviewer's first report
+   * held a must-fix finding. The executor's fix sessions are charged to the
+   * run's own token usage; the re-reviews to {@link reviewSpend}.
+   */
+  reviewRounds?: RunReviewRound[];
   /**
    * What the reviewer spent, accumulated as its spawns finish. Already
    * included in {@link tokenUsage}; kept apart so the review's share can be

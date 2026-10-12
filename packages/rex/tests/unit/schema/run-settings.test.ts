@@ -9,6 +9,8 @@ const FULL = {
   provider: "api",
   permissionMode: "bypassPermissions",
   review: false,
+  reviewMode: "pair",
+  reviewVendor: "codex",
   reviewTier: "light",
   reviewModels: { codex: "gpt-5.6-mini" },
   reviewOptional: true,
@@ -94,6 +96,10 @@ describe("validateRunSettings", () => {
     rejects({ tokenBudget: Number.MAX_SAFE_INTEGER + 2 }, "tokenBudget");
     rejects({ tier: "huge" }, "tier");
     rejects({ reviewTier: "free" }, "reviewTier");
+    rejects({ reviewMode: "both" }, "reviewMode");
+    rejects({ reviewMode: true }, "reviewMode");
+    rejects({ reviewVendor: "google" }, "reviewVendor");
+    rejects({ reviewVendor: "local" }, "reviewVendor");
     rejects({ models: { claude: 42 } }, "models.claude");
     rejects({ models: { claude: "" } }, "models.claude");
     rejects({ models: "claude-opus-5-5" }, "models");

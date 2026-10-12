@@ -116,7 +116,7 @@ export const editItemTool = defineTool({
     tags: z.array(z.string()).optional().describe("New tags"),
     source: z.string().optional().describe("New source"),
     blockedBy: z.array(z.string()).optional().describe("New blocked-by IDs"),
-    run: RunSettingsSchema.nullable().optional().describe("Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
+    run: RunSettingsSchema.nullable().optional().describe("Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewMode (off|self|pair), reviewVendor (claude|codex: the pair reviewer), reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
   },
   access: "write",
   run: (ws, args) => handleEditItem(ws.store, ws.projectDir, args),

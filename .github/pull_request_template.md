@@ -1,6 +1,6 @@
 <!--
-Keep the trailer block at the bottom. GitHub copies a PR's description into the
-squash-merge commit message, so a trailer written here lands in history on main
+Keep the trailer block at the bottom. This PR's description becomes the body of
+the merge commit that lands on main, so a trailer written here lands in history
 — which is where rex looks for it. See `packages/core/commit-trailers.js`.
 -->
 

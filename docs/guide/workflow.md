@@ -2,6 +2,12 @@
 
 The core n-dx loop: **analyze** your codebase, **build** a PRD from findings and ideas, **execute** tasks with an autonomous agent, **repeat**.
 
+The PRD is the product's requirements (the product layer: areas, capabilities, constraints) plus the changes being made to them (the change layer: changes, tasks, subtasks). Findings and ideas enter as changes; completed changes update the requirements. See [The PRD](./concepts/).
+
+::: info v1 projects
+Until the storage migration ships, `ndx init` creates v1 projects: the PRD is one tree of epics, features, tasks and subtasks in `.rex/prd_tree/`, with no product layer. The steps below note where a v1 project behaves differently.
+:::
+
 ## 1. Analyze
 
 ```sh
@@ -31,14 +37,25 @@ Translates SourceVision findings into PRD tasks. The `--actionable-only` flag fi
 ```sh
 ndx add "Add SSO support with Google and Okta" .
 ndx add --file=ideas.txt .
-ndx add "Add retries" --parent=<item-id> .
 ```
 
-Smart add uses an LLM to decompose descriptions into structured epic/feature/task proposals. If duplicates are detected against existing PRD items:
+Each description becomes a change in the Inbox, with the rules' suggested placement: the capabilities and constraints it could add to, amend or touch. Record the placement, then add tasks to the change:
+
+```sh
+rex change place <change>                                   # the shortlist
+rex change place <change> --target=<node> --relation=amends # record it
+rex add task --title="Add the Okta provider" --parent=<change> .
+```
+
+A change that amends a capability updates it when the change completes; see [Changes and apply](./concepts/changes-and-apply).
+
+::: info v1 projects
+On a v1 PRD, smart add uses an LLM to decompose descriptions into epic/feature/task proposals, and `--parent=<item-id>` nests the result under an existing item. If duplicates are detected against existing PRD items:
 
 - **Cancel** — write nothing
 - **Merge** — update matched items, add only non-duplicates
 - **Proceed** — create duplicates with override markers for auditing
+:::
 
 ## 4. Plan (Full Pipeline)
 
@@ -64,7 +81,7 @@ This prevents a wall of "pending" tasks for code that's already implemented.
 ```sh
 ndx work --auto .                          # highest-priority task
 ndx work --auto --iterations=4 .           # 4 tasks sequentially
-ndx work --epic="Auth System" --auto .     # scope to an epic
+ndx work --epic="Auth System" --auto .     # scope to one top-level item (an epic on v1)
 ndx work --task=abc123 .                   # specific task by ID
 ```
 
@@ -88,7 +105,8 @@ See [Self-Heal Loop](./self-heal) for details on fuzzy acknowledgment and findin
 ## 7. Monitor
 
 ```sh
-ndx status .                 # PRD tree with completion stats
+rex product show .           # requirements with computed status and health (v2)
+ndx status .                 # PRD tree with completion stats (v1)
 ndx start .                  # web dashboard + MCP server
 ndx start --background .     # daemon mode
 ndx usage .                  # token usage analytics
@@ -111,10 +129,10 @@ Each skill below maps to a step in this loop. Edit the linked file in your proje
 | Skill | Source | Role in this guide |
 |-------|--------|--------------------|
 | `/ndx-plan` | [`.agents/skills/ndx-plan/SKILL.md`](./skills#ndx-plan) | Steps 2–4: translates SourceVision findings into PRD proposals and accepts them |
-| `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](./skills#ndx-capture) | Step 3: decomposes freeform ideas into structured PRD items with parent placement |
+| `/ndx-capture` | [`.agents/skills/ndx-capture/SKILL.md`](./skills#ndx-capture) | Step 3: turns a freeform idea into a PRD item under the right parent (v1 PRDs today) |
 | `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](./skills#ndx-work) | Step 5: picks the next task and drives an LLM tool-use loop to implement it |
 | `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Step 7: shows combined PRD completion, zone health, and next recommended action |
-| `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](./skills#ndx-reshape) | Structural cleanup: reparents, merges, and rebalances the PRD tree when hierarchy drifts |
+| `/ndx-reshape` | [`.agents/skills/ndx-reshape/SKILL.md`](./skills#ndx-reshape) | Structural cleanup of a v1 PRD tree: reparents, merges, and rebalances items when the tree drifts |
 
 Related guides that share these skills: [Spec-Driven Development](./spec-driven), [Codebase Onboarding](./onboarding), [Run While You Sleep](./overnight), [Self-Heal Loop](./self-heal).
 
@@ -122,13 +140,13 @@ For the full skill inventory and customization guidance, see the [Skills Referen
 
 ## See it on a real project
 
-n-dx runs this loop on itself. Two artifacts in the repository show both ends
-of it:
+n-dx runs this loop on itself. Its repository is still a v1 project, and two
+artifacts show both ends of the loop:
 
 - [`prd.md`](https://github.com/en-dash-consulting/n-dx/blob/main/prd.md) — the
   hand-written spec that seeded the project
 - [`.rex/prd_tree/`](https://github.com/en-dash-consulting/n-dx/tree/main/.rex/prd_tree)
-  — the live tree the agent reads from and writes back to
+  — the live v1 tree the agent reads from and writes back to
 
 The [PRD storage layout guide](./prd-storage) walks through how one becomes the
 other, and which commands and MCP tools you use to interact with the result.

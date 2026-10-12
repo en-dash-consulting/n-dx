@@ -54,6 +54,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
       { flag: "--resolve", description: "With --task: print the settings the run would use, where each came from, and why it would refuse, as JSON. Runs nothing (see below)" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
+      { flag: "--review-mode=<off|self|pair>", description: "Who reviews: self (this vendor), pair (another vendor reviews, the executor fixes) or off. --review is self, --no-review is off; overrides a task's saved reviewMode" },
+      { flag: "--reviewer=<claude|codex>", description: "The pair reviewer's vendor, over the task's saved reviewVendor and hench.review.vendor. Must differ from the executor's vendor; refused with --review or --no-review" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
       { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
       { flag: "--no-review", description: "No review pass for this run, even when the task saved review:true. Refused with --review, --review-model or --review-optional" },
@@ -148,7 +150,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "             when it carries none — also null when a malformed block\n" +
           "             was ignored, which is reported in warnings\n" +
           "  resolved   vendor, model, provider, permissionMode, review,\n" +
-          "             reviewModel, skipTestGate, maxTurns, tokenBudget, fresh,\n" +
+          "             reviewMode, reviewVendor, reviewModel, skipTestGate,\n" +
+          "             maxTurns, tokenBudget, fresh,\n" +
           "             allowDirty, resetDeferred — each {value, source}, where\n" +
           "             source is the key that supplied it (cli-flag, task.run\n" +
           "             and its task.run.tier / task.run.models /\n" +

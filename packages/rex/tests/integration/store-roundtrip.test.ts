@@ -163,6 +163,8 @@ describe("Store roundtrip integration", () => {
       provider: "cli" as const,
       permissionMode: "default" as const,
       review: true,
+      reviewMode: "pair" as const,
+      reviewVendor: "codex" as const,
       reviewTier: "standard" as const,
       reviewModels: { claude: "claude-sonnet-5" },
       reviewOptional: false,

@@ -140,6 +140,26 @@ describe("MCP write tools — folder tree state", () => {
     expect(epics[0].run).toEqual({ tier: "heavy", models: { claude: "m1", codex: "m2" }, skipTestGate: false });
   });
 
+  it("add_item and edit_item take reviewMode and reviewVendor in the run block, and the tree round-trips them", async () => {
+    const { rexDir, store } = await setupRexDir(tmpDir);
+    const run = { review: true, reviewMode: "pair", reviewVendor: "codex" };
+
+    for (const bad of [{ reviewMode: "both" }, { reviewVendor: "google" }]) {
+      const rejected = await handleAddItem(store, tmpDir, rexDir, { title: "Bad", level: "epic", run: bad });
+      expect(rejected.isError, JSON.stringify(bad)).toBe(true);
+    }
+    expect(await treeEpics(rexDir)).toHaveLength(0);
+
+    const added = await handleAddItem(store, tmpDir, rexDir, { title: "Paired", level: "epic", run });
+    expect(added.isError).toBeFalsy();
+    expect((await treeEpics(rexDir))[0].run).toEqual(run);
+
+    const { id } = JSON.parse(added.content[0].text) as { id: string };
+    const edited = await handleEditItem(store, tmpDir, { id, run: { reviewMode: "self" } });
+    expect(edited.isError).toBeFalsy();
+    expect((await treeEpics(rexDir))[0].run).toEqual({ reviewMode: "self" });
+  });
+
   it("add_item and edit_item set a change's acceptanceCriteria, read back as the typed field", async () => {
     const { rexDir, store } = await setupRexDir(tmpDir);
 

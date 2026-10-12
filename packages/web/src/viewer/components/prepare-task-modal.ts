@@ -48,6 +48,7 @@ import {
   optionsProblem,
   providerChoices,
   resetField,
+  reviewModeOf,
   runOptionsOf,
   setField,
   sourceOf,
@@ -92,6 +93,7 @@ interface SaveConflict {
 }
 
 const PERMISSION_MODES = RUN_OPTION_SPECS.find((s) => s.key === "permissionMode")?.values ?? [];
+const REVIEWER_VENDORS = RUN_OPTION_SPECS.find((s) => s.key === "reviewVendor")?.values ?? [];
 
 /**
  * Keyed by task id, so a different `taskId` is a different modal: edits, preview
@@ -469,8 +471,10 @@ function Form(props: FormProps) {
   const { saveError, conflict, confirmClear, setConfirmClear } = props;
   const set = (key: RunOptionKey, value: unknown) => {
     let next = setField(defaults, edits, key, value);
-    // Turning review off drops its model, so the field does not linger as a change.
-    if (key === "review" && value !== true) next = resetField(next, "reviewModel");
+    // Turning review off drops its model, and leaving pair drops its reviewer,
+    // so neither field lingers as a change.
+    if (key === "reviewMode" && value === "off") next = resetField(next, "reviewModel");
+    if (key === "reviewMode" && value !== "pair") next = resetField(next, "reviewVendor");
     setEdits(next);
   };
   const reset = (key: RunOptionKey) => setEdits(resetField(edits, key));
@@ -483,7 +487,10 @@ function Form(props: FormProps) {
     onReset: () => reset(key),
   });
 
-  const reviewOn = effective(defaults, edits, "review") === true;
+  const reviewMode = reviewModeOf(defaults, edits);
+  const reviewOn = reviewMode !== "off";
+  const pairSupported = prep.pairSupported === true;
+  const executor = prep.resolved.vendor.value;
   const turnsApply = maxTurnsApplies(defaults, edits);
   const refusals = standingRefusals(prep, defaults, edits);
   const warnings = workspaceWarnings(prep);
@@ -532,15 +539,35 @@ function Form(props: FormProps) {
       ),
 
       h(Section, { title: "Behaviour" },
-        h(Field, { label: "Adversarial review", ...field("review") },
-          // Switchable both ways since `--no-review` exists: it was locked on
-          // while a review turned on by config could not be turned off for one
-          // run, which is no longer true.
+        h(Field, {
+          label: "Review", ...field("reviewMode"),
+          note: pairSupported ? null : "Pair review is not available on this server",
+        },
+          // Self re-reads the work on the executor's vendor; Pair has the other
+          // vendor review and the executor fix. Switchable both ways, so a review
+          // the config or the task turns on can be turned off for one run.
           h("select", {
-            id: "prep-review",
-            value: reviewOn ? "on" : "off",
-            onChange: (e: Event) => set("review", (e.target as HTMLSelectElement).value === "on"),
-          }, h("option", { value: "off" }, "Off"), h("option", { value: "on" }, "On"))),
+            id: "prep-reviewMode",
+            value: reviewMode,
+            onChange: (e: Event) => set("reviewMode", (e.target as HTMLSelectElement).value),
+          },
+            h("option", { value: "off" }, "Off"),
+            h("option", { value: "self" }, "Self"),
+            h("option", { value: "pair", disabled: !pairSupported }, "Pair"))),
+        h(Field, {
+          label: "Reviewer vendor", ...field("reviewVendor"),
+          note: reviewMode === "pair" ? null : "Used by Pair review",
+        },
+          h("select", {
+            id: "prep-reviewVendor",
+            value: effective(defaults, edits, "reviewVendor"),
+            disabled: reviewMode !== "pair",
+            onChange: (e: Event) => set("reviewVendor", (e.target as HTMLSelectElement).value),
+          },
+            // No default when the executor has no CLI counterpart: the reader must pick.
+            defaults.reviewVendor === "" ? h("option", { key: "unset", value: "" }, "Not set") : null,
+            // The executor cannot review its own pair review.
+            REVIEWER_VENDORS.map((v) => h("option", { key: v, value: v, disabled: v === executor }, v)))),
         h(Field, {
           label: "Review model", ...field("reviewModel"),
           note: reviewOn ? null : "Enabled when review is on",

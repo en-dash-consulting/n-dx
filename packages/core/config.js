@@ -1017,8 +1017,97 @@ function getValidator(pkg, settingPath) {
     if (settingPath.startsWith("timeouts.")) return validateTimeoutMs;
   }
   if (pkg === "selfHeal") return SELF_HEAL_VALIDATORS[settingPath] ?? null;
+  if (pkg === "hench") return HENCH_VALIDATORS[settingPath] ?? null;
   return null;
 }
+
+const REVIEW_MODES = ["off", "self", "pair"];
+/** CLI vendors that can review in pair mode. Mirrors hench's `ReviewerVendor`. */
+const REVIEWER_VENDORS = ["claude", "codex"];
+/** Mirrors hench's `MIN_REVIEW_ROUNDS` / `MAX_REVIEW_ROUNDS`; core imports no package. */
+const MIN_REVIEW_ROUNDS = 1;
+const MAX_REVIEW_ROUNDS = 3;
+
+/** Mirrors hench's `DEFAULT_REVIEW_ROUNDS`. */
+const DEFAULT_REVIEW_ROUNDS = 2;
+
+/**
+ * Settings `ndx pair-programming` reviews with, read from `hench.review.*`
+ * (`.hench/config.json`) and `llm.*` (`.n-dx.json`). A value that is unset
+ * falls back to its default; a set-but-unusable one also adds a warning.
+ *
+ * @param {string} dir  Project root.
+ * @param {string | undefined} primaryVendor  The vendor doing the work.
+ * @returns {Promise<{
+ *   vendor?: "claude" | "codex";
+ *   modelFor: (reviewer: string) => string | undefined;
+ *   rounds: number;
+ *   warnings: string[];
+ * }>}
+ */
+export async function readReviewerSettings(dir, primaryVendor) {
+  const henchConfig = await loadOptionalJSON(join(resolveLayout(dir).henchDir, "config.json"));
+  const llm = (await loadProjectConfig(dir))?.llm;
+  const review = henchConfig?.review ?? {};
+  const warnings = [];
+
+  let vendor;
+  if (review.vendor !== undefined) {
+    if (!REVIEWER_VENDORS.includes(review.vendor)) {
+      warnings.push(
+        `hench.review.vendor "${review.vendor}" is not one of ${REVIEWER_VENDORS.join(", ")}; using the default reviewer.`,
+      );
+    } else if (review.vendor === primaryVendor) {
+      warnings.push(
+        `hench.review.vendor "${review.vendor}" is the primary vendor; using the default reviewer instead.`,
+      );
+    } else {
+      vendor = review.vendor;
+    }
+  }
+
+  let rounds = DEFAULT_REVIEW_ROUNDS;
+  if (review.rounds !== undefined) {
+    if (Number.isInteger(review.rounds) && review.rounds >= MIN_REVIEW_ROUNDS && review.rounds <= MAX_REVIEW_ROUNDS) {
+      rounds = review.rounds;
+    } else {
+      warnings.push(
+        `hench.review.rounds "${review.rounds}" is not a whole number from ${MIN_REVIEW_ROUNDS} to ${MAX_REVIEW_ROUNDS}; using ${DEFAULT_REVIEW_ROUNDS}.`,
+      );
+    }
+  }
+
+  const pick = (v) => (typeof v === "string" && v.length > 0 ? v : undefined);
+  const modelFor = (reviewer) => pick(llm?.[reviewer]?.reviewModel) ?? pick(llm?.reviewModel);
+
+  return { vendor, modelFor, rounds, warnings };
+}
+
+/**
+ * Validators for hench.* keys written to `.hench/config.json`. hench refuses to
+ * start on a file its own schema rejects, so a value that schema would refuse
+ * is stopped here, with a message, rather than at the next `ndx work`. Only the
+ * keys that need more than their type are listed.
+ */
+const HENCH_VALIDATORS = {
+  "review.mode": (value) => {
+    if (!REVIEW_MODES.includes(value)) {
+      throw new Error(`Invalid review mode "${value}". Expected one of: ${REVIEW_MODES.join(", ")}.`);
+    }
+  },
+  "review.vendor": (value) => {
+    if (!REVIEWER_VENDORS.includes(value)) {
+      throw new Error(`Invalid reviewer "${value}". Expected one of: ${REVIEWER_VENDORS.join(", ")}.`);
+    }
+  },
+  "review.rounds": (value) => {
+    if (!Number.isInteger(value) || value < MIN_REVIEW_ROUNDS || value > MAX_REVIEW_ROUNDS) {
+      throw new Error(
+        `Invalid review rounds "${value}". Expected a whole number from ${MIN_REVIEW_ROUNDS} to ${MAX_REVIEW_ROUNDS}.`,
+      );
+    }
+  },
+};
 
 /**
  * Validators for specific claude config keys.
@@ -1935,6 +2024,21 @@ Hench git-safety settings (pre-run commit gate):
                                            attended path — the gate prompts, and so proposes
                                            a subject, solely in an interactive TTY session.
 
+Hench review settings (the review pass after a task validates):
+  hench.review.mode        string    "off" (default), "self" or "pair". "self" is --review: the
+                                     executor's own vendor re-reads its work. "pair" has the other
+                                     vendor review the diff in a fresh session that edits no
+                                     files and writes the findings report; the executor then
+                                     fixes the must-fix findings. --review / --no-review and a
+                                     task's saved review setting still win. Review needs
+                                     hench.provider "cli".
+  hench.review.vendor      string    Reviewer for pair mode: "claude" or "codex". Unset means the
+                                     other one of the two; it must differ from the executor.
+  hench.review.rounds      number    Times the executor may fix must-fix findings in pair mode,
+                                     1-3 (default: 2)
+                                     The reviewer's model stays llm.<vendor>.reviewModel, then
+                                     llm.reviewModel, then the vendor default.
+
 Hench guard settings (security boundaries):
   hench.guard.blockedPaths       string[]  Glob patterns for blocked file paths
                                            (default: .hench/**, .rex/**, .git/**, node_modules/**)
@@ -2447,7 +2551,85 @@ async function loadAllConfigs(dir) {
     configs.language = projectConfig.language;
   }
 
-  return { configs, rawConfigs };
+  return { configs, rawConfigs, projectConfig };
+}
+
+/**
+ * Resolve the same filtered environment as hench for cross-vendor reviewers.
+ * Config I/O and foundation loading stay in the spawn-exempt config module.
+ * @param {string} dir
+ * @param {"claude" | "codex"} vendor
+ * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions }} [options]
+ *   `trust` relocates the repository-trust store (e.g. `{ ndxHome }`); callers
+ *   that omit it use the user's real store.
+ * @returns {Promise<NodeJS.ProcessEnv>}
+ */
+export async function loadVendorCliEnv(dir, vendor, options = {}) {
+  const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
+  const envPolicy = await loadProjectEnvPolicy(dir);
+  const llmConfig = await loadLLMConfig(dir);
+  return resolveVendorCliEnv({ ...llmConfig, vendor }, await applyRepoTrustToEnvPolicy(dir, envPolicy, options.trust));
+}
+
+/** Directories already warned about, so a loop of reviews warns once. */
+const warnedUntrustedEnvAllow = new Set();
+
+/**
+ * Drop repository-supplied `guard.env.allow` entries unless the user trusts
+ * this checkout. `deny` is kept: it only narrows. "Not trusted" is
+ * `evaluateRepoTrust(...).restricted` (untrusted or changed), which is also
+ * the state of any checkout with an unaccepted `env-allow-added` finding.
+ * Loaded dynamically: config.js may not import packages statically.
+ */
+async function applyRepoTrustToEnvPolicy(dir, envPolicy, trust) {
+  if (!envPolicy?.allow?.length) return envPolicy;
+  const { evaluateRepoTrust } = await import("@n-dx/llm-client");
+  const evaluation = evaluateRepoTrust(dir, trust);
+  if (!evaluation.restricted) return envPolicy;
+  if (!warnedUntrustedEnvAllow.has(dir)) {
+    warnedUntrustedEnvAllow.add(dir);
+    const finding = evaluation.findings.find((f) => f.code === "env-allow-added");
+    console.warn(
+      `Ignoring repository guard.env.allow (${envPolicy.allow.join(", ")}) for the reviewer CLI: ` +
+      `this checkout is ${evaluation.state}` +
+      (finding ? ` (finding: ${finding.code})` : "") +
+      ". Run 'ndx trust accept .' to apply it.",
+    );
+  }
+  const { allow: _ignored, ...rest } = envPolicy;
+  return rest;
+}
+
+/** The project's `hench.guard.env` policy, `.hench/config.json` merged with `.n-dx.json`. */
+async function loadProjectEnvPolicy(dir) {
+  const { configs, projectConfig } = await loadAllConfigs(dir);
+  return configs.hench?.guard?.env ?? projectConfig.hench?.guard?.env;
+}
+
+/**
+ * Environment for the reviewer's shell test command: `process.env` filtered by
+ * the project's `hench.guard.env` policy, with none of a vendor CLI's
+ * authentication exceptions — the test command is not a vendor CLI.
+ *
+ * When the project policy cannot be loaded or compiled, the default deny
+ * policy applies and `policyError` says why, so the caller can report it.
+ * Never returns the unfiltered parent environment.
+ *
+ * @param {string} dir
+ * @returns {Promise<{ env: NodeJS.ProcessEnv; policyError?: string }>}
+ */
+export async function loadShellTestEnv(dir) {
+  const { compileEnvPolicy, sanitizeChildEnv } = await import("@n-dx/llm-client");
+  let policy;
+  let policyError;
+  try {
+    policy = compileEnvPolicy(await loadProjectEnvPolicy(dir));
+  } catch (err) {
+    policy = compileEnvPolicy(undefined);
+    policyError = err instanceof Error ? err.message : String(err);
+  }
+  const env = sanitizeChildEnv(process.env, policy);
+  return policyError === undefined ? { env } : { env, policyError };
 }
 
 // ── Test connection handler ──────────────────────────────────────────────────
@@ -2851,6 +3033,7 @@ async function handleSetPackageConfig(
   valueArg,
   configs,
   rawConfigs,
+  flags,
 ) {
   if (!PACKAGES[pkg]) {
     console.error(
@@ -2901,6 +3084,19 @@ async function handleSetPackageConfig(
   } catch (err) {
     console.error(`Invalid value for "${keyArg}": ${err.message}`);
     process.exit(1);
+  }
+
+  if (flags.force !== "true") {
+    const validator = getValidator(pkg, settingPath);
+    if (validator) {
+      try {
+        await validator(coerced);
+      } catch (err) {
+        console.error(`Invalid value for "${keyArg}": ${err.message}`);
+        console.error("  Use --force to set this value anyway.");
+        process.exit(1);
+      }
+    }
   }
 
   // Write to raw (un-merged) config so project overrides don't leak
@@ -3134,6 +3330,7 @@ export async function runConfig(args) {
         valueArg,
         configs,
         rawConfigs,
+        flags,
       );
     }
     return;

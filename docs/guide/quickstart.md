@@ -73,20 +73,26 @@ Running `ndx init` again is safe. It detects existing assistant surfaces and reu
 
 ## 3. Add to the PRD
 
+The PRD is your product's requirements (the product layer: areas and capabilities) plus the changes being made to them (the change layer). Everything new enters as a **change**. See [The PRD](./concepts/) for the model.
+
 ```sh
 ndx add "<describe what you want to create>"
 ```
 
+`ndx add` creates one change per description in the **Inbox**, under `.ndx/rex/changes/`, and prints its id with a suggested placement: the capabilities it could add to, amend or touch. Record the placement with `rex change place <change> --target=<node>`, or leave it in the Inbox for later. See [Changes and apply](./concepts/changes-and-apply).
+
+::: info v1 projects
+Until the storage migration ships, `ndx init` creates a v1 project, and `ndx add` there behaves as these screenshots show: the configured LLM drafts a proposal of epics, features and tasks, and you accept it into `.rex/prd_tree/`.
+
 ![ndx add #1](../../documentation/ndx_add_1.png)
 ![ndx add #2](../../documentation/ndx_add_2.png)
-
-`ndx add` takes your natural-language description, asks the configured LLM to draft a PRD proposal (epics → features → tasks), and prints it for review. At the bottom you'll see:
 
 ```
 accept proposals? (y=all / n=none / b#=break down / c=consolidate / 1,2,…=select)
 ```
 
-Press `y` to accept everything into `.rex/prd_tree/`, or pick specific items.
+Press `y` to accept everything, or pick specific items.
+:::
 
 ## 4. Work on the PRD
 
@@ -100,13 +106,23 @@ The agent picks the highest-priority pending task, builds a brief with codebase 
 
 ## 5. Check progress
 
+See the requirements, each capability with its computed status (*proposed*, *changing*, *met*, *revised*) and health:
+
+```sh
+rex product show
+```
+
+::: info v1 projects
+A v1 project has no product layer, so `rex product show` refuses it. Use `ndx status`, which shows the item tree with completion stats:
+
 ```sh
 ndx status
 ```
 
-![ndx status example](../../documentation/ndx_status.png)
+![ndx status example (v1 project)](../../documentation/ndx_status.png)
 
-You'll see a tree of epics, features, and tasks with completion stats.
+`ndx status` reads the v1 layout only; it does not read a v2 PRD yet.
+:::
 
 ## 6. Analyze your changes (optional)
 
@@ -136,7 +152,7 @@ ndx start
 
 ![ndx start example](../../documentation/ndx_start.png)
 
-Opens a web dashboard at `http://localhost:3117` with interactive views of your codebase analysis, PRD tree, and agent runs.
+Opens a web dashboard at `http://localhost:3117` with interactive views of your codebase analysis, your PRD, and agent runs.
 
 ## What's next?
 
@@ -157,8 +173,8 @@ Opens a web dashboard at `http://localhost:3117` with interactive views of your 
 | Skill | Role in this guide |
 |-------|--------------------|
 | `/ndx-work` | Step 4: executes PRD tasks with codebase context and workflow discipline |
-| `/ndx-status` | Step 5: shows the PRD tree with per-epic completion stats |
-| `/ndx-capture` | Step 3 alternative: adds freeform ideas as structured PRD items without leaving the chat |
+| `/ndx-status` | Step 5: shows PRD progress and codebase health together |
+| `/ndx-capture` | Step 3 alternative: adds a freeform idea to the PRD without leaving the chat |
 | `/ndx-feedback` | What's next: files a GitHub issue with your environment details automatically included |
 
 For the full skill inventory and customization guidance, see the [Skills Reference](./skills).
