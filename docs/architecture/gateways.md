@@ -36,7 +36,7 @@ Within the web package, `src/viewer/external.ts` concentrates all viewer-side im
 |---------|---------|
 | Reader | `prdLayout`, `loadPrdModel`; types `PrdModel`, `LoadPrdModelOptions`, `V2Tree`, `RuleNode` |
 | Transaction | `withPrdModelTransaction` (PRD lock held across load, mutate, write; refuses a v1 tree with `PrdLayoutError`); types `PrdModelEdit`, `PrdModelTransactionOptions`, `PrdModelTransactionResult` |
-| Selection | `findNextWork`, `findActionableWork`, `resolveWorkById`; `findNextWorkTask` (v1-shaped answer `get_next_task` returns), `completedWorkIds`; types `WorkUnit`, `WorkKind`, `WorkSelectionOptions`, `NextWorkTask`, `NextWorkOptions` |
+| Selection | `findNextWork`, `findActionableWork`, `resolveWorkById` (`null` for a change holding a change); `changeWorkShape` (unit, tasks or container: the one judgement selection, `resolveWorkById` and `claim_task` share); `findNextWorkTask` (v1-shaped answer `get_next_task` returns), `completedWorkIds`; types `WorkUnit`, `WorkKind`, `WorkSelectionOptions`, `ChangeWorkShape`, `WorkShapeChild`, `NextWorkTask`, `NextWorkOptions` |
 | Completion | `completeTask`, `completeChange`, `completeWork` (pure, on a `V2Tree`), `ChangeCompletionError`; `completeV2Work` (the transaction `update_task_status` runs: completes, applies per `rex.applyOn`, logs), `loadApplyOn`; types `ChangeCompletionOptions`, `ChangeCompletionResult`, `CompleteWorkOptions`, `CompleteWorkResult`, `V2Completion`, `V2CompletionOptions`, `ApplyOn` |
 | Brief | `buildChangeBrief`, `renderChangeBrief`; types `ChangeBrief`, `ChangeBriefOptions`, `BriefCommands`, `BriefLogEntry` |
 | Store | `ChangeLayerStore`, `isChangeLayerStore` (what `resolveStore` returns on a v2 tree) |

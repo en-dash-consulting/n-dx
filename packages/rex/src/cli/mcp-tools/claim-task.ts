@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { changeWorkShape } from "../../core/change-selection.js";
 import { changeLayerType } from "../../core/layer-projection.js";
 import type { PRDItem } from "../../schema/index.js";
 import type { ChangeNodeType } from "../../schema/v2.js";
@@ -52,13 +53,18 @@ export async function handleClaimTask(
   }
 }
 
-/** On a v2 tree the unit of work is a task, or a change with no tasks: a subtask or a change with tasks is refused. */
+/**
+ * On a v2 tree the claimable unit is what selection offers ({@link changeWorkShape}):
+ * a task, or a change with no live tasks or nested changes.
+ */
 function changeLayerClaimRefusal(item: PRDItem, type: ChangeNodeType): string | undefined {
   if (type === "subtask") return `"${item.id}" is a subtask: claim its task instead.`;
-  // A deleted task is a tombstone: change selection does not count it, so neither does the claim.
-  const hasTasks = item.children?.some((c) => changeLayerType(c) === "task" && c.status !== "deleted") ?? false;
-  if (type === "change" && hasTasks) return `"${item.id}" is a change with tasks: claim one of its tasks instead.`;
-  return undefined;
+  if (type !== "change") return undefined;
+  const shape = changeWorkShape(item);
+  if (shape === "tasks") return `"${item.id}" is a change with tasks: claim one of its tasks instead.`;
+  if (shape !== "container") return undefined;
+  const nested = (item.children ?? []).filter((c) => (c.type === "change" || c.type === "task") && c.status !== "deleted");
+  return `"${item.id}" is a change that holds changes: claim one of its nested changes or tasks instead (${nested.map((c) => `${c.type} ${c.id}`).join(", ")}).`;
 }
 
 export const claimTaskTool = defineTool({

@@ -9,7 +9,8 @@
  * selected while it has any (completing it is the completion path's job). A
  * change holding a change is a container: selection descends into it, and the
  * enclosing change's gates apply to everything inside. Subtasks belong to
- * their task.
+ * their task. {@link changeWorkShape} is the one judgement of which a change
+ * is; selection, {@link resolveWorkById} and `claim_task` all use it.
  *
  * ## Autonomous selection
  *
@@ -59,6 +60,22 @@ export interface WorkSelectionOptions {
   assignee?: string;
 }
 
+/** A child as {@link changeWorkShape} reads it: a change-layer node or its projected item. */
+export interface WorkShapeChild {
+  type?: string;
+  status?: string;
+}
+
+/** `unit`: the change is itself the work. `tasks`: worked through its tasks. `container`: holds a change, never a unit. */
+export type ChangeWorkShape = "unit" | "tasks" | "container";
+
+/** How a change is worked, judged on its live children (a deleted one is a tombstone and does not count). */
+export function changeWorkShape(change: { children?: readonly WorkShapeChild[] }): ChangeWorkShape {
+  const live = (change.children ?? []).filter((c) => c.status !== "deleted");
+  if (live.some((c) => c.type === "change")) return "container";
+  return live.some((c) => c.type === "task") ? "tasks" : "unit";
+}
+
 const ACTIONABLE: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["pending", "in_progress", "failing"]);
 
 /** Every autonomous candidate, best first. */
@@ -89,12 +106,12 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
     }
     // Entries are in tree order, so an enclosing change is judged before what it holds.
     if (node.type !== "change" || !changeWorkable(node)) return;
-    const live = (node.children ?? []).filter((c) => c.status !== "deleted");
-    const tasks = live.filter((c) => c.type === "task");
     const change = node as ChangeRule;
-    // A change holding a change is a container: its work is its tasks and the nested changes.
-    if (tasks.length === 0 && !live.some((c) => c.type === "change")) units.push({ kind: "change", node: change, change });
-    for (const task of tasks) if (runnable(task)) units.push({ kind: "task", node: task as TaskRule, change });
+    if (changeWorkShape(change) === "unit") units.push({ kind: "change", node: change, change });
+    // A container's own tasks are units beside its nested changes.
+    for (const task of node.children ?? []) {
+      if (task.type === "task" && task.status !== "deleted" && runnable(task)) units.push({ kind: "task", node: task as TaskRule, change });
+    }
   });
 
   const candidates = units.filter(
@@ -121,11 +138,14 @@ export function findNextWork(tree: V2Tree, options: WorkSelectionOptions = {}): 
 /**
  * The change or task a ref names (id, display id or alias), for an explicit
  * `ndx work --task`. Selection gates do not apply: a change awaiting placement
- * runs when asked for by name. `null` when the ref names no live change or task.
+ * runs when asked for by name. `null` when the ref names no live change or
+ * task, or names a container ({@link changeWorkShape}): its work is its nested
+ * changes and tasks, so a caller explaining the refusal checks the shape.
  */
 export function resolveWorkById(tree: V2Tree, ref: string): WorkUnit | null {
   const index = indexTree(tree);
   const node = index.resolve(ref);
+  if (node?.type === "change" && changeWorkShape(node) === "container") return null;
   if (node?.type === "change") return { kind: "change", node: node as ChangeRule, change: node as ChangeRule };
   if (node?.type !== "task") return null;
   const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));

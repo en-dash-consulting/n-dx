@@ -221,6 +221,22 @@ describe("rex MCP tools on a v2 tree", () => {
     expect(json(res)).toMatchObject({ id: CHANGE, claimed: true, type: "change" });
   });
 
+  it("claim_task refuses a change that holds only nested changes, naming them; with them all deleted it claims", async () => {
+    const outer = await addChange("Wallets");
+    const inner = await addChange("Google Pay");
+    expect((await call("move_item", { id: inner, parentId: outer })).isError).toBe(false);
+
+    const refused = await call("claim_task", { id: outer });
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toMatch(/claim one of its nested changes or tasks instead/);
+    expect(refused.text).toContain(`change ${inner}`);
+
+    await ws.store.updateItem(inner, { status: "deleted" });
+    const res = await call("claim_task", { id: outer });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({ id: outer, claimed: true, type: "change" });
+  });
+
   it("release_task gives back a claim on a v2 task", async () => {
     await call("claim_task", { id: TASK });
     const res = await call("release_task", { id: TASK });

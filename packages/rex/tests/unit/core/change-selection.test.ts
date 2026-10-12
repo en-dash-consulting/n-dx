@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compareReleases, findActionableWork, findNextWork, resolveWorkById } from "../../../src/core/change-selection.js";
+import { changeWorkShape, compareReleases, findActionableWork, findNextWork, resolveWorkById } from "../../../src/core/change-selection.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ title: fields.id as string, slug: fields.id as string, ...fields }) as RuleNode;
@@ -57,6 +57,25 @@ describe("nested changes", () => {
     const t = tree(change("outer", { children: [change("inner", { children: [task("t")] })] }));
     expect(resolveWorkById(t, "t")).toMatchObject({ kind: "task", node: { id: "t" }, change: { id: "inner" } });
     expect(resolveWorkById(t, "inner")).toMatchObject({ kind: "change", node: { id: "inner" }, change: { id: "inner" } });
+  });
+
+  it("resolveWorkById does not return a change that holds a change as a unit", () => {
+    expect(resolveWorkById(tree(change("outer", { children: [change("inner")] })), "outer")).toBeNull();
+    expect(resolveWorkById(tree(change("outer", { children: [task("own"), change("inner")] })), "outer")).toBeNull();
+  });
+
+  it("selection and resolveWorkById agree with changeWorkShape on every shape", () => {
+    const cases: [RuleNode, ReturnType<typeof changeWorkShape>][] = [
+      [change("c", { children: [change("gone", { status: "deleted" })] }), "unit"],
+      [change("c", { children: [task("t")] }), "tasks"],
+      [change("c", { children: [change("inner")] }), "container"],
+    ];
+    for (const [c, shape] of cases) {
+      expect(changeWorkShape(c)).toBe(shape);
+      expect(ids(tree(c)).includes("c")).toBe(shape === "unit");
+      expect(resolveWorkById(tree(c), "c") !== null).toBe(shape !== "container");
+    }
+    expect(resolveWorkById(tree(cases[0][0]), "c")).toMatchObject({ kind: "change", node: { id: "c" } });
   });
 });
 
