@@ -56,5 +56,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
 | [Wire ndx migrate --plan to write the classified plan](./wire-ndx-migrate-plan-to-write-the.md) | completed |
 | [Write Inbox changes to the reserved changes/inbox/ folder, and move them out on placement](./write-inbox-changes-to-the-reserved.md) | completed |
-| [ensureLegacyPrdMigrated scaffolds prd_tree/ beside product/ when a v2 tree keeps a stray prd.json](./ensurelegacyprdmigrated-scaffolds-prd.md) | pending |
 | [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | pending |

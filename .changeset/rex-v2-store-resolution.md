@@ -15,3 +15,8 @@ MCP fields added on a v2 tree (optional, absent on v1; MCP tool shapes are soft-
 - `edit_item`: `item.type`, `item.displayId` and the item's other v2 fields (`slug`, `touches`, `amends`, …), as stored.
 - `move_item`: `type`.
 - `claim_task`: `type`.
+- `update_task_status`: items listed in `autoCompleted` carry the projected item's v2 fields (`type`, `slug`, `displayId`, `body`, `amends`, …), as stored.
+
+MCP values changed on a v2 tree (the field is unchanged and v1 answers as before):
+
+- `get_capabilities`: `adapter` reads `"v2-change-layer"` and `supportsWatch` reads `false`, the change-layer store's values.

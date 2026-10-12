@@ -1,0 +1,27 @@
+---
+id: "d1dc7f68-d08f-4377-a30a-0394a135bc62"
+level: "task"
+title: "A stray prd.json splits a v2 tree, and the split tree overrides what status, tree, next and validate show"
+status: "pending"
+priority: "high"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "pr-33"
+  - "lane-rex-store"
+  - "rex"
+  - "review-2026-10-12"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "ensureLegacyPrdMigrated on a copy of the v2 fixture with a valid .rex/prd.json creates no prd_tree/ and leaves prd.json untouched (test)"
+  - "Its result names the v2 layout as the reason it skipped: { migrated: false, reason: \"v2-layout\" } (test)"
+  - "On a v2 copy holding a same-id prd.json with stale titles and statuses, `rex status`, `rex status --all` and `rex next` create no prd_tree/ and show the v2 titles and the pending v2 task (tests that fail on 91865a3c2a)"
+  - "An MCP session start (mcp-workspace) on the same copy creates no prd_tree/, and get_next_task answers the v2 task (test)"
+  - "The call `ndx start` makes on startup (web start.ts → ensureLegacyPrdMigrated) creates no prd_tree/ on that copy (rex-level test here; the web start test is D1-4 in PR 36)"
+  - "loadItemsPreferFolderTree ignores a prd_tree/ when the store is the change layer: a v2 copy that already has a stray same-id prd_tree/ shows the v2 titles in status, tree, next and validate (test)"
+  - "v1 legacy migration behaviour is unchanged: existing ensure-legacy-prd-migrated and folder-tree-sync tests pass unedited"
+description: "Review 2026-10-12, PR #687 must-fix (CONFIRMED twice: by the subagent with the built CLI, and by the lead reviewer on the integration build). This item was filed by the adversarial review of 74584d30 as an out-of-scope follow-up and judged the stray tree \"inert after T1\". It is not inert: the stray tree changes what the read commands answer.\n\nDefect 1: packages/rex/src/store/ensure-legacy-prd-migrated.ts:168-178 never checks the layout before migrating. It is called from cli/commands/status.ts:115, next.ts:25, tree.ts:132, update.ts:41, cli/mcp-workspace.ts:53 (every MCP session start) and packages/web/src/server/start.ts:1095/1118. On a v2 tree (product/ present) with a .rex/prd.json and no prd.json.migrated marker, it serializes that JSON into .rex/prd_tree/ beside product/.\n\nDefect 2: packages/rex/src/cli/commands/folder-tree-sync.ts:123 (loadItemsPreferFolderTree), used by status.ts:139, tree.ts:139, next.ts:33 and validate.ts:145, reads prd_tree/ and spreads its fields over the store's items by id, whatever the store's layout.\n\nFailure scenario (reproduced): copy packages/rex/tests/fixtures/v2-tree and add a .rex/prd.json holding the same ids as the change and task, with stale titles and completed statuses. `rex status .` creates prd_tree/, tree-meta.json, prd.json.migrated and a backup beside product/. `rex status --all .` and `rex tree .` then print \"STALE v1 title 100% / STALE task\", and `rex next .` prints \"COMPLETE — no actionable tasks remaining\" while the v2 task is pending. With a prd.json whose ids differ, the split tree is still created; only the overlay is skipped. The state arises from a checkout that brings prd.json back, or a project that kept prd.json beside its prd_tree/.\n\nFix (both parts, in this feature, not as a follow-up):\n(a) In ensureLegacyPrdMigrated, return { migrated: false, reason: \"v2-layout\" } when prdLayout(rexDir) === \"v2\", before Step 2. This extends the reason union.\n(b) In loadItemsPreferFolderTree, return (loaded ?? await store.loadDocument()).items when isChangeLayerStore(store), so a prd_tree/ never overlays the change layer.\n\nOut of scope: callers skipping the call one by one (about 14 call sites); the dashboard half is D1-4 in PR 36 and only adds a web test once this lands."
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-12T18:12:39.174Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
