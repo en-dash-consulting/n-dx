@@ -29,5 +29,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [hench writes status, completion and claims through the v2 transaction](./hench-writes-status-completion-and.md) | pending |
 | [ndx work --task=<display id> --resolve reports "Task not found" on a v2 tree](./ndx-work-task-display-id-resolve.md) | pending |
 | [On a v2 tree hench's brief can drop workflow.md whole when rex's 4,000-token budget runs out](./on-a-v2-tree-hench-s-brief-can-drop.md) | pending |
-| [Re-record the prompt-census baseline for hench's v2 brief](./re-record-the-prompt-census-baseline.md) | in_progress |
+| [Re-record the prompt-census baseline for hench's v2 brief](./re-record-the-prompt-census-baseline.md) | completed |
 | [The completion gate and review captures understand v2](./the-completion-gate-and-review.md) | pending |
