@@ -106,7 +106,7 @@ import { runExport } from "./export.js";
 import { ensureGitignoreEntry } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
 import { initDirLabels, padInitDirLabel } from "./init-summary.js";
-import { runMigrateChain } from "./migrate-chain.js";
+import { isLegacyV1Project, runMigrateChain } from "./migrate-chain.js";
 import { runMigrateLayout } from "./migrate-layout.js";
 import {
   resolveInitLLMSelection,
@@ -516,6 +516,29 @@ function childEnv() {
   return Object.keys(experimentalEnvFragment).length > 0
     ? { ...process.env, ...experimentalEnvFragment }
     : process.env;
+}
+
+/**
+ * ndx commands that spawn rex more than once. Each prints rex's v1 deprecation
+ * notice once itself and silences rex for its children. A delegated rex
+ * command (`ndx rex …`, `ndx validate`) is one spawn, so rex prints its own.
+ */
+const LEGACY_NOTICE_COMMANDS = new Set(["ci", "status", "plan", "add", "recommend", "refresh", "work", "analyze"]);
+
+/** Mirrors rex's LEGACY_LAYOUT_NOTICE (`cli/legacy-layout-notice.ts`); core spawns rex and cannot import it. */
+const LEGACY_LAYOUT_NOTICE =
+  "Deprecated: this PRD uses the v1 layout (prd_tree/). Run 'ndx migrate' to move it to v2; the next release refuses v1 PRDs.";
+
+/**
+ * Print the v1 notice once for `command` on a v1 project at `dir` (`--quiet`
+ * drops it, as in rex), then set NDX_LEGACY_NOTICE=off so every rex child
+ * stays quiet.
+ */
+function noteLegacyLayoutOnce(command, dir) {
+  if (!LEGACY_NOTICE_COMMANDS.has(command) || process.env.NDX_LEGACY_NOTICE === "off") return;
+  if (!isLegacyV1Project(dir)) return;
+  if (!updateCheckQuiet) console.error(LEGACY_LAYOUT_NOTICE);
+  process.env.NDX_LEGACY_NOTICE = "off";
 }
 
 /** BETA experimental flags to forward to children. Empty unless opted in. */
@@ -3497,6 +3520,8 @@ async function main() {
       // Non-fatal — stale check failure never blocks command execution.
     }
   }
+
+  if (command && !hasHelp) noteLegacyLayoutOnce(command, dir);
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   const runCommand = async () => {
