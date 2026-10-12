@@ -48,7 +48,7 @@ import type { PRDItem } from "../../schema/v1.js";
 import type { Criterion } from "../../schema/v2.js";
 import { specHash } from "../../schema/v2-rules.js";
 import type { CapabilitySpecDraft } from "./capability-spec.js";
-import type { MigrationPlan } from "./migration-plan.js";
+import type { MigrationPlan, PlanEntry } from "./migration-plan.js";
 import { freeSlug } from "../../core/apply-amendments.js";
 import { isUsableFrozenSlug, resolveSiblingSlugs } from "../../store/folder-tree-serializer.js";
 
@@ -212,7 +212,33 @@ interface FrozenSlug {
  * In tree order the first holder keeps a name; a later item that clashes
  * (ignoring case) or cannot be frozen gets `freeSlug`'s `-<id6>` form.
  */
-function planSlugs(items: readonly PRDItem[], plan: MigrationPlan): Map<string, FrozenSlug> {
+function planSlugs(items: readonly PRDItem[], plan: Pick<MigrationPlan, "entries">): Map<string, FrozenSlug> {
+  return resolvePlanSlugs(items, plan.entries).frozen;
+}
+
+/** Where each entry sits in v2, as the slug rule reads it. */
+export type SlugEntry = Pick<PlanEntry, "id" | "title" | "target" | "parent">;
+
+/**
+ * The v2 slug of every item in `entries` that has a v1 directory name: that
+ * name, or the replacement {@link planSlugs} assigns. Apply calls it with the
+ * entries as they land, so a tree newer than the plan gets its slugs from the
+ * siblings it actually has.
+ */
+export function v2Slugs(items: readonly PRDItem[], entries: readonly SlugEntry[]): Map<string, string> {
+  const { v1Slugs, frozen } = resolvePlanSlugs(items, entries);
+  const out = new Map<string, string>();
+  for (const { id } of entries) {
+    const slug = frozen.get(id)?.slug.to ?? v1Slugs.get(id);
+    if (slug !== undefined) out.set(id, slug);
+  }
+  return out;
+}
+
+function resolvePlanSlugs(
+  items: readonly PRDItem[],
+  entries: readonly SlugEntry[],
+): { v1Slugs: Map<string, string>; frozen: Map<string, FrozenSlug> } {
   const v1Slugs = new Map<string, string>();
   const collect = (list: readonly PRDItem[]): void => {
     for (const [id, slug] of resolveSiblingSlugs([...list])) v1Slugs.set(id, slug);
@@ -222,7 +248,7 @@ function planSlugs(items: readonly PRDItem[], plan: MigrationPlan): Map<string, 
 
   const taken = new Map<string, { slug: string }[]>();
   const out = new Map<string, FrozenSlug>();
-  for (const entry of plan.entries) {
+  for (const entry of entries) {
     const from = v1Slugs.get(entry.id);
     if (entry.target === "release" || from === undefined) continue;
     const key = `${PRODUCT_TARGETS.has(entry.target) ? "product" : "changes"}:${entry.parent ?? ""}`;
@@ -238,7 +264,7 @@ function planSlugs(items: readonly PRDItem[], plan: MigrationPlan): Map<string, 
     siblings.push({ slug: to });
     out.set(entry.id, { slug: { from, to }, flag: usable ? "slug-clash" : "unsafe-slug" });
   }
-  return out;
+  return { v1Slugs, frozen: out };
 }
 
 // ── Review ───────────────────────────────────────────────────────
