@@ -251,6 +251,18 @@ describe("applyV1ToV2", () => {
     expect(snapshot(rexDir)).toEqual(before);
   });
 
+  it("refuses a v1 tree that holds an id twice, and writes nothing", async () => {
+    const plan = await planOf((await load()).items);
+    const before = snapshot(rexDir);
+    const loadWithDuplicate = async () => {
+      const doc = await load();
+      doc.items[0]!.children!.push(item("t1", "task", "A second item with t1's id"));
+      return doc;
+    };
+    await expect(applyV1ToV2(rexDir, plan, { load: loadWithDuplicate })).rejects.toThrow(/holds 1 id more than once \(t1\)/);
+    expect(snapshot(rexDir)).toEqual(before);
+  });
+
   it("refuses a plan whose model pass stopped, and writes nothing", async () => {
     const plan = await planOf((await load()).items);
     const stopped: PlanFile = { ...plan, header: { ...plan.header, passes: [...plan.header.passes, { name: "text", model: "m", incomplete: { error: "rate limited" } }] } };

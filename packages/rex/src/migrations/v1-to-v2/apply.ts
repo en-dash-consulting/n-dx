@@ -431,6 +431,26 @@ export function everyV1Id(items: readonly PRDItem[], tree: V2Tree, containers: r
   return diffFingerprints(before, ids(landed));
 }
 
+/**
+ * Refuse a v1 tree that holds an id more than once. The id check compares id
+ * sets, and the tree is built by id, so a repeated id would lose an item
+ * without either noticing.
+ */
+export function assertUniqueV1Ids(items: readonly PRDItem[]): void {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const { item } of flatten(items, undefined, [])) {
+    if (seen.has(item.id)) repeated.add(item.id);
+    seen.add(item.id);
+  }
+  if (repeated.size === 0) return;
+  const ids = [...repeated];
+  throw new MigrationApplyError(
+    `The v1 tree holds ${ids.length} id${ids.length === 1 ? "" : "s"} more than once (${ids.slice(0, 5).join(", ")}${ids.length > 5 ? ", …" : ""}): ` +
+      "give each item its own id, then apply again. Nothing was written.",
+  );
+}
+
 function assertEveryV1Id(diff: FingerprintDiff, v1Count: number, where: string): void {
   if (isLossless(diff)) return;
   const parts = [
@@ -499,6 +519,7 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
       await rm(changesDir, { recursive: true, force: true });
 
       const v1 = await options.load();
+      assertUniqueV1Ids(v1.items);
       const built = buildV2Tree(v1.items, plan);
       const v1Items = fingerprintTree(v1.items).size;
       assertEveryV1Id(everyV1Id(v1.items, built.tree, built.containers, built.cut), v1Items, "v2 tree");
