@@ -77,6 +77,15 @@ describe("a stray prd.json beside a v2 tree", () => {
   });
 });
 
+describe("a legacy .rex/tree/ beside a v2 tree", () => {
+  it("is not renamed to prd_tree/", async () => {
+    await serializeFolderTree(STALE_ITEMS, join(rexDir, "tree"));
+    expect(await ensureLegacyPrdMigrated(tmp)).toEqual({ migrated: false, reason: "v2-layout" });
+    expect(existsSync(join(rexDir, "prd_tree"))).toBe(false);
+    expect(existsSync(join(rexDir, "tree"))).toBe(true);
+  });
+});
+
 describe("a stray prd_tree/ beside a v2 tree", () => {
   it("never overlays the change layer in loadItemsPreferFolderTree", async () => {
     await serializeFolderTree(STALE_ITEMS, join(rexDir, "prd_tree"));
