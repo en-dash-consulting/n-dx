@@ -32,3 +32,78 @@
 
 delete process.env.CLAUDE_CODE_SESSION_ID;
 delete process.env.CLAUDE_CONFIG_DIR;
+
+// ---------------------------------------------------------------------------
+// One git config for every fixture repository
+// ---------------------------------------------------------------------------
+//
+// WHY: fixtures build real git repositories in temp dirs, and each one needs
+// an identity so commits succeed, LF line endings so byte-exact assertions
+// hold on Windows, and signing off so a developer's `commit.gpgsign=true`
+// cannot fail every fixture commit. Before this file, each fixture set those
+// per repository: `git init` followed by two to five `git config` spawns, in
+// 38 test files plus the hench helper, inside beforeEach hooks that run per
+// test. A git spawn is cheap on Linux and about ten times dearer on the
+// Windows CI runner, which is where those thousands of spawns showed up as
+// minutes (run 38193308009).
+//
+// Git reads `GIT_CONFIG_GLOBAL` in place of `~/.gitconfig` (git 2.32+), and
+// the setting is inherited by every process this worker spawns — the test's
+// own `git`, and the CLIs the e2e tests run, which spawn `git` in turn. So
+// one file written here covers every fixture at once, and a fixture that sets
+// a different identity at local level still wins, as local config always
+// does. The system config is left in place: Git for Windows ships settings
+// there (fscache, credential helper) that are not this file's business, and
+// the one that matters, `core.autocrlf=true`, is overridden below.
+//
+// `core.hooksPath` points at an empty directory so a global hooks path on the
+// developer's machine (husky-style installs, `core.hooksPath` in their own
+// gitconfig) cannot run inside a fixture. No test installs a real hook; the
+// ones that test hook failures mock the git boundary.
+//
+// Written to a stable path and only when the content differs, through a
+// rename, so the thousands of worker processes a run forks do not each leave
+// a file behind and do not race each other writing the same one.
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const gitTestDir = join(tmpdir(), "ndx-test-git");
+const gitHooksDir = join(gitTestDir, "no-hooks");
+const gitConfigPath = join(gitTestDir, "gitconfig");
+
+// Forward slashes: git parses backslashes in config values as escapes.
+const hooksPathValue = gitHooksDir.split("\\").join("/");
+const gitConfigContent = [
+  "# Written by tests/setup-session-env.js for every vitest worker. Safe to delete.",
+  "[user]",
+  "\tname = Test",
+  "\temail = test@test.com",
+  "[core]",
+  "\tautocrlf = false",
+  "\teol = lf",
+  `\thooksPath = ${hooksPathValue}`,
+  "[commit]",
+  "\tgpgsign = false",
+  "",
+].join("\n");
+
+mkdirSync(gitHooksDir, { recursive: true });
+let current = null;
+try {
+  current = readFileSync(gitConfigPath, "utf-8");
+} catch {
+  // Missing on the first worker of a fresh machine; written below.
+}
+if (current !== gitConfigContent) {
+  const staging = `${gitConfigPath}.${process.pid}.tmp`;
+  writeFileSync(staging, gitConfigContent, "utf-8");
+  try {
+    renameSync(staging, gitConfigPath);
+  } catch (err) {
+    // Another worker renamed its identical copy in between; theirs is fine.
+    if (!existsSync(gitConfigPath)) throw err;
+  }
+}
+
+process.env.GIT_CONFIG_GLOBAL = gitConfigPath;
