@@ -195,7 +195,7 @@ function reportRehearsal(rehearsal: RehearseV1ToV2Result): void {
     return;
   }
   const { kinds, built, nodes, files, v1Items } = rehearsal;
-  result(`Dry run: apply would migrate ${v1Items} v1 items to the v2 layout (${nodes} nodes, the cut change ${built.cut} included). Wrote ${files} files to a temporary directory and read them back; nothing was written to the project.`);
+  result(`Dry run: apply would migrate ${v1Items} v1 items to the v2 layout (${nodes} nodes, the cut change ${built.cut} included). Wrote ${files} files to a temporary directory and read them back. Nothing was written to the project.`);
   for (const kind of V1_KINDS) {
     const t = kinds[kind];
     if (t.total === 0) continue;
