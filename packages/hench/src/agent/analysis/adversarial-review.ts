@@ -44,7 +44,7 @@
  * @module hench/agent/analysis/adversarial-review
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { ReviewModelSource, RunReviewRecord } from "../../schema/index.js";
@@ -98,6 +98,12 @@ export interface ReviewFinding {
   verdict: ReviewVerdict;
   /** Concrete inputs or state → wrong output, crash, or corruption. */
   scenario: string;
+  /**
+   * What the code should do instead. Optional: a pair reviewer fills it in so
+   * the executor, which is handed the finding to fix, is told the behaviour
+   * wanted and not only the one observed.
+   */
+  expected?: string;
   /** What the pass did about it. */
   action: ReviewAction;
   /** Rex item id, when the finding was captured to the PRD. */
@@ -168,7 +174,14 @@ export type ReviewFailureReason =
   | "no-report"
   | "malformed-report"
   | "spawn-failed"
-  | "unsupported-vendor";
+  | "unsupported-vendor"
+  /**
+   * A pair review whose fix rounds ran out with a must-fix finding still open
+   * (or whose fix session or tests broke). A verdict, not a missing review, so
+   * it is not in {@link REVIEW_NEVER_RAN_REASONS} and `--review-optional` does
+   * not excuse it.
+   */
+  | "must-fix-unresolved";
 
 /**
  * The failure reasons meaning **no reviewer ever attacked the change**.
@@ -463,9 +476,36 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "",
   );
 
-  lines.push("## Output");
-  lines.push("");
   lines.push(
+    ...reportOutputLines(ctx, {
+      fixesApplied: "Set `fixesApplied` to true only if you actually edited a file.",
+      writeLast: "Write the file last, after every fix and capture is done, so its contents",
+    }),
+  );
+
+  return lines.join("\n");
+}
+
+/** Prose that differs between the self and pair reports; the schema itself is shared. */
+interface ReportOutputWording {
+  /** The sentence about `fixesApplied`. */
+  fixesApplied: string;
+  /** First line of the closing "write the file last" paragraph; the second line is common. */
+  writeLast: string;
+}
+
+/**
+ * The "Output" section of a review brief — the report path, JSON schema and
+ * the rule that every finding is accounted for. Shared by the self and pair
+ * briefs so a change to the report format cannot reach one and miss the other.
+ */
+function reportOutputLines(
+  ctx: Pick<ReviewPromptContext, "taskId" | "reportPath">,
+  wording: ReportOutputWording,
+): string[] {
+  return [
+    "## Output",
+    "",
     `Write your report as JSON to this exact path:`,
     "",
     `    ${ctx.reportPath}`,
@@ -484,6 +524,7 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     '      "severity": "critical | high | medium | low",',
     '      "verdict": "must-fix | should-fix | not-worth-fixing | out-of-scope",',
     '      "scenario": "Concrete inputs or state -> the wrong result that follows",',
+    '      "expected": "What the code should do instead (optional)",',
     '      "action": "fixed | captured | dropped | failed",',
     '      "itemId": "rex item id, when captured",',
     '      "note": "Why dropped / what the fix changed / why capture failed",',
@@ -501,13 +542,342 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "nothing; say what you attacked in `summary` so the next reader can judge",
     "whether it was aimed correctly.",
     "",
-    "Set `fixesApplied` to true only if you actually edited a file.",
+    wording.fixesApplied,
     "",
-    "Write the file last, after every fix and capture is done, so its contents",
+    wording.writeLast,
     "describe what happened rather than what you intended.",
-  );
+  ];
+}
 
+// ── Pair review prompts ──────────────────────────────────────────────────
+
+/**
+ * Cap on the diff text embedded in a pair brief. A fresh reviewer has no other
+ * way to see the change, so the diff is inlined; past this size it is cut and
+ * the brief says how to read the rest from git.
+ */
+export const PAIR_REVIEW_DIFF_CHAR_LIMIT = 200_000;
+
+/** Everything {@link buildPairReviewBrief} needs. The reviewer starts with no context at all. */
+export interface PairReviewPromptContext {
+  taskId: string;
+  taskTitle: string;
+  /** The task as the executor was briefed on it: description and acceptance criteria. */
+  taskBrief: string;
+  /** Commit the tree sat at before the run, or undefined when it could not be captured. */
+  startingHead?: string;
+  /** `git diff <startingHead>` (or `git diff HEAD`), untruncated. */
+  diff: string;
+  /** Paths the run changed, including untracked ones. */
+  changedFiles: readonly string[];
+  /** Absolute path the reviewer must write its JSON report to. */
+  reportPath: string;
+  /** Project-relative PRD folder tree, with a trailing slash. */
+  prdTreeDir: string;
+  /** True when no human is attached: the reviewer captures findings itself. */
+  autonomous: boolean;
+  /** True when hench's test gate runs right after this review. */
+  testGateFollows: boolean;
+  /**
+   * Set on a re-review, after the executor tried to fix the previous round's
+   * must-fix findings. Absent on the first review.
+   */
+  recheck?: PairRecheck;
+  /**
+   * True when the executor will be handed this report's must-fix findings, so
+   * the reviewer reports them and does not capture them. False (the default)
+   * on the last review, after which a must-fix finding that remains is
+   * captured like any other.
+   */
+  executorFixesMustFix?: boolean;
+}
+
+/** What a pair re-review is told about the round before it. */
+export interface PairRecheck {
+  /** 1-based fix round that just ran. */
+  round: number;
+  /** The must-fix findings the executor was asked to fix. */
+  mustFix: readonly ReviewFinding[];
+}
+
+/** The task text a pair reviewer is given: description, then acceptance criteria as a checklist. */
+export function pairTaskBrief(task: { description?: string; acceptanceCriteria?: readonly string[] }): string {
+  const parts: string[] = [];
+  if (task.description?.trim()) parts.push(task.description.trim());
+  if (task.acceptanceCriteria?.length) {
+    parts.push(["Acceptance criteria:", ...task.acceptanceCriteria.map((c) => `- ${c}`)].join("\n"));
+  }
+  return parts.join("\n\n");
+}
+
+/**
+ * System prompt for a pair reviewer: the adversarial posture of
+ * {@link buildReviewSystemPrompt}, plus the rule that defines pair mode — the
+ * reviewer reports and the executor fixes.
+ */
+export function buildPairReviewSystemPrompt(): string {
+  return [
+    buildReviewSystemPrompt(),
+    "",
+    "You are a different assistant from the one that wrote this change, in a",
+    "fresh session, and you did not write any of it. Report only: you MUST NOT",
+    "edit, create, move or delete any file except the JSON report you are told",
+    "to write. Fixing is the executor's job. A file you change is a change nobody",
+    "reviewed.",
+  ].join("\n");
+}
+
+/** Cut `diff` to {@link PAIR_REVIEW_DIFF_CHAR_LIMIT}, reporting whether anything was lost. */
+export function truncatePairDiff(diff: string): { text: string; truncated: boolean } {
+  if (diff.length <= PAIR_REVIEW_DIFF_CHAR_LIMIT) return { text: diff, truncated: false };
+  return { text: diff.slice(0, PAIR_REVIEW_DIFF_CHAR_LIMIT), truncated: true };
+}
+
+/**
+ * The brief for a pair reviewer: the task, the changed files and the diff,
+ * inline, since a different vendor's CLI cannot resume the executor's session.
+ */
+export function buildPairReviewBrief(ctx: PairReviewPromptContext): string {
+  const { text: diffText, truncated } = truncatePairDiff(ctx.diff);
+  // The verdicts this reviewer captures itself. A must-fix finding the executor
+  // is about to fix is reported, not captured.
+  const capturedVerdicts = ctx.executorFixesMustFix
+    ? "`should-fix`, `out-of-scope`"
+    : "`must-fix`, `should-fix`, `out-of-scope`";
+  const diffCommand = ctx.startingHead ? `git diff ${ctx.startingHead}` : "git diff HEAD";
+  const lines: string[] = [
+    "# Pair review pass",
+    "",
+    "Another assistant just completed the task below and its change is about to be",
+    "committed. Review that change adversarially. You have none of that assistant's",
+    "context: the task, the changed files and the diff are all below.",
+    "",
+    `Task: ${ctx.taskId} — ${ctx.taskTitle}`,
+    "",
+    "## Task as briefed",
+    "",
+    ctx.taskBrief.trim() || "(no description or acceptance criteria)",
+    "",
+    "## Changed files",
+    "",
+    ...(ctx.changedFiles.length > 0 ? ctx.changedFiles.map((f) => `- ${f}`) : ["(none)"]),
+    "",
+    "## Diff",
+    "",
+    `Output of \`${diffCommand}\`:`,
+    "",
+    "```diff",
+    diffText,
+    "```",
+  ];
+  if (truncated) {
+    lines.push(
+      "",
+      `The diff above was cut at ${PAIR_REVIEW_DIFF_CHAR_LIMIT} characters. Read the rest with`,
+      `\`${diffCommand} -- <path>\` for each changed file you have not seen.`,
+    );
+  }
+  if (!ctx.startingHead) {
+    lines.push(
+      "",
+      "The pre-run commit could not be captured, so this is the diff against HEAD and",
+      "may miss work the run already committed. Say so in your summary.",
+    );
+  }
+  lines.push(
+    "",
+    "Untracked files appear in the list above but not in the diff; read them from disk.",
+  );
+  if (ctx.recheck) lines.push("", ...recheckLines(ctx.recheck));
+  lines.push(
+    "",
+    "## Method",
+    "",
+    "Run the `/ndx-adversarial-review` skill if you have it, otherwise follow its",
+    "method: build ground truth from the code, attack the change, then decide",
+    "necessity. Check the change against the acceptance criteria above.",
+    ctx.testGateFollows
+      ? "Run scoped checks for the files in the diff only; hench's test gate runs the full suite next."
+      : "Read-only project checks (tests, typecheck, lint) are fine.",
+    "",
+    "## Report only",
+    "",
+    "- **Edit no files** except the JSON report below. Do not fix anything, even a",
+    "  one-line must-fix: the executor fixes. `fixed` is never a valid `action` here.",
+    "- Do not commit, reset, checkout or clean, and do not change the task's status.",
+    "  Never run `ndx ci`, `ndx plan`, `ndx analyze` or `ndx refresh`.",
+    "",
+    "## What to do with each finding",
+    "",
+    "| Verdict | Action | Record as | disposition |",
+    "|---|---|---|---|",
+    ...(ctx.executorFixesMustFix
+      ? [
+          "| `must-fix` | Report it, with `expected` saying what the code should do. Do not capture it: the executor is asked to fix it and you check again. | `dropped` | `offered` |",
+        ]
+      : []),
+    ctx.autonomous
+      ? `| ${capturedVerdicts} | Capture as a PRD task with \`add_item\` (rex MCP), under the area it belongs to. | \`captured\` | \`offered\` |`
+      : `| ${capturedVerdicts} | Report it. Do not capture it — the run queues it for the operator. | \`dropped\` | \`offered\` |`,
+    "| `not-worth-fixing` | Nothing. Report it with the reason. | `dropped` | `dropped` |",
+    "",
+    "Do not write `deferred` as a disposition; the run sets it.",
+    ...(ctx.autonomous
+      ? [
+          "",
+          `Before creating an item, list the directories under \`${ctx.prdTreeDir}\` and read the`,
+          "`index.md` of any whose slug is plausibly related. If the defect is already tracked,",
+          "record the finding as `captured` with that item's id instead of creating a duplicate.",
+          "When you create one, set `priority` to the severity, `tags` to",
+          "`ndx-adversarial-review` and `severity:<level>`, and `source` to `ndx-adversarial-review`.",
+        ]
+      : []),
+    "",
+    ...reportOutputLines(ctx, {
+      fixesApplied: "Set `fixesApplied` to false: you edit nothing.",
+      writeLast: "Write the file last, after every capture is done, so its contents",
+    }),
+  );
   return lines.join("\n");
+}
+
+// ── Pair review: fix rounds ──────────────────────────────────────────────
+
+function recheckLines(recheck: PairRecheck): string[] {
+  return [
+    "## Previous round",
+    "",
+    `The executor was asked to fix ${recheck.mustFix.length} must-fix finding(s) from the last review`,
+    `(fix round ${recheck.round}); the diff above includes its fix. Confirm each one against the code now:`,
+    "",
+    ...recheck.mustFix.map(
+      (f) => `- **${f.title}**${f.location ? ` (${f.location})` : ""} — ${f.scenario}`,
+    ),
+    "",
+    "A finding that is fixed is not reported again. One that is still broken is reported",
+    "again with the **same `title`**, verdict `must-fix`, and `scenario` saying what is",
+    "still wrong. Also report anything new, including what the fix broke. Findings below",
+    "must-fix from the last review are already recorded: do not report them again.",
+  ];
+}
+
+/** System prompt for the executor session resumed to fix a reviewer's findings. */
+export function buildExecutorFixSystemPrompt(): string {
+  return [
+    "You are fixing review findings inside an automated `ndx work` run.",
+    "A reviewer from a different vendor read your change and found defects in it.",
+    "Fix exactly what is listed. Do not defend the earlier code, and do not widen the diff.",
+  ].join("\n");
+}
+
+/** Everything {@link buildExecutorFixPrompt} needs. */
+export interface ExecutorFixPromptContext {
+  /** 1-based fix round. */
+  round: number;
+  /** Fix rounds the run allows. */
+  rounds: number;
+  /** The must-fix findings to fix. */
+  findings: readonly ReviewFinding[];
+  /** True when this is the executor's own session, which already holds the task. */
+  resumed: boolean;
+  /** The task as briefed, for a fresh session that holds none of it. */
+  taskBrief?: string;
+  taskTitle: string;
+}
+
+/**
+ * The prompt that resumes the executor with the reviewer's must-fix findings:
+ * each with its file, the failure trigger and the behaviour wanted.
+ */
+export function buildExecutorFixPrompt(ctx: ExecutorFixPromptContext): string {
+  const lines = [
+    `# Fix the reviewer's must-fix findings (round ${ctx.round} of ${ctx.rounds})`,
+    "",
+    ctx.resumed
+      ? "A reviewer from a different vendor read your change and found the defects below."
+      : `A reviewer from a different vendor read the change made for "${ctx.taskTitle}" and found the defects below. ` +
+        "You are in a fresh session: read the change with `git diff` before fixing.",
+    "",
+  ];
+  if (!ctx.resumed && ctx.taskBrief?.trim()) lines.push("## Task as briefed", "", ctx.taskBrief.trim(), "");
+  ctx.findings.forEach((f, i) => {
+    lines.push(
+      `## ${i + 1}. ${f.title}`,
+      "",
+      `- File: ${f.location ?? "(not given)"}`,
+      `- Failure trigger: ${f.scenario}`,
+      `- Expected behaviour: ${f.expected ?? "the trigger above must stop producing the wrong result"}`,
+      "",
+    );
+  });
+  lines.push(
+    "## Rules",
+    "",
+    "- Fix these findings and nothing else: no refactors, no other cleanup.",
+    "- Add or update the test that fails without each fix, then run the scoped checks for the files you touched.",
+    "- If you committed the task's work, commit the fix the same way, with the same trailers. If you did not, do not start now.",
+    "- Do not change the task's status. Never run `ndx ci`, `ndx plan`, `ndx analyze` or `ndx refresh`.",
+    "- If a finding is wrong, say so in your final message with the guard that makes it impossible; the reviewer checks again.",
+  );
+  return lines.join("\n");
+}
+
+const normalizeTitle = (title: string): string => title.trim().toLowerCase();
+
+/** How many of `previous` the `current` report no longer lists as a must-fix finding. Matched by title. */
+export function countFixedFindings(
+  previous: readonly ReviewFinding[],
+  current: readonly ReviewFinding[],
+): number {
+  const open = new Set(current.filter((f) => f.verdict === "must-fix").map((f) => normalizeTitle(f.title)));
+  return previous.filter((f) => !open.has(normalizeTitle(f.title))).length;
+}
+
+/**
+ * Copy the findings below must-fix from an earlier round's report into the
+ * current one, so the last report is the whole review and not just its last
+ * round. A re-review is told not to repeat them, and an attended run's queue
+ * (`hench review pending`) reads only the last report.
+ *
+ * Edits the raw JSON, so a key the parser does not model survives, as in
+ * {@link mergeDispositionsIntoRaw}. Must-fix entries are not copied: the executor
+ * had them, and the re-review reports the ones still open.
+ *
+ * @returns false when either file could not be read or is not a findings
+ *   report; the current report is then left as it was.
+ */
+export async function carryForwardFindings(previousPath: string, currentPath: string): Promise<boolean> {
+  try {
+    const previous: unknown = JSON.parse(await readFile(previousPath, "utf-8"));
+    const current: unknown = JSON.parse(await readFile(currentPath, "utf-8"));
+    if (!isFindingObject(previous) || !isFindingObject(current)) return false;
+    if (!Array.isArray(previous.findings) || !Array.isArray(current.findings)) return false;
+
+    const present = new Set(
+      current.findings.filter(isFindingObject).map((f) => normalizeTitle(String(f.title ?? ""))),
+    );
+    const carried = previous.findings
+      .filter(isFindingObject)
+      .filter((f) => f.verdict !== "must-fix" && !present.has(normalizeTitle(String(f.title ?? ""))));
+    if (carried.length === 0) return true;
+
+    current.findings.push(...carried);
+    await writeFile(currentPath, `${JSON.stringify(current, null, 2)}\n`, "utf-8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The refusal text for a pair review that ended with must-fix findings still open. */
+export function formatUnresolvedMustFixRefusal(review: FailedReviewRecord): string {
+  return [
+    "Refusing to report this task completed: the pair review did not pass.",
+    `  ${review.detail}`,
+    ...(review.reportPath ? [`  Report: ${review.reportPath}`] : []),
+    "  The work is left in place. Findings the reviewer did not capture to the PRD",
+    "  are listed by `hench review pending <run-id>`.",
+  ].join("\n");
 }
 
 // ── Report parsing ───────────────────────────────────────────────────────
@@ -588,6 +958,7 @@ export function parseReviewReport(raw: string): ReviewReport | null {
       severity: coerceEnum(f.severity, REVIEW_SEVERITIES, "critical"),
       verdict: coerceEnum(f.verdict, REVIEW_VERDICTS, "must-fix"),
       scenario: isNonEmptyString(f.scenario) ? f.scenario : "(no failure scenario recorded)",
+      expected: isNonEmptyString(f.expected) ? f.expected : undefined,
       action: coerceEnum(f.action, REVIEW_ACTIONS, "failed"),
       itemId: isNonEmptyString(f.itemId) ? f.itemId : undefined,
       note: isNonEmptyString(f.note) ? f.note : undefined,
@@ -986,6 +1357,10 @@ export function formatRunReviewStatus(
   runId?: string,
 ): string[] {
   if (!review) return [];
+
+  if (review.failed === "must-fix-unresolved") {
+    return [`Review: ⚠ DID NOT PASS — ${review.detail}`, ...(review.reportPath ? [`        ${review.reportPath}`] : [])];
+  }
 
   if (review.failed !== undefined) {
     const verb = reviewNeverRan(review) ? "NEVER RAN" : "PRODUCED NO REPORT";

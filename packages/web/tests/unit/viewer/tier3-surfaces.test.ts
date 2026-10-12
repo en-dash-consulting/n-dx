@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { ActivityView } from "../../../src/viewer/views/activity.js";
-import { AuthStatusChip } from "../../../src/viewer/views/robot-wrangler.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 
 const LOG = {
@@ -98,53 +97,3 @@ describe("ActivityView (execution-log viewer)", () => {
   });
 });
 
-describe("AuthStatusChip", () => {
-  let root: HTMLDivElement;
-
-  beforeEach(() => {
-    clearProjectMetadataCache();
-    root = document.createElement("div");
-    document.body.appendChild(root);
-  });
-
-  afterEach(() => {
-    render(null, root);
-    root.remove();
-    vi.unstubAllGlobals();
-  });
-
-  it("reports usable credentials", async () => {
-    stubFetch((url) => url.includes("/api/commands/auth")
-      ? { status: 200, body: { ok: true, output: "claude: credentials OK", error: null } }
-      : { status: 200, body: {} });
-    act(() => { render(h(AuthStatusChip, null), root); });
-    await settle();
-    expect(root.textContent).toContain("Credentials OK");
-    expect(root.querySelector(".auth-chip-ok")).toBeTruthy();
-  });
-
-  it("reports unusable credentials with the reason", async () => {
-    stubFetch((url) => url.includes("/api/commands/auth")
-      ? { status: 200, body: { ok: false, output: "", error: "No API key found for vendor claude" } }
-      : { status: 200, body: {} });
-    act(() => { render(h(AuthStatusChip, null), root); });
-    await settle();
-    expect(root.textContent).toContain("Credentials not usable");
-    expect(root.textContent).toContain("No API key found");
-  });
-
-  it("re-checks on demand", async () => {
-    const mock = stubFetch((url) => url.includes("/api/commands/auth")
-      ? { status: 200, body: { ok: true, output: "ok", error: null } }
-      : { status: 200, body: {} });
-    act(() => { render(h(AuthStatusChip, null), root); });
-    await settle();
-    const before = mock.mock.calls.length;
-
-    await act(async () => {
-      (root.querySelector("button") as HTMLButtonElement).click();
-      await new Promise((r) => setTimeout(r, 10));
-    });
-    expect(mock.mock.calls.length).toBeGreaterThan(before);
-  });
-});

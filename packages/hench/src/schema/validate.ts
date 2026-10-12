@@ -1,5 +1,5 @@
 import { z, ZodError } from "zod";
-import { DEFAULT_HENCH_CONFIG, DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MIN_PRUNE_PAIRS } from "./v1.js";
+import { DEFAULT_HENCH_CONFIG, DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MAX_REVIEW_ROUNDS, MIN_PRUNE_PAIRS, MIN_REVIEW_ROUNDS } from "./v1.js";
 import type { HenchConfig } from "./v1.js";
 
 export type ValidationResult<T> =
@@ -187,6 +187,15 @@ export const HenchConfigSchema = z.object({
       rerunCommand: z.string().optional(),
     })
     .optional(),
+  // No defaults, like testGate: the run-settings resolver applies them so
+  // `--resolve` can say which settings the project actually set.
+  review: z
+    .object({
+      mode: z.enum(["off", "self", "pair"]).optional(),
+      vendor: z.enum(["claude", "codex"]).optional(),
+      rounds: z.number().int().min(MIN_REVIEW_ROUNDS).max(MAX_REVIEW_ROUNDS).optional(),
+    })
+    .optional(),
   promptCache: z.boolean().optional(),
   promptCacheTtl: z.enum(["5m", "1h"]).optional(),
 });
@@ -204,7 +213,7 @@ const RunStatusSchema = z.enum([
 const ToolCallRecordSchema = z.object({
   turn: z.number(),
   tool: z.string(),
-  input: z.record(z.unknown()),
+  input: z.record(z.string(), z.unknown()),
   output: z.string(),
   durationMs: z.number(),
 });
@@ -326,7 +335,7 @@ const PersistedRuntimeEventSchema = z.object({
   text: z.string().optional(),
   toolCall: z.object({
     tool: z.string(),
-    input: z.record(z.unknown()),
+    input: z.record(z.string(), z.unknown()),
   }).optional(),
   toolResult: z.object({
     tool: z.string(),
@@ -425,7 +434,7 @@ export const RunRecordSchema = z.object({
   assisted: z.boolean().optional(),
   retryAttempts: z.number().int().nonnegative().optional(),
   spawnCount: z.number().int().nonnegative().optional(),
-  spawnBreakdown: z.record(z.number().int().nonnegative()).optional(),
+  spawnBreakdown: z.record(z.string(), z.number().int().nonnegative()).optional(),
   backgroundResume: z.object({ tool: z.string(), detail: z.string() }).optional(),
   readOnlyRefusal: z.object({ reason: z.string() }).optional(),
   structuredSummary: RunSummaryDataSchema.optional(),
@@ -439,6 +448,8 @@ export const RunRecordSchema = z.object({
     .passthrough()
     .optional(),
   reviewSpend: z.object({}).passthrough().optional(),
+  // One entry per pair-review fix round; the fields ride along untouched.
+  reviewRounds: z.array(z.object({ round: z.number() }).passthrough()).optional(),
   actor: z.string().optional(),
   host: z.string().optional(),
   logPath: z.string().optional(),
@@ -544,7 +555,7 @@ export interface FieldRevertResult {
  */
 export function revertInvalidFields(
   data: Record<string, unknown>,
-  issues: Array<{ path: Array<string | number> }>,
+  issues: Array<{ path: Array<PropertyKey> }>,
   fallback: Record<string, unknown>,
 ): FieldRevertResult | null {
   const defaults = DEFAULT_HENCH_CONFIG() as unknown as Record<string, unknown>;
@@ -577,12 +588,12 @@ export function revertInvalidFields(
  * repeating every unrelated issue in the same message.
  */
 export function formatFieldIssues(
-  issues: Array<{ path: Array<string | number>; message: string }>,
+  issues: Array<{ path: Array<PropertyKey>; message: string }>,
   key: string,
 ): string {
   return issues
     .filter((issue) => issue.path[0] === key)
-    .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+    .map((issue) => `${issue.path.map(String).join(".")}: ${issue.message}`)
     .join("; ");
 }
 

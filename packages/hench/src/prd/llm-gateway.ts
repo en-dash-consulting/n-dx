@@ -334,3 +334,13 @@ export {
 } from "@n-dx/llm-client";
 
 export type { AvailableMemoryReading } from "@n-dx/llm-client";
+export {
+  DEFAULT_ENV_DENY,
+  DEFAULT_ENV_ALLOW,
+  compileEnvPolicy,
+  envNameAllowed,
+  sanitizeChildEnv,
+  strippedEnvNames,
+  resolveVendorCliEnv,
+} from "@n-dx/llm-client";
+export type { EnvPolicy, EnvPolicyConfig } from "@n-dx/llm-client";

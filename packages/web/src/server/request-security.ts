@@ -84,9 +84,14 @@ function rejectUnauthenticated(res: ServerResponse): true {
  * the same URL without the parameter, so the token stays out of the address
  * bar and history. Only safe methods get that treatment; a POST with the
  * token in its query is answered 401 like any other unauthenticated request.
+ *
+ * The redirect happens whether or not the browser already holds the cookie:
+ * the printed URL is reopened on every `ndx start`, and letting an
+ * already-authenticated navigation through with the parameter attached left
+ * the token in the address bar and handed routes a URL they did not expect.
  */
 export function enforceToken(req: IncomingMessage, res: ServerResponse, token: string): boolean {
-  if (isAuthenticatedRequest(req, token)) return false;
+  const authenticated = isAuthenticatedRequest(req, token);
   const method = (req.method || "GET").toUpperCase();
   if (method === "GET" || method === "HEAD") {
     const { token: fromQuery, location } = splitTokenQuery(req.url ?? "/");
@@ -100,6 +105,7 @@ export function enforceToken(req: IncomingMessage, res: ServerResponse, token: s
       return true;
     }
   }
+  if (authenticated) return false;
   return rejectUnauthenticated(res);
 }
 

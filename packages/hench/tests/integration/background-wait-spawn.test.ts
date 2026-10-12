@@ -51,6 +51,7 @@ describe("background-wait signal in spawnWithAdapter", () => {
       adapter: claudeCliAdapter,
       spawnConfig: { binary: process.execPath, args: [script], env: process.env, stdinContent: null, cwd: dir },
       cliBinary: process.execPath,
+      cliEnv: process.env,
       cwd: dir,
       tokenMetadata: { vendor: "claude", model: "sonnet" },
     });

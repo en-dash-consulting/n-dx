@@ -124,7 +124,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 
 ### `ndx config` — Robot Wrangler view detail
 
-- **Local vendor (full):** the Robot Wrangler view (`packages/web/src/viewer/views/robot-wrangler.ts`) adds a "local" vendor alongside Claude/Codex — host/port/model fields, a live status probe, a connection smoke test (latency + tokens/sec), and saved server profiles. Backed by GET/PUT `/api/llm/config` plus GET `/api/llm/local-status`, POST `/api/llm/local-test`, and GET/POST/DELETE `/api/llm/local-profiles` (`packages/web/src/server/routes-llm.ts`).
+- **Local vendor (full):** the Robot Wrangler view (`packages/web/src/viewer/views/robot-wrangler.ts`) adds a "local" vendor alongside Claude/Codex — a Server section with a live status probe, saved server profile chips, host/port fields, and a connection test (model count, latency, tokens/sec); context budget, request timeout and the second-model verifier sit in collapsed advanced rows. Backed by GET/PUT `/api/llm/config` plus GET `/api/llm/local-status`, POST `/api/llm/local-test`, and GET/POST/DELETE `/api/llm/local-profiles` (`packages/web/src/server/routes-llm.ts`).
 - **Providers and models (full):** each vendor offers only the providers hench accepts and a model dropdown over the server's catalog (GET `/api/llm/catalog`, `?refresh=true` to re-fetch). The agent model saves as `hench.models.<vendor>` through PUT `/api/llm/config`; the provider saves through PUT `/api/hench/config`. The page shows the installed CLI version for Claude and Codex but offers no update or install action.
 
 ## rex package CLI
@@ -177,7 +177,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `hench record` | n/a | — | Plumbing for the assisted-run skills (`/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config`); reads its token usage from the Claude Code session transcript |
 | `hench init` | n/a | — | Covered by `ndx init` |
 
-## Rex MCP tools (16)
+## Rex MCP tools (18)
 
 MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Coverage below records whether an equivalent human surface exists, since a capability reachable by agents but invisible to humans is an observability gap.
 
@@ -185,6 +185,8 @@ MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Cover
 |------|---------------|----------|
 | `get_prd_status` | Rex dashboard stats + PRD tree | full |
 | `get_next_task` | Next-task card | full |
+| `claim_task` | PRD tree shows a `claimed · <worktree>` chip on a claimed row; no control to take a claim | partial |
+| `release_task` | Held claims name the release command in the chip tooltip; no release control | partial |
 | `update_task_status` | Inline status picker / bulk actions | full |
 | `add_item` | Add-item + smart-add | full |
 | `edit_item` | Detail panel editing | full |

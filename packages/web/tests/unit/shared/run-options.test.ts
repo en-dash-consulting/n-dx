@@ -68,6 +68,54 @@ describe("run options", () => {
       ]);
     });
   });
+
+  describe("review mode and reviewer", () => {
+    it("writes --review-mode and --reviewer, in table order", () => {
+      expect(runOptionArgs({ reviewVendor: "codex", reviewMode: "pair", reviewModel: "r" })).toEqual([
+        "--review-mode=pair",
+        "--reviewer=codex",
+        "--review-model=r",
+      ]);
+    });
+
+    it("accepts only off|self|pair and claude|codex", () => {
+      for (const reviewMode of ["off", "self", "pair"]) {
+        expect(checkRunOptions({ reviewMode }), reviewMode).toMatchObject({ ok: true });
+      }
+      expect(checkRunOptions({ reviewMode: "both" })).toMatchObject({ ok: false, key: "reviewMode" });
+      expect(checkRunOptions({ reviewMode: true })).toMatchObject({ ok: false, key: "reviewMode" });
+      expect(checkRunOptions({ reviewVendor: "codex" })).toMatchObject({ ok: true });
+      expect(checkRunOptions({ reviewVendor: "google" })).toMatchObject({ ok: false, key: "reviewVendor" });
+    });
+
+    it("lets the review companions ride on a self or pair mode, not on off", () => {
+      expect(checkRunOptions({ reviewMode: "pair", reviewModel: "r", reviewOptional: true })).toMatchObject({ ok: true });
+      expect(checkRunOptions({ reviewMode: "self", reviewModel: "r" })).toMatchObject({ ok: true });
+      expect(checkRunOptions({ reviewMode: "off", reviewModel: "r" })).toMatchObject({ ok: false, key: "reviewModel" });
+      expect(checkRunOptions({ reviewMode: "off", reviewOptional: true })).toMatchObject({ ok: false, key: "reviewOptional" });
+    });
+
+    it("refuses a mode that contradicts the review boolean, as hench refuses the flags", () => {
+      expect(checkRunOptions({ review: true, reviewMode: "off" })).toMatchObject({ ok: false, key: "reviewMode" });
+      expect(checkRunOptions({ review: false, reviewMode: "self" })).toMatchObject({ ok: false, key: "reviewMode" });
+      expect(checkRunOptions({ review: false, reviewMode: "pair" })).toMatchObject({ ok: false, key: "reviewMode" });
+      expect(checkRunOptions({ review: true, reviewMode: "pair" })).toMatchObject({ ok: true });
+      expect(checkRunOptions({ review: true, reviewMode: "self" })).toMatchObject({ ok: true });
+      expect(checkRunOptions({ review: false, reviewMode: "off" })).toMatchObject({ ok: true });
+    });
+
+    it("takes a reviewer for pair, or alone for a task that saved pair; not beside another review", () => {
+      expect(checkRunOptions({ reviewMode: "pair", reviewVendor: "codex" })).toMatchObject({ ok: true });
+      expect(checkRunOptions({ reviewVendor: "codex" })).toMatchObject({ ok: true });
+      for (const input of [
+        { reviewMode: "self", reviewVendor: "codex" },
+        { reviewMode: "off", reviewVendor: "codex" },
+        { review: true, reviewVendor: "codex" },
+        { review: false, reviewVendor: "codex" },
+      ]) {        expect(checkRunOptions(input), JSON.stringify(input)).toMatchObject({ ok: false, key: "reviewVendor" });
+      }
+    });
+  });
 });
 
 describe("run options: values the command line must never carry", () => {
