@@ -2,7 +2,7 @@
 id: "5769af51-4147-49af-9331-938bbd12161e"
 level: "task"
 title: "ndx migrate --plan has no automated test of its spawn path"
-status: "pending"
+status: "in_progress"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -13,6 +13,7 @@ tags:
 blockedBy:
   - "ad842166-7ac1-4875-bac8-e5f55ea18402"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-12T09:38:25.765Z"
 acceptanceCriteria:
   - "An e2e test spawns `ndx migrate --plan --rules-only --out <path> <dir>` (space-separated --out) and finds the plan at <path>, not under <dir>"
   - "The same test asserts the fixture's .rex/prd_tree/ is byte-identical before and after"
@@ -20,6 +21,6 @@ acceptanceCriteria:
   - "An incomplete model pass reported by rex surfaces as a non-zero ndx exit (test)"
 description: "Scenario: handleMigrate in packages/core/cli.js rewrites `--out p` / `--cut-at t` / `--model m` to the `=` form before spawning `rex migrate`, refuses a call without --plan, and forwards the exit code. A regression there (e.g. the rewrite dropped, so `p` is read as the project dir and the plan lands in the wrong project or rex refuses) passes every suite: the only tests drive cmdMigrate in-process (packages/rex/tests/unit/cli/commands/migrate.test.ts). The acceptance criterion \"ndx migrate --plan writes a plan file and leaves .rex/prd_tree/ unchanged (test)\" is verified at the rex layer only; the core path was checked by hand once (review of task 27e4f378). Verdict should-fix: reachable from every `ndx migrate` call, cheap to cover. Option (recommended): one tests/e2e case spawning `node packages/core/cli.js migrate --plan --rules-only --out <tmp> <fixture>` with a space-separated --out, asserting the plan exists at <tmp>, the fixture's .rex is byte-identical, and a call without --plan exits 1. Cost: one e2e test (~1 s).\n\nScheduled overnight 2026-10-12 to run in stack C's top layer (C3), after ad842166 reshapes `ndx migrate` into one chained command; criterion 3 was rewritten from \"without --plan exits non-zero\" because C3 makes a bare `ndx migrate` valid. Lane: tests/e2e and packages/core's migrate handler."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-12T07:43:14.671Z"
+lastModified: "2026-10-12T09:38:26.032Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
