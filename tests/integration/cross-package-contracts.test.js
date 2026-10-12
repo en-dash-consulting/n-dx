@@ -229,6 +229,7 @@ describe("hench → rex gateway contract", () => {
     "acknowledgeFinding",
     "resolveActor",
     "validateRunSettings",
+    "repointCommits",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -775,7 +776,7 @@ describe("gateway export auto-detection", () => {
         "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding", "resolveActor",
-        "validateRunSettings"],
+        "validateRunSettings", "repointCommits"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "TREE_META_FILENAME", "PRD_CACHE_DIRNAME",
         "SELF_HEAL_TAG", "checkTreeConformance"],
     ]);
