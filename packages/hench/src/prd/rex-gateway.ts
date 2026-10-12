@@ -63,6 +63,8 @@
  * - v2 work selection (prdLayout, isChangeLayerStore, findNextWorkTask,
  *   findActionableWork, resolveWorkById — what `get_next_task` runs on a v2
  *   tree, so `ndx work` picks the same unit)
+ * - v2 agent brief (buildChangeBrief — the selected unit's brief, built from
+ *   its change and the product nodes it touches or amends)
  * - Cross-worktree task claims (openClaimsStore, resolveClaimHolder — the
  *   run claims the task it selected so other worktrees pass over it)
  * - Timestamp computation (status change timestamps)
@@ -154,6 +156,13 @@ export {
   findActionableWork,
   resolveWorkById,
 } from "@n-dx/rex";
+
+// ---- v2 agent brief -----------------------------------------------------------
+// On a v2 tree the brief is the unit's change and the capabilities and
+// constraints it touches or amends, not the v1 parent chain over the
+// projection. What that brief holds, and what its budget drops first, is rex's
+// to decide; a hench-side assembly would be a second definition of it.
+export { buildChangeBrief } from "@n-dx/rex";
 
 // `matchesAssignee` is selection's own `--mine` rule (own field, or inherited
 // from any ancestor). Anything hench scopes to `--mine` that is *not* selection

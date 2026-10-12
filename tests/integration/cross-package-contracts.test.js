@@ -220,6 +220,8 @@ describe("hench → rex gateway contract", () => {
     "findNextWorkTask",
     "findActionableWork",
     "resolveWorkById",
+    // v2 agent brief
+    "buildChangeBrief",
     "openClaimsStore",
     "resolveClaimHolder",
     "computeTimestampUpdates",
@@ -778,6 +780,7 @@ describe("gateway export auto-detection", () => {
         "findItem", "walkTree", "findNextTask", "findActionableTasks",
         "collectCompletedIds", "explainSelection", "matchesAssignee", "traversalBlock",
         "prdLayout", "isChangeLayerStore", "findNextWorkTask", "findActionableWork", "resolveWorkById",
+        "buildChangeBrief",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
         "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",

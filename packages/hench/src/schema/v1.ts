@@ -2104,7 +2104,21 @@ export interface TaskBriefRequirement {
   source: string;
 }
 
+/** One rendered section of rex's v2 change brief (`task`, `change`, `capabilities`, …). */
+export interface TaskBriefChangeSection {
+  name: string;
+  text: string;
+}
+
 export interface TaskBrief {
+  /**
+   * On a v2 tree, rex's change brief for this unit, in render order: the work
+   * item, its change, the capabilities and constraints it touches or amends,
+   * and the rest within rex's budget. When present, `formatTaskBrief`
+   * renders it instead of the v1 sections below, which stay populated for the
+   * code that reads single fields (title, status, acceptance criteria).
+   */
+  changeBrief?: TaskBriefChangeSection[];
   task: TaskBriefTask;
   parentChain: TaskBriefParent[];
   siblings: TaskBriefSibling[];

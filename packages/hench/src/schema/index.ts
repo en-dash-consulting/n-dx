@@ -61,6 +61,7 @@ export type {
   RunGateOnlyRetry,
   RunSessionRecord,
   TaskBrief,
+  TaskBriefChangeSection,
   TaskBriefTask,
   TaskBriefParent,
   TaskBriefSibling,

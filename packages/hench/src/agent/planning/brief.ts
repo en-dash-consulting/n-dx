@@ -6,6 +6,8 @@ import {
   walkTree,
   collectRequirements,
   isWorkItem,
+  buildChangeBrief,
+  resolveWorkById,
 } from "../../prd/rex-gateway.js";
 import type { PRDStore, PRDItem, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
 import {
@@ -19,6 +21,7 @@ import {
 import { resolveProjectCliName, DEFAULT_CLI_NAME } from "./cli-identity.js";
 import type {
   TaskBrief,
+  TaskBriefChangeSection,
   TaskBriefTask,
   TaskBriefParent,
   TaskBriefSibling,
@@ -343,6 +346,26 @@ export async function selectTaskEntry(
   );
 }
 
+/**
+ * Rex's change brief for the unit `unitId` on a v2 tree, section by section.
+ *
+ * The project's validate and test commands are left out for the reason the v1
+ * brief has no project block: the system prompt states them, and both reach
+ * the model in one call.
+ */
+function changeBriefSections(
+  tree: V2Tree,
+  unitId: string,
+  workflow: string,
+  recentLog: readonly TaskBriefLogEntry[],
+): TaskBriefChangeSection[] {
+  // Selection resolved this id to a unit a moment ago, through the same tree.
+  const unit = resolveWorkById(tree, unitId);
+  if (!unit) throw new Error(`Cannot brief ${unitId}: it is not a unit of work on this v2 tree.`);
+  const { sections } = buildChangeBrief({ tree, unit, workflow, recentLog });
+  return sections.map(({ name, text }) => ({ name, text }));
+}
+
 export async function assembleTaskBrief(
   store: PRDStore,
   taskId?: string,
@@ -359,9 +382,10 @@ export async function assembleTaskBrief(
     ? resolveProjectCliName(options.projectDir)
     : DEFAULT_CLI_NAME;
 
-  const tree = await loadV2Tree(store);
+  const loadedTree = await loadV2Tree(store);
+  const tree = loadedTree && resetIds?.size ? readTreeAsReset(loadedTree, resetIds) : loadedTree;
   const entry = await selectTaskEntry(doc.items, {
-    ...(tree ? { tree: resetIds?.size ? readTreeAsReset(tree, resetIds) : tree } : {}),
+    ...(tree ? { tree } : {}),
     ...(taskId ? { taskId } : {}),
     ...(excludeIds ? { excludeTaskIds: excludeIds } : {}),
     ...(options?.epicId ? { epicId: options.epicId } : {}),
@@ -399,6 +423,7 @@ export async function assembleTaskBrief(
   }));
 
   const brief: TaskBrief = {
+    ...(tree ? { changeBrief: changeBriefSections(tree, entry.item.id, workflow, recentLog) } : {}),
     task: itemToTaskBrief(entry.item),
     parentChain: entry.parents.map(itemToParent),
     siblings: getSiblings(entry, doc),
@@ -496,7 +521,52 @@ export function buildBriefSections(brief: TaskBrief): PromptSection[] {
 // Brief text formatting (backward-compatible flat string)
 // ---------------------------------------------------------------------------
 
+/**
+ * Commit trailers — the task id and run live here, not in the system prompt,
+ * which is built per project. Placed right after the task so a brief truncated
+ * to the vendor's context limit still carries them.
+ */
+function commitTrailersBlock(brief: TaskBrief): string | undefined {
+  if (!brief.commitTrailers?.length) return undefined;
+  return [
+    "## Commit Trailers",
+    "End every commit message you write for this task with these exact lines, " +
+      "in one final trailer block together with your own trailers (such as " +
+      "Co-Authored-By:) and no blank line between them:",
+    "```",
+    ...brief.commitTrailers,
+    "```",
+  ].join("\n");
+}
+
+/** Session filters (e.g. self-heal tag constraint, --mine assignee constraint). */
+function sessionFiltersBlock(brief: TaskBrief): string | undefined {
+  const { tags, assignee } = brief.sessionFilters ?? {};
+  if (!tags?.length && !assignee) return undefined;
+  const lines = ["## Session Filters"];
+  if (tags?.length) {
+    lines.push(`Active tag filter: ${tags.join(", ")} — only tasks with these tags are eligible for selection.`);
+  }
+  if (assignee) {
+    lines.push(`Active assignee filter: ${assignee} — only tasks assigned to this identity are eligible for selection.`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * The v2 brief: rex's change brief, with hench's own blocks inserted — the
+ * commit trailers and session filters, right after the task section (rex
+ * never drops it). Rex already bounded and budgeted every section.
+ */
+function formatChangeBrief(brief: TaskBrief, changeBrief: readonly TaskBriefChangeSection[]): string {
+  const own = [commitTrailersBlock(brief), sessionFiltersBlock(brief)].filter((b): b is string => b !== undefined);
+  return changeBrief
+    .flatMap((section) => (section.name === "task" ? [section.text, ...own] : [section.text]))
+    .join("\n\n");
+}
+
 export function formatTaskBrief(brief: TaskBrief): string {
+  if (brief.changeBrief?.length) return formatChangeBrief(brief, brief.changeBrief);
   const sections: string[] = [];
 
   // Task
@@ -535,20 +605,8 @@ export function formatTaskBrief(brief: TaskBrief): string {
     );
   }
 
-  // Commit trailers — the task id and run live here, not in the system prompt,
-  // which is built per project. Placed near the top so a brief truncated to
-  // the vendor's context limit still carries them.
-  if (brief.commitTrailers?.length) {
-    sections.push("\n## Commit Trailers");
-    sections.push(
-      "End every commit message you write for this task with these exact lines, " +
-        "in one final trailer block together with your own trailers (such as " +
-        "Co-Authored-By:) and no blank line between them:",
-    );
-    sections.push("```");
-    sections.push(...brief.commitTrailers);
-    sections.push("```");
-  }
+  const trailers = commitTrailersBlock(brief);
+  if (trailers) sections.push(`\n${trailers}`);
 
   // Parent chain
   if (brief.parentChain.length > 0) {
@@ -594,16 +652,8 @@ export function formatTaskBrief(brief: TaskBrief): string {
     }
   }
 
-  // Session filters (e.g. self-heal tag constraint, --mine assignee constraint)
-  if (brief.sessionFilters?.tags?.length || brief.sessionFilters?.assignee) {
-    sections.push(`\n## Session Filters`);
-    if (brief.sessionFilters.tags?.length) {
-      sections.push(`Active tag filter: ${brief.sessionFilters.tags.join(", ")} — only tasks with these tags are eligible for selection.`);
-    }
-    if (brief.sessionFilters.assignee) {
-      sections.push(`Active assignee filter: ${brief.sessionFilters.assignee} — only tasks assigned to this identity are eligible for selection.`);
-    }
-  }
+  const filters = sessionFiltersBlock(brief);
+  if (filters) sections.push(`\n${filters}`);
 
   // Project
   // No project block here. `buildSystemPrompt` emits the same four facts under

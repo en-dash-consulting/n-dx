@@ -56,6 +56,8 @@ const EXPECTED_EXPORTS = [
   "findNextWorkTask",
   "findActionableWork",
   "resolveWorkById",
+  // v2 agent brief
+  "buildChangeBrief",
   // Cross-worktree task claims
   "openClaimsStore",
   "resolveClaimHolder",
