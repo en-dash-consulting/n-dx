@@ -200,4 +200,40 @@ project(':c').projectDir = new File(settingsDir, 'vendor/c')`,
       }
     },
   );
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "skips a .java file it cannot read when there is no build file, and reports it",
+    async () => {
+      await file("src/app/A.java", "package app;\nclass A {}");
+      await file("lib/b/B.java", "package b;\nclass B {}");
+      await chmod(join(dir, "lib/b/B.java"), 0o000);
+      try {
+        const layout = await discoverJavaModules(dir);
+        expect(layout.buildSystem).toBe("none");
+        expect(layout.modules[0].sourceRoots).toEqual(["src"]);
+        expect(layout.notices).toEqual(["lib/b/B.java is unreadable (EACCES); skipped"]);
+      } finally {
+        await chmod(join(dir, "lib/b/B.java"), 0o644);
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "treats an unreadable module pom.xml as absent and reports it",
+    async () => {
+      await file("pom.xml", "<project><artifactId>root</artifactId><modules><module>core</module></modules></project>");
+      await file("core/pom.xml", "<project><artifactId>core</artifactId></project>");
+      await dirs("src/main/java", "core/src/main/java");
+      await chmod(join(dir, "core/pom.xml"), 0o000);
+      try {
+        const { layout, get } = await discover();
+        expect(layout.buildSystem).toBe("maven");
+        expect(layout.modules.map((m) => m.name)).toEqual(["root"]);
+        expect(get("root")?.sourceRoots).toEqual(["src/main/java"]);
+        expect(layout.notices).toEqual(["core/pom.xml is unreadable (EACCES); skipped"]);
+      } finally {
+        await chmod(join(dir, "core/pom.xml"), 0o644);
+      }
+    },
+  );
 });
