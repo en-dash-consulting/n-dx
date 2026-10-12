@@ -162,6 +162,97 @@ describe("discoverChangedFiles", () => {
     expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual(["work.ts"]);
   });
 
+  it("counts .rex/workflow.md as the run's work — it is project content, not bookkeeping", async () => {
+    // The whole of `.rex/` used to be bookkeeping, so a task whose only job
+    // was to edit the workflow could never complete through `ndx work`: the
+    // gate read "no changes", skipped, and the completion check rejected the
+    // claim. workflow.md goes into every agent brief.
+    await mkdir(join(repoDir, ".rex"), { recursive: true });
+    await writeFile(join(repoDir, ".rex/workflow.md"), "# Workflow\n");
+    git(repoDir, "add", "-A");
+    git(repoDir, "commit", "-m", "track workflow");
+    startingHead = git(repoDir, "rev-parse", "HEAD").trim();
+
+    await writeFile(join(repoDir, ".rex/workflow.md"), "# Workflow\n\nStep one.\n");
+
+    expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual([
+      ".rex/workflow.md",
+    ]);
+  });
+
+  it("counts the container's rex/workflow.md on the .ndx/ layout", async () => {
+    // The container prefix used to swallow everything inside it, so the new
+    // layout had the same defect by a different spelling.
+    await mkdir(join(repoDir, ".ndx/rex"), { recursive: true });
+    await writeFile(join(repoDir, ".ndx/rex/workflow.md"), "# Workflow\n");
+    git(repoDir, "add", "-A");
+    git(repoDir, "commit", "-m", "track workflow");
+    startingHead = git(repoDir, "rev-parse", "HEAD").trim();
+
+    await writeFile(join(repoDir, ".ndx/rex/workflow.md"), "# Workflow\n\nStep one.\n");
+
+    expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual([
+      ".ndx/rex/workflow.md",
+    ]);
+  });
+
+  it("counts .rex/config.json as the run's work", async () => {
+    await mkdir(join(repoDir, ".rex"), { recursive: true });
+    await writeFile(join(repoDir, ".rex/config.json"), "{}\n");
+    git(repoDir, "add", "-A");
+    git(repoDir, "commit", "-m", "track rex config");
+    startingHead = git(repoDir, "rev-parse", "HEAD").trim();
+
+    await writeFile(join(repoDir, ".rex/config.json"), '{"facets":[]}\n');
+
+    expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual([
+      ".rex/config.json",
+    ]);
+  });
+
+  it("still excludes rex's own records, on both layouts", async () => {
+    // The other half of the narrowing: the status write, the execution log and
+    // the acknowledged-findings file the reviewer writes are all hench's own
+    // trail, and a run that produced only those has produced nothing.
+    const records = [
+      ".rex/prd_tree/some-epic/index.md",
+      ".rex/execution-log.jsonl",
+      ".rex/acknowledged-findings.json",
+      ".rex/tree-meta.json",
+      ".rex/archive.json",
+      ".rex/pending-proposals.json",
+      ".rex/.cache/prd.json",
+      ".ndx/rex/prd_tree/some-epic/index.md",
+      ".ndx/rex/execution-log.jsonl",
+      ".ndx/rex/acknowledged-findings.json",
+    ];
+    for (const path of records) {
+      await mkdir(join(repoDir, path, ".."), { recursive: true });
+      await writeFile(join(repoDir, path), "before\n");
+    }
+    git(repoDir, "add", "-A");
+    git(repoDir, "commit", "-m", "track records");
+    startingHead = git(repoDir, "rev-parse", "HEAD").trim();
+
+    for (const path of records) {
+      await writeFile(join(repoDir, path), "after\n");
+    }
+
+    expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual([]);
+  });
+
+  it("counts .ndx/sourcevision output, as the legacy layout already did", async () => {
+    // Analysis output is a change under `.sourcevision/`; the container prefix
+    // made the same output invisible under `.ndx/`, so the two layouts
+    // disagreed about an identical run.
+    await mkdir(join(repoDir, ".ndx/sourcevision"), { recursive: true });
+    await writeFile(join(repoDir, ".ndx/sourcevision/manifest.json"), "{}\n");
+
+    expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual([
+      ".ndx/sourcevision/manifest.json",
+    ]);
+  });
+
   it("falls back to HEAD when no starting head was captured", async () => {
     await writeFile(join(repoDir, "base.ts"), "export const base = 2;\n");
 

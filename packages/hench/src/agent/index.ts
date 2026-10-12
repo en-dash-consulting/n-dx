@@ -50,6 +50,10 @@ export {
   countBudgetedTokens,
   runBudgetedTokens,
   contextWriteFloor,
+  hasCacheWrites,
+  highConsumptionThreshold,
+  HIGH_COUNTED_TOKENS_PER_RUN_CACHED,
+  HIGH_COUNTED_TOKENS_PER_RUN_UNCACHED,
 } from "./token-cost.js";
 
 // Token usage parsing & accumulation

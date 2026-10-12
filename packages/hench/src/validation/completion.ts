@@ -1,4 +1,5 @@
 import { exec, execShellCmd } from "../process/exec.js";
+import { BOOKKEEPING_PATHS } from "../store/paths.js";
 import { discoverChangedFiles } from "./changed-files.js";
 
 /**
@@ -33,15 +34,23 @@ export interface CompletionValidationOptions {
 const DEFAULT_TIMEOUT = 30_000;
 
 /**
- * Git pathspec excludes for the human-readable diff summary, mirroring the
- * bookkeeping filter in validation/changed-files.ts. Decoration only — the
- * verdict comes from {@link discoverChangedFiles}, which applies the shared
- * rule (including `.hench-commit-msg.txt` and the repo-relative prefix a
- * pathspec gets for free by being resolved against `projectDir`).
+ * Git pathspec excludes for the human-readable diff summary.
+ *
+ * Built from {@link BOOKKEEPING_PATHS}, the same list the verdict uses, so the
+ * summary cannot name a different set of files than the gate counted. It used
+ * to be three hand-written entries — `.rex`, `.hench`, `.hench-commit-msg.txt`
+ * — which hid `.rex/workflow.md` from the summary even once the gate started
+ * counting it, so a run whose only work was the workflow reported an empty
+ * diff.
+ *
+ * Trailing slashes are stripped: a pathspec names a directory without one, and
+ * `:(exclude).rex/prd_tree/` matches nothing. Decoration only — the verdict
+ * comes from {@link discoverChangedFiles}, which also applies
+ * `isHenchRuntimeArtifact` and gets the repo-relative prefix for free by being
+ * resolved against `projectDir`.
  */
 const BOOKKEEPING_EXCLUDES = [
-  ":(exclude).rex",
-  ":(exclude).hench",
+  ...BOOKKEEPING_PATHS.map((path) => `:(exclude)${path.replace(/\/$/, "")}`),
   ":(exclude).hench-commit-msg.txt",
   ":(exclude).ndx-commit-msg.txt",
 ];

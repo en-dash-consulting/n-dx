@@ -2,6 +2,9 @@
  * hench's Claude API turn loop builds its own Anthropic request, so it must
  * send the same `output_config.effort` the llm-client API provider sends for
  * the same model and config. Both sides are driven here and compared.
+ *
+ * The CLI loop builds its own argv for the same reason, and is held to the
+ * same validation — minus the per-model default, which belongs to the API.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -16,7 +19,8 @@ vi.mock("@anthropic-ai/sdk", () => ({
 import { createApiClient, resetClaudeEffortWarnings } from "@n-dx/llm-client";
 import type { LLMConfig } from "@n-dx/llm-client";
 import { resolveTaskModel } from "../../../../src/prd/llm-gateway.js";
-import { resolveAgentApiEffort } from "../../../../src/agent/lifecycle/api-effort.js";
+import { resolveAgentApiEffort, resolveAgentCliEffort } from "../../../../src/agent/lifecycle/agent-effort.js";
+import { buildClaudeCliArgs } from "../../../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 import { buildCachedMessageRequest } from "../../../../src/agent/lifecycle/prompt-cache.js";
 
 const CASES: Array<{ name: string; model: string; config: LLMConfig }> = [
@@ -82,5 +86,81 @@ describe("hench API loop effort parity with the llm-client provider", () => {
       effort: "high",
     });
     expect(params.output_config).toEqual({ effort: "high" });
+  });
+});
+
+describe("hench CLI loop effort", () => {
+  let stderr: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    resetClaudeEffortWarnings();
+    stderr = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => stderr.mockRestore());
+
+  it("passes a matching rule through", () => {
+    expect(resolveAgentCliEffort("claude-opus-5-5", { effort: { "agent.*": "xhigh" } })).toBe(
+      "xhigh",
+    );
+  });
+
+  it("applies no default when no rule matches, unlike the API path", () => {
+    // Claude Code picks its own per-model default. Sending ours unasked would
+    // override that on every run nobody configured.
+    expect(resolveAgentCliEffort("claude-opus-5-5", {})).toBeUndefined();
+    expect(resolveAgentApiEffort("claude-opus-5-5", {})).toBe("high");
+  });
+
+  it("drops an invalid level with the same warning as the API path", () => {
+    expect(
+      resolveAgentCliEffort("claude-sonnet-5-5", { effort: { "agent.execute": "lots" } }),
+    ).toBeUndefined();
+    expect(stderr.mock.calls.flat().join(" ")).toContain('"lots"');
+  });
+
+  it("drops a rule aimed at a model that does not accept effort", () => {
+    expect(resolveAgentCliEffort("claude-haiku-4-5", { effort: { "*": "max" } })).toBeUndefined();
+    expect(stderr.mock.calls.flat().join(" ")).toContain("does not accept an effort setting");
+  });
+
+  it("resolves to nothing for a non-Claude model id", () => {
+    expect(resolveAgentCliEffort("gpt-5-codex", { effort: { "*": "high" } })).toBeUndefined();
+  });
+
+  it("resolves to nothing when no model was given", () => {
+    expect(resolveAgentCliEffort(undefined, { effort: { "*": "high" } })).toBeUndefined();
+  });
+});
+
+describe("buildClaudeCliArgs --effort", () => {
+  const base = {
+    systemPrompt: "system",
+    promptText: "brief",
+    allowedTools: ["Read"],
+  };
+
+  it("emits --effort <level> when one was resolved", () => {
+    const { args } = buildClaudeCliArgs({ ...base, effort: "xhigh" }, "linux");
+    expect(args).toContain("--effort");
+    expect(args[args.indexOf("--effort") + 1]).toBe("xhigh");
+  });
+
+  it("emits no --effort at all when none was resolved", () => {
+    const { args } = buildClaudeCliArgs(base, "linux");
+    expect(args).not.toContain("--effort");
+  });
+
+  it("emits it on Windows too, where the system prompt moves to stdin", () => {
+    const { args } = buildClaudeCliArgs({ ...base, effort: "high" }, "win32");
+    expect(args[args.indexOf("--effort") + 1]).toBe("high");
+  });
+
+  it("sits after --model, so neither shadows the other", () => {
+    const { args } = buildClaudeCliArgs(
+      { ...base, modelOverride: "claude-opus-5-5", effort: "low" },
+      "linux",
+    );
+    expect(args.indexOf("--model")).toBeLessThan(args.indexOf("--effort"));
   });
 });

@@ -6,7 +6,13 @@
  */
 
 import type { RunRecord, RunStatus, HenchConfig } from "../../schema/index.js";
-import { contextWriteFloor, runBudgetedTokens } from "../token-cost.js";
+import {
+  contextWriteFloor,
+  contextWriteFloorFromCompletedRun,
+  hasCacheWrites,
+  highConsumptionThreshold,
+  runBudgetedTokens,
+} from "../token-cost.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -55,11 +61,27 @@ export interface WorkflowStats {
    */
   avgTokensPerRun: number;
   /**
-   * Lowest counted cost of a completed prompt-cached run — the floor a
-   * proposed `tokenBudget` must clear. 0 when unmeasurable.
+   * Lowest observed arrival cost — the floor a proposed `tokenBudget` must
+   * clear. 0 only when no run in the set wrote cache.
    * See {@link contextWriteFloor}.
    */
   contextWriteFloor: number;
+
+  /**
+   * Whether {@link contextWriteFloor} came from a run that completed.
+   *
+   * When it did not, the number is the cheapest failed run's cache writes
+   * summed over every turn — an upper estimate of arrival cost. Safe to raise
+   * a budget to, unsafe to floor a reduction with.
+   */
+  contextWriteFloorFromCompletedRun: boolean;
+  /**
+   * Whether any run in the set wrote cache, whatever its status, and so
+   * whether `avgTokensPerRun` carries cache writes. Separate from
+   * `contextWriteFloor` because the floor needs a run that survived and this
+   * does not. See {@link hasCacheWrites}.
+   */
+  promptCached: boolean;
   avgDurationMs: number;
   failuresByStatus: Record<string, number>;
   /** Tasks with the most failures. */
@@ -107,6 +129,8 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
       avgTurns: 0,
       avgTokensPerRun: 0,
       contextWriteFloor: 0,
+      contextWriteFloorFromCompletedRun: false,
+      promptCached: false,
       avgDurationMs: 0,
       failuresByStatus: {},
       troubleTaskIds: [],
@@ -160,6 +184,8 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
     avgTurns,
     avgTokensPerRun,
     contextWriteFloor: contextWriteFloor(runs),
+    contextWriteFloorFromCompletedRun: contextWriteFloorFromCompletedRun(runs),
+    promptCached: hasCacheWrites(runs),
     avgDurationMs,
     failuresByStatus,
     troubleTaskIds,
@@ -170,32 +196,11 @@ export function computeStats(runs: RunRecord[], config?: HenchConfig): WorkflowS
 
 // ── Suggestion generators ────────────────────────────────────────────
 
-/**
- * Where "high token consumption" starts, in budgeted units, for a run set
- * whose `contextWriteFloor` is 0 — no completed run in the set ever paid a
- * cache write, so `avgTokensPerRun` is still an input + output sum. This is
- * the original threshold, unchanged.
- */
-const HIGH_COUNTED_TOKENS_PER_RUN_UNCACHED = 100_000;
+// The two thresholds, and the rule for choosing between them, live in
+// ../token-cost.ts beside the counting rule they are expressed in — and so
+// that tests/e2e/token-cost-parity.test.js can compare them against the
+// dashboard's port rather than against a copied literal.
 
-/**
- * Where "high token consumption" starts once the run set has a non-zero
- * `contextWriteFloor` — at least one completed run paid a cache write, so
- * `avgTokensPerRun` counts cache writes too.
- *
- * Counting cache writes moved the measure by roughly 12x — across the
- * completed runs in this repository's `.hench/runs/` (2026-09) the median went
- * from 39.5K to 489K — so the uncached number would fire on almost every
- * prompt-cached project. 1.2M keeps it at the same place the uncached
- * threshold used to occupy relative to that population: about 2.5x the median
- * completed run.
- *
- * Gating on `contextWriteFloor` rather than switching globally matters
- * because a project with no cache writes never gets the 12x inflation: the
- * 100K threshold still fits its `avgTokensPerRun`, and raising it 12x for
- * those runs would silence a suggestion that should fire.
- */
-const HIGH_COUNTED_TOKENS_PER_RUN_CACHED = 1_200_000;
 
 function suggestTokenEfficiency(
   runs: RunRecord[],
@@ -203,9 +208,7 @@ function suggestTokenEfficiency(
   config?: HenchConfig,
 ): WorkflowSuggestion[] {
   const suggestions: WorkflowSuggestion[] = [];
-  const highCountedTokensPerRun = stats.contextWriteFloor > 0
-    ? HIGH_COUNTED_TOKENS_PER_RUN_CACHED
-    : HIGH_COUNTED_TOKENS_PER_RUN_UNCACHED;
+  const highCountedTokensPerRun = highConsumptionThreshold(runs);
 
   // High token usage with low success rate
   if (stats.avgTokensPerRun > highCountedTokensPerRun && stats.successRate < 0.5) {
@@ -219,9 +222,13 @@ function suggestTokenEfficiency(
       impact: "Reduces wasted tokens on tasks that are unlikely to succeed.",
       configChanges: config?.tokenBudget === 0
         ? {
+            // Only a floor measured from a completed run may raise this cap.
+            // The fallback is an upper estimate of arrival cost, and flooring
+            // a cap that exists to curb waste with it lifts the cap to the
+            // cheapest runaway's whole cache-write total.
             tokenBudget: Math.max(
               Math.round(stats.avgTokensPerRun * 0.7),
-              stats.contextWriteFloor,
+              stats.contextWriteFloorFromCompletedRun ? stats.contextWriteFloor : 0,
             ),
           }
         : undefined,

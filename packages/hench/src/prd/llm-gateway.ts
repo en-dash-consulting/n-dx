@@ -191,6 +191,8 @@ export {
   mapCodexUsageToTokenUsage,
   accumulateTokenUsage,
   emptyAggregateTokenUsage,
+  usageMessageId,
+  UsageMessageFilter,
 } from "@n-dx/llm-client";
 
 export type {
@@ -217,7 +219,7 @@ export {
 export type { VendorModelResetResult, FailoverAttemptResult } from "@n-dx/llm-client";
 
 // ---- Claude API effort ------------------------------------------------------
-export { resolveClaudeApiEffort } from "@n-dx/llm-client";
+export { resolveClaudeApiEffort, resolveClaudeCliEffort } from "@n-dx/llm-client";
 export type { ClaudeEffort } from "@n-dx/llm-client";
 
 // ---- Usage formatting -------------------------------------------------------
