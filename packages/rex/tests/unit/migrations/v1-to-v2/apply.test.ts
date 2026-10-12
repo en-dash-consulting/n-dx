@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpath
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { computeProductStatus } from "../../../../src/core/product-status.js";
+import { findActionableWork } from "../../../../src/core/change-selection.js";
 import { isLossless } from "../../../../src/core/slug-migration.js";
 import type { PRDItem } from "../../../../src/schema/v1.js";
 import { isAppliedChange, type RuleNode, type V2Tree } from "../../../../src/schema/v2-rules.js";
@@ -108,6 +109,36 @@ describe("buildV2Tree", () => {
     expect(byId(tree, "f5")!.plannedRelease).toBe("0.9.0");
     expect(byId(tree, "f3")!.plannedRelease).toBeUndefined();
     expect(byId(tree, "e2")).toBeUndefined();
+  });
+
+  describe("blockedBy a dissolved container", () => {
+    const WITH_BLOCKER: PRDItem[] = [
+      ...TREE,
+      item("e4", "epic", "Follow-ups", [item("f6", "feature", "Tidy the cache", [], { status: "pending", blockedBy: ["e3", "e2"] })]),
+    ];
+
+    it("names the container's children, not the container", async () => {
+      const { tree, containers } = buildV2Tree(WITH_BLOCKER, await planOf(WITH_BLOCKER));
+      const dissolved = new Set(containers.map((c) => c.id));
+      expect(dissolved).toEqual(new Set(["e2", "e3"]));
+      for (const node of all(tree)) {
+        for (const ref of node.blockedBy ?? []) expect(dissolved.has(ref)).toBe(false);
+      }
+      expect(byId(tree, "f6")!.blockedBy).toEqual(["f5", "f3"]);
+    });
+
+    it("is selectable once every child of the container is completed", async () => {
+      const items: PRDItem[] = [
+        item("r1", "epic", "ndx 0.9.0", [item("f7", "feature", "Shipped thing", [item("t7", "task", "Ship it")])]),
+        item("f8", "feature", "Next thing", [item("t8", "task", "Do it", [], { status: "pending", blockedBy: ["r1"] })], { status: "pending" }),
+      ];
+      const { tree } = buildV2Tree(items, await planOf(items));
+      const blocked = byId(tree, "t8")!;
+      expect(blocked.blockedBy).not.toContain("r1");
+      // Pending v1 work lands in the Inbox; placing it is the operator's step, not this one's.
+      for (const n of all(tree)) delete n.needsPlacement;
+      expect(findActionableWork(tree).map((u) => u.node.id)).toContain("t8");
+    });
   });
 
   it("starts capabilities met or proposed, never revised", async () => {
