@@ -22,7 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Go and SQL pack grammar versions are not tied to the build pin](./go-and-sql-pack-grammar-versions-are.md) | pending |
 | [Go build reader drops the unlistable-directory notice when no go.mod or go.work is found](./go-build-reader-drops-the-unlistable.md) | pending |
 | [Go resolver lets a go.mod versioned replace beat the go.work replace for the same module](./go-resolver-lets-a-go-mod-versioned.md) | pending |
-| [Java discovery rejects when a .java or pom.xml file is unreadable](./java-discovery-rejects-when-a-java-or.md) | pending |
+| [Java discovery rejects when a .java or pom.xml file is unreadable](./java-discovery-rejects-when-a-java-or.md) | completed |
 | [Java entry_point.main misses an interface's implicitly public static void main](./java-entry-point-main-misses-an.md) | pending |
 | [Java entry points are guessed from file names, not detected from public static void main](./java-entry-points-are-guessed-from.md) | completed |
 | [Java pack grammar version is not tied to the build pin](./java-pack-grammar-version-is-not-tied.md) | completed |
