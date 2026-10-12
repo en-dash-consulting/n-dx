@@ -31,6 +31,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [rex migrate-to-folder-tree, migrate-to-md and migrate-folder-tree-filenames do not refuse a v2 tree](./rex-migrate-to-folder-tree-migrate-to.md) | completed |
 | [rex report flags a change nested two deep as a hierarchy-placement error on v2](./rex-report-flags-a-change-nested-two.md) | pending |
 | [rex validate and MCP reorganize accept a change nested two deep](./rex-validate-and-mcp-reorganize-accept.md) | completed |
-| [rex validate runs the prd_tree/ slug and identity checks on a v2 tree](./rex-validate-runs-the-prd-tree-slug.md) | pending |
+| [rex validate runs the prd_tree/ slug and identity checks on a v2 tree](./rex-validate-runs-the-prd-tree-slug.md) | completed |
 | [The rex CLI serves a v2 tree, and refuses what it cannot yet do](./the-rex-cli-serves-a-v2-tree-and.md) | completed |
 | [The rex MCP tools serve a v2 tree](./the-rex-mcp-tools-serve-a-v2-tree.md) | completed |
