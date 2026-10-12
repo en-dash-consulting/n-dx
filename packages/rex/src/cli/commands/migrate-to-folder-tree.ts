@@ -9,6 +9,7 @@ import { walkTree } from "../../core/tree.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { CLIError } from "../errors.js";
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
+import { refuseOnV2, MIGRATE_ON_V2_HINT } from "./v2-cli.js";
 import type { PRDDocument, PRDItem } from "../../schema/index.js";
 import type { PromptFn } from "./validate-interactive.js";
 
@@ -49,6 +50,7 @@ export async function cmdMigrateToFolderTree(
   }
 
   const rexDir = resolveRexPaths(dir).rexDir;
+  await refuseOnV2(rexDir, "migrate-to-folder-tree", MIGRATE_ON_V2_HINT);
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
 
   const { doc, fromTree } = await loadSourceDocument(rexDir, treeRoot);

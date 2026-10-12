@@ -133,4 +133,24 @@ describe("rex on a v2 tree", () => {
     const out = run(["restore", tmp], tmp, true);
     expect(out).toMatch(/v1/);
   });
+
+  it("migrate-to-folder-tree refuses a leftover prd.md and writes no prd_tree/", async () => {
+    await writeFile(join(tmp, ".rex", "prd.md"), "---\nid: x\ntitle: Legacy\nschema: rex/v1\n---\n");
+    const out = run(["migrate-to-folder-tree", tmp], tmp, true);
+    expect(out).toContain("v2");
+    expect(existsSync(join(tmp, ".rex", "prd_tree"))).toBe(false);
+  });
+
+  it("migrate-to-md refuses a leftover prd.json and writes no prd.md", async () => {
+    await writeFile(join(tmp, ".rex", "prd.json"), JSON.stringify({ schema: SCHEMA_VERSION, title: "Legacy", items: [] }));
+    const out = run(["migrate-to-md", tmp], tmp, true);
+    expect(out).toContain("v2");
+    expect(existsSync(join(tmp, ".rex", "prd.md"))).toBe(false);
+  });
+
+  it("migrate-folder-tree-filenames refuses and creates no prd_tree/", () => {
+    const out = run(["migrate-folder-tree-filenames", tmp], tmp, true);
+    expect(out).toContain("v2");
+    expect(existsSync(join(tmp, ".rex", "prd_tree"))).toBe(false);
+  });
 });

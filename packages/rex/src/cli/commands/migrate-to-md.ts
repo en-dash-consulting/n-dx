@@ -5,6 +5,7 @@ import {
   migrateJsonPrdToMarkdown,
   PRDMarkdownMigrationError, resolveRexPaths } from "../../store/index.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
+import { refuseOnV2, MIGRATE_ON_V2_HINT } from "./v2-cli.js";
 
 export async function cmdMigrateToMd(
   dir: string,
@@ -17,6 +18,7 @@ export async function cmdMigrateToMd(
   }
 
   const rexDir = resolveRexPaths(dir).rexDir;
+  await refuseOnV2(rexDir, "migrate-to-md", MIGRATE_ON_V2_HINT);
 
   try {
     const result = await migrateJsonPrdToMarkdown(rexDir);

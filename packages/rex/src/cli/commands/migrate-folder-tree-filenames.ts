@@ -21,6 +21,7 @@ import { resolveRexPaths } from "../../store/index.js";
 import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { CLIError } from "../errors.js";
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
+import { refuseOnV2, MIGRATE_ON_V2_HINT } from "./v2-cli.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ export async function cmdMigrateFolderTreeFilenames(
   }
 
   const rexDir = resolveRexPaths(dir).rexDir;
+  await refuseOnV2(rexDir, "migrate-folder-tree-filenames", MIGRATE_ON_V2_HINT);
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
 
   const result = await migrateFolderTreeFilenames(treeRoot);
