@@ -1374,7 +1374,7 @@ export interface PairFixContext {
   adapter: VendorAdapter;
   vendor: LLMVendor;
   cliBinary: string;
-  cliEnv?: NodeJS.ProcessEnv;
+  cliEnv: NodeJS.ProcessEnv;
   /** Model label for token accounting. */
   model: string;
   /** Model flag the work spawn used, when it sent one. */
