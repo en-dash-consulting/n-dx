@@ -15,8 +15,6 @@ function git(cwd: string, ...args: string[]): string {
 
 function initRepo(dir: string): void {
   git(dir, "init", "--initial-branch=main");
-  git(dir, "config", "user.email", "test@test.com");
-  git(dir, "config", "user.name", "Test");
 }
 
 describe("checkBranchGuard", () => {
@@ -40,8 +38,6 @@ describe("checkBranchGuard", () => {
 
   it("does not block on the default branch (master)", () => {
     git(tmpDir, "init", "--initial-branch=master");
-    git(tmpDir, "config", "user.email", "test@test.com");
-    git(tmpDir, "config", "user.name", "Test");
     git(tmpDir, "commit", "--allow-empty", "-m", "init");
     const result = checkBranchGuard(tmpDir, {});
     expect(result.blocked).toBe(false);

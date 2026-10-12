@@ -53,7 +53,6 @@ describe("rex-prd merge driver in a real repository", () => {
     repo = await mkdtemp(join(tmpdir(), "rex-merge-driver-"));
     git(repo, "init", "-b", "main");
     git(repo, "config", "user.email", "test@example.com");
-    git(repo, "config", "user.name", "Test");
     // Register the driver exactly the way ndx init will.
     git(repo, "config", "merge.rex-prd.name", "n-dx PRD tree merge");
     git(

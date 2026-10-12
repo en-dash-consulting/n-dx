@@ -85,8 +85,6 @@ function git(cwd: string, ...args: string[]): string {
 
 function initRepo(dir: string): void {
   git(dir, "init", "--initial-branch=main");
-  git(dir, "config", "user.email", "test@test.com");
-  git(dir, "config", "user.name", "Test");
 }
 
 describe("resolveGitBranch", () => {
@@ -242,8 +240,6 @@ describe("getFirstCommitDate", () => {
   it("falls back to root commit when no default branch exists", () => {
     // Init with a non-standard default branch
     git(tmpDir, "init", "--initial-branch=trunk");
-    git(tmpDir, "config", "user.email", "test@test.com");
-    git(tmpDir, "config", "user.name", "Test");
 
     execFileSync("git", ["commit", "--allow-empty", "-m", "root"], {
       cwd: tmpDir,

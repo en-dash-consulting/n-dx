@@ -50,8 +50,6 @@ describe("merge-history pipeline (integration)", () => {
     // Init repo with deterministic defaults
     git(tmpDir, ["init", "--initial-branch=main", "-q"]);
     git(tmpDir, ["config", "user.email", "test@example.com"]);
-    git(tmpDir, ["config", "user.name", "Test"]);
-    git(tmpDir, ["config", "commit.gpgsign", "false"]);
 
     // PRD fixture
     await mkdir(join(tmpDir, ".rex"), { recursive: true });

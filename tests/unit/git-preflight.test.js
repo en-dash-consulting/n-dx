@@ -39,7 +39,6 @@ function initRepo(dir) {
   // git config has no user.name / user.email.
   execFileSync("git", ["config", "user.email", "ndx-test@example.com"], { cwd: dir, stdio: "pipe" });
   execFileSync("git", ["config", "user.name", "ndx test"], { cwd: dir, stdio: "pipe" });
-  execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: dir, stdio: "pipe" });
 }
 
 describe("git-preflight: isInsideGitRepo", () => {

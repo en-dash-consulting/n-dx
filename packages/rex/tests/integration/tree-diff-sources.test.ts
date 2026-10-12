@@ -41,8 +41,6 @@ function git(cwd: string, ...args: string[]): string {
 
 function initRepo(dir: string): void {
   git(dir, "init", "--initial-branch=main");
-  git(dir, "config", "user.email", "test@test.com");
-  git(dir, "config", "user.name", "Test");
 }
 
 function commitAll(dir: string, message: string): string {

@@ -57,7 +57,6 @@ beforeAll(async () => {
   execFileSync("git", ["init", "-q", "-b", "main", repo]);
   git(["config", "user.email", "dev@example.com"]);
   git(["config", "user.name", "Dev"]);
-  git(["config", "commit.gpgsign", "false"]);
 
   const base = await commit("base.txt", "Initial commit");
   sha.onMain = await commit("on-main.txt", "Already landed");

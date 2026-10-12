@@ -573,6 +573,16 @@ an agent running the suite inside Claude Code — ever saw the failure.
   memoised reads. `tests/setup-color-env.js` and `tests/setup-session-env.js` do
   this, and every package's `vitest.config.ts` registers both. `globalSetup` is
   the wrong hook — it runs in another process and does not affect the workers.
+- **Fixture repos get their git config from one file, not from `git config`.**
+  `tests/setup-session-env.js` writes a gitconfig (identity `Test
+  <test@test.com>`, `core.autocrlf=false`, `core.eol=lf`, `commit.gpgsign=false`,
+  `core.hooksPath` at an empty directory) and points `GIT_CONFIG_GLOBAL` at it,
+  so every `git` the worker or its spawned CLIs run sees the same settings. A
+  fixture is `git init` and nothing more; do not add per-repo `git config`
+  calls for those keys. A test that needs a different identity sets it at local
+  level, which wins over the global file as it always has. The per-repo form
+  cost two to five extra spawns per fixture, which on the Windows CI runner was
+  minutes across the monorepo.
 - **Guard, do not remove, a genuine environment dependency.** `sh -c` in the
   process-tree tests is load-bearing: libuv puts every non-detached child it
   spawns on Windows into a global job object, so spawning `node` directly reaps

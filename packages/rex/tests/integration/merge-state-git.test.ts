@@ -67,7 +67,6 @@ describe("rex-state merge driver in a real repository", () => {
     repo = await mkdtemp(join(tmpdir(), "rex-merge-state-"));
     git(repo, "init", "-b", "main");
     git(repo, "config", "user.email", "test@example.com");
-    git(repo, "config", "user.name", "Test");
     // Register the driver the way ndx init does.
     git(repo, "config", "merge.rex-state.name", "n-dx PRD state merge");
     git(
