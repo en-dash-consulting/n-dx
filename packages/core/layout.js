@@ -47,6 +47,7 @@ export const NDX_CONTAINER_DIRNAME = ".ndx";
  * @property {string} rexDir            Rex PRD state.
  * @property {string} henchDir          Hench agent state.
  * @property {string} sourcevisionDir   SourceVision analysis output.
+ * @property {string} graviewDir        The Graview projection (derived, gitignored).
  * @property {string} configFile        Project config overrides.
  * @property {string} localConfigFile   Machine-local config overrides.
  * @property {string} webPidFile        Dashboard PID marker.
@@ -59,6 +60,7 @@ const NDX_ENTRIES = {
   REX: "rex",
   HENCH: "hench",
   SOURCEVISION: "sourcevision",
+  GRAVIEW: "graview",
   CONFIG: "config.json",
   LOCAL_CONFIG: "config.local.json",
   WEB_PID: "web.pid",
@@ -71,6 +73,7 @@ const LEGACY_ENTRIES = {
   REX: ".rex",
   HENCH: ".hench",
   SOURCEVISION: ".sourcevision",
+  GRAVIEW: ".graview",
   CONFIG: ".n-dx.json",
   LOCAL_CONFIG: ".n-dx.local.json",
   WEB_PID: ".n-dx-web.pid",
@@ -111,6 +114,7 @@ export function resolveLayout(root, options = {}) {
       rexDir: join(container, NDX_ENTRIES.REX),
       henchDir: join(container, NDX_ENTRIES.HENCH),
       sourcevisionDir: join(container, NDX_ENTRIES.SOURCEVISION),
+      graviewDir: join(container, NDX_ENTRIES.GRAVIEW),
       configFile: join(container, NDX_ENTRIES.CONFIG),
       localConfigFile: join(container, NDX_ENTRIES.LOCAL_CONFIG),
       webPidFile: join(container, NDX_ENTRIES.WEB_PID),
@@ -126,6 +130,7 @@ export function resolveLayout(root, options = {}) {
     rexDir: join(root, LEGACY_ENTRIES.REX),
     henchDir: join(root, LEGACY_ENTRIES.HENCH),
     sourcevisionDir: join(root, LEGACY_ENTRIES.SOURCEVISION),
+    graviewDir: join(root, LEGACY_ENTRIES.GRAVIEW),
     configFile: join(root, LEGACY_ENTRIES.CONFIG),
     localConfigFile: join(root, LEGACY_ENTRIES.LOCAL_CONFIG),
     webPidFile: join(root, LEGACY_ENTRIES.WEB_PID),

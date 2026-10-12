@@ -24,13 +24,25 @@ name: CI
 on:
   push:
     branches: [main]
+  # opened, synchronize and reopened are GitHub's default set. ready_for_review
+  # starts the full run the moment a draft is marked ready; converted_to_draft
+  # starts a run whose jobs all skip, so the concurrency group cancels the
+  # in-flight full run. labeled lets the `ci:run` label start one run on a
+  # draft (see the job gate); every other label skips. No `unlabeled`: removing
+  # the label must not start a run.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, labeled]
   # The merge queue builds main + the queued PR on a gh-readonly-queue/main/*
   # branch and waits for the required checks to report on that merge_group run.
   # Without this trigger they never report and the queue waits forever. Steps
   # that read pull_request-only context (head_ref) must stay gated on
   # github.event_name == 'pull_request'.
   merge_group:
+  # The "Run workflow" button / `gh workflow run`, for a manual run on a draft
+  # or any branch. Only shown once the default branch's copy of this file
+  # declares it. Runs the branch head, not the PR's merge commit with its base;
+  # results appear in the Actions tab, not as a PR event. No inputs.
+  workflow_dispatch:
 
 # Least privilege for every job in this file. CI only ever needs to read the
 # checkout; nothing here writes to the repository, comments on a PR, or mints
@@ -44,8 +56,17 @@ on:
 permissions:
   contents: read
 
+# The group is evaluated before any job `if:`, so runs that will do nothing must
+# not cancel runs that will:
+#  - `dispatch-` prefix: a dispatch run shares github.ref with a push to the
+#    same branch, so without it a button press on main would cancel main's push
+#    run and the next push would cancel the button's run.
+#  - `-noop-<run_id>`: a `labeled` event that will not run CI (any label other
+#    than `ci:run`, or `ci:run` on a ready PR) gets a group of its own, so it
+#    cannot cancel the PR's real in-flight run. converted_to_draft stays in the
+#    shared PR group on purpose: cancelling the in-flight run is its point.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'workflow_dispatch' && 'dispatch-' || '' }}${{ github.ref }}${{ github.event.action == 'labeled' && !(github.event.label.name == 'ci:run' && github.event.pull_request.draft) && format('-noop-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -65,6 +86,18 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    # Drafts cannot merge, so a draft PR run buys nothing; a job skipped by a
+    # job-level `if:` gets no runner and is not billed. Do NOT write
+    # `pull_request.draft == false` alone: on push and merge_group the PR
+    # context is null, the expression is false, and main CI and the merge
+    # queue would stop running. Clauses: non-PR events (push, merge_group,
+    # workflow_dispatch) always run; a PR event runs when ready, except
+    # `labeled`, which runs only for `ci:run` on a draft (one-shot: later pushes
+    # to the draft skip again; remove and re-add the label to run again).
+    if: >-
+      github.event_name != 'pull_request'
+      || (github.event.action != 'labeled' && github.event.pull_request.draft == false)
+      || (github.event.action == 'labeled' && github.event.label.name == 'ci:run' && github.event.pull_request.draft == true)
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
@@ -272,6 +305,12 @@ jobs:
   smoke-parity:
     name: CLI Smoke Parity
     runs-on: ubuntu-latest
+    # Same gate as `build` (see the comment there). Redundant with `needs:`
+    # today, but it keeps the intent readable and survives `if: always()`.
+    if: >-
+      github.event_name != 'pull_request'
+      || (github.event.action != 'labeled' && github.event.pull_request.draft == false)
+      || (github.event.action == 'labeled' && github.event.label.name == 'ci:run' && github.event.pull_request.draft == true)
     needs:
       - build
     timeout-minutes: 10

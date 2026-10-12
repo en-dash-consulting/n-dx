@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>n-dx</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" />
+<style>
+  /* The theme is injected by src/main.tsx from the declared brand; this is only
+     the pre-paint ground so the page never flashes white, in either scheme. */
+  html, body { margin: 0; min-height: 100%; background: #f7f7f2; color: #1b1d22; }
+  @media (prefers-color-scheme: dark) { html, body { background: #0f1115; color: #e9ecf1; } }
+  #root:empty::after {
+    content: "";
+    position: fixed; inset: 0; margin: auto; width: 2.5rem; height: 2.5rem;
+    border-radius: 999px; border: 3px solid rgba(38, 105, 236, 0.25); border-top-color: #2669ec;
+    animation: ndx-spin 0.9s linear infinite;
+  }
+  @keyframes ndx-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { #root:empty::after { animation: none; } }
+</style>
+<div id="root"></div>
+<script type="module" src="/src/main.tsx"></script>

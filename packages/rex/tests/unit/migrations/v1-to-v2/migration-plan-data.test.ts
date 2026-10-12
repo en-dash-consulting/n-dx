@@ -291,3 +291,23 @@ describe("slugs against the v2 sibling set", () => {
     for (const slugs of sets.values()) expect(new Set(slugs).size).toBe(slugs.length);
   });
 });
+
+describe("metAt", () => {
+  it("stamps a met capability with its draft's spec hash, and nothing else", async () => {
+    const { draftCapabilitySpecs } = await import("../../../../src/migrations/v1-to-v2/capability-spec.js");
+    const task = item("task", "Cache the catalogue", { acceptanceCriteria: ["When offline, the catalogue still lists."] });
+    const done = item("feature", "Offline cache", { description: "The catalogue is readable offline." }, [task]);
+    const building = item("feature", "Receipt archive", { description: "Receipts are kept for a year." }, [item("task", "Keep receipts")], "in_progress");
+    const items = [item("epic", "Storage", {}, [done, building])];
+    const plan = classifyV1Tree(items);
+    const specs = draftCapabilitySpecs(plan, items, { testFiles: [] });
+    const draft = specs.find((s) => s.capability === done.id);
+    expect(draft).toBeDefined();
+    const data = buildPlanData(items, plan, { cutAt: CUT, specs });
+    expect(data.items[done.id]!.metAt).toBe(specHash(draft!));
+    expect(data.items[building.id]?.metAt).toBeUndefined();
+    expect(data.items[task.id]?.metAt).toBeUndefined();
+    // Without a draft there is no spec to hash.
+    expect(buildPlanData(items, plan, { cutAt: CUT }).items[done.id]?.metAt).toBeUndefined();
+  });
+});
