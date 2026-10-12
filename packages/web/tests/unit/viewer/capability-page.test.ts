@@ -53,7 +53,7 @@ describe("CapabilityPage", () => {
 
     const items = el.querySelectorAll(".cap-criterion");
     expect(items).toHaveLength(CAPABILITY_DETAIL_FIXTURE.criteria.length);
-    expect(el.querySelector(".cap-criteria .section-header")?.textContent).toBe("Criteria (4)");
+    expect(el.querySelector(".cap-criteria .section-header")?.textContent).toBe("Capability criteria (4)");
 
     const inherited = [...items].filter((li) => li.className.includes("cap-criterion-inherited"));
     expect(inherited).toHaveLength(1);

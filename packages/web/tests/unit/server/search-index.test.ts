@@ -375,7 +375,7 @@ describe("SearchIndex", () => {
     expect(r.id).toBe("task-1");
     expect(r.title).toBe("Authentication system");
     expect(r.description).toBe("Build auth");
-    expect(r.level).toBe("task");
+    expect(r.itemType).toBe("task");
     expect(r.status).toBe("pending");
     expect(typeof r.score).toBe("number");
     expect(r.score).toBeGreaterThan(0);
@@ -448,7 +448,7 @@ describe("SearchIndex", () => {
 
     const results = index.search("search");
     expect(results.length).toBe(4);
-    const levels = results.map((r) => r.level);
+    const levels = results.map((r) => r.itemType);
     expect(levels).toContain("epic");
     expect(levels).toContain("feature");
     expect(levels).toContain("task");

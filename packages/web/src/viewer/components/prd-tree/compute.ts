@@ -4,7 +4,7 @@
  */
 
 import type { PRDItemData, BranchStats, ItemStatus } from "./types.js";
-import { isWorkItem } from "./levels.js";
+import { isWorkItemType, itemTypeOf } from "../../external.js";
 
 /**
  * Compute stats for a list of items, counting only tasks and subtasks
@@ -24,7 +24,7 @@ export function computeBranchStats(items: PRDItemData[]): BranchStats {
 
   function walk(nodes: PRDItemData[]): void {
     for (const item of nodes) {
-      if (isWorkItem(item.level)) {
+      if (isWorkItemType(itemTypeOf(item))) {
         // Deleted items are tracked separately and excluded from total
         if (item.status === "deleted") {
           stats.deleted++;

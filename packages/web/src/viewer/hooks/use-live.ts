@@ -93,7 +93,7 @@ export interface LiveWorktreeFull extends LiveWorktreeRef {
 export interface LiveChainLink {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
 }
 
 /** Mirrors LiveRun in server/routes-live.ts. */

@@ -200,8 +200,8 @@ describe("GET /api/live", () => {
       taskId: "task-a",
       taskTitle: "title fresh",
       epicChain: [
-        { id: "epic-1", title: "Epic one", level: "epic" },
-        { id: "feature-1", title: "Feature one", level: "feature" },
+        { id: "epic-1", title: "Epic one", itemType: "epic" },
+        { id: "feature-1", title: "Feature one", itemType: "feature" },
       ],
       branch: "side",
       criteriaTotal: 2,

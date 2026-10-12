@@ -35,6 +35,7 @@ import { join } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import { loadPRDSync, prdMaxMtimeMs } from "./prd-io.js";
 import type { PRDDocument, PRDItem } from "./rex-gateway.js";
+import { itemTypeOf } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -76,7 +77,7 @@ export interface PrdNode {
   kind: "prd";
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   status: string;
   parentId?: string;
   priority?: string;
@@ -500,7 +501,7 @@ export function flattenPrdItems(doc: PRDDocument, rexDir?: string): {
         kind: "prd",
         id: item.id,
         title: item.title,
-        level: item.level,
+        itemType: itemTypeOf(item),
         status: item.status,
         ...(parentId !== undefined && { parentId }),
         ...(item.priority !== undefined && { priority: item.priority }),

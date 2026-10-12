@@ -2,19 +2,20 @@
  * Inline add form for creating child items directly within the PRD tree.
  *
  * Renders a lightweight form below a parent node, auto-inferring the child
- * level from the parent. Supports title, description, and priority fields
+ * type from the parent. Supports title, description, and priority fields
  * with keyboard shortcuts (Enter to submit, Escape to cancel).
  */
 
 import { h } from "preact";
 import { useState, useCallback, useRef, useEffect } from "preact/hooks";
-import type { ItemLevel, Priority } from "./types.js";
+import type { Priority } from "./types.js";
+import { type ItemType, childTypeOf, itemTypeLabel } from "../../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface InlineAddFormProps {
-  /** The level of the parent item (used to infer child level). */
-  parentLevel: ItemLevel;
+  /** The type of the parent item (used to infer the child type). */
+  parentType: ItemType;
   /** The ID of the parent item. */
   parentId: string;
   /** Tree depth for indentation alignment. */
@@ -28,26 +29,12 @@ export interface InlineAddFormProps {
 export interface InlineAddInput {
   title: string;
   parentId: string;
-  level: ItemLevel;
+  type: ItemType;
   description?: string;
   priority?: string;
 }
 
 // ── Constants ────────────────────────────────────────────────────────
-
-/** Infer child level from parent level. */
-const CHILD_LEVEL: Record<string, ItemLevel> = {
-  epic: "feature",
-  feature: "task",
-  task: "subtask",
-};
-
-const LEVEL_LABELS: Record<ItemLevel, string> = {
-  epic: "Epic",
-  feature: "Feature",
-  task: "Task",
-  subtask: "Subtask",
-};
 
 const PRIORITY_OPTIONS: Array<{ value: Priority | ""; label: string }> = [
   { value: "", label: "None" },
@@ -59,7 +46,7 @@ const PRIORITY_OPTIONS: Array<{ value: Priority | ""; label: string }> = [
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function InlineAddForm({ parentLevel, parentId, depth, onSubmit, onCancel }: InlineAddFormProps) {
+export function InlineAddForm({ parentType, parentId, depth, onSubmit, onCancel }: InlineAddFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<string>("");
@@ -76,10 +63,10 @@ export function InlineAddForm({ parentLevel, parentId, depth, onSubmit, onCancel
     return () => clearTimeout(timer);
   }, []);
 
-  const childLevel = CHILD_LEVEL[parentLevel];
-  if (!childLevel) return null; // subtasks can't have children
+  const childType = childTypeOf(parentType);
+  if (!childType) return null; // nothing nests under this type
 
-  const childLabel = LEVEL_LABELS[childLevel];
+  const childLabel = itemTypeLabel(childType);
   const indent = (depth + 1) * 24;
 
   const handleSubmit = useCallback(
@@ -100,7 +87,7 @@ export function InlineAddForm({ parentLevel, parentId, depth, onSubmit, onCancel
         await onSubmit({
           title: trimmedTitle,
           parentId,
-          level: childLevel,
+          type: childType,
           description: description.trim() || undefined,
           priority: priority || undefined,
         });
@@ -109,7 +96,7 @@ export function InlineAddForm({ parentLevel, parentId, depth, onSubmit, onCancel
         setSubmitting(false);
       }
     },
-    [title, description, priority, parentId, childLevel, onSubmit],
+    [title, description, priority, parentId, childType, onSubmit],
   );
 
   const handleKeyDown = useCallback(
@@ -156,7 +143,7 @@ export function InlineAddForm({ parentLevel, parentId, depth, onSubmit, onCancel
     // Main input row: icon + title + actions
     h("div", { class: "prd-inline-add-row" },
       // Level indicator
-      h("span", { class: `prd-level-badge prd-level-${childLevel}` }, childLabel),
+      h("span", { class: `prd-level-badge prd-level-${childType}` }, childLabel),
 
       // Title input
       h("input", {

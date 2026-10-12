@@ -19,12 +19,8 @@ import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
   type PRDItem,
-  type ItemLevel,
   type TreeEntry,
-  LEVEL_HIERARCHY,
-  CHILD_LEVEL,
   isPriority,
-  isItemLevel,
   validateMerge,
   previewMerge,
   mergeItems,
@@ -32,6 +28,16 @@ import {
   mergeChanges,
   type ChangesMergeOutcome,
 } from "../rex-gateway.js";
+import {
+  type ItemType,
+  childTypeOf,
+  isItemType,
+  isProductType,
+  isValidParentType,
+  itemTypeOf,
+  levelOf,
+  parentTypesOf,
+} from "../../shared/index.js";
 
 // Re-import parentIdOf from rex-route-helpers for merge handler
 
@@ -113,7 +119,8 @@ export function routeItems(
  * The fields the viewer edits through `PATCH /api/rex/items/:id`. Anything else
  * is refused — in particular `run`, which only the version-checked
  * `PUT /api/hench/prep/:taskId` may write, and the system-managed fields
- * (id, level, timestamps, blockedBy, children).
+ * (id, type, timestamps, blockedBy, children). A node's type is set when it is
+ * added and changed by `move_item`, never by an edit.
  */
 const PATCHABLE_FIELDS = new Set([
   "status", "failureReason", "priority", "tags", "title",
@@ -260,7 +267,8 @@ async function handleItemDelete(
   }
 
   const title = item.title;
-  const level = item.level;
+  const type = itemTypeOf(item);
+  const level = levelOf(type);
   try {
     await store.removeItem(itemId);
   } catch (err) {
@@ -277,7 +285,7 @@ async function handleItemDelete(
     timestamp: new Date().toISOString(),
     event: "item_deleted",
     itemId,
-    detail: `Deleted ${level} "${title}" and its descendants (via web)`,
+    detail: `Deleted ${type} "${title}" and its descendants (via web)`,
   };
   try {
     appendFileSync(logPath, JSON.stringify(logEntry) + "\n");
@@ -291,6 +299,7 @@ async function handleItemDelete(
     broadcast({
       type: "rex:item-deleted",
       itemId,
+      itemType: type,
       level,
       title,
       timestamp,
@@ -302,7 +311,7 @@ async function handleItemDelete(
     });
   }
 
-  jsonResponse(res, 200, { ok: true, id: itemId, level, title });
+  jsonResponse(res, 200, { ok: true, id: itemId, type, level, title });
   return true;
 }
 
@@ -317,6 +326,7 @@ async function handleItemAdd(
     const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       title?: string;
+      /** Node type (`change`, `task`, …). `level` is the accepted v1 spelling. */
       type?: string;
       level?: string;
       parentId?: string;
@@ -375,42 +385,48 @@ async function handleItemAdd(
       }
     }
 
-    // Resolve level: explicit > inferred from parent > default to epic
-    let level: ItemLevel;
-    if (input.level && isItemLevel(input.level)) {
-      level = input.level;
-    } else if (parent) {
-      const parentLevel = parent.level;
-      const inferred = isItemLevel(parentLevel) ? CHILD_LEVEL[parentLevel] : undefined;
+    // Resolve the type: explicit > the parent's child type > the root type.
+    const parentType = parent ? itemTypeOf(parent) : undefined;
+    const requested = itemTypeOf(input);
+    let type: ItemType;
+    if (requested) {
+      if (!isItemType(requested)) {
+        errorResponse(res, 400, `Unknown type: "${requested}"`);
+        return true;
+      }
+      type = requested;
+    } else if (parentType) {
+      const inferred = childTypeOf(parentType);
       if (!inferred) {
-        errorResponse(res, 400, `Cannot infer child level for parent type "${parentLevel}"`);
+        errorResponse(res, 400, `Cannot infer a child type for a ${parentType}`);
         return true;
       }
-      level = inferred;
+      type = inferred;
     } else {
-      level = "epic";
+      type = "epic";
     }
 
-    // Validate parent-child level relationship
-    const allowedParents = isItemLevel(level) ? LEVEL_HIERARCHY[level] : undefined;
-    if (!allowedParents) {
-      errorResponse(res, 400, `Unknown level: "${level}"`);
-      return true;
-    }
-    const canBeRoot = allowedParents.includes(null);
-
-    if (!canBeRoot && !parentId) {
-      const parentNames = allowedParents.filter((p): p is ItemLevel => p !== null).join(" or ");
-      errorResponse(res, 400, `A ${level} requires a parent (${parentNames})`);
-      return true;
-    }
-
-    if (parent) {
-      const allowedParentLevels = allowedParents.filter((p): p is ItemLevel => p !== null);
-      if (allowedParentLevels.length > 0 && !allowedParentLevels.includes(parent.level)) {
-        errorResponse(res, 400, `A ${level} must be a child of a ${allowedParentLevels.join(" or ")}, not a ${parent.level}`);
-        return true;
+    // Validate the parent-child relationship before touching the store.
+    if (!isValidParentType(type, parentType ?? null)) {
+      const allowed = parentTypesOf(type);
+      if (!parentId) {
+        errorResponse(res, 400, `A ${type} requires a parent (${allowed.join(" or ")})`);
+      } else {
+        errorResponse(res, 400, `A ${type} must be a child of a ${allowed.join(" or ")}, not a ${parentType}`);
       }
+      return true;
+    }
+
+    // The store behind this route is still v1, which has no level for a
+    // product-layer node. Refusing names the reason rather than writing the
+    // node out as an epic that reads back as something it is not.
+    const level = levelOf(type, parentType);
+    if (!level) {
+      const why = isProductType(type)
+        ? `the product layer is not writable through this route yet`
+        : `it has no v1 level`;
+      errorResponse(res, 400, `Cannot add a ${type}: ${why}`);
+      return true;
     }
 
     const id = randomUUID();
@@ -441,7 +457,7 @@ async function handleItemAdd(
       timestamp: new Date().toISOString(),
       event: "item_added",
       itemId: id,
-      detail: `Added ${level}: ${item.title} (via web)`,
+      detail: `Added ${type}: ${item.title} (via web)`,
     });
 
     if (broadcast) {
@@ -451,7 +467,8 @@ async function handleItemAdd(
       });
     }
 
-    jsonResponse(res, 201, { ok: true, id, level, title: item.title });
+    // `level` rides along for a client still reading the v1 spelling.
+    jsonResponse(res, 201, { ok: true, id, type, level, title: item.title });
   } catch (err) {
     errorResponse(res, 400, String(err));
   }

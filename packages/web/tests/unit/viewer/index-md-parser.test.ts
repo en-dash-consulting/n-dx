@@ -114,7 +114,7 @@ Just a summary, no other sections.
       expect(sections.progress).toHaveLength(3);
       expect(sections.progress?.[0]).toEqual({
         title: "Task Alpha",
-        level: "task",
+        itemType: "task",
         status: "completed",
         lastUpdated: "2026-04-30",
       });

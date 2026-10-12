@@ -41,6 +41,7 @@
  */
 
 import { h } from "preact";
+import { CRITERIA_LABEL } from "../external.js";
 
 /** Path of the apply endpoint. Exported so tests assert on the real string. */
 export const REFINEMENT_APPLY_ENDPOINT = "/api/rex/apply-refinements";
@@ -77,7 +78,7 @@ export interface RefinementProposal {
   op: "edit" | "reparent" | "merge";
   itemId: string;
   itemTitle: string;
-  itemLevel: string;
+  itemType: string;
   rationale: string;
   diffs: RefinementDiff[];
   baseline: Array<{ itemId: string; fingerprint: string }>;
@@ -103,7 +104,7 @@ export type RefinementCardState =
 /** Human-readable label for each field, used as the diff's heading. */
 const FIELD_LABEL: Record<RefinementField, string> = {
   description: "Description",
-  acceptanceCriteria: "Acceptance criteria",
+  acceptanceCriteria: CRITERIA_LABEL.work,
   priority: "Priority",
   parent: "Parent",
 };
@@ -118,12 +119,12 @@ const FIELD_LABEL: Record<RefinementField, string> = {
 export function describeProposal(proposal: RefinementProposal): string {
   switch (proposal.op) {
     case "reparent":
-      return `Move this ${proposal.itemLevel} to a different parent`;
+      return `Move this ${proposal.itemType} to a different parent`;
     case "merge":
-      return `Merge this ${proposal.itemLevel} into "${proposal.intoTitle ?? "a duplicate sibling"}"`;
+      return `Merge this ${proposal.itemType} into "${proposal.intoTitle ?? "a duplicate sibling"}"`;
     default: {
       const fields = proposal.diffs.map((diff) => FIELD_LABEL[diff.field].toLowerCase());
-      return `Rewrite the ${fields.join(" and ")} of this ${proposal.itemLevel}`;
+      return `Rewrite the ${fields.join(" and ")} of this ${proposal.itemType}`;
     }
   }
 }

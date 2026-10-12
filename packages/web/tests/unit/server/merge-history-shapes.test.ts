@@ -239,7 +239,7 @@ describe("flattenPrdItems with shape classification", () => {
     const node = nodes[0];
     expect(node.id).toBe("task1");
     expect(node.title).toBe("My Task");
-    expect(node.level).toBe("task");
+    expect(node.itemType).toBe("task");
     expect(node.status).toBe("in_progress");
     expect(node.priority).toBe("high");
     expect(node.shape).toBe("triangle");

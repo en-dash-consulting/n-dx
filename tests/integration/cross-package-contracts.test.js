@@ -512,11 +512,8 @@ describe("web → rex gateway contract", () => {
     "applyReshape",
     "reasonForReshape",
     "isPriority",
-    "isItemLevel",
     "isRequirementCategory",
     "isValidationType",
-    "isRootLevel",
-    "isWorkItem",
     "handleEditItem",
     "aggregateItemTokenUsage",
     "aggregateItemDurations",
@@ -535,11 +532,9 @@ describe("web → rex gateway contract", () => {
 
   const GATEWAY_CONSTANTS = [
     "SCHEMA_VERSION",
-    "LEVEL_HIERARCHY",
     "VALID_STATUSES",
     "VALID_REQUIREMENT_CATEGORIES",
     "VALID_VALIDATION_TYPES",
-    "CHILD_LEVEL",
     "PRD_TREE_DIRNAME",
     "PRD_CACHE_DIRNAME",
   ];
@@ -947,14 +942,14 @@ describe("gateway export auto-detection", () => {
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
         "computeRequirementsSummary", "computeHealthScore",
         "detectReorganizations", "applyProposals", "applyReshape",
-        "reasonForReshape", "isPriority", "isItemLevel",
-        "isRequirementCategory", "isValidationType", "isRootLevel", "isWorkItem",
+        "reasonForReshape", "isPriority",
+        "isRequirementCategory", "isValidationType",
         "handleEditItem", "aggregateItemTokenUsage", "aggregateItemDurations",
         "serializeDocument", "parseDocument",
         "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "prdLayout", "isChangeLayerStore", "completeV2Work", "cascadeParentReset",
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
-        "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
-        "VALID_VALIDATION_TYPES", "CHILD_LEVEL", "PRD_CACHE_DIRNAME",
+        "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
+        "VALID_VALIDATION_TYPES", "PRD_CACHE_DIRNAME",
         "estimateCostFromTotals", "validateRunSettings"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance"],
     ]);
@@ -1332,12 +1327,6 @@ describe("gateway behavioral tests: web → rex return shapes", () => {
     expect(gw).toBeDefined();
   });
 
-  it("LEVEL_HIERARCHY is a non-empty object", async () => {
-    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
-    expect(typeof gw.LEVEL_HIERARCHY).toBe("object");
-    expect(Object.keys(gw.LEVEL_HIERARCHY).length).toBeGreaterThan(0);
-  });
-
   it("diffTrees returns the five categories the PRD delta projects", async () => {
     if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
     const from = [
@@ -1389,23 +1378,10 @@ describe("gateway behavioral tests: web → rex return shapes", () => {
     expect(statuses).toEqual(expect.arrayContaining(["pending", "in_progress", "completed"]));
   });
 
-  it("CHILD_LEVEL maps parent levels to child levels", async () => {
-    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
-    expect(typeof gw.CHILD_LEVEL).toBe("object");
-    expect(gw.CHILD_LEVEL["epic"]).toBeDefined();
-    expect(gw.CHILD_LEVEL["feature"]).toBeDefined();
-  });
-
   it("isPriority validates priority strings", async () => {
     if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
     expect(gw.isPriority("high")).toBe(true);
     expect(gw.isPriority("invalid")).toBe(false);
-  });
-
-  it("isItemLevel validates level strings", async () => {
-    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
-    expect(gw.isItemLevel("epic")).toBe(true);
-    expect(gw.isItemLevel("invalid")).toBe(false);
   });
 
   it("computeStats returns stats for a tree", async () => {

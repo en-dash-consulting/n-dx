@@ -3,7 +3,7 @@ import type { PrepResponse } from "../../src/viewer/components/prepare-task-mode
 /** A `GET /api/hench/prep/:taskId` answer for an actionable task on a branch worktree. */
 export function prepFixture(overrides: Partial<PrepResponse> = {}): PrepResponse {
   return {
-    task: { id: "task-1", title: "Prep me", status: "pending", level: "task" },
+    task: { id: "task-1", title: "Prep me", status: "pending", itemType: "task" },
     workspace: { key: null, root: "/repo", branch: "main", isAnchor: false, dirty: false, liveRun: false },
     resolved: {
       vendor: { value: "claude", source: "llm.vendor" },

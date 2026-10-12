@@ -504,7 +504,7 @@ describe("Rex API routes", () => {
       expect(res.status).toBe(404);
     });
 
-    it("returns estimated storage savings and level breakdown", async () => {
+    it("returns estimated storage savings and type breakdown", async () => {
       const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       expect(res.status).toBe(200);
       const data = await res.json();
@@ -513,9 +513,9 @@ describe("Rex API routes", () => {
       expect(data.estimatedBytes).toBeGreaterThan(0);
       expect(data.totalPrdBytes).toBeGreaterThan(0);
       expect(data.estimatedBytes).toBeLessThanOrEqual(data.totalPrdBytes);
-      // Should include level breakdown
-      expect(data.levelBreakdown).toBeDefined();
-      expect(data.levelBreakdown.task).toBe(1); // task-3 is a completed task
+      // Should include the type breakdown
+      expect(data.typeBreakdown).toBeDefined();
+      expect(data.typeBreakdown.task).toBe(1); // task-3 is a completed task
       // Should echo back criteria defaults
       expect(data.criteria).toBeDefined();
       expect(data.criteria.minAgeDays).toBe(0);

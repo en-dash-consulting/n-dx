@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { GLOSSARY_TERMS, getGlossaryDefinition } from "../../../src/viewer/components/glossary-terms.js";
-import { getChildLevel } from "../../../src/viewer/components/prd-tree/levels.js";
+import { childTypeOf } from "../../../src/shared/item-type.js";
 
 const REQUIRED_TERMS = [
   "zone",
@@ -34,14 +34,18 @@ describe("GLOSSARY_TERMS", () => {
  * actually render. It first shipped saying "The three levels of the PRD
  * hierarchy" while `prd-tree` renders four level badges — Epic, Feature,
  * Task and Subtask — so a reader looking at a subtask was told it did not
- * exist. The level chain is read from `getChildLevel`, the module the tree
- * itself uses, rather than restated here: add a level there and this fails
- * until the definition accounts for it.
+ * exist. The chain is read from `childTypeOf`, the helper the tree itself
+ * uses, rather than restated here: add a type there and this fails until the
+ * definition accounts for it.
+ *
+ * The walk stops on a repeat rather than on `null`, because a type may hold
+ * its own kind — rex allows a subtask under a subtask, so `subtask`'s child
+ * type is `subtask`.
  */
 describe("epic / feature / task definition matches the rendered hierarchy", () => {
   function levelChain(): string[] {
     const chain: string[] = ["epic"];
-    for (let next = getChildLevel("epic"); next; next = getChildLevel(next)) {
+    for (let next = childTypeOf("epic"); next && !chain.includes(next); next = childTypeOf(next)) {
       chain.push(next);
     }
     return chain;

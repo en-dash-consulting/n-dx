@@ -10,6 +10,7 @@ import type { WebSocketBroadcaster } from "../websocket.js";
 import { findItemById, appendLog } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
 import { resolveStore } from "../rex-gateway.js";
+import { itemTypeOf } from "../../shared/index.js";
 
 import {
   type PRDItem,
@@ -85,8 +86,8 @@ export function routeRequirementsAnalytics(
 function collectInheritedRequirements(
   items: PRDItem[],
   targetId: string,
-): Array<RequirementRecord & { sourceItemId: string; sourceItemTitle: string; sourceItemLevel: string }> {
-  const result: Array<RequirementRecord & { sourceItemId: string; sourceItemTitle: string; sourceItemLevel: string }> = [];
+): Array<RequirementRecord & { sourceItemId: string; sourceItemTitle: string; sourceItemType: string }> {
+  const result: Array<RequirementRecord & { sourceItemId: string; sourceItemTitle: string; sourceItemType: string }> = [];
 
   // Find the item and its parent chain
   function findWithParents(
@@ -114,7 +115,7 @@ function collectInheritedRequirements(
       ...req,
       sourceItemId: found.item.id,
       sourceItemTitle: found.item.title,
-      sourceItemLevel: found.item.level,
+      sourceItemType: itemTypeOf(found.item),
     });
   }
 
@@ -126,7 +127,7 @@ function collectInheritedRequirements(
         ...req,
         sourceItemId: parent.id,
         sourceItemTitle: parent.title,
-        sourceItemLevel: parent.level,
+        sourceItemType: itemTypeOf(parent),
       });
     }
   }
@@ -493,8 +494,8 @@ function handleRequirementsTraceability(
     requirement: RequirementRecord;
     definedOnItemId: string;
     definedOnItemTitle: string;
-    definedOnItemLevel: string;
-    appliesTo: Array<{ id: string; title: string; level: string; status: string }>;
+    definedOnItemType: string;
+    appliesTo: Array<{ id: string; title: string; itemType: string; status: string }>;
   }> = [];
 
   // Collect all unique requirements and find what items they are defined on
@@ -502,7 +503,7 @@ function handleRequirementsTraceability(
     requirement: RequirementRecord;
     definedOnItemId: string;
     definedOnItemTitle: string;
-    definedOnItemLevel: string;
+    definedOnItemType: string;
     childIds: string[];
   }>();
 
@@ -515,7 +516,7 @@ function handleRequirementsTraceability(
             requirement: req,
             definedOnItemId: item.id,
             definedOnItemTitle: item.title,
-            definedOnItemLevel: item.level,
+            definedOnItemType: itemTypeOf(item),
             childIds: [],
           });
         }
@@ -527,11 +528,11 @@ function handleRequirementsTraceability(
   }
 
   // Collect descendant items for each requirement-bearing item
-  function collectDescendants(items: PRDItem[]): Array<{ id: string; title: string; level: string; status: string }> {
-    const result: Array<{ id: string; title: string; level: string; status: string }> = [];
+  function collectDescendants(items: PRDItem[]): Array<{ id: string; title: string; itemType: string; status: string }> {
+    const result: Array<{ id: string; title: string; itemType: string; status: string }> = [];
     for (const item of items) {
       if (item.status !== "deleted") {
-        result.push({ id: item.id, title: item.title, level: item.level, status: item.status });
+        result.push({ id: item.id, title: item.title, itemType: itemTypeOf(item), status: item.status });
       }
       if (Array.isArray(item.children)) {
         result.push(...collectDescendants(item.children));
@@ -545,13 +546,13 @@ function handleRequirementsTraceability(
   // For each requirement, find all items it applies to (the defining item + descendants)
   for (const [, entry] of reqMap) {
     const defItem = findItemById(doc.items, entry.definedOnItemId);
-    const appliesTo: Array<{ id: string; title: string; level: string; status: string }> = [];
+    const appliesTo: Array<{ id: string; title: string; itemType: string; status: string }> = [];
 
     if (defItem) {
       appliesTo.push({
         id: defItem.id,
         title: defItem.title,
-        level: defItem.level,
+        itemType: itemTypeOf(defItem),
         status: defItem.status,
       });
       if (Array.isArray(defItem.children)) {
@@ -563,7 +564,7 @@ function handleRequirementsTraceability(
       requirement: entry.requirement,
       definedOnItemId: entry.definedOnItemId,
       definedOnItemTitle: entry.definedOnItemTitle,
-      definedOnItemLevel: entry.definedOnItemLevel,
+      definedOnItemType: entry.definedOnItemType,
       appliesTo,
     });
   }

@@ -2,17 +2,18 @@
 id: "d8b23226-f958-4fba-a873-eb35c9045761"
 level: "task"
 title: "Make item routes type-aware and remap views that use level"
-status: "pending"
+status: "in_progress"
 priority: "medium"
 tags:
   - "pr-21"
   - "lane-web"
   - "web"
 source: "roadmap"
+startedAt: "2026-10-12T04:06:19.268Z"
 acceptanceCriteria:
   - "No web source reads level outside a compatibility shim"
   - "Plan, Work and Live e2e tests pass"
 description: "Item CRUD routes accept type; the about 41 web files that read level move to type; the product layer becomes the home page with Plan, Work and Live remapped.\n\nLabel a capability's criteria 'capability criteria' and a work item's acceptanceCriteria 'done when' (terminology decided 2026-10-08)."
-lastModified: "2026-10-08T18:56:31.327Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-12T04:06:19.753Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

@@ -14,6 +14,7 @@
 
 import { h } from "preact";
 import { BrandedHeader } from "../components/index.js";
+import { CRITERIA_LABEL } from "../external.js";
 import {
   CAPABILITY_HEALTH_LABELS,
   CAPABILITY_STATUS_LABELS,
@@ -26,8 +27,8 @@ import {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function Criteria({ capability }: { capability: CapabilityDetail }) {
-  return h("section", { class: "cap-criteria", "aria-label": "Acceptance criteria" },
-    h("h3", { class: "section-header" }, `Criteria (${capability.criteria.length})`),
+  return h("section", { class: "cap-criteria", "aria-label": CRITERIA_LABEL.capability },
+    h("h3", { class: "section-header" }, `${CRITERIA_LABEL.capability} (${capability.criteria.length})`),
     capability.criteria.length === 0
       ? h("div", { class: "empty-state" },
           "No criteria yet. A capability with no criteria cannot be shown to be met.")

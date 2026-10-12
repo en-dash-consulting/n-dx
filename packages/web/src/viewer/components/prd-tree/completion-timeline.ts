@@ -8,13 +8,14 @@
 import { h } from "preact";
 import { useMemo, useState } from "preact/hooks";
 import type { PRDItemData } from "./types.js";
+import { itemTypeOf } from "../../external.js";
 
 // ── Data source ──────────────────────────────────────────────────────
 
 export interface TimelineEntry {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   completedAt: string;
   parentChain: string[];
 }
@@ -29,7 +30,7 @@ export function buildTimeline(items: PRDItemData[], parentChain: string[] = []):
       entries.push({
         id: item.id,
         title: item.title,
-        level: item.level,
+        itemType: itemTypeOf(item),
         completedAt: item.completedAt,
         parentChain,
       });
@@ -44,9 +45,11 @@ export function buildTimeline(items: PRDItemData[], parentChain: string[] = []):
 
 // ── View ─────────────────────────────────────────────────────────────
 
-const LEVEL_ICONS: Record<string, string> = {
+const TYPE_ICONS: Record<string, string> = {
   epic: "\u25A0",
+  change: "\u25A0",
   feature: "\u25C6",
+  capability: "\u25C6",
   task: "\u25CF",
   subtask: "\u25CB",
 };
@@ -133,7 +136,7 @@ export function CompletionTimeline({ items }: CompletionTimelineProps) {
                   h("div", { class: "timeline-day-header" }, day),
                   entries.map((entry) =>
                     h("div", { key: entry.id, class: "timeline-entry" },
-                      h("span", { class: `timeline-level timeline-level-${entry.level}` }, LEVEL_ICONS[entry.level] || "\u25CF"),
+                      h("span", { class: `timeline-level timeline-level-${entry.itemType}` }, TYPE_ICONS[entry.itemType] || "\u25CF"),
                       h("span", { class: "timeline-title" }, entry.title),
                       entry.parentChain.length > 0
                         ? h("span", { class: "timeline-breadcrumb" }, entry.parentChain.join(" \u203A "))

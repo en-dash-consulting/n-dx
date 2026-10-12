@@ -26,7 +26,7 @@ import { createWSPipeline } from "./use-gateway.js";
 export interface LiveTaskChainLink {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
 }
 
 export interface LiveTaskItem {

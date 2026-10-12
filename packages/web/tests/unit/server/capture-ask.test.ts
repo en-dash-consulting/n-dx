@@ -63,6 +63,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
 interface CapturedItem {
   id: string;
   title: string;
+  /** As stored: the tree behind this route is still v1, so items carry a level. */
   level: string;
   description?: string;
   priority?: string;
@@ -140,7 +141,7 @@ describe("POST /api/rex/capture-ask", () => {
     expect(epic?.children).toHaveLength(1);
 
     const item = epic!.children![0];
-    // A task, not a feature: LEVEL_HIERARCHY accepts a task under an epic, so
+    // A task, not a feature: a task may sit directly under an epic, so
     // no filler feature has to be invented to hold an actionable item.
     expect(item.level).toBe("task");
     expect(item.title).toBe("Which zones are most coupled?");
@@ -155,10 +156,10 @@ describe("POST /api/rex/capture-ask", () => {
     const firstBody = await first.json();
     expect(firstBody.ok).toBe(true);
     expect(firstBody.item.title).toBe("First question?");
-    expect(firstBody.item.level).toBe("task");
+    expect(firstBody.item.itemType).toBe("task");
     expect(typeof firstBody.item.id).toBe("string");
     expect(firstBody.parent.title).toBe(EPIC_TITLE);
-    expect(firstBody.parent.level).toBe("epic");
+    expect(firstBody.parent.itemType).toBe("epic");
     expect(firstBody.parent.created).toBe(true);
 
     const second = await capture({ question: "Second question?", answer: "Second answer." });

@@ -28,6 +28,15 @@ import {
   collectAllIds,
   cascadeParentReset,
 } from "./rex-gateway.js";
+import { isRootType, itemTypeOf, levelOf } from "../shared/index.js";
+
+/**
+ * The v1 levels a captured change and its children are stored as. The capture
+ * paths write through the v1 store, so the type has to be resolved to a level
+ * here; `levelOf` is the one place that mapping lives.
+ */
+const CAPTURE_ROOT_LEVEL = levelOf("change")!;
+const CAPTURE_CHILD_LEVEL = levelOf("change", "change")!;
 
 /**
  * Resolve how to invoke the rex CLI for a given analyzed project.
@@ -388,7 +397,7 @@ async function handleCaptureNextSteps(
 
     let created = 0;
     let skipped = 0;
-    let epic = doc.items.find((i) => i.level === "epic" && i.title === CAPTURE_EPIC_TITLE);
+    let epic = doc.items.find((i) => isRootType(itemTypeOf(i)) && i.title === CAPTURE_EPIC_TITLE);
     let epicId = epic?.id;
 
     for (const step of input.steps) {
@@ -404,7 +413,7 @@ async function handleCaptureNextSteps(
         const epicItem: PRDItem = {
           id: epicId,
           title: CAPTURE_EPIC_TITLE,
-          level: "epic",
+          level: CAPTURE_ROOT_LEVEL,
           status: "pending",
           source: "sv-next-steps",
           description: "Findings captured from the SourceVision Overview Next Steps panel.",
@@ -418,7 +427,7 @@ async function handleCaptureNextSteps(
       const item: PRDItem = {
         id: randomUUID(),
         title: step.title!.trim(),
-        level: "feature",
+        level: CAPTURE_CHILD_LEVEL,
         status: "pending",
         source: "sv-next-steps",
         tags,
@@ -540,7 +549,7 @@ async function handleCaptureAsk(
     const doc = await store.loadDocument();
 
     const existingEpic = doc.items.find(
-      (i) => i.level === "epic" && i.title === ASK_CAPTURE_EPIC_TITLE,
+      (i) => isRootType(itemTypeOf(i)) && i.title === ASK_CAPTURE_EPIC_TITLE,
     );
     let epicId = existingEpic?.id;
     const epicCreated = epicId === undefined;
@@ -549,7 +558,7 @@ async function handleCaptureAsk(
       const epicItem: PRDItem = {
         id: epicId,
         title: ASK_CAPTURE_EPIC_TITLE,
-        level: "epic",
+        level: CAPTURE_ROOT_LEVEL,
         status: "pending",
         source: "sv-ask",
         description: "Questions and answers captured from the SourceVision Ask panel.",
@@ -591,11 +600,11 @@ async function handleCaptureAsk(
 
     jsonResponse(res, 200, {
       ok: true,
-      item: { id: item.id, title: item.title, level: item.level },
+      item: { id: item.id, title: item.title, itemType: itemTypeOf(item) },
       parent: {
         id: epicId,
         title: ASK_CAPTURE_EPIC_TITLE,
-        level: "epic",
+        itemType: "epic",
         created: epicCreated,
       },
     });
@@ -977,7 +986,7 @@ async function handleAcceptEditedProposals(
     for (const parentId of parentsToCascade) {
       const { resetItems } = await cascadeParentReset(store, parentId);
       for (const item of resetItems) {
-        console.log(`[accept-edited] reset ${item.level} id=${item.id} title="${item.title}" -> pending`);
+        console.log(`[accept-edited] reset ${itemTypeOf(item)} id=${item.id} title="${item.title}" -> pending`);
       }
     }
 

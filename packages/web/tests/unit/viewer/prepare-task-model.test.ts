@@ -189,7 +189,7 @@ describe("prepare task model", () => {
   });
 
   it("adds --reset-deferred for a deferred task, as the server does", () => {
-    const deferred = prepFixture({ task: { id: "task-1", title: "t", status: "deferred", level: "task" } });
+    const deferred = prepFixture({ task: { id: "task-1", title: "t", status: "deferred", itemType: "task" } });
     expect(commandWords(deferred, "task-1", defaultsOf(deferred), {})).toContain("--reset-deferred");
   });
 });

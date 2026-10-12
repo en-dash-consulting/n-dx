@@ -113,7 +113,7 @@ export function useDeleteActions({
           throw new Error(errBody.error || `HTTP ${res.status}`);
         }
         const result = await res.json();
-        showToast(`Deleted ${result.level}: ${result.title}`);
+        showToast(`Deleted ${result.type}: ${result.title}`);
         await fetchPRDData();
         await fetchTaskUsage();
       } catch (err) {

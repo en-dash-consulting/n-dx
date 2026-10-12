@@ -49,7 +49,7 @@ function editProposal(overrides: Partial<RefinementProposal> = {}): RefinementPr
     op: "edit",
     itemId: "task-a",
     itemTitle: "Add the Ask panel",
-    itemLevel: "task",
+    itemType: "task",
     rationale: "The criteria do not say what done looks like.",
     diffs: [{
       field: "acceptanceCriteria",
@@ -208,7 +208,7 @@ describe("AskView — PRD refinement proposals", () => {
     const [card] = proposalCards();
     expect(card).toBeDefined();
     const fields = [...card.querySelectorAll(".sv-ask-diff-field")].map((n) => n.textContent);
-    expect(fields).toEqual(["Acceptance criteria"]);
+    expect(fields).toEqual(["Done when"]);
 
     const before = card.querySelector(".sv-ask-diff-before")?.textContent ?? "";
     const after = card.querySelector(".sv-ask-diff-after")?.textContent ?? "";
@@ -239,7 +239,7 @@ describe("AskView — PRD refinement proposals", () => {
     await askInRefineMode();
 
     const summary = proposalCards()[0].querySelector(".sv-ask-proposal-summary")?.textContent ?? "";
-    expect(summary).toContain("acceptance criteria");
+    expect(summary).toContain("done when");
     expect(proposalCards()[0].getAttribute("data-proposal-op")).toBe("edit");
   });
 
@@ -447,7 +447,7 @@ describe("AskView — PRD refinement proposals", () => {
 
 describe("describeProposal", () => {
   it("names the operation, which the diff values do not", () => {
-    expect(describeProposal(editProposal())).toContain("Rewrite the acceptance criteria");
+    expect(describeProposal(editProposal())).toContain("Rewrite the done when");
     expect(describeProposal(editProposal({ op: "reparent" }))).toContain("different parent");
     expect(describeProposal(editProposal({ op: "merge", intoTitle: "Other task" })))
       .toContain('into "Other task"');

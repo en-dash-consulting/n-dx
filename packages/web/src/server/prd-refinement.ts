@@ -47,7 +47,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
-  LEVEL_HIERARCHY,
   findItem,
   insertChild,
   isPriority,
@@ -60,7 +59,8 @@ import {
   validateMerge,
   walkTree,
 } from "./rex-gateway.js";
-import type { ItemLevel, PRDDocument, PRDItem } from "./rex-gateway.js";
+import type { PRDDocument, PRDItem } from "./rex-gateway.js";
+import { isValidParentType, itemTypeOf, parentTypesOf } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Caps
@@ -130,7 +130,7 @@ interface RefinementCommon {
   id: string;
   itemId: string;
   itemTitle: string;
-  itemLevel: string;
+  itemType: string;
   /** The model's stated reason. Empty when it gave none. */
   rationale: string;
   /** Exactly the fields this proposal changes, in a fixed order. */
@@ -188,7 +188,9 @@ export interface RefinementOutcome {
  */
 export function itemFingerprint(item: PRDItem): string {
   const canonical = JSON.stringify({
-    level: item.level,
+    // The key stays `level` so a fingerprint taken before the move to `type`
+    // still matches; on a v1 tree the value is the same string either way.
+    level: itemTypeOf(item),
     title: item.title,
     description: item.description ?? null,
     acceptanceCriteria: item.acceptanceCriteria ?? null,
@@ -234,7 +236,7 @@ export function renderPrdContext(doc: PRDDocument): string[] {
 
   for (const entry of shown) {
     const item = entry.item;
-    const facts = [item.level, item.status, item.priority ? `priority ${item.priority}` : null]
+    const facts = [itemTypeOf(item), item.status, item.priority ? `priority ${item.priority}` : null]
       .filter(Boolean)
       .join(", ");
     lines.push(`- \`${item.id}\` (${facts}) — ${truncate(item.title, MAX_ITEM_PROSE_CHARS)}`);
@@ -373,10 +375,10 @@ function validateAgainst(doc: PRDDocument, proposal: RefinementProposal, changeL
         return "An item cannot be moved under one of its own descendants.";
       }
     }
-    const allowed = (LEVEL_HIERARCHY[entry.item.level as ItemLevel] ?? [])
-      .filter((level): level is ItemLevel => level !== null);
-    if (!allowed.includes(target.item.level as ItemLevel)) {
-      return `A ${entry.item.level} cannot sit under a ${target.item.level}.`;
+    const movedType = itemTypeOf(entry.item);
+    const targetType = itemTypeOf(target.item);
+    if (!isValidParentType(movedType, targetType)) {
+      return `A ${movedType} cannot sit under a ${targetType}.`;
     }
     if (parentIdOf(entry) === proposal.toParentId) {
       return "The item is already under that parent.";
@@ -456,7 +458,7 @@ function buildEdit(
       id,
       itemId: item.id,
       itemTitle: item.title,
-      itemLevel: item.level,
+      itemType: itemTypeOf(item),
       rationale: truncate(raw.rationale ?? "", MAX_RATIONALE_CHARS),
       updates,
       diffs,
@@ -481,7 +483,7 @@ function buildReparent(
     id,
     itemId: entry.item.id,
     itemTitle: entry.item.title,
-    itemLevel: entry.item.level,
+    itemType: itemTypeOf(entry.item),
     rationale: truncate(raw.rationale ?? "", MAX_RATIONALE_CHARS),
     fromParentId,
     toParentId: raw.parentId,
@@ -546,7 +548,7 @@ function buildMerge(
       id,
       itemId: entry.item.id,
       itemTitle: entry.item.title,
-      itemLevel: entry.item.level,
+      itemType: itemTypeOf(entry.item),
       rationale: truncate(raw.rationale ?? "", MAX_RATIONALE_CHARS),
       intoId: target.item.id,
       intoTitle: target.item.title,

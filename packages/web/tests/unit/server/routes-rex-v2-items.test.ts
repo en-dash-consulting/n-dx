@@ -13,6 +13,7 @@ import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import { refreshPRDCache } from "../../../src/server/prd-io.js";
 import { itemFingerprint, type RefinementProposal } from "../../../src/server/prd-refinement.js";
+import { itemTypeOf } from "../../../src/shared/index.js";
 import { resolveStore, findItem, detectReorganizations, type PRDItem } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
@@ -290,7 +291,7 @@ describe("Rex item routes on a v2 project", () => {
         op: "merge",
         itemId,
         itemTitle: findItem(doc.items, itemId)!.item.title,
-        itemLevel: findItem(doc.items, itemId)!.item.level,
+        itemType: itemTypeOf(findItem(doc.items, itemId)!.item),
         rationale: "Same work.",
         intoId,
         intoTitle: findItem(doc.items, intoId)!.item.title,

@@ -42,7 +42,7 @@ function snapshot(over: Partial<LiveTaskSnapshot> = {}): LiveTaskSnapshot {
     task: {
       id: "t1", title: "Fix the thing", description: "Do it well", status: "in_progress", priority: "high",
       acceptanceCriteria: ["first", "second"],
-      epicChain: [{ id: "e", title: "Epic", level: "epic" }, { id: "f", title: "Feature", level: "feature" }],
+      epicChain: [{ id: "e", title: "Epic", itemType: "epic" }, { id: "f", title: "Feature", itemType: "feature" }],
     },
     runs: [run(), run({ runId: "r1", status: "failed", finishedAt: "2026-10-01T09:30:00.000Z", startedAt: "2026-10-01T09:00:00.000Z", pid: null, startedFrom: null, outcome: "Tests failed" })],
     maxTurns: 50,

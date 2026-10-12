@@ -14,7 +14,9 @@
 
 import { h, Fragment } from "preact";
 import { useState, useMemo, useCallback, useEffect } from "preact/hooks";
-import type {PRDItemData, PRDDocumentData, ItemLevel} from "./types.js";import { computeBranchStats, completionRatio } from "./compute.js";
+import type { PRDItemData, PRDDocumentData } from "./types.js";
+import { computeBranchStats, completionRatio } from "./compute.js";
+import { itemTypeLabel, itemTypeOf } from "../../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -44,13 +46,6 @@ const STATUS_ICONS: Record<string, string> = {
   deferred: "\u25CC",     // ◌
   blocked: "\u2298",      // ⊘
   deleted: "\u2715",      // ✕
-};
-
-const LEVEL_LABELS: Record<ItemLevel, string> = {
-  epic: "Epic",
-  feature: "Feature",
-  task: "Task",
-  subtask: "Subtask",
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -160,7 +155,7 @@ function DiffNodeRow({
     hasChildren ? "prune-diff-node-expandable" : "",
     isPrunable ? "prune-diff-node-prunable" : "",
     isAffectedParent ? "prune-diff-node-affected" : "",
-    `prd-level-${item.level}`,
+    `prd-level-${itemTypeOf(item)}`,
   ].filter(Boolean).join(" ");
 
   const handleClick = (e: MouseEvent) => {
@@ -197,10 +192,10 @@ function DiffNodeRow({
       class: `prune-diff-status prd-status-${item.status}${isPrunable ? " prune-diff-status-prunable" : ""}`,
     }, STATUS_ICONS[item.status] ?? "\u25CF"),
 
-    // Level badge
+    // Type badge
     h("span", {
-      class: `prd-level-badge prd-level-${item.level}`,
-    }, LEVEL_LABELS[item.level]),
+      class: `prd-level-badge prd-level-${itemTypeOf(item)}`,
+    }, itemTypeLabel(itemTypeOf(item))),
 
     // Title
     h("span", {

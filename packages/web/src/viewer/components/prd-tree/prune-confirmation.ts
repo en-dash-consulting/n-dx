@@ -17,7 +17,7 @@
 
 import { h } from "preact";
 import { useState, useCallback } from "preact/hooks";
-import { getLevelLabel, getLevelPlural } from "./levels.js";
+import { itemTypeLabel, itemTypePlural } from "../../external.js";
 import { PruneDiffTree } from "./prune-diff-tree.js";
 import type { EpicImpact } from "./prune-diff-tree.js";
 // ── Helpers (inlined to avoid cross-zone import from ../../utils) ────
@@ -39,7 +39,7 @@ export interface PruneConfirmationProps {
 interface PrunableItem {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   status: string;
   childCount: number;
   totalCount: number;
@@ -52,7 +52,7 @@ interface PrunePreview {
   hasPrunableItems: boolean;
   estimatedBytes: number;
   totalPrdBytes: number;
-  levelBreakdown: Record<string, number>;
+  typeBreakdown: Record<string, number>;
   criteria: {
     minAgeDays: number;
     statuses: string[];
@@ -78,8 +78,8 @@ interface PruneCriteria {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-// Level labels provided by getLevelLabel() from ./levels.ts
-// Level icons specific to prune UI (geometric shapes for compact display)
+// Type labels come from itemTypeLabel() in shared/item-type.ts.
+// Icons specific to the prune UI (geometric shapes for compact display).
 const PRUNE_ICONS: Record<string, string> = {
   epic: "\u25A0",     // ■
   feature: "\u25C6",   // ◆
@@ -475,15 +475,15 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
             )
           : null,
       ),
-      // Level breakdown
-      Object.keys(preview.levelBreakdown).length > 0
+      // Type breakdown
+      Object.keys(preview.typeBreakdown).length > 0
         ? h("div", { class: "prune-confirmation-breakdown" },
-            Object.entries(preview.levelBreakdown).map(([level, count]) =>
+            Object.entries(preview.typeBreakdown).map(([type, count]) =>
               h("span", {
-                key: level,
-                class: `prune-confirmation-level-chip prd-level-${level}`,
+                key: type,
+                class: `prune-confirmation-level-chip prd-level-${type}`,
               },
-                `${count} ${count !== 1 ? getLevelPlural(level).toLowerCase() : getLevelLabel(level).toLowerCase()}`,
+                `${count} ${count !== 1 ? itemTypePlural(type).toLowerCase() : itemTypeLabel(type).toLowerCase()}`,
               ),
             ),
           )
@@ -522,12 +522,12 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
                   key: item.id,
                   class: "prune-confirmation-item",
                 },
-                  h("span", { class: `prune-confirmation-item-icon prd-level-${item.level}` },
-                    PRUNE_ICONS[item.level] ?? "\u2022",
+                  h("span", { class: `prune-confirmation-item-icon prd-level-${item.itemType}` },
+                    PRUNE_ICONS[item.itemType] ?? "\u2022",
                   ),
                   h("span", { class: "prune-confirmation-item-title" }, item.title),
-                  h("span", { class: `prd-level-badge prd-level-${item.level}` },
-                    getLevelLabel(item.level),
+                  h("span", { class: `prd-level-badge prd-level-${item.itemType}` },
+                    itemTypeLabel(item.itemType),
                   ),
                   item.totalCount > 1
                     ? h("span", { class: "prune-confirmation-item-count" },

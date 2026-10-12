@@ -9,7 +9,8 @@
 
 export interface ProgressRow {
   title: string;
-  level: string;
+  /** The row's node type. rex still heads this column "Level" in index.md. */
+  itemType: string;
   status: string;
   lastUpdated: string;
 }
@@ -154,7 +155,7 @@ function parseProgressTable(content: string): ProgressRow[] {
     if (cells.length >= 4) {
       rows.push({
         title: cells[0],
-        level: cells[1],
+        itemType: cells[1],
         status: cells[2],
         lastUpdated: cells[3],
       });

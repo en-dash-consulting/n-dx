@@ -90,7 +90,14 @@ export interface PRDItemData {
   id: string;
   title: string;
   status: ItemStatus;
-  level: ItemLevel;
+  /**
+   * v2 node type. Absent on a v1 tree, which carries {@link PRDItemData.level}
+   * instead — read either through `itemTypeOf` from `shared/item-type.ts`,
+   * never directly.
+   */
+  type?: string;
+  /** @deprecated v1 spelling of {@link PRDItemData.type}; read via `itemTypeOf`. */
+  level?: ItemLevel;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: Priority;

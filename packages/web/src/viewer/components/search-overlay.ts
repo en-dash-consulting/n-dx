@@ -15,17 +15,8 @@
 import {h} from "preact";import type { ComponentChild } from "preact";
 import { useState, useEffect, useRef, useCallback, useMemo } from "preact/hooks";
 import type { NavigateTo } from "../api.js";
+import { itemTypeEmoji } from "../external.js";
 
-// ── Level emoji (self-contained mirror of prd-tree/levels.ts — no cross-zone import) ──
-const LEVEL_EMOJI: Record<string, string> = {
-  epic: "\u{1F4E6}",    // 📦
-  feature: "\u{2728}",   // ✨
-  task: "\u{1F4CB}",     // 📋
-  subtask: "\u{1F539}",  // 🔹
-};
-function getLevelEmoji(level: string): string {
-  return LEVEL_EMOJI[level] ?? "\u2022";
-}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -33,7 +24,7 @@ interface SearchResult {
   id: string;
   title: string;
   description: string | null;
-  level: string;
+  itemType: string;
   status: string;
   parentChain: string[];
   score: number;
@@ -267,7 +258,7 @@ export function SearchOverlay({ visible, onClose, navigateTo }: SearchOverlayPro
   const filteredResults = useMemo(() => {
     if (activeFilterCount === 0) return results;
     return results.filter((r) => {
-      if (filters.levels.size > 0 && !filters.levels.has(r.level)) return false;
+      if (filters.levels.size > 0 && !filters.levels.has(r.itemType)) return false;
       if (filters.statuses.size > 0 && !filters.statuses.has(r.status)) return false;
       // Priority filtering is approximate — the API doesn't return priority,
       // so we skip it when the field isn't available. A future enhancement
@@ -554,7 +545,7 @@ function renderResult(
 
   const statusClass = `status-badge status-badge--${result.status}`;
   const statusLabel = STATUS_LABELS[result.status] ?? result.status;
-  const levelIcon = getLevelEmoji(result.level);
+  const levelIcon = itemTypeEmoji(result.itemType);
 
   return h("div", {
     id: `search-result-${index}`,
@@ -572,7 +563,7 @@ function renderResult(
   },
     // Top row: level icon + highlighted title + status badge
     h("div", { class: "search-result-header" },
-      h("span", { class: "search-result-level", title: result.level }, levelIcon),
+      h("span", { class: "search-result-level", title: result.itemType }, levelIcon),
       h("span", { class: "search-result-title" },
         ...highlightText(result.title, queryTerms),
       ),

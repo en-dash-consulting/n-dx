@@ -77,7 +77,7 @@ export interface PrepResolvedSettings {
 
 /** `GET /api/hench/prep/:taskId`, as the modal reads it. */
 export interface PrepResponse {
-  task: { id: string; title: string; status: string; level: string } | null;
+  task: { id: string; title: string; status: string; itemType: string } | null;
   workspace: {
     key: string | null;
     root: string;

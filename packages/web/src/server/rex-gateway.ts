@@ -53,20 +53,20 @@ export { checkTreeConformance } from "@n-dx/rex";
 export { SCHEMA_VERSION, isCompatibleSchema } from "@n-dx/rex";
 
 // ---- Rex domain types & constants -------------------------------------------
-export type { ItemLevel, ItemStatus } from "@n-dx/rex";
+// The level system is deliberately absent. Web reads a node's type through
+// `shared/item-type.ts` — the one module that knows about v1's `level` — so
+// routes no longer need rex's `LEVEL_HIERARCHY` / `CHILD_LEVEL` / `isItemLevel`
+// and the mirror is pinned against rex by
+// `tests/unit/shared/item-type-contract.test.ts`.
+export type { ItemStatus } from "@n-dx/rex";
 export type { PRDItem, PRDDocument, Requirement } from "@n-dx/rex";
 export {
-  LEVEL_HIERARCHY,
   VALID_STATUSES,
   VALID_REQUIREMENT_CATEGORIES,
   VALID_VALIDATION_TYPES,
-  CHILD_LEVEL,
   isPriority,
-  isItemLevel,
   isRequirementCategory,
   isValidationType,
-  isRootLevel,
-  isWorkItem,
 } from "@n-dx/rex";
 
 // ---- Rex tree utilities -----------------------------------------------------

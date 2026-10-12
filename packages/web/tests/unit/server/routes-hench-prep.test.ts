@@ -599,7 +599,7 @@ describe("hench prep routes", () => {
         title: "Task crit",
         status: "pending",
         priority: "critical",
-        level: "task",
+        itemType: "task",
         parentChain: ["The epic", "The feature"],
         criteriaCount: 2,
         tags: ["web", "prep"],

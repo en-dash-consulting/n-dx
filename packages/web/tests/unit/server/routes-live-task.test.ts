@@ -96,7 +96,7 @@ describe("buildLiveTaskSnapshot", () => {
     expect(snap.task).toMatchObject({
       title: "Task one", description: "Do the thing", priority: "high", status: "in_progress",
       acceptanceCriteria: ["first", "second"],
-      epicChain: [{ id: "e1", title: "Epic", level: "epic" }, { id: "f1", title: "Feature", level: "feature" }],
+      epicChain: [{ id: "e1", title: "Epic", itemType: "epic" }, { id: "f1", title: "Feature", itemType: "feature" }],
     });
     expect(snap.runs.map((r) => r.runId)).toEqual(["r2", "r1"]);
     const [running, failed] = snap.runs;

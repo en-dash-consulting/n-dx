@@ -47,5 +47,29 @@ export type { RunOptions, RunOptionKey, RunMode, HubMemoryPressure } from "../sh
 export { RUN_OPTION_SPECS, checkRunOptions, workCommandArgs, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "../shared/index.js";
 export { HUB_PATH, detectBasePath, detectViewerBasePath, workspaceKeyFromBasePath, withBasePath, stripBasePath, webSocketUrl } from "../shared/index.js";
 
+// ── Item type (the v1 `level` compatibility shim) ─────────────────────────
+// The viewer reads a node's type through `itemTypeOf`, never `item.level`, and
+// asks these helpers about the hierarchy rather than keeping its own tables —
+// it used to keep six copies of a level-label map and a level hierarchy that
+// had already drifted from rex's. Accessors only: the backing tables stay
+// behind `shared/item-type.ts` so a consumer cannot index one directly and
+// skip the fallback.
+export type { ItemType } from "../shared/index.js";
+export {
+  CRITERIA_LABEL,
+  canAddChildType,
+  itemTypeOf,
+  isRootType,
+  isWorkItemType,
+  isContainerType,
+  childTypeOf,
+  parentTypesOf,
+  isValidParentType,
+  itemTypeLabel,
+  itemTypePlural,
+  itemTypeEmoji,
+  criteriaLabel,
+} from "../shared/index.js";
+
 // ── Messaging (via barrel) ───────────────────────────────────────────────────
 export { frameIsForWorkspace } from "./messaging/index.js";

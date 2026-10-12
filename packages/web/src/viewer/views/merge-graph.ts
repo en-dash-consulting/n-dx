@@ -30,6 +30,7 @@ import { usePanZoom, useGraphArrowNav } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import type { PRDItemData } from "../components/prd-tree/types.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
+import { isRootType } from "../external.js";
 
 // ── API types (mirrors packages/web/src/server/merge-history.ts) ─────────────
 
@@ -61,7 +62,7 @@ interface PrdNode {
   kind: "prd";
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   status: string;
   parentId?: string;
   priority?: string;
@@ -176,14 +177,14 @@ const SHAPE_COLOR: Record<string, string> = {
   triangle:  "var(--brand-rose)",
 };
 
-const LEVEL_DEPTH: Record<string, number> = {
-  epic: 0, feature: 1, task: 2, subtask: 3,
+const TYPE_DEPTH: Record<string, number> = {
+  epic: 0, change: 0, feature: 1, capability: 1, task: 2, subtask: 3,
 };
 
 // Reduced node radii so the compact layout doesn't crowd. Values are tuned so
 // each node fits comfortably inside the ROW_H rhythm with room for stroke.
-const LEVEL_RADIUS: Record<string, number> = {
-  epic: 7, feature: 6, task: 5, subtask: 4,
+const TYPE_RADIUS: Record<string, number> = {
+  epic: 7, change: 7, feature: 6, capability: 6, task: 5, subtask: 4,
 };
 
 // ── Layout computation ────────────────────────────────────────────────────────
@@ -261,7 +262,7 @@ function computeLayout(
   function traverse(nodeId: string): void {
     const node = prdNodes.find((p) => p.id === nodeId);
     if (!node) return;
-    const depth = LEVEL_DEPTH[node.level] ?? 3;
+    const depth = TYPE_DEPTH[node.itemType] ?? 3;
     if (depth > maxDepth) maxDepth = depth;
     positions.set(nodeId, {
       x: depth * INDENT_W,
@@ -595,10 +596,10 @@ const EMPTY_FIELD = "—"; // em dash
  * the parent view on click; this component renders the loading / ready /
  * error / "no commit history" states uniformly.
  */
-function PrdFrontMatterSummary({ item, fallback, level, origin, onClose }: {
+function PrdFrontMatterSummary({ item, fallback, itemType, origin, onClose }: {
   item: PRDItemData | null;
   fallback: { title: string; status: string; priority?: string };
-  level: string;
+  itemType: string;
   origin: OriginEntry | undefined;
   onClose: () => void;
 }) {
@@ -609,7 +610,7 @@ function PrdFrontMatterSummary({ item, fallback, level, origin, onClose }: {
 
   return h("div", { class: "mg-detail mg-detail-prd" },
     h("div", { class: "mg-detail-header" },
-      h("span", { class: "mg-detail-title" }, level.toUpperCase()),
+      h("span", { class: "mg-detail-title" }, itemType.toUpperCase()),
       h("button", {
         class: "mg-detail-close",
         onClick: onClose,
@@ -789,7 +790,7 @@ function DetailPanelContent({ selection, prdData, origin, onClose }: {
   return h(PrdFrontMatterSummary, {
     item,
     fallback: { title: pn.title, status: pn.status, priority: pn.priority },
-    level: pn.level,
+    itemType: pn.itemType,
     origin,
     onClose,
   });
@@ -916,7 +917,7 @@ function MergeMetaPanel({ graph, selection }: {
 
   if (merges.length === 0) {
     const ctx = selection.kind === "prd"
-      ? `${selection.node.level}: ${selection.node.title}`
+      ? `${selection.node.itemType}: ${selection.node.title}`
       : "";
     return h("div", {
       class: "mg-meta-panel mg-meta-no-merge",
@@ -977,14 +978,14 @@ function ContextTableView({
   };
 
   const rows = useMemo(() => {
-    const LEVEL_ORDER = ["epic", "feature", "task", "subtask"];
+    const TYPE_ORDER = ["epic", "change", "feature", "capability", "task", "subtask"];
     const prdNodes = graph.nodes.filter((n): n is PrdNode => n.kind === "prd" && visiblePrdIds.has(n.id));
     return [...prdNodes].sort((a, b) => {
       let cmp = 0;
       if (sortCol === "title") {
         cmp = a.title.localeCompare(b.title);
       } else if (sortCol === "type") {
-        cmp = (LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level)) || a.title.localeCompare(b.title);
+        cmp = (TYPE_ORDER.indexOf(a.itemType) - TYPE_ORDER.indexOf(b.itemType)) || a.title.localeCompare(b.title);
       } else if (sortCol === "parent") {
         const ap = a.parentId ? (parentTitleById.get(a.parentId) ?? "") : "";
         const bp = b.parentId ? (parentTitleById.get(b.parentId) ?? "") : "";
@@ -1036,7 +1037,7 @@ function ContextTableView({
                 },
               },
                 h("td", null, n.title),
-                h("td", null, h("span", { class: `mg-level-badge mg-level-${n.level}` }, n.level)),
+                h("td", null, h("span", { class: `mg-level-badge mg-level-${n.itemType}` }, n.itemType)),
                 h("td", null, parentTitle),
                 h("td", null,
                   h("span", { class: `mg-status-chip mg-status-${n.status.replace(/_/g, "-")}` },
@@ -1155,7 +1156,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
   // ── Compute visible sets based on filters ──────────────────────────────────
   const epics = useMemo(() => {
     if (!graph) return [] as PrdNode[];
-    return graph.nodes.filter((n): n is PrdNode => n.kind === "prd" && n.level === "epic");
+    return graph.nodes.filter((n): n is PrdNode => n.kind === "prd" && isRootType(n.itemType));
   }, [graph]);
 
   // Filter pass: which PRD/merge ids survive epic+status+date filters and the
@@ -1197,7 +1198,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
 
     const prdSet = new Set<string>();
     for (const n of prdNodes) {
-      if (viewMode === "epics-only" && n.level !== "epic") continue;
+      if (viewMode === "epics-only" && !isRootType(n.itemType)) continue;
       if (!epicFilter(n.id)) continue;
       if (!filters.statuses.has(n.status)) continue;
       prdSet.add(n.id);
@@ -1726,7 +1727,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
             .filter((n): n is LayoutPrdNode => n.kind === "prd")
             .map((ln) => {
               const n = ln.node;
-              const r = LEVEL_RADIUS[n.level] ?? 6;
+              const r = TYPE_RADIUS[n.itemType] ?? 6;
               const fill = SHAPE_COLOR[n.shape ?? "circle"] ?? "var(--text-muted)";
               const isHighlighted = hasHighlight ? highlightIds.has(n.id) : true;
               const isSelected = selected?.kind === "prd" && selected.node.id === n.id;
@@ -1738,7 +1739,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
                 onClick: (e: MouseEvent) => { e.stopPropagation(); handlePrdClick(n); },
                 role: "button",
                 tabIndex: 0,
-                "aria-label": `PRD ${n.level}: ${n.title} (${n.status})`,
+                "aria-label": `PRD ${n.itemType}: ${n.title} (${n.status})`,
                 ref: (el: Element | null) => {
                   if (el) prdNodeRefs.current.set(n.id, el);
                   else prdNodeRefs.current.delete(n.id);
@@ -1760,8 +1761,8 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
                   class: "mg-label mg-prd-label",
                   "text-anchor": "start",
                   "dominant-baseline": "middle",
-                  "font-size": n.level === "epic" ? 11 : 10,
-                  "font-weight": n.level === "epic" ? 600 : 400,
+                  "font-size": isRootType(n.itemType) ? 11 : 10,
+                  "font-weight": isRootType(n.itemType) ? 600 : 400,
                 }, shortStatus(n.status) + " " + (n.title.length > 48 ? n.title.slice(0, 46) + "…" : n.title)),
               );
             }),

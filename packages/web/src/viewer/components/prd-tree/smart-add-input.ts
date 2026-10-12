@@ -18,7 +18,7 @@ import type { ComponentChildren } from "preact";
 import { useState, useCallback, useRef, useEffect, useMemo } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
-import { isContainerLevel, isRootLevel, getLevelLabel } from "./levels.js";
+import { isContainerType, isRootType, itemTypeLabel, itemTypeOf } from "../../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -66,7 +66,7 @@ type PreviewState = "idle" | "loading" | "done" | "error";
 interface ScopeOption {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   depth: number;
 }
 
@@ -126,11 +126,12 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
         if (cancelled) return;
 
         const options: ScopeOption[] = [];
-        function walk(items: Array<{ id: string; title: string; level: string; children?: unknown[] }>, depth: number) {
+        function walk(items: Array<{ id: string; title: string; type?: string; level?: string; children?: unknown[] }>, depth: number) {
           for (const item of items) {
-            if (isContainerLevel(item.level)) {
-              options.push({ id: item.id, title: item.title, level: item.level, depth });
-              if (isRootLevel(item.level) && Array.isArray(item.children)) {
+            const itemType = itemTypeOf(item);
+            if (isContainerType(itemType)) {
+              options.push({ id: item.id, title: item.title, itemType, depth });
+              if (isRootType(itemType) && Array.isArray(item.children)) {
                 walk(item.children as typeof items, depth + 1);
               }
             }
@@ -369,7 +370,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
   const scopeLabel = useMemo(() => {
     if (!selectedScope) return null;
     const opt = scopeOptions.find((o) => o.id === selectedScope);
-    return opt ? `${opt.level}: ${opt.title}` : null;
+    return opt ? `${opt.itemType}: ${opt.title}` : null;
   }, [selectedScope, scopeOptions]);
 
   const panelClass = bar ? "smart-add-panel smart-add-panel-bar" : "smart-add-panel";
@@ -403,7 +404,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
             h("option", { value: "" }, "Entire project (new epics)"),
             scopeOptions.map((opt) =>
               h("option", { key: opt.id, value: opt.id },
-                `${"  ".repeat(opt.depth)}${getLevelLabel(opt.level)}: ${opt.title}`,
+                `${"  ".repeat(opt.depth)}${itemTypeLabel(opt.itemType)}: ${opt.title}`,
               ),
             ),
           ),
