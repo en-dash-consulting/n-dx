@@ -15,6 +15,10 @@
  * - **Folders.** A change is always a folder (`<slug>/index.md`), so tasks can
  *   be added without moving it; any other node is a folder only while it has
  *   children, and a leaf `<slug>.md` otherwise.
+ * - **Inbox.** A top-level change with `needsPlacement` is stored in the
+ *   reserved `changes/inbox/` folder ({@link INBOX_DIRNAME}) and moves to the
+ *   changes root when placement clears the flag, keeping its id and slug. No
+ *   top-level change may take the slug `inbox`.
  * - **Root header.** `product/index.md` carries the title, the `schema` stamp
  *   and the `slugRule` that new slugs are made under: the v1 `tree-meta.json`
  *   sidecar has no v2 counterpart and is never written.
@@ -67,9 +71,11 @@ import { SLUG_RULE_VERSION, isWindowsSafeSegment } from "./folder-tree-serialize
 import { prdLockPath } from "./paths.js";
 import {
   CHANGES_DIRNAME,
+  INBOX_DIRNAME,
   PRODUCT_DIRNAME,
   assertPrdModelWritable,
   assertV2TreeWritable,
+  isInboxChange,
   type FolderStateKeys,
   type PrdModel,
 } from "./prd-model-reader.js";
@@ -246,14 +252,18 @@ async function loadAllStateFiles(
   return loaded;
 }
 
+/** Whose folder is planned: a folder node, a layer root, or the reserved Inbox folder. */
+type FolderOwner = RuleNode | Layer | typeof INBOX_DIRNAME;
+
 /**
- * Plan folder `dir`: `owner` (the folder node, or the layer for a layer root)
- * and `nodes`, its children. Everything is validated here, before any write.
+ * Plan folder `dir`: `owner` and `nodes`, its children. In the changes root,
+ * Inbox changes go to the Inbox folder. Everything is validated here, before
+ * any write.
  */
 async function planFolder(
   dir: string,
   nodes: readonly RuleNode[],
-  owner: RuleNode | Layer,
+  owner: FolderOwner,
   stamp: string,
   loaded: LoadedState,
   plan: Plan,
@@ -262,7 +272,7 @@ async function planFolder(
   const entries = (await listDir(dir)) ?? [];
   const existing = loaded.files.get(dir) ?? { ...emptyStateFile(), schema: stamp };
   const { layers, nodes: byOwner } = loaded.folderState;
-  Object.assign(existing, typeof owner === "string" ? layers[owner] : byOwner.get(owner.id));
+  Object.assign(existing, owner === INBOX_DIRNAME ? undefined : typeof owner === "string" ? layers[owner] : byOwner.get(owner.id));
   const rows: Record<string, ItemState> = {};
   const specs = new Map<string, ProductSpec>();
   const keep = (node: RuleNode, intent: Record<string, unknown>): void => {
@@ -277,7 +287,7 @@ async function planFolder(
     if (spec) specs.set(node.id, spec);
   };
 
-  if (typeof owner !== "string") {
+  if (typeof owner === "object") {
     const intent: Record<string, unknown> = {};
     keep(owner, intent);
     assertValidIntent(owner, intent, dir);
@@ -285,8 +295,10 @@ async function planFolder(
   }
 
   const expectedDirs = new Set<string>();
+  // An index.md in the Inbox folder holds no node the reader reads; never stale, so never deleted unread.
   const expectedFiles = new Set<string>([INDEX_FILE]);
   const seen = new Map<string, string>();
+  const inbox: RuleNode[] = [];
   for (const node of nodes) {
     const folder = isFolderNode(node);
     assertSlug(node, folder, dir);
@@ -297,6 +309,15 @@ async function planFolder(
       throw new Error(`Two nodes in ${dir} share the slug "${node.slug}" (ignoring case): ${clash} and ${node.id}`);
     }
     seen.set(key, node.id);
+    if (owner === "changes") {
+      if (key === INBOX_DIRNAME) {
+        throw new Error(`Change ${node.id} in ${dir} has the slug "${node.slug}", which names the reserved Inbox folder`);
+      }
+      if (isInboxChange(node)) {
+        inbox.push(node);
+        continue;
+      }
+    }
     if (folder) {
       expectedDirs.add(node.slug);
       await planFolder(join(dir, node.slug), node.children ?? [], node, stamp, loaded, plan);
@@ -309,6 +330,10 @@ async function planFolder(
       assertValidIntent(node, intent, dir);
       plan.files.set(join(dir, file), renderNode(node, intent));
     }
+  }
+  if (inbox.length > 0) {
+    expectedDirs.add(INBOX_DIRNAME);
+    await planFolder(join(dir, INBOX_DIRNAME), inbox, INBOX_DIRNAME, stamp, loaded, plan);
   }
 
   if (Object.keys(rows).length === 0 && !extraTopLevelKeys(existing)) {

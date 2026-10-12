@@ -34,10 +34,14 @@ message naming the layout.
 │           ├── state.yaml
 │           └── partial-refunds.md
 └── changes/
-    └── refund-card-payments/      ← change: always a folder
-        ├── index.md
-        ├── state.yaml
-        └── add-refund-endpoint.md ← task
+    ├── refund-card-payments/      ← change: always a folder
+    │   ├── index.md
+    │   ├── state.yaml
+    │   └── add-refund-endpoint.md ← task
+    └── inbox/                     ← reserved: the Inbox, not a change
+        └── tidy-the-card-form/    ← change awaiting placement
+            ├── index.md
+            └── state.yaml         ← needsPlacement: true
 ```
 
 A project still on the older `.rex/` directory layout keeps the same two
@@ -64,6 +68,11 @@ merge-state` is the git merge driver for it).
   without moving it.
 - Any other node is a folder only while it has children, and a `<slug>.md`
   file otherwise.
+- `changes/inbox/` is the **Inbox**, a reserved folder. A change added with no
+  target (no amendment, nothing it touches) is stored there with
+  `needsPlacement: true`; placing it moves it to `changes/`, keeping its id
+  and slug. No change may take the slug `inbox`. A tree that keeps Inbox
+  changes at the `changes/` root still reads, and the next write moves them in.
 - There are no `## Children` tables: the directory tree is the structure.
 - `product/index.md` is the root header. It carries the PRD title, the schema
   stamp, the slug rule and the default `stewards:` list.

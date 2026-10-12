@@ -267,6 +267,14 @@ describe("slugs against the v2 sibling set", () => {
     expect(data.flagCounts["unsafe-slug"]).toBe(0);
   });
 
+  it("renames a root change named inbox, which the reserved Inbox folder holds, flagged", () => {
+    const tree = [item("epic", "ndx 0.9.0", {}, [item("feature", "Inbox")])];
+    const inbox = tree[0]!.children![0]!;
+    const data = dataFor(tree);
+    expect(data.items[inbox.id]!.slug).toEqual({ from: "inbox", to: `inbox-${inbox.id.slice(0, 6)}` });
+    expect(data.items[inbox.id]!.flags).toContain("slug-clash");
+  });
+
   it("freezes a slug unique, ignoring case, within every v2 sibling set", () => {
     const deep = item("epic", "PR 7 rework", {}, [
       item("feature", "Docs", {}, [item("task", "Notes", {}, [item("subtask", "Check")]), item("task", "Check")]),

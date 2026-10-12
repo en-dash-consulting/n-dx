@@ -23,7 +23,7 @@
 import type { ItemLevel, ItemStatus, PRDItem } from "../schema/v1.js";
 import type { ChangeNodeType } from "../schema/v2.js";
 import type { RuleNode } from "../schema/v2-rules.js";
-import { freeSlug } from "./apply-amendments.js";
+import { freeChangeSlug, freeSlug } from "./apply-amendments.js";
 
 /** The change-layer type an item of `level` is written as. */
 const TYPE_OF_LEVEL: Readonly<Record<ItemLevel, ChangeNodeType>> = {
@@ -68,18 +68,19 @@ export function changeLayerFromItems(items: readonly PRDItem[], previous: readon
   walk(previous);
 
   const kept = new Set<string>();
-  const toNodes = (list: readonly PRDItem[]): RuleNode[] => {
+  const toNodes = (list: readonly PRDItem[], top = false): RuleNode[] => {
     const nodes = list.map((item) => {
       kept.add(item.id);
       return changeNode(item, known.get(item.id), toNodes);
     });
-    // A created item gets a slug no sibling holds; existing slugs are frozen.
+    // A created item gets a slug no sibling holds (nor, at the top, the Inbox folder); existing slugs are frozen.
+    const slugFor = top ? freeChangeSlug : freeSlug;
     for (const node of nodes) {
-      if (!node.slug) node.slug = freeSlug(node.title, node.id, nodes.filter((n) => n.slug));
+      if (!node.slug) node.slug = slugFor(node.title, node.id, nodes.filter((n) => n.slug));
     }
     return nodes;
   };
-  const changes = toNodes(items);
+  const changes = toNodes(items, true);
   return { changes, removed: new Set([...known.keys()].filter((id) => !kept.has(id))) };
 }
 

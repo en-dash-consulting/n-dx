@@ -14,7 +14,9 @@
  *   placement with neither is refused). The change is
  *   dry-run through apply (`applyAmendmentsProblems`), and a problem the new
  *   amendment brings refuses the placement in apply's words, since nothing
- *   edits the amendment afterwards. Either clears `needsPlacement`.
+ *   edits the amendment afterwards. Either clears `needsPlacement`, so the
+ *   writer moves a top-level change out of `changes/inbox/` to the changes
+ *   root, keeping its id and slug.
  *
  * Only an open change is placed. The result is checked against the v2 rules;
  * an error finding about the change refuses the placement.

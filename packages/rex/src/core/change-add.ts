@@ -5,7 +5,8 @@
  * - A **change** with no `amends` and no `touches` goes to the Inbox: it is
  *   stamped `needsPlacement` so a person confirms its targets before it closes.
  *   One with a target is placed. Without a parent it sits at the change-layer
- *   root; a parent must be a change.
+ *   root (stored in `changes/inbox/` while it needs placement); a parent must
+ *   be a change.
  * - A **task** goes through {@link addTask}, so the split rule applies and a
  *   completed, applied, cancelled or deleted change is refused.
  * - A **subtask** goes under a task.
@@ -30,7 +31,7 @@ import { randomUUID } from "node:crypto";
 import type { Priority } from "../schema/v1.js";
 import type { Amendment, ChangeNodeType, DiscoveredFrom, SavedRunSettings } from "../schema/v2.js";
 import { checkV2Rules, indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { applyAmendmentsProblems, freeSlug, NO_PROBLEMS, pendingWarnings } from "./apply-amendments.js";
+import { applyAmendmentsProblems, freeChangeSlug, freeSlug, NO_PROBLEMS, pendingWarnings } from "./apply-amendments.js";
 import { addTask, closedState, ClosedChangeError, type ChangeSplit } from "./change-completion.js";
 
 export interface AddChangeNodeInput {
@@ -116,12 +117,12 @@ export function addChangeNode(tree: V2Tree, input: AddChangeNodeInput, options: 
 
   const id = (options.newId ?? randomUUID)();
   if (indexTree(tree, { includeTombstones: true }).resolve(id)) throw new AddChangeNodeError(`The new id ${id} is already taken`);
-  const siblings = parent ? (parent.children ?? []) : type === "change" ? tree.changes : [];
+  const slug = parent ? freeSlug(input.title, id, parent.children ?? []) : freeChangeSlug(input.title, id, tree.changes);
   const node = {
     id,
     type,
     title: input.title,
-    slug: freeSlug(input.title, id, siblings),
+    slug,
     ...fields(input),
   } as RuleNode;
 

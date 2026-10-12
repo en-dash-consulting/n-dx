@@ -48,6 +48,7 @@ import type { CapabilitySpecDraft } from "./capability-spec.js";
 import type { MigrationPlan } from "./migration-plan.js";
 import { freeSlug } from "../../core/apply-amendments.js";
 import { isUsableFrozenSlug, resolveSiblingSlugs } from "../../store/folder-tree-serializer.js";
+import { INBOX_DIRNAME } from "../../store/prd-model-reader.js";
 
 export const CORRUPT_VALUE = "[object Object]";
 
@@ -215,7 +216,8 @@ function planSlugs(items: readonly PRDItem[], plan: MigrationPlan): Map<string, 
   };
   collect(items);
 
-  const taken = new Map<string, { slug: string }[]>();
+  // The changes root reserves the Inbox folder's name: a v1 item there named "inbox" is renamed as a clash.
+  const taken = new Map<string, { slug: string }[]>([["changes:", [{ slug: INBOX_DIRNAME }]]]);
   const out = new Map<string, FrozenSlug>();
   for (const entry of plan.entries) {
     const from = v1Slugs.get(entry.id);

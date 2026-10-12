@@ -55,6 +55,7 @@ import { RequirementSchema } from "../schema/validate.js";
 import { isDisplayId, type Amendment, type ChangeNode, type CriteriaDelta, type Criterion } from "../schema/v2.js";
 import { checkV2Rules, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { isUsableFrozenSlug, slugifyTitle } from "../store/folder-tree-serializer.js";
+import { INBOX_DIRNAME } from "../store/prd-model-reader.js";
 
 export interface ApplyAmendmentsOptions {
   /** ISO timestamp stamped as the change's `appliedAt`. */
@@ -557,6 +558,11 @@ export function freeSlug(title: string, id: string, siblings: readonly { slug: s
   const base = slugifyTitle(title);
   if (!taken.has(base) && isUsableFrozenSlug(base)) return base;
   return `${base}-${id.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "item"}`;
+}
+
+/** {@link freeSlug} for a new top-level change: `changes` are its siblings, and the reserved Inbox folder's name is taken. */
+export function freeChangeSlug(title: string, id: string, changes: readonly { slug: string }[]): string {
+  return freeSlug(title, id, [...changes, { slug: INBOX_DIRNAME }]);
 }
 
 /** Ids of the live product nodes the removed amendments in `amends` target, resolved before any is applied. */

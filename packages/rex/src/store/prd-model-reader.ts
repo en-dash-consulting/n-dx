@@ -20,7 +20,15 @@
  * product/<slug>/state.yaml state for the folder node and its leaf files
  * product/<slug>/<leaf>.md  a leaf node
  * changes/…                 the same shape, with no root header
+ * changes/inbox/<slug>/     a top-level change awaiting placement
  * ```
+ *
+ * `changes/inbox/` is reserved: it is not a change. Each change stored in it
+ * reads as a top-level change with `needsPlacement` set, and the writer
+ * stores every top-level change with `needsPlacement` there, so where a
+ * change sits and whether it awaits placement never disagree. A tree written
+ * before the folder was reserved keeps such changes at the changes root; they
+ * read the same, and the next write moves them in.
  *
  * Children are read in slug order. A node whose intent fails validation is
  * skipped with its subtree and reported in `warnings`, as are state rows that
@@ -52,6 +60,13 @@ import { parseTreeMeta } from "./tree-meta.js";
 
 export const PRODUCT_DIRNAME = "product";
 export const CHANGES_DIRNAME = "changes";
+/** The reserved folder under `changes/` that holds the Inbox: top-level changes with `needsPlacement`. */
+export const INBOX_DIRNAME = "inbox";
+
+/** Whether the writer stores `node`, a top-level change-layer node, in the Inbox folder. */
+export function isInboxChange(node: Pick<RuleNode, "type" | "needsPlacement">): boolean {
+  return node.type === "change" && node.needsPlacement === true;
+}
 
 /** Environment variable that turns on read-only inspection of a skewed tree. */
 export const IGNORE_SCHEMA_SKEW_ENV = "NDX_IGNORE_SCHEMA_SKEW";
@@ -297,11 +312,34 @@ interface ReadContext {
 
 async function readLayer(layerDir: string, layer: Layer, ctx: ReadContext): Promise<RuleNode[]> {
   if (!(await isDirectory(layerDir))) return [];
-  const folder = await readFolder(layerDir, ctx);
+  const reserved = layer === "changes" ? INBOX_DIRNAME : undefined;
+  const folder = await readFolder(layerDir, ctx, reserved);
   warnOrphanRows(layerDir, folder, ctx.warnings);
   const extra = extraTopLevelKeys(folder.state);
   if (extra && ctx.folderState) ctx.folderState.layers[layer] = extra;
-  return folder.children;
+  if (reserved === undefined) return folder.children;
+  return [...folder.children, ...(await readInbox(join(layerDir, INBOX_DIRNAME), ctx))].sort((a, b) =>
+    a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0,
+  );
+}
+
+/**
+ * The changes in the reserved Inbox folder, each with `needsPlacement`: the
+ * folder, not the row, says a change awaits placement. Anything else stored
+ * there is skipped with a warning; the writer refuses to delete it.
+ */
+async function readInbox(dir: string, ctx: ReadContext): Promise<RuleNode[]> {
+  if (!(await isDirectory(dir))) return [];
+  const folder = await readFolder(dir, ctx);
+  warnOrphanRows(dir, folder, ctx.warnings);
+  if ((await readIfExists(join(dir, "index.md"))) !== null) {
+    ctx.warnings.push({ path: join(dir, "index.md"), message: `${INBOX_DIRNAME}/ is the reserved Inbox folder, not a node; its index.md is not read`, skipped: true });
+  }
+  return folder.children.flatMap((node) => {
+    if (node.type === "change") return [{ ...node, needsPlacement: true } as RuleNode];
+    ctx.warnings.push({ path: join(dir, node.slug), message: `The Inbox holds only changes; ${node.type} ${node.id} is skipped`, skipped: true });
+    return [];
+  });
 }
 
 /** A folder's `state.yaml`, its child nodes, and the state rows those children claimed. */
@@ -311,13 +349,17 @@ interface FolderRead {
   claimed: Set<string>;
 }
 
-/** The nodes stored directly in `dir`: subfolders with an `index.md`, and leaf `.md` files, in slug order. */
-async function readFolder(dir: string, ctx: ReadContext): Promise<FolderRead> {
+/**
+ * The nodes stored directly in `dir`: subfolders with an `index.md`, and leaf
+ * `.md` files, in slug order. A subfolder named `reserved` is not a node.
+ */
+async function readFolder(dir: string, ctx: ReadContext, reserved?: string): Promise<FolderRead> {
   const state = await loadStateFile(dir, { ignoreSchemaStamp: ctx.ignoreStamp });
   const claimed = new Set<string>();
   const named: Array<{ name: string; node: RuleNode }> = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
+      if (entry.name === reserved) continue;
       const node = await readFolderNode(join(dir, entry.name), ctx);
       if (node) named.push({ name: entry.name, node });
     } else if (entry.isFile() && entry.name.endsWith(".md") && entry.name !== "index.md") {

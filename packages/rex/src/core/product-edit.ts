@@ -46,7 +46,7 @@
 import { randomUUID } from "node:crypto";
 import type { Amendment, ChangeNode, Criterion } from "../schema/v2.js";
 import { isOpenChange, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { appendHistory, freeSlug, nodeSpecHash, resolve, stampMet } from "./apply-amendments.js";
+import { appendHistory, freeChangeSlug, nodeSpecHash, resolve, stampMet } from "./apply-amendments.js";
 
 /** The spec `metAt` hashes: statement and criteria (a constraint has a statement only). */
 export interface Spec {
@@ -145,7 +145,7 @@ export function handleProductEdit(tree: V2Tree, nodeRef: string, before: Spec, o
     id,
     type: "change",
     title,
-    slug: freeSlug(title, id, next.changes),
+    slug: freeChangeSlug(title, id, next.changes),
     source: PRODUCT_EDIT_SOURCE,
     intent: [`${node.title} (${label}) was edited in the product layer. Build it.`, "", ...diff.lines].join("\n"),
     amends: [amendment],
