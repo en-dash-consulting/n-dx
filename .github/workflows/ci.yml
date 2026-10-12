@@ -3,8 +3,16 @@
 # Replicates the pipeline previously defined in bitbucket-pipelines.yml.
 # One `build` matrix job runs ubuntu, macOS and Windows in parallel:
 #   install → build → (Linux: policy, typecheck, docs, PR check, PRD structure)
-#   → (macOS/Windows: smoke collect) → root e2e/integration → per-package tests
+#   → (macOS/Windows: smoke collect)
 # then smoke-parity compares the macOS and Windows smoke artifacts.
+#
+# The test suites run in a separate `test` matrix job: three suite groups per
+# OS, nine jobs in all, each doing its own install and build. They used to be
+# two steps at the end of `build`, which ran the root suite and then every
+# package suite in series on one runner: 28 to 29 minutes on Windows against a
+# 30 minute timeout (run 38193308009). Splitting by suite group turns that
+# into three jobs of roughly a third each, for about the same billed minutes
+# plus one install and build per job.
 #
 # Node 22 LTS. Exact pnpm version managed by corepack via packageManager
 # field in package.json.
@@ -107,28 +115,42 @@ jobs:
             name: Build & Validate
             # changeset status compares against main to compute the release plan
             fetch-depth: 0
-            timeout: 20
-          # macOS and Windows get 30 rather than 20: the per-package suites
-          # were measured locally at ~1.7x the root suite's wall time, and these
-          # runners are slower than Linux. A timeout kill presents as a red job,
-          # so the headroom is deliberate. Lower it again if real runs land
-          # comfortably under 20.
+            timeout: 15
+          # Without the test suites these legs are install, build and the
+          # smoke collector: under three minutes measured. 10 is headroom for
+          # a slow runner, not an expectation.
           - os: macos-latest
             name: CLI Smoke (macOS)
             smoke: macos
             fetch-depth: 1
-            timeout: 30
+            timeout: 10
           - os: windows-latest
             name: CLI Smoke (Windows)
             smoke: windows
             fetch-depth: 1
-            timeout: 30
+            timeout: 10
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: ${{ matrix.fetch-depth }}
+
+      # Defender's on-access scan runs on every file node, git and pnpm touch,
+      # and these runners come with it on. Measured on run 38193308009: the
+      # git-fixture integration suites ran 13x to 17x slower than on Linux,
+      # and one teardown sat through fs.rm's whole 5.5 s EBUSY retry window
+      # because the scanner still held the file. The runner is thrown away
+      # after the job, so there is nothing to protect; the exclusions cover
+      # the checkout, the temp dirs every fixture lives in, and the pnpm store.
+      - name: Exclude workspace and temp from Defender scanning
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $paths = @($env:GITHUB_WORKSPACE, $env:RUNNER_TEMP, $env:TEMP, "$env:LOCALAPPDATA\pnpm", $env:RUNNER_TOOL_CACHE)
+          foreach ($p in $paths) { if ($p) { Add-MpPreference -ExclusionPath $p } }
+          foreach ($exe in @("node.exe", "git.exe", "pnpm.exe")) { Add-MpPreference -ExclusionProcess $exe }
+          Get-MpPreference | Select-Object -ExpandProperty ExclusionPath
 
       - name: Install pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -240,38 +262,6 @@ jobs:
           name: ndx-cli-smoke-${{ matrix.smoke }}
           path: ndx-cli-smoke-${{ matrix.smoke }}.json
 
-      # Root-level e2e / integration / gauntlet suites live in tests/** and are
-      # NOT covered by the per-package runner. The bind-aware runner excludes the
-      # LLM-spend sourcevision eval gate (run separately via `pnpm gauntlet:evals`)
-      # and any loopback-bind suites when the runner can't bind a local socket.
-      #
-      # Runs on EVERY leg and EVERY event, macOS included. It was once gated to
-      # main-branch pushes on macOS to save billed minutes, which meant PRs got
-      # no macOS test coverage at all — and its one historical catch (run
-      # 32283838405: a test assuming synchronous reaping, true for
-      # `taskkill /T /F` but not POSIX `SIGKILL`) was exactly the kind of defect
-      # that should be caught before merge. tests/** is where every cross-OS
-      # behaviour lives: spawn/quoting, child-process lifecycle, config file
-      # permissions, init, and the CLI e2e flows.
-      #
-      # Runs after the smoke upload so a test failure still leaves the artifact
-      # published for smoke-parity's comparison on the next green run.
-      - name: Run root e2e / integration tests
-        run: node scripts/run-vitest-bind-aware.mjs root
-
-      # NOT `pnpm -r run test`: that bails on the first failing package, and
-      # because hench and web depend on rex they are ordered after it — so a red
-      # rex meant they never executed and their absence from the log read as
-      # "nothing to report". This runner executes every package regardless and
-      # still exits non-zero if any failed. (`pnpm -r --no-bail` is not an
-      # option: pnpm documents it as exiting 0 even when a script fails.)
-      #
-      # Runs on EVERY leg, macOS included, and is deliberately unconditional:
-      # macOS bills at 10x Linux minutes, but coverage is not traded for speed
-      # here. Reduce cost by making the suites faster, not by skipping an OS.
-      - name: Run per-package tests
-        run: node scripts/run-all-tests.mjs packages
-
       - name: Require changeset
         # Skip on the Changesets release PR: that PR's whole purpose is
         # to consume the changesets, so the directory is empty by design.
@@ -301,6 +291,109 @@ jobs:
         # HEAD with no local "main" branch for changeset to diff against.
         if: runner.os == 'Linux'
         run: pnpm exec changeset status --since=origin/main
+
+  # THE TEST SUITES: THREE GROUPS PER OS, NINE JOBS, ALL IN PARALLEL.
+  #
+  # Each group is a comma list of suite labels that scripts/run-all-tests.mjs
+  # already accepts (`root` is tests/**, the rest are package directory names).
+  # The groups pair a long suite with a short one so the three jobs on a given
+  # OS finish close together; measured per-suite seconds on run 38193308009
+  # (Windows): root 484, rex 423, hench 366, web 266, sourcevision 98,
+  # llm-client 29. Rebalance when those move.
+  #
+  # Every group runs on EVERY OS and EVERY event, macOS included. macOS bills at
+  # 10x Linux minutes, but coverage is not traded for speed here: tests/** is
+  # where every cross-OS behaviour lives (spawn/quoting, child-process
+  # lifecycle, config file permissions, init, the CLI e2e flows), and its one
+  # historical catch on macOS (run 32283838405: a test assuming synchronous
+  # reaping, true for `taskkill /T /F` but not POSIX `SIGKILL`) was exactly the
+  # kind of defect that must be caught before merge. Reduce cost by making the
+  # suites faster, not by skipping an OS.
+  #
+  # The runner is scripts/run-all-tests.mjs, NOT `pnpm -r run test`: that bails
+  # on the first failing package, and because hench and web depend on rex they
+  # are ordered after it — so a red rex meant they never executed and their
+  # absence from the log read as "nothing to report". The script runs every
+  # selected suite regardless and still exits non-zero if any failed. For
+  # `root` it delegates to the bind-aware runner, which excludes the LLM-spend
+  # sourcevision eval gate (run separately via `pnpm gauntlet:evals`) and any
+  # loopback-bind suites when the runner can't bind a local socket.
+  #
+  # No `needs: build`: each job installs and builds for itself (about a minute
+  # and a half on Windows) so the nine start together rather than queueing
+  # behind the validate leg.
+  test:
+    name: Tests (${{ matrix.runner }}, ${{ matrix.group }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      # The default would cancel the other eight the moment one fails, hiding
+      # whether a defect is platform-specific or suite-specific.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        group: [root+llm-client, rex+sourcevision, hench+web]
+        include:
+          - group: root+llm-client
+            suites: root,llm-client
+          - group: rex+sourcevision
+            suites: rex,sourcevision
+          - group: hench+web
+            suites: hench,web
+          - os: ubuntu-latest
+            runner: Linux
+            timeout: 15
+          - os: macos-latest
+            runner: macOS
+            timeout: 15
+          # Windows gets 20 rather than 15: the heaviest group measured about
+          # 11 minutes of suite time before the Defender exclusion below, and
+          # a timeout kill presents as a red job. Lower it once real runs land
+          # comfortably under 15.
+          - os: windows-latest
+            runner: Windows
+            timeout: 20
+
+    env:
+      # Node 22's on-disk compile cache. Hundreds of e2e tests each spawn a
+      # fresh CLI process that loads the same dist/ trees; with the cache every
+      # spawn after the first reuses the compiled bytecode. Measured locally:
+      # the sourcevision CLI's startup halved, hench's trimmed, rex's unchanged.
+      NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Same step as in `build`, for the same reasons: see the comment there.
+      - name: Exclude workspace and temp from Defender scanning
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $paths = @($env:GITHUB_WORKSPACE, $env:RUNNER_TEMP, $env:TEMP, "$env:LOCALAPPDATA\pnpm", $env:RUNNER_TOOL_CACHE)
+          foreach ($p in $paths) { if ($p) { Add-MpPreference -ExclusionPath $p } }
+          foreach ($exe in @("node.exe", "git.exe", "pnpm.exe")) { Add-MpPreference -ExclusionProcess $exe }
+          Get-MpPreference | Select-Object -ExpandProperty ExclusionPath
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The root suite's globalSetup (tests/e2e/verify-build.js) refuses to run
+      # against a missing or stale dist/, and the e2e tests spawn the built CLIs.
+      - name: Build
+        run: pnpm build
+
+      - name: Run ${{ matrix.suites }}
+        run: node scripts/run-all-tests.mjs ${{ matrix.suites }}
 
   smoke-parity:
     name: CLI Smoke Parity
