@@ -295,6 +295,20 @@ Rules:
 
 ---
 
+### Draft pull requests
+
+Draft PRs do not run CI, to save Actions minutes. To run CI on a draft:
+
+- **Add the `ci:run` label.** CI runs once, on the PR's merge commit. Later
+  pushes skip again; remove the label and add it back to run again.
+- **Or use Run workflow** on the CI workflow in the Actions tab. It runs the
+  branch head, not merged with its base, and shows in the Actions tab rather
+  than on the PR. Available once the trigger is on `main`.
+
+Marking the PR ready runs everything, CodeQL and Dependency Review included.
+
+---
+
 ### Linking code to PRD items
 
 When hench runs a task it stages `.rex/prd_tree/` changes alongside the code
