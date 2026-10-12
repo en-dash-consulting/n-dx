@@ -22,7 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Bulk status PATCH completes v2 work without rex's v2 completion](./bulk-status-patch-completes-v2-work.md) | pending |
+| [Bulk status PATCH completes v2 work without rex's v2 completion](./bulk-status-patch-completes-v2-work.md) | completed |
 | [Dashboard misses v2 edits under changes/ when it was created after ndx start](./dashboard-misses-v2-edits-under.md) | completed |
 | [Quick Add creates a change on v2](./quick-add-creates-a-change-on-v2.md) | completed |
 | [The PRD cache is built from the change-layer projection on v2](./the-prd-cache-is-built-from-the-change.md) | completed |
