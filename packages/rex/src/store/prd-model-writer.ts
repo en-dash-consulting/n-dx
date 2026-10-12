@@ -336,6 +336,7 @@ async function planFolder(
       expectedDirs.add(node.slug);
       await planFolder(join(dir, node.slug), node.children ?? [], node, stamp, loaded, plan);
     } else {
+      assertNoStrandedState(join(dir, node.slug), node, loaded);
       const intent: Record<string, unknown> = {};
       keep(node, intent);
       const file = `${node.slug}.md`;
@@ -364,6 +365,21 @@ async function planFolder(
     if (entry.isDirectory() ? expectedDirs.has(entry.name) : !entry.name.endsWith(".md") || expectedFiles.has(entry.name)) continue;
     plan.stale.push({ path: join(dir, entry.name), isDir: entry.isDirectory() });
   }
+}
+
+/**
+ * A node that lost its last child becomes a leaf file, and its old folder (with
+ * its `state.yaml`) is removed. Top-level keys a newer build wrote there have
+ * no home in a leaf, so refuse rather than drop them silently.
+ */
+function assertNoStrandedState(oldFolder: string, node: RuleNode, loaded: LoadedState): void {
+  const file = loaded.files.get(oldFolder);
+  const extra = file && extraTopLevelKeys(file);
+  if (!extra) return;
+  throw new Error(
+    `Node ${node.id} would become a leaf, but its folder ${oldFolder} keeps state.yaml keys this build cannot place: ` +
+      `${Object.keys(extra).join(", ")}. Nothing was written. Keep a child in the folder, or remove those keys by hand if they are not needed.`,
+  );
 }
 
 /**
