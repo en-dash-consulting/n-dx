@@ -162,7 +162,7 @@ Once you have an architectural picture, turn SourceVision's findings into a stru
 ndx plan .
 ```
 
-This runs analysis (if not already done) and then uses an LLM to propose a PRD from findings. You'll see proposed epics, features, and tasks. Review the proposals, then accept:
+This runs analysis (if not already done) and then uses an LLM to propose PRD items from findings. Review the proposals, then accept:
 
 ```sh
 ndx plan --accept .
@@ -170,7 +170,9 @@ ndx plan --accept .
 
 ### What the baseline scan detects
 
-When scanning an existing codebase for the first time (empty PRD + existing code), the LLM automatically performs a **baseline scan**: it marks already-implemented functionality as `completed` and only creates `pending` tasks for gaps, improvements, and missing features. You won't get a wall of pending tasks for code that already works.
+An existing codebase already does things, and the PRD should say so without inventing work for them. In the PRD's terms (see [The PRD](./concepts/)), what the code already does is the product layer: capabilities that read *met*. Only gaps, improvements and missing features arrive as changes.
+
+On a v1 project, which `ndx init` creates until the storage migration ships, there is no product layer. When scanning an existing codebase for the first time (empty PRD + existing code), the LLM performs a **baseline scan** instead: it marks already-implemented functionality as `completed` and only creates `pending` tasks for gaps. You won't get a wall of pending tasks for code that already works.
 
 ### Reviewing the initial PRD
 
@@ -178,11 +180,13 @@ When scanning an existing codebase for the first time (empty PRD + existing code
 ndx status .
 ```
 
-This shows the full PRD tree. At this point you'll typically see:
+On a v1 project this shows the full item tree. At this point you'll typically see:
 
-- A handful of epics organized by zone or architectural concern
+- A handful of top-level epics organized by zone or architectural concern
 - Features representing refactoring opportunities from anti-pattern findings
 - Tasks for specific improvements (decouple X from Y, move file Z, etc.)
+
+On a v2 PRD, `rex product show .` lists the capabilities with their status instead.
 
 From here you can add your own items, reprioritize, and start working:
 

@@ -1,6 +1,10 @@
 # PRD Folder Tree Schema
 
-Normative contract for the serializer (PRD → folder tree) and parser (folder tree → PRD) implementations. This is the sole authoritative PRD storage format; `.rex/prd.md` and `.rex/prd.json` are legacy migration sources (absent after running `rex migrate-to-folder-tree`).
+::: warning The v1 storage format
+This page is the contract for the v1 PRD tree (`.rex/prd_tree/`), which `ndx init` creates until the storage migration ships. The v2 PRD is stored as `product/` and `changes/` with per-folder `state.yaml`; see [PRD Storage Layout](../guide/prd-storage) and `packages/rex/src/store/prd-model-writer.ts`.
+:::
+
+Normative contract for the v1 serializer (PRD → folder tree) and parser (folder tree → PRD) implementations. Within v1 this is the sole authoritative PRD storage format; `.rex/prd.md` and `.rex/prd.json` are legacy migration sources (absent after running `rex migrate-to-folder-tree`).
 
 ---
 
