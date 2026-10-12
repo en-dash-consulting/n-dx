@@ -6,7 +6,7 @@ import { validateDAG } from "../../core/dag.js";
 import { validateStructure } from "../../core/structural.js";
 import { walkTree } from "../../core/tree.js";
 import { computeStats } from "../../core/stats.js";
-import { resolveStore, resolveRexPaths } from "../../store/index.js";
+import { resolveStore, isChangeLayerStore, resolveRexPaths } from "../../store/index.js";
 
 import { result } from "../output.js";
 import type { PRDDocument, PRDItem, ItemLevel } from "../../schema/index.js";
@@ -59,6 +59,9 @@ async function runChecks(dir: string): Promise<{
   const rexDir = resolveRexPaths(dir).rexDir;
   const checks: CheckResult[] = [];
   let doc: PRDDocument | null = null;
+  // The change layer's placement rule is enforced at write time; the v1 level
+  // hierarchy and "a container needs a child" do not describe it (as validate.ts).
+  let changeLayer = false;
 
   // Check config.json schema
   try {
@@ -85,6 +88,7 @@ async function runChecks(dir: string): Promise<{
   // Check PRD schema (Markdown is authoritative; FileStore performs legacy migration if needed)
   try {
     const store = await resolveStore(rexDir);
+    changeLayer = isChangeLayerStore(store);
     const loaded = await store.loadDocument();
     const res = validateDocument(loaded);
     if (res.ok) {
@@ -136,13 +140,15 @@ async function runChecks(dir: string): Promise<{
   if (doc) {
     const structural = validateStructure(doc.items);
 
-    checks.push({
-      name: "hierarchy placement",
-      pass: structural.orphanedItems.length === 0,
-      errors: structural.orphanedItems.map(
-        (o) => `"${o.itemId}" (${o.level}): ${o.reason}`,
-      ),
-    });
+    if (!changeLayer) {
+      checks.push({
+        name: "hierarchy placement",
+        pass: structural.orphanedItems.length === 0,
+        errors: structural.orphanedItems.map(
+          (o) => `"${o.itemId}" (${o.level}): ${o.reason}`,
+        ),
+      });
+    }
 
     checks.push({
       name: "blockedBy cycles",
@@ -159,14 +165,16 @@ async function runChecks(dir: string): Promise<{
       ),
     });
 
-    checks.push({
-      name: "empty containers",
-      pass: structural.emptyContainers.length === 0,
-      severity: "warn",
-      errors: structural.emptyContainers.map(
-        (e) => `"${e.itemId}" (${e.level}): ${e.reason}`,
-      ),
-    });
+    if (!changeLayer) {
+      checks.push({
+        name: "empty containers",
+        pass: structural.emptyContainers.length === 0,
+        severity: "warn",
+        errors: structural.emptyContainers.map(
+          (e) => `"${e.itemId}" (${e.level}): ${e.reason}`,
+        ),
+      });
+    }
 
     if (structural.warnings.length > 0) {
       checks.push({

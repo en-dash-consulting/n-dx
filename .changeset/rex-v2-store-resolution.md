@@ -24,3 +24,5 @@ MCP values changed on a v2 tree (the field is unchanged and v1 answers as before
 - `get_capabilities`: `adapter` reads `"v2-change-layer"` and `supportsWatch` reads `false`, the change-layer store's values.
 
 `rex validate` on a v2 tree no longer runs the `tree identity`, `tree slug convention` and `tree slug rule marker` checks against a stray `.rex/prd_tree/`.
+
+`rex report` on a v2 tree no longer raises `hierarchy placement` or `empty containers` for a change nested under a change or a change with no task, so `--fail-on-error` exits 0.

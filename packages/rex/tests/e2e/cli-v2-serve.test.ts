@@ -132,6 +132,22 @@ describe("rex on a v2 tree", () => {
     run(["report", tmp], tmp);
   });
 
+  it("report --fail-on-error passes with a change nested two deep and a task-less change, with no v1 placement or empty-container check", () => {
+    const add = (title: string): string => {
+      const added = JSON.parse(run(["add", "change", `--title=${title}`, "--format=json", tmp], tmp));
+      return (Array.isArray(added) ? added[0] : added).id as string;
+    };
+    const mid = add("Tidy the card form");
+    const leaf = add("Tidy the card form further");
+    run(["move", mid, `--parent=${CHANGE}`, tmp], tmp);
+    run(["move", leaf, `--parent=${mid}`, tmp], tmp);
+    const report = JSON.parse(run(["report", "--fail-on-error", "--format=json", tmp], tmp));
+    expect(report.ok).toBe(true);
+    const names = report.validation.checks.map((c: { name: string }) => c.name);
+    expect(names).not.toContain("hierarchy placement");
+    expect(names).not.toContain("empty containers");
+  });
+
   it("analyze refuses, naming rex add and rex change", () => {
     const out = run(["analyze", tmp], tmp, true);
     expect(out).toContain("rex add");
