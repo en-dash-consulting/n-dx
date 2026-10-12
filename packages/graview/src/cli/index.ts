@@ -23,6 +23,7 @@ import { prepareCommandCwd, readGraviewConfig, resolveGraviewCommand, type Gravi
 import { loadDocument } from "../document.js";
 import { rexMcpEndpoint } from "../hub.js";
 import { fileURLToPath } from "node:url";
+import { describeMisfits } from "../fit.js";
 import { resolveLayout } from "../llm-gateway.js";
 import { FACE_EXTENSION, faceEnvironment, findInstalledFace, planProductFace, type FacePlan, type InstalledFace } from "../face.js";
 
@@ -264,6 +265,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     warn: (message) => console.error(`warning: ${message}`),
   });
   say(describeEmit(emitted));
+  // A snapshot the declaration does not admit fails later, in the face; say so now, and refuse it in check.
+  if (emitted.misfits.length > 0) console.error(`${parsed.sub === "check" ? "error" : "warning"}: ${describeMisfits(emitted.misfits)}`);
   if (parsed.sub === "emit") return 0;
 
   const root = emitted.layout.root;
@@ -282,8 +285,10 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   say(`graview: ${command.detail} (${command.source})`);
 
   switch (parsed.sub) {
-    case "check":
-      return runGraview(command, ["check", emitted.documentPath, ...parsed.passthrough], root);
+    case "check": {
+      const checked = await runGraview(command, ["check", emitted.documentPath, ...parsed.passthrough], root);
+      return checked !== 0 ? checked : emitted.misfits.length > 0 ? 1 : 0;
+    }
     case "describe":
       return runGraview(command, ["describe", emitted.documentPath, "--seed", emitted.snapshotPath, ...parsed.passthrough], root);
     case "serve": {

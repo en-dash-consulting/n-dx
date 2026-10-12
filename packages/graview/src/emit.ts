@@ -4,6 +4,7 @@
  * (`snapshot-file.ts`), whose first line says when it was made and what it
  * holds.
  */
+import { fitSnapshot, type Misfit } from "./fit.js";
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { resolveLayout, type Layout } from "./llm-gateway.js";
@@ -35,6 +36,8 @@ export interface EmitResult {
   prdLayout: "v1" | "v2";
   /** Where the product layer came from: the v2 tree, rex's migration plan over a v1 tree, or nowhere. */
   productLayer: "stored" | "proposed" | "none";
+  /** Records and edges the declaration does not admit (`fit.ts`); `check` fails on any. */
+  misfits: Misfit[];
 }
 
 function writeAtomically(path: string, text: string): void {
@@ -67,5 +70,6 @@ export async function emitProjection(root: string, options: EmitOptions = {}): P
     warnings: report.warnings,
     prdLayout: report.layout,
     productLayer: report.productLayer,
+    misfits: fitSnapshot(document, report.snapshot),
   };
 }
