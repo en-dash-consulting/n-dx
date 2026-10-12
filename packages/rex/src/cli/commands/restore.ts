@@ -15,7 +15,7 @@ import { readdir, stat } from "node:fs/promises";
 import { CLIError, requireRexDir } from "../errors.js";
 import { info, result, warn } from "../output.js";
 
-import { getAvailableBackups, restoreFromBackup } from "../../core/backup-snapshots.js";
+import { getAvailableBackups, restoreFromBackup, V2_RESTORE_REFUSAL } from "../../core/backup-snapshots.js";
 import { resolveRexPaths } from "../../store/index.js";
 import { refuseOnV2 } from "./v2-cli.js";
 
@@ -61,7 +61,7 @@ export async function cmdRestore(
   await refuseOnV2(
     rexDir,
     "restore",
-    "Restore is v1-only until after the v2 cut; recover a v2 tree from git history.",
+    V2_RESTORE_REFUSAL,
   );
   const backupsDir = join(rexDir, ".backups");
   const isJson = flags.format === "json";

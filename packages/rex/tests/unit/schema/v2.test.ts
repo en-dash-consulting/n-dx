@@ -469,7 +469,8 @@ describe("isolation", () => {
     // move_item, merge_items and claim_task, with the type-based parent rule
     // and merge rules they use (core/move.ts, core/merge.ts), and the legacy
     // prd.json migration, which never migrates beside a v2 tree
-    // (store/ensure-legacy-prd-migrated.ts).
+    // (store/ensure-legacy-prd-migrated.ts), and the snapshot restore, which
+    // refuses a v2 tree (core/backup-snapshots.ts).
     // `public.ts` re-exports the reader, the node and tree types, the index
     // and the derived product computations: consumers of the product layer
     // (the dashboard's Product and Changes views, the Graview projection) read
@@ -536,6 +537,7 @@ describe("isolation", () => {
         "core/move.ts",
         "core/merge.ts",
         "store/ensure-legacy-prd-migrated.ts",
+        "core/backup-snapshots.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

@@ -598,6 +598,7 @@ export type {
 export {
   getAvailableBackups,
   restoreFromBackup,
+  V2RestoreRefusedError,
   encodeSnapshotId,
   isValidSnapshotId,
 } from "./core/backup-snapshots.js";
