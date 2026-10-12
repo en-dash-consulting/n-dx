@@ -26,7 +26,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A stray prd.json splits a v2 tree, and the split tree overrides what status, tree, next and validate show](./a-stray-prd-json-splits-a-v2-tree-and.md) | completed |
 | [merge_items on v2 keeps the absorbed change's id, display id and aliases as aliases on the target](./merge-items-on-v2-keeps-the-absorbed.md) | pending |
 | [Resolve the store by layout, and refuse a split tree](./resolve-the-store-by-layout-and-refuse.md) | completed |
-| [restoreFromBackup and the backups listing refuse a v2 tree inside rex](./restorefrombackup-and-the-backups.md) | pending |
+| [restoreFromBackup and the backups listing refuse a v2 tree inside rex](./restorefrombackup-and-the-backups.md) | completed |
 | [rex migrate-to-folder-tree, migrate-to-md and migrate-folder-tree-filenames do not refuse a v2 tree](./rex-migrate-to-folder-tree-migrate-to.md) | completed |
 | [rex validate and MCP reorganize accept a change nested two deep](./rex-validate-and-mcp-reorganize-accept.md) | pending |
 | [rex validate runs the prd_tree/ slug and identity checks on a v2 tree](./rex-validate-runs-the-prd-tree-slug.md) | pending |
