@@ -283,10 +283,14 @@ async function withCacheLock<T>(henchDir: string, fn: () => Promise<T>): Promise
         failure = err as Error;
         break;
       }
-      const age = await stat(path).then(
-        (s) => Date.now() - s.mtimeMs,
-        () => Number.POSITIVE_INFINITY,
-      );
+      // A stat that fails means the lock is already gone — the holder released
+      // it between our open and this call. That is the opposite of stale, and
+      // treating it as stale (an infinite age) made the unlink below delete
+      // whichever lock the *next* writer had just taken: it then proceeded
+      // believing it held a lock nobody held, and two writers ran the
+      // read-modify-write at once. Race for it again instead; `wx` decides.
+      const age = await stat(path).then((s) => Date.now() - s.mtimeMs, () => undefined);
+      if (age === undefined) continue;
       if (age > LOCK_STALE_MS) {
         await unlink(path).catch(() => { /* another waiter got there first */ });
         continue;
