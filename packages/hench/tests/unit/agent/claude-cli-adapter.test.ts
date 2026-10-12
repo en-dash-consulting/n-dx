@@ -1158,18 +1158,23 @@ describe("ClaudeCliAdapter: rex MCP write tools", () => {
     return tools.filter((t) => t.startsWith("mcp__"));
   }
 
-  it("grants exactly the three tools hench's own prompts direct", () => {
+  it("grants exactly the five tools hench's own prompts direct", () => {
     // Pinned, not open-ended. `update_task_status` and `append_log` are steps 6
     // and 7 of the base workflow; `add_item` is steps 3 and 9 of the same
     // workflow and the autonomous adversarial-review pass's `should-fix`
-    // action. A tool no hench prompt asks for does not belong here — the
-    // session reaches the whole rex server, and this list is the only thing
-    // deciding what it may call.
+    // action; `get_capability` and `place_change` read the product layer and
+    // file follow-up changes on a v2 tree. A tool no hench prompt asks for does
+    // not belong here — the session reaches the whole rex server, and this list
+    // is the only thing deciding what it may call. `apply_change` stays
+    // operator-only.
     expect(rexTools).toEqual([
       "mcp__rex__update_task_status",
       "mcp__rex__append_log",
       "mcp__rex__add_item",
+      "mcp__rex__get_capability",
+      "mcp__rex__place_change",
     ]);
+    expect(rexTools).not.toContain("mcp__rex__apply_change");
   });
 
   it("adds no MCP tool beyond that set, whatever the policy allows", () => {

@@ -203,7 +203,6 @@ export const SOURCEVISION_MCP_SERVER_NAME = "sourcevision";
  * - `append_log` — base workflow step 7.
  * - `add_item` — base workflow steps 3 and 9, and the `should-fix` action of the
  *   autonomous adversarial-review pass (`../agent/analysis/adversarial-review.ts`).
- *
  * - `get_capability` — read a product-layer capability on a v2 tree.
  * - `place_change` — file a follow-up change on a v2 tree. `apply_change` is
  *   deliberately absent: applying amendments to the product layer is the
