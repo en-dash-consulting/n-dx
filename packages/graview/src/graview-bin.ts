@@ -2,7 +2,11 @@
  * Where the `graview` binary is. In order: `graview.bin` in the project
  * config (shared, then machine-local), `NDX_GRAVIEW_BIN`, a `graview` on PATH,
  * the product face's own `graview` (it pins the same release this package
- * checks against), then `npx -y graview@<pinned>`. A path ending in
+ * checks against), then — only when the project opts in with
+ * `graview.allowNpx: true` or `NDX_GRAVIEW_NPX=1` — `npx -y
+ * graview@<pinned>`. Without the opt-in nothing is downloaded: npx fetches
+ * and runs a package at command time and hangs offline, so the answer is
+ * `source: "none"` with a sentence on how to install graview. A path ending in
  * `.js`/`.mjs`/`.cjs` is a CLI entry run under the current Node, so a sibling
  * framework checkout (`../graview/packages/graview/dist/cli.js`) works without
  * a global install.
@@ -15,12 +19,13 @@ import { delimiter, isAbsolute, join, resolve } from "node:path";
 import type { Layout } from "./llm-gateway.js";
 import { GRAVIEW_VERSION } from "./document.js";
 
-export type GraviewBinSource = "config" | "env" | "path" | "face" | "npx";
+export type GraviewBinSource = "config" | "env" | "path" | "face" | "npx" | "none";
 
 export interface GraviewCommand {
   cmd: string;
   /** Arguments that come before the graview subcommand (`-y graview@x` for npx, the script for a .js entry). */
   prefix: string[];
+  /** `none`: nothing found and npx not allowed; `cmd` is empty and `detail` says how to install graview. */
   source: GraviewBinSource;
   /** What was configured or found, for the operator. */
   detail: string;
@@ -50,9 +55,13 @@ export interface GraviewConfig {
    * on the fresh projection instead of the bare `graview serve`.
    */
   app?: string;
+  /** When no graview binary is found, let `npx -y graview@<pinned>` download one. Default false. */
+  allowNpx?: boolean;
 }
 
 export const GRAVIEW_BIN_ENV = "NDX_GRAVIEW_BIN";
+/** Set to 1 (or true) to let npx download the pinned graview when none is installed. */
+export const GRAVIEW_NPX_ENV = "NDX_GRAVIEW_NPX";
 
 function readConfigFile(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
@@ -70,7 +79,8 @@ export function readGraviewConfig(layout: Layout): GraviewConfig {
   for (const file of [layout.configFile, layout.localConfigFile]) {
     const section = readConfigFile(file).graview;
     if (section === null || typeof section !== "object") continue;
-    const { bin, includeFiles, app, mainRef, proposeProductLayer } = section as Record<string, unknown>;
+    const { bin, includeFiles, app, mainRef, proposeProductLayer, allowNpx } = section as Record<string, unknown>;
+    if (typeof allowNpx === "boolean") out.allowNpx = allowNpx;
     if (typeof bin === "string" && bin.trim().length > 0) out.bin = bin.trim();
     if (typeof includeFiles === "boolean") out.includeFiles = includeFiles;
     if (typeof mainRef === "string" && mainRef.trim().length > 0) out.mainRef = mainRef.trim();
@@ -145,6 +155,17 @@ export function resolveGraviewCommand(layout: Layout, options: ResolveGraviewOpt
   const fromFace = faceBin(options.face, platform);
   if (fromFace) return { cmd: fromFace, prefix: [], source: "face", detail: fromFace };
 
-  const npx = platform === "win32" ? "npx.cmd" : "npx";
-  return { cmd: npx, prefix: ["-y", `graview@${GRAVIEW_VERSION}`], source: "npx", detail: `npx -y graview@${GRAVIEW_VERSION}` };
+  const npxEnv = env[GRAVIEW_NPX_ENV]?.trim().toLowerCase();
+  if (readGraviewConfig(layout).allowNpx === true || npxEnv === "1" || npxEnv === "true") {
+    const npx = platform === "win32" ? "npx.cmd" : "npx";
+    return { cmd: npx, prefix: ["-y", `graview@${GRAVIEW_VERSION}`], source: "npx", detail: `npx -y graview@${GRAVIEW_VERSION}` };
+  }
+  return {
+    cmd: "",
+    prefix: [],
+    source: "none",
+    detail:
+      `no graview binary found. Install it (npm i -D graview@${GRAVIEW_VERSION}, or @n-dx/graview-face, which carries its own), ` +
+      `point graview.bin in .n-dx.json or ${GRAVIEW_BIN_ENV} at one, or let npx download it with graview.allowNpx: true or ${GRAVIEW_NPX_ENV}=1.`,
+  };
 }
