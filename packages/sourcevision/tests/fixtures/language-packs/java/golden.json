@@ -56,6 +56,19 @@
             }
           },
           {
+            "name": "entry_point.main",
+            "nodeType": "method_declaration",
+            "text": "public static void main(String[] args) {\n    System.out.println(\"hello\");\n  }",
+            "start": {
+              "line": 3,
+              "column": 2
+            },
+            "end": {
+              "line": 5,
+              "column": 3
+            }
+          },
+          {
             "name": "method.name",
             "nodeType": "identifier",
             "text": "main",
@@ -1221,6 +1234,116 @@
         "calls": [],
         "annotations": [],
         "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/FooApplication.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class FooApplication {\n  public static void start(String[] args) {}\n}",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "FooApplication",
+            "start": {
+              "line": 4,
+              "column": 13
+            },
+            "end": {
+              "line": 4,
+              "column": 27
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public static void start(String[] args) {}",
+            "start": {
+              "line": 5,
+              "column": 2
+            },
+            "end": {
+              "line": 5,
+              "column": 44
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "start",
+            "start": {
+              "line": 5,
+              "column": 21
+            },
+            "end": {
+              "line": 5,
+              "column": 26
+            }
+          }
+        ],
+        "calls": [],
+        "annotations": [],
+        "type-references": [
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 5,
+              "column": 27
+            },
+            "end": {
+              "line": 5,
+              "column": 33
+            }
+          }
+        ]
       }
     },
     {
@@ -4995,6 +5118,325 @@
     },
     {
       "status": "parsed",
+      "path": "src/com/example/tool/Launcher.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.tool;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.tool",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class Launcher {\n  public static void main(String... args) {\n    System.out.println(args.length);\n  }\n\n  // Near misses: not static, and not void, so neither is an entry point.\n  public void main(String[] args) {}\n\n  static class Exit {\n    public static int main(String[] args) {\n      return 0;\n    }\n  }\n}",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 17,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Launcher",
+            "start": {
+              "line": 4,
+              "column": 13
+            },
+            "end": {
+              "line": 4,
+              "column": 21
+            }
+          },
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "static class Exit {\n    public static int main(String[] args) {\n      return 0;\n    }\n  }",
+            "start": {
+              "line": 12,
+              "column": 2
+            },
+            "end": {
+              "line": 16,
+              "column": 3
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Exit",
+            "start": {
+              "line": 12,
+              "column": 15
+            },
+            "end": {
+              "line": 12,
+              "column": 19
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public static void main(String... args) {\n    System.out.println(args.length);\n  }",
+            "start": {
+              "line": 5,
+              "column": 2
+            },
+            "end": {
+              "line": 7,
+              "column": 3
+            }
+          },
+          {
+            "name": "entry_point.main",
+            "nodeType": "method_declaration",
+            "text": "public static void main(String... args) {\n    System.out.println(args.length);\n  }",
+            "start": {
+              "line": 5,
+              "column": 2
+            },
+            "end": {
+              "line": 7,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "main",
+            "start": {
+              "line": 5,
+              "column": 21
+            },
+            "end": {
+              "line": 5,
+              "column": 25
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public void main(String[] args) {}",
+            "start": {
+              "line": 10,
+              "column": 2
+            },
+            "end": {
+              "line": 10,
+              "column": 36
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "main",
+            "start": {
+              "line": 10,
+              "column": 14
+            },
+            "end": {
+              "line": 10,
+              "column": 18
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public static int main(String[] args) {\n      return 0;\n    }",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 15,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "main",
+            "start": {
+              "line": 13,
+              "column": 22
+            },
+            "end": {
+              "line": 13,
+              "column": 26
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "System.out.println(args.length)",
+            "start": {
+              "line": 6,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 35
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "field_access",
+            "text": "System.out",
+            "start": {
+              "line": 6,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 14
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "println",
+            "start": {
+              "line": 6,
+              "column": 15
+            },
+            "end": {
+              "line": 6,
+              "column": 22
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(args.length)",
+            "start": {
+              "line": 6,
+              "column": 22
+            },
+            "end": {
+              "line": 6,
+              "column": 35
+            }
+          }
+        ],
+        "annotations": [],
+        "type-references": [
+          {
+            "name": "typeref.parameter",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 5,
+              "column": 26
+            },
+            "end": {
+              "line": 5,
+              "column": 32
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 5,
+              "column": 26
+            },
+            "end": {
+              "line": 5,
+              "column": 32
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "System",
+            "start": {
+              "line": 6,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 10
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "args",
+            "start": {
+              "line": 6,
+              "column": 23
+            },
+            "end": {
+              "line": 6,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 10,
+              "column": 19
+            },
+            "end": {
+              "line": 10,
+              "column": 25
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 13,
+              "column": 27
+            },
+            "end": {
+              "line": 13,
+              "column": 33
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
       "path": "src/com/example/util/Cart.java",
       "hasErrorNodes": false,
       "hasMissingNodes": false,
@@ -5517,6 +5959,10 @@
       "files": [],
       "external": []
     },
+    "src/com/example/app/FooApplication.java": {
+      "files": [],
+      "external": []
+    },
     "src/com/example/app/Receipt.java": {
       "files": [],
       "external": []
@@ -5594,6 +6040,10 @@
       ]
     },
     "src/com/example/time/Clock.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/tool/Launcher.java": {
       "files": [],
       "external": []
     },

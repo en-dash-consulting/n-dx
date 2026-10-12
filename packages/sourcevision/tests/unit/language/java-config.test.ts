@@ -151,10 +151,9 @@ describe("java language config", () => {
     }
   });
 
-  it("matches conventional entry-point file names", () => {
-    const hit = (p: string): boolean => javaConfig.entryPointPatterns.some((re) => re.test(p));
-    expect(hit("src/main/java/com/acme/DemoApplication.java")).toBe(true);
-    expect(hit("src/main/java/com/acme/Main.java")).toBe(true);
-    expect(hit("src/main/java/com/acme/Service.java")).toBe(false);
+  it("does not guess entry points from file names", () => {
+    // Entry points come from the pack's entry_point.main capture, which reads
+    // the main method itself (see java-pack-queries.test.ts).
+    expect(javaConfig.entryPointPatterns).toEqual([]);
   });
 });

@@ -156,13 +156,18 @@ export function createTreeSitterRunner(options: RunnerOptions = {}): TreeSitterR
       const root = tree.rootNode;
       const captures: Record<string, Capture[]> = {};
       for (const { name, query } of queries) {
-        captures[name] = query.captures(root).map(({ name: capture, node }) => ({
-          name: capture,
-          nodeType: node.type,
-          text: node.text,
-          start: { line: node.startPosition.row + 1, column: node.startPosition.column },
-          end: { line: node.endPosition.row + 1, column: node.endPosition.column },
-        }));
+        // A capture named `@_…` exists only for a predicate to test (the
+        // tree-sitter convention), so it is not part of the output.
+        captures[name] = query
+          .captures(root)
+          .filter(({ name: capture }) => !capture.startsWith("_"))
+          .map(({ name: capture, node }) => ({
+            name: capture,
+            nodeType: node.type,
+            text: node.text,
+            start: { line: node.startPosition.row + 1, column: node.startPosition.column },
+            end: { line: node.endPosition.row + 1, column: node.endPosition.column },
+          }));
       }
       parsed++;
       return { status: "parsed", path, ...findErrorNodes(root), captures };
