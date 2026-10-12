@@ -194,8 +194,8 @@ function reportRehearsal(rehearsal: RehearseV1ToV2Result): void {
     if (rehearsal.removed.length > 0) info(`Apply would remove what an interrupted apply left: ${rehearsal.removed.join(", ")}`);
     return;
   }
-  const { kinds, built, nodes, v1Items } = rehearsal;
-  result(`Dry run: apply would migrate ${v1Items} v1 items to the v2 layout (${nodes} nodes, the cut change ${built.cut} included). Nothing was written.`);
+  const { kinds, built, nodes, files, v1Items } = rehearsal;
+  result(`Dry run: apply would migrate ${v1Items} v1 items to the v2 layout (${nodes} nodes, the cut change ${built.cut} included). Wrote ${files} files to a temporary directory and read them back; nothing was written to the project.`);
   for (const kind of V1_KINDS) {
     const t = kinds[kind];
     if (t.total === 0) continue;
