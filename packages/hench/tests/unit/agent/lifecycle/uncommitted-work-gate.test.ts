@@ -8,6 +8,7 @@ import {
   findUncommittedWork,
   formatLoopRefusal,
   formatUncommittedWorkRefusal,
+  reviewDedupeDir,
 } from "../../../../src/agent/lifecycle/uncommitted-work-gate.js";
 import { RM_RETRY } from "../../../helpers/index.js";
 
@@ -66,6 +67,24 @@ describe("findUncommittedWork", () => {
         withDirty([" M .rex/prd_tree/some-task/index.md"], { discountPaths: [...PRD_COMMIT_PATHS] }),
       ),
     ).resolves.toEqual({ clean: true, paths: [] });
+  });
+
+  it("does not count v2 product/ and changes/ writes, state.yaml included", async () => {
+    for (const rexDir of [".rex", ".ndx/rex"]) {
+      await expect(
+        findUncommittedWork(
+          withDirty(
+            [
+              ` M ${rexDir}/changes/ch-1/index.md`,
+              ` M ${rexDir}/changes/ch-1/state.yaml`,
+              `?? ${rexDir}/changes/ch-2/state.yaml`,
+              ` M ${rexDir}/product/area/capability/state.yaml`,
+            ],
+            { discountPaths: [...PRD_COMMIT_PATHS] },
+          ),
+        ),
+      ).resolves.toEqual({ clean: true, paths: [] });
+    }
   });
 
   it("does not count the tree-meta sidecar every PRD write rewrites", async () => {
@@ -248,6 +267,14 @@ describe("refusal messages", () => {
 // but still discounted (a tracked log left silently dirty after every
 // completion until the pre-run gate refused). These tests fail on the next
 // drift in either direction.
+
+describe("reviewDedupeDir", () => {
+  it("lists changes/ on v2 and prd_tree/ on v1, never prd_tree/ on v2", () => {
+    expect(reviewDedupeDir(".rex", "v2")).toBe(".rex/changes/");
+    expect(reviewDedupeDir(".ndx/rex", "v2")).toBe(".ndx/rex/changes/");
+    expect(reviewDedupeDir(".rex", "v1")).toBe(".rex/prd_tree/");
+  });
+});
 
 describe("PRD staged and discounted sets derive from one definition", () => {
   it("the discount covers exactly the staged paths plus every unstaged write, on both layouts", async () => {

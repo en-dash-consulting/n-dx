@@ -105,7 +105,8 @@ import {
 import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
 import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
-import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
+import { prdLayout } from "../../prd/rex-gateway.js";
+import { reviewDedupeDir } from "./uncommitted-work-gate.js";
 import { resolveAgentCliEffort } from "./agent-effort.js";
 import { BOOKKEEPING_PATHS } from "../../store/paths.js";
 import { matchesProjectPath } from "../../store/artifacts.js";
@@ -1633,7 +1634,7 @@ async function runAdversarialReviewPass(
   await mkdir(dirname(reportPath), { recursive: true });
 
   const layout = resolveLayout(inv.projectDir);
-  const prdTreeDir = `${relativeToRoot(layout, layout.rexDir)}/${PRD_TREE_DIRNAME}/`;
+  const prdTreeDir = reviewDedupeDir(relativeToRoot(layout, layout.rexDir), await prdLayout(layout.rexDir));
   const systemPrompt = pair ? buildPairReviewSystemPrompt() : buildReviewSystemPrompt();
 
   let brief: string;

@@ -81,6 +81,8 @@ import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
 import {
   PRD_COMMIT_PATHS,
+  V2_CHANGES_DIRNAME,
+  V2_PRODUCT_DIRNAME,
   deletedAmong,
   findUncommittedWork,
   formatOperatorPrdLeftovers,
@@ -2343,8 +2345,11 @@ async function scopePrdPathsToReport(
   // git accepts it on Windows too.
   const allowedRoots = new Set(rootPaths.map((p) => p.split(sep).join("/")));
   const rexDir = rexDirName(projectDir);
-  const treePrefix = `${rexDir}/${PRD_TREE_DIRNAME}/`;
-  const treeAllowed = allowedRoots.has(`${rexDir}/${PRD_TREE_DIRNAME}`);
+  // The tree on v1, the product/ and changes/ layers on v2.
+  const treeDirs = [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME]
+    .filter((dir) => allowedRoots.has(`${rexDir}/${dir}`))
+    .map((dir) => `${rexDir}/${dir}/`);
+  const inAllowedTree = (path: string) => treeDirs.some((prefix) => path.startsWith(prefix));
 
   const scoped: string[] = [];
   const seen = new Set<string>();
@@ -2355,14 +2360,14 @@ async function scopePrdPathsToReport(
     }
   };
 
-  if (treeAllowed) {
+  if (treeDirs.length > 0) {
     for (const path of report.written) {
-      if (!path.startsWith(treePrefix)) continue;
+      if (!inAllowedTree(path)) continue;
       if (!existsSync(join(projectDir, path))) continue;
       push(path);
     }
     for (const path of report.deleted) {
-      if (!path.startsWith(treePrefix)) continue;
+      if (!inAllowedTree(path)) continue;
       if (existsSync(join(projectDir, path)) || (await isGitTracked(projectDir, path))) {
         push(path);
       }

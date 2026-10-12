@@ -625,6 +625,41 @@ describe("commitCompletionMetadata — stages only the save report's files (WM20
     expect(dirty[0]).toContain("unrelated-item");
   });
 
+  it("stages a v2 changes/ write the save report names, state.yaml included, and nothing else", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const changeRel = ".rex/changes/ch-1";
+    const stateRelPath = `${changeRel}/state.yaml`;
+    const siblingRelPath = ".rex/changes/ch-2/state.yaml";
+    await mkdir(join(projectDir, changeRel), { recursive: true });
+    await mkdir(join(projectDir, ".rex/changes/ch-2"), { recursive: true });
+    await mkdir(join(projectDir, ".rex/product"), { recursive: true });
+    await writeFile(join(projectDir, stateRelPath), "status: in_progress\n", "utf-8");
+    await writeFile(join(projectDir, siblingRelPath), "status: pending\n", "utf-8");
+    await writeFile(join(projectDir, ".rex/product/state.yaml"), "x: 1\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "add v2 layers"', { cwd: projectDir });
+
+    // The completion's write, plus an operator edit the report does not name.
+    await writeFile(join(projectDir, stateRelPath), "status: completed\n", "utf-8");
+    await writeFile(join(projectDir, siblingRelPath), "status: pending\nnote: in flight\n", "utf-8");
+
+    const store = buildScopedMockStore();
+    store.takeSaveFileReport = vi.fn(() => ({ written: [stateRelPath], deleted: [] }));
+
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(taskId),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    expect(changed).toContain(stateRelPath);
+    expect(changed).not.toContain(siblingRelPath);
+  });
+
   it("stages a deletion the save report names", async () => {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
     const doomedRelPath = ".rex/prd_tree/doomed-leaf.md";

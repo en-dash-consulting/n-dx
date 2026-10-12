@@ -41,6 +41,24 @@ import {
 } from "../../store/artifacts.js";
 
 /**
+ * The v2 layer folders under rex's state directory. Spelled here because
+ * rex's public API does not export `PRODUCT_DIRNAME` / `CHANGES_DIRNAME`
+ * (they live in `store/prd-model-reader.ts`); switch to a gateway re-export
+ * once rex exports them.
+ */
+export const V2_PRODUCT_DIRNAME = "product";
+export const V2_CHANGES_DIRNAME = "changes";
+
+/**
+ * The folder the review pass lists to check whether a finding is already
+ * tracked, project-relative with a trailing slash: `changes/` on a v2 tree
+ * (follow-ups land there), `prd_tree/` on v1.
+ */
+export function reviewDedupeDir(rexDir: string, layout: "v1" | "v2"): string {
+  return `${rexDir}/${layout === "v2" ? V2_CHANGES_DIRNAME : PRD_TREE_DIRNAME}/`;
+}
+
+/**
  * One entry in the single definition of the PRD paths hench's own writes
  * touch. {@link prdStagePaths} and `PRD_COMMIT_PATHS` both derive from the
  * list below — the staged set and the discounted set have drifted twice, in
@@ -99,6 +117,11 @@ interface PrdWritePath {
  */
 const PRD_WRITE_PATHS: readonly PrdWritePath[] = [
   { path: PRD_TREE_DIRNAME, isDirectory: true, stagedBy: "hench" },
+  // v2 layers: a v2 tree has `product/` and `changes/` instead of `prd_tree/`,
+  // `state.yaml` files included. Absent on a v1 tree, so the staging step's
+  // existence check drops them and v1 behaviour is unchanged.
+  { path: V2_PRODUCT_DIRNAME, isDirectory: true, stagedBy: "hench" },
+  { path: V2_CHANGES_DIRNAME, isDirectory: true, stagedBy: "hench" },
   { path: TREE_META_FILENAME, isDirectory: false, stagedBy: "hench" },
   { path: "execution-log.jsonl", isDirectory: false, stagedBy: "operator" },
   { path: "execution-log.1.jsonl", isDirectory: false, stagedBy: "operator" },

@@ -204,6 +204,11 @@ export const SOURCEVISION_MCP_SERVER_NAME = "sourcevision";
  * - `add_item` — base workflow steps 3 and 9, and the `should-fix` action of the
  *   autonomous adversarial-review pass (`../agent/analysis/adversarial-review.ts`).
  *
+ * - `get_capability` — read a product-layer capability on a v2 tree.
+ * - `place_change` — file a follow-up change on a v2 tree. `apply_change` is
+ *   deliberately absent: applying amendments to the product layer is the
+ *   operator's call (completion applies them through rex, not the agent).
+ *
  * A tool no prompt asks for does not belong here. Adding one is a deliberate
  * edit with a test to match, not a convenience.
  *
@@ -219,6 +224,8 @@ export const AGENT_REX_MCP_TOOLS: readonly string[] = [
   "update_task_status",
   "append_log",
   "add_item",
+  "get_capability",
+  "place_change",
 ].map((tool) => `mcp__${REX_MCP_SERVER_NAME}__${tool}`);
 
 /**

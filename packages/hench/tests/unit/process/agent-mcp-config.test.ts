@@ -124,7 +124,10 @@ describe("AGENT_REX_MCP_TOOLS", () => {
       "mcp__rex__update_task_status",
       "mcp__rex__append_log",
       "mcp__rex__add_item",
+      "mcp__rex__get_capability",
+      "mcp__rex__place_change",
     ]);
+    expect([...AGENT_REX_MCP_TOOLS]).not.toContain("mcp__rex__apply_change");
   });
 
   it("names no tool from the sourcevision server", () => {
