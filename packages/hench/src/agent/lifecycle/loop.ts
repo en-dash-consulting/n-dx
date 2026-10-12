@@ -27,7 +27,7 @@ import type {
 import type { TokenUsage } from "../../schema/index.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { buildCachedMessageRequest } from "./prompt-cache.js";
-import { resolveAgentApiEffort } from "./api-effort.js";
+import { resolveAgentApiEffort } from "./agent-effort.js";
 import {
   ConversationPruner,
   PRUNE_BRIDGE_TEXT,

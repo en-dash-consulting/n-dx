@@ -10,10 +10,11 @@ import {
   REVIEWS_DIRNAME,
   RECOVERY_DIRNAME,
   AGENT_MCP_DIRNAME,
-  BOOKKEEPING_DIR_PREFIXES,
+  BOOKKEEPING_PATHS,
   resolveHenchPaths,
   stateDirNameUnder,
 } from "../../../src/store/paths.js";
+import { matchesProjectPath } from "../../../src/store/artifacts.js";
 
 let legacyRoot: string;
 let ndxRoot: string;
@@ -116,29 +117,61 @@ describe("stateDirNameUnder", () => {
   });
 });
 
-describe("BOOKKEEPING_DIR_PREFIXES", () => {
-  it("covers rex and hench on both layouts, and nothing else", () => {
-    // The container entry is what covers `.ndx/rex` and `.ndx/hench` — one
-    // prefix for both, because everything n-dx owns is inside it.
-    expect([...BOOKKEEPING_DIR_PREFIXES]).toEqual([".rex/", ".hench/", ".ndx/"]);
-  });
+describe("BOOKKEEPING_PATHS", () => {
+  const matches = (path: string): boolean => matchesProjectPath(path, BOOKKEEPING_PATHS);
 
-  it("does not claim sourcevision output on the legacy layout", () => {
-    // Analysis output is not hench's bookkeeping: a run that rewrote it has
-    // changed something the gates built on this list should see. Asserted
-    // because deriving the list from the resolver's three-directory answer
-    // would have swept it in silently.
-    expect(BOOKKEEPING_DIR_PREFIXES).not.toContain(".sourcevision/");
-  });
-
-  it("matches a PRD write under either layout by prefix", () => {
-    const matches = (path: string): boolean =>
-      BOOKKEEPING_DIR_PREFIXES.some((prefix) => path.startsWith(prefix));
-
-    expect(matches(".rex/prd_tree/task-1/index.md")).toBe(true);
-    expect(matches(".ndx/rex/prd_tree/task-1/index.md")).toBe(true);
+  it("covers hench's whole state directory on both layouts", () => {
+    // Nothing hench writes about itself is ever a work product.
     expect(matches(".hench/runs/abc/record.json")).toBe(true);
     expect(matches(".ndx/hench/runs/abc/record.json")).toBe(true);
+    expect(matches(".hench/reviews/abc.json")).toBe(true);
+  });
+
+  it("covers rex's own records on both layouts", () => {
+    for (const entry of [
+      "prd_tree/task-1/index.md",
+      ".cache/prd.json",
+      "execution-log.jsonl",
+      "execution-log.1.jsonl",
+      "tree-meta.json",
+      "archive.json",
+      "pending-proposals.json",
+      "acknowledged-findings.json",
+    ]) {
+      expect(matches(`.rex/${entry}`), `.rex/${entry}`).toBe(true);
+      expect(matches(`.ndx/rex/${entry}`), `.ndx/rex/${entry}`).toBe(true);
+    }
+  });
+
+  it("does not claim rex's project content on either layout", () => {
+    // The defect this list replaced: `.rex/` whole was bookkeeping, so a run
+    // that only edited the workflow read as "no changes" and could never
+    // complete. workflow.md goes into every agent brief; config.json is
+    // project configuration.
+    for (const entry of ["workflow.md", "n-dx_workflow.md", "config.json"]) {
+      expect(matches(`.rex/${entry}`), `.rex/${entry}`).toBe(false);
+      expect(matches(`.ndx/rex/${entry}`), `.ndx/rex/${entry}`).toBe(false);
+    }
+  });
+
+  it("does not claim sourcevision output on either layout", () => {
+    // Analysis output is not hench's bookkeeping: a run that rewrote it has
+    // changed something the gates built on this list should see. The legacy
+    // layout always behaved this way; `.ndx/` used to sweep the whole
+    // container in, so the two layouts disagreed.
+    expect(matches(".sourcevision/manifest.json")).toBe(false);
+    expect(matches(".ndx/sourcevision/manifest.json")).toBe(false);
+  });
+
+  it("matches the state directory itself, not just paths beneath it", () => {
+    // `git status --porcelain` can report a new directory as a single entry.
+    expect(matches(".hench")).toBe(true);
+    expect(matches(".rex/prd_tree")).toBe(true);
+  });
+
+  it("does not match unrelated work", () => {
     expect(matches("src/index.ts")).toBe(false);
+    // Neither a sibling directory whose name merely starts the same way.
+    expect(matches(".rexxed/thing.ts")).toBe(false);
   });
 });

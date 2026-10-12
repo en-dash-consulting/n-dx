@@ -3547,20 +3547,21 @@ export function deriveTokenDiagnosticStatus(turns: TurnTokenUsage[]): "complete"
 async function collectRunCommits(projectDir: string, startHead: string | undefined): Promise<RunCommitRecord[]> {
   if (!startHead) return [];
   try {
-    // Unit separator (\x1f) between hash and subject: a commit subject can
-    // contain almost anything else a simpler delimiter might collide with.
+    // Unit separator (\x1f) between fields: a commit subject can contain
+    // almost anything else a simpler delimiter might collide with, so it is
+    // read last and everything after the second separator is subject.
     // --reverse lists oldest first, so the work commit precedes the record
     // commit that followed it.
     const output = await execStdout(
       "git",
-      ["log", "--reverse", `--format=%H%x1f%s`, `${startHead}..HEAD`],
+      ["log", "--reverse", `--format=%H%x1f%aI%x1f%s`, `${startHead}..HEAD`],
       { cwd: projectDir, timeout: 10_000 },
     );
     const trimmed = output.trim();
     if (!trimmed) return [];
     return trimmed.split("\n").map((line) => {
-      const [sha, ...rest] = line.split("\x1f");
-      return { sha, subject: rest.join("\x1f"), attribution: "start-head" as const };
+      const [sha, authorDate, ...rest] = line.split("\x1f");
+      return { sha, subject: rest.join("\x1f"), authorDate, attribution: "start-head" as const };
     });
   } catch {
     // Best-effort: a run whose commits cannot be enumerated still reports
@@ -3621,6 +3622,34 @@ export async function findCommitsMissingItem(
     if (items && !items.includes(taskId)) missing.push({ sha: commit.sha, subject: commit.subject, items });
   }
   return missing;
+}
+
+/**
+ * Read one commit's subject and author date, for a SHA the run records but did
+ * not produce.
+ *
+ * Returns undefined outside a git repository, for an absent SHA, or when the
+ * commit is not readable — the facts are an aid to re-pointing later, never
+ * something a run should fail over.
+ */
+async function readCommitFacts(
+  projectDir: string,
+  sha: string | undefined,
+): Promise<RunCommitRecord | undefined> {
+  if (!sha) return undefined;
+  try {
+    const output = await execStdout(
+      "git",
+      ["log", "-1", `--format=%H%x1f%aI%x1f%s`, sha],
+      { cwd: projectDir, timeout: 10_000 },
+    );
+    const trimmed = output.trim();
+    if (!trimmed) return undefined;
+    const [full, authorDate, ...rest] = trimmed.split("\x1f");
+    return { sha: full, subject: rest.join("\x1f"), authorDate };
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -4382,6 +4411,11 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   const missingItem = await findCommitsMissingItem(projectDir, run.commits, run.taskId);
   if (missingItem.length > 0) run.commitsMissingItem = missingItem;
   else delete run.commitsMissingItem;
+  // The baseline's own facts, so it can be re-pointed after a rewrite like any
+  // commit the run produced. It is the SHA most worth keeping findable: the
+  // diff baseline, the gate's scope and the reviewer's scope are all defined
+  // against it, and a stack rebase moves it along with everything else.
+  run.startHeadCommit = await readCommitFacts(projectDir, run.startHead);
 
   // …and name what the run left behind uncommitted. Computed here, after the
   // rollback above, so it describes the tree as the run actually ends up:
