@@ -55,6 +55,28 @@ node packages/sourcevision/scripts/java-scip-compare.mjs [--json]
 
 Exit 2 means a prerequisite is missing and the script printed what.
 
+## Measured results
+
+Resolver as of 2026-10-12 (after constructor references count as type references).
+
+| Repository | Pinned SHA | Files compared | Precision | Recall | Date |
+|---|---|---|---|---|---|
+| spring-petclinic | `500158f73241` | 50 | 100.0% | 100.0% | 2026-10-12 |
+| thingsboard | `0439df09f31b` | 6694 (297 build output, 191 not in the index left out) | 100.0% | 99.9% | 2026-10-12 |
+| junit-framework | `99a00b9bb827` | not built | — | — | 2026-10-12 |
+
+junit-framework has no index: scip-java 0.12.3 (the latest release) injects its
+Gradle init script into junit's Kotlin build-logic included builds
+(`gradle/base`, `gradle/plugins`), and Gradle 9.8 then fails reading
+`compileKotlin` `freeCompilerArgs` before `generatePrecompiledScriptPluginAccessors`
+has run. Its build is not edited to force one.
+
+thingsboard needs Maven 3.9.x (3.10 rejects the duplicate byte-buddy
+`dependencyManagement` entries in its root pom) and trailing scip-java arguments
+`package --batch-mode -DskipTests -Dskip.ui.build=true -Dskip.yarn=true -Dpkg.skip=true -Dlicense.skip=true`.
+
+Proposed G2 floors: precision ≥ 98.0%, recall ≥ 97.0%.
+
 ## How the numbers are defined
 
 - **SCIP edges:** every non-definition occurrence of a *type* symbol (descriptor
@@ -64,8 +86,17 @@ Exit 2 means a prerequisite is missing and the script printed what.
   recorded that way. Other method and field symbols are ignored: the resolver
   models type references. Symbols defined outside the repository (JDK,
   dependencies) and `local` symbols never produce an edge.
-- **Resolver edges:** `buildPackImportGraph` over the same `.java` files,
-  limited to targets inside the repository.
+- **Files compared:** the `.java` files under the repository that (1) are not
+  build output and (2) have a document in the SCIP index, on both sides. Build
+  output is a `target/` directory beside a `pom.xml` or a `build/` directory
+  beside a `build.gradle(.kts)`: `sourcevision analyze` never inventories it
+  (gitignored), so generated sources would otherwise enter both edge sets.
+  scip-java indexes only what the build compiled (a module behind an inactive
+  profile is not), so a file outside the index would turn every resolver edge
+  from it into a false positive. The script prints how many walked files were
+  left out and why.
+- **Resolver edges:** `buildPackImportGraph` over the compared files, limited
+  to targets among them.
 - **Precision** = matched / resolver edges. **Recall** = matched / SCIP edges.
 - **Unmatched patterns:** resolver-only and SCIP-only edges, split into
   `same-directory` and `cross-directory`, with the target files involved in the
