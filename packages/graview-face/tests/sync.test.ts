@@ -166,7 +166,7 @@ describe("two-way sync with rex as the system of record", () => {
     door.touch(change.id, { priority: "high" });
     const writesBefore = door.calls.filter((c) => c.name === "edit_item" || c.name === "update_task_status").length;
     const { report, resolved } = await sync.run();
-    expect(resolved.map((c) => `${c.field}:${String(c.ours)}→${String(c.theirs)}:${c.took}`)).toEqual(["priority:low→high:theirs"]);
+    expect(resolved.map((c) => ("field" in c ? `${c.field}:${String(c.ours)}→${String(c.theirs)}:${c.took}` : `deleted:${c.took}`))).toEqual(["priority:low→high:theirs"]);
     expect((store.graph.getNode(change.id) as unknown as Item).priority).toBe("high");
     expect(door.rex.get(change.id)?.priority).toBe("high");
     // Rex was told nothing: its value stood, and ours was replaced locally through the inbound act.

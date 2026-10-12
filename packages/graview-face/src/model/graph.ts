@@ -94,7 +94,9 @@ export function isOpen(n: Node): boolean {
 export const plural = (store: Reader, kind: string): string => store.schema.tryDefinition(kind)?.plural ?? `${kind}s`;
 export const noun = (store: Reader, kind: string): string => store.schema.tryDefinition(kind)?.noun ?? kind;
 
-export function count<K extends Kind>(store: Reader, kind: K, where: (n: Of<K>) => boolean = () => true): number {
+export function count<K extends Kind>(store: Reader, kind: K, where?: (n: Of<K>) => boolean): number {
+  // The graph keeps a tally per kind (Graph.count, 0.1.24); a walk is only for a narrowed count.
+  if (!where) return store.graph.count(kind);
   return nodesOf(store, kind).filter(where).length;
 }
 
