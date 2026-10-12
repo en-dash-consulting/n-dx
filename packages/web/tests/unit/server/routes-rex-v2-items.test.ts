@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { cpSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
@@ -86,6 +86,9 @@ describe("Rex item routes on a v2 project", () => {
 
     expect((await send("PATCH", `items/${CHANGE_ID}`, { status: "completed" })).status).toBe(200);
     expect((await store.getItem(CHANGE_ID))?.status).toBe("completed");
+    // Only rex's v2 completion applies the change's amendment to the product
+    // layer; a plain status write through the store would leave it unapplied.
+    expect(readFileSync(join(rexDir, "product", "checkout", "pay-by-card.md"), "utf-8")).toContain("Apple Pay is offered on Safari");
   });
 
   it("PATCH of an unknown id on v2 is a 404", async () => {
