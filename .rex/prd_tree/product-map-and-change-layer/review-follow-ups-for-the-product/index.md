@@ -61,3 +61,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [hench reopens an applied v2 change when it withdraws a bypassed completion](./hench-reopens-an-applied-v2-change.md) | pending |
 | [ndx work --task on a v2 change with tasks claims the change while another worktree holds one of its tasks](./ndx-work-task-on-a-v2-change-with.md) | pending |
 | [On a v2 tree hench's completion commit stages product/ and changes/ wholesale, sweeping in operator edits](./on-a-v2-tree-hench-s-completion-commit.md) | pending |
+| [On a v2 tree, --resolve reports a subtask or container-change ref as "Task not found" instead of the run's reason](./on-a-v2-tree-resolve-reports-a-subtask.md) | pending |
