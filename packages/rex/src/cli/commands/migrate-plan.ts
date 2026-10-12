@@ -158,6 +158,16 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   // typing `--out=plan.json` means "here", not "in the project".
   const outPath = resolve(out);
   const summaryPath = flags.summary && flags.summary !== "true" ? resolve(flags.summary) : summaryPathFor(outPath);
+  // The summary is written after the plan, so the same path for both destroys
+  // the plan in the same run that produced it — and the run reports success.
+  // `--out` is already guarded against clobbering a file that is not a plan
+  // (readPrevious); this is the other half of that guarantee.
+  if (summaryPath === outPath) {
+    throw new CLIError(
+      "--summary and --out name the same file.",
+      "The summary is written after the plan and would overwrite it, discarding the recorded answers. Pass --summary=<another path>, or omit it for <out>.md.",
+    );
+  }
   assertOutsideRexDir(outPath, dir, "migration plan", "./migration-plan.json");
   assertOutsideRexDir(summaryPath, dir, "migration plan summary", "./migration-plan.md");
 

@@ -224,6 +224,12 @@ describe("rex cli/commands import surface", () => {
     "../../migrations/v1-to-v2/index.js",
     "../../migrations/v1-to-v2/seams.js",
     "../../migrations/v1-to-v2/plan-summary.js",
+    // Loaded by migrate-plan through `await import()` so a --rules-only run
+    // never pulls the model machinery in. The extractor above only matches
+    // static `from "…"`, so these would otherwise sit outside the tracked
+    // surface by accident rather than by decision.
+    "../../analyze/place-reason.js",
+    "../../analyze/spec-draft-reason.js",
   ]);
 
   /**

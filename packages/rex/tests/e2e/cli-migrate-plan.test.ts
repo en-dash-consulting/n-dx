@@ -173,6 +173,16 @@ describe("rex migrate-plan", () => {
     expect(existsSync(join(dir, ".rex", "prd.md"))).toBe(false);
   });
 
+  it("refuses a --summary that is the --out path, rather than overwriting the plan it just wrote", async () => {
+    // The summary is written after the plan, so sharing the path destroyed the
+    // plan in the same run and still reported success; the next run then
+    // refused the Markdown as "not a migration plan file".
+    await mkdir(join(dir, "out"), { recursive: true });
+    const output = run(["migrate-plan", "--rules-only", `--out=${outPath}`, `--summary=${outPath}`, dir], true);
+    expect(output).toContain("name the same file");
+    expect(existsSync(outPath)).toBe(false);
+  });
+
   it("refuses an --out that is not a plan file rather than overwriting it", async () => {
     await mkdir(join(dir, "out"), { recursive: true });
     await writeFile(outPath, "{}\n", "utf-8");
