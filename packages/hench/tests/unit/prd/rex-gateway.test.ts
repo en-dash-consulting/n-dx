@@ -58,6 +58,8 @@ const EXPECTED_EXPORTS = [
   "resolveWorkById",
   // v2 agent brief
   "buildChangeBrief",
+  // v2 completion — what update_task_status runs on a v2 tree
+  "completeV2Work",
   // Cross-worktree task claims
   "openClaimsStore",
   "resolveClaimHolder",

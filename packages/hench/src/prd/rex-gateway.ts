@@ -65,6 +65,8 @@
  *   tree, so `ndx work` picks the same unit)
  * - v2 agent brief (buildChangeBrief — the selected unit's brief, built from
  *   its change and the product nodes it touches or amends)
+ * - v2 completion (completeV2Work — what `update_task_status` runs on a v2
+ *   tree: completes the change with its last task and applies it)
  * - Cross-worktree task claims (openClaimsStore, resolveClaimHolder — the
  *   run claims the task it selected so other worktrees pass over it)
  * - Timestamp computation (status change timestamps)
@@ -163,6 +165,15 @@ export {
 // projection. What that brief holds, and what its budget drops first, is rex's
 // to decide; a hench-side assembly would be a second definition of it.
 export { buildChangeBrief } from "@n-dx/rex";
+
+// ---- v2 completion --------------------------------------------------------------
+// On a v2 tree completing a task can complete its change, and a completed
+// change applies its amendments to the product layer per `rex.applyOn`, all in
+// one transaction. That is rex's completion — the entry point
+// `update_task_status` runs on v2 — so hench completes through it rather than
+// writing the status and running the v1 ancestor cascade over the projection,
+// which completed the change without ever applying it.
+export { completeV2Work } from "@n-dx/rex";
 
 // `matchesAssignee` is selection's own `--mine` rule (own field, or inherited
 // from any ancestor). Anything hench scopes to `--mine` that is *not* selection
