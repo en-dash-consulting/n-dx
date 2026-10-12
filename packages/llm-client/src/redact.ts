@@ -83,11 +83,45 @@ const RULES: readonly Rule[] = [
         // token (repository, project or workspace), ATATT on an Atlassian API
         // token — the credential that is replacing app passwords for the
         // Bitbucket Cloud API — and BBDC- on a Bitbucket Data Center HTTP
-        // access token. The newer ones end in `=` plus a checksum, so `=` is
-        // part of the body.
-        "ATBB[A-Za-z0-9]{20,}",
-        "AT(?:CT|AT)T[A-Za-z0-9_=-]{20,}",
-        "BBDC-[A-Za-z0-9]{20,}",
+        // access token.
+        //
+        // Each body alphabet below is taken from a published detector
+        // ruleset, cited on its line, rather than from memory. The earlier
+        // classes were written without one and were too narrow in exactly the
+        // way that matters for redaction: a body character outside the class
+        // ends the match, and everything after it stays in the record in
+        // plain text. A too-wide class only over-redacts.
+        //
+        // Length floors are deliberately *below* the published ones. A floor
+        // that is too high misses a short credential entirely; one that is
+        // too low costs an occasional over-redaction behind a four-character
+        // prefix that does not occur in ordinary prose.
+
+        // trufflehog `pkg/detectors/bitbucketapppassword`:
+        // `ATBB[A-Za-z0-9_=.-]+`. Its own fixture `ATBBa9iO-tyg7u_op` carries
+        // both `-` and `_`, neither of which the previous `[A-Za-z0-9]` class
+        // admitted — so a real app password was redacted only up to its first
+        // hyphen. No vendor-published length; the floor sits below the
+        // shortest body in that ruleset's fixtures rather than being invented.
+        "ATBB[A-Za-z0-9_=.-]{12,}",
+
+        // gitleaks `atlassian-api-token` pins `ATATT3[A-Za-z0-9_\\-=]{186}`
+        // (192 characters all told), and trufflehog `pkg/detectors/atlassian/v2`
+        // pins `ATCTT3xFfG[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8}`. Both describe the
+        // same shape: prefix, a base64 body, then `=` and 8 hex of CRC32. The
+        // `+` and `/` come from trufflehog's class and its sample token; the
+        // previous class had neither, so a body containing one was cut there.
+        // The `=` and the checksum are inside the class, so the tail is
+        // covered without anchoring on it — a token issued without one is
+        // still matched.
+        "AT(?:CT|AT)T[A-Za-z0-9+/=_-]{20,}",
+
+        // Prefixed since Bitbucket Data Center 8 (GitGuardian's
+        // `bitbucket_http_access_token_prefixed` detector). The body is plain
+        // base64 — glsec's rule is `BBDC-[A-Za-z0-9+/=]{32,}` and its fixture
+        // is `Ab+/` repeated — so `+`, `/` and `=` all belong in the class and
+        // none of them were there before.
+        "BBDC-[A-Za-z0-9+/=]{20,}",
         "eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}",
       ].join("|"),
       "g",
