@@ -169,6 +169,15 @@ describe("rex MCP tools on a v2 tree", () => {
     expect(json(apply)).toHaveProperty("applied");
   });
 
+  it("reorganize proposes no v1 level collapse of changes nested two deep", async () => {
+    const mid = await addChange("Tidy the card form");
+    const leaf = await addChange("Tidy the card form further");
+    expect((await call("move_item", { id: mid, parentId: CHANGE })).isError).toBe(false);
+    expect((await call("move_item", { id: leaf, parentId: mid })).isError).toBe(false);
+    const detect = json(await call("reorganize", { mode: "fast" }));
+    expect(detect.structural.proposals.filter((p: { type: string }) => p.type === "collapse")).toEqual([]);
+  });
+
   it("get_token_usage rolls up over the change layer", async () => {
     const res = await call("get_token_usage", { id: TASK });
     expect(res.isError, res.text).toBe(false);

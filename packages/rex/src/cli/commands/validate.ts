@@ -9,7 +9,7 @@ import {
   resolveEpiclessFeatures,
   applyEpiclessResolutions,
 } from "./validate-interactive.js";
-import { resolveStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError, resolveRexPaths } from "../../store/index.js";
+import { resolveStore, isChangeLayerStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError, resolveRexPaths } from "../../store/index.js";
 import {
   findNonConformingSlugs,
   findTreeIdentityFaults,
@@ -179,13 +179,20 @@ export async function cmdValidate(
   if (doc) {
     const structural = validateStructure(doc.items);
 
-    checks.push({
-      name: "hierarchy placement",
-      pass: structural.orphanedItems.length === 0,
-      errors: structural.orphanedItems.map(
-        (o) => `"${o.itemId}" (${o.level}): ${o.reason}`,
-      ),
-    });
+    // The change layer's placement rule is changeLayerParentRule, enforced at
+    // write time; the v1 level hierarchy and "a container needs a child" do
+    // not describe it (a change nests under a change, and may hold no task).
+    const changeLayer = store !== null && isChangeLayerStore(store);
+
+    if (!changeLayer) {
+      checks.push({
+        name: "hierarchy placement",
+        pass: structural.orphanedItems.length === 0,
+        errors: structural.orphanedItems.map(
+          (o) => `"${o.itemId}" (${o.level}): ${o.reason}`,
+        ),
+      });
+    }
 
     checks.push({
       name: "blockedBy cycles",
@@ -202,14 +209,16 @@ export async function cmdValidate(
       ),
     });
 
-    checks.push({
-      name: "empty containers",
-      pass: structural.emptyContainers.length === 0,
-      severity: "warn",
-      errors: structural.emptyContainers.map(
-        (e) => `"${e.itemId}" (${e.level}): ${e.reason}`,
-      ),
-    });
+    if (!changeLayer) {
+      checks.push({
+        name: "empty containers",
+        pass: structural.emptyContainers.length === 0,
+        severity: "warn",
+        errors: structural.emptyContainers.map(
+          (e) => `"${e.itemId}" (${e.level}): ${e.reason}`,
+        ),
+      });
+    }
 
     // Categorise warnings by type for clearer reporting
     const blockedWarnings = structural.warnings.filter((w) => w.startsWith("Blocked without"));

@@ -114,6 +114,20 @@ describe("rex on a v2 tree", () => {
     run(["validate", tmp], tmp);
   });
 
+  it("validate passes with a change nested two deep and a task-less change, with no v1 placement or empty-container finding", () => {
+    const add = (title: string): string => {
+      const added = JSON.parse(run(["add", "change", `--title=${title}`, "--format=json", tmp], tmp));
+      return (Array.isArray(added) ? added[0] : added).id as string;
+    };
+    const mid = add("Tidy the card form");
+    const leaf = add("Tidy the card form further");
+    run(["move", mid, `--parent=${CHANGE}`, tmp], tmp);
+    run(["move", leaf, `--parent=${mid}`, tmp], tmp);
+    const out = run(["validate", tmp], tmp);
+    expect(out).not.toContain("hierarchy placement");
+    expect(out).not.toContain("empty containers");
+  });
+
   it("report passes", () => {
     run(["report", tmp], tmp);
   });

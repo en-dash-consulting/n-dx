@@ -311,7 +311,7 @@ export async function cmdReorganize(
 
   // Stage 1: Programmatic detectors
   info("Analyzing PRD structure...");
-  const plan = detectReorganizations(doc.items, { includeCompleted });
+  const plan = detectReorganizations(doc.items, { includeCompleted, changeLayer: v2 });
   const productPlan = v2 ? reportProductLayer(productItems, includeCompleted, isJson) : undefined;
   // Added to every JSON result, so a v2 run still prints one document.
   const productJson = productPlan ? { product: { proposals: productPlan.proposals.map(summarizeProposal), stats: productPlan.stats } } : {};
