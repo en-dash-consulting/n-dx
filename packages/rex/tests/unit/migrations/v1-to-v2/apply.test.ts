@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +22,21 @@ import {
   V1_KINDS,
   type V1ToV2Plan,
 } from "../../../../src/migrations/v1-to-v2/apply.js";
+
+// A model the reader cannot read back is a writer or reader defect, not something a v1 tree can
+// provoke on demand, so the read-back is made to report a skipped file when a test asks.
+const readBack = vi.hoisted(() => ({ skip: false }));
+vi.mock("../../../../src/store/prd-model-reader.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../../../src/store/prd-model-reader.js")>();
+  return {
+    ...real,
+    loadPrdModel: async (...args: Parameters<typeof real.loadPrdModel>) => {
+      const model = await real.loadPrdModel(...args);
+      if (!readBack.skip) return model;
+      return { ...model, warnings: [...model.warnings, { path: "product/area/index.md", message: "unreadable", skipped: true }] };
+    },
+  };
+});
 
 const CUT_AT = "2026-10-12T00:00:00.000Z";
 
@@ -220,7 +235,10 @@ describe("applyV1ToV2", () => {
     await store().saveDocument({ schema: "rex/v1", title: "Shop", items: TREE });
   });
 
-  afterEach(() => rmSync(repo, { recursive: true }));
+  afterEach(() => {
+    readBack.skip = false;
+    rmSync(repo, { recursive: true });
+  });
 
   it("writes the v2 tree and removes prd_tree/ and tree-meta.json in the same transaction", async () => {
     const plan = await planOf((await load()).items);
@@ -359,6 +377,26 @@ describe("applyV1ToV2", () => {
       const entries = readdirSync(rexDir).sort();
       const outcome = await rehearseV1ToV2(rexDir, plan, { load });
       expect(outcome.status).toBe("rehearsed");
+      expect(snapshot(rexDir)).toEqual(before);
+      expect(readdirSync(rexDir).sort()).toEqual(entries);
+    });
+
+    it("reports the files it wrote to a temporary directory and removes the directory", async () => {
+      const plan = await planOf((await load()).items);
+      const outcome = await rehearseV1ToV2(rexDir, plan, { load });
+      if (outcome.status !== "rehearsed") throw new Error("expected a rehearsal");
+      expect(outcome.files).toBeGreaterThan(0);
+      expect(readdirSync(tmpdir()).filter((name) => name.startsWith("rex-migrate-rehearsal-"))).toEqual([]);
+    });
+
+    it("refuses a model that does not read back, as apply does, and writes nothing under the project", async () => {
+      const plan = await planOf((await load()).items);
+      const before = snapshot(rexDir);
+      const entries = readdirSync(rexDir).sort();
+      readBack.skip = true;
+      const message = /The written v2 tree does not read back: product\/area\/index\.md: unreadable\. Nothing was written\./;
+      await expect(rehearseV1ToV2(rexDir, plan, { load })).rejects.toThrow(message);
+      await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(message);
       expect(snapshot(rexDir)).toEqual(before);
       expect(readdirSync(rexDir).sort()).toEqual(entries);
     });

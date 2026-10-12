@@ -44,7 +44,8 @@
 
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, rename, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { amendsHash, freeChangeSlug } from "../../core/apply-amendments.js";
 import { diffFingerprints, fingerprintTree, isLossless, type FingerprintDiff } from "../../core/slug-migration.js";
@@ -570,6 +571,24 @@ async function prepare(plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Opti
   return { v1, built, v1Items };
 }
 
+/**
+ * Write the built model into `dir` and read it back, refusing what apply refuses:
+ * a writer error, a skipped warning on read-back, or a v1 id the read-back lost.
+ * `dir` must exist; the caller owns it and cleans up.
+ */
+async function writeAndVerify(dir: string, prepared: Prepared, lock: LockOptions | undefined): Promise<{ files: number; nodes: number }> {
+  const { v1, built, v1Items } = prepared;
+  const model: PrdModel = { layout: "v2", schema: SCHEMA_VERSION_V2, title: v1.title, tree: built.tree, warnings: [] };
+  const written = await withLock(prdLockPath(dir), () => writePrdModel(dir, model, { stateKeys: built.stateKeys }), lock);
+  const back = await loadPrdModel(dir, { ignoreSchemaSkew: false });
+  const skipped = back.warnings.filter((w) => w.skipped);
+  if (skipped.length > 0) {
+    throw new MigrationApplyError(`The written v2 tree does not read back: ${skipped.map((w) => `${w.path}: ${w.message}`).join("; ")}. Nothing was written.`);
+  }
+  assertEveryV1Id(everyV1Id(v1.items, back.tree, built.containers, built.cut), v1Items, "v2 tree read back");
+  return { files: written.written.length, nodes: idsOf([...back.tree.product, ...back.tree.changes], new Set()).size };
+}
+
 // ── Rehearsal ────────────────────────────────────────────────────
 
 export type V1Kind = "epic" | "feature" | "task" | "subtask";
@@ -627,11 +646,12 @@ export function tallyV1ToV2(items: readonly PRDItem[], built: Pick<BuiltV2Tree, 
 
 export type RehearseV1ToV2Result =
   | { status: "already-v2"; removed: string[] }
-  | { status: "rehearsed"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; kinds: Record<V1Kind, KindTally>; nodes: number; v1Items: number };
+  | { status: "rehearsed"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; kinds: Record<V1Kind, KindTally>; nodes: number; files: number; v1Items: number };
 
 /**
- * {@link applyV1ToV2} up to the write: the same refusals and id check, then the
- * tally in place of the write. Writes nothing and does not take the PRD lock.
+ * {@link applyV1ToV2} without the swap: the same refusals, id check, write and
+ * read-back, the write going to an OS temp directory that is removed afterwards.
+ * Writes nothing under `rexDir` and does not take its PRD lock.
  * On a v2 tree, `removed` lists the v1 files apply would remove.
  */
 export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load">): Promise<RehearseV1ToV2Result> {
@@ -640,9 +660,17 @@ export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined,
   }
   if (!existsSync(join(rexDir, PRD_TREE_DIRNAME))) throw new MigrationApplyError(`No PRD folder tree at ${join(rexDir, PRD_TREE_DIRNAME)}: nothing to apply.`);
   await assertNoLegacySources(rexDir);
-  const { v1, built, v1Items } = await prepare(plan, options);
-  const { tree, stateKeys: _keys, ...summary } = built;
-  return { status: "rehearsed", built: summary, kinds: tallyV1ToV2(v1.items, built), nodes: idsOf([...tree.product, ...tree.changes], new Set()).size, v1Items };
+  const prepared = await prepare(plan, options);
+  const { v1, built, v1Items } = prepared;
+  const scratch = await mkdtemp(join(tmpdir(), "rex-migrate-rehearsal-"));
+  let verified: { files: number; nodes: number };
+  try {
+    verified = await writeAndVerify(scratch, prepared, undefined);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+  const { tree: _tree, stateKeys: _keys, ...summary } = built;
+  return { status: "rehearsed", built: summary, kinds: tallyV1ToV2(v1.items, built), ...verified, v1Items };
 }
 
 /**
@@ -672,22 +700,14 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
       // Without product/ the tree reads as v1, so a changes/ here is what an interrupted apply moved in.
       await rm(changesDir, { recursive: true, force: true });
 
-      const { v1, built, v1Items } = await prepare(plan, options);
+      const prepared = await prepare(plan, options);
+      const { built, v1Items } = prepared;
 
-      const model: PrdModel = { layout: "v2", schema: SCHEMA_VERSION_V2, title: v1.title, tree: built.tree, warnings: [] };
       let files: number;
       let nodes: number;
       try {
         await mkdir(staging, { recursive: true });
-        const written = await withLock(prdLockPath(staging), () => writePrdModel(staging, model, { stateKeys: built.stateKeys }), options.lock);
-        files = written.written.length;
-        const back = await loadPrdModel(staging, { ignoreSchemaSkew: false });
-        const skipped = back.warnings.filter((w) => w.skipped);
-        if (skipped.length > 0) {
-          throw new MigrationApplyError(`The written v2 tree does not read back: ${skipped.map((w) => `${w.path}: ${w.message}`).join("; ")}. Nothing was written.`);
-        }
-        assertEveryV1Id(everyV1Id(v1.items, back.tree, built.containers, built.cut), v1Items, "v2 tree read back");
-        nodes = idsOf([...back.tree.product, ...back.tree.changes], new Set()).size;
+        ({ files, nodes } = await writeAndVerify(staging, prepared, options.lock));
         if (existsSync(join(staging, CHANGES_DIRNAME))) await rename(join(staging, CHANGES_DIRNAME), changesDir);
         await rename(join(staging, PRODUCT_DIRNAME), productDir);
       } catch (err) {
