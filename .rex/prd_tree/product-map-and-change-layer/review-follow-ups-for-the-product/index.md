@@ -45,6 +45,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Record review decisions as calibration records on the run record](./record-review-decisions-as-calibration.md) | pending |
 | [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | deferred |
 | [Replace the v1 terminal screenshots in quickstart and existing-project with v2 ones](./replace-the-v1-terminal-screenshots-in.md) | pending |
+| [rex migrate-to-folder-tree drops the PRD title: it never writes tree-meta.json, so the tree reads back as "PRD"](./rex-migrate-to-folder-tree-drops-the.md) | pending |
 | [rex release stamp runs git tag --contains for every historical unstamped change, on every release](./rex-release-stamp-runs-git-tag.md) | pending |
 | [rex update ignores unknown flags such as --resolution without an error](./rex-update-ignores-unknown-flags-such.md) | pending |
 | [rex usage ignores .n-dx.json rex overrides: token-store passes the wrong dir and key to loadProjectOverrides](./rex-usage-ignores-n-dx-json-rex.md) | pending |
