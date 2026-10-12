@@ -22,8 +22,12 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A v2 PATCH that both completes and edits a field must not half-apply](./a-v2-patch-that-both-completes-and.md) | pending |
 | [Bulk status PATCH completes v2 work without rex's v2 completion](./bulk-status-patch-completes-v2-work.md) | completed |
 | [Dashboard misses v2 edits under changes/ when it was created after ndx start](./dashboard-misses-v2-edits-under.md) | completed |
+| [POST /api/rex/restore and GET /api/rex/backups refuse on a v2 project](./post-api-rex-restore-and-get-api-rex.md) | pending |
 | [Quick Add creates a change on v2](./quick-add-creates-a-change-on-v2.md) | completed |
 | [The PRD cache is built from the change-layer projection on v2](./the-prd-cache-is-built-from-the-change.md) | completed |
 | [The Product, Changes and capability views show real v2 data](./the-product-changes-and-capability.md) | pending |
+| [The v2 refusal of parentId says what to do instead](./the-v2-refusal-of-parentid-says-what.md) | pending |
+| [ndx start on a v2 tree with a stray prd.json creates no prd_tree/](./ndx-start-on-a-v2-tree-with-a-stray.md) | pending |
