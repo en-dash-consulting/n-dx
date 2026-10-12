@@ -19,6 +19,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Gate ci.yml build and smoke-parity jobs on non-draft pull requests](./gate-ci-yml-build-and-smoke-parity.md) | pending |
+| [Gate ci.yml build and smoke-parity jobs on non-draft pull requests](./gate-ci-yml-build-and-smoke-parity.md) | completed |
 | [Gate CodeQL and Dependency Review on non-draft pull requests](./gate-codeql-and-dependency-review-on.md) | pending |
 | [Policy test: PR-triggered workflow jobs skip drafts without skipping main or the merge queue](./policy-test-pr-triggered-workflow-jobs.md) | pending |
