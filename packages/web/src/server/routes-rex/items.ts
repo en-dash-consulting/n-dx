@@ -14,7 +14,7 @@ import {
   appendLog, API_SETTABLE_STATUSES,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
-import { resolveStore } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore, completeV2Work } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
@@ -181,12 +181,22 @@ async function handleItemPatch(
     // read-modify-write sits inside the lock so a concurrent writer's item is
     // not dropped. `updateInTree` applies startedAt/completedAt on a status change.
     const store = await resolveStore(ctx.rexDir);
-    const updatedDoc = await store.withTransaction(async (doc) => {
-      if (!updateInTree(doc.items, itemId, updates as Partial<PRDItem>)) {
-        throw new ItemNotFoundError(`Item "${itemId}" not found`);
-      }
-      return doc;
-    });
+    // On a v2 tree completing work follows the change layer's rules (a task's
+    // change closes with its last task, an applied change amends the product
+    // layer), so it goes through rex's completion, not a status write. Any
+    // other field, and every other status, goes through the store as on v1.
+    const completing = updates.status === "completed" && isChangeLayerStore(store);
+    const fieldUpdates = { ...updates };
+    if (completing) delete fieldUpdates.status;
+    if (Object.keys(fieldUpdates).length > 0 || !completing) {
+      await store.withTransaction(async (doc) => {
+        if (!updateInTree(doc.items, itemId, fieldUpdates as Partial<PRDItem>)) {
+          throw new ItemNotFoundError(`Item "${itemId}" not found`);
+        }
+      });
+    }
+    if (completing) await completeV2Work(store, itemId);
+    const updatedDoc = await store.loadDocument();
 
     // Refresh the in-process cache immediately so subsequent loadPRDSync calls
     // see the change before the folder-tree watcher fires.
@@ -206,6 +216,8 @@ async function handleItemPatch(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (err instanceof ItemNotFoundError) {
+      errorResponse(res, 404, message);
+    } else if (message.startsWith("No live ")) {
       errorResponse(res, 404, message);
     } else if (message.includes("Could not acquire PRD lock")) {
       // Names the holder's PID — pass it through rather than retrying.
@@ -313,6 +325,17 @@ async function handleItemAdd(
     // on reload.
     const store = await resolveStore(ctx.rexDir);
 
+    // v2: the item is a change in the Inbox, placed later. Levels are a v1
+    // notion and are ignored; a parent has no meaning until the type-aware
+    // CRUD of roadmap PR 21.
+    if (isChangeLayerStore(store)) {
+      if (input.parentId) {
+        errorResponse(res, 400, "A v2 project takes a new change in the Inbox, not under a parent");
+        return true;
+      }
+      return await addInboxChange(res, ctx, store, { ...input, title: input.title.trim() }, broadcast);
+    }
+
     const parentId = input.parentId;
     let parent: PRDItem | null = null;
     if (parentId) {
@@ -403,6 +426,38 @@ async function handleItemAdd(
   } catch (err) {
     errorResponse(res, 400, String(err));
   }
+  return true;
+}
+
+/**
+ * Add an Inbox change to a v2 tree: a root change that neither amends nor
+ * touches anything carries `needsPlacement`, as rex's `add_item` makes it.
+ * Slug and rule checks are the change-layer store's.
+ */
+async function addInboxChange(
+  res: ServerResponse,
+  ctx: ServerContext,
+  store: Parameters<typeof completeV2Work>[0],
+  input: { title: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[] },
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const id = randomUUID();
+  const item = { id, title: input.title, status: "pending", level: "epic", type: "change", needsPlacement: true } as PRDItem;
+  if (input.description) item.description = input.description;
+  if (input.priority && isPriority(input.priority)) item.priority = input.priority;
+  if (Array.isArray(input.tags)) item.tags = input.tags;
+  if (Array.isArray(input.acceptanceCriteria)) item.acceptanceCriteria = input.acceptanceCriteria;
+
+  await store.addItem(item);
+  refreshPRDCache(ctx.rexDir, await store.loadDocument());
+  appendLog(ctx, {
+    timestamp: new Date().toISOString(),
+    event: "item_added",
+    itemId: id,
+    detail: `Added change: ${input.title} (via web)`,
+  });
+  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  jsonResponse(res, 201, { ok: true, id, level: "change", title: input.title, needsPlacement: true });
   return true;
 }
 
