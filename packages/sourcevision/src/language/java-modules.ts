@@ -28,6 +28,8 @@ export interface JavaModule {
 export interface JavaModuleLayout {
   buildSystem: JavaBuildSystem;
   modules: JavaModule[];
+  /** Directories the search could not list; present only when there are any. */
+  notices?: string[];
 }
 
 const DEFAULT_ROOTS = ["src/main/java", "src/test/java"];
@@ -44,9 +46,9 @@ export async function discoverJavaModules(projectDir: string): Promise<JavaModul
   if (settings || build) {
     return { buildSystem: "gradle", modules: await readGradleModules(projectDir, settings, build) };
   }
-  const roots = await packageDeclarationRoots(projectDir);
+  const { roots, notices } = await packageDeclarationRoots(projectDir);
   const modules = roots.length ? [{ name: basename(projectDir), dir: "", sourceRoots: roots }] : [];
-  return { buildSystem: "none", modules };
+  return { buildSystem: "none", modules, ...(notices.length ? { notices } : {}) };
 }
 
 // ── Maven ────────────────────────────────────────────────────────────────
@@ -209,12 +211,24 @@ function statementTail(src: string, from: number): string {
 
 // ── No build file ────────────────────────────────────────────────────────
 
-/** Roots inferred from `package` declarations; skips directories the Java config skips. */
-async function packageDeclarationRoots(projectDir: string): Promise<string[]> {
+/**
+ * Roots inferred from `package` declarations; skips directories the Java config
+ * skips. A directory that cannot be listed is skipped and reported as a notice.
+ */
+async function packageDeclarationRoots(projectDir: string): Promise<{ roots: string[]; notices: string[] }> {
   const roots = new Set<string>();
+  const notices: string[] = [];
 
   async function walk(dir: string): Promise<void> {
-    const entries = await readdir(dir, { withFileTypes: true });
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "EACCES" && code !== "EPERM" && code !== "ENOENT" && code !== "ENOTDIR") throw err;
+      notices.push(`${toPosix(relative(projectDir, dir)) || "."} is unreadable (${code}); skipped`);
+      return;
+    }
     for (const e of entries) {
       if (e.isDirectory()) {
         if (e.name.startsWith(".") || e.name === "node_modules" || javaConfig.skipDirectories.has(e.name)) continue;
@@ -227,7 +241,7 @@ async function packageDeclarationRoots(projectDir: string): Promise<string[]> {
   }
 
   await walk(projectDir);
-  return [...roots].sort();
+  return { roots: [...roots].sort(), notices };
 }
 
 /** The directory a file's package path hangs off, or null when path and package disagree. */
