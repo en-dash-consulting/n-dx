@@ -120,6 +120,8 @@ describe("the resolution report", () => {
       provider: { value: "cli", source: "hench.provider" },
       permissionMode: { value: "acceptEdits", source: "autonomous-default" },
       review: { value: false, source: "built-in" },
+      reviewMode: { value: "off", source: "built-in" },
+      reviewVendor: { value: "codex", source: "built-in" },
       // Reported without --review: the reviewer a review would use.
       reviewModel: { value: REVIEW_MODELS.claude, source: "vendor-default", vendorDefault: REVIEW_MODELS.claude },
       reviewOptional: { value: false, source: "built-in" },
@@ -169,6 +171,9 @@ describe("the resolution report", () => {
 
     for (const key of Object.keys(r.resolved) as Array<keyof RunResolution["resolved"]>) {
       if (key === "vendor") continue;
+      // `--reviewer` is refused beside `--review` (self review has no reviewer
+      // to name); task-review-settings.test.ts covers it as a cli-flag.
+      if (key === "reviewVendor") continue;
       expect(r.resolved[key].source, key).toBe("cli-flag");
     }
     expect(r.resolved.model.value).toBe(resolveModel("opus"));

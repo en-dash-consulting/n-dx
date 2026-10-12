@@ -25,6 +25,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The merge queue builds main + the queued PR on a gh-readonly-queue/main/*
+  # branch and waits for the required checks to report on that merge_group run.
+  # Without this trigger they never report and the queue waits forever. Steps
+  # that read pull_request-only context (head_ref) must stay gated on
+  # github.event_name == 'pull_request'.
+  merge_group:
 
 # Least privilege for every job in this file. CI only ever needs to read the
 # checkout; nothing here writes to the repository, comments on a PR, or mints

@@ -11,3 +11,9 @@ description: "When ndx is set up for the first time in an established codebase t
 lastModified: "2026-10-08T18:09:44.381Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Fill capability codeFiles from .sourcevision output](./fill-capability-codefiles-from.md) | pending |

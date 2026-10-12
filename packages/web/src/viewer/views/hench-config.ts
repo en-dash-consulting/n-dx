@@ -84,6 +84,11 @@ export const CATEGORY_META: Record<string, { label: string; icon: string; descri
     icon: "\u2714",
     description: "The full-suite run that must pass before a commit",
   },
+  review: {
+    label: "Review",
+    icon: "⚒",
+    description: "Whether a second pass reviews a task's work, and which vendor does it. Owned by the Robot Wrangler redesign",
+  },
   git: {
     label: "Git Safety",
     icon: "\u2387",
@@ -109,6 +114,7 @@ export const CATEGORY_ORDER = [
   "retry",
   "prune",
   "test-gate",
+  "review",
   "git",
   "guard",
   "general",

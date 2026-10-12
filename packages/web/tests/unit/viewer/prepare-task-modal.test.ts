@@ -128,7 +128,10 @@ describe("PrepareTaskModal", () => {
     expect(fieldOf("prep-permissionMode").textContent).toContain("from autonomous-default");
     expect($<HTMLInputElement>("#prep-maxTurns").value).toBe("50");
     expect(fieldOf("prep-maxTurns").textContent).toContain("from hench.maxTurns");
-    expect($<HTMLSelectElement>("#prep-review").value).toBe("off");
+    expect($<HTMLSelectElement>("#prep-reviewMode").value).toBe("off");
+    expect(fieldOf("prep-reviewMode").textContent).toContain("from built-in");
+    expect($<HTMLSelectElement>("#prep-reviewVendor").value).toBe("codex");
+    expect(fieldOf("prep-reviewVendor").textContent).toContain("from built-in");
     expect($<HTMLSelectElement>("#prep-reviewModel").disabled).toBe(true);
     expect($<HTMLSelectElement>("#prep-skipTestGate").value).toBe("run");
     expect($<HTMLSelectElement>("#prep-fresh").value).toBe("reuse");
@@ -157,24 +160,66 @@ describe("PrepareTaskModal", () => {
     await open();
     expect($<HTMLSelectElement>("#prep-reviewModel").value).toBe("claude-sonnet");
     expect(fieldOf("prep-reviewModel").textContent).toContain("from llm.claude.reviewModel");
-    await change("prep-review", "on");
+    await change("prep-reviewMode", "self");
     await change("prep-reviewModel", "claude-opus");
     expect($<HTMLSelectElement>("#prep-reviewModel").selectedOptions[0].textContent).toBe("Vendor default (claude-opus)");
     expect($(".prep-command-line").textContent).toBe(
-      "ndx work --task=task-1 --auto --review --review-model=claude-opus /repo",
+      "ndx work --task=task-1 --auto --review-mode=self --review-model=claude-opus /repo",
     );
     // Back to the configured reviewer clears the edit.
     await change("prep-reviewModel", "claude-sonnet");
-    expect($(".prep-command-line").textContent).toBe("ndx work --task=task-1 --auto --review /repo");
+    expect($(".prep-command-line").textContent).toBe("ndx work --task=task-1 --auto --review-mode=self /repo");
   });
 
   it("enables the review model only with review on, and max turns only on the api provider", async () => {
     await open();
-    await change("prep-review", "on");
+    await change("prep-reviewMode", "self");
     expect($<HTMLSelectElement>("#prep-reviewModel").disabled).toBe(false);
     await change("prep-provider", "cli");
     expect($<HTMLInputElement>("#prep-maxTurns").disabled).toBe(true);
     expect(fieldOf("prep-maxTurns").textContent).toContain("api provider only");
+  });
+
+  describe("review mode and reviewer vendor", () => {
+    it("disables Pair while the server does not report pairSupported", async () => {
+      await open(prepFixture({ pairSupported: false }));
+      const pair = $<HTMLSelectElement>("#prep-reviewMode").querySelector<HTMLOptionElement>('option[value="pair"]')!;
+      expect(pair.disabled).toBe(true);
+      expect(fieldOf("prep-reviewMode").textContent).toContain("Pair review is not available");
+    });
+
+    it("offers Pair when pairSupported, and puts the mode and reviewer in the command", async () => {
+      await open();
+      const vendor = () => $<HTMLSelectElement>("#prep-reviewVendor");
+      expect(vendor().disabled).toBe(true);
+      await change("prep-reviewMode", "pair");
+      expect(vendor().disabled).toBe(false);
+      expect($(".prep-command-line").textContent).toBe("ndx work --task=task-1 --auto --review-mode=pair /repo");
+      // The default reviewer is codex; choosing claude is a change, and the
+      // executor's own vendor is not offered as its reviewer.
+      expect(vendor().querySelector<HTMLOptionElement>('option[value="claude"]')!.disabled).toBe(true);
+      expect(vendor().querySelector<HTMLOptionElement>('option[value="codex"]')!.disabled).toBe(false);
+    });
+
+    it("drops the reviewer when the mode leaves pair", async () => {
+      await open(prepFixture({ resolved: { ...prepFixture().resolved, vendor: { value: "google", source: "llm.vendor" } } }));
+      await change("prep-reviewMode", "pair");
+      await change("prep-reviewVendor", "claude");
+      expect($(".prep-command-line").textContent).toBe(
+        "ndx work --task=task-1 --auto --review-mode=pair --reviewer=claude /repo",
+      );
+      await change("prep-reviewMode", "self");
+      expect($(".prep-command-line").textContent).toBe("ndx work --task=task-1 --auto --review-mode=self /repo");
+    });
+
+    it("saves reviewMode and reviewVendor into the run block", async () => {
+      await open(prepFixture({ resolved: { ...prepFixture().resolved, vendor: { value: "google", source: "llm.vendor" } } }), (call) =>
+        call.method === "PUT" ? { status: 200, body: { saved: call.body!.run, version: "v2", workspace: { isAnchor: true } } } : undefined);
+      await change("prep-reviewMode", "pair");
+      await change("prep-reviewVendor", "claude");
+      await click(button("Save"));
+      expect(puts()[0]!.body!.run).toEqual({ reviewMode: "pair", reviewVendor: "claude" });
+    });
   });
 
   it("lists refusals and warnings, and keeps Execute off until allow dirty tree answers the dirty-tree refusal", async () => {
@@ -586,6 +631,7 @@ describe("PrepareTaskModal — settings saved on the task", () => {
       // choosing a reviewer and saving sent `run: null` and reported Saved.
       const prep = prepFixture({ savedVersion: "none" });
       prep.resolved.review = { value: true, source: "hench.review" };
+      prep.resolved.reviewMode = { value: "self", source: "hench.review" };
       await open(prep, (call) =>
         call.method === "PUT" ? { status: 200, body: { saved: call.body!.run, version: "v2", workspace: { isAnchor: true } } } : undefined);
 
@@ -736,17 +782,18 @@ describe("PrepareTaskModal — settings saved on the task", () => {
       expect(exec.body!.options).toEqual({ maxTurns: 9 });
     });
 
-    it("sends false for a saved boolean switched off, so the run gets the negation", async () => {
-      const prep = savedPrep({ saved: { review: true } });
+    it("sends the mode for a saved review switched off, so the run overrides it", async () => {
+      const prep = savedPrep({ saved: { reviewMode: "self" } });
       prep.resolved.review = { value: true, source: "task.run", fallback: { value: false, source: "built-in" } };
+      prep.resolved.reviewMode = { value: "self", source: "task.run", fallback: { value: "off", source: "built-in" } };
       await open(prep, (call) =>
         call.url === "/api/hench/execute" ? { status: 200, body: { ok: true } } : undefined);
 
-      await change("prep-review", "off");
+      await change("prep-reviewMode", "off");
       await click(button("Execute"));
 
       const exec = calls.find((c) => c.url === "/api/hench/execute")!;
-      expect(exec.body!.options).toMatchObject({ review: false });
+      expect(exec.body!.options).toEqual({ reviewMode: "off" });
     });
   });
 });

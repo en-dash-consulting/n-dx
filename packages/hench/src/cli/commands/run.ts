@@ -1379,7 +1379,10 @@ export function formatTaskSettingsLines(taskTitle: string, settings: TaskRunSett
   if (fromTask(settings.model.source)) changed.push(`model ${settings.model.value} (${settings.model.weight} tier)`);
   if (fromTask(settings.provider.source)) changed.push(`provider ${settings.provider.value}`);
   if (fromTask(settings.permissionMode.source)) changed.push(`permission-mode ${settings.permissionMode.value}`);
-  if (fromTask(settings.review.source)) changed.push(`review ${settings.review.value}`);
+  if (fromTask(settings.reviewMode.source)) changed.push(`review-mode ${settings.reviewMode.value}`);
+  if (settings.reviewMode.value === "pair" && fromTask(settings.reviewVendor.source)) {
+    changed.push(`reviewer ${settings.reviewVendor.value}`);
+  }
   if (settings.review.value && fromTask(settings.reviewModel.source)) {
     changed.push(`review-model ${settings.reviewModel.value}`);
   }
@@ -1504,6 +1507,7 @@ async function runOne(
     // rather than refusing it — the same split `cmdRun` makes.
     if (!dryRun) {
       if (settings.provider.error) throw settings.provider.error;
+      if (settings.reviewPairError) throw settings.reviewPairError;
       if (reviewPass) {
         const reviewError = reviewProviderError(settingsCtx.vendor, settings.provider.value);
         if (reviewError) throw reviewError;
@@ -1552,6 +1556,13 @@ async function runOne(
         ...(settings ? { modelWeight: settings.model.weight, modelSource: settings.model.source } : {}),
         approveDiff: reviewOpts.approveDiff,
         reviewPass: reviewOpts.reviewPass,
+        ...(settings?.reviewMode.value === "pair" && reviewOpts.reviewPass
+          ? {
+              reviewMode: "pair" as const,
+              reviewVendor: settings.reviewVendor.value ?? undefined,
+              reviewRounds: settings.reviewRounds.value,
+            }
+          : {}),
         reviewModel: reviewOpts.reviewModel,
         reviewOptional: reviewOpts.reviewOptional,
         excludeTaskIds,
@@ -1859,11 +1870,14 @@ export async function cmdRun(
   // real run would be.
   if (!dryRun) {
     if (invocationSettings.provider.error) throw invocationSettings.provider.error;
+    if (invocationSettings.reviewPairError) throw invocationSettings.reviewPairError;
     const reviewError = reviewOpts.reviewPass ? reviewProviderError(llmVendor, provider) : undefined;
     if (reviewError) throw reviewError;
   }
 
-  if (reviewOpts.reviewPass) {
+  // The invocation's own answer, so a project that sets hench.review.mode "self"
+  // gets the same notice as --review. A task's saved review still decides per task.
+  if (invocationSettings.review.value) {
     info(
       "\nAdversarial review enabled — a reviewer runs after each task validates, " +
         "before the commit.\n(The diff-approval gate that used to be --review is now --approve-diff.)",

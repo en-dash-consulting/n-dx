@@ -94,6 +94,18 @@ Example `.n-dx.json` after init:
 }
 ```
 
+### Robot Wrangler (dashboard)
+
+The dashboard's **Robot Wrangler** settings page (the cog in the bottom bar) edits the same LLM keys. It reads top to bottom:
+
+1. **Vendor** — Claude, Codex, Gemini or Local, with each vendor's readiness.
+2. **Connection** (**Server** for Local) — CLI or API per provider; for Local, the server profiles, host and port, and a connection test.
+3. **Models** — the model for each tier (Primary, Standard, Light).
+4. **If a run fails** — the failover chain.
+5. **Review** — Off, Self review or Pair review. Pair review has the other vendor's CLI read the diff in a fresh session and report findings without editing any file.
+
+A run card beside the sections shows what a command will use and whether its credentials check out. The save bar at the bottom lists what will change; **Discard** reverts it and **Save** stays disabled until something has. At widths under 768px the vendor cards drop from four columns to two; under 640px tier rows and review cards stack.
+
 ::: tip .codex/config.toml remains MCP-only
 Model configuration lives in `.n-dx.json`, not in `.codex/config.toml`. The Codex config file is used exclusively for MCP server definitions (stdio transport). `ndx init` does not write model or vendor settings to `.codex/config.toml`.
 :::
@@ -208,6 +220,29 @@ ndx config hench.maxTokens 100000 . # token budget per task
 Configuration is stored in `.hench/config.json`.
 
 The test gate can be scoped and its flakes absorbed with `hench.testGate.command` (with `{base}`) and `hench.testGate.rerunCommand` (with `{suites}`). Set them in `.n-dx.json`; see [Completion Waits for the Test Gate](../packages/hench.md#completion-waits-for-the-test-gate).
+
+### Review modes
+
+`hench.review.mode` sets how `ndx work` reviews a task's diff before it is committed.
+
+| Mode | What it does |
+|------|--------------|
+| `off` (default) | No review. |
+| `self` | The executing vendor reviews its own work in a fresh session, as `--review` does. |
+| `pair` | The other vendor's CLI reviews the diff in a fresh session and reports findings without editing any file. |
+
+```sh
+ndx config hench.review.mode pair .       # off, self or pair
+ndx config hench.review.vendor codex .    # the pair reviewer; unset means the other vendor
+ndx config hench.review.rounds 2 .        # fix rounds, 1-3 (default 2)
+ndx config llm.codex.reviewModel <model> . # the reviewer's model, per vendor
+```
+
+Pair review needs a CLI on both sides: the executor and the reviewer must each be `claude` or `codex` running on the CLI provider, and the reviewer must not be the executor's own vendor. Otherwise `ndx config` and the dashboard refuse the setting.
+
+**Findings.** Must-fix findings go back to the executor, whose own session is resumed to fix them. The task's tests re-run, and a fresh reviewer checks again, for up to `hench.review.rounds` rounds. A must-fix finding still open after the last round fails the review. Lesser findings are not fixed: they are captured to the PRD as new items. `--review-mode=<off|self|pair>`, `--reviewer=<claude|codex>`, `--review`, `--no-review` and a task's saved `run.reviewMode` / `run.reviewVendor` / `run.review` outrank the project setting, in that order; `ndx work --task=<id> --resolve .` shows which key supplied each value.
+
+**Per task.** A task can save its own `reviewMode` and `reviewVendor` in its `run` block, so one task is pair-reviewed by a chosen vendor whatever the project default is. A saved value that cannot be honoured is skipped with a warning and never stops a loop: a `reviewVendor` equal to the executor's vendor falls back to `hench.review.vendor`, then the executor's other vendor; a `reviewMode` of `pair` on an executor with no CLI counterpart, or on the API provider, falls back to the task's `run.review`, then the project. A reviewer or mode typed on the command line is refused instead.
 
 ## Web Server
 

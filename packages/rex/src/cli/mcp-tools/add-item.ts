@@ -209,7 +209,7 @@ export const addItemTool = defineTool({
     tags: z.array(z.string()).optional().describe("Tags"),
     source: z.string().optional().describe("Source of this item"),
     blockedBy: z.array(z.string()).optional().describe("IDs of blocking items"),
-    run: RunSettingsSchema.optional().describe("Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
+    run: RunSettingsSchema.optional().describe("Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewMode (off|self|pair), reviewVendor (claude|codex: the pair reviewer), reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
     amends: z.array(AmendmentSchema).optional().describe("v2 change only: product-layer edits the change carries ({target, delta: added|modified|removed, summary, criteria?, proposed?, under?, title?, type?})"),
     touches: z.array(z.string()).optional().describe("v2 change only: product node IDs the change works on without amending them"),
     discoveredFrom: DiscoveredFromSchema.optional().describe("v2 change only: {item?, run?}, the change or task (and hench run) whose work surfaced this one. Use it for a follow-up to a closed change"),

@@ -24,7 +24,20 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | Command | Description |
 |---------|-------------|
 | `ndx plan [dir]` | Analyze codebase and generate PRD proposals |
-| `ndx add "<desc>" [dir]` | Add PRD items from natural language |
+| `ndx add "<desc>" [dir]` | Add a change to the PRD from natural language |
+
+## Product layer and changes
+
+The PRD is the product's requirements (the product layer) plus the changes being made to them (the change layer); see [The PRD](./concepts/). These rex commands work on a v2 PRD (`.ndx/rex/product/` and `.ndx/rex/changes/`) and refuse a v1 one. Run them as `rex <command>` or `ndx rex <command>`.
+
+| Command | Description |
+|---------|-------------|
+| `rex product show [<node>] [dir]` | The areas, capabilities and constraints with computed status and health; with a node, its statement, capability criteria and changes |
+| `rex product edit <node> [dir]` | Edit a capability's or constraint's statement (`--statement`) or capability criteria (`--capability-criterion="<id>: <text>"`); `--editorial` for wording only |
+| `rex change place <change> [dir]` | Without `--target`, the shortlist of places a change could go; with `--target=<node> --relation=touches\|amends`, record it |
+| `rex change apply <change> [dir]` | Apply a change's amendments to the product layer, as a steward |
+| `rex release stamp <version> [dir]` | Stamp `shippedIn` on the changes a release ships |
+| `rex codeowners [dir]` | Write the host's code-owner files from the stewards lists (opt-in) |
 
 ## Execute
 
@@ -39,7 +52,7 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 |---------|-------------|
 | `ndx status [dir]` | Show PRD status tree |
 | `ndx next [dir]` | Print next actionable task |
-| `ndx tree [dir]` | Show full PRD hierarchy with color-coded status |
+| `ndx tree [dir]` | Show the full PRD tree with color-coded status |
 | `ndx tree-diff [dir]` | Compare two PRD trees (commits, or a worktree against its anchor) |
 | `ndx claim list\|release [dir]` | Inspect and free cross-worktree task claims |
 | `ndx log <event> [dir]` | Append an execution-log entry (non-MCP route to `append_log`) |
@@ -104,7 +117,7 @@ ndx init --git .                 # also create a git repository (answers the pre
 ndx init --no-git .              # never create one
 ```
 
-Initializes the project: creates analysis metadata (`.sourcevision/`), PRD storage (`.rex/`), agent configuration (`.hench/`), and assistant-specific artifacts. By default both Claude and Codex surfaces are provisioned.
+Initializes the project: creates analysis metadata (`.sourcevision/`), PRD storage (`.rex/`, holding a v1 PRD until the storage migration ships), agent configuration (`.hench/`), and assistant-specific artifacts. By default both Claude and Codex surfaces are provisioned.
 
 When the directory is not inside a git repository, init offers to create one — n-dx records autonomous work as commits, so without a repository auto-commit, pair programming, and the hench run loop stay disabled. That prompt needs a TTY: scripted runs and the dashboard's setup wizard answer it with `--git` or `--no-git` instead. A repository created this way also gets a `chore: n-dx init` baseline commit, so the working tree is clean straight out of init.
 
@@ -147,7 +160,11 @@ ndx add "Request A" "Request B" .     # multiple requests
 ndx add --file=ideas.txt .            # import from file
 ```
 
-Uses an LLM to decompose natural language descriptions into structured PRD items (epics, features, tasks). Detects duplicates and offers merge/cancel/proceed options.
+Each description becomes one change in the Inbox, with no LLM call. The output names the change and the rules' suggested placement, which `rex change place` records. `--criterion="…"` (repeatable) sets the change's acceptance criteria, its "done when"; a capability's capability criteria are edited with `rex product edit`, never here.
+
+::: info v1 projects
+On a v1 PRD (`.rex/prd_tree/`, which `ndx init` creates until the storage migration ships), `ndx add` uses an LLM to decompose the descriptions into a proposal of epics, features and tasks, detects duplicates, and offers merge, cancel or proceed.
+:::
 
 ### plan
 
@@ -167,7 +184,7 @@ ndx work .                             # interactive task selection
 ndx work --auto .                      # highest-priority task
 ndx work --auto --iterations=4 .       # run 4 tasks sequentially
 ndx work --task=abc123 .               # specific task
-ndx work --epic="Auth System" --auto . # scope to epic
+ndx work --epic="Auth System" --auto . # scope to one top-level item
 ndx work --dry-run .                   # preview without executing
 ndx work --model=claude-opus-5-5 .        # override model
 ndx work --auto --loop .               # run continuously until done
@@ -191,7 +208,7 @@ By default on an interactive terminal, `ndx work` presents a menu to choose whic
 
 #### Scoping
 
-`--epic=<name-or-id>` restricts task selection (both interactive and auto) to tasks within a specific epic. Combine with `--auto` or `--iterations` to work through an epic sequentially.
+`--epic=<name-or-id>` restricts task selection (both interactive and auto) to the tasks under one top-level item, matched by title substring or id. Combine with `--auto` or `--iterations` to work through it sequentially. The flag keeps its v1 name: on a v1 PRD the top-level items are epics.
 
 #### Other flags
 

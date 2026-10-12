@@ -166,7 +166,7 @@ export const ZonesSchema = z.object({
   enrichmentMode: z.enum(["cascade", "generative"]).optional(),
   metaEvaluationCount: z.number().int().nonnegative().optional(),
   structureHash: z.string().optional(),
-  zoneContentHashes: z.record(z.string()).optional(),
+  zoneContentHashes: z.record(z.string(), z.string()).optional(),
   lastReset: z.object({ from: z.number().int().positive(), to: z.number().int().positive() }).optional(),
 });
 

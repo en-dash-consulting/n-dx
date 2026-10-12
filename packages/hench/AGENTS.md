@@ -25,3 +25,7 @@ Rules:
 - **Barrels are the target, not the current state.** Only `agent/` has an `index.ts`; `prd/`, `process/`, and `tools/` do not. Adding one is preferred when touching a sub-directory's public surface, but no test enforces it yet.
 - Cross-sub-directory imports should flow through barrels where they exist, not reach into internal modules.
 - Boundary assertions should be added to hench's test suite before the zone approaches `web-viewer`'s scale. Nothing enforces these boundaries today, so treat them as review guidance rather than guarantees.
+
+### Review modes
+
+`hench.review.mode` is `off`, `self` or `pair`; `.vendor` names the pair reviewer (unset = the other CLI vendor) and `.rounds` (1-3, default 2) bounds fix rounds. Reviewer model: `llm.<vendor>.reviewModel`. Pair needs a CLI on both sides and a reviewer that is not the executor's vendor. The pair reviewer only reports; must-fix findings resume the executor's session (`agent/lifecycle/pair-review-rounds.ts`), lesser findings are captured to the PRD. User docs: `docs/guide/configuration.md`.
