@@ -126,6 +126,41 @@ describe("rex MCP tools on a v2 tree", () => {
     expect(json(got).item.id).toBe(CHANGE);
   });
 
+  it("reorganize merging two similar changes keeps the absorbed change's touches, ids and aliases on the target", async () => {
+    const giftCards = "a0000000-0000-4000-8000-000000000003";
+    await writeFile(
+      join(rexDir, "product", "checkout", "gift-cards.md"),
+      `---\nid: "${giftCards}"\ntype: "capability"\ntitle: "Gift cards"\nslug: "gift-cards"\ndisplayId: "A1.2"\nstatement: "A shopper can pay with a gift card."\n---\n`,
+    );
+    const a = await addChange("Add gift card checkout");
+    const b = await addChange("Add gift card checkout");
+    await ws.store.updateItem(b, { displayId: "CH-9", aliases: ["CH-gift"], touches: [giftCards] } as never);
+    const res = await call("reorganize", { accept: "all", mode: "fast" });
+    expect(res.isError, res.text).toBe(false);
+    const model = await loadPrdModel(rexDir, quiet);
+    const ids = model.tree.changes.map((c) => c.id);
+    expect(ids.filter((id) => id === a || id === b)).toHaveLength(1);
+    const [target, absorbed] = ids.includes(a) ? [a, b] : [b, a];
+    const node2 = (await node(target)) as { touches?: string[]; aliases?: string[] };
+    expect([...(node2.touches ?? [])].sort()).toEqual(["a0000000-0000-4000-8000-000000000002", giftCards]);
+    expect(node2.aliases).toEqual(expect.arrayContaining([absorbed]));
+    if (absorbed === b) expect(node2.aliases).toEqual(expect.arrayContaining(["CH-9", "CH-gift"]));
+  });
+
+  it("reorganize never merges away a change that carries amendments", async () => {
+    // Same title as the fixture's amending change, and richer (two tasks), so
+    // the detector picks it as the target and the amending change as absorbed.
+    const richer = await addChange("Add Apple Pay");
+    for (const title of ["One", "Two"]) {
+      expect((await call("add_item", { type: "task", title, parentId: richer })).isError).toBe(false);
+    }
+    const res = await call("reorganize", { accept: "all", mode: "fast" });
+    expect(res.isError, res.text).toBe(false);
+    const model = await loadPrdModel(rexDir, quiet);
+    expect(model.tree.changes.map((c) => c.id)).toContain(CHANGE);
+    expect(await node(CHANGE)).toMatchObject({ amends: [expect.objectContaining({ delta: "modified" })] });
+  });
+
   it("claim_task claims a task, and refuses a change that has tasks", async () => {
     const res = await call("claim_task", { id: TASK });
     expect(res.isError, res.text).toBe(false);

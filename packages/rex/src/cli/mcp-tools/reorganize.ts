@@ -87,7 +87,7 @@ export async function handleReorganize(
       // minutes); re-apply them against a freshly loaded document under the
       // lock so a concurrent writer's item is not clobbered by the save.
       const result = await store.withTransaction(async (freshDoc) =>
-        applyProposals(freshDoc.items, toApply),
+        applyProposals(freshDoc.items, toApply, { changeLayer: isChangeLayerStore(store) }),
       );
       applied = result.applied;
       failed = result.failed;

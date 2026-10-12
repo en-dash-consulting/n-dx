@@ -2,7 +2,7 @@
  * Reorganization executor: applies reorganization proposals to the PRD tree.
  *
  * Each proposal type maps to existing tree primitives:
- * - merge  → mergeItems()
+ * - merge  → mergeItems() (mergeChanges() on a v2 change layer)
  * - move   → moveItem()
  * - delete → removeFromTree()
  * - prune  → pruneItems()
@@ -30,7 +30,7 @@ import type {
   SplitDetail,
 } from "./reorganize.js";
 import { removeFromTree, findItem } from "./tree.js";
-import { mergeItems } from "./merge.js";
+import { mergeChanges, mergeItems } from "./merge.js";
 import { moveItem } from "./move.js";
 import { deleteKeepReason, mergeKeepReason, pruneItems, pruneKeepReason } from "./prune.js";
 import { keptItemRefusal } from "./reshape.js";
@@ -54,6 +54,11 @@ export interface ApplyResult {
   archivedItems: PRDItem[];
 }
 
+export interface ApplyOptions {
+  /** The items are a v2 change layer: a merge goes through `mergeChanges`. */
+  changeLayer?: boolean;
+}
+
 export interface ProposalResult {
   proposalId: number;
   success: boolean;
@@ -72,6 +77,7 @@ export interface ProposalResult {
 export function applyProposals(
   items: PRDItem[],
   proposals: ReorganizationProposal[],
+  options: ApplyOptions = {},
 ): ApplyResult {
   const results: ProposalResult[] = [];
   const archivedItems: PRDItem[] = [];
@@ -80,7 +86,7 @@ export function applyProposals(
 
   for (const proposal of proposals) {
     try {
-      const removed = applyOne(items, proposal);
+      const removed = applyOne(items, proposal, options);
       archivedItems.push(...removed);
       results.push({ proposalId: proposal.id, success: true });
       applied++;
@@ -98,10 +104,10 @@ export function applyProposals(
  * Apply a single proposal to the tree. Throws on failure.
  * Returns items that were removed (for archival).
  */
-function applyOne(items: PRDItem[], proposal: ReorganizationProposal): PRDItem[] {
+function applyOne(items: PRDItem[], proposal: ReorganizationProposal, options: ApplyOptions): PRDItem[] {
   switch (proposal.detail.kind) {
     case "merge":
-      return applyMerge(items, proposal.detail);
+      return applyMerge(items, proposal.detail, options);
     case "move":
       applyMove(items, proposal.detail);
       return [];
@@ -120,7 +126,7 @@ function applyOne(items: PRDItem[], proposal: ReorganizationProposal): PRDItem[]
 
 // ── Executors ────────────────────────────────────────────────────────────────
 
-function applyMerge(items: PRDItem[], detail: MergeDetail): PRDItem[] {
+function applyMerge(items: PRDItem[], detail: MergeDetail, options: ApplyOptions): PRDItem[] {
   // Snapshot absorbed items before merge removes them
   const absorbedIds = detail.sourceIds.filter((id) => id !== detail.targetId);
   refuseKept(items, absorbedIds, mergeKeepReason, "merge away");
@@ -130,6 +136,12 @@ function applyMerge(items: PRDItem[], detail: MergeDetail): PRDItem[] {
     if (entry) {
       snapshots.push(structuredClone(entry.item));
     }
+  }
+
+  if (options.changeLayer) {
+    const outcome = mergeChanges(items, detail.sourceIds, detail.targetId);
+    if (!outcome.valid) throw new Error(`Skipped: ${outcome.error}`);
+    return snapshots;
   }
 
   const result = mergeItems(items, detail.sourceIds, detail.targetId);

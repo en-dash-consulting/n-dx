@@ -467,7 +467,9 @@ describe("isolation", () => {
     // project with a PRD in either layout to `n-dx init` (cli/errors.ts), and
     // the MCP tools that follow the change-layer types on a v2 tree: edit_item,
     // move_item, merge_items and claim_task, with the type-based parent rule
-    // and merge rules they use (core/move.ts, core/merge.ts), and the legacy
+    // and merge rules they use (core/move.ts, core/merge.ts, which the
+    // reorganize executor merges changes through: core/reorganize-executor.ts),
+    // and the legacy
     // prd.json migration, which never migrates beside a v2 tree
     // (store/ensure-legacy-prd-migrated.ts), and the snapshot restore, which
     // refuses a v2 tree (core/backup-snapshots.ts).
@@ -536,6 +538,7 @@ describe("isolation", () => {
         "cli/mcp-tools/claim-task.ts",
         "core/move.ts",
         "core/merge.ts",
+        "core/reorganize-executor.ts",
         "store/ensure-legacy-prd-migrated.ts",
         "core/backup-snapshots.ts",
       ].map(

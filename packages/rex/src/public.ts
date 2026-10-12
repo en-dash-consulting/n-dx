@@ -402,8 +402,11 @@ export type {
 
 // ---- Core: merge/consolidation ----------------------------------------------
 
-export { validateMerge, previewMerge, mergeItems } from "./core/merge.js";
-export type { MergeOptions, MergeValidation, MergePreview, MergeResult } from "./core/merge.js";
+// On a v2 change layer, merge with mergeChanges (and preview-check with
+// validateChangesMerge), never mergeItems directly: it keeps the absorbed
+// changes' touches and ids, and refuses to absorb a change carrying amends.
+export { validateMerge, previewMerge, mergeItems, validateChangesMerge, mergeChanges } from "./core/merge.js";
+export type { MergeOptions, MergeValidation, MergePreview, MergeResult, ChangesMergeOutcome } from "./core/merge.js";
 
 // ---- Core: prune ------------------------------------------------------------
 

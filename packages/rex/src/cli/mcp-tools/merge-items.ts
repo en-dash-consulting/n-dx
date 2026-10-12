@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { validateMerge, previewMerge, mergeItems, validateChangeLayerMerge, carryTouches, carryAliases } from "../../core/merge.js";
-import type { PRDItem } from "../../schema/index.js";
+import { validateMerge, previewMerge, mergeItems, validateChangesMerge, mergeChanges, type ChangesMergeOutcome } from "../../core/merge.js";
 import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
@@ -24,16 +23,12 @@ export async function handleMergeItems(
       ...(description !== undefined ? { description } : {}),
     };
 
-    // On a v2 tree only sibling changes merge, and their touches carry over.
+    // On a v2 tree only sibling changes merge, through mergeChanges.
     const v2 = isChangeLayerStore(store);
-    const validate = (items: PRDItem[]) => {
-      const layer = v2 ? validateChangeLayerMerge(items, sourceIds, targetId) : { valid: true };
-      return layer.valid ? validateMerge(items, sourceIds, targetId) : layer;
-    };
 
     if (preview) {
       const doc = await store.loadDocument();
-      const validation = validate(doc.items);
+      const validation = (v2 ? validateChangesMerge : validateMerge)(doc.items, sourceIds, targetId);
       if (!validation.valid) {
         return textResult(`${validation.error}`, true);
       }
@@ -43,19 +38,16 @@ export async function handleMergeItems(
 
     // Validate and merge inside one transaction so the lock covers the whole
     // read-modify-write — a concurrent writer's item survives this save.
-    const outcome = await store.withTransaction(async (doc) => {
-      const validation = validate(doc.items);
+    const outcome = await store.withTransaction(async (doc): Promise<ChangesMergeOutcome> => {
+      if (v2) return mergeChanges(doc.items, sourceIds, targetId, options);
+      const validation = validateMerge(doc.items, sourceIds, targetId);
       if (!validation.valid) {
-        return { ok: false as const, message: `${validation.error}` };
+        return { valid: false, error: `${validation.error}` };
       }
-      if (v2) {
-        carryTouches(doc.items, sourceIds, targetId);
-        carryAliases(doc.items, sourceIds, targetId);
-      }
-      return { ok: true as const, result: mergeItems(doc.items, sourceIds, targetId, options) };
+      return { valid: true, result: mergeItems(doc.items, sourceIds, targetId, options) };
     });
-    if (!outcome.ok) {
-      return textResult(outcome.message, true);
+    if (!outcome.valid) {
+      return textResult(outcome.error, true);
     }
     const result = outcome.result;
 

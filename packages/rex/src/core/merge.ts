@@ -130,7 +130,7 @@ export function validateMerge(
  * {@link validateMerge}: only changes merge, and an absorbed change may not
  * carry amendments, which have no target-side home and would be lost.
  */
-export function validateChangeLayerMerge(
+function validateChangeLayerMerge(
   items: PRDItem[],
   sourceIds: string[],
   targetId: string,
@@ -140,7 +140,7 @@ export function validateChangeLayerMerge(
     if (!item) continue;
     const type = changeLayerType(item);
     if (type !== "change") {
-      return { valid: false, error: `This PRD uses the v2 layout, where merge_items merges changes only: "${id}" is a ${type ?? item.level}.` };
+      return { valid: false, error: `This PRD uses the v2 layout, where rex merges changes only: "${id}" is a ${type ?? item.level}.` };
     }
     if (id !== targetId && Array.isArray(item.amends) && item.amends.length > 0) {
       return { valid: false, error: `"${id}" carries amendments, which a merge would lose. Make it the target, or move its amendments first.` };
@@ -150,7 +150,7 @@ export function validateChangeLayerMerge(
 }
 
 /** Carry the absorbed changes' `touches` onto the target (v2), deduplicated; call before {@link mergeItems}. */
-export function carryTouches(items: PRDItem[], sourceIds: string[], targetId: string): void {
+function carryTouches(items: PRDItem[], sourceIds: string[], targetId: string): void {
   const touches = new Set<string>();
   for (const id of [targetId, ...sourceIds]) {
     const item = findItem(items, id)?.item;
@@ -165,7 +165,7 @@ export function carryTouches(items: PRDItem[], sourceIds: string[], targetId: st
  * commits and lookups that name the absorbed change still resolve to it. Call
  * before {@link mergeItems}.
  */
-export function carryAliases(items: PRDItem[], sourceIds: string[], targetId: string): void {
+function carryAliases(items: PRDItem[], sourceIds: string[], targetId: string): void {
   const target = findItem(items, targetId)!.item;
   const own = new Set([target.id, target.displayId].filter((v): v is string => typeof v === "string"));
   const aliases = new Set<string>(Array.isArray(target.aliases) ? target.aliases.map(String) : []);
@@ -178,6 +178,40 @@ export function carryAliases(items: PRDItem[], sourceIds: string[], targetId: st
   }
   for (const ref of own) aliases.delete(ref);
   if (aliases.size > 0) target.aliases = [...aliases];
+}
+
+/** A v2 merge's checks: {@link validateChangeLayerMerge}, then {@link validateMerge}. */
+export function validateChangesMerge(
+  items: PRDItem[],
+  sourceIds: string[],
+  targetId: string,
+): MergeValidation {
+  const layer = validateChangeLayerMerge(items, sourceIds, targetId);
+  return layer.valid ? validateMerge(items, sourceIds, targetId) : layer;
+}
+
+export type ChangesMergeOutcome =
+  | { valid: true; result: MergeResult }
+  | { valid: false; error: string };
+
+/**
+ * The merge on a v2 change layer, and the only one its callers should use:
+ * validate ({@link validateChangesMerge}), carry the absorbed changes'
+ * touches and ids onto the target ({@link carryTouches},
+ * {@link carryAliases}), then {@link mergeItems}. Writes nothing when the
+ * merge is refused. Modifies `items` in place.
+ */
+export function mergeChanges(
+  items: PRDItem[],
+  sourceIds: string[],
+  targetId: string,
+  options?: MergeOptions,
+): ChangesMergeOutcome {
+  const validation = validateChangesMerge(items, sourceIds, targetId);
+  if (!validation.valid) return { valid: false, error: validation.error ?? "Merge refused." };
+  carryTouches(items, sourceIds, targetId);
+  carryAliases(items, sourceIds, targetId);
+  return { valid: true, result: mergeItems(items, sourceIds, targetId, options) };
 }
 
 // ── Preview ─────────────────────────────────────────────────────────
