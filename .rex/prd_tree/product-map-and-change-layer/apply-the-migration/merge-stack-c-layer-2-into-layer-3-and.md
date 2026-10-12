@@ -2,7 +2,7 @@
 id: "bf427461-57d4-4fd2-ae15-ce468eb56eb2"
 level: "task"
 title: "Merge stack C layer 2 into layer 3 and resolve the cli-migrate-apply e2e conflict"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "pr-23"
@@ -10,6 +10,7 @@ tags:
   - "rex"
   - "core"
 source: "roadmap"
+startedAt: "2026-10-12T10:13:31.319Z"
 acceptanceCriteria:
   - "The branch feat/100-pr23b-migrate-apply (C2, tip 4646976b) is merged into this branch with a merge commit; no rebase, no force-push"
   - "tests/e2e/cli-migrate-apply.test.js keeps C3's \"ndx migrate (the chain)\" describe block and C2's refusal test (\"refuses, exits non-zero and writes nothing while .rex/prd.json sits beside the tree\"), and drops C2's \"still needs --plan or --apply\" test, because a bare ndx migrate now runs the chain (test file passes)"
@@ -18,6 +19,6 @@ acceptanceCriteria:
   - "The full root, rex, hench and web suites pass after a build"
 description: "Stack C's layer 2 (C2, feat/100-pr23b-migrate-apply) gained commits after layer 3 (C3, this branch) was cut: fde93c35, a09e2a27, 3e5c1961, aa61a436 and a single consolidated changeset (.changeset/migrate-apply.md). The stack rule is that a lower layer's fixes merge up. A plain `git merge feat/100-pr23b-migrate-apply` conflicts in tests/e2e/cli-migrate-apply.test.js (C3 added the chain's describe block where C2 added two tests) and in two PRD Children tables.\n\nResolution (decided overnight 2026-10-12, confirm): keep both sides' tests except C2's \"still needs --plan or --apply\", which C3 makes wrong (a bare `ndx migrate` runs the chain; C3's own tests cover that). Check that the chain's legacy prd.json fixture still migrates in one command, since a09e2a27 now refuses a leftover prd.json and aa61a436 renames it to prd.json.migrated during the folder-tree conversion. Union the PRD table rows. Commit the merge with an N-DX-Item trailer for this task. Do not change behaviour beyond what the merge needs; if the chain test fails for a reason the merge does not explain, stop and report it.\n\nFirst pass (decided 2026-10-12; v2 migration path, decisions D1-D7):\n- Every v1 item lands in v2, checked by count and id. The migration drops or cancels nothing.\n- Changes the rules placed land on their capability. Changes the rules could not place (held) land in the Inbox with needsPlacement, in changes/inbox/. A text-model pick is recorded as a suggestion only.\n- Areas keep their v1 epic names, except a review-sourced epic (source \"ndx-adversarial-review\"), which proposes no area (#631 finding 1). Its children are placed or held like other changes.\n- Capability specs ship as drafted and stay flagged as unreviewed.\n- The cut is recorded as the first change, as 11c88bce describes.\n- Apply removes prd_tree/ and tree-meta.json in the same PRD transaction that writes the v2 tree, so the two layouts never exist side by side.\n- No decisions file and no area-renaming pass: those come after the cut.\n\nBoundary (stack C, roadmap PR 23):\n- Lane files: packages/rex/src/migrations/; one new rex CLI command for plan and apply, in its own module under packages/rex/src/cli/commands/ plus one dispatch line in packages/rex/src/cli/ (keep edits to the shared CLI files minimal: another stack is changing rex's store resolution and CLI error mapping in the same files, so a merge conflict is expected later); store/prd-model-writer.ts (c0dc9b3f); core/change-add.ts or the Inbox writer (2898acbe); packages/core for ndx migrate (spawn only, no library imports) and ndx init; tests.\n- Not hench, not web, not the v2 schema shape (schema/v2.ts), and not the MCP tools.\n- v1 trees keep working exactly as today, apart from the one-line deprecation notice in ad842166.\n- Each newly wired module that imports a v2 module is added to the v2 isolation allowlist in packages/rex/tests/unit/schema/v2.test.ts."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-12T10:13:19.898Z"
+lastModified: "2026-10-12T10:13:31.586Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
