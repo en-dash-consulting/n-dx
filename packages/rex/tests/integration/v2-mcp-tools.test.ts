@@ -114,6 +114,18 @@ describe("rex MCP tools on a v2 tree", () => {
     expect(refused.text).toMatch(/merges changes only/);
   });
 
+  it("merge_items keeps the absorbed change's id, display id and aliases as aliases on the target", async () => {
+    const other = await addChange("Apple Pay, again");
+    await ws.store.updateItem(other, { displayId: "CH-7", aliases: ["CH-old"] } as never);
+    const res = await call("merge_items", { sourceIds: [CHANGE, other], targetId: CHANGE });
+    expect(res.isError, res.text).toBe(false);
+    const aliases = ((await node(CHANGE)) as { aliases?: string[] }).aliases ?? [];
+    expect([...aliases].sort()).toEqual([other, "CH-7", "CH-old"].sort());
+    const got = await call("get_item", { id: other });
+    expect(got.isError, got.text).toBe(false);
+    expect(json(got).item.id).toBe(CHANGE);
+  });
+
   it("claim_task claims a task, and refuses a change that has tasks", async () => {
     const res = await call("claim_task", { id: TASK });
     expect(res.isError, res.text).toBe(false);

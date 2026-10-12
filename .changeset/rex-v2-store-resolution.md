@@ -13,6 +13,7 @@ Every PRD tool opens a v2 tree, and none can split it.
 
 MCP fields added on a v2 tree (optional, absent on v1; MCP tool shapes are soft-frozen since 0.9.0):
 
+- `merge_items`: on a v2 tree the absorbed changes' ids and display ids (and their former aliases) are recorded as `aliases` on the target (the target item's `aliases` field, optional, absent on v1), so `get_item` and `N-DX-Item` trailers naming an absorbed change still resolve to the target.
 - `edit_item`: `item.type`, `item.displayId` and the item's other v2 fields (`slug`, `touches`, `amends`, …), as stored.
 - `move_item`: `type`.
 - `claim_task`: `type`.

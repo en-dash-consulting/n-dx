@@ -159,6 +159,27 @@ export function carryTouches(items: PRDItem[], sourceIds: string[], targetId: st
   if (touches.size > 0) findItem(items, targetId)!.item.touches = [...touches];
 }
 
+/**
+ * Keep each absorbed change's id, display id and former aliases as aliases on
+ * the target (v2), deduplicated and never the target's own id or display id, so
+ * commits and lookups that name the absorbed change still resolve to it. Call
+ * before {@link mergeItems}.
+ */
+export function carryAliases(items: PRDItem[], sourceIds: string[], targetId: string): void {
+  const target = findItem(items, targetId)!.item;
+  const own = new Set([target.id, target.displayId].filter((v): v is string => typeof v === "string"));
+  const aliases = new Set<string>(Array.isArray(target.aliases) ? target.aliases.map(String) : []);
+  for (const id of sourceIds) {
+    if (id === targetId) continue;
+    const item = findItem(items, id)?.item;
+    if (!item) continue;
+    const refs = [item.id, item.displayId, ...(Array.isArray(item.aliases) ? item.aliases : [])];
+    for (const ref of refs) if (typeof ref === "string") aliases.add(ref);
+  }
+  for (const ref of own) aliases.delete(ref);
+  if (aliases.size > 0) target.aliases = [...aliases];
+}
+
 // ── Preview ─────────────────────────────────────────────────────────
 
 /**

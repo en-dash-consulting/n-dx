@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { validateMerge, previewMerge, mergeItems, validateChangeLayerMerge, carryTouches } from "../../core/merge.js";
+import { validateMerge, previewMerge, mergeItems, validateChangeLayerMerge, carryTouches, carryAliases } from "../../core/merge.js";
 import type { PRDItem } from "../../schema/index.js";
 import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
@@ -48,7 +48,10 @@ export async function handleMergeItems(
       if (!validation.valid) {
         return { ok: false as const, message: `${validation.error}` };
       }
-      if (v2) carryTouches(doc.items, sourceIds, targetId);
+      if (v2) {
+        carryTouches(doc.items, sourceIds, targetId);
+        carryAliases(doc.items, sourceIds, targetId);
+      }
       return { ok: true as const, result: mergeItems(doc.items, sourceIds, targetId, options) };
     });
     if (!outcome.ok) {
