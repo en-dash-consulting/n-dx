@@ -516,3 +516,146 @@ describe("writePrdModel", () => {
     expect(await snapshot(rexDir)).toEqual(before);
   });
 });
+
+/**
+ * The Inbox is a reserved folder, not a view: an unplaced change is stored
+ * under `changes/inbox/` and placement moves it out.
+ */
+describe("writePrdModel and the reserved Inbox folder", () => {
+  const INBOX_CHANGE = "c0000000-0000-4000-8000-000000000009";
+  const SECOND = "c0000000-0000-4000-8000-00000000000a";
+
+  /** A top-level change with no target, as `add_item` adds one. */
+  function unplaced(id = INBOX_CHANGE, slug = "refunds-by-card", title = "Refunds by card"): RuleNode {
+    return { id, type: "change", title, slug, needsPlacement: true } as RuleNode;
+  }
+
+  function paths(files: Record<string, string>, match: string): string[] {
+    return Object.keys(files).filter((p) => p.includes(match)).sort();
+  }
+
+  it("writes an unplaced change to changes/inbox/<slug>/, with needsPlacement in that folder's state.yaml", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    model.tree.changes.push(unplaced());
+
+    const result = await write(rexDir, model);
+
+    expect(result.written).toContain("changes/inbox/refunds-by-card/index.md");
+    const index = await readFile(join(rexDir, "changes/inbox/refunds-by-card/index.md"), "utf-8");
+    expect(index).toContain(`id: "${INBOX_CHANGE}"`);
+    expect(index).not.toContain("needsPlacement");
+    expect(await readFile(join(rexDir, "changes/inbox/refunds-by-card/state.yaml"), "utf-8")).toContain(
+      `  "${INBOX_CHANGE}":\n    needsPlacement: true\n`,
+    );
+    // The folder is reserved, not a node: it has no index.md and no state of its own.
+    expect(paths(await snapshot(rexDir), "changes/inbox/")).toEqual([
+      "changes/inbox/refunds-by-card/index.md",
+      "changes/inbox/refunds-by-card/state.yaml",
+    ]);
+  });
+
+  it("reads an Inbox change back as a top-level change, and rewrites it byte-identically", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    model.tree.changes.push(unplaced());
+    await write(rexDir, model);
+
+    const reread = await loadPrdModel(rexDir, quiet);
+    expect(reread.warnings).toEqual([]);
+    expect(reread.tree.changes.map((n) => n.id)).toEqual([CHANGE, INBOX_CHANGE]);
+    expect(reread.tree.changes[1]).toMatchObject({ type: "change", slug: "refunds-by-card", needsPlacement: true });
+    const before = await snapshot(rexDir);
+    expect(await write(rexDir, reread)).toEqual({ written: [], removed: [] });
+    expect(await snapshot(rexDir)).toEqual(before);
+  });
+
+  // PR 17 (#612) shipped the rejected alternative: the flag at the change-layer root, with no Inbox folder.
+  it("reads a change written at the changes root with the flag, and moves it in on the next write", async () => {
+    const rexDir = await copyFixture();
+    const seeded = await loadPrdModel(rexDir, quiet);
+    seeded.tree.changes.push({ ...unplaced(), needsPlacement: undefined } as RuleNode);
+    await write(rexDir, seeded);
+    await writeFile(
+      join(rexDir, "changes/refunds-by-card/state.yaml"),
+      `schema: "rex/v2"\nitems:\n  "${INBOX_CHANGE}":\n    needsPlacement: true\n`,
+    );
+
+    const model = await loadPrdModel(rexDir, quiet);
+    expect(model.warnings).toEqual([]);
+    expect(find(all(model), INBOX_CHANGE)).toMatchObject({ slug: "refunds-by-card", needsPlacement: true });
+
+    const result = await write(rexDir, model);
+
+    expect(result.written).toContain("changes/inbox/refunds-by-card/index.md");
+    expect(result.removed).toEqual(["changes/refunds-by-card"]);
+    expect(paths(await snapshot(rexDir), "refunds-by-card")).toEqual([
+      "changes/inbox/refunds-by-card/index.md",
+      "changes/inbox/refunds-by-card/state.yaml",
+    ]);
+  });
+
+  it("moves a placed change out of the Inbox, keeping its id and slug, and drops the empty folder", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    model.tree.changes.push(unplaced());
+    await write(rexDir, model);
+
+    const held = await loadPrdModel(rexDir, quiet);
+    const change = find(all(held), INBOX_CHANGE);
+    delete (change as Record<string, unknown>).needsPlacement;
+    change.touches = [CAPABILITY];
+    const result = await write(rexDir, held);
+
+    expect(result.written).toContain("changes/refunds-by-card/index.md");
+    expect(result.removed).toEqual(["changes/inbox"]);
+    expect(paths(await snapshot(rexDir), "inbox")).toEqual([]);
+    expect(find(all(await loadPrdModel(rexDir, quiet)), INBOX_CHANGE)).toMatchObject({
+      id: INBOX_CHANGE,
+      slug: "refunds-by-card",
+      touches: [CAPABILITY],
+    });
+  });
+
+  it("keeps the Inbox folder while another unplaced change is still in it", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    model.tree.changes.push(unplaced(), unplaced(SECOND, "retry-failed-payments", "Retry failed payments"));
+    await write(rexDir, model);
+
+    const held = await loadPrdModel(rexDir, quiet);
+    const change = find(all(held), INBOX_CHANGE);
+    delete (change as Record<string, unknown>).needsPlacement;
+    change.touches = [CAPABILITY];
+    const result = await write(rexDir, held);
+
+    expect(result.removed).toEqual(["changes/inbox/refunds-by-card"]);
+    expect(paths(await snapshot(rexDir), "inbox")).toEqual([
+      "changes/inbox/retry-failed-payments/index.md",
+      "changes/inbox/retry-failed-payments/state.yaml",
+    ]);
+  });
+
+  it("refuses an Inbox change whose slug a placed change already uses", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    model.tree.changes.push(unplaced(INBOX_CHANGE, "add-apple-pay"));
+    const before = await snapshot(rexDir);
+
+    await expect(write(rexDir, model)).rejects.toThrow(/share the slug "add-apple-pay"/);
+    expect(await snapshot(rexDir)).toEqual(before);
+  });
+
+  it("leaves an unplaced change nested under another change where its parent holds it", async () => {
+    const rexDir = await copyFixture();
+    const model = await loadPrdModel(rexDir, quiet);
+    find(all(model), CHANGE).children!.push(unplaced(INBOX_CHANGE, "refunds-by-card"));
+
+    await write(rexDir, model);
+
+    expect(paths(await snapshot(rexDir), "refunds-by-card")).toEqual([
+      "changes/add-apple-pay/refunds-by-card/index.md",
+      "changes/add-apple-pay/refunds-by-card/state.yaml",
+    ]);
+  });
+});

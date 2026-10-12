@@ -15,6 +15,12 @@
  * - **Folders.** A change is always a folder (`<slug>/index.md`), so tasks can
  *   be added without moving it; any other node is a folder only while it has
  *   children, and a leaf `<slug>.md` otherwise.
+ * - **The Inbox.** A top-level change still carrying `needsPlacement` is
+ *   written under the reserved `changes/inbox/` folder
+ *   ({@link isInboxChange}); clearing the flag moves it out to the
+ *   change-layer root on the next write, keeping its id and its slug. The two
+ *   share one slug namespace, so that move can never collide. The folder is
+ *   created with the first unplaced change and removed with the last.
  * - **Root header.** `product/index.md` carries the title, the `schema` stamp
  *   and the `slugRule` that new slugs are made under: the v1 `tree-meta.json`
  *   sidecar has no v2 counterpart and is never written.
@@ -67,6 +73,7 @@ import { SLUG_RULE_VERSION, isWindowsSafeSegment } from "./folder-tree-serialize
 import { prdLockPath } from "./paths.js";
 import {
   CHANGES_DIRNAME,
+  INBOX_DIRNAME,
   PRODUCT_DIRNAME,
   assertPrdModelWritable,
   assertV2TreeWritable,
@@ -170,7 +177,7 @@ export async function writePrdModel(
   plan.files.set(join(productDir, INDEX_FILE), renderRootHeader(model, stamp));
   await planFolder(productDir, model.tree.product, "product", stamp, loaded, plan);
   if (model.tree.changes.length > 0 || loaded.folderState.layers.changes || (await listDir(changesDir)) !== null) {
-    await planFolder(changesDir, model.tree.changes, "changes", stamp, loaded, plan);
+    await planFolder(changesDir, model.tree.changes, "changes", stamp, loaded, plan, isInboxChange);
   }
   await assertStaleRemovable(plan.stale, collectIds(model), options.removed ?? new Set());
 
@@ -247,22 +254,26 @@ async function loadAllStateFiles(
 }
 
 /**
- * Plan folder `dir`: `owner` (the folder node, or the layer for a layer root)
- * and `nodes`, its children. Everything is validated here, before any write.
+ * Plan folder `dir`: `owner` (the folder node, the layer for a layer root, or
+ * {@link INBOX_DIRNAME} for the reserved Inbox, which has neither an
+ * `index.md` nor state of its own) and `nodes`, its children. `reserve` picks
+ * the nodes stored one level down in the Inbox rather than here. Everything is
+ * validated here, before any write.
  */
 async function planFolder(
   dir: string,
   nodes: readonly RuleNode[],
-  owner: RuleNode | Layer,
+  owner: RuleNode | Layer | typeof INBOX_DIRNAME,
   stamp: string,
   loaded: LoadedState,
   plan: Plan,
+  reserve?: (node: RuleNode) => boolean,
 ): Promise<void> {
   plan.dirs.add(dir);
   const entries = (await listDir(dir)) ?? [];
   const existing = loaded.files.get(dir) ?? { ...emptyStateFile(), schema: stamp };
   const { layers, nodes: byOwner } = loaded.folderState;
-  Object.assign(existing, typeof owner === "string" ? layers[owner] : byOwner.get(owner.id));
+  Object.assign(existing, typeof owner !== "string" ? byOwner.get(owner.id) : owner === INBOX_DIRNAME ? undefined : layers[owner]);
   const rows: Record<string, ItemState> = {};
   const specs = new Map<string, ProductSpec>();
   const keep = (node: RuleNode, intent: Record<string, unknown>): void => {
@@ -287,6 +298,7 @@ async function planFolder(
   const expectedDirs = new Set<string>();
   const expectedFiles = new Set<string>([INDEX_FILE]);
   const seen = new Map<string, string>();
+  const reserved: RuleNode[] = [];
   for (const node of nodes) {
     const folder = isFolderNode(node);
     assertSlug(node, folder, dir);
@@ -297,6 +309,11 @@ async function planFolder(
       throw new Error(`Two nodes in ${dir} share the slug "${node.slug}" (ignoring case): ${clash} and ${node.id}`);
     }
     seen.set(key, node.id);
+    // Checked against this folder's slugs before the split: placement moves a node out of the Inbox into it.
+    if (reserve?.(node)) {
+      reserved.push(node);
+      continue;
+    }
     if (folder) {
       expectedDirs.add(node.slug);
       await planFolder(join(dir, node.slug), node.children ?? [], node, stamp, loaded, plan);
@@ -308,6 +325,12 @@ async function planFolder(
       assertValidIntent(node, intent, dir);
       plan.files.set(join(dir, file), renderNode(node, intent));
     }
+  }
+
+  // An empty Inbox is not kept: the folder goes stale with the last change placed out of it.
+  if (reserved.length > 0) {
+    expectedDirs.add(INBOX_DIRNAME);
+    await planFolder(join(dir, INBOX_DIRNAME), reserved, INBOX_DIRNAME, stamp, loaded, plan);
   }
 
   if (Object.keys(rows).length === 0 && !extraTopLevelKeys(existing)) {
@@ -332,6 +355,16 @@ async function planFolder(
  */
 export function isFolderNode(node: RuleNode): boolean {
   return node.type === "change" || (node.children?.length ?? 0) > 0;
+}
+
+/**
+ * Whether a top-level change is stored in the reserved Inbox folder
+ * ({@link INBOX_DIRNAME}): the flag decides, nothing else. Applied only to the
+ * change-layer root, so a change nested under another change stays where its
+ * parent holds it.
+ */
+export function isInboxChange(node: RuleNode): boolean {
+  return node.type === "change" && node.needsPlacement === true;
 }
 
 /** Runs in the planning pass, so a bad slug refuses the write before any file changes. */

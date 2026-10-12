@@ -29,6 +29,7 @@ const AREA = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
 const TASK = "c0000000-0000-4000-8000-000000000002";
+const INBOX_CHANGE = "c0000000-0000-4000-8000-000000000009";
 
 const EPIC = "11111111-1111-4111-8111-111111111111";
 const FEATURE = "22222222-2222-4222-8222-222222222222";
@@ -135,6 +136,15 @@ function find(nodes: readonly RuleNode[], id: string): RuleNode | undefined {
   return undefined;
 }
 
+/** An unplaced change in the reserved Inbox folder of the tree at `rexDir`. */
+async function writeInboxChange(rexDir: string): Promise<void> {
+  const dir = join(rexDir, "changes", "inbox", "refunds-by-card");
+  await mkdir(dir, { recursive: true });
+  const intent = ["---", `id: "${INBOX_CHANGE}"`, 'type: "change"', 'title: "Refunds by card"', 'slug: "refunds-by-card"', "---", ""];
+  await writeFile(join(dir, "index.md"), intent.join("\n"));
+  await writeFile(join(dir, "state.yaml"), ['schema: "rex/v2"', "items:", `  "${INBOX_CHANGE}":`, "    needsPlacement: true", ""].join("\n"));
+}
+
 function findBundled(nodes: readonly BundleNodeV2[], id: string): BundleNodeV2 | undefined {
   for (const n of nodes) {
     if (n.id === id) return n;
@@ -163,6 +173,26 @@ describe("envelope v2 round trip", () => {
     const outcome = await importBundleIntoV2(dest, parseAnyBundle(await exportedJson(src)), "merge");
     expect(outcome).toMatchObject({ added: 4, replaced: 0, collisions: [] });
     expect(await snapshot(dest)).toEqual(await snapshot(src));
+  });
+
+  it("round-trips a tree holding an Inbox change, rebuilding the reserved folder", async () => {
+    const src = await copyV2Fixture(join(tmp, "src"), "lf");
+    await writeInboxChange(src);
+
+    const bundle = (await exportedJson(src)) as PRDBundleV2;
+    // The Inbox is storage: the bundle carries its change as a top-level change like any other.
+    expect(bundle.changes.map((n) => n.id)).toEqual([CHANGE, INBOX_CHANGE]);
+    expect(findBundled(bundle.changes, INBOX_CHANGE)).toMatchObject({
+      slug: "refunds-by-card",
+      state: { needsPlacement: true },
+    });
+
+    const dest = await emptyV2Tree("dest");
+    const outcome = await importBundleIntoV2(dest, parseAnyBundle(bundle), "merge");
+
+    expect(outcome).toMatchObject({ added: 5, replaced: 0, collisions: [] });
+    expect(await snapshot(dest)).toEqual(await snapshot(src));
+    expect(Object.keys(await snapshot(dest))).toContain("changes/inbox/refunds-by-card/index.md");
   });
 
   it("replace swaps both layers and adopts the title and header", async () => {

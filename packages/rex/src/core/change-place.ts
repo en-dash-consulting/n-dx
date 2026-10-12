@@ -14,7 +14,9 @@
  *   placement with neither is refused). The change is
  *   dry-run through apply (`applyAmendmentsProblems`), and a problem the new
  *   amendment brings refuses the placement in apply's words, since nothing
- *   edits the amendment afterwards. Either clears `needsPlacement`.
+ *   edits the amendment afterwards. Either clears `needsPlacement`, which moves
+ *   the change out of the reserved `changes/inbox/` folder on the next write,
+ *   keeping its id and its slug (`store/prd-model-writer.ts`).
  *
  * Only an open change is placed. The result is checked against the v2 rules;
  * an error finding about the change refuses the placement.

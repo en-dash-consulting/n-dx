@@ -342,3 +342,55 @@ describe("schema skew", () => {
     });
   });
 });
+
+/** `changes/inbox/` is a reserved folder name, not a change: its children are top-level changes. */
+describe("the reserved Inbox folder", () => {
+  const INBOX_CHANGE = "c0000000-0000-4000-8000-000000000009";
+
+  /** A hand-written change folder `slug` under `dir`, with `state` lines for its row. */
+  async function writeChange(dir: string, slug: string, id: string, state?: string): Promise<void> {
+    await mkdir(join(dir, slug), { recursive: true });
+    const intent = ["---", `id: ${JSON.stringify(id)}`, 'type: "change"', 'title: "Refunds by card"', `slug: ${JSON.stringify(slug)}`, "---", ""];
+    await writeFile(join(dir, slug, "index.md"), intent.join("\n"));
+    if (state) await writeFile(join(dir, slug, "state.yaml"), stateFile(id, state));
+  }
+
+  function stateFile(id: string, ...rows: string[]): string {
+    return ['schema: "rex/v2"', "items:", `  ${JSON.stringify(id)}:`, ...rows, ""].join("\n");
+  }
+
+  it("reads its children as top-level changes, and itself as no node at all", async () => {
+    const rexDir = await copyFixture("lf");
+    await writeChange(join(rexDir, "changes/inbox"), "refunds-by-card", INBOX_CHANGE, "    needsPlacement: true");
+
+    const model = await loadPrdModel(rexDir, quiet);
+
+    expect(model.warnings).toEqual([]);
+    expect(model.tree.changes.map((n) => n.id)).toEqual([CHANGE, INBOX_CHANGE]);
+    expect(find(model, INBOX_CHANGE)).toMatchObject({ type: "change", slug: "refunds-by-card", needsPlacement: true });
+    expect(model.tree.changes.some((n) => n.slug === "inbox")).toBe(false);
+  });
+
+  it("sorts its children in among the placed changes by slug", async () => {
+    const rexDir = await copyFixture("lf");
+    await writeChange(join(rexDir, "changes/inbox"), "aa-first", "c-aa");
+    await writeChange(join(rexDir, "changes/inbox"), "zz-last", "c-zz");
+
+    const model = await loadPrdModel(rexDir, quiet);
+
+    expect(model.tree.changes.map((n) => n.slug)).toEqual(["aa-first", "add-apple-pay", "zz-last"]);
+  });
+
+  it("reports a row in its own state.yaml as an orphan: a change keeps its row in its own folder", async () => {
+    const rexDir = await copyFixture("lf");
+    await writeChange(join(rexDir, "changes/inbox"), "refunds-by-card", INBOX_CHANGE);
+    await writeFile(join(rexDir, "changes/inbox/state.yaml"), stateFile(INBOX_CHANGE, "    needsPlacement: true"));
+
+    const model = await loadPrdModel(rexDir, quiet);
+
+    expect(model.warnings).toEqual([
+      { path: join(rexDir, "changes/inbox/state.yaml"), message: `State row "${INBOX_CHANGE}" matches no node in this folder` },
+    ]);
+    expect(find(model, INBOX_CHANGE).needsPlacement).toBeUndefined();
+  });
+});
