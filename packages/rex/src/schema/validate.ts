@@ -12,6 +12,8 @@ import {
   RUN_SETTING_MAX_TURNS_MIN,
   RUN_SETTING_MAX_TURNS_MAX,
   RUN_SETTING_TIERS,
+  RUN_SETTING_REVIEW_MODES,
+  RUN_SETTING_REVIEW_VENDORS,
   RUN_SETTING_KEYS,
 } from "./v1.js";
 import { LLM_VENDORS } from "@n-dx/llm-client";
@@ -126,6 +128,8 @@ export const RunSettingsSchema = z
     provider: z.enum(["cli", "api"]).optional(),
     permissionMode: z.enum(["default", "acceptEdits", "bypassPermissions"]).optional(),
     review: z.boolean().optional(),
+    reviewMode: z.enum(RUN_SETTING_REVIEW_MODES).optional(),
+    reviewVendor: z.enum(RUN_SETTING_REVIEW_VENDORS).optional(),
     reviewTier: RunTierSchema.optional(),
     reviewModels: RunModelsSchema.optional(),
     reviewOptional: z.boolean().optional(),

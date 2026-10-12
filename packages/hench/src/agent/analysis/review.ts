@@ -45,6 +45,44 @@ export async function collectReviewDiff(
   };
 }
 
+/** What a pair reviewer is shown of the change. See {@link collectPairReviewScope}. */
+export interface PairReviewScope {
+  /** `git diff <base>`: committed and uncommitted changes to tracked files. */
+  diff: string;
+  /** Changed paths, tracked and untracked, sorted. */
+  changedFiles: string[];
+}
+
+/**
+ * Collect the change a pair reviewer must see: the diff against `base` (the
+ * commit the run started at, or `HEAD` when it could not be captured) and the
+ * list of changed files, untracked ones included.
+ *
+ * Paths under the run's own bookkeeping directories (`.rex/`, `.hench/`,
+ * `.ndx/`) are left out: the task's status flip and the review report live
+ * there, and neither is the change under review.
+ */
+export async function collectPairReviewScope(
+  projectDir: string,
+  base: string | undefined,
+  bookkeepingPrefixes: readonly string[],
+  timeout = DEFAULT_TIMEOUT,
+): Promise<PairReviewScope> {
+  const ref = base ?? "HEAD";
+  const exclude = bookkeepingPrefixes.map((prefix) => `:(exclude)${prefix}`);
+  const pathspec = ["--", ".", ...exclude];
+  const [diff, names, untracked] = await Promise.all([
+    execStdout("git", ["diff", ref, ...pathspec], { cwd: projectDir, timeout }),
+    execStdout("git", ["diff", "--name-only", ref, ...pathspec], { cwd: projectDir, timeout }),
+    listUntrackedPaths(projectDir, timeout),
+  ]);
+  const isBookkeeping = (path: string): boolean => bookkeepingPrefixes.some((prefix) => path.startsWith(prefix));
+  const changedFiles = [
+    ...new Set([...names.split("\n").map((l) => l.trim()).filter(Boolean), ...untracked.filter((p) => !isBookkeeping(p))]),
+  ].sort();
+  return { diff, changedFiles };
+}
+
 /**
  * Display the review UI and prompt for approval.
  *

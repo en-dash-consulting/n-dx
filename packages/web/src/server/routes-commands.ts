@@ -1132,13 +1132,18 @@ const refreshSlots = new WorkspaceScoped<JobSlot<RefreshStatus>>(() => ({
   stopRequested: false,
 }));
 
-/** Extract the `[refresh] …` phase lines from CLI output (ANSI stripped). */
-function parseRefreshPhases(stdout: string): string[] {
+/** Remove ANSI SGR (colour) sequences from CLI output. */
+function stripAnsi(text: string): string {
   // Written as the \x1b ESCAPE SEQUENCE, not a raw ESC byte: the raw byte
   // is invisible in most views, which has already caused this regex to be
   // misread as missing its escape prefix entirely.
   // eslint-disable-next-line no-control-regex
-  const plain = stdout.replace(/\x1b\[[0-9;]*m/g, "");
+  return text.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+/** Extract the `[refresh] …` phase lines from CLI output (ANSI stripped). */
+function parseRefreshPhases(stdout: string): string[] {
+  const plain = stripAnsi(stdout);
   return plain
     .split("\n")
     .filter((line) => line.startsWith("[refresh]"))
@@ -1659,8 +1664,8 @@ async function runAuthCheck(ctx: ServerContext): Promise<AuthCheckResult> {
     const ok = !result.error;
     return {
       ok,
-      output: outputTail(result.stdout.trim(), 2000),
-      error: ok ? null : (result.stderr || result.error?.message || "Credential check failed").slice(-1000),
+      output: outputTail(stripAnsi(result.stdout).trim(), 2000),
+      error: ok ? null : stripAnsi(result.stderr || result.error?.message || "Credential check failed").slice(-1000),
     };
   } catch (err) {
     // Report the failure in the body rather than as a 500: "could not check"

@@ -1289,6 +1289,8 @@ describe("serializeFolderTree: run settings", () => {
     provider: "api",
     permissionMode: "acceptEdits",
     review: false,
+    reviewMode: "pair",
+    reviewVendor: "codex",
     reviewTier: "standard",
     reviewModels: { claude: "claude-sonnet-5" },
     reviewOptional: false,

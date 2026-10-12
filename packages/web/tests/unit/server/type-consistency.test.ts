@@ -243,6 +243,8 @@ describe("Viewer type mirrors match canonical definitions", () => {
       provider: "cli",
       permissionMode: "default",
       review: true,
+      reviewMode: "pair",
+      reviewVendor: "codex",
       reviewTier: "light",
       reviewModels: { codex: "r" },
       reviewOptional: false,
