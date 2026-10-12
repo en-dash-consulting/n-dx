@@ -25,6 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [hench briefs a v2 task from its change](./hench-briefs-a-v2-task-from-its-change.md) | pending |
 | [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | pending |
-| [hench selects v2 work and finds a task by id](./hench-selects-v2-work-and-finds-a-task.md) | pending |
+| [hench selects v2 work and finds a task by id](./hench-selects-v2-work-and-finds-a-task.md) | completed |
 | [hench writes status, completion and claims through the v2 transaction](./hench-writes-status-completion-and.md) | pending |
+| [ndx work --task=<display id> --resolve reports "Task not found" on a v2 tree](./ndx-work-task-display-id-resolve.md) | pending |
 | [The completion gate and review captures understand v2](./the-completion-gate-and-review.md) | pending |
