@@ -84,6 +84,7 @@ The PRD is the product's requirements (the product layer) plus the changes being
 | `ndx refresh [dir]` | Refresh dashboard artifacts |
 | `ndx export [dir]` | Export static deployable dashboard |
 | `ndx web [dir]` | Dashboard server control (lower-level counterpart to `ndx start`) |
+| `ndx graview <emit\|check\|describe\|serve\|mcp> [dir]` | Project the PRD, analysis and runs into [Graview](https://graview.dev) and drive the `graview` CLI on the result |
 
 ## Try it out
 
