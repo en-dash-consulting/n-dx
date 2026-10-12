@@ -23,6 +23,19 @@
  * correct by construction; the cost is one synchronous read of each test
  * file when vitest starts, about 50 ms for the largest package.
  *
+ * WHAT THE SCAN DOES NOT SEE. It reads each test file's own source and nothing
+ * it imports, so a file that reaches these APIs only through a helper is read
+ * as safe and lands in the shared project. `tests/helpers/viewer-boot.ts` calls
+ * `vi.stubGlobal` and `vi.resetModules`, and the two files that use it —
+ * `integration/pr-markdown-tab-parity.test.ts` and
+ * `integration/token-usage-route-regression.test.ts` — are shared today.
+ *
+ * Following imports would mean resolving the module graph at config time, for
+ * a case that is rare and that announces itself: the symptom is a neighbour in
+ * the same worker failing, and `NDX_TEST_ISOLATE_ALL=1` separates a leak from
+ * a real defect in one run. If a helper of this kind becomes common, the scan
+ * should follow relative imports one level rather than stay as it is.
+ *
  * WHY NOT FIX THE LEAK INSTEAD. The isolated project is for files whose
  * isolation is the point of the API they use. A file that only leaks state by
  * accident — a module-level singleton it forgets to reset — belongs in the
@@ -96,8 +109,20 @@ export function isolationProjects({ root, name, testsDir = "tests", isTestFile =
   // set, every file runs in its own worker as it did before the split. A
   // failure that disappears under it is a leak in the shared project; one
   // that stays is the test's own.
+  // Extra excludes from the caller, as a newline-separated list.
+  //
+  // Not `--exclude`: each project below sets its own `exclude`, and a project's
+  // list replaces the CLI flag rather than adding to it, so the patterns
+  // `scripts/run-vitest-bind-aware.mjs` passes when loopback bind is
+  // unavailable never reached a project at all — the network suites they name
+  // ran anyway. Appending here is the only place both projects see them.
+  const extraExclude = (process.env["NDX_TEST_EXTRA_EXCLUDE"] ?? "")
+    .split("\n")
+    .map((pattern) => pattern.trim())
+    .filter(Boolean);
+
   if (process.env["NDX_TEST_ISOLATE_ALL"]) {
-    return [{ extends: true, test: { name: `${name}:isolated`, exclude: [] } }];
+    return [{ extends: true, test: { name: `${name}:isolated`, exclude: [...extraExclude] } }];
   }
   const files = listTestFiles(root, join(root, testsDir), isTestFile);
   const isolated = new Set(files.filter((file) => needsIsolation(readFileSync(join(root, file), "utf-8"))));
@@ -108,14 +133,14 @@ export function isolationProjects({ root, name, testsDir = "tests", isTestFile =
       test: {
         name: `${name}:shared`,
         isolate: false,
-        exclude: [...isolated],
+        exclude: [...isolated, ...extraExclude],
       },
     },
     {
       extends: true,
       test: {
         name: `${name}:isolated`,
-        exclude: shared,
+        exclude: [...shared, ...extraExclude],
       },
     },
   ];
