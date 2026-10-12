@@ -249,7 +249,7 @@ ndx graview describe .      # re-emit, then graview describe: the places and act
 ndx graview serve .         # re-emit, then the product face (@n-dx/graview-face) on http://localhost:5188
 ndx graview mcp .           # re-emit, then graview mcp over stdio on the snapshot
 ndx graview info .          # where the projection, the graview binary, the face and rex's MCP endpoint are
-ndx graview emit --files .  # include file nodes (large)
+ndx graview emit --no-files .  # leave file nodes out
 ```
 
 `ndx graview` projects the PRD tree, sourcevision's zones and components and hench's runs into a [Graview](https://graview.dev) declaration and a `{nodes, edges}` snapshot under the layout's graview dir (`.graview/`, or `.ndx/graview/` on the `.ndx` layout), then spawns the `graview` CLI on them. No `@graview/*` package is installed with n-dx: the binary is found through `graview.bin` in the project config, `$NDX_GRAVIEW_BIN`, PATH, the installed `@n-dx/graview-face`'s own `graview`, then `npx -y graview@<pinned>`. `serve` runs the separately published `@n-dx/graview-face` when it is installed or beside the adapter in the monorepo; when the repository is registered with the hub (`ndx start .`), the face writes changes and tasks back to rex through its MCP endpoint. See [Graview projection](../architecture/graview-projection.md).

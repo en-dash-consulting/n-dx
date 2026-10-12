@@ -12,13 +12,13 @@ import { join } from "node:path";
 import { loadTrailerCommits, loadCommitFiles, computeLandings, listReleaseTags, releasesContaining, resolveNode, trailerIds } from "./rex-gateway.js";
 import { execStdout, type Layout } from "./llm-gateway.js";
 import { readRequirements, releaseId, RELEASE_PREFIX } from "./sources/requirements.js";
-import { readCode } from "./sources/code.js";
+import { readCode, FILE_PREFIX } from "./sources/code.js";
 import { readRuns } from "./sources/runs.js";
 import { byString } from "./canonical.js";
 import type { GraphSnapshot, SnapshotEdge, SnapshotNode, Warn } from "./types.js";
 
 export interface BuildSnapshotOptions {
-  /** Project every file in the inventory as a node. Off by default. */
+  /** Project every file in the inventory as a node, with the commits that changed it and the capabilities whose work did. Default true. */
   files?: boolean;
   /** The branch commits and landings are read from; rex's default (`origin/HEAD`, `origin/main`, `main`) when unset. */
   ref?: string;
@@ -85,7 +85,8 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
   };
 
   const requirements = await readRequirements(layout.rexDir, warn, { proposeProductLayer: options.proposeProductLayer });
-  const code = readCode(layout.sourcevisionDir, { files: options.files }, warn);
+  const files = options.files ?? true;
+  const code = readCode(layout.sourcevisionDir, { files }, warn);
   const runs = readRuns(layout.henchDir, warn);
 
   const nodes = new Map<string, SnapshotNode>();
@@ -173,10 +174,14 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
   // commit to the work. Wider than rex's own `computeRealizedBy` (amending
   // changes, trailers only), because on a proposed product layer the relation
   // is a lead-verb guess and the hench-era commits come only from run records.
+  // With files projected, the same files are kept as edges too: every commit
+  // to the files it changed, and every capability to the files its commits
+  // changed. A path the inventory no longer has is dropped with the rest of
+  // the dangling edges below.
   const capabilities = requirements.nodes.filter((n) => n.kind === "capability");
-  if (capabilities.length > 0) {
+  if (capabilities.length > 0 || files) {
     if (known === undefined) {
-      warn("Realized-by edges skipped: the commits that realize a capability need a git repository with full history");
+      if (capabilities.length > 0) warn("Realized-by edges skipped: the commits that realize a capability need a git repository with full history");
     } else {
       try {
         const shasOf = new Map<string, Set<string>>();
@@ -189,14 +194,19 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
           }
           if (shas.size > 0) shasOf.set(capability.id, shas);
         }
-        const files = await loadCommitFiles(gitOptions.repoDir, gitOptions.cacheDir, [...shasOf.values()].flatMap((s) => [...s]));
+        const wanted = files ? [...nodes.values()].filter((n) => n.kind === "commit" && known!.has(n.id)).map((n) => n.id) : [...shasOf.values()].flatMap((s) => [...s]);
+        const changed = await loadCommitFiles(gitOptions.repoDir, gitOptions.cacheDir, wanted);
+        if (files) {
+          for (const [sha, paths] of changed) for (const path of paths ?? []) edges.push({ kind: "changed", from: sha, to: `${FILE_PREFIX}${path}` });
+        }
         for (const [capabilityId, shas] of shasOf) {
           const zones = new Set<string>();
           for (const sha of shas) {
             edges.push({ kind: "realizes", from: sha, to: capabilityId });
-            for (const file of files.get(sha) ?? []) {
+            for (const file of changed.get(sha) ?? []) {
               const zone = code.zoneOf(file);
               if (zone !== undefined) zones.add(zone);
+              if (files) edges.push({ kind: "livesIn", from: capabilityId, to: `${FILE_PREFIX}${file}` });
             }
           }
           for (const zone of zones) edges.push({ kind: "realizedIn", from: capabilityId, to: zone });

@@ -3,7 +3,7 @@
 `@n-dx/graview` turns an n-dx project into one typed context graph on
 [Graview](https://graview.dev): the product layer (areas, capabilities,
 constraints), the change layer (changes, tasks, releases), the code
-(zones, components, optionally files) and the work (agent runs, commits).
+(zones, components, files) and the work (agent runs, commits).
 Graview's declaration names every kind, field, relation, lens and rule once;
 `graview check` holds it, `graview serve` serves it to any Graview face,
 `graview mcp` derives an agent tool surface from it. The face n-dx ships is
@@ -82,7 +82,7 @@ and the same code path then reads the stored v2 tree.
 | `release` | every `plannedRelease` and `shippedIn` value, and every release tag git has (`X.Y.Z`, `vX.Y.Z` or `<package>@X.Y.Z`, dated by the tag; `graview.mainRef` picks the branch) | `release:<version>` |
 | `zone` | `zones.json`, sub-zones included | zone id |
 | `component` | `components.json` | `component:<file>#<name>` |
-| `file` (with `--files`) | `inventory.json` | `file:<path>` |
+| `file` (left out with `--no-files`) | `inventory.json` | `file:<path>` |
 | `run` | `<henchDir>/runs/*.json[.gz]` | run id |
 | `commit` | every commit on main whose `N-DX-Item` trailer names a change or task (`loadTrailerCommits`), and every commit a run record names (`RunRecord.commits`, filled live or by `hench backfill-commits`); git supplies author and date, and `attribution` says how the commit was tied | sha |
 
@@ -97,6 +97,7 @@ and the same code path then reads the stored v2 tree.
 | `plannedFor`, `shippedWith` | `change.plannedRelease`, `ItemState.shippedIn`; a finished change with no stamped `shippedIn` ships with the first release tag containing its landing (`computeLandings`, `releasesContaining`: rex's `resolveShippedIn` answer, for every change in one walk) |
 | `landedFor` (commit → change or task) | the commit's `N-DX-Item` trailers, and the run record that names the commit (its task) |
 | `realizedIn` (capability → zone), `realizes` (commit → capability) | every commit that landed for a change placed on the capability (`amends` or `touches`, via `changedBy`) or for the work under it, through `loadCommitFiles` and the zone map |
+| `changed` (commit → file), `livesIn` (capability → file) | the same `loadCommitFiles` read, kept as edges when files are projected: every commit on the graph to the files it changed, and a capability to the files its realizing commits changed. A path the inventory no longer has is dropped |
 | `inZone` | a component's or file's deepest zone |
 | `crosses` | `zones.json` crossings and sub-crossings |
 | `ranFor`, `produced` | `RunRecord.taskId`, `RunRecord.commits` |

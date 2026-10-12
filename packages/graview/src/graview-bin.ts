@@ -29,7 +29,7 @@ export interface GraviewCommand {
 export interface GraviewConfig {
   /** The graview binary or its `cli.js`. */
   bin?: string;
-  /** Project every source file as a node by default. */
+  /** Project every source file as a node (default true; `false` is `--no-files`). */
   includeFiles?: boolean;
   /**
    * The branch the commits and landings are read from (`main`,

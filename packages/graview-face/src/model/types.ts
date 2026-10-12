@@ -165,7 +165,7 @@ export interface Component {
   readonly line?: number;
 }
 
-/** A source file. Projected only on request: zones carry the shape of the code without them. */
+/** A source file, with the commits that changed it and the capabilities whose work did. Kept off the map's bar: reach one from its zone, a capability or a commit. */
 export interface File {
   readonly id: string;
   readonly kind: "file";
@@ -239,6 +239,8 @@ export type Edges = {
     readonly dependsOn: "capability";
     /** the code zones changed by the work placed on this capability */
     readonly realizedIn: "zone";
+    /** the files changed by the work placed on this capability */
+    readonly livesIn: "file";
   };
   readonly constraint: {
     /** what this constraint sits inside */
@@ -294,6 +296,8 @@ export type Edges = {
     readonly landedFor: "change" | "task";
     /** the capabilities the work this commit landed for was placed on */
     readonly realizes: "capability";
+    /** the files this commit changed */
+    readonly changed: "file";
   };
 };
 

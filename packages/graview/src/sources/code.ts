@@ -17,7 +17,7 @@ export interface CodeSlice extends SourceSlice {
 }
 
 export interface ReadCodeOptions {
-  /** Project every file in the inventory as a node. Off by default. */
+  /** Project every file in the inventory as a node. */
   files?: boolean;
 }
 

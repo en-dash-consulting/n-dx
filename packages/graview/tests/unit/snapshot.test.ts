@@ -54,7 +54,7 @@ describe("buildSnapshot", () => {
     expect(counts.zone).toBe(3);
     expect(counts.component).toBe(2);
     expect(counts.run).toBe(2);
-    expect(counts.file).toBeUndefined();
+    expect(counts.file).toBe(2);
 
     const byId = new Map(snapshot.nodes.map((n) => [n.id, n]));
     const capability = snapshot.nodes.find((n) => n.kind === "capability")!;
@@ -113,12 +113,12 @@ describe("buildSnapshot", () => {
     expect(kinds).toEqual([...kinds].sort());
   });
 
-  it("projects file nodes only when asked", async () => {
+  it("projects file nodes unless told not to", async () => {
     const root = project();
     const layout = resolveLayout(root);
-    const without = await buildSnapshot(layout, quiet);
+    const without = await buildSnapshot(layout, { ...quiet, files: false });
     expect(without.snapshot.nodes.some((n) => n.kind === "file")).toBe(false);
-    const withFiles = await buildSnapshot(layout, { ...quiet, files: true });
+    const withFiles = await buildSnapshot(layout, quiet);
     expect(withFiles.counts.file).toBe(2);
     expect(withFiles.snapshot.edges).toContainEqual({ kind: "inZone", from: `${FILE_PREFIX}src/catalog/list.ts`, to: "catalog" });
   });
@@ -289,6 +289,14 @@ describe("buildSnapshot", () => {
     expect(edges).toContainEqual({ kind: "realizes", from: unreleased, to: capability });
     expect(edges.some((e) => e.kind === "realizes" && e.from === lost)).toBe(false);
     expect(edges).toContainEqual({ kind: "realizedIn", from: capability, to: "checkout" });
+    // With files projected, the same read ties the commit and the capability to the file itself;
+    // later.ts is not in the inventory, so its edges are dropped, and the run record's lost commit changed nothing git knows.
+    expect(edges).toContainEqual({ kind: "changed", from: landed, to: `${FILE_PREFIX}src/checkout/pay.ts` });
+    expect(edges).toContainEqual({ kind: "livesIn", from: capability, to: `${FILE_PREFIX}src/checkout/pay.ts` });
+    expect(edges.filter((e) => e.kind === "changed" || e.kind === "livesIn").every((e) => e.to === `${FILE_PREFIX}src/checkout/pay.ts`)).toBe(true);
+    const bare = await buildSnapshot(layout, { ...quiet, files: false });
+    expect(bare.snapshot.edges.some((e) => e.kind === "changed" || e.kind === "livesIn")).toBe(false);
+    expect(bare.snapshot.edges).toContainEqual({ kind: "realizedIn", from: capability, to: "checkout" });
     // The change landed with its last commit, which no release tag contains yet: not shipped.
     expect(edges.some((e) => e.kind === "shippedWith" && e.from === change)).toBe(false);
 

@@ -287,6 +287,13 @@
           ],
           "description": "the code zones changed by the work placed on this capability",
           "inverse": "the capabilities realized here"
+        },
+        "livesIn": {
+          "to": [
+            "file"
+          ],
+          "description": "the files changed by the work placed on this capability",
+          "inverse": "the capabilities whose work changed it"
         }
       },
       "page": {
@@ -326,6 +333,10 @@
         "zones": {
           "expr": "count(out('realizedIn'))",
           "label": "Zones realized in"
+        },
+        "files": {
+          "expr": "count(out('livesIn'))",
+          "label": "Files it lives in"
         }
       }
     },
@@ -1034,7 +1045,7 @@
     "file": {
       "noun": "file",
       "plural": "Files",
-      "description": "A source file. Projected only on request: zones carry the shape of the code without them.",
+      "description": "A source file, with the commits that changed it and the capabilities whose work did. Kept off the map's bar: reach one from its zone, a capability or a commit.",
       "figure": "note",
       "label": "{path}",
       "glance": [
@@ -1075,6 +1086,16 @@
           "role",
           "lineCount"
         ]
+      },
+      "computed": {
+        "commits": {
+          "expr": "count(in('changed'))",
+          "label": "Commits that changed it"
+        },
+        "capabilities": {
+          "expr": "count(in('livesIn'))",
+          "label": "Capabilities living here"
+        }
       }
     },
     "run": {
@@ -1259,6 +1280,13 @@
           ],
           "description": "the capabilities the work this commit landed for was placed on",
           "inverse": "the commits that realized it"
+        },
+        "changed": {
+          "to": [
+            "file"
+          ],
+          "description": "the files this commit changed",
+          "inverse": "the commits that changed it"
         }
       },
       "page": {
@@ -1600,6 +1628,11 @@
               "figure": "zones",
               "as": "number",
               "label": "Zones"
+            },
+            {
+              "figure": "files",
+              "as": "number",
+              "label": "Files"
             }
           ],
           "direction": "row"
@@ -1634,6 +1667,20 @@
           "list": "out('realizedIn')",
           "as": "row",
           "empty": "No commit tied to the work placed on this has realized it yet."
+        },
+        {
+          "title": "Lives in files",
+          "key": "lives-in"
+        },
+        {
+          "list": "out('livesIn')",
+          "sort": {
+            "by": "path",
+            "direction": "asc"
+          },
+          "limit": 25,
+          "as": "row",
+          "empty": "No commit tied to the work placed on this has changed a file still in the inventory."
         },
         {
           "title": "Bound by",
@@ -2066,6 +2113,65 @@
           "field": "open",
           "as": "count",
           "label": "Still open"
+        }
+      ]
+    },
+    "file": {
+      "page": [
+        {
+          "headline": "{path}"
+        },
+        {
+          "group": [
+            {
+              "figure": "lineCount",
+              "as": "number",
+              "label": "Lines"
+            },
+            {
+              "figure": "commits",
+              "as": "number",
+              "label": "Commits"
+            },
+            {
+              "figure": "capabilities",
+              "as": "number",
+              "label": "Capabilities"
+            }
+          ],
+          "direction": "row"
+        },
+        {
+          "title": "Zone",
+          "key": "zone"
+        },
+        {
+          "list": "out('inZone')",
+          "as": "row",
+          "empty": "No zone lists this file."
+        },
+        {
+          "title": "Capabilities living here",
+          "key": "capabilities"
+        },
+        {
+          "list": "in('livesIn')",
+          "as": "row",
+          "empty": "No capability's work has changed this file."
+        },
+        {
+          "title": "Commits that changed it",
+          "key": "commits"
+        },
+        {
+          "list": "in('changed')",
+          "sort": {
+            "by": "committedAt",
+            "direction": "desc"
+          },
+          "limit": 25,
+          "as": "row",
+          "empty": "No commit on the graph changed this file."
         }
       ]
     }

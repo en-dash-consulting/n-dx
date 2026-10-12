@@ -54,8 +54,12 @@ carries, never a judgement rex has not made.
   cache/          rex's N-DX-Item trailer cache and commit-file cache, kept here
 ```
 
-File nodes are opt-in (`--files`): zones, components and entry points keep a
-repository this size inside Graview's comfortable scale.
+File nodes are on by default (`--no-files` or `graview.includeFiles: false`
+leaves them out). Each file carries its zone (`inZone`), the commits on the
+graph that changed it (`changed`) and the capabilities whose realizing
+commits did (`livesIn`), all from the one commit-file read the zones of
+`realizedIn` come from. The map keeps files under "Everything else"
+(`pages.hide`); reach them from a zone, a capability or a commit.
 
 ### The product face
 

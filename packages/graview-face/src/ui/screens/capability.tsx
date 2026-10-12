@@ -27,10 +27,11 @@ export function CapabilityScreen({ context, app }: { context: Ctx; app: App }) {
   const bound = inward(store, id, "appliesTo");
   const standing = node.intentStatus ?? "proposed";
   const health = node.health ?? "ok";
-  // The kind's computed fields (openChanges, zones), worked out as every face works them out.
+  // The kind's computed fields (openChanges, zones, files), worked out as every face works them out.
   const computed = computedValues(store.schema, store.graph, node as never).values;
   const openChanges = Number(computed["openChanges"] ?? 0);
   const zones = Number(computed["zones"] ?? 0);
+  const files = Number(computed["files"] ?? 0);
 
   return (
     <Page testId="capability-page">
@@ -45,7 +46,8 @@ export function CapabilityScreen({ context, app }: { context: Ctx; app: App }) {
         <Stat i={0} value={node.criteriaCount ?? 0} label="criteria" />
         <Stat i={1} value={openChanges} label="open changes" tone={openChanges > 0 ? "accent" : undefined} />
         <Stat i={2} value={zones} label="zones realized in" hint={zones === 0 ? "no commit tied to its work yet" : undefined} />
-        <Stat i={3} value={bound.length} label="constraints binding it" />
+        <Stat i={3} value={files} label="files it lives in" hint={files === 0 && zones > 0 ? "its commits' files have since moved" : undefined} />
+        <Stat i={4} value={bound.length} label="constraints binding it" />
       </Stats>
 
       <Problems context={context} violations={facts.violations} />

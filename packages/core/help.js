@@ -1322,7 +1322,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       "comes from graview.bin in the project config, $NDX_GRAVIEW_BIN, PATH, the\n" +
       "installed @n-dx/graview-face's own graview, or npx -y graview@<pinned>.",
     options: [
-      { flag: "--files", description: "Project every source file as a node (default: zones and components only)" },
+      { flag: "--no-files", description: "Leave source files out (default: every file, with its zone, the commits that changed it and the capabilities living there)" },
       { flag: "--place=<slug>", description: "describe: one place (a titled lens) instead of the whole graph" },
       { flag: "--port=<n>", description: "serve: the port the product face (or the bare graview store) listens on" },
       { flag: "--no-face", description: "serve: the bare graview store even when a product face is installed" },

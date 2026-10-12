@@ -32,7 +32,7 @@ type Subcommand = (typeof SUBCOMMANDS)[number];
 
 const USAGE = `ndx graview <command> [dir] [flags]
 
-  emit [dir] [--files]            write document.json and snapshot.json under the graview dir
+  emit [dir] [--no-files]         write document.json and snapshot.json under the graview dir
   check [dir] [--json]            graview check on the emitted declaration
   describe [dir] [--place <slug>] graview describe over the emitted snapshot
   serve [dir] [--port <n>]        the product face (@n-dx/graview-face, or graview.app in the config) on the
@@ -42,7 +42,7 @@ const USAGE = `ndx graview <command> [dir] [flags]
   info [dir] [--json]             where the projection lands, which graview binary, and the hub's rex
                                   endpoint a face writes back through
 
-  --files    project every source file as a node (default: zones and components only)
+  --no-files leave source files out: zones and components carry the shape of the code without them
   --no-face  serve: the bare graview store even when a product face is installed
   --quiet    print nothing but errors
 
@@ -53,7 +53,8 @@ PATH, the installed product face's own graview, or npx -y graview@<pinned>, in t
 interface ParsedArgs {
   sub: Subcommand | "help";
   dir: string;
-  files: boolean;
+  /** Unset unless a flag says: `graview.includeFiles` in the config decides, and files are on by default. */
+  files?: boolean;
   /** `serve`: run the product face when one is found (default) or the bare store. */
   face: boolean;
   quiet: boolean;
@@ -63,19 +64,20 @@ interface ParsedArgs {
 function parse(argv: string[]): ParsedArgs {
   const [first, ...rest] = argv;
   if (first === undefined || first === "help" || first === "--help" || first === "-h") {
-    return { sub: "help", dir: process.cwd(), files: false, face: true, quiet: false, passthrough: [] };
+    return { sub: "help", dir: process.cwd(), face: true, quiet: false, passthrough: [] };
   }
   if (!(SUBCOMMANDS as readonly string[]).includes(first)) {
     throw new Error(`Unknown command "${first}". ${USAGE}`);
   }
   let dir: string | undefined;
-  let files = false;
+  let files: boolean | undefined;
   let face = true;
   let quiet = false;
   const passthrough: string[] = [];
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i]!;
     if (arg === "--files") files = true;
+    else if (arg === "--no-files") files = false;
     else if (arg === "--no-face") face = false;
     else if (arg === "--quiet" || arg === "-q") quiet = true;
     else if (arg.startsWith("-")) {
@@ -86,7 +88,7 @@ function parse(argv: string[]): ParsedArgs {
     } else if (dir === undefined) dir = arg;
     else passthrough.push(arg);
   }
-  return { sub: first as Subcommand, dir: resolve(dir ?? process.cwd()), files, face, quiet, passthrough };
+  return { sub: first as Subcommand, dir: resolve(dir ?? process.cwd()), ...(files === undefined ? {} : { files }), face, quiet, passthrough };
 }
 
 function describeEmit(result: EmitResult): string {
@@ -229,7 +231,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   }
 
   const emitted = await emitProjection(parsed.dir, {
-    files: parsed.files || config.includeFiles === true,
+    files: parsed.files ?? config.includeFiles ?? true,
     ref: config.mainRef,
     proposeProductLayer: config.proposeProductLayer,
     warn: (message) => console.error(`warning: ${message}`),

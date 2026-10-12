@@ -84,6 +84,8 @@ export function KindRecord({ context, app, kind }: { context: Ctx; app: App; kin
   if (!node || !facts || node.kind !== kind) return <Missing context={context} />;
   const page = opening(declaredPage(context, app, node));
   const long = facts.fields.find((f) => f.long);
+  // A declared page that lists anything has chosen which relations to show, and how many; the derived ones would repeat them.
+  const links = page.rest.some((b) => b.t === "list") ? [] : facts.links;
 
   return (
     <Page testId={`record-${kind}`} narrow>
@@ -95,7 +97,7 @@ export function KindRecord({ context, app, kind }: { context: Ctx; app: App; kin
       <Section title="Facts" i={4}>
         <Facts fields={facts.fields.filter((f) => f !== long)} />
       </Section>
-      {facts.links.map((group, g) => (
+      {links.map((group, g) => (
         <Section key={`${group.edgeKind}|${group.direction}`} title={(group.description ?? group.edgeKind).replace(/^./, (c) => c.toUpperCase())} i={5 + g}>
           <Rows>
             {group.targets.slice(0, 40).map((t, i) => {
