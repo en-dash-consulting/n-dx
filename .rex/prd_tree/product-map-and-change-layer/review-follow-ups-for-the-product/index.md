@@ -60,3 +60,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [hench task-lookup.ts imports @n-dx/rex directly, bypassing rex-gateway](./hench-task-lookup-ts-imports-n-dx-rex.md) | pending |
 | [ndx work --task on a v2 change with tasks claims the change while another worktree holds one of its tasks](./ndx-work-task-on-a-v2-change-with.md) | pending |
 | [On a v2 tree, --resolve reports a subtask or container-change ref as "Task not found" instead of the run's reason](./on-a-v2-tree-resolve-reports-a-subtask.md) | pending |
+| [No test covers the PRD watcher refreshing the cache on product/ or changes/ edits](./no-test-covers-the-prd-watcher.md) | pending |

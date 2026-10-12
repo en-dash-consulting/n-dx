@@ -22,6 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Dashboard misses v2 edits under changes/ when it was created after ndx start](./dashboard-misses-v2-edits-under.md) | pending |
 | [Quick Add creates a change on v2](./quick-add-creates-a-change-on-v2.md) | pending |
 | [The PRD cache is built from the change-layer projection on v2](./the-prd-cache-is-built-from-the-change.md) | pending |
 | [The Product, Changes and capability views show real v2 data](./the-product-changes-and-capability.md) | pending |
