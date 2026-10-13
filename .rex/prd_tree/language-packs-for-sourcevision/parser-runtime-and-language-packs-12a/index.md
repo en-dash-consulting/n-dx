@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A pack whose analyzeProject rejects fails the whole imports phase instead of degrading its language](./a-pack-whose-analyzeproject-rejects.md) | pending |
+| [A pack whose analyzeProject rejects fails the whole imports phase instead of degrading its language](./a-pack-whose-analyzeproject-rejects.md) | completed |
 | [Define the pack entry in lang-kit, move Java and Go into their packs, and load packs at run time](./define-the-pack-entry-in-lang-kit-move.md) | completed |
 | [Drop the parser runtime from sourcevision and enforce dynamic-only pack loading](./drop-the-parser-runtime-from.md) | pending |
 | [Move SQL and Terraform (HCL) into @n-dx/lang-sql and @n-dx/lang-terraform](./move-sql-and-terraform-hcl-into-n-dx.md) | completed |
