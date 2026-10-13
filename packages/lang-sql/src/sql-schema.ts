@@ -6,7 +6,7 @@
  * result says so rather than assuming it parsed, and a table is reported only
  * when the grammar recognised its statement.
  *
- * @module sourcevision/language/sql-schema
+ * @module lang-sql/sql-schema
  */
 
 import { sqlPack } from "./sql-pack.js";

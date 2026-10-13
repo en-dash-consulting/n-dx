@@ -2,12 +2,13 @@
 /**
  * Build tree-sitter grammars to WASM from pinned releases.
  *
- *   node packages/lang-runtime/scripts/build-grammars.mjs [--out <dir>] [<name>...]
+ *   node packages/lang-runtime/scripts/build-grammars.mjs --out <dir> [<name>...]
  *
  * Writes `<name>.wasm` for each named grammar (every one in {@link GRAMMARS}
- * when none is named) into `--out`, which defaults to
- * {@link GRAMMAR_BUILD_DIR}. Both `build/` directories are gitignored: no
- * `.wasm` file is ever committed.
+ * when none is named) into `--out`, which is required: each grammar belongs
+ * to exactly one language pack, and its `build:grammars` script names the
+ * grammar and the pack's own `build/grammars`. Every `build/` directory is
+ * gitignored: no `.wasm` file is ever committed.
  *
  * Every download is pinned here and only here — the grammar source archive and
  * the tree-sitter CLI binary for each platform — and each is checked against
@@ -38,13 +39,6 @@ import { gunzipSync } from "node:zlib";
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD_ROOT = join(PACKAGE_ROOT, "build");
 
-/**
- * Where built grammars land when no `--out` is given: sourcevision's
- * `build/grammars`, where its SQL and Terraform readers read them until those
- * move into their packs. The Java and Go packs build into their own
- * `build/grammars` with `--out` (their `build:grammars` scripts).
- */
-export const GRAMMAR_BUILD_DIR = resolve(PACKAGE_ROOT, "..", "sourcevision", "build", "grammars");
 const CACHE_DIR = join(BUILD_ROOT, "cache");
 
 /** tree-sitter CLI release that compiles grammars. Keep in step with `web-tree-sitter` in package.json. */
@@ -89,7 +83,7 @@ export const GRAMMARS = {
 };
 
 /** Absolute path of a built grammar in `outDir`, whether or not it exists yet. */
-export function grammarWasmPath(name, outDir = GRAMMAR_BUILD_DIR) {
+export function grammarWasmPath(name, outDir) {
   return join(outDir, `${name}.wasm`);
 }
 
@@ -213,18 +207,21 @@ async function buildGrammar(cli, name, { repo, version, sha256: expected }, outD
 }
 
 /**
- * The build a command line asks for: `--out <dir>` (resolved against the
- * working directory; default {@link GRAMMAR_BUILD_DIR}) and the grammar names
- * to build (default every one). Throws on an unknown name.
+ * The build a command line asks for: `--out <dir>` (required; resolved against
+ * the working directory) and the grammar names to build (default every one).
+ * Throws without `--out` and on an unknown name.
  */
 export function parseBuildArgs(argv) {
   const { values, positionals } = parseArgs({ args: argv, options: { out: { type: "string" } }, allowPositionals: true });
+  if (values.out === undefined) {
+    throw new Error("--out <dir> is required: run `pnpm --filter <pack> build:grammars` to build a pack's grammar into its build/grammars");
+  }
   const unknown = positionals.filter((name) => !Object.hasOwn(GRAMMARS, name));
   if (unknown.length > 0) {
     throw new Error(`Unknown grammar ${unknown.join(", ")}; known: ${Object.keys(GRAMMARS).join(", ")}`);
   }
   return {
-    outDir: values.out === undefined ? GRAMMAR_BUILD_DIR : resolve(values.out),
+    outDir: resolve(values.out),
     names: positionals.length > 0 ? positionals : Object.keys(GRAMMARS),
   };
 }

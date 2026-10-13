@@ -3,8 +3,6 @@ import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { GRAMMAR_BUILD_DIR } from "../../../../lang-runtime/scripts/build-grammars.mjs";
-
 // Under jsdom the global URL is not Node's, so fileURLToPath(new URL(...))
 // throws. The library must still load, find its packs and resolve their asset
 // paths.
@@ -15,9 +13,8 @@ describe("language packs under jsdom", () => {
     expect(load.status).toBe("loaded");
   });
 
-  it("resolves sourcevision's grammar directory and version", async () => {
-    const { grammarBuildDir, sourcevisionVersion } = await import("../../../src/language/package-paths.js");
-    expect(grammarBuildDir()).toBe(GRAMMAR_BUILD_DIR);
+  it("resolves sourcevision's version", async () => {
+    const { sourcevisionVersion } = await import("../../../src/language/package-paths.js");
     expect(sourcevisionVersion()).toMatch(/^\d+\.\d+\.\d+/);
   });
 

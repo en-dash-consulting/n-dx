@@ -1,6 +1,6 @@
 /**
  * The tree-sitter runner, against the Java grammar built by
- * scripts/build-grammars.mjs. Tests that need the grammar skip (with the
+ * `pnpm --filter @n-dx/lang-java build:grammars`. Tests that need the grammar skip (with the
  * command to run) when it has not been built, unless SV_REQUIRE_GRAMMARS=1
  * (set by CI) makes that a failure; size limits do not need it.
  */
@@ -17,7 +17,8 @@ import { goConfig } from "@n-dx/lang-kit";
 import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
 import { skipUnlessGrammar } from "../../src/testing/grammar.js";
 
-const JAVA_WASM = grammarWasmPath("tree-sitter-java");
+// The runtime owns no grammar: the runner is exercised on the Java pack's build.
+const JAVA_WASM = grammarWasmPath("tree-sitter-java", join(import.meta.dirname, "..", "..", "..", "lang-java", "build", "grammars"));
 
 // Counted before any runner call so the process-wide counts start at zero.
 // Plain wrappers, not vi.spyOn: vitest clears a spy's calls between tests, and
