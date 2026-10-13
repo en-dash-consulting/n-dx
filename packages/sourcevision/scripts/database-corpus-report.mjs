@@ -65,11 +65,13 @@ if (!existsSync(dist("database-engines"))) {
   console.error("sourcevision is not built — run `pnpm --filter @n-dx/sourcevision build`");
   process.exit(2);
 }
+const langKitDist = new URL("../../lang-kit/dist/index.js", import.meta.url);
+if (!existsSync(langKitDist)) {
+  console.error("lang-kit is not built — run `pnpm --filter @n-dx/lang-kit build`");
+  process.exit(2);
+}
 const { detectDatabaseEngines } = await import(dist("database-engines").href);
-const { discoverJavaModules } = await import(dist("java-modules").href);
-const { readMavenBuildModels } = await import(dist("java-maven-build").href);
-const { readGradleBuildModels } = await import(dist("java-gradle-build").href);
-const { readGoBuildModels } = await import(dist("go-build").href);
+const { discoverJavaModules, readMavenBuildModels, readGradleBuildModels, readGoBuildModels } = await import(langKitDist.href);
 
 async function buildModels(dir) {
   const layout = await discoverJavaModules(dir);

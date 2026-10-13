@@ -6,7 +6,7 @@
  */
 
 import { join } from "node:path";
-import { javaConfig } from "./java.js";
+import { javaConfig } from "@n-dx/lang-kit";
 import { javaResolver } from "./java-resolver.js";
 import { queryDir } from "./package-paths.js";
 import type { LanguagePack, RuleProvenance } from "./pack.js";

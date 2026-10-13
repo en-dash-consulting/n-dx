@@ -13,7 +13,7 @@
  *    and `kotlin` blocks are read, so a value inside `if`, `subprojects` or
  *    `allprojects` is absent rather than approximated.
  *
- * @module sourcevision/language/java-gradle-build
+ * @module lang-kit/java-gradle-build
  */
 
 import { readFile } from "node:fs/promises";

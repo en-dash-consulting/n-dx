@@ -6,7 +6,7 @@
  * parser: it throws {@link XmlSyntaxError} on mismatched or unterminated
  * markup and accepts everything else.
  *
- * @module sourcevision/language/xml-lite
+ * @module lang-kit/xml-lite
  */
 
 export interface XmlElement {

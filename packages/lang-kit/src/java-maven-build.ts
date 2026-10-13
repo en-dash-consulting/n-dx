@@ -10,7 +10,7 @@
  * in-repository parents' properties (a child overrides its parent, as Maven
  * interpolates the effective model).
  *
- * @module sourcevision/language/java-maven-build
+ * @module lang-kit/java-maven-build
  */
 
 import { readFile } from "node:fs/promises";

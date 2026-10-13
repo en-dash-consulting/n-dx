@@ -6,7 +6,7 @@
  * This config is the **backward-compatible default** — when no language is
  * detected or when a project has `package.json`, SourceVision uses this config.
  *
- * @module sourcevision/language/typescript
+ * @module lang-kit/typescript
  */
 
 import type { LanguageConfig } from "./registry.js";

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
-import { discoverJavaModules } from "../../../src/language/java-modules.js";
+import { discoverJavaModules } from "../../src/java-modules.js";
 
 describe("discoverJavaModules", () => {
   let dir: string;

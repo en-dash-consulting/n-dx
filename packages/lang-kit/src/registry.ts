@@ -6,7 +6,7 @@
  * analyzers: file extensions, skip directories, test/generated file patterns,
  * config filenames, and entry point detection.
  *
- * @module sourcevision/language/registry
+ * @module lang-kit/registry
  */
 
 // ── Generated-file header rule ──────────────────────────────────────────────

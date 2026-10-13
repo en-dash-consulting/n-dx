@@ -1,8 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { LANG_KIT_PACKAGE } from "../../src/index.js";
+import * as langKit from "../../src/index.js";
 
 describe("@n-dx/lang-kit barrel", () => {
-  it("exports the package name", () => {
-    expect(LANG_KIT_PACKAGE).toBe("@n-dx/lang-kit");
+  it("exports the language facts sourcevision imports", () => {
+    for (const name of [
+      "typescriptConfig",
+      "goConfig",
+      "swiftConfig",
+      "pythonConfig",
+      "javaConfig",
+      "javaSecondaryConfig",
+      "terraformConfig",
+      "isTerraformFile",
+      "isGoStdlibPath",
+      "detectLanguage",
+      "detectLanguages",
+      "getLanguageConfig",
+      "languageConfigsFromIds",
+      "mergeLanguageConfigs",
+      "VALID_LANGUAGE_IDS",
+      "readGoBuildModels",
+      "discoverJavaModules",
+      "readMavenBuildModels",
+      "readGradleBuildModels",
+      "parseToml",
+      "parseXml",
+      "parseYamlSubset",
+    ]) {
+      expect(langKit, name).toHaveProperty(name);
+    }
   });
 });

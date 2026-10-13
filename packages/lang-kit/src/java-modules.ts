@@ -7,7 +7,7 @@
  * `include` entries in `settings.gradle(.kts)` with literal `projectDir`
  * overrides. With no build file, roots come from `package` declarations.
  *
- * @module sourcevision/language/java-modules
+ * @module lang-kit/java-modules
  */
 
 import { readFile, readdir, stat } from "node:fs/promises";

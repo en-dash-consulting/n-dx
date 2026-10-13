@@ -4,7 +4,7 @@
  * Defines extensions, skip directories, test/generated file patterns,
  * config filenames, and entry points specific to Python projects.
  *
- * @module sourcevision/language/python
+ * @module lang-kit/python
  */
 
 import type { LanguageConfig } from "./registry.js";

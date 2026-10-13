@@ -5,7 +5,7 @@
  * dates and arrays of tables are not part of a catalog and are rejected
  * rather than misread. No regular expressions, no dependency.
  *
- * @module sourcevision/language/toml-lite
+ * @module lang-kit/toml-lite
  */
 
 export type TomlValue = string | number | boolean | TomlValue[] | TomlTable;

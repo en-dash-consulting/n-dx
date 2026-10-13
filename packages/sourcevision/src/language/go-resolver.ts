@@ -39,6 +39,8 @@
 
 import { posix } from "node:path";
 import {
+  goConfig,
+  isGoStdlibPath,
   readGoBuildModels,
   readGoVendorModules,
   readGoWorkFiles,
@@ -46,8 +48,7 @@ import {
   type GoReplace,
   type GoVendoredModule,
   type GoWorkFacts,
-} from "./go-build.js";
-import { goConfig, isGoStdlibPath } from "./go.js";
+} from "@n-dx/lang-kit";
 import type {
   Capture,
   ExternalModule,

@@ -13,7 +13,7 @@
  *
  * A malformed line becomes a notice and the rest of the file is still read.
  *
- * @module sourcevision/language/go-build
+ * @module lang-kit/go-build
  */
 
 import { readdir, readFile } from "node:fs/promises";

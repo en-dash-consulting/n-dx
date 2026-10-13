@@ -9,7 +9,7 @@
  * is not used: those grammars would need their own pinned source archives and
  * checksums, and a build script is read for a handful of literal shapes.
  *
- * @module sourcevision/language/gradle-script
+ * @module lang-kit/gradle-script
  */
 
 /** Half-open range into the script text. */

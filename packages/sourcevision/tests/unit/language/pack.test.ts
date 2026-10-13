@@ -9,7 +9,7 @@ import {
   type LanguagePack,
 } from "../../../src/language/pack.js";
 import { grammarBuildDir } from "../../../src/language/package-paths.js";
-import { goConfig } from "../../../src/language/go.js";
+import { goConfig } from "@n-dx/lang-kit";
 import { GRAMMAR_BUILD_DIR } from "../../../scripts/build-grammars.mjs";
 
 const pack: LanguagePack = {

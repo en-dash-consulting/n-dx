@@ -5,11 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { BuildDependency, ModuleBuildModel } from "../../../src/language/build-model.js";
-import { readGradleBuildModels } from "../../../src/language/java-gradle-build.js";
-import { discoverJavaModules } from "../../../src/language/java-modules.js";
-import { GradleScript } from "../../../src/language/gradle-script.js";
-import { parseToml, TomlSyntaxError } from "../../../src/language/toml-lite.js";
+import { type BuildDependency, type ModuleBuildModel, readGradleBuildModels, discoverJavaModules, GradleScript, parseToml, TomlSyntaxError } from "@n-dx/lang-kit";
 import { UPDATE_ENV, updateRequested } from "../../helpers/pack-golden.js";
 
 const FIXTURES = fileURLToPath(new URL("../../fixtures/gradle-build", import.meta.url));

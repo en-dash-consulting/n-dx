@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { BuildDependency, ModuleBuildModel } from "../../../src/language/build-model.js";
+import { type BuildDependency, type ModuleBuildModel, parseGoMod } from "@n-dx/lang-kit";
 import {
   DRIVER_TABLE,
   IMAGE_TABLE,
@@ -16,7 +16,6 @@ import {
   versionFromTag,
   type DatabaseCandidate,
 } from "../../../src/language/database-engines.js";
-import { parseGoMod } from "../../../src/language/go-build.js";
 
 type Files = Record<string, string>;
 

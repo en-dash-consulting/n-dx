@@ -45,7 +45,7 @@ import {
   stringAt,
   YamlSubsetError,
   type YamlValue,
-} from "./yaml-subset.js";
+} from "@n-dx/lang-kit";
 import type {
   SdlcCiJob,
   SdlcCiPipeline,

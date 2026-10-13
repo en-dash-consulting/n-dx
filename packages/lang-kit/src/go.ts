@@ -4,7 +4,7 @@
  * Defines extensions, skip directories, test/generated file patterns,
  * config filenames, and entry points specific to Go projects.
  *
- * @module sourcevision/language/go
+ * @module lang-kit/go
  */
 
 import type { LanguageConfig } from "./registry.js";

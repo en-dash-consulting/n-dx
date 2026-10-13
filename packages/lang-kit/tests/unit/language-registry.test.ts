@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { goConfig } from "../../../src/language/go.js";
-import { typescriptConfig } from "../../../src/language/typescript.js";
-import { getLanguageConfig } from "../../../src/language/detect.js";
-import type { LanguageConfig } from "../../../src/language/registry.js";
+import { goConfig } from "../../src/go.js";
+import { typescriptConfig } from "../../src/typescript.js";
+import { getLanguageConfig } from "../../src/detect.js";
+import type { LanguageConfig } from "../../src/registry.js";
 
 // ── Go config ────────────────────────────────────────────────────────────────
 

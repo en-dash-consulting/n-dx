@@ -5,7 +5,7 @@
  * Spring Boot config). Inventory roles only; structure extraction arrives
  * with the Java pack's queries.
  *
- * @module sourcevision/language/java
+ * @module lang-kit/java
  */
 
 import type { LanguageConfig } from "./registry.js";
