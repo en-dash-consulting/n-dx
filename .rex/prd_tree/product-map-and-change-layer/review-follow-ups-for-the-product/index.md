@@ -67,3 +67,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
 | [Wire ndx migrate --plan to write the classified plan](./wire-ndx-migrate-plan-to-write-the.md) | completed |
 | [Write Inbox changes to the reserved changes/inbox/ folder, and move them out on placement](./write-inbox-changes-to-the-reserved.md) | completed |
+| [A kept v2 completion's commit commands sweep the operator's pre-run edits into the task's commit](./a-kept-v2-completion-s-commit-commands.md) | pending |
+| [No test pins that a kept v2 completion suppresses the failed-run rollback](./no-test-pins-that-a-kept-v2-completion.md) | pending |

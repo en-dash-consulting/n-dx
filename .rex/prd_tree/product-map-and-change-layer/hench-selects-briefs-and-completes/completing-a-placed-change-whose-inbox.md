@@ -1,0 +1,26 @@
+---
+id: "1e977a49-67fa-4dbe-a039-54a3a0d651a3"
+level: "task"
+title: "Completing a placed change whose Inbox copy was committed leaves the Inbox path in HEAD, giving a duplicate node id"
+status: "completed"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "pr-35"
+  - "lane-hench"
+  - "review-2026-10-13"
+source: "ndx-adversarial-review"
+startedAt: "2026-10-13T18:40:49.260Z"
+completedAt: "2026-10-13T18:50:17.510Z"
+endedAt: "2026-10-13T18:50:17.510Z"
+resolutionType: "code-change"
+resolutionDetail: "Option (a): a v2 completion that stages an untracked intent file for its state row also stages tracked-but-deleted files under changes/ whose committed copy carries the same id (rex loadPrdModel over a scratch tree of git's copies), plus that folder's deleted state.yaml. Commit e99bf875d."
+acceptanceCriteria:
+  - "A test: with changes/inbox/<slug>/index.md committed and then moved to changes/<slug>/ (untracked), completing its task produces a commit whose tree has the change in changes/<slug>/ only"
+  - "git status after the run shows no deleted changes/inbox/<slug>/ path"
+description: "Verdict: should-fix (adversarial review of 3b82d7d8a). The underlying gap is older than that commit: a placement's move is written by the MCP server outside any hench save report. 3b82d7d8a turns its symptom from an orphan state row into a duplicate node.\n\nScenario: an Inbox capture changes/inbox/<slug>/index.md is committed (the operator commits the tree). Later the agent calls place_change, which moves it to changes/<slug>/ and leaves the tracked inbox path deleted in the working tree. A later run completes the change. The report names changes/<slug>/state.yaml, and scopePrdPathsToReport (packages/hench/src/agent/lifecycle/shared.ts) now stages the untracked changes/<slug>/index.md. The deletion of changes/inbox/<slug>/index.md is never staged, so HEAD holds the same change id in two folders, and a clean clone reads a duplicate node.\n\nOptions:\n(a) Recommended: when staging a v2 node's intent file for its state row, also stage the tracked-but-deleted .md under changes/ that carries the same id (git ls-files --deleted, then match on id).\n(b) Have place_change's MCP write commit or report its move. This is outside hench's lane (rex/MCP)."
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-13T18:50:17.807Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

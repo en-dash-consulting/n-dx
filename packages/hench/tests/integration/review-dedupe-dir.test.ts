@@ -85,6 +85,16 @@ describe("review brief's dedupe directory", () => {
     expect(brief).not.toContain(PRD_TREE_DIRNAME);
   });
 
+  it("also names changes/inbox/ on a v2 tree that holds an Inbox capture", async () => {
+    const projectDir = await project("v2");
+    const capture = join(projectDir, ".rex", "changes", "inbox", "retry-soft-declines-twice");
+    await mkdir(capture, { recursive: true });
+    await writeFile(join(capture, "index.md"), "# Retry soft declines twice\n");
+    const brief = await reviewBrief(projectDir);
+    expect(brief).toContain(".rex/changes/inbox/");
+    expect(brief).toContain("where unplaced changes wait");
+  });
+
   it("names prd_tree/ and not changes/ on a v1 tree", async () => {
     const brief = await reviewBrief(await project("v1"));
     expect(brief).toContain(`.rex/${PRD_TREE_DIRNAME}/`);

@@ -33,6 +33,7 @@ import {
 import { relativeToRoot, resolveLayout, type LayoutMode } from "../../prd/llm-gateway.js";
 import {
   V2_CHANGES_DIRNAME,
+  V2_INBOX_DIRNAME,
   V2_PRODUCT_DIRNAME,
   resolveHenchPaths,
   stateDirNameUnder,
@@ -52,6 +53,15 @@ import {
  */
 export function reviewDedupeDir(rexDir: string, layout: "v1" | "v2"): string {
   return `${rexDir}/${layout === "v2" ? V2_CHANGES_DIRNAME : PRD_TREE_DIRNAME}/`;
+}
+
+/**
+ * The folder where unplaced changes wait. {@link reviewDedupeDir}'s listing
+ * does not reach it (`changes/inbox/` has no `index.md`), so the review brief
+ * names it as well. Undefined on v1, which has no Inbox.
+ */
+export function reviewInboxDir(rexDir: string, layout: "v1" | "v2"): string | undefined {
+  return layout === "v2" ? `${rexDir}/${V2_CHANGES_DIRNAME}/${V2_INBOX_DIRNAME}/` : undefined;
 }
 
 /**

@@ -180,6 +180,12 @@ export { completeV2Work } from "@n-dx/rex";
 // applied, and which changes enclose a task, are rex's to answer.
 export { isAppliedChange, indexTree, enclosingChangeIds } from "@n-dx/rex";
 
+// A completion commit stages an untracked intent file beside a state.yaml it
+// wrote only when that file's node has a row there; an operator's draft has
+// none. Which file holds which node, and which rows a folder holds, are the
+// reader's to say (its `stateRows` option), not a hench-side frontmatter regex.
+export { loadPrdModel } from "@n-dx/rex";
+
 // `matchesAssignee` is selection's own `--mine` rule (own field, or inherited
 // from any ancestor). Anything hench scopes to `--mine` that is *not* selection
 // — the deferred/failing reset offer, the counts behind an empty menu — has to

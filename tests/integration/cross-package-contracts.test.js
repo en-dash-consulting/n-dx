@@ -239,6 +239,8 @@ describe("hench → rex gateway contract", () => {
     "isAppliedChange",
     "indexTree",
     "enclosingChangeIds",
+    // v2 reader — which untracked intent files a completion's state.yaml holds rows for
+    "loadPrdModel",
     "openClaimsStore",
     "resolveClaimHolder",
     "computeTimestampUpdates",
@@ -812,7 +814,7 @@ describe("gateway export auto-detection", () => {
         "collectCompletedIds", "explainSelection", "matchesAssignee", "traversalBlock",
         "prdLayout", "isChangeLayerStore", "findNextWorkTask", "findActionableWork", "resolveWorkById",
         "buildChangeBrief", "completeV2Work",
-        "isAppliedChange", "indexTree", "enclosingChangeIds",
+        "isAppliedChange", "indexTree", "enclosingChangeIds", "loadPrdModel",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
         "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",

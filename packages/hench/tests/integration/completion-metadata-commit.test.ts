@@ -919,4 +919,283 @@ describe("commitCompletionMetadata — v2 change layer, real store", () => {
     expect(dirty).toContain(otherChangeRel);
     expect(dirty).toContain(productRootRel);
   });
+
+  /**
+   * PROBE4 (holistic review 2026-10-13). A follow-up captured and placed
+   * through MCP after the agent's commit is untracked when a later run
+   * completes it. The completion writes only its `state.yaml`, so a commit of
+   * the report alone would land a state row for a node git does not have.
+   */
+  it("commits a placed follow-up's untracked intent files with its completion state", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore } = await import("../../src/prd/rex-gateway.js");
+    const changeRel = ".rex/changes/add-apple-pay";
+    await execAsync(`git rm -r -q --cached ${changeRel}`, { cwd: projectDir });
+    await execAsync('git commit -q -m "follow-up placed after the agent commit"', { cwd: projectDir });
+    // An unrelated untracked change the operator is drafting.
+    const draftRel = ".rex/changes/draft-idea/index.md";
+    await mkdir(join(rexDir, "changes", "draft-idea"));
+    await writeFile(
+      join(projectDir, draftRel),
+      ["---", 'id: "c0000000-0000-4000-8000-000000000010"', 'type: "change"', 'title: "Draft idea"', 'slug: "draft-idea"', 'intent: "Not yet."', "---", ""].join("\n"),
+    );
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+    expect(subject.trim()).toContain(WIRE_ID);
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    const files = changed.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(files).toEqual(
+      expect.arrayContaining([`${changeRel}/state.yaml`, `${changeRel}/index.md`, `${changeRel}/wire-the-button.md`]),
+    );
+    expect(files).not.toContain(draftRel);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    const dirty = status.split("\n").filter(Boolean).map((l) => l.slice(3));
+    expect(dirty.filter((p) => p.startsWith(`${changeRel}/`))).toEqual([]);
+    expect(dirty).toContain(draftRel);
+  });
+
+  /**
+   * The apply writes product/checkout/state.yaml, but a capability the
+   * operator is drafting in that folder has no state row: it is not the
+   * completion's node, so it stays out of the commit and stays untracked.
+   */
+  it("leaves an operator's untracked draft out of a folder whose state.yaml the completion writes", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore } = await import("../../src/prd/rex-gateway.js");
+    const draftRel = ".rex/product/checkout/refunds.md";
+    await writeFile(
+      join(projectDir, draftRel),
+      [
+        "---",
+        'id: "a0000000-0000-4000-8000-000000000099"',
+        'type: "capability"',
+        'title: "Refunds"',
+        'slug: "refunds"',
+        'statement: "A shopper can be refunded."',
+        'criteria: [{"id":"c1","text":"A refund reaches the card"}]',
+        "---",
+        "",
+      ].join("\n"),
+    );
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    const files = changed.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(files).toContain(".rex/product/checkout/state.yaml");
+    expect(files).not.toContain(draftRel);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    expect(status.split("\n")).toContain(`?? ${draftRel}`);
+  });
+
+  it("leaves an operator's untracked draft task out of the change folder whose state.yaml the completion writes", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore } = await import("../../src/prd/rex-gateway.js");
+    const draftRel = ".rex/changes/add-apple-pay/draft-step.md";
+    await writeFile(
+      join(projectDir, draftRel),
+      ["---", 'id: "c0000000-0000-4000-8000-000000000098"', 'type: "task"', 'title: "Draft step"', 'slug: "draft-step"', "---", ""].join("\n"),
+    );
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    const files = changed.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(files).toContain(".rex/changes/add-apple-pay/state.yaml");
+    expect(files).not.toContain(draftRel);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    expect(status.split("\n")).toContain(`?? ${draftRel}`);
+  });
+
+  /**
+   * An Inbox capture the operator committed is moved out of changes/inbox/ by
+   * place_change, an MCP write no hench save report names. Completing it must
+   * land the move: staging the new folder without the Inbox deletion would
+   * leave the change's id in two folders of HEAD.
+   */
+  it("lands a placed change's move out of a committed Inbox with its completion", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore } = await import("../../src/prd/rex-gateway.js");
+    const changeRel = ".rex/changes/add-apple-pay";
+    const inboxRel = ".rex/changes/inbox/add-apple-pay";
+    await mkdir(join(rexDir, "changes", "inbox"));
+    await execAsync(`git mv ${changeRel} ${inboxRel}`, { cwd: projectDir });
+    await execAsync('git commit -q -m "capture in the Inbox"', { cwd: projectDir });
+    // place_change: the folder moves on disk; git is not told.
+    await rename(join(projectDir, inboxRel), join(projectDir, changeRel));
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+    expect(subject.trim()).toContain(WIRE_ID);
+    const { stdout: tree } = await execAsync("git ls-tree -r --name-only HEAD -- .rex/changes", { cwd: projectDir });
+    const committed = tree.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(committed).toEqual(
+      expect.arrayContaining([`${changeRel}/state.yaml`, `${changeRel}/index.md`, `${changeRel}/wire-the-button.md`]),
+    );
+    expect(committed.filter((p) => p.startsWith(`${inboxRel}/`))).toEqual([]);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    const dirty = status.split("\n").filter(Boolean).map((l) => l.slice(3));
+    expect(dirty.filter((p) => p.startsWith(`${inboxRel}/`) || p.startsWith(`${changeRel}/`))).toEqual([]);
+  });
+
+  /**
+   * Completing a subtask writes only its task folder's state.yaml, deep inside
+   * the placed change. The move still lands whole: committing the task folder
+   * without the change's own index.md would leave it in a folder rex skips on
+   * a clean clone, and the Inbox copy would have lost it.
+   */
+  it("lands a whole placed change when the completion writes only a nested folder's state", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore, loadPrdModel } = await import("../../src/prd/rex-gateway.js");
+    const changeRel = ".rex/changes/add-apple-pay";
+    const inboxRel = ".rex/changes/inbox/add-apple-pay";
+    const PRESS_ID = "c0000000-0000-4000-8000-000000000021";
+    const LABEL_ID = "c0000000-0000-4000-8000-000000000022";
+    const taskDir = join(rexDir, "changes", "add-apple-pay", "wire-the-button");
+    await mkdir(taskDir);
+    await rename(join(rexDir, "changes", "add-apple-pay", "wire-the-button.md"), join(taskDir, "index.md"));
+    for (const [id, slug] of [[PRESS_ID, "press"], [LABEL_ID, "label"]]) {
+      await writeFile(
+        join(taskDir, `${slug}.md`),
+        ["---", `id: "${id}"`, 'type: "subtask"', `title: "${slug}"`, `slug: "${slug}"`, "---", ""].join("\n"),
+      );
+    }
+    await writeFile(
+      join(rexDir, "changes", "add-apple-pay", "state.yaml"),
+      ['schema: "rex/v2"', "items:", `  "${CHANGE_ID}":`, '    status: "in_progress"', ""].join("\n"),
+    );
+    await writeFile(
+      join(taskDir, "state.yaml"),
+      [
+        'schema: "rex/v2"', "items:",
+        `  "${WIRE_ID}":`, '    status: "in_progress"',
+        `  "${PRESS_ID}":`, '    status: "in_progress"',
+        `  "${LABEL_ID}":`, '    status: "pending"', "",
+      ].join("\n"),
+    );
+    await mkdir(join(rexDir, "changes", "inbox"));
+    await execAsync("git add -A", { cwd: projectDir });
+    await execAsync(`git mv ${changeRel} ${inboxRel}`, { cwd: projectDir });
+    await execAsync('git commit -q -m "capture in the Inbox"', { cwd: projectDir });
+    await rename(join(projectDir, inboxRel), join(projectDir, changeRel));
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(PRESS_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+    expect(subject.trim()).toContain(PRESS_ID);
+    const { stdout: tree } = await execAsync("git ls-tree -r --name-only HEAD -- .rex/changes", { cwd: projectDir });
+    const committed = tree.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(committed).toEqual(
+      expect.arrayContaining([
+        `${changeRel}/index.md`,
+        `${changeRel}/state.yaml`,
+        `${changeRel}/wire-the-button/index.md`,
+        `${changeRel}/wire-the-button/press.md`,
+        `${changeRel}/wire-the-button/label.md`,
+        `${changeRel}/wire-the-button/state.yaml`,
+      ]),
+    );
+    expect(committed.filter((p) => p.startsWith(`${inboxRel}/`))).toEqual([]);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    const dirty = status.split("\n").filter(Boolean).map((l) => l.slice(3));
+    expect(dirty.filter((p) => p.startsWith(`${inboxRel}/`) || p.startsWith(`${changeRel}/`))).toEqual([]);
+
+    // A clean checkout of HEAD reads the change once, with its task and subtasks.
+    const clone = realpathSync.native(await mkdtemp(join(tmpdir(), "hench-v2-clone-")));
+    try {
+      await execAsync(`git clone -q "${projectDir}" "${clone}"`);
+      const model = await loadPrdModel(join(clone, ".rex"), { warn: () => {} });
+      const ids: string[] = [];
+      const walk = (nodes: ReadonlyArray<{ id: string; children?: unknown[] }>) => {
+        for (const n of nodes) {
+          ids.push(n.id);
+          if (n.children) walk(n.children as typeof nodes);
+        }
+      };
+      walk(model.tree.changes);
+      expect(ids.filter((id) => [CHANGE_ID, WIRE_ID, PRESS_ID, LABEL_ID].includes(id)).sort()).toEqual(
+        [CHANGE_ID, WIRE_ID, PRESS_ID, LABEL_ID].sort(),
+      );
+    } finally {
+      await rm(clone, { recursive: true, force: true, ...RM_RETRY });
+    }
+  });
+
+  /** A deleted Inbox file whose id is not the completed node's is someone else's edit. */
+  it("leaves a deleted Inbox change with another id out of the completion commit", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore } = await import("../../src/prd/rex-gateway.js");
+    const changeRel = ".rex/changes/add-apple-pay";
+    const otherInboxRel = ".rex/changes/inbox/add-apple-pay/index.md";
+    await execAsync(`git rm -r -q --cached ${changeRel}`, { cwd: projectDir });
+    // Another change committed in the Inbox under the same slug.
+    await mkdir(join(rexDir, "changes", "inbox", "add-apple-pay"), { recursive: true });
+    await writeFile(
+      join(projectDir, otherInboxRel),
+      ["---", 'id: "c0000000-0000-4000-8000-000000000011"', 'type: "change"', 'title: "Add Apple Pay"', 'slug: "add-apple-pay"', 'intent: "Another."', "---", ""].join("\n"),
+    );
+    await execAsync(`git add ${otherInboxRel}`, { cwd: projectDir });
+    await execAsync('git commit -q -m "another capture"', { cwd: projectDir });
+    await rm(join(rexDir, "changes", "inbox"), { recursive: true });
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    const files = changed.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(files).toContain(`${changeRel}/index.md`);
+    expect(files).not.toContain(otherInboxRel);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    expect(status.split("\n")).toContain(` D ${otherInboxRel}`);
+  });
 });

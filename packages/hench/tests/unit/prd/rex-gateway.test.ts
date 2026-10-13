@@ -64,6 +64,8 @@ const EXPECTED_EXPORTS = [
   "isAppliedChange",
   "indexTree",
   "enclosingChangeIds",
+  // v2 reader — which untracked intent files a completion's state.yaml holds rows for
+  "loadPrdModel",
   // Cross-worktree task claims
   "openClaimsStore",
   "resolveClaimHolder",

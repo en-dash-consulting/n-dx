@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { cp, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
 import { resolveModel, NEWEST_MODELS, REVIEW_MODELS, TIER_MODELS } from "@n-dx/llm-client";
@@ -574,6 +574,18 @@ describe("on a v2 tree", () => {
         await claims.releaseAll();
       }
     });
+  });
+
+  it("refuses an Inbox change and its task, naming placement", async () => {
+    await appendFile(join(rexDir, "changes/add-apple-pay/state.yaml"), "    needsPlacement: true\n");
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "inbox change");
+    for (const ref of ["CH-1", "c0000000-0000-4000-8000-000000000002"]) {
+      const r = await resolve({ task: ref });
+      expect(codes(r)).toEqual(["not-actionable"]);
+      expect(r.refusals[0].message).toContain("needs placement");
+      expect(r.refusals[0].hint).toContain("place_change");
+    }
   });
 
   it("still refuses a ref that names nothing", async () => {

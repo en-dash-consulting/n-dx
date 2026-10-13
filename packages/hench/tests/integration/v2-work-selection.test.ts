@@ -110,8 +110,8 @@ describe("v2 autoselection", () => {
     const { taskId } = await assembleTaskBrief(s);
     expect(taskId).toBe(WIRE_ID);
     expect(taskId).toBe(findNextWork((await loadV2Tree(s))!)!.node.id);
-    // Asked for by name, an Inbox task still runs.
-    expect((await assembleTaskBrief(s, INBOX_TASK_ID)).taskId).toBe(INBOX_TASK_ID);
+    // Asked for by name, an Inbox task is refused: rex will not close it.
+    await expect(assembleTaskBrief(s, INBOX_TASK_ID)).rejects.toThrow(/needs placement/);
   });
 
   it("honours --tags and --mine with rex's own rules", async () => {

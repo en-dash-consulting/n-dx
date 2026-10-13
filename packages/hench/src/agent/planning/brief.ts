@@ -12,6 +12,7 @@ import {
 import type { PRDStore, PRDItem, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
 import {
   actionableV2Entries,
+  inboxRefusal,
   loadV2Tree,
   nextV2Entry,
   readTreeAsReset,
@@ -289,6 +290,8 @@ export async function selectTaskEntry(
     // On v2 the ref may be a display id or alias; the entry carries the real id.
     const entry = tree ? resolveV2Entry(tree, items, taskId) : findItem(items, taskId);
     if (!entry) throw new Error(`Task not found: ${taskId}`);
+    const inbox = tree ? inboxRefusal(tree, taskId, cliName) : undefined;
+    if (inbox) throw inbox;
     const notActionable = explicitTaskRefusal(entry.item, cliName);
     if (notActionable) throw notActionable;
     // An explicit task another worktree is working on is refused, not stolen.
