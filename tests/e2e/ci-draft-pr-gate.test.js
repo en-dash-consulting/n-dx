@@ -1,7 +1,7 @@
 /**
- * Draft pull requests cannot merge, so PR-triggered workflows skip them to save
- * Actions minutes, without skipping main or the merge queue. Read as text: no
- * YAML dependency.
+ * ci.yml runs on a pull request only when asked (the `ci:run` label or Run
+ * workflow); codeql.yml and dependency-review.yml still skip drafts. None of it
+ * may skip main or the merge queue. Read as text: no YAML dependency.
  */
 
 import { describe, it, expect } from "vitest";
@@ -46,14 +46,33 @@ function foldIfs(text) {
   );
 }
 
-const WORKFLOWS = [
-  { file: "ci.yml", jobs: ["build", "smoke-parity"] },
-  { file: "codeql.yml", jobs: ["analyze"] },
-  { file: "dependency-review.yml", jobs: ["dependency-review"] },
-];
+/** Job ids: the two-space-indented keys under the top-level `jobs:` block. */
+function jobIds(text) {
+  const lines = text.split("\n");
+  const start = lines.findIndex((l) => /^jobs:\s*$/.test(l));
+  expect(start, "no top-level `jobs:` block").toBeGreaterThanOrEqual(0);
+  const ids = [];
+  for (const l of lines.slice(start + 1)) {
+    if (/^\S/.test(l) && !l.startsWith("#")) break;
+    const m = /^ {2}([A-Za-z_][\w-]*):\s*$/.exec(l);
+    if (m) ids.push(m[1]);
+  }
+  return ids;
+}
 
-describe.each(WORKFLOWS)("$file draft gate", ({ file, jobs }) => {
+// codeql.yml and dependency-review.yml are automatic: they skip drafts. Jobs
+// are discovered, not listed, so a job added later fails until it is gated.
+const AUTO_WORKFLOWS = ["codeql.yml", "dependency-review.yml"].map((file) => ({
+  file,
+  jobs: jobIds(read(file)),
+}));
+
+describe.each(AUTO_WORKFLOWS)("$file draft gate", ({ file, jobs }) => {
   const text = read(file);
+
+  it("has jobs to gate", () => {
+    expect(jobs.length).toBeGreaterThan(0);
+  });
 
   it("pull_request types include the draft transitions and GitHub's defaults", () => {
     const body = onBlock(text);
@@ -72,6 +91,10 @@ describe.each(WORKFLOWS)("$file draft gate", ({ file, jobs }) => {
     expect(ifLine).toContain("github.event_name != 'pull_request'");
     expect(ifLine).toContain("github.event.pull_request.draft == false");
   });
+
+  it("is not started by a label", () => {
+    expect(onBlock(text).join("\n")).not.toMatch(/\blabeled\b/);
+  });
 });
 
 // On push, merge_group and schedule events the PR context is null, so a bare
@@ -87,27 +110,71 @@ describe.each(["ci.yml", "codeql.yml"])("%s bare draft check", (file) => {
   });
 });
 
-// Manual ways to run CI on a draft: the `ci:run` label (one-shot) and the Run
-// workflow button. Neither may reach the other workflows or cancel a real run.
-describe("ci.yml manual triggers", () => {
+// ci.yml is manual on pull requests: the `ci:run` label (removed by
+// `consume-label`) or the Run workflow button, draft or ready alike. Push to
+// main and merge_group stay automatic.
+describe("ci.yml manual PR CI", () => {
   const text = read("ci.yml");
   const body = onBlock(text);
+  // consume-label is the one job that is not CI: it runs only on the label
+  // event, to remove the label, so it carries its own condition.
+  const CONSUME = "consume-label";
+  const gated = jobIds(text).filter((j) => j !== CONSUME);
 
-  it("declares workflow_dispatch", () => {
+  it("declares workflow_dispatch, push to main and merge_group", () => {
     expect(body.some((l) => /^ {2}workflow_dispatch:/.test(l))).toBe(true);
+    expect(body.some((l) => /^ {2}merge_group:/.test(l))).toBe(true);
+    expect(body.join("\n")).toMatch(/push:\n\s+branches: \[main\]/);
   });
 
-  it("pull_request types include labeled and not unlabeled", () => {
+  it("pull_request types are exactly [labeled]", () => {
     const at = body.findIndex((l) => /^ {2}pull_request:/.test(l));
     const types = body.slice(at + 1).find((l) => /^ {4}types:/.test(l));
-    expect(types).toMatch(/\blabeled\b/);
-    expect(types).not.toMatch(/\bunlabeled\b/);
+    expect(types?.trim()).toBe("types: [labeled]");
   });
 
-  it.each(["build", "smoke-parity"])("job %s admits the ci:run label and keeps the event guard", (job) => {
+  it("has jobs to gate", () => {
+    expect(gated.length).toBeGreaterThan(0);
+  });
+
+  it.each(gated)("job %s runs on a PR only for the ci:run label, draft or not", (job) => {
     const ifLine = jobBlock(foldIfs(text), job).find((l) => /^ {4}if:/.test(l));
-    expect(ifLine).toContain("github.event.label.name == 'ci:run'");
+    expect(ifLine, `${job} has no job-level if:`).toBeDefined();
     expect(ifLine).toContain("github.event_name != 'pull_request'");
+    expect(ifLine).toContain("github.event.action == 'labeled'");
+    expect(ifLine).toContain("github.event.label.name == 'ci:run'");
+    expect(ifLine).not.toContain("draft");
+  });
+
+  describe(CONSUME, () => {
+    const block = () => jobBlock(text, CONSUME);
+    const runLines = () => block().filter((l) => /^\s+run:/.test(l)).join("\n");
+
+    it("runs only for the ci:run labeled event", () => {
+      const ifLine = block().find((l) => /^ {4}if:/.test(l));
+      expect(ifLine).toContain("github.event_name == 'pull_request'");
+      expect(ifLine).toContain("github.event.action == 'labeled'");
+      expect(ifLine).toContain("github.event.label.name == 'ci:run'");
+    });
+
+    it("has a job-scoped pull-requests: write token and does not break CI", () => {
+      expect(block().join("\n")).toMatch(/^ {4}permissions:\n {6}pull-requests: write$/m);
+      expect(block().some((l) => /^\s+continue-on-error: true$/.test(l))).toBe(true);
+    });
+
+    it("checks out nothing and passes PR fields through env", () => {
+      expect(block().join("\n")).not.toMatch(/actions\/checkout/);
+      expect(runLines()).toContain("--remove-label ci:run");
+      expect(runLines()).not.toContain("${{");
+      expect(block().join("\n")).toMatch(/PR: \$\{\{ github\.event\.pull_request\.number \}\}/);
+    });
+
+    it("does not reuse a required check name", () => {
+      const name = block().find((l) => /^ {4}name:/.test(l)) ?? "";
+      for (const required of ["Build & Validate", "CLI Smoke", "Tests ("]) {
+        expect(name).not.toContain(required);
+      }
+    });
   });
 
   // The group is evaluated before job `if:`s. A labeled event that runs
@@ -117,11 +184,7 @@ describe("ci.yml manual triggers", () => {
     const group = text.split("\n").find((l) => /^ {2}group:/.test(l));
     expect(group, "no concurrency group").toBeDefined();
     expect(group).toContain("github.run_id");
-    expect(group).toContain("github.event.action == 'labeled'");
+    expect(group).toContain("github.event.action == 'labeled' && github.event.label.name != 'ci:run'");
     expect(group).toContain("github.event_name == 'workflow_dispatch'");
-  });
-
-  it.each(["codeql.yml", "dependency-review.yml"])("%s is not started by a label", (file) => {
-    expect(onBlock(read(file)).join("\n")).not.toMatch(/\blabeled\b/);
   });
 });
