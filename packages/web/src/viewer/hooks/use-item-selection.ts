@@ -13,6 +13,7 @@ import { replaceAppHistory } from "../base-path.js";
 import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import type { DetailItem } from "../types.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
+import { itemTypeOf } from "../external.js";
 
 export interface ItemSelectionDeps {
   /** Current PRD document data. */
@@ -79,7 +80,7 @@ export function useItemSelection({ data, onSelectItem }: ItemSelectionDeps): Ite
           type: "prd",
           title: item.title,
           id: item.id,
-          level: item.level,
+          itemType: itemTypeOf(item),
           status: item.status,
           description: item.description,
           acceptanceCriteria: item.acceptanceCriteria,

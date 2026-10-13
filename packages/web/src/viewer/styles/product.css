@@ -314,3 +314,89 @@
   font-size: var(--font-xs);
   color: var(--text-muted);
 }
+
+/* ── Direct edit ─────────────────────────────────────────────────── */
+
+.cap-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.cap-edit-label {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+}
+
+.cap-edit-statement,
+.cap-edit-criterion {
+  width: 100%;
+  padding: var(--space-2);
+  font: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.cap-edit-statement:focus,
+.cap-edit-criterion:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.cap-edit-criteria {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.cap-edit-criteria legend {
+  padding: 0 var(--space-1);
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+}
+
+.cap-edit-editorial-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Disabled with a reason beside it, not hidden: the reason is the point. */
+.cap-edit-editorial-blocked { color: var(--text-muted); }
+
+.cap-edit-editorial-reason,
+.cap-edit-outcome {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  line-height: var(--leading-normal);
+}
+
+.cap-edit-submit {
+  padding: var(--space-2) var(--space-4);
+  font: inherit;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.cap-edit-submit:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.cap-edit-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

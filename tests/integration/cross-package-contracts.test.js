@@ -61,6 +61,17 @@ describe("rex public API contract", () => {
     { name: "validateMerge", type: "function" },
     { name: "previewMerge", type: "function" },
     { name: "mergeItems", type: "function" },
+    { name: "validateChangesMerge", type: "function" },
+    { name: "mergeChanges", type: "function" },
+    // v2 model and product reports
+    { name: "loadPrdModel", type: "function" },
+    { name: "productReport", type: "function" },
+    { name: "capabilityReport", type: "function" },
+    { name: "indexTree", type: "function" },
+    { name: "isOpenChange", type: "function" },
+    { name: "isAppliedChange", type: "function" },
+    { name: "specHash", type: "function" },
+    { name: "nodeSpec", type: "function" },
     // Analytics
     { name: "computeEpicStats", type: "function" },
     { name: "computeHealthScore", type: "function" },
@@ -214,6 +225,22 @@ describe("hench → rex gateway contract", () => {
     "collectCompletedIds",
     "explainSelection",
     "matchesAssignee",
+    // v2 work selection — what get_next_task runs on a v2 tree
+    "prdLayout",
+    "isChangeLayerStore",
+    "findNextWorkTask",
+    "findActionableWork",
+    "resolveWorkById",
+    // v2 agent brief
+    "buildChangeBrief",
+    // v2 completion — what update_task_status runs on a v2 tree
+    "completeV2Work",
+    // v2 applied changes — a failure after the completion keeps an applied change's completion
+    "isAppliedChange",
+    "indexTree",
+    "enclosingChangeIds",
+    // v2 reader — which untracked intent files a completion's state.yaml holds rows for
+    "loadPrdModel",
     "openClaimsStore",
     "resolveClaimHolder",
     "computeTimestampUpdates",
@@ -463,6 +490,18 @@ describe("web → rex gateway contract", () => {
     "validateMerge",
     "previewMerge",
     "mergeItems",
+    // v2 merge — the dashboard's merge, refinement and reorganize on a change layer
+    "validateChangesMerge",
+    "mergeChanges",
+    // v2 product reads — the Product, Changes and capability views
+    "loadPrdModel",
+    "productReport",
+    "capabilityReport",
+    "indexTree",
+    "isOpenChange",
+    "isAppliedChange",
+    "specHash",
+    "nodeSpec",
     "countSubtree",
     "computeEpicStats",
     "computePriorityDistribution",
@@ -473,11 +512,8 @@ describe("web → rex gateway contract", () => {
     "applyReshape",
     "reasonForReshape",
     "isPriority",
-    "isItemLevel",
     "isRequirementCategory",
     "isValidationType",
-    "isRootLevel",
-    "isWorkItem",
     "handleEditItem",
     "aggregateItemTokenUsage",
     "aggregateItemDurations",
@@ -485,22 +521,31 @@ describe("web → rex gateway contract", () => {
     "parseFolderTree",
     "resolveSiblingSlugs",
     "resolveStore",
+    "prdLayout",
     "cascadeParentReset",
     "getAvailableBackups",
     "restoreFromBackup",
     "isValidSnapshotId",
+    "V2RestoreRefusedError",
     "validateRunSettings",
+    // The Workflow page validates rex.applyOn and rex.placement.autoAccept
+    // through rex's own parsers, so the chooser cannot offer a value the CLI
+    // would silently fall back from.
+    "parseApplyOn",
+    "parsePlacementSettings",
   ];
 
   const GATEWAY_CONSTANTS = [
     "SCHEMA_VERSION",
-    "LEVEL_HIERARCHY",
     "VALID_STATUSES",
     "VALID_REQUIREMENT_CATEGORIES",
     "VALID_VALIDATION_TYPES",
-    "CHILD_LEVEL",
     "PRD_TREE_DIRNAME",
     "PRD_CACHE_DIRNAME",
+    "APPLY_ON",
+    "DEFAULT_APPLY_ON",
+    "PLACEMENT_AUTO_ACCEPT",
+    "DEFAULT_PLACEMENT_SETTINGS",
   ];
 
   for (const name of GATEWAY_FUNCTIONS) {
@@ -771,6 +816,9 @@ describe("gateway export auto-detection", () => {
       ...["resolveStore", "takeSaveFileReport", "isCompatibleSchema", "assertSchemaVersion",
         "findItem", "walkTree", "findNextTask", "findActionableTasks",
         "collectCompletedIds", "explainSelection", "matchesAssignee", "traversalBlock",
+        "prdLayout", "isChangeLayerStore", "findNextWorkTask", "findActionableWork", "resolveWorkById",
+        "buildChangeBrief", "completeV2Work",
+        "isAppliedChange", "indexTree", "enclosingChangeIds", "loadPrdModel",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
         "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",
@@ -897,19 +945,27 @@ describe("gateway export auto-detection", () => {
         "collectAllIds", "findNextTask", "findActionableTasks", "collectCompletedIds",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
+        "validateChangesMerge", "mergeChanges",
+        "loadPrdModel", "productReport", "capabilityReport", "indexTree",
+        "isOpenChange", "isAppliedChange", "specHash", "nodeSpec",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
         "computeRequirementsSummary", "computeHealthScore",
         "detectReorganizations", "applyProposals", "applyReshape",
-        "reasonForReshape", "isPriority", "isItemLevel",
-        "isRequirementCategory", "isValidationType", "isRootLevel", "isWorkItem",
+        "reasonForReshape", "isPriority",
+        "isRequirementCategory", "isValidationType",
         "handleEditItem", "aggregateItemTokenUsage", "aggregateItemDurations",
         "serializeDocument", "parseDocument",
-        "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "cascadeParentReset",
-        "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId",
-        "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
-        "VALID_VALIDATION_TYPES", "CHILD_LEVEL", "PRD_CACHE_DIRNAME",
-        "estimateCostFromTotals", "validateRunSettings"],
-      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance"],
+        "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "prdLayout", "isChangeLayerStore", "completeV2Work", "cascadeParentReset",
+        "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
+        "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
+        "VALID_VALIDATION_TYPES", "PRD_CACHE_DIRNAME",
+        "estimateCostFromTotals", "validateRunSettings",
+        // rex-owned project settings the Workflow page edits, validated with
+        // rex's own parsers so the chooser cannot offer a value the CLI would
+        // silently fall back from.
+        "parseApplyOn", "parsePlacementSettings"],
+      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",
+        "APPLY_ON", "DEFAULT_APPLY_ON", "PLACEMENT_AUTO_ACCEPT", "DEFAULT_PLACEMENT_SETTINGS"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));
@@ -1285,12 +1341,6 @@ describe("gateway behavioral tests: web → rex return shapes", () => {
     expect(gw).toBeDefined();
   });
 
-  it("LEVEL_HIERARCHY is a non-empty object", async () => {
-    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
-    expect(typeof gw.LEVEL_HIERARCHY).toBe("object");
-    expect(Object.keys(gw.LEVEL_HIERARCHY).length).toBeGreaterThan(0);
-  });
-
   it("diffTrees returns the five categories the PRD delta projects", async () => {
     if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
     const from = [
@@ -1342,23 +1392,10 @@ describe("gateway behavioral tests: web → rex return shapes", () => {
     expect(statuses).toEqual(expect.arrayContaining(["pending", "in_progress", "completed"]));
   });
 
-  it("CHILD_LEVEL maps parent levels to child levels", async () => {
-    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
-    expect(typeof gw.CHILD_LEVEL).toBe("object");
-    expect(gw.CHILD_LEVEL["epic"]).toBeDefined();
-    expect(gw.CHILD_LEVEL["feature"]).toBeDefined();
-  });
-
   it("isPriority validates priority strings", async () => {
     if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
     expect(gw.isPriority("high")).toBe(true);
     expect(gw.isPriority("invalid")).toBe(false);
-  });
-
-  it("isItemLevel validates level strings", async () => {
-    if (!gw) gw = await import("../../packages/web/dist/server/rex-gateway.js");
-    expect(gw.isItemLevel("epic")).toBe(true);
-    expect(gw.isItemLevel("invalid")).toBe(false);
   });
 
   it("computeStats returns stats for a tree", async () => {

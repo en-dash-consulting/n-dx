@@ -30,6 +30,7 @@ import { MetricCard, BarChart } from "../visualization/index.js";
 import { BrandedHeader } from "../components/index.js";
 import { usePolling } from "../hooks/index.js";
 import { TOKEN_USAGE_POLL_KEY, USAGE_POLL_INTERVAL_MS } from "../usage/constants.js";
+import { itemTypeOf } from "../external.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirroring API response shapes)
@@ -169,7 +170,7 @@ interface ItemUsageRollupWire {
 interface ItemUsageRow extends ItemUsageRollupWire {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,17 +224,18 @@ function fmtWindow(since: string | null, until: string | null): string {
 interface PrdItemNode {
   id: string;
   title: string;
-  level: string;
+  type?: string;
+  level?: string;
   children?: PrdItemNode[];
 }
 
-/** Flatten the PRD tree into an id → { title, level } map for join with the token rollup. */
-function flattenPrdTitles(items: PrdItemNode[]): Map<string, { title: string; level: string }> {
-  const out = new Map<string, { title: string; level: string }>();
+/** Flatten the PRD tree into an id → { title, itemType } map for join with the token rollup. */
+function flattenPrdTitles(items: PrdItemNode[]): Map<string, { title: string; itemType: string }> {
+  const out = new Map<string, { title: string; itemType: string }>();
   const stack = [...items];
   while (stack.length > 0) {
     const node = stack.pop()!;
-    out.set(node.id, { title: node.title, level: node.level });
+    out.set(node.id, { title: node.title, itemType: itemTypeOf(node) });
     if (node.children) stack.push(...node.children);
   }
   return out;
@@ -554,14 +556,14 @@ export function TokenUsageView() {
 
       const titles = prdRes.ok
         ? flattenPrdTitles(((await prdRes.json()) as { items?: PrdItemNode[] }).items ?? [])
-        : new Map<string, { title: string; level: string }>();
+        : new Map<string, { title: string; itemType: string }>();
 
       const rows: ItemUsageRow[] = Object.entries(rollup)
         .filter(([, r]) => r.total.totalTokens > 0)
         .map(([id, r]) => ({
           id,
           title: titles.get(id)?.title ?? id,
-          level: titles.get(id)?.level ?? "item",
+          itemType: titles.get(id)?.itemType ?? "item",
           ...r,
         }))
         .sort((a, b) => b.total.totalTokens - a.total.totalTokens);
@@ -930,7 +932,7 @@ export function TokenUsageView() {
               h("thead", null,
                 h("tr", null,
                   h("th", null, "Item"),
-                  h("th", null, "Level"),
+                  h("th", null, "Type"),
                   h("th", { class: "num" }, "Self"),
                   h("th", { class: "num" }, "Descendants"),
                   h("th", { class: "num" }, "Total"),
@@ -942,7 +944,7 @@ export function TokenUsageView() {
                 (showAllItems ? itemRows : itemRows.slice(0, 15)).map((row) =>
                   h("tr", { key: row.id },
                     h("td", null, row.title),
-                    h("td", null, row.level),
+                    h("td", null, row.itemType),
                     h("td", { class: "num" }, fmtTokens(row.self.totalTokens)),
                     h("td", { class: "num" }, fmtTokens(row.descendants.totalTokens)),
                     h("td", { class: "num" }, fmtTokens(row.total.totalTokens)),

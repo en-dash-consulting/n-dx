@@ -19,6 +19,7 @@
 
 import type { PRDItem, ItemLevel } from "../schema/index.js";
 import { findItem, removeFromTree, walkTree } from "./tree.js";
+import { changeLayerType } from "./layer-projection.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -122,6 +123,114 @@ export function validateMerge(
   }
 
   return { valid: true };
+}
+
+/**
+ * The extra rules for a merge on a v2 change layer, checked before
+ * {@link validateMerge}: only changes merge, and an absorbed change may not
+ * carry amendments, which have no target-side home and would be lost.
+ */
+function validateChangeLayerMerge(
+  items: PRDItem[],
+  sourceIds: string[],
+  targetId: string,
+): MergeValidation {
+  for (const id of sourceIds) {
+    const item = findItem(items, id)?.item;
+    if (!item) continue;
+    const type = changeLayerType(item);
+    if (type !== "change") {
+      return { valid: false, error: `This PRD uses the v2 layout, where rex merges changes only: "${id}" is a ${type ?? item.level}.` };
+    }
+    if (id !== targetId && Array.isArray(item.amends) && item.amends.length > 0) {
+      return { valid: false, error: `"${id}" carries amendments, which a merge would lose. Make it the target, or move its amendments first.` };
+    }
+  }
+  return { valid: true };
+}
+
+/** Carry the absorbed changes' `touches` onto the target (v2), deduplicated; call before {@link mergeItems}. */
+function carryTouches(items: PRDItem[], sourceIds: string[], targetId: string): void {
+  const touches = new Set<string>();
+  for (const id of [targetId, ...sourceIds]) {
+    const item = findItem(items, id)?.item;
+    if (Array.isArray(item?.touches)) for (const t of item.touches) touches.add(String(t));
+  }
+  if (touches.size > 0) findItem(items, targetId)!.item.touches = [...touches];
+}
+
+/**
+ * Clear the target's `needsPlacement` (v2) when an absorbed change was placed
+ * and touches something: {@link carryTouches} gives the target those confirmed
+ * targets, so it is no longer in the Inbox. A merge where every change needs
+ * placement keeps the flag, as does absorbing a placed change with no touches
+ * (a spike), which would leave the target placed with no target. Call before
+ * {@link mergeItems}.
+ */
+function carryPlacement(items: PRDItem[], sourceIds: string[], targetId: string): void {
+  const target = findItem(items, targetId)!.item;
+  if (!target.needsPlacement) return;
+  const placedWithTargets = sourceIds.some((id) => {
+    const item = id === targetId ? undefined : findItem(items, id)?.item;
+    return !!item && !item.needsPlacement && Array.isArray(item.touches) && item.touches.length > 0;
+  });
+  if (placedWithTargets) delete target.needsPlacement;
+}
+
+/**
+ * Keep each absorbed change's id, display id and former aliases as aliases on
+ * the target (v2), deduplicated and never the target's own id or display id, so
+ * commits and lookups that name the absorbed change still resolve to it. Call
+ * before {@link mergeItems}.
+ */
+function carryAliases(items: PRDItem[], sourceIds: string[], targetId: string): void {
+  const target = findItem(items, targetId)!.item;
+  const own = new Set([target.id, target.displayId].filter((v): v is string => typeof v === "string"));
+  const aliases = new Set<string>(Array.isArray(target.aliases) ? target.aliases.map(String) : []);
+  for (const id of sourceIds) {
+    if (id === targetId) continue;
+    const item = findItem(items, id)?.item;
+    if (!item) continue;
+    const refs = [item.id, item.displayId, ...(Array.isArray(item.aliases) ? item.aliases : [])];
+    for (const ref of refs) if (typeof ref === "string") aliases.add(ref);
+  }
+  for (const ref of own) aliases.delete(ref);
+  if (aliases.size > 0) target.aliases = [...aliases];
+}
+
+/** A v2 merge's checks: {@link validateChangeLayerMerge}, then {@link validateMerge}. */
+export function validateChangesMerge(
+  items: PRDItem[],
+  sourceIds: string[],
+  targetId: string,
+): MergeValidation {
+  const layer = validateChangeLayerMerge(items, sourceIds, targetId);
+  return layer.valid ? validateMerge(items, sourceIds, targetId) : layer;
+}
+
+export type ChangesMergeOutcome =
+  | { valid: true; result: MergeResult }
+  | { valid: false; error: string };
+
+/**
+ * The merge on a v2 change layer, and the only one its callers should use:
+ * validate ({@link validateChangesMerge}), carry the absorbed changes'
+ * touches, placement and ids onto the target ({@link carryTouches},
+ * {@link carryPlacement}, {@link carryAliases}), then {@link mergeItems}. Writes nothing when the
+ * merge is refused. Modifies `items` in place.
+ */
+export function mergeChanges(
+  items: PRDItem[],
+  sourceIds: string[],
+  targetId: string,
+  options?: MergeOptions,
+): ChangesMergeOutcome {
+  const validation = validateChangesMerge(items, sourceIds, targetId);
+  if (!validation.valid) return { valid: false, error: validation.error ?? "Merge refused." };
+  carryTouches(items, sourceIds, targetId);
+  carryPlacement(items, sourceIds, targetId);
+  carryAliases(items, sourceIds, targetId);
+  return { valid: true, result: mergeItems(items, sourceIds, targetId, options) };
 }
 
 // ── Preview ─────────────────────────────────────────────────────────

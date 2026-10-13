@@ -6,8 +6,8 @@
  * release, changes sit under their stage in lifecycle order; the unscheduled
  * group comes last because it is a backlog, not the next release.
  *
- * Driven entirely by its `changes` prop: no fetch and no route, so it renders
- * from a v2 fixture until the v2 reader and its routes land.
+ * Driven entirely by its `changes` prop: `product-pages.ts` fetches it from
+ * `GET /api/rex/changes`, and tests render it from a fixture.
  */
 
 import { h, Fragment } from "preact";

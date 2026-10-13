@@ -4,9 +4,13 @@
  *
  * ## Units of work
  *
- * A task is a unit. A change with no live tasks is itself the unit; a change
- * with tasks is worked through them and is never selected while it has any
- * (completing it is the completion path's job). Subtasks belong to their task.
+ * A task is a unit. A change with no live tasks and no live nested changes is
+ * itself the unit; a change with tasks is worked through them and is never
+ * selected while it has any (completing it is the completion path's job). A
+ * change holding a change is a container: selection descends into it, and the
+ * enclosing change's gates apply to everything inside. Subtasks belong to
+ * their task. {@link changeWorkShape} is the one judgement of which a change
+ * is; selection, {@link resolveWorkById} and `claim_task` all use it.
  *
  * ## Autonomous selection
  *
@@ -48,12 +52,32 @@ export interface WorkUnit {
 }
 
 export interface WorkSelectionOptions {
-  /** Ids to pass over, e.g. units another worktree has claimed. */
+  /**
+   * Ids to pass over, e.g. units another worktree has claimed. A change's id
+   * also passes over everything inside it, at any depth: a claim on a
+   * task-less change covers the task it later splits into.
+   */
   excludeIds?: ReadonlySet<string>;
   /** Only units marked `ready` (`--ready-only`). */
   readyOnly?: boolean;
   /** Only units this identity is assigned, directly or through the change (`--mine`). */
   assignee?: string;
+}
+
+/** A child as {@link changeWorkShape} reads it: a change-layer node or its projected item. */
+export interface WorkShapeChild {
+  type?: string;
+  status?: string;
+}
+
+/** `unit`: the change is itself the work. `tasks`: worked through its tasks. `container`: holds a change, never a unit. */
+export type ChangeWorkShape = "unit" | "tasks" | "container";
+
+/** How a change is worked, judged on its live children (a deleted one is a tombstone and does not count). */
+export function changeWorkShape(change: { children?: readonly WorkShapeChild[] }): ChangeWorkShape {
+  const live = (change.children ?? []).filter((c) => c.status !== "deleted");
+  if (live.some((c) => c.type === "change")) return "container";
+  return live.some((c) => c.type === "task") ? "tasks" : "unit";
 }
 
 const ACTIONABLE: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["pending", "in_progress", "failing"]);
@@ -65,6 +89,21 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
     (node.blockedBy ?? []).some((ref) => index.resolve(ref)?.status !== "completed");
   const runnable = (node: RuleNode): boolean => ACTIONABLE.has(node.status ?? "pending") && !blockerOpen(node);
 
+  // Whether a change may yield work: its own gates and every enclosing change's.
+  const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
+  const workable = new Map<RuleNode, boolean>();
+  const changeWorkable = (node: RuleNode): boolean => {
+    const parent = parentOf.get(node);
+    const ok = isOpenChange(node) && !node.needsPlacement && runnable(node) && (parent?.type !== "change" || workable.get(parent) === true);
+    workable.set(node, ok);
+    return ok;
+  };
+
+  // Whether a change or one enclosing it is excluded, which excludes all it holds.
+  const exclude = options.excludeIds ?? new Set<string>();
+  const held = (change: RuleNode): boolean =>
+    exclude.size > 0 && [change, ...enclosingChanges(change, parentOf)].some((c) => exclude.has(c.id));
+
   const order = new Map<RuleNode, number>();
   const dependents = new Map<RuleNode, number>();
   const units: WorkUnit[] = [];
@@ -74,17 +113,20 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
       const target = index.resolve(ref);
       if (target) dependents.set(target, (dependents.get(target) ?? 0) + 1);
     }
-    if (node.type !== "change") return;
-    if (!isOpenChange(node) || node.needsPlacement || !runnable(node)) return;
-    const tasks = (node.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
+    // Entries are in tree order, so an enclosing change is judged before what it holds.
+    if (node.type !== "change" || !changeWorkable(node)) return;
     const change = node as ChangeRule;
-    if (tasks.length === 0) units.push({ kind: "change", node: change, change });
-    for (const task of tasks) if (runnable(task)) units.push({ kind: "task", node: task as TaskRule, change });
+    if (changeWorkShape(change) === "unit") units.push({ kind: "change", node: change, change });
+    // A container's own tasks are units beside its nested changes.
+    for (const task of node.children ?? []) {
+      if (task.type === "task" && task.status !== "deleted" && runnable(task)) units.push({ kind: "task", node: task as TaskRule, change });
+    }
   });
 
   const candidates = units.filter(
     (u) =>
-      !options.excludeIds?.has(u.node.id) &&
+      !exclude.has(u.node.id) &&
+      !held(u.change) &&
       (!options.readyOnly || (u.node.ready ?? u.change.ready) === true) &&
       (!options.assignee || u.node.assignee === options.assignee || u.change.assignee === options.assignee),
   );
@@ -106,17 +148,35 @@ export function findNextWork(tree: V2Tree, options: WorkSelectionOptions = {}): 
 /**
  * The change or task a ref names (id, display id or alias), for an explicit
  * `ndx work --task`. Selection gates do not apply: a change awaiting placement
- * runs when asked for by name. `null` when the ref names no live change or task.
+ * runs when asked for by name. `null` when the ref names no live change or
+ * task, or names a container ({@link changeWorkShape}): its work is its nested
+ * changes and tasks, so a caller explaining the refusal checks the shape.
  */
 export function resolveWorkById(tree: V2Tree, ref: string): WorkUnit | null {
   const index = indexTree(tree);
   const node = index.resolve(ref);
+  if (node?.type === "change" && changeWorkShape(node) === "container") return null;
   if (node?.type === "change") return { kind: "change", node: node as ChangeRule, change: node as ChangeRule };
   if (node?.type !== "task") return null;
-  const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
-  let change = parentOf.get(node);
-  while (change && change.type !== "change") change = parentOf.get(change);
+  const [change] = enclosingChanges(node, new Map(index.entries.map((e) => [e.node, e.parent])));
   return change ? { kind: "task", node: node as TaskRule, change: change as ChangeRule } : null;
+}
+
+/**
+ * Ids of the changes enclosing the node a ref names, innermost first, not the
+ * node itself: a claim on any of them covers the node. `[]` when the ref names
+ * nothing.
+ */
+export function enclosingChangeIds(tree: V2Tree, ref: string): string[] {
+  const index = indexTree(tree);
+  const node = index.resolve(ref);
+  return node ? enclosingChanges(node, new Map(index.entries.map((e) => [e.node, e.parent]))).map((c) => c.id) : [];
+}
+
+function enclosingChanges(node: RuleNode, parentOf: ReadonlyMap<RuleNode, RuleNode | undefined>): RuleNode[] {
+  const out: RuleNode[] = [];
+  for (let p = parentOf.get(node); p; p = parentOf.get(p)) if (p.type === "change") out.push(p);
+  return out;
 }
 
 function urgency(node: RuleNode): number {

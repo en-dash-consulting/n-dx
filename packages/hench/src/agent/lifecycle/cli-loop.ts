@@ -105,7 +105,8 @@ import {
 import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
 import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
-import { PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
+import { prdLayout } from "../../prd/rex-gateway.js";
+import { reviewDedupeDir, reviewInboxDir } from "./uncommitted-work-gate.js";
 import { resolveAgentCliEffort } from "./agent-effort.js";
 import { BOOKKEEPING_PATHS } from "../../store/paths.js";
 import { matchesProjectPath } from "../../store/artifacts.js";
@@ -1473,7 +1474,7 @@ function chargeSpawnToRun(
 }
 
 /** Per-invocation inputs that only exist once the task has actually run. */
-interface ReviewPassInvocation {
+export interface ReviewPassInvocation {
   run: RunRecord;
   taskId: string;
   projectDir: string;
@@ -1602,7 +1603,7 @@ async function runExecutorFix(
  * before the commit prompt, so it ships in the same commit as the work it
  * repairs.
  */
-async function runAdversarialReviewPass(
+export async function runAdversarialReviewPass(
   ctx: ReviewPassContext,
   inv: ReviewPassInvocation,
   step?: PairReviewStep,
@@ -1633,7 +1634,10 @@ async function runAdversarialReviewPass(
   await mkdir(dirname(reportPath), { recursive: true });
 
   const layout = resolveLayout(inv.projectDir);
-  const prdTreeDir = `${relativeToRoot(layout, layout.rexDir)}/${PRD_TREE_DIRNAME}/`;
+  const rexRel = relativeToRoot(layout, layout.rexDir);
+  const prdLayoutKind = await prdLayout(layout.rexDir);
+  const prdTreeDir = reviewDedupeDir(rexRel, prdLayoutKind);
+  const inboxDir = reviewInboxDir(rexRel, prdLayoutKind);
   const systemPrompt = pair ? buildPairReviewSystemPrompt() : buildReviewSystemPrompt();
 
   let brief: string;
@@ -1661,6 +1665,7 @@ async function runAdversarialReviewPass(
       changedFiles: scope.changedFiles,
       reportPath,
       prdTreeDir,
+      inboxDir,
       autonomous: ctx.autonomous,
       testGateFollows: ctx.testGateFollows,
       recheck: step?.recheck,
@@ -1676,6 +1681,7 @@ async function runAdversarialReviewPass(
       autonomous: ctx.autonomous,
       testGateFollows: ctx.testGateFollows,
       prdTreeDir,
+      inboxDir,
     });
   }
 

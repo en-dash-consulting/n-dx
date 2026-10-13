@@ -42,8 +42,8 @@ interface MatrixRow {
   requirement: RequirementWire;
   definedOnItemId: string;
   definedOnItemTitle: string;
-  definedOnItemLevel: string;
-  appliesTo: Array<{ id: string; title: string; level: string; status: string }>;
+  definedOnItemType: string;
+  appliesTo: Array<{ id: string; title: string; itemType: string; status: string }>;
 }
 
 interface TraceabilityResponse {
@@ -185,7 +185,7 @@ export function RequirementsView() {
                       h("td", null, h("span", { class: "tag" }, row.requirement.validationType)),
                       h("td", null,
                         `${row.definedOnItemTitle} `,
-                        h("span", { class: "req-level" }, `(${row.definedOnItemLevel})`),
+                        h("span", { class: "req-level" }, `(${row.definedOnItemType})`),
                       ),
                       h("td", null,
                         h("button", {
@@ -212,7 +212,7 @@ export function RequirementsView() {
                           row.appliesTo.map((item) =>
                             h("li", { key: item.id, class: "req-applies-item" },
                               `${item.title} `,
-                              h("span", { class: "req-level" }, `(${item.level})`),
+                              h("span", { class: "req-level" }, `(${item.itemType})`),
                               " ",
                               h("span", { class: `tag req-status-${item.status}` }, item.status),
                             ),

@@ -119,7 +119,7 @@ describe("Search API routes", () => {
     expect(result.id).toBe("t-1");
     expect(result.title).toBe("Authentication task");
     expect(result.description).toBe("Build the auth system");
-    expect(result.level).toBe("task");
+    expect(result.itemType).toBe("task");
     expect(result.status).toBe("in_progress");
     expect(typeof result.score).toBe("number");
     expect(result.score).toBeGreaterThan(0);

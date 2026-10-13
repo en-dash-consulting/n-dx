@@ -34,6 +34,19 @@ import { join } from "node:path";
 import type { PRDDocument } from "./rex-gateway.js";
 import { SCHEMA_VERSION, isCompatibleSchema, serializeDocument, parseDocument, PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME } from "./rex-gateway.js";
 
+/**
+ * The v2 layer directories under a rexDir. rex's public API does not export
+ * its `PRODUCT_DIRNAME` / `CHANGES_DIRNAME`, so these two literals mirror them;
+ * `prdLayout` (via the gateway) stays the authority on which layout a tree is.
+ */
+export const V2_PRODUCT_DIRNAME = "product";
+export const V2_CHANGES_DIRNAME = "changes";
+
+/** Whether `rexDir` holds a v2 tree (a `product/` layer). Sync twin of rex's `prdLayout`. */
+export function isV2Tree(rexDir: string): boolean {
+  return existsSync(join(rexDir, V2_PRODUCT_DIRNAME));
+}
+
 /** Primary Markdown PRD file. */
 const PRD_MD_FILENAME = "prd.md";
 
@@ -78,6 +91,8 @@ export function discoverMarkdownPRDFiles(rexDir: string): string[] {
 
 /** Check whether a readable PRD exists (folder tree primary, Markdown + legacy JSON fallback). */
 export function prdExists(rexDir: string): boolean {
+  // v2: the product layer is the tree
+  if (isV2Tree(rexDir)) return true;
   // Primary: folder-tree backend (.rex/prd_tree/)
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   if (existsSync(treeRoot)) {
@@ -209,6 +224,10 @@ export function prdMaxMtimeMs(rexDir: string): number {
   // Walk folder-tree (primary)
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   max = Math.max(max, walkMaxMtimeMs(treeRoot));
+
+  // Walk the v2 layers
+  max = Math.max(max, walkMaxMtimeMs(join(rexDir, V2_PRODUCT_DIRNAME)));
+  max = Math.max(max, walkMaxMtimeMs(join(rexDir, V2_CHANGES_DIRNAME)));
 
   // Stat primary prd.md
   try {

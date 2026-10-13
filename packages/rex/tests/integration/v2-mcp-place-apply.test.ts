@@ -6,8 +6,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, readdir, readFile, rename, rm } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -108,5 +108,72 @@ describe("Inbox change placed with its amendment content, then applied over MCP"
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain(message);
     expect(await rexFiles()).toEqual(before);
+  });
+});
+
+/**
+ * The Inbox is a reserved folder: `add_item` writes an unplaced change into it
+ * and `place_change` moves the change out. Both are storage — every read goes
+ * through the model, where an Inbox change is a top-level change wherever its
+ * folder sits.
+ */
+describe("the reserved Inbox folder over MCP", () => {
+  /** Paths under `.rex/`, forward-slashed, that contain `match`. */
+  async function treePaths(match: string): Promise<string[]> {
+    const root = join(tmp, ".rex");
+    return [...(await rexFiles()).keys()]
+      .map((p) => relative(root, p).split("\\").join("/"))
+      .filter((p) => p.includes(match))
+      .sort();
+  }
+
+  it("add_item writes the change to changes/inbox/<slug>/, with needsPlacement in that folder's state.yaml", async () => {
+    const { id, needsPlacement } = await call("add_item", { title: "Refunds by card" });
+
+    expect(needsPlacement).toBe(true);
+    expect(await treePaths("refunds-by-card")).toEqual([
+      "changes/inbox/refunds-by-card/index.md",
+      "changes/inbox/refunds-by-card/state.yaml",
+    ]);
+    const files = await rexFiles();
+    expect(files.get(join(tmp, ".rex", "changes", "inbox", "refunds-by-card", "state.yaml"))).toContain(
+      `  "${id}":\n    needsPlacement: true\n`,
+    );
+    expect(files.get(join(tmp, ".rex", "changes", "inbox", "refunds-by-card", "index.md"))).not.toContain("needsPlacement");
+  });
+
+  it("place_change moves it out to the change-layer root, keeping its id and slug", async () => {
+    const { id } = await call("add_item", { title: "Refunds by card" });
+
+    await call("place_change", { id, target: "A1.1", relation: "touches" });
+
+    expect(await treePaths("refunds-by-card")).toEqual(["changes/refunds-by-card/index.md"]);
+    expect(await treePaths("inbox")).toEqual([]);
+    const item = await call("get_item", { id });
+    expect(item.item).toMatchObject({ id, slug: "refunds-by-card" });
+    expect(item.item.needsPlacement).toBeUndefined();
+  });
+
+  it("reports the same status and capability changes whichever folder holds the Inbox change", async () => {
+    const { id } = await call("add_item", { title: "Refunds by card" });
+    const inFolder = await call("get_prd_status", {});
+    const capability = await call("get_capability", { id: CAPABILITY });
+    expect(inFolder.inbox).toBe(1);
+    expect(inFolder.changes.total).toBe(2);
+
+    // The layout PR 17 (#612) shipped: the flag alone, at the change-layer root.
+    const rexDir = join(tmp, ".rex");
+    await rename(join(rexDir, "changes/inbox/refunds-by-card"), join(rexDir, "changes/refunds-by-card"));
+    await rm(join(rexDir, "changes/inbox"), { recursive: true });
+
+    expect(await call("get_prd_status", {})).toEqual(inFolder);
+    expect(await call("get_capability", { id: CAPABILITY })).toEqual(capability);
+
+    // Placing it clears the flag, which is what the Inbox count follows.
+    await call("place_change", { id, target: "A1.1", relation: "touches" });
+    const placed = await call("get_prd_status", {});
+    expect(placed.inbox).toBe(0);
+    expect(placed.changes).toEqual(inFolder.changes);
+    expect((await call("get_capability", { id: CAPABILITY })).changes.map((c: { id: string }) => c.id)).toContain(id);
   });
 });

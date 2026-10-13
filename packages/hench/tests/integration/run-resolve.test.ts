@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { cp, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
 import { resolveModel, NEWEST_MODELS, REVIEW_MODELS, TIER_MODELS } from "@n-dx/llm-client";
@@ -498,6 +498,100 @@ describe("refusals are reported, not thrown", () => {
     expect(codes(r)).toEqual(["dirty-tree"]);
     expect(r.workspace.dirty).toBe(true);
     expect(codes(await resolve({ task: "t-pending", "allow-dirty": "true" }))).toEqual([]);
+  });
+});
+
+describe("on a v2 tree", () => {
+  const FIXTURE = join(import.meta.dirname, "../../../rex/tests/fixtures/v2-tree");
+  /** The fixture's change CH-1, which `--task=CH-1` runs. */
+  const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
+
+  beforeEach(async () => {
+    await rm(join(rexDir, PRD_TREE_DIRNAME), { recursive: true, force: true });
+    await cp(FIXTURE, rexDir, { recursive: true });
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "v2 tree");
+  });
+
+  it("reports the unit a display id runs, by its real id", async () => {
+    const r = await resolve({ task: "CH-1" });
+    expect(codes(r)).toEqual([]);
+    expect(r.task?.id).toBe(CHANGE_ID);
+  });
+
+  it("checks the claim on the real id, not the display id", async () => {
+    const other = `${projectDir}-wt`;
+    extraDirs.push(other);
+    git(projectDir, "worktree", "add", "-q", "-b", "other", other);
+    const claims = TaskClaims.forProject(other);
+    expect(await claims.claim(CHANGE_ID)).toBeNull();
+    try {
+      const r = await resolve({ task: "CH-1" });
+      expect(codes(r)).toEqual(["claimed-elsewhere"]);
+      expect(r.task?.claimedBy?.worktree).toBe(gitToplevel(other));
+    } finally {
+      await claims.releaseAll();
+    }
+  });
+
+  describe("a task inside a claimed change", () => {
+    /** The fixture's task under CH-1, which `--task=<id>` runs. */
+    const TASK_ID = "c0000000-0000-4000-8000-000000000002";
+
+    it("is refused, naming the change and its holder, when another worktree claims the change", async () => {
+      const other = `${projectDir}-wt`;
+      extraDirs.push(other);
+      git(projectDir, "worktree", "add", "-q", "-b", "other", other);
+      const claims = TaskClaims.forProject(other);
+      expect(await claims.claim(CHANGE_ID)).toBeNull();
+      try {
+        const r = await resolve({ task: TASK_ID });
+        expect(codes(r)).toEqual(["claimed-elsewhere"]);
+        expect(r.task?.id).toBe(TASK_ID);
+        expect(r.task?.claimedBy?.worktree).toBe(gitToplevel(other));
+        const refusal = r.refusals.find((x) => x.code === "claimed-elsewhere");
+        expect(refusal?.message).toContain(CHANGE_ID);
+        expect(refusal?.message).toContain(gitToplevel(other));
+      } finally {
+        await claims.releaseAll();
+      }
+    });
+
+    it("reports no refusal when the change is unclaimed", async () => {
+      const r = await resolve({ task: TASK_ID });
+      expect(codes(r)).toEqual([]);
+      expect(r.task?.claimedBy).toBeNull();
+    });
+
+    it("reports no refusal when this worktree holds the change", async () => {
+      const claims = TaskClaims.forProject(projectDir);
+      expect(await claims.claim(CHANGE_ID)).toBeNull();
+      try {
+        const r = await resolve({ task: TASK_ID });
+        expect(codes(r)).toEqual([]);
+        expect(r.task?.claimedBy).toBeNull();
+      } finally {
+        await claims.releaseAll();
+      }
+    });
+  });
+
+  it("refuses an Inbox change and its task, naming placement", async () => {
+    await appendFile(join(rexDir, "changes/add-apple-pay/state.yaml"), "    needsPlacement: true\n");
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "inbox change");
+    for (const ref of ["CH-1", "c0000000-0000-4000-8000-000000000002"]) {
+      const r = await resolve({ task: ref });
+      expect(codes(r)).toEqual(["not-actionable"]);
+      expect(r.refusals[0].message).toContain("needs placement");
+      expect(r.refusals[0].hint).toContain("place_change");
+    }
+  });
+
+  it("still refuses a ref that names nothing", async () => {
+    const r = await resolve({ task: "CH-404" });
+    expect(r.task).toBeNull();
+    expect(codes(r)).toEqual(["task-not-found"]);
   });
 });
 

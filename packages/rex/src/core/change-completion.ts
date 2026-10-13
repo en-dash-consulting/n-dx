@@ -7,17 +7,23 @@
  *
  * ## Completion
  *
- * A change with tasks completes when every live task is completed
- * ({@link SUCCESSFUL_CHILD_STATUSES}); a cancelled task blocks it and deleted
- * tombstones are ignored. Completing a task checks only that task's change,
- * and only a `pending` change auto-completes: an `in_progress` change is never
- * swept (#368), so it completes through {@link completeChange}. A change that
- * still `needsPlacement` is held: it may not close (`change-placed-at-close`).
+ * A change completes when every live task and nested change under it is
+ * completed ({@link SUCCESSFUL_CHILD_STATUSES}); a cancelled one blocks it and
+ * deleted tombstones are ignored. Completing a change (on its own or with its
+ * last task) then checks each enclosing change outward. Only a `pending`
+ * change auto-completes: an `in_progress` change is never swept (#368), so it
+ * completes through {@link completeChange}. A change that still
+ * `needsPlacement` is held: it may not close (`change-placed-at-close`).
  *
  * A completed change goes through `applyOnTrigger(…, "complete", …)`: applied
  * under `complete`, left open and unapplied under `review` or `release`. A
  * refused apply (`ApplyAmendmentsError`) is reported, and the change stays
- * completed and unapplied for a steward.
+ * completed and unapplied for a steward. A container is never applied while a
+ * nested change is unapplied: inner amendments land first.
+ *
+ * {@link completeWork} is what a status update to `completed` runs on a v2
+ * tree (`update_task_status`, `rex update --status`): it dispatches on the
+ * node's type and stamps every node it completes as a v1 status update does.
  *
  * ## Split
  *
@@ -39,7 +45,9 @@
  */
 
 import { indexTree, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
-import { SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
+import type { ResolutionType } from "../schema/index.js";
+import { AUTO_COMPLETABLE_STATUSES, SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
+import { computeTimestampUpdates } from "./timestamps.js";
 import { applyOnTrigger, type ApplyOnTriggerOptions, type ApplyOnTriggerResult } from "./apply-policy.js";
 import { ApplyAmendmentsError } from "./apply-amendments.js";
 
@@ -67,8 +75,10 @@ export interface ChangeCompletionResult {
   /** Ids completed: the task, then its change when that completed too. */
   completed: string[];
   split: ChangeSplit | null;
-  /** `applyOnTrigger`'s result for the completed change; `null` when no change completed. */
+  /** `applyOnTrigger`'s result for the first change completed; `null` when no change completed. */
   apply: CompletionApplyResult | null;
+  /** Every completed change's apply result, innermost first: the change, then each enclosing change completed with it. */
+  applies: Array<{ changeId: string; apply: CompletionApplyResult }>;
   held: CompletionHeld | null;
 }
 
@@ -91,10 +101,7 @@ export function completeTask(tree: V2Tree, taskRef: string, options: ChangeCompl
     markCompleted(task, options.now);
     completed.push(task.id);
   }
-  const result = emptyResult(next, completed);
-  if (!change || (change.status ?? "pending") !== "pending" || !isOpenChange(change)) return result;
-  if (!liveTasks(change).every((t) => SUCCESSFUL_CHILD_STATUSES.has(t.status ?? "pending"))) return result;
-  return closeChange(result, change, options);
+  return closeEnclosing(emptyResult(next, completed), change, options);
 }
 
 /**
@@ -107,13 +114,81 @@ export function completeChange(tree: V2Tree, changeRef: string, options: ChangeC
   const { node: change } = locate(next, changeRef, "change");
   const label = change.displayId ?? change.id;
   if (!isOpenChange(change)) throw new ChangeCompletionError(`Cannot complete change ${label}: it is not open`);
-  const open = liveTasks(change).filter((t) => !SUCCESSFUL_CHILD_STATUSES.has(t.status ?? "pending"));
+  const open = liveWork(change).filter((c) => !SUCCESSFUL_CHILD_STATUSES.has(c.status ?? "pending"));
   if (open.length > 0) {
-    throw new ChangeCompletionError(`Cannot complete change ${label}: task ${open.map((t) => t.displayId ?? t.id).join(", ")} is not completed`);
+    const named = open.map((c) => `${c.type} ${c.displayId ?? c.id}`).join(", ");
+    throw new ChangeCompletionError(`Cannot complete change ${label}: ${named} ${open.length > 1 ? "are" : "is"} not completed`);
   }
   const result = emptyResult(next, []);
   if (change.status === "completed") return result;
-  return closeChange(result, change, options);
+  closeChange(result, change, options);
+  return result.held ? result : closeEnclosing(result, enclosingChange(result.tree, change.id), options);
+}
+
+export interface CompleteWorkOptions extends ChangeCompletionOptions {
+  /** Recorded on the completed node itself, not on a node completed with it. */
+  resolutionType?: ResolutionType;
+  resolutionDetail?: string;
+}
+
+export interface CompleteWorkResult extends ChangeCompletionResult {
+  /** The change `ref` belongs to (itself when `ref` is a change). */
+  changeId: string | undefined;
+}
+
+/**
+ * Complete the task, change or subtask `ref`: what a status update to
+ * `completed` does on a v2 tree. A task goes through {@link completeTask} and
+ * a change through {@link completeChange}. A subtask completes on its own, and
+ * when it was the last live subtask of a `pending` task, the task completes
+ * through {@link completeTask}, as v1 auto-completes a parent. Every node
+ * completed also gets the timestamps a v1 status update writes
+ * (`computeTimestampUpdates`): `startedAt` when unset, `endedAt`, and its
+ * open active interval closed. A change that still needs placement is
+ * refused rather than reported held, because it is the node asked for.
+ */
+export function completeWork(tree: V2Tree, ref: string, options: CompleteWorkOptions): CompleteWorkResult {
+  const node = indexTree(tree).resolve(ref);
+  let out: ChangeCompletionResult;
+  if (node?.type === "change") out = completeChange(tree, node.id, options);
+  else if (node?.type === "task") out = completeTask(tree, node.id, options);
+  else if (node?.type === "subtask") out = completeSubtask(tree, node.id, options);
+  else throw new ChangeCompletionError(`No live task, change or subtask "${ref}"`);
+  // A held change is not completed: refuse, so no caller reports a completion that was not written.
+  if (out.held?.changeId === node.id) {
+    throw new ChangeCompletionError(`Cannot complete change ${node.displayId ?? node.id}: ${out.held.reason}`);
+  }
+
+  const before = indexTree(tree);
+  const after = indexTree(out.tree);
+  for (const id of out.completed) {
+    const prior = before.resolve(id)!;
+    const done = after.resolve(id)!;
+    const stamps = computeTimestampUpdates(prior.status ?? "pending", "completed", prior, options.now);
+    delete stamps.completedAt; // stamped by markCompleted
+    Object.assign(done, stamps);
+  }
+  const target = after.resolve(node.id)!;
+  if (options.resolutionType) target.resolutionType = options.resolutionType;
+  if (options.resolutionDetail) target.resolutionDetail = options.resolutionDetail;
+  return { ...out, changeId: node.type === "change" ? node.id : locate(tree, node.id, node.type).change?.id };
+}
+
+function completeSubtask(tree: V2Tree, subtaskRef: string, options: ChangeCompletionOptions): ChangeCompletionResult {
+  const next = structuredClone(tree);
+  const index = indexTree(next);
+  const subtask = index.resolve(subtaskRef)!;
+  if (subtask.status === "completed") return emptyResult(next, []);
+  markCompleted(subtask, options.now);
+  const task = index.entries.find((e) => e.node === subtask)?.parent;
+  const subtasks = (task?.children ?? []).filter((c) => c.type === "subtask" && c.status !== "deleted");
+  const taskCompletes =
+    task?.type === "task" &&
+    AUTO_COMPLETABLE_STATUSES.has(task.status ?? "pending") &&
+    subtasks.every((s) => SUCCESSFUL_CHILD_STATUSES.has(s.status ?? "pending"));
+  if (!taskCompletes) return emptyResult(next, [subtask.id]);
+  const out = completeTask(next, task.id, options);
+  return { ...out, completed: [subtask.id, ...out.completed] };
 }
 
 /** Why a change takes no new task: work found after it closed is a follow-up change. */
@@ -184,18 +259,43 @@ export function addTask(tree: V2Tree, changeRef: string, task: RuleNode, now: Da
   return result;
 }
 
-function locate(tree: V2Tree, ref: string, type: "change" | "task"): { node: RuleNode; change?: RuleNode } {
-  const index = indexTree(tree);
-  const node = index.resolve(ref);
+function locate(tree: V2Tree, ref: string, type: "change" | "task" | "subtask"): { node: RuleNode; change?: RuleNode } {
+  const node = indexTree(tree).resolve(ref);
   if (node?.type !== type) throw new ChangeCompletionError(`No live ${type} "${ref}"`);
+  return { node, change: enclosingChange(tree, node.id) };
+}
+
+/** The nearest change above the live node `id`, if any. */
+function enclosingChange(tree: V2Tree, id: string): RuleNode | undefined {
+  const index = indexTree(tree);
   const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
-  let change = parentOf.get(node);
+  let change = parentOf.get(index.resolve(id)!);
   while (change && change.type !== "change") change = parentOf.get(change);
-  return { node, change };
+  return change;
 }
 
 function liveTasks(change: RuleNode): RuleNode[] {
   return (change.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
+}
+
+/** The live tasks and nested changes a change waits on: the work `changeWorkShape` (change-selection) sees. */
+function liveWork(change: RuleNode): RuleNode[] {
+  return (change.children ?? []).filter((c) => (c.type === "task" || c.type === "change") && c.status !== "deleted");
+}
+
+/**
+ * Close `change` when it is `pending`, open and all its live work is
+ * completed, then each enclosing change outward on the same terms. Stops at
+ * the first change that does not close, a held one included.
+ */
+function closeEnclosing(result: ChangeCompletionResult, change: RuleNode | undefined, options: ChangeCompletionOptions): ChangeCompletionResult {
+  for (let at = change; at; at = enclosingChange(result.tree, at.id)) {
+    if ((at.status ?? "pending") !== "pending" || !isOpenChange(at)) break;
+    if (!liveWork(at).every((c) => SUCCESSFUL_CHILD_STATUSES.has(c.status ?? "pending"))) break;
+    closeChange(result, at, options);
+    if (result.held) break;
+  }
+  return result;
 }
 
 function markCompleted(node: RuleNode, now: Date): void {
@@ -204,7 +304,7 @@ function markCompleted(node: RuleNode, now: Date): void {
 }
 
 function emptyResult(tree: V2Tree, completed: string[]): ChangeCompletionResult {
-  return { tree, completed, split: null, apply: null, held: null };
+  return { tree, completed, split: null, apply: null, applies: [], held: null };
 }
 
 function closeChange(result: ChangeCompletionResult, change: RuleNode, options: ChangeCompletionOptions): ChangeCompletionResult {
@@ -214,12 +314,21 @@ function closeChange(result: ChangeCompletionResult, change: RuleNode, options: 
   }
   markCompleted(change, options.now);
   result.completed.push(change.id);
-  try {
-    result.apply = applyOnTrigger(result.tree, change.id, "complete", options);
-  } catch (error) {
-    if (!(error instanceof ApplyAmendmentsError)) throw error;
-    result.apply = { applied: false, reason: error.message, error };
+  const unapplied = (change.children ?? []).filter((c) => c.type === "change" && c.status !== "deleted" && isOpenChange(c));
+  let apply: CompletionApplyResult;
+  if (unapplied.length > 0) {
+    const named = unapplied.map((c) => `change ${c.displayId ?? c.id}`).join(", ");
+    apply = { applied: false, reason: `${named} ${unapplied.length > 1 ? "are" : "is"} not applied; a change applies after the changes nested in it` };
+  } else {
+    try {
+      apply = applyOnTrigger(result.tree, change.id, "complete", options);
+    } catch (error) {
+      if (!(error instanceof ApplyAmendmentsError)) throw error;
+      apply = { applied: false, reason: error.message, error };
+    }
   }
-  if (result.apply.applied) result.tree = result.apply.result.tree;
+  if (apply.applied) result.tree = apply.result.tree;
+  result.apply ??= apply;
+  result.applies.push({ changeId: change.id, apply });
   return result;
 }

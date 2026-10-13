@@ -29,6 +29,7 @@ import {
   type RunEventLine,
 } from "../hooks/index.js";
 import { WorkspaceWriteStrip } from "../components/index.js";
+import { CRITERIA_LABEL } from "../external.js";
 import { fmtDuration, formatSince, formatTokenCount } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
 import { LogTab } from "./live-log.js";
@@ -287,7 +288,7 @@ function TaskSection({ snapshot }: { snapshot: LiveTaskSnapshot }) {
   return h(Section, { id: "lt-task-h", title: "Task" },
     task.description ? h("p", { class: "live-task-desc" }, task.description) : null,
     criteria.length > 0
-      ? h("ul", { class: "live-criteria", "aria-label": "Acceptance criteria" }, criteria.map((c, i) =>
+      ? h("ul", { class: "live-criteria", "aria-label": CRITERIA_LABEL.work }, criteria.map((c, i) =>
         h("li", { key: i, class: `live-criterion live-criterion-${c.met ? "met" : "open"}` },
           h("span", { class: "live-criterion-mark", "aria-hidden": "true" }, c.met ? "✓" : "○"),
           h("span", null, c.text),

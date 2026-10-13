@@ -45,6 +45,8 @@ import {
   TaskAuditView,
   WorkflowOptimizationView,
   MergeGraphView,
+  ProductPage,
+  ChangesPage,
 } from "./domain-rex.js";
 
 import {
@@ -197,6 +199,12 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "prd": ({ setDetail, setPrdDetailContent, selectedTaskId, navigateTo }) =>
     h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, navigateTo }),
+
+  "product": () =>
+    h(ProductPage, null),
+
+  "changes": ({ navigateTo }) =>
+    h(ChangesPage, { navigateTo }),
 
   "analysis": () =>
     h(AnalysisView, null),

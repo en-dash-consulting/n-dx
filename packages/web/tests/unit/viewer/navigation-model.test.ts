@@ -481,10 +481,11 @@ describe("the Analysis stage carries what SOURCEVISION_TABS used to", () => {
 
   it("marks the server-built views so static exports hide them", () => {
     // The isometric map is hidden in a static export by its section's `alt`
-    // being dropped there, and Ask and Workspaces by `requiresServer`.
+    // being dropped there, and Ask, Product, Changes and Workspaces by
+    // `requiresServer` (Product and Changes read rex's v2 model per request).
     const serverBuilt = STAGE_ORDER.flatMap((stage: StageId) =>
       STAGES[stage].sections.filter((s) => s.requiresServer).map((s) => s.view),
     );
-    expect(serverBuilt).toEqual(["ask", "workspaces"]);
+    expect(serverBuilt).toEqual(["ask", "product", "changes", "workspaces"]);
   });
 });

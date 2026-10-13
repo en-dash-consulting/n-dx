@@ -15,6 +15,12 @@
  * - **Folders.** A change is always a folder (`<slug>/index.md`), so tasks can
  *   be added without moving it; any other node is a folder only while it has
  *   children, and a leaf `<slug>.md` otherwise.
+ * - **The Inbox.** A top-level change still carrying `needsPlacement` is
+ *   written under the reserved `changes/inbox/` folder
+ *   ({@link isInboxChange}); clearing the flag moves it out to the
+ *   change-layer root on the next write, keeping its id and its slug. The two
+ *   share one slug namespace, so that move can never collide. The folder is
+ *   created with the first unplaced change and removed with the last.
  * - **Root header.** `product/index.md` carries the title, the `schema` stamp
  *   and the `slugRule` that new slugs are made under: the v1 `tree-meta.json`
  *   sidecar has no v2 counterpart and is never written.
@@ -67,6 +73,7 @@ import { SLUG_RULE_VERSION, isWindowsSafeSegment } from "./folder-tree-serialize
 import { prdLockPath } from "./paths.js";
 import {
   CHANGES_DIRNAME,
+  INBOX_DIRNAME,
   PRODUCT_DIRNAME,
   assertPrdModelWritable,
   assertV2TreeWritable,
@@ -110,8 +117,10 @@ export interface WritePrdModelOptions {
 export interface WritePrdModelResult {
   /** Files written, relative to `rexDir`. */
   written: string[];
-  /** Files and folders deleted, relative to `rexDir`. */
+  /** Files and folders deleted, relative to `rexDir`: a folder that went is listed alone. */
   removed: string[];
+  /** Every file deleted, relative to `rexDir`, those inside a removed folder included: what a git stage addresses. */
+  deletedFiles: string[];
 }
 
 const INDEX_FILE = "index.md";
@@ -170,11 +179,11 @@ export async function writePrdModel(
   plan.files.set(join(productDir, INDEX_FILE), renderRootHeader(model, stamp));
   await planFolder(productDir, model.tree.product, "product", stamp, loaded, plan);
   if (model.tree.changes.length > 0 || loaded.folderState.layers.changes || (await listDir(changesDir)) !== null) {
-    await planFolder(changesDir, model.tree.changes, "changes", stamp, loaded, plan);
+    await planFolder(changesDir, model.tree.changes, "changes", stamp, loaded, plan, isInboxChange);
   }
   await assertStaleRemovable(plan.stale, collectIds(model), options.removed ?? new Set());
 
-  const result: WritePrdModelResult = { written: [], removed: [] };
+  const result: WritePrdModelResult = { written: [], removed: [], deletedFiles: [] };
   const rel = (path: string): string => relative(rexDir, path).split("\\").join("/");
   for (const dir of plan.dirs) await mkdir(dir, { recursive: true });
   for (const [path, text] of plan.files) {
@@ -188,12 +197,15 @@ export async function writePrdModel(
       if ((await readIfExists(path)) === null) continue;
       await rm(path);
       result.removed.push(rel(path));
+      result.deletedFiles.push(rel(path));
     } else if (await saveStateFile(dir, file, { rexDir, specs, now: options.now })) {
       result.written.push(rel(path));
     }
   }
   for (const { path, isDir } of plan.stale) {
-    for (const removed of await removeStale(path, isDir)) result.removed.push(rel(removed));
+    const { removed, files } = await removeStale(path, isDir);
+    result.removed.push(...removed.map(rel));
+    result.deletedFiles.push(...files.map(rel));
   }
   return result;
 }
@@ -247,22 +259,26 @@ async function loadAllStateFiles(
 }
 
 /**
- * Plan folder `dir`: `owner` (the folder node, or the layer for a layer root)
- * and `nodes`, its children. Everything is validated here, before any write.
+ * Plan folder `dir`: `owner` (the folder node, the layer for a layer root, or
+ * {@link INBOX_DIRNAME} for the reserved Inbox, which has neither an
+ * `index.md` nor state of its own) and `nodes`, its children. `reserve` picks
+ * the nodes stored one level down in the Inbox rather than here. Everything is
+ * validated here, before any write.
  */
 async function planFolder(
   dir: string,
   nodes: readonly RuleNode[],
-  owner: RuleNode | Layer,
+  owner: RuleNode | Layer | typeof INBOX_DIRNAME,
   stamp: string,
   loaded: LoadedState,
   plan: Plan,
+  reserve?: (node: RuleNode) => boolean,
 ): Promise<void> {
   plan.dirs.add(dir);
   const entries = (await listDir(dir)) ?? [];
   const existing = loaded.files.get(dir) ?? { ...emptyStateFile(), schema: stamp };
   const { layers, nodes: byOwner } = loaded.folderState;
-  Object.assign(existing, typeof owner === "string" ? layers[owner] : byOwner.get(owner.id));
+  Object.assign(existing, typeof owner !== "string" ? byOwner.get(owner.id) : owner === INBOX_DIRNAME ? undefined : layers[owner]);
   const rows: Record<string, ItemState> = {};
   const specs = new Map<string, ProductSpec>();
   const keep = (node: RuleNode, intent: Record<string, unknown>): void => {
@@ -287,6 +303,7 @@ async function planFolder(
   const expectedDirs = new Set<string>();
   const expectedFiles = new Set<string>([INDEX_FILE]);
   const seen = new Map<string, string>();
+  const reserved: RuleNode[] = [];
   for (const node of nodes) {
     const folder = isFolderNode(node);
     assertSlug(node, folder, dir);
@@ -297,6 +314,24 @@ async function planFolder(
       throw new Error(`Two nodes in ${dir} share the slug "${node.slug}" (ignoring case): ${clash} and ${node.id}`);
     }
     seen.set(key, node.id);
+    // Checked against this folder's slugs before the split: placement moves a node out of the Inbox into it.
+    const held = reserve?.(node) ?? false;
+    // The Inbox is addressed by folder name, so a placed change that slugs to
+    // it is read back as the Inbox itself: the change vanishes from the model
+    // and its children are promoted to top-level changes, with nothing but an
+    // orphan state row to show for it. Refuse rather than write a tree that
+    // cannot be read back. Case-folded like the clash check above, because the
+    // reader matches the directory name the filesystem actually hands it.
+    if (reserve && !held && key === INBOX_DIRNAME) {
+      throw new Error(
+        `Node ${node.id} in ${dir} has the slug "${node.slug}", which is reserved for the Inbox folder. ` +
+          `Rename it: a change written there reads back as the Inbox, not as a change.`,
+      );
+    }
+    if (held) {
+      reserved.push(node);
+      continue;
+    }
     if (folder) {
       expectedDirs.add(node.slug);
       await planFolder(join(dir, node.slug), node.children ?? [], node, stamp, loaded, plan);
@@ -308,6 +343,12 @@ async function planFolder(
       assertValidIntent(node, intent, dir);
       plan.files.set(join(dir, file), renderNode(node, intent));
     }
+  }
+
+  // An empty Inbox is not kept: the folder goes stale with the last change placed out of it.
+  if (reserved.length > 0) {
+    expectedDirs.add(INBOX_DIRNAME);
+    await planFolder(join(dir, INBOX_DIRNAME), reserved, INBOX_DIRNAME, stamp, loaded, plan);
   }
 
   if (Object.keys(rows).length === 0 && !extraTopLevelKeys(existing)) {
@@ -332,6 +373,16 @@ async function planFolder(
  */
 export function isFolderNode(node: RuleNode): boolean {
   return node.type === "change" || (node.children?.length ?? 0) > 0;
+}
+
+/**
+ * Whether a top-level change is stored in the reserved Inbox folder
+ * ({@link INBOX_DIRNAME}): the flag decides, nothing else. Applied only to the
+ * change-layer root, so a change nested under another change stays where its
+ * parent holds it.
+ */
+export function isInboxChange(node: RuleNode): boolean {
+  return node.type === "change" && node.needsPlacement === true;
 }
 
 /** Runs in the planning pass, so a bad slug refuses the write before any file changes. */
@@ -426,29 +477,36 @@ async function assertStaleRemovable(
 /**
  * Delete a stale entry. A folder loses only its tree files (`.md`, `state.yaml`)
  * and is removed once empty, so anything else kept there survives and the
- * folder stays. Returns the paths deleted: the folder itself when it went,
- * else the files.
+ * folder stays. `removed` is the folder itself when it went, else the files;
+ * `files` is every file deleted.
  */
-async function removeStale(path: string, isDir: boolean): Promise<string[]> {
+async function removeStale(path: string, isDir: boolean): Promise<Removal> {
   if (!isDir) {
     await rm(path, { force: true });
-    return [path];
+    return { removed: [path], files: [path] };
   }
-  const files = await removeTreeFiles(path);
-  return (await removeIfEmpty(path)) ? [path] : files;
+  const inner = await removeTreeFiles(path);
+  return { removed: (await removeIfEmpty(path)) ? [path] : inner.removed, files: inner.files };
 }
 
-async function removeTreeFiles(dir: string): Promise<string[]> {
-  const out: string[] = [];
+interface Removal {
+  removed: string[];
+  files: string[];
+}
+
+async function removeTreeFiles(dir: string): Promise<Removal> {
+  const out: Removal = { removed: [], files: [] };
   for (const entry of (await listDir(dir)) ?? []) {
     if (entry.name.startsWith(".")) continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      const files = await removeTreeFiles(path);
-      out.push(...((await removeIfEmpty(path)) ? [path] : files));
+      const inner = await removeTreeFiles(path);
+      out.removed.push(...((await removeIfEmpty(path)) ? [path] : inner.removed));
+      out.files.push(...inner.files);
     } else if (entry.name.endsWith(".md") || entry.name === STATE_FILE_NAME) {
       await rm(path, { force: true });
-      out.push(path);
+      out.removed.push(path);
+      out.files.push(path);
     }
   }
   return out;

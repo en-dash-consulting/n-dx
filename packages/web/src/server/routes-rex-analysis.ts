@@ -13,7 +13,7 @@ import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
@@ -28,6 +28,15 @@ import {
   collectAllIds,
   cascadeParentReset,
 } from "./rex-gateway.js";
+import { isRootType, itemTypeOf, levelOf } from "../shared/index.js";
+
+/**
+ * The v1 levels a captured change and its children are stored as. The capture
+ * paths write through the v1 store, so the type has to be resolved to a level
+ * here; `levelOf` is the one place that mapping lives.
+ */
+const CAPTURE_ROOT_LEVEL = levelOf("change")!;
+const CAPTURE_CHILD_LEVEL = levelOf("change", "change")!;
 
 /**
  * Resolve how to invoke the rex CLI for a given analyzed project.
@@ -62,6 +71,82 @@ function resolveRexCli(projectDir: string): { binPath: string; prefixArgs: strin
     binPath: "node",
     prefixArgs: [join(projectDir, "packages", "rex", "dist", "cli", "index.js")],
   };
+}
+
+// ---------------------------------------------------------------------------
+// `rex add --format=json` output
+// ---------------------------------------------------------------------------
+
+/**
+ * What `rex add --format=json` prints, across both PRD layouts.
+ *
+ * A v1 tree answers with level-based `proposals`. A v2 tree (product/ and
+ * changes/) has no levels: without `--accept` it previews one change per
+ * description as `{ preview: true, changes: [...] }` and writes nothing, and
+ * with `--accept` it prints the rows it created — a bare object for one
+ * change, an array for several. See
+ * `packages/rex/src/cli/commands/add-change.ts`.
+ */
+interface RexAddOutput {
+  preview?: boolean;
+  changes?: unknown[];
+  proposals?: unknown;
+  qualityIssues?: unknown;
+  added?: number;
+}
+
+/** One change `rex add` previewed or created, forwarded to the viewer as it came. */
+interface RexChangeRow {
+  id: string;
+  type: string;
+  title: string;
+  needsPlacement?: boolean;
+  placement?: unknown;
+}
+
+/** The v2 preview's change rows, or null when this is a v1 proposal payload. */
+function v2PreviewChanges(parsed: unknown): unknown[] | null {
+  const out = parsed as RexAddOutput | null;
+  return out?.preview === true && Array.isArray(out.changes) ? out.changes : null;
+}
+
+/**
+ * The rows `rex add --accept` printed on a v2 tree, or null on a v1 payload.
+ *
+ * A v1 accept answers with an object carrying `proposals`/`added`, which has
+ * none of a change row's three required fields, so the shape alone separates
+ * them without the route having to detect the layout first.
+ */
+function v2AcceptedChanges(parsed: unknown): RexChangeRow[] | null {
+  if (Array.isArray(parsed)) return parsed as RexChangeRow[];
+  const row = parsed as Partial<RexChangeRow> | null;
+  const isChangeRow =
+    typeof row?.id === "string" && typeof row.type === "string" && typeof row.title === "string";
+  return isChangeRow ? [row as RexChangeRow] : null;
+}
+
+/**
+ * The PRD's own id for a request's `parentId`, or null when the PRD holds no
+ * such item.
+ *
+ * The value handed to `rex add --parent` is the string read from the PRD, not
+ * the one read from the request. The child is spawned without a shell, so this
+ * is not about quoting — it is that a request value starting with `-` would be
+ * read by the CLI's own parser as a flag, and more generally that nothing from
+ * the request belongs on a command line unchecked (CodeQL
+ * js/command-line-injection). A shape check (a regexp) would be enough in
+ * practice but is not something that analysis recognises; an id that provably
+ * came from the tree is. The dashboard can only offer a scope the loaded
+ * document contains, so a legitimate request always resolves.
+ */
+function resolveParentId(ctx: ServerContext, requested: unknown): string | null {
+  if (typeof requested !== "string" || requested === "") return null;
+  const doc = loadPRDSync(ctx.rexDir);
+  if (!doc) return null;
+  for (const id of collectAllIds(doc.items)) {
+    if (id === requested) return id;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +317,11 @@ export function routeProposals(
     return handleSmartAddPreview(req, res, ctx);
   }
 
+  // POST /api/rex/smart-add-accept — create the changes a v2 preview showed
+  if (path === "smart-add-accept" && method === "POST") {
+    return handleSmartAddAccept(req, res, ctx, broadcast);
+  }
+
   // POST /api/rex/batch-import — process multiple ideas from various sources
   if (path === "batch-import" && method === "POST") {
     return handleBatchImport(req, res, ctx, broadcast);
@@ -307,7 +397,7 @@ async function handleCaptureNextSteps(
 
     let created = 0;
     let skipped = 0;
-    let epic = doc.items.find((i) => i.level === "epic" && i.title === CAPTURE_EPIC_TITLE);
+    let epic = doc.items.find((i) => isRootType(itemTypeOf(i)) && i.title === CAPTURE_EPIC_TITLE);
     let epicId = epic?.id;
 
     for (const step of input.steps) {
@@ -323,7 +413,7 @@ async function handleCaptureNextSteps(
         const epicItem: PRDItem = {
           id: epicId,
           title: CAPTURE_EPIC_TITLE,
-          level: "epic",
+          level: CAPTURE_ROOT_LEVEL,
           status: "pending",
           source: "sv-next-steps",
           description: "Findings captured from the SourceVision Overview Next Steps panel.",
@@ -337,7 +427,7 @@ async function handleCaptureNextSteps(
       const item: PRDItem = {
         id: randomUUID(),
         title: step.title!.trim(),
-        level: "feature",
+        level: CAPTURE_CHILD_LEVEL,
         status: "pending",
         source: "sv-next-steps",
         tags,
@@ -459,7 +549,7 @@ async function handleCaptureAsk(
     const doc = await store.loadDocument();
 
     const existingEpic = doc.items.find(
-      (i) => i.level === "epic" && i.title === ASK_CAPTURE_EPIC_TITLE,
+      (i) => isRootType(itemTypeOf(i)) && i.title === ASK_CAPTURE_EPIC_TITLE,
     );
     let epicId = existingEpic?.id;
     const epicCreated = epicId === undefined;
@@ -468,7 +558,7 @@ async function handleCaptureAsk(
       const epicItem: PRDItem = {
         id: epicId,
         title: ASK_CAPTURE_EPIC_TITLE,
-        level: "epic",
+        level: CAPTURE_ROOT_LEVEL,
         status: "pending",
         source: "sv-ask",
         description: "Questions and answers captured from the SourceVision Ask panel.",
@@ -510,11 +600,11 @@ async function handleCaptureAsk(
 
     jsonResponse(res, 200, {
       ok: true,
-      item: { id: item.id, title: item.title, level: item.level },
+      item: { id: item.id, title: item.title, itemType: itemTypeOf(item) },
       parent: {
         id: epicId,
         title: ASK_CAPTURE_EPIC_TITLE,
-        level: "epic",
+        itemType: "epic",
         created: epicCreated,
       },
     });
@@ -896,7 +986,7 @@ async function handleAcceptEditedProposals(
     for (const parentId of parentsToCascade) {
       const { resetItems } = await cascadeParentReset(store, parentId);
       for (const item of resetItems) {
-        console.log(`[accept-edited] reset ${item.level} id=${item.id} title="${item.title}" -> pending`);
+        console.log(`[accept-edited] reset ${itemTypeOf(item)} id=${item.id} title="${item.title}" -> pending`);
       }
     }
 
@@ -963,13 +1053,19 @@ async function handleSmartAddPreview(
     // Use rex CLI add (smart mode) with --format=json (no --accept = preview mode).
     // Pass description via --description flag (not positional) to prevent any
     // stale UI text from being concatenated into the argument list.
+    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
+    if (parentId === null) {
+      errorResponse(res, 400, "parentId does not name an item in this PRD");
+      return true;
+    }
+
     const description = String(input.text).trim();
     // The dashboard preview is a draft the user reviews — `--fast` forces the
     // vendor's light tier (e.g. haiku) so the CLI provider completes well
     // within the timeout from a daemonized server. The user-driven CLI
     // `n-dx add` keeps the configured top-tier model.
     const args = ["add", "--format=json", "--fast", "--description", description];
-    if (input.parentId) args.push("--parent", input.parentId);
+    if (parentId !== undefined) args.push("--parent", parentId);
     args.push(ctx.projectDir);
 
     const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
@@ -1016,7 +1112,24 @@ async function handleSmartAddPreview(
 
     try {
       const parsed = JSON.parse(cliResult.stdout);
-      const proposals = parsed.proposals ?? [];
+
+      // On a v2 tree there are no proposals to read — reading only `proposals`
+      // showed the user an empty preview and no way to add. Forward the
+      // changes instead; the viewer renders them when `preview` is set and
+      // accepts through POST /api/rex/smart-add-accept.
+      const changes = v2PreviewChanges(parsed);
+      if (changes) {
+        jsonResponse(res, 200, {
+          preview: true,
+          changes,
+          proposals: [],
+          confidence: 0,
+          qualityIssues: (parsed as RexAddOutput).qualityIssues ?? [],
+        });
+        return true;
+      }
+
+      const proposals = (parsed as RexAddOutput).proposals ?? [];
 
       // Compute a confidence score based on proposal quality
       const confidence = computeConfidence(Array.isArray(proposals) ? proposals : []);
@@ -1024,7 +1137,7 @@ async function handleSmartAddPreview(
       jsonResponse(res, 200, {
         proposals: Array.isArray(proposals) ? proposals : [],
         confidence,
-        qualityIssues: parsed.qualityIssues ?? [],
+        qualityIssues: (parsed as RexAddOutput).qualityIssues ?? [],
       });
     } catch {
       // Non-JSON output — return empty
@@ -1032,6 +1145,102 @@ async function handleSmartAddPreview(
     }
   } catch (err) {
     errorResponse(res, 500, String(err));
+  }
+  return true;
+}
+
+/**
+ * Handle POST /api/rex/smart-add-accept — create the changes a v2 preview showed.
+ *
+ * Re-runs the preview's own command with `--accept` rather than replaying a
+ * payload the browser round-tripped: a v2 add is deterministic (a change's
+ * title is its description's first line, with no LLM call and no decomposition
+ * — `packages/rex/src/cli/commands/add-change.ts`), so the same text writes
+ * the changes the preview named. The CLI takes the PRD lock itself, for the
+ * workspace this request addressed, which is why this route does not open a
+ * store transaction of its own.
+ *
+ * The v1 accept path (`proposals/accept-edited`) writes epics, features and
+ * tasks and has no meaning here.
+ */
+async function handleSmartAddAccept(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  try {
+    const body = await readBody(req, res);
+    const input = JSON.parse(body) as { text: string; parentId?: string };
+
+    const description = typeof input.text === "string" ? input.text.trim() : "";
+    if (!description) {
+      errorResponse(res, 400, "Text is required");
+      return true;
+    }
+    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
+    if (parentId === null) {
+      errorResponse(res, 400, "parentId does not name an item in this PRD");
+      return true;
+    }
+
+    // The description goes to rex through a file, the way batch import already
+    // sends its items, rather than as a `--description` argv token: the text
+    // is whatever the user typed, and argv is the wrong place for it — a value
+    // starting with `-` reads as a flag, and Windows caps a command line at
+    // 32 KB, which a pasted spec can exceed. The file is the server's own
+    // path, so the command line carries nothing from the request.
+    const tmpDir = mkdtempSync(join(tmpdir(), "rex-quick-add-"));
+    try {
+      const descriptionFile = join(tmpDir, "description.txt");
+      writeFileSync(descriptionFile, description, "utf-8");
+
+      const args = ["add", "--format=json", "--accept", `--file=${descriptionFile}`];
+      if (parentId !== undefined) args.push("--parent", parentId);
+      args.push(ctx.projectDir);
+
+      const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
+      const cliResult = await foundationExec(binPath, [...prefixArgs, ...args], {
+        cwd: ctx.projectDir,
+        timeout: resolveEffectiveCliTimeoutMs(ctx.projectDir, "add"),
+        maxBuffer: 10 * 1024 * 1024,
+        env: process.env,
+      });
+
+      if (cliResult.error && !cliResult.stdout.trim()) {
+        throw new Error(cliResult.stderr || cliResult.error.message);
+      }
+
+      let changes: RexChangeRow[] | null = null;
+      try {
+        changes = v2AcceptedChanges(JSON.parse(cliResult.stdout));
+      } catch {
+        /* reported below as non-JSON output */
+      }
+      if (!changes) {
+        throw new Error(
+          `rex add did not report the changes it created: ${cliResult.stdout.trim() || cliResult.stderr.trim()}`,
+        );
+      }
+
+      appendLog(ctx, {
+        timestamp: new Date().toISOString(),
+        event: "smart_add_accept",
+        detail: `Added ${changes.length} change${changes.length === 1 ? "" : "s"} from Quick Add: ${changes
+          .map((c) => c.title)
+          .join(", ")}`,
+      });
+
+      if (broadcast) {
+        broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      }
+
+      jsonResponse(res, 200, { ok: true, changes });
+    } finally {
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
+  } catch (err) {
+    errorResponse(res, 500, errorMessage(err));
   }
   return true;
 }
@@ -1076,6 +1285,12 @@ async function handleBatchImport(
       }
     }
 
+    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
+    if (parentId === null) {
+      errorResponse(res, 400, "parentId does not name an item in this PRD");
+      return true;
+    }
+
     // Write items to temp files and build --file args for rex CLI
     const tmpDir = mkdtempSync(join(tmpdir(), "rex-batch-"));
     const filePaths: string[] = [];
@@ -1095,7 +1310,7 @@ async function handleBatchImport(
 
       // Build rex CLI args: add --format=json --file=<f1> --file=<f2> ...
       const args = ["add", "--format=json"];
-      if (input.parentId) args.push("--parent", input.parentId);
+      if (parentId !== undefined) args.push("--parent", parentId);
       if (input.accept) args.push("--accept");
       for (const fp of filePaths) {
         args.push(`--file=${fp}`);
@@ -1120,7 +1335,7 @@ async function handleBatchImport(
       }
 
       // Parse the JSON output from rex CLI
-      let parsed: Record<string, unknown>;
+      let parsed: unknown;
       try {
         parsed = JSON.parse(cliResult.stdout);
       } catch {
@@ -1134,16 +1349,48 @@ async function handleBatchImport(
         return true;
       }
 
-      const proposals = parsed.proposals ?? [];
+      // A v2 tree answers in changes, not level-based proposals: a preview
+      // without --accept, the rows it created with it. Reading only
+      // `proposals` left the preview empty and, on accept, dropped both the
+      // log line and the refresh broadcast for work that had been written.
+      const changes = input.accept ? v2AcceptedChanges(parsed) : v2PreviewChanges(parsed);
+      if (changes) {
+        if (input.accept) {
+          appendLog(ctx, {
+            timestamp: new Date().toISOString(),
+            event: "batch_import_accept",
+            detail: `Batch imported ${input.items.length} items (${changes.length} changes added) from: ${itemSources.join(", ")}`,
+          });
+
+          if (broadcast) {
+            broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+          }
+        }
+
+        jsonResponse(res, 200, {
+          ...(input.accept ? { ok: true } : { preview: true }),
+          changes,
+          proposals: [],
+          confidence: 0,
+          qualityIssues: [],
+          itemCount: input.items.length,
+          itemSources,
+          added: input.accept ? changes.length : 0,
+        });
+        return true;
+      }
+
+      const output = parsed as RexAddOutput;
+      const proposals = output.proposals ?? [];
       const proposalArray = Array.isArray(proposals) ? proposals : [];
       const confidence = computeConfidence(proposalArray as Record<string, unknown>[]);
 
       // If accept mode was used, proposals were already committed
-      if (input.accept && parsed.added) {
+      if (input.accept && output.added) {
         appendLog(ctx, {
           timestamp: new Date().toISOString(),
           event: "batch_import_accept",
-          detail: `Batch imported ${input.items.length} items (${parsed.added} PRD items added) from: ${itemSources.join(", ")}`,
+          detail: `Batch imported ${input.items.length} items (${output.added} PRD items added) from: ${itemSources.join(", ")}`,
         });
 
         if (broadcast) {
@@ -1157,10 +1404,10 @@ async function handleBatchImport(
       jsonResponse(res, 200, {
         proposals: proposalArray,
         confidence,
-        qualityIssues: parsed.qualityIssues ?? [],
+        qualityIssues: output.qualityIssues ?? [],
         itemCount: input.items.length,
         itemSources,
-        added: parsed.added ?? 0,
+        added: output.added ?? 0,
       });
     } finally {
       // Clean up temp files

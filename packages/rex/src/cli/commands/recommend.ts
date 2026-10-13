@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { access, readFile } from "node:fs/promises";
 import { resolveLayout } from "@n-dx/llm-client";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
+import { refuseOnV2 } from "./v2-cli.js";
 
 import { parseIntList } from "../parse-utils.js";
 import { info, result, withCommandProgressReporter } from "../output.js";
@@ -784,6 +785,13 @@ async function runRecommend(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
+  if (flags.accept !== undefined) {
+    await refuseOnV2(
+      resolveRexPaths(dir).rexDir,
+      "recommend --accept",
+      "Capture each recommendation with 'rex add' (a new change) or 'rex change place' (place a change on the product map).",
+    );
+  }
   const hasSourceVision = await detectSourceVision(dir);
   if (!hasSourceVision) {
     result("SourceVision not detected.");

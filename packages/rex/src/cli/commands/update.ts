@@ -1,9 +1,10 @@
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths, isChangeLayerStore } from "../../store/index.js";
 
 import { parseCsvList } from "../parse-utils.js";
 import { CLIError, requireRexDir } from "../errors.js";
-import { info, result } from "../output.js";
+import { info, result, warn } from "../output.js";
+import { completeV2Work, type V2Completion } from "../v2-completion.js";
 import { emitMigrationNotification } from "../migration-notification.js";
 import { validateTransition } from "../../core/transitions.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
@@ -16,6 +17,9 @@ import { holdCompletionForRun, describeHeldCompletion } from "../completion-hold
 import { VALID_STATUSES, VALID_PRIORITIES, RUN_SETTING_KEYS, isItemStatus, isPriority } from "../../schema/index.js";
 import { validateRunSettings } from "../../schema/validate.js";
 import type {PRDItem, ItemStatus} from "../../schema/index.js";
+/** Fields a v2 completion writes itself; the rest of the update is written after it. */
+const V2_COMPLETION_FIELDS = ["status", "startedAt", "completedAt", "endedAt", "activeIntervals"] as const;
+
 /** Summary rendering of one updated field; criteria show a count, not the array. */
 function describeUpdate(key: string, value: unknown): string {
   if (key === "acceptanceCriteria" && Array.isArray(value)) {
@@ -229,7 +233,24 @@ export async function cmdUpdate(
     }
   }
 
-  await store.updateItem(resolvedId, updates, { applyAttribution: true, projectDir: dir });
+  // On a v2 tree completion follows the change layer's rules, applying a
+  // completed change per rex.applyOn, as update_task_status does
+  // (cli/v2-completion.ts). It writes the status and its timestamps; any
+  // other field is written after it. The order is the rule: complete first,
+  // write the other fields only if the completion succeeded, so a refused
+  // completion writes nothing. Every refusal the field write could raise
+  // (dependencies, --run) is checked above, before the completion.
+  let v2: V2Completion | undefined;
+  let fieldUpdates = updates;
+  if (updates.status === "completed" && isChangeLayerStore(store)) {
+    v2 = await completeV2Work(store, resolvedId);
+    for (const w of v2.warnings) warn(w);
+    fieldUpdates = { ...updates };
+    for (const key of V2_COMPLETION_FIELDS) delete fieldUpdates[key];
+  }
+  if (Object.keys(fieldUpdates).length > 0) {
+    await store.updateItem(resolvedId, fieldUpdates, { applyAttribution: true, projectDir: dir });
+  }
 
   // Log the update
   await store.appendLog({
@@ -243,8 +264,9 @@ export async function cmdUpdate(
   // status can never itself make a parent auto-completable (only a fully
   // `completed` child set can — see parent-completion.ts), but re-checking
   // here is harmless.
-  const autoCompleted: Array<{ id: string; title: string; level: string }> = [];
+  const autoCompleted: Array<{ id: string; title: string; level: string }> = v2?.autoCompleted ?? [];
   if (
+    !v2 &&
     updates.status &&
     (updates.status === "completed" || updates.status === "deferred")
   ) {
@@ -278,7 +300,8 @@ export async function cmdUpdate(
 
   if (flags.format === "json") {
     const updated = await store.getItem(resolvedId);
-    result(JSON.stringify({ ...updated, autoCompleted }, null, 2));
+    const v2Fields = v2 ? { changeId: v2.changeId, changeCompleted: v2.changeCompleted, applied: v2.applied, reason: v2.reason } : {};
+    result(JSON.stringify({ ...updated, autoCompleted, ...v2Fields }, null, 2));
   } else {
     if (heldCompletion) info(heldCompletion);
     result(`Updated ${existing.level}: ${existing.title}`);
@@ -286,5 +309,7 @@ export async function cmdUpdate(
     for (const item of autoCompleted) {
       info(`  ✓ Auto-completed ${item.level}: ${item.title}`);
     }
+    if (v2?.applied) info(`  ✓ Applied change ${v2.changeId} to the product layer`);
+    else if (v2?.reason) info(`  Change ${v2.changeId} not applied: ${v2.reason}`);
   }
 }

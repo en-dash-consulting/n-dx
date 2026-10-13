@@ -14,7 +14,8 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
-import type { PRDItemData, ItemLevel } from "./types.js";
+import type { PRDItemData } from "./types.js";
+import { itemTypeLabel, itemTypeOf } from "../../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ interface MergePreviewData {
   absorbed: Array<{
     id: string;
     title: string;
+    /** As rex's `previewMerge` returns it; read through `itemTypeOf`, never directly. */
     level: string;
     status: string;
     childCount: number;
@@ -56,13 +58,6 @@ const STATUS_ICONS: Record<string, string> = {
   deferred: "\u25CC",      // ◌
   blocked: "\u2298",       // ⊘
   deleted: "\u2715",       // ✕
-};
-
-const LEVEL_LABELS: Record<ItemLevel, string> = {
-  epic: "Epic",
-  feature: "Feature",
-  task: "Task",
-  subtask: "Subtask",
 };
 
 // ── Component ────────────────────────────────────────────────────────
@@ -269,8 +264,8 @@ export function MergePreview({ selectedItems, onMergeComplete, onCancel }: Merge
                 h("div", { class: "merge-preview-card-title" },
                   h("span", { class: "merge-preview-card-icon absorbed" }, "\u2715"),
                   h("span", null, item.title),
-                  h("span", { class: `prd-level-badge prd-level-${item.level}` },
-                    LEVEL_LABELS[item.level as ItemLevel] ?? item.level,
+                  h("span", { class: `prd-level-badge prd-level-${itemTypeOf(item)}` },
+                    itemTypeLabel(itemTypeOf(item)),
                   ),
                 ),
                 item.childCount > 0

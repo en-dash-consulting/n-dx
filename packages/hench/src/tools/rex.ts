@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor } from "../prd/rex-gateway.js";
 import { PROJECT_DIRS } from "../prd/llm-gateway.js";
 import { execShellCmd } from "../process/exec.js";
-import { computeTimestampUpdates, reconcileAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding, openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
+import { completeV2Work, computeTimestampUpdates, isChangeLayerStore, reconcileAutoCompletions,validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding, openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 import type {
   RexToolHandlers,
@@ -125,6 +125,9 @@ export async function toolRexUpdateStatus(
     }
   }
 
+  const v2 = isChangeLayerStore(store);
+  if (params.status === "completed" && v2) return completeOnV2(store, taskId, params);
+
   const existing = await store.getItem(taskId);
   const tsUpdates = computeTimestampUpdates(
     existing?.status ?? "pending",
@@ -146,21 +149,7 @@ export async function toolRexUpdateStatus(
     ...(options?.projectDir ? { projectDir: options.projectDir } : {}),
   });
 
-  // status_updated log is best-effort: a failure must not cancel the cascade.
-  try {
-    await store.appendLog({
-      timestamp: new Date().toISOString(),
-      event: "status_updated",
-      itemId: taskId,
-      detail: `Status changed to ${params.status} by hench agent`,
-    });
-  } catch (err) {
-    // Non-fatal: proceed to cascade. Surface a trace so a dropped status_updated
-    // entry isn't completely silent (the tool has no run handle for diagnostics).
-    console.warn(
-      `[rex] status_updated log append failed for ${taskId} (non-fatal): ${(err as Error).message}`,
-    );
-  }
+  await logStatusUpdated(store, taskId, params.status);
 
   // Auto-acknowledge sourcevision findings when a task is deferred
   if (params.status === "deferred" && existing?.tags && options?.projectDir) {
@@ -193,8 +182,11 @@ export async function toolRexUpdateStatus(
   // their authorship on the way out. Containment is what bounds the blast
   // radius of this call to the subtree the run is actually operating on,
   // whatever the completion predicate decides.
+  //
+  // Not on a v2 tree: a change completes only through completeOnV2, which
+  // applies it. This cascade would complete one over the projection unapplied.
   const autoCompleted: string[] = [];
-  if (params.status === "completed" || params.status === "deferred") {
+  if (!v2 && (params.status === "completed" || params.status === "deferred")) {
     const doc = await store.loadDocument();
     const { completedItems } = reconcileAutoCompletions(doc.items, { ancestorsOf: taskId });
 
@@ -232,6 +224,57 @@ export async function toolRexUpdateStatus(
     return `${msg}\nAuto-completed: ${autoCompleted.join(", ")}`;
   }
   return msg;
+}
+
+/** status_updated is best-effort: a failure must not cancel the cascade or the apply report. */
+async function logStatusUpdated(store: PRDStore, taskId: string, status: string): Promise<void> {
+  try {
+    await store.appendLog({
+      timestamp: new Date().toISOString(),
+      event: "status_updated",
+      itemId: taskId,
+      detail: `Status changed to ${status} by hench agent`,
+    });
+  } catch (err) {
+    // Surface a trace so a dropped status_updated entry isn't completely
+    // silent (the tool has no run handle for diagnostics).
+    console.warn(
+      `[rex] status_updated log append failed for ${taskId} (non-fatal): ${(err as Error).message}`,
+    );
+  }
+}
+
+/**
+ * Complete `taskId` on a v2 tree through rex's v2 runtime, the entry point
+ * `update_task_status` uses there: the task's change completes with its last
+ * task and applies per `rex.applyOn`, in one transaction. Logs what completed
+ * and applied (`auto_completed`, `change_applied`) as rex does.
+ */
+async function completeOnV2(
+  store: Parameters<typeof completeV2Work>[0],
+  taskId: string,
+  params: { status: string; resolutionType?: string; resolutionDetail?: string },
+): Promise<string> {
+  const done = await completeV2Work(store, taskId, {
+    ...(params.resolutionType ? { resolutionType: params.resolutionType as ResolutionType } : {}),
+    ...(params.resolutionDetail ? { resolutionDetail: params.resolutionDetail } : {}),
+  });
+  await logStatusUpdated(store, taskId, params.status);
+
+  const lines = [`Updated task ${taskId} status to ${params.status}`];
+  if (done.autoCompleted.length > 0) {
+    // Titles only: `level` is the v1 projection's, which names a change an epic or feature.
+    lines.push(`Auto-completed: ${done.autoCompleted.map((i) => `"${i.title}" (${i.id})`).join(", ")}`);
+  }
+  if (done.changeId && done.changeCompleted) {
+    lines.push(done.applied
+      ? `Change ${done.changeId} applied to the product layer`
+      : `Change ${done.changeId} completed, not applied${done.reason ? `: ${done.reason}` : ""}`);
+  } else if (done.changeId && done.reason) {
+    lines.push(`Change ${done.changeId} held open: ${done.reason}`);
+  }
+  for (const warning of done.warnings) lines.push(`Warning: ${warning}`);
+  return lines.join("\n");
 }
 
 export async function toolRexAppendLog(

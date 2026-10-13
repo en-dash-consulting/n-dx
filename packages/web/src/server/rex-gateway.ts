@@ -29,7 +29,19 @@ export type { LegacyPrdMigrationResult } from "@n-dx/rex";
 
 // ---- Rex folder-tree storage path -------------------------------------------
 export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, resolveStore, cascadeParentReset } from "@n-dx/rex";
+
+// ---- Rex storage layout -----------------------------------------------------
+// On a v2 tree the dashboard's PRD cache is the change-layer projection
+// `resolveStore` returns, not a parse of `prd_tree/`.
+export { prdLayout } from "@n-dx/rex";
+// Item writes on a v2 tree: the guard narrows resolveStore's answer to the
+// change-layer store, and completion is rex's own v2 completion (apply-on-complete).
+export { isChangeLayerStore, completeV2Work } from "@n-dx/rex";
 export type { PRDStore } from "@n-dx/rex";
+// The Product, Changes and capability views on a v2 tree: rex's model and its
+// derived product status, never recomputed in web (routes-rex/product.ts).
+export { loadPrdModel, productReport, capabilityReport, indexTree, isOpenChange, isAppliedChange, specHash, nodeSpec } from "@n-dx/rex";
+export type { V2Tree, RuleNode, ChangeNode, TreeIndex } from "@n-dx/rex";
 
 // ---- Rex PRD tree slug conformance ------------------------------------------
 // The Execute route's pre-run gate. The run it spawns writes the PRD when it
@@ -41,20 +53,20 @@ export { checkTreeConformance } from "@n-dx/rex";
 export { SCHEMA_VERSION, isCompatibleSchema } from "@n-dx/rex";
 
 // ---- Rex domain types & constants -------------------------------------------
-export type { ItemLevel, ItemStatus } from "@n-dx/rex";
+// The level system is deliberately absent. Web reads a node's type through
+// `shared/item-type.ts` — the one module that knows about v1's `level` — so
+// routes no longer need rex's `LEVEL_HIERARCHY` / `CHILD_LEVEL` / `isItemLevel`
+// and the mirror is pinned against rex by
+// `tests/unit/shared/item-type-contract.test.ts`.
+export type { ItemStatus } from "@n-dx/rex";
 export type { PRDItem, PRDDocument, Requirement } from "@n-dx/rex";
 export {
-  LEVEL_HIERARCHY,
   VALID_STATUSES,
   VALID_REQUIREMENT_CATEGORIES,
   VALID_VALIDATION_TYPES,
-  CHILD_LEVEL,
   isPriority,
-  isItemLevel,
   isRequirementCategory,
   isValidationType,
-  isRootLevel,
-  isWorkItem,
 } from "@n-dx/rex";
 
 // ---- Rex tree utilities -----------------------------------------------------
@@ -109,6 +121,11 @@ export type { ItemDurationTotals } from "@n-dx/rex";
 
 // ---- Rex merge/consolidation ------------------------------------------------
 export { validateMerge, previewMerge, mergeItems } from "@n-dx/rex";
+// On a v2 change layer a merge goes through rex's change-layer rule: sibling
+// changes only, never one carrying amends, and the absorbed change's touches
+// and ids carried onto the target.
+export { validateChangesMerge, mergeChanges } from "@n-dx/rex";
+export type { ChangesMergeOutcome } from "@n-dx/rex";
 
 // ---- Rex prune --------------------------------------------------------------
 export { countSubtree } from "@n-dx/rex";
@@ -134,7 +151,7 @@ export type { ReshapeProposal } from "@n-dx/rex";
 export { handleEditItem } from "@n-dx/rex";
 
 // ---- Rex PRD tree backup snapshots (undo for reorganize/prune/reshape/fix) --
-export { getAvailableBackups, restoreFromBackup, isValidSnapshotId } from "@n-dx/rex";
+export { getAvailableBackups, restoreFromBackup, isValidSnapshotId, V2RestoreRefusedError } from "@n-dx/rex";
 export type { BackupSnapshot } from "@n-dx/rex";
 
 // ---- Saved run settings -----------------------------------------------------
@@ -146,6 +163,18 @@ export type { BackupSnapshot } from "@n-dx/rex";
 // would honour).
 export { validateRunSettings } from "@n-dx/rex";
 export type { RunSettings } from "@n-dx/rex";
+
+// ---- Project settings rex owns (`rex.*` in .n-dx.json) ----------------------
+// The Workflow page edits `rex.applyOn` and `rex.placement.autoAccept`, which
+// the CLI reads from the same file. The dashboard already holds `.n-dx.json`
+// parsed, so it validates the section through rex's own parsers rather than a
+// second copy of the rule — and offers exactly the values those parsers accept.
+// A web-local list is how a chooser comes to write a setting the CLI silently
+// falls back from, which looks like a save that did nothing.
+export { APPLY_ON, DEFAULT_APPLY_ON, parseApplyOn } from "@n-dx/rex";
+export type { ApplyOn } from "@n-dx/rex";
+export { PLACEMENT_AUTO_ACCEPT, DEFAULT_PLACEMENT_SETTINGS, parsePlacementSettings } from "@n-dx/rex";
+export type { PlacementAutoAccept, PlacementSettings } from "@n-dx/rex";
 
 // ---- Rex proposal types (consumed by viewer analyze-panel) ------------------
 export type { Proposal, ProposalFeature, ProposalTask } from "@n-dx/rex";

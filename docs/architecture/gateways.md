@@ -6,9 +6,9 @@ When a package imports from another package at runtime, all imports are concentr
 
 | Package | Gateway file | Imports from | Purpose |
 |---------|-------------|--------------|---------|
-| hench | `src/prd/rex-gateway.ts` | rex | Store access, tree traversal, task selection, timestamps, auto-completion, finding acknowledgment |
+| hench | `src/prd/rex-gateway.ts` | rex | Store access, tree traversal, task selection, timestamps, auto-completion, finding acknowledgment, and the v2 surfaces: layout and store detection (`prdLayout`, `isChangeLayerStore`), selection (`findNextWorkTask`, `findActionableWork`, `resolveWorkById`), the brief (`buildChangeBrief`), completion (`completeV2Work`), tree bookkeeping (`isAppliedChange`, `indexTree`, `enclosingChangeIds`, type `V2Tree`) and the reader (`loadPrdModel`: which untracked intent files beside a completion's `state.yaml` hold rows there). Export ceiling enforced by `tests/e2e/architecture-policy.test.js`: 66 |
 | hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | Config, constants, JSON parsing, output formatting, process execution, token parsing, model resolution |
-| web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities |
+| web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities, PRD backup snapshots and `V2RestoreRefusedError` (the restore routes answer 409 `V2_RESTORE_REFUSED` on a v2 tree), and the v2 merge rule (`validateChangesMerge`, `mergeChanges`, `ChangesMergeOutcome`: the merge route, refinement merge and reorganize apply on a v2 tree), and the v2 model and product reports (`loadPrdModel`, `productReport`, `capabilityReport`, `indexTree`, `isOpenChange`, `isAppliedChange`, `specHash`, `nodeSpec` and the `V2Tree`, `RuleNode`, `ChangeNode`, `TreeIndex` types: the Product, Changes and capability views); export ceiling 99 — raised from 87 to 99 for the v2 product reads, the project settings rex owns (`rex.applyOn`, `rex.placement.autoAccept`: accepted values, defaults and parsers); export ceiling 102 |
 | web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types, live analyze progress reader, analyze command-line check, cross-repo artifact types (repo identity, outbound, infrastructure) |
 | web | `src/viewer/external.ts` | messaging, shared, schema | Viewer-to-server boundary gateway |
 
@@ -27,6 +27,25 @@ When a package imports from another package at runtime, all imports are concentr
 ## Intra-Package Gateways
 
 Within the web package, `src/viewer/external.ts` concentrates all viewer-side imports from `src/viewer/messaging/`, `src/shared/`, and `src/schema/`. `RequestDedup` is canonically located in `src/viewer/messaging/request-dedup.ts` and re-exported through `external.ts` for viewer consumers.
+
+## Rex v2 runtime surface
+
+`packages/rex/src/public.ts` exports the v2 (product/change layer) surface in two blocks. #648 (on main) added the model: reader, tree types, index and the derived product computations. The selection-and-completion PR adds the runtime the MCP tools and CLI call: transaction, selection, completion, brief and `ChangeLayerStore`. hench's and web's rex gateways re-export the parts they need (roadmap PRs 35 and 36, stacked on this one), so consumers never import rex internals.
+
+**A name is exported from `public.ts` once.** A second `export { X }` of a name is TS2300 "Duplicate identifier", so identical names on two branches do not merge cleanly: the restack onto #648 had to delete this PR's duplicate re-exports of `prdLayout`, `loadPrdModel`, `PrdModel`, `LoadPrdModelOptions`, `V2Tree` and `RuleNode`. Grep `public.ts` before adding a name.
+
+| Concern | Exports |
+|---------|---------|
+| Reader (#648) | `loadPrdModel`, `prdLayout`, `V1_LEVEL_TYPES`, `NEWEST_SCHEMA`, `SchemaSkewError`; types `PrdModel`, `LoadPrdModelOptions`, `FolderStateKeys` |
+| Tree and index (#648) | `indexTree`, `isAppliedChange`, `isOpenChange`, `isBuildingChange`, `specHash`, `nodeSpec`; types `V2Tree`, `RuleNode`, `TreeIndex`, `V2TreeEntry`, `IndexOptions` |
+| Product computations (#648) | `computeProductStatus`, `productReport`, `capabilityReport`, `prdStatusReport`, `computeEdges`, `computeRealizedBy`, `computeLandings`; types `ProductStatus`, `CapabilityReport`, `PrdStatusReport`, `ProductEdges`, `Realization`, `ChangeLanding` |
+| Transaction | `withPrdModelTransaction` (PRD lock held across load, mutate, write; refuses a v1 tree with `PrdLayoutError`); types `PrdModelEdit`, `PrdModelTransactionOptions`, `PrdModelTransactionResult` |
+| Selection | `findNextWork`, `findActionableWork`, `resolveWorkById` (`null` for a change holding a change); `changeWorkShape` (unit, tasks or container: the one judgement selection, `resolveWorkById` and `claim_task` share); `enclosingChangeIds` (changes enclosing a ref, innermost first: a claim on any covers it, so a consumer claiming a task directly must refuse one inside a foreign-claimed change); `findNextWorkTask` (v1-shaped answer `get_next_task` returns), `completedWorkIds`; types `WorkUnit`, `WorkKind`, `WorkSelectionOptions`, `ChangeWorkShape`, `WorkShapeChild`, `NextWorkTask`, `NextWorkOptions` |
+| Completion | `completeTask`, `completeChange`, `completeWork` (pure, on a `V2Tree`), `ChangeCompletionError`; `completeV2Work` (the transaction `update_task_status` runs: completes, applies per `rex.applyOn`, logs), `loadApplyOn`; types `ChangeCompletionOptions`, `ChangeCompletionResult`, `CompleteWorkOptions`, `CompleteWorkResult`, `V2Completion`, `V2CompletionOptions`, `ApplyOn` |
+| Brief | `buildChangeBrief`, `renderChangeBrief`; types `ChangeBrief`, `ChangeBriefOptions`, `BriefCommands`, `BriefLogEntry` |
+| Store | `ChangeLayerStore`, `isChangeLayerStore` (what `resolveStore` returns on a v2 tree) |
+
+Covered by `packages/rex/tests/integration/public-v2-runtime.test.ts`, which imports only `public.ts`.
 
 ## Injection Seams
 

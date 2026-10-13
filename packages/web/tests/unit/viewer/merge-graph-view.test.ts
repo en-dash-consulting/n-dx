@@ -30,7 +30,7 @@ interface MinimalPrdNode {
   kind: "prd";
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   status: string;
   parentId?: string;
   priority?: string;
@@ -92,11 +92,11 @@ function makeGraph(): MinimalGraph {
   return {
     generatedAt: "2026-05-08T00:00:00Z",
     nodes: [
-      { kind: "prd", id: "E1", title: "Epic One", level: "epic", status: "in_progress", treePath: "epic-one", shape: "trapezoid" },
-      { kind: "prd", id: "F1", title: "Feature One", level: "feature", status: "pending", parentId: "E1", treePath: "epic-one/feature-one", shape: "diamond" },
-      { kind: "prd", id: "T1", title: "Task One", level: "task", status: "pending", parentId: "F1", priority: "high", treePath: "epic-one/feature-one/task-one", shape: "triangle" },
-      { kind: "prd", id: "T2", title: "Task Two", level: "task", status: "pending", parentId: "F1", treePath: "epic-one/feature-one/task-two", shape: "triangle" },
-      { kind: "prd", id: "E2", title: "Epic Two", level: "epic", status: "pending", treePath: "epic-two", shape: "triangle" },
+      { kind: "prd", id: "E1", title: "Epic One", itemType: "epic", status: "in_progress", treePath: "epic-one", shape: "trapezoid" },
+      { kind: "prd", id: "F1", title: "Feature One", itemType: "feature", status: "pending", parentId: "E1", treePath: "epic-one/feature-one", shape: "diamond" },
+      { kind: "prd", id: "T1", title: "Task One", itemType: "task", status: "pending", parentId: "F1", priority: "high", treePath: "epic-one/feature-one/task-one", shape: "triangle" },
+      { kind: "prd", id: "T2", title: "Task Two", itemType: "task", status: "pending", parentId: "F1", treePath: "epic-one/feature-one/task-two", shape: "triangle" },
+      { kind: "prd", id: "E2", title: "Epic Two", itemType: "epic", status: "pending", treePath: "epic-two", shape: "triangle" },
       {
         kind: "merge", id: "M1", sha: "abcdef1", shortSha: "abcdef1",
         subject: "fix: thing", body: "", mergedAt: "2026-05-01T00:00:00Z",
@@ -210,7 +210,7 @@ describe("resolveMergeMetaForSelection", () => {
       makeGraph() as never,
       {
         kind: "prd",
-        node: { id: "T2", title: "Task Two", level: "task", status: "pending" },
+        node: { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
         linkedMergeIds: [],
       } as never,
     );
@@ -232,7 +232,7 @@ describe("resolveMergeMetaForSelection", () => {
       graph as never,
       {
         kind: "prd",
-        node: { id: "T1", title: "Task One", level: "task", status: "pending" },
+        node: { id: "T1", title: "Task One", itemType: "task", status: "pending" },
         linkedMergeIds: ["M1", "M2"],
       } as never,
     );
@@ -294,11 +294,11 @@ describe("MergeGraphView", () => {
 
   it("renders every PRD item from the graph on initial load (full-tree default)", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     // Five PRD nodes — every level (epic, feature, task) is visible without
@@ -318,11 +318,11 @@ describe("MergeGraphView", () => {
 
   it("renders no chevron affordance — clicking a node only selects, never toggles", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -347,11 +347,11 @@ describe("MergeGraphView", () => {
 
   it("renders both view-mode chips with full-tree active by default", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -368,11 +368,11 @@ describe("MergeGraphView", () => {
 
   it("trims to epics only when 'Epics only' is selected and restores everything when toggled back", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -397,11 +397,11 @@ describe("MergeGraphView", () => {
 
   it("highlights the clicked PRD subtree and dims unrelated nodes", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress", priority: "high", tags: ["alpha", "beta"] },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending", priority: "high" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress", priority: "high", tags: ["alpha", "beta"] },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending", priority: "high" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -421,11 +421,11 @@ describe("MergeGraphView", () => {
 
   it("clears the previous highlight when a different node is selected", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -448,11 +448,11 @@ describe("MergeGraphView", () => {
 
   it("recenters the SVG viewport on the clicked node", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -486,11 +486,11 @@ describe("MergeGraphView", () => {
 
   it("renders a front-matter summary with title, status, priority, and tags on click", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress", priority: "high", tags: ["alpha", "beta"] },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending", priority: "high", tags: ["graph"] },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress", priority: "high", tags: ["alpha", "beta"] },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending", priority: "high", tags: ["graph"] },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -514,11 +514,11 @@ describe("MergeGraphView", () => {
   it("renders an em dash for missing priority/tags without breaking layout", async () => {
     mountWithPrd([
       // Intentionally omit priority and tags on T2.
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending", priority: "high" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending", priority: "high" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -554,11 +554,11 @@ describe("MergeGraphView", () => {
     };
     mountWithPrd(
       [
-        { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-        { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-        { id: "T1", title: "Task One", level: "task", status: "pending" },
-        { id: "T2", title: "Task Two", level: "task", status: "pending" },
-        { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+        { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+        { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+        { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+        { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+        { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
       ],
       {
         originHandler: (url: string) => {
@@ -590,11 +590,11 @@ describe("MergeGraphView", () => {
 
   it("renders a 'No commit history' state when the origin lookup returns null", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -614,11 +614,11 @@ describe("MergeGraphView", () => {
 
   it("renders the empty/instructional merge metadata panel before any selection", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -635,11 +635,11 @@ describe("MergeGraphView", () => {
 
   it("renders timestamp, short SHA, and author when a linked PRD node is selected", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -662,11 +662,11 @@ describe("MergeGraphView", () => {
 
   it("shows 'no merge recorded' for a PRD node with no linked merges", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -695,11 +695,11 @@ describe("MergeGraphView", () => {
     });
 
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -723,11 +723,11 @@ describe("MergeGraphView", () => {
 
   it("updates the metadata panel synchronously when the selection changes", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -757,11 +757,11 @@ describe("MergeGraphView", () => {
 
   it("does not refetch the merge graph when the selection changes", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -787,11 +787,11 @@ describe("MergeGraphView", () => {
 
   it("places parents above children in the top-down layout", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -820,11 +820,11 @@ describe("MergeGraphView", () => {
    */
   it("renders the compact folder-tree layout for a representative PRD fixture", async () => {
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {
@@ -886,11 +886,11 @@ describe("MergeGraphView", () => {
     // fill — the user-facing contract is "shape ⇒ color". Status is encoded
     // by the glyph prefix in the node label (▶ ⊘ ✓ etc.).
     mountWithPrd([
-      { id: "E1", title: "Epic One", level: "epic", status: "in_progress" },
-      { id: "F1", title: "Feature One", level: "feature", status: "pending" },
-      { id: "T1", title: "Task One", level: "task", status: "pending" },
-      { id: "T2", title: "Task Two", level: "task", status: "pending" },
-      { id: "E2", title: "Epic Two", level: "epic", status: "pending" },
+      { id: "E1", title: "Epic One", itemType: "epic", status: "in_progress" },
+      { id: "F1", title: "Feature One", itemType: "feature", status: "pending" },
+      { id: "T1", title: "Task One", itemType: "task", status: "pending" },
+      { id: "T2", title: "Task Two", itemType: "task", status: "pending" },
+      { id: "E2", title: "Epic Two", itemType: "epic", status: "pending" },
     ]);
 
     await waitFor(() => {

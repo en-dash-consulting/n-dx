@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "nod
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
-import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
+import { explainSelection, collectCompletedIds, computeTimestampUpdates, enclosingChangeIds, findItem, findParentResets, indexTree, isAppliedChange, isChangeLayerStore, loadPrdModel, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD, DEFAULT_GIT_COMMIT_MESSAGE_SOURCE } from "../../schema/index.js";
 import type { GitCommitMessageSource, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
@@ -79,10 +79,12 @@ import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
+import { V2_CHANGES_DIRNAME, V2_INBOX_DIRNAME, V2_PRODUCT_DIRNAME, V2_STATE_FILENAME } from "../../store/paths.js";
 import {
   PRD_COMMIT_PATHS,
   deletedAmong,
   findUncommittedWork,
+  formatAppliedCompletionKept,
   formatOperatorPrdLeftovers,
   formatRecordCommitPending,
   formatReviewRepairsUncommittedRefusal,
@@ -2313,6 +2315,209 @@ async function isGitTracked(projectDir: string, relativePath: string): Promise<b
 }
 
 /**
+ * The untracked, non-ignored intent files (`.md`) directly inside the v2 node
+ * folder `folder` (project-relative, trailing slash).
+ */
+async function untrackedIntentFiles(projectDir: string, folder: string): Promise<string[]> {
+  const result = await exec("git", ["ls-files", "--others", "--exclude-standard", "-z", "--", folder], {
+    cwd: projectDir,
+    timeout: 10_000,
+  });
+  if (result.exitCode !== 0) return [];
+  return result.stdout
+    .split("\0")
+    .filter((p) => p.startsWith(folder) && p.endsWith(".md") && !p.slice(folder.length).includes("/"));
+}
+
+type StateRows = NonNullable<NonNullable<Parameters<typeof loadPrdModel>[1]>["stateRows"]>;
+
+/**
+ * Which of `candidates` (untracked intent files beside a `state.yaml` the
+ * completion wrote) belong in the completion commit: those whose node has a
+ * row in that `state.yaml`.
+ *
+ * A change captured and placed through MCP after the agent's commit has never
+ * been committed when a later run completes it, and the completion writes only
+ * its `state.yaml`. Committing that alone lands a state row for a node git
+ * does not have, so the node's files come too. An operator's draft in the same
+ * folder (a new capability, a task file) has no row — state exists only for
+ * nodes a tool wrote — and stays out, as any in-flight edit under product/ or
+ * changes/ does. Tracked intent files are never candidates: git already has
+ * the node, and a modification there is someone's edit, not this write's.
+ *
+ * rex's reader resolves which file holds which node and records each node's
+ * row from its own folder's `state.yaml` (`stateRows`), so a node with a row
+ * there is exactly a node of that folder with state. A node's file is located
+ * by its slug, the name rex stores it under; a tree rex refuses to read stages
+ * none of them.
+ */
+async function intentFilesWithStateRows(
+  projectDir: string,
+  candidates: string[],
+): Promise<Array<{ path: string; id: string }>> {
+  if (candidates.length === 0) return [];
+  const rexDir = rexDirName(projectDir);
+  const stateRows: StateRows = new Map();
+  let model: Awaited<ReturnType<typeof loadPrdModel>>;
+  try {
+    model = await loadPrdModel(join(projectDir, rexDir), { stateRows, warn: () => {} });
+  } catch (err) {
+    detail(`Not staging untracked intent files: the PRD could not be read (${(err as Error).message})`);
+    return [];
+  }
+
+  const withRow = v2NodeIdsByPath(rexDir, model.tree, (id) => stateRows.has(id));
+  return candidates.flatMap((path) => {
+    const id = withRow.get(path);
+    if (id) return [{ path, id }];
+    detail(`Leaving untracked ${path} out of the completion commit: its node has no state row`);
+    return [];
+  });
+}
+
+type V2NodeTree = { product: readonly V2Node[]; changes: readonly V2Node[] };
+type V2Node = { id: string; slug: string; children?: V2Node[] };
+
+/**
+ * Every project-relative path a node of `tree` (those `keep` accepts) can be
+ * stored at, mapped to its id. A change at the top of changes/ may sit in the
+ * Inbox, and a folder node may have no children, so both candidates are
+ * recorded; only the real one is ever looked up.
+ */
+function v2NodeIdsByPath(rexDir: string, tree: V2NodeTree, keep: (id: string) => boolean): Map<string, string> {
+  const byPath = new Map<string, string>();
+  const walk = (nodes: readonly V2Node[], dirs: string[]) => {
+    for (const node of nodes) {
+      if (keep(node.id)) {
+        for (const dir of dirs) {
+          byPath.set(`${dir}${node.slug}.md`, node.id);
+          byPath.set(`${dir}${node.slug}/index.md`, node.id);
+        }
+      }
+      if (node.children?.length) walk(node.children, dirs.map((dir) => `${dir}${node.slug}/`));
+    }
+  };
+  walk(tree.product, [`${rexDir}/${V2_PRODUCT_DIRNAME}/`]);
+  walk(tree.changes, [
+    `${rexDir}/${V2_CHANGES_DIRNAME}/`,
+    `${rexDir}/${V2_CHANGES_DIRNAME}/${V2_INBOX_DIRNAME}/`,
+  ]);
+  return byPath;
+}
+
+/**
+ * The placement moves that a node in `nodeIds` (an intent file the completion
+ * stages) belongs to, as paths to stage: both sides of each move.
+ *
+ * place_change moves an Inbox change to the top of changes/ through the MCP
+ * server, outside any save report hench drains. When the Inbox copy was
+ * committed, staging part of the moved folder lands the change's id in two
+ * folders of HEAD, or (when the completion's state.yaml sits deeper than the
+ * change) a task folder under a change folder with no index.md, which rex
+ * skips on a clean clone while the Inbox copy has already lost it.
+ *
+ * So the move lands whole. A moved file is a tracked file under changes/,
+ * deleted in the working tree, whose node (read by rex's reader from git's
+ * copy, in a scratch tree) is stored again at an untracked path under
+ * changes/. Every such pair inside a top-level change holding one of
+ * `nodeIds` is staged on both sides, with the deleted `state.yaml` files of
+ * the old folders and the untracked ones of the new. An untracked file whose
+ * node git never had (an operator's draft) has no pair and stays out, as does
+ * a deleted file whose node is stored nowhere else (an operator's removal).
+ */
+async function placementMoves(projectDir: string, nodeIds: ReadonlySet<string>): Promise<string[]> {
+  if (nodeIds.size === 0) return [];
+  const rexDir = rexDirName(projectDir);
+  const changesDir = `${rexDir}/${V2_CHANGES_DIRNAME}/`;
+  const gitList = async (args: string[]): Promise<string[]> => {
+    const result = await exec("git", ["ls-files", ...args, "-z", "--", changesDir], { cwd: projectDir, timeout: 10_000 });
+    return result.exitCode === 0 ? result.stdout.split("\0").filter((p) => p.startsWith(changesDir)) : [];
+  };
+  const isIntent = (p: string) => p.endsWith(".md");
+  const deleted = await gitList(["--deleted"]);
+  if (!deleted.some(isIntent)) return [];
+  const untracked = await gitList(["--others", "--exclude-standard"]);
+  if (!untracked.some(isIntent)) return [];
+
+  const committed = await committedNodeIds(projectDir, rexDir, deleted.filter(isIntent));
+  if (!committed) return [];
+  let current: Awaited<ReturnType<typeof loadPrdModel>>;
+  try {
+    current = await loadPrdModel(join(projectDir, rexDir), { warn: () => {} });
+  } catch (err) {
+    detail(`Not staging placement moves: the PRD could not be read (${(err as Error).message})`);
+    return [];
+  }
+  const currentPaths = v2NodeIdsByPath(rexDir, current.tree, () => true);
+  const untrackedById = new Map<string, string>();
+  for (const path of untracked) {
+    const id = currentPaths.get(path);
+    if (id) untrackedById.set(id, path);
+  }
+
+  // The top-level change a node path under changes/ belongs to, Inbox or not.
+  const inboxPrefix = `${V2_INBOX_DIRNAME}/`;
+  const changeOf = (path: string): string => {
+    const rest = path.slice(changesDir.length);
+    const name = (rest.startsWith(inboxPrefix) ? rest.slice(inboxPrefix.length) : rest).split("/")[0];
+    return name.endsWith(".md") ? name.slice(0, -".md".length) : name;
+  };
+  const pairs: Array<{ from: string; to: string; id: string }> = [];
+  for (const [from, id] of committed) {
+    const to = untrackedById.get(id);
+    if (to) pairs.push({ from, to, id });
+  }
+  const changes = new Set(pairs.filter(({ id }) => nodeIds.has(id)).map(({ to }) => changeOf(to)));
+  const moved = pairs.filter(({ to }) => changes.has(changeOf(to)));
+  if (moved.length === 0) return [];
+
+  const folderOf = (path: string) => path.slice(0, path.lastIndexOf("/") + 1);
+  const stateIn = (paths: string[], dirs: Set<string>) =>
+    paths.filter((p) => p.endsWith(`/${V2_STATE_FILENAME}`) && dirs.has(p.slice(0, -V2_STATE_FILENAME.length)));
+  return [
+    ...moved.flatMap(({ from, to }) => [to, from]),
+    ...stateIn(untracked, new Set(moved.map(({ to }) => folderOf(to)))),
+    ...stateIn(deleted, new Set(moved.map(({ from }) => folderOf(from)))),
+  ];
+}
+
+/**
+ * The node id git's copy stores at each of `paths` (deleted intent files under
+ * changes/), read by rex's reader from a scratch tree of those copies under
+ * git's product header. Null when that tree cannot be read.
+ */
+async function committedNodeIds(projectDir: string, rexDir: string, paths: string[]): Promise<Map<string, string> | null> {
+  const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { dirname } = await import("node:path");
+  const scratch = await mkdtemp(join(tmpdir(), "hench-placement-"));
+  try {
+    for (const path of [`${rexDir}/${V2_PRODUCT_DIRNAME}/index.md`, ...paths]) {
+      const shown = await exec("git", ["show", `:${path}`], { cwd: projectDir, timeout: 10_000 });
+      if (shown.exitCode !== 0) continue;
+      await mkdir(join(scratch, dirname(path)), { recursive: true });
+      await writeFile(join(scratch, path), shown.stdout, "utf-8");
+    }
+    let model: Awaited<ReturnType<typeof loadPrdModel>>;
+    try {
+      model = await loadPrdModel(join(scratch, rexDir), { warn: () => {} });
+    } catch (err) {
+      detail(`Not staging placement moves: their committed copies could not be read (${(err as Error).message})`);
+      return null;
+    }
+    const byPath = v2NodeIdsByPath(rexDir, model.tree, () => true);
+    const ids = new Map<string, string>();
+    for (const path of paths) {
+      const id = byPath.get(path);
+      if (id) ids.set(path, id);
+    }
+    return ids;
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+}
+
+/**
  * Narrow the wholesale staging roots to the exact files the PRD save(s)
  * reported written and deleted, plus the `tree-meta.json` sidecar (rewritten
  * by every save, deliberately not part of the report).
@@ -2322,6 +2527,11 @@ async function isGitTracked(projectDir: string, relativePath: string): Promise<b
  * survived (an ignored `.rex/prd_tree/` drops every file under it). Report
  * paths outside `.rex/prd_tree/` are dropped too — the report is trusted
  * about *which tree files* changed, not as a licence to stage anywhere.
+ * A reported v2 `state.yaml` also brings the untracked intent files of the
+ * nodes it holds rows for ({@link intentFilesWithStateRows}), so a state row
+ * never lands without its node and an operator's draft beside it stays out,
+ * and, when those nodes were placed out of a committed Inbox, the whole move
+ * ({@link placementMoves}), so a placed change is not left in two folders.
  *
  * Per-path checks keep `git add` from erroring:
  * - a written file must still exist (a path that vanished since the save and
@@ -2343,8 +2553,11 @@ async function scopePrdPathsToReport(
   // git accepts it on Windows too.
   const allowedRoots = new Set(rootPaths.map((p) => p.split(sep).join("/")));
   const rexDir = rexDirName(projectDir);
-  const treePrefix = `${rexDir}/${PRD_TREE_DIRNAME}/`;
-  const treeAllowed = allowedRoots.has(`${rexDir}/${PRD_TREE_DIRNAME}`);
+  // The tree on v1, the product/ and changes/ layers on v2.
+  const treeDirs = [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME]
+    .filter((dir) => allowedRoots.has(`${rexDir}/${dir}`))
+    .map((dir) => `${rexDir}/${dir}/`);
+  const inAllowedTree = (path: string) => treeDirs.some((prefix) => path.startsWith(prefix));
 
   const scoped: string[] = [];
   const seen = new Set<string>();
@@ -2355,14 +2568,21 @@ async function scopePrdPathsToReport(
     }
   };
 
-  if (treeAllowed) {
+  if (treeDirs.length > 0) {
+    const untrackedIntents: string[] = [];
     for (const path of report.written) {
-      if (!path.startsWith(treePrefix)) continue;
+      if (!inAllowedTree(path)) continue;
       if (!existsSync(join(projectDir, path))) continue;
       push(path);
+      if (path.endsWith(`/${V2_STATE_FILENAME}`)) {
+        untrackedIntents.push(...(await untrackedIntentFiles(projectDir, path.slice(0, -V2_STATE_FILENAME.length))));
+      }
     }
+    const intents = await intentFilesWithStateRows(projectDir, untrackedIntents);
+    for (const { path } of intents) push(path);
+    for (const path of await placementMoves(projectDir, new Set(intents.map(({ id }) => id)))) push(path);
     for (const path of report.deleted) {
-      if (!path.startsWith(treePrefix)) continue;
+      if (!inAllowedTree(path)) continue;
       if (existsSync(join(projectDir, path)) || (await isGitTracked(projectDir, path))) {
         push(path);
       }
@@ -2431,9 +2651,16 @@ async function commitPrdTreeIfStaged(
   // With a save report, stage exactly the files the store's save(s) wrote and
   // deleted rather than the whole tree — staging `.rex/prd_tree/` wholesale
   // once swept a 1,378-file in-flight rename into a "task completed" commit.
-  // Without one (a store that does not track saves, or nothing saved), fall
-  // back to the wholesale roots, which is the pre-report behaviour.
-  const prdPaths = report ? await scopePrdPathsToReport(projectDir, rootPaths, report) : rootPaths;
+  // Without one (a store that does not track saves, or nothing saved), a v1
+  // tree falls back to the wholesale roots, the pre-report behaviour. A v2
+  // tree never does: product/ and changes/ are where operators and the
+  // dashboard edit while a run works, so no report means this store wrote
+  // nothing there and nothing there is staged.
+  const { sep } = await import("node:path");
+  const v2Product = `${rexDirName(projectDir)}/${V2_PRODUCT_DIRNAME}`;
+  const isV2 = rootPaths.some((p) => p.split(sep).join("/") === v2Product);
+  const scope = report ?? (isV2 ? { written: [], deleted: [] } : null);
+  const prdPaths = scope ? await scopePrdPathsToReport(projectDir, rootPaths, scope) : rootPaths;
 
   if (prdPaths.length === 0) {
     return { staged: 0 };
@@ -2513,9 +2740,9 @@ async function commitCompletionMetadata(
   }
 
   // With a save report, stages exactly the files the completion write touched
-  // (the task plus cascaded ancestors); without one, falls back to staging the
-  // whole `.rex/prd_tree/`, which under the no-concurrent-PRD-writers contract
-  // is just this run's metadata. The message reflects it may span the tree.
+  // (the task plus cascaded ancestors); without one, a v1 tree falls back to
+  // staging the whole `.rex/prd_tree/`, which under the no-concurrent-PRD-
+  // writers contract is just this run's metadata, and a v2 tree stages nothing. The message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
   const result = await commitPrdTreeIfStaged(projectDir, message, "PRD record (task completion)", report, taskId);
   if (result.error) {
@@ -2963,7 +3190,7 @@ export async function performCommitPromptIfNeeded(
     run.error = `Could not stage review repairs: ${reviewStageFailure.message}`;
     info(`\n${run.error}`);
     if (store) {
-      await withdrawCompletionClaim(store, run, run.error);
+      await withdrawCompletionClaim(store, run, run.error, projectDir);
     }
     try { unlinkSync(msgPath); } catch { /* ignore */ }
     return "no-commit";
@@ -3054,7 +3281,7 @@ export async function performCommitPromptIfNeeded(
         run.status = "failed";
         run.error = `Could not stage PRD files: ${error.message}`;
         info(`\n${run.error}`);
-        await withdrawCompletionClaim(store, run, run.error);
+        await withdrawCompletionClaim(store, run, run.error, projectDir);
         try { unlinkSync(msgPath); } catch { /* ignore */ }
         return "no-commit";
       }
@@ -3164,7 +3391,7 @@ export async function performCommitPromptIfNeeded(
     run.error = `Commit failed: ${error.message}`;
     info(run.error);
     if (store) {
-      await withdrawCompletionClaim(store, run, run.error);
+      await withdrawCompletionClaim(store, run, run.error, projectDir);
     }
   } finally {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
@@ -3269,7 +3496,68 @@ async function reopenWithdrawnAncestors(store: PRDStore, taskId: string): Promis
 }
 
 /**
+ * On a v2 tree, the applied change a completed `taskId` stands in, or
+ * undefined: the node itself when it is a task-less change, else the innermost
+ * applied change enclosing it. Always undefined on v1, and for a task that is
+ * not completed.
+ *
+ * Completing a change's last task applies the change in the same write, so a
+ * completion that reaches here applied it, or completed under one already
+ * applied. Either way the product layer holds its amendment.
+ */
+async function appliedChangeOfCompletion(store: PRDStore, taskId: string): Promise<string | undefined> {
+  if (!isChangeLayerStore(store)) return undefined;
+  if ((await store.getItem(taskId))?.status !== "completed") return undefined;
+  const tree = await store.loadTree();
+  const index = indexTree(tree);
+  return [taskId, ...enclosingChangeIds(tree, taskId)].find((id) => {
+    const node = index.resolve(id);
+    return node !== undefined && isAppliedChange(node);
+  });
+}
+
+/**
+ * Keep a v2 completion that applied its change, instead of withdrawing it
+ * (decision S1-Q2: an applied change is never reopened).
+ *
+ * Withdrawing would reset the task and, through the v1 ancestor reset, the
+ * change, while the change kept `appliedAt` and product/ kept the amendment —
+ * and the next completion commit, which discounts product/ and changes/ as
+ * bookkeeping, would sweep the phantom amendment in. The run has already
+ * failed; this replaces its error with one that names every uncommitted path
+ * and the commands that land them under the task's N-DX-Item trailer.
+ */
+async function keepAppliedCompletion(
+  store: PRDStore,
+  run: RunRecord,
+  reason: string,
+  changeId: string,
+  projectDir: string,
+): Promise<void> {
+  const taskId = run.taskId!;
+  const { paths } = await findUncommittedWork({ projectDir });
+  const deleted = deletedAmong(projectDir, paths);
+  run.error = formatAppliedCompletionKept({
+    cause: reason,
+    changeId,
+    taskId,
+    paths,
+    deleted,
+    files: await prepareRecoveryPathspecs(projectDir, paths, deleted),
+  });
+  info(`\n${run.error}`);
+  await toolRexAppendLog(store, taskId, {
+    event: "completion_kept",
+    detail: `Change ${changeId} is applied, so the completion stands: ${reason}`,
+  });
+}
+
+/**
  * Withdraw a completion claim the run is no longer entitled to make.
+ *
+ * Except on a v2 tree where the completion applied its change
+ * ({@link appliedChangeOfCompletion}): that completion is kept and reported
+ * ({@link keepAppliedCompletion}), never reset.
  *
  * {@link resetInProgressTaskIfFailed} is not enough on its own: the agent is
  * instructed to call `rex_update_status` itself, so by the time the
@@ -3285,11 +3573,18 @@ async function withdrawCompletionClaim(
   store: PRDStore,
   run: RunRecord,
   reason: string,
+  projectDir: string,
 ): Promise<void> {
   if (!run.taskId) return;
   try {
     const item = await store.getItem(run.taskId);
     if (!item || (item.status !== "completed" && item.status !== "in_progress")) return;
+
+    const appliedChangeId = await appliedChangeOfCompletion(store, run.taskId);
+    if (appliedChangeId) {
+      await keepAppliedCompletion(store, run, reason, appliedChangeId, projectDir);
+      return;
+    }
 
     await toolRexUpdateStatus(store, run.taskId, { status: "pending" });
     await toolRexAppendLog(store, run.taskId, {
@@ -3475,10 +3770,11 @@ async function settleAfterTestGateFailure(
   if (hold?.outcome === "bypassed" && opts.store) {
     info(
       "\n⚠ The task was already marked completed when the test gate ran: the agent's completion did not go " +
-        "through the hold (a rex MCP server built before it, or a direct write). Withdrawing it. " +
+        "through the hold (a rex MCP server built before it, or a direct write). Withdrawing it, " +
+        "unless it applied a v2 change, which is kept. " +
         "If the agent committed it, that commit still records the task as completed.",
     );
-    await withdrawCompletionClaim(opts.store, run, run.error ?? "Test gate failed");
+    await withdrawCompletionClaim(opts.store, run, run.error ?? "Test gate failed", opts.projectDir);
   }
 
   const review = run.review;
@@ -4086,7 +4382,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     run.review.gated = true;
     info(`\n${run.error}`);
     if (opts.store) {
-      await withdrawCompletionClaim(opts.store, run, run.error);
+      await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
     }
   }
 
@@ -4101,7 +4397,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     run.error = formatUnresolvedMustFixRefusal(run.review);
     info(`\n${run.error}`);
     if (opts.store) {
-      await withdrawCompletionClaim(opts.store, run, run.error);
+      await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
     }
   }
 
@@ -4203,7 +4499,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         : formatUncommittedWorkRefusal(leaked.paths, leakedDeleted, pathspecs);
       info(`\n${run.error}`);
       if (opts.store) {
-        await withdrawCompletionClaim(opts.store, run, run.error);
+        await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
       }
       // Hold the cross-worktree claim rather than letting the run's `finally`
       // release it. The refusal means finished work is sitting uncommitted in
@@ -4294,7 +4590,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       run.error = `Could not commit review repairs: ${error.message}`;
       info(`\n${run.error}`);
       if (opts.store) {
-        await withdrawCompletionClaim(opts.store, run, run.error);
+        await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
       }
     }
 
@@ -4385,12 +4681,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // finished work here that nobody committed", so offering to revert it would
   // put the very files the gate just saved one keystroke from deletion. Same
   // for the missing-review refusal: the work passed its own validation and the
-  // only thing that failed was the reviewer's spawn.
+  // only thing that failed was the reviewer's spawn. Nor after a kept v2
+  // completion (keepAppliedCompletion): reverting its PRD writes would unapply
+  // the change the error just told the operator to commit.
   if (
     !uncommittedWorkRefused &&
     !reviewGateRefused &&
     opts.rollbackOnFailure !== false &&
-    FAILURE_STATUSES.has(run.status)
+    FAILURE_STATUSES.has(run.status) &&
+    !(opts.store && run.taskId && (await appliedChangeOfCompletion(opts.store, run.taskId)))
   ) {
     await performRollbackIfNeeded(projectDir, {
       yes: opts.yes,

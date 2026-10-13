@@ -331,10 +331,12 @@ export function prdStatusReport(tree: V2Tree, options: { allReleases?: boolean }
   // Every live change, nested ones included: add_item takes a change as a change's parent.
   const changes = index.entries.filter((e) => e.root === "changes" && e.node.type === "change").map((e) => e.node);
 
+  // Each node maps to its top-level area: an area nested in an area rolls up into its ancestor's row.
   const areaOf = new Map<string, RuleNode>();
   for (const { node, parent } of index.entries) {
-    if (node.type === "area") areaOf.set(node.id, node);
-    else if (parent && areaOf.has(parent.id)) areaOf.set(node.id, areaOf.get(parent.id)!);
+    const inherited = parent ? areaOf.get(parent.id) : undefined;
+    if (inherited) areaOf.set(node.id, inherited);
+    else if (node.type === "area") areaOf.set(node.id, node);
   }
 
   const openByArea = new Map<string, Set<string>>();

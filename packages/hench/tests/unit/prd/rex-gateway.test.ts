@@ -50,6 +50,22 @@ const EXPECTED_EXPORTS = [
   // an epic has nothing selectable when its tasks all read "pending".
   "traversalBlock",
   "matchesAssignee",
+  // v2 work selection — the entry points get_next_task uses on a v2 tree
+  "prdLayout",
+  "isChangeLayerStore",
+  "findNextWorkTask",
+  "findActionableWork",
+  "resolveWorkById",
+  // v2 agent brief
+  "buildChangeBrief",
+  // v2 completion — what update_task_status runs on a v2 tree
+  "completeV2Work",
+  // v2 applied changes — a failure after the completion keeps an applied change's completion
+  "isAppliedChange",
+  "indexTree",
+  "enclosingChangeIds",
+  // v2 reader — which untracked intent files a completion's state.yaml holds rows for
+  "loadPrdModel",
   // Cross-worktree task claims
   "openClaimsStore",
   "resolveClaimHolder",

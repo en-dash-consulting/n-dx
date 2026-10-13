@@ -8,8 +8,8 @@
  * true. Revised (the spec has moved ahead of the build) and defective (it is
  * broken now) are highlighted, because those are the rows people come for.
  *
- * Driven entirely by its `map` prop: no fetch and no route, so it renders
- * from a v2 fixture until the v2 reader and its routes land.
+ * Driven entirely by its `map` prop: `product-pages.ts` fetches it from
+ * `GET /api/rex/product`, and tests render it from a fixture.
  */
 
 import { h, Fragment } from "preact";

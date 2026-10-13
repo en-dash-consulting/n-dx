@@ -28,7 +28,7 @@
  */
 
 import { join } from "node:path";
-import { serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME, prdLockPath, withLock, assertSlugRuleWritable, readPerfFlags } from "../../store/index.js";
+import { serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME, prdLockPath, withLock, assertSlugRuleWritable, readPerfFlags, isChangeLayerStore } from "../../store/index.js";
 import { walkTree } from "../../core/tree.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PRDItem, PRDDocument } from "../../schema/index.js";
@@ -116,7 +116,10 @@ export async function loadItemsPreferFolderTree(
   // `parseFolderTree` yields nothing and the merge returns the store's items
   // unchanged, which is exactly what the fast path returns.
   // `fast-read-equivalence.test.ts` pins both against the slow path.
-  if (readPerfFlags(rexDir).fastReads) {
+  //
+  // The change-layer store (v2 tree) never reads prd_tree/, so a stray one
+  // beside product/ must not overlay the change layer's items either.
+  if (isChangeLayerStore(store) || readPerfFlags(rexDir).fastReads) {
     return (loaded ?? (await store.loadDocument())).items;
   }
 

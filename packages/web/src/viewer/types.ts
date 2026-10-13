@@ -74,10 +74,12 @@ export interface GenericDetail {
 }
 
 export interface PRDDetail {
+  /** Which detail panel to render. The node's own type is `itemType`. */
   type: "prd";
   title: string;
   id: string;
-  level: string;
+  /** Node type (`epic`, `change`, `task`, …) — see `shared/item-type.ts`. */
+  itemType: string;
   status: string;
   description?: string;
   acceptanceCriteria?: string[];
@@ -86,7 +88,7 @@ export interface PRDDetail {
   blockedBy?: string[];
   startedAt?: string;
   completedAt?: string;
-  children?: Array<{ id: string; title: string; status: string; level: string }>;
+  children?: Array<{ id: string; title: string; status: string; itemType: string }>;
 }
 
 export type DetailItem = FileDetail | ZoneDetail | GenericDetail | PRDDetail;

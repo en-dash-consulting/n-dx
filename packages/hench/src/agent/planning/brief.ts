@@ -6,11 +6,23 @@ import {
   walkTree,
   collectRequirements,
   isWorkItem,
+  buildChangeBrief,
+  resolveWorkById,
 } from "../../prd/rex-gateway.js";
-import type { PRDStore, PRDItem, TreeEntry } from "../../prd/rex-gateway.js";
+import type { PRDStore, PRDItem, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
+import {
+  actionableV2Entries,
+  inboxRefusal,
+  loadV2Tree,
+  nextV2Entry,
+  readTreeAsReset,
+  resolveV2Entry,
+  V2_HAS_NO_EPICS,
+} from "./work-selection.js";
 import { resolveProjectCliName, DEFAULT_CLI_NAME } from "./cli-identity.js";
 import type {
   TaskBrief,
+  TaskBriefChangeSection,
   TaskBriefTask,
   TaskBriefParent,
   TaskBriefSibling,
@@ -236,6 +248,12 @@ export interface SelectTaskOptions {
    * untransformed tree.
    */
   wouldResetIds?: ReadonlySet<string>;
+  /**
+   * The v2 tree `rawItems` were projected from ({@link loadV2Tree}). When set,
+   * selection is rex's v2 selection (`findNextWorkTask`, `resolveWorkById`) and
+   * `rawItems` only supply the entry; there is no epic level to scope to.
+   */
+  tree?: V2Tree;
 }
 
 /**
@@ -263,17 +281,30 @@ export async function selectTaskEntry(
   const { taskId, excludeTaskIds: excludeIds, epicId, tags, assignee, claims } = options;
   const cliName = options.cliName ?? DEFAULT_CLI_NAME;
   const items = options.wouldResetIds?.size ? readAsReset(rawItems, options.wouldResetIds) : rawItems;
+  const tree = options.tree && options.wouldResetIds?.size
+    ? readTreeAsReset(options.tree, options.wouldResetIds)
+    : options.tree;
+  if (tree && epicId) throw new Error(`Cannot scope selection to an epic: ${V2_HAS_NO_EPICS}.`);
 
   if (taskId) {
-    const entry = findItem(items, taskId);
+    // On v2 the ref may be a display id or alias; the entry carries the real id.
+    const entry = tree ? resolveV2Entry(tree, items, taskId) : findItem(items, taskId);
     if (!entry) throw new Error(`Task not found: ${taskId}`);
+    const inbox = tree ? inboxRefusal(tree, taskId, cliName) : undefined;
+    if (inbox) throw inbox;
     const notActionable = explicitTaskRefusal(entry.item, cliName);
     if (notActionable) throw notActionable;
     // An explicit task another worktree is working on is refused, not stolen.
     // Claiming is the check: the store answers atomically under its lock.
     if (claims) {
-      const refusedBy = await claims.claim(taskId);
-      if (refusedBy) throw new TaskClaimedElsewhereError(taskId, refusedBy, entry.item.title);
+      // On v2 a claim on an enclosing change covers the work inside it (rex
+      // refuses the same in claim_task), so the task's own id is not enough.
+      if (tree) {
+        const held = await claims.heldByEnclosingChange(tree, entry.item.id);
+        if (held) throw new TaskClaimedElsewhereError(held.changeId, held.claim, findItem(items, held.changeId)?.item.title);
+      }
+      const refusedBy = await claims.claim(entry.item.id);
+      if (refusedBy) throw new TaskClaimedElsewhereError(entry.item.id, refusedBy, entry.item.title);
     }
     return entry;
   }
@@ -292,7 +323,14 @@ export async function selectTaskEntry(
       ...(claimedElsewhere.size > 0 ? { excludeIds: claimedElsewhere } : {}),
     };
     let candidate: TreeEntry | null;
-    if (epicId) {
+    if (tree) {
+      candidate = nextV2Entry(tree, {
+        excludeIds: new Set([...(excludeIds ?? []), ...claimedElsewhere]),
+        ...(tags?.length ? { tags } : {}),
+        ...(assignee ? { assignee } : {}),
+      });
+      if (!candidate) throw new Error("No actionable tasks found in PRD");
+    } else if (epicId) {
       // Epic filter active: get all actionable tasks and filter to the epic.
       const epicTaskIds = collectEpicTaskIds(items, epicId);
       const allActionable = findActionableTasks(items, skipIds, Infinity, selectOptions);
@@ -317,6 +355,29 @@ export async function selectTaskEntry(
   );
 }
 
+/**
+ * Rex's change brief for the unit `unitId` on a v2 tree, section by section.
+ *
+ * The project's validate and test commands are left out for the reason the v1
+ * brief has no project block: the system prompt states them, and both reach
+ * the model in one call.
+ *
+ * workflow.md is left out too: it is execution policy, and rex's budget drops
+ * it whole once a change fills the brief. {@link formatChangeBrief} renders it
+ * outside that budget, as v1 does.
+ */
+function changeBriefSections(
+  tree: V2Tree,
+  unitId: string,
+  recentLog: readonly TaskBriefLogEntry[],
+): TaskBriefChangeSection[] {
+  // Selection resolved this id to a unit a moment ago, through the same tree.
+  const unit = resolveWorkById(tree, unitId);
+  if (!unit) throw new Error(`Cannot brief ${unitId}: it is not a unit of work on this v2 tree.`);
+  const { sections } = buildChangeBrief({ tree, unit, recentLog });
+  return sections.map(({ name, text }) => ({ name, text }));
+}
+
 export async function assembleTaskBrief(
   store: PRDStore,
   taskId?: string,
@@ -333,7 +394,10 @@ export async function assembleTaskBrief(
     ? resolveProjectCliName(options.projectDir)
     : DEFAULT_CLI_NAME;
 
+  const loadedTree = await loadV2Tree(store);
+  const tree = loadedTree && resetIds?.size ? readTreeAsReset(loadedTree, resetIds) : loadedTree;
   const entry = await selectTaskEntry(doc.items, {
+    ...(tree ? { tree } : {}),
     ...(taskId ? { taskId } : {}),
     ...(excludeIds ? { excludeTaskIds: excludeIds } : {}),
     ...(options?.epicId ? { epicId: options.epicId } : {}),
@@ -371,6 +435,7 @@ export async function assembleTaskBrief(
   }));
 
   const brief: TaskBrief = {
+    ...(tree ? { changeBrief: changeBriefSections(tree, entry.item.id, recentLog) } : {}),
     task: itemToTaskBrief(entry.item),
     parentChain: entry.parents.map(itemToParent),
     siblings: getSiblings(entry, doc),
@@ -424,12 +489,15 @@ export async function getActionableTasks(
     ...(claimedElsewhere?.size ? { excludeIds: claimedElsewhere } : {}),
     ...(assignee ? { assignee } : {}),
   };
-  const entries = findActionableTasks(
-    doc.items,
-    completedIds,
-    limit,
-    Object.keys(selectOptions).length > 0 ? selectOptions : undefined,
-  );
+  const tree = await loadV2Tree(store);
+  const entries = tree
+    ? actionableV2Entries(tree, doc.items, selectOptions).slice(0, limit)
+    : findActionableTasks(
+        doc.items,
+        completedIds,
+        limit,
+        Object.keys(selectOptions).length > 0 ? selectOptions : undefined,
+      );
 
   return entries.map((e) => ({
     id: e.item.id,
@@ -465,7 +533,67 @@ export function buildBriefSections(brief: TaskBrief): PromptSection[] {
 // Brief text formatting (backward-compatible flat string)
 // ---------------------------------------------------------------------------
 
+/**
+ * Commit trailers — the task id and run live here, not in the system prompt,
+ * which is built per project. Placed right after the task so a brief truncated
+ * to the vendor's context limit still carries them.
+ */
+function commitTrailersBlock(brief: TaskBrief): string | undefined {
+  if (!brief.commitTrailers?.length) return undefined;
+  return [
+    "## Commit Trailers",
+    "End every commit message you write for this task with these exact lines, " +
+      "in one final trailer block together with your own trailers (such as " +
+      "Co-Authored-By:) and no blank line between them:",
+    "```",
+    ...brief.commitTrailers,
+    "```",
+  ].join("\n");
+}
+
+/** Session filters (e.g. self-heal tag constraint, --mine assignee constraint). */
+function sessionFiltersBlock(brief: TaskBrief): string | undefined {
+  const { tags, assignee } = brief.sessionFilters ?? {};
+  if (!tags?.length && !assignee) return undefined;
+  const lines = ["## Session Filters"];
+  if (tags?.length) {
+    lines.push(`Active tag filter: ${tags.join(", ")} — only tasks with these tags are eligible for selection.`);
+  }
+  if (assignee) {
+    lines.push(`Active assignee filter: ${assignee} — only tasks assigned to this identity are eligible for selection.`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * workflow.md — trimmed at a line boundary. This file states rules, so a
+ * mid-line cut would leave a truncated rule reading as a complete one.
+ */
+function workflowBlock(brief: TaskBrief): string | undefined {
+  if (!brief.workflow) return undefined;
+  return `## Workflow\n${trimDocument(brief.workflow, MAX_WORKFLOW_CHARS, "workflow.md")}`;
+}
+
+/**
+ * The v2 brief: rex's change brief, with hench's own blocks inserted — the
+ * commit trailers and session filters right after the task section (rex
+ * never drops it), and workflow.md before the log and the trimmed note.
+ * Rex bounded and budgeted every section of its own; workflow is outside that
+ * budget, as on v1, because the project's execution rules must always arrive.
+ */
+function formatChangeBrief(brief: TaskBrief, changeBrief: readonly TaskBriefChangeSection[]): string {
+  const own = [commitTrailersBlock(brief), sessionFiltersBlock(brief)].filter((b): b is string => b !== undefined);
+  const blocks = changeBrief.flatMap((section) => (section.name === "task" ? [section.text, ...own] : [section.text]));
+  const workflow = workflowBlock(brief);
+  if (workflow) {
+    const tail = changeBrief.findIndex((section) => section.name === "log" || section.name === "trimmed");
+    blocks.splice(tail === -1 ? blocks.length : tail + own.length, 0, workflow);
+  }
+  return blocks.join("\n\n");
+}
+
 export function formatTaskBrief(brief: TaskBrief): string {
+  if (brief.changeBrief?.length) return formatChangeBrief(brief, brief.changeBrief);
   const sections: string[] = [];
 
   // Task
@@ -504,20 +632,8 @@ export function formatTaskBrief(brief: TaskBrief): string {
     );
   }
 
-  // Commit trailers — the task id and run live here, not in the system prompt,
-  // which is built per project. Placed near the top so a brief truncated to
-  // the vendor's context limit still carries them.
-  if (brief.commitTrailers?.length) {
-    sections.push("\n## Commit Trailers");
-    sections.push(
-      "End every commit message you write for this task with these exact lines, " +
-        "in one final trailer block together with your own trailers (such as " +
-        "Co-Authored-By:) and no blank line between them:",
-    );
-    sections.push("```");
-    sections.push(...brief.commitTrailers);
-    sections.push("```");
-  }
+  const trailers = commitTrailersBlock(brief);
+  if (trailers) sections.push(`\n${trailers}`);
 
   // Parent chain
   if (brief.parentChain.length > 0) {
@@ -563,16 +679,8 @@ export function formatTaskBrief(brief: TaskBrief): string {
     }
   }
 
-  // Session filters (e.g. self-heal tag constraint, --mine assignee constraint)
-  if (brief.sessionFilters?.tags?.length || brief.sessionFilters?.assignee) {
-    sections.push(`\n## Session Filters`);
-    if (brief.sessionFilters.tags?.length) {
-      sections.push(`Active tag filter: ${brief.sessionFilters.tags.join(", ")} — only tasks with these tags are eligible for selection.`);
-    }
-    if (brief.sessionFilters.assignee) {
-      sections.push(`Active assignee filter: ${brief.sessionFilters.assignee} — only tasks assigned to this identity are eligible for selection.`);
-    }
-  }
+  const filters = sessionFiltersBlock(brief);
+  if (filters) sections.push(`\n${filters}`);
 
   // Project
   // No project block here. `buildSystemPrompt` emits the same four facts under
@@ -586,12 +694,8 @@ export function formatTaskBrief(brief: TaskBrief): string {
   // whether a solution satisfies the task's acceptance criteria, which the
   // project's name and command list do not bear on.
 
-  // Workflow — trimmed at a line boundary. This file states rules, so a
-  // mid-line cut would leave a truncated rule reading as a complete one.
-  if (brief.workflow) {
-    sections.push("\n## Workflow");
-    sections.push(trimDocument(brief.workflow, MAX_WORKFLOW_CHARS, "workflow.md"));
-  }
+  const workflow = workflowBlock(brief);
+  if (workflow) sections.push(`\n${workflow}`);
 
   // Recent log
   if (brief.recentLog.length > 0) {

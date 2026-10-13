@@ -144,6 +144,10 @@ describe("buildReviewBrief", () => {
 
     expect(brief).toMatch(/Do not stop to ask/);
     expect(brief).toMatch(/Capture as a PRD task with `add_item`/);
+    // On a v2 tree the capture is an Inbox change with `needsPlacement`, which
+    // nothing autonomous selects: the same pass that captures must place it,
+    // and `place_change` is in the run's grant for exactly this line.
+    expect(brief).toMatch(/place it with `place_change`/);
   });
 
   it("leaves the capture choice to the operator when the run is attended, without waiting for it", () => {
@@ -157,6 +161,8 @@ describe("buildReviewBrief", () => {
     expect(brief).not.toMatch(/wait for an explicit selection/);
     expect(brief).not.toMatch(/capture only what the user selects/);
     expect(brief).not.toMatch(/Capture as a PRD task with `add_item`/);
+    // Nothing is captured on an attended run, so there is nothing to place.
+    expect(brief).not.toMatch(/place_change/);
   });
 
   it("names the exact report path and the schema fields the parser reads", () => {

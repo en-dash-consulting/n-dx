@@ -23,7 +23,12 @@ export type ApplyOn = "complete" | "review" | "release";
 
 export const DEFAULT_APPLY_ON: ApplyOn = "complete";
 
-const APPLY_ON: readonly ApplyOn[] = ["complete", "review", "release"];
+/**
+ * Every value `rex.applyOn` accepts, in the order a chooser should offer them:
+ * earliest apply first. Exported so a settings surface offers exactly what
+ * {@link parseApplyOn} accepts rather than keeping its own list.
+ */
+export const APPLY_ON: readonly ApplyOn[] = ["complete", "review", "release"];
 
 /**
  * The moment a caller asks to apply: a change completed on its branch

@@ -32,6 +32,9 @@ export type ViewId =
   | "ask"
   | "rex-dashboard"
   | "prd"
+  // The v2 product layer and change layer; on v1 they say to run `ndx migrate`.
+  | "product"
+  | "changes"
   | "token-usage"
   | "validation"
   | "requirements"

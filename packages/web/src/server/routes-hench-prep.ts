@@ -51,7 +51,6 @@ import {
   collectCompletedIds,
   findItem,
   findActionableTasks,
-  isWorkItem,
   openClaimsStore,
   resolveClaimHolder,
   resolveStore,
@@ -59,6 +58,7 @@ import {
   validateRunSettings,
 } from "./rex-gateway.js";
 import type { RunSettings } from "./rex-gateway.js";
+import { isWorkItemType, itemTypeOf } from "../shared/index.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import {
   HUB_ADMISSION_HEADER,
@@ -117,8 +117,8 @@ export interface ReadyTask {
   title: string;
   status: string;
   priority: string | null;
-  level: string;
-  /** Ancestor titles, epic first. */
+  itemType: string;
+  /** Ancestor titles, root first. */
   parentChain: string[];
   criteriaCount: number;
   tags: string[];
@@ -413,7 +413,7 @@ async function handleSave(
         missing = true;
         return doc;
       }
-      if (!isWorkItem(entry.item.level)) {
+      if (!isWorkItemType(itemTypeOf(entry.item))) {
         notAWorkItem = true;
         return doc;
       }
@@ -631,7 +631,7 @@ async function handleReady(req: IncomingMessage, res: ServerResponse, ctx: Serve
       title: item.title,
       status: item.status,
       priority: item.priority ?? null,
-      level: item.level,
+      itemType: itemTypeOf(item),
       parentChain: parents.map((p) => p.title),
       criteriaCount: item.acceptanceCriteria?.length ?? 0,
       tags: item.tags ?? [],

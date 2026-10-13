@@ -3,9 +3,10 @@
  * change, or a subtask under a task.
  *
  * - A **change** with no `amends` and no `touches` goes to the Inbox: it is
- *   stamped `needsPlacement` so a person confirms its targets before it closes.
- *   One with a target is placed. Without a parent it sits at the change-layer
- *   root; a parent must be a change.
+ *   stamped `needsPlacement` so a person confirms its targets before it closes,
+ *   and the store writes it under the reserved `changes/inbox/` folder
+ *   (`store/prd-model-writer.ts`). One with a target is placed. Without a
+ *   parent it sits at the change-layer root; a parent must be a change.
  * - A **task** goes through {@link addTask}, so the split rule applies and a
  *   completed, applied, cancelled or deleted change is refused.
  * - A **subtask** goes under a task.

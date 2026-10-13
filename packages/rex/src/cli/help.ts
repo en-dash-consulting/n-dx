@@ -843,6 +843,53 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["reorganize", "report", "validate"],
   },
+  "migrate-plan": {
+    tool: "rex",
+    command: "migrate-plan",
+    summary: "plan the v1 → v2 migration and write it out for review",
+    usage: "rex migrate-plan --out=<path.json> [--summary=<path.md>] [--rules-only] [dir]",
+    description:
+      "Classifies every v1 item into the v2 product and change layers and writes\n" +
+      "the proposal to two files: the JSON plan, keyed by v1 item id, which the\n" +
+      "apply step will read, and a Markdown summary for a person to review.\n" +
+      "\n" +
+      "Nothing is written to the PRD. Planning is a pure read, and the two\n" +
+      "output files are the only artifacts. Both must sit outside the rex\n" +
+      "directory, for the reason 'rex export' refuses it: a JSON document at\n" +
+      ".rex/prd.json would be read as the PRD on a checkout without the tree.\n" +
+      "\n" +
+      "Re-planning reads the plan already at --out and reuses every model\n" +
+      "answer whose item, question and model still match, so an unchanged tree\n" +
+      "is re-planned without asking anything — and, because the earlier cut\n" +
+      "time is reused too, into a byte-identical file. That is also the retry\n" +
+      "path after a model error: the pass is recorded incomplete, the answers\n" +
+      "already paid for are kept, and the next run continues from them.\n" +
+      "\n" +
+      "Which models run follows rex.placement.models (text by default); Jev\n" +
+      "reviews the plan unless --no-jev-review, and is skipped with a warning\n" +
+      "when there is no TypeSafe key. A text-only placement suggests rather\n" +
+      "than places: under autoAccept 'agree' a held change stays held with the\n" +
+      "suggestion recorded. --rules-only turns every model off, which makes\n" +
+      "the run free and fully deterministic.\n" +
+      "\n" +
+      "This command is also available as 'ndx migrate --plan'.",
+    options: [
+      { flag: "--out=<path>", description: "Where to write the JSON plan (required)" },
+      { flag: "--summary=<path>", description: "Where to write the Markdown summary (default: --out with .md)" },
+      { flag: "--rules-only", description: "Run the rules alone: no model calls, no cost" },
+      { flag: "--no-jev-review", description: "Skip the Jev review pass" },
+      { flag: "--model=<model>", description: "Pin the text tier's model for both placement and spec drafting" },
+      { flag: "--cut-at=<iso>", description: "Cut time the plan records (default: the earlier plan's, else now)" },
+      { flag: "--migration=<id>", description: "Migration to plan (default: v1-to-v2)" },
+      { flag: "--format=json", description: "Print a JSON report instead of human lines" },
+    ],
+    examples: [
+      { command: "rex migrate-plan --rules-only --out=./migration-plan.json", description: "A free, deterministic first look" },
+      { command: "rex migrate-plan --out=./migration-plan.json", description: "Plan with the configured models" },
+      { command: "rex migrate-plan --out=./migration-plan.json", description: "Re-run after a model error to continue from the recorded answers" },
+    ],
+    related: ["migrate-to-folder-tree", "export", "validate"],
+  },
   "migrate-to-folder-tree": {
     tool: "rex",
     command: "migrate-to-folder-tree",

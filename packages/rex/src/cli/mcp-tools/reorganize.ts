@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { detectReorganizations } from "../../core/reorganize.js";
 import { applyProposals } from "../../core/reorganize-executor.js";
-import { resolveRexPaths } from "../../store/index.js";
+import { isChangeLayerStore, resolveRexPaths } from "../../store/index.js";
 import { parseIntList } from "../parse-utils.js";
 import type { PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
@@ -20,6 +20,7 @@ export async function handleReorganize(
 
     const plan = detectReorganizations(doc.items, {
       includeCompleted: args.includeCompleted ?? false,
+      changeLayer: isChangeLayerStore(store),
     });
 
     // LLM proposals (unless mode=fast). The analyze and reason modules pull in
@@ -86,7 +87,7 @@ export async function handleReorganize(
       // minutes); re-apply them against a freshly loaded document under the
       // lock so a concurrent writer's item is not clobbered by the save.
       const result = await store.withTransaction(async (freshDoc) =>
-        applyProposals(freshDoc.items, toApply),
+        applyProposals(freshDoc.items, toApply, { changeLayer: isChangeLayerStore(store) }),
       );
       applied = result.applied;
       failed = result.failed;

@@ -14,6 +14,7 @@
 
 import type { PRDItem, PRDDocument } from "./rex-gateway.js";
 import { walkTree } from "./rex-gateway.js";
+import { itemTypeOf } from "../shared/index.js";
 import { loadPRDSync, prdMaxMtimeMs } from "./prd-io.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -23,7 +24,7 @@ export interface IndexedItem {
   id: string;
   title: string;
   description: string;
-  level: string;
+  itemType: string;
   status: string;
   tags: string[];
   /** All text from acceptance criteria joined. */
@@ -37,7 +38,7 @@ export interface SearchResult {
   id: string;
   title: string;
   description: string | null;
-  level: string;
+  itemType: string;
   status: string;
   parentChain: string[];
   /** Relevance score — higher is better. */
@@ -229,7 +230,7 @@ export class SearchIndex {
         id: item.id,
         title: item.title,
         description: item.description || null,
-        level: item.level,
+        itemType: item.itemType,
         status: item.status,
         parentChain: item.parentChain,
         score,
@@ -316,7 +317,7 @@ export class SearchIndex {
       id: item.id,
       title: item.title,
       description: item.description ?? "",
-      level: item.level,
+      itemType: itemTypeOf(item),
       status: item.status,
       tags: item.tags ?? [],
       acceptanceCriteria: (item.acceptanceCriteria ?? []).join(" "),

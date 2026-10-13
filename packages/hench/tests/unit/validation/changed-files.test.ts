@@ -149,6 +149,27 @@ describe("discoverChangedFiles", () => {
     expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual([]);
   });
 
+  it("excludes v2 product/ and changes/ writes, state.yaml included", async () => {
+    const files = [
+      ".rex/product/area/capability/index.md",
+      ".rex/product/area/capability/state.yaml",
+      ".rex/changes/ch-1/index.md",
+      ".rex/changes/ch-1/state.yaml",
+    ];
+    for (const file of files) {
+      await mkdir(join(repoDir, file, ".."), { recursive: true });
+      await writeFile(join(repoDir, file), "status: pending\n");
+    }
+    git(repoDir, "add", "-A");
+    git(repoDir, "commit", "-m", "track v2 tree");
+    startingHead = git(repoDir, "rev-parse", "HEAD").trim();
+
+    for (const file of files) await writeFile(join(repoDir, file), "status: completed\n");
+    await writeFile(join(repoDir, ".rex/changes/ch-1/new-task.md"), "x\n");
+
+    expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual([]);
+  });
+
   it("still reports real work alongside excluded bookkeeping", async () => {
     await mkdir(join(repoDir, ".rex/prd_tree/some-epic"), { recursive: true });
     await writeFile(join(repoDir, ".rex/prd_tree/some-epic/index.md"), "status: pending\n");

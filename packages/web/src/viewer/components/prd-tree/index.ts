@@ -14,7 +14,6 @@ export type { FacetFilterProps } from "./facet-filter.js";
 export type {
   PRDItemData,
   PRDDocumentData,
-  ItemLevel,
   ItemStatus,
   Priority,
   BranchStats,

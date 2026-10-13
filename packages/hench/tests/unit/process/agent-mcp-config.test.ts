@@ -14,6 +14,7 @@ import { mkdtemp, mkdir, readdir, readFile, rm, utimes, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { NDX_WORKFLOW } from "@n-dx/rex";
 import {
   agentMcpConfigPath,
   AGENT_REX_MCP_TOOLS,
@@ -120,11 +121,37 @@ describe("AGENT_REX_MCP_TOOLS", () => {
     //   append_log         — base workflow step 7
     //   add_item           — base workflow steps 3 and 9, and the autonomous
     //                        adversarial-review pass's `should-fix` action
+    //   get_capability     — base workflow step 2: reads a capability the v2
+    //                        brief could only show trimmed under its budget
+    //   place_change       — base workflow step 9 and the autonomous review
+    //                        pass's capture note: clears `needsPlacement` on
+    //                        the Inbox change `add_item` writes on a v2 tree
     expect([...AGENT_REX_MCP_TOOLS]).toEqual([
       "mcp__rex__update_task_status",
       "mcp__rex__append_log",
       "mcp__rex__add_item",
+      "mcp__rex__get_capability",
+      "mcp__rex__place_change",
     ]);
+  });
+
+  it("names every granted tool in the base workflow the agent reads", () => {
+    // The rule above, checked rather than asserted in a comment: a grant whose
+    // tool no prompt mentions is a tool the agent is never told to call. The
+    // base workflow (`.rex/n-dx_workflow.md`, written by `rex init`) is the
+    // prompt every provider's run receives, so it is where each name must be.
+    for (const tool of AGENT_REX_MCP_TOOLS) {
+      const bare = tool.replace(/^mcp__.*?__/, "");
+      expect(NDX_WORKFLOW, `${bare} is granted but the base workflow never asks for it`).toContain(bare);
+    }
+  });
+
+  it("withholds apply_change, the one PRD write the completion hold cannot withdraw", () => {
+    // Applying a change's amendments rewrites the product layer — the standing
+    // requirements — and the hold defers a task *status*, so an apply would
+    // land immediately and survive a failing gate. Stewards apply; runs do not.
+    expect(AGENT_REX_MCP_TOOLS).not.toContain("mcp__rex__apply_change");
+    expect(NDX_WORKFLOW).not.toContain("apply_change");
   });
 
   it("names no tool from the sourcevision server", () => {

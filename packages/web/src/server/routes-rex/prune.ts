@@ -19,8 +19,8 @@ import {
   type PRDItem,
   walkTree,
   countSubtree,
-  isWorkItem,
 } from "../rex-gateway.js";
+import { isRootType, isWorkItemType, itemTypeOf } from "../../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Prune helpers
@@ -57,7 +57,7 @@ function pruneItemsByIds(
 function summarizeItem(item: PRDItem): {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   status: string;
   childCount: number;
   totalCount: number;
@@ -66,7 +66,7 @@ function summarizeItem(item: PRDItem): {
   return {
     id: item.id,
     title: item.title,
-    level: item.level,
+    itemType: itemTypeOf(item),
     status: item.status,
     childCount: Array.isArray(item.children) ? item.children.length : 0,
     totalCount: countSubtree(item),
@@ -180,7 +180,7 @@ function computeEpicImpact(
   const impact: EpicImpactEntry[] = [];
 
   for (const epic of items) {
-    if (epic.level !== "epic") continue;
+    if (!isRootType(itemTypeOf(epic))) continue;
 
     // Count tasks/subtasks in the epic subtree
     let beforeTotal = 0;
@@ -188,7 +188,7 @@ function computeEpicImpact(
     let removedCount = 0;
 
     function countBefore(node: PRDItem): void {
-      if (isWorkItem(node.level)) {
+      if (isWorkItemType(itemTypeOf(node))) {
         if (node.status !== "deleted") {
           beforeTotal++;
           if (node.status === "completed") beforeCompleted++;
@@ -203,7 +203,7 @@ function computeEpicImpact(
       if (prunableIds.has(node.id)) {
         // Count all tasks/subtasks in this subtree as removed
         function countAll(n: PRDItem): void {
-          if (isWorkItem(n.level)) {
+          if (isWorkItemType(itemTypeOf(n))) {
             if (n.status !== "deleted") removedCount++;
           }
           if (Array.isArray(n.children)) {
@@ -227,7 +227,7 @@ function computeEpicImpact(
     function countRemovedCompleted(node: PRDItem): void {
       if (prunableIds.has(node.id)) {
         function countComp(n: PRDItem): void {
-          if (isWorkItem(n.level) && n.status === "completed") {
+          if (isWorkItemType(itemTypeOf(n)) && n.status === "completed") {
             removedCompleted++;
           }
           if (Array.isArray(n.children)) {
@@ -355,10 +355,11 @@ function handlePrunePreview(
   // Estimate storage savings
   const estimatedBytes = prunable.reduce((sum, item) => sum + estimateSubtreeBytes(item), 0);
 
-  // Compute level breakdown
-  const levelBreakdown: Record<string, number> = {};
+  // Compute type breakdown
+  const typeBreakdown: Record<string, number> = {};
   for (const item of prunable) {
-    levelBreakdown[item.level] = (levelBreakdown[item.level] || 0) + 1;
+    const type = itemTypeOf(item);
+    typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
   }
 
   // Total PRD size for context
@@ -377,7 +378,7 @@ function handlePrunePreview(
     hasPrunableItems: prunable.length > 0,
     estimatedBytes,
     totalPrdBytes,
-    levelBreakdown,
+    typeBreakdown,
     criteria: {
       minAgeDays: criteria.minAgeDays,
       statuses: criteria.statuses,

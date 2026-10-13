@@ -36,7 +36,6 @@ import {
   VALID_VALIDATION_TYPES as CANONICAL_VALID_VALIDATION_TYPES,
   CHILD_LEVEL as CANONICAL_CHILD_LEVEL,
   isPriority as canonicalIsPriority,
-  isItemLevel as canonicalIsItemLevel,
   isItemStatus as canonicalIsItemStatus,
   isRequirementCategory as canonicalIsReqCategory,
   isValidationType as canonicalIsValidationType,
@@ -52,13 +51,10 @@ import {
 // Gateway re-exports (should be identical references)
 // Only symbols that are actually re-exported by the trimmed gateway
 import {
-  LEVEL_HIERARCHY as GATEWAY_LEVEL_HIERARCHY,
   VALID_STATUSES as GATEWAY_VALID_STATUSES,
   VALID_REQUIREMENT_CATEGORIES as GATEWAY_VALID_REQ_CATEGORIES,
   VALID_VALIDATION_TYPES as GATEWAY_VALID_VALIDATION_TYPES,
-  CHILD_LEVEL as GATEWAY_CHILD_LEVEL,
   isPriority as gatewayIsPriority,
-  isItemLevel as gatewayIsItemLevel,
   isRequirementCategory as gatewayIsReqCategory,
   isValidationType as gatewayIsValidationType,
 } from "../../../src/server/rex-gateway.js";
@@ -73,10 +69,6 @@ describe("Gateway re-exports are identical to canonical", () => {
    * through the gateway — see rex-gateway.ts for the full list.
    */
 
-  it("LEVEL_HIERARCHY is same reference", () => {
-    expect(GATEWAY_LEVEL_HIERARCHY).toBe(CANONICAL_LEVEL_HIERARCHY);
-  });
-
   it("VALID_STATUSES is same reference", () => {
     expect(GATEWAY_VALID_STATUSES).toBe(CANONICAL_VALID_STATUSES);
   });
@@ -89,16 +81,8 @@ describe("Gateway re-exports are identical to canonical", () => {
     expect(GATEWAY_VALID_VALIDATION_TYPES).toBe(CANONICAL_VALID_VALIDATION_TYPES);
   });
 
-  it("CHILD_LEVEL is same reference", () => {
-    expect(GATEWAY_CHILD_LEVEL).toBe(CANONICAL_CHILD_LEVEL);
-  });
-
   it("isPriority is same reference", () => {
     expect(gatewayIsPriority).toBe(canonicalIsPriority);
-  });
-
-  it("isItemLevel is same reference", () => {
-    expect(gatewayIsItemLevel).toBe(canonicalIsItemLevel);
   });
 
   it("isRequirementCategory is same reference", () => {
@@ -186,10 +170,6 @@ describe("Viewer type mirrors match canonical definitions", () => {
     expect(canonicalIsPriority("critical")).toBe(true);
     expect(canonicalIsPriority("invalid")).toBe(false);
     expect(canonicalIsPriority(undefined)).toBe(false);
-
-    expect(canonicalIsItemLevel("epic")).toBe(true);
-    expect(canonicalIsItemLevel("invalid")).toBe(false);
-    expect(canonicalIsItemLevel(undefined)).toBe(false);
 
     expect(canonicalIsItemStatus("pending")).toBe(true);
     expect(canonicalIsItemStatus("deleted")).toBe(true);

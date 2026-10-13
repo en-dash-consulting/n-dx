@@ -9,7 +9,7 @@ import {
   resolveEpiclessFeatures,
   applyEpiclessResolutions,
 } from "./validate-interactive.js";
-import { resolveStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError, resolveRexPaths } from "../../store/index.js";
+import { resolveStore, isChangeLayerStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError, resolveRexPaths } from "../../store/index.js";
 import {
   findNonConformingSlugs,
   findTreeIdentityFaults,
@@ -175,17 +175,25 @@ export async function cmdValidate(
     }
   }
 
+  // The change layer's placement rule is changeLayerParentRule, enforced at
+  // write time; the v1 level hierarchy, "a container needs a child" and the
+  // prd_tree/ checks do not describe it (a change nests under a change, and may
+  // hold no task).
+  const changeLayer = store !== null && isChangeLayerStore(store);
+
   // Structural validation: orphans, cycles, stuck tasks
   if (doc) {
     const structural = validateStructure(doc.items);
 
-    checks.push({
-      name: "hierarchy placement",
-      pass: structural.orphanedItems.length === 0,
-      errors: structural.orphanedItems.map(
-        (o) => `"${o.itemId}" (${o.level}): ${o.reason}`,
-      ),
-    });
+    if (!changeLayer) {
+      checks.push({
+        name: "hierarchy placement",
+        pass: structural.orphanedItems.length === 0,
+        errors: structural.orphanedItems.map(
+          (o) => `"${o.itemId}" (${o.level}): ${o.reason}`,
+        ),
+      });
+    }
 
     checks.push({
       name: "blockedBy cycles",
@@ -202,14 +210,16 @@ export async function cmdValidate(
       ),
     });
 
-    checks.push({
-      name: "empty containers",
-      pass: structural.emptyContainers.length === 0,
-      severity: "warn",
-      errors: structural.emptyContainers.map(
-        (e) => `"${e.itemId}" (${e.level}): ${e.reason}`,
-      ),
-    });
+    if (!changeLayer) {
+      checks.push({
+        name: "empty containers",
+        pass: structural.emptyContainers.length === 0,
+        severity: "warn",
+        errors: structural.emptyContainers.map(
+          (e) => `"${e.itemId}" (${e.level}): ${e.reason}`,
+        ),
+      });
+    }
 
     // Categorise warnings by type for clearer reporting
     const blockedWarnings = structural.warnings.filter((w) => w.startsWith("Blocked without"));
@@ -243,6 +253,11 @@ export async function cmdValidate(
       });
     }
 
+  }
+
+  // prd_tree/ is a v1 backend. On the change layer a stray one is not the PRD,
+  // and rex migrate-slugs would be wrong advice, so its checks do not run.
+  if (doc && !changeLayer) {
     // Tree identity: the merge guard that the title-only slug rule relies on.
     // Paths no longer carry an id, so two same-titled items created on
     // divergent branches derive the same path and a merge can silently unify

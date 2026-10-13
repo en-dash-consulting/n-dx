@@ -248,6 +248,8 @@ export interface ReviewPromptContext {
    * duplicate of an item that was already there.
    */
   prdTreeDir: string;
+  /** v2 only: the Inbox folder, listed as well because unplaced changes wait there. */
+  inboxDir?: string;
   /**
    * True when the reviewer is resuming the session that did the work. Changes
    * the brief substantially: a resumed reviewer already holds the context, so
@@ -310,6 +312,14 @@ export function buildReviewSystemPrompt(): string {
     "invented findings cost a human triage cycle each and teach the team to",
     "ignore the next report.",
   ].join("\n");
+}
+
+/**
+ * v2 only: the dedupe listing of `changes/` does not reach `changes/inbox/`
+ * (no `index.md`, no matching slug), yet unplaced captures wait there.
+ */
+function inboxClause(ctx: { inboxDir?: string }): string {
+  return ctx.inboxDir ? ` and under \`${ctx.inboxDir}\`, where unplaced changes wait,` : "";
 }
 
 /**
@@ -431,6 +441,16 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
       : "| `out-of-scope` | Report it under the area it actually belongs to. Do not capture it — the run queues it for the operator. | `dropped` | `offered` |",
     "| `not-worth-fixing` | Nothing. Report it with the reason — unreachable, already covered, or fix costs more than the defect. | `dropped` | `dropped` |",
     "",
+    // On a v2 tree `add_item` files an untargeted change in the Inbox with
+    // `needsPlacement`, and nothing autonomous selects it from there.
+    ...(ctx.autonomous
+      ? [
+          "On a v2 PRD a captured item is a change in the Inbox: place it with `place_change`",
+          "on the capability or constraint it belongs to, or it is never selected",
+          "autonomously.",
+          "",
+        ]
+      : []),
     "`disposition` records a finding's fate on its own closed scale of",
     "`fixed | dropped | offered | deferred`, set at the moment you decide it —",
     "every finding needs one. `offered` covers both a capture that succeeded",
@@ -441,7 +461,7 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
     "decision behind. Record what you actually did and let it park the rest.",
     "",
     "Before creating any PRD item, check whether one already tracks the same",
-    `defect: list the directories under \`${ctx.prdTreeDir}\` and read the \`index.md\``,
+    `defect: list the directories under \`${ctx.prdTreeDir}\`${inboxClause(ctx)} and read the \`index.md\``,
     "of any whose slug is plausibly related. Match on the defect, not the",
     "wording. If it is already tracked, record the finding as `captured` with the",
     "existing item's id and say so in `note` — do not create a duplicate.",
@@ -574,6 +594,8 @@ export interface PairReviewPromptContext {
   reportPath: string;
   /** Project-relative PRD folder tree, with a trailing slash. */
   prdTreeDir: string;
+  /** v2 only: the Inbox folder, listed as well because unplaced changes wait there. */
+  inboxDir?: string;
   /** True when no human is attached: the reviewer captures findings itself. */
   autonomous: boolean;
   /** True when hench's test gate runs right after this review. */
@@ -725,11 +747,13 @@ export function buildPairReviewBrief(ctx: PairReviewPromptContext): string {
     ...(ctx.autonomous
       ? [
           "",
-          `Before creating an item, list the directories under \`${ctx.prdTreeDir}\` and read the`,
+          `Before creating an item, list the directories under \`${ctx.prdTreeDir}\`${inboxClause(ctx)} and read the`,
           "`index.md` of any whose slug is plausibly related. If the defect is already tracked,",
           "record the finding as `captured` with that item's id instead of creating a duplicate.",
           "When you create one, set `priority` to the severity, `tags` to",
           "`ndx-adversarial-review` and `severity:<level>`, and `source` to `ndx-adversarial-review`.",
+          "On a v2 PRD the item is a change in the Inbox: place it with `place_change` on the",
+          "capability or constraint it belongs to, or it is never selected autonomously.",
         ]
       : []),
     "",

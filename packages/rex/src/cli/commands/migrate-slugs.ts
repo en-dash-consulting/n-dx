@@ -23,7 +23,7 @@
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import {
-  resolveStore,
+  resolveV1Store,
   PRD_TREE_DIRNAME,
   SLUG_RULE_VERSION,
   readSlugRuleMarker, resolveRexPaths } from "../../store/index.js";
@@ -55,7 +55,8 @@ export async function cmdMigrateSlugs(
 
   const rexDir = resolveRexPaths(dir).rexDir;
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
-  const store = await resolveStore(rexDir);
+  // Slugs are a v1 folder-tree property; a v2 tree's slugs are frozen.
+  const store = await resolveV1Store(rexDir);
 
   const before = await listTree(treeRoot);
   if (before.length === 0) {

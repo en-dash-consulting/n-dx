@@ -8,6 +8,7 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 |---------|-------------|
 | `ndx init [dir]` | Initialize a project for n-dx |
 | `ndx migrate-layout [dir]` | Move an existing project's state into `.ndx/` |
+| `ndx migrate --plan [dir]` | Plan the PRD's v1 → v2 migration and write it out for review |
 | `ndx config [key] [value]` | View or edit settings |
 | `ndx which` | Show which n-dx is running: version, path, install kind, git |
 | `ndx trust [status\|accept\|revoke] [dir]` | Review or accept the execution config this checkout ships |

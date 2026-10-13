@@ -15,7 +15,7 @@ import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { appendLog } from "./rex-route-helpers.js";
-import { getAvailableBackups, restoreFromBackup, isValidSnapshotId } from "../rex-gateway.js";
+import { getAvailableBackups, restoreFromBackup, isValidSnapshotId, V2RestoreRefusedError } from "../rex-gateway.js";
 
 /** Render a snapshot id back into a readable ISO timestamp for display. */
 function formatSnapshotId(id: string): string {
@@ -67,9 +67,21 @@ export function routeRestore(
   return false;
 }
 
+/** Answer 409 with rex's own refusal: snapshots are v1 trees and restoring one would split a v2 tree. */
+function refuseV2Restore(res: ServerResponse, err: V2RestoreRefusedError): true {
+  jsonResponse(res, 409, { ok: false, code: err.code, error: err.message });
+  return true;
+}
+
 /** Handle GET /api/rex/backups — list snapshots, newest first. */
 async function handleListBackups(res: ServerResponse, ctx: ServerContext): Promise<boolean> {
-  const ids = await getAvailableBackups(ctx.rexDir);
+  let ids: string[];
+  try {
+    ids = await getAvailableBackups(ctx.rexDir);
+  } catch (err) {
+    if (err instanceof V2RestoreRefusedError) return refuseV2Restore(res, err);
+    throw err;
+  }
   const backupsDir = join(ctx.rexDir, ".backups");
 
   const snapshots: SnapshotSummary[] = [];
@@ -144,6 +156,7 @@ async function handleRestore(
 
     jsonResponse(res, 200, { ok: true, restored: input.id, files: fileCount });
   } catch (err) {
+    if (err instanceof V2RestoreRefusedError) return refuseV2Restore(res, err);
     errorResponse(res, 400, String(err));
   }
   return true;

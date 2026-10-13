@@ -16,6 +16,28 @@
 import { readdir, stat, mkdir, cp, rm, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { isAtomicWriteTempPath } from "../store/atomic-write.js";
+import { prdLayout } from "../store/prd-model-reader.js";
+
+/** Wording of the v2 refusal, shared by `rex restore` and {@link V2RestoreRefusedError}. */
+export const V2_RESTORE_REFUSAL =
+  "Restore is v1-only until after the v2 cut; recover a v2 tree from git history.";
+
+/**
+ * Thrown by {@link restoreFromBackup} and {@link getAvailableBackups} on a v2
+ * tree. Snapshots are v1 `prd_tree/` copies; restoring one beside `product/`
+ * would split the tree.
+ */
+export class V2RestoreRefusedError extends Error {
+  readonly code = "V2_RESTORE_REFUSED";
+  constructor() {
+    super(V2_RESTORE_REFUSAL);
+    this.name = "V2RestoreRefusedError";
+  }
+}
+
+async function refuseOnV2Layout(rexDir: string): Promise<void> {
+  if ((await prdLayout(rexDir)) === "v2") throw new V2RestoreRefusedError();
+}
 
 /**
  * Result of a backup snapshot operation.
@@ -297,6 +319,7 @@ export async function snapshotPRDTree(rexDir: string): Promise<BackupSnapshot | 
  * @throws If the backup doesn't exist or restore fails
  */
 export async function restoreFromBackup(rexDir: string, id: string): Promise<void> {
+  await refuseOnV2Layout(rexDir);
   if (!isValidSnapshotId(id)) {
     throw new Error(`Invalid snapshot id: ${JSON.stringify(id)}`);
   }
@@ -359,6 +382,12 @@ export async function restoreFromBackup(rexDir: string, id: string): Promise<voi
  * @returns Array of backup timestamps in descending order
  */
 export async function getAvailableBackups(rexDir: string): Promise<string[]> {
+  await refuseOnV2Layout(rexDir);
+  return listSnapshotIds(rexDir);
+}
+
+/** Snapshot ids, newest first, in either layout (retention runs on v2 too). */
+async function listSnapshotIds(rexDir: string): Promise<string[]> {
   const backupsDir = join(rexDir, ".backups");
 
   const backupDirExists = await dirExists(backupsDir);
@@ -402,7 +431,7 @@ export async function pruneBackups(rexDir: string, retentionCap: number = 10): P
   }
 
   // Get all available backups (newest first)
-  const backups = await getAvailableBackups(rexDir);
+  const backups = await listSnapshotIds(rexDir);
 
   // If we're under the cap, nothing to prune
   if (backups.length <= retentionCap) {

@@ -18,7 +18,7 @@ acceptanceCriteria:
   - "A task-less change is selectable (test)"
   - "needsPlacement items are skipped by autonomous selection and runnable by id (test)"
   - "Ordering follows priority then plannedRelease (test)"
-description: "get_next_task picks placed changes and tasks; a change with no tasks is itself the unit of work. Order by priority, then nearest plannedRelease, then dependency order. needsPlacement blocks autonomous selection only; ndx work --task still runs it. ready is informational; --ready-only and --mine (by assignee) are opt-in."
-lastModified: "2026-10-08T16:08:38.746Z"
+description: "get_next_task picks placed changes and tasks; a change with no tasks is itself the unit of work. Order by priority, then nearest plannedRelease, then dependency order. needsPlacement blocks autonomous selection only; ndx work --task still runs it. ready is informational; --ready-only and --mine (by assignee) are opt-in.\n\nThe module landed here; wiring it into get_next_task, update_task_status and hench is roadmap PR 34 (A2) and stack B."
+lastModified: "2026-10-12T08:18:05.847Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

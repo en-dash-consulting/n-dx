@@ -28,6 +28,7 @@ import { dashboardExecutionsFor, loadHenchConfig } from "./routes-hench.js";
 import { heartbeatAgeMs, isRunStale } from "./run-staleness.js";
 import { isValidRunId, readLogTailLines, resolveRunLogFile } from "./run-tail.js";
 import { estimateCostFromTotals, walkTree } from "./rex-gateway.js";
+import { itemTypeOf } from "../shared/index.js";
 import { loadPRDSync } from "./prd-io.js";
 import { readLiveReviewReport, type LiveReviewReport } from "./live-review-report.js";
 
@@ -37,7 +38,7 @@ export const LIVE_TASK_LOG_TAIL_LINES = 5;
 export interface LiveTaskChainLink {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
 }
 
 export interface LiveTaskItem {
@@ -155,7 +156,7 @@ function findTask(rexDir: string, taskId: string): LiveTaskItem | null {
       status: item.status,
       priority: item.priority ?? null,
       acceptanceCriteria: [...(item.acceptanceCriteria ?? [])],
-      epicChain: parents.map((p) => ({ id: p.id, title: p.title, level: p.level })),
+      epicChain: parents.map((p) => ({ id: p.id, title: p.title, itemType: itemTypeOf(p) })),
     };
   }
   return null;

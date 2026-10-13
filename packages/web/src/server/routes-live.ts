@@ -75,7 +75,7 @@ import type { PRDDocument } from "./rex-gateway.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
 import { readLastEvent, resolveRunEventsFile } from "./run-tail.js";
 import { hubConfigPath, readHubConfig, resolveHubHome } from "../hub/index.js";
-import { HUB_ADMISSION_HEADER, parseHubAdmissionHeader, type HubAdmissionHeader } from "../shared/index.js";
+import { HUB_ADMISSION_HEADER, itemTypeOf, parseHubAdmissionHeader, type HubAdmissionHeader } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Response shape
@@ -94,11 +94,11 @@ export interface LiveWorktree {
   isServed: boolean;
 }
 
-/** One ancestor of a task, root (the epic) first. */
+/** One ancestor of a task, root first. */
 export interface LiveChainLink {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
 }
 
 export interface LiveRun {
@@ -355,7 +355,7 @@ function prdIndexFor(rexDir: string): PrdIndex {
   const index: PrdIndex = { signature, chains: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set() };
   if (doc) {
     for (const { item, parents } of walkTree(doc.items)) {
-      index.chains.set(item.id, parents.map((p) => ({ id: p.id, title: p.title, level: p.level })));
+      index.chains.set(item.id, parents.map((p) => ({ id: p.id, title: p.title, itemType: itemTypeOf(p) })));
       const criteria = item.acceptanceCriteria?.length ?? 0;
       if (criteria > 0) index.criteria.set(item.id, criteria);
     }
@@ -383,7 +383,7 @@ function nextTasks(index: PrdIndex, excluded: ReadonlySet<string>): LiveNextTask
       status: entry.item.status,
       ...(entry.item.blockedBy?.length ? { blockedBy: entry.item.blockedBy } : {}),
       priority: entry.item.priority ?? null,
-      epicChain: entry.parents.map((p) => ({ id: p.id, title: p.title, level: p.level })),
+      epicChain: entry.parents.map((p) => ({ id: p.id, title: p.title, itemType: itemTypeOf(p) })),
     });
   }
   return next;

@@ -26,6 +26,30 @@ Latest analysis (2026-08-24, `main`): `web-viewer` 205 files (cohesion 0.98 / co
 - **Barrel import enforcement:** Consumers must import through `shared/index.ts` rather than directly from leaf files (`data-files.ts`, `view-id.ts`). Enforced by `boundary-check.test.ts`.
 - **Two-consumer rule (automated):** Every module in `shared/` must have at least two distinct consumer zones. Enforced by the "shared/ modules have at least two consumer zones" assertion in `boundary-check.test.ts`.
 
+## `shared/item-type.ts` is the only reader of v1's `level`
+
+Schema v2 replaced the v1 `level` (epic/feature/task/subtask) with `type`
+(area/capability/constraint/change/task/subtask), and both storages are live:
+the tree the dashboard serves is still v1, the nodes the v2 reader will serve
+are not. `shared/item-type.ts` is the single module that knows this. Everything
+else — routes, views, components, hooks — calls `itemTypeOf(item)` and keys on
+`ItemType`.
+
+- **Never read `item.level` outside that module**, and never write one except
+  through `levelOf(type, parentType)`, which answers the v1 level a type is
+  stored as (and `null` for a product-layer type the v1 store cannot hold).
+- **The vocabulary is the union, not the v2 set.** A v1 item reads as its own
+  level, a v2 node as its own type. Collapsing epic and feature onto `change`
+  at read time — which rex's dual-read loader does for its own purposes — would
+  relabel every epic in a v1 PRD; that collapse belongs to `ndx migrate`.
+- **The hierarchy tables are a mirror**, because `shared/` is browser-bundled
+  and cannot import `@n-dx/rex`. `tests/unit/shared/item-type-contract.test.ts`
+  pins them against rex's `LEVEL_HIERARCHY` / `CHILD_LEVEL` and its predicates.
+  Change rex's level system and that test fails here.
+- The viewer reaches the helpers through `external.ts`, accessors only — the
+  label, plural, emoji, parent and child tables stay behind the module so a
+  consumer cannot index one and skip the v1 fallback.
+
 ## `crash/` proactive governance
 
 `crash/` (`crash-detector.ts` + `index.ts`) is imported unidirectionally by `web-viewer` and reaches into `src/shared/` directly — a documented bypass. Barrel enforcement (imports must enter through `crash/index.ts`) is asserted by `boundary-check.test.ts`. Apply the two-consumer rule proactively to new additions here.

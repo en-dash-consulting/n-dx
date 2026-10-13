@@ -31,7 +31,13 @@ import {
   TREE_META_FILENAME,
 } from "../../prd/rex-gateway.js";
 import { relativeToRoot, resolveLayout, type LayoutMode } from "../../prd/llm-gateway.js";
-import { resolveHenchPaths, stateDirNameUnder } from "../../store/paths.js";
+import {
+  V2_CHANGES_DIRNAME,
+  V2_INBOX_DIRNAME,
+  V2_PRODUCT_DIRNAME,
+  resolveHenchPaths,
+  stateDirNameUnder,
+} from "../../store/paths.js";
 import {
   excludeHenchRuntimeArtifacts,
   matchesProjectPath,
@@ -39,6 +45,24 @@ import {
   repoRelativePrefix,
   splitPorcelainLines,
 } from "../../store/artifacts.js";
+
+/**
+ * The folder the review pass lists to check whether a finding is already
+ * tracked, project-relative with a trailing slash: `changes/` on a v2 tree
+ * (follow-ups land there), `prd_tree/` on v1.
+ */
+export function reviewDedupeDir(rexDir: string, layout: "v1" | "v2"): string {
+  return `${rexDir}/${layout === "v2" ? V2_CHANGES_DIRNAME : PRD_TREE_DIRNAME}/`;
+}
+
+/**
+ * The folder where unplaced changes wait. {@link reviewDedupeDir}'s listing
+ * does not reach it (`changes/inbox/` has no `index.md`), so the review brief
+ * names it as well. Undefined on v1, which has no Inbox.
+ */
+export function reviewInboxDir(rexDir: string, layout: "v1" | "v2"): string | undefined {
+  return layout === "v2" ? `${rexDir}/${V2_CHANGES_DIRNAME}/${V2_INBOX_DIRNAME}/` : undefined;
+}
 
 /**
  * One entry in the single definition of the PRD paths hench's own writes
@@ -99,6 +123,11 @@ interface PrdWritePath {
  */
 const PRD_WRITE_PATHS: readonly PrdWritePath[] = [
   { path: PRD_TREE_DIRNAME, isDirectory: true, stagedBy: "hench" },
+  // v2 layers: a v2 tree has `product/` and `changes/` instead of `prd_tree/`,
+  // `state.yaml` files included. Absent on a v1 tree, so the staging step's
+  // existence check drops them and v1 behaviour is unchanged.
+  { path: V2_PRODUCT_DIRNAME, isDirectory: true, stagedBy: "hench" },
+  { path: V2_CHANGES_DIRNAME, isDirectory: true, stagedBy: "hench" },
   { path: TREE_META_FILENAME, isDirectory: false, stagedBy: "hench" },
   { path: "execution-log.jsonl", isDirectory: false, stagedBy: "operator" },
   { path: "execution-log.1.jsonl", isDirectory: false, stagedBy: "operator" },
@@ -626,12 +655,14 @@ function renderRecoveryCommands(
   paths: string[],
   deleted: ReadonlySet<string>,
   files?: RecoveryPathspecs,
-  opts: { setAside?: boolean } = {},
+  opts: { setAside?: boolean; message?: string[] } = {},
 ): string {
   const { setAside = true } = opts;
   const existing = paths.filter((p) => !deleted.has(p));
   const gone = paths.filter((p) => deleted.has(p));
   const mode = specMode(paths, files);
+  // One `-m` per paragraph. Callers pass only shell-inert text (ids, words), so double quotes hold in every shell.
+  const commit = ["git commit", ...(opts.message ?? []).map((p) => `-m "${p}"`)].join(" ");
 
   const lines: string[] = [];
   if (mode.kind === "file") {
@@ -645,7 +676,7 @@ function renderRecoveryCommands(
     if (gone.length > 0) {
       lines.push(`  git rm --cached --pathspec-from-file=${mode.files.rm ?? mode.files.all}`);
     }
-    lines.push(`  git commit --pathspec-from-file=${mode.files.all}`);
+    lines.push(`  ${commit} --pathspec-from-file=${mode.files.all}`);
     if (setAside) {
       lines.push("Or set them aside:");
       lines.push(`  git stash push --pathspec-from-file=${mode.files.all}`);
@@ -661,7 +692,7 @@ function renderRecoveryCommands(
   );
   if (existing.length > 0) lines.push(`  git add -- ${spec(existing)}`);
   if (gone.length > 0) lines.push(`  git rm --cached -- ${spec(gone)}`);
-  lines.push(`  git commit -- ${spec(paths)}`);
+  lines.push(`  ${commit} -- ${spec(paths)}`);
   if (setAside) {
     lines.push("Or set them aside:");
     lines.push(`  git stash push -- ${spec(paths)}`);
@@ -726,6 +757,39 @@ export function formatReviewRepairsUncommittedRefusal(
     `Nothing was discarded. Land them, then mark the task completed — do not re-run it.\n` +
     `${renderRecoveryCommands(paths, deleted, files, { setAside: false })}\n` +
     `  ndx rex update ${taskId} --status=completed`
+  );
+}
+
+/**
+ * The run error when a failure follows a v2 completion that applied its change
+ * and hench keeps the completion rather than reopen the change (decision
+ * S1-Q2). The task stays completed, so it says not to re-run and offers no
+ * `git stash`: the only correct ending is to land every listed path, under
+ * the task's N-DX-Item trailer so rex ties the commit to the task.
+ */
+export function formatAppliedCompletionKept(opts: {
+  cause: string;
+  changeId: string;
+  taskId: string;
+  paths: string[];
+  deleted?: ReadonlySet<string>;
+  files?: RecoveryPathspecs;
+}): string {
+  const { cause, changeId, taskId, paths, deleted = new Set(), files } = opts;
+  const head =
+    `⚠ Completion kept: Change ${changeId} was applied to the product layer when this task completed, ` +
+    `and an applied change is never reopened. The task stays completed; the run failed.\n` +
+    `  ${cause}\n`;
+  if (paths.length === 0) return head + "Nothing is left uncommitted.";
+  return (
+    head +
+    `Still uncommitted (${paths.length} path(s)):\n` +
+    `${renderPaths(paths)}\n` +
+    `Nothing was discarded. Land them once the cause is fixed — do not re-run the task:\n` +
+    renderRecoveryCommands(paths, deleted, files, {
+      setAside: false,
+      message: [`Land the work of task ${taskId}`, `N-DX-Item: ${taskId}`],
+    })
   );
 }
 

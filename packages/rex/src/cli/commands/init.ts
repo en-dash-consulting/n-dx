@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG } from "../../schema/index.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
 import { relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 import { PRD_CACHE_DIRNAME, ensureRexDir, resolveRexPaths } from "../../store/index.js";
+import { prdLayout } from "../../store/prd-model-reader.js";
 import { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "../../workflow/default.js";
 
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
@@ -59,20 +60,13 @@ export async function cmdInit(
     info("Created workflow.md (edit to add project-specific rules)");
   }
 
-  // The folder-tree scaffold (created once; not overwritten)
-  const treeDir = join(rexDir, FOLDER_TREE_SUBDIR);
-  await mkdir(treeDir, { recursive: true });
-  const treeRootStub = join(treeDir, "index.md");
-  try {
-    await access(treeRootStub);
-    info(`tree/index.md already exists, skipping`);
-  } catch {
-    await writeFile(
-      treeRootStub,
-      `# ${project}\n\nPRD folder tree for **${project}**.\nManaged by rex — add items with \`rex add epic\`.\n`,
-      "utf-8",
-    );
-    info("Created tree/index.md");
+  // The folder-tree scaffold (created once; not overwritten). Never beside a
+  // v2 tree: an empty prd_tree/ next to product/ is a split tree that v1
+  // tools would read as an empty PRD.
+  if ((await prdLayout(rexDir)) === "v2") {
+    info("PRD is in the v2 layout (product/), skipping the v1 folder tree");
+  } else {
+    await scaffoldFolderTree(join(rexDir, FOLDER_TREE_SUBDIR), project);
   }
 
   // NOTE: init deliberately does *not* write `tree-meta.json`, even though
@@ -111,6 +105,22 @@ export async function cmdInit(
   info("Next steps:");
   info("  rex add epic --title=\"Your first epic\" " + dir);
   info("  rex status " + dir);
+}
+
+async function scaffoldFolderTree(treeDir: string, project: string): Promise<void> {
+  await mkdir(treeDir, { recursive: true });
+  const treeRootStub = join(treeDir, "index.md");
+  try {
+    await access(treeRootStub);
+    info(`tree/index.md already exists, skipping`);
+  } catch {
+    await writeFile(
+      treeRootStub,
+      `# ${project}\n\nPRD folder tree for **${project}**.\nManaged by rex — add items with \`rex add epic\`.\n`,
+      "utf-8",
+    );
+    info("Created tree/index.md");
+  }
 }
 
 /**

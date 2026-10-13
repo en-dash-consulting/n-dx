@@ -1,5 +1,5 @@
 export type { PRDStore, StoreCapabilities } from "./contracts.js";
-export { FileStore, ensureRexDir, PRD_FILENAME } from "./file-adapter.js";
+export { FileStore, ensureRexDir, PRD_FILENAME, V1StoreOnV2TreeError } from "./file-adapter.js";
 export {
   PRD_CACHE_DIRNAME,
   PRD_TREE_DIRNAME,
@@ -61,6 +61,7 @@ export { readPerfFlags, clearPerfFlagCache } from "./perf-flags.js";
 export type { RexPerfFlags } from "./perf-flags.js";
 export { openClaimsStore, claimsStorePath, resolveClaimHolder } from "./claims.js";
 export type { ClaimsStore, ClaimHolder, TaskClaim, PendingCompletion } from "./claims.js";
+export { isChangeLayerStore } from "./change-layer-store.js";
 export {
   ensureLegacyPrdMigrated,
   LegacyPrdMigrationError,
@@ -73,6 +74,7 @@ import { resolveGitBranch } from "./branch-naming.js";
 import { findPRDFileForBranch } from "./prd-discovery.js";
 import { PRD_MARKDOWN_FILENAME } from "./prd-md-migration.js";
 import type { PRDStore } from "./contracts.js";
+import { resolveLayerStore } from "./change-layer-store.js";
 
 /**
  * The only store backend rex has.
@@ -103,9 +105,35 @@ export function createStore(adapter: string, rexDir: string): PRDStore {
 }
 
 /**
- * Resolve the local PRDStore for a `.rex/` directory.
+ * Resolve the PRDStore for a `.rex/` directory, by layout.
  *
- * Always returns a FileStore. Reads aggregate all branch-scoped PRD files
+ * On a v2 tree (`product/` present) returns the change-layer store
+ * (`ChangeLayerStore`), which serves the change layer projected as v1
+ * items; on a v1 tree returns {@link resolveV1Store}'s FileStore.
+ *
+ * @param rexDir  Path to the rex state directory. Resolve it with
+ *                {@link resolveRexPaths} rather than joining a directory name
+ *                to the project root — where it lives depends on the layout.
+ *
+ * @example
+ * ```ts
+ * const store = await resolveStore(resolveRexPaths(dir).rexDir);
+ * const doc = await store.loadDocument();
+ * ```
+ */
+export async function resolveStore(rexDir: string): Promise<PRDStore> {
+  const { store } = await resolveLayerStore(rexDir, await resolveV1Store(rexDir));
+  return store;
+}
+
+/**
+ * Resolve the v1 FileStore for a `.rex/` directory, whatever its layout.
+ *
+ * Only for the commands that work on a v1 tree alone (`rex migrate-slugs`).
+ * On a v2 tree the store refuses every document read and write
+ * (`V1StoreOnV2TreeError`); config, log and workflow stay open.
+ *
+ * Reads aggregate all branch-scoped PRD files
  * (`prd_{branch}_{date}.json`) plus `prd.json` into one in-memory document.
  * On first load after the markdown-storage upgrade, `prd.md` is generated from
  * `prd.json` when the markdown file is missing. When a branch-scoped file
@@ -115,18 +143,10 @@ export function createStore(adapter: string, rexDir: string): PRDStore {
  * CLI commands that write new root items should call {@link resolvePRDFile}
  * before writing to ensure the branch file exists and the store targets it.
  *
- * @param rexDir  Path to the rex state directory. Resolve it with
- *                {@link resolveRexPaths} rather than joining a directory name
- *                to the project root — where it lives depends on the layout.
+ * @param rexDir  Path to the rex state directory.
  * @returns A FileStore instance.
- *
- * @example
- * ```ts
- * const store = await resolveStore(resolveRexPaths(dir).rexDir);
- * const doc = await store.loadDocument();
- * ```
  */
-export async function resolveStore(rexDir: string): Promise<PRDStore> {
+export async function resolveV1Store(rexDir: string): Promise<FileStore> {
   const projectDir = dirname(rexDir);
   const branch = resolveGitBranch(projectDir);
   const currentBranchFile = await findPRDFileForBranch(rexDir, branch);

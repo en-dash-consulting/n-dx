@@ -26,6 +26,35 @@ export {
   webSocketUrl,
 } from "./base-path.js";
 export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
+export {
+  V1_LEVELS,
+  PRODUCT_TYPES,
+  CHANGE_TYPES,
+  ITEM_TYPES,
+  TYPE_PARENTS,
+  CHILD_TYPE,
+  ITEM_TYPE_LABELS,
+  ITEM_TYPE_PLURAL,
+  ITEM_TYPE_EMOJI,
+  ADDABLE_TYPES,
+  CRITERIA_LABEL,
+  canAddChildType,
+  isItemType,
+  isProductType,
+  itemTypeOf,
+  levelOf,
+  isRootType,
+  isWorkItemType,
+  isContainerType,
+  childTypeOf,
+  parentTypesOf,
+  isValidParentType,
+  itemTypeLabel,
+  itemTypePlural,
+  itemTypeEmoji,
+  criteriaLabel,
+} from "./item-type.js";
+export type { ItemType, ItemTypeCarrier, V1Level, ProductType, ChangeType } from "./item-type.js";
 export { HUB_ADMISSION_HEADER, formatHubAdmissionHeader, parseHubAdmissionHeader } from "./hub-admission.js";
 export type { HubAdmissionHeader, HubMemoryPressure } from "./hub-admission.js";
 export { RUN_OPTION_SPECS, CONTEXT_NOTES_MAX_BYTES, checkRunOptions, resetsDeferred, runOptionArgs, workCommandArgs, checkRunMode, RUN_MODES, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "./run-options.js";

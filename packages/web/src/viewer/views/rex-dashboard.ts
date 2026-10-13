@@ -15,6 +15,7 @@ import { TaskStartControl } from "../components/index.js";
 import { ReorganizePanel, RestorePanel } from "../components/prd-tree/index.js";
 import { HealthGauge } from "../visualization/index.js";
 import { usePolling } from "../hooks/index.js";
+import { itemTypeLabel } from "../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ interface PriorityDistribution {
 interface NextTask {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   status: string;
   priority?: string;
   description?: string;
@@ -196,7 +197,7 @@ function EpicCard({ epic, navigateTo }: { epic: EpicStats; navigateTo?: Navigate
     h("div", { class: "rex-dash-epic-top" },
       h("div", { class: "rex-dash-epic-info" },
         h(RexTaskLink, {
-          task: { id: epic.id, title: epic.title, status: epic.status, level: "epic", priority: epic.priority },
+          task: { id: epic.id, title: epic.title, status: epic.status, itemType: "epic", priority: epic.priority },
           navigateTo,
           compact: true,
           showStatus: true,
@@ -429,8 +430,8 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                     h("span", {
                       class: `prd-status-icon prd-status-${nextTask.status.replace("_", "-")}`,
                     }, STATUS_ICONS[nextTask.status] ?? "○"),
-                    h("span", { class: `prd-level-badge prd-level-${nextTask.level}` },
-                      nextTask.level.charAt(0).toUpperCase() + nextTask.level.slice(1),
+                    h("span", { class: `prd-level-badge prd-level-${nextTask.itemType}` },
+                      itemTypeLabel(nextTask.itemType),
                     ),
                     nextTask.priority
                       ? h("span", { class: `prd-priority-badge prd-priority-${nextTask.priority}` },
@@ -441,7 +442,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                   h(TaskStartControl, { task: nextTask, onStarted: fetchDashboard, runModes: true, navigateTo }),
                 ),
                 h(RexTaskLink, {
-                  task: { id: nextTask.id, title: nextTask.title, status: nextTask.status, level: nextTask.level, priority: nextTask.priority },
+                  task: { id: nextTask.id, title: nextTask.title, status: nextTask.status, itemType: nextTask.itemType, priority: nextTask.priority },
                   navigateTo,
                   showStatus: false,
                   class: "rex-dash-next-link",

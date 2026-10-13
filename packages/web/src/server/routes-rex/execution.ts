@@ -25,9 +25,9 @@ import { loadPRDSync } from "../prd-io.js";
 
 import {
   computeStats,
-  isRootLevel,
   type PRDItem,
 } from "../rex-gateway.js";
+import { isRootType, itemTypeOf } from "../../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Execution types
@@ -303,7 +303,7 @@ async function handleStartEpicByEpic(
     };
 
     // Build the list of epics to execute
-    const allEpics = doc.items.filter((item) => isRootLevel(item.level));
+    const allEpics = doc.items.filter((item) => isRootType(itemTypeOf(item)));
 
     let epicsToRun: PRDItem[];
     if (input.epicIds && input.epicIds.length > 0) {

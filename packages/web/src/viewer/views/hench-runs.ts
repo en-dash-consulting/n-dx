@@ -1043,7 +1043,7 @@ interface NextTaskInfo {
   id: string;
   title: string;
   status: string;
-  level: string;
+  itemType: string;
   priority?: string;
 }
 
@@ -1395,7 +1395,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
               h(RexTaskLink, {
                 task: {
                   id: nextTask.id, title: nextTask.title,
-                  status: nextTask.status, level: nextTask.level, priority: nextTask.priority,
+                  status: nextTask.status, itemType: nextTask.itemType, priority: nextTask.priority,
                 },
                 navigateTo,
                 showLevel: true,

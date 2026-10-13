@@ -6,7 +6,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, isAbsolute } from "node:path";
 import {
   CLI_ERROR_CODES,
   CLIError as BaseCLIError,
@@ -16,6 +16,7 @@ import {
 } from "@n-dx/llm-client";
 
 import { resolveRexPaths } from "../store/index.js";
+import { rexDirHoldsPrd } from "../store/prd-model-reader.js";
 
 /**
  * Rex CLI error — extends the foundation CLIError.
@@ -129,6 +130,22 @@ const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
   ],
 ];
 
+/** Hints that tell the operator the project has no PRD and to run `n-dx init`. */
+const UNINITIALIZED_CODES: ReadonlySet<CLIErrorCode> = new Set([
+  CLI_ERROR_CODES.NOT_INITIALIZED,
+  CLI_ERROR_CODES.PRD_NOT_FOUND,
+]);
+
+/**
+ * Whether the file a missing-file error names sits in a directory that holds
+ * a PRD in either layout. Such a project is initialized — a v2 tree, say, has
+ * no `prd.json` by design — so "run n-dx init" would be wrong advice.
+ */
+function missingFileBesidePrd(message: string): boolean {
+  const path = /'([^']+)'/.exec(message)?.[1];
+  return path !== undefined && isAbsolute(path) && rexDirHoldsPrd(dirname(path));
+}
+
 function renderCLIError(code: CLIErrorCode, message: string, suggestion?: string): string {
   let formatted = `Error: [${code}] ${message}`;
   if (suggestion) {
@@ -168,6 +185,7 @@ function formatCLIErrorMessage(err: unknown): string {
   // Check for known patterns
   for (const [pattern, code, friendly, suggestion] of ERROR_HINTS) {
     if (pattern.test(message)) {
+      if (UNINITIALIZED_CODES.has(code) && missingFileBesidePrd(message)) continue;
       const displayMsg = friendly || message;
       return renderCLIError(code, displayMsg, suggestion);
     }

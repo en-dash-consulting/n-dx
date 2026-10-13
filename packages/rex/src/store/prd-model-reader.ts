@@ -20,6 +20,7 @@
  * product/<slug>/state.yaml state for the folder node and its leaf files
  * product/<slug>/<leaf>.md  a leaf node
  * changes/…                 the same shape, with no root header
+ * changes/inbox/            reserved: unplaced changes (see {@link INBOX_DIRNAME})
  * ```
  *
  * Children are read in slug order. A node whose intent fails validation is
@@ -39,6 +40,7 @@
  * @module rex/store/prd-model-reader
  */
 
+import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { ItemLevel, PRDItem } from "../schema/index.js";
@@ -52,6 +54,21 @@ import { parseTreeMeta } from "./tree-meta.js";
 
 export const PRODUCT_DIRNAME = "product";
 export const CHANGES_DIRNAME = "changes";
+
+/**
+ * The Inbox: a folder name reserved under `changes/`, not a change.
+ *
+ * An unplaced change lives at `changes/inbox/<slug>/index.md` with
+ * `needsPlacement: true` in its own folder's `state.yaml`; placement clears the
+ * flag and the next write moves the change out to the change-layer root
+ * (`isInboxChange` in `prd-model-writer.ts`). The folder is storage only: the
+ * model keeps its children where an unplaced change belongs, as top-level
+ * changes, so counts, selection and the rules see no folder at all.
+ *
+ * A `changes/<slug>/` holding an unplaced change still reads — the flag is the
+ * only thing that decides where the next write puts it.
+ */
+export const INBOX_DIRNAME = "inbox";
 
 /** Environment variable that turns on read-only inspection of a skewed tree. */
 export const IGNORE_SCHEMA_SKEW_ENV = "NDX_IGNORE_SCHEMA_SKEW";
@@ -199,6 +216,15 @@ export async function prdLayout(rexDir: string): Promise<PrdModel["layout"]> {
   return (await isDirectory(join(rexDir, PRODUCT_DIRNAME))) ? "v2" : "v1";
 }
 
+/**
+ * Whether `rexDir` holds a PRD in either layout: a v2 `product/`, a v1
+ * `prd_tree/`, or a legacy `prd.md` / `prd.json`. Synchronous, for error
+ * formatting, which has no async path.
+ */
+export function rexDirHoldsPrd(rexDir: string): boolean {
+  return [PRODUCT_DIRNAME, PRD_TREE_DIRNAME, "prd.md", "prd.json"].some((entry) => existsSync(join(rexDir, entry)));
+}
+
 /** Load the PRD under `rexDir` as one model, from whichever layout it uses. */
 export async function loadPrdModel(rexDir: string, options: LoadPrdModelOptions = {}): Promise<PrdModel> {
   const ignore = options.ignoreSchemaSkew ?? ignoreSchemaSkewRequested([], options.env ?? process.env);
@@ -297,27 +323,42 @@ interface ReadContext {
 
 async function readLayer(layerDir: string, layer: Layer, ctx: ReadContext): Promise<RuleNode[]> {
   if (!(await isDirectory(layerDir))) return [];
-  const folder = await readFolder(layerDir, ctx);
+  const folder = await readFolder(layerDir, ctx, layer === "changes" ? INBOX_DIRNAME : undefined);
   warnOrphanRows(layerDir, folder, ctx.warnings);
   const extra = extraTopLevelKeys(folder.state);
   if (extra && ctx.folderState) ctx.folderState.layers[layer] = extra;
-  return folder.children;
+  return childrenOf(folder);
 }
 
-/** A folder's `state.yaml`, its child nodes, and the state rows those children claimed. */
+/** A folder's `state.yaml`, its child nodes under the names they are stored by, and the state rows those children claimed. */
 interface FolderRead {
   state: StateFile;
-  children: RuleNode[];
+  named: Array<{ name: string; node: RuleNode }>;
   claimed: Set<string>;
 }
 
-/** The nodes stored directly in `dir`: subfolders with an `index.md`, and leaf `.md` files, in slug order. */
-async function readFolder(dir: string, ctx: ReadContext): Promise<FolderRead> {
+function childrenOf(folder: FolderRead): RuleNode[] {
+  return folder.named.map(({ node }) => node);
+}
+
+/**
+ * The nodes stored directly in `dir`: subfolders with an `index.md`, and leaf
+ * `.md` files, in slug order. A subfolder named `reserved` is not a node: it is
+ * read as a folder of its own and its children join this folder's, sorted in
+ * among them. That is how `changes/inbox/` holds top-level changes.
+ */
+async function readFolder(dir: string, ctx: ReadContext, reserved?: string): Promise<FolderRead> {
   const state = await loadStateFile(dir, { ignoreSchemaStamp: ctx.ignoreStamp });
   const claimed = new Set<string>();
   const named: Array<{ name: string; node: RuleNode }> = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
+      if (entry.name === reserved) {
+        const inner = await readFolder(join(dir, entry.name), ctx);
+        warnOrphanRows(join(dir, entry.name), inner, ctx.warnings);
+        named.push(...inner.named);
+        continue;
+      }
       const node = await readFolderNode(join(dir, entry.name), ctx);
       if (node) named.push({ name: entry.name, node });
     } else if (entry.isFile() && entry.name.endsWith(".md") && entry.name !== "index.md") {
@@ -330,7 +371,7 @@ async function readFolder(dir: string, ctx: ReadContext): Promise<FolderRead> {
     }
   }
   named.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  return { state, children: named.map(({ node }) => node), claimed };
+  return { state, named, claimed };
 }
 
 async function readFolderNode(dir: string, ctx: ReadContext): Promise<RuleNode | null> {
@@ -346,7 +387,7 @@ async function readFolderNode(dir: string, ctx: ReadContext): Promise<RuleNode |
   warnOrphanRows(dir, folder, ctx.warnings);
   const extra = extraTopLevelKeys(folder.state);
   if (extra) ctx.folderState?.nodes.set(node.id, extra);
-  if (folder.children.length) node.children = folder.children;
+  if (folder.named.length) node.children = childrenOf(folder);
   return node;
 }
 

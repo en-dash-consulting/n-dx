@@ -261,7 +261,7 @@ async function _cmdReshapeCore(
   // lock across them would starve every other writer (and exceed the lock's
   // staleness window). Their results are plain per-item updates that are
   // re-applied under the lock below.
-  const previewResult = applyReshape(docAfterCompaction.items, accepted);
+  const previewResult = applyReshape(docAfterCompaction.items, accepted, { changeLayer: v2 });
 
   // LLM body merge: for each accepted hash-suffix MergeAction, generate a merged description
   const { findItem: findItemInTree, updateInTree } = await import("../../core/tree.js");
@@ -349,7 +349,7 @@ async function _cmdReshapeCore(
   // and archive before saving — all in one transaction so an item a concurrent
   // writer added during the LLM passes survives this full-document save.
   const reshapeResult = await store.withTransaction(async (doc) => {
-    const outcome = applyReshape(doc.items, accepted);
+    const outcome = applyReshape(doc.items, accepted, { changeLayer: v2 });
     for (const u of bodyMergeUpdates) {
       updateInTree(doc.items, u.id, { description: u.description });
     }

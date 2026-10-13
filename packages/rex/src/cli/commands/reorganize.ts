@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { resolveStore, resolveRexPaths } from "../../store/index.js";
+import { isChangeLayerStore, resolveStore, resolveRexPaths } from "../../store/index.js";
 import type { PRDStore } from "../../store/index.js";
 import { loadProductLayerItems, resolveLayerStore } from "../../store/change-layer-store.js";
 import type { PRDDocument } from "../../schema/index.js";
@@ -173,7 +173,7 @@ async function applyStructural(
   // Re-apply against a freshly loaded document under the lock so an item a
   // concurrent writer added in the meantime survives this full-document save.
   const applyResult = await store.withTransaction(async (doc) =>
-    applyProposals(doc.items, toApply),
+    applyProposals(doc.items, toApply, { changeLayer: isChangeLayerStore(store) }),
   );
   if (applyResult.applied > 0) {
     await store.appendLog({
@@ -311,7 +311,7 @@ export async function cmdReorganize(
 
   // Stage 1: Programmatic detectors
   info("Analyzing PRD structure...");
-  const plan = detectReorganizations(doc.items, { includeCompleted });
+  const plan = detectReorganizations(doc.items, { includeCompleted, changeLayer: v2 });
   const productPlan = v2 ? reportProductLayer(productItems, includeCompleted, isJson) : undefined;
   // Added to every JSON result, so a v2 run still prints one document.
   const productJson = productPlan ? { product: { proposals: productPlan.proposals.map(summarizeProposal), stats: productPlan.stats } } : {};

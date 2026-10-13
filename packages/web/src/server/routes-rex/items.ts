@@ -14,21 +14,30 @@ import {
   appendLog, API_SETTABLE_STATUSES,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
-import { resolveStore } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore, completeV2Work } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
   type PRDItem,
-  type ItemLevel,
   type TreeEntry,
-  LEVEL_HIERARCHY,
-  CHILD_LEVEL,
   isPriority,
-  isItemLevel,
   validateMerge,
   previewMerge,
   mergeItems,
+  validateChangesMerge,
+  mergeChanges,
+  type ChangesMergeOutcome,
 } from "../rex-gateway.js";
+import {
+  type ItemType,
+  childTypeOf,
+  isItemType,
+  isProductType,
+  isValidParentType,
+  itemTypeOf,
+  levelOf,
+  parentTypesOf,
+} from "../../shared/index.js";
 
 // Re-import parentIdOf from rex-route-helpers for merge handler
 
@@ -110,7 +119,8 @@ export function routeItems(
  * The fields the viewer edits through `PATCH /api/rex/items/:id`. Anything else
  * is refused — in particular `run`, which only the version-checked
  * `PUT /api/hench/prep/:taskId` may write, and the system-managed fields
- * (id, level, timestamps, blockedBy, children).
+ * (id, type, timestamps, blockedBy, children). A node's type is set when it is
+ * added and changed by `move_item`, never by an edit.
  */
 const PATCHABLE_FIELDS = new Set([
   "status", "failureReason", "priority", "tags", "title",
@@ -155,6 +165,21 @@ function validateItemPatch(body: unknown): string | null {
 
 class ItemNotFoundError extends Error {}
 
+/**
+ * Refresh the in-process cache (so the next read sees the write before the
+ * folder-tree watcher fires) and tell connected clients what changed.
+ */
+async function publishItemUpdate(
+  ctx: ServerContext,
+  store: Awaited<ReturnType<typeof resolveStore>>,
+  itemId: string,
+  updates: Record<string, unknown>,
+  broadcast?: WebSocketBroadcaster,
+): Promise<void> {
+  refreshPRDCache(ctx.rexDir, await store.loadDocument());
+  broadcast?.({ type: "rex:item-updated", itemId, updates, timestamp: new Date().toISOString() });
+}
+
 /** Handle PATCH /api/rex/items/:id */
 async function handleItemPatch(
   req: IncomingMessage,
@@ -181,31 +206,39 @@ async function handleItemPatch(
     // read-modify-write sits inside the lock so a concurrent writer's item is
     // not dropped. `updateInTree` applies startedAt/completedAt on a status change.
     const store = await resolveStore(ctx.rexDir);
-    const updatedDoc = await store.withTransaction(async (doc) => {
-      if (!updateInTree(doc.items, itemId, updates as Partial<PRDItem>)) {
-        throw new ItemNotFoundError(`Item "${itemId}" not found`);
+    // On a v2 tree completing work follows the change layer's rules (a task's
+    // change closes with its last task, an applied change amends the product
+    // layer), so it goes through rex's completion, not a status write. Any
+    // other field, and every other status, goes through the store as on v1.
+    const completing = updates.status === "completed" && isChangeLayerStore(store);
+    const fieldUpdates = { ...updates };
+    if (completing) delete fieldUpdates.status;
+    // Completion first, as `rex update` does: a refused completion throws before
+    // anything is written, so a PATCH never half-applies.
+    const completion = completing ? await completeV2Work(store, itemId) : undefined;
+    if (Object.keys(fieldUpdates).length > 0 || !completing) {
+      try {
+        await store.withTransaction(async (doc) => {
+          if (!updateInTree(doc.items, itemId, fieldUpdates as Partial<PRDItem>)) {
+            throw new ItemNotFoundError(`Item "${itemId}" not found`);
+          }
+        });
+      } catch (err) {
+        if (!completing) throw err;
+        // The completion is already on disk: publish it, and say the fields were not saved.
+        await publishItemUpdate(ctx, store, itemId, { status: "completed" }, broadcast);
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`Completed "${itemId}", but its other fields were not saved: ${message}`);
       }
-      return doc;
-    });
-
-    // Refresh the in-process cache immediately so subsequent loadPRDSync calls
-    // see the change before the folder-tree watcher fires.
-    refreshPRDCache(ctx.rexDir, updatedDoc);
-
-    // Broadcast change to connected WebSocket clients
-    if (broadcast) {
-      broadcast({
-        type: "rex:item-updated",
-        itemId,
-        updates,
-        timestamp: new Date().toISOString(),
-      });
     }
-
-    jsonResponse(res, 200, { ok: true });
+    await publishItemUpdate(ctx, store, itemId, updates, broadcast);
+    // Say why a change was held open or left unapplied (rex.applyOn), so the dashboard can.
+    jsonResponse(res, 200, completion?.reason ? { ok: true, applied: completion.applied, reason: completion.reason } : { ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (err instanceof ItemNotFoundError) {
+      errorResponse(res, 404, message);
+    } else if (message.startsWith("No live ")) {
       errorResponse(res, 404, message);
     } else if (message.includes("Could not acquire PRD lock")) {
       // Names the holder's PID — pass it through rather than retrying.
@@ -234,7 +267,8 @@ async function handleItemDelete(
   }
 
   const title = item.title;
-  const level = item.level;
+  const type = itemTypeOf(item);
+  const level = levelOf(type);
   try {
     await store.removeItem(itemId);
   } catch (err) {
@@ -251,7 +285,7 @@ async function handleItemDelete(
     timestamp: new Date().toISOString(),
     event: "item_deleted",
     itemId,
-    detail: `Deleted ${level} "${title}" and its descendants (via web)`,
+    detail: `Deleted ${type} "${title}" and its descendants (via web)`,
   };
   try {
     appendFileSync(logPath, JSON.stringify(logEntry) + "\n");
@@ -265,6 +299,7 @@ async function handleItemDelete(
     broadcast({
       type: "rex:item-deleted",
       itemId,
+      itemType: type,
       level,
       title,
       timestamp,
@@ -276,7 +311,7 @@ async function handleItemDelete(
     });
   }
 
-  jsonResponse(res, 200, { ok: true, id: itemId, level, title });
+  jsonResponse(res, 200, { ok: true, id: itemId, type, level, title });
   return true;
 }
 
@@ -291,6 +326,8 @@ async function handleItemAdd(
     const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       title?: string;
+      /** Node type (`change`, `task`, …). `level` is the accepted v1 spelling. */
+      type?: string;
       level?: string;
       parentId?: string;
       description?: string;
@@ -313,6 +350,31 @@ async function handleItemAdd(
     // on reload.
     const store = await resolveStore(ctx.rexDir);
 
+    // v2: the item is a change in the Inbox, placed later. Levels are a v1
+    // notion and are ignored. Only a change can be added here: any other
+    // `type` is refused, and so is a parent.
+    if (isChangeLayerStore(store)) {
+      if (input.type !== undefined && input.type !== "change") {
+        errorResponse(
+          res,
+          400,
+          `Quick Add on a v2 project creates a change, not a ${String(input.type)}. ` +
+            'Omit type (or send "change") for an Inbox change, or use `rex add --type=<type> --parent=<id>` (or MCP add_item).',
+        );
+        return true;
+      }
+      if (input.parentId) {
+        errorResponse(
+          res,
+          400,
+          "Quick Add does not add a task under a change. " +
+            "Use Add with no parent for an Inbox change, or `rex add --type=task --parent=<id>` (or MCP add_item).",
+        );
+        return true;
+      }
+      return await addInboxChange(res, ctx, store, { ...input, title: input.title.trim() }, broadcast);
+    }
+
     const parentId = input.parentId;
     let parent: PRDItem | null = null;
     if (parentId) {
@@ -323,42 +385,48 @@ async function handleItemAdd(
       }
     }
 
-    // Resolve level: explicit > inferred from parent > default to epic
-    let level: ItemLevel;
-    if (input.level && isItemLevel(input.level)) {
-      level = input.level;
-    } else if (parent) {
-      const parentLevel = parent.level;
-      const inferred = isItemLevel(parentLevel) ? CHILD_LEVEL[parentLevel] : undefined;
+    // Resolve the type: explicit > the parent's child type > the root type.
+    const parentType = parent ? itemTypeOf(parent) : undefined;
+    const requested = itemTypeOf(input);
+    let type: ItemType;
+    if (requested) {
+      if (!isItemType(requested)) {
+        errorResponse(res, 400, `Unknown type: "${requested}"`);
+        return true;
+      }
+      type = requested;
+    } else if (parentType) {
+      const inferred = childTypeOf(parentType);
       if (!inferred) {
-        errorResponse(res, 400, `Cannot infer child level for parent type "${parentLevel}"`);
+        errorResponse(res, 400, `Cannot infer a child type for a ${parentType}`);
         return true;
       }
-      level = inferred;
+      type = inferred;
     } else {
-      level = "epic";
+      type = "epic";
     }
 
-    // Validate parent-child level relationship
-    const allowedParents = isItemLevel(level) ? LEVEL_HIERARCHY[level] : undefined;
-    if (!allowedParents) {
-      errorResponse(res, 400, `Unknown level: "${level}"`);
-      return true;
-    }
-    const canBeRoot = allowedParents.includes(null);
-
-    if (!canBeRoot && !parentId) {
-      const parentNames = allowedParents.filter((p): p is ItemLevel => p !== null).join(" or ");
-      errorResponse(res, 400, `A ${level} requires a parent (${parentNames})`);
-      return true;
-    }
-
-    if (parent) {
-      const allowedParentLevels = allowedParents.filter((p): p is ItemLevel => p !== null);
-      if (allowedParentLevels.length > 0 && !allowedParentLevels.includes(parent.level)) {
-        errorResponse(res, 400, `A ${level} must be a child of a ${allowedParentLevels.join(" or ")}, not a ${parent.level}`);
-        return true;
+    // Validate the parent-child relationship before touching the store.
+    if (!isValidParentType(type, parentType ?? null)) {
+      const allowed = parentTypesOf(type);
+      if (!parentId) {
+        errorResponse(res, 400, `A ${type} requires a parent (${allowed.join(" or ")})`);
+      } else {
+        errorResponse(res, 400, `A ${type} must be a child of a ${allowed.join(" or ")}, not a ${parentType}`);
       }
+      return true;
+    }
+
+    // The store behind this route is still v1, which has no level for a
+    // product-layer node. Refusing names the reason rather than writing the
+    // node out as an epic that reads back as something it is not.
+    const level = levelOf(type, parentType);
+    if (!level) {
+      const why = isProductType(type)
+        ? `the product layer is not writable through this route yet`
+        : `it has no v1 level`;
+      errorResponse(res, 400, `Cannot add a ${type}: ${why}`);
+      return true;
     }
 
     const id = randomUUID();
@@ -389,7 +457,7 @@ async function handleItemAdd(
       timestamp: new Date().toISOString(),
       event: "item_added",
       itemId: id,
-      detail: `Added ${level}: ${item.title} (via web)`,
+      detail: `Added ${type}: ${item.title} (via web)`,
     });
 
     if (broadcast) {
@@ -399,10 +467,43 @@ async function handleItemAdd(
       });
     }
 
-    jsonResponse(res, 201, { ok: true, id, level, title: item.title });
+    // `level` rides along for a client still reading the v1 spelling.
+    jsonResponse(res, 201, { ok: true, id, type, level, title: item.title });
   } catch (err) {
     errorResponse(res, 400, String(err));
   }
+  return true;
+}
+
+/**
+ * Add an Inbox change to a v2 tree: a root change that neither amends nor
+ * touches anything carries `needsPlacement`, as rex's `add_item` makes it.
+ * Slug and rule checks are the change-layer store's.
+ */
+async function addInboxChange(
+  res: ServerResponse,
+  ctx: ServerContext,
+  store: Parameters<typeof completeV2Work>[0],
+  input: { title: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[] },
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const id = randomUUID();
+  const item = { id, title: input.title, status: "pending", level: "epic", type: "change", needsPlacement: true } as PRDItem;
+  if (input.description) item.description = input.description;
+  if (input.priority && isPriority(input.priority)) item.priority = input.priority;
+  if (Array.isArray(input.tags)) item.tags = input.tags;
+  if (Array.isArray(input.acceptanceCriteria)) item.acceptanceCriteria = input.acceptanceCriteria;
+
+  await store.addItem(item);
+  refreshPRDCache(ctx.rexDir, await store.loadDocument());
+  appendLog(ctx, {
+    timestamp: new Date().toISOString(),
+    event: "item_added",
+    itemId: id,
+    detail: `Added change: ${input.title} (via web)`,
+  });
+  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  jsonResponse(res, 201, { ok: true, id, type: "change", title: input.title, needsPlacement: true });
   return true;
 }
 
@@ -440,18 +541,78 @@ async function handleBulkUpdate(
     // savePRDSync.
     const store = await resolveStore(ctx.rexDir);
     const results: Array<{ id: string; ok: boolean; error?: string }> = [];
-    const updatedDoc = await store.withTransaction(async (doc) => {
-      for (const id of input.ids) {
-        // Clone updates for each item to get independent timestamps
-        const itemUpdates = { ...input.updates };
-        if (updateInTree(doc.items, id, itemUpdates)) {
-          results.push({ id, ok: true });
-        } else {
-          results.push({ id, ok: false, error: "not found" });
+    // As the single PATCH: on a v2 tree "completed" goes through rex's
+    // completion (closes a change with its last task, applies amendments to the
+    // product layer); any other field or status goes through the store.
+    const completing = input.updates.status === "completed" && isChangeLayerStore(store);
+    const fieldUpdates = { ...input.updates };
+    if (completing) delete fieldUpdates.status;
+    const writeFields = !completing || Object.keys(fieldUpdates).length > 0;
+    let updatedDoc: Awaited<ReturnType<typeof store.loadDocument>>;
+    if (completing) {
+      // Completion runs first and fields are written only for the ids it
+      // completed, so a refused completion writes nothing of its own. A change
+      // selected with its tasks is refused while a task listed after it is
+      // still open, so a refused id is retried after any pass that completed
+      // something.
+      const before = await store.loadDocument();
+      for (const id of input.ids) results.push({ id, ok: Boolean(findItemById(before.items, id)) });
+      let pending = results.filter((r) => r.ok);
+      while (pending.length > 0) {
+        const refused: typeof pending = [];
+        for (const result of pending) {
+          try {
+            await completeV2Work(store, result.id);
+            delete result.error;
+          } catch (err) {
+            result.error = err instanceof Error ? err.message : String(err);
+            refused.push(result);
+          }
+        }
+        if (refused.length === pending.length) break;
+        pending = refused;
+      }
+      for (const result of pending) result.ok = !result.error;
+      updatedDoc = await store.loadDocument();
+      // A change that closed with its last task refuses its own call (not
+      // open). Report the outcome, not the call: completed is what was asked.
+      for (const result of results) {
+        if (!result.ok && result.error && findItemById(updatedDoc.items, result.id)?.status === "completed") {
+          result.ok = true;
+          delete result.error;
         }
       }
-      return doc;
-    });
+      if (writeFields) {
+        try {
+          updatedDoc = await store.withTransaction(async (doc) => {
+            for (const result of results) {
+              if (result.ok) updateInTree(doc.items, result.id, { ...fieldUpdates });
+            }
+            return doc;
+          });
+        } catch (err) {
+          // The completions are on disk; report them and fall through to the
+          // cache refresh and broadcast below.
+          const message = err instanceof Error ? err.message : String(err);
+          for (const result of results) {
+            if (!result.ok) continue;
+            result.ok = false;
+            result.error = `completed, but its other fields were not saved: ${message}`;
+          }
+        }
+      }
+    } else {
+      updatedDoc = await store.withTransaction(async (doc) => {
+        for (const id of input.ids) {
+          // Cloned per item to get independent timestamps
+          results.push({ id, ok: updateInTree(doc.items, id, { ...fieldUpdates }) });
+        }
+        return doc;
+      });
+    }
+    for (const result of results) {
+      if (!result.ok && !result.error) result.error = "not found";
+    }
     refreshPRDCache(ctx.rexDir, updatedDoc);
 
     // Log the bulk update
@@ -503,19 +664,21 @@ async function handleItemMerge(
     }
 
     const store = await resolveStore(ctx.rexDir);
+    // On a v2 tree only sibling changes merge, through rex's mergeChanges.
+    const v2 = isChangeLayerStore(store);
+    const options = {
+      ...(input.title ? { title: input.title } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+    };
 
     // Preview mode — read-only, no store mutation needed.
     if (input.preview) {
       const doc = await store.loadDocument();
-      const validation = validateMerge(doc.items, input.sourceIds, input.targetId);
+      const validation = (v2 ? validateChangesMerge : validateMerge)(doc.items, input.sourceIds, input.targetId);
       if (!validation.valid) {
         errorResponse(res, 400, validation.error!);
         return true;
       }
-      const options = {
-        ...(input.title ? { title: input.title } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-      };
       const preview = previewMerge(doc.items, input.sourceIds, input.targetId, options);
       jsonResponse(res, 200, { ok: true, preview });
       return true;
@@ -523,31 +686,29 @@ async function handleItemMerge(
 
     // Execute merge via the PRDStore's transaction so writes go to the
     // correct backend (prd_tree/ or prd.md) rather than always writing to
-    // prd.md via savePRDSync.
-    let result: ReturnType<typeof mergeItems> | undefined;
-    let validationError: string | undefined;
+    // prd.md via savePRDSync. A refused merge mutates nothing.
+    let outcome: ChangesMergeOutcome | undefined;
     const updatedDoc = await store.withTransaction(async (doc) => {
-      const validation = validateMerge(doc.items, input.sourceIds, input.targetId);
-      if (!validation.valid) {
-        validationError = validation.error!;
+      if (v2) {
+        outcome = mergeChanges(doc.items, input.sourceIds, input.targetId, options);
         return doc;
       }
-      const options = {
-        ...(input.title ? { title: input.title } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-      };
-      result = mergeItems(doc.items, input.sourceIds, input.targetId, options);
+      const validation = validateMerge(doc.items, input.sourceIds, input.targetId);
+      outcome = validation.valid
+        ? { valid: true, result: mergeItems(doc.items, input.sourceIds, input.targetId, options) }
+        : { valid: false, error: validation.error! };
       return doc;
     });
 
-    if (validationError) {
-      errorResponse(res, 400, validationError);
-      return true;
-    }
-    if (!result) {
+    if (!outcome) {
       errorResponse(res, 500, "Merge did not produce a result");
       return true;
     }
+    if (!outcome.valid) {
+      errorResponse(res, 400, outcome.error);
+      return true;
+    }
+    const result = outcome.result;
 
     refreshPRDCache(ctx.rexDir, updatedDoc);
 

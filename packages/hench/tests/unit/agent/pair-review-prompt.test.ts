@@ -85,6 +85,12 @@ describe("buildPairReviewBrief", () => {
     expect(brief).toMatch(/pre-run commit could not be captured/);
   });
 
+  it("names the v2 Inbox in the autonomous dedupe check only when given one", () => {
+    const v2 = buildPairReviewBrief(ctx({ prdTreeDir: ".rex/changes/", inboxDir: ".rex/changes/inbox/" }));
+    expect(v2).toContain("under `.rex/changes/` and under `.rex/changes/inbox/`, where unplaced changes wait,");
+    expect(buildPairReviewBrief(ctx())).not.toContain("inbox");
+  });
+
   it("shares the report schema with the self brief", () => {
     const pair = buildPairReviewBrief(ctx());
     const self = buildReviewBrief({

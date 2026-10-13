@@ -1,7 +1,8 @@
 /**
  * The change layer of a v2 tree behind the {@link PRDStore} interface, so the
  * level-based restructuring commands (`rex reshape`, `rex reorganize`,
- * `rex prune`) run on it as they run on a v1 tree.
+ * `rex prune`) run on it as they run on a v1 tree. `resolveStore` returns it
+ * on a v2 tree, so every `PRDStore` caller opens the change layer there.
  *
  * The document is the change layer projected as v1 items
  * (`core/layer-projection.ts`). Every write goes through
@@ -25,10 +26,18 @@ import { newErrors } from "../core/apply-amendments.js";
 import { changeLayerFromItems, changeLayerItems, productLayerItems } from "../core/layer-projection.js";
 import { pruneKeepReason } from "../core/prune.js";
 import { findItem, insertChild, removeFromTree, updateInTree, walkTree } from "../core/tree.js";
-import type { RuleNode } from "../schema/v2-rules.js";
-import type { PRDStore, StoreCapabilities } from "./contracts.js";
-import { loadPrdModel, prdLayout } from "./prd-model-reader.js";
-import { withPrdModelTransaction } from "./prd-model-transaction.js";
+import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
+import { join } from "node:path";
+import { projectRootOf } from "@n-dx/llm-client";
+import type { PRDStore, SaveFileReport, StoreCapabilities } from "./contracts.js";
+import { buildSaveFileReport, mergeSaveFileReports } from "./contracts.js";
+import { loadPrdModel, prdLayout, type PrdModel } from "./prd-model-reader.js";
+import {
+  withPrdModelTransaction,
+  type PrdModelEdit,
+  type PrdModelTransactionOptions,
+  type PrdModelTransactionResult,
+} from "./prd-model-transaction.js";
 
 /** Thrown when a change-layer write would break a v2 rule the tree did not break before. */
 export class ChangeLayerWriteError extends Error {
@@ -39,8 +48,11 @@ export class ChangeLayerWriteError extends Error {
 }
 
 export class ChangeLayerStore implements PRDStore {
+  /** Files written/deleted under `product/` and `changes/` since the last {@link takeSaveFileReport}. */
+  private pendingSaveReport: SaveFileReport | null = null;
+
   constructor(
-    private readonly rexDir: string,
+    readonly rexDir: string,
     /** The v1 store, for config, log and workflow. */
     private readonly base: PRDStore,
     private readonly now: () => Date = () => new Date(),
@@ -51,9 +63,40 @@ export class ChangeLayerStore implements PRDStore {
     return { schema: SCHEMA_VERSION, title: model.title, items: changeLayerItems(model.tree.changes) };
   }
 
+  /** The v2 tree itself, for the code that works on change-layer nodes rather than projected items. */
+  async loadTree(): Promise<V2Tree> {
+    return (await loadPrdModel(this.rexDir)).tree;
+  }
+
+  /**
+   * {@link withPrdModelTransaction} on this store's tree, recording the files
+   * the write touched for {@link takeSaveFileReport}. Every v2 write made
+   * through this store goes through here: the change-layer edits and
+   * `completeV2Work`'s completion and apply.
+   */
+  async withModelTransaction<T>(
+    mutate: (model: PrdModel) => PrdModelEdit<T> | Promise<PrdModelEdit<T>>,
+    options?: PrdModelTransactionOptions,
+  ): Promise<PrdModelTransactionResult<T>> {
+    const out = await withPrdModelTransaction(this.rexDir, mutate, options);
+    const abs = (paths: string[]) => paths.map((p) => join(this.rexDir, p));
+    // projectRootOf, not dirname: on the `.ndx/` layout rexDir's parent is the container.
+    this.pendingSaveReport = mergeSaveFileReports(
+      this.pendingSaveReport,
+      buildSaveFileReport({ writtenPaths: abs(out.written.written), deletedPaths: abs(out.written.deletedFiles) }, projectRootOf(this.rexDir)),
+    );
+    return out;
+  }
+
+  /** Drain the files this store's writes touched since the last take; `null` when none did. */
+  takeSaveFileReport(): SaveFileReport | null {
+    const report = this.pendingSaveReport;
+    this.pendingSaveReport = null;
+    return report;
+  }
+
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
-    const { result } = await withPrdModelTransaction(
-      this.rexDir,
+    const { result } = await this.withModelTransaction(
       async (model) => {
         const doc: PRDDocument = { schema: SCHEMA_VERSION, title: model.title, items: changeLayerItems(model.tree.changes) };
         const value = await fn(doc);
@@ -128,6 +171,11 @@ export class ChangeLayerStore implements PRDStore {
   }
 }
 
+/** Whether `store` serves the change layer of a v2 tree. */
+export function isChangeLayerStore(store: PRDStore): store is ChangeLayerStore {
+  return store instanceof ChangeLayerStore;
+}
+
 /**
  * A problem for each removed change prune keeps ({@link pruneKeepReason}): the
  * backstop behind the restructure guards, so no write path can delete the
@@ -142,9 +190,14 @@ function keptRemovals(changes: readonly RuleNode[], removed: ReadonlySet<string>
   return problems;
 }
 
-/** The store the restructuring commands write: the change layer on a v2 tree, `base` itself on a v1 tree. */
+/**
+ * The change layer on a v2 tree, `base` itself on a v1 tree. A `base` that is
+ * already the change layer (what `resolveStore` returns on a v2 tree) is
+ * returned as it is.
+ */
 export async function resolveLayerStore(rexDir: string, base: PRDStore): Promise<{ store: PRDStore; v2: boolean }> {
   if ((await prdLayout(rexDir)) !== "v2") return { store: base, v2: false };
+  if (base instanceof ChangeLayerStore) return { store: base, v2: true };
   return { store: new ChangeLayerStore(rexDir, base), v2: true };
 }
 

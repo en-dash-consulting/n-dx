@@ -17,7 +17,7 @@ import type {
   SubtaskEntry,
 } from "../../utils/index-md-parser.js";
 
-type SortColumn = "title" | "level" | "status" | "lastUpdated" | null;
+type SortColumn = "title" | "type" | "status" | "lastUpdated" | null;
 type SortDirection = "asc" | "desc";
 
 /**
@@ -38,9 +38,9 @@ export function ProgressTable({ rows }: { rows: ProgressRow[] }) {
           aVal = a.title;
           bVal = b.title;
           break;
-        case "level":
-          aVal = a.level;
-          bVal = b.level;
+        case "type":
+          aVal = a.itemType;
+          bVal = b.itemType;
           break;
         case "status":
           aVal = a.status;
@@ -95,12 +95,12 @@ export function ProgressTable({ rows }: { rows: ProgressRow[] }) {
           h(
             "th",
             {
-              class: `sortable${sortColumn === "level" ? " active" : ""}`,
-              onClick: () => handleSort("level"),
-              title: "Click to sort by level",
+              class: `sortable${sortColumn === "type" ? " active" : ""}`,
+              onClick: () => handleSort("type"),
+              title: "Click to sort by type",
             },
-            "Level",
-            sortColumn === "level" ? (sortDirection === "asc" ? " ▲" : " ▼") : "",
+            "Type",
+            sortColumn === "type" ? (sortDirection === "asc" ? " ▲" : " ▼") : "",
           ),
           h(
             "th",
@@ -132,7 +132,7 @@ export function ProgressTable({ rows }: { rows: ProgressRow[] }) {
             "tr",
             { key: `${row.title}-${row.lastUpdated}` },
             h("td", null, row.title),
-            h("td", null, h("span", { class: `prd-level-badge prd-level-${row.level}` }, row.level)),
+            h("td", null, h("span", { class: `prd-level-badge prd-level-${row.itemType}` }, row.itemType)),
             h("td", null, h("span", { class: `prd-status-badge prd-status-${row.status}` }, row.status)),
             h("td", null, row.lastUpdated),
           ),

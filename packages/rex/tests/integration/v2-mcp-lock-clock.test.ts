@@ -8,14 +8,15 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createStore } from "../../src/store/index.js";
-import { handleAddItem, handleApplyChange, handlePlaceChange } from "../../src/cli/mcp-tools/index.js";
+import { createStore, resolveStore } from "../../src/store/index.js";
+import { handleAddItem, handleApplyChange, handlePlaceChange, handleUpdateTaskStatus } from "../../src/cli/mcp-tools/index.js";
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 import { prdLockPath } from "../../src/store/paths.js";
 import { indexTree } from "../../src/schema/v2-rules.js";
 import { copyV2Fixture, editText } from "../helpers/v2-fixture.js";
 
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
+const TASK = "c0000000-0000-4000-8000-000000000002";
 const quiet = { env: {}, warn: () => {} };
 
 const BEFORE_WAIT = new Date("2026-10-09T00:00:00.000Z");
@@ -140,5 +141,31 @@ describe("apply_change on v2 reads its clock inside the lock", () => {
     expect((await nodeById(CHANGE) as { appliedAt?: string }).appliedAt).toBe(AFTER_LOCK.toISOString());
     const entries = (await readFile(join(rexDir, "execution-log.jsonl"), "utf-8")).trim().split("\n").map((l) => JSON.parse(l));
     expect(entries.at(-1)).toMatchObject({ event: "change_applied", timestamp: AFTER_LOCK.toISOString() });
+  });
+});
+
+describe("update_task_status on v2 completes inside the lock", () => {
+  it("completes and applies the change on the tree the holder left, at the post-lock time", async () => {
+    const clock = movableClock(BEFORE_WAIT);
+    const v2Store = await resolveStore(rexDir);
+    const res = await behindHolder(
+      () => handleUpdateTaskStatus(v2Store, tmp, { id: TASK, status: "completed" }, undefined, clock.read),
+      async () => {
+        // The fixture's change is in_progress, which never auto-completes (#368):
+        // the holder's write is what lets this completion close and apply it.
+        await editText(join(rexDir, "changes/add-apple-pay/state.yaml"), (t) => t.replace('status: "in_progress"', 'status: "pending"'));
+        clock.set(AFTER_LOCK);
+      },
+    );
+    expect(res.isError, res.content[0].text).toBeFalsy();
+    expect(clock.reads).toEqual([AFTER_LOCK]);
+    expect(JSON.parse(res.content[0].text)).toMatchObject({ changeCompleted: true, applied: true });
+    expect(await nodeById(CHANGE)).toMatchObject({
+      status: "completed",
+      completedAt: AFTER_LOCK.toISOString(),
+      appliedAt: AFTER_LOCK.toISOString(),
+    });
+    const entries = (await readFile(join(rexDir, "execution-log.jsonl"), "utf-8")).trim().split("\n").map((l) => JSON.parse(l));
+    expect(entries.find((e) => e.event === "change_applied")).toMatchObject({ itemId: CHANGE, timestamp: AFTER_LOCK.toISOString() });
   });
 });

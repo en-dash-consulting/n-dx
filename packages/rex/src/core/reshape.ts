@@ -13,6 +13,7 @@ import type { PRDItem } from "../schema/index.js";
 import { findItem, removeFromTree, updateInTree, insertChild } from "./tree.js";
 import { moveItem } from "./move.js";
 import { deleteKeepReason, mergeKeepReason } from "./prune.js";
+import { mergeChanges } from "./merge.js";
 
 // ── Proposal types ──
 
@@ -168,6 +169,7 @@ function applyMerge(
   action: MergeAction,
   result: ReshapeResult,
   proposal: ReshapeProposal,
+  changeLayer: boolean,
 ): void {
   const survivorEntry = findItem(items, action.survivorId);
   if (!survivorEntry) {
@@ -177,6 +179,11 @@ function applyMerge(
   const refusal = keptItemRefusal(items, action.mergedIds.filter((id) => id !== action.survivorId), mergeKeepReason, "merge away");
   if (refusal) {
     result.errors.push({ proposal, error: refusal });
+    return;
+  }
+
+  if (changeLayer) {
+    applyChangeMerge(items, action, result, proposal);
     return;
   }
 
@@ -220,6 +227,46 @@ function applyMerge(
     reasoning: action.mergeReasoning || action.reason || "merge",
   });
 
+  result.applied.push(proposal);
+}
+
+/**
+ * A merge on a v2 change layer goes through {@link mergeChanges}, the single
+ * v2 merge path: the absorbed changes' touches, ids and display ids carry to
+ * the survivor, and a change carrying amendments is refused. A refusal writes
+ * nothing for the proposal.
+ */
+function applyChangeMerge(
+  items: PRDItem[],
+  action: MergeAction,
+  result: ReshapeResult,
+  proposal: ReshapeProposal,
+): void {
+  const absorbedIds = [...new Set(action.mergedIds)].filter((id) => id !== action.survivorId);
+  const missing = absorbedIds.find((id) => !findItem(items, id));
+  if (missing) {
+    result.errors.push({ proposal, error: `Merged item "${missing}" not found.` });
+    return;
+  }
+  const snapshots = absorbedIds.map((id) => structuredClone(findItem(items, id)!.item));
+  const outcome = mergeChanges(items, [action.survivorId, ...absorbedIds], action.survivorId, {
+    title: action.title,
+    description: action.description,
+  });
+  if (!outcome.valid) {
+    result.errors.push({ proposal, error: `Skipped: ${outcome.error}` });
+    return;
+  }
+  for (const snapshot of snapshots) {
+    snapshot.children = [];
+    result.archivedItems.push(snapshot);
+  }
+  result.deletedIds.push(...absorbedIds);
+  result.mergeAuditTrail.push({
+    survivorId: action.survivorId,
+    mergedFromIds: action.mergedIds,
+    reasoning: action.mergeReasoning || action.reason || "merge",
+  });
   result.applied.push(proposal);
 }
 
@@ -410,11 +457,13 @@ function applyGroup(
  *
  * @param items - The mutable items array (modified in place)
  * @param proposals - Accepted reshape proposals to apply
+ * @param options - `changeLayer`: the items are a v2 change layer, so a merge goes through `mergeChanges`
  * @returns Result with applied proposals, deleted IDs, archived items, and errors
  */
 export function applyReshape(
   items: PRDItem[],
   proposals: ReshapeProposal[],
+  options: { changeLayer?: boolean } = {},
 ): ReshapeResult {
   const result: ReshapeResult = {
     applied: [],
@@ -428,7 +477,7 @@ export function applyReshape(
   for (const proposal of proposals) {
     switch (proposal.action.action) {
       case "merge":
-        applyMerge(items, proposal.action, result, proposal);
+        applyMerge(items, proposal.action, result, proposal, options.changeLayer === true);
         break;
       case "update":
         applyUpdate(items, proposal.action, result, proposal);

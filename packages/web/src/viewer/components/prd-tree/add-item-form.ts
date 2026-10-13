@@ -2,13 +2,14 @@
  * Add item form for creating new PRD items.
  *
  * Provides a form with type selection, title input, optional description,
- * priority, and parent constraint. The form validates level/parent
+ * priority, and parent constraint. The form validates type/parent
  * relationships and provides real-time feedback.
  */
 
 import { h } from "preact";
 import { useState, useCallback, useMemo, useRef, useEffect } from "preact/hooks";
-import type { PRDItemData, ItemLevel, Priority } from "./types.js";
+import type { PRDItemData, Priority } from "./types.js";
+import { type ItemType, childTypeOf, isRootType, isValidParentType, itemTypeLabel, itemTypeOf, parentTypesOf } from "../../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ export interface AddItemFormProps {
 
 export interface AddItemInput {
   title: string;
-  level?: string;
+  type?: string;
   parentId?: string;
   description?: string;
   priority?: string;
@@ -35,12 +36,12 @@ export interface AddItemInput {
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const LEVEL_OPTIONS: Array<{ value: ItemLevel; label: string }> = [
-  { value: "epic", label: "Epic" },
-  { value: "feature", label: "Feature" },
-  { value: "task", label: "Task" },
-  { value: "subtask", label: "Subtask" },
-];
+/**
+ * The types this form can create. The route behind it writes a v1 store, so
+ * the product-layer types are deliberately absent — it would refuse them.
+ */
+const TYPE_OPTIONS: Array<{ value: ItemType; label: string }> =
+  (["epic", "feature", "task", "subtask"] as const).map((value) => ({ value, label: itemTypeLabel(value) }));
 
 const PRIORITY_OPTIONS: Array<{ value: Priority | ""; label: string }> = [
   { value: "", label: "None" },
@@ -49,21 +50,6 @@ const PRIORITY_OPTIONS: Array<{ value: Priority | ""; label: string }> = [
   { value: "medium", label: "Medium" },
   { value: "low", label: "Low" },
 ];
-
-/** Valid parent levels for each item level. */
-const LEVEL_HIERARCHY: Record<ItemLevel, Array<ItemLevel | null>> = {
-  epic: [null],
-  feature: ["epic"],
-  task: ["feature", "epic"],
-  subtask: ["task"],
-};
-
-/** Infer child level from parent level. */
-const CHILD_LEVEL: Record<string, ItemLevel> = {
-  epic: "feature",
-  feature: "task",
-  task: "subtask",
-};
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -79,19 +65,12 @@ function flattenItems(items: PRDItemData[], depth = 0): Array<{ item: PRDItemDat
   return result;
 }
 
-/** Check if a level is allowed under a given parent level. */
-function isValidParent(childLevel: ItemLevel, parentLevel: ItemLevel | null): boolean {
-  const allowed = LEVEL_HIERARCHY[childLevel];
-  if (parentLevel === null) return allowed.includes(null);
-  return allowed.includes(parentLevel);
-}
-
 // ── Component ────────────────────────────────────────────────────────
 
 export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: AddItemFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [level, setLevel] = useState<ItemLevel | "">(defaultParentId ? "" : "epic");
+  const [type, setType] = useState<ItemType | "">(defaultParentId ? "" : "epic");
   const [parentId, setParentId] = useState<string>(defaultParentId ?? "");
   const [priority, setPriority] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
@@ -107,26 +86,26 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
   // Flatten items for parent selector
   const flatItems = useMemo(() => flattenItems(allItems), [allItems]);
 
-  // Auto-infer level when parent changes
-  const effectiveLevel = useMemo<ItemLevel | "">(() => {
-    if (level) return level;
+  // Auto-infer the type when the parent changes
+  const effectiveType = useMemo<ItemType | "">(() => {
+    if (type) return type;
     if (parentId) {
       const parent = flatItems.find((f) => f.item.id === parentId);
       if (parent) {
-        return CHILD_LEVEL[parent.item.level] ?? "";
+        return childTypeOf(itemTypeOf(parent.item)) ?? "";
       }
     }
     return "epic";
-  }, [level, parentId, flatItems]);
+  }, [type, parentId, flatItems]);
 
-  // Filter parent options based on selected level
+  // Filter parent options based on the selected type
   const validParents = useMemo(() => {
-    if (!effectiveLevel) return flatItems;
-    return flatItems.filter((f) => isValidParent(effectiveLevel, f.item.level));
-  }, [effectiveLevel, flatItems]);
+    if (!effectiveType) return flatItems;
+    return flatItems.filter((f) => isValidParentType(effectiveType, itemTypeOf(f.item)));
+  }, [effectiveType, flatItems]);
 
-  // Determine if the selected level can be a root item
-  const canBeRoot = effectiveLevel ? LEVEL_HIERARCHY[effectiveLevel].includes(null) : true;
+  // Determine if the selected type can be a root item
+  const canBeRoot = effectiveType ? isRootType(effectiveType) : true;
 
   // Title validation state
   const titleError = titleTouched && !title.trim() ? "Title is required" : null;
@@ -148,7 +127,7 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
       try {
         await onSubmit({
           title: title.trim(),
-          level: effectiveLevel || undefined,
+          type: effectiveType || undefined,
           parentId: parentId || undefined,
           description: description.trim() || undefined,
           priority: priority || undefined,
@@ -156,7 +135,7 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
         // Reset form on success
         setTitle("");
         setDescription("");
-        setLevel("");
+        setType("");
         setParentId("");
         setPriority("");
         setTitleTouched(false);
@@ -166,12 +145,10 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
         setSubmitting(false);
       }
     },
-    [title, effectiveLevel, parentId, description, priority, onSubmit],
+    [title, effectiveType, parentId, description, priority, onSubmit],
   );
 
-  const levelLabel = effectiveLevel
-    ? LEVEL_OPTIONS.find((o) => o.value === effectiveLevel)?.label ?? effectiveLevel
-    : "item";
+  const typeLabel = effectiveType ? itemTypeLabel(effectiveType) : "item";
 
   return h(
     "form",
@@ -193,27 +170,27 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
       ? h("div", { class: "rex-add-form-error", role: "alert", "aria-live": "assertive" }, error)
       : null,
 
-    // Level selector
+    // Type selector
     h("div", { class: "rex-add-form-field" },
       h("label", { class: "rex-add-form-label", id: "add-form-type-label" }, "Type"),
       h("div", { class: "rex-add-form-level-group", role: "group", "aria-labelledby": "add-form-type-label" },
-        LEVEL_OPTIONS.map((opt) =>
+        TYPE_OPTIONS.map((opt) =>
           h("button", {
             key: opt.value,
             type: "button",
-            class: `rex-add-form-level-btn prd-level-${opt.value}${effectiveLevel === opt.value ? " active" : ""}`,
-            "aria-pressed": effectiveLevel === opt.value ? "true" : "false",
+            class: `rex-add-form-level-btn prd-level-${opt.value}${effectiveType === opt.value ? " active" : ""}`,
+            "aria-pressed": effectiveType === opt.value ? "true" : "false",
             onClick: () => {
-              setLevel(opt.value);
+              setType(opt.value);
               // Clear parent if it's incompatible
               if (parentId) {
                 const parent = flatItems.find((f) => f.item.id === parentId);
-                if (parent && !isValidParent(opt.value, parent.item.level)) {
+                if (parent && !isValidParentType(opt.value, itemTypeOf(parent.item))) {
                   setParentId("");
                 }
               }
-              // Clear parent if the level must be root
-              if (LEVEL_HIERARCHY[opt.value].length === 1 && LEVEL_HIERARCHY[opt.value][0] === null) {
+              // Clear parent if the type can only sit at the root
+              if (isRootType(opt.value) && parentTypesOf(opt.value).length === 0) {
                 setParentId("");
               }
             },
@@ -222,8 +199,8 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
       ),
     ),
 
-    // Parent selector (hidden for epic)
-    effectiveLevel !== "epic"
+    // Parent selector (hidden for a root-only type)
+    effectiveType !== "epic"
       ? h("div", { class: "rex-add-form-field" },
           h("label", { class: "rex-add-form-label", for: "add-form-parent" }, "Parent"),
           h("select", {
@@ -233,12 +210,12 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
             onChange: (e: Event) => {
               const val = (e.target as HTMLSelectElement).value;
               setParentId(val);
-              // Auto-infer level from parent if not explicitly set
-              if (val && !level) {
+              // Auto-infer the type from the parent if not explicitly set
+              if (val && !type) {
                 const parent = flatItems.find((f) => f.item.id === val);
                 if (parent) {
-                  const inferred = CHILD_LEVEL[parent.item.level];
-                  if (inferred) setLevel(inferred);
+                  const inferred = childTypeOf(itemTypeOf(parent.item));
+                  if (inferred) setType(inferred);
                 }
               }
             },
@@ -248,7 +225,7 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
               : h("option", { value: "", disabled: true }, "Select a parent..."),
             validParents.map((f) =>
               h("option", { key: f.item.id, value: f.item.id },
-                `${"  ".repeat(f.depth)}${f.item.title} (${f.item.level})`,
+                `${"  ".repeat(f.depth)}${f.item.title} (${itemTypeOf(f.item)})`,
               ),
             ),
           ),
@@ -263,7 +240,7 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
         class: `rex-add-form-input${titleError ? " rex-add-form-input-error" : ""}`,
         type: "text",
         value: title,
-        placeholder: `Enter ${levelLabel} title...`,
+        placeholder: `Enter ${typeLabel} title...`,
         onInput: (e: Event) => setTitle((e.target as HTMLInputElement).value),
         onBlur: () => setTitleTouched(true),
         required: true,
@@ -319,7 +296,7 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
         type: "submit",
         class: "rex-add-form-btn rex-add-form-btn-submit",
         disabled: submitting || !title.trim(),
-      }, submitting ? "Adding..." : `Add ${levelLabel}`),
+      }, submitting ? "Adding..." : `Add ${typeLabel}`),
     ),
   );
 }

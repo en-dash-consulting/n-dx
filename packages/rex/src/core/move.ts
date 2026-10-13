@@ -3,7 +3,8 @@
  *
  * Handles validation of structural constraints:
  * - Target parent exists (when specified)
- * - Level hierarchy is respected (LEVEL_HIERARCHY)
+ * - The parent rule is respected: the level hierarchy (LEVEL_HIERARCHY) on
+ *   a v1 tree, the node types on a v2 change layer ({@link changeLayerParentRule})
  * - No circular moves (item cannot move under its own descendants)
  *
  * @module core/move
@@ -12,6 +13,7 @@
 import type { PRDItem, ItemLevel } from "../schema/index.js";
 import { LEVEL_HIERARCHY } from "../schema/index.js";
 import {findItem, removeFromTree, insertChild} from "./tree.js";
+import { changeLayerType } from "./layer-projection.js";
 export interface MoveResult {
   item: PRDItem;
   previousParentId: string | null;
@@ -48,13 +50,14 @@ function collectDescendantIds(item: PRDItem): Set<string> {
  * 2. New parent exists (if specified)
  * 3. Not moving to self
  * 4. Not moving to a descendant (cycle prevention)
- * 5. Level hierarchy is respected
- * 6. Item can be a root if no parent specified
+ * 5/6. `rule` accepts the new parent, or the root when none is given
+ *    (default: the level hierarchy)
  */
 export function validateMove(
   items: PRDItem[],
   itemId: string,
   newParentId: string | undefined,
+  rule: ParentRule = levelParentRule,
 ): MoveValidation {
   // 1. Item must exist
   const entry = findItem(items, itemId);
@@ -66,7 +69,6 @@ export function validateMove(
     };
   }
 
-  const itemLevel = entry.item.level;
   const currentParentId = entry.parents.length > 0
     ? entry.parents[entry.parents.length - 1].id
     : null;
@@ -87,23 +89,8 @@ export function validateMove(
     };
   }
 
-  // 5/6. Level hierarchy check
-  const allowedParents = LEVEL_HIERARCHY[itemLevel];
-  const canBeRoot = allowedParents.includes(null);
-  const allowedParentLevels = allowedParents.filter((p): p is ItemLevel => p !== null);
-
-  if (!newParentId) {
-    // Moving to root
-    if (!canBeRoot) {
-      const parentNames = allowedParentLevels.join(" or ");
-      return {
-        valid: false,
-        error: `A ${itemLevel} cannot be a root item.`,
-        suggestion: `Use --parent=<id> to specify a ${parentNames}.`,
-      };
-    }
-    return { valid: true };
-  }
+  // 6. Moving to root
+  if (!newParentId) return rule(entry.item, null) ?? { valid: true };
 
   // 2. New parent must exist
   const parentEntry = findItem(items, newParentId);
@@ -125,18 +112,62 @@ export function validateMove(
     };
   }
 
-  // 5. Level hierarchy check against new parent
-  if (allowedParentLevels.length > 0 && !allowedParentLevels.includes(parentEntry.item.level)) {
-    const parentNames = allowedParentLevels.join(" or ");
+  // 5. The new parent
+  return rule(entry.item, parentEntry.item) ?? { valid: true };
+}
+
+/**
+ * Whether `item` may sit under `parent` (null: at the root). Returns the
+ * refusal, or null when the placement is allowed.
+ */
+export type ParentRule = (item: PRDItem, parent: PRDItem | null) => MoveValidation | null;
+
+/** The v1 rule: {@link LEVEL_HIERARCHY}. */
+export const levelParentRule: ParentRule = (item, parent) => {
+  const allowedParents = LEVEL_HIERARCHY[item.level];
+  const allowedParentLevels = allowedParents.filter((p): p is ItemLevel => p !== null);
+  const parentNames = allowedParentLevels.join(" or ");
+  if (!parent) {
+    if (allowedParents.includes(null)) return null;
     return {
       valid: false,
-      error: `A ${itemLevel} must be a child of a ${parentNames}, but "${newParentId}" is a ${parentEntry.item.level}.`,
-      suggestion: `Use --parent=<id> to specify a ${parentNames} instead.`,
+      error: `A ${item.level} cannot be a root item.`,
+      suggestion: `Use --parent=<id> to specify a ${parentNames}.`,
     };
   }
+  if (allowedParentLevels.length === 0 || allowedParentLevels.includes(parent.level)) return null;
+  return {
+    valid: false,
+    error: `A ${item.level} must be a child of a ${parentNames}, but "${parent.id}" is a ${parent.level}.`,
+    suggestion: `Use --parent=<id> to specify a ${parentNames} instead.`,
+  };
+};
 
-  return { valid: true };
-}
+/** Parent types on a v2 change layer; null is the root. */
+const CHANGE_LAYER_PARENTS = {
+  change: [null, "change"],
+  task: ["change"],
+  subtask: ["task"],
+} as const;
+
+/**
+ * The v2 change-layer rule, by node type rather than level: a change sits at
+ * the root or under a change, a task under a change, a subtask under a task.
+ */
+export const changeLayerParentRule: ParentRule = (item, parent) => {
+  const type = changeLayerType(item);
+  if (!type) return { valid: false, error: `Item "${item.id}" is not a change-layer node.` };
+  const allowed: readonly (string | null)[] = CHANGE_LAYER_PARENTS[type];
+  const parentType = parent ? changeLayerType(parent) ?? parent.level : null;
+  if (allowed.includes(parentType)) return null;
+  const names = allowed.map((t) => t ?? "the root").join(" or ");
+  return {
+    valid: false,
+    error: parent
+      ? `A ${type} cannot move under a ${parentType}: "${parent.id}" is a ${parentType}, and a ${type}'s parent is ${names}.`
+      : `A ${type} cannot be a root item: its parent is a ${names}.`,
+  };
+};
 
 /**
  * Move an item to a new parent in the tree.
@@ -150,14 +181,24 @@ export function validateMove(
  * @param items - The mutable items array (will be modified in place)
  * @param itemId - ID of the item to move
  * @param newParentId - ID of the new parent, or undefined to move to root
+ * @param rule - Which parents the item may take (default: the level hierarchy)
  * @returns The move result, or throws on validation failure
  */
+/** Append `child` under `parentId` without a level check; false when the parent is missing. */
+function appendChild(items: PRDItem[], parentId: string, child: PRDItem): boolean {
+  const parent = findItem(items, parentId)?.item;
+  if (!parent) return false;
+  (parent.children ??= []).push(child);
+  return true;
+}
+
 export function moveItem(
   items: PRDItem[],
   itemId: string,
   newParentId: string | undefined,
+  rule: ParentRule = levelParentRule,
 ): MoveResult {
-  const validation = validateMove(items, itemId, newParentId);
+  const validation = validateMove(items, itemId, newParentId, rule);
   if (!validation.valid) {
     throw new Error(validation.error!);
   }
@@ -177,7 +218,11 @@ export function moveItem(
 
   // Insert at new position
   if (newParentId) {
-    const inserted = insertChild(items, newParentId, removed);
+    // insertChild re-checks the level hierarchy; any other rule was checked
+    // above, and a change nested under a change still reads as an epic.
+    const inserted = rule === levelParentRule
+      ? insertChild(items, newParentId, removed)
+      : appendChild(items, newParentId, removed);
     if (!inserted) {
       // Rollback: try to restore to original position
       if (previousParentId) {

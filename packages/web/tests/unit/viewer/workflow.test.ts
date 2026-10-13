@@ -62,6 +62,18 @@ function allFields(): Field[] {
 
 const TIMEOUTS = { timeoutMs: null, timeouts: {}, defaultTimeoutMs: 1_800_000, noDefaultTimeoutCommands: ["start", "dev"] };
 
+/** GET /api/rex/settings, as the server answers it for a project with no `rex` section. */
+const REX_SETTINGS = {
+  applyOn: "complete",
+  applyOnSet: false,
+  placementAutoAccept: "agree",
+  placementAutoAcceptSet: false,
+  choices: { applyOn: ["complete", "review", "release"], placementAutoAccept: ["none", "agree", "confident"] },
+  defaults: { applyOn: "complete", placementAutoAccept: "agree" },
+  warnings: [],
+  configFile: ".n-dx.json",
+};
+
 const TEMPLATES = {
   templates: [
     { id: "quick", name: "Quick", description: "Short runs", useCases: [], tags: [], config: { maxTurns: 10 }, builtIn: true },
@@ -75,8 +87,9 @@ interface Request { method: string; url: string; body: Json | null }
  * that message; applying the "quick" template sets maxTurns to 10, so the next
  * config read returns it.
  */
-function stubApi(opts: { fields?: () => Field[]; failures?: Record<string, string> } = {}) {
+function stubApi(opts: { fields?: () => Field[]; failures?: Record<string, string>; rexSettings?: Json } = {}) {
   const requests: Request[] = [];
+  const rexSettings = opts.rexSettings ?? {};
   let maxTurns = 50;
   const fields = opts.fields ?? (() => smallFields(maxTurns));
   const respond = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
@@ -91,6 +104,10 @@ function stubApi(opts: { fields?: () => Field[]; failures?: Record<string, strin
       case "GET /api/hench/config":
         return respond({ config: { schema: "hench/v1", maxTurns }, fields: fields() });
       case "PUT /api/hench/config":
+        return respond({ applied: [] });
+      case "GET /api/rex/settings":
+        return respond({ ...REX_SETTINGS, ...rexSettings });
+      case "PUT /api/rex/settings":
         return respond({ applied: [] });
       case "GET /api/cli/timeouts":
         return respond(TIMEOUTS);
@@ -159,10 +176,21 @@ describe("WorkflowView", () => {
   const applyButton = () => root.querySelector<HTMLButtonElement>(".hench-template-apply-btn")!;
   const saveAsTemplateButton = () => root.querySelector<HTMLButtonElement>(".hench-template-save-current-btn")!;
 
+  const rexField = (key: string) =>
+    root.querySelector<HTMLElement>(`.rex-settings .ct-field[data-field="${key}"]`)!;
+  const rexSelect = (key: string) => rexField(key).querySelector<HTMLSelectElement>("select")!;
+
   async function type(input: HTMLInputElement, value: string) {
     await act(async () => {
       input.value = value;
       input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  async function choose(select: HTMLSelectElement, value: string) {
+    await act(async () => {
+      select.value = value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
     });
   }
 
@@ -177,17 +205,18 @@ describe("WorkflowView", () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise(() => { /* never resolves */ })));
     act(() => { render(h(WorkflowView, { navigateTo }), root); });
     expect(root.textContent).toContain("Loading work settings");
+    expect(root.textContent).toContain("Loading PRD settings");
     expect(root.textContent).toContain("Loading timeout configuration");
     expect(root.textContent).toContain("Loading templates");
   });
 
-  it("puts work settings, CLI timeouts and templates inside exactly one settings frame", async () => {
+  it("puts every section inside exactly one settings frame", async () => {
     stubApi();
     await mount();
 
     expect(root.querySelectorAll(".settings-frame")).toHaveLength(1);
     const titles = [...root.querySelectorAll(".workflow-section-title")].map((t) => t.textContent);
-    expect(titles).toEqual(["Work settings", "CLI timeouts", "Templates"]);
+    expect(titles).toEqual(["Work settings", "PRD settings", "CLI timeouts", "Templates"]);
     expect(root.querySelector(".workflow-header-title")!.textContent).toBe("Workflow");
     // The frame owns Save: none of the sections' old save bars or toasts remain.
     expect(root.querySelector(".hench-config-changes-panel")).toBeNull();
@@ -198,7 +227,12 @@ describe("WorkflowView", () => {
     const { requests } = stubApi();
     await mount();
     const reads = requests.filter((r) => r.method === "GET").map((r) => r.url);
-    expect(reads).toEqual(expect.arrayContaining(["/api/hench/config", "/api/cli/timeouts", "/api/hench/templates"]));
+    expect(reads).toEqual(expect.arrayContaining([
+      "/api/hench/config",
+      "/api/rex/settings",
+      "/api/cli/timeouts",
+      "/api/hench/templates",
+    ]));
   });
 
   it("renders every field GET /api/hench/config serves except provider and model", async () => {
@@ -367,6 +401,81 @@ describe("WorkflowView", () => {
       { method: "PUT", url: "/api/cli/timeouts", body: { timeoutMs: 60000, timeouts: { work: 0 } } },
     ]);
     expect(indicator()).toBe("All changes saved");
+  });
+
+  // ── PRD settings ──────────────────────────────────────────────────
+
+  it("offers only the values the server says each PRD setting accepts", async () => {
+    stubApi();
+    await mount();
+
+    const values = (key: string) => [...rexSelect(key).options].map((o) => o.value);
+    expect(values("rex.applyOn")).toEqual(REX_SETTINGS.choices.applyOn);
+    expect(values("rex.placement.autoAccept")).toEqual(REX_SETTINGS.choices.placementAutoAccept);
+    expect(rexSelect("rex.applyOn").value).toBe("complete");
+    expect(rexSelect("rex.placement.autoAccept").value).toBe("agree");
+  });
+
+  it("writes both PRD settings to PUT /api/rex/settings", async () => {
+    const { writes } = stubApi();
+    await mount();
+
+    await choose(rexSelect("rex.applyOn"), "release");
+    await choose(rexSelect("rex.placement.autoAccept"), "none");
+    expect(indicator()).toContain("Unsaved");
+
+    await clickSave();
+
+    expect(writes()).toEqual([
+      { method: "PUT", url: "/api/rex/settings", body: { applyOn: "release", placementAutoAccept: "none" } },
+    ]);
+    expect(indicator()).toBe("All changes saved");
+  });
+
+  it("sends only the PRD setting that moved", async () => {
+    const { writes } = stubApi();
+    await mount();
+
+    await choose(rexSelect("rex.applyOn"), "review");
+    await clickSave();
+
+    expect(writes()).toEqual([
+      { method: "PUT", url: "/api/rex/settings", body: { applyOn: "review" } },
+    ]);
+  });
+
+  it("is clean again once a PRD setting is set back to what is saved", async () => {
+    stubApi();
+    await mount();
+
+    await choose(rexSelect("rex.applyOn"), "release");
+    expect(saveButton().disabled).toBe(false);
+
+    await choose(rexSelect("rex.applyOn"), "complete");
+    expect(saveButton().disabled).toBe(true);
+  });
+
+  // A hand-edited config runs on the fallback and says nothing anywhere else.
+  it("shows what rex ignored in the config", async () => {
+    stubApi({ rexSettings: { warnings: ['rex.applyOn: "later" is not one of complete, review, release; using "complete"'] } });
+    await mount();
+
+    const warnings = root.querySelector(".rex-settings-warnings")!;
+    expect(warnings.textContent).toContain("later");
+    expect(warnings.textContent).toContain(".n-dx.json");
+  });
+
+  it("keeps a failed PRD save dirty with its error", async () => {
+    stubApi({ failures: { "/api/rex/settings": "Could not write the project config" } });
+    await mount();
+
+    await choose(rexSelect("rex.applyOn"), "release");
+    await clickSave();
+
+    expect(indicator()).toContain("Unsaved");
+    expect(root.querySelector(".rex-settings .ct-error-banner")!.textContent)
+      .toContain("Could not write the project config");
+    expect(root.querySelector(".settings-frame-error")!.textContent).toContain("PRD settings");
   });
 
   it("writes each dirty part to its own endpoint in one Save", async () => {

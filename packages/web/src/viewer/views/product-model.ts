@@ -5,16 +5,17 @@
  * shapes and nothing else — no fetch, no store, no rex import. The viewer
  * cannot import rex (that crosses the server boundary and goes through
  * `src/server/rex-gateway.ts`), so the wire types are declared here the way
- * every other view declares its own, and the three views are driven from
- * fixtures until the v2 reader and its routes land.
+ * every other view declares its own. `server/routes-rex/product.ts` builds
+ * these shapes from rex's v2 model and declares the server-side twins; a
+ * type test in `routes-rex-product.test.ts` fails when the two drift.
  *
  * ## Derived fields are inputs, not outputs
  *
  * Capability `status` and `health`, a change's `stage` and a capability's
  * open-change overlays are *computed* values: the v2 schema deliberately
- * gives them no stored field (see `rex/schema/v2`), and the engine that
- * computes them is a separate piece of work. They arrive here already
- * computed. The helpers below only order and group what they are given.
+ * gives them no stored field (see `rex/schema/v2`). Status and health are
+ * rex's (`productReport`); the server maps a change onto a stage. They arrive
+ * here already computed. The helpers below only order and group them.
  *
  * @module viewer/views/product-model
  */
@@ -60,24 +61,25 @@ export const CAPABILITY_HEALTH_LABELS: Readonly<Record<CapabilityHealth, string>
  *
  * **Provisional — this vocabulary is not yet fixed by the schema.** The v2
  * schema has no stage field and no stage concept (grep `stage` over
- * `rex/schema/v2.ts`: nothing), and these five values do not line up with
+ * `rex/schema/v2.ts`: nothing), and these six values do not line up with
  * `VALID_STATUSES` either. They are this view's reading of "work grouped by
  * planned release and stage", chosen so a change's state fields map onto them
  * — `ready` from `ready`, `applied` from `appliedIn`, `shipped` from
  * `shippedIn`.
  *
- * The engine that computes derived status, health and edges owns the real
- * vocabulary. When it lands it must either adopt these values or update this
- * type, the three views and their fixtures together: nothing else pins them,
- * so the drift would otherwise be silent.
+ * Rex's derived product status has no stage either, so `stageOf` in
+ * `server/routes-rex/product.ts` maps a change onto these values. If rex
+ * grows a stage, adopt its vocabulary here, there and in the fixtures
+ * together.
  */
-export type ChangeStage = "proposed" | "ready" | "in-progress" | "applied" | "shipped";
+export type ChangeStage = "proposed" | "ready" | "in-progress" | "awaiting-apply" | "applied" | "shipped";
 
 /** Display order within a release group: earliest stage first. */
 export const CHANGE_STAGE_ORDER: readonly ChangeStage[] = [
   "proposed",
   "ready",
   "in-progress",
+  "awaiting-apply",
   "applied",
   "shipped",
 ];
@@ -86,6 +88,7 @@ export const CHANGE_STAGE_LABELS: Readonly<Record<ChangeStage, string>> = {
   proposed: "Proposed",
   ready: "Ready",
   "in-progress": "In progress",
+  "awaiting-apply": "Waiting for a steward to apply it",
   applied: "Applied",
   shipped: "Shipped",
 };
@@ -236,12 +239,76 @@ export interface CodeSite {
  * contradict the list below it.
  */
 export interface CapabilityDetail extends Omit<CapabilityRow, "criteriaCount"> {
+  /** The capability was met at some point (rex recorded `metAt`). */
+  met: boolean;
+  /** Met once, and its spec no longer hashes to `metAt`. Never true when `met` is false. */
+  specChangedSinceMet: boolean;
   areaId: string;
   areaTitle: string;
   criteria: CapabilityCriterion[];
   dependsOn: Array<{ id: string; title: string }>;
   history: CapabilityHistoryEntry[];
   code: CodeSite[];
+}
+
+/**
+ * A direct edit to a product node, as the capability page submits it.
+ *
+ * Mirrors what `rex product edit` sends: the spec as the author now wants it,
+ * plus whether the move is **editorial**. Editorial means the wording moved
+ * and nothing was asked for — the node stays met and the edit is recorded as
+ * history. Anything else leaves the node revised and drafts a change to build
+ * the difference, so the two are not interchangeable and the author is the
+ * only one who can tell them apart.
+ *
+ * The outcome is not decided here. The page submits the edit and renders the
+ * capability it is given back, the same way every other derived field on this
+ * page arrives already computed.
+ */
+export interface ProductEdit {
+  /** Id of the node being edited. */
+  id: string;
+  /** The statement as edited. */
+  statement: string;
+  /**
+   * Criteria as edited, by id. Inherited criteria are not included: they
+   * belong to the capability they come from, and editing one here would be
+   * editing a different node than the page says it is editing.
+   */
+  criteria: Array<{ id: string; text: string }>;
+  /** Wording only, nothing to build: the node stays met. */
+  editorial: boolean;
+}
+
+/**
+ * Whether a product node can be edited directly at all.
+ *
+ * A retired node is no longer live, and rex refuses an edit to one outright
+ * rather than editing part of it — so the form does not render instead of
+ * offering an edit that would be refused on submit.
+ */
+export function isEditable(capability: Pick<CapabilityRow, "status">): boolean {
+  return capability.status !== "retired";
+}
+
+/**
+ * Why "editorial" is unavailable for this node, or null when it is offered.
+ *
+ * Both cases are rex's, not the page's. `revised` is the one rex refuses
+ * outright: the spec has already moved ahead of the build, so re-stamping
+ * would mark the unbuilt revision met. `proposed` has never been met, so
+ * there is no met spec to re-stamp and the flag changes nothing. Saying so
+ * beside a disabled checkbox is the difference between knowing before typing
+ * and being refused afterwards.
+ */
+export function editorialBlockedReason(capability: Pick<CapabilityRow, "status">): string | null {
+  if (capability.status === "revised") {
+    return "Already revised: the spec has moved ahead of the build, so re-stamping it would mark the unbuilt revision met.";
+  }
+  if (capability.status === "proposed") {
+    return "Not met yet: there is no met spec to re-stamp, so an edit here is just the spec changing.";
+  }
+  return null;
 }
 
 // ── Grouping and ordering ────────────────────────────────────────────

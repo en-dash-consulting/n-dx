@@ -136,6 +136,12 @@ export interface DetectorOptions {
   minContainerSize?: number;
   /** Include completed items in similarity checks. Default: false */
   includeCompleted?: boolean;
+  /**
+   * Items are the change layer projected as v1 items. Its depth is not the v1
+   * level hierarchy, so the placement and single-child-collapse detectors,
+   * which assume that hierarchy, are skipped. Default: false
+   */
+  changeLayer?: boolean;
 }
 
 const DEFAULT_OPTIONS: Required<DetectorOptions> = {
@@ -143,6 +149,7 @@ const DEFAULT_OPTIONS: Required<DetectorOptions> = {
   maxContainerSize: 15,
   minContainerSize: 2,
   includeCompleted: false,
+  changeLayer: false,
 };
 
 // ── Main entry point ─────────────────────────────────────────────────────────
@@ -160,7 +167,7 @@ export function detectReorganizations(
   let nextId = 1;
 
   // Stage 1: Structural checks (high confidence)
-  for (const p of detectOrphanedFeatures(items)) {
+  for (const p of opts.changeLayer ? [] : detectOrphanedFeatures(items)) {
     proposals.push({ ...p, id: nextId++ });
   }
   // Note: Empty container deletion and completed subtree pruning are intentionally
@@ -179,7 +186,7 @@ export function detectReorganizations(
   for (const p of detectUndersizedContainers(items, opts)) {
     proposals.push({ ...p, id: nextId++ });
   }
-  for (const p of detectSingleChildContainers(items)) {
+  for (const p of opts.changeLayer ? [] : detectSingleChildContainers(items)) {
     proposals.push({ ...p, id: nextId++ });
   }
 

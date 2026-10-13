@@ -223,6 +223,24 @@
   border-color: var(--accent);
 }
 
+/* The PRD settings section reuses the field frame with a chooser in place of
+   the number input; wide enough for the longest option label. */
+.ct-select {
+  width: 280px;
+  padding: 5px 10px;
+  font-size: var(--font-base);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  transition: border-color var(--transition-fast);
+}
+
+.ct-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .ct-input.ct-input-error {
   border-color: var(--red);
 }

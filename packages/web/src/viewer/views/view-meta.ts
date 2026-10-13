@@ -189,6 +189,18 @@ export const VIEW_META = {
     product: "rex",
     blurb: "The full PRD tree — epics, features, tasks.",
   },
+  product: {
+    label: "Product",
+    glyph: "▣",
+    product: "rex",
+    blurb: "Areas and capabilities as built, with computed status and health (v2).",
+  },
+  changes: {
+    label: "Changes",
+    glyph: "⇄",
+    product: "rex",
+    blurb: "Work grouped by planned release and stage (v2).",
+  },
   "rex-dashboard": {
     label: "Up Next",
     glyph: "◎",

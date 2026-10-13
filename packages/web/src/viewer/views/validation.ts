@@ -12,6 +12,7 @@ import { pushAppHistory } from "../base-path.js";
 import { BrandedHeader } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import { useCliName } from "../hooks/index.js";
+import { itemTypeLabel } from "../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ interface ValidationReport {
 interface GraphNode {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   status: string;
   blockedBy: string[];
 }
@@ -74,13 +75,6 @@ const STATUS_ICONS: Record<string, string> = {
   pending: "\u25CB",
   blocked: "\u2298",
   deferred: "\u25CC",
-};
-
-const LEVEL_LABELS: Record<string, string> = {
-  epic: "Epic",
-  feature: "Feature",
-  task: "Task",
-  subtask: "Subtask",
 };
 
 function truncate(s: string, max: number): string {
@@ -174,7 +168,7 @@ function CheckResultCard({
 interface LayoutNode {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   status: string;
   x: number;
   y: number;
@@ -291,7 +285,7 @@ function layoutGraph(
       layoutNodes.set(nodeId, {
         id: nodeId,
         title: src.title,
-        level: src.level,
+        itemType: src.itemType,
         status: src.status,
         x: startX + i * colSpacing,
         y: padding + layer * layerSpacing,
@@ -508,8 +502,8 @@ function DependencyGraphSVG({
     selectedNodeData
       ? h("div", { class: "dep-node-detail" },
           h("div", { class: "dep-detail-header" },
-            h("span", { class: `prd-level-badge prd-level-${selectedNodeData.level}` },
-              LEVEL_LABELS[selectedNodeData.level] || selectedNodeData.level,
+            h("span", { class: `prd-level-badge prd-level-${selectedNodeData.itemType}` },
+              itemTypeLabel(selectedNodeData.itemType),
             ),
             h("span", { class: `prd-status-icon prd-status-${selectedNodeData.status}` },
               STATUS_ICONS[selectedNodeData.status] || "\u25CB",

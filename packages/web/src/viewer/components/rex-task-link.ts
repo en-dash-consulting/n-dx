@@ -16,6 +16,7 @@ import { h } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { ViewId } from "../types.js";
 import { buildShareableUrl } from "./copy-link-button.js";
+import { itemTypeLabel } from "../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -23,7 +24,7 @@ export interface TaskRef {
   id: string;
   title: string;
   status: string;
-  level?: string;
+  itemType?: string;
   priority?: string;
 }
 
@@ -54,13 +55,6 @@ const STATUS_CONFIG: Record<string, { icon: string; label: string; cssClass: str
   deferred: { icon: "◌", label: "Deferred", cssClass: "prd-status-deferred" },
   blocked: { icon: "⊘", label: "Blocked", cssClass: "prd-status-blocked" },
   deleted: { icon: "✕", label: "Deleted", cssClass: "prd-status-deleted" },
-};
-
-const LEVEL_LABELS: Record<string, string> = {
-  epic: "Epic",
-  feature: "Feature",
-  task: "Task",
-  subtask: "Subtask",
 };
 
 function getStatusConfig(status: string) {
@@ -287,9 +281,9 @@ export function RexTaskLink({
       : null,
 
     // Level badge
-    showLevel && task.level
-      ? h("span", { class: `prd-level-badge prd-level-${task.level}` },
-          LEVEL_LABELS[task.level] ?? task.level,
+    showLevel && task.itemType
+      ? h("span", { class: `prd-level-badge prd-level-${task.itemType}` },
+          itemTypeLabel(task.itemType),
         )
       : null,
 

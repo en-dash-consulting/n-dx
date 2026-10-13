@@ -402,8 +402,11 @@ export type {
 
 // ---- Core: merge/consolidation ----------------------------------------------
 
-export { validateMerge, previewMerge, mergeItems } from "./core/merge.js";
-export type { MergeOptions, MergeValidation, MergePreview, MergeResult } from "./core/merge.js";
+// On a v2 change layer, merge with mergeChanges (and preview-check with
+// validateChangesMerge), never mergeItems directly: it keeps the absorbed
+// changes' touches and ids, and refuses to absorb a change carrying amends.
+export { validateMerge, previewMerge, mergeItems, validateChangesMerge, mergeChanges } from "./core/merge.js";
+export type { MergeOptions, MergeValidation, MergePreview, MergeResult, ChangesMergeOutcome } from "./core/merge.js";
 
 // ---- Core: prune ------------------------------------------------------------
 
@@ -598,6 +601,7 @@ export type {
 export {
   getAvailableBackups,
   restoreFromBackup,
+  V2RestoreRefusedError,
   encodeSnapshotId,
   isValidSnapshotId,
 } from "./core/backup-snapshots.js";
@@ -624,6 +628,20 @@ export type { AppendLogArgs } from "./core/execution-log.js";
 
 export { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "./workflow/default.js";
 
+// ---- Project settings rex owns (`rex.*` in .n-dx.json) -----------------------
+// When a change's amendments reach the product layer, and when a placement is
+// accepted without a human. Both are read from the same `rex` config section by
+// `loadApplyOn` / `loadPlacementSettings`, which the CLI uses; the parsers below
+// are pure, so a surface that already holds the parsed section (the dashboard
+// reads `.n-dx.json` itself) validates against rex's rule rather than its own.
+// The accepted-value lists come with them for the same reason: a chooser that
+// offers a value the parser would reject is a chooser that silently writes a
+// setting the CLI then ignores.
+
+export { APPLY_ON, DEFAULT_APPLY_ON, parseApplyOn } from "./core/apply-policy.js";
+export { PLACEMENT_AUTO_ACCEPT, DEFAULT_PLACEMENT_SETTINGS, parsePlacementSettings } from "./core/placement-policy.js";
+export type { PlacementAutoAccept, PlacementSettings } from "./core/placement-policy.js";
+
 // ---- Commit re-pointing ------------------------------------------------------
 // A rebase or squash rewrites the SHAs other tools recorded. This maps a
 // recorded SHA to the commit it became on main, and names the rule that
@@ -640,3 +658,39 @@ export type {
   RecordedCommitFacts,
   RepointRule,
 } from "./core/repoint-commits.js";
+
+// ---- v2 runtime (product/change layers) -------------------------------------
+//
+// What hench (stack B) and the dashboard (D1) need to read, select, brief and
+// complete v2 work without re-implementing what the MCP tools run. The reader
+// (prdLayout, loadPrdModel, PrdModel, LoadPrdModelOptions) and the tree types
+// (V2Tree, RuleNode) are exported above with #648's v2 model; they are not
+// repeated here, because a second re-export of a name is a duplicate export.
+
+// Reader and transaction
+export { withPrdModelTransaction, PrdLayoutError } from "./store/prd-model-transaction.js";
+export type { PrdModelEdit, PrdModelTransactionOptions, PrdModelTransactionResult } from "./store/prd-model-transaction.js";
+
+// Selection
+export { findNextWork, findActionableWork, resolveWorkById, changeWorkShape, enclosingChangeIds } from "./core/change-selection.js";
+export type { WorkUnit, WorkKind, WorkSelectionOptions, ChangeWorkShape, WorkShapeChild } from "./core/change-selection.js";
+export { findNextWorkTask, completedWorkIds } from "./core/change-next-task.js";
+export type { NextWorkTask, NextWorkOptions } from "./core/change-next-task.js";
+
+// Completion and apply-on-complete
+export { completeTask, completeChange, completeWork, ChangeCompletionError } from "./core/change-completion.js";
+export type {
+  ChangeCompletionOptions,
+  ChangeCompletionResult,
+  CompleteWorkOptions,
+  CompleteWorkResult,
+} from "./core/change-completion.js";
+export { loadApplyOn } from "./core/apply-policy.js";
+export type { ApplyOn } from "./core/apply-policy.js";
+export { completeV2Work } from "./cli/v2-completion.js";
+export type { V2Completion, V2CompletionOptions } from "./cli/v2-completion.js";
+export { ChangeLayerStore, isChangeLayerStore } from "./store/change-layer-store.js";
+
+// Brief
+export { buildChangeBrief, renderChangeBrief } from "./core/change-brief.js";
+export type { ChangeBrief, ChangeBriefOptions, BriefCommands, BriefLogEntry } from "./core/change-brief.js";

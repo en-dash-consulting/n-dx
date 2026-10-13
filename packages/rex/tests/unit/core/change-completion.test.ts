@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addTask, ChangeCompletionError, ClosedChangeError, completeChange, completeTask } from "../../../src/core/change-completion.js";
+import { addTask, ChangeCompletionError, ClosedChangeError, completeChange, completeTask, completeWork } from "../../../src/core/change-completion.js";
 import type { ApplyOn } from "../../../src/core/apply-policy.js";
 import { isOpenChange, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import { ChangeIntentSchema, TaskIntentSchema } from "../../../src/schema/v2.js";
@@ -105,6 +105,120 @@ describe("completeChange", () => {
 
   it("refuses while a live task is not completed", () => {
     expect(() => completeChange(tree(change({ children: [task("t", { status: "cancelled" })] })), "ch", opts())).toThrow(/task t is not completed/);
+  });
+});
+
+describe("a change that holds a nested change", () => {
+  const inner = (extra: Record<string, unknown> = {}) =>
+    node({ id: "in", type: "change", touches: ["cap"], children: [task("t")], ...extra });
+  const outer = (...children: RuleNode[]) => change({ children });
+
+  it("refuses to complete the container while a nested change is open, and never applies it", () => {
+    const input = tree(outer(inner()));
+    expect(() => completeChange(input, "ch", opts())).toThrow(/Cannot complete change ch: change in is not completed/);
+    expect(() => completeWork(input, "ch", opts())).toThrow(ChangeCompletionError);
+    expect(theChange(input).status).toBeUndefined();
+    expect(statement(input)).toBe(OLD);
+  });
+
+  it("completes and applies the container once its last nested change completes", () => {
+    const result = completeWork(tree(outer(inner())), "t", opts());
+    expect(result.completed).toEqual(["t", "in", "ch"]);
+    expect(result.applies.map((a) => [a.changeId, a.apply.applied])).toEqual([["in", true], ["ch", true]]);
+    expect(result.apply?.applied).toBe(true);
+    expect(theChange(result.tree)).toMatchObject({ status: "completed", appliedAt: NOW.toISOString() });
+    expect(statement(result.tree)).toBe(NEW);
+  });
+
+  it("waits for every live nested change and task; a deleted nested change does not count", () => {
+    const sibling = node({ id: "in2", type: "change", touches: ["cap"] });
+    expect(completeWork(tree(outer(inner(), sibling)), "t", opts()).completed).toEqual(["t", "in"]);
+    expect(completeWork(tree(outer(inner(), task("u"))), "t", opts()).completed).toEqual(["t", "in"]);
+    expect(completeWork(tree(outer(inner(), node({ ...sibling, status: "deleted" }))), "t", opts()).completed).toEqual(["t", "in", "ch"]);
+  });
+
+  it("completing a container's last task waits for its open nested change", () => {
+    const result = completeTask(tree(outer(inner(), task("u"))), "u", opts());
+    expect(result.completed).toEqual(["u"]);
+    expect(statement(result.tree)).toBe(OLD);
+  });
+
+  it("does not sweep an in_progress or unplaced container", () => {
+    expect(completeWork(tree(change({ status: "in_progress", children: [inner()] })), "t", opts()).completed).toEqual(["t", "in"]);
+    const unplaced = completeWork(tree(change({ needsPlacement: true, children: [inner()] })), "t", opts());
+    expect(unplaced.completed).toEqual(["t", "in"]);
+    expect(theChange(unplaced.tree).status).toBeUndefined();
+  });
+
+  it("completes but does not apply the container while a completed nested change is unapplied", () => {
+    const review = completeWork(tree(outer(inner())), "t", opts("review"));
+    expect(review.completed).toEqual(["t", "in", "ch"]);
+    expect(review.applies.every((a) => !a.apply.applied)).toBe(true);
+    expect(statement(review.tree)).toBe(OLD);
+
+    // Under complete, a nested change whose apply was refused keeps the container unapplied too.
+    const done = completeWork(tree(outer(inner(), node({ id: "in2", type: "change", touches: ["cap"], status: "completed" }))), "t", opts());
+    expect(done.completed).toEqual(["t", "in", "ch"]);
+    expect(done.applies.find((a) => a.changeId === "ch")?.apply).toMatchObject({ applied: false, reason: /change in2 is not applied/ });
+    expect(theChange(done.tree).appliedAt).toBeUndefined();
+    expect(statement(done.tree)).toBe(OLD);
+  });
+});
+
+describe("completeWork", () => {
+  const STARTED = "2026-10-08T09:00:00.000Z";
+  const subtask = (id: string, extra: Record<string, unknown> = {}) => node({ id, type: "subtask", ...extra });
+
+  it("completes a task, its change and applies, stamping both as a v1 status update does", () => {
+    const input = tree(change({ children: [task("t", { status: "in_progress", startedAt: STARTED, activeIntervals: [{ start: STARTED }] })] }));
+    const result = completeWork(input, "t", { ...opts(), resolutionType: "code-change", resolutionDetail: "wired" });
+    expect(result.completed).toEqual(["t", "ch"]);
+    expect(result.changeId).toBe("ch");
+    expect(result.apply?.applied).toBe(true);
+    const done = theChange(result.tree);
+    expect(done.children?.[0]).toMatchObject({
+      status: "completed",
+      completedAt: NOW.toISOString(),
+      endedAt: NOW.toISOString(),
+      startedAt: STARTED,
+      activeIntervals: [{ start: STARTED, end: NOW.toISOString() }],
+      resolutionType: "code-change",
+      resolutionDetail: "wired",
+    });
+    expect(done).toMatchObject({ status: "completed", startedAt: NOW.toISOString(), endedAt: NOW.toISOString(), appliedAt: NOW.toISOString() });
+    expect(done.resolutionType).toBeUndefined();
+  });
+
+  it("completes a change through completeChange", () => {
+    const result = completeWork(tree(change({ status: "in_progress" })), "ch", opts());
+    expect(result).toMatchObject({ completed: ["ch"], changeId: "ch", apply: { applied: true } });
+  });
+
+  it("completes a subtask, and its pending task with it when it was the last live subtask", () => {
+    const open = tree(change({ children: [task("t", { children: [subtask("s1"), subtask("s2")] })] }));
+    expect(completeWork(open, "s1", opts()).completed).toEqual(["s1"]);
+    const last = tree(change({ children: [task("t", { children: [subtask("s1", { status: "completed" }), subtask("s2")] })] }));
+    const result = completeWork(last, "s2", opts());
+    expect(result.completed).toEqual(["s2", "t", "ch"]);
+    expect(result.changeId).toBe("ch");
+    expect(result.apply?.applied).toBe(true);
+  });
+
+  it("does not complete an in_progress task with its last subtask (#368)", () => {
+    const input = tree(change({ children: [task("t", { status: "in_progress", children: [subtask("s")] })] }));
+    expect(completeWork(input, "s", opts()).completed).toEqual(["s"]);
+  });
+
+  it("refuses a change that still needs placement, but completes its task and holds the change", () => {
+    expect(() => completeWork(tree(change({ needsPlacement: true })), "ch", opts())).toThrow(/Cannot complete change ch: it still needs placement/);
+    const result = completeWork(tree(change({ needsPlacement: true, children: [task("t")] })), "t", opts());
+    expect(result.completed).toEqual(["t"]);
+    expect(result.held?.changeId).toBe("ch");
+  });
+
+  it("refuses a product node or an unknown ref", () => {
+    expect(() => completeWork(tree(change()), "cap", opts())).toThrow(ChangeCompletionError);
+    expect(() => completeWork(tree(change()), "nope", opts())).toThrow(/No live task, change or subtask "nope"/);
   });
 });
 

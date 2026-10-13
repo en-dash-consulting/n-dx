@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { compareReleases, findActionableWork, findNextWork, resolveWorkById } from "../../../src/core/change-selection.js";
+import { addTask } from "../../../src/core/change-completion.js";
+import { changeWorkShape, compareReleases, enclosingChangeIds, findActionableWork, findNextWork, resolveWorkById } from "../../../src/core/change-selection.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ title: fields.id as string, slug: fields.id as string, ...fields }) as RuleNode;
@@ -25,6 +26,57 @@ describe("findNextWork", () => {
 
   it("returns null when nothing is actionable", () => {
     expect(findNextWork(tree())).toBeNull();
+  });
+});
+
+describe("nested changes", () => {
+  it("never selects a change that holds a change; selects within the nested one", () => {
+    expect(ids(tree(change("outer", { children: [change("inner")] })))).toEqual(["inner"]);
+    expect(ids(tree(change("outer", { children: [change("inner", { children: [task("t")] })] })))).toEqual(["t"]);
+    expect(findNextWork(tree(change("outer", { children: [change("inner", { children: [task("t")] })] })))).toMatchObject({
+      kind: "task",
+      node: { id: "t" },
+      change: { id: "inner" },
+    });
+  });
+
+  it("selects an outer change's own tasks beside its nested change", () => {
+    expect(ids(tree(change("outer", { children: [task("own"), change("inner")] })))).toEqual(["own", "inner"]);
+  });
+
+  it("treats an outer change whose nested changes are all deleted as task-less", () => {
+    expect(ids(tree(change("outer", { children: [change("inner", { status: "deleted" })] })))).toEqual(["outer"]);
+  });
+
+  it("gates nested work on every enclosing change", () => {
+    expect(ids(tree(change("outer", { needsPlacement: true, children: [change("inner", { children: [task("t")] })] })))).toEqual([]);
+    expect(ids(tree(change("outer", { status: "deferred", children: [change("inner")] })))).toEqual([]);
+    expect(ids(tree(change("outer", { blockedBy: ["nowhere"], children: [change("inner")] })))).toEqual([]);
+  });
+
+  it("resolveWorkById resolves a task under a nested change to the nested change", () => {
+    const t = tree(change("outer", { children: [change("inner", { children: [task("t")] })] }));
+    expect(resolveWorkById(t, "t")).toMatchObject({ kind: "task", node: { id: "t" }, change: { id: "inner" } });
+    expect(resolveWorkById(t, "inner")).toMatchObject({ kind: "change", node: { id: "inner" }, change: { id: "inner" } });
+  });
+
+  it("resolveWorkById does not return a change that holds a change as a unit", () => {
+    expect(resolveWorkById(tree(change("outer", { children: [change("inner")] })), "outer")).toBeNull();
+    expect(resolveWorkById(tree(change("outer", { children: [task("own"), change("inner")] })), "outer")).toBeNull();
+  });
+
+  it("selection and resolveWorkById agree with changeWorkShape on every shape", () => {
+    const cases: [RuleNode, ReturnType<typeof changeWorkShape>][] = [
+      [change("c", { children: [change("gone", { status: "deleted" })] }), "unit"],
+      [change("c", { children: [task("t")] }), "tasks"],
+      [change("c", { children: [change("inner")] }), "container"],
+    ];
+    for (const [c, shape] of cases) {
+      expect(changeWorkShape(c)).toBe(shape);
+      expect(ids(tree(c)).includes("c")).toBe(shape === "unit");
+      expect(resolveWorkById(tree(c), "c") !== null).toBe(shape !== "container");
+    }
+    expect(resolveWorkById(tree(cases[0][0]), "c")).toMatchObject({ kind: "change", node: { id: "c" } });
   });
 });
 
@@ -129,6 +181,27 @@ describe("opt-in filters", () => {
 
   it("excludeIds passes over claimed units", () => {
     expect(ids(t, { excludeIds: new Set(["inherits"]) })).toEqual(["not-ready", "unready"]);
+  });
+});
+
+describe("an excluded change covers the work inside it", () => {
+  it("skips the task an in-flight task-less change splits into while the change is excluded", () => {
+    const split = addTask(tree(change("C", { status: "in_progress" }), change("other")), "C", task("T"), new Date("2026-10-12T00:00:00Z")).tree;
+    expect(findNextWork(split)?.node.id).toBe("T");
+    expect(findNextWork(split, { excludeIds: new Set(["C"]) })?.node.id).toBe("other");
+  });
+
+  it("skips units under an excluded change at any depth", () => {
+    const t = tree(change("outer", { children: [task("own"), change("mid", { children: [change("inner", { children: [task("deep")] })] })] }), change("free"));
+    expect(ids(t, { excludeIds: new Set(["outer"]) })).toEqual(["free"]);
+    expect(ids(t, { excludeIds: new Set(["mid"]) })).toEqual(["own", "free"]);
+  });
+
+  it("enclosingChangeIds lists the changes around a node, innermost first", () => {
+    const t = tree(change("outer", { children: [change("inner", { children: [task("t")] })] }));
+    expect(enclosingChangeIds(t, "t")).toEqual(["inner", "outer"]);
+    expect(enclosingChangeIds(t, "outer")).toEqual([]);
+    expect(enclosingChangeIds(t, "nope")).toEqual([]);
   });
 });
 

@@ -35,9 +35,26 @@ import { readPerfFlags } from "./perf-flags.js";
 import { preImageOf, tryTargetedItemWrite } from "./targeted-update.js";
 import type { PRDStore, StoreCapabilities, WriteOptions, SaveFileReport } from "./contracts.js";
 import { buildSaveFileReport, mergeSaveFileReports } from "./contracts.js";
+import { CHANGES_DIRNAME, PRODUCT_DIRNAME, prdLayout } from "./prd-model-reader.js";
 
 /** Canonical filename for the consolidated PRD document. */
 export const PRD_FILENAME = "prd.json";
+
+/**
+ * Thrown when the v1 store is asked to read or write a v2 tree. Without it the
+ * v1 store would fall back to the legacy files and fail on a missing
+ * `prd.json`, or scaffold `prd_tree/` beside `product/` — a split tree that v1
+ * tools read as empty.
+ */
+export class V1StoreOnV2TreeError extends Error {
+  constructor(rexDir: string) {
+    super(
+      `${rexDir} holds a PRD in the v2 layout (${PRODUCT_DIRNAME}/ and ${CHANGES_DIRNAME}/); ` +
+        `the v1 store cannot read or write it. Open it with resolveStore, which serves the change layer.`,
+    );
+    this.name = "V1StoreOnV2TreeError";
+  }
+}
 
 export class FileStore implements PRDStore {
   private rexDir: string;
@@ -488,6 +505,7 @@ export class FileStore implements PRDStore {
    * present; the title defaults to "PRD" and the schema to the running version.
    */
   async loadDocument(): Promise<PRDDocument> {
+    await this.assertV1Layout();
     // Taken before the read starts, so an entry written during or after the
     // parse registers as newer than the load and the guard flags it.
     this.loadedAt = Date.now();
@@ -550,6 +568,16 @@ export class FileStore implements PRDStore {
     return (err as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
   }
 
+  /**
+   * Refuse a v2 tree. Every document read runs through {@link loadDocument}
+   * and every write through {@link writeFolderTree}, so checking both covers
+   * the store; config, log and workflow do not depend on the layout and stay
+   * open, which is what the change-layer store delegates to this store for.
+   */
+  private async assertV1Layout(): Promise<void> {
+    if ((await prdLayout(this.rexDir)) === "v2") throw new V1StoreOnV2TreeError(this.rexDir);
+  }
+
   private async hasLegacySource(): Promise<boolean> {
     if (await this.fileExists(PRD_MARKDOWN_FILENAME)) return true;
     if (await this.fileExists(PRD_FILENAME)) return true;
@@ -577,6 +605,7 @@ export class FileStore implements PRDStore {
    *   newer".
    */
   private async writeFolderTree(doc: PRDDocument, adoptSlugRule = false): Promise<void> {
+    await this.assertV1Layout();
     // Before mkdir, before the sidecar, before the serializer: a refusal has
     // to leave the tree byte-identical, which it only does if nothing has been
     // written yet. Both branches read the marker fresh, here, under the lock

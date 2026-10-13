@@ -21,11 +21,11 @@
 import { h, Fragment, Component } from "preact";
 import type { ComponentChild, ComponentType } from "preact";
 import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
-import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority, TaskUsageSummary, WeeklyBudgetResolution, ItemUsageRollup } from "./types.js";
+import type { PRDItemData, PRDDocumentData, ItemStatus, Priority, TaskUsageSummary, WeeklyBudgetResolution, ItemUsageRollup } from "./types.js";
 import type { ClaimEntry } from "../../hooks/index.js";
 import { useCliName } from "../../hooks/index.js";
 import { computeBranchStats, completionRatio, formatTimestamp } from "./compute.js";
-import { isWorkItem } from "./levels.js";
+import { canAddChildType, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { defaultStatusFilter } from "../../views/status-filter.js";
 import { InlineAddForm } from "./inline-add-form.js";
 import type { InlineAddInput } from "./inline-add-form.js";
@@ -38,9 +38,6 @@ import { highlightSearchText, buildBranchVisibleSet } from "./tree-search.js";
 import { getTaskDuration } from "./durations.js";
 import { formatTokensExact, formatDuration, formatUsd, newTokens, EMPTY_DASH } from "./format-usage.js";
 import { useLiveTick } from "./use-live-tick.js";
-
-/** Levels that can have children added via inline form. */
-const ADDABLE_LEVELS = new Set<ItemLevel>(["epic", "feature", "task"]);
 
 // ── Status rendering ────────────────────────────────────────────────
 
@@ -63,13 +60,6 @@ const PRIORITY_CONFIG: Record<Priority, { cssClass: string }> = {
   high: { cssClass: "prd-priority-high" },
   medium: { cssClass: "prd-priority-medium" },
   low: { cssClass: "prd-priority-low" },
-};
-
-const LEVEL_LABELS: Record<ItemLevel, string> = {
-  epic: "Epic",
-  feature: "Feature",
-  task: "Task",
-  subtask: "Subtask",
 };
 
 function statusSetKey(statuses: Set<ItemStatus>): string {
@@ -277,7 +267,7 @@ function renderUsageCell(args: UsageCellArgs) {
   // When the token-budget feature toggle is on AND this is a leaf work
   // item (the historic scope of the budget chip), render the chip with
   // the utilization pill as before.
-  if (showTokenBudget && isWorkItem(item.level) && selfTokens > 0) {
+  if (showTokenBudget && isWorkItemType(itemTypeOf(item)) && selfTokens > 0) {
     return h(
       "span",
       {
@@ -517,7 +507,8 @@ class NodeRow extends Component<NodeRowProps> {
     const children = item.children ?? [];
     const stats = hasChildren ? computeBranchStats(children) : null;
     const ratio = stats ? completionRatio(stats) : 0;
-    const canAddChild = ADDABLE_LEVELS.has(item.level);
+    const itemType = itemTypeOf(item);
+    const canAddChild = canAddChildType(itemType);
     const usage = taskUsage ?? {
       totalTokens: 0,
       runCount: 0,
@@ -530,7 +521,7 @@ class NodeRow extends Component<NodeRowProps> {
     return h(
       "div",
       {
-        class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""}${isHighlighted ? " prd-node-highlighted" : ""}${isDeleting ? " prd-node-deleting" : ""}${isSearchMatch ? " prd-node-search-match" : ""} prd-level-${item.level}`,
+        class: `prd-node-row${hasChildren ? " prd-node-expandable" : ""}${isSelected ? " prd-node-selected" : ""}${isBulkSelected ? " prd-node-bulk-selected" : ""}${isHighlighted ? " prd-node-highlighted" : ""}${isDeleting ? " prd-node-deleting" : ""}${isSearchMatch ? " prd-node-search-match" : ""} prd-level-${itemType}`,
         style: `padding-left: ${indent + 8}px`,
         // Data attributes for delegated event handling
         "data-node-id": item.id,
@@ -565,7 +556,7 @@ class NodeRow extends Component<NodeRowProps> {
       // sibling group, so the indentation level reads as a section header
       // instead of a repeating badge on every row.
       showLevelLabel
-        ? h("span", { class: `prd-level-badge prd-level-${item.level}` }, LEVEL_LABELS[item.level])
+        ? h("span", { class: `prd-level-badge prd-level-${itemType}` }, itemTypeLabel(itemType))
         : null,
       // Branch badge (only when attribution is present)
       item.branch
@@ -624,7 +615,7 @@ class NodeRow extends Component<NodeRowProps> {
         canDelete
           ? h("button", {
               class: "prd-node-action prd-node-action-delete",
-              title: `Delete ${LEVEL_LABELS[item.level]} "${item.title}"`,
+              title: `Delete ${itemTypeLabel(itemType)} "${item.title}"`,
               "aria-label": `Delete ${item.title}`,
               tabIndex: 0,
             }, "\u2717")
@@ -1172,7 +1163,7 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
         // First item of each contiguous same-level group gets the level
         // badge as a section header; subsequent rows omit it.
         const prev = idx > 0 ? virtualScroll.visibleNodes[idx - 1] : null;
-        const showLevelLabel = !prev || prev.item.level !== item.level || prev.depth !== depth;
+        const showLevelLabel = !prev || itemTypeOf(prev.item) !== itemTypeOf(item) || prev.depth !== depth;
 
         // Only in-progress rows receive the live tick. Idle rows
         // receive `null` so their `shouldComponentUpdate` short-circuits.
@@ -1205,7 +1196,7 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
           // Inline add form — rendered below the parent node
           isInlineAddActive && onInlineAddSubmit
             ? h(InlineAddForm, {
-                parentLevel: item.level,
+                parentType: itemTypeOf(item),
                 parentId: item.id,
                 depth,
                 onSubmit: handleInlineAddSubmit,

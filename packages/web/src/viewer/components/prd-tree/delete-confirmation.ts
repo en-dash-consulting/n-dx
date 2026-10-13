@@ -8,15 +8,9 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import type { PRDItemData, ItemLevel } from "./types.js";
+import type { PRDItemData } from "./types.js";
 import { countDescendants } from "./tree-utils.js";
-
-const LEVEL_LABELS: Record<ItemLevel, string> = {
-  epic: "Epic",
-  feature: "Feature",
-  task: "Task",
-  subtask: "Subtask",
-};
+import { itemTypeLabel, itemTypeOf } from "../../external.js";
 
 export interface DeleteConfirmationProps {
   /** The item targeted for deletion. */
@@ -32,7 +26,8 @@ export function DeleteConfirmation({ item, onConfirm, onCancel }: DeleteConfirma
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
-  const levelLabel = LEVEL_LABELS[item.level] || item.level;
+  const itemType = itemTypeOf(item);
+  const levelLabel = itemTypeLabel(itemType);
   const descendantCount = countDescendants(item);
 
   // Focus the cancel button on mount for keyboard accessibility
@@ -101,7 +96,7 @@ export function DeleteConfirmation({ item, onConfirm, onCancel }: DeleteConfirma
         h(
           "div",
           { class: "delete-modal-item" },
-          h("span", { class: `prd-level-badge prd-level-${item.level}` }, levelLabel),
+          h("span", { class: `prd-level-badge prd-level-${itemType}` }, levelLabel),
           h("span", { class: "delete-modal-item-title" }, item.title),
         ),
 

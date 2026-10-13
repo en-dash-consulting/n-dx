@@ -460,11 +460,26 @@ describe("isolation", () => {
     // and `rex prune`: the change-layer store, the layer projection, and the
     // product-layer reshape draft (cli/commands/reshape-product.ts), and
     // `rex tree-diff`, which loads either layout (core/tree-source.ts) and
-    // diffs the product layer (core/map-diff.ts). `public.ts` re-exports the
-    // reader, the node and tree types, the index and the derived product
-    // computations: consumers of the product layer (the dashboard's Product
-    // and Changes views, the Graview projection) read them through the public
-    // surface rather than a dist/* path.
+    // diffs the product layer (core/map-diff.ts), and the layout-aware store
+    // resolution: the v1 store's refusal of a v2 tree (store/file-adapter.ts),
+    // `rex init`, which never scaffolds prd_tree/ beside product/
+    // (cli/commands/init.ts), and the CLI error hints, which never send a
+    // project with a PRD in either layout to `n-dx init` (cli/errors.ts), and
+    // the MCP tools that follow the change-layer types on a v2 tree: edit_item,
+    // move_item, merge_items and claim_task, with the type-based parent rule
+    // and merge rules they use (core/move.ts, core/merge.ts, which the
+    // reorganize executor merges changes through: core/reorganize-executor.ts),
+    // and the legacy prd.json migration, which never migrates beside a v2 tree
+    // (store/ensure-legacy-prd-migrated.ts), and the snapshot restore, which
+    // refuses a v2 tree (core/backup-snapshots.ts), and v2 selection behind
+    // get_next_task and `rex next`, in get_next_task's v1 shape
+    // (core/change-next-task.ts), and v2 completion and apply-on-complete
+    // behind update_task_status and `rex update --status`
+    // (cli/v2-completion.ts).
+    // `public.ts` re-exports the reader, the node and tree types, the index
+    // and the derived product computations: consumers of the product layer
+    // (the dashboard's Product and Changes views, the Graview projection) read
+    // them through the public surface rather than a dist/* path.
     const v2Files = new Set(
       [
         "public.ts",
@@ -517,6 +532,20 @@ describe("isolation", () => {
         "migrations/v1-to-v2/capability-spec.ts",
         "migrations/v1-to-v2/migration-plan-data.ts",
         "migrations/v1-to-v2/spec-pass.ts",
+        "store/file-adapter.ts",
+        "cli/commands/init.ts",
+        "cli/errors.ts",
+        "cli/mcp-tools/edit-item.ts",
+        "cli/mcp-tools/move-item.ts",
+        "cli/mcp-tools/merge-items.ts",
+        "cli/mcp-tools/claim-task.ts",
+        "core/move.ts",
+        "core/merge.ts",
+        "core/reorganize-executor.ts",
+        "store/ensure-legacy-prd-migrated.ts",
+        "core/backup-snapshots.ts",
+        "core/change-next-task.ts",
+        "cli/v2-completion.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

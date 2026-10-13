@@ -2,7 +2,7 @@
 id: "20d12416-3fa3-4bec-aa2d-0fb00a0fbf93"
 level: "feature"
 title: "Agent brief from the product layer"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "product-map"
@@ -13,10 +13,13 @@ blockedBy:
   - "d3bfe8a4-c3d5-4aa4-893b-36fc58647dca"
   - "4cd7c27a-13d3-4fd3-85b4-9f309a4237fd"
 source: "roadmap"
+startedAt: "2026-10-12T03:29:23.180Z"
+completedAt: "2026-10-12T03:29:23.180Z"
+endedAt: "2026-10-12T03:29:23.180Z"
 acceptanceCriteria: []
 description: "The brief carries the capability being changed, its constraints and where it lives in code, not a release title. Same for every vendor.\n\nRoadmap PR 19 · wave 2 · lane hench."
 assignee: "Sterling H <sterling.h@endash.us>"
-lastModified: "2026-10-06T16:54:33.740Z"
+lastModified: "2026-10-12T03:29:23.674Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -25,4 +28,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Build the brief from the change and the capabilities it affects](./build-the-brief-from-the-change-and.md) | completed |
-| [Let agents read capabilities and place follow-ups; run task-less changes](./let-agents-read-capabilities-and-place.md) | pending |
+| [Let agents read capabilities and place follow-ups; run task-less changes](./let-agents-read-capabilities-and-place.md) | completed |

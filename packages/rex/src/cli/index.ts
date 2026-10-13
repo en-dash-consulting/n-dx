@@ -110,6 +110,8 @@ const VALUE_KEYS = new Set([
   "target",
   "relation",
   "summary",
+  "migration",
+  "cut-at",
   "proposed",
   "statement",
   ...MULTI_VALUE_KEYS,
@@ -604,6 +606,11 @@ async function dispatchCommand(
       await startMcpServer(resolveDir(positional));
       break;
     }
+    case "migrate-plan": {
+      const { cmdMigratePlan } = await import("./commands/migrate-plan.js");
+      await cmdMigratePlan(resolveDir(positional), flags);
+      break;
+    }
     case "migrate-to-md": {
       const { cmdMigrateToMd } = await import("./commands/migrate-to-md.js");
       await cmdMigrateToMd(resolveDir(positional), flags);
@@ -668,7 +675,7 @@ async function dispatchCommand(
         "prune", "restore", "validate", "fix", "usage", "report", "verify", "ready", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "codeowners",
         "release", "reorganize", "health", "product", "change", "mcp",
-        "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
+        "migrate-plan", "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
         "backfill-commit-attribution",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");

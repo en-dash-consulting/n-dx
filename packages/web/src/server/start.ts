@@ -20,8 +20,8 @@ import { handleValidationRoute } from "./routes-validation.js";
 import { settleContextNotesRemovals, sweepStaleContextNotes } from "./run-options.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, closeWorktreeRunWatchers, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
-import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
-import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION } from "./rex-gateway.js";
+import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME } from "./prd-io.js";
+import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION, prdLayout, resolveStore } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
@@ -53,6 +53,7 @@ import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
+import { handleRexSettingsRoute } from "./routes-rex-settings.js";
 import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { ALL_DATA_FILES, stripWorkspaceSlot, urlWithToken } from "../shared/index.js";
@@ -323,7 +324,14 @@ export async function refreshPRDCache(rexDir: string): Promise<void> {
 
   let doc: { schema: string; title: string; items: unknown[] } | null = null;
 
-  if (existsSync(treeRoot)) {
+  if (await prdLayout(rexDir) === "v2") {
+    // v2: the cache is the change layer projected as v1 items.
+    try {
+      doc = await (await resolveStore(rexDir)).loadDocument();
+    } catch (err) {
+      console.warn(`[prd-cache] v2 projection error: ${(err as Error).message}`);
+    }
+  } else if (existsSync(treeRoot)) {
     try {
       const { items, warnings } = await parseFolderTree(treeRoot);
       let title = "PRD";
@@ -398,13 +406,27 @@ function registerSourcevisionWatcher(
   }
 }
 
-function registerRexWatcher(
+/**
+ * Watch the PRD: `.rex/` itself (non-recursive) plus each PRD folder
+ * recursively. A folder that does not exist yet — rex's v2 writer creates
+ * `changes/` with the first change — is picked up when its name appears under
+ * `.rex/`, so a write made after boot still refreshes the cache. `.rex/` is
+ * deliberately not watched recursively: the refresh's own output lands in
+ * `.rex/.cache/` and would loop.
+ *
+ * Watchers are appended to `into`, the caller's list, so ones added later are
+ * closed with the rest.
+ *
+ * @internal exported for integration testing only
+ */
+export function registerRexWatcher(
   scope: ViewerScope | undefined,
   rexDir: string,
   watcher: ReturnType<typeof createDataWatcher>,
   ws: Broadcasting,
-): FSWatcher[] {
-  if (!isInScope(scope, "rex") || !existsSync(rexDir)) return [];
+  into: FSWatcher[],
+): void {
+  if (!isInScope(scope, "rex") || !existsSync(rexDir)) return;
   const debouncedRefresh = debounce(() => {
     // A changed tree stales every PRD delta it takes part in, as anchor or
     // as the compared worktree.
@@ -418,15 +440,33 @@ function registerRexWatcher(
     });
   }, WATCHER_DEBOUNCE_MS);
 
-  const watchers: FSWatcher[] = [];
+  const prdDirNames = [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME];
+  const watched = new Set<string>();
+  const watchPrdFolder = (dirName: string): void => {
+    const root = join(rexDir, dirName);
+    if (watched.has(dirName) || !existsSync(root)) return;
+    try {
+      into.push(watch(root, { recursive: true }, () => {
+        debouncedRefresh();
+      }));
+      watched.add(dirName);
+    } catch {
+      // fs.watch recursive may not be supported on every platform — non-fatal
+    }
+  };
 
-  // Watch .rex/ for legacy prd.md and tree-meta.json changes
+  // Watch .rex/ for legacy prd.md and tree-meta.json changes, and for a PRD
+  // folder appearing after boot.
   try {
-    watchers.push(watch(rexDir, (_eventType, filename) => {
-      if (
-        filename === "prd.md" ||
-        filename === "tree-meta.json" ||
-        (typeof filename === "string" && /^prd_.*\.md$/.test(filename))
+    into.push(watch(rexDir, (_eventType, filename) => {
+      const name = filename === null ? "" : String(filename);
+      if (prdDirNames.includes(name)) {
+        watchPrdFolder(name);
+        debouncedRefresh();
+      } else if (
+        name === "prd.md" ||
+        name === "tree-meta.json" ||
+        /^prd_.*\.md$/.test(name)
       ) {
         debouncedRefresh();
       }
@@ -435,19 +475,7 @@ function registerRexWatcher(
     // ignore
   }
 
-  // Watch .rex/prd_tree/ recursively for folder-tree changes
-  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
-  if (existsSync(treeRoot)) {
-    try {
-      watchers.push(watch(treeRoot, { recursive: true }, () => {
-        debouncedRefresh();
-      }));
-    } catch {
-      // fs.watch recursive may not be supported on every platform — non-fatal
-    }
-  }
-
-  return watchers;
+  for (const dirName of prdDirNames) watchPrdFolder(dirName);
 }
 
 /**
@@ -525,9 +553,7 @@ function registerWatchers(
   const watchers: FSWatcher[] = [];
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
   if (sv) watchers.push(sv);
-  for (const w of registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws)) {
-    watchers.push(w);
-  }
+  registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws, watchers);
   const hench = registerHenchWatcher(ctx.scope, henchRunsDir, ws);
   if (hench) watchers.push(hench);
   const dev = registerDevViewerWatcher(ctx.dev, viewerPath, watcher, ws);
@@ -602,9 +628,7 @@ function reregisterProjectWatchers(
   // key is null) drops those.
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
   if (sv) handles.watchers.push(sv);
-  for (const w of registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws)) {
-    handles.watchers.push(w);
-  }
+  registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws, handles.watchers);
   const hench = registerHenchWatcher(ctx.scope, handles.henchRunsDir, ws);
   if (hench) handles.watchers.push(hench);
 }
@@ -799,6 +823,9 @@ async function handleApiRoutes(
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;
   if (await handleProjectSettingsRoute(req, res, ctx)) return true;
+  // Before the generic /api/rex/ router below, which would answer its own 404
+  // for a path it does not know.
+  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexSettingsRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleCommandsRoute(req, res, ctx, broadcast, {
     onProjectInitialized: () => {
       clearStatusCache();

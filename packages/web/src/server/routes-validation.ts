@@ -9,15 +9,13 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./response-utils.js";
 import {
-  type ItemLevel,
   type PRDItem,
   type PRDDocument,
-  LEVEL_HIERARCHY,
-  isItemLevel,
   walkTree,
   findItem,
   collectAllIds,
 } from "./rex-gateway.js";
+import { type ItemType, TYPE_PARENTS, isItemType, itemTypeOf } from "../shared/index.js";
 import { loadPRDSync } from "./prd-io.js";
 
 const VALIDATION_PREFIX = "/api/rex/validate";
@@ -25,11 +23,11 @@ const DEPGRAPH_PREFIX = "/api/rex/dependency-graph";
 
 // ── Thin wrappers over canonical rex functions ───────────────────────
 // The rex walkTree yields { item, parents[] }. Validation checks need
-// parentLevel, so we derive it from the parents array.
+// the parent's type, so we derive it from the parents array.
 
-/** Get the parent's level from a parents array (null for root items). */
-function parentLevel(parents: PRDItem[]): ItemLevel | null {
-  return parents.length > 0 ? parents[parents.length - 1].level : null;
+/** Get the parent's type from a parents array (null for root items). */
+function parentType(parents: PRDItem[]): ItemType | null {
+  return parents.length > 0 ? itemTypeOf(parents[parents.length - 1]) : null;
 }
 
 /** Find an item by ID, returning just the item (or null). */
@@ -56,7 +54,7 @@ interface CheckResult {
 interface OrphanResult {
   itemId: string;
   title: string;
-  level: string;
+  itemType: string;
   reason: string;
 }
 
@@ -70,20 +68,20 @@ interface StuckResult {
 function findOrphanedItems(items: PRDItem[]): OrphanResult[] {
   const orphans: OrphanResult[] = [];
   for (const { item, parents } of walkTree(items)) {
-    if (!isItemLevel(item.level)) continue;
-    const allowedParents = LEVEL_HIERARCHY[item.level];
-    if (!allowedParents) continue;
-    const pLevel = parentLevel(parents);
-    if (!allowedParents.includes(pLevel)) {
-      const placement = pLevel === null ? "root" : `under ${pLevel}`;
+    const type = itemTypeOf(item);
+    if (!isItemType(type)) continue;
+    const allowedParents = TYPE_PARENTS[type];
+    const pType = parentType(parents);
+    if (!allowedParents.includes(pType)) {
+      const placement = pType === null ? "root" : `under ${pType}`;
       const expected = allowedParents
-        .map((l: ItemLevel | null) => (l === null ? "root" : l))
+        .map((t) => (t === null ? "root" : t))
         .join(" or ");
       orphans.push({
         itemId: item.id,
         title: item.title,
-        level: item.level,
-        reason: `${item.level} at ${placement}, expected under ${expected}`,
+        itemType: type,
+        reason: `${type} at ${placement}, expected under ${expected}`,
       });
     }
   }
@@ -297,7 +295,7 @@ function runValidation(items: PRDItem[]): {
 interface GraphNode {
   id: string;
   title: string;
-  level: string;
+  itemType: string;
   status: string;
   /** IDs this node depends on (is blocked by). */
   blockedBy: string[];
@@ -354,7 +352,7 @@ function buildDependencyGraph(items: PRDItem[]): DependencyGraph {
         nodes.push({
           id: item.id,
           title: item.title,
-          level: item.level,
+          itemType: itemTypeOf(item),
           status: item.status,
           blockedBy: validDeps,
         });
@@ -369,7 +367,7 @@ function buildDependencyGraph(items: PRDItem[]): DependencyGraph {
             nodes.push({
               id: depItem.id,
               title: depItem.title,
-              level: depItem.level,
+              itemType: itemTypeOf(depItem),
               status: depItem.status,
               blockedBy: depItem.blockedBy?.filter((d) => allIds.has(d)) ?? [],
             });

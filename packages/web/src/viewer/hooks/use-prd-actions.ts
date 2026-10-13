@@ -27,8 +27,17 @@ import type { DetailItem, NavigateTo } from "../types.js";
 import { TaskDetail } from "../components/prd-tree/task-detail.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
 import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
+import { itemTypeOf } from "../external.js";
 import { useItemSelection } from "./use-item-selection.js";
 import { useDeleteActions } from "./use-delete-actions.js";
+
+/**
+ * Toast text for a `POST /api/rex/items` answer. A v1 project answers the
+ * item's `level`; a v2 project answers `type: "change"` and no level.
+ */
+export function createdItemToast(result: { type?: string; level?: string; title: string }): string {
+  return `Created ${result.type ?? result.level}: ${result.title}`;
+}
 
 /** Active tab in the command bar. */
 export type CommandTab = null | "add" | "merge" | "prune";
@@ -100,7 +109,7 @@ export interface PRDActionsState {
   /** Navigate to an item by ID (from detail panel links). */
   handleNavigateToItem: (id: string) => void;
   /** Add a child item from the detail panel. */
-  handleAddChild: (input: { title: string; parentId: string; level: string; description?: string; priority?: string }) => Promise<void>;
+  handleAddChild: (input: { title: string; parentId: string; type: string; description?: string; priority?: string }) => Promise<void>;
   /** Add an item from the command bar form. */
   handleAddItem: (input: AddItemInput) => Promise<void>;
   /** Add an item from the inline tree form. */
@@ -213,7 +222,7 @@ export function usePRDActions({
   // ── Add child (from detail panel) ────────────────────────────────
 
   const handleAddChild = useCallback(
-    async (input: { title: string; parentId: string; level: string; description?: string; priority?: string }) => {
+    async (input: { title: string; parentId: string; type: string; description?: string; priority?: string }) => {
       const res = await fetch("/api/rex/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -226,7 +235,7 @@ export function usePRDActions({
       }
 
       const result = await res.json();
-      showToast(`Created ${result.level}: ${result.title}`);
+      showToast(createdItemToast(result));
       await fetchPRDData();
       await fetchTaskUsage();
     },
@@ -249,7 +258,7 @@ export function usePRDActions({
       }
 
       const result = await res.json();
-      showToast(`Created ${result.level}: ${result.title}`);
+      showToast(createdItemToast(result));
       setActiveTab(null);
       setAddParentId(null);
       await fetchPRDData();
@@ -274,7 +283,7 @@ export function usePRDActions({
       }
 
       const result = await res.json();
-      showToast(`Created ${result.level}: ${result.title}`);
+      showToast(createdItemToast(result));
       await fetchPRDData();
       await fetchTaskUsage();
     },
@@ -324,7 +333,7 @@ export function usePRDActions({
         type: "prd",
         title: item.title,
         id: item.id,
-        level: item.level,
+        itemType: itemTypeOf(item),
         status: item.status,
         description: item.description,
         acceptanceCriteria: item.acceptanceCriteria,

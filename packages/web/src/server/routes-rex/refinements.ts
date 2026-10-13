@@ -40,7 +40,7 @@ import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { appendLog } from "./rex-route-helpers.js";
 import { refreshPRDCache } from "../prd-io.js";
-import { resolveStore } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore } from "../rex-gateway.js";
 import {
   MAX_REFINEMENT_PROPOSALS,
   applyRefinements,
@@ -138,8 +138,9 @@ async function handleApplyRefinements(
     // The whole read-modify-write sits inside the lock. Loading the document
     // outside it and mutating a snapshot is exactly the pattern the staleness
     // check exists to defend against, so this route must not use it.
+    const changeLayer = isChangeLayerStore(store);
     const updatedDoc = await store.withTransaction(async (doc) => {
-      outcomes = applyRefinements(doc, proposals);
+      outcomes = applyRefinements(doc, proposals, { changeLayer });
       return doc;
     });
     refreshPRDCache(ctx.rexDir, updatedDoc);
