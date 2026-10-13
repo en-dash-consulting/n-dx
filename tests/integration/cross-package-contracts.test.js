@@ -224,6 +224,10 @@ describe("hench → rex gateway contract", () => {
     "buildChangeBrief",
     // v2 completion — what update_task_status runs on a v2 tree
     "completeV2Work",
+    // v2 applied changes — a failure after the completion keeps an applied change's completion
+    "isAppliedChange",
+    "indexTree",
+    "enclosingChangeIds",
     "openClaimsStore",
     "resolveClaimHolder",
     "computeTimestampUpdates",
@@ -783,6 +787,7 @@ describe("gateway export auto-detection", () => {
         "collectCompletedIds", "explainSelection", "matchesAssignee", "traversalBlock",
         "prdLayout", "isChangeLayerStore", "findNextWorkTask", "findActionableWork", "resolveWorkById",
         "buildChangeBrief", "completeV2Work",
+        "isAppliedChange", "indexTree", "enclosingChangeIds",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
         "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",

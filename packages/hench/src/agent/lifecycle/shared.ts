@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "nod
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
-import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
+import { explainSelection, collectCompletedIds, computeTimestampUpdates, enclosingChangeIds, findItem, findParentResets, indexTree, isAppliedChange, isChangeLayerStore, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD, DEFAULT_GIT_COMMIT_MESSAGE_SOURCE } from "../../schema/index.js";
 import type { GitCommitMessageSource, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
@@ -84,6 +84,7 @@ import {
   PRD_COMMIT_PATHS,
   deletedAmong,
   findUncommittedWork,
+  formatAppliedCompletionKept,
   formatOperatorPrdLeftovers,
   formatRecordCommitPending,
   formatReviewRepairsUncommittedRefusal,
@@ -2967,7 +2968,7 @@ export async function performCommitPromptIfNeeded(
     run.error = `Could not stage review repairs: ${reviewStageFailure.message}`;
     info(`\n${run.error}`);
     if (store) {
-      await withdrawCompletionClaim(store, run, run.error);
+      await withdrawCompletionClaim(store, run, run.error, projectDir);
     }
     try { unlinkSync(msgPath); } catch { /* ignore */ }
     return "no-commit";
@@ -3058,7 +3059,7 @@ export async function performCommitPromptIfNeeded(
         run.status = "failed";
         run.error = `Could not stage PRD files: ${error.message}`;
         info(`\n${run.error}`);
-        await withdrawCompletionClaim(store, run, run.error);
+        await withdrawCompletionClaim(store, run, run.error, projectDir);
         try { unlinkSync(msgPath); } catch { /* ignore */ }
         return "no-commit";
       }
@@ -3168,7 +3169,7 @@ export async function performCommitPromptIfNeeded(
     run.error = `Commit failed: ${error.message}`;
     info(run.error);
     if (store) {
-      await withdrawCompletionClaim(store, run, run.error);
+      await withdrawCompletionClaim(store, run, run.error, projectDir);
     }
   } finally {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
@@ -3273,7 +3274,68 @@ async function reopenWithdrawnAncestors(store: PRDStore, taskId: string): Promis
 }
 
 /**
+ * On a v2 tree, the applied change a completed `taskId` stands in, or
+ * undefined: the node itself when it is a task-less change, else the innermost
+ * applied change enclosing it. Always undefined on v1, and for a task that is
+ * not completed.
+ *
+ * Completing a change's last task applies the change in the same write, so a
+ * completion that reaches here applied it, or completed under one already
+ * applied. Either way the product layer holds its amendment.
+ */
+async function appliedChangeOfCompletion(store: PRDStore, taskId: string): Promise<string | undefined> {
+  if (!isChangeLayerStore(store)) return undefined;
+  if ((await store.getItem(taskId))?.status !== "completed") return undefined;
+  const tree = await store.loadTree();
+  const index = indexTree(tree);
+  return [taskId, ...enclosingChangeIds(tree, taskId)].find((id) => {
+    const node = index.resolve(id);
+    return node !== undefined && isAppliedChange(node);
+  });
+}
+
+/**
+ * Keep a v2 completion that applied its change, instead of withdrawing it
+ * (decision S1-Q2: an applied change is never reopened).
+ *
+ * Withdrawing would reset the task and, through the v1 ancestor reset, the
+ * change, while the change kept `appliedAt` and product/ kept the amendment —
+ * and the next completion commit, which discounts product/ and changes/ as
+ * bookkeeping, would sweep the phantom amendment in. The run has already
+ * failed; this replaces its error with one that names every uncommitted path
+ * and the commands that land them under the task's N-DX-Item trailer.
+ */
+async function keepAppliedCompletion(
+  store: PRDStore,
+  run: RunRecord,
+  reason: string,
+  changeId: string,
+  projectDir: string,
+): Promise<void> {
+  const taskId = run.taskId!;
+  const { paths } = await findUncommittedWork({ projectDir });
+  const deleted = deletedAmong(projectDir, paths);
+  run.error = formatAppliedCompletionKept({
+    cause: reason,
+    changeId,
+    taskId,
+    paths,
+    deleted,
+    files: await prepareRecoveryPathspecs(projectDir, paths, deleted),
+  });
+  info(`\n${run.error}`);
+  await toolRexAppendLog(store, taskId, {
+    event: "completion_kept",
+    detail: `Change ${changeId} is applied, so the completion stands: ${reason}`,
+  });
+}
+
+/**
  * Withdraw a completion claim the run is no longer entitled to make.
+ *
+ * Except on a v2 tree where the completion applied its change
+ * ({@link appliedChangeOfCompletion}): that completion is kept and reported
+ * ({@link keepAppliedCompletion}), never reset.
  *
  * {@link resetInProgressTaskIfFailed} is not enough on its own: the agent is
  * instructed to call `rex_update_status` itself, so by the time the
@@ -3289,11 +3351,18 @@ async function withdrawCompletionClaim(
   store: PRDStore,
   run: RunRecord,
   reason: string,
+  projectDir: string,
 ): Promise<void> {
   if (!run.taskId) return;
   try {
     const item = await store.getItem(run.taskId);
     if (!item || (item.status !== "completed" && item.status !== "in_progress")) return;
+
+    const appliedChangeId = await appliedChangeOfCompletion(store, run.taskId);
+    if (appliedChangeId) {
+      await keepAppliedCompletion(store, run, reason, appliedChangeId, projectDir);
+      return;
+    }
 
     await toolRexUpdateStatus(store, run.taskId, { status: "pending" });
     await toolRexAppendLog(store, run.taskId, {
@@ -3479,10 +3548,11 @@ async function settleAfterTestGateFailure(
   if (hold?.outcome === "bypassed" && opts.store) {
     info(
       "\n⚠ The task was already marked completed when the test gate ran: the agent's completion did not go " +
-        "through the hold (a rex MCP server built before it, or a direct write). Withdrawing it. " +
+        "through the hold (a rex MCP server built before it, or a direct write). Withdrawing it, " +
+        "unless it applied a v2 change, which is kept. " +
         "If the agent committed it, that commit still records the task as completed.",
     );
-    await withdrawCompletionClaim(opts.store, run, run.error ?? "Test gate failed");
+    await withdrawCompletionClaim(opts.store, run, run.error ?? "Test gate failed", opts.projectDir);
   }
 
   const review = run.review;
@@ -4090,7 +4160,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     run.review.gated = true;
     info(`\n${run.error}`);
     if (opts.store) {
-      await withdrawCompletionClaim(opts.store, run, run.error);
+      await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
     }
   }
 
@@ -4105,7 +4175,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     run.error = formatUnresolvedMustFixRefusal(run.review);
     info(`\n${run.error}`);
     if (opts.store) {
-      await withdrawCompletionClaim(opts.store, run, run.error);
+      await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
     }
   }
 
@@ -4207,7 +4277,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         : formatUncommittedWorkRefusal(leaked.paths, leakedDeleted, pathspecs);
       info(`\n${run.error}`);
       if (opts.store) {
-        await withdrawCompletionClaim(opts.store, run, run.error);
+        await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
       }
       // Hold the cross-worktree claim rather than letting the run's `finally`
       // release it. The refusal means finished work is sitting uncommitted in
@@ -4298,7 +4368,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       run.error = `Could not commit review repairs: ${error.message}`;
       info(`\n${run.error}`);
       if (opts.store) {
-        await withdrawCompletionClaim(opts.store, run, run.error);
+        await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
       }
     }
 
@@ -4389,12 +4459,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // finished work here that nobody committed", so offering to revert it would
   // put the very files the gate just saved one keystroke from deletion. Same
   // for the missing-review refusal: the work passed its own validation and the
-  // only thing that failed was the reviewer's spawn.
+  // only thing that failed was the reviewer's spawn. Nor after a kept v2
+  // completion (keepAppliedCompletion): reverting its PRD writes would unapply
+  // the change the error just told the operator to commit.
   if (
     !uncommittedWorkRefused &&
     !reviewGateRefused &&
     opts.rollbackOnFailure !== false &&
-    FAILURE_STATUSES.has(run.status)
+    FAILURE_STATUSES.has(run.status) &&
+    !(opts.store && run.taskId && (await appliedChangeOfCompletion(opts.store, run.taskId)))
   ) {
     await performRollbackIfNeeded(projectDir, {
       yes: opts.yes,

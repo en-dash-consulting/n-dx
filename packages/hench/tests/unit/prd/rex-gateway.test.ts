@@ -60,6 +60,10 @@ const EXPECTED_EXPORTS = [
   "buildChangeBrief",
   // v2 completion — what update_task_status runs on a v2 tree
   "completeV2Work",
+  // v2 applied changes — a failure after the completion keeps an applied change's completion
+  "isAppliedChange",
+  "indexTree",
+  "enclosingChangeIds",
   // Cross-worktree task claims
   "openClaimsStore",
   "resolveClaimHolder",

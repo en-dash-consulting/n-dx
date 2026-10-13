@@ -645,12 +645,14 @@ function renderRecoveryCommands(
   paths: string[],
   deleted: ReadonlySet<string>,
   files?: RecoveryPathspecs,
-  opts: { setAside?: boolean } = {},
+  opts: { setAside?: boolean; message?: string[] } = {},
 ): string {
   const { setAside = true } = opts;
   const existing = paths.filter((p) => !deleted.has(p));
   const gone = paths.filter((p) => deleted.has(p));
   const mode = specMode(paths, files);
+  // One `-m` per paragraph. Callers pass only shell-inert text (ids, words), so double quotes hold in every shell.
+  const commit = ["git commit", ...(opts.message ?? []).map((p) => `-m "${p}"`)].join(" ");
 
   const lines: string[] = [];
   if (mode.kind === "file") {
@@ -664,7 +666,7 @@ function renderRecoveryCommands(
     if (gone.length > 0) {
       lines.push(`  git rm --cached --pathspec-from-file=${mode.files.rm ?? mode.files.all}`);
     }
-    lines.push(`  git commit --pathspec-from-file=${mode.files.all}`);
+    lines.push(`  ${commit} --pathspec-from-file=${mode.files.all}`);
     if (setAside) {
       lines.push("Or set them aside:");
       lines.push(`  git stash push --pathspec-from-file=${mode.files.all}`);
@@ -680,7 +682,7 @@ function renderRecoveryCommands(
   );
   if (existing.length > 0) lines.push(`  git add -- ${spec(existing)}`);
   if (gone.length > 0) lines.push(`  git rm --cached -- ${spec(gone)}`);
-  lines.push(`  git commit -- ${spec(paths)}`);
+  lines.push(`  ${commit} -- ${spec(paths)}`);
   if (setAside) {
     lines.push("Or set them aside:");
     lines.push(`  git stash push -- ${spec(paths)}`);
@@ -745,6 +747,39 @@ export function formatReviewRepairsUncommittedRefusal(
     `Nothing was discarded. Land them, then mark the task completed — do not re-run it.\n` +
     `${renderRecoveryCommands(paths, deleted, files, { setAside: false })}\n` +
     `  ndx rex update ${taskId} --status=completed`
+  );
+}
+
+/**
+ * The run error when a failure follows a v2 completion that applied its change
+ * and hench keeps the completion rather than reopen the change (decision
+ * S1-Q2). The task stays completed, so it says not to re-run and offers no
+ * `git stash`: the only correct ending is to land every listed path, under
+ * the task's N-DX-Item trailer so rex ties the commit to the task.
+ */
+export function formatAppliedCompletionKept(opts: {
+  cause: string;
+  changeId: string;
+  taskId: string;
+  paths: string[];
+  deleted?: ReadonlySet<string>;
+  files?: RecoveryPathspecs;
+}): string {
+  const { cause, changeId, taskId, paths, deleted = new Set(), files } = opts;
+  const head =
+    `⚠ Completion kept: Change ${changeId} was applied to the product layer when this task completed, ` +
+    `and an applied change is never reopened. The task stays completed; the run failed.\n` +
+    `  ${cause}\n`;
+  if (paths.length === 0) return head + "Nothing is left uncommitted.";
+  return (
+    head +
+    `Still uncommitted (${paths.length} path(s)):\n` +
+    `${renderPaths(paths)}\n` +
+    `Nothing was discarded. Land them once the cause is fixed — do not re-run the task:\n` +
+    renderRecoveryCommands(paths, deleted, files, {
+      setAside: false,
+      message: [`Land the work of task ${taskId}`, `N-DX-Item: ${taskId}`],
+    })
   );
 }
 

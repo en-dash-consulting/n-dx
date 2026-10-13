@@ -175,6 +175,11 @@ export { buildChangeBrief } from "@n-dx/rex";
 // which completed the change without ever applying it.
 export { completeV2Work } from "@n-dx/rex";
 
+// A failure after that completion must not reopen a change it applied: the
+// product layer keeps the amendment whatever the task says. Whether a change is
+// applied, and which changes enclose a task, are rex's to answer.
+export { isAppliedChange, indexTree, enclosingChangeIds } from "@n-dx/rex";
+
 // `matchesAssignee` is selection's own `--mine` rule (own field, or inherited
 // from any ancestor). Anything hench scopes to `--mine` that is *not* selection
 // — the deferred/failing reset offer, the counts behind an empty menu — has to
