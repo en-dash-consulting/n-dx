@@ -10,6 +10,7 @@ import {
   readUsageSinceMark,
   resolveTranscriptPath,
   saveUsageCursor,
+  withClaimExcluded,
   type MarkedUsageDelta,
   type SessionUsageCursor,
   type SessionUsageDelta,
@@ -70,6 +71,12 @@ const ZERO_USAGE: Required<TokenUsage> = {
  *   2. the session transcript (default) — from the task's start mark when
  *      `hench usage mark --task=<id>` was run, else from the session watermark
  *   3. zeros, when there is no session to read and nothing was passed
+ *
+ * A mark outranks the watermark, so marks nest: a review marked and recorded
+ * inside a task's still-open window is consumed first. Every record therefore
+ * charges its own span to the marks still outstanding that enclose it, and a
+ * mark's window is read less whatever was charged to it — so the two records
+ * sum to the outer window instead of overlapping. See {@link withClaimExcluded}.
  *
  * `--startedAt` is metadata (the run's start time). It never selects usage: a
  * typed timestamp is not a measurement, and the mark is. `--since` remains an
@@ -272,12 +279,18 @@ async function resolveUsage(
 
   if (sessionId) {
     // The consumed mark is removed: a second record for the same task must not
-    // claim the same span again. Others stay for their own records.
+    // claim the same span again. Others stay for their own records — charged
+    // this record's span, so an enclosing mark does not re-claim it. That is
+    // what stops a review recorded inside a task's window being counted twice.
     const { [markId]: _consumed, ...remaining } = cursor.marks ?? {};
+    const marks = withClaimExcluded(transcript.text, remaining, {
+      from: delta.from,
+      to: { lastUuid: delta.cursor.lastUuid, consumed: delta.cursor.consumed },
+    });
     await saveUsageCursor(henchDir, sessionId, {
       lastUuid: delta.cursor.lastUuid,
       consumed: delta.cursor.consumed,
-      ...(Object.keys(remaining).length > 0 ? { marks: remaining } : {}),
+      ...(Object.keys(marks).length > 0 ? { marks } : {}),
     });
   }
 
@@ -311,12 +324,24 @@ async function resolveUsage(
       `Token usage measured from the "${markId}" mark: ${describeUsage(marked.tokenUsage)} across ` +
         `${marked.messages} message${marked.messages === 1 ? "" : "s"}, from ${describePosition(marked.from)} to ${describePosition(marked.to)}.`,
     ];
+    if (marked.excludedMessages > 0) {
+      notes.push(
+        `${describeUsage(marked.excluded)} across ${marked.excludedMessages} message${marked.excludedMessages === 1 ? "" : "s"} ` +
+          "was excluded: a record taken inside this window already claimed it.",
+      );
+    }
     if (marked.resynced) {
       notes.push(
         "The mark's message was missing from the transcript (it was rewritten, likely by compaction), so the delta is the difference of the two snapshots and approximate.",
       );
     }
-    if (marked.messages === 0) notes.push("Nothing was spent since the mark.");
+    if (marked.messages === 0) {
+      notes.push(
+        marked.excludedMessages > 0
+          ? "Nothing was spent that an inner record had not already claimed."
+          : "Nothing was spent since the mark.",
+      );
+    }
     return {
       tokenUsage: marked.tokenUsage,
       messages: marked.messages,

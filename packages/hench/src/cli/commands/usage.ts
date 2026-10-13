@@ -113,6 +113,13 @@ async function cmdUsageMarks(dir: string, flags: Record<string, string>): Promis
     return;
   }
   for (const m of marks) {
-    result(`${m.task}  at ${m.at || "?"}  message ${m.consumed}${m.lastUuid ? ` (${m.lastUuid.slice(0, 8)})` : ""}`);
+    // A nested record inside this mark's window has already claimed part of it;
+    // say so, or the mark's eventual record looks short for no visible reason.
+    const excluded = m.excludedMessages
+      ? `  (${m.excludedMessages} message${m.excludedMessages === 1 ? "" : "s"} inside already recorded)`
+      : "";
+    result(
+      `${m.task}  at ${m.at || "?"}  message ${m.consumed}${m.lastUuid ? ` (${m.lastUuid.slice(0, 8)})` : ""}${excluded}`,
+    );
   }
 }

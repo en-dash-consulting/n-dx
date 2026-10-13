@@ -39,6 +39,26 @@
  * in the same file. Marks live beside the watermark in the session's cursor
  * file, keyed by task.
  *
+ * ## Nested marks
+ *
+ * Marks nest. `/ndx-work` marks when a task starts and records when it ends; an
+ * `/ndx-adversarial-review` run inside it marks and records within that still
+ * -open window. The inner record is consumed first, so the outer one's window
+ * contains a span that has already been attributed — observed as a review
+ * claiming 10.9M tokens and the task containing it claiming 25.3M of which
+ * those 10.9M were the review's, double-counted by `ndx usage`.
+ *
+ * So every record subtracts its claim from the marks still outstanding that
+ * enclose it: {@link withClaimExcluded} accumulates it on each enclosing mark's
+ * `excluded`, and {@link readUsageSinceMark} takes it off. The outer record then
+ * claims its own window minus the inner one, which is what an operator
+ * correcting this by hand arrives at.
+ *
+ * Clamping the mark to the watermark instead — starting at whichever is later —
+ * was the obvious cheaper fix and is wrong: it also discards the task's own work
+ * from before the inner mark was taken (77→155 in the case above), so the two
+ * records sum to less than the window rather than to it.
+ *
  * ## What this deliberately does not do
  *
  * It does not price the tokens, and it does not try to split one message's usage
@@ -93,6 +113,15 @@ export interface UsageMark {
   consumed: number;
   /** Cumulative usage of the whole transcript at mark time, per token class. */
   totals: Required<TokenUsage>;
+  /**
+   * Usage inside this mark's window that a later record already claimed — a
+   * nested mark consumed before this one, or a markless record. Accumulated by
+   * {@link withClaimExcluded} and subtracted by {@link readUsageSinceMark}, so
+   * the span is attributed once.
+   */
+  excluded?: Required<TokenUsage>;
+  /** Messages those records claimed, subtracted from this mark's turn count. */
+  excludedMessages?: number;
 }
 
 /** A session that has had nothing attributed yet. */
@@ -116,6 +145,12 @@ export interface SessionUsageDelta {
   messages: number;
   /** Model of the most recent contributing message, when there was one. */
   model?: string;
+  /**
+   * Where the window began. With {@link SessionUsageDelta.cursor} as its end,
+   * this is the span the record claims — what {@link withClaimExcluded} takes
+   * off the marks that enclose it.
+   */
+  from: { lastUuid?: string; consumed: number };
   /** Where to resume next time. */
   cursor: SessionUsageCursor;
   /**
@@ -127,9 +162,12 @@ export interface SessionUsageDelta {
 
 /** What `hench record` reports when it consumed a mark. */
 export interface MarkedUsageDelta extends SessionUsageDelta {
-  /** The two positions the delta was taken between. */
-  from: { lastUuid?: string; consumed: number };
+  /** The end of the window; `from` is its start. */
   to: { lastUuid?: string; consumed: number };
+  /** Usage taken off because a record inside the window already claimed it. */
+  excluded: Required<TokenUsage>;
+  /** Messages that exclusion removed. Zero when nothing nested inside. */
+  excludedMessages: number;
 }
 
 interface TranscriptEntry {
@@ -239,7 +277,90 @@ export function takeUsageMark(transcript: string, task: string, at = new Date().
 }
 
 /**
- * The usage that appeared after `mark`.
+ * Resolve a transcript position to an index in `entries`.
+ *
+ * A position names the last entry BEFORE the span it opens, so the index
+ * returned is the first entry of that span. The uuid is exact; `consumed` is
+ * the fallback for a transcript rewritten under us.
+ */
+function resolvePosition(
+  entries: TranscriptEntry[],
+  position: { lastUuid?: string; consumed: number },
+): { index: number; resynced: boolean } {
+  if (!position.lastUuid) return { index: Math.min(position.consumed, entries.length), resynced: false };
+  const found = entries.findIndex((e) => e.uuid === position.lastUuid);
+  if (found === -1) return { index: Math.min(position.consumed, entries.length), resynced: true };
+  return { index: found + 1, resynced: false };
+}
+
+function subtractUsage(from: Required<TokenUsage>, amount: Required<TokenUsage>): Required<TokenUsage> {
+  return {
+    input: Math.max(0, from.input - amount.input),
+    output: Math.max(0, from.output - amount.output),
+    cacheCreationInput: Math.max(0, from.cacheCreationInput - amount.cacheCreationInput),
+    cacheReadInput: Math.max(0, from.cacheReadInput - amount.cacheReadInput),
+  };
+}
+
+function addUsage(a: Required<TokenUsage>, b: Required<TokenUsage>): Required<TokenUsage> {
+  return {
+    input: a.input + b.input,
+    output: a.output + b.output,
+    cacheCreationInput: a.cacheCreationInput + b.cacheCreationInput,
+    cacheReadInput: a.cacheReadInput + b.cacheReadInput,
+  };
+}
+
+/**
+ * Charge a record's claim to every outstanding mark whose window encloses it.
+ *
+ * `claim` is the span a record just took — `from` its start, `to` its end. A
+ * mark positioned at or before that start encloses it, so when that mark is
+ * eventually recorded it would claim the span a second time; the overlap is
+ * accumulated on the mark's `excluded` instead and subtracted there.
+ *
+ * The overlap, not the whole claim: a mark taken *inside* the claimed span
+ * (three levels of nesting, or a markless record that reached back past one
+ * mark but not another) only ever re-claims the part after its own position.
+ *
+ * Marks are returned updated rather than mutated — the caller persists them.
+ * Pass the marks the record did not consume; the consumed one is deleted.
+ */
+export function withClaimExcluded(
+  transcript: string,
+  marks: Record<string, UsageMark>,
+  claim: { from: { lastUuid?: string; consumed: number }; to: { lastUuid?: string; consumed: number } },
+): Record<string, UsageMark> {
+  const taskIds = Object.keys(marks);
+  if (taskIds.length === 0) return marks;
+
+  const entries = parseUsageEntries(transcript);
+  const claimStart = resolvePosition(entries, claim.from).index;
+  const claimEnd = resolvePosition(entries, claim.to).index;
+  if (claimEnd <= claimStart) return marks;
+
+  const updated: Record<string, UsageMark> = {};
+  for (const taskId of taskIds) {
+    const mark = marks[taskId];
+    const markIndex = resolvePosition(entries, { lastUuid: mark.lastUuid, consumed: mark.consumed }).index;
+    const overlapStart = Math.max(claimStart, markIndex);
+    if (overlapStart >= claimEnd) {
+      updated[taskId] = mark;
+      continue;
+    }
+    const { totals } = sumUsage(entries.slice(overlapStart, claimEnd));
+    updated[taskId] = {
+      ...mark,
+      excluded: addUsage(mark.excluded ?? zeroUsage(), totals),
+      excludedMessages: (mark.excludedMessages ?? 0) + (claimEnd - overlapStart),
+    };
+  }
+  return updated;
+}
+
+/**
+ * The usage that appeared after `mark`, less whatever a record inside its
+ * window already claimed.
  *
  * Exact when the mark's uuid is still in the transcript: the messages after it
  * are summed directly. When it is not (compaction rewrote the file, or the mark
@@ -247,6 +368,10 @@ export function takeUsageMark(transcript: string, task: string, at = new Date().
  * snapshots — now minus then, per class, clamped at zero — and `resynced`
  * says the number is approximate. Either way the result is computed from two
  * positions in the same file; no timestamp is consulted.
+ *
+ * `mark.excluded` comes off both paths. It is what {@link withClaimExcluded}
+ * charged to this mark while it was outstanding, and leaving it in is the
+ * double-count described in the module header.
  */
 export function readUsageSinceMark(transcript: string, mark: UsageMark): MarkedUsageDelta {
   const entries = parseUsageEntries(transcript);
@@ -268,24 +393,24 @@ export function readUsageSinceMark(transcript: string, mark: UsageMark): MarkedU
     messages = entries.length;
   } else {
     resynced = true;
-    tokenUsage = {
-      input: Math.max(0, now.totals.input - mark.totals.input),
-      output: Math.max(0, now.totals.output - mark.totals.output),
-      cacheCreationInput: Math.max(0, now.totals.cacheCreationInput - mark.totals.cacheCreationInput),
-      cacheReadInput: Math.max(0, now.totals.cacheReadInput - mark.totals.cacheReadInput),
-    };
+    tokenUsage = subtractUsage(now.totals, mark.totals);
     messages = Math.max(0, now.messages - mark.consumed);
     model = now.model;
   }
 
+  const excluded = mark.excluded ?? zeroUsage();
+  const excludedMessages = Math.min(mark.excludedMessages ?? 0, messages);
+
   return {
-    tokenUsage,
-    messages,
+    tokenUsage: subtractUsage(tokenUsage, excluded),
+    messages: messages - excludedMessages,
     model,
     cursor: { lastUuid: now.lastUuid, consumed: now.messages },
     resynced,
     from: { lastUuid: mark.lastUuid, consumed: mark.consumed },
     to: { lastUuid: now.lastUuid, consumed: now.messages },
+    excluded,
+    excludedMessages,
   };
 }
 
@@ -355,6 +480,10 @@ export function readUsageDelta(
     tokenUsage,
     messages: fresh.length,
     model,
+    // The window this record dealt with, `since` filtering included: an entry
+    // excluded by `since` is still claimed in the sense that matters here —
+    // the watermark moves past it, so no later record may have it either.
+    from: { lastUuid: cursor.lastUuid, consumed: startAt },
     cursor: {
       // Hold the previous watermark when nothing was scanned, so a no-op record
       // does not move it and a later one still sees the right window. When
@@ -467,6 +596,17 @@ export async function loadUsageCursor(
   }
 }
 
+/** Coerce an untrusted object into a full token-usage record. */
+function readUsageFields(raw: unknown): Required<TokenUsage> {
+  const usage = (raw ?? {}) as Partial<Required<TokenUsage>>;
+  return {
+    input: numeric(usage.input),
+    output: numeric(usage.output),
+    cacheCreationInput: numeric(usage.cacheCreationInput),
+    cacheReadInput: numeric(usage.cacheReadInput),
+  };
+}
+
 /** Validate the marks map of a cursor file; malformed entries are dropped, not fatal. */
 function readMarks(raw: unknown): Record<string, UsageMark> | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -474,18 +614,15 @@ function readMarks(raw: unknown): Record<string, UsageMark> | undefined {
   for (const [task, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!value || typeof value !== "object") continue;
     const m = value as Partial<UsageMark>;
-    const totals = (m.totals ?? {}) as Partial<Required<TokenUsage>>;
     marks[task] = {
       task,
       at: typeof m.at === "string" ? m.at : "",
       lastUuid: typeof m.lastUuid === "string" ? m.lastUuid : undefined,
       consumed: numeric(m.consumed),
-      totals: {
-        input: numeric(totals.input),
-        output: numeric(totals.output),
-        cacheCreationInput: numeric(totals.cacheCreationInput),
-        cacheReadInput: numeric(totals.cacheReadInput),
-      },
+      totals: readUsageFields(m.totals),
+      // Absent in cursor files written before nested marks were accounted for.
+      ...(m.excluded ? { excluded: readUsageFields(m.excluded) } : {}),
+      ...(m.excludedMessages ? { excludedMessages: numeric(m.excludedMessages) } : {}),
     };
   }
   return Object.keys(marks).length > 0 ? marks : undefined;
