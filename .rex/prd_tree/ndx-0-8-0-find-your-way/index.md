@@ -16,8 +16,9 @@ acceptanceCriteria:
   - "The three settings pages read provider and model from both the old and the new config locations."
   - "A pre-0.8.0 project upgrades with no edit to any config key, PRD file or run record."
 description: "Minor release that gives a first-time user a place to land and a way to know what each command will do. Today ndx start opens on an empty analysis page, the sidebar lists 33 items in six one-at-a-time sections, settings are spread across six routes, and nothing says whether a command is read-only, why it calls an LLM or what it costs. This release adds a state-aware Home page, landing pages for SourceVision, Rex and Hench, a 24-item always-open sidebar with tabbed Terrain and Architecture pages, three settings pages (Robot Wrangler for provider and model, Workflow, Project), and a command effects manifest that drives a preflight banner in the terminal and preflight cards, Run buttons and one shared job tray in the dashboard. Robot Wrangler also takes on the vendor-aware hench model and provider settings deferred from 0.7.1. Alongside the UI it carries the additive halves of the PRD-storage and folder-layout changes, a rex log command and budget tuners that measure cost in the same units as the token budget, deterministic replacements for the remaining wall-clock test assertions, and a tested contract for Codex session reuse. The cache and prune configuration keys first planned here shipped early, in 0.7.1. Every renamed route keeps a redirect and every schema change is additive.\n\nGoal: Someone opening n-dx for the first time knows where they are, what to do next, and what each action will read, write and spend before they run it."
-lastModified: "2026-09-29T17:28:30.942Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-13T19:52:48.271Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -25,7 +26,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Codex cache safety](./codex-cache-safety/index.md) | completed |
-| [Command transparency](./command-transparency/index.md) | pending |
+| [Command transparency](./command-transparency/index.md) | completed |
 | [Dashboard request hardening](./dashboard-request-hardening/index.md) | completed |
 | [Layout resolver](./layout-resolver/index.md) | completed |
 | [Machine memory reads true on macOS](./machine-memory-reads-true-on-macos/index.md) | completed |

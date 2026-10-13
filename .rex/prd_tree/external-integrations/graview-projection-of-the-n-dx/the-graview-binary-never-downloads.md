@@ -12,6 +12,7 @@ acceptanceCriteria:
   - "npx is used only when the project config or the environment opts in (e.g. graview.allowNpx: true)"
   - "ndx graview info says which source would be used, including that npx is off"
 description: "From the #647 review, point 8. When graview.bin, NDX_GRAVIEW_BIN, PATH and the installed face's own binary all miss, `graview-bin.ts` falls back to `npx -y graview@<GRAVIEW_VERSION>`, which downloads and runs a package at command time and hangs offline. The version already lives in one constant (GRAVIEW_VERSION)."
-lastModified: "2026-10-12T20:19:21.690Z"
-lastModifiedBy: "Nick Daniel <nick@endash.us>"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-13T19:53:08.042Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

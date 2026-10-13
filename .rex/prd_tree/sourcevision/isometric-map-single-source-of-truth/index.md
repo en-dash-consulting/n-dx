@@ -27,8 +27,9 @@ acceptanceCriteria:
   - "The map is reachable and generatable from the web dashboard UI, not only the CLI"
   - "The rendered page meets the project's accessibility bar: not colour-only, light and dark themes, reduced-motion, and a usable tab order"
 description: "Follow-up hardening of the isometric architecture map after the initial feature (see \"Optional 3D isometric architecture map generator\") shipped with known gaps.\n\nStructural: the portable `/iso-map` skill script was a hand-maintained second copy of the layout, routing and rendering logic and had already drifted from the package — the two disagreed on zone colours because one counted archetypes before mapping them to kinds and the other after. The skill is now a build artifact generated from `packages/sourcevision/src/export/` by `scripts/build-iso-skill.mjs`, with `tests/e2e/iso-skill-drift.test.js` failing on staleness and also executing the shipped bundle.\n\nData: the call graph is aggregated into per-edge runtime call counts with a Weight toggle; injection seams and runtime infrastructure — the two things no import graph can show — are read from `sourcevision.isoMap` in `.n-dx.json` and from Terraform, drawn in a distinct colour and labelled as declared rather than inferred.\n\nSurfaces: `ndx iso`, `sourcevision iso --source=scan`, `GET /api/iso-map`, and a dashboard view with generation controls.\n\nAlso: reproducible output (timestamps from the HEAD commit), source links from the git remote, obstacle-avoiding edge routing, tsconfig/workspace/go.mod import resolution in scan mode, and accessibility work (light theme, reduced motion, kind glyphs, skip link, one tab stop per zone)."
-lastModified: "2026-10-06T07:37:51.566Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-13T22:17:54.156Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
