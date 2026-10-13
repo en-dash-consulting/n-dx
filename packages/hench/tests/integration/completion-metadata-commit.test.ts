@@ -963,4 +963,73 @@ describe("commitCompletionMetadata — v2 change layer, real store", () => {
     expect(dirty.filter((p) => p.startsWith(`${changeRel}/`))).toEqual([]);
     expect(dirty).toContain(draftRel);
   });
+
+  /**
+   * The apply writes product/checkout/state.yaml, but a capability the
+   * operator is drafting in that folder has no state row: it is not the
+   * completion's node, so it stays out of the commit and stays untracked.
+   */
+  it("leaves an operator's untracked draft out of a folder whose state.yaml the completion writes", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore } = await import("../../src/prd/rex-gateway.js");
+    const draftRel = ".rex/product/checkout/refunds.md";
+    await writeFile(
+      join(projectDir, draftRel),
+      [
+        "---",
+        'id: "a0000000-0000-4000-8000-000000000099"',
+        'type: "capability"',
+        'title: "Refunds"',
+        'slug: "refunds"',
+        'statement: "A shopper can be refunded."',
+        'criteria: [{"id":"c1","text":"A refund reaches the card"}]',
+        "---",
+        "",
+      ].join("\n"),
+    );
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    const files = changed.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(files).toContain(".rex/product/checkout/state.yaml");
+    expect(files).not.toContain(draftRel);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    expect(status.split("\n")).toContain(`?? ${draftRel}`);
+  });
+
+  it("leaves an operator's untracked draft task out of the change folder whose state.yaml the completion writes", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore } = await import("../../src/prd/rex-gateway.js");
+    const draftRel = ".rex/changes/add-apple-pay/draft-step.md";
+    await writeFile(
+      join(projectDir, draftRel),
+      ["---", 'id: "c0000000-0000-4000-8000-000000000098"', 'type: "task"', 'title: "Draft step"', 'slug: "draft-step"', "---", ""].join("\n"),
+    );
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    const files = changed.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(files).toContain(".rex/changes/add-apple-pay/state.yaml");
+    expect(files).not.toContain(draftRel);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    expect(status.split("\n")).toContain(`?? ${draftRel}`);
+  });
 });

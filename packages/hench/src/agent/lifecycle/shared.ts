@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "nod
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
-import { explainSelection, collectCompletedIds, computeTimestampUpdates, enclosingChangeIds, findItem, findParentResets, indexTree, isAppliedChange, isChangeLayerStore, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
+import { explainSelection, collectCompletedIds, computeTimestampUpdates, enclosingChangeIds, findItem, findParentResets, indexTree, isAppliedChange, isChangeLayerStore, loadPrdModel, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD, DEFAULT_GIT_COMMIT_MESSAGE_SOURCE } from "../../schema/index.js";
 import type { GitCommitMessageSource, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
@@ -79,7 +79,7 @@ import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
-import { V2_CHANGES_DIRNAME, V2_PRODUCT_DIRNAME, V2_STATE_FILENAME } from "../../store/paths.js";
+import { V2_CHANGES_DIRNAME, V2_INBOX_DIRNAME, V2_PRODUCT_DIRNAME, V2_STATE_FILENAME } from "../../store/paths.js";
 import {
   PRD_COMMIT_PATHS,
   deletedAmong,
@@ -2317,12 +2317,6 @@ async function isGitTracked(projectDir: string, relativePath: string): Promise<b
 /**
  * The untracked, non-ignored intent files (`.md`) directly inside the v2 node
  * folder `folder` (project-relative, trailing slash).
- *
- * A change captured and placed through MCP after the agent's commit has never
- * been committed when a later run completes it, and the completion writes only
- * its `state.yaml`. Committing that alone lands a state row for a node git
- * does not have. Tracked intent files are left alone: git already has the
- * node, and a modification there is someone's edit, not this write's.
  */
 async function untrackedIntentFiles(projectDir: string, folder: string): Promise<string[]> {
   const result = await exec("git", ["ls-files", "--others", "--exclude-standard", "-z", "--", folder], {
@@ -2335,6 +2329,69 @@ async function untrackedIntentFiles(projectDir: string, folder: string): Promise
     .filter((p) => p.startsWith(folder) && p.endsWith(".md") && !p.slice(folder.length).includes("/"));
 }
 
+type StateRows = NonNullable<NonNullable<Parameters<typeof loadPrdModel>[1]>["stateRows"]>;
+
+/**
+ * Which of `candidates` (untracked intent files beside a `state.yaml` the
+ * completion wrote) belong in the completion commit: those whose node has a
+ * row in that `state.yaml`.
+ *
+ * A change captured and placed through MCP after the agent's commit has never
+ * been committed when a later run completes it, and the completion writes only
+ * its `state.yaml`. Committing that alone lands a state row for a node git
+ * does not have, so the node's files come too. An operator's draft in the same
+ * folder (a new capability, a task file) has no row — state exists only for
+ * nodes a tool wrote — and stays out, as any in-flight edit under product/ or
+ * changes/ does. Tracked intent files are never candidates: git already has
+ * the node, and a modification there is someone's edit, not this write's.
+ *
+ * rex's reader resolves which file holds which node and records each node's
+ * row from its own folder's `state.yaml` (`stateRows`), so a node with a row
+ * there is exactly a node of that folder with state. A node's file is located
+ * by its slug, the name rex stores it under; a tree rex refuses to read stages
+ * none of them.
+ */
+async function intentFilesWithStateRows(projectDir: string, candidates: string[]): Promise<string[]> {
+  if (candidates.length === 0) return [];
+  const rexDir = rexDirName(projectDir);
+  const stateRows: StateRows = new Map();
+  let model: Awaited<ReturnType<typeof loadPrdModel>>;
+  try {
+    model = await loadPrdModel(join(projectDir, rexDir), { stateRows, warn: () => {} });
+  } catch (err) {
+    detail(`Not staging untracked intent files: the PRD could not be read (${(err as Error).message})`);
+    return [];
+  }
+
+  // Every path a node with a state row can be stored at. A change at the top
+  // of changes/ may sit in the Inbox, and a folder node may have no children,
+  // so both candidates are recorded; only the real one is ever looked up.
+  const withRow = new Set<string>();
+  type Node = { id: string; slug: string; children?: Node[] };
+  const walk = (nodes: readonly Node[], dirs: string[]) => {
+    for (const node of nodes) {
+      if (stateRows.has(node.id)) {
+        for (const dir of dirs) {
+          withRow.add(`${dir}${node.slug}.md`);
+          withRow.add(`${dir}${node.slug}/index.md`);
+        }
+      }
+      if (node.children?.length) walk(node.children, dirs.map((dir) => `${dir}${node.slug}/`));
+    }
+  };
+  walk(model.tree.product, [`${rexDir}/${V2_PRODUCT_DIRNAME}/`]);
+  walk(model.tree.changes, [
+    `${rexDir}/${V2_CHANGES_DIRNAME}/`,
+    `${rexDir}/${V2_CHANGES_DIRNAME}/${V2_INBOX_DIRNAME}/`,
+  ]);
+
+  return candidates.filter((path) => {
+    if (withRow.has(path)) return true;
+    detail(`Leaving untracked ${path} out of the completion commit: its node has no state row`);
+    return false;
+  });
+}
+
 /**
  * Narrow the wholesale staging roots to the exact files the PRD save(s)
  * reported written and deleted, plus the `tree-meta.json` sidecar (rewritten
@@ -2345,8 +2402,9 @@ async function untrackedIntentFiles(projectDir: string, folder: string): Promise
  * survived (an ignored `.rex/prd_tree/` drops every file under it). Report
  * paths outside `.rex/prd_tree/` are dropped too — the report is trusted
  * about *which tree files* changed, not as a licence to stage anywhere.
- * A reported v2 `state.yaml` also brings its folder's untracked intent files
- * ({@link untrackedIntentFiles}), so a state row never lands without its node.
+ * A reported v2 `state.yaml` also brings the untracked intent files of the
+ * nodes it holds rows for ({@link intentFilesWithStateRows}), so a state row
+ * never lands without its node and an operator's draft beside it stays out.
  *
  * Per-path checks keep `git add` from erroring:
  * - a written file must still exist (a path that vanished since the save and
@@ -2384,16 +2442,16 @@ async function scopePrdPathsToReport(
   };
 
   if (treeDirs.length > 0) {
+    const untrackedIntents: string[] = [];
     for (const path of report.written) {
       if (!inAllowedTree(path)) continue;
       if (!existsSync(join(projectDir, path))) continue;
       push(path);
       if (path.endsWith(`/${V2_STATE_FILENAME}`)) {
-        for (const intent of await untrackedIntentFiles(projectDir, path.slice(0, -V2_STATE_FILENAME.length))) {
-          push(intent);
-        }
+        untrackedIntents.push(...(await untrackedIntentFiles(projectDir, path.slice(0, -V2_STATE_FILENAME.length))));
       }
     }
+    for (const intent of await intentFilesWithStateRows(projectDir, untrackedIntents)) push(intent);
     for (const path of report.deleted) {
       if (!inAllowedTree(path)) continue;
       if (existsSync(join(projectDir, path)) || (await isGitTracked(projectDir, path))) {
