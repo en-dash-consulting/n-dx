@@ -11,6 +11,7 @@ import { act } from "preact/test-utils";
 import { ProductPage, ChangesPage } from "../../../src/viewer/views/product-pages.js";
 import { STAGES } from "../../../src/viewer/views/index.js";
 import { buildValidViews } from "../../../src/shared/index.js";
+import { clearProjectMetadataCache, getProjectMetadata } from "../../../src/viewer/hooks/use-project-metadata.js";
 import {
   CAPABILITY_DETAIL_FIXTURE,
   CHANGES_FIXTURE,
@@ -60,6 +61,10 @@ async function mount(vnode: ReturnType<typeof h>): Promise<void> {
 }
 
 beforeEach(() => {
+  // The project-metadata hook caches `/api/project` at module level, so
+  // without this the second case reads the first case's answer and never
+  // exercises the cold path.
+  clearProjectMetadataCache();
   flushes.length = 0;
   root = document.createElement("div");
   document.body.appendChild(root);
@@ -198,8 +203,13 @@ describe("on a v1 project", () => {
   ] as const)("the %s page shows an empty state naming ndx migrate", async (_name, Page, url) => {
     // The command is named with the project's CLI name, as `ndx start` reports it.
     stubRoutes({ [url]: { layout: "v1" }, "/api/project": { cliName: "ndx" } });
-    await mount(h(Page, null));
-    await settle(); // the empty state's own project-metadata read
+    // Mount under act so the effect that starts the `/api/project` read runs
+    // here, then await that same read under act so its state update flushes
+    // synchronously. A fixed wait let the update land outside act(), which
+    // armed preact's after-paint fallback timer (the frame-leak guard's
+    // failure) and, on a slow runner, asserted before the CLI name arrived.
+    await act(async () => { render(h(Page, null), root); });
+    await act(async () => { await getProjectMetadata(); });
     const empty = root.querySelector(".pm-no-product-layer");
     expect(empty?.textContent).toContain("ndx migrate");
     expect(root.querySelector(".pm-area, [data-change-id]")).toBeNull();
