@@ -45,7 +45,7 @@ const VERSIONS = [
 ];
 
 const SCOPE = "@n-dx";
-const PACKAGES = ["core", "rex", "lang-kit", "sourcevision", "hench", "llm-client", "web"];
+const PACKAGES = ["core", "rex", "lang-kit", "lang-runtime", "lang-java", "lang-go", "lang-sql", "lang-terraform", "sourcevision", "hench", "llm-client", "web"];
 
 const execute = process.argv.includes("--execute");
 if (process.argv.some((a) => a.startsWith("-") && a !== "--execute" && a !== "--dry-run")) {

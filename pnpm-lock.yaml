@@ -196,7 +196,102 @@ importers:
         specifier: ^5.0.4
         version: 5.0.4(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@1.8.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(yaml@2.9.1))
 
+  packages/lang-go:
+    dependencies:
+      '@n-dx/lang-kit':
+        specifier: workspace:*
+        version: link:../lang-kit
+      '@n-dx/lang-runtime':
+        specifier: workspace:*
+        version: link:../lang-runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.5
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.4(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@1.8.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(yaml@2.9.1))
+
+  packages/lang-java:
+    dependencies:
+      '@n-dx/lang-kit':
+        specifier: workspace:*
+        version: link:../lang-kit
+      '@n-dx/lang-runtime':
+        specifier: workspace:*
+        version: link:../lang-runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.5
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.4(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@1.8.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(yaml@2.9.1))
+
   packages/lang-kit:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.5
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.4(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@1.8.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(yaml@2.9.1))
+
+  packages/lang-runtime:
+    dependencies:
+      '@n-dx/lang-kit':
+        specifier: workspace:*
+        version: link:../lang-kit
+      web-tree-sitter:
+        specifier: 0.27.0
+        version: 0.27.0
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.5
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.4(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@1.8.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(yaml@2.9.1))
+
+  packages/lang-sql:
+    dependencies:
+      '@n-dx/lang-kit':
+        specifier: workspace:*
+        version: link:../lang-kit
+      '@n-dx/lang-runtime':
+        specifier: workspace:*
+        version: link:../lang-runtime
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.5
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.4(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@1.8.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(yaml@2.9.1))
+
+  packages/lang-terraform:
+    dependencies:
+      '@n-dx/lang-kit':
+        specifier: workspace:*
+        version: link:../lang-kit
+      '@n-dx/lang-runtime':
+        specifier: workspace:*
+        version: link:../lang-runtime
     devDependencies:
       '@types/node':
         specifier: ^26.6.4
@@ -276,6 +371,18 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
     devDependencies:
+      '@n-dx/lang-java':
+        specifier: workspace:*
+        version: link:../lang-java
+      '@n-dx/lang-runtime':
+        specifier: workspace:*
+        version: link:../lang-runtime
+      '@n-dx/lang-sql':
+        specifier: workspace:*
+        version: link:../lang-sql
+      '@n-dx/lang-terraform':
+        specifier: workspace:*
+        version: link:../lang-terraform
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.5
@@ -288,6 +395,10 @@ importers:
       vitest:
         specifier: ^5.0.4
         version: 5.0.4(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@1.8.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(yaml@2.9.1))
+    optionalDependencies:
+      '@n-dx/lang-go':
+        specifier: workspace:*
+        version: link:../lang-go
 
   packages/web:
     dependencies:

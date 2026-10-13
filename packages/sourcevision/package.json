@@ -51,7 +51,14 @@
     "web-tree-sitter": "0.27.0",
     "zod": "^4.6.7"
   },
+  "optionalDependencies": {
+    "@n-dx/lang-go": "workspace:*"
+  },
   "devDependencies": {
+    "@n-dx/lang-java": "workspace:*",
+    "@n-dx/lang-runtime": "workspace:*",
+    "@n-dx/lang-sql": "workspace:*",
+    "@n-dx/lang-terraform": "workspace:*",
     "@types/node": "^26.6.5",
     "@types/pdfkit": "^0.17.6",
     "jsdom": "^30.1.2",
