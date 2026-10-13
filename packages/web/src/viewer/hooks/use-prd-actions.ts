@@ -30,6 +30,14 @@ import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
 import { useItemSelection } from "./use-item-selection.js";
 import { useDeleteActions } from "./use-delete-actions.js";
 
+/**
+ * Toast text for a `POST /api/rex/items` answer. A v1 project answers the
+ * item's `level`; a v2 project answers `type: "change"` and no level.
+ */
+export function createdItemToast(result: { type?: string; level?: string; title: string }): string {
+  return `Created ${result.type ?? result.level}: ${result.title}`;
+}
+
 /** Active tab in the command bar. */
 export type CommandTab = null | "add" | "merge" | "prune";
 
@@ -226,7 +234,7 @@ export function usePRDActions({
       }
 
       const result = await res.json();
-      showToast(`Created ${result.level}: ${result.title}`);
+      showToast(createdItemToast(result));
       await fetchPRDData();
       await fetchTaskUsage();
     },
@@ -249,7 +257,7 @@ export function usePRDActions({
       }
 
       const result = await res.json();
-      showToast(`Created ${result.level}: ${result.title}`);
+      showToast(createdItemToast(result));
       setActiveTab(null);
       setAddParentId(null);
       await fetchPRDData();
@@ -274,7 +282,7 @@ export function usePRDActions({
       }
 
       const result = await res.json();
-      showToast(`Created ${result.level}: ${result.title}`);
+      showToast(createdItemToast(result));
       await fetchPRDData();
       await fetchTaskUsage();
     },
