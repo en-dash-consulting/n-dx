@@ -32,6 +32,8 @@ export default defineConfig({
       "../../tests/setup-session-env.js",
       // Clears TYPESAFE_API_KEY so no test resolves a live judgment route.
       "../../tests/setup-judgment-env.js",
+      // Keeps a pack installed in the developer's ndx home out of the tests.
+      "./tests/setup-ndx-home.ts",
     ],
     include: [
       "tests/**/*.test.ts",
