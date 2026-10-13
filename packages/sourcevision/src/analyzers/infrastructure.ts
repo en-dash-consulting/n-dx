@@ -27,8 +27,11 @@
  * ## Two constraints on what this module may import
  *
  * It bundles into the standalone iso-map skill script, which must run in any
- * repository with no dependencies, so **only `node:` builtins and type-only
- * imports** may appear here. That is also why serialization is not done here:
+ * repository with no dependencies, so only these imports may appear here:
+ * `node:` builtins, type-only imports, and `IAC_KINDS` from `@n-dx/lang-kit`.
+ * `scripts/build-iso-skill.mjs` aliases `@n-dx/lang-kit` to
+ * `packages/lang-kit/src/iac-kinds.ts` alone, so any other lang-kit import
+ * fails the bundle build. That is also why serialization is not done here:
  * canonical JSON comes from `util/sort.ts`, which re-exports it from
  * `@n-dx/llm-client`, and importing that would pull a package into the
  * bundle. The analyze pipeline writes the file; this module only computes the
@@ -462,9 +465,10 @@ export function linkInfrastructure(
  * names it, so a Terraform file would be linked as a user of the resource it
  * declares (and, in a workspace, become the crossing endpoint instead of the
  * code that calls it). Decides by the rules of `isTerraformFile` in
- * `language/terraform.ts`: `.tf` and `.tfvars` by lowercased extension,
- * `terragrunt.hcl` and `*.tftest.hcl` by exact, case-sensitive name. Kept as a
- * local copy because this module may import only `node:` builtins;
+ * the terraform module of `@n-dx/lang-kit`: `.tf` and `.tfvars` by lowercased
+ * extension, `terragrunt.hcl` and `*.tftest.hcl` by exact, case-sensitive name.
+ * Kept as a local copy because the bundle's lang-kit alias reaches only
+ * `iac-kinds.ts`, so no other lang-kit export is available here;
  * `terraform-config.test.ts` fails if the two disagree.
  */
 export function isTerraformPath(path: string): boolean {
