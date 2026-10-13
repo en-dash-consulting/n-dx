@@ -534,6 +534,48 @@ describe("on a v2 tree", () => {
     }
   });
 
+  describe("a task inside a claimed change", () => {
+    /** The fixture's task under CH-1, which `--task=<id>` runs. */
+    const TASK_ID = "c0000000-0000-4000-8000-000000000002";
+
+    it("is refused, naming the change and its holder, when another worktree claims the change", async () => {
+      const other = `${projectDir}-wt`;
+      extraDirs.push(other);
+      git(projectDir, "worktree", "add", "-q", "-b", "other", other);
+      const claims = TaskClaims.forProject(other);
+      expect(await claims.claim(CHANGE_ID)).toBeNull();
+      try {
+        const r = await resolve({ task: TASK_ID });
+        expect(codes(r)).toEqual(["claimed-elsewhere"]);
+        expect(r.task?.id).toBe(TASK_ID);
+        expect(r.task?.claimedBy?.worktree).toBe(gitToplevel(other));
+        const refusal = r.refusals.find((x) => x.code === "claimed-elsewhere");
+        expect(refusal?.message).toContain(CHANGE_ID);
+        expect(refusal?.message).toContain(gitToplevel(other));
+      } finally {
+        await claims.releaseAll();
+      }
+    });
+
+    it("reports no refusal when the change is unclaimed", async () => {
+      const r = await resolve({ task: TASK_ID });
+      expect(codes(r)).toEqual([]);
+      expect(r.task?.claimedBy).toBeNull();
+    });
+
+    it("reports no refusal when this worktree holds the change", async () => {
+      const claims = TaskClaims.forProject(projectDir);
+      expect(await claims.claim(CHANGE_ID)).toBeNull();
+      try {
+        const r = await resolve({ task: TASK_ID });
+        expect(codes(r)).toEqual([]);
+        expect(r.task?.claimedBy).toBeNull();
+      } finally {
+        await claims.releaseAll();
+      }
+    });
+  });
+
   it("still refuses a ref that names nothing", async () => {
     const r = await resolve({ task: "CH-404" });
     expect(r.task).toBeNull();

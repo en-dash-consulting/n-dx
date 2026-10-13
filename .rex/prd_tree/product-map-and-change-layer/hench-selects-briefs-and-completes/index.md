@@ -35,7 +35,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [hench stages only the change-layer paths in rex's save report on a v2 completion](./hench-stages-only-the-change-layer.md) | completed |
 | [hench writes status, completion and claims through the v2 transaction](./hench-writes-status-completion-and.md) | completed |
 | [ndx work --task=<display id> --resolve reports "Task not found" on a v2 tree](./ndx-work-task-display-id-resolve.md) | completed |
-| [ndx work --task --resolve on a v2 tree reports a task inside a change another worktree claims as runnable](./ndx-work-task-resolve-on-a-v2-tree.md) | pending |
+| [ndx work --task --resolve on a v2 tree reports a task inside a change another worktree claims as runnable](./ndx-work-task-resolve-on-a-v2-tree.md) | completed |
 | [No test pins that a kept v2 completion suppresses the failed-run rollback](./no-test-pins-that-a-kept-v2-completion.md) | pending |
 | [On a v2 tree hench's brief can drop workflow.md whole when rex's 4,000-token budget runs out](./on-a-v2-tree-hench-s-brief-can-drop.md) | completed |
 | [Pin the review-dedupe wiring to changes/ on a v2 tree](./pin-the-review-dedupe-wiring-to.md) | completed |
