@@ -303,6 +303,10 @@ const DOCUMENTED_POLICIES = [
     enforcedBy: "domain-isolation.test.js → architecture policy: foundation tier boundary",
   },
   {
+    rule: "Foundation tier (@n-dx/lang-kit) imports no @n-dx package and declares no dependencies",
+    enforcedBy: "architecture-policy.test.js → architecture policy: foundation tier boundary (@n-dx/lang-kit)",
+  },
+  {
     rule: "Domain-layer files must not import from CLI layer (intra-package layering)",
     enforcedBy: "architecture-policy.test.js → architecture policy: intra-package layering",
   },
@@ -356,6 +360,48 @@ const DOCUMENTED_POLICIES = [
   },
 ];
 
+/**
+ * Foundation tier boundary: @n-dx/lang-kit holds pure language facts and the
+ * pack contract. It sits beside @n-dx/llm-client at the bottom of the
+ * hierarchy and is stricter still: it imports no @n-dx package at all and
+ * depends on nothing beyond Node.
+ */
+describe("architecture policy: foundation tier boundary (@n-dx/lang-kit)", () => {
+  const LANG_KIT = join(ROOT, "packages/lang-kit");
+  // Static `from`/`import "…"`, dynamic `import("…")` and `require("…")`.
+  const NDX_IMPORT = /(?:\bfrom|\bimport|\brequire)\s*\(?\s*["']@n-dx\//;
+
+  it("packages/lang-kit/src imports no @n-dx/* package", () => {
+    const srcDir = join(LANG_KIT, "src");
+    expect(existsSync(srcDir), "packages/lang-kit/src is missing").toBe(true);
+    const violations = [];
+    for (const file of walk(srcDir)) {
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
+      for (const [i, line] of readFileSync(file, "utf-8").split("\n").entries()) {
+        if (NDX_IMPORT.test(line)) violations.push(`  ${rel}:${i + 1}: ${line.trim()}`);
+      }
+    }
+    if (violations.length > 0) {
+      expect.fail(
+        [
+          "@n-dx/lang-kit (foundation) must not import any @n-dx/* package.",
+          "",
+          "Violations:",
+          ...violations,
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("packages/lang-kit/package.json declares no dependencies", () => {
+    const pkg = JSON.parse(readFileSync(join(LANG_KIT, "package.json"), "utf-8"));
+    expect(
+      pkg.dependencies,
+      "@n-dx/lang-kit depends on nothing beyond Node; use devDependencies for tooling.",
+    ).toBeUndefined();
+  });
+});
+
 describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
   it("all documented tier boundary rules have enforcement tests", () => {
     // This is a declarative registry — it does not parse CLAUDE.md.
@@ -363,7 +409,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
     // add an entry to DOCUMENTED_POLICIES above. If this test has
     // fewer entries than the rules in CLAUDE.md, the gap is visible
     // in code review. Minimum: 12 policies.
-    expect(DOCUMENTED_POLICIES.length).toBe(21);
+    expect(DOCUMENTED_POLICIES.length).toBe(22);
   });
 
   for (const policy of DOCUMENTED_POLICIES) {
@@ -642,6 +688,7 @@ describe("architecture policy: non-web zone coupling guard", () => {
     // Foundation tier — imports *to* these families are always allowed
     const FOUNDATION_FAMILIES = new Set([
       "packages-llm-client",
+      "packages-lang-kit",
     ]);
 
     const violations = [];
