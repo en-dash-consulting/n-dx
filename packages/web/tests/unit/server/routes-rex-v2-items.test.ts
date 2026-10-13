@@ -22,8 +22,10 @@ describe("Rex item routes on a v2 project", () => {
   let rexDir: string;
   let server: Server;
   let base: string;
+  let frames: unknown[];
 
   beforeEach(async () => {
+    frames = [];
     tmpDir = mkdtempSync(join(tmpdir(), "rex-v2-items-"));
     rexDir = join(tmpDir, ".rex");
     const svDir = join(tmpDir, ".sourcevision");
@@ -32,7 +34,7 @@ describe("Rex item routes on a v2 project", () => {
 
     const ctx: ServerContext = { projectDir: tmpDir, svDir, rexDir, dev: false };
     server = createServer(async (req, res) => {
-      const handled = await handleRexRoute(req, res, ctx);
+      const handled = await handleRexRoute(req, res, ctx, (frame) => { frames.push(frame); });
       if (!handled) {
         res.writeHead(404);
         res.end("Not found");
@@ -135,6 +137,7 @@ describe("Rex item routes on a v2 project", () => {
     const item = await (await resolveStore(rexDir)).getItem(CHANGE_ID);
     expect(item?.title).not.toBe("Renamed dup");
     expect(item?.status).not.toBe("completed");
+    expect(frames).toEqual([]);
   });
 
   it("bulk PATCH completing with a field writes none of a refused item's fields", async () => {
@@ -149,12 +152,30 @@ describe("Rex item routes on a v2 project", () => {
     expect(res.status).toBe(200);
     const item = await (await resolveStore(rexDir)).getItem(TASK_ID);
     expect(item).toMatchObject({ status: "completed", title: "Renamed task" });
+    expect(frames).toEqual([expect.objectContaining({ type: "rex:item-updated", itemId: TASK_ID })]);
   });
 
   it("bulk PATCH completing with a field writes both for the items it completed", async () => {
     const res = await send("PATCH", "items/bulk", { ids: [TASK_ID], updates: { status: "completed", priority: "high" } });
     expect((await res.json()).results).toEqual([{ id: TASK_ID, ok: true }]);
     expect(await (await resolveStore(rexDir)).getItem(TASK_ID)).toMatchObject({ status: "completed", priority: "high" });
+  });
+
+  it("PATCH whose fields are refused after the completion was written says so and publishes the completion", async () => {
+    const res = await send("PATCH", `items/${TASK_ID}`, { status: "completed", requirements: [{ bogus: 1 }] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/^Completed ".*", but its other fields were not saved/);
+    expect((await (await resolveStore(rexDir)).getItem(TASK_ID))?.status).toBe("completed");
+    expect(frames).toEqual([expect.objectContaining({ type: "rex:item-updated", itemId: TASK_ID, updates: { status: "completed" } })]);
+  });
+
+  it("bulk PATCH whose fields are refused after completion reports the completion", async () => {
+    const res = await send("PATCH", "items/bulk", { ids: [TASK_ID], updates: { status: "completed", requirements: [{ bogus: 1 }] } });
+    const [result] = (await res.json()).results;
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/^completed, but its other fields were not saved/);
+    expect((await (await resolveStore(rexDir)).getItem(TASK_ID))?.status).toBe("completed");
+    expect(frames).toEqual([expect.objectContaining({ type: "rex:prd-changed" })]);
   });
 
   it("PATCH of an unknown id on v2 is a 404", async () => {

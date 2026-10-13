@@ -155,6 +155,21 @@ function validateItemPatch(body: unknown): string | null {
 
 class ItemNotFoundError extends Error {}
 
+/**
+ * Refresh the in-process cache (so the next read sees the write before the
+ * folder-tree watcher fires) and tell connected clients what changed.
+ */
+async function publishItemUpdate(
+  ctx: ServerContext,
+  store: Awaited<ReturnType<typeof resolveStore>>,
+  itemId: string,
+  updates: Record<string, unknown>,
+  broadcast?: WebSocketBroadcaster,
+): Promise<void> {
+  refreshPRDCache(ctx.rexDir, await store.loadDocument());
+  broadcast?.({ type: "rex:item-updated", itemId, updates, timestamp: new Date().toISOString() });
+}
+
 /** Handle PATCH /api/rex/items/:id */
 async function handleItemPatch(
   req: IncomingMessage,
@@ -192,28 +207,21 @@ async function handleItemPatch(
     // anything is written, so a PATCH never half-applies.
     if (completing) await completeV2Work(store, itemId);
     if (Object.keys(fieldUpdates).length > 0 || !completing) {
-      await store.withTransaction(async (doc) => {
-        if (!updateInTree(doc.items, itemId, fieldUpdates as Partial<PRDItem>)) {
-          throw new ItemNotFoundError(`Item "${itemId}" not found`);
-        }
-      });
+      try {
+        await store.withTransaction(async (doc) => {
+          if (!updateInTree(doc.items, itemId, fieldUpdates as Partial<PRDItem>)) {
+            throw new ItemNotFoundError(`Item "${itemId}" not found`);
+          }
+        });
+      } catch (err) {
+        if (!completing) throw err;
+        // The completion is already on disk: publish it, and say the fields were not saved.
+        await publishItemUpdate(ctx, store, itemId, { status: "completed" }, broadcast);
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`Completed "${itemId}", but its other fields were not saved: ${message}`);
+      }
     }
-    const updatedDoc = await store.loadDocument();
-
-    // Refresh the in-process cache immediately so subsequent loadPRDSync calls
-    // see the change before the folder-tree watcher fires.
-    refreshPRDCache(ctx.rexDir, updatedDoc);
-
-    // Broadcast change to connected WebSocket clients
-    if (broadcast) {
-      broadcast({
-        type: "rex:item-updated",
-        itemId,
-        updates,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
+    await publishItemUpdate(ctx, store, itemId, updates, broadcast);
     jsonResponse(res, 200, { ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -539,12 +547,23 @@ async function handleBulkUpdate(
         }
       }
       if (writeFields) {
-        updatedDoc = await store.withTransaction(async (doc) => {
+        try {
+          updatedDoc = await store.withTransaction(async (doc) => {
+            for (const result of results) {
+              if (result.ok) updateInTree(doc.items, result.id, { ...fieldUpdates });
+            }
+            return doc;
+          });
+        } catch (err) {
+          // The completions are on disk; report them and fall through to the
+          // cache refresh and broadcast below.
+          const message = err instanceof Error ? err.message : String(err);
           for (const result of results) {
-            if (result.ok) updateInTree(doc.items, result.id, { ...fieldUpdates });
+            if (!result.ok) continue;
+            result.ok = false;
+            result.error = `completed, but its other fields were not saved: ${message}`;
           }
-          return doc;
-        });
+        }
       }
     } else {
       updatedDoc = await store.withTransaction(async (doc) => {
