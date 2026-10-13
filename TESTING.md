@@ -27,6 +27,62 @@ packages/<name>/tests/
   fixtures/       # Shared test data
 ```
 
+### Browser suites (web only)
+
+The web package has two Playwright suites beside its vitest tiers. Both drive
+the **built** dashboard (`packages/web/dist`) in headless Chromium, so rebuild
+web (`pnpm --filter @n-dx/web build`) after a source change and install the
+browser once (`npx playwright install chromium` in `packages/web`). Neither is
+run by `pnpm test` or by CI; vitest only collects `*.test.ts`, and these are
+`*.spec.ts`.
+
+**`tests/e2e-ui/` — automated, LLM-free** (`pnpm --filter @n-dx/web test:e2e-ui`).
+One fixture project and one `web serve` per spec file, local vendor on a dead
+port. Besides the required `navigation.spec.ts` and the workflow specs, the
+`happy-click/` directory holds one spec per page group (shell, SourceVision,
+Rex, Hench, Live, Settings) that presses each control on a page and asserts
+its intended effect, plus `sweep.spec.ts`, which deep-links every view and
+clicks every control the click policy allows as a broad "nothing throws" net.
+
+- The deny list is `happy-click/helpers/click-policy.ts`. A control that
+  spawns a process, needs the vendor, destroys fixture state or leaves the page
+  (clipboard, download, new tab, OS dialog) is named there and is exercised
+  only by a scripted test that knows what to assert. **Add to it in the same
+  change that adds such a control.**
+- One `test()` per page. Never click a control whose enabled state depends on
+  a pending effect: `expect(...).toBeEnabled()` first (Family 2 below).
+- The Settings pages sit behind a leave guard: a test that edits a field must
+  Discard or Save before it navigates (`happy-click/helpers/settings.ts`).
+- `createFixtureProject({ sources: true })` seeds a few importing source files
+  so Files, Zones and the map have data; the workflow specs use the bare
+  fixture.
+
+**`tests/e2e-ui-manual/` — manual, real vendor, video** (`pnpm --filter @n-dx/web test:e2e-manual`).
+Three flows against the operator's real Claude CLI login (and Codex when
+`codex` is on PATH): a typed prompt that becomes a task the agent completes;
+a full analysis, a task added through the Add form, completed by the agent;
+and a Settings vendor/model switch followed by a three-task iteration run on
+Claude, then on Codex. Every test records a 1280×720 video and a trace into
+`packages/web/test-results/manual/`, attaches the hench run records and run
+logs, and the HTML report is at `playwright-report/manual`
+(`pnpm --filter @n-dx/web test:e2e-manual:report`). Both directories are
+gitignored.
+
+- **It spends tokens and takes 20–60 minutes.** Runs are non-deterministic by
+  design; a failed agent run is reported with its attached record and log,
+  never retried.
+- Run it from a plain terminal, not from inside a Claude Code session — the
+  session's `CLAUDECODE` / `CLAUDE_CODE_SESSION_ID` leak into the spawned
+  server (Family 4), and only the first is stripped on the way to the agent.
+- Knobs: `NDX_E2E_CLAUDE_MODEL` (default `claude-haiku-4-5`),
+  `NDX_E2E_CODEX_MODEL` (default `gpt-5.5`), `NDX_E2E_RUN_TIMEOUT_MS` per task
+  (default 15 min), `NDX_E2E_ANALYZE_TIMEOUT_MS`, `NDX_E2E_MANUAL_TIMEOUT_MS`
+  per test (default 45 min), `NDX_E2E_KEEP_FIXTURE=1` to keep the temp project.
+- A flow skips, naming the reason, when its vendor CLI is missing or the
+  dashboard's own credential probe (`GET /api/commands/auth`) fails.
+- Run one flow at a time while iterating: `-- --grep prompt`, `--grep analysis`,
+  `--grep Claude`.
+
 ## Integration Test Tier
 
 The integration tier bridges the gap between unit tests (isolated) and e2e tests
