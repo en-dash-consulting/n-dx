@@ -11,9 +11,9 @@ tags:
 source: "review-2026-10-13"
 startedAt: "2026-10-13T18:05:54.362Z"
 completedAt: "2026-10-13T18:14:14.957Z"
+endedAt: "2026-10-13T18:14:14.957Z"
 resolutionType: "code-change"
 resolutionDetail: "Run 6129d508 committed e9f5a7f22 and 26ab6a593; its gate failed only on the stale prompt-census baseline, re-recorded in 52c23af56, after which the recorded gate (affected since 9349d6846) passed."
-endedAt: "2026-10-13T18:14:14.957Z"
 acceptanceCriteria:
   - "The review brief on a v2 tree tells the reviewer to look in both changes/ and changes/inbox/ (or the equivalent listing), and a test with an existing Inbox capture asserts it"
   - "The v1 review brief is unchanged"

@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A kept v2 completion's commit commands sweep the operator's pre-run edits into the task's commit](./a-kept-v2-completion-s-commit-commands.md) | pending |
 | [A placed follow-up's index.md is committed with its completion on v2](./a-placed-follow-up-s-index-md-is.md) | completed |
 | [A v2 completion commit sweeps an operator's untracked draft into a node folder whose state.yaml it wrote](./a-v2-completion-commit-sweeps-an.md) | pending |
-| [An explicit --task on an Inbox change is refused before the run, not reported completed](./an-explicit-task-on-an-inbox-change-is.md) | pending |
+| [An explicit --task on an Inbox change is refused before the run, not reported completed](./an-explicit-task-on-an-inbox-change-is.md) | completed |
 | [An explicit --task refuses a task whose enclosing change another worktree has claimed](./an-explicit-task-refuses-a-task-whose.md) | completed |
 | [Completing a placed change whose Inbox copy was committed leaves the Inbox path in HEAD, giving a duplicate node id](./completing-a-placed-change-whose-inbox.md) | pending |
 | [gateways.md names hench's v2 rex surfaces and its export ceiling](./gateways-md-names-hench-s-v2-rex.md) | pending |
