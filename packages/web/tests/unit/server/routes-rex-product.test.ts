@@ -174,6 +174,38 @@ describe("v2 product reads", () => {
     expect(capability.openChanges.map((c) => c.id)).toEqual([CHANGE_ID]);
   });
 
+  describe("met and specChangedSinceMet", () => {
+    const statePath = () => join(rexDir, "product", "checkout", "state.yaml");
+    const specPath = () => join(rexDir, "product", "checkout", "pay-by-card.md");
+    const detail = async () => (await get(`product/capability/${CAPABILITY_ID}`)).body.capability as CapabilityDetail;
+    /** Record `metAt` as rex's met-check would: the hash of the spec as it reads now. */
+    async function markMet(): Promise<void> {
+      const { nodeSpec, specHash, loadPrdModel, indexTree } = await import("../../../src/server/rex-gateway.js");
+      const model = await loadPrdModel(rexDir);
+      const node = indexTree(model.tree).resolve(CAPABILITY_ID)!;
+      const hash = specHash(nodeSpec(node));
+      writeFileSync(statePath(), readFileSync(statePath(), "utf-8") + `    metAt: "${hash}"\n`);
+    }
+
+    it("is not met when metAt is absent", async () => {
+      expect(await detail()).toMatchObject({ met: false, specChangedSinceMet: false });
+    });
+
+    it("is met with an unchanged spec when metAt matches the spec hash", async () => {
+      await markMet();
+      expect(await detail()).toMatchObject({ met: true, specChangedSinceMet: false });
+    });
+
+    it("reads a revised node as changing while reporting met and spec moved", async () => {
+      await markMet();
+      writeFileSync(specPath(), readFileSync(specPath(), "utf-8").replace("A shopper can pay", "A shopper can quickly pay"));
+      const capability = await detail();
+      // An in-progress change amends it, so rex's status is `changing`, not `revised`.
+      expect(capability.status).toBe("changing");
+      expect(capability).toMatchObject({ met: true, specChangedSinceMet: true });
+    });
+  });
+
   it("GET /product/capability/<id> lists an applied change in its history", async () => {
     applyChange();
     const { body } = await get(`product/capability/${CAPABILITY_ID}`);

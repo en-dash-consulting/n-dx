@@ -301,6 +301,8 @@ export const CAPABILITY_DETAIL_FIXTURE: CapabilityDetail = {
   status: "revised",
   health: "defective",
   specReviewed: false,
+  met: true,
+  specChangedSinceMet: true,
   areaId: "area-execute",
   areaTitle: "Execute the work",
   openChanges: [

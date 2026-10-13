@@ -239,6 +239,10 @@ export interface CodeSite {
  * contradict the list below it.
  */
 export interface CapabilityDetail extends Omit<CapabilityRow, "criteriaCount"> {
+  /** The capability was met at some point (rex recorded `metAt`). */
+  met: boolean;
+  /** Met once, and its spec no longer hashes to `metAt`. Never true when `met` is false. */
+  specChangedSinceMet: boolean;
   areaId: string;
   areaTitle: string;
   criteria: CapabilityCriterion[];

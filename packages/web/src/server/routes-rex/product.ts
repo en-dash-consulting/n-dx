@@ -103,6 +103,10 @@ export interface ChangeRowWire {
 }
 
 export interface CapabilityDetailWire extends Omit<CapabilityRowWire, "criteriaCount"> {
+  /** The capability was met at some point (`metAt` is recorded). */
+  met: boolean;
+  /** Met once, and its spec no longer hashes to `metAt`. Never true when `met` is false. */
+  specChangedSinceMet: boolean;
   areaId: string;
   areaTitle: string;
   criteria: Array<{ id: string; text: string; inheritedFrom?: string }>;
@@ -315,6 +319,10 @@ export function buildCapabilityDetail(tree: V2Tree, ref: string): CapabilityDeta
     status: report.status.status,
     health: report.status.health,
     ...(specReviewed(node) ? { specReviewed: true } : {}),
+    // Read from rex's own record, not the display status: `changing` outranks
+    // `revised` and `proposed`, so the status cannot tell them apart.
+    met: !!node.metAt,
+    specChangedSinceMet: !!node.metAt && specHash(nodeSpec(node)) !== node.metAt,
     openChanges: overlaysByNode(index, changesOf(index)).get(node.id) ?? [],
     areaId: area?.id ?? "",
     areaTitle: area?.title ?? "",
