@@ -7,7 +7,7 @@
  * the import graph empty and zone detection falling back to file-tree
  * proximity.
  *
- * @module sourcevision/language/swift
+ * @module lang-kit/swift
  */
 
 import type { LanguageConfig } from "./registry.js";

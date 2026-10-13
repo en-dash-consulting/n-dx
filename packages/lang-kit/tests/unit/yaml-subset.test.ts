@@ -7,7 +7,7 @@
  * a CI job silently missing its steps reads downstream as "this project does
  * not test", which is a worse answer than "this file could not be read".
  *
- * @see src/analyzers/yaml-subset.ts
+ * @see src/yaml-subset.ts
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -16,7 +16,7 @@ import {
   isMap,
   listAt,
   stringAt,
-} from "../../../src/analyzers/yaml-subset.js";
+} from "../../src/yaml-subset.js";
 
 describe("mappings and scalars", () => {
   it("reads nested maps", () => {

@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseGoMod, parseGoVendorModules, readGoBuildModels, readGoWorkFiles } from "../../../src/language/go-build.js";
+import { parseGoMod, parseGoVendorModules, readGoBuildModels, readGoWorkFiles } from "../../src/go-build.js";
 
-const FIXTURES = fileURLToPath(new URL("../../fixtures/go-build", import.meta.url));
+const FIXTURES = fileURLToPath(new URL("../fixtures/go-build", import.meta.url));
 const ver = (value: string) => ({ resolved: true, value });
 
 const cleanups: string[] = [];

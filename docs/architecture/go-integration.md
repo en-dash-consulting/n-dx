@@ -14,7 +14,7 @@ The implementation follows a key design principle: **Go support extends existing
 
 ## File Inventory
 
-Go files are classified using the language registry (`packages/sourcevision/src/language/go.ts`).
+Go files are classified using the language registry (`packages/lang-kit/src/go.ts`).
 
 ### File Role Classification
 

@@ -7,7 +7,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ImportEdge, ImportType, ExternalImport } from "../schema/index.js";
-import { isGoStdlibPath } from "../language/go.js";
+import { isGoStdlibPath } from "@n-dx/lang-kit";
 import { toPosix } from "../util/paths.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────

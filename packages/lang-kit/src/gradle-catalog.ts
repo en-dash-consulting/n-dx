@@ -7,7 +7,7 @@
  * Catalogs declared elsewhere (`versionCatalogs { … from(files(…)) }` in
  * settings) are not found; a reference to one stays unresolved.
  *
- * @module sourcevision/language/gradle-catalog
+ * @module lang-kit/gradle-catalog
  */
 
 import { readFile, readdir } from "node:fs/promises";

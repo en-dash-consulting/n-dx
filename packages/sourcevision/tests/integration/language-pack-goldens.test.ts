@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
 import { skipUnlessGrammar } from "../helpers/grammar.js";
-import { goConfig } from "../../src/language/go.js";
+import { goConfig } from "@n-dx/lang-kit";
 import { loadLanguagePacks } from "../../src/language/pack.js";
 import type { RunnablePack } from "../../src/language/runner.js";
 import {

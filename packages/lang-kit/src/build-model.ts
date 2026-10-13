@@ -4,7 +4,7 @@
  * `go.mod`/`go.work` mirror it) so the packs do not drift. Held in memory
  * only; nothing here is persisted into analysis artifacts.
  *
- * @module sourcevision/language/build-model
+ * @module lang-kit/build-model
  */
 
 /**

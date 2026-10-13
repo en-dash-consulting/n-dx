@@ -26,7 +26,7 @@
  * Tabs for indentation throw for the same reason: YAML forbids them, and
  * guessing a width would invent structure.
  *
- * @module sourcevision/analyzers/yaml-subset
+ * @module lang-kit/yaml-subset
  */
 
 /** A parsed node: a map, a sequence, a scalar, or absent. */

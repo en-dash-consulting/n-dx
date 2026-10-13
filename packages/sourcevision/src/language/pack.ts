@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { buildGrammarsScript, grammarBuildDir } from "./package-paths.js";
 import { goPack } from "./go-pack.js";
 import { javaPack } from "./java-pack.js";
-import type { LanguageConfig } from "./registry.js";
+import type { LanguageConfig } from "@n-dx/lang-kit";
 
 // ── Pack contract ───────────────────────────────────────────────────────────
 

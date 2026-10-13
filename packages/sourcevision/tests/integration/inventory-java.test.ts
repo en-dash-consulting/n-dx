@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
-import { typescriptConfig } from "../../src/language/typescript.js";
+import { typescriptConfig } from "@n-dx/lang-kit";
 import { detectLanguages, languageConfigsFromIds, mergeLanguageConfigs } from "../../src/language/detect.js";
 import type { Inventory } from "../../src/schema/index.js";
 

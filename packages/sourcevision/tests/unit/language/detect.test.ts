@@ -3,8 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { detectLanguage, getLanguageConfig, VALID_LANGUAGE_IDS } from "../../../src/language/detect.js";
-import { typescriptConfig } from "../../../src/language/typescript.js";
-import { goConfig } from "../../../src/language/go.js";
+import { typescriptConfig, goConfig } from "@n-dx/lang-kit";
 
 describe("detectLanguage", () => {
   let tmpDir: string;

@@ -4,7 +4,7 @@
  * Inventory roles only. Structure comes from the HCL grammar's queries and
  * stays in memory; nothing here is written to `infrastructure.json`.
  *
- * @module sourcevision/language/terraform
+ * @module lang-kit/terraform
  */
 
 import { extname } from "node:path";

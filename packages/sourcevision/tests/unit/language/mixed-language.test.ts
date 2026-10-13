@@ -13,8 +13,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { detectLanguage, detectLanguages, mergeLanguageConfigs, getLanguageConfig } from "../../../src/language/detect.js";
-import { typescriptConfig } from "../../../src/language/typescript.js";
-import { goConfig } from "../../../src/language/go.js";
+import { typescriptConfig, goConfig } from "@n-dx/lang-kit";
 import { analyzeClassifications } from "../../../src/analyzers/classify.js";
 import type { Inventory, Imports, ArchetypeSignal } from "../../../src/schema/v1.js";
 
