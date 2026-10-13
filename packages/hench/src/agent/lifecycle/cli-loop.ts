@@ -106,7 +106,7 @@ import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
 import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout } from "../../prd/llm-gateway.js";
 import { prdLayout } from "../../prd/rex-gateway.js";
-import { reviewDedupeDir } from "./uncommitted-work-gate.js";
+import { reviewDedupeDir, reviewInboxDir } from "./uncommitted-work-gate.js";
 import { resolveAgentCliEffort } from "./agent-effort.js";
 import { BOOKKEEPING_PATHS } from "../../store/paths.js";
 import { matchesProjectPath } from "../../store/artifacts.js";
@@ -1634,7 +1634,10 @@ export async function runAdversarialReviewPass(
   await mkdir(dirname(reportPath), { recursive: true });
 
   const layout = resolveLayout(inv.projectDir);
-  const prdTreeDir = reviewDedupeDir(relativeToRoot(layout, layout.rexDir), await prdLayout(layout.rexDir));
+  const rexRel = relativeToRoot(layout, layout.rexDir);
+  const prdLayoutKind = await prdLayout(layout.rexDir);
+  const prdTreeDir = reviewDedupeDir(rexRel, prdLayoutKind);
+  const inboxDir = reviewInboxDir(rexRel, prdLayoutKind);
   const systemPrompt = pair ? buildPairReviewSystemPrompt() : buildReviewSystemPrompt();
 
   let brief: string;
@@ -1662,6 +1665,7 @@ export async function runAdversarialReviewPass(
       changedFiles: scope.changedFiles,
       reportPath,
       prdTreeDir,
+      inboxDir,
       autonomous: ctx.autonomous,
       testGateFollows: ctx.testGateFollows,
       recheck: step?.recheck,
@@ -1677,6 +1681,7 @@ export async function runAdversarialReviewPass(
       autonomous: ctx.autonomous,
       testGateFollows: ctx.testGateFollows,
       prdTreeDir,
+      inboxDir,
     });
   }
 

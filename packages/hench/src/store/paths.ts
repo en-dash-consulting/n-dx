@@ -39,6 +39,8 @@ import { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../prd/
  */
 export const V2_PRODUCT_DIRNAME = "product";
 export const V2_CHANGES_DIRNAME = "changes";
+/** Where unplaced changes wait, under changes/ (rex's `INBOX_DIRNAME`). */
+export const V2_INBOX_DIRNAME = "inbox";
 /** A v2 node folder's tool-state file; its intent files are the folder's `.md` files. */
 export const V2_STATE_FILENAME = "state.yaml";
 
