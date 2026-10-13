@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { goConfig } from "@n-dx/lang-kit";
 import { goResolver } from "./go-resolver.js";
 import { queryDir } from "./package-paths.js";
-import type { LanguagePack, RuleProvenance } from "./pack.js";
+import type { LanguagePack, RuleProvenance } from "@n-dx/lang-runtime";
 
 const QUERY_NAMES = ["packages", "imports", "types", "functions", "methods", "calls", "struct-tags"] as const;
 
@@ -21,7 +21,7 @@ const queryPath = (file: string): string => join(queryDir("go"), file);
 
 /**
  * Grammar release the queries were written and checked against. Keep in step
- * with `scripts/build-grammars.mjs`; update `verifiedOn` when re-checking.
+ * with `packages/lang-runtime/scripts/build-grammars.mjs`; update `verifiedOn` when re-checking.
  */
 const GRAMMAR_VERSION = "0.25.0";
 

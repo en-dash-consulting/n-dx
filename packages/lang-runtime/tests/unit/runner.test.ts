@@ -11,11 +11,11 @@ import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Language, Parser, Query, Tree } from "web-tree-sitter";
 
-import { createTreeSitterRunner, type RunnablePack, type TreeSitterRunner } from "../../../src/language/runner.js";
-import type { LanguagePack } from "../../../src/language/pack.js";
+import { createTreeSitterRunner, type RunnablePack, type TreeSitterRunner } from "../../src/runner.js";
+import type { LanguagePack } from "../../src/pack.js";
 import { goConfig } from "@n-dx/lang-kit";
-import { grammarWasmPath } from "../../../scripts/build-grammars.mjs";
-import { skipUnlessGrammar } from "../../helpers/grammar.js";
+import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
+import { skipUnlessGrammar } from "../../src/testing/grammar.js";
 
 const JAVA_WASM = grammarWasmPath("tree-sitter-java");
 

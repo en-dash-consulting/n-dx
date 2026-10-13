@@ -6,12 +6,19 @@
 import { existsSync, readFileSync } from "node:fs";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
+import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
 import { goPack } from "../../src/language/go-pack.js";
 import { goResolver } from "../../src/language/go-resolver.js";
-import { createTreeSitterRunner, type Capture, type ParsedFile } from "../../src/language/runner.js";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
-import { fixtureDirFor, goldenPathFor, type PackGolden } from "../helpers/pack-golden.js";
+import {
+  createTreeSitterRunner,
+  fixtureDirFor,
+  goldenPathFor,
+  skipUnlessGrammar,
+  type Capture,
+  type PackGolden,
+  type ParsedFile,
+} from "@n-dx/lang-runtime";
+import { PACK_FIXTURE_ROOT } from "../helpers/pack-fixtures.js";
 
 const GO_WASM = grammarWasmPath("tree-sitter-go");
 const target = { pack: goPack, grammarPath: GO_WASM };
@@ -222,7 +229,7 @@ describe("go pack", () => {
   });
 
   it("golden: every string argument is a direct argument of its paired argument list", () => {
-    const golden = JSON.parse(readFileSync(goldenPathFor(fixtureDirFor(goPack)), "utf8")) as PackGolden;
+    const golden = JSON.parse(readFileSync(goldenPathFor(fixtureDirFor(PACK_FIXTURE_ROOT, goPack)), "utf8")) as PackGolden;
     let checked = 0;
     for (const file of golden.files) {
       const calls = (file.captures as Record<string, Capture[]> | undefined)?.calls ?? [];

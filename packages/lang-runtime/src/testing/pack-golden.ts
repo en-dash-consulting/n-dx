@@ -2,32 +2,34 @@
  * Golden-file harness for language packs.
  *
  * Convention: a pack with id `<id>` keeps its fixture project in
- * `tests/fixtures/language-packs/<id>/` — source files under `src/`, the
- * committed result in `golden.json`. The harness runs the pack's queries over
+ * `<fixture root>/<id>/` — source files under `src/`, the committed result in
+ * `golden.json`; the fixture root is the testing package's
+ * `tests/fixtures/language-packs`. The harness runs the pack's queries over
  * every file whose extension the pack's config claims, then the pack's
- * resolver (if any) over those results, and compares both with the golden. Goldens are rewritten only when {@link UPDATE_ENV} is set,
- * which `pnpm --filter @n-dx/sourcevision test:update-goldens` does.
+ * resolver (if any) over those results, and compares both with the golden.
+ * Goldens are rewritten only when {@link UPDATE_ENV} is set, which the
+ * testing package's `test:update-goldens` script does.
+ *
+ * @module lang-runtime/testing/pack-golden
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { fileURLToPath } from "node:url";
 
-import type { FileReferences, LanguagePack } from "../../src/language/pack.js";
+import type { FileReferences, LanguagePack } from "../pack.js";
 import {
   createTreeSitterRunner,
   type FileResult,
   type ParsedFile,
   type RunnablePack,
-} from "../../src/language/runner.js";
+} from "../runner.js";
 
 /** Set to `1` to rewrite goldens instead of comparing. Never set by default. */
 export const UPDATE_ENV = "SV_UPDATE_PACK_GOLDENS";
 
-export const PACK_FIXTURE_ROOT = fileURLToPath(new URL("../fixtures/language-packs", import.meta.url));
-
-export function fixtureDirFor(pack: LanguagePack): string {
-  return join(PACK_FIXTURE_ROOT, pack.id);
+/** The pack's fixture project under `fixtureRoot`. */
+export function fixtureDirFor(fixtureRoot: string, pack: LanguagePack): string {
+  return join(fixtureRoot, pack.id);
 }
 
 export function goldenPathFor(fixtureDir: string): string {

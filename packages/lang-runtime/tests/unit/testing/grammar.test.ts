@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-import { grammarsRequired, skipUnlessGrammar } from "../../helpers/grammar.js";
+import { grammarsRequired, skipUnlessGrammar } from "../../../src/testing/grammar.js";
 
 const dir = mkdtempSync(join(tmpdir(), "sv-grammar-gate-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

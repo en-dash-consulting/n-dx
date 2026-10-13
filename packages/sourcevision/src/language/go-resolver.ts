@@ -57,7 +57,7 @@ import type {
   PackSourceFile,
   PreparedResolver,
   SourcePosition,
-} from "./pack.js";
+} from "@n-dx/lang-runtime";
 
 // ── Project facts ───────────────────────────────────────────────────────────
 

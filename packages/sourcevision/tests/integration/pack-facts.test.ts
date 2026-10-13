@@ -9,14 +9,12 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import type { SourcePosition } from "@n-dx/lang-kit";
 
-import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
+import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
 import { goPack } from "../../src/language/go-pack.js";
 import { javaPack } from "../../src/language/java-pack.js";
-import type { LanguagePack, PackSourceFile } from "../../src/language/pack.js";
+import { createTreeSitterRunner, skipUnlessGrammar, type LanguagePack, type PackSourceFile } from "@n-dx/lang-runtime";
 import { factGaps, readPackFacts } from "../../src/language/pack-facts.js";
-import { createTreeSitterRunner } from "../../src/language/runner.js";
 import { sqlPack } from "../../src/language/sql-pack.js";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
 
 const runner = createTreeSitterRunner();
 afterAll(() => runner.dispose());

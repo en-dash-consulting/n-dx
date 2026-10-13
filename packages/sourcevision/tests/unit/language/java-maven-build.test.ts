@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { type ModuleBuildModel, readMavenBuildModels, discoverJavaModules, parseXml, XmlSyntaxError } from "@n-dx/lang-kit";
-import { UPDATE_ENV, updateRequested } from "../../helpers/pack-golden.js";
+import { UPDATE_ENV, updateRequested } from "@n-dx/lang-runtime";
 
 const FIXTURES = fileURLToPath(new URL("../../fixtures/maven-build", import.meta.url));
 

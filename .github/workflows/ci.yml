@@ -409,15 +409,15 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            packages/sourcevision/build/cache
+            packages/lang-runtime/build/cache
             ~/.cache/tree-sitter
             ~/Library/Caches/tree-sitter
             ~/AppData/Local/tree-sitter
-          key: grammars-${{ runner.os }}-${{ hashFiles('packages/sourcevision/scripts/build-grammars.mjs') }}
+          key: grammars-${{ runner.os }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
 
       - name: Build tree-sitter grammars
         if: contains(matrix.suites, 'sourcevision')
-        run: node packages/sourcevision/scripts/build-grammars.mjs
+        run: node packages/lang-runtime/scripts/build-grammars.mjs
 
       # `shell: bash` so the same line works on the Windows leg, whose default
       # shell is PowerShell.

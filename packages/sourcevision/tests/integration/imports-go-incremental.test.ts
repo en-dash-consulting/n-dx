@@ -23,7 +23,7 @@ import { goResolver } from "../../src/language/go-resolver.js";
 import { BUILTIN_PACKS } from "../../src/language/pack.js";
 import { grammarBuildDir } from "../../src/language/package-paths.js";
 import type { Imports } from "../../src/schema/v1.js";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
+import { skipUnlessGrammar } from "@n-dx/lang-runtime";
 
 const GO_WASM = join(grammarBuildDir(), `${goPack.grammar.name}.wasm`);
 

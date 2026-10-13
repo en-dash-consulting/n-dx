@@ -14,9 +14,8 @@ import { goPack } from "../../../src/language/go-pack.js";
 import { goResolver } from "../../../src/language/go-resolver.js";
 import { javaPack } from "../../../src/language/java-pack.js";
 import { grammarBuildDir } from "../../../src/language/package-paths.js";
-import { DEFAULT_MAX_FILE_BYTES } from "../../../src/language/runner.js";
+import { DEFAULT_MAX_FILE_BYTES, skipUnlessGrammar } from "@n-dx/lang-runtime";
 import type { Inventory } from "../../../src/schema/v1.js";
-import { skipUnlessGrammar } from "../../helpers/grammar.js";
 
 const file = (path: string): Inventory["files"][number] =>
   ({ path, size: 1, language: "Java", lineCount: 1, hash: "x", role: "source", category: "code" }) as Inventory["files"][number];

@@ -20,7 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { BUILTIN_PACKS } from "../../src/language/pack.js";
 import { grammarBuildDir } from "../../src/language/package-paths.js";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
+import { skipUnlessGrammar } from "@n-dx/lang-runtime";
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 

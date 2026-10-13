@@ -49,7 +49,7 @@ reported as skipped. Do not hand-edit its build to force one.
 
 ```sh
 pnpm --filter @n-dx/sourcevision build
-node packages/sourcevision/scripts/build-grammars.mjs
+node packages/lang-runtime/scripts/build-grammars.mjs
 node packages/sourcevision/scripts/java-scip-compare.mjs [--json]
 ```
 

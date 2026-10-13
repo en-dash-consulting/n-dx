@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Capture, SourcePosition } from "../../../src/language/pack.js";
-import { groupCalls } from "../../../src/language/pack-calls.js";
+import type { Capture, SourcePosition } from "../../src/pack.js";
+import { groupCalls } from "../../src/pack-calls.js";
 
 let reads = 0;
 

@@ -10,8 +10,7 @@
  */
 
 import { sqlPack } from "./sql-pack.js";
-import type { Capture } from "./pack.js";
-import type { RunnablePack, TreeSitterRunner } from "./runner.js";
+import type { Capture, RunnablePack, TreeSitterRunner } from "@n-dx/lang-runtime";
 
 export interface SqlTable {
   /** Unquoted table name. */

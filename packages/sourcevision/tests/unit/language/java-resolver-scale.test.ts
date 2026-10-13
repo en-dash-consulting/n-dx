@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { javaResolver } from "../../../src/language/java-resolver.js";
-import type { Capture, PackSourceFile } from "../../../src/language/pack.js";
+import type { Capture, PackSourceFile } from "@n-dx/lang-runtime";
 
 const QUALIFIED = 20_000;
 const NAMES_PER_SPAN = 3;

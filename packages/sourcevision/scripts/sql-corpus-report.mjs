@@ -23,7 +23,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { grammarWasmPath } from "./build-grammars.mjs";
+import { grammarWasmPath } from "../../lang-runtime/scripts/build-grammars.mjs";
 import { checkedOutSha, CLONE_COMMAND, corpusDir, loadCorpus } from "./java-corpus.mjs";
 
 /** Large enough that no corpus file is skipped: the report measures the grammar, not the size limit. */
@@ -72,7 +72,7 @@ if (missing.length > 0) {
 
 const wasm = grammarWasmPath("tree-sitter-sql");
 if (!existsSync(wasm)) {
-  console.error(`${wasm} is not built — run \`node packages/sourcevision/scripts/build-grammars.mjs\``);
+  console.error(`${wasm} is not built — run \`node packages/lang-runtime/scripts/build-grammars.mjs\``);
   process.exit(2);
 }
 const dist = (name) => new URL(`../dist/language/${name}.js`, import.meta.url);
@@ -80,7 +80,12 @@ if (!existsSync(dist("sql-schema"))) {
   console.error("sourcevision is not built — run `pnpm --filter @n-dx/sourcevision build`");
   process.exit(2);
 }
-const { createTreeSitterRunner } = await import(dist("runner").href);
+const runtimeDist = new URL("../../lang-runtime/dist/index.js", import.meta.url);
+if (!existsSync(runtimeDist)) {
+  console.error("lang-runtime is not built — run `pnpm --filter @n-dx/lang-runtime build`");
+  process.exit(2);
+}
+const { createTreeSitterRunner } = await import(runtimeDist.href);
 const { extractSqlTables, sqlTarget } = await import(dist("sql-schema").href);
 const { detectMigrationTools } = await import(dist("sql-migrations").href);
 

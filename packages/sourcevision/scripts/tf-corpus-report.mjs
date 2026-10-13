@@ -21,7 +21,7 @@ import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
-import { grammarWasmPath } from "./build-grammars.mjs";
+import { grammarWasmPath } from "../../lang-runtime/scripts/build-grammars.mjs";
 import { checkedOutSha, cloneCommand, loadCorpus, repoDir } from "./tf-corpus.mjs";
 
 /** Share of `.tf` files that must parse without ERROR or MISSING nodes. */
@@ -64,15 +64,15 @@ if (missing.length > 0) {
 
 const wasm = grammarWasmPath("tree-sitter-hcl");
 if (!existsSync(wasm)) {
-  console.error(`${wasm} is not built — run \`node packages/sourcevision/scripts/build-grammars.mjs\``);
+  console.error(`${wasm} is not built — run \`node packages/lang-runtime/scripts/build-grammars.mjs\``);
   process.exit(2);
 }
-const distRunner = new URL("../dist/language/runner.js", import.meta.url);
-if (!existsSync(distRunner)) {
-  console.error("sourcevision is not built — run `pnpm --filter @n-dx/sourcevision build`");
+const runtimeDist = new URL("../../lang-runtime/dist/index.js", import.meta.url);
+if (!existsSync(runtimeDist)) {
+  console.error("lang-runtime is not built — run `pnpm --filter @n-dx/lang-runtime build`");
   process.exit(2);
 }
-const { createTreeSitterRunner } = await import(distRunner.href);
+const { createTreeSitterRunner } = await import(runtimeDist.href);
 
 /** A stand-in pack whose only query reports error nodes; the Terraform pack's queries come later. */
 const pack = { id: "terraform-corpus", queries: [{ name: "errors", path: ERROR_QUERY }] };

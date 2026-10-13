@@ -6,15 +6,14 @@
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
+import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
 import { extractGoEmbeddedSql } from "../../src/language/go-sql.js";
 import { goPack } from "../../src/language/go-pack.js";
 import { extractJavaEmbeddedSql } from "../../src/language/java-sql.js";
 import { javaPack } from "../../src/language/java-pack.js";
-import { createTreeSitterRunner, type ParsedFile } from "../../src/language/runner.js";
+import { createTreeSitterRunner, skipUnlessGrammar, type ParsedFile } from "@n-dx/lang-runtime";
 import { detectMigrationTools } from "../../src/language/sql-migrations.js";
 import { extractSqlcTables, type EmbeddedSqlTable } from "../../src/language/sql-references.js";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
 
 const JAVA_WASM = grammarWasmPath("tree-sitter-java");
 const GO_WASM = grammarWasmPath("tree-sitter-go");

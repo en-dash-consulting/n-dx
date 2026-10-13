@@ -18,7 +18,7 @@ import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { Language, Parser } from "web-tree-sitter";
 
-import { grammarWasmPath } from "./build-grammars.mjs";
+import { grammarWasmPath } from "../../lang-runtime/scripts/build-grammars.mjs";
 
 const SKIP_DIRS = new Set([".git", "node_modules"]);
 
@@ -52,7 +52,7 @@ async function main() {
   const root = resolve(target);
   const wasm = grammarWasmPath("tree-sitter-java");
   if (!existsSync(wasm)) {
-    console.error(`${wasm} is not built — run \`node packages/sourcevision/scripts/build-grammars.mjs\``);
+    console.error(`${wasm} is not built — run \`node packages/lang-runtime/scripts/build-grammars.mjs\``);
     process.exit(2);
   }
 

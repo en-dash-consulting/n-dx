@@ -9,14 +9,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
+import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
 import { extractGoImports } from "../../src/analyzers/go-imports.js";
 import { goPack } from "../../src/language/go-pack.js";
 import { goResolver } from "../../src/language/go-resolver.js";
-import type { FileReferences, PackSourceFile } from "../../src/language/pack.js";
-import { createTreeSitterRunner } from "../../src/language/runner.js";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
-import { listFixtureFiles } from "../helpers/pack-golden.js";
+import {
+  createTreeSitterRunner,
+  listFixtureFiles,
+  skipUnlessGrammar,
+  type FileReferences,
+  type PackSourceFile,
+} from "@n-dx/lang-runtime";
 
 const GO_WASM = grammarWasmPath("tree-sitter-go");
 const FIXTURES = join(import.meta.dirname, "../fixtures");

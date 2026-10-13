@@ -17,14 +17,12 @@
  */
 
 import type { CallFact } from "@n-dx/lang-kit";
-import type { Capture } from "./pack.js";
-import { contains, groupCalls, innermost } from "./pack-calls.js";
+import { contains, groupCalls, innermost, type Capture, type ParsedFile } from "@n-dx/lang-runtime";
 import {
   extractSqlTableReferences,
   looksLikeSql,
   type EmbeddedSqlTable,
 } from "./sql-references.js";
-import type { ParsedFile } from "./runner.js";
 
 export interface UnresolvedEntity {
   readonly name: string;

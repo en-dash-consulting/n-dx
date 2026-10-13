@@ -32,7 +32,7 @@
   ],
   "scripts": {
     "build": "tsc && node ../../scripts/write-build-stamp.mjs",
-    "build:grammars": "node scripts/build-grammars.mjs",
+    "build:grammars": "node ../lang-runtime/scripts/build-grammars.mjs",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "node ../../scripts/run-vitest-bind-aware.mjs sourcevision",

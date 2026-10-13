@@ -7,7 +7,7 @@ import { detectLanguage, detectLanguages, getLanguageConfig, mergeLanguageConfig
 import { terraformConfig, isTerraformFile, javaConfig, javaSecondaryConfig, typescriptConfig } from "@n-dx/lang-kit";
 import { analyzeInventory, classifyRole, detectLanguage as inventoryLanguage } from "../../../src/analyzers/inventory.js";
 import { computeInfrastructure, toInfrastructureData, isTerraformPath } from "../../../src/analyzers/infrastructure.js";
-import { GRAMMARS } from "../../../scripts/build-grammars.mjs";
+import { GRAMMARS } from "../../../../lang-runtime/scripts/build-grammars.mjs";
 
 describe("terraform language config", () => {
   let dir: string;
