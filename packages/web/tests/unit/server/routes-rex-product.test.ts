@@ -136,6 +136,15 @@ describe("v2 product reads", () => {
     });
   });
 
+  it("GET /changes reads a completed but unapplied change as awaiting-apply, not in-progress", async () => {
+    const statePath = join(rexDir, "changes", "add-apple-pay", "state.yaml");
+    writeFileSync(statePath, readFileSync(statePath, "utf-8").replace('    status: "in_progress"\n', '    status: "completed"\n'));
+    const { body } = await get("changes");
+    expect((body.changes as ChangeRow[])[0].stage).toBe("awaiting-apply");
+    const map = (await get("product")).body.map as ProductMap;
+    expect(map.areas[0].capabilities[0].openChanges[0].stage).toBe("awaiting-apply");
+  });
+
   it("GET /changes reads a shipped change as shipped", async () => {
     applyChange();
     const { body } = await get("changes");

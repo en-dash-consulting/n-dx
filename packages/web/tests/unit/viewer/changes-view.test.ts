@@ -63,6 +63,18 @@ describe("ChangesView", () => {
     expect(change?.textContent).toContain("Placement engine for changes");
   });
 
+  it("labels an awaiting-apply change as waiting for a steward, between in-progress and applied", () => {
+    const row = (id: string, stage: ChangeRow["stage"]): ChangeRow => ({
+      id, title: id, stage, plannedRelease: "2.0.0", amends: [], touches: [], taskCount: 0, completedTaskCount: 0,
+    });
+    const el = mount(h(ChangesView, {
+      changes: [row("a", "applied"), row("b", "awaiting-apply"), row("c", "in-progress")],
+    }));
+    const stages = [...el.querySelectorAll(".ch-stage")];
+    expect(stages.map((s) => s.getAttribute("data-stage"))).toEqual(["in-progress", "awaiting-apply", "applied"]);
+    expect(stages[1].querySelector(".ch-stage-header")?.textContent).toContain("Waiting for a steward to apply it");
+  });
+
   it("puts a change with no planned release in the unscheduled group", () => {
     const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
 

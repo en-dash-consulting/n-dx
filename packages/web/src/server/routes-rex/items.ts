@@ -208,7 +208,7 @@ async function handleItemPatch(
     if (completing) delete fieldUpdates.status;
     // Completion first, as `rex update` does: a refused completion throws before
     // anything is written, so a PATCH never half-applies.
-    if (completing) await completeV2Work(store, itemId);
+    const completion = completing ? await completeV2Work(store, itemId) : undefined;
     if (Object.keys(fieldUpdates).length > 0 || !completing) {
       try {
         await store.withTransaction(async (doc) => {
@@ -225,7 +225,8 @@ async function handleItemPatch(
       }
     }
     await publishItemUpdate(ctx, store, itemId, updates, broadcast);
-    jsonResponse(res, 200, { ok: true });
+    // Say why a change was held open or left unapplied (rex.applyOn), so the dashboard can.
+    jsonResponse(res, 200, completion?.reason ? { ok: true, applied: completion.applied, reason: completion.reason } : { ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (err instanceof ItemNotFoundError) {

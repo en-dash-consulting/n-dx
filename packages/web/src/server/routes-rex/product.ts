@@ -36,7 +36,7 @@ import type { ChangeNode, RuleNode, TreeIndex, V2Tree } from "../rex-gateway.js"
 
 export type CapabilityStatusWire = "proposed" | "changing" | "met" | "revised" | "retired";
 export type CapabilityHealthWire = "ok" | "defective";
-export type ChangeStageWire = "proposed" | "ready" | "in-progress" | "applied" | "shipped";
+export type ChangeStageWire = "proposed" | "ready" | "in-progress" | "awaiting-apply" | "applied" | "shipped";
 export type AmendmentDeltaWire = "added" | "modified" | "removed";
 
 export interface OpenChangeOverlayWire {
@@ -132,7 +132,10 @@ const HISTORY_LIMIT = 100;
 function stageOf(change: RuleNode): ChangeStageWire {
   if (change.shippedIn) return "shipped";
   if (isAppliedChange(change)) return "applied";
-  if (change.startedAt || change.status === "in_progress" || change.status === "completed" || change.status === "failing") {
+  // Completed but not applied: rex.applyOn is review or release, so only a steward's
+  // apply (MCP, CLI) or a release stamp moves it on. The dashboard has no apply action.
+  if (change.status === "completed") return "awaiting-apply";
+  if (change.startedAt || change.status === "in_progress" || change.status === "failing") {
     return "in-progress";
   }
   return change.ready ? "ready" : "proposed";

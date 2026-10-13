@@ -115,6 +115,24 @@ describe("Rex item routes on a v2 project", () => {
     expect(readFileSync(join(rexDir, "product", "checkout", "pay-by-card.md"), "utf-8")).toContain("Apple Pay is offered on Safari");
   });
 
+  it("PATCH completing a change under rex.applyOn review returns why it was left unapplied", async () => {
+    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "review" } }));
+    expect((await send("PATCH", `items/${TASK_ID}`, { status: "completed" })).status).toBe(200);
+    const res = await send("PATCH", `items/${CHANGE_ID}`, { status: "completed" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.applied).toBe(false);
+    expect(body.reason).toEqual(expect.any(String));
+    expect(readFileSync(join(rexDir, "product", "checkout", "pay-by-card.md"), "utf-8")).not.toContain("Apple Pay is offered on Safari");
+  });
+
+  it("PATCH completing a change that applies carries no reason", async () => {
+    expect((await send("PATCH", `items/${TASK_ID}`, { status: "completed" })).status).toBe(200);
+    const body = await (await send("PATCH", `items/${CHANGE_ID}`, { status: "completed" })).json();
+    expect(body).toEqual({ ok: true });
+  });
+
   it("bulk PATCH completed applies the change's amendments through rex", async () => {
     expect((await send("PATCH", "items/bulk", { ids: [TASK_ID], updates: { status: "completed" } })).status).toBe(200);
     const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID, "nope"], updates: { status: "completed" } });

@@ -61,7 +61,7 @@ export const CAPABILITY_HEALTH_LABELS: Readonly<Record<CapabilityHealth, string>
  *
  * **Provisional — this vocabulary is not yet fixed by the schema.** The v2
  * schema has no stage field and no stage concept (grep `stage` over
- * `rex/schema/v2.ts`: nothing), and these five values do not line up with
+ * `rex/schema/v2.ts`: nothing), and these six values do not line up with
  * `VALID_STATUSES` either. They are this view's reading of "work grouped by
  * planned release and stage", chosen so a change's state fields map onto them
  * — `ready` from `ready`, `applied` from `appliedIn`, `shipped` from
@@ -72,13 +72,14 @@ export const CAPABILITY_HEALTH_LABELS: Readonly<Record<CapabilityHealth, string>
  * grows a stage, adopt its vocabulary here, there and in the fixtures
  * together.
  */
-export type ChangeStage = "proposed" | "ready" | "in-progress" | "applied" | "shipped";
+export type ChangeStage = "proposed" | "ready" | "in-progress" | "awaiting-apply" | "applied" | "shipped";
 
 /** Display order within a release group: earliest stage first. */
 export const CHANGE_STAGE_ORDER: readonly ChangeStage[] = [
   "proposed",
   "ready",
   "in-progress",
+  "awaiting-apply",
   "applied",
   "shipped",
 ];
@@ -87,6 +88,7 @@ export const CHANGE_STAGE_LABELS: Readonly<Record<ChangeStage, string>> = {
   proposed: "Proposed",
   ready: "Ready",
   "in-progress": "In progress",
+  "awaiting-apply": "Waiting for a steward to apply it",
   applied: "Applied",
   shipped: "Shipped",
 };
