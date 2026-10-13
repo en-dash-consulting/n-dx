@@ -344,7 +344,7 @@ jobs:
         group: [root+llm-client, rex+sourcevision, hench+web]
         include:
           - group: root+llm-client
-            suites: root,llm-client
+            suites: root,llm-client,lang-kit
           - group: rex+sourcevision
             suites: rex,sourcevision
           - group: hench+web
