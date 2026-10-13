@@ -4,7 +4,7 @@
  *
  * Resolution needs an index of the whole project, so every file of a pack's
  * language is parsed on each run, incremental or not. A pack degrades when its
- * grammar is not built or will not load, a query will not compile against it,
+ * `produces` omits "imports", its grammar is not built or will not load, a query will not compile against it,
  * or its resolver cannot read the project's build files. It is reported once,
  * produces no edges, and is listed in {@link PackImportGraph.degraded} so a
  * caller with another parser for the language (Go's regex parser) can run it.
@@ -95,12 +95,20 @@ export async function buildPackImportGraph(
     const fallback = options.fallbacks?.get(pack.id);
     return fallback ? `${pack.config.displayName} imports come from ${fallback}` : inventoryOnlyOutcome(pack);
   };
-  const statuses = loadLanguagePacks({ packs: present, grammarDir: options.grammarDir, warn: options.warn, outcome });
   const warn = options.warn ?? ((message: string) => console.warn(message));
   const degrade = (pack: LanguagePack, message: string): void => {
     warn(message);
     degraded.push(pack.id);
   };
+  // A resolver's references reach the graph only as the pack's imports facts.
+  // A pack that does not produce them would parse every file for no edges, so
+  // degrade it before its grammar is loaded and let a fallback parser run.
+  const readable = present.filter((pack) => {
+    if (pack.produces.includes("imports")) return true;
+    degrade(pack, `${pack.config.displayName}: the pack has a resolver but does not produce "imports"; ${outcome(pack)}.`);
+    return false;
+  });
+  const statuses = loadLanguagePacks({ packs: readable, grammarDir: options.grammarDir, warn: options.warn, outcome });
   const runner = createTreeSitterRunner();
   try {
     for (const status of statuses) {
