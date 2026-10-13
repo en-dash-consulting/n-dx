@@ -7,7 +7,6 @@ import { detectLanguage, detectLanguages, getLanguageConfig, mergeLanguageConfig
 import { terraformConfig, isTerraformFile, javaConfig, javaSecondaryConfig, typescriptConfig } from "@n-dx/lang-kit";
 import { analyzeInventory, classifyRole, detectLanguage as inventoryLanguage } from "../../../src/analyzers/inventory.js";
 import { computeInfrastructure, toInfrastructureData, isTerraformPath } from "../../../src/analyzers/infrastructure.js";
-import { GRAMMARS } from "../../../../lang-runtime/scripts/build-grammars.mjs";
 
 describe("terraform language config", () => {
   let dir: string;
@@ -28,14 +27,6 @@ describe("terraform language config", () => {
 
   it("is registered under the id terraform", () => {
     expect(getLanguageConfig("terraform")).toBe(terraformConfig);
-  });
-
-  it("pins tree-sitter-hcl v1.2.0 with a checksum", () => {
-    expect(GRAMMARS["tree-sitter-hcl"]).toMatchObject({
-      repo: "tree-sitter-grammars/tree-sitter-hcl",
-      version: "1.2.0",
-      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
-    });
   });
 
   describe("detection", () => {

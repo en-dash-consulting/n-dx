@@ -182,8 +182,8 @@ jobs:
         if: github.event_name == 'push' || inputs.mode == 'publish'
         run: pnpm build
 
-      # Each language pack (@n-dx/lang-*) and @n-dx/sourcevision ship their
-      # own build/grammars/*.wasm (package.json "files"). Grammars are never
+      # Each language pack (@n-dx/lang-*) ships its own build/grammars/*.wasm
+      # (package.json "files"); sourcevision ships none. Grammars are never
       # committed, so they must be built here or a published pack degrades its
       # language to inventory-only. SV_REQUIRE_GRAMMARS=1 makes the tests
       # below — including sourcevision's tests/e2e/packed-tarball.test.ts,

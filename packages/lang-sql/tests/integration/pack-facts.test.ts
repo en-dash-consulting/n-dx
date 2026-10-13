@@ -1,16 +1,21 @@
 /**
  * The adapter from captures to lang-kit facts, on SQL sources, with the SQL
- * symbol rules sourcevision still holds. Java and Go facts are tested in their
- * packs.
+ * symbol rules.
  */
 
 import { afterAll, describe, expect, it } from "vitest";
 import type { SourcePosition } from "@n-dx/lang-kit";
+import {
+  createTreeSitterRunner,
+  factGaps,
+  readPackFacts,
+  skipUnlessGrammar,
+  type LanguagePack,
+  type PackSourceFile,
+} from "@n-dx/lang-runtime";
 
-import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
-import { createTreeSitterRunner, skipUnlessGrammar, type LanguagePack, type PackSourceFile } from "@n-dx/lang-runtime";
-import { factGaps, readPackFacts } from "../../src/language/pack-facts.js";
-import { sqlPack } from "../../src/language/sql-pack.js";
+import { SQL_SYMBOL_RULES } from "../../src/sql-facts.js";
+import { sqlGrammarPath, sqlPack } from "../../src/sql-pack.js";
 
 const runner = createTreeSitterRunner();
 afterAll(() => runner.dispose());
@@ -18,7 +23,7 @@ afterAll(() => runner.dispose());
 type Ctx = Parameters<typeof skipUnlessGrammar>[0];
 
 async function parse(ctx: Ctx, pack: LanguagePack, path: string, source: string): Promise<PackSourceFile> {
-  const grammarPath = grammarWasmPath(pack.grammar.name);
+  const grammarPath = sqlGrammarPath();
   skipUnlessGrammar(ctx, grammarPath);
   const result = await runner.parseSource({ pack, grammarPath }, path, source);
   if (result.status !== "parsed") throw new Error("expected a parsed file");
@@ -44,7 +49,7 @@ describe("produces against the rules", () => {
   });
 
   it("finds the SQL pack's produces consistent with its rules", () => {
-    expect(factGaps(sqlPack)).toEqual([]);
+    expect(factGaps(sqlPack, SQL_SYMBOL_RULES)).toEqual([]);
   });
 
   it("names both gaps of a pack with a resolver and symbols but neither imports nor rules", () => {
@@ -61,7 +66,7 @@ ALTER TABLE owners ADD COLUMN name TEXT;
 describe("SQL facts", () => {
   it("reads each CREATE TABLE as a table symbol, schema as container, and nothing else", async (ctx) => {
     const file = await parse(ctx, sqlPack, "db/schema.sql", SQL_SCHEMA);
-    const facts = readPackFacts(sqlPack, file);
+    const facts = readPackFacts(sqlPack, file, { symbolRules: SQL_SYMBOL_RULES });
     expect(Object.keys(facts).sort()).toEqual(["path", "symbols"]);
     expect(facts.symbols?.map((s) => [s.kind, s.name, s.container, s.position])).toEqual([
       ["table", "owners", undefined, at(SQL_SCHEMA, "owners")],

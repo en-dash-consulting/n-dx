@@ -13,7 +13,8 @@
  * missing checkout prints its clone command. Never touches the network. Not
  * part of the test run. It measures the grammar only: no queries, no model.
  *
- * Needs `pnpm --filter @n-dx/sourcevision build` and `build-grammars.mjs`.
+ * Needs `pnpm --filter @n-dx/lang-terraform build` and
+ * `pnpm --filter @n-dx/lang-terraform build:grammars`.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -21,7 +22,6 @@ import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
-import { grammarWasmPath } from "../../lang-runtime/scripts/build-grammars.mjs";
 import { checkedOutSha, cloneCommand, loadCorpus, repoDir } from "./tf-corpus.mjs";
 
 /** Share of `.tf` files that must parse without ERROR or MISSING nodes. */
@@ -62,17 +62,24 @@ if (missing.length > 0) {
   process.exit(2);
 }
 
-const wasm = grammarWasmPath("tree-sitter-hcl");
-if (!existsSync(wasm)) {
-  console.error(`${wasm} is not built — run \`node packages/lang-runtime/scripts/build-grammars.mjs\``);
-  process.exit(2);
-}
 const runtimeDist = new URL("../../lang-runtime/dist/index.js", import.meta.url);
 if (!existsSync(runtimeDist)) {
   console.error("lang-runtime is not built — run `pnpm --filter @n-dx/lang-runtime build`");
   process.exit(2);
 }
+const terraformDist = new URL("../../lang-terraform/dist/index.js", import.meta.url);
+if (!existsSync(terraformDist)) {
+  console.error("lang-terraform is not built — run `pnpm --filter @n-dx/lang-terraform build`");
+  process.exit(2);
+}
 const { createTreeSitterRunner } = await import(runtimeDist.href);
+const { terraformGrammarPath } = await import(terraformDist.href);
+
+const wasm = terraformGrammarPath();
+if (!existsSync(wasm)) {
+  console.error(`${wasm} is not built — run \`pnpm --filter @n-dx/lang-terraform build:grammars\``);
+  process.exit(2);
+}
 
 /** A stand-in pack whose only query reports error nodes; the Terraform pack's queries come later. */
 const pack = { id: "terraform-corpus", queries: [{ name: "errors", path: ERROR_QUERY }] };

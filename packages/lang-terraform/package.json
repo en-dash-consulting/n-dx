@@ -27,6 +27,7 @@
   ],
   "scripts": {
     "build": "tsc && node ../../scripts/write-build-stamp.mjs",
+    "build:grammars": "node ../lang-runtime/scripts/build-grammars.mjs --out build/grammars tree-sitter-hcl",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
