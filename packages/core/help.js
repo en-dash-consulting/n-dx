@@ -1320,7 +1320,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       "The projection is read-only: nothing is written under the rex,\n" +
       "sourcevision or hench directories. No @graview/* dependency: the binary\n" +
       "comes from graview.bin in the project config, $NDX_GRAVIEW_BIN, PATH, the\n" +
-      "installed @n-dx/graview-face's own graview, or npx -y graview@<pinned>.",
+      "installed @n-dx/graview-face's own graview; npx -y graview@<pinned> only\n" +
+      "with graview.allowNpx: true or NDX_GRAVIEW_NPX=1.",
     options: [
       { flag: "--no-files", description: "Leave source files out (default: every file, with its zone, the commits that changed it and the capabilities living there)" },
       { flag: "--place=<slug>", description: "describe: one place (a titled lens) instead of the whole graph" },

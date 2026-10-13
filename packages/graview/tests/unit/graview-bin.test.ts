@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolveLayout } from "../../src/llm-gateway.js";
-import { resolveGraviewCommand, readGraviewConfig, GRAVIEW_BIN_ENV } from "../../src/graview-bin.js";
+import { resolveGraviewCommand, readGraviewConfig, GRAVIEW_BIN_ENV, GRAVIEW_NPX_ENV } from "../../src/graview-bin.js";
 import { GRAVIEW_VERSION } from "../../src/document.js";
 
 let root: string;
@@ -17,9 +17,21 @@ afterEach(() => {
 const noPath = { PATH: "" };
 
 describe("resolveGraviewCommand", () => {
-  it("falls back to npx pinned to the checked release when nothing is configured or on PATH", () => {
+  it("downloads nothing unasked: with no binary found it says how to install graview, and runs nothing", () => {
     const command = resolveGraviewCommand(resolveLayout(root), { env: noPath, platform: "linux" });
-    expect(command).toMatchObject({ cmd: "npx", prefix: ["-y", `graview@${GRAVIEW_VERSION}`], source: "npx" });
+    expect(command).toMatchObject({ cmd: "", prefix: [], source: "none" });
+    expect(command.detail).toContain(`npm i -D graview@${GRAVIEW_VERSION}`);
+    expect(command.detail).toContain("graview.allowNpx: true");
+    expect(command.detail).toContain(GRAVIEW_NPX_ENV);
+  });
+
+  it("falls back to npx pinned to the checked release only when the project or the environment opts in", () => {
+    for (const env of [{ ...noPath, [GRAVIEW_NPX_ENV]: "1" }, { ...noPath, [GRAVIEW_NPX_ENV]: "true" }]) {
+      expect(resolveGraviewCommand(resolveLayout(root), { env, platform: "linux" })).toMatchObject({ cmd: "npx", prefix: ["-y", `graview@${GRAVIEW_VERSION}`], source: "npx" });
+    }
+    expect(resolveGraviewCommand(resolveLayout(root), { env: { ...noPath, [GRAVIEW_NPX_ENV]: "0" }, platform: "linux" }).source).toBe("none");
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { allowNpx: true } }));
+    expect(resolveGraviewCommand(resolveLayout(root), { env: noPath, platform: "linux" }).source).toBe("npx");
     expect(resolveGraviewCommand(resolveLayout(root), { env: noPath, platform: "win32" }).cmd).toBe("npx.cmd");
   });
 
@@ -58,13 +70,13 @@ describe("resolveGraviewCommand", () => {
     }
   });
 
-  it("takes the product face's own graview before npx, and never before PATH", () => {
+  it("takes the product face's own graview before anything else is tried, and never before PATH", () => {
     const face = join(root, "face");
     mkdirSync(join(face, "node_modules", ".bin"), { recursive: true });
     writeFileSync(join(face, "node_modules", ".bin", "graview"), "#!/bin/sh\n");
     const layout = resolveLayout(root);
     expect(resolveGraviewCommand(layout, { env: noPath, platform: "linux", face })).toMatchObject({ cmd: join(face, "node_modules", ".bin", "graview"), source: "face" });
-    expect(resolveGraviewCommand(layout, { env: noPath, platform: "linux", face: join(root, "nowhere") }).source).toBe("npx");
+    expect(resolveGraviewCommand(layout, { env: noPath, platform: "linux", face: join(root, "nowhere") }).source).toBe("none");
     const bin = mkdtempSync(join(tmpdir(), "graview-path-"));
     writeFileSync(join(bin, "graview"), "#!/bin/sh\n");
     try {

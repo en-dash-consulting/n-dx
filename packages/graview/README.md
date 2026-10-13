@@ -17,15 +17,17 @@ ndx graview info .            # where the projection lands, which binary, and th
 
 Nothing here depends on `@graview/*`. The `graview` binary is resolved from
 `graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH, the installed
-`@n-dx/graview-face`'s own `graview` (it pins the same release), then
-`npx -y graview@0.1.20`. Install it once with `npm i -g graview` to skip the
-npx round-trip.
+`@n-dx/graview-face`'s own `graview` (it pins the same release). Nothing is
+downloaded unasked: with none of those, every command but `emit` stops and says
+how to install graview, unless `graview.allowNpx: true` (or `NDX_GRAVIEW_NPX=1`)
+lets `npx -y graview@<pinned>` fetch it.
 
 Config keys (`.ndx/config.json` or `.n-dx.json`):
 
 | Key | Meaning |
 |-----|---------|
 | `graview.bin` | Path to the graview binary or its `cli.js`; a `.js` path runs under the current Node |
+| `graview.allowNpx` | When no graview binary is found, let `npx -y graview@<pinned>` download one (default `false`; `NDX_GRAVIEW_NPX=1` does the same) |
 | `graview.includeFiles` | Project file nodes (default `true`); `false` leaves them out, the same as `--no-files` |
 | `graview.proposeProductLayer` | On a v1 tree, draw the areas, capabilities and constraints rex's migration plan proposes, each marked `proposed` (default `true`); `false` projects the tree as changes only |
 | `graview.mainRef` | The branch commits, landings and releases are read from (`main`, `upstream/main`). Unset, rex's default: the first of `origin/HEAD`, `origin/main`, `main` that resolves |
