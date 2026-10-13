@@ -26,7 +26,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A failed commit after a held completion must not reopen an applied v2 change](./a-failed-commit-after-a-held.md) | completed |
-| [A kept v2 completion's commit commands sweep the operator's pre-run edits into the task's commit](./a-kept-v2-completion-s-commit-commands.md) | pending |
 | [A placed follow-up's index.md is committed with its completion on v2](./a-placed-follow-up-s-index-md-is.md) | completed |
 | [A v2 completion commit sweeps an operator's untracked draft into a node folder whose state.yaml it wrote](./a-v2-completion-commit-sweeps-an.md) | completed |
 | [An explicit --task on an Inbox change is refused before the run, not reported completed](./an-explicit-task-on-an-inbox-change-is.md) | completed |
@@ -41,7 +40,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [hench writes status, completion and claims through the v2 transaction](./hench-writes-status-completion-and.md) | completed |
 | [ndx work --task=<display id> --resolve reports "Task not found" on a v2 tree](./ndx-work-task-display-id-resolve.md) | completed |
 | [ndx work --task --resolve on a v2 tree reports a task inside a change another worktree claims as runnable](./ndx-work-task-resolve-on-a-v2-tree.md) | completed |
-| [No test pins that a kept v2 completion suppresses the failed-run rollback](./no-test-pins-that-a-kept-v2-completion.md) | pending |
 | [On a v2 tree hench's brief can drop workflow.md whole when rex's 4,000-token budget runs out](./on-a-v2-tree-hench-s-brief-can-drop.md) | completed |
 | [Pin the review-dedupe wiring to changes/ on a v2 tree](./pin-the-review-dedupe-wiring-to.md) | completed |
 | [prompt-census baseline is stale after the review brief's v2 Inbox clause (+11 tokens in buildReviewBrief)](./prompt-census-baseline-is-stale-after.md) | completed |
