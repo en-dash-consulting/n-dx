@@ -39,8 +39,8 @@ describe("groupCalls", () => {
   it("pairs each call with its name, receiver and own string arguments", () => {
     const calls = groupCalls([...call(1), ...call(2)]);
     expect(calls).toEqual([
-      { name: "Query", receiver: "db", strings: [expect.objectContaining({ text: '"s1"' })] },
-      { name: "Query", receiver: "db", strings: [expect.objectContaining({ text: '"s2"' })] },
+      { callee: "Query", receiver: "db", strings: [{ text: '"s1"', start: { line: 1, column: 9 }, end: { line: 1, column: 14 } }] },
+      { callee: "Query", receiver: "db", strings: [{ text: '"s2"', start: { line: 2, column: 9 }, end: { line: 2, column: 14 } }] },
     ]);
   });
 

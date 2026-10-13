@@ -31,6 +31,9 @@ export * from "./gradle-catalog.js";
 // IaC resource kinds
 export * from "./iac-kinds.js";
 
+// The pack contract: the facts a language pack returns per file
+export * from "./pack-contract.js";
+
 // Small parsers
 export * from "./toml-lite.js";
 export * from "./xml-lite.js";

@@ -18,8 +18,12 @@ and the pack contract that sourcevision's engine and language packs share.
 
 Language ids and configs, file-to-language detection, build-file readers and
 the small TOML/XML/YAML parsers, and the IaC resource-kind table (`IAC_KINDS`,
-which the iso-map bundle aliases to `src/iac-kinds.ts` alone); the facts-out
-pack contract is to follow. Detection takes the config override and the
+which the iso-map bundle aliases to `src/iac-kinds.ts` alone), and the
+facts-out pack contract (`src/pack-contract.ts`): the per-file `FileFacts` a
+pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls) and
+`DECLARED_FACT_KINDS` (routes, components, outbound calls, resources, typed
+but not yet produced). The contract names no parser type; sourcevision's
+`src/language/pack-facts.ts` reads tree-sitter captures into it. Detection takes the config override and the
 Terraform file search as arguments (`detectLanguage(rootDir, { override,
 hasTerraformFile })`); sourcevision's `src/language/detect.ts` supplies both. Resolvers, the parser runner, pack loading, queries and grammars
 stay in sourcevision. Domain packages import it directly, as they do

@@ -5,8 +5,7 @@
  * statements and `name { … }` blocks. Callers read literals from the original
  * text at the same offsets. Anything the scanner cannot place is left alone.
  *
- * Gradle is never run, and the grammar-based path (tree-sitter Groovy/Kotlin)
- * is not used: those grammars would need their own pinned source archives and
+ * Gradle is never run, and no Groovy or Kotlin grammar is used: those grammars would need their own pinned source archives and
  * checksums, and a build script is read for a handful of literal shapes.
  *
  * @module lang-kit/gradle-script

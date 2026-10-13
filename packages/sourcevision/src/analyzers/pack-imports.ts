@@ -9,6 +9,9 @@
  * produces no edges, and is listed in {@link PackImportGraph.degraded} so a
  * caller with another parser for the language (Go's regex parser) can run it.
  *
+ * Edges and externals come from each file's lang-kit imports facts, read by
+ * `language/pack-facts.ts` from the pack's resolver.
+ *
  * @module sourcevision/analyzers/pack-imports
  */
 
@@ -23,6 +26,7 @@ import {
   type PackResolver,
   type PackSourceFile,
 } from "../language/pack.js";
+import { readPackFacts } from "../language/pack-facts.js";
 import { createTreeSitterRunner, loadGrammar, type RunnablePack } from "../language/runner.js";
 
 export interface PackImportsOptions {
@@ -139,12 +143,13 @@ export async function buildPackImportGraph(
       const { parsed, unparsed } = await parsePackFiles(runner, target, files, targetDir);
       const prepared = resolver.prepare(parsed, unparsed);
 
-      for (const { path } of parsed) {
-        const refs = prepared.resolve(path);
-        for (const ref of refs.files) {
+      for (const file of parsed) {
+        const { path, imports } = readPackFacts(pack, file, { kinds: ["imports"], resolver: prepared });
+        if (!imports) continue;
+        for (const ref of imports.files) {
           edges.push({ from: path, to: ref.to, type: "static", symbols: [...ref.symbols] });
         }
-        for (const ext of refs.external) {
+        for (const ext of imports.external) {
           const existing = external.get(ext.package);
           if (existing) {
             existing.importedBy.push(path);

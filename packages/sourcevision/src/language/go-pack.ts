@@ -40,5 +40,6 @@ export const goPack: LanguagePack = {
     return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
   },
   resolver: goResolver,
+  produces: ["imports", "symbols", "calls"],
   provenance: Object.fromEntries(QUERY_NAMES.map((name) => [name, VERIFIED])),
 };
