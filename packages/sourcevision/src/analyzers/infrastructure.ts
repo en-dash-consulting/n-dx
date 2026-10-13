@@ -52,9 +52,10 @@ import type { InfraLink, InfraResource, InfrastructureData } from "../schema/v1.
  * The `.ndx/` container for a project root, or `null` on the legacy layout.
  *
  * Hand-written twin of `resolveLayout(root).container`. This module bundles
- * into the standalone skill script and may import nothing but `node:`
- * builtins, so it cannot reach the resolver in `@n-dx/llm-client` — the same
- * constraint that gives `packages/core/layout.js` its own copy.
+ * into the standalone skill script and may import only what the header
+ * above allows (no `@n-dx/llm-client`), so it cannot reach that package's
+ * resolver — the same constraint that gives `packages/core/layout.js` its
+ * own copy.
  * `tests/integration/layout-resolver-contract.test.js` pins what is built on
  * it to the canonical implementation, because a third copy of a rule drifts
  * just as silently as a second one.
