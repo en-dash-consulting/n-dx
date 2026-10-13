@@ -5,11 +5,12 @@ paths:
 
 # Web injection seam registry
 
-The registry lives in the **"Web injection seam registry"** section of
-`packages/web/AGENTS.md`, which `packages/web/CLAUDE.md` imports — so Claude
-Code already has it loaded under this path. Read it there. It lists the
-callback-injection seams inside the web package that static analysis cannot
-see (`boundary-check.test.ts`, `domain-isolation.test.js` are blind to them),
+The **"Web injection seam registry"** section of `packages/web/AGENTS.md`
+names the three seams and sends you to the table, which lives beside the code
+in `packages/web/src/server/AGENTS.md`. Both are nested `AGENTS.md` files, so
+every assistant reads them under this path; Claude Code has them loaded
+already. They list the callback-injection seams static analysis cannot see
+(`boundary-check.test.ts` and `domain-isolation.test.js` are blind to them)
 and the rules for adding one.
 
 This file exists only for its `paths:` scoping. Keep it a pointer: `.claude/`

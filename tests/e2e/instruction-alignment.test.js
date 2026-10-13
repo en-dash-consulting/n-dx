@@ -434,10 +434,31 @@ describe("package instruction surfaces", () => {
   });
 
   it("web and core keep their governance in AGENTS.md", () => {
+    // Web's guidance is split by directory (PRD fabfa3a2): the package file
+    // keeps a pointer section so a session rooted at packages/web still knows
+    // the seams and the boundary exist, and the rules themselves sit beside the
+    // code they govern. Both halves are AGENTS.md, so every assistant reads
+    // whichever one its working directory puts on the chain.
     const web = readFileSync(join(PACKAGES_DIR, "web", "AGENTS.md"), "utf-8");
     expect(web).toContain("## Web injection seam registry");
     expect(web).toContain("## Web viewer gateway boundary");
     expect(web).toContain("RegisterSchedulerOptions");
+
+    const server = readFileSync(
+      join(PACKAGES_DIR, "web", "src", "server", "AGENTS.md"),
+      "utf-8",
+    );
+    expect(server, "the seam table itself").toContain("| Injection site |");
+    for (const iface of ["RegisterSchedulerOptions", "WorkspaceHooks", "LiveSources"]) {
+      expect(server, `seam row for ${iface}`).toContain(iface);
+    }
+
+    const viewer = readFileSync(
+      join(PACKAGES_DIR, "web", "src", "viewer", "AGENTS.md"),
+      "utf-8",
+    );
+    expect(viewer).toContain("## Web viewer gateway boundary");
+    expect(viewer).toContain("external.ts");
 
     const core = readFileSync(join(PACKAGES_DIR, "core", "AGENTS.md"), "utf-8");
     expect(core).toContain("## Core injection seam registry");

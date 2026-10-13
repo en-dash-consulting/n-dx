@@ -34,30 +34,31 @@ The web package's internal layering (`web-server` → `web-viewer` →
 
 ##### Monorepo-wide zone fragility governance
 
-Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragility
-zone requiring active governance. Zone ids and metrics are Louvain output and move
-between analyses, so no list of them is reproduced here — read the live values with
-`ndx analyze --deep .` then `ndx zone <id>` (or the `/ndx-zone` skill). These rules
-hold whatever the current zones are:
+A production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragility
+zone and needs active governance. Zone ids and metrics are Louvain output and
+move between analyses, so read the live values with `ndx analyze --deep .` then
+`ndx zone <id>` (or the `/ndx-zone` skill) rather than trusting a list. Three
+rules hold whatever the current zones are:
 
 - **Two-consumer rule.** A new module in a shared directory needs at least two
-  distinct consumer zones. A single-consumer utility belongs next to its use site.
-- **Cohesion monitoring.** If a zone's cohesion drops below its current value after
-  a change, the change needs explicit justification.
-- **Directory policies outlive zone detection.** A rule tied to a directory (barrel
-  imports, framework-agnostic constraints) stays in force whether or not Louvain
-  currently emits a zone for it — tests enforce it, not the analyser. Correct a stale
-  metric; do not delete a policy because its zone stopped appearing.
+  distinct consumer zones; a single-consumer utility belongs next to its use site.
+- **Cohesion monitoring.** A change that drops a zone's cohesion below its
+  current value needs explicit justification.
+- **Directory policies outlive zone detection.** A rule tied to a directory
+  stays in force whether or not Louvain still emits a zone for it — tests
+  enforce it, not the analyser. Correct a stale metric; do not delete a policy
+  because its zone stopped appearing.
 
-Per-package zone policy lives in `packages/<pkg>/AGENTS.md`. Fuller treatment,
-including the dual-fragility threshold and the web package's internal layering:
+Per-package zone policy lives in `packages/<pkg>/AGENTS.md`; the threshold and
+the web package's internal layering are covered fully in
 [docs/architecture/overview.md](docs/architecture/overview.md).
 
 > **Spawn-exempt exception:** `config.js` directly reads/writes package config files (`.rex/config.json`, `.hench/config.json`, `.sourcevision/manifest.json`, `.n-dx.json`) rather than delegating to spawned CLIs. This is intentional — config operations require cross-package reads, atomic merges, and validation logic that cannot be expressed as a single CLI spawn. It is the only orchestration-tier script that breaks the spawn-only rule.
 
 ### Gateway modules
 
-Packages that import from other packages at runtime concentrate **all** cross-package imports into a single gateway module per upstream package. This makes the dependency surface explicit, auditable, and easy to update when upstream APIs change.
+Cross-package runtime imports concentrate into one gateway module per upstream
+package, so the dependency surface stays explicit and auditable.
 
 | Package | Gateway file | Imports from |
 |---------|-------------|--------------|
@@ -68,15 +69,17 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 | web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` |
 | web | `src/viewer/api.ts` | `src/viewer/types.ts`, `src/viewer/route-state.ts` |
 
-Each gateway's export inventory, and the export ceiling
-`tests/e2e/architecture-policy.test.js` holds it to, are in
-[docs/architecture/gateways.md](docs/architecture/gateways.md) — read the file
-itself before adding to one.
+Export inventories and the ceiling `tests/e2e/architecture-policy.test.js`
+holds them to are in
+[docs/architecture/gateways.md](docs/architecture/gateways.md) — read it before
+adding to a gateway.
 
 Rules:
 - **One gateway per source package** — all runtime imports from a given upstream package pass through a single gateway. A consumer may have multiple gateways (e.g. web has separate gateways for rex and sourcevision).
 - **Re-export only** — gateways re-export; they contain no logic. Enforced by `domain-isolation.test.js`.
-- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in the owning package's `AGENTS.md` (e.g. "Web viewer gateway boundary" in `packages/web/AGENTS.md`).
+- **Type imports through gateway** — `import type` flows through the gateway
+  too, or a type import gets silently promoted to a runtime one in a later
+  refactor. Per-package exemptions are documented in that package's `AGENTS.md`.
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
 Per-package gateways, exemptions and seam registries are in that package's
@@ -98,23 +101,26 @@ sharing — is in [docs/architecture/overview.md](docs/architecture/overview.md)
 
 ### Concurrency contract
 
-The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) share mutable state files on disk. Concurrent execution rules:
-
-`ndx status` and `ndx usage` are read-only and safe against anything. `ndx start` runs alongside `ndx work`, and tolerates `ndx plan` — though a restart is what flushes its in-process caches. Never pair two writers: `ndx ci` with `ndx work`, `ndx plan` with `ndx work`, `ndx refresh` with any write command, or two `ndx config` runs. The full table is in [docs/architecture/overview.md](docs/architecture/overview.md#concurrency).
+The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`)
+share mutable state on disk. `ndx status` and `ndx usage` are read-only and
+safe against anything. `ndx start` runs alongside `ndx work`, and tolerates
+`ndx plan` — though only a restart flushes its in-process caches. Never pair
+two writers: `ndx ci` with `ndx work`, `ndx plan` with `ndx work`, `ndx refresh`
+with any write command, or two `ndx config` runs. The full table is in
+[docs/architecture/overview.md](docs/architecture/overview.md#concurrency).
 
 **General rule:** Commands that write to the PRD backend (`.rex/prd_tree/`), `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
 **MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced.
 
-**What the code enforces, and what does not.** PRD-writing MCP tools,
-dashboard routes and bulk restructurers read-modify-write inside
-`store.withTransaction`, which holds the PRD file lock for the whole span; a
-writer that cannot take the lock fails loudly naming the holder's PID. The
-lock is per workspace, one per `rexDir`, so it does not serialize two
-worktrees. Other CLI write paths (`analyze`/`plan` imports, `update`, `move`,
-`remove`, `fix`) still load→mutate→save, so the last full-document writer
-wins — do not run them alongside another PRD writer. Full reasoning, and the
-bundle and narrative carve-outs:
+**What the code enforces, and what does not.** PRD-writing MCP tools, dashboard
+routes and bulk restructurers read-modify-write inside `store.withTransaction`,
+which holds the PRD file lock for the whole span; a writer that cannot take the
+lock fails loudly naming the holder's PID. The lock is per workspace, one per
+`rexDir`, so it does not serialize two worktrees. Other CLI write paths
+(`analyze`/`plan` imports, `update`, `move`, `remove`, `fix`) still
+load→mutate→save, so the last full-document writer wins — do not run them
+alongside another PRD writer. Reasoning and the export carve-outs:
 [docs/architecture/prd-write-concurrency.md](docs/architecture/prd-write-concurrency.md).
 
 **PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
@@ -142,23 +148,26 @@ Claude Code loads a package's own `CLAUDE.md` when work happens under that direc
 
 ## Assistant Instruction Files
 
-`ndx init` generates per-assistant instruction files from a shared source of truth (`packages/core/assistant-assets/project-guidance.md`). Each file has a defined role:
+`ndx init` generates every assistant's instruction file from one source,
+`packages/core/assistant-assets/project-guidance.md`. `AGENTS.md` is the
+canonical shared surface: that guidance, filtered, plus the manifest-derived
+workflow, skills and MCP sections and `codex-troubleshooting.md`. `CLAUDE.md`
+is the same guidance plus `claude-addendum.md`. `.codex/config.toml` carries
+the MCP server descriptors.
 
-| File | Role | Generated from |
-|------|------|----------------|
-| `AGENTS.md` | **Canonical shared guidance surface.** Read by Codex and any future assistants. Contains project docs, zone governance, gateway rules, the concurrency contract, workflow, skill inventory, and MCP tool reference derived from the asset manifest. | `project-guidance.md` (filtered) + manifest-derived sections + `codex-troubleshooting.md` |
-| `CLAUDE.md` | **Claude-facing bridge.** Read by Claude Code on startup. Imports the same shared guidance plus the pointers to Claude's own per-directory instruction files. | `project-guidance.md` + `claude-addendum.md` |
-| `.codex/config.toml` | **Codex MCP configuration.** Auto-read by Codex — no manual registration required. | Manifest MCP server descriptors |
+**Design invariant:** both instruction files take their project documentation
+from `project-guidance.md`, and vendor-specific material layers on top rather
+than being inlined — that is what stops the two surfaces drifting. The addendum
+is for Claude Code's own behaviour alone: anything describing the *codebase*
+belongs in the shared guidance, because a section in the addendum never reaches
+`AGENTS.md`. `tests/e2e/instruction-alignment.test.js` enforces both halves.
 
-**Design invariant:** Both `AGENTS.md` and `CLAUDE.md` derive their base project documentation (Packages, Architecture, Commands, Key Files) from `project-guidance.md`. Vendor-specific additions are layered on top — never inlined into the shared template. This prevents instruction drift between assistant surfaces.
-
-**What goes in `claude-addendum.md`:** only guidance about Claude Code's own
-behaviour. Anything describing the *codebase* belongs in
-`project-guidance.md`, because a section in the addendum never reaches
-`AGENTS.md`; `tests/e2e/instruction-alignment.test.js` fails an addendum
-heading that is not on its Claude-only allowlist.
-
-Re-run `ndx init` to regenerate all instruction files after changes to `packages/core/assistant-assets/`.
+Re-run `ndx init` after changing anything under
+`packages/core/assistant-assets/`. The root `AGENTS.md` has a byte budget —
+Codex reads the root and a package's file as one chain and silently drops the
+tail past `project_doc_max_bytes`, so `tests/e2e/agents-md-size-budget.test.js`
+fails a pull request that grows it too far. Put reasoning in `docs/` and link
+it.
 
 ## n-dx Orchestration Commands
 
@@ -235,13 +244,14 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 | `.rex/prd.json` | (Legacy) JSON PRD; migration source when neither `prd.md` nor the tree exists. |
 | `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
 | `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
-| `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
-| `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |
-| `tests/e2e/mcp-transport.test.js` | MCP HTTP transport end-to-end validation (session management, tool calls) |
-| `tests/e2e/integration-coverage-policy.test.js` | Minimum integration test file count, cross-package contract verification |
-| `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
-| `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `OPEN_SOURCE_SCOPE.md` | Licensing boundaries, included/excluded components, and contribution expectations |
+
+The policy suites that enforce the rules above — spawn-only and intra-package
+layering (`architecture-policy`), gateway and tier isolation
+(`domain-isolation`), MCP transport, integration coverage — live under
+`tests/e2e/`. `tests/e2e/cli-dev.test.js` and
+`tests/integration/scheduler-startup.test.js` are required on every change:
+see [TESTING.md](TESTING.md#required-tests).
 
 Derived files an assistant never edits — the sourcevision caches, the hench
 usage cursors, the archive and the dashboard spend ledger — are described in
