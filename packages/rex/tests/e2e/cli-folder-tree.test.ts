@@ -9,8 +9,8 @@
  * No test references prd.md paths; all assertions target `.rex/prd_tree/`.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readdir, readFile, stat } from "node:fs/promises";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { cp, mkdtemp, rm, readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -158,14 +158,35 @@ function flattenIds(items: Array<{ id: string; children?: unknown[] }>): string[
 
 // ── Write-command folder-tree state tests ─────────────────────────────────────
 
+/**
+ * `rex init` runs once per describe, into a template that each test copies:
+ * the spawn cost about a second here and three on the Windows CI runner, per
+ * test. The init output names nothing about its directory, so a copy is the
+ * same project a fresh init would give.
+ */
+async function initTemplate(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "rex-e2e-tree-template-"));
+  run(["init", dir]);
+  return dir;
+}
+
 describe("rex CLI — folder-tree state after write commands", { timeout: 60_000 }, () => {
+  let templateDir: string;
   let tmpDir: string;
   let treeRoot: string;
+
+  beforeAll(async () => {
+    templateDir = await initTemplate();
+  });
+
+  afterAll(async () => {
+    await rm(templateDir, { recursive: true, force: true });
+  });
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-e2e-tree-"));
     treeRoot = join(tmpDir, ".rex", PRD_TREE_DIRNAME);
-    run(["init", tmpDir]);
+    await cp(templateDir, tmpDir, { recursive: true });
   });
 
   afterEach(async () => {
@@ -332,11 +353,20 @@ describe("rex CLI — folder-tree state after write commands", { timeout: 60_000
 // ── Pipeline tests: add items → status/next read from tree ───────────────────
 
 describe("rex CLI — status and next read from folder tree", { timeout: 60_000 }, () => {
+  let templateDir: string;
   let tmpDir: string;
+
+  beforeAll(async () => {
+    templateDir = await initTemplate();
+  });
+
+  afterAll(async () => {
+    await rm(templateDir, { recursive: true, force: true });
+  });
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-e2e-tree-pipeline-"));
-    run(["init", tmpDir]);
+    await cp(templateDir, tmpDir, { recursive: true });
   });
 
   afterEach(async () => {

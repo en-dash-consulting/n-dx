@@ -24,6 +24,11 @@ const run = promisify(execFile);
  *
  * The round-trip case is the one that matters: asserting the config value alone
  * would not catch a future git that ignored it.
+ *
+ * The pin lives in the gitconfig that tests/setup-session-env.js writes and
+ * points GIT_CONFIG_GLOBAL at, not in each repo, so the values are read as git
+ * resolves them (the effective value, every level considered) rather than with
+ * `--local`. A fixture repo's own config is empty by design.
  */
 describe("git fixture repos", () => {
   let dir: string;
@@ -37,9 +42,22 @@ describe("git fixture repos", () => {
   });
 
   async function configValue(key: string): Promise<string> {
-    const { stdout } = await run("git", ["config", "--local", key], { cwd: dir });
+    const { stdout } = await run("git", ["config", key], { cwd: dir });
     return stdout.trim();
   }
+
+  it("takes its config from the shared test gitconfig, not from the repo", async () => {
+    await initGitFixtureRepo(dir);
+
+    // The setup file is what pins every value below; if it stopped running,
+    // the other cases would pass or fail on the machine's own config instead.
+    const globalPath = process.env["GIT_CONFIG_GLOBAL"];
+    expect(globalPath, "tests/setup-session-env.js did not set GIT_CONFIG_GLOBAL").toBeTruthy();
+    expect(await readFile(globalPath!, "utf-8")).toContain("gpgsign = false");
+
+    const { stdout } = await run("git", ["config", "--local", "--list"], { cwd: dir });
+    expect(stdout).not.toMatch(/^user\.|^commit\.gpgsign|^core\.autocrlf/m);
+  });
 
   /** Commit LF content, change it, restore it via git, and read the bytes back. */
   async function lfSurvivesCheckout(): Promise<string> {

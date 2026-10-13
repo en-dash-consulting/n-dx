@@ -532,6 +532,28 @@ describe("batch chain — concurrent mutation", () => {
     expect(chain?.tasksUsed).toBe(advances);
   });
 
+  it("refuses the write rather than losing an update when the lock cannot be taken", async () => {
+    // withCacheLock used to run the read-modify-write whether or not it got
+    // the lock: on a timeout, or any error that was not EEXIST, it fell
+    // through and wrote anyway. That is the lost update this suite races to
+    // catch — two writers read the same tasksUsed and both write it plus one —
+    // and it showed up as 7 of 8 advances landing under CI contention.
+    //
+    // Held by someone else and fresh, so the stale-lock path does not reclaim
+    // it. Every caller treats a cache write as best effort, so refusing costs
+    // a cache entry where proceeding costs a miscount nothing reports.
+    await advanceBatchChain(dir, ADVANCE);
+    const before = await readBatchChain(dir);
+
+    await writeFile(join(dir, "session-cache.json.lock"), "99999\n", "utf-8");
+    try {
+      await expect(advanceBatchChain(dir, ADVANCE)).rejects.toThrow(/session cache lock/);
+      expect((await readBatchChain(dir))?.tasksUsed).toBe(before?.tasksUsed);
+    } finally {
+      await rm(join(dir, "session-cache.json.lock"), { force: true });
+    }
+  }, 30_000);
+
   it("never leaves the cache file unparseable under concurrent writes", async () => {
     await Promise.all([
       ...Array.from({ length: 6 }, () => advanceBatchChain(dir, ADVANCE)),

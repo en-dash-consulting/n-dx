@@ -641,5 +641,6 @@ export type {
   RepointMiss,
   RepointOptions,
   RepointResult,
+  RecordedCommitFacts,
   RepointRule,
 } from "./core/repoint-commits.js";

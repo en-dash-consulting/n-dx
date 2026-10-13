@@ -160,8 +160,6 @@ describe("resolveStore", () => {
   it.skip("writes new root items to prd.md regardless of the current branch (single-file mode)", async () => {
     await mkdir(tmpDir, { recursive: true });
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, encoding: "utf-8" });
-    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir, encoding: "utf-8" });
-    execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir, encoding: "utf-8" });
     execFileSync("git", ["commit", "--allow-empty", "-m", "init"], {
       cwd: tmpDir,
       encoding: "utf-8",

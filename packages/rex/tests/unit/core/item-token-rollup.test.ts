@@ -5,9 +5,14 @@
  * per item, and rolls them up to parents and ancestors.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { priceTokens, resolveModelPricing } from "@n-dx/llm-client";
 import {
   aggregateItemTokenUsage,
+  readRunTokensFromHench,
   type ItemRunTokens,
   type ItemTokenTotals,
 } from "../../../src/core/item-token-rollup.js";
@@ -322,5 +327,58 @@ describe("aggregateItemTokenUsage", () => {
     expect(totals.size).toBeGreaterThanOrEqual(500);
     expect(orphans.length).toBeGreaterThan(0);
     expect(elapsed).toBeLessThan(50 * BUDGET_MULTIPLIER);
+  });
+});
+
+describe("readRunTokensFromHench prices each run at the model it recorded", () => {
+  let dir: string;
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), "rex-rollup-cost-")); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  const writeRun = async (name: string, run: Record<string, unknown>): Promise<void> => {
+    const runs = join(dir, ".hench", "runs");
+    await mkdir(runs, { recursive: true });
+    await writeFile(join(runs, name), JSON.stringify(run), "utf-8");
+  };
+
+  const usage = { input: 1_000_000, output: 1_000_000, cacheCreationInput: 0, cacheReadInput: 0 };
+  const expectedFor = (model: string): number =>
+    priceTokens(
+      { inputTokens: 1_000_000, outputTokens: 1_000_000, cacheCreationTokens: 0, cacheReadTokens: 0 },
+      resolveModelPricing(model).pricing,
+    ).totalRaw;
+
+  it("sets a non-zero costUsd, at that model's rate", async () => {
+    // Before this, every tuple carried costUsd: 0 and nothing ever set it, so
+    // get_token_usage reported zero cost for every item in the PRD.
+    await writeRun("a.json", { taskId: "t1", status: "completed", model: "claude-opus-5", tokenUsage: usage });
+
+    const [row] = await readRunTokensFromHench(dir);
+
+    expect(row.tokens.costUsd).toBeGreaterThan(0);
+    expect(row.tokens.costUsd).toBeCloseTo(expectedFor("claude-opus-5"), 10);
+  });
+
+  it("prices two runs of one task apart when they ran on different models", async () => {
+    // The reason this is per run and not over the summed rollup: a blended
+    // rate would be wrong for every item that mixed tiers.
+    await writeRun("a.json", { taskId: "t1", status: "completed", model: "claude-opus-5", tokenUsage: usage });
+    await writeRun("b.json", { taskId: "t1", status: "completed", model: "claude-haiku-4-5", tokenUsage: usage });
+
+    const rows = await readRunTokensFromHench(dir);
+    const costs = rows.map((r) => r.tokens.costUsd ?? 0).sort((x, y) => x - y);
+
+    expect(costs[0]).toBeCloseTo(expectedFor("claude-haiku-4-5"), 10);
+    expect(costs[1]).toBeCloseTo(expectedFor("claude-opus-5"), 10);
+    expect(costs[0]).toBeLessThan(costs[1]);
+  });
+
+  it("prices a run with no model at the fallback rate rather than at nothing", async () => {
+    await writeRun("a.json", { taskId: "t1", status: "completed", tokenUsage: usage });
+
+    const [row] = await readRunTokensFromHench(dir);
+
+    expect(row.tokens.costUsd).toBeCloseTo(expectedFor(""), 10);
+    expect(row.tokens.costUsd).toBeGreaterThan(0);
   });
 });

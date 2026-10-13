@@ -2031,6 +2031,14 @@ export interface RunCommitRecord {
    * re-point simply has one fewer rule available for them.
    */
   authorDate?: string;
+  /**
+   * Author email, as git prints `%ae`.
+   *
+   * Recorded because rex's twin rule keys on email + author date + subject.
+   * Without it the stored facts cannot identify a rewritten commit whose
+   * original object is gone, which is the case they exist for.
+   */
+  authorEmail?: string;
 }
 
 /** A run commit whose N-DX-Item does not name the run's task. See {@link RunRecord.commitsMissingItem}. */

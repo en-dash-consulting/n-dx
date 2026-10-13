@@ -20,8 +20,8 @@
  * becomes the baseline the exported bundle is checked against.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readdir, readFile, writeFile } from "node:fs/promises";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { cp, mkdtemp, rm, readdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -216,20 +216,26 @@ function flatten(items: PRDItem[], parentId: string | null = null): Map<string, 
 }
 
 describe("rex export / import-bundle", { timeout: 120_000 }, () => {
+  /**
+   * The seeded source project, built once through the production write path
+   * (`rex init`, then `rex import-bundle` of the fixture) and copied into a
+   * fresh directory for every test. Each test still gets its own source tree
+   * to export from or wreck; what it no longer pays for is the two CLI spawns
+   * that built it — about a second here and three on the Windows CI runner,
+   * per test, for 49 tests (171 s for this file on run 38193308009). Nothing
+   * in the seeded tree names the directory it was built in, so the copy is
+   * indistinguishable from a fresh seed.
+   */
+  let templateDir: string;
   let sourceDir: string;
   let targetDir: string;
   let bundlePath: string;
-  let fixturePath: string;
 
-  beforeEach(async () => {
-    sourceDir = await mkdtemp(join(tmpdir(), "rex-bundle-src-"));
-    targetDir = await mkdtemp(join(tmpdir(), "rex-bundle-dst-"));
-    bundlePath = join(sourceDir, "prd-bundle.json");
-    fixturePath = join(sourceDir, "fixture-bundle.json");
-
+  beforeAll(async () => {
+    templateDir = await mkdtemp(join(tmpdir(), "rex-bundle-template-"));
     // Seed the source project through the production write path.
     await writeFile(
-      fixturePath,
+      join(templateDir, "fixture-bundle.json"),
       JSON.stringify({
         bundle: "rex/prd-bundle",
         bundleVersion: 1,
@@ -239,8 +245,19 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
         items: fixtureItems(),
       }),
     );
-    run(["init", sourceDir]);
-    run(["import-bundle", `--in=${fixturePath}`, sourceDir]);
+    run(["init", templateDir]);
+    run(["import-bundle", `--in=${join(templateDir, "fixture-bundle.json")}`, templateDir]);
+  });
+
+  afterAll(async () => {
+    await rm(templateDir, { recursive: true, force: true });
+  });
+
+  beforeEach(async () => {
+    sourceDir = await mkdtemp(join(tmpdir(), "rex-bundle-src-"));
+    targetDir = await mkdtemp(join(tmpdir(), "rex-bundle-dst-"));
+    bundlePath = join(sourceDir, "prd-bundle.json");
+    await cp(templateDir, sourceDir, { recursive: true });
   });
 
   afterEach(async () => {
