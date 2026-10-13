@@ -10,9 +10,9 @@ tags:
 source: "roadmap"
 acceptanceCriteria: []
 description: "Home for items captured by review passes and runs on the product layer roadmap that are not needed to finish the PR they came from. Captures left under a roadmap feature keep that feature pending, and every feature that depends on it stays blocked, which is what happened after the first overnight wave. Move such items here (rex move <id> --parent=<this feature>) and tag them with the pr-NN they came from. Nothing depends on this feature. Work them as small PRs of their own, or fold one into a later roadmap PR that touches the same files."
+assignee: "Ryan Keith <ryan.k@endash.us>"
 lastModified: "2026-10-13T19:52:36.022Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
-assignee: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -26,7 +26,6 @@ assignee: "Ryan Keith <ryan.k@endash.us>"
 | [Apply refuses removing one member of a pre-existing dependsOn knot that stays cyclic](./apply-refuses-removing-one-member-of-a.md) | pending |
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | completed |
 | [Bulk PATCH /api/rex/items/bulk writes fields the single PATCH refuses](./bulk-patch-api-rex-items-bulk-writes.md) | pending |
-| [Bulk status PATCH completing a v2 change under rex.applyOn review reports ok with no reason it was left unapplied](./bulk-status-patch-completing-a-v2.md) | pending |
 | [Bundle v2 export blames a missing child when the folder's child was skipped as invalid, and drops the reader warning naming it](./bundle-v2-export-blames-a-missing.md) | pending |
 | [Bundle v2 round trip moves unknown state.yaml keys into node frontmatter](./bundle-v2-round-trip-moves-unknown.md) | completed |
 | [change-management guide says rex remove archives items and rex restore <item-id> recovers them; neither is true](./change-management-guide-says-rex.md) | completed |
@@ -44,18 +43,14 @@ assignee: "Ryan Keith <ryan.k@endash.us>"
 | [MCP Integration guide still says HTTP MCP is single-project until a 0.7.0 hub](./mcp-integration-guide-still-says-http.md) | pending |
 | [ndx work --task on a v2 change with tasks claims the change while another worktree holds one of its tasks](./ndx-work-task-on-a-v2-change-with.md) | pending |
 | [No test covers the PRD watcher refreshing the cache on product/ or changes/ edits](./no-test-covers-the-prd-watcher.md) | pending |
-| [No test pins that a kept v2 completion suppresses the failed-run rollback](./no-test-pins-that-a-kept-v2-completion.md) | pending |
 | [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | completed |
 | [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | pending |
-| [On a v2 tree, --resolve reports a subtask or container-change ref as "Task not found" instead of the run's reason](./on-a-v2-tree-resolve-reports-a-subtask.md) | pending |
 | [Record review decisions as calibration records on the run record](./record-review-decisions-as-calibration.md) | pending |
 | [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | deferred |
 | [rex release stamp applies a container change before the changes nested in it](./rex-release-stamp-applies-a-container.md) | pending |
-| [rex release stamp runs git tag --contains for every historical unstamped change, on every release](./rex-release-stamp-runs-git-tag.md) | pending |
 | [rex usage ignores .n-dx.json rex overrides: token-store passes the wrong dir and key to loadProjectOverrides](./rex-usage-ignores-n-dx-json-rex.md) | pending |
 | [Rex watcher stops following a PRD folder that is deleted and recreated while ndx start runs](./rex-watcher-stops-following-a-prd.md) | pending |
 | [Stop the timed-out test gate test racing its fake gate startup](./stop-the-timed-out-test-gate-test.md) | completed |
-| [The Ask panel proposes v2 merges that the v1 rule allows and the v2 rule then refuses at apply](./the-ask-panel-proposes-v2-merges-that.md) | pending |
 | [The exported computeLanding still reports an open change as landed, because it takes ids rather than the change](./the-exported-computelanding-still.md) | pending |
 | [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | pending |
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | pending |
