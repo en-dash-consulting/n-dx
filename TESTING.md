@@ -573,6 +573,28 @@ an agent running the suite inside Claude Code — ever saw the failure.
   memoised reads. `tests/setup-color-env.js` and `tests/setup-session-env.js` do
   this, and every package's `vitest.config.ts` registers both. `globalSetup` is
   the wrong hook — it runs in another process and does not affect the workers.
+- **Test files share a worker unless they mock.** Each package's `vitest.config.ts`
+  splits its files into two `test.projects` through `tests/vitest-isolation.mjs`:
+  `<pkg>:shared` runs with `isolate: false`, so files reuse the worker, its
+  module graph and (for jsdom files) the environment; `<pkg>:isolated` holds
+  every file whose source calls `vi.mock`, `vi.doMock`, `vi.resetModules`,
+  `vi.stubGlobal`, `vi.stubEnv`, `vi.hoisted` or `process.chdir`, found by
+  scanning the files when vitest starts, so the split cannot go stale. A
+  shared-project file that leaks state (a module singleton it never resets)
+  fails a later file; fix the leak rather than adding a mock to move the file.
+  To check whether a failure is a leak, run with `NDX_TEST_ISOLATE_ALL=1`, which
+  puts every file back in its own worker: a failure that disappears is a leak
+  in the shared project, one that stays is the test's own.
+- **Fixture repos get their git config from one file, not from `git config`.**
+  `tests/setup-session-env.js` writes a gitconfig (identity `Test
+  <test@test.com>`, `core.autocrlf=false`, `core.eol=lf`, `commit.gpgsign=false`,
+  `core.hooksPath` at an empty directory) and points `GIT_CONFIG_GLOBAL` at it,
+  so every `git` the worker or its spawned CLIs run sees the same settings. A
+  fixture is `git init` and nothing more; do not add per-repo `git config`
+  calls for those keys. A test that needs a different identity sets it at local
+  level, which wins over the global file as it always has. The per-repo form
+  cost two to five extra spawns per fixture, which on the Windows CI runner was
+  minutes across the monorepo.
 - **Guard, do not remove, a genuine environment dependency.** `sh -c` in the
   process-tree tests is load-bearing: libuv puts every non-detached child it
   spawns on Windows into a global job object, so spawning `node` directly reaps

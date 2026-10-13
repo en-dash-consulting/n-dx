@@ -33,9 +33,10 @@
  * @module hench/store/repoint-runs
  */
 
-import type { RunRecord } from "../schema/index.js";
+import type { RunCommitRecord, RunRecord } from "../schema/index.js";
 import {
   repointCommits,
+  type RecordedCommitFacts,
   type RepointMatch,
   type RepointMiss,
 } from "../prd/rex-gateway.js";
@@ -121,9 +122,30 @@ export async function repointRun(
     };
   }
 
+  // The facts the run recorded, for the SHAs git can no longer resolve. Rex
+  // rejects a missing SHA before any twin rule runs, and its twin key is
+  // author email + author date + subject — so without these the stored facts
+  // were never read at all, in exactly the case they were recorded for: a
+  // pruned branch, a fresh clone, `git gc` after a squash merge.
+  const recorded = new Map<string, RecordedCommitFacts>();
+  const remember = (sha: string | undefined, facts: RunCommitRecord | undefined): void => {
+    if (!sha || !facts) return;
+    recorded.set(sha, {
+      ...(facts.authorEmail ? { authorEmail: facts.authorEmail } : {}),
+      ...(facts.authorDate ? { authorDate: facts.authorDate } : {}),
+      ...(facts.subject ? { subject: facts.subject } : {}),
+    });
+  };
+  remember(run.startHead, run.startHeadCommit);
+  for (const commit of run.commits ?? []) remember(commit.sha, commit);
+
   const result = await repointCommits(
     shas.map((entry) => entry.sha),
-    { repoDir: options.repoDir, ...(options.ref ? { ref: options.ref } : {}) },
+    {
+      repoDir: options.repoDir,
+      ...(options.ref ? { ref: options.ref } : {}),
+      ...(recorded.size > 0 ? { facts: recorded } : {}),
+    },
   );
 
   // `on-main` means the SHA is still reachable and nothing needs rewriting.

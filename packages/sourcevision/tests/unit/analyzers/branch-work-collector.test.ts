@@ -58,8 +58,6 @@ async function setupGitRepo(
   baseName = "main",
 ) {
   execFileSync("git", ["init", "-b", baseName], { cwd: dir });
-  execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: dir });
-  execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
 
   await writeFile(join(dir, "README.md"), "hello");
   execFileSync("git", ["add", "."], { cwd: dir });
