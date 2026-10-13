@@ -31,7 +31,7 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { resolveLayout } from "@n-dx/llm-client";
+import { priceTokens, resolveLayout, resolveModelPricing } from "@n-dx/llm-client";
 import type { PRDItem } from "../schema/v1.js";
 
 // ---------------------------------------------------------------------------
@@ -223,6 +223,8 @@ export function aggregateItemTokenUsage(
 interface MinimalRunRecord {
   taskId?: string;
   status?: string;
+  /** The model the run actually ran on; what its tokens are priced at. */
+  model?: string;
   tokens?: Partial<ItemTokenTuple>;
   tokenUsage?: {
     input?: number;
@@ -232,6 +234,28 @@ interface MinimalRunRecord {
   };
 }
 
+/**
+ * What one run's tokens cost, at the model that run recorded.
+ *
+ * Priced per run rather than over the summed rollup: a task's Haiku and Opus
+ * runs bill an order of magnitude apart, so one blended rate over the total
+ * would be wrong for every item that mixed them. A run with no model, or one
+ * `resolveModelPricing` does not know, prices at the fallback rate — the same
+ * rate `rex usage` quotes for it, rather than silently contributing nothing.
+ */
+function costOf(run: MinimalRunRecord, tuple: ItemTokenTuple): number {
+  const { pricing } = resolveModelPricing(run.model ?? "");
+  return priceTokens(
+    {
+      inputTokens: tuple.input,
+      outputTokens: tuple.output,
+      cacheCreationTokens: tuple.cacheCreation,
+      cacheReadTokens: tuple.cacheRead,
+    },
+    pricing,
+  ).totalRaw;
+}
+
 function tokensFromRecord(run: MinimalRunRecord): ItemTokenTuple {
   if (run.tokens) {
     const input = run.tokens.input ?? 0;
@@ -239,7 +263,8 @@ function tokensFromRecord(run: MinimalRunRecord): ItemTokenTuple {
     const cacheCreation = run.tokens.cacheCreation ?? 0;
     const cacheRead = run.tokens.cacheRead ?? 0;
     const total = run.tokens.total ?? input + output + cacheCreation + cacheRead;
-    return { input, output, cacheCreation, cacheRead, total };
+    const tuple = { input, output, cacheCreation, cacheRead, total };
+    return { ...tuple, costUsd: costOf(run, tuple) };
   }
   const u = run.tokenUsage;
   if (!u) return zeroTuple();
@@ -247,7 +272,8 @@ function tokensFromRecord(run: MinimalRunRecord): ItemTokenTuple {
   const output = u.output ?? 0;
   const cacheCreation = u.cacheCreationInput ?? 0;
   const cacheRead = u.cacheReadInput ?? 0;
-  return { input, output, cacheCreation, cacheRead, total: input + output + cacheCreation + cacheRead };
+  const tuple = { input, output, cacheCreation, cacheRead, total: input + output + cacheCreation + cacheRead };
+  return { ...tuple, costUsd: costOf(run, tuple) };
 }
 
 /**

@@ -694,8 +694,6 @@ describe("getChangedFiles", () => {
     const { execFileSync: exec } = await import("node:child_process");
     // Bootstrap a minimal git repo with one commit
     exec("git", ["init"], { cwd: tmpDir, stdio: "pipe" });
-    exec("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir, stdio: "pipe" });
-    exec("git", ["config", "user.name", "Test"], { cwd: tmpDir, stdio: "pipe" });
     writeFileSync(join(tmpDir, "hello.txt"), "hello", "utf-8");
     exec("git", ["add", "hello.txt"], { cwd: tmpDir, stdio: "pipe" });
     exec("git", ["commit", "-m", "init"], { cwd: tmpDir, stdio: "pipe" });
