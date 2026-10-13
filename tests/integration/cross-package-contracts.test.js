@@ -61,6 +61,8 @@ describe("rex public API contract", () => {
     { name: "validateMerge", type: "function" },
     { name: "previewMerge", type: "function" },
     { name: "mergeItems", type: "function" },
+    { name: "validateChangesMerge", type: "function" },
+    { name: "mergeChanges", type: "function" },
     // Analytics
     { name: "computeEpicStats", type: "function" },
     { name: "computeHealthScore", type: "function" },
@@ -477,6 +479,9 @@ describe("web → rex gateway contract", () => {
     "validateMerge",
     "previewMerge",
     "mergeItems",
+    // v2 merge — the dashboard's merge, refinement and reorganize on a change layer
+    "validateChangesMerge",
+    "mergeChanges",
     "countSubtree",
     "computeEpicStats",
     "computePriorityDistribution",
@@ -916,6 +921,7 @@ describe("gateway export auto-detection", () => {
         "collectAllIds", "findNextTask", "findActionableTasks", "collectCompletedIds",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
+        "validateChangesMerge", "mergeChanges",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
         "computeRequirementsSummary", "computeHealthScore",
         "detectReorganizations", "applyProposals", "applyReshape",

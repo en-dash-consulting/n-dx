@@ -4,13 +4,16 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { cpSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
-import { resolveStore } from "@n-dx/rex";
+import { refreshPRDCache } from "../../../src/server/prd-io.js";
+import { itemFingerprint, type RefinementProposal } from "../../../src/server/prd-refinement.js";
+import { resolveStore, findItem, type PRDItem } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
@@ -185,4 +188,133 @@ describe("Rex item routes on a v2 project", () => {
     const res = await send("PATCH", "items/nope", { status: "in_progress" });
     expect(res.status).toBe(404);
   });
+
+  describe("merge follows the change-layer rule", () => {
+    const PAY_BY_CARD = "a0000000-0000-4000-8000-000000000002";
+
+    /** An Inbox change, a sibling of the fixture's change, with the given v2 fields. */
+    async function addChange(title: string, fields: Partial<PRDItem> = {}): Promise<string> {
+      const res = await send("POST", "items", { title });
+      expect(res.status).toBe(201);
+      const { id } = await res.json();
+      if (Object.keys(fields).length > 0) await (await resolveStore(rexDir)).updateItem(id, fields);
+      return id;
+    }
+
+    async function itemById(id: string): Promise<PRDItem | undefined> {
+      const doc = await (await resolveStore(rexDir)).loadDocument();
+      return findItem(doc.items, id)?.item;
+    }
+
+    it("POST /items/merge carries the absorbed change's touches, id, displayId and aliases onto the target", async () => {
+      const other = await addChange("Apple Pay, again", { touches: [PAY_BY_CARD], displayId: "CH-7", aliases: ["CH-old"] } as Partial<PRDItem>);
+      const res = await send("POST", "items/merge", { sourceIds: [CHANGE_ID, other], targetId: CHANGE_ID });
+      expect(res.status).toBe(200);
+      expect((await res.json()).absorbedIds).toEqual([other]);
+
+      expect(await itemById(other)).toBeUndefined();
+      const target = (await itemById(CHANGE_ID)) as PRDItem & { touches?: string[]; aliases?: string[] };
+      expect(target.touches).toEqual([PAY_BY_CARD]);
+      expect([...(target.aliases ?? [])].sort()).toEqual([other, "CH-7", "CH-old"].sort());
+    });
+
+    it("POST /items/merge refuses to absorb a change carrying amends, with rex's reason, and writes nothing", async () => {
+      const other = await addChange("Apple Pay, again");
+      const before = treeSnapshot(rexDir);
+      const res = await send("POST", "items/merge", { sourceIds: [CHANGE_ID, other], targetId: other });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/carries amendments/);
+      expect(treeSnapshot(rexDir)).toEqual(before);
+      expect(frames.filter((f) => (f as { type?: string }).type === "rex:prd-changed")).toHaveLength(1); // the add only
+    });
+
+    it("POST /items/merge refuses to merge tasks, with rex's reason, and writes nothing", async () => {
+      const task2 = randomUUID();
+      await (await resolveStore(rexDir)).addItem(
+        { id: task2, title: "Style the button", status: "pending", level: "task", type: "task" } as PRDItem,
+        CHANGE_ID,
+      );
+      const before = treeSnapshot(rexDir);
+      const res = await send("POST", "items/merge", { sourceIds: [TASK_ID, task2], targetId: TASK_ID });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/merges changes only/);
+      expect(treeSnapshot(rexDir)).toEqual(before);
+    });
+
+    it("POST /items/merge preview refuses what the merge would refuse", async () => {
+      const other = await addChange("Apple Pay, again");
+      const res = await send("POST", "items/merge", { sourceIds: [CHANGE_ID, other], targetId: other, preview: true });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/carries amendments/);
+    });
+
+    it("POST /apply-refinements merges through the change-layer rule", async () => {
+      const other = await addChange("Apple Pay, again", { touches: [PAY_BY_CARD], displayId: "CH-7" } as Partial<PRDItem>);
+      const doc = await (await resolveStore(rexDir)).loadDocument();
+      const merge = (itemId: string, intoId: string, id: string): RefinementProposal => ({
+        id,
+        op: "merge",
+        itemId,
+        itemTitle: findItem(doc.items, itemId)!.item.title,
+        itemLevel: findItem(doc.items, itemId)!.item.level,
+        rationale: "Same work.",
+        intoId,
+        intoTitle: findItem(doc.items, intoId)!.item.title,
+        diffs: [],
+        baseline: [
+          { itemId, fingerprint: itemFingerprint(findItem(doc.items, itemId)!.item) },
+          { itemId: intoId, fingerprint: itemFingerprint(findItem(doc.items, intoId)!.item) },
+        ],
+      });
+
+      // Absorbing the amending change is refused; absorbing the plain one carries its touches and ids.
+      const res = await send("POST", "apply-refinements", {
+        proposals: [merge(CHANGE_ID, other, "r1"), merge(other, CHANGE_ID, "r2")],
+      });
+      expect(res.status).toBe(200);
+      const outcomes = (await res.json()).outcomes as Array<{ id: string; status: string; detail?: string }>;
+      expect(outcomes.find((o) => o.id === "r1")).toMatchObject({ status: "invalid", detail: expect.stringMatching(/carries amendments/) });
+      expect(outcomes.find((o) => o.id === "r2")).toMatchObject({ status: "applied" });
+
+      const target = (await itemById(CHANGE_ID)) as PRDItem & { touches?: string[]; aliases?: string[] };
+      expect(target.touches).toEqual([PAY_BY_CARD]);
+      expect([...(target.aliases ?? [])].sort()).toEqual([other, "CH-7"].sort());
+    });
+
+    it("reorganize proposes no v1 orphan or single-child collapse, and its merge carries touches and ids", async () => {
+      const a = await addChange("Add gift card checkout");
+      const b = await addChange("Add gift card checkout", { touches: [PAY_BY_CARD], displayId: "CH-9" } as Partial<PRDItem>);
+      refreshPRDCache(rexDir, await (await resolveStore(rexDir)).loadDocument());
+
+      const listed = await fetch(`${base}/reorganize?mode=fast`);
+      expect(listed.status).toBe(200);
+      const proposals = (await listed.json()).structural.proposals as Array<{ id: number; type: string; items: string[] }>;
+      // v1 would also propose collapsing the fixture's one-task change.
+      expect(proposals.filter((p) => p.type !== "merge")).toEqual([]);
+      const duplicate = proposals.find((p) => [...p.items].sort().join() === [a, b].sort().join());
+      expect(duplicate).toBeDefined();
+
+      const res = await send("POST", "reorganize/apply", { proposalIds: [duplicate!.id] });
+      expect(await res.json()).toMatchObject({ applied: 1, failed: 0 });
+
+      const [target, absorbed] = (await itemById(a)) ? [a, b] : [b, a];
+      expect(await itemById(absorbed)).toBeUndefined();
+      const node = (await itemById(target)) as PRDItem & { touches?: string[]; aliases?: string[] };
+      expect(node.touches).toEqual([PAY_BY_CARD]);
+      expect(node.aliases).toEqual(expect.arrayContaining([absorbed]));
+      if (absorbed === b) expect(node.aliases).toEqual(expect.arrayContaining(["CH-9"]));
+    });
+  });
 });
+
+/** Every file under `dir` (the PRD cache aside) and its content, to show a refused write wrote nothing. */
+function treeSnapshot(dir: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const entry of readdirSync(dir, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const path = join(entry.parentPath, entry.name);
+    if (path.includes(`${sep}.cache${sep}`)) continue;
+    out[path] = readFileSync(path, "utf-8");
+  }
+  return out;
+}

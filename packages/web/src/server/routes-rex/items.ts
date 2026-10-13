@@ -28,6 +28,9 @@ import {
   validateMerge,
   previewMerge,
   mergeItems,
+  validateChangesMerge,
+  mergeChanges,
+  type ChangesMergeOutcome,
 } from "../rex-gateway.js";
 
 // Re-import parentIdOf from rex-route-helpers for merge handler
@@ -633,19 +636,21 @@ async function handleItemMerge(
     }
 
     const store = await resolveStore(ctx.rexDir);
+    // On a v2 tree only sibling changes merge, through rex's mergeChanges.
+    const v2 = isChangeLayerStore(store);
+    const options = {
+      ...(input.title ? { title: input.title } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+    };
 
     // Preview mode — read-only, no store mutation needed.
     if (input.preview) {
       const doc = await store.loadDocument();
-      const validation = validateMerge(doc.items, input.sourceIds, input.targetId);
+      const validation = (v2 ? validateChangesMerge : validateMerge)(doc.items, input.sourceIds, input.targetId);
       if (!validation.valid) {
         errorResponse(res, 400, validation.error!);
         return true;
       }
-      const options = {
-        ...(input.title ? { title: input.title } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-      };
       const preview = previewMerge(doc.items, input.sourceIds, input.targetId, options);
       jsonResponse(res, 200, { ok: true, preview });
       return true;
@@ -653,31 +658,29 @@ async function handleItemMerge(
 
     // Execute merge via the PRDStore's transaction so writes go to the
     // correct backend (prd_tree/ or prd.md) rather than always writing to
-    // prd.md via savePRDSync.
-    let result: ReturnType<typeof mergeItems> | undefined;
-    let validationError: string | undefined;
+    // prd.md via savePRDSync. A refused merge mutates nothing.
+    let outcome: ChangesMergeOutcome | undefined;
     const updatedDoc = await store.withTransaction(async (doc) => {
-      const validation = validateMerge(doc.items, input.sourceIds, input.targetId);
-      if (!validation.valid) {
-        validationError = validation.error!;
+      if (v2) {
+        outcome = mergeChanges(doc.items, input.sourceIds, input.targetId, options);
         return doc;
       }
-      const options = {
-        ...(input.title ? { title: input.title } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-      };
-      result = mergeItems(doc.items, input.sourceIds, input.targetId, options);
+      const validation = validateMerge(doc.items, input.sourceIds, input.targetId);
+      outcome = validation.valid
+        ? { valid: true, result: mergeItems(doc.items, input.sourceIds, input.targetId, options) }
+        : { valid: false, error: validation.error! };
       return doc;
     });
 
-    if (validationError) {
-      errorResponse(res, 400, validationError);
-      return true;
-    }
-    if (!result) {
+    if (!outcome) {
       errorResponse(res, 500, "Merge did not produce a result");
       return true;
     }
+    if (!outcome.valid) {
+      errorResponse(res, 400, outcome.error);
+      return true;
+    }
+    const result = outcome.result;
 
     refreshPRDCache(ctx.rexDir, updatedDoc);
 

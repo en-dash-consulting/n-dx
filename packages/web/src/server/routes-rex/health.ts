@@ -7,7 +7,7 @@ import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
-import { resolveStore } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore, prdLayout } from "../rex-gateway.js";
 
 import {
   computeHealthScore,
@@ -52,7 +52,10 @@ export function routeHealthReorganize(
       const urlObj = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
       const mode = urlObj.searchParams.get("mode") ?? "fast";
 
-      const plan = detectReorganizations(doc.items);
+      // The same detection the apply below runs, so a proposal's id here is
+      // the id the apply finds.
+      const changeLayer = await prdLayout(ctx.rexDir) === "v2";
+      const plan = detectReorganizations(doc.items, { changeLayer });
       const structural = {
         proposals: plan.proposals.map((p) => ({
           id: p.id,
@@ -106,6 +109,9 @@ export function routeHealthReorganize(
       // savePRDSync — this is a bulk load->mutate->save operation, exactly
       // what withTransaction is documented for.
       const store = await resolveStore(ctx.rexDir);
+      // On a v2 change layer, rex proposes no v1 orphan or single-child
+      // collapse and merges through mergeChanges.
+      const changeLayer = isChangeLayerStore(store);
 
       let structuralApplied = 0;
       let structuralFailed = 0;
@@ -115,13 +121,13 @@ export function routeHealthReorganize(
       const updatedDoc = await store.withTransaction(async (doc) => {
         // Apply structural proposals
         if (proposalIds.length > 0 || (llmProposalIds.length === 0 && proposalIds.length === 0)) {
-          const plan = detectReorganizations(doc.items);
+          const plan = detectReorganizations(doc.items, { changeLayer });
           const toApply = proposalIds.length > 0
             ? plan.proposals.filter((p) => proposalIds.includes(p.id))
             : plan.proposals.filter((p) => p.risk === "low");
 
           if (toApply.length > 0) {
-            const result = applyProposals(doc.items, toApply);
+            const result = applyProposals(doc.items, toApply, { changeLayer });
             structuralApplied = result.applied;
             structuralFailed = result.failed;
           }
@@ -134,7 +140,7 @@ export function routeHealthReorganize(
             const { proposals } = await reasonForReshape(doc.items, { dir: ctx.projectDir });
             const toApply = proposals.filter((p: ReshapeProposal) => llmProposalIds.includes(p.id));
             if (toApply.length > 0) {
-              const reshapeResult = applyReshape(doc.items, toApply);
+              const reshapeResult = applyReshape(doc.items, toApply, { changeLayer });
               llmApplied = reshapeResult.applied.length;
               llmFailed = reshapeResult.errors.length;
             }

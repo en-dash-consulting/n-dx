@@ -117,6 +117,11 @@ export type { ItemDurationTotals } from "@n-dx/rex";
 
 // ---- Rex merge/consolidation ------------------------------------------------
 export { validateMerge, previewMerge, mergeItems } from "@n-dx/rex";
+// On a v2 change layer a merge goes through rex's change-layer rule: sibling
+// changes only, never one carrying amends, and the absorbed change's touches
+// and ids carried onto the target.
+export { validateChangesMerge, mergeChanges } from "@n-dx/rex";
+export type { ChangesMergeOutcome } from "@n-dx/rex";
 
 // ---- Rex prune --------------------------------------------------------------
 export { countSubtree } from "@n-dx/rex";

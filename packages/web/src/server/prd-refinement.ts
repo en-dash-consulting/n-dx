@@ -51,10 +51,12 @@ import {
   findItem,
   insertChild,
   isPriority,
+  mergeChanges,
   mergeItems,
   previewMerge,
   removeFromTree,
   updateInTree,
+  validateChangesMerge,
   validateMerge,
   walkTree,
 } from "./rex-gateway.js";
@@ -355,7 +357,7 @@ function scalarLines(value: string | undefined | null): string[] {
  * new parent deleted, its merge sibling moved away), and re-running the same
  * checks under the lock is what catches that.
  */
-function validateAgainst(doc: PRDDocument, proposal: RefinementProposal): string | null {
+function validateAgainst(doc: PRDDocument, proposal: RefinementProposal, changeLayer = false): string | null {
   const entry = findItem(doc.items, proposal.itemId);
   if (!entry) return `Item "${proposal.itemId}" is no longer in the PRD.`;
 
@@ -383,7 +385,8 @@ function validateAgainst(doc: PRDDocument, proposal: RefinementProposal): string
   }
 
   if (proposal.op === "merge") {
-    const check = validateMerge(doc.items, [proposal.itemId, proposal.intoId], proposal.intoId);
+    const validate = changeLayer ? validateChangesMerge : validateMerge;
+    const check = validate(doc.items, [proposal.itemId, proposal.intoId], proposal.intoId);
     if (!check.valid) return check.error ?? "The two items cannot be merged.";
     return null;
   }
@@ -654,6 +657,12 @@ function reparentPlacementStale(doc: PRDDocument, proposal: RefinementProposal):
   return `"${proposal.itemTitle}" has already been moved by someone else.`;
 }
 
+/** How {@link applyRefinements} writes. */
+export interface ApplyRefinementsOptions {
+  /** `doc` is a v2 change layer: a merge follows rex's change-layer rule (`mergeChanges`). */
+  changeLayer?: boolean;
+}
+
 /**
  * Apply accepted proposals to `doc` in order, reporting each one's outcome.
  *
@@ -669,7 +678,9 @@ function reparentPlacementStale(doc: PRDDocument, proposal: RefinementProposal):
 export function applyRefinements(
   doc: PRDDocument,
   proposals: RefinementProposal[],
+  options: ApplyRefinementsOptions = {},
 ): RefinementOutcome[] {
+  const changeLayer = options.changeLayer === true;
   const outcomes: RefinementOutcome[] = [];
 
   for (const proposal of proposals) {
@@ -688,7 +699,7 @@ export function applyRefinements(
 
     // Re-checked against the freshly-loaded document, not trusted from parse
     // time: a parent or merge sibling may have moved since.
-    const problem = validateAgainst(doc, proposal);
+    const problem = validateAgainst(doc, proposal, changeLayer);
     if (problem) {
       outcomes.push({ id: proposal.id, itemId: proposal.itemId, status: "invalid", detail: problem });
       continue;
@@ -743,7 +754,15 @@ export function applyRefinements(
       continue;
     }
 
-    mergeItems(doc.items, [proposal.itemId, proposal.intoId], proposal.intoId);
+    if (changeLayer) {
+      const merged = mergeChanges(doc.items, [proposal.itemId, proposal.intoId], proposal.intoId);
+      if (!merged.valid) {
+        outcomes.push({ id: proposal.id, itemId: proposal.itemId, status: "invalid", detail: merged.error });
+        continue;
+      }
+    } else {
+      mergeItems(doc.items, [proposal.itemId, proposal.intoId], proposal.intoId);
+    }
     outcomes.push({ id: proposal.id, itemId: proposal.itemId, status: "applied" });
   }
 
