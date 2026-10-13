@@ -16,6 +16,7 @@ import {
   findNextWork,
   findActionableWork,
   resolveWorkById,
+  enclosingChangeIds,
   findNextWorkTask,
   completedWorkIds,
   completeTask,
@@ -72,6 +73,13 @@ describe("v2 runtime exported from public.ts", () => {
     expect(findActionableWork(t).map((u) => u.node.id)).toContain(TASK);
     expect(resolveWorkById(t, TASK)?.node.id).toBe(TASK);
     expect(findNextWork(t, { excludeIds: new Set([TASK]) })?.node.id).not.toBe(TASK);
+  });
+
+  it("enclosingChangeIds names the changes whose claim covers a task", async () => {
+    const t = await tree();
+    expect(enclosingChangeIds(t, TASK)).toEqual([CHANGE]);
+    expect(enclosingChangeIds(t, CHANGE)).toEqual([]);
+    expect(enclosingChangeIds(t, "no-such-ref")).toEqual([]);
   });
 
   it("findNextWorkTask answers in v1 item shape; completedWorkIds starts empty", async () => {
