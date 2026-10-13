@@ -21,6 +21,9 @@
  * the last one (`projectStamp`): the loop asks every 30 s and after each
  * edit, and a full emit reads the whole PRD and git.
  *
+ * It also serves the isometric code map `emit` writes beside them
+ * (`/data/iso-map.html`), which the Code map page and zone pages frame.
+ *
  * Environment (what `ndx graview serve .` sets):
  *   NDX_GRAVIEW_DIR    the project's graview dir: document.json and snapshot.json
  *   NDX_PROJECT_ROOT   the n-dx project; with NDX_GRAVIEW_CLI, what `POST /ndx/emit` re-emits
@@ -204,6 +207,13 @@ export function ndxDoor(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const url = (req.url ?? "").split("?")[0] ?? "";
         try {
+          if (graviewDir && url === "/data/iso-map.html") {
+            const file = join(graviewDir, "iso-map.html");
+            if (!existsSync(file)) return next();
+            res.setHeader("content-type", "text/html; charset=utf-8");
+            res.setHeader("cache-control", "no-store");
+            return void createReadStream(file).pipe(res);
+          }
           if (graviewDir && (url === "/data/document.json" || url === "/data/snapshot.json")) {
             const file = join(graviewDir, url.slice("/data/".length));
             if (!existsSync(file)) return next();

@@ -51,6 +51,7 @@ carries, never a judgement rex has not made.
 ```
 <graviewDir>/
   document.json   the declaration, `name` set to the project
+  iso-map.html    sourcevision's isometric map in embed mode, when the project is analyzed: the face's Code map and zone pages frame it
   snapshot.json   Graview's line format: a header saying when it was made and what it holds, then one record per line, keys sorted — the body is byte-identical on an unchanged checkout
   data/           graview's own store, created by `serve` and `mcp`; refreshed with `sync-seed`
   cache/          rex's N-DX-Item trailer cache and commit-file cache, kept here

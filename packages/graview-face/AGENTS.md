@@ -16,8 +16,9 @@ Rules that keep that honest:
   (`scripts/sync-data.mjs` copies them from the project's graview dir;
   `dev/ndx-door.ts` serves them live, by byte range when asked, since the
   snapshot is in Graview's line format and `fetchSnapshot` reads a kind at a
-  time). That is why there are no gateways here and the domain-isolation
-  tests have nothing to check.
+  time; and `/data/iso-map.html`, sourcevision's isometric map, which the
+  Code map page and zone pages frame). That is why there are no gateways
+  here and the domain-isolation tests have nothing to check.
 - **The types come from the document.** `src/model/types.ts` is written by
   `graview types` from n-dx.graview.json (`pnpm types`), and `src/model/graph.ts`
   reads the store through `typedReader`, so a kind, field or relation renamed

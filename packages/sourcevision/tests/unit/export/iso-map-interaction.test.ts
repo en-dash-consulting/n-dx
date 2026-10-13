@@ -414,6 +414,17 @@ describe("iso map embedded in a host page", () => {
     await post({ type: "something-else", wheelZoom: true });
     expect(wheel().defaultPrevented).toBe(false);
   });
+
+  it("selects the zone a host names with focus, and stays put for an id it does not have", async () => {
+    doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape" }));
+    await post({ type: "ndx-iso", focus: "nowhere" });
+    expect(doc.documentElement.classList.contains("idle")).toBe(true);
+    await post({ type: "ndx-iso", focus: "db" });
+    expect(doc.documentElement.classList.contains("idle")).toBe(false);
+    expect(doc.querySelector("#dossier h3")?.textContent).toBe("Db");
+    await post({ type: "ndx-iso", focus: "api" });
+    expect(doc.querySelector("#dossier h3")?.textContent).toBe("Api");
+  });
 });
 
 describe("iso map standalone page", () => {

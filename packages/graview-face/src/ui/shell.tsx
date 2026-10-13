@@ -91,7 +91,10 @@ export function shell(app: App) {
             {kindItem("task")}
             {kindItem("release")}
           </Group>
-          <Group title="Code">{CODE.map(kindItem)}</Group>
+          <Group title="Code">
+            <Item to="/code-map" icon="scene" label="Code map" here={here} />
+            {CODE.map(kindItem)}
+          </Group>
           <Group title="Runs">{RUNS.map(kindItem)}</Group>
           {pictures.length > 0 ? (
             <Group title="Pictures">
