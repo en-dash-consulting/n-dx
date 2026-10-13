@@ -13,7 +13,7 @@ import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, errorMessage, readBody } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
@@ -114,6 +114,21 @@ function v2AcceptedChanges(parsed: unknown): RexChangeRow[] | null {
   const isChangeRow =
     typeof row?.id === "string" && typeof row.type === "string" && typeof row.title === "string";
   return isChangeRow ? [row as RexChangeRow] : null;
+}
+
+/**
+ * Whether a request's `parentId` has the shape of a PRD item id, so it can be
+ * handed to `rex add --parent` as one argv token.
+ *
+ * An item id is a UUID or a v2 display id (`CH-12`, `A1.2`): letters, digits,
+ * dots and dashes, never a leading dash. The child is spawned without a shell,
+ * so this is not about quoting — it is about a value that starts with `-`
+ * being read by the CLI's own parser as a flag rather than as the parent, and
+ * about keeping request text off the command line unchecked
+ * (CodeQL js/command-line-injection).
+ */
+function isValidParentId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9.-]{0,63}$/.test(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -1020,6 +1035,11 @@ async function handleSmartAddPreview(
     // Use rex CLI add (smart mode) with --format=json (no --accept = preview mode).
     // Pass description via --description flag (not positional) to prevent any
     // stale UI text from being concatenated into the argument list.
+    if (input.parentId !== undefined && !isValidParentId(input.parentId)) {
+      errorResponse(res, 400, "parentId is not an item id");
+      return true;
+    }
+
     const description = String(input.text).trim();
     // The dashboard preview is a draft the user reviews — `--fast` forces the
     // vendor's light tier (e.g. haiku) so the CLI provider completes well
@@ -1139,50 +1159,68 @@ async function handleSmartAddAccept(
       errorResponse(res, 400, "Text is required");
       return true;
     }
-
-    const args = ["add", "--format=json", "--accept", "--description", description];
-    if (input.parentId) args.push("--parent", input.parentId);
-    args.push(ctx.projectDir);
-
-    const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
-    const cliResult = await foundationExec(binPath, [...prefixArgs, ...args], {
-      cwd: ctx.projectDir,
-      timeout: resolveEffectiveCliTimeoutMs(ctx.projectDir, "add"),
-      maxBuffer: 10 * 1024 * 1024,
-      env: process.env,
-    });
-
-    if (cliResult.error && !cliResult.stdout.trim()) {
-      throw new Error(cliResult.stderr || cliResult.error.message);
+    if (input.parentId !== undefined && !isValidParentId(input.parentId)) {
+      errorResponse(res, 400, "parentId is not an item id");
+      return true;
     }
 
-    let changes: RexChangeRow[] | null = null;
+    // The description goes to rex through a file, the way batch import already
+    // sends its items, rather than as a `--description` argv token: the text
+    // is whatever the user typed, and argv is the wrong place for it — a value
+    // starting with `-` reads as a flag, and Windows caps a command line at
+    // 32 KB, which a pasted spec can exceed. The file is the server's own
+    // path, so the command line carries nothing from the request.
+    const tmpDir = mkdtempSync(join(tmpdir(), "rex-quick-add-"));
     try {
-      changes = v2AcceptedChanges(JSON.parse(cliResult.stdout));
-    } catch {
-      /* reported below as non-JSON output */
-    }
-    if (!changes) {
-      throw new Error(
-        `rex add did not report the changes it created: ${cliResult.stdout.trim() || cliResult.stderr.trim()}`,
-      );
-    }
+      const descriptionFile = join(tmpDir, "description.txt");
+      writeFileSync(descriptionFile, description, "utf-8");
 
-    appendLog(ctx, {
-      timestamp: new Date().toISOString(),
-      event: "smart_add_accept",
-      detail: `Added ${changes.length} change${changes.length === 1 ? "" : "s"} from Quick Add: ${changes
-        .map((c) => c.title)
-        .join(", ")}`,
-    });
+      const args = ["add", "--format=json", "--accept", `--file=${descriptionFile}`];
+      if (input.parentId !== undefined) args.push("--parent", input.parentId);
+      args.push(ctx.projectDir);
 
-    if (broadcast) {
-      broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
+      const cliResult = await foundationExec(binPath, [...prefixArgs, ...args], {
+        cwd: ctx.projectDir,
+        timeout: resolveEffectiveCliTimeoutMs(ctx.projectDir, "add"),
+        maxBuffer: 10 * 1024 * 1024,
+        env: process.env,
+      });
+
+      if (cliResult.error && !cliResult.stdout.trim()) {
+        throw new Error(cliResult.stderr || cliResult.error.message);
+      }
+
+      let changes: RexChangeRow[] | null = null;
+      try {
+        changes = v2AcceptedChanges(JSON.parse(cliResult.stdout));
+      } catch {
+        /* reported below as non-JSON output */
+      }
+      if (!changes) {
+        throw new Error(
+          `rex add did not report the changes it created: ${cliResult.stdout.trim() || cliResult.stderr.trim()}`,
+        );
+      }
+
+      appendLog(ctx, {
+        timestamp: new Date().toISOString(),
+        event: "smart_add_accept",
+        detail: `Added ${changes.length} change${changes.length === 1 ? "" : "s"} from Quick Add: ${changes
+          .map((c) => c.title)
+          .join(", ")}`,
+      });
+
+      if (broadcast) {
+        broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      }
+
+      jsonResponse(res, 200, { ok: true, changes });
+    } finally {
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
     }
-
-    jsonResponse(res, 200, { ok: true, changes });
   } catch (err) {
-    errorResponse(res, 500, String(err));
+    errorResponse(res, 500, errorMessage(err));
   }
   return true;
 }
@@ -1225,6 +1263,11 @@ async function handleBatchImport(
         errorResponse(res, 400, `Item ${i + 1} has empty content`);
         return true;
       }
+    }
+
+    if (input.parentId !== undefined && !isValidParentId(input.parentId)) {
+      errorResponse(res, 400, "parentId is not an item id");
+      return true;
     }
 
     // Write items to temp files and build --file args for rex CLI

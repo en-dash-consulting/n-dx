@@ -16,6 +16,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir, readFile } from "node:fs/promises";
+import { readFileSync, existsSync } from "node:fs";
 import { removeTempDir } from "../helpers/temp-dir.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -26,6 +27,8 @@ import { createServer, type Server } from "node:http";
 interface CapturedExec {
   cmd: string;
   args: string[];
+  /** Contents of every `--file=<path>` argument, read while the file still exists. */
+  files: Record<string, string>;
 }
 
 const execCalls: CapturedExec[] = [];
@@ -41,7 +44,16 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
   return {
     ...original,
     exec: vi.fn(async (cmd: string, args: string[]) => {
-      execCalls.push({ cmd, args });
+      // The route deletes its temp directory once rex returns, so the file
+      // has to be read here, at the moment rex would have read it.
+      const files: Record<string, string> = {};
+      for (const arg of args) {
+        if (arg.startsWith("--file=")) {
+          const path = arg.slice("--file=".length);
+          files[path] = readFileSync(path, "utf-8");
+        }
+      }
+      execCalls.push({ cmd, args, files });
       return { ...mockExecResult };
     }),
   };
@@ -227,8 +239,24 @@ describe("Quick Add on a v2 PRD", () => {
     expect(args).toContain("add");
     expect(args).toContain("--accept");
     expect(args).toContain("--format=json");
-    expect(args[args.indexOf("--description") + 1]).toBe("Support refunds when paying by card");
     expect(args[args.length - 1]).toBe(tmpDir);
+
+    // The text reaches rex through a file the server wrote, never as an argv
+    // token: the command line carries nothing the user typed.
+    expect(args).not.toContain("--description");
+    const fileArg = args.find((a) => a.startsWith("--file="));
+    expect(fileArg).toBeDefined();
+    expect(execCalls[0].files[fileArg!.slice("--file=".length)]).toBe("Support refunds when paying by card");
+    expect(args.some((a) => a.includes("Support refunds"))).toBe(false);
+  });
+
+  it("deletes the description file once rex has answered", async () => {
+    mockExecResult = { stdout: JSON.stringify(V2_ACCEPTED), stderr: "", exitCode: 0, error: null };
+
+    await post(port, "/api/rex/smart-add-accept", { text: "Support refunds when paying by card" });
+
+    const fileArg = execCalls[0].args.find((a) => a.startsWith("--file="))!;
+    expect(existsSync(fileArg.slice("--file=".length))).toBe(false);
   });
 
   it("does not write the v1 tree when accepting a change", async () => {
@@ -269,6 +297,28 @@ describe("Quick Add on a v2 PRD", () => {
 
     expect(res.status).toBe(400);
     expect(execCalls).toHaveLength(0);
+  });
+
+  it("refuses a parentId that is not an item id, so it can never reach argv as a flag", async () => {
+    for (const parentId of ["--parent", "-x", "CH 12", "a/b", ""]) {
+      const res = await post(port, "/api/rex/smart-add-accept", {
+        text: "Support refunds when paying by card",
+        parentId,
+      });
+      expect(res.status, `parentId ${JSON.stringify(parentId)}`).toBe(400);
+    }
+    expect(execCalls).toHaveLength(0);
+  });
+
+  it("does not echo an error object or stack into the response", async () => {
+    mockExecResult = { stdout: "", stderr: "", exitCode: 1, error: new Error("rex add failed") };
+
+    const res = await post(port, "/api/rex/smart-add-accept", { text: "Support refunds when paying by card" });
+
+    expect(res.status).toBe(500);
+    const { error } = await res.json();
+    expect(error).not.toMatch(/^Error:/);
+    expect(error).not.toMatch(/\n\s+at /);
   });
 
   it("surfaces a CLI failure rather than reporting a silent success", async () => {

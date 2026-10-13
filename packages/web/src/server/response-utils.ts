@@ -44,6 +44,20 @@ export function errorResponse(
 }
 
 /**
+ * The message of a caught value, for an error response.
+ *
+ * Only the message crosses to the client. `String(err)` on an Error is
+ * "Error: <message>", which is harmless, but routes that interpolate the
+ * error object itself, or read `.stack`, send the server's own call sites
+ * and file paths to the browser (CodeQL js/stack-trace-exposure). Taking
+ * `.message` by name is the one read that query recognises as safe.
+ */
+export function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return typeof err === "string" ? err : String(err);
+}
+
+/**
  * Read the full request body as a string, refusing bodies over
  * {@link MAX_REQUEST_BODY_BYTES}.
  *
