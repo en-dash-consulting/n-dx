@@ -4,7 +4,7 @@
  * no pack entry each come back as a notice naming the install command.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -35,6 +35,37 @@ const known = (importByResolution: () => Promise<unknown>): KnownPack => ({
   packageName: "@n-dx/lang-java",
   config: javaConfig,
   importByResolution,
+});
+
+describe("workspace tests and scripts versus the user's pack directory", () => {
+  const java = () => KNOWN_PACKS.find((p) => p.id === "java")!;
+
+  /** Plant a pack of sourcevision's version in `<ndx home>/packs/<version>` that throws when imported. */
+  function plantBrokenJavaPack(): string {
+    const version = sourcevisionVersion();
+    const dir = join(defaultPackDir(version), "node_modules", "@n-dx", "lang-java");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "@n-dx/lang-java", version, main: "index.js" }));
+    writeFileSync(join(dir, "index.js"), `throw new Error("planted pack must not be loaded");\n`);
+    return defaultPackDir(version);
+  }
+
+  it("starts every test from an ndx home with no packs, not the developer's", () => {
+    expect(resolveNdxHome().startsWith(tmpdir())).toBe(true);
+    expect(existsSync(join(defaultPackDir(), "node_modules"))).toBe(false);
+  });
+
+  it("keeps a pack planted in the ndx home out of the corpus scripts' loader", async () => {
+    const planted = plantBrokenJavaPack();
+    try {
+      // Control: the default loader does read the planted directory.
+      expect((await loadPack(java())).status).toBe("invalid");
+      const { workspaceLoader } = (await import("../../../scripts/workspace-pack.mjs")) as { workspaceLoader: { packDir: string } };
+      expect(await loadPack(java(), workspaceLoader)).toMatchObject({ status: "loaded", source: "resolution" });
+    } finally {
+      rmSync(planted, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("loadPack", () => {

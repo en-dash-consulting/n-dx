@@ -34,4 +34,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Drop the parser runtime from sourcevision and enforce dynamic-only pack loading](./drop-the-parser-runtime-from.md) | pending |
 | [Move SQL and Terraform (HCL) into @n-dx/lang-sql and @n-dx/lang-terraform](./move-sql-and-terraform-hcl-into-n-dx.md) | completed |
 | [Move the tree-sitter runtime into @n-dx/lang-runtime](./move-the-tree-sitter-runtime-into-n-dx.md) | completed |
-| [Workspace tests and corpus scripts load opt-in packs from the user's real pack directory, shadowing workspace code](./workspace-tests-and-corpus-scripts.md) | pending |
+| [Workspace tests and corpus scripts load opt-in packs from the user's real pack directory, shadowing workspace code](./workspace-tests-and-corpus-scripts.md) | in_progress |

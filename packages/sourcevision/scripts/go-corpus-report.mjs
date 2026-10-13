@@ -27,7 +27,7 @@ import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import { CLONE_COMMAND, CORPUS_DIR_ENV, checkedOutSha, corpusDir, loadCorpus } from "./go-corpus.mjs";
-import { importWorkspacePack } from "./workspace-pack.mjs";
+import { importWorkspacePack, workspaceLoader } from "./workspace-pack.mjs";
 
 /** Share of files that must parse without ERROR or MISSING nodes. */
 const CLEAN_SHARE_GATE = 0.98;
@@ -114,7 +114,7 @@ const setMinus = (a, b) => [...a].filter((k) => !b.has(k)).sort();
 async function edgeParity(dir) {
   const inventory = await analyzeInventory(dir, { languageConfig: goConfig });
   const notices = [];
-  const pack = await analyzeImports(dir, inventory, { language: "go", packs: { warn: (m) => notices.push(m) } });
+  const pack = await analyzeImports(dir, inventory, { language: "go", packs: { loader: workspaceLoader, warn: (m) => notices.push(m) } });
   // No pack: every Go file goes to the regex parser, as when the Go pack is not installed.
   const regex = await analyzeImports(dir, inventory, { language: "go", packs: { packs: [], warn: () => undefined } });
   const edges = (imports) => new Set(imports.edges.map((e) => `${e.from} -> ${e.to} [${[...e.symbols].sort().join(",")}]`));

@@ -23,7 +23,7 @@ import { join, relative } from "node:path";
 
 import { CLONE_COMMAND, CORPUS_DIR_ENV, checkedOutSha, corpusDir, loadCorpus } from "./java-corpus.mjs";
 import { compareEdges, edgeKey, isBuildOutputDir, proposeThreshold, readScipDocuments, scipEdges, selectComparedFiles } from "./java-scip.mjs";
-import { importWorkspacePack } from "./workspace-pack.mjs";
+import { importWorkspacePack, workspaceLoader } from "./workspace-pack.mjs";
 
 const INDEX_FILE = "index.scip";
 const SKIP_DIRS = new Set([".git", "node_modules"]);
@@ -104,6 +104,7 @@ for (const repo of present) {
   const graph = await buildPackImportGraph(
     files.map((path) => ({ path })),
     dir,
+    { loader: workspaceLoader },
   );
   const resolver = new Set(graph.edges.filter((e) => fileSet.has(e.to) && e.to !== e.from).map((e) => edgeKey(e.from, e.to)));
   const scip = scipEdges(documents, files);
