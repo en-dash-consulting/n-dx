@@ -919,4 +919,48 @@ describe("commitCompletionMetadata — v2 change layer, real store", () => {
     expect(dirty).toContain(otherChangeRel);
     expect(dirty).toContain(productRootRel);
   });
+
+  /**
+   * PROBE4 (holistic review 2026-10-13). A follow-up captured and placed
+   * through MCP after the agent's commit is untracked when a later run
+   * completes it. The completion writes only its `state.yaml`, so a commit of
+   * the report alone would land a state row for a node git does not have.
+   */
+  it("commits a placed follow-up's untracked intent files with its completion state", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore } = await import("../../src/prd/rex-gateway.js");
+    const changeRel = ".rex/changes/add-apple-pay";
+    await execAsync(`git rm -r -q --cached ${changeRel}`, { cwd: projectDir });
+    await execAsync('git commit -q -m "follow-up placed after the agent commit"', { cwd: projectDir });
+    // An unrelated untracked change the operator is drafting.
+    const draftRel = ".rex/changes/draft-idea/index.md";
+    await mkdir(join(rexDir, "changes", "draft-idea"));
+    await writeFile(
+      join(projectDir, draftRel),
+      ["---", 'id: "c0000000-0000-4000-8000-000000000010"', 'type: "change"', 'title: "Draft idea"', 'slug: "draft-idea"', 'intent: "Not yet."', "---", ""].join("\n"),
+    );
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+    expect(subject.trim()).toContain(WIRE_ID);
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    const files = changed.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(files).toEqual(
+      expect.arrayContaining([`${changeRel}/state.yaml`, `${changeRel}/index.md`, `${changeRel}/wire-the-button.md`]),
+    );
+    expect(files).not.toContain(draftRel);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    const dirty = status.split("\n").filter(Boolean).map((l) => l.slice(3));
+    expect(dirty.filter((p) => p.startsWith(`${changeRel}/`))).toEqual([]);
+    expect(dirty).toContain(draftRel);
+  });
 });

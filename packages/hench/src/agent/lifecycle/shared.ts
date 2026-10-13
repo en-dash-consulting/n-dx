@@ -79,7 +79,7 @@ import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
-import { V2_CHANGES_DIRNAME, V2_PRODUCT_DIRNAME } from "../../store/paths.js";
+import { V2_CHANGES_DIRNAME, V2_PRODUCT_DIRNAME, V2_STATE_FILENAME } from "../../store/paths.js";
 import {
   PRD_COMMIT_PATHS,
   deletedAmong,
@@ -2315,6 +2315,27 @@ async function isGitTracked(projectDir: string, relativePath: string): Promise<b
 }
 
 /**
+ * The untracked, non-ignored intent files (`.md`) directly inside the v2 node
+ * folder `folder` (project-relative, trailing slash).
+ *
+ * A change captured and placed through MCP after the agent's commit has never
+ * been committed when a later run completes it, and the completion writes only
+ * its `state.yaml`. Committing that alone lands a state row for a node git
+ * does not have. Tracked intent files are left alone: git already has the
+ * node, and a modification there is someone's edit, not this write's.
+ */
+async function untrackedIntentFiles(projectDir: string, folder: string): Promise<string[]> {
+  const result = await exec("git", ["ls-files", "--others", "--exclude-standard", "-z", "--", folder], {
+    cwd: projectDir,
+    timeout: 10_000,
+  });
+  if (result.exitCode !== 0) return [];
+  return result.stdout
+    .split("\0")
+    .filter((p) => p.startsWith(folder) && p.endsWith(".md") && !p.slice(folder.length).includes("/"));
+}
+
+/**
  * Narrow the wholesale staging roots to the exact files the PRD save(s)
  * reported written and deleted, plus the `tree-meta.json` sidecar (rewritten
  * by every save, deliberately not part of the report).
@@ -2324,6 +2345,8 @@ async function isGitTracked(projectDir: string, relativePath: string): Promise<b
  * survived (an ignored `.rex/prd_tree/` drops every file under it). Report
  * paths outside `.rex/prd_tree/` are dropped too — the report is trusted
  * about *which tree files* changed, not as a licence to stage anywhere.
+ * A reported v2 `state.yaml` also brings its folder's untracked intent files
+ * ({@link untrackedIntentFiles}), so a state row never lands without its node.
  *
  * Per-path checks keep `git add` from erroring:
  * - a written file must still exist (a path that vanished since the save and
@@ -2365,6 +2388,11 @@ async function scopePrdPathsToReport(
       if (!inAllowedTree(path)) continue;
       if (!existsSync(join(projectDir, path))) continue;
       push(path);
+      if (path.endsWith(`/${V2_STATE_FILENAME}`)) {
+        for (const intent of await untrackedIntentFiles(projectDir, path.slice(0, -V2_STATE_FILENAME.length))) {
+          push(intent);
+        }
+      }
     }
     for (const path of report.deleted) {
       if (!inAllowedTree(path)) continue;
