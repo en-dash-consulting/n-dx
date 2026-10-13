@@ -7,7 +7,8 @@
  * when it is missing, of another version or not a pack entry, when its
  * `produces` omits "imports", or when it reports that it could not run (its
  * grammar is not built or will not load, a query will not compile, the
- * project's build files cannot be read). It is reported once, produces no
+ * project's build files cannot be read), or when its `analyzeProject` rejects
+ * anyway (a defect in the pack). It is reported once, produces no
  * edges, and is listed in {@link PackImportGraph.degraded} so a caller with
  * another parser for the language (Go's regex parser) can run it.
  *
