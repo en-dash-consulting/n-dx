@@ -30,6 +30,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A placed follow-up's index.md is committed with its completion on v2](./a-placed-follow-up-s-index-md-is.md) | pending |
 | [An explicit --task on an Inbox change is refused before the run, not reported completed](./an-explicit-task-on-an-inbox-change-is.md) | pending |
 | [An explicit --task refuses a task whose enclosing change another worktree has claimed](./an-explicit-task-refuses-a-task-whose.md) | completed |
+| [gateways.md names hench's v2 rex surfaces and its export ceiling](./gateways-md-names-hench-s-v2-rex.md) | pending |
 | [hench briefs a v2 task from its change](./hench-briefs-a-v2-task-from-its-change.md) | completed |
 | [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | completed |
 | [hench's precise bookkeeping list discounts a v2 tree's product/ and changes/](./hench-s-precise-bookkeeping-list.md) | completed |
@@ -44,4 +45,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Re-record the prompt-census baseline for hench's v2 brief](./re-record-the-prompt-census-baseline.md) | completed |
 | [The completion gate and review captures understand v2](./the-completion-gate-and-review.md) | completed |
 | [The review dedupe sees Inbox changes under changes/inbox/](./the-review-dedupe-sees-inbox-changes.md) | pending |
-| [gateways.md names hench's v2 rex surfaces and its export ceiling](./gateways-md-names-hench-s-v2-rex.md) | pending |

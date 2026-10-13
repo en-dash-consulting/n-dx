@@ -34,5 +34,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The PRD cache is built from the change-layer projection on v2](./the-prd-cache-is-built-from-the-change.md) | completed |
 | [The Product and Changes views stay stale after a PRD change until the page is reloaded](./the-product-and-changes-views-stay.md) | completed |
 | [The Product, Changes and capability views show real v2 data](./the-product-changes-and-capability.md) | completed |
-| [The v2 Quick Add answers type change and refuses any other type](./the-v2-quick-add-answers-type-change.md) | pending |
+| [The v2 Quick Add answers type change and refuses any other type](./the-v2-quick-add-answers-type-change.md) | completed |
 | [The v2 refusal of parentId says what to do instead](./the-v2-refusal-of-parentid-says-what.md) | completed |
