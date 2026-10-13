@@ -570,7 +570,7 @@ describe("writePrdModel and the reserved Inbox folder", () => {
     expect(reread.tree.changes.map((n) => n.id)).toEqual([CHANGE, INBOX_CHANGE]);
     expect(reread.tree.changes[1]).toMatchObject({ type: "change", slug: "refunds-by-card", needsPlacement: true });
     const before = await snapshot(rexDir);
-    expect(await write(rexDir, reread)).toEqual({ written: [], removed: [] });
+    expect(await write(rexDir, reread)).toEqual({ written: [], removed: [], deletedFiles: [] });
     expect(await snapshot(rexDir)).toEqual(before);
   });
 
