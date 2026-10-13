@@ -73,6 +73,9 @@ describe("Rex item routes on a v2 project", () => {
   it("POST /items refuses a parent, which v2 does not take until type-aware CRUD", async () => {
     const res = await send("POST", "items", { title: "Nested", parentId: CHANGE_ID });
     expect(res.status).toBe(400);
+    const { error } = await res.json();
+    expect(error).toContain("Add with no parent");
+    expect(error).toContain("rex add --type=task --parent=<id>");
   });
 
   it("PATCH status in_progress goes through the change-layer store", async () => {

@@ -340,7 +340,12 @@ async function handleItemAdd(
     // CRUD of roadmap PR 21.
     if (isChangeLayerStore(store)) {
       if (input.parentId) {
-        errorResponse(res, 400, "A v2 project takes a new change in the Inbox, not under a parent");
+        errorResponse(
+          res,
+          400,
+          "Adding a task under a change from the dashboard comes with roadmap PR 21. " +
+            "Use Add with no parent for an Inbox change, or `rex add --type=task --parent=<id>` (or MCP add_item).",
+        );
         return true;
       }
       return await addInboxChange(res, ctx, store, { ...input, title: input.title.trim() }, broadcast);
