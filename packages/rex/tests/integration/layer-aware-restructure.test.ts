@@ -48,6 +48,7 @@ import { withPrdModelTransaction } from "../../src/store/prd-model-transaction.j
 import type { RuleNode } from "../../src/schema/v2-rules.js";
 import { ChangeLayerWriteError, resolveLayerStore } from "../../src/store/change-layer-store.js";
 import { resolveStore } from "../../src/store/index.js";
+import { runScopedConsolidationPass } from "../../src/cli/commands/add-reshape.js";
 
 const AREA = "a0000000-0000-4000-8000-000000000001";
 const PAY_BY_CARD = "a0000000-0000-4000-8000-000000000002";
@@ -289,6 +290,51 @@ describe("rex reshape on a v2 tree", () => {
       [APPLE_PAY, "deferred"],
       [DONE_CHANGE, "completed"],
     ]);
+  });
+});
+
+/** A change that touches Gift cards and carries a display id and an alias of its own. */
+async function writeAbsorbableChange(id: string, title: string, slug: string): Promise<void> {
+  const dir = join(rexDir, "changes", slug);
+  await mkdir(dir);
+  await writeFile(
+    join(dir, "index.md"),
+    `---\nid: "${id}"\ntype: "change"\ntitle: "${title}"\nslug: "${slug}"\ndisplayId: "CH-7"\naliases: ["CH-old"]\ntouches: ["${GIFT_CARDS}"]\n---\n`,
+  );
+}
+
+type MergedChange = { touches?: string[]; aliases?: string[] };
+
+describe("merging two changes on a v2 tree keeps what the absorbed change carried", () => {
+  it("rex reshape --accept carries the absorbed change's touches, id, display id and aliases to the survivor", async () => {
+    const ABSORBED = "c0000000-0000-4000-8000-0000000000a1";
+    await writeAbsorbableChange(ABSORBED, "Apple Pay, again", "apple-pay-again");
+    proposeOnChanges([{ id: "m1", action: { action: "merge", survivorId: APPLE_PAY, mergedIds: [ABSORBED], reason: "same work" } }]);
+
+    await cmdReshape(tmp, { accept: "true" });
+
+    const { tree } = await loadPrdModel(rexDir);
+    const survivor = tree.changes.find((c) => c.id === APPLE_PAY) as MergedChange | undefined;
+    expect(survivor?.touches).toContain(GIFT_CARDS);
+    expect([...(survivor?.aliases ?? [])].sort()).toEqual([ABSORBED, "CH-7", "CH-old"].sort());
+  });
+
+  it("rex add's hash-suffix consolidation carries the absorbed change's touches, id, display id and aliases to the survivor", async () => {
+    const SUFFIXED = "c0000000-0000-4000-8000-0000000000a2";
+    const PLAIN = "c0000000-0000-4000-8000-0000000000a3";
+    await writeAbsorbableChange(SUFFIXED, "Gift card change (abc123)", "gift-card-change-abc123");
+    const dir = join(rexDir, "changes", "gift-card-change");
+    await mkdir(dir);
+    await writeFile(join(dir, "index.md"), `---\nid: "${PLAIN}"\ntype: "change"\ntitle: "Gift card change"\nslug: "gift-card-change"\ndisplayId: "CH-8"\n---\n`);
+
+    const store = await resolveStore(rexDir);
+    const outcome = await runScopedConsolidationPass(rexDir, store, SUFFIXED, {});
+
+    expect(outcome.mergedCount).toBe(1);
+    const { tree } = await loadPrdModel(rexDir);
+    const survivor = tree.changes.find((c) => c.id === PLAIN) as MergedChange | undefined;
+    expect(survivor?.touches).toEqual([GIFT_CARDS]);
+    expect([...(survivor?.aliases ?? [])].sort()).toEqual([SUFFIXED, "CH-7", "CH-old"].sort());
   });
 });
 
