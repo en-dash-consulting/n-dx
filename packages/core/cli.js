@@ -3465,7 +3465,7 @@ async function main() {
   // ./hench and report an initialized project as stale.
   const dir = resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
-  const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
+  const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig, rest[0]);
 
   // Resolve BETA experimental flags from the same config read, so childEnv() can
   // forward them to sub-CLIs without a second filesystem hit.
