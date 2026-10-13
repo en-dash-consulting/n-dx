@@ -2,7 +2,7 @@
 id: "aa78a8da-4ff4-46b4-86b2-77e67a8814a5"
 level: "task"
 title: "A v2 completion commit sweeps an operator's untracked draft into a node folder whose state.yaml it wrote"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -12,11 +12,15 @@ tags:
   - "review-2026-10-13"
 source: "ndx-adversarial-review"
 startedAt: "2026-10-13T18:24:17.380Z"
+completedAt: "2026-10-13T18:40:15.492Z"
+endedAt: "2026-10-13T18:40:15.492Z"
+resolutionType: "code-change"
+resolutionDetail: "Option (a): a v2 completion stages an untracked intent .md beside a reported state.yaml only when its node has a row there, via rex loadPrdModel stateRows through rex-gateway (cap 65→66). New tests for a draft capability and a draft task; PROBE4 unedited and passing. Commit c9b41edff."
 acceptanceCriteria:
   - "A test: an untracked capability .md with no state row in a folder whose state.yaml the completion writes stays out of the completion commit and stays untracked"
   - "The PROBE4 test in completion-metadata-commit.test.ts still passes unedited"
 description: "Verdict: should-fix (adversarial review of 3b82d7d8a; reachable only once a v2 tree exists, i.e. after the cut).\n\nScenario: while a run works a change that amends product/checkout, an operator drafts a new capability product/checkout/refunds.md (untracked). On completion, the apply writes product/checkout/state.yaml, so the report names it. untrackedIntentFiles (packages/hench/src/agent/lifecycle/shared.ts, called from scopePrdPathsToReport) stages every untracked .md in that folder, and refunds.md lands in \"chore(prd): ... (task X completed)\". This breaks 748b439c0's rule that an operator's in-flight edit under product/ or changes/ stays out of hench's commit. The same applies to a draft task file in the change's own folder.\n\nOptions:\n(a) Recommended: stage an untracked .md only when its frontmatter id has a row in the reported state.yaml. Rows exist only for nodes with state; an operator's draft has none. This is precise. The cost is reading row keys and frontmatter ids, ideally through a rex export via rex-gateway rather than a regex duplicating rex's format.\n(b) Stage only when the folder's index.md is itself untracked, meaning the node is unknown to git. This is cheaper, but it leaves an orphan row for a task file added through MCP to a tracked change.\n\nPrevious attempt (run eb0bce36, 2026-10-13): the fix is committed as c9b41edff, but the gate failed on tests/integration/cross-package-contracts.test.js > gateway export auto-detection > hench gateway source exports match contract test list, because packages/hench/src/prd/rex-gateway.ts gained loadPrdModel without it being added to GATEWAY_FUNCTIONS in that test. Keep the fix; add loadPrdModel to the contract list, raise the hench→rex maxExports in tests/e2e/architecture-policy.test.js by one with a \\\"Raised from X to Y\\\" entry saying why the gateway needs loadPrdModel, and name it in docs/architecture/gateways.md's hench row. Run the root suite before finishing."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-13T18:34:45.098Z"
+lastModified: "2026-10-13T18:40:15.733Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
