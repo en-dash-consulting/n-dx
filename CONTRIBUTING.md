@@ -295,17 +295,21 @@ Rules:
 
 ---
 
-### Draft pull requests
+### Running CI on a pull request
 
-Draft PRs do not run CI, to save Actions minutes. To run CI on a draft:
+Pull requests, draft or ready, do not run CI when you push, to save Actions
+minutes. To run it:
 
-- **Add the `ci:run` label.** CI runs once, on the PR's merge commit. Later
-  pushes skip again; remove the label and add it back to run again.
+- **Add the `ci:run` label.** CI runs on the PR's merge commit and the label is
+  removed when the run starts; add it again for the next commit. (On a fork PR
+  the removal can fail; a maintainer removes it by hand.)
 - **Or use Run workflow** on the CI workflow in the Actions tab. It runs the
-  branch head, not merged with its base, and shows in the Actions tab rather
-  than on the PR. Available once the trigger is on `main`.
+  branch head, not merged with its base.
 
-Marking the PR ready runs everything, CodeQL and Dependency Review included.
+A PR cannot merge until the required checks have run on its latest commit,
+including after you update it from `main`. CodeQL and Dependency Review still
+run automatically on ready PRs. Only people with write access can add labels,
+so outside contributors ask a maintainer.
 
 ---
 

@@ -41,3 +41,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [The isometric code map in the Graview face: a Code map page, and each zone page shows its place on it](./the-isometric-code-map-in-the-graview.md) | completed |
 | [The product map is one click from the dashboard and ready to try in any repo](./the-product-map-is-one-click-from-the.md) | completed |
 | [Two-way writes through Graview's SyncEngine with rex as the system of record](./two-way-writes-through-graview-s.md) | completed |
+
