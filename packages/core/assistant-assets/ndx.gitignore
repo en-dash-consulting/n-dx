@@ -50,6 +50,8 @@
 
 # Run logs
 .run-logs/
+# Vendor-CLI invocation log: every claude/codex spawn appends a line; rotates to .1
+claude_commands.log*
 
 # `ndx export` output (default out-dir; carries PRD data and run summaries)
 ndx-export/

@@ -62,3 +62,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Work page content paints over the prepare-task modal](./work-page-content-paints-over-the.md) | completed |
 | [Condense the Workflow settings page into a responsive grid of fields](./condense-the-workflow-settings-page.md) | pending |
 | [Stack the dashboard's floating notices and status pills like toasts instead of overlapping](./stack-the-dashboard-s-floating-notices.md) | pending |
+| [Overview's isometric hero never shows its Options button because the page does not pass onOpenOptions](./overview-s-isometric-hero-never-shows.md) | pending |
+| [Stopping web serve on Windows leaves the ndx work and sv analyze children it spawned running](./stopping-web-serve-on-windows-leaves.md) | pending |
+| [Windows: exec() and spawnCli have no windowsHide, so children of console-less parents open visible console windows and sv narrate's claude window never closes](./windows-exec-and-spawncli-have-no.md) | pending |

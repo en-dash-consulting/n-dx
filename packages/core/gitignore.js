@@ -31,6 +31,7 @@ import { join } from "node:path";
 export function isGitTracked(relPath, cwd) {
   try {
     const result = spawnSync("git", ["ls-files", "--error-unmatch", "--", relPath], {
+      windowsHide: true,
       cwd,
       encoding: "utf-8",
       timeout: 5000,

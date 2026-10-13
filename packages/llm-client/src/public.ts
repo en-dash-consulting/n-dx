@@ -358,10 +358,11 @@ export type {
 // Process-tree termination — a kill that reaches descendants, not just the child.
 export {
   terminateProcessTree,
+  terminateTreeByPidSync,
   treeKillSpawnOptions,
   treeKillCommand,
 } from "./process-tree.js";
-export type { TerminateTreeOptions } from "./process-tree.js";
+export type { TerminateTreeOptions, TerminateByPidOptions } from "./process-tree.js";
 
 // Project feature toggles - read by the dashboard and by the run loop alike.
 export {
@@ -728,3 +729,8 @@ export {
   resolveVendorCliEnv,
 } from "./child-env.js";
 export type { EnvPolicy, EnvPolicyConfig } from "./child-env.js";
+
+// ---- Vendor-CLI invocation log ----------------------------------------------
+// The file name is public so consumers that classify a project's files (hench's
+// uncommitted-work gate, ndx init's gitignore) name the log the writer writes.
+export { CLI_LOG_FILENAME } from "./cli-log.js";

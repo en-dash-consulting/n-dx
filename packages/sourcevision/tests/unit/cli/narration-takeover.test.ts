@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { carryNarration, takeOverNarration } from "../../../src/cli/commands/narrate.js";
+import { carryNarration, killNarrationTree, takeOverNarration } from "../../../src/cli/commands/narrate.js";
 import type { NarrationState } from "../../../src/schema/index.js";
 
 let dir: string;
@@ -72,5 +72,21 @@ describe("carryNarration", () => {
     expect(merged.names.sort()).toEqual(["b", "c"]);
     expect(merged.carried).toBe(2);
     expect(merged.dropped).toBe(1);
+  });
+});
+
+describe("killNarrationTree", () => {
+  it("does not throw for a narrator that is already gone, on either platform's path", () => {
+    // A pid no live process is likely to hold: the tree kill fails, the group
+    // signal fails, the single-process fallback fails, and all of it is swallowed.
+    expect(() => killNarrationTree(2_147_483_000, "win32")).not.toThrow();
+    expect(() => killNarrationTree(2_147_483_000, "linux")).not.toThrow();
+  });
+
+  it("is what takeOverNarration stops a live narrator with by default", () => {
+    // Pinned so a future default cannot quietly go back to process.kill(pid),
+    // which on Windows leaves the narrator's vendor CLI (and its console) running.
+    const source = readFileSync(new URL("../../../src/cli/commands/narrate.ts", import.meta.url), "utf-8");
+    expect(source).toMatch(/deps\.kill \?\? killNarrationTree/);
   });
 });

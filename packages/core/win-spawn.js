@@ -151,7 +151,7 @@ export function execFileSyncCli(binary, args, options) {
     });
   }
   logCliInvocation({ binary, args, cwd: options?.cwd, via: "execFileSyncCli" });
-  return execFileSync(binary, args, options);
+  return execFileSync(binary, args, { ...options, windowsHide: true });
 }
 
 /**
@@ -178,5 +178,5 @@ export function spawnCli(binary, args, options = {}) {
     });
   }
   logCliInvocation({ binary, args, cwd: options.cwd, via: "spawnCli" });
-  return spawn(binary, args, options);
+  return spawn(binary, args, { ...options, windowsHide: true });
 }

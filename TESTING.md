@@ -676,6 +676,21 @@ named over a moved file, a renamed directory) — so those gates assert the path
 exists and fail loudly. `tests/unit/architecture-gate-reporting.test.js` keeps
 both halves honest: it fails if any gate goes back to returning silently.
 
+### Windows console windows — every production spawn passes `windowsHide`
+
+`tests/e2e/windows-hide-policy.test.js` (in `root-policy`) scans every
+`spawn` / `spawnSync` / `execFile` / `execFileSync` under `packages/*` except
+tests and developer scripts, and fails on one whose options do not mention
+`windowsHide`. On Windows a parent without a console — the hub, the background
+dashboard, a detached `sv narrate`, or anything they spawned hidden — hands
+every unhidden console child its own visible window, for as long as that
+child lives. The flag has to travel with every hop, so the gate is a scan, not
+a list. Pass `windowsHide: true` for piped or ignored stdio,
+`windowsHide: !process.stdout.isTTY` for a child that must inherit the
+operator's terminal, or mark a deliberate exemption with
+`// windows-console: inherit <reason>`. The scanner is also runnable on its
+own: `node scripts/lib/windows-hide-scan.mjs`.
+
 ### Family 5 — the suite leaking into the developer's environment
 
 The inverse of Family 4, and harder to notice: the tests pass, so nothing

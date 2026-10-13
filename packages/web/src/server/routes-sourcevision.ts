@@ -145,6 +145,7 @@ function gitOutput(ctx: ServerContext, args: string[]): string | null {
 function gitOutputResult(ctx: ServerContext, args: string[]): GitCommandResult {
   try {
     const out = execFileSync("git", args, {
+      windowsHide: true,
       cwd: ctx.projectDir,
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],

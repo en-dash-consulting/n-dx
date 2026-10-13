@@ -3006,6 +3006,7 @@ function getProcessRss(pid: number): number | null {
 
     // macOS / other: use ps command
     const out = execFileSync("ps", ["-o", "rss=", "-p", String(pid)], {
+      windowsHide: true,
       timeout: 2000,
       encoding: "utf-8",
     });

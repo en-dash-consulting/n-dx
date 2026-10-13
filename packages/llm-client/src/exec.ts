@@ -106,6 +106,15 @@ export interface ExecOptions {
    */
   treeKill?: boolean;
   /**
+   * Windows only: start the child without a console window (CREATE_NO_WINDOW).
+   * Defaults to true. A parent that has no console itself — the hub, the
+   * background dashboard, `sv narrate`, or any child they spawned hidden —
+   * would otherwise hand every command its own visible window. Nothing in
+   * n-dx runs an interactive child through `exec`, so there is no reason to
+   * turn it off; the option exists so a caller can say so deliberately.
+   */
+  windowsHide?: boolean;
+  /**
    * Stop the command when this signal aborts, its process tree included under
    * {@link treeKill}. Resolves `exitCode: null` with a `killed: true` error, like
    * an outside signal. A signal already aborted never spawns: `launched: false`.
@@ -208,6 +217,7 @@ export function exec(
     onData,
     input,
     treeKill = true,
+    windowsHide = true,
     signal: abortSignal,
     freeze = isPosixFreezeKillEnabled(env ?? process.env),
     _platform = process.platform as NodeJS.Platform,
@@ -264,6 +274,8 @@ export function exec(
         cwd,
         env,
         stdio: ["pipe", "pipe", "pipe"],
+        // No console window on Windows; see ExecOptions.windowsHide.
+        windowsHide,
         // This is the reason exec spawns rather than execFile'ing. execFile builds
         // its own options object for spawn and silently drops anything outside its
         // curated set, `detached` included — so on POSIX the child was never a
@@ -496,10 +508,10 @@ export function execStdout(
   args: string[],
   opts: ExecOptions,
 ): Promise<string> {
-  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env } = opts;
+  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env, windowsHide = true } = opts;
 
   return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (_error, stdout) => {
+    execFile(cmd, args, { cwd, timeout, maxBuffer, env, windowsHide }, (_error, stdout) => {
       resolve((stdout ?? "").toString());
     });
   });
@@ -648,6 +660,7 @@ export function execShellCmd(
 export function getCurrentHead(cwd: string): string | undefined {
   try {
     return execFileSync("git", ["rev-parse", "HEAD"], {
+      windowsHide: true,
       cwd,
       encoding: "utf-8",
       // Captured, not inherited — same reason as gitRevParsePath: asking a
@@ -704,6 +717,7 @@ function gitRevParsePath(cwd: string, flag: string): string | null {
   let output: string;
   try {
     output = execFileSync("git", ["rev-parse", flag], {
+      windowsHide: true,
       cwd,
       encoding: "utf-8",
       // Capture stderr rather than inheriting it. Asking "is this a git
@@ -907,7 +921,7 @@ export function sanitizeBranchName(branch: string): string {
 function resolveExecutablePath(name: string): string | null {
   try {
     const cmd = process.platform === "win32" ? "where" : "which";
-    const output = execFileSync(cmd, [name], { stdio: "pipe", encoding: "utf-8" }) as string;
+    const output = execFileSync(cmd, [name], { windowsHide: true, stdio: "pipe", encoding: "utf-8" }) as string;
     const first = output.split(/\r?\n/).find((l) => l.trim().length > 0);
     return first?.trim() ?? null;
   } catch {
@@ -1547,6 +1561,15 @@ export interface SpawnCliOptions {
   /** stdio wiring passed through to spawn. */
   stdio?: StdioOptions;
   /**
+   * Windows only: start the vendor CLI without a console window. Defaults to
+   * true. The CLI runs under a hidden `ndx work` or a detached `sv narrate`
+   * far more often than under an operator's terminal, and a visible console
+   * for the whole run is the symptom that keeps coming back; a caller that
+   * runs the CLI interactively in the operator's own console passes
+   * `!process.stdout.isTTY`.
+   */
+  windowsHide?: boolean;
+  /**
    * @internal Override platform detection — for unit tests only.
    * Production callers must never pass this.
    */
@@ -1732,8 +1755,8 @@ export function spawnCli(
   args: string[],
   opts: SpawnCliOptions = {},
 ): ChildProcess {
-  const { cwd, env, stdio, _platform = process.platform as NodeJS.Platform } = opts;
-  const baseOpts = { cwd, env, stdio };
+  const { cwd, env, stdio, windowsHide = true, _platform = process.platform as NodeJS.Platform } = opts;
+  const baseOpts = { cwd, env, stdio, windowsHide };
 
   if (_platform === "win32") {
     assertNoWindowsEnvExpansion([cliBinary, ...args], env ?? process.env);
@@ -1745,10 +1768,11 @@ export function spawnCli(
     // would strip the binary path's own quotes and break spaced paths (#68).
     return spawn("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
       ...baseOpts,
+      windowsHide,
       windowsVerbatimArguments: true,
     });
   }
 
   logCliInvocation({ binary: cliBinary, args, cwd, via: "spawnCli", platform: _platform });
-  return spawn(cliBinary, args, baseOpts);
+  return spawn(cliBinary, args, { ...baseOpts, windowsHide });
 }

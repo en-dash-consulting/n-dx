@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 import {
   terminateProcessTree,
+  terminateTreeByPidSync,
   treeKillSpawnOptions,
   treeKillCommand,
 } from "../../src/process-tree.js";
@@ -562,5 +563,60 @@ describe("terminateProcessTree — already-exited child", () => {
     expect(killGroup).not.toHaveBeenCalled();
     expect(spawnImpl).not.toHaveBeenCalled();
     expect(child.kills).toEqual([]);
+  });
+});
+
+/**
+ * The pid-only form. Its reason for existing is a caller that recorded a pid
+ * and lost the handle — `sv narrate` writes one to the manifest — so there is
+ * no ChildProcess to watch, and on Windows a plain kill of that pid leaves the
+ * vendor CLI beneath it running with its console window open.
+ */
+describe("terminateTreeByPidSync", () => {
+  it("signals the process group on POSIX, and does not fall back when that works", () => {
+    const killImpl = vi.fn();
+    terminateTreeByPidSync(4242, { platform: "linux", killImpl });
+    // Negative pid: the group the detached child leads.
+    expect(killImpl.mock.calls).toEqual([[-4242, "SIGTERM"]]);
+  });
+
+  it("kills the process itself when it leads no group", () => {
+    const killImpl = vi.fn((pid: number) => {
+      if (pid < 0) throw Object.assign(new Error("ESRCH"), { code: "ESRCH" });
+    });
+    terminateTreeByPidSync(4242, { platform: "linux", killImpl });
+    expect(killImpl.mock.calls).toEqual([[-4242, "SIGTERM"], [4242, "SIGTERM"]]);
+  });
+
+  it("runs taskkill /T /F on Windows, hidden and bounded", () => {
+    const execFileSyncImpl = vi.fn();
+    const killImpl = vi.fn();
+    terminateTreeByPidSync(4242, { platform: "win32", execFileSyncImpl, killImpl, timeoutMs: 1234 });
+    expect(execFileSyncImpl).toHaveBeenCalledWith(
+      "taskkill",
+      ["/PID", "4242", "/T", "/F"],
+      { stdio: "ignore", windowsHide: true, timeout: 1234 },
+    );
+    // taskkill walked the tree, so the single-process kill must not also fire.
+    expect(killImpl).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a plain kill when taskkill cannot run", () => {
+    const execFileSyncImpl = vi.fn(() => {
+      throw new Error("taskkill not found");
+    });
+    const killImpl = vi.fn();
+    terminateTreeByPidSync(4242, { platform: "win32", execFileSyncImpl, killImpl });
+    expect(killImpl.mock.calls).toEqual([[4242, "SIGTERM"]]);
+  });
+
+  it("never throws when the target is already gone", () => {
+    const gone = () => {
+      throw Object.assign(new Error("ESRCH"), { code: "ESRCH" });
+    };
+    expect(() => terminateTreeByPidSync(1, { platform: "linux", killImpl: gone })).not.toThrow();
+    expect(() =>
+      terminateTreeByPidSync(1, { platform: "win32", execFileSyncImpl: gone as never, killImpl: gone }),
+    ).not.toThrow();
   });
 });

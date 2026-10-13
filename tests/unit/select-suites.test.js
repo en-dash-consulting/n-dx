@@ -329,6 +329,7 @@ describe("root subset test files", () => {
       "tests/e2e/layout-literal-policy.test.js",
       "tests/e2e/obfuscated-code-policy.test.js",
       "tests/e2e/integration-coverage-policy.test.js",
+      "tests/e2e/windows-hide-policy.test.js",
     ]);
   });
 });
