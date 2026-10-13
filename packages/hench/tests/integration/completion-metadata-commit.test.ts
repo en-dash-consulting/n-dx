@@ -1032,4 +1032,79 @@ describe("commitCompletionMetadata — v2 change layer, real store", () => {
     const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
     expect(status.split("\n")).toContain(`?? ${draftRel}`);
   });
+
+  /**
+   * An Inbox capture the operator committed is moved out of changes/inbox/ by
+   * place_change, an MCP write no hench save report names. Completing it must
+   * land the move: staging the new folder without the Inbox deletion would
+   * leave the change's id in two folders of HEAD.
+   */
+  it("lands a placed change's move out of a committed Inbox with its completion", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore } = await import("../../src/prd/rex-gateway.js");
+    const changeRel = ".rex/changes/add-apple-pay";
+    const inboxRel = ".rex/changes/inbox/add-apple-pay";
+    await mkdir(join(rexDir, "changes", "inbox"));
+    await execAsync(`git mv ${changeRel} ${inboxRel}`, { cwd: projectDir });
+    await execAsync('git commit -q -m "capture in the Inbox"', { cwd: projectDir });
+    // place_change: the folder moves on disk; git is not told.
+    await rename(join(projectDir, inboxRel), join(projectDir, changeRel));
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+    expect(subject.trim()).toContain(WIRE_ID);
+    const { stdout: tree } = await execAsync("git ls-tree -r --name-only HEAD -- .rex/changes", { cwd: projectDir });
+    const committed = tree.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(committed).toEqual(
+      expect.arrayContaining([`${changeRel}/state.yaml`, `${changeRel}/index.md`, `${changeRel}/wire-the-button.md`]),
+    );
+    expect(committed.filter((p) => p.startsWith(`${inboxRel}/`))).toEqual([]);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    const dirty = status.split("\n").filter(Boolean).map((l) => l.slice(3));
+    expect(dirty.filter((p) => p.startsWith(`${inboxRel}/`) || p.startsWith(`${changeRel}/`))).toEqual([]);
+  });
+
+  /** A deleted Inbox file whose id is not the completed node's is someone else's edit. */
+  it("leaves a deleted Inbox change with another id out of the completion commit", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore } = await import("../../src/prd/rex-gateway.js");
+    const changeRel = ".rex/changes/add-apple-pay";
+    const otherInboxRel = ".rex/changes/inbox/add-apple-pay/index.md";
+    await execAsync(`git rm -r -q --cached ${changeRel}`, { cwd: projectDir });
+    // Another change committed in the Inbox under the same slug.
+    await mkdir(join(rexDir, "changes", "inbox", "add-apple-pay"), { recursive: true });
+    await writeFile(
+      join(projectDir, otherInboxRel),
+      ["---", 'id: "c0000000-0000-4000-8000-000000000011"', 'type: "change"', 'title: "Add Apple Pay"', 'slug: "add-apple-pay"', 'intent: "Another."', "---", ""].join("\n"),
+    );
+    await execAsync(`git add ${otherInboxRel}`, { cwd: projectDir });
+    await execAsync('git commit -q -m "another capture"', { cwd: projectDir });
+    await rm(join(rexDir, "changes", "inbox"), { recursive: true });
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    const files = changed.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(files).toContain(`${changeRel}/index.md`);
+    expect(files).not.toContain(otherInboxRel);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    expect(status.split("\n")).toContain(` D ${otherInboxRel}`);
+  });
 });

@@ -2351,7 +2351,10 @@ type StateRows = NonNullable<NonNullable<Parameters<typeof loadPrdModel>[1]>["st
  * by its slug, the name rex stores it under; a tree rex refuses to read stages
  * none of them.
  */
-async function intentFilesWithStateRows(projectDir: string, candidates: string[]): Promise<string[]> {
+async function intentFilesWithStateRows(
+  projectDir: string,
+  candidates: string[],
+): Promise<Array<{ path: string; id: string }>> {
   if (candidates.length === 0) return [];
   const rexDir = rexDirName(projectDir);
   const stateRows: StateRows = new Map();
@@ -2363,33 +2366,98 @@ async function intentFilesWithStateRows(projectDir: string, candidates: string[]
     return [];
   }
 
-  // Every path a node with a state row can be stored at. A change at the top
-  // of changes/ may sit in the Inbox, and a folder node may have no children,
-  // so both candidates are recorded; only the real one is ever looked up.
-  const withRow = new Set<string>();
-  type Node = { id: string; slug: string; children?: Node[] };
-  const walk = (nodes: readonly Node[], dirs: string[]) => {
+  const withRow = v2NodeIdsByPath(rexDir, model.tree, (id) => stateRows.has(id));
+  return candidates.flatMap((path) => {
+    const id = withRow.get(path);
+    if (id) return [{ path, id }];
+    detail(`Leaving untracked ${path} out of the completion commit: its node has no state row`);
+    return [];
+  });
+}
+
+type V2NodeTree = { product: readonly V2Node[]; changes: readonly V2Node[] };
+type V2Node = { id: string; slug: string; children?: V2Node[] };
+
+/**
+ * Every project-relative path a node of `tree` (those `keep` accepts) can be
+ * stored at, mapped to its id. A change at the top of changes/ may sit in the
+ * Inbox, and a folder node may have no children, so both candidates are
+ * recorded; only the real one is ever looked up.
+ */
+function v2NodeIdsByPath(rexDir: string, tree: V2NodeTree, keep: (id: string) => boolean): Map<string, string> {
+  const byPath = new Map<string, string>();
+  const walk = (nodes: readonly V2Node[], dirs: string[]) => {
     for (const node of nodes) {
-      if (stateRows.has(node.id)) {
+      if (keep(node.id)) {
         for (const dir of dirs) {
-          withRow.add(`${dir}${node.slug}.md`);
-          withRow.add(`${dir}${node.slug}/index.md`);
+          byPath.set(`${dir}${node.slug}.md`, node.id);
+          byPath.set(`${dir}${node.slug}/index.md`, node.id);
         }
       }
       if (node.children?.length) walk(node.children, dirs.map((dir) => `${dir}${node.slug}/`));
     }
   };
-  walk(model.tree.product, [`${rexDir}/${V2_PRODUCT_DIRNAME}/`]);
-  walk(model.tree.changes, [
+  walk(tree.product, [`${rexDir}/${V2_PRODUCT_DIRNAME}/`]);
+  walk(tree.changes, [
     `${rexDir}/${V2_CHANGES_DIRNAME}/`,
     `${rexDir}/${V2_CHANGES_DIRNAME}/${V2_INBOX_DIRNAME}/`,
   ]);
+  return byPath;
+}
 
-  return candidates.filter((path) => {
-    if (withRow.has(path)) return true;
-    detail(`Leaving untracked ${path} out of the completion commit: its node has no state row`);
-    return false;
-  });
+/**
+ * The tracked files under changes/ that a node in `nodeIds` was moved out of:
+ * deleted in the working tree, and carrying one of those ids in git's copy.
+ *
+ * place_change moves an Inbox change to the top of changes/ through the MCP
+ * server, outside any save report hench drains. When the Inbox copy was
+ * committed, staging the moved folder alone lands the change's id in two
+ * folders of HEAD. The id is read from git's copy by rex's reader (from a
+ * scratch tree of the deleted files), so a deleted file of another node, an
+ * operator's removal, stays out. A folder whose intent file moved also gives
+ * up its deleted `state.yaml`, which belonged to the same folder.
+ */
+async function movedIntentSources(projectDir: string, nodeIds: ReadonlySet<string>): Promise<string[]> {
+  if (nodeIds.size === 0) return [];
+  const rexDir = rexDirName(projectDir);
+  const changesDir = `${rexDir}/${V2_CHANGES_DIRNAME}/`;
+  const listed = await exec("git", ["ls-files", "--deleted", "-z", "--", changesDir], { cwd: projectDir, timeout: 10_000 });
+  if (listed.exitCode !== 0) return [];
+  const deleted = listed.stdout.split("\0").filter((p) => p.startsWith(changesDir));
+  const deletedIntents = deleted.filter((p) => p.endsWith(".md"));
+  if (deletedIntents.length === 0) return [];
+
+  const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { dirname } = await import("node:path");
+  const scratch = await mkdtemp(join(tmpdir(), "hench-moved-intents-"));
+  try {
+    // rex reads a v2 tree only under a product/ header; git's copy is the one
+    // whose layout the deleted files were committed against.
+    const header = `${rexDir}/${V2_PRODUCT_DIRNAME}/index.md`;
+    for (const path of [header, ...deletedIntents]) {
+      const shown = await exec("git", ["show", `:${path}`], { cwd: projectDir, timeout: 10_000 });
+      if (shown.exitCode !== 0) continue;
+      await mkdir(join(scratch, dirname(path)), { recursive: true });
+      await writeFile(join(scratch, path), shown.stdout, "utf-8");
+    }
+    let model: Awaited<ReturnType<typeof loadPrdModel>>;
+    try {
+      model = await loadPrdModel(join(scratch, rexDir), { warn: () => {} });
+    } catch (err) {
+      detail(`Not staging moved intent files: their committed copies could not be read (${(err as Error).message})`);
+      return [];
+    }
+    const byPath = v2NodeIdsByPath(rexDir, model.tree, (id) => nodeIds.has(id));
+    const moved = deletedIntents.filter((path) => byPath.has(path));
+    const movedDirs = new Set(moved.map((path) => path.slice(0, path.lastIndexOf("/") + 1)));
+    const movedState = deleted.filter(
+      (path) => path.endsWith(`/${V2_STATE_FILENAME}`) && movedDirs.has(path.slice(0, -V2_STATE_FILENAME.length)),
+    );
+    return [...moved, ...movedState];
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -2404,7 +2472,9 @@ async function intentFilesWithStateRows(projectDir: string, candidates: string[]
  * about *which tree files* changed, not as a licence to stage anywhere.
  * A reported v2 `state.yaml` also brings the untracked intent files of the
  * nodes it holds rows for ({@link intentFilesWithStateRows}), so a state row
- * never lands without its node and an operator's draft beside it stays out.
+ * never lands without its node and an operator's draft beside it stays out,
+ * and the deleted committed copies those nodes were moved out of
+ * ({@link movedIntentSources}), so a placed change is not left in two folders.
  *
  * Per-path checks keep `git add` from erroring:
  * - a written file must still exist (a path that vanished since the save and
@@ -2451,7 +2521,9 @@ async function scopePrdPathsToReport(
         untrackedIntents.push(...(await untrackedIntentFiles(projectDir, path.slice(0, -V2_STATE_FILENAME.length))));
       }
     }
-    for (const intent of await intentFilesWithStateRows(projectDir, untrackedIntents)) push(intent);
+    const intents = await intentFilesWithStateRows(projectDir, untrackedIntents);
+    for (const { path } of intents) push(path);
+    for (const path of await movedIntentSources(projectDir, new Set(intents.map(({ id }) => id)))) push(path);
     for (const path of report.deleted) {
       if (!inAllowedTree(path)) continue;
       if (existsSync(join(projectDir, path)) || (await isGitTracked(projectDir, path))) {
