@@ -309,6 +309,11 @@ jobs:
   test:
     name: Tests (${{ matrix.runner }}, ${{ matrix.group }})
     runs-on: ${{ matrix.os }}
+    # Same gate as `build` (see the comment there).
+    if: >-
+      github.event_name != 'pull_request'
+      || (github.event.action != 'labeled' && github.event.pull_request.draft == false)
+      || (github.event.action == 'labeled' && github.event.label.name == 'ci:run' && github.event.pull_request.draft == true)
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
       # The default would cancel the other eight the moment one fails, hiding

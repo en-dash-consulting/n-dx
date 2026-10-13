@@ -46,14 +46,35 @@ function foldIfs(text) {
   );
 }
 
-const WORKFLOWS = [
-  { file: "ci.yml", jobs: ["build", "smoke-parity"] },
-  { file: "codeql.yml", jobs: ["analyze"] },
-  { file: "dependency-review.yml", jobs: ["dependency-review"] },
-];
+/** Job ids: the two-space-indented keys under the top-level `jobs:` block. */
+function jobIds(text) {
+  const lines = text.split("\n");
+  const start = lines.findIndex((l) => /^jobs:\s*$/.test(l));
+  expect(start, "no top-level `jobs:` block").toBeGreaterThanOrEqual(0);
+  const ids = [];
+  for (const l of lines.slice(start + 1)) {
+    if (/^\S/.test(l) && !l.startsWith("#")) break;
+    const m = /^ {2}([A-Za-z_][\w-]*):\s*$/.exec(l);
+    if (m) ids.push(m[1]);
+  }
+  return ids;
+}
+
+// Jobs are discovered, not listed, so a job added later fails until it is gated.
+// A job that must legitimately run on drafts goes here, per file, with the reason.
+const DRAFT_EXEMPT = {};
+
+const WORKFLOWS = ["ci.yml", "codeql.yml", "dependency-review.yml"].map((file) => ({
+  file,
+  jobs: jobIds(read(file)).filter((j) => !(DRAFT_EXEMPT[file] ?? []).includes(j)),
+}));
 
 describe.each(WORKFLOWS)("$file draft gate", ({ file, jobs }) => {
   const text = read(file);
+
+  it("has jobs to gate", () => {
+    expect(jobs.length).toBeGreaterThan(0);
+  });
 
   it("pull_request types include the draft transitions and GitHub's defaults", () => {
     const body = onBlock(text);
@@ -104,7 +125,7 @@ describe("ci.yml manual triggers", () => {
     expect(types).not.toMatch(/\bunlabeled\b/);
   });
 
-  it.each(["build", "smoke-parity"])("job %s admits the ci:run label and keeps the event guard", (job) => {
+  it.each(["build", "test", "smoke-parity"])("job %s admits the ci:run label and keeps the event guard", (job) => {
     const ifLine = jobBlock(foldIfs(text), job).find((l) => /^ {4}if:/.test(l));
     expect(ifLine).toContain("github.event.label.name == 'ci:run'");
     expect(ifLine).toContain("github.event_name != 'pull_request'");
