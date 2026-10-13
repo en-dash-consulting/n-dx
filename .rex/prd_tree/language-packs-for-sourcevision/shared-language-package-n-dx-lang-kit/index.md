@@ -30,7 +30,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Create the @n-dx/lang-kit package and wire it into the workspace, release and architecture policy](./create-the-n-dx-lang-kit-package-and.md) | completed |
 | [Define the facts-out pack contract in lang-kit and adapt the Java, Go and SQL packs through a sourcevision adapter](./define-the-facts-out-pack-contract-in.md) | completed |
 | [infrastructure.ts header says only node: builtins may be imported, but it now imports IAC_KINDS from @n-dx/lang-kit](./infrastructure-ts-header-says-only.md) | pending |
+| [java-sql treats the new type.anonymous capture as a type declaration because it selects every type.* capture](./java-sql-treats-the-new-type-anonymous.md) | pending |
 | [Move language ids, configs, detection, build-file readers and the small TOML/XML/YAML parsers into lang-kit](./move-language-ids-configs-detection.md) | completed |
 | [Move the IaC resource-kind table into lang-kit as data](./move-the-iac-resource-kind-table-into.md) | completed |
-| [pack-facts gives a method inside a Java anonymous class the enclosing named class as its container](./pack-facts-gives-a-method-inside-a.md) | pending |
+| [pack-facts gives a method inside a Java anonymous class the enclosing named class as its container](./pack-facts-gives-a-method-inside-a.md) | completed |
 | [web and graview vitest load sourcevision source but resolve @n-dx/lang-kit to its built dist](./web-and-graview-vitest-load.md) | completed |
