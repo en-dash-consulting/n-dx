@@ -44,7 +44,9 @@ export function RestorePanel({ open, onClose, onRestored }: RestorePanelProps) {
     try {
       const res = await fetch("/api/rex/backups");
       if (!res.ok) {
-        setError(`Failed to list snapshots (${res.status})`);
+        // A refusal (409 on a v2 tree) carries its reason; show it rather than the status alone.
+        const errBody = await res.json().catch(() => ({}));
+        setError(errBody.error || `Failed to list snapshots (${res.status})`);
         return;
       }
       const data = await res.json();
