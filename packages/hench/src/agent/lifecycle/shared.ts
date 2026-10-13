@@ -2436,9 +2436,16 @@ async function commitPrdTreeIfStaged(
   // With a save report, stage exactly the files the store's save(s) wrote and
   // deleted rather than the whole tree — staging `.rex/prd_tree/` wholesale
   // once swept a 1,378-file in-flight rename into a "task completed" commit.
-  // Without one (a store that does not track saves, or nothing saved), fall
-  // back to the wholesale roots, which is the pre-report behaviour.
-  const prdPaths = report ? await scopePrdPathsToReport(projectDir, rootPaths, report) : rootPaths;
+  // Without one (a store that does not track saves, or nothing saved), a v1
+  // tree falls back to the wholesale roots, the pre-report behaviour. A v2
+  // tree never does: product/ and changes/ are where operators and the
+  // dashboard edit while a run works, so no report means this store wrote
+  // nothing there and nothing there is staged.
+  const { sep } = await import("node:path");
+  const v2Product = `${rexDirName(projectDir)}/${V2_PRODUCT_DIRNAME}`;
+  const isV2 = rootPaths.some((p) => p.split(sep).join("/") === v2Product);
+  const scope = report ?? (isV2 ? { written: [], deleted: [] } : null);
+  const prdPaths = scope ? await scopePrdPathsToReport(projectDir, rootPaths, scope) : rootPaths;
 
   if (prdPaths.length === 0) {
     return { staged: 0 };
@@ -2518,9 +2525,9 @@ async function commitCompletionMetadata(
   }
 
   // With a save report, stages exactly the files the completion write touched
-  // (the task plus cascaded ancestors); without one, falls back to staging the
-  // whole `.rex/prd_tree/`, which under the no-concurrent-PRD-writers contract
-  // is just this run's metadata. The message reflects it may span the tree.
+  // (the task plus cascaded ancestors); without one, a v1 tree falls back to
+  // staging the whole `.rex/prd_tree/`, which under the no-concurrent-PRD-
+  // writers contract is just this run's metadata, and a v2 tree stages nothing. The message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
   const result = await commitPrdTreeIfStaged(projectDir, message, "PRD record (task completion)", report, taskId);
   if (result.error) {

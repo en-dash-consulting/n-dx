@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir, appendFile, rename } from "node:fs/promises";
-import { readFileSync } from "node:fs";
+import { mkdtemp, rm, writeFile, mkdir, appendFile, rename, cp } from "node:fs/promises";
+import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
@@ -625,41 +625,6 @@ describe("commitCompletionMetadata — stages only the save report's files (WM20
     expect(dirty[0]).toContain("unrelated-item");
   });
 
-  it("stages a v2 changes/ write the save report names, state.yaml included, and nothing else", async () => {
-    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
-    const changeRel = ".rex/changes/ch-1";
-    const stateRelPath = `${changeRel}/state.yaml`;
-    const siblingRelPath = ".rex/changes/ch-2/state.yaml";
-    await mkdir(join(projectDir, changeRel), { recursive: true });
-    await mkdir(join(projectDir, ".rex/changes/ch-2"), { recursive: true });
-    await mkdir(join(projectDir, ".rex/product"), { recursive: true });
-    await writeFile(join(projectDir, stateRelPath), "status: in_progress\n", "utf-8");
-    await writeFile(join(projectDir, siblingRelPath), "status: pending\n", "utf-8");
-    await writeFile(join(projectDir, ".rex/product/state.yaml"), "x: 1\n", "utf-8");
-    await execAsync("git add .", { cwd: projectDir });
-    await execAsync('git commit -m "add v2 layers"', { cwd: projectDir });
-
-    // The completion's write, plus an operator edit the report does not name.
-    await writeFile(join(projectDir, stateRelPath), "status: completed\n", "utf-8");
-    await writeFile(join(projectDir, siblingRelPath), "status: pending\nnote: in flight\n", "utf-8");
-
-    const store = buildScopedMockStore();
-    store.takeSaveFileReport = vi.fn(() => ({ written: [stateRelPath], deleted: [] }));
-
-    await (finalizeRun as Function)({
-      run: buildCompletedRun(taskId),
-      henchDir,
-      projectDir,
-      autoCommit: true,
-      skipFullTestGate: true,
-      store,
-    });
-
-    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
-    expect(changed).toContain(stateRelPath);
-    expect(changed).not.toContain(siblingRelPath);
-  });
-
   it("stages a deletion the save report names", async () => {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
     const doomedRelPath = ".rex/prd_tree/doomed-leaf.md";
@@ -841,5 +806,117 @@ describe("commitCompletionMetadata — real store save report (WM2040)", () => {
     // untracked by design (rex init gitignores it) and never staged.
     const dirty = await getRexDirtyLines(projectDir);
     expect(dirty.filter((line) => !line.includes("execution-log"))).toHaveLength(0);
+  });
+});
+
+/**
+ * The v2 half of WM2040, on rex's real ChangeLayerStore (review 2026-10-12,
+ * PR #692 should-fix 2). Completing a change's last task writes the change's
+ * state and, on apply, the capability it amends. The completion commit carries
+ * exactly those files: an operator's edit in flight under another change, or
+ * elsewhere in product/, stays out of it and stays dirty.
+ */
+describe("commitCompletionMetadata — v2 change layer, real store", () => {
+  const FIXTURE = join(import.meta.dirname, "../../../rex/tests/fixtures/v2-tree");
+  /** CH-1 and its only task; completing the task completes and applies CH-1. */
+  const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
+  const WIRE_ID = "c0000000-0000-4000-8000-000000000002";
+  const OTHER_CHANGE_ID = "c0000000-0000-4000-8000-000000000009";
+  const otherChangeRel = ".rex/changes/fix-typo/index.md";
+  const productRootRel = ".rex/product/index.md";
+  let projectDir: string;
+  let henchDir: string;
+  let rexDir: string;
+
+  beforeEach(async () => {
+    projectDir = realpathSync.native(await mkdtemp(join(tmpdir(), "hench-v2-stage-")));
+    henchDir = join(projectDir, ".hench");
+    rexDir = join(projectDir, ".rex");
+    await initConfig(henchDir);
+    await mkdir(join(henchDir, "runs"), { recursive: true });
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await initGitFixtureRepo(projectDir);
+    await cp(FIXTURE, rexDir, { recursive: true });
+    await writeFile(join(rexDir, "config.json"), JSON.stringify({ schema: "rex/v1", project: "shop", adapter: "file" }));
+    await writeFile(
+      join(rexDir, "changes", "add-apple-pay", "state.yaml"),
+      ['schema: "rex/v2"', "items:", `  "${CHANGE_ID}":`, '    status: "pending"', `  "${WIRE_ID}":`, '    status: "in_progress"', ""].join("\n"),
+    );
+    // A second change, which the operator is editing while the run works.
+    await mkdir(join(rexDir, "changes", "fix-typo"));
+    await writeFile(
+      join(projectDir, otherChangeRel),
+      ["---", `id: "${OTHER_CHANGE_ID}"`, 'type: "change"', 'title: "Fix typo"', 'slug: "fix-typo"', 'intent: "A typo on the receipt."', "---", ""].join("\n"),
+    );
+    await writeFile(join(projectDir, ".gitignore"), ".hench/\n.rex/execution-log*.jsonl\n.rex/.cache/\n");
+    await execAsync("git add -A", { cwd: projectDir });
+    await execAsync('git commit -q -m "baseline"', { cwd: projectDir });
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
+  });
+
+  it("commits the completion's change-layer writes and leaves an operator's changes/ and product/ edits dirty", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore, isChangeLayerStore } = await import("../../src/prd/rex-gateway.js");
+    const store = await resolveStore(rexDir);
+    expect(isChangeLayerStore(store)).toBe(true);
+
+    await appendFile(join(projectDir, otherChangeRel), "\nOperator notes in flight.\n");
+    await appendFile(join(projectDir, productRootRel), "\nOperator notes in flight.\n");
+
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+    expect(subject.trim()).toContain(WIRE_ID);
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    const files = changed.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(files).toContain(".rex/changes/add-apple-pay/state.yaml");
+    expect(files.some((f) => f.startsWith(".rex/product/checkout/"))).toBe(true);
+    expect(files).not.toContain(otherChangeRel);
+    expect(files).not.toContain(productRootRel);
+
+    const dirty = await getRexDirtyLines(projectDir);
+    expect(dirty.map((l) => l.slice(3)).sort()).toEqual([otherChangeRel, productRootRel].sort());
+  });
+
+  it("never stages product/ or changes/ wholesale when the store reports no save", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore, completeV2Work } = await import("../../src/prd/rex-gateway.js");
+    // The completion was written by another store instance (the rex MCP
+    // server, say), so the store finalizeRun drains has nothing to report.
+    const other = await resolveStore(rexDir);
+    await completeV2Work(other as Parameters<typeof completeV2Work>[0], WIRE_ID);
+    const store = await resolveStore(rexDir);
+
+    await appendFile(join(projectDir, otherChangeRel), "\nOperator notes in flight.\n");
+    await appendFile(join(projectDir, productRootRel), "\nOperator notes in flight.\n");
+
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(WIRE_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+    expect(subject.trim()).toBe("baseline");
+    const dirty = (await getRexDirtyLines(projectDir)).map((l) => l.slice(3));
+    expect(dirty).toContain(otherChangeRel);
+    expect(dirty).toContain(productRootRel);
   });
 });
