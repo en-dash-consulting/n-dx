@@ -79,10 +79,9 @@ import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
+import { V2_CHANGES_DIRNAME, V2_PRODUCT_DIRNAME } from "../../store/paths.js";
 import {
   PRD_COMMIT_PATHS,
-  V2_CHANGES_DIRNAME,
-  V2_PRODUCT_DIRNAME,
   deletedAmong,
   findUncommittedWork,
   formatOperatorPrdLeftovers,

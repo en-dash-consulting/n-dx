@@ -31,6 +31,15 @@ import {
 } from "../prd/llm-gateway.js";
 import { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../prd/rex-gateway.js";
 
+/**
+ * The v2 layer folders under rex's state directory. Spelled here because
+ * rex's public API does not export `PRODUCT_DIRNAME` / `CHANGES_DIRNAME`
+ * (they live in `store/prd-model-reader.ts`); switch to a gateway re-export
+ * once rex exports them.
+ */
+export const V2_PRODUCT_DIRNAME = "product";
+export const V2_CHANGES_DIRNAME = "changes";
+
 /** Which tool's state directory {@link stateDirNameUnder} is asked about. */
 export type StateDirKey = "rex" | "hench" | "sourcevision";
 
@@ -91,6 +100,10 @@ const REX_BOOKKEEPING_ENTRIES: readonly string[] = [
   // the thing it names.
   `${PRD_TREE_DIRNAME}/`,
   `${PRD_CACHE_DIRNAME}/`,
+  // A v2 tree's layers, prd_tree/'s counterparts: completing a task writes
+  // changes/<change>/state.yaml, and applying a change writes product/.
+  `${V2_PRODUCT_DIRNAME}/`,
+  `${V2_CHANGES_DIRNAME}/`,
   "execution-log.jsonl",
   // `core/execution-log.ts` rotates at 1 MB and keeps exactly one generation.
   // Listed rather than glob-matched: `matchesProjectPath` compares literals,

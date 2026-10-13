@@ -31,7 +31,12 @@ import {
   TREE_META_FILENAME,
 } from "../../prd/rex-gateway.js";
 import { relativeToRoot, resolveLayout, type LayoutMode } from "../../prd/llm-gateway.js";
-import { resolveHenchPaths, stateDirNameUnder } from "../../store/paths.js";
+import {
+  V2_CHANGES_DIRNAME,
+  V2_PRODUCT_DIRNAME,
+  resolveHenchPaths,
+  stateDirNameUnder,
+} from "../../store/paths.js";
 import {
   excludeHenchRuntimeArtifacts,
   matchesProjectPath,
@@ -39,15 +44,6 @@ import {
   repoRelativePrefix,
   splitPorcelainLines,
 } from "../../store/artifacts.js";
-
-/**
- * The v2 layer folders under rex's state directory. Spelled here because
- * rex's public API does not export `PRODUCT_DIRNAME` / `CHANGES_DIRNAME`
- * (they live in `store/prd-model-reader.ts`); switch to a gateway re-export
- * once rex exports them.
- */
-export const V2_PRODUCT_DIRNAME = "product";
-export const V2_CHANGES_DIRNAME = "changes";
 
 /**
  * The folder the review pass lists to check whether a finding is already

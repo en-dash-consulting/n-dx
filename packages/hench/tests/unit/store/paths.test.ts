@@ -11,6 +11,8 @@ import {
   RECOVERY_DIRNAME,
   AGENT_MCP_DIRNAME,
   BOOKKEEPING_PATHS,
+  V2_CHANGES_DIRNAME,
+  V2_PRODUCT_DIRNAME,
   resolveHenchPaths,
   stateDirNameUnder,
 } from "../../../src/store/paths.js";
@@ -141,6 +143,27 @@ describe("BOOKKEEPING_PATHS", () => {
       expect(matches(`.rex/${entry}`), `.rex/${entry}`).toBe(true);
       expect(matches(`.ndx/rex/${entry}`), `.ndx/rex/${entry}`).toBe(true);
     }
+  });
+
+  it("covers a v2 tree's product/ and changes/ layers on both layouts", () => {
+    // Completing a task on a v2 tree writes changes/<change>/state.yaml (and
+    // product/ files when the change applies): bookkeeping, as prd_tree/ is on v1.
+    for (const entry of [
+      `${V2_PRODUCT_DIRNAME}/area/capability/state.yaml`,
+      `${V2_CHANGES_DIRNAME}/ch-1/state.yaml`,
+      `${V2_CHANGES_DIRNAME}/ch-1/index.md`,
+    ]) {
+      expect(matches(`.rex/${entry}`), `.rex/${entry}`).toBe(true);
+      expect(matches(`.ndx/rex/${entry}`), `.ndx/rex/${entry}`).toBe(true);
+    }
+    expect(BOOKKEEPING_PATHS).toEqual(
+      expect.arrayContaining([
+        ".rex/product/",
+        ".rex/changes/",
+        ".ndx/rex/product/",
+        ".ndx/rex/changes/",
+      ]),
+    );
   });
 
   it("does not claim rex's project content on either layout", () => {
