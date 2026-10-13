@@ -615,7 +615,9 @@
         "blockedBy": {
           "to": [
             "change",
-            "task"
+            "task",
+            "capability",
+            "area"
           ],
           "description": "what has to finish first",
           "inverse": "what is waiting on this"
@@ -809,7 +811,9 @@
         "blockedBy": {
           "to": [
             "change",
-            "task"
+            "task",
+            "capability",
+            "area"
           ],
           "description": "what has to finish first",
           "inverse": "what is waiting on this"
@@ -1174,7 +1178,9 @@
         "ranFor": {
           "to": [
             "change",
-            "task"
+            "task",
+            "capability",
+            "area"
           ],
           "cardinality": "one",
           "description": "the work this run was for",
@@ -1269,7 +1275,9 @@
         "landedFor": {
           "to": [
             "change",
-            "task"
+            "task",
+            "capability",
+            "area"
           ],
           "description": "the work this commit landed for",
           "inverse": "the commits that landed for it"

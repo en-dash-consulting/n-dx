@@ -92,15 +92,15 @@ and the same code path then reads the stored v2 tree.
 | `dependsOn` | `capability.dependsOn` |
 | `appliesTo` | `constraint.appliesTo` (an `"all"` binding is the `appliesToAll` field) |
 | `amends`, `touches` | `change.amends[].target`, `change.touches` (rex derives `changedBy` and `coChanges` from these) |
-| `blockedBy` | `blockedBy` on changes and tasks |
+| `blockedBy` | `blockedBy` on changes and tasks; on a v1 tree's proposed layer it may reach the capability or area a blocking feature or epic became |
 | `discoveredFrom` | `change.discoveredFrom.item` / `.run` |
 | `plannedFor`, `shippedWith` | `change.plannedRelease`, `ItemState.shippedIn`; a finished change with no stamped `shippedIn` ships with the first release tag containing its landing (`computeLandings`, `releasesContaining`: rex's `resolveShippedIn` answer, for every change in one walk) |
-| `landedFor` (commit → change or task) | the commit's `N-DX-Item` trailers, and the run record that names the commit (its task) |
+| `landedFor` (commit → change or task; a capability or area when the trailer names a v1 feature or epic the proposed layer turned into one) | the commit's `N-DX-Item` trailers, and the run record that names the commit (its task) |
 | `realizedIn` (capability → zone), `realizes` (commit → capability) | every commit that landed for a change placed on the capability (`amends` or `touches`, via `changedBy`) or for the work under it, through `loadCommitFiles` and the zone map |
 | `changed` (commit → file), `livesIn` (capability → file) | the same `loadCommitFiles` read, kept as edges when files are projected: every commit on the graph to the files it changed, and a capability to the files its realizing commits changed. A path the inventory no longer has is dropped |
 | `inZone` | a component's or file's deepest zone |
 | `crosses` | `zones.json` crossings and sub-crossings |
-| `ranFor`, `produced` | `RunRecord.taskId`, `RunRecord.commits` |
+| `ranFor`, `produced` | `RunRecord.taskId` (a capability or area when the run worked a v1 feature or epic the proposed layer turned into one), `RunRecord.commits` |
 
 A v1 tree gets all of this too: its changes carry `completedAt`, its tasks
 the trailers, and the tags are git's; with the proposed product layer the
@@ -116,6 +116,13 @@ checkout is what gives its graph the history.
 when a rex `NodeType` or `ProductEdges` key has no kind or edge in the
 declaration. Rex's own rules stay the schema of record; the document's rules
 mirror a computed state the snapshot already carries.
+
+`ndx graview emit` holds the snapshot to the declaration (`src/fit.ts`):
+every record's kind and fields, every enum value, list, number range and
+required field, and every edge's relation, target kind and cardinality.
+`emit` warns about a misfit and `check` fails on one, naming the record,
+because `graview check` judges the declaration alone and a misfit would
+otherwise surface only when a face loads the pair.
 
 Ids are n-dx's own, so a Graview answer can be taken straight back to the tool
 that owns the node. Edges whose far end is missing are dropped, never

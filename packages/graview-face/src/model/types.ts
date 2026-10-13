@@ -256,7 +256,7 @@ export type Edges = {
     /** the product nodes this change works on without rewriting them */
     readonly touches: "capability" | "constraint" | "area";
     /** what has to finish first */
-    readonly blockedBy: "change" | "task";
+    readonly blockedBy: "change" | "task" | "capability" | "area";
     /** the work that surfaced this change */
     readonly discoveredFrom: "change" | "task" | "run";
     /** the release this change is planned for */
@@ -268,7 +268,7 @@ export type Edges = {
     /** the change or task this runs under */
     readonly under: "change" | "task";
     /** what has to finish first */
-    readonly blockedBy: "change" | "task";
+    readonly blockedBy: "change" | "task" | "capability" | "area";
   };
   readonly release: {};
   readonly zone: {
@@ -287,13 +287,13 @@ export type Edges = {
   };
   readonly run: {
     /** the work this run was for */
-    readonly ranFor: "change" | "task";
+    readonly ranFor: "change" | "task" | "capability" | "area";
     /** the commits this run made */
     readonly produced: "commit";
   };
   readonly commit: {
     /** the work this commit landed for */
-    readonly landedFor: "change" | "task";
+    readonly landedFor: "change" | "task" | "capability" | "area";
     /** the capabilities the work this commit landed for was placed on */
     readonly realizes: "capability";
     /** the files this commit changed */
