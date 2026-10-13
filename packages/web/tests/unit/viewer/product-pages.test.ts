@@ -17,8 +17,23 @@ import {
   PRODUCT_MAP_FIXTURE,
 } from "../../fixtures/v2-product-map.js";
 
+// The WebSocket pipeline is captured so a test can deliver a coalesced flush.
+const flushes: Array<(batch: { types: Set<string> }) => void> = [];
+vi.mock("../../../src/viewer/hooks/use-gateway.js", () => ({
+  createWSPipeline: vi.fn((opts: { onFlush: (batch: { types: Set<string> }) => void }) => {
+    flushes.push(opts.onFlush);
+    return { push: vi.fn(), dispose: vi.fn() };
+  }),
+}));
+
 let root: HTMLDivElement;
 let fetched: string[];
+
+/** Deliver a flushed batch of frame types to every mounted subscriber. */
+async function flushFrames(...types: string[]): Promise<void> {
+  act(() => { for (const onFlush of [...flushes]) onFlush({ types: new Set(types) }); });
+  await settle();
+}
 
 /** Answer each URL from `routes`; anything else is a 404. */
 function stubRoutes(routes: Record<string, unknown>): void {
@@ -45,6 +60,7 @@ async function mount(vnode: ReturnType<typeof h>): Promise<void> {
 }
 
 beforeEach(() => {
+  flushes.length = 0;
   root = document.createElement("div");
   document.body.appendChild(root);
 });
@@ -116,6 +132,56 @@ describe("on a v2 project", () => {
 
     act(() => { root.querySelector<HTMLButtonElement>(".ch-change-link")!.click(); });
     expect(navigateTo).toHaveBeenCalledWith("prd", { taskId: expect.any(String) });
+  });
+
+  it("the Product page refetches the map after a rex:prd-changed frame", async () => {
+    const renamed = { ...PRODUCT_MAP_FIXTURE, areas: PRODUCT_MAP_FIXTURE.areas.map((a) => ({ ...a, title: `${a.title} (new)` })) };
+    const routes: Record<string, unknown> = { "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } };
+    stubRoutes(routes);
+    await mount(h(ProductPage, null));
+    expect(root.textContent).not.toContain("(new)");
+
+    routes["/api/rex/product"] = { layout: "v2", map: renamed };
+    await flushFrames("rex:prd-changed");
+    expect(fetched).toEqual(["/api/rex/product", "/api/rex/product"]);
+    expect(root.textContent).toContain("(new)");
+  });
+
+  it("the Changes page lists a change added since it mounted", async () => {
+    const added = { ...CHANGES_FIXTURE[0]!, id: "change-added-later", displayId: "CH-999", title: "Added later" };
+    const routes: Record<string, unknown> = { "/api/rex/changes": { layout: "v2", changes: CHANGES_FIXTURE } };
+    stubRoutes(routes);
+    await mount(h(ChangesPage, null));
+    expect(root.querySelector('[data-change-id="change-added-later"]')).toBeNull();
+
+    routes["/api/rex/changes"] = { layout: "v2", changes: [...CHANGES_FIXTURE, added] };
+    await flushFrames("rex:prd-changed");
+    expect(root.querySelector('[data-change-id="change-added-later"]')).not.toBeNull();
+  });
+
+  it("an open capability page refetches its capability", async () => {
+    const capabilityUrl = `/api/rex/product/capability/${CAPABILITY_DETAIL_FIXTURE.id}`;
+    stubRoutes({
+      "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
+      [capabilityUrl]: { layout: "v2", capability: CAPABILITY_DETAIL_FIXTURE },
+    });
+    await mount(h(ProductPage, null));
+    act(() => {
+      [...root.querySelectorAll<HTMLButtonElement>(".pm-capability-link")]
+        .find((b) => b.textContent === CAPABILITY_DETAIL_FIXTURE.title)!.click();
+    });
+    await settle();
+
+    await flushFrames("rex:prd-changed");
+    expect(fetched.filter((u) => u === capabilityUrl)).toHaveLength(2);
+    expect(root.querySelector(".cap-container")).not.toBeNull();
+  });
+
+  it("ignores a flush that carries no rex:prd-changed frame", async () => {
+    stubRoutes({ "/api/rex/changes": { layout: "v2", changes: CHANGES_FIXTURE } });
+    await mount(h(ChangesPage, null));
+    await flushFrames("hench:run-changed");
+    expect(fetched).toEqual(["/api/rex/changes"]);
   });
 
   it("says what failed when a read errors", async () => {

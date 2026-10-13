@@ -14,9 +14,9 @@
  */
 
 import { h } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
-import { useCliName } from "../hooks/index.js";
+import { useCliName, usePrdChangedRefresh } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { ProductView } from "./product.js";
 import { CapabilityPage } from "./capability.js";
@@ -32,12 +32,24 @@ type Load<T> =
   | { state: "v1" }
   | { state: "ready"; data: T };
 
-/** Fetch one product read; `pick` takes the payload out of a v2 answer. */
+/**
+ * Fetch one product read; `pick` takes the payload out of a v2 answer. It
+ * reads again on each `rex:prd-changed`, keeping the current data on screen
+ * until the new answer arrives, so the view follows the Tasks tree.
+ */
 function useProductRead<T>(url: string, pick: (body: Record<string, unknown>) => T): Load<T> {
   const [load, setLoad] = useState<Load<T>>({ state: "loading" });
+  const [revision, setRevision] = useState(0);
+  const refetch = useCallback(() => setRevision((n) => n + 1), []);
+  const loadedUrl = useRef(url);
+  usePrdChangedRefresh(refetch);
   useEffect(() => {
     let live = true;
-    setLoad({ state: "loading" });
+    // A new url is a new read; a revision bump refreshes the same one in place.
+    if (loadedUrl.current !== url) {
+      loadedUrl.current = url;
+      setLoad({ state: "loading" });
+    }
     (async () => {
       const res = await fetch(url);
       const body = await res.json() as Record<string, unknown> | V1Answer;
@@ -54,7 +66,7 @@ function useProductRead<T>(url: string, pick: (body: Record<string, unknown>) =>
       if (live) setLoad({ state: "error", message: err instanceof Error ? err.message : String(err) });
     });
     return () => { live = false; };
-  }, [url]);
+  }, [url, revision]);
   return load;
 }
 
