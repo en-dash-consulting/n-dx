@@ -4,8 +4,8 @@
     "surfaces": 38,
     "perCallTokens": 23393,
     "uniqueTokens": 14890,
-    "skills": 13,
-    "skillTokens": 20439
+    "skills": 14,
+    "skillTokens": 21120
   },
   "skills": [
     {
@@ -70,6 +70,13 @@
       "shipped": true,
       "chars": 4985,
       "tokens": 1247
+    },
+    {
+      "name": "ndx-graview",
+      "file": "packages/core/assistant-assets/skills/ndx-graview.md",
+      "shipped": true,
+      "chars": 2724,
+      "tokens": 681
     },
     {
       "name": "ndx-feedback",
@@ -1021,8 +1028,8 @@
       }
     ]
   },
-  "contentHash": "cf05efd08ecdaa08",
-  "recordedAt": "2026-10-11T07:52:33.623Z",
-  "commit": "7c54ef5ac04f",
+  "contentHash": "ee49265ac4875db9",
+  "recordedAt": "2026-10-13T16:27:26.379Z",
+  "commit": "7b0c5be31fd8",
   "dirty": false
 }
