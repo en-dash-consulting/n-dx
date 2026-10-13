@@ -504,6 +504,7 @@ describe("web → rex gateway contract", () => {
     "getAvailableBackups",
     "restoreFromBackup",
     "isValidSnapshotId",
+    "V2RestoreRefusedError",
     "validateRunSettings",
   ];
 
@@ -923,7 +924,7 @@ describe("gateway export auto-detection", () => {
         "handleEditItem", "aggregateItemTokenUsage", "aggregateItemDurations",
         "serializeDocument", "parseDocument",
         "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "prdLayout", "isChangeLayerStore", "completeV2Work", "cascadeParentReset",
-        "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId",
+        "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "CHILD_LEVEL", "PRD_CACHE_DIRNAME",
         "estimateCostFromTotals", "validateRunSettings"],
