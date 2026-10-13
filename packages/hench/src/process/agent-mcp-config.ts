@@ -203,13 +203,32 @@ export const SOURCEVISION_MCP_SERVER_NAME = "sourcevision";
  * - `append_log` — base workflow step 7.
  * - `add_item` — base workflow steps 3 and 9, and the `should-fix` action of the
  *   autonomous adversarial-review pass (`../agent/analysis/adversarial-review.ts`).
- * - `get_capability` — read a product-layer capability on a v2 tree.
- * - `place_change` — file a follow-up change on a v2 tree. `apply_change` is
- *   deliberately absent: applying amendments to the product layer is the
- *   operator's call (completion applies them through rex, not the agent).
+ * - `get_capability` — base workflow step 2. The v2 brief names the
+ *   capabilities and constraints the change affects, but renders them under a
+ *   token budget that trims their criteria (`rex/src/core/change-brief.ts`).
+ *   This is how the agent reads the full node when the trimmed entry is not
+ *   enough to tell whether its change is finished. Read-only.
+ * - `place_change` — base workflow step 9, and the autonomous
+ *   adversarial-review pass's capture note. The follow-up work those direct is
+ *   written with `add_item`, and on a v2 tree a change added that way lands in
+ *   the Inbox carrying `needsPlacement`. `place_change` is the only tool that
+ *   clears it, so without the grant every follow-up an autonomous run captures
+ *   stays unplaced and is never selected autonomously.
  *
  * A tool no prompt asks for does not belong here. Adding one is a deliberate
  * edit with a test to match, not a convenience.
+ *
+ * ## Why `apply_change` is not here
+ *
+ * Applying a change's amendments rewrites the **product layer** — the standing
+ * requirements the capabilities promise — which is a steward's decision, not a
+ * run's (`rex/src/cli/mcp-tools/apply-change.ts`). It is also the one PRD write
+ * the completion hold below cannot cover: the hold defers a *task status*, so a
+ * product-layer rewrite would land immediately and survive a failing gate.
+ * Granting it would put the single irreversible PRD write inside the part of
+ * the run that has no withdrawal path. (Completion still applies a change's
+ * amendments through rex, per `rex.applyOn` — after the gate, not from the
+ * agent's hand.)
  *
  * ## Why granting the write tools is safe
  *
@@ -218,6 +237,10 @@ export const SOURCEVISION_MCP_SERVER_NAME = "sourcevision";
  * (`TaskClaims.pendingCompletion`) rather than writing it, and hench applies it
  * only once the test gate has passed. Denying the tool did not add a safeguard —
  * it pushed the agent into hand-editing the task file, which has none.
+ *
+ * `place_change` is not covered by that hold either, but it is not irreversible
+ * the way an apply is: it records where an Inbox change belongs, and placing it
+ * again moves it.
  */
 export const AGENT_REX_MCP_TOOLS: readonly string[] = [
   "update_task_status",

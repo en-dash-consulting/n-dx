@@ -10,13 +10,13 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-10-13T18:12:54.953Z
-- **Commit** — `9a30ad325125`
-- **Content hash** — `3f253cbbdea5ab23` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-10-13T19:20:19.949Z
+- **Commit** — `0f876c5df2ba`
+- **Content hash** — `f4f35c75696ec8d0` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 38
-- **Per-call total** — 23,411 tokens (what every surface costs, summed)
-- **Unique fixed text** — 14,907 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 23,454 tokens (what every surface costs, summed)
+- **Unique fixed text** — 14,949 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -115,7 +115,7 @@ so a jump is never mistaken for a regression or a win.
 | `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 27 | 119 | — | 119 |
 | `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
-## hench — 4,665 per-call / 4,664 unique, 9 surfaces
+## hench — 4,708 per-call / 4,706 unique, 9 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
@@ -123,7 +123,7 @@ so a jump is never mistaken for a regression or a win.
 | `buildGoLanguageContext` | `packages/hench/src/agent/planning/prompt.ts` | Go toolchain and convention context, added when the project is Go. | 26 | 278 | — | 278 |
 | `formatTaskBrief` | `packages/hench/src/agent/planning/brief.ts` | Render the task brief section — task, parent chain, requirements. | 40 | 184 | 115 | 299 |
 | `buildReviewSystemPrompt` | `packages/hench/src/agent/analysis/adversarial-review.ts` | System prompt for the adversarial review pass. | 27 | 331 | — | 331 |
-| `buildReviewBrief` | `packages/hench/src/agent/analysis/adversarial-review.ts` | Brief handed to the reviewer — what to attack and where to report. | 110 | 1,494 | 364 | 1,858 |
+| `buildReviewBrief` | `packages/hench/src/agent/analysis/adversarial-review.ts` | Brief handed to the reviewer — what to attack and where to report. | 114 | 1,536 | 365 | 1,901 |
 | `buildOrientationSystemPrompt` | `packages/hench/src/agent/lifecycle/orientation.ts` | System prompt for the one-off repository orientation pass. | 10 | 147 | — | 147 |
 | `buildOrientationPrompt` | `packages/hench/src/agent/lifecycle/orientation.ts` | Orientation task prompt — what to establish about the repo. | 36 | 391 | — | 391 |
 | `buildRetryNotice` | `packages/hench/src/agent/lifecycle/cli-loop.ts` | Notice appended on retry telling a fresh session what is on disk. | 4 | 55 | — | 55 |

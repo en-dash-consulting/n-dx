@@ -441,6 +441,16 @@ export function buildReviewBrief(ctx: ReviewPromptContext): string {
       : "| `out-of-scope` | Report it under the area it actually belongs to. Do not capture it — the run queues it for the operator. | `dropped` | `offered` |",
     "| `not-worth-fixing` | Nothing. Report it with the reason — unreachable, already covered, or fix costs more than the defect. | `dropped` | `dropped` |",
     "",
+    // On a v2 tree `add_item` files an untargeted change in the Inbox with
+    // `needsPlacement`, and nothing autonomous selects it from there.
+    ...(ctx.autonomous
+      ? [
+          "On a v2 PRD a captured item is a change in the Inbox: place it with `place_change`",
+          "on the capability or constraint it belongs to, or it is never selected",
+          "autonomously.",
+          "",
+        ]
+      : []),
     "`disposition` records a finding's fate on its own closed scale of",
     "`fixed | dropped | offered | deferred`, set at the moment you decide it —",
     "every finding needs one. `offered` covers both a capture that succeeded",
@@ -742,6 +752,8 @@ export function buildPairReviewBrief(ctx: PairReviewPromptContext): string {
           "record the finding as `captured` with that item's id instead of creating a duplicate.",
           "When you create one, set `priority` to the severity, `tags` to",
           "`ndx-adversarial-review` and `severity:<level>`, and `source` to `ndx-adversarial-review`.",
+          "On a v2 PRD the item is a change in the Inbox: place it with `place_change` on the",
+          "capability or constraint it belongs to, or it is never selected autonomously.",
         ]
       : []),
     "",
