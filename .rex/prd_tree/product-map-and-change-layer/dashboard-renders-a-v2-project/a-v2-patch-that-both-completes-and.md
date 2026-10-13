@@ -8,6 +8,8 @@ tags:
   - "pr-36"
   - "review-2026-10-12"
   - "lane-web"
+blockedBy:
+  - "38978e4a-4c61-4546-989d-fed5e9514725"
 source: "review-2026-10-12"
 acceptanceCriteria:
   - "PATCH /api/rex/items/<inbox change> {status: completed, title: X} on a v2 copy is refused and the change's title is unchanged on disk (route test that fails on 4a7b64a8c8)"
