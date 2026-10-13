@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateMerge, previewMerge, mergeItems } from "../../../src/core/merge.js";
+import { validateMerge, previewMerge, mergeItems, mergeChanges } from "../../../src/core/merge.js";
 import { findItem } from "../../../src/core/tree.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 
@@ -323,5 +323,30 @@ describe("mergeItems", () => {
     const childIds = (target.children ?? []).map((c) => c.id);
     expect(childIds).toContain("s1");
     expect(childIds).toContain("s2");
+  });
+});
+
+describe("mergeChanges placement", () => {
+  const change = (id: string, extra: Record<string, unknown> = {}): PRDItem =>
+    makeItem({ id, title: id, level: "epic", type: "change", ...extra } as never);
+
+  it("clears the target's needsPlacement when an absorbed change was placed", () => {
+    const items = [change("placed", { touches: ["A1"] }), change("inbox", { needsPlacement: true })];
+    expect(mergeChanges(items, ["placed", "inbox"], "inbox").valid).toBe(true);
+    const target = findItem(items, "inbox")!.item;
+    expect(target.needsPlacement).toBeUndefined();
+    expect(target.touches).toEqual(["A1"]);
+  });
+
+  it("keeps needsPlacement when every change needs placement", () => {
+    const items = [change("a", { needsPlacement: true }), change("b", { needsPlacement: true })];
+    expect(mergeChanges(items, ["a", "b"], "a").valid).toBe(true);
+    expect(findItem(items, "a")!.item.needsPlacement).toBe(true);
+  });
+
+  it("leaves a placed target placed", () => {
+    const items = [change("a", { touches: ["A1"] }), change("b", { needsPlacement: true })];
+    expect(mergeChanges(items, ["a", "b"], "a").valid).toBe(true);
+    expect(findItem(items, "a")!.item.needsPlacement).toBeUndefined();
   });
 });
