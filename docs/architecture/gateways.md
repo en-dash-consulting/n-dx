@@ -6,7 +6,7 @@ When a package imports from another package at runtime, all imports are concentr
 
 | Package | Gateway file | Imports from | Purpose |
 |---------|-------------|--------------|---------|
-| hench | `src/prd/rex-gateway.ts` | rex | Store access, tree traversal, task selection, timestamps, auto-completion, finding acknowledgment, the v2 reader (`loadPrdModel`: which untracked intent files beside a completion's `state.yaml` hold rows there) |
+| hench | `src/prd/rex-gateway.ts` | rex | Store access, tree traversal, task selection, timestamps, auto-completion, finding acknowledgment, and the v2 surfaces: layout and store detection (`prdLayout`, `isChangeLayerStore`), selection (`findNextWorkTask`, `findActionableWork`, `resolveWorkById`), the brief (`buildChangeBrief`), completion (`completeV2Work`), tree bookkeeping (`isAppliedChange`, `indexTree`, `enclosingChangeIds`, type `V2Tree`) and the reader (`loadPrdModel`: which untracked intent files beside a completion's `state.yaml` hold rows there). Export ceiling enforced by `tests/e2e/architecture-policy.test.js`: 66 |
 | hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | Config, constants, JSON parsing, output formatting, process execution, token parsing, model resolution |
 | web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities |
 | web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types, live analyze progress reader, analyze command-line check, cross-repo artifact types (repo identity, outbound, infrastructure) |
