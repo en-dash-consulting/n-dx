@@ -89,6 +89,14 @@ export const SYMBOL_RULES: Readonly<Record<string, readonly SymbolRule[]>> = {
   ],
 };
 
+/**
+ * Captures that bound a type without declaring a symbol, per pack id: a member
+ * inside one has no named container, rather than the named type around it.
+ */
+const ANONYMOUS_BODIES: Readonly<Record<string, { readonly query: string; readonly capture: string }>> = {
+  java: { query: "declarations", capture: "type.anonymous" },
+};
+
 /** Kinds whose symbols contain members: a member without an explicit container belongs to the nearest one. */
 const TYPE_KINDS: ReadonlySet<SymbolKind> = new Set(["class", "interface", "enum", "record", "annotation", "struct"]);
 
@@ -158,6 +166,8 @@ export function readSymbols(pack: LanguagePack, file: PackSourceFile): SymbolFac
   }
 
   symbols.sort((a, b) => before(a.span.start, b.span.start));
+  const anonymous = ANONYMOUS_BODIES[pack.id];
+  const bodies = anonymous ? (file.captures[anonymous.query] ?? []).filter((c) => c.name === anonymous.capture) : [];
   return symbols.map((symbol) => {
     if (symbol.container !== undefined) return symbol;
     let enclosing: SymbolFact | undefined;
@@ -165,7 +175,9 @@ export function readSymbols(pack: LanguagePack, file: PackSourceFile): SymbolFac
       if (other === symbol || !TYPE_KINDS.has(other.kind) || !within(other.span, symbol.span)) continue;
       if (enclosing === undefined || within(enclosing.span, other.span)) enclosing = other;
     }
-    return enclosing ? { ...symbol, container: enclosing.name } : symbol;
+    // An anonymous body between the symbol and its named type makes it no member of that type.
+    const cut = bodies.some((b) => within(span(b), symbol.span) && (enclosing === undefined || within(enclosing.span, span(b))));
+    return enclosing && !cut ? { ...symbol, container: enclosing.name } : symbol;
   });
 }
 

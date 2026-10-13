@@ -15,3 +15,8 @@
 
 (annotation_type_declaration
   name: (identifier) @type.name) @type.annotation
+
+; An anonymous class body (`new Runnable() { … }`). It is not a symbol; it marks
+; where a member stops belonging to the named type around it.
+(object_creation_expression
+  (class_body) @type.anonymous)
