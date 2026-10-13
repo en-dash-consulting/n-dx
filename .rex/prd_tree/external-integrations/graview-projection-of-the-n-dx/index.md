@@ -36,3 +36,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [The graview binary never downloads silently: npx only on explicit opt-in, otherwise an install hint](./the-graview-binary-never-downloads.md) | completed |
 | [The isometric code map in the Graview face: a Code map page, and each zone page shows its place on it](./the-isometric-code-map-in-the-graview.md) | completed |
 | [Two-way writes through Graview's SyncEngine with rex as the system of record](./two-way-writes-through-graview-s.md) | completed |
+
