@@ -40,3 +40,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [The isometric code map in the Graview face: a Code map page, and each zone page shows its place on it](./the-isometric-code-map-in-the-graview.md) | completed |
 | [Two-way writes through Graview's SyncEngine with rex as the system of record](./two-way-writes-through-graview-s.md) | completed |
 | [Small projection gaps: overlapping sibling zones, sub-zone crossings, proposed-area notes, stale zone descriptions](./small-projection-gaps-overlapping.md) | pending |
+
