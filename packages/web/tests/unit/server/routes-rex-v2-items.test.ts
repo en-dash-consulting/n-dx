@@ -128,6 +128,35 @@ describe("Rex item routes on a v2 project", () => {
     expect((await (await resolveStore(rexDir)).getItem(TASK_ID))?.status).toBe("in_progress");
   });
 
+  it("PATCH completing with a field refused by rex writes neither", async () => {
+    // The change's task is still open, so completion is refused.
+    const res = await send("PATCH", `items/${CHANGE_ID}`, { status: "completed", title: "Renamed dup" });
+    expect(res.status).toBe(400);
+    const item = await (await resolveStore(rexDir)).getItem(CHANGE_ID);
+    expect(item?.title).not.toBe("Renamed dup");
+    expect(item?.status).not.toBe("completed");
+  });
+
+  it("bulk PATCH completing with a field writes none of a refused item's fields", async () => {
+    const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID], updates: { status: "completed", title: "Renamed dup" } });
+    const [result] = (await res.json()).results;
+    expect(result.ok).toBe(false);
+    expect((await (await resolveStore(rexDir)).getItem(CHANGE_ID))?.title).not.toBe("Renamed dup");
+  });
+
+  it("PATCH completing with a field writes both once completion succeeds", async () => {
+    const res = await send("PATCH", `items/${TASK_ID}`, { status: "completed", title: "Renamed task" });
+    expect(res.status).toBe(200);
+    const item = await (await resolveStore(rexDir)).getItem(TASK_ID);
+    expect(item).toMatchObject({ status: "completed", title: "Renamed task" });
+  });
+
+  it("bulk PATCH completing with a field writes both for the items it completed", async () => {
+    const res = await send("PATCH", "items/bulk", { ids: [TASK_ID], updates: { status: "completed", priority: "high" } });
+    expect((await res.json()).results).toEqual([{ id: TASK_ID, ok: true }]);
+    expect(await (await resolveStore(rexDir)).getItem(TASK_ID)).toMatchObject({ status: "completed", priority: "high" });
+  });
+
   it("PATCH of an unknown id on v2 is a 404", async () => {
     const res = await send("PATCH", "items/nope", { status: "in_progress" });
     expect(res.status).toBe(404);

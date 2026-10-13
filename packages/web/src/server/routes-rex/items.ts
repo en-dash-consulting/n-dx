@@ -188,6 +188,9 @@ async function handleItemPatch(
     const completing = updates.status === "completed" && isChangeLayerStore(store);
     const fieldUpdates = { ...updates };
     if (completing) delete fieldUpdates.status;
+    // Completion first, as `rex update` does: a refused completion throws before
+    // anything is written, so a PATCH never half-applies.
+    if (completing) await completeV2Work(store, itemId);
     if (Object.keys(fieldUpdates).length > 0 || !completing) {
       await store.withTransaction(async (doc) => {
         if (!updateInTree(doc.items, itemId, fieldUpdates as Partial<PRDItem>)) {
@@ -195,7 +198,6 @@ async function handleItemPatch(
         }
       });
     }
-    if (completing) await completeV2Work(store, itemId);
     const updatedDoc = await store.loadDocument();
 
     // Refresh the in-process cache immediately so subsequent loadPRDSync calls
@@ -502,23 +504,15 @@ async function handleBulkUpdate(
     const fieldUpdates = { ...input.updates };
     if (completing) delete fieldUpdates.status;
     const writeFields = !completing || Object.keys(fieldUpdates).length > 0;
-    let updatedDoc = await store.withTransaction(async (doc) => {
-      for (const id of input.ids) {
-        if (!writeFields) {
-          results.push({ id, ok: Boolean(findItemById(doc.items, id)) });
-        } else if (updateInTree(doc.items, id, { ...fieldUpdates })) {
-          // Cloned per item to get independent timestamps
-          results.push({ id, ok: true });
-        } else {
-          results.push({ id, ok: false });
-        }
-      }
-      return doc;
-    });
+    let updatedDoc: Awaited<ReturnType<typeof store.loadDocument>>;
     if (completing) {
-      // A change selected with its tasks is refused while a task listed after
-      // it is still open, so a refused id is retried after any pass that
-      // completed something.
+      // Completion runs first and fields are written only for the ids it
+      // completed, so a refused completion writes nothing of its own. A change
+      // selected with its tasks is refused while a task listed after it is
+      // still open, so a refused id is retried after any pass that completed
+      // something.
+      const before = await store.loadDocument();
+      for (const id of input.ids) results.push({ id, ok: Boolean(findItemById(before.items, id)) });
       let pending = results.filter((r) => r.ok);
       while (pending.length > 0) {
         const refused: typeof pending = [];
@@ -544,6 +538,22 @@ async function handleBulkUpdate(
           delete result.error;
         }
       }
+      if (writeFields) {
+        updatedDoc = await store.withTransaction(async (doc) => {
+          for (const result of results) {
+            if (result.ok) updateInTree(doc.items, result.id, { ...fieldUpdates });
+          }
+          return doc;
+        });
+      }
+    } else {
+      updatedDoc = await store.withTransaction(async (doc) => {
+        for (const id of input.ids) {
+          // Cloned per item to get independent timestamps
+          results.push({ id, ok: updateInTree(doc.items, id, { ...fieldUpdates }) });
+        }
+        return doc;
+      });
     }
     for (const result of results) {
       if (!result.ok && !result.error) result.error = "not found";
