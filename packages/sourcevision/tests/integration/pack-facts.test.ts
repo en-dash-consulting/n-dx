@@ -76,6 +76,19 @@ describe("Java facts", () => {
     expect(symbols![2]!.position).toEqual(at(JAVA_CLINIC, "owners()"));
   });
 
+  it("gives a method in an anonymous class no named container", async (ctx) => {
+    const source =
+      "class Clinic {\n  void start() { new Thread(new Runnable() { public void run() {} }); }\n  void stop() {}\n}\n";
+    const file = await parse(ctx, javaPack, "Clinic.java", source);
+    const { symbols } = readPackFacts(javaPack, file, { kinds: ["symbols"] });
+    expect(symbols?.map((s) => [s.name, s.container])).toEqual([
+      ["Clinic", undefined],
+      ["start", "Clinic"],
+      ["run", undefined],
+      ["stop", "Clinic"],
+    ]);
+  });
+
   it("groups calls with their receiver and own string arguments", async (ctx) => {
     const file = await parse(ctx, javaPack, "src/com/example/Clinic.java", JAVA_CLINIC);
     const literal = '"SELECT * FROM owners"';

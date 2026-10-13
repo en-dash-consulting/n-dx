@@ -112,7 +112,8 @@ export interface SymbolFact {
   /**
    * The type a member belongs to (a method's enclosing class, a Go method's
    * receiver base type, a nested type's outer type) or a table's schema.
-   * Absent at top level.
+   * Absent at top level, and for a Java member of an anonymous class: it
+   * belongs to no named type, so it does not take the one around it.
    */
   readonly container?: string;
 }
