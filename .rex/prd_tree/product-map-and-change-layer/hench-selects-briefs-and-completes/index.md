@@ -25,7 +25,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A failed commit after a held completion must not reopen an applied v2 change](./a-failed-commit-after-a-held.md) | pending |
+| [A failed commit after a held completion must not reopen an applied v2 change](./a-failed-commit-after-a-held.md) | completed |
+| [A kept v2 completion's commit commands sweep the operator's pre-run edits into the task's commit](./a-kept-v2-completion-s-commit-commands.md) | pending |
+| [An explicit --task refuses a task whose enclosing change another worktree has claimed](./an-explicit-task-refuses-a-task-whose.md) | pending |
 | [hench briefs a v2 task from its change](./hench-briefs-a-v2-task-from-its-change.md) | completed |
 | [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | completed |
 | [hench's precise bookkeeping list discounts a v2 tree's product/ and changes/](./hench-s-precise-bookkeeping-list.md) | completed |
@@ -33,8 +35,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [hench stages only the change-layer paths in rex's save report on a v2 completion](./hench-stages-only-the-change-layer.md) | pending |
 | [hench writes status, completion and claims through the v2 transaction](./hench-writes-status-completion-and.md) | completed |
 | [ndx work --task=<display id> --resolve reports "Task not found" on a v2 tree](./ndx-work-task-display-id-resolve.md) | completed |
+| [No test pins that a kept v2 completion suppresses the failed-run rollback](./no-test-pins-that-a-kept-v2-completion.md) | pending |
 | [On a v2 tree hench's brief can drop workflow.md whole when rex's 4,000-token budget runs out](./on-a-v2-tree-hench-s-brief-can-drop.md) | completed |
 | [Pin the review-dedupe wiring to changes/ on a v2 tree](./pin-the-review-dedupe-wiring-to.md) | pending |
 | [Re-record the prompt-census baseline for hench's v2 brief](./re-record-the-prompt-census-baseline.md) | completed |
 | [The completion gate and review captures understand v2](./the-completion-gate-and-review.md) | completed |
-| [An explicit --task refuses a task whose enclosing change another worktree has claimed](./an-explicit-task-refuses-a-task-whose.md) | pending |
