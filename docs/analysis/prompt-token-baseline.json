@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 38,
-    "perCallTokens": 23393,
-    "uniqueTokens": 14890,
+    "perCallTokens": 23400,
+    "uniqueTokens": 14896,
     "skills": 13,
     "skillTokens": 20439
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 4647,
-      "uniqueTokens": 4647
+      "perCallTokens": 4654,
+      "uniqueTokens": 4653
     },
     "core": {
       "surfaces": 1,
@@ -261,6 +261,14 @@
       ]
     },
     {
+      "pkg": "hench",
+      "name": "commitTrailersBlock",
+      "tokens": 55,
+      "usedBy": [
+        "formatTaskBrief"
+      ]
+    },
+    {
       "pkg": "sourcevision",
       "name": "formatFileHeaders",
       "tokens": 54,
@@ -275,6 +283,14 @@
       "usedBy": [
         "buildLaterPassEnvelope",
         "buildSingleZoneLaterPassEnvelope"
+      ]
+    },
+    {
+      "pkg": "hench",
+      "name": "sessionFiltersBlock",
+      "tokens": 48,
+      "usedBy": [
+        "formatTaskBrief"
       ]
     },
     {
@@ -328,6 +344,22 @@
       "tokens": 15,
       "usedBy": [
         "buildMetaEnvelope"
+      ]
+    },
+    {
+      "pkg": "hench",
+      "name": "workflowBlock",
+      "tokens": 6,
+      "usedBy": [
+        "formatTaskBrief"
+      ]
+    },
+    {
+      "pkg": "hench",
+      "name": "formatChangeBrief",
+      "tokens": 5,
+      "usedBy": [
+        "formatTaskBrief"
       ]
     }
   ],
@@ -783,11 +815,16 @@
       "builder": "formatTaskBrief",
       "purpose": "Render the task brief section — task, parent chain, requirements.",
       "inline": false,
-      "literals": 49,
-      "constants": {},
-      "ownTokens": 292,
-      "fixedChars": 1166,
-      "fixedTokens": 292
+      "literals": 40,
+      "constants": {
+        "formatChangeBrief": 5,
+        "commitTrailersBlock": 55,
+        "sessionFiltersBlock": 48,
+        "workflowBlock": 6
+      },
+      "ownTokens": 184,
+      "fixedChars": 1194,
+      "fixedTokens": 299
     },
     {
       "pkg": "hench",
@@ -964,9 +1001,9 @@
           "tokens": 167
         }
       ],
-      "fixedTokens": 1478,
+      "fixedTokens": 1485,
       "branchConditional": true,
-      "unreachedTokens": 520
+      "unreachedTokens": 527
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -1021,8 +1058,8 @@
       }
     ]
   },
-  "contentHash": "cf05efd08ecdaa08",
-  "recordedAt": "2026-10-11T07:52:33.623Z",
-  "commit": "7c54ef5ac04f",
+  "contentHash": "e90ce181db6b46e9",
+  "recordedAt": "2026-10-13T02:42:01.683Z",
+  "commit": "e883ea05ef71",
   "dirty": false
 }
