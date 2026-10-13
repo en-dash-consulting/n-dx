@@ -48,7 +48,6 @@ function initRepo(dir) {
   // Local identity so commits succeed where the global git config has none.
   git(["config", "user.email", "ndx-test@example.com"], dir);
   git(["config", "user.name", "ndx test"], dir);
-  git(["config", "commit.gpgsign", "false"], dir);
 }
 
 /**

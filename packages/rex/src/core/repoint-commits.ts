@@ -57,6 +57,27 @@ export interface RepointOptions {
   ref?: string;
   /** Off by default: without it, only git is read. */
   host?: CommitHost;
+  /**
+   * Facts a caller recorded for SHAs that may no longer be in the repository,
+   * keyed by the SHA as recorded.
+   *
+   * A rewritten commit whose original object is gone — a pruned branch, a
+   * fresh clone, `git gc` after a squash merge — cannot be read from git, and
+   * every twin rule compares against facts read from git. Without these it
+   * fails at "not in this repository" before any rule runs, which is the one
+   * case re-pointing exists for. Supplied facts let the author-date-subject
+   * and trailer-subject rules still run; patch-id cannot, because it needs the
+   * object itself.
+   */
+  facts?: ReadonlyMap<string, RecordedCommitFacts>;
+}
+
+/** The subset of {@link CommitFacts} a caller can usefully have stored. */
+export interface RecordedCommitFacts {
+  authorEmail?: string;
+  authorDate?: string;
+  subject?: string;
+  items?: string[];
 }
 
 export interface RepointMatch {
@@ -155,7 +176,7 @@ export function findPatchTwin(oldPatchId: string | undefined, mainByPatchId: Map
  * shallow (a truncated history would make landed commits read as unmatched).
  */
 export async function repointCommits(shas: Iterable<string>, options: RepointOptions): Promise<RepointResult> {
-  const { repoDir, host } = options;
+  const { repoDir, host, facts: recordedFacts } = options;
   const { ref, tip } = await resolveMainRef(repoDir, options.ref);
   await assertFullHistory(repoDir);
 
@@ -182,9 +203,13 @@ export async function repointCommits(shas: Iterable<string>, options: RepointOpt
     else offMain.push({ sha, full });
   }
 
+  let mainIndex: MainCommitIndex | undefined;
+  const indexOfMain = async (): Promise<MainCommitIndex> =>
+    (mainIndex ??= indexMainCommits(await readFacts(repoDir, ["--no-merges", tip])));
+
   if (offMain.length > 0) {
     const oldFacts = new Map((await readFacts(repoDir, ["--no-walk=unsorted", ...offMain.map((o) => o.full)])).map((f) => [f.hash, f]));
-    const index = indexMainCommits(await readFacts(repoDir, ["--no-merges", tip]));
+    const index = await indexOfMain();
 
     for (const { sha, full } of offMain) {
       const facts = oldFacts.get(full);
@@ -205,6 +230,29 @@ export async function repointCommits(shas: Iterable<string>, options: RepointOpt
         `no commit on ${ref} matches it by author date and subject, patch-id, or N-DX-Item trailer and subject`,
         ...ambiguous,
       ].join("; "));
+    }
+  }
+
+  // A SHA git cannot resolve is the case re-pointing exists for, and it is the
+  // one case the rules above never reach. Stored facts stand in for the object
+  // that is gone; patch-id is skipped because it needs the object.
+  if (recordedFacts) {
+    for (const [sha, reason] of [...gitMiss]) {
+      const stored = recordedFacts.get(sha);
+      if (!stored?.authorEmail || !stored.authorDate || !stored.subject) continue;
+      const standIn: CommitFacts = {
+        hash: sha,
+        authorEmail: stored.authorEmail,
+        authorDate: stored.authorDate,
+        subject: stored.subject,
+        items: stored.items ?? [],
+      };
+      const index = await indexOfMain();
+      const twin = findTwin(standIn, index);
+      if (twin && "hash" in twin) { match(sha, twin.hash, "author-date-subject"); gitMiss.delete(sha); continue; }
+      const trailer = findTrailerSubject(standIn, index);
+      if (trailer && "hash" in trailer) { match(sha, trailer.hash, "trailer-subject"); gitMiss.delete(sha); continue; }
+      gitMiss.set(sha, `${reason}; its recorded facts match no commit on ${ref} either`);
     }
   }
 

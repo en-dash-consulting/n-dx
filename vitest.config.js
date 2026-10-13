@@ -2,6 +2,11 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // Console output is kept for failing tests and dropped for passing ones.
+    // A green run of the monorepo printed 7500 lines from hench and 5300 from
+    // rex (run 38193308009), every one of them from a test that passed; the
+    // lines a failure needs are exactly the ones this still prints.
+    silent: "passed-only",
     include: ["tests/**/*.test.js"],
     globalSetup: ["tests/e2e/verify-build.js"],
     // Runs inside each worker before it loads any test module — early enough to

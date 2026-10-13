@@ -53,7 +53,6 @@ beforeEach(async () => {
   execFileSync("git", ["init", "-q", "-b", "main", repo]);
   git("config", "user.email", "dev@example.com");
   git("config", "user.name", "Dev");
-  git("config", "commit.gpgsign", "false");
 });
 
 afterEach(async () => {

@@ -71,7 +71,11 @@ describe("reviewer environment cannot be resolved", () => {
       JSON.stringify({ llm: { claude: { cli_path: writeMockReviewer(tmpDir) } } }),
       "utf-8",
     );
-    const testCommand = `${process.execPath} -e "process.exit(0)"`;
+    // Quoted, like the .cmd shim above: the command runs through a shell, and
+    // on a machine whose node lives under "Program Files" an unquoted path
+    // makes the shell look for `C:\Program`. CI's node has no space in its
+    // path, so the fixture passed there and failed only locally.
+    const testCommand = `"${process.execPath}" -e "process.exit(0)"`;
 
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "claude", testCommand });
 

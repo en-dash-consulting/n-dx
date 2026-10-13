@@ -135,12 +135,27 @@ describe("finalizeRun reports commits git cannot tie to the task", () => {
     await finalizeRun({ run, henchDir, projectDir });
 
     expect(run.commits?.map((c) => c.sha)).toEqual([tagged, bare, split, other]);
+    // Against git's own answer, not expect.any(String): the point of recording
+    // the facts is that they identify the commit's twin after a rewrite, and a
+    // shape assertion passes just as well when the write is deleted.
+    const authorDateOf = (sha: string): string =>
+      git(projectDir, "log", "-1", "--format=%aI", sha).trim();
+    const authorEmailOf = (sha: string): string =>
+      git(projectDir, "log", "-1", "--format=%ae", sha).trim();
+    // authorEmail is here because rex's twin key is email + date + subject;
+    // the facts are recorded to identify a rewritten commit, so each is pinned
+    // against git rather than asserted as a shape.
     expect(run.commitsMissingItem).toEqual([
-      // authorDate comes from the commit facts every run record now carries.
-      { sha: bare, subject: "feat: untagged", items: [], authorDate: expect.any(String) },
-      { sha: split, subject: "feat: split", items: [], authorDate: expect.any(String) },
-      { sha: other, subject: "feat: other item", items: ["some-other-task"], authorDate: expect.any(String) },
+      { sha: bare, subject: "feat: untagged", items: [], authorDate: authorDateOf(bare), authorEmail: authorEmailOf(bare) },
+      { sha: split, subject: "feat: split", items: [], authorDate: authorDateOf(split), authorEmail: authorEmailOf(split) },
+      { sha: other, subject: "feat: other item", items: ["some-other-task"], authorDate: authorDateOf(other), authorEmail: authorEmailOf(other) },
     ]);
+    // The baseline's own facts are recorded too, and nothing above would miss
+    // their absence.
+    expect(run.startHeadCommit).toBeDefined();
+    expect(run.startHeadCommit!.sha).toBe(run.startHead);
+    expect(run.startHeadCommit!.authorDate).toBe(authorDateOf(run.startHead!));
+    expect(run.startHeadCommit!.authorEmail).toBe(authorEmailOf(run.startHead!));
 
     const lines = formatCommitsMissingItem(run);
     expect(lines[0]).toContain(`3 commits not tied to this task (no \`N-DX-Item: ${TASK}\``);
