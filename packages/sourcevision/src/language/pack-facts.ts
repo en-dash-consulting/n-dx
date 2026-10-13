@@ -94,7 +94,7 @@ export const SYMBOL_RULES: Readonly<Record<string, readonly SymbolRule[]>> = {
  * inside one has no named container, rather than the named type around it.
  */
 const ANONYMOUS_BODIES: Readonly<Record<string, { readonly query: string; readonly capture: string }>> = {
-  java: { query: "declarations", capture: "type.anonymous" },
+  java: { query: "declarations", capture: "anonymous.body" },
 };
 
 /** Kinds whose symbols contain members: a member without an explicit container belongs to the nearest one. */
