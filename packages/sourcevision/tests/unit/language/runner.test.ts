@@ -19,9 +19,26 @@ const JAVA_WASM = grammarWasmPath("tree-sitter-java");
 const NOT_BUILT =
   "tree-sitter-java.wasm is not built — run `node packages/sourcevision/scripts/build-grammars.mjs`";
 
-// Spied before any runner call so the process-wide counts start at zero.
-const initSpy = vi.spyOn(Parser, "init");
-const loadSpy = vi.spyOn(Language, "load");
+// Counted before any runner call so the process-wide counts start at zero.
+// Plain wrappers, not vi.spyOn: vitest clears a spy's calls between tests, and
+// these counts must run across the whole file.
+// @vitest-isolate: these counts are per process, so this file needs a worker of its
+// own; another grammar test sharing the worker would have initialised the parser first.
+const calls = { init: 0, load: 0 };
+const realInit = Parser.init;
+const realLoad = Language.load;
+Parser.init = ((...args: Parameters<typeof realInit>) => {
+  calls.init++;
+  return realInit.apply(Parser, args);
+}) as typeof Parser.init;
+Language.load = ((...args: Parameters<typeof realLoad>) => {
+  calls.load++;
+  return realLoad.apply(Language, args);
+}) as typeof Language.load;
+afterAll(() => {
+  Parser.init = realInit;
+  Language.load = realLoad;
+});
 
 const STRUCTURE_SCM = `
 (class_declaration name: (identifier) @class.name) @class
@@ -150,8 +167,8 @@ describe("tree-sitter runner", () => {
       other.dispose();
     }
 
-    expect(initSpy).toHaveBeenCalledTimes(1);
-    expect(loadSpy).toHaveBeenCalledTimes(1);
+    expect(calls.init).toBe(1);
+    expect(calls.load).toBe(1);
   });
 
   it("frees trees: parsing many files does not grow memory without bound", async (ctx) => {
