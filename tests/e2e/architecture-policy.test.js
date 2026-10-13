@@ -307,6 +307,10 @@ const DOCUMENTED_POLICIES = [
     enforcedBy: "architecture-policy.test.js → architecture policy: foundation tier boundary (@n-dx/lang-kit)",
   },
   {
+    rule: "Pack tier: @n-dx/lang-runtime imports only @n-dx/lang-kit; each @n-dx/lang-* pack imports only @n-dx/lang-kit and @n-dx/lang-runtime",
+    enforcedBy: "architecture-policy.test.js → architecture policy: pack tier boundary (@n-dx/lang-runtime and packs)",
+  },
+  {
     rule: "Domain-layer files must not import from CLI layer (intra-package layering)",
     enforcedBy: "architecture-policy.test.js → architecture policy: intra-package layering",
   },
@@ -402,6 +406,48 @@ describe("architecture policy: foundation tier boundary (@n-dx/lang-kit)", () =>
   });
 });
 
+/**
+ * Pack tier boundary: the parser runtime and the language packs sit beside the
+ * domain tier. The runtime builds on @n-dx/lang-kit alone; a pack builds on
+ * lang-kit and the runtime, and never on another pack, so any pack can be left
+ * out of an install. sourcevision loads packs at run time.
+ */
+describe("architecture policy: pack tier boundary (@n-dx/lang-runtime and packs)", () => {
+  const NDX_IMPORT = /(?:\bfrom|\bimport|\brequire)\s*\(?\s*["'](@n-dx\/[a-z-]+)/g;
+  const PACK_TIER = {
+    "lang-runtime": ["@n-dx/lang-kit"],
+    "lang-java": ["@n-dx/lang-kit", "@n-dx/lang-runtime"],
+    "lang-go": ["@n-dx/lang-kit", "@n-dx/lang-runtime"],
+    "lang-sql": ["@n-dx/lang-kit", "@n-dx/lang-runtime"],
+    "lang-terraform": ["@n-dx/lang-kit", "@n-dx/lang-runtime"],
+  };
+
+  for (const [dir, allowed] of Object.entries(PACK_TIER)) {
+    it(`packages/${dir}/src imports only ${allowed.join(" and ")} from n-dx`, () => {
+      const srcDir = join(ROOT, "packages", dir, "src");
+      expect(existsSync(srcDir), `packages/${dir}/src is missing`).toBe(true);
+      const violations = [];
+      for (const file of walk(srcDir)) {
+        const rel = relative(ROOT, file).replace(/\\/g, "/");
+        for (const [i, line] of readFileSync(file, "utf-8").split("\n").entries()) {
+          for (const m of line.matchAll(NDX_IMPORT)) {
+            if (!allowed.includes(m[1])) violations.push(`  ${rel}:${i + 1}: ${line.trim()}`);
+          }
+        }
+      }
+      if (violations.length > 0) {
+        expect.fail([`@n-dx/${dir} may import only ${allowed.join(" and ")} from n-dx.`, "", "Violations:", ...violations].join("\n"));
+      }
+    });
+
+    it(`packages/${dir}/package.json depends on no other @n-dx package`, () => {
+      const pkg = JSON.parse(readFileSync(join(ROOT, "packages", dir, "package.json"), "utf-8"));
+      const ndx = Object.keys(pkg.dependencies ?? {}).filter((name) => name.startsWith("@n-dx/"));
+      expect(ndx.filter((name) => !allowed.includes(name)), `@n-dx/${dir} may depend only on ${allowed.join(" and ")}`).toEqual([]);
+    });
+  }
+});
+
 describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
   it("all documented tier boundary rules have enforcement tests", () => {
     // This is a declarative registry — it does not parse CLAUDE.md.
@@ -409,7 +455,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
     // add an entry to DOCUMENTED_POLICIES above. If this test has
     // fewer entries than the rules in CLAUDE.md, the gap is visible
     // in code review. Minimum: 12 policies.
-    expect(DOCUMENTED_POLICIES.length).toBe(22);
+    expect(DOCUMENTED_POLICIES.length).toBe(23);
   });
 
   for (const policy of DOCUMENTED_POLICIES) {
