@@ -32,7 +32,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | completed |
 | [hench's precise bookkeeping list discounts a v2 tree's product/ and changes/](./hench-s-precise-bookkeeping-list.md) | completed |
 | [hench selects v2 work and finds a task by id](./hench-selects-v2-work-and-finds-a-task.md) | completed |
-| [hench stages only the change-layer paths in rex's save report on a v2 completion](./hench-stages-only-the-change-layer.md) | pending |
+| [hench stages only the change-layer paths in rex's save report on a v2 completion](./hench-stages-only-the-change-layer.md) | completed |
 | [hench writes status, completion and claims through the v2 transaction](./hench-writes-status-completion-and.md) | completed |
 | [ndx work --task=<display id> --resolve reports "Task not found" on a v2 tree](./ndx-work-task-display-id-resolve.md) | completed |
 | [No test pins that a kept v2 completion suppresses the failed-run rollback](./no-test-pins-that-a-kept-v2-completion.md) | pending |
