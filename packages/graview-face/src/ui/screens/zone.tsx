@@ -5,6 +5,7 @@ import { crossings, isFragile } from "../../model/code.js";
 import { inward, inwardOf, nodeOf, out, type Of } from "../../model/graph.js";
 import { Badge, Empty, Facts, Hero, Meter, Page, RecordRow, Rows, Section, Stat, Stats, type Ctx } from "../kit.js";
 import { Missing, Under } from "./generic.js";
+import { IsoFrame } from "../iso-frame.js";
 
 const shape = (z: Of<"zone">) => `cohesion ${Math.round((z.cohesion ?? 0) * 100)}% · coupling ${Math.round((z.coupling ?? 0) * 100)}%`;
 
@@ -82,6 +83,10 @@ export function ZoneScreen({ context }: { context: Ctx; app: App }) {
         </Section>
       ) : null}
 
+
+      <Section title="On the code map" i={6} more={{ to: "/code-map", label: "The whole map" }}>
+        <IsoFrame title={`${facts.label} on the code map`} height="26rem" focus={node.id} />
+      </Section>
 
       <Section title={`Components${components.length ? ` (${components.length})` : ""}`} i={7}>
         {components.length === 0 ? <Empty command="ndx analyze .">No components catalogued here.</Empty> : <Rows>{components.slice(0, 40).map((c, i) => <RecordRow key={c.id} context={context} node={c} i={i} sub={c.file ?? ""} end={<Badge plain>{c.role ?? ""}</Badge>} />)}</Rows>}

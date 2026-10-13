@@ -1,0 +1,25 @@
+---
+id: "7e2137c9-ca0a-4206-a890-9ebae7b2bcfc"
+level: "task"
+title: "The isometric code map in the Graview face: a Code map page, and each zone page shows its place on it"
+status: "completed"
+priority: "medium"
+tags:
+  - "graview"
+  - "sourcevision"
+  - "iso-map"
+source: "conversation"
+startedAt: "2026-10-13T00:00:39.721Z"
+completedAt: "2026-10-13T00:00:39.721Z"
+endedAt: "2026-10-13T00:00:39.721Z"
+resolutionType: "code-change"
+resolutionDetail: "emit writes iso-map.html in embed mode (removing a stale one); the door serves it; the face has a Code map page and a zone-page map focused on the zone through a new focus message in sourcevision's embed contract; iso skill regenerated."
+acceptanceCriteria:
+  - "`ndx graview emit .` writes iso-map.html under the graview dir when sourcevision analysis exists, and writes none (removing a stale one) when it does not"
+  - "The face has a Code map page in the rail's Code group that shows the map full height, in the face's colour scheme"
+  - "A zone page shows the map with that zone selected, through the embed contract's `{ type: \"ndx-iso\", focus: <zone id> }` message, including a sub-zone that lives inside an area's scene"
+  - "The generated /iso-map skill script is rebuilt from the sourcevision source, and the iso-skill drift test passes"
+description: "Asked for on 2026-10-12: surface sourcevision's isometric architecture map in the Graview face. `ndx graview emit` writes the map (sourcevision's `renderIsoMap` in embed mode over `loadFromSourcevision`) beside the snapshot as `iso-map.html`; the face's dev door serves it; the face gets a Code map page under Code, and every zone page embeds the map focused on that zone. The map's URL hash names only an area's scene, so sourcevision's embed contract gains a `focus` message that opens the scene holding a zone and selects it."
+lastModified: "2026-10-13T00:00:39.992Z"
+lastModifiedBy: "Nick Daniel <nick@endash.us>"
+---

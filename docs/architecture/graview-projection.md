@@ -154,6 +154,18 @@ that owns the node. Edges whose far end is missing are dropped, never
 invented. Nodes and edges are sorted and written as canonical JSON, so two
 projections of an unchanged checkout are byte-identical.
 
+## The code map
+
+When sourcevision has analyzed the project, `emit` also writes its isometric
+architecture map in embed mode (`iso-map.html`, through `loadFromSourcevision`,
+`buildIsoModel` and `renderIsoMap` on the sourcevision gateway), and removes a
+stale one when the analysis is gone. The face's door serves it at
+`/data/iso-map.html`; the Code map page frames it whole, and each zone page
+frames it focused on that zone through the embed contract's
+`{ type: "ndx-iso", focus: "<zone id>" }` message, which opens the area scene
+holding the zone and selects it, expanding the parent when the zone is a tile
+on its top.
+
 ## Places the declaration opens with
 
 | Lens | Over |

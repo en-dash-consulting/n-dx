@@ -102,7 +102,8 @@ function describeEmit(result: EmitResult): string {
     .map(([kind, n]) => `${n} ${n === 1 ? kind : plural(kind)}`);
   const rel = (p: string) => relativeToRoot(result.layout, p);
   const layer = result.productLayer === "proposed" ? "; product layer proposed by rex's migration plan" : "";
-  return `Wrote ${rel(result.documentPath)} and ${rel(result.snapshotPath)}: ${parts.join(", ")}; ${counts.edges} edges (PRD layout ${result.prdLayout}${layer}).`;
+  const map = result.isoMapPath ? `, and the code map at ${rel(result.isoMapPath)}` : "";
+  return `Wrote ${rel(result.documentPath)} and ${rel(result.snapshotPath)}: ${parts.join(", ")}; ${counts.edges} edges (PRD layout ${result.prdLayout}${layer})${map}.`;
 }
 
 /**

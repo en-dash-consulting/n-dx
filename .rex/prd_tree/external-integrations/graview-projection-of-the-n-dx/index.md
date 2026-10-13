@@ -25,7 +25,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Capabilities are realized in the zones of every change placed on them, from run commits as well as trailers](./capabilities-are-realized-in-the-zones.md) | completed |
-| [Migration review: project a migration plan file into Graview for people to approve](./migration-review-project-a-migration.md) | pending |
+| [Migration review: project a migration plan file into Graview for people to approve](./migration-review-project-a-migration.md) | blocked |
 | [@n-dx/graview adapter: declaration document, snapshot projection and ndx graview spawn commands](./n-dx-graview-adapter-declaration.md) | completed |
 | [n-dx on Graview: declared design and a custom pages face, in n-dx's own words](./n-dx-on-graview-declared-design-and-a.md) | completed |
 | [ndx graview check fits the emitted snapshot to the declaration, not only the declaration](./ndx-graview-check-fits-the-emitted.md) | completed |
@@ -34,5 +34,6 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Revisit: refuse ndx graview on a v1 PRD once n-dx's own tree has migrated](./revisit-refuse-ndx-graview-on-a-v1-prd.md) | pending |
 | [The face and the adapter take Graview 0.1.22 and drop the workarounds it answers](./the-face-and-the-adapter-take-graview.md) | completed |
 | [The graview binary never downloads silently: npx only on explicit opt-in, otherwise an install hint](./the-graview-binary-never-downloads.md) | completed |
+| [The isometric code map in the Graview face: a Code map page, and each zone page shows its place on it](./the-isometric-code-map-in-the-graview.md) | completed |
 | [Two-way writes through Graview's SyncEngine with rex as the system of record](./two-way-writes-through-graview-s.md) | completed |
 
