@@ -44,6 +44,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [No test pins that a kept v2 completion suppresses the failed-run rollback](./no-test-pins-that-a-kept-v2-completion.md) | pending |
 | [On a v2 tree hench's brief can drop workflow.md whole when rex's 4,000-token budget runs out](./on-a-v2-tree-hench-s-brief-can-drop.md) | completed |
 | [Pin the review-dedupe wiring to changes/ on a v2 tree](./pin-the-review-dedupe-wiring-to.md) | completed |
+| [prompt-census baseline is stale after the review brief's v2 Inbox clause (+11 tokens in buildReviewBrief)](./prompt-census-baseline-is-stale-after.md) | pending |
 | [Re-record the prompt-census baseline for hench's v2 brief](./re-record-the-prompt-census-baseline.md) | completed |
 | [The completion gate and review captures understand v2](./the-completion-gate-and-review.md) | completed |
 | [The review dedupe sees Inbox changes under changes/inbox/](./the-review-dedupe-sees-inbox-changes.md) | pending |
