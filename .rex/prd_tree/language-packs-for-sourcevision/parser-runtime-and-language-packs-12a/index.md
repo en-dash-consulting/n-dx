@@ -29,7 +29,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Define the pack entry in lang-kit, move Java and Go into their packs, and load packs at run time](./define-the-pack-entry-in-lang-kit-move.md) | pending |
+| [A pack whose analyzeProject rejects fails the whole imports phase instead of degrading its language](./a-pack-whose-analyzeproject-rejects.md) | pending |
+| [Define the pack entry in lang-kit, move Java and Go into their packs, and load packs at run time](./define-the-pack-entry-in-lang-kit-move.md) | completed |
 | [Drop the parser runtime from sourcevision and enforce dynamic-only pack loading](./drop-the-parser-runtime-from.md) | pending |
 | [Move SQL and Terraform (HCL) into @n-dx/lang-sql and @n-dx/lang-terraform](./move-sql-and-terraform-hcl-into-n-dx.md) | pending |
 | [Move the tree-sitter runtime into @n-dx/lang-runtime](./move-the-tree-sitter-runtime-into-n-dx.md) | completed |
+| [Workspace tests and corpus scripts load opt-in packs from the user's real pack directory, shadowing workspace code](./workspace-tests-and-corpus-scripts.md) | pending |
