@@ -7,7 +7,7 @@
  * tree is freed before `parse` returns. Files above the size limit are
  * skipped and counted rather than parsed.
  *
- * @module sourcevision/language/runner
+ * @module lang-runtime/runner
  */
 
 import { readFileSync, statSync } from "node:fs";

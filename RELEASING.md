@@ -58,7 +58,7 @@ The sub-packages (`@n-dx/rex`, `@n-dx/hench`, etc.) are published independently 
 
 Verify with `pnpm pack --dry-run` from `packages/core/`.
 
-`@n-dx/sourcevision` also ships its language-pack assets: query files (`src/language/queries/`) and built tree-sitter grammars (`build/grammars/*.wasm`). Grammars are never committed, so the release workflow builds them with `scripts/build-grammars.mjs` before its tests and sets `SV_REQUIRE_GRAMMARS=1`. `tests/e2e/packed-tarball.test.ts` packs the tarball and loads the packs from it, so a release whose tarball lacks a grammar fails before publish.
+`@n-dx/sourcevision` also ships its language-pack assets: query files (`src/language/queries/`) and built tree-sitter grammars (`build/grammars/*.wasm`). Grammars are never committed, so the release workflow builds them with `packages/lang-runtime/scripts/build-grammars.mjs` before its tests and sets `SV_REQUIRE_GRAMMARS=1`. `tests/e2e/packed-tarball.test.ts` packs the tarball and loads the packs from it, so a release whose tarball lacks a grammar fails before publish.
 
 ## CLI commands registered on install
 

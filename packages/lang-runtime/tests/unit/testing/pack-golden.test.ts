@@ -12,7 +12,7 @@ import {
   UPDATE_ENV,
   updateRequested,
   type PackGolden,
-} from "../../helpers/pack-golden.js";
+} from "../../../src/testing/pack-golden.js";
 
 const golden: PackGolden = {
   pack: "demo",

@@ -17,17 +17,18 @@ function packageRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 }
 
-/** Where `scripts/build-grammars.mjs` writes grammars: `<package>/build/grammars`. */
+/** Where `@n-dx/lang-runtime`'s `scripts/build-grammars.mjs` writes grammars by default: `<package>/build/grammars`. */
 export function grammarBuildDir(): string {
   return join(packageRoot(), "build", "grammars");
 }
 
 /**
- * `scripts/build-grammars.mjs`. Present only in a source checkout: the
- * published package ships built grammars instead of the script.
+ * `packages/lang-runtime/scripts/build-grammars.mjs`, beside this package in
+ * the n-dx checkout. Present only in a source checkout: the published
+ * packages ship built grammars instead of the script.
  */
 export function buildGrammarsScript(): string {
-  return join(packageRoot(), "scripts", "build-grammars.mjs");
+  return join(packageRoot(), "..", "lang-runtime", "scripts", "build-grammars.mjs");
 }
 
 /** Query files ship in `<package>/src/language/queries/<lang>`, for both src and dist. */

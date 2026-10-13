@@ -25,7 +25,7 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { grammarWasmPath } from "./build-grammars.mjs";
+import { grammarWasmPath } from "../../lang-runtime/scripts/build-grammars.mjs";
 import { CLONE_COMMAND, CORPUS_DIR_ENV, checkedOutSha, corpusDir, loadCorpus } from "./go-corpus.mjs";
 
 /** Share of files that must parse without ERROR or MISSING nodes. */
@@ -81,11 +81,11 @@ if (missing.length > 0) {
 
 const wasm = grammarWasmPath("tree-sitter-go");
 if (!existsSync(wasm)) {
-  console.error(`${wasm} is not built — run \`node packages/sourcevision/scripts/build-grammars.mjs\``);
+  console.error(`${wasm} is not built — run \`node packages/lang-runtime/scripts/build-grammars.mjs\``);
   process.exit(2);
 }
-const distRunner = new URL("../dist/language/runner.js", import.meta.url);
-if (!existsSync(distRunner)) {
+const distPack = new URL("../dist/language/go-pack.js", import.meta.url);
+if (!existsSync(distPack)) {
   console.error("sourcevision is not built — run `pnpm --filter @n-dx/sourcevision build`");
   process.exit(2);
 }
@@ -94,7 +94,12 @@ if (!existsSync(langKitDist)) {
   console.error("lang-kit is not built — run `pnpm --filter @n-dx/lang-kit build`");
   process.exit(2);
 }
-const { createTreeSitterRunner } = await import(distRunner.href);
+const runtimeDist = new URL("../../lang-runtime/dist/index.js", import.meta.url);
+if (!existsSync(runtimeDist)) {
+  console.error("lang-runtime is not built — run `pnpm --filter @n-dx/lang-runtime build`");
+  process.exit(2);
+}
+const { createTreeSitterRunner } = await import(runtimeDist.href);
 const { goPack } = await import(new URL("../dist/language/go-pack.js", import.meta.url).href);
 const { extractGoImports } = await import(new URL("../dist/analyzers/go-imports.js", import.meta.url).href);
 const { analyzeInventory } = await import(new URL("../dist/analyzers/inventory.js", import.meta.url).href);

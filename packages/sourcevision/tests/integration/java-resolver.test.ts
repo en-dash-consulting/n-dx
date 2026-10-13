@@ -6,15 +6,20 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
+import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
 import { javaPack } from "../../src/language/java-pack.js";
-import type { FileReferences, PackSourceFile } from "../../src/language/pack.js";
-import { createTreeSitterRunner } from "../../src/language/runner.js";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
-import { fixtureDirFor, listFixtureFiles } from "../helpers/pack-golden.js";
+import {
+  createTreeSitterRunner,
+  fixtureDirFor,
+  listFixtureFiles,
+  skipUnlessGrammar,
+  type FileReferences,
+  type PackSourceFile,
+} from "@n-dx/lang-runtime";
+import { PACK_FIXTURE_ROOT } from "../helpers/pack-fixtures.js";
 
 const JAVA_WASM = grammarWasmPath("tree-sitter-java");
-const FIXTURE = fixtureDirFor(javaPack);
+const FIXTURE = fixtureDirFor(PACK_FIXTURE_ROOT, javaPack);
 const APP = "src/com/example/app";
 
 async function resolveFixture(ctx: Parameters<typeof skipUnlessGrammar>[0]): Promise<(path: string) => FileReferences> {

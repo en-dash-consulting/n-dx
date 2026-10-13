@@ -12,10 +12,10 @@
 
 import { join } from "node:path";
 import { queryDir } from "./package-paths.js";
-import type { LanguagePack, RuleProvenance } from "./pack.js";
+import type { LanguagePack, RuleProvenance } from "@n-dx/lang-runtime";
 import type { LanguageConfig } from "@n-dx/lang-kit";
 
-/** Keep in step with `scripts/build-grammars.mjs`. */
+/** Keep in step with `packages/lang-runtime/scripts/build-grammars.mjs`. */
 const GRAMMAR_VERSION = "0.3.11";
 
 const sqlConfig: LanguageConfig = {

@@ -8,9 +8,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { detectMigrationTools, sqlcPaths } from "../../../src/language/sql-migrations.js";
 import { extractSqlTables, splitSqlName, sqlTarget } from "../../../src/language/sql-schema.js";
-import { createTreeSitterRunner, type TreeSitterRunner } from "../../../src/language/runner.js";
-import { grammarWasmPath } from "../../../scripts/build-grammars.mjs";
-import { skipUnlessGrammar } from "../../helpers/grammar.js";
+import { createTreeSitterRunner, skipUnlessGrammar, type TreeSitterRunner } from "@n-dx/lang-runtime";
+import { grammarWasmPath } from "../../../../lang-runtime/scripts/build-grammars.mjs";
 
 type Fixture = Record<string, string>;
 

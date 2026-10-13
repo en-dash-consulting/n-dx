@@ -19,15 +19,16 @@ import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import type { ExternalImport, ImportEdge, Inventory } from "../schema/index.js";
 import {
-  BUILTIN_PACKS,
+  createTreeSitterRunner,
   inventoryOnlyOutcome,
-  loadLanguagePacks,
+  loadGrammar,
   type LanguagePack,
   type PackResolver,
   type PackSourceFile,
-} from "../language/pack.js";
+  type RunnablePack,
+} from "@n-dx/lang-runtime";
+import { BUILTIN_PACKS, loadLanguagePacks } from "../language/pack.js";
 import { readPackFacts } from "../language/pack-facts.js";
-import { createTreeSitterRunner, loadGrammar, type RunnablePack } from "../language/runner.js";
 
 export interface PackImportsOptions {
   /** Defaults to {@link BUILTIN_PACKS}. */

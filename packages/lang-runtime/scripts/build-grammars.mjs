@@ -2,17 +2,19 @@
 /**
  * Build tree-sitter grammars to WASM from pinned releases.
  *
- *   node packages/sourcevision/scripts/build-grammars.mjs
+ *   node packages/lang-runtime/scripts/build-grammars.mjs [--out <dir>] [<name>...]
  *
- * Writes `build/grammars/<name>.wasm` inside the sourcevision package. The
- * `build/` directory is gitignored: no `.wasm` file is ever committed.
+ * Writes `<name>.wasm` for each named grammar (every one in {@link GRAMMARS}
+ * when none is named) into `--out`, which defaults to
+ * {@link GRAMMAR_BUILD_DIR}. Both `build/` directories are gitignored: no
+ * `.wasm` file is ever committed.
  *
  * Every download is pinned here and only here — the grammar source archive and
  * the tree-sitter CLI binary for each platform — and each is checked against
  * its SHA-256 before use. The CLI is the prebuilt release binary, not an npm
  * package: the `tree-sitter-cli` package fetches the same binary without
  * verifying it, and the `tree-sitter-java` package ships a node-gyp native
- * binding, which sourcevision does not use.
+ * binding, which n-dx does not use.
  *
  * `tree-sitter build --wasm` (CLI >= 0.26) downloads its own wasi-sdk
  * toolchain into the user cache on first use, so no Docker, emscripten or
@@ -21,7 +23,8 @@
  * A grammar whose tag omits `src/parser.c` is generated first with
  * `tree-sitter generate`, which evaluates the pinned `grammar.js`.
  *
- * Re-running is cheap: verified downloads are cached under `build/cache/`.
+ * Re-running is cheap: verified downloads are cached under this package's
+ * `build/cache/`, and grammar sources are extracted under its `build/src/`.
  */
 
 import { createHash } from "node:crypto";
@@ -29,13 +32,18 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { gunzipSync } from "node:zlib";
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD_ROOT = join(PACKAGE_ROOT, "build");
 
-/** Where built grammars land. Read by the runner and its tests. */
-export const GRAMMAR_BUILD_DIR = join(BUILD_ROOT, "grammars");
+/**
+ * Where built grammars land when no `--out` is given: sourcevision's
+ * `build/grammars`, which its pack loader and tests read until each pack
+ * builds its own.
+ */
+export const GRAMMAR_BUILD_DIR = resolve(PACKAGE_ROOT, "..", "sourcevision", "build", "grammars");
 const CACHE_DIR = join(BUILD_ROOT, "cache");
 
 /** tree-sitter CLI release that compiles grammars. Keep in step with `web-tree-sitter` in package.json. */
@@ -79,9 +87,9 @@ export const GRAMMARS = {
   },
 };
 
-/** Absolute path of a built grammar, whether or not it exists yet. */
-export function grammarWasmPath(name) {
-  return join(GRAMMAR_BUILD_DIR, `${name}.wasm`);
+/** Absolute path of a built grammar in `outDir`, whether or not it exists yet. */
+export function grammarWasmPath(name, outDir = GRAMMAR_BUILD_DIR) {
+  return join(outDir, `${name}.wasm`);
 }
 
 const PLATFORMS = { darwin: "macos", linux: "linux", win32: "windows" };
@@ -178,15 +186,12 @@ export function extractTarGz(gz, dest) {
   }
 }
 
-function fetchSource(name, { repo, version, sha256: expected }) {
-  return fetchVerified(
+async function buildGrammar(cli, name, { repo, version, sha256: expected }, outDir) {
+  const archive = await fetchVerified(
     `https://github.com/${repo}/archive/refs/tags/v${version}.tar.gz`,
     expected,
     `${name}-${version}.tar.gz`,
   );
-}
-
-function buildGrammar(cli, name, { version }, archive) {
   const source = join(BUILD_ROOT, "src", `${name}-${version}`);
   rmSync(source, { recursive: true, force: true });
   extractTarGz(archive, source);
@@ -198,29 +203,42 @@ function buildGrammar(cli, name, { version }, archive) {
     if (generated.status !== 0) throw new Error(`tree-sitter generate failed for ${name} (exit ${generated.status})`);
   }
 
-  mkdirSync(GRAMMAR_BUILD_DIR, { recursive: true });
-  const output = grammarWasmPath(name);
+  mkdirSync(outDir, { recursive: true });
+  const output = grammarWasmPath(name, outDir);
   const result = spawnSync(cli, ["build", "--wasm", "--output", output, source], { stdio: "inherit" });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`tree-sitter build --wasm failed for ${name} (exit ${result.status})`);
   console.log(`built ${output}`);
 }
 
+/**
+ * The build a command line asks for: `--out <dir>` (resolved against the
+ * working directory; default {@link GRAMMAR_BUILD_DIR}) and the grammar names
+ * to build (default every one). Throws on an unknown name.
+ */
+export function parseBuildArgs(argv) {
+  const { values, positionals } = parseArgs({ args: argv, options: { out: { type: "string" } }, allowPositionals: true });
+  const unknown = positionals.filter((name) => !Object.hasOwn(GRAMMARS, name));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown grammar ${unknown.join(", ")}; known: ${Object.keys(GRAMMARS).join(", ")}`);
+  }
+  return {
+    outDir: values.out === undefined ? GRAMMAR_BUILD_DIR : resolve(values.out),
+    names: positionals.length > 0 ? positionals : Object.keys(GRAMMARS),
+  };
+}
+
 async function main() {
+  const { outDir, names } = parseBuildArgs(process.argv.slice(2));
   const cli = await installCli();
-  // Every download happens before the first build. A build blocks the event
-  // loop for minutes (the CLI fetches and unpacks wasi-sdk on a cold cache),
-  // and on Windows the next fetch after it fails ("fetch failed"), so a second
-  // grammar never got its source.
-  const archives = new Map();
-  for (const [name, grammar] of Object.entries(GRAMMARS)) archives.set(name, await fetchSource(name, grammar));
-  for (const [name, grammar] of Object.entries(GRAMMARS)) buildGrammar(cli, name, grammar, archives.get(name));
+  for (const name of names) {
+    await buildGrammar(cli, name, GRAMMARS[name], outDir);
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : error);
-    if (error instanceof Error && error.cause) console.error("  cause:", error.cause);
     process.exit(1);
   });
 }

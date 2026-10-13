@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
+import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeZones } from "../../src/analyzers/zones.js";
@@ -16,7 +16,7 @@ import { detectLanguage, detectLanguages, mergeLanguageConfigs } from "../../src
 import { javaConfig, javaSecondaryConfig, typescriptConfig } from "@n-dx/lang-kit";
 import type { Imports, Inventory } from "../../src/schema/v1.js";
 import { validate, ZonesSchema } from "../../src/schema/validate.js";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
+import { skipUnlessGrammar } from "@n-dx/lang-runtime";
 
 const FIXTURE = join(import.meta.dirname, "../fixtures/java-spring-project");
 const TS_FIXTURE = join(import.meta.dirname, "../fixtures/small-ts-project");

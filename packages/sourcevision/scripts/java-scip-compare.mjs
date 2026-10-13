@@ -19,7 +19,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { grammarWasmPath } from "./build-grammars.mjs";
+import { grammarWasmPath } from "../../lang-runtime/scripts/build-grammars.mjs";
 import { CLONE_COMMAND, CORPUS_DIR_ENV, checkedOutSha, corpusDir, loadCorpus } from "./java-corpus.mjs";
 import { compareEdges, edgeKey, isBuildOutputDir, proposeThreshold, readScipDocuments, scipEdges, selectComparedFiles } from "./java-scip.mjs";
 
@@ -78,7 +78,7 @@ if (notCloned.length > 0) {
   process.exit(2);
 }
 if (!existsSync(grammarWasmPath("tree-sitter-java"))) {
-  console.error("Java grammar is not built — run `node packages/sourcevision/scripts/build-grammars.mjs`");
+  console.error("Java grammar is not built — run `node packages/lang-runtime/scripts/build-grammars.mjs`");
   process.exit(2);
 }
 const distGraph = new URL("../dist/analyzers/pack-imports.js", import.meta.url);

@@ -11,8 +11,7 @@
  * @module sourcevision/language/go-sql
  */
 
-import { groupCalls } from "./pack-calls.js";
-import type { ParsedFile } from "./runner.js";
+import { groupCalls, type ParsedFile } from "@n-dx/lang-runtime";
 import { extractSqlTableReferences, looksLikeSql, type EmbeddedSqlTable } from "./sql-references.js";
 
 /** `database/sql` and `sqlx` methods that take a query string, with their Context, Named and Must forms. */

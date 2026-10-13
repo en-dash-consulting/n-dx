@@ -8,8 +8,8 @@
 import { describe, expect, it } from "vitest";
 import { Language, Parser } from "web-tree-sitter";
 
-import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
+import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
+import { skipUnlessGrammar } from "@n-dx/lang-runtime";
 
 const GO_WASM = grammarWasmPath("tree-sitter-go");
 

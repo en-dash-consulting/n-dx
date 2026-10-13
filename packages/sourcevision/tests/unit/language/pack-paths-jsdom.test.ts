@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { GRAMMAR_BUILD_DIR } from "../../../scripts/build-grammars.mjs";
+import { GRAMMAR_BUILD_DIR } from "../../../../lang-runtime/scripts/build-grammars.mjs";
 
 // Under jsdom the global URL is not Node's, so fileURLToPath(new URL(...))
 // throws. The library must still load and resolve its asset paths.

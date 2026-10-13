@@ -6,10 +6,9 @@
 import { existsSync } from "node:fs";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
+import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
 import { javaPack } from "../../src/language/java-pack.js";
-import { createTreeSitterRunner, type Capture, type ParsedFile } from "../../src/language/runner.js";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
+import { createTreeSitterRunner, skipUnlessGrammar, type Capture, type ParsedFile } from "@n-dx/lang-runtime";
 
 const JAVA_WASM = grammarWasmPath("tree-sitter-java");
 const target = { pack: javaPack, grammarPath: JAVA_WASM };

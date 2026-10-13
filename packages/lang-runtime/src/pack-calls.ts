@@ -7,7 +7,7 @@
  * `@call.arguments` containing it, and a call's name is the `@call.name`
  * that ends exactly where its argument list starts.
  *
- * @module sourcevision/language/pack-calls
+ * @module lang-runtime/pack-calls
  */
 
 import type { CallFact, StringArgument } from "@n-dx/lang-kit";

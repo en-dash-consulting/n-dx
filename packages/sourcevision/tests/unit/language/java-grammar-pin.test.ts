@@ -4,7 +4,7 @@
  * tests fail when the two disagree, so provenance cannot misstate the grammar.
  */
 import { describe, expect, it } from "vitest";
-import { GRAMMARS } from "../../../scripts/build-grammars.mjs";
+import { GRAMMARS } from "../../../../lang-runtime/scripts/build-grammars.mjs";
 import { javaPack } from "../../../src/language/java-pack.js";
 
 const pinned = GRAMMARS["tree-sitter-java"].version;

@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { javaConfig } from "@n-dx/lang-kit";
 import { javaResolver } from "./java-resolver.js";
 import { queryDir } from "./package-paths.js";
-import type { LanguagePack, RuleProvenance } from "./pack.js";
+import type { LanguagePack, RuleProvenance } from "@n-dx/lang-runtime";
 
 const QUERY_NAMES = ["packages", "imports", "declarations", "methods", "calls", "annotations", "type-references"] as const;
 
@@ -18,7 +18,7 @@ const queryPath = (file: string): string => join(queryDir("java"), file);
 
 /**
  * Grammar release the queries were written and checked against. Keep in step
- * with `scripts/build-grammars.mjs`; update `verifiedOn` when re-checking.
+ * with `packages/lang-runtime/scripts/build-grammars.mjs`; update `verifiedOn` when re-checking.
  */
 const GRAMMAR_VERSION = "0.23.5";
 

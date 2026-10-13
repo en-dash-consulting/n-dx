@@ -12,18 +12,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
+import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
 import { goConfig } from "@n-dx/lang-kit";
-import { loadLanguagePacks } from "../../src/language/pack.js";
-import type { RunnablePack } from "../../src/language/runner.js";
 import {
   checkGolden,
   fixtureDirFor,
   goldenPathFor,
   runPackOverFixture,
+  skipUnlessGrammar,
   updateRequested,
-} from "../helpers/pack-golden.js";
+  type RunnablePack,
+} from "@n-dx/lang-runtime";
+import { loadLanguagePacks } from "../../src/language/pack.js";
+import { PACK_FIXTURE_ROOT } from "../helpers/pack-fixtures.js";
 
 const statuses = loadLanguagePacks({ warn: () => undefined });
 
@@ -70,12 +71,13 @@ describe("language pack goldens", () => {
     const { pack } = status;
     describe(pack.id, () => {
       it("has a fixture project", () => {
-        expect(existsSync(fixtureDirFor(pack)), `missing ${fixtureDirFor(pack)}`).toBe(true);
+        const dir = fixtureDirFor(PACK_FIXTURE_ROOT, pack);
+        expect(existsSync(dir), `missing ${dir}`).toBe(true);
       });
 
       it("matches its golden", async (ctx) => {
         skipUnlessGrammar(ctx, status.grammarPath);
-        const dir = fixtureDirFor(pack);
+        const dir = fixtureDirFor(PACK_FIXTURE_ROOT, pack);
         const actual = await runPackOverFixture(status, dir);
         expect(actual.files.length).toBeGreaterThan(0);
         expect(checkGolden(actual, goldenPathFor(dir), updateRequested())).toMatch(/matched|updated/);
