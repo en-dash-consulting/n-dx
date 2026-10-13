@@ -30,11 +30,15 @@ Within the web package, `src/viewer/external.ts` concentrates all viewer-side im
 
 ## Rex v2 runtime surface
 
-`packages/rex/src/public.ts` exports the v2 (product/change layer) runtime so hench and the dashboard reach it through their rex gateways instead of re-implementing it. The functions are the ones the MCP tools and CLI call. This surface is deliberately narrow; a wider one is Nick's #648, and the names match the modules' own so the two merge cleanly. No gateway has been edited to re-export it yet (hench stack B and web D1 do that).
+`packages/rex/src/public.ts` exports the v2 (product/change layer) surface in two blocks. #648 (on main) added the model: reader, tree types, index and the derived product computations. The selection-and-completion PR adds the runtime the MCP tools and CLI call: transaction, selection, completion, brief and `ChangeLayerStore`. hench's and web's rex gateways re-export the parts they need (roadmap PRs 35 and 36, stacked on this one), so consumers never import rex internals.
+
+**A name is exported from `public.ts` once.** A second `export { X }` of a name is TS2300 "Duplicate identifier", so identical names on two branches do not merge cleanly: the restack onto #648 had to delete this PR's duplicate re-exports of `prdLayout`, `loadPrdModel`, `PrdModel`, `LoadPrdModelOptions`, `V2Tree` and `RuleNode`. Grep `public.ts` before adding a name.
 
 | Concern | Exports |
 |---------|---------|
-| Reader | `prdLayout`, `loadPrdModel`; types `PrdModel`, `LoadPrdModelOptions`, `V2Tree`, `RuleNode` |
+| Reader (#648) | `loadPrdModel`, `prdLayout`, `V1_LEVEL_TYPES`, `NEWEST_SCHEMA`, `SchemaSkewError`; types `PrdModel`, `LoadPrdModelOptions`, `FolderStateKeys` |
+| Tree and index (#648) | `indexTree`, `isAppliedChange`, `isOpenChange`, `isBuildingChange`, `specHash`, `nodeSpec`; types `V2Tree`, `RuleNode`, `TreeIndex`, `V2TreeEntry`, `IndexOptions` |
+| Product computations (#648) | `computeProductStatus`, `productReport`, `capabilityReport`, `prdStatusReport`, `computeEdges`, `computeRealizedBy`, `computeLandings`; types `ProductStatus`, `CapabilityReport`, `PrdStatusReport`, `ProductEdges`, `Realization`, `ChangeLanding` |
 | Transaction | `withPrdModelTransaction` (PRD lock held across load, mutate, write; refuses a v1 tree with `PrdLayoutError`); types `PrdModelEdit`, `PrdModelTransactionOptions`, `PrdModelTransactionResult` |
 | Selection | `findNextWork`, `findActionableWork`, `resolveWorkById` (`null` for a change holding a change); `changeWorkShape` (unit, tasks or container: the one judgement selection, `resolveWorkById` and `claim_task` share); `findNextWorkTask` (v1-shaped answer `get_next_task` returns), `completedWorkIds`; types `WorkUnit`, `WorkKind`, `WorkSelectionOptions`, `ChangeWorkShape`, `WorkShapeChild`, `NextWorkTask`, `NextWorkOptions` |
 | Completion | `completeTask`, `completeChange`, `completeWork` (pure, on a `V2Tree`), `ChangeCompletionError`; `completeV2Work` (the transaction `update_task_status` runs: completes, applies per `rex.applyOn`, logs), `loadApplyOn`; types `ChangeCompletionOptions`, `ChangeCompletionResult`, `CompleteWorkOptions`, `CompleteWorkResult`, `V2Completion`, `V2CompletionOptions`, `ApplyOn` |
