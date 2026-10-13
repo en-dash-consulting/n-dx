@@ -304,8 +304,7 @@ minutes. To run it:
   removed when the run starts; add it again for the next commit. (On a fork PR
   the removal can fail; a maintainer removes it by hand.)
 - **Or use Run workflow** on the CI workflow in the Actions tab. It runs the
-  branch head, not merged with its base, and shows in the Actions tab rather
-  than on the PR. Available once the trigger is on `main`.
+  branch head, not merged with its base.
 
 A PR cannot merge until the required checks have run on its latest commit,
 including after you update it from `main`. CodeQL and Dependency Review still
