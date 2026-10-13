@@ -33,13 +33,22 @@ test.describe.configure({ mode: "serial" });
 
 const VENDOR_LABEL: Record<Vendor, string> = { claude: "Claude", codex: "Codex" };
 
+/**
+ * The model the fixture starts on, so the Claude leg is a real change in
+ * Settings (to the cheap model) rather than a no-op that leaves Save
+ * disabled. The catalog's recommended Claude entry
+ * (packages/core/llm-model-catalog.js); no run uses it, because a run only
+ * starts once the switch has saved.
+ */
+const INITIAL_CLAUDE_MODEL = process.env["NDX_E2E_INITIAL_CLAUDE_MODEL"] ?? "claude-sonnet-5-5";
+
 let project: RealVendorProject;
 let dashboard: RunningDashboard;
 let completedSoFar = 0;
 
 test.beforeAll(async () => {
   test.skip(!hasCli("claude"), "claude CLI not on PATH");
-  project = await createRealVendorProject("claude");
+  project = await createRealVendorProject("claude", INITIAL_CLAUDE_MODEL);
   dashboard = await startRealDashboard(project.dir);
 });
 
@@ -79,10 +88,13 @@ async function switchVendorInSettings(page: Page, vendor: Vendor, model: string)
     await overlay.getByRole("textbox", { name: / — model id$/ }).first().fill(model);
   }
 
+  // Save is disabled when the page already holds this vendor and model; then there is nothing to write.
   const save = overlay.locator("button.settings-frame-save");
-  await expect(save).toBeEnabled();
-  await save.click();
-  await expect(overlay.locator(".settings-frame-indicator")).toHaveText("All changes saved", { timeout: 30_000 });
+  if (await save.isEnabled()) {
+    await save.click();
+    await expect(overlay.locator(".settings-frame-indicator")).toHaveText("All changes saved", { timeout: 30_000 });
+  }
+  await expect(overlay.locator(".settings-frame-indicator")).toHaveText("All changes saved");
 
   const readiness = overlay.getByRole("list", { name: "Readiness" });
   const credentials = readiness.locator("li", { hasText: /Credentials (valid|failed)/ });
@@ -102,7 +114,9 @@ async function startThreeTasks(page: Page, firstTaskId: string): Promise<void> {
   await page.locator("select.start-task-mode-select").selectOption({ label: "A set number" });
   await page.locator("input.start-task-iterations").fill("3");
   await page.getByRole("button", { name: /More ways to run/ }).click();
-  const startNow = page.getByRole("menuitem", { name: /^Start now/ });
+  // In iterations mode the item's accessible name says what it commits to;
+  // its visible text is "Start now · 3 tasks", so locate by that.
+  const startNow = page.locator('.ready-menu [role="menuitem"]', { hasText: /^Start now/ });
   await expect(startNow).toContainText("3 tasks");
   await startNow.click();
   await openLiveTask(page, firstTaskId);
