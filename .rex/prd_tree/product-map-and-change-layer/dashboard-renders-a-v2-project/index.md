@@ -26,9 +26,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Bulk status PATCH completes v2 work without rex's v2 completion](./bulk-status-patch-completes-v2-work.md) | completed |
 | [Dashboard misses v2 edits under changes/ when it was created after ndx start](./dashboard-misses-v2-edits-under.md) | completed |
 | [ndx start on a v2 tree with a stray prd.json creates no prd_tree/](./ndx-start-on-a-v2-tree-with-a-stray.md) | pending |
-| [POST /api/rex/restore and GET /api/rex/backups refuse on a v2 project](./post-api-rex-restore-and-get-api-rex.md) | pending |
+| [POST /api/rex/restore and GET /api/rex/backups refuse on a v2 project](./post-api-rex-restore-and-get-api-rex.md) | completed |
 | [Quick Add creates a change on v2](./quick-add-creates-a-change-on-v2.md) | completed |
+| [The dashboard's merge route and refinement merge follow the v2 change-layer merge rules](./the-dashboard-s-merge-route-and.md) | pending |
 | [The PRD cache is built from the change-layer projection on v2](./the-prd-cache-is-built-from-the-change.md) | completed |
 | [The Product, Changes and capability views show real v2 data](./the-product-changes-and-capability.md) | pending |
 | [The v2 refusal of parentId says what to do instead](./the-v2-refusal-of-parentid-says-what.md) | pending |
-| [The dashboard's merge route and refinement merge follow the v2 change-layer merge rules](./the-dashboard-s-merge-route-and.md) | pending |
