@@ -162,6 +162,14 @@ a.ndx-card:hover { transform: translateY(-1px); }
 .ndx-meter i b { display: block; height: 100%; border-radius: 999px; width: var(--w, 0%); background: var(--meter, var(--graview-accent)); transition: width 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
 .ndx-meter.good i b { background: var(--graview-good); } .ndx-meter.bad i b { background: var(--graview-bad); } .ndx-meter.warn i b { background: var(--graview-warn); }
 
+.ndx-iso {
+  display: block;
+  width: 100%;
+  min-height: 18rem;
+  border: 1px solid var(--graview-edge);
+  border-radius: var(--graview-radius, 10px);
+  background: var(--graview-panel);
+}
 .ndx-empty {
   padding: 1.1rem 1.2rem; display: grid; gap: 0.35rem; color: var(--graview-ink-muted);
   border: 1px dashed var(--graview-edge); border-radius: var(--graview-radius, 10px);

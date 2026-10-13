@@ -18,6 +18,7 @@ import { ChangeScreen, ChangesScreen } from "./screens/change.js";
 import { ZoneScreen } from "./screens/zone.js";
 import { RunScreen } from "./screens/run.js";
 import { AttentionScreen, InboxScreen, SpendScreen } from "./screens/attention.js";
+import { CodeMapScreen } from "./screens/code-map.js";
 import { KindList, KindRecord } from "./screens/generic.js";
 
 type P = PageComponent<AnySchema>;
@@ -39,7 +40,8 @@ export function pages(app: App) {
     .surface("home", page(({ context }) => <HomeScreen context={context} app={app} />))
     .route("/attention", page(({ context }) => <AttentionScreen context={context} />))
     .route("/inbox", page(({ context }) => <InboxScreen context={context} />))
-    .route("/spend", page(({ context }) => <SpendScreen context={context} />));
+    .route("/spend", page(({ context }) => <SpendScreen context={context} />))
+    .route("/code-map", page(({ context }) => <CodeMapScreen context={context} />));
   if (kinds.includes("capability")) registry = registry.register("capability", "record", page(({ context }) => <CapabilityScreen context={context} app={app} />));
   if (kinds.includes("change")) {
     registry = registry

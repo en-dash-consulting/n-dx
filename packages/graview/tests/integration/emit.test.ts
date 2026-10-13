@@ -3,11 +3,11 @@
  * deterministically, and touches nothing else n-dx owns.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { existsSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { resolveLayout } from "../../src/llm-gateway.js";
 import { readSnapshot } from "@graview/core/snapshot";
-import { emitProjection, DOCUMENT_FILENAME, SNAPSHOT_FILENAME } from "../../src/emit.js";
+import { emitProjection, DOCUMENT_FILENAME, SNAPSHOT_FILENAME, ISO_MAP_FILENAME } from "../../src/emit.js";
 import { makeProject } from "../helpers/project.js";
 
 const roots: string[] = [];
@@ -87,5 +87,25 @@ describe("emitProjection", () => {
     roots.push(root);
     const result = await emitProjection(root, { projectName: "Checkout", warn: () => {} });
     expect((JSON.parse(readFileSync(result.documentPath, "utf-8")) as { name: string }).name).toBe("Checkout");
+  });
+
+  it("writes the code map beside the snapshot when sourcevision has analyzed the project, and removes it when the analysis is gone", async () => {
+    const root = makeProject();
+    roots.push(root);
+    const layout = resolveLayout(root);
+    // The fixture's analysis lacks imports.json, which the map needs: none is written.
+    expect((await emitProjection(root, { warn: () => {} })).isoMapPath).toBeUndefined();
+    writeFileSync(join(layout.sourcevisionDir, "imports.json"), JSON.stringify({ edges: [], external: [], summary: { totalEdges: 0, totalExternal: 0, circularCount: 0, circulars: [], mostImported: [], avgImportsPerFile: 0 } }));
+    const withMap = await emitProjection(root, { warn: () => {} });
+    expect(withMap.isoMapPath).toBe(join(layout.graviewDir, ISO_MAP_FILENAME));
+    const html = readFileSync(withMap.isoMapPath!, "utf-8");
+    expect(html).toContain('class="embed"');
+    expect(html).toContain("checkout");
+    // A map of an analysis that is gone is removed, never framed.
+    rmSync(join(layout.sourcevisionDir, "imports.json"));
+    expect((await emitProjection(root, { warn: () => {} })).isoMapPath).toBeUndefined();
+    expect(existsSync(join(layout.graviewDir, ISO_MAP_FILENAME))).toBe(false);
+    // And it can be turned off.
+    expect((await emitProjection(root, { warn: () => {}, isoMap: false })).isoMapPath).toBeUndefined();
   });
 });

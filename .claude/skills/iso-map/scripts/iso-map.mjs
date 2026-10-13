@@ -1912,6 +1912,45 @@ function selectEdge(index){
   curEdge = index; curNode = null;
   refresh(true);
 }
+/** The node in a scene that is the zone itself (exact) or carries it as a tile on its top face. */
+function holderIn(scene, id, exact){
+  var list = (scene && scene.nodes) || [];
+  for (var i = 0; i < list.length; i++) {
+    var n = list[i];
+    if (n.id === id) return n.id;
+    if (exact) continue;
+    var tiles = n.tiles || [];
+    for (var t = 0; t < tiles.length; t++) if (tiles[t].id === id) return n.id;
+  }
+  return null;
+}
+/**
+ * Select a zone from outside (the host's focus message). An area and a zone
+ * may share an id (the area named for its largest zone), and a zone page
+ * means the zone: so the area scene that holds the zone itself comes first,
+ * then one that holds it as a tile, and only then the area's own block.
+ */
+function focusZone(id){
+  if (!id) return;
+  if (MODEL !== ROOT && BY[id]) { selectNode(id); return; }
+  var scenes = ROOT.scenes || {};
+  for (var pass = 0; pass < 2; pass++) {
+    for (var sid in scenes) {
+      var holder = holderIn(scenes[sid], id, pass === 0);
+      if (!holder) continue;
+      switchScene(sid);
+      // A tile is a sub-zone drawn on its parent's top: open the parent so the zone itself can be selected.
+      if (!BY[id] && BY[holder] && expandable(BY[holder])) toggleExpand(holder);
+      selectNode(BY[id] ? id : holder);
+      return;
+    }
+  }
+  switchScene("");
+  if (BY["area:" + id]) { selectNode("area:" + id); return; }
+  if (BY[id]) { selectNode(id); return; }
+  var top = holderIn(ROOT, id, false);
+  if (top) selectNode(BY[top] ? top : "area:" + top);
+}
 function clearSelection(){
   if (curNode === null && curEdge === null) return;
   curNode = null; curEdge = null;
@@ -1988,6 +2027,7 @@ if (EMBED) {
     if (!d || d.type !== "ndx-iso") return;
     if (typeof d.wheelZoom === "boolean") wheelZoom = d.wheelZoom;
     if (d.theme === "light" || d.theme === "dark") document.documentElement.setAttribute("data-theme", d.theme);
+    if (typeof d.focus === "string") focusZone(d.focus);
   });
 }
 
