@@ -87,8 +87,9 @@ packages/sourcevision/tests/fixtures/sdlc/** text eol=lf
 packages/sourcevision/tests/fixtures/maven-build/** text eol=lf
 packages/sourcevision/tests/fixtures/gradle-build/** text eol=lf
 
-# Language-pack fixtures: sources and golden.json. checkGolden compares the
-# serialized golden byte-for-byte, and captured text and positions depend on
-# the fixture's line endings, so a Windows checkout (core.autocrlf=true) that
-# turns them into CRLF fails the comparison.
-packages/sourcevision/tests/fixtures/language-packs/** text eol=lf
+# Language-pack fixtures (each @n-dx/lang-* package's): sources and
+# golden.json. checkGolden compares the serialized golden byte-for-byte, and
+# captured text and positions depend on the fixture's line endings, so a
+# Windows checkout (core.autocrlf=true) that turns them into CRLF fails the
+# comparison.
+packages/lang-*/tests/fixtures/** text eol=lf

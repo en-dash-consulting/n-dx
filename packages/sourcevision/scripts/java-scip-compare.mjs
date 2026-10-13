@@ -13,15 +13,17 @@
  * prints the operator commands when no index is present. Not part of the test
  * run; see java-scip-compare.md for producing the indexes.
  *
- * Needs `pnpm --filter @n-dx/sourcevision build` and `build-grammars.mjs`.
+ * Needs `pnpm --filter @n-dx/sourcevision build`, `pnpm --filter
+ * @n-dx/lang-java build` and `pnpm --filter @n-dx/lang-java build:grammars`;
+ * the imports phase loads the pack from the workspace.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { grammarWasmPath } from "../../lang-runtime/scripts/build-grammars.mjs";
 import { CLONE_COMMAND, CORPUS_DIR_ENV, checkedOutSha, corpusDir, loadCorpus } from "./java-corpus.mjs";
 import { compareEdges, edgeKey, isBuildOutputDir, proposeThreshold, readScipDocuments, scipEdges, selectComparedFiles } from "./java-scip.mjs";
+import { importWorkspacePack } from "./workspace-pack.mjs";
 
 const INDEX_FILE = "index.scip";
 const SKIP_DIRS = new Set([".git", "node_modules"]);
@@ -77,8 +79,9 @@ if (notCloned.length > 0) {
   console.error(`Not a checkout in ${root}: ${notCloned.map((r) => r.name).join(", ")}. Clone with: ${CLONE_COMMAND}`);
   process.exit(2);
 }
-if (!existsSync(grammarWasmPath("tree-sitter-java"))) {
-  console.error("Java grammar is not built — run `node packages/lang-runtime/scripts/build-grammars.mjs`");
+const { javaGrammarPath } = await importWorkspacePack("@n-dx/lang-java");
+if (!existsSync(javaGrammarPath())) {
+  console.error("Java grammar is not built — run `pnpm --filter @n-dx/lang-java build:grammars`");
   process.exit(2);
 }
 const distGraph = new URL("../dist/analyzers/pack-imports.js", import.meta.url);

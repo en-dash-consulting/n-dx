@@ -10,7 +10,8 @@
  * tree contains ERROR or MISSING nodes. Each tree is freed after use.
  *
  * Not part of the test run: it needs a large input and lives outside
- * `tests/`. Build the grammar first with `build-grammars.mjs`.
+ * `tests/`. Build the pack and its grammar first: `pnpm --filter
+ * @n-dx/lang-java build` and `pnpm --filter @n-dx/lang-java build:grammars`.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -18,7 +19,7 @@ import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { Language, Parser } from "web-tree-sitter";
 
-import { grammarWasmPath } from "../../lang-runtime/scripts/build-grammars.mjs";
+import { importWorkspacePack } from "./workspace-pack.mjs";
 
 const SKIP_DIRS = new Set([".git", "node_modules"]);
 
@@ -50,9 +51,10 @@ async function main() {
     process.exit(2);
   }
   const root = resolve(target);
-  const wasm = grammarWasmPath("tree-sitter-java");
+  const { javaGrammarPath } = await importWorkspacePack("@n-dx/lang-java");
+  const wasm = javaGrammarPath();
   if (!existsSync(wasm)) {
-    console.error(`${wasm} is not built — run \`node packages/lang-runtime/scripts/build-grammars.mjs\``);
+    console.error(`${wasm} is not built — run \`pnpm --filter @n-dx/lang-java build:grammars\``);
     process.exit(2);
   }
 

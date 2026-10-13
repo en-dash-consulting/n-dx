@@ -1,14 +1,16 @@
 /**
- * Package-relative paths for language-pack assets.
+ * Package-relative paths: this package's version and the language assets it
+ * still ships (the SQL queries and the grammars it builds).
  *
  * Built from the module's own directory with `node:path`, never the global
  * `URL` constructor: under jsdom that global is not Node's, and
- * `fileURLToPath` rejects it. Both functions are lazy so importing the
+ * `fileURLToPath` rejects it. Every function is lazy so importing the
  * library never depends on the filesystem layout.
  *
  * @module sourcevision/language/package-paths
  */
 
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,18 +19,17 @@ function packageRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 }
 
+let version: string | undefined;
+
+/** The `version` in this package's `package.json`; a language pack must carry the same. */
+export function sourcevisionVersion(): string {
+  version ??= String((JSON.parse(readFileSync(join(packageRoot(), "package.json"), "utf-8")) as { version?: unknown }).version);
+  return version;
+}
+
 /** Where `@n-dx/lang-runtime`'s `scripts/build-grammars.mjs` writes grammars by default: `<package>/build/grammars`. */
 export function grammarBuildDir(): string {
   return join(packageRoot(), "build", "grammars");
-}
-
-/**
- * `packages/lang-runtime/scripts/build-grammars.mjs`, beside this package in
- * the n-dx checkout. Present only in a source checkout: the published
- * packages ship built grammars instead of the script.
- */
-export function buildGrammarsScript(): string {
-  return join(packageRoot(), "..", "lang-runtime", "scripts", "build-grammars.mjs");
 }
 
 /** Query files ship in `<package>/src/language/queries/<lang>`, for both src and dist. */

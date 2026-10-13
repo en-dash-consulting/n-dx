@@ -1,9 +1,10 @@
 /**
- * The symbol rules of sourcevision's packs, and the runtime's captures-to-facts
- * adapter bound to them.
+ * The symbol rules of the SQL pack, which sourcevision still holds, and the
+ * runtime's captures-to-facts adapter bound to them.
  *
- * The adapter itself is `@n-dx/lang-runtime`'s; the rule tables are pack data
- * and move into each pack in a later task.
+ * The adapter itself is `@n-dx/lang-runtime`'s; the rule table is pack data
+ * and moves into `@n-dx/lang-sql` in a later task. The Java and Go packs hold
+ * their own rules.
  *
  * SQL's only query names tables. A `CREATE TABLE` is a symbol of kind
  * `table`: its name is the unquoted last part of the object reference, its
@@ -18,7 +19,6 @@ import type { FileFacts } from "@n-dx/lang-kit";
 import {
   factGaps as runtimeFactGaps,
   readPackFacts as runtimeReadPackFacts,
-  typeRule,
   type LanguagePack,
   type PackSourceFile,
   type PackSymbolRules,
@@ -28,33 +28,6 @@ import { splitSqlName } from "./sql-schema.js";
 
 /** Symbol rules per pack id, written against `queries/<lang>/*.scm`. */
 export const SYMBOL_RULES: Readonly<Record<string, PackSymbolRules>> = {
-  java: {
-    rules: [
-      typeRule("declarations", "type.class", "class"),
-      typeRule("declarations", "type.interface", "interface"),
-      typeRule("declarations", "type.enum", "enum"),
-      typeRule("declarations", "type.record", "record"),
-      typeRule("declarations", "type.annotation", "annotation"),
-      { query: "methods", declaration: "method.declaration", name: "method.name", kind: "method" },
-      { query: "methods", declaration: "constructor.declaration", name: "constructor.name", kind: "constructor" },
-    ],
-    anonymousBody: { query: "declarations", capture: "anonymous.body" },
-  },
-  go: {
-    rules: [
-      typeRule("types", "type.struct", "struct"),
-      typeRule("types", "type.interface", "interface"),
-      typeRule("types", "type.alias", "alias"),
-      { query: "functions", declaration: "function.declaration", name: "function.name", kind: "function" },
-      {
-        query: "methods",
-        declaration: "method.declaration",
-        name: "method.name",
-        kind: "method",
-        container: "method.receiver_type",
-      },
-    ],
-  },
   sql: {
     rules: [
       {

@@ -415,9 +415,12 @@ jobs:
             ~/AppData/Local/tree-sitter
           key: grammars-${{ runner.os }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
 
+      # Every package with grammars builds its own (`build:grammars`): each
+      # language pack into its own build/grammars, sourcevision the rest.
+      # One at a time, since they share the download cache.
       - name: Build tree-sitter grammars
         if: contains(matrix.suites, 'sourcevision')
-        run: node packages/lang-runtime/scripts/build-grammars.mjs
+        run: pnpm -r --workspace-concurrency=1 run build:grammars
 
       # `shell: bash` so the same line works on the Windows leg, whose default
       # shell is PowerShell.

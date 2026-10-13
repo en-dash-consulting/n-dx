@@ -40,8 +40,9 @@ const BUILD_ROOT = join(PACKAGE_ROOT, "build");
 
 /**
  * Where built grammars land when no `--out` is given: sourcevision's
- * `build/grammars`, which its pack loader and tests read until each pack
- * builds its own.
+ * `build/grammars`, where its SQL and Terraform readers read them until those
+ * move into their packs. The Java and Go packs build into their own
+ * `build/grammars` with `--out` (their `build:grammars` scripts).
  */
 export const GRAMMAR_BUILD_DIR = resolve(PACKAGE_ROOT, "..", "sourcevision", "build", "grammars");
 const CACHE_DIR = join(BUILD_ROOT, "cache");

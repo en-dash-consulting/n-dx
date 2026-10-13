@@ -2,10 +2,11 @@
  * SQL grammar target: the pinned tree-sitter-sql grammar and the table query
  * under `queries/sql/`.
  *
- * Not in `BUILTIN_PACKS`. SQL is not a language sourcevision analyzes for
- * structure: the grammar is generic across dialects, and only table names are
- * read from it, in memory (see `sql-schema.ts`). Keeping it out of the
- * built-in list leaves inventory, import and zone analysis unchanged.
+ * Not a pack the imports phase loads (`pack-loader.ts`). SQL is not a
+ * language sourcevision analyzes for structure: the grammar is generic across
+ * dialects, and only table names are read from it, in memory (see
+ * `sql-schema.ts`). Keeping it out of the loaded packs leaves inventory,
+ * import and zone analysis unchanged.
  *
  * @module sourcevision/language/sql-pack
  */

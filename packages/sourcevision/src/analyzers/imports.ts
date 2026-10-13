@@ -1,8 +1,8 @@
 /**
  * Deterministic import graph analyzer.
  * Uses the TypeScript compiler API for JS/TS AST parsing and language packs
- * (tree-sitter) for Java and Go, with the Go regex import parser as Go's
- * fallback when its pack degrades — no Claude invocation.
+ * (loaded at run time) for Java and Go, with the Go regex import parser as
+ * Go's fallback when its pack is missing or degrades — no Claude invocation.
  */
 
 import { readFile } from "node:fs/promises";
@@ -345,7 +345,7 @@ export interface ImportsOptions {
   fileSetChanged?: boolean;
   /** Primary language id (e.g. "go", "typescript"). Reads manifest.language / detectLanguage when omitted. */
   language?: string;
-  /** Grammar location and notice sink for language-pack (Java, Go) files. */
+  /** Which language packs (Java, Go) to load, where to find them, and the notice sink. */
   packs?: PackImportsOptions;
 }
 

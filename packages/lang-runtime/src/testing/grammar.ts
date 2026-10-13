@@ -1,6 +1,7 @@
 /**
  * Gate for tests that need a tree-sitter grammar built by
- * scripts/build-grammars.mjs. A grammar is a local build artifact, so on a
+ * scripts/build-grammars.mjs (each package's `build:grammars` script). A
+ * grammar is a local build artifact, so on a
  * developer machine a missing one skips the test. A CI job that is meant to
  * have it sets SV_REQUIRE_GRAMMARS=1, and then a missing grammar fails the
  * test instead of passing silently as a skip.
@@ -28,7 +29,7 @@ export function skipUnlessGrammar(
   env: NodeJS.ProcessEnv = process.env,
 ): void {
   if (existsSync(wasmPath)) return;
-  const message = `${wasmPath} is not built — run \`node packages/lang-runtime/scripts/build-grammars.mjs\``;
+  const message = `${wasmPath} is not built — run \`pnpm -r run build:grammars\` (each package's build-grammars.mjs script)`;
   if (grammarsRequired(env)) throw new Error(`${message} (${REQUIRE_GRAMMARS_ENV}=1 forbids skipping)`);
   ctx.skip(message);
 }
