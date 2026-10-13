@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A claim on a task-less change covers the task it splits into](./a-claim-on-a-task-less-change-covers.md) | completed |
 | [Change selection descends into a change nested under another change](./change-selection-descends-into-a.md) | completed |
-| [ChangeLayerStore writes return a save report of the paths written and deleted](./changelayerstore-writes-return-a-save.md) | pending |
+| [ChangeLayerStore writes return a save report of the paths written and deleted](./changelayerstore-writes-return-a-save.md) | completed |
 | [gateways.md describes the rex v2 surface as it is after #648 and the restack](./gateways-md-describes-the-rex-v2.md) | completed |
 | [get_next_task and rex next pick v2 work with findNextWork](./get-next-task-and-rex-next-pick-v2.md) | completed |
 | [get_prd_status on v2 drops capabilities and open changes under a nested area](./get-prd-status-on-v2-drops.md) | completed |
