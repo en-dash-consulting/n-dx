@@ -36,9 +36,14 @@ const PACKAGE_META: Record<string, { label: string; icon: string; description: s
     icon: "▶",
     description: "Autonomous agent execution, retry policies, and guard rails",
   },
+  graview: {
+    label: "{cli} graview",
+    icon: "◇",
+    description: "The product map: a Graview face over the PRD, the analysis and the runs",
+  },
 };
 
-const PACKAGE_ORDER = ["sourcevision", "rex", "hench"];
+const PACKAGE_ORDER = ["sourcevision", "rex", "hench", "graview"];
 
 const STABILITY_META: Record<string, { label: string; class: string }> = {
   experimental: { label: "Experimental", class: "ft-badge-experimental" },

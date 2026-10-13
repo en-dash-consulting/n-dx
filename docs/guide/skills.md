@@ -27,6 +27,7 @@ The table below is derived from [`packages/core/assistant-assets/manifest.json`]
 | [`ndx-work`](#ndx-work) | Pick up a task from the PRD and begin working on it | `/ndx-work [task-id]` |
 | [`ndx-config`](#ndx-config) | View or change n-dx configuration with guided assistance | `/ndx-config [key] [value]` |
 | [`ndx-reshape`](#ndx-reshape) | Restructure a v1 PRD tree — regroup epics, change levels, merge overlaps | `/ndx-reshape` |
+| [`ndx-graview`](#ndx-graview) | Run the product map (the Graview face), walk its pages and report what is wrong | `/ndx-graview` |
 | [`ndx-feedback`](#ndx-feedback) | Submit feedback, bug reports, or feature requests for n-dx | `/ndx-feedback [description]` |
 | [`ndx-adversarial-review`](#ndx-adversarial-review) | Attack a change or a completion claim, triage what breaks, capture what the user approves | `/ndx-adversarial-review [task-id \| name \| topic]` |
 
@@ -188,6 +189,23 @@ they all share:
 5. Verifies with `reorganize` (rex MCP)
 
 **Customization:** Adjust the target epic count or naming conventions in the skill body to match your team's PRD style guide.
+
+---
+
+### ndx-graview
+
+**Purpose:** Bring up the product map, the Graview face over the PRD, the analysis and the runs, and say what it shows and what is wrong with it. Useful when trying n-dx on a new repository.
+
+**When it triggers:** Invoke with `/ndx-graview`.
+
+**What it does:**
+1. Runs `ndx graview info .`: the graview binary, the face, whether the face can write back through the hub, and any face already running
+2. Runs `ndx graview check .` and keeps the counts and every misfit, meaning a node or an edge the declaration does not admit
+3. Uses the running face, or starts `ndx graview serve .` in the background (port 5188 or the next free one)
+4. Walks the pages, with a browser tool when there is one: home, Needs attention, the Inbox, an area, a capability, a zone and its code map, Runs and Spend
+5. Reports the URL, the sync state, the misfits and one line per problem, with the page it is on
+
+**What it will not do:** change code, the declaration or the PRD, or capture what it found. That is a separate `/ndx-capture` run. It leaves the face running for you to look at.
 
 ---
 

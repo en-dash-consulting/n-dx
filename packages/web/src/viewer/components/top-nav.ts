@@ -1,7 +1,9 @@
 /**
  * Top navigation: the brand (which is also the way home), the three stage
- * tabs — Analysis, Plan, Work — then, after a divider, the Live tab, and
- * search. Nothing else lives up here; settings and commands are on the bottom bar.
+ * tabs — Analysis, Plan, Work — then, after a divider, the Live tab, the
+ * product map's link when a Graview face is running (or the flag offers to
+ * start one), and search. Nothing else lives up here; settings and commands
+ * are on the bottom bar.
  *
  * A tab is active on its own stage page and on any view that stage lists,
  * so `/zones` keeps Analysis lit and `/hench-runs/<id>` keeps Plan lit.
@@ -14,6 +16,7 @@ import { stageForView, visibleStages, stageProduct, viewLabel, viewGlyph, isLive
 import { isDeployedMode } from "../deployed-mode.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { LiveTab } from "./live-tab.js";
+import { ProductMapLink } from "./product-map-link.js";
 
 export interface TopNavProps {
   view: ViewId;
@@ -80,6 +83,9 @@ export function TopNav({ view, validViews, onNavigate, navigateTo, onOpenSearch,
       liveEnabled ? h("span", { class: "topnav-divider", role: "separator", "aria-orientation": "vertical" }) : null,
       h(LiveTab, { view, active: isLiveView(view), onNavigate, navigateTo, enabled: liveEnabled }),
     ),
+
+    // A static export has no server, so no map to link to; a scoped viewer is one package's.
+    h(ProductMapLink, { enabled: !isDeployedMode() && !scoped }),
 
     h("button", {
       type: "button",

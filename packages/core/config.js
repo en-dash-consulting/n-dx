@@ -2264,6 +2264,9 @@ Feature toggles (.n-dx.json — managed via web UI or ndx config):
   features.hench.autoRetry          boolean   Auto-retry on failure (default: true)
   features.hench.guardRails         boolean   Security guard rails (default: true)
   features.hench.adaptiveWorkflow   boolean   Adaptive workflow adjustment (default: false)
+  features.graview.productFace      boolean   Start the product map (ndx graview serve) with
+                                              the dashboard and link it from the top bar
+                                              (default: false, experimental)
 
 Sourcevision settings (.n-dx.json):
   sourcevision.zones.pins  object    Override zone assignments: {"file/path.ts": "zone-id"}

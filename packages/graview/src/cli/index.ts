@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import { describeMisfits } from "../fit.js";
+import { runningFace } from "../face.js";
 import { resolveLayout } from "../llm-gateway.js";
 
 const SUBCOMMANDS = ["emit", "check", "describe", "serve", "mcp", "info"] as const;
@@ -221,6 +222,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       graviewDir: layout.graviewDir,
       graview: { source: command.source, detail: command.detail },
       app: config.app ?? findProductFace() ?? null,
+      running: runningFace(layout.graviewDir) ?? null,
       rex: rex ? { url: rex.url, projectId: rex.projectId, tokenFile: rex.tokenFile ?? null, registered: rex.registered, worktree: rex.worktree ?? null } : null,
     };
     if (parsed.passthrough.includes("--json")) console.log(JSON.stringify(info, null, 2));
@@ -228,6 +230,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       console.log(`projection: ${relativeToRoot(layout, layout.graviewDir)}/`);
       console.log(`graview:    ${command.detail} (${command.source})`);
       console.log(`face:       ${config.app ?? findProductFace() ?? "none (install @n-dx/graview-face, or set graview.app)"}`);
+      const running = info.running;
+      console.log(running ? `serving:    ${running.url} (pid ${running.pid})` : "serving:    no face running (ndx graview serve .)");
       console.log(rex ? `rex:        ${rex.url}${rex.worktree ? " (as this worktree's workspace)" : ""}${rex.registered ? "" : " (hub not serving it; run ndx start .)"}` : "rex:        not registered with the hub (run ndx start .)");
     }
     return 0;

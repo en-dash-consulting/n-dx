@@ -21,6 +21,12 @@ export const DOCUMENT_FILENAME = "document.json";
 export const SNAPSHOT_FILENAME = "snapshot.json";
 export const DATA_DIRNAME = "data";
 export const ISO_MAP_FILENAME = "iso-map.html";
+/**
+ * Ignores the whole graview dir from inside it. `ndx init` gitignores the dir,
+ * but a project initialized before the projection existed has no such entry,
+ * and nothing in here is ever meant to be committed.
+ */
+export const GITIGNORE_FILENAME = ".gitignore";
 
 export interface EmitOptions extends BuildSnapshotOptions {
   /** The document's `name`; defaults to the project directory's name. */
@@ -80,6 +86,8 @@ export async function emitProjection(root: string, options: EmitOptions = {}): P
   const layout = resolveLayout(root);
   const graviewDir = graviewDirOf(layout);
   mkdirSync(graviewDir, { recursive: true });
+  const gitignore = join(graviewDir, GITIGNORE_FILENAME);
+  if (!existsSync(gitignore)) writeFileSync(gitignore, "# Derived by ndx graview; never committed.\n*\n");
 
   const report = await buildSnapshot(layout, options);
   const document = documentFor(options.projectName ?? basename(layout.root));

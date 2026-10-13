@@ -1,0 +1,25 @@
+---
+id: "ebabb9f7-12d4-45f6-92b9-c25a24bd7945"
+level: "task"
+title: "The product map is one click from the dashboard and ready to try in any repo"
+status: "completed"
+priority: "high"
+tags:
+  - "graview"
+source: "ndx-capture"
+startedAt: "2026-10-13T16:21:44.307Z"
+completedAt: "2026-10-13T16:21:44.307Z"
+endedAt: "2026-10-13T16:21:44.307Z"
+resolutionType: "code-change"
+resolutionDetail: "face.json discovery, /api/graview/face + top-bar link, graview.productFace flag, port fallback, self-ignoring graview dir, /ndx-graview skill; verified live on n-dx and the graview repo"
+acceptanceCriteria:
+  - "A running face records its URL and pid in face.json in the graview dir and removes it when it stops; ndx graview info prints it"
+  - "The dashboard's top bar shows a Product map link while a face runs, whatever the flag"
+  - "With features.graview.productFace on, the dashboard starts ndx graview serve at startup, offers Start map when none runs, and stops the face it started at shutdown; POST /api/graview/face is refused with the flag off"
+  - "Without --port the face takes 5188 or the next free port"
+  - "Every emit writes a .gitignore of * in the graview dir"
+  - "The /ndx-graview skill ships to Claude and Codex and is read-only"
+description: "Release readiness for local testing across repositories. The dashboard links to a running Graview face, an experimental flag starts the face with the dashboard, a skill runs the check-serve-walk loop, and the bugs found while doing so are fixed: a second checkout's face collided on port 5188, and a project initialized before the projection existed could commit its graview dir."
+lastModified: "2026-10-13T16:21:44.613Z"
+lastModifiedBy: "Nick Daniel <nick@endash.us>"
+---

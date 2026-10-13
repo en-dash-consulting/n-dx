@@ -37,6 +37,9 @@
       "description": "Submit feedback, bug reports, or feature requests for n-dx",
       "argumentHint": "[description]"
     },
+    "ndx-graview": {
+      "description": "Run the product map (the Graview face) on this project, walk its pages and report what is wrong"
+    },
     "ndx-adversarial-review": {
       "description": "Attack a change or a completion claim, triage what breaks, and capture only what the user approves",
       "argumentHint": "[task-id | name | topic]",

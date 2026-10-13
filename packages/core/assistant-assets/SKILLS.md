@@ -14,6 +14,7 @@ Reference for skill authors: every skill is classified by mutation footprint. Fi
 | `ndx-reshape` | `skills/ndx-reshape.md` | **file-modifying** | `.rex/prd_tree/` (via `add/move/edit/merge` MCP) | ✓ | No |
 | `ndx-status` | `skills/ndx-status.md` | read-only | — | — | No |
 | `ndx-zone` | `skills/ndx-zone.md` | read-only | — | — | No |
+| `ndx-graview` | `skills/ndx-graview.md` | read-only | — (the projection under the layout's graview dir, which is gitignored) | — | No |
 | `ndx-feedback` | `skills/ndx-feedback.md` | read-only† | — | — | No |
 | `ndx-adversarial-review` | `skills/ndx-adversarial-review.md` | read-only until authorized¶ | `.rex/prd_tree/` (via `add_item`/`edit_item`/`update_task_status` MCP) | ✓ | No |
 | `no-plan-mode` | `skills/no-plan-mode.md` | read-only (rule) | — | — | ⚠ applies to hench |
