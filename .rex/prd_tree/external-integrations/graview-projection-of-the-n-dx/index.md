@@ -32,8 +32,12 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Promote the rex v2 reader and derived-edge computations to the public API](./promote-the-rex-v2-reader-and-derived.md) | completed |
 | [Reproducible graview checks and documented naming divergences from rex](./reproducible-graview-checks-and.md) | completed |
 | [Revisit: refuse ndx graview on a v1 PRD once n-dx's own tree has migrated](./revisit-refuse-ndx-graview-on-a-v1-prd.md) | pending |
+| [Runs whose task left the PRD still reach a capability, through the archive and the tree's history](./runs-whose-task-left-the-prd-still.md) | pending |
 | [The face and the adapter take Graview 0.1.22 and drop the workarounds it answers](./the-face-and-the-adapter-take-graview.md) | completed |
 | [The graview binary never downloads silently: npx only on explicit opt-in, otherwise an install hint](./the-graview-binary-never-downloads.md) | completed |
+| [The Graview face loads nothing from a CDN, and only the face may skip the release-age gate](./the-graview-face-loads-nothing-from-a.md) | pending |
+| [The Graview face says what is true at a glance: open Inbox only, open changes on the home, area cards by standing, the Ask field clear of the page's end](./the-graview-face-says-what-is-true-at.md) | completed |
 | [The isometric code map in the Graview face: a Code map page, and each zone page shows its place on it](./the-isometric-code-map-in-the-graview.md) | completed |
 | [Two-way writes through Graview's SyncEngine with rex as the system of record](./two-way-writes-through-graview-s.md) | completed |
+| [Small projection gaps: overlapping sibling zones, sub-zone crossings, proposed-area notes, stale zone descriptions](./small-projection-gaps-overlapping.md) | pending |
 

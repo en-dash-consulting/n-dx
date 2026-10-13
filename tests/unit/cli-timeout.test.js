@@ -52,9 +52,24 @@ describe("resolveCommandTimeout", () => {
     expect(resolveCommandTimeout("analyze", cfg)).toBe(0);
   });
 
+  it("returns 0 for graview serve and mcp, which serve, but times graview's one-shot subcommands", () => {
+    expect(resolveCommandTimeout("graview", {}, "serve")).toBe(0);
+    expect(resolveCommandTimeout("graview", {}, "mcp")).toBe(0);
+    expect(resolveCommandTimeout("graview", {}, "emit")).toBe(DEFAULT_TIMEOUT_MS);
+    expect(resolveCommandTimeout("graview", {}, "check")).toBe(DEFAULT_TIMEOUT_MS);
+  });
+
+  it("the global cli.timeoutMs does not bound a server", () => {
+    const cfg = { cli: { timeoutMs: 5000 } };
+    expect(resolveCommandTimeout("start", cfg)).toBe(0);
+    expect(resolveCommandTimeout("graview", cfg, "serve")).toBe(0);
+    expect(resolveCommandTimeout("graview", cfg, "emit")).toBe(5000);
+  });
+
   it("per-command override applies to server commands too", () => {
     const cfg = { cli: { timeouts: { start: 7200000 } } };
     expect(resolveCommandTimeout("start", cfg)).toBe(7200000);
+    expect(resolveCommandTimeout("graview", { cli: { timeouts: { graview: 60000 } } }, "serve")).toBe(60000);
   });
 
   it("ignores negative per-command values and falls back to the default", () => {

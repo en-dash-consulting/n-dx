@@ -1,0 +1,25 @@
+---
+id: "29c0a36b-35fa-4858-8c78-50dd5074aa86"
+level: "task"
+title: "The Graview face says what is true at a glance: open Inbox only, open changes on the home, area cards by standing, the Ask field clear of the page's end"
+status: "completed"
+priority: "medium"
+tags:
+  - "graview"
+  - "ux"
+source: "conversation"
+startedAt: "2026-10-13T00:04:33.454Z"
+completedAt: "2026-10-13T00:04:33.454Z"
+endedAt: "2026-10-13T00:04:33.454Z"
+resolutionType: "code-change"
+resolutionDetail: "attention() and the declaration count open Inbox changes only (15, not 142) and the Inbox page lists finished ones apart; home lists open changes; areaStanding drives area cards; zone Components hidden when empty, Files says how many more; .ndx-main pads by --graview-foot-room."
+acceptanceCriteria:
+  - "The Inbox, Needs attention and the home count only open changes in the Inbox; the Inbox page lists finished, never-placed changes in their own section, not counted"
+  - "The home lists open changes instead of in-progress changes"
+  - "An area card shows how many of its capabilities are met and how many changes on them are open, not its slug or proposed flag"
+  - "A zone page shows a Components section only when the zone has components, and a Files list says how many more it does not show"
+  - "The face's main column pads its end by --graview-foot-room, so the Ask field never covers a page's last row"
+description: "Raised on 2026-10-12 (\"the faces are not good enough yet\"). On n-dx the Inbox counted 142 changes, 127 of them finished work the rules never placed, so \"Needs attention\" read 143; \"Changing now\" listed in-progress changes, which a v1 tree never has (work moves on tasks), so it was always empty; area cards showed \"Proposed Yes\", the slug and a status because an area carries no standing; zone pages offered `ndx analyze .` for \"no components\" on an analyzed project (sourcevision catalogues React components only); and Graview's Ask field covered the last rows of every page because the face's main column ignored `--graview-foot-room`."
+lastModified: "2026-10-13T00:04:33.752Z"
+lastModifiedBy: "Nick Daniel <nick@endash.us>"
+---
