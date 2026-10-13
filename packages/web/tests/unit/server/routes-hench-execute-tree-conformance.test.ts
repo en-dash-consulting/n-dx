@@ -326,8 +326,6 @@ describe("POST /api/hench/execute — PRD tree conformance gate", () => {
     it("surfaces rex's branch-guard refusal on a feature branch instead of migrating", async () => {
       const foreign = await reSuffixEpicDir();
       execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
-      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: tmpDir, stdio: "ignore" });
-      execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir, stdio: "ignore" });
       execFileSync("git", ["add", "-A"], { cwd: tmpDir, stdio: "ignore" });
       execFileSync("git", ["commit", "-m", "baseline"], { cwd: tmpDir, stdio: "ignore" });
       const branch = "feature/442-web-branch-guard";

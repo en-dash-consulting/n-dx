@@ -3554,14 +3554,22 @@ async function collectRunCommits(projectDir: string, startHead: string | undefin
     // commit that followed it.
     const output = await execStdout(
       "git",
-      ["log", "--reverse", `--format=%H%x1f%aI%x1f%s`, `${startHead}..HEAD`],
+      ["log", "--reverse", `--format=%H%x1f%aI%x1f%ae%x1f%s`, `${startHead}..HEAD`],
       { cwd: projectDir, timeout: 10_000 },
     );
     const trimmed = output.trim();
     if (!trimmed) return [];
     return trimmed.split("\n").map((line) => {
-      const [sha, authorDate, ...rest] = line.split("\x1f");
-      return { sha, subject: rest.join("\x1f"), authorDate, attribution: "start-head" as const };
+      // Subject last and joined back: a subject may contain the separator,
+      // the fields before it cannot.
+      const [sha, authorDate, authorEmail, ...rest] = line.split("\x1f");
+      return {
+        sha,
+        subject: rest.join("\x1f"),
+        authorDate,
+        authorEmail,
+        attribution: "start-head" as const,
+      };
     });
   } catch {
     // Best-effort: a run whose commits cannot be enumerated still reports
@@ -3643,13 +3651,13 @@ async function readCommitFacts(
   try {
     const output = await execStdout(
       "git",
-      ["log", "-1", `--format=%H%x1f%aI%x1f%s`, sha],
+      ["log", "-1", `--format=%H%x1f%aI%x1f%ae%x1f%s`, sha],
       { cwd: projectDir, timeout: 10_000 },
     );
     const trimmed = output.trim();
     if (!trimmed) return undefined;
-    const [full, authorDate, ...rest] = trimmed.split("\x1f");
-    return { sha: full, subject: rest.join("\x1f"), authorDate };
+    const [full, authorDate, authorEmail, ...rest] = trimmed.split("\x1f");
+    return { sha: full, subject: rest.join("\x1f"), authorDate, authorEmail };
   } catch {
     return undefined;
   }

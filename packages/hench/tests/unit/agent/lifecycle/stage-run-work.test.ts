@@ -28,12 +28,8 @@ function git(dir: string, args: string[]): string {
 
 function initRepo(dir: string): void {
   git(dir, ["init"]);
-  git(dir, ["config", "user.email", "test@test.com"]);
-  git(dir, ["config", "user.name", "Test"]);
-  // See routes-git.test.ts: Git-for-Windows defaults core.autocrlf=true in the
-  // SYSTEM config, which makes byte-exact expectations non-deterministic.
-  git(dir, ["config", "core.autocrlf", "false"]);
-  git(dir, ["config", "core.eol", "lf"]);
+  // Identity and line-ending config come from the gitconfig that
+  // tests/setup-session-env.js points GIT_CONFIG_GLOBAL at.
   git(dir, ["checkout", "-b", "main"]);
 }
 

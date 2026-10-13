@@ -68,7 +68,6 @@ describe("ndx migrate-layout", () => {
     git(["init", "-q"], dir);
     git(["config", "user.email", "ndx-test@example.com"], dir);
     git(["config", "user.name", "ndx test"], dir);
-    git(["config", "commit.gpgsign", "false"], dir);
     await writeFile(join(dir, ".gitignore"), ".rex/execution-log*.jsonl\n.hench/runs/\n");
 
     // Take the readings first, then commit. Reading the PRD is not a read-only

@@ -13,6 +13,8 @@
  */
 
 import {
+  isModelCompatibleWithVendor,
+  LLM_VENDOR,
   resolveClaudeApiEffort,
   resolveClaudeCliEffort,
   resolveTaskModel,
@@ -35,15 +37,23 @@ export function resolveAgentApiEffort(
  * no flag.
  *
  * Only meaningful for the Claude CLI: other vendors' adapters ignore
- * `VendorSpawnOptions.effort`, and the model allowlist inside
- * `resolveClaudeCliEffort` drops a value aimed at a model that cannot take
- * one, so a Codex or Gemini model id resolves to nothing here.
+ * `VendorSpawnOptions.effort`.
+ *
+ * A non-Claude model returns before the allowlist is consulted, because that
+ * check does not merely drop the value — it warns that the model "does not
+ * accept an effort setting". That reads as a misconfiguration, and on a Codex
+ * project with `llm.effort` set it fired on every run, where before this path
+ * existed nothing was sent and nothing was printed. `llm.effort` is a Claude
+ * setting; a Codex model is not failing to honour it, it is simply not its
+ * audience. A Claude model that cannot take effort still warns, which is the
+ * case the warning is for.
  */
 export function resolveAgentCliEffort(
   model: string | undefined,
   llmConfig: LLMConfig | undefined,
 ): ClaudeEffort | undefined {
   if (!model) return undefined;
+  if (!isModelCompatibleWithVendor(LLM_VENDOR.CLAUDE, model)) return undefined;
   // Literal class name: tests/integration/task-class-registry.test.js finds
   // routed classes by scanning call sites for the string.
   const { effort } = resolveTaskModel("agent.execute", llmConfig);

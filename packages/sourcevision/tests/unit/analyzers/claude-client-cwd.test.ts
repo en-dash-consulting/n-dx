@@ -4,6 +4,13 @@
  * packages/llm-client/tests/unit/cli-provider-cwd.test.ts: a fake `claude`
  * binary echoes its own `process.cwd()` back so a silently-dropped `cwd`
  * option would surface as a failing assertion instead of passing by luck.
+ *
+ * @vitest-isolate — this file rests on two pieces of process-wide state it
+ * only reads, so nothing in it is a call the isolation scan can key on. It
+ * asserts against the *inherited* `process.cwd()`, and the first test needs
+ * module state where `setProjectDir` has never been called — there is no
+ * public unset. Sharing a worker broke it both ways on macOS and Windows CI:
+ * as a cwd mismatch, and as a spawn that could not run the shim.
  */
 
 import { describe, it, expect } from "vitest";

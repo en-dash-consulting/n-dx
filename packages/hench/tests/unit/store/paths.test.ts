@@ -169,6 +169,19 @@ describe("BOOKKEEPING_PATHS", () => {
     expect(matches(".rex/prd_tree")).toBe(true);
   });
 
+  it("discounts rex's locks and backup store on either layout", () => {
+    // Review finding on #678. The blanket `.rex/` prefix this list replaced
+    // covered these; `rex init` does not gitignore them (it appends only
+    // n-dx_workflow.md, execution-log*.jsonl and the derived cache), so on a
+    // project that never pasted the ndx.gitignore block they are untracked. A
+    // lock held while the end-of-run snapshot is taken then read as the run's
+    // own changed work and fired the full-suite gate.
+    for (const entry of ["prd.lock", "prd.json.lock", "reshape.lock", ".backups/snap-1.json"]) {
+      expect(matches(`.rex/${entry}`), `.rex/${entry}`).toBe(true);
+      expect(matches(`.ndx/rex/${entry}`), `.ndx/rex/${entry}`).toBe(true);
+    }
+  });
+
   it("does not match unrelated work", () => {
     expect(matches("src/index.ts")).toBe(false);
     // Neither a sibling directory whose name merely starts the same way.
