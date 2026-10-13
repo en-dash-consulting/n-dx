@@ -2,7 +2,7 @@
 id: "d2081c59-9b1a-4b37-bc05-c9d09b5d28cc"
 level: "task"
 title: "Migration review: project a migration plan file into Graview for people to approve"
-status: "pending"
+status: "blocked"
 priority: "medium"
 tags:
   - "graview"
@@ -16,6 +16,6 @@ acceptanceCriteria:
   - "Decisions export to a reviewed-plan file outside .rex/, keyed by v1 id, and a re-emit after a plan re-run keeps decisions for unchanged entries"
   - "Nothing under the rex, sourcevision or hench directories is written by any step of the review"
 description: "Proposed by Ryan in the #647 review. Project a PR 13 migration plan file (`ndx-migration-plan` v1) into the Graview input files, so a person, or two people on a call, can review the proposed product layer and approve it. Reuses the adapter's emit, spawn and serve plumbing and its product kinds, and adds a migration review module to the declaration: fields for each proposal's source, a named confidence per question (placement, kind, job-shaped, spec), held, the suggested place and its runners-up, and the review decision; acts accept, place elsewhere, leave in the Inbox, merge, split; rules listing what still needs deciding; an approval gate that passes only when every area and held change is decided. Decisions export to a reviewed-plan file keyed by v1 item id, which PR 23's apply reads. Nothing writes rex during review. The 2026-10-09 full-tree dry run is the fixture; the design workshop's v4 declaration and plan-to-bundle converter are the starting point."
-lastModified: "2026-10-12T20:19:13.894Z"
+lastModified: "2026-10-12T23:52:55.889Z"
 lastModifiedBy: "Nick Daniel <nick@endash.us>"
 ---
