@@ -73,4 +73,13 @@ describe("renderPlanSummary", () => {
     const row = text.split("\n").find((l) => l.startsWith("| `e1` |"))!;
     expect(row.match(/(?<!\\)\|/g)).toHaveLength(7); // six columns
   });
+
+  it("escapes a backslash in a title so it cannot turn the next pipe into an escaped one", async () => {
+    const text = renderPlanSummary(await plan([item("e1", "epic", "Paths C:\\ and D:\\", [], "pending")]));
+    expect(text).toContain("Paths C:\\\\ and D:\\\\");
+    const row = text.split("\n").find((l) => l.startsWith("| `e1` |"))!;
+    // `D:\\ |` must still end the cell: the literal backslash is doubled, so the pipe after it is a boundary, not `\|`.
+    expect(row).toContain("D:\\\\ | area |");
+    expect(row.split(" | ")).toHaveLength(6);
+  });
 });

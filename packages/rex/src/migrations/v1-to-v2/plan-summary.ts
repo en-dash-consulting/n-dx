@@ -26,9 +26,18 @@ export type V1ToV2Plan = PlanFile<V1ToV2Entry, V1ToV2Summary>;
 /** Targets in the order the counts table lists them; a target absent from the plan still gets a row. */
 const TARGET_ORDER: readonly PlanTargetType[] = ["area", "capability", "constraint", "change", "task", "subtask", "release"];
 
-/** A table cell: pipes escaped and newlines flattened, so one long description cannot break the row. */
+/**
+ * A table cell: backslashes and pipes escaped, newlines flattened, so one long
+ * description cannot break the row. Backslashes go first: a title ending in `\`
+ * before a pipe would otherwise read as `\|`, an escaped pipe, and swallow the
+ * column boundary.
+ */
 function cell(value: string | undefined): string {
-  const text = (value ?? "").replace(/\r?\n/g, " ").replace(/\|/g, "\\|").trim();
+  const text = (value ?? "")
+    .replace(/\r?\n/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .trim();
   return text === "" ? "—" : text;
 }
 
