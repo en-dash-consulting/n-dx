@@ -99,9 +99,29 @@ const before = (a: SourceSpan["start"], b: SourceSpan["start"]): number => a.lin
 const within = (outer: SourceSpan, inner: SourceSpan): boolean =>
   before(outer.start, inner.start) <= 0 && before(inner.end, outer.end) <= 0;
 
-/** The symbols a file declares, in document order of their declarations. */
+const IMPORTS_GAP = 'has a resolver but does not produce "imports"';
+const SYMBOLS_GAP = 'produces "symbols" but has no symbol rules';
+
+/**
+ * Where a pack's `produces` disagrees with what this adapter can read for it:
+ * a resolver whose imports would never be read, or symbols with no
+ * {@link SYMBOL_RULES} entry. Empty for a consistent pack.
+ */
+export function factGaps(pack: LanguagePack): string[] {
+  return [
+    ...(pack.resolver !== undefined && !pack.produces.includes("imports") ? [IMPORTS_GAP] : []),
+    ...(pack.produces.includes("symbols") && SYMBOL_RULES[pack.id] === undefined ? [SYMBOLS_GAP] : []),
+  ];
+}
+
+/**
+ * The symbols a file declares, in document order of their declarations.
+ * Throws for a pack without symbol rules: an empty list would read as
+ * "declares nothing".
+ */
 export function readSymbols(pack: LanguagePack, file: PackSourceFile): SymbolFact[] {
-  const rules = SYMBOL_RULES[pack.id] ?? [];
+  const rules = SYMBOL_RULES[pack.id];
+  if (rules === undefined) throw new Error(`${pack.id}: ${SYMBOLS_GAP}`);
   const symbols: SymbolFact[] = [];
   for (const query of new Set(rules.map((r) => r.query))) {
     const captures = file.captures[query] ?? [];

@@ -13,7 +13,7 @@ import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
 import { goPack } from "../../src/language/go-pack.js";
 import { javaPack } from "../../src/language/java-pack.js";
 import type { LanguagePack, PackSourceFile } from "../../src/language/pack.js";
-import { readPackFacts } from "../../src/language/pack-facts.js";
+import { factGaps, readPackFacts } from "../../src/language/pack-facts.js";
 import { createTreeSitterRunner } from "../../src/language/runner.js";
 import { sqlPack } from "../../src/language/sql-pack.js";
 import { skipUnlessGrammar } from "../helpers/grammar.js";
@@ -176,7 +176,24 @@ describe("Go facts", () => {
   });
 });
 
-const SQL_SCHEMA = `CREATE TABLE owners (id INT);
+describe("produces against the rules", () => {
+  it("rejects a pack that produces symbols but has no symbol rules, rather than reading an empty list", () => {
+    const pack: LanguagePack = { ...javaPack, id: "kotlin", produces: ["symbols"] };
+    const file: PackSourceFile = { path: "A.kt", captures: {} };
+    expect(() => readPackFacts(pack, file)).toThrow(/kotlin.*produces "symbols".*no symbol rules/);
+  });
+
+  it("finds every built-in pack's produces consistent with its resolver and rules", () => {
+    for (const pack of [javaPack, goPack, sqlPack]) expect(factGaps(pack), pack.id).toEqual([]);
+  });
+
+  it("names both gaps of a pack with a resolver and symbols but neither imports nor rules", () => {
+    const pack: LanguagePack = { ...javaPack, id: "kotlin", produces: ["symbols"] };
+    expect(factGaps(pack)).toEqual(['has a resolver but does not produce "imports"', 'produces "symbols" but has no symbol rules']);
+  });
+});
+
+const SQL_SCHEMA =`CREATE TABLE owners (id INT);
 CREATE TABLE "billing"."Invoices" (id INT);
 ALTER TABLE owners ADD COLUMN name TEXT;
 `;
