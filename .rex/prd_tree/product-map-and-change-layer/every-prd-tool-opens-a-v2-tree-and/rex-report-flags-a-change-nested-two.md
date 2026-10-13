@@ -14,6 +14,8 @@ source: "ndx-adversarial-review"
 startedAt: "2026-10-12T19:44:06.991Z"
 completedAt: "2026-10-12T19:56:16.475Z"
 endedAt: "2026-10-12T19:56:16.475Z"
+resolutionType: "code-change"
+resolutionDetail: "rex report skips the v1 placement and empty-container checks on a v2 tree (run a512fba6, 8b4382937 before the restack onto #716)."
 acceptanceCriteria:
   - "On a v2 copy with a change nested under a change under a change, `rex report --fail-on-error .` exits 0 and its JSON has ok: true with no hierarchy-placement check failing (test)"
   - "A task-less change on v2 raises no empty-containers warning in rex report (test)"

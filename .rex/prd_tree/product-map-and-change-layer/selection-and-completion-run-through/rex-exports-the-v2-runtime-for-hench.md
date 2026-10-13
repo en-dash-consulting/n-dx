@@ -13,6 +13,7 @@ blockedBy:
 startedAt: "2026-10-12T08:54:01.755Z"
 completedAt: "2026-10-12T09:03:39.753Z"
 endedAt: "2026-10-12T09:03:39.753Z"
+resolutionType: "code-change"
 acceptanceCriteria:
   - "public.ts exports what stack B and D1 need (Q4): prdLayout, loadPrdModel, findNextWork, completeTask/completeChange, buildChangeBrief, withPrdModelTransaction and their types (test that imports only public.ts)"
   - "docs/architecture/gateways.md describes the new surface"
