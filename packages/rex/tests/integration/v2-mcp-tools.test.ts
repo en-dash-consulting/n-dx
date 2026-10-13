@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -131,6 +131,43 @@ describe("rex MCP tools on a v2 tree", () => {
     const got = await call("get_item", { id: other });
     expect(got.isError, got.text).toBe(false);
     expect(json(got).item.id).toBe(CHANGE);
+  });
+
+  describe("merging across the Inbox boundary", () => {
+    const inboxDir = (): string => join(rexDir, "changes", "inbox");
+    const addInboxChange = async (title: string): Promise<string> => {
+      const res = await call("add_item", { type: "change", title });
+      expect(res.isError, res.text).toBe(false);
+      return json(res).id;
+    };
+
+    it("merge_items of a placed change into an Inbox change places the target, keeps its task selected and its files out of changes/inbox/", async () => {
+      const placed = await addChange("Saved cards");
+      const task = json(await call("add_item", { type: "task", title: "Store the token", parentId: placed, tags: ["stored"] })).id;
+      const inbox = await addInboxChange("Remember my card");
+      expect(await node(inbox)).toMatchObject({ needsPlacement: true });
+
+      const res = await call("merge_items", { sourceIds: [placed, inbox], targetId: inbox });
+      expect(res.isError, res.text).toBe(false);
+
+      const merged = (await node(inbox)) as { needsPlacement?: boolean; touches?: string[] };
+      expect(merged.needsPlacement).toBeUndefined();
+      expect(merged.touches).toEqual(["a0000000-0000-4000-8000-000000000002"]);
+      expect(existsSync(inboxDir()) ? readdirSync(inboxDir()) : []).toEqual([]);
+
+      const next = await call("get_next_task", { tags: ["stored"] });
+      expect(next.isError, next.text).toBe(false);
+      expect(json(next).item.id).toBe(task);
+    });
+
+    it("a merge whose changes all need placement keeps the target in the Inbox", async () => {
+      const a = await addInboxChange("Remember my card");
+      const b = await addInboxChange("Remember my card again");
+      const res = await call("merge_items", { sourceIds: [a, b], targetId: a });
+      expect(res.isError, res.text).toBe(false);
+      expect(await node(a)).toMatchObject({ needsPlacement: true });
+      expect(readdirSync(inboxDir())).toHaveLength(1);
+    });
   });
 
   it("reorganize merging two similar changes keeps the absorbed change's touches, ids and aliases on the target", async () => {

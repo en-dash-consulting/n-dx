@@ -160,6 +160,21 @@ function carryTouches(items: PRDItem[], sourceIds: string[], targetId: string): 
 }
 
 /**
+ * Clear the target's `needsPlacement` (v2) when an absorbed change was placed:
+ * {@link carryTouches} gives the target that change's confirmed targets, so it
+ * is no longer in the Inbox. A merge where every change needs placement keeps
+ * the flag. Call before {@link mergeItems}.
+ */
+function carryPlacement(items: PRDItem[], sourceIds: string[], targetId: string): void {
+  const target = findItem(items, targetId)!.item;
+  if (!target.needsPlacement) return;
+  const placedSource = sourceIds.some(
+    (id) => id !== targetId && !findItem(items, id)?.item.needsPlacement,
+  );
+  if (placedSource) delete target.needsPlacement;
+}
+
+/**
  * Keep each absorbed change's id, display id and former aliases as aliases on
  * the target (v2), deduplicated and never the target's own id or display id, so
  * commits and lookups that name the absorbed change still resolve to it. Call
@@ -197,8 +212,8 @@ export type ChangesMergeOutcome =
 /**
  * The merge on a v2 change layer, and the only one its callers should use:
  * validate ({@link validateChangesMerge}), carry the absorbed changes'
- * touches and ids onto the target ({@link carryTouches},
- * {@link carryAliases}), then {@link mergeItems}. Writes nothing when the
+ * touches, placement and ids onto the target ({@link carryTouches},
+ * {@link carryPlacement}, {@link carryAliases}), then {@link mergeItems}. Writes nothing when the
  * merge is refused. Modifies `items` in place.
  */
 export function mergeChanges(
@@ -210,6 +225,7 @@ export function mergeChanges(
   const validation = validateChangesMerge(items, sourceIds, targetId);
   if (!validation.valid) return { valid: false, error: validation.error ?? "Merge refused." };
   carryTouches(items, sourceIds, targetId);
+  carryPlacement(items, sourceIds, targetId);
   carryAliases(items, sourceIds, targetId);
   return { valid: true, result: mergeItems(items, sourceIds, targetId, options) };
 }
