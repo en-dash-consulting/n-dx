@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [gateways.md describes the rex v2 surface as it is after #648 and the restack](./gateways-md-describes-the-rex-v2.md) | completed |
 | [get_next_task and rex next pick v2 work with findNextWork](./get-next-task-and-rex-next-pick-v2.md) | completed |
 | [get_prd_status on v2 drops capabilities and open changes under a nested area](./get-prd-status-on-v2-drops.md) | completed |
-| [Pin rex update's v2 order: complete first, write the other fields only if the completion succeeded](./pin-rex-update-s-v2-order-complete.md) | pending |
+| [Pin rex update's v2 order: complete first, write the other fields only if the completion succeeded](./pin-rex-update-s-v2-order-complete.md) | completed |
 | [resolveWorkById and claim_task treat a change that holds a nested change as a runnable unit](./resolveworkbyid-and-claim-task-treat-a.md) | completed |
 | [rex does not export enclosingChangeIds, so hench's explicit --task on v2 can claim a task inside a change another worktree holds](./rex-does-not-export-enclosingchangeids.md) | pending |
 | [rex exports the v2 runtime for hench and the dashboard](./rex-exports-the-v2-runtime-for-hench.md) | completed |
