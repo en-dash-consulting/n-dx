@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { cpSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -13,7 +13,7 @@ import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import { refreshPRDCache } from "../../../src/server/prd-io.js";
 import { itemFingerprint, type RefinementProposal } from "../../../src/server/prd-refinement.js";
-import { resolveStore, findItem, type PRDItem } from "@n-dx/rex";
+import { resolveStore, findItem, detectReorganizations, type PRDItem } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
@@ -282,15 +282,28 @@ describe("Rex item routes on a v2 project", () => {
     });
 
     it("reorganize proposes no v1 orphan or single-child collapse, and its merge carries touches and ids", async () => {
-      const a = await addChange("Add gift card checkout");
-      const b = await addChange("Add gift card checkout", { touches: [PAY_BY_CARD], displayId: "CH-9" } as Partial<PRDItem>);
-      refreshPRDCache(rexDir, await (await resolveStore(rexDir)).loadDocument());
+      const giftCards = "a0000000-0000-4000-8000-000000000003";
+      writeFileSync(
+        join(rexDir, "product", "checkout", "gift-cards.md"),
+        `---\nid: "${giftCards}"\ntype: "capability"\ntitle: "Gift cards"\nslug: "gift-cards"\ndisplayId: "A1.2"\nstatement: "A shopper can pay with a gift card."\n---\n`,
+      );
+      const a = await addChange("Add gift card checkout", { touches: [PAY_BY_CARD] } as Partial<PRDItem>);
+      const b = await addChange("Add gift card checkout", { touches: [giftCards], displayId: "CH-9" } as Partial<PRDItem>);
+      // A change holding one nested change: v1 detection reads it as an epic
+      // with one feature and proposes collapsing it.
+      const outer = await addChange("Wallets");
+      await (await resolveStore(rexDir)).addItem(
+        { id: randomUUID(), title: "Google Pay", status: "pending", level: "feature", type: "change", touches: [PAY_BY_CARD] } as PRDItem,
+        outer,
+      );
+      const doc = await (await resolveStore(rexDir)).loadDocument();
+      expect(detectReorganizations(doc.items).proposals.map((p) => p.type)).toContain("collapse");
+      refreshPRDCache(rexDir, doc);
 
       const listed = await fetch(`${base}/reorganize?mode=fast`);
       expect(listed.status).toBe(200);
       const proposals = (await listed.json()).structural.proposals as Array<{ id: number; type: string; items: string[] }>;
-      // v1 would also propose collapsing the fixture's one-task change.
-      expect(proposals.filter((p) => p.type !== "merge")).toEqual([]);
+      expect(proposals.filter((p) => p.type === "collapse" || p.type === "move")).toEqual([]);
       const duplicate = proposals.find((p) => [...p.items].sort().join() === [a, b].sort().join());
       expect(duplicate).toBeDefined();
 
@@ -300,7 +313,7 @@ describe("Rex item routes on a v2 project", () => {
       const [target, absorbed] = (await itemById(a)) ? [a, b] : [b, a];
       expect(await itemById(absorbed)).toBeUndefined();
       const node = (await itemById(target)) as PRDItem & { touches?: string[]; aliases?: string[] };
-      expect(node.touches).toEqual([PAY_BY_CARD]);
+      expect([...(node.touches ?? [])].sort()).toEqual([PAY_BY_CARD, giftCards].sort());
       expect(node.aliases).toEqual(expect.arrayContaining([absorbed]));
       if (absorbed === b) expect(node.aliases).toEqual(expect.arrayContaining(["CH-9"]));
     });
