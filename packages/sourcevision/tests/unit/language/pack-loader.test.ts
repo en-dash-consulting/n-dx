@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { javaConfig, type LanguagePackEntry } from "@n-dx/lang-kit";
 import { resolveNdxHome } from "@n-dx/llm-client";
@@ -53,6 +53,16 @@ describe("workspace tests and scripts versus the user's pack directory", () => {
   it("starts every test from an ndx home with no packs, not the developer's", () => {
     expect(resolveNdxHome().startsWith(tmpdir())).toBe(true);
     expect(existsSync(join(defaultPackDir(), "node_modules"))).toBe(false);
+  });
+
+  it("sets the ndx home up once per worker, however many files the worker runs", async () => {
+    const home = process.env["NDX_HOME"];
+    const listeners = process.listenerCount("exit");
+    // The shared project re-runs setupFiles before each file in the same process.
+    vi.resetModules();
+    await import("../../setup-ndx-home.ts");
+    expect(process.env["NDX_HOME"]).toBe(home);
+    expect(process.listenerCount("exit")).toBe(listeners);
   });
 
   it("keeps a pack planted in the ndx home out of the corpus scripts' loader", async () => {
