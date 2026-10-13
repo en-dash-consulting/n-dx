@@ -11,6 +11,8 @@ tags:
   - "hench"
   - "lane-hench"
   - "review-2026-10-12"
+blockedBy:
+  - "b3ae06d2-f228-46c7-9f3d-50611b28ca36"
 source: "ndx-adversarial-review"
 acceptanceCriteria:
   - "Completing a v2 task through the real ChangeLayerStore on the autoCommit path leaves an unrelated dirty file under changes/ (and one under product/) out of the completion commit and still dirty (integration test that fails on 676ed8eb27)"

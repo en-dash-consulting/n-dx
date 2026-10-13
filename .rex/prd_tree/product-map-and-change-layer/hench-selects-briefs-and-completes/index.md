@@ -36,3 +36,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Pin the review-dedupe wiring to changes/ on a v2 tree](./pin-the-review-dedupe-wiring-to.md) | pending |
 | [Re-record the prompt-census baseline for hench's v2 brief](./re-record-the-prompt-census-baseline.md) | completed |
 | [The completion gate and review captures understand v2](./the-completion-gate-and-review.md) | completed |
+| [hench's precise bookkeeping list discounts a v2 tree's product/ and changes/](./hench-s-precise-bookkeeping-list.md) | pending |
