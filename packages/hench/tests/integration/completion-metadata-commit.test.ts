@@ -1073,6 +1073,97 @@ describe("commitCompletionMetadata — v2 change layer, real store", () => {
     expect(dirty.filter((p) => p.startsWith(`${inboxRel}/`) || p.startsWith(`${changeRel}/`))).toEqual([]);
   });
 
+  /**
+   * Completing a subtask writes only its task folder's state.yaml, deep inside
+   * the placed change. The move still lands whole: committing the task folder
+   * without the change's own index.md would leave it in a folder rex skips on
+   * a clean clone, and the Inbox copy would have lost it.
+   */
+  it("lands a whole placed change when the completion writes only a nested folder's state", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { resolveStore, loadPrdModel } = await import("../../src/prd/rex-gateway.js");
+    const changeRel = ".rex/changes/add-apple-pay";
+    const inboxRel = ".rex/changes/inbox/add-apple-pay";
+    const PRESS_ID = "c0000000-0000-4000-8000-000000000021";
+    const LABEL_ID = "c0000000-0000-4000-8000-000000000022";
+    const taskDir = join(rexDir, "changes", "add-apple-pay", "wire-the-button");
+    await mkdir(taskDir);
+    await rename(join(rexDir, "changes", "add-apple-pay", "wire-the-button.md"), join(taskDir, "index.md"));
+    for (const [id, slug] of [[PRESS_ID, "press"], [LABEL_ID, "label"]]) {
+      await writeFile(
+        join(taskDir, `${slug}.md`),
+        ["---", `id: "${id}"`, 'type: "subtask"', `title: "${slug}"`, `slug: "${slug}"`, "---", ""].join("\n"),
+      );
+    }
+    await writeFile(
+      join(rexDir, "changes", "add-apple-pay", "state.yaml"),
+      ['schema: "rex/v2"', "items:", `  "${CHANGE_ID}":`, '    status: "in_progress"', ""].join("\n"),
+    );
+    await writeFile(
+      join(taskDir, "state.yaml"),
+      [
+        'schema: "rex/v2"', "items:",
+        `  "${WIRE_ID}":`, '    status: "in_progress"',
+        `  "${PRESS_ID}":`, '    status: "in_progress"',
+        `  "${LABEL_ID}":`, '    status: "pending"', "",
+      ].join("\n"),
+    );
+    await mkdir(join(rexDir, "changes", "inbox"));
+    await execAsync("git add -A", { cwd: projectDir });
+    await execAsync(`git mv ${changeRel} ${inboxRel}`, { cwd: projectDir });
+    await execAsync('git commit -q -m "capture in the Inbox"', { cwd: projectDir });
+    await rename(join(projectDir, inboxRel), join(projectDir, changeRel));
+
+    const store = await resolveStore(rexDir);
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(PRESS_ID),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store,
+    });
+
+    const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+    expect(subject.trim()).toContain(PRESS_ID);
+    const { stdout: tree } = await execAsync("git ls-tree -r --name-only HEAD -- .rex/changes", { cwd: projectDir });
+    const committed = tree.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(committed).toEqual(
+      expect.arrayContaining([
+        `${changeRel}/index.md`,
+        `${changeRel}/state.yaml`,
+        `${changeRel}/wire-the-button/index.md`,
+        `${changeRel}/wire-the-button/press.md`,
+        `${changeRel}/wire-the-button/label.md`,
+        `${changeRel}/wire-the-button/state.yaml`,
+      ]),
+    );
+    expect(committed.filter((p) => p.startsWith(`${inboxRel}/`))).toEqual([]);
+    const { stdout: status } = await execAsync("git status --porcelain -uall", { cwd: projectDir });
+    const dirty = status.split("\n").filter(Boolean).map((l) => l.slice(3));
+    expect(dirty.filter((p) => p.startsWith(`${inboxRel}/`) || p.startsWith(`${changeRel}/`))).toEqual([]);
+
+    // A clean checkout of HEAD reads the change once, with its task and subtasks.
+    const clone = realpathSync.native(await mkdtemp(join(tmpdir(), "hench-v2-clone-")));
+    try {
+      await execAsync(`git clone -q "${projectDir}" "${clone}"`);
+      const model = await loadPrdModel(join(clone, ".rex"), { warn: () => {} });
+      const ids: string[] = [];
+      const walk = (nodes: ReadonlyArray<{ id: string; children?: unknown[] }>) => {
+        for (const n of nodes) {
+          ids.push(n.id);
+          if (n.children) walk(n.children as typeof nodes);
+        }
+      };
+      walk(model.tree.changes);
+      expect(ids.filter((id) => [CHANGE_ID, WIRE_ID, PRESS_ID, LABEL_ID].includes(id)).sort()).toEqual(
+        [CHANGE_ID, WIRE_ID, PRESS_ID, LABEL_ID].sort(),
+      );
+    } finally {
+      await rm(clone, { recursive: true, force: true, ...RM_RETRY });
+    }
+  });
+
   /** A deleted Inbox file whose id is not the completed node's is someone else's edit. */
   it("leaves a deleted Inbox change with another id out of the completion commit", async () => {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
