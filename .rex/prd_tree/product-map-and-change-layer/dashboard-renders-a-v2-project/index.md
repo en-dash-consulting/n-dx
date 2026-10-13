@@ -28,7 +28,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [ndx start on a v2 tree with a stray prd.json creates no prd_tree/](./ndx-start-on-a-v2-tree-with-a-stray.md) | completed |
 | [POST /api/rex/restore and GET /api/rex/backups refuse on a v2 project](./post-api-rex-restore-and-get-api-rex.md) | completed |
 | [Quick Add creates a change on v2](./quick-add-creates-a-change-on-v2.md) | completed |
-| [The dashboard's merge route and refinement merge follow the v2 change-layer merge rules](./the-dashboard-s-merge-route-and.md) | pending |
+| [The Ask panel proposes v2 merges that the v1 rule allows and the v2 rule then refuses at apply](./the-ask-panel-proposes-v2-merges-that.md) | pending |
+| [The dashboard's merge route and refinement merge follow the v2 change-layer merge rules](./the-dashboard-s-merge-route-and.md) | completed |
 | [The PRD cache is built from the change-layer projection on v2](./the-prd-cache-is-built-from-the-change.md) | completed |
 | [The Product, Changes and capability views show real v2 data](./the-product-changes-and-capability.md) | pending |
 | [The v2 refusal of parentId says what to do instead](./the-v2-refusal-of-parentid-says-what.md) | completed |
