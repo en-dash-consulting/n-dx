@@ -58,20 +58,25 @@ if (profile === "root") {
   vitestArgs.push("--exclude", "**/sourcevision-evals/evals.test.js");
 }
 
+const childEnv = { ...process.env };
+
 if (!bindAvailable) {
   const excludes = excludesForProfile(profile);
   if (excludes.length > 0) {
     console.log(
       `[vitest-bind-aware] local socket bind unavailable; excluding ${profile} network suites.`,
     );
-    for (const pattern of excludes) {
-      vitestArgs.push("--exclude", pattern);
-    }
+    // Through the environment rather than `--exclude`: the isolation split in
+    // tests/vitest-isolation.mjs gives each project its own `exclude`, and a
+    // project's list replaces the CLI flag instead of adding to it — so these
+    // patterns never reached a project and the network suites ran anyway.
+    childEnv["NDX_TEST_EXTRA_EXCLUDE"] = excludes.join("\n");
   }
 }
 
 const result = spawnSync(process.execPath, [VITEST_BIN, ...vitestArgs], {
   cwd: process.cwd(),
+  env: childEnv,
   stdio: "inherit",
   windowsHide: true,
   env: process.env,

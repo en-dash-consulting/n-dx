@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { cp, mkdtemp, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -23,11 +23,30 @@ function run(args: string[]): string {
 }
 
 describe("rex prune", { timeout: 120_000 }, () => {
+  /**
+   * `rex init` runs once, into a template that each test copies: the spawn
+   * cost about a second here and three on the Windows CI runner, per test.
+   * The copies do carry the template's name: `rex init` writes the directory's
+   * basename into `.rex/config.json` as `project`, and into the prd_tree
+   * heading. Nothing here asserts on either, so a copy behaves as a fresh init
+   * would for these tests — but a test that did assert on the project name
+   * would need its own init rather than a copy.
+   */
+  let templateDir: string;
   let tmpDir: string;
+
+  beforeAll(async () => {
+    templateDir = await mkdtemp(join(tmpdir(), "rex-e2e-prune-template-"));
+    run(["init", templateDir]);
+  });
+
+  afterAll(async () => {
+    await rm(templateDir, { recursive: true, force: true });
+  });
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-e2e-prune-"));
-    run(["init", tmpDir]);
+    await cp(templateDir, tmpDir, { recursive: true });
   });
 
   afterEach(async () => {
