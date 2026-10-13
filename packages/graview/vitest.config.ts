@@ -6,6 +6,7 @@ const rexRoot = resolve(import.meta.dirname, "../rex");
 const svRoot = resolve(import.meta.dirname, "../sourcevision");
 const henchRoot = resolve(import.meta.dirname, "../hench");
 const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
+const langKitRoot = resolve(import.meta.dirname, "../lang-kit");
 
 export default defineConfig({
   resolve: {
@@ -19,6 +20,8 @@ export default defineConfig({
       { find: /^@n-dx\/sourcevision\/dist\/(.+)\.js$/, replacement: `${svRoot}/src/$1.ts` },
       { find: /^@n-dx\/hench$/, replacement: `${henchRoot}/src/public.ts` },
       { find: /^@n-dx\/llm-client$/, replacement: `${llmClientRoot}/src/public.ts` },
+      // sourcevision imports @n-dx/lang-kit; its dist would hit the .js → .ts rewrite
+      { find: /^@n-dx\/lang-kit$/, replacement: `${langKitRoot}/src/index.ts` },
       // Map local .js imports to .ts files
       { find: /^(\..+)\.js$/, replacement: "$1.ts" },
     ],
