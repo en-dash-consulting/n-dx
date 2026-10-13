@@ -7,8 +7,9 @@
  * amended it. "Where it lives" is the answer a map gives that a task list
  * cannot: the code that makes the statement true.
  *
- * Driven entirely by its `capability` prop: no fetch and no route, so it
- * renders from a v2 fixture until the v2 reader and its routes land.
+ * Driven entirely by its `capability` prop: `product-pages.ts` fetches it
+ * from `GET /api/rex/product/capability/<id>`, and tests render it from a
+ * fixture.
  */
 
 import { h } from "preact";

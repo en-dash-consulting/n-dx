@@ -5,16 +5,17 @@
  * shapes and nothing else — no fetch, no store, no rex import. The viewer
  * cannot import rex (that crosses the server boundary and goes through
  * `src/server/rex-gateway.ts`), so the wire types are declared here the way
- * every other view declares its own, and the three views are driven from
- * fixtures until the v2 reader and its routes land.
+ * every other view declares its own. `server/routes-rex/product.ts` builds
+ * these shapes from rex's v2 model and declares the server-side twins; a
+ * type test in `routes-rex-product.test.ts` fails when the two drift.
  *
  * ## Derived fields are inputs, not outputs
  *
  * Capability `status` and `health`, a change's `stage` and a capability's
  * open-change overlays are *computed* values: the v2 schema deliberately
- * gives them no stored field (see `rex/schema/v2`), and the engine that
- * computes them is a separate piece of work. They arrive here already
- * computed. The helpers below only order and group what they are given.
+ * gives them no stored field (see `rex/schema/v2`). Status and health are
+ * rex's (`productReport`); the server maps a change onto a stage. They arrive
+ * here already computed. The helpers below only order and group them.
  *
  * @module viewer/views/product-model
  */
@@ -66,10 +67,10 @@ export const CAPABILITY_HEALTH_LABELS: Readonly<Record<CapabilityHealth, string>
  * — `ready` from `ready`, `applied` from `appliedIn`, `shipped` from
  * `shippedIn`.
  *
- * The engine that computes derived status, health and edges owns the real
- * vocabulary. When it lands it must either adopt these values or update this
- * type, the three views and their fixtures together: nothing else pins them,
- * so the drift would otherwise be silent.
+ * Rex's derived product status has no stage either, so `stageOf` in
+ * `server/routes-rex/product.ts` maps a change onto these values. If rex
+ * grows a stage, adopt its vocabulary here, there and in the fixtures
+ * together.
  */
 export type ChangeStage = "proposed" | "ready" | "in-progress" | "applied" | "shipped";
 

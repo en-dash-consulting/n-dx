@@ -38,6 +38,10 @@ export { prdLayout } from "@n-dx/rex";
 // change-layer store, and completion is rex's own v2 completion (apply-on-complete).
 export { isChangeLayerStore, completeV2Work } from "@n-dx/rex";
 export type { PRDStore } from "@n-dx/rex";
+// The Product, Changes and capability views on a v2 tree: rex's model and its
+// derived product status, never recomputed in web (routes-rex/product.ts).
+export { loadPrdModel, productReport, capabilityReport, indexTree, isOpenChange, isAppliedChange, specHash, nodeSpec } from "@n-dx/rex";
+export type { V2Tree, RuleNode, ChangeNode, TreeIndex } from "@n-dx/rex";
 
 // ---- Rex PRD tree slug conformance ------------------------------------------
 // The Execute route's pre-run gate. The run it spawns writes the PRD when it

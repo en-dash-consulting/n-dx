@@ -29,6 +29,8 @@ export const REX_SCOPE_VIEWS: readonly ViewId[] = [
   "plan",
   "rex-dashboard",
   "prd",
+  "product",
+  "changes",
   "analysis",
   "merge-graph",
   "validation",

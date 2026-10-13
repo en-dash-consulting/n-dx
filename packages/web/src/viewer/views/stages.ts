@@ -131,6 +131,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     sections: [
       { view: "analysis", plain: true },
       { view: "prd", open: true, fill: true },
+      { view: "product", requiresServer: true },
+      { view: "changes", requiresServer: true },
       { view: "command-reference" },
       { view: "hench-runs", scroll: true },
       { view: "merge-graph" },
