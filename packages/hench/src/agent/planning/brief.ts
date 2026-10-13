@@ -8,6 +8,7 @@ import {
   isWorkItem,
   buildChangeBrief,
   resolveWorkById,
+  enclosingChangeIds,
 } from "../../prd/rex-gateway.js";
 import type { PRDStore, PRDItem, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
 import {
@@ -294,6 +295,15 @@ export async function selectTaskEntry(
     // An explicit task another worktree is working on is refused, not stolen.
     // Claiming is the check: the store answers atomically under its lock.
     if (claims) {
+      // On v2 a claim on an enclosing change covers the work inside it (rex
+      // refuses the same in claim_task), so the task's own id is not enough.
+      if (tree) {
+        const foreign = await claims.foreignClaims();
+        for (const changeId of enclosingChangeIds(tree, entry.item.id)) {
+          const heldBy = foreign.get(changeId);
+          if (heldBy) throw new TaskClaimedElsewhereError(changeId, heldBy, findItem(items, changeId)?.item.title);
+        }
+      }
       const refusedBy = await claims.claim(entry.item.id);
       if (refusedBy) throw new TaskClaimedElsewhereError(entry.item.id, refusedBy, entry.item.title);
     }
