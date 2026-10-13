@@ -265,7 +265,10 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   } else if (!entry) {
     refuse("task-not-found", new CLIError(`Task not found: ${taskId}`, "Check the id with 'ndx status'."));
   } else {
-    const claim = await TaskClaims.forProject(dir, { readOnly: true }).heldElsewhere(entry.item.id);
+    const claims = TaskClaims.forProject(dir, { readOnly: true });
+    // On v2 a claim on an enclosing change refuses the task, as a run does.
+    const enclosing = v2Tree ? await claims.heldByEnclosingChange(v2Tree, entry.item.id) : null;
+    const claim = enclosing?.claim ?? (await claims.heldElsewhere(entry.item.id));
     task = {
       id: entry.item.id,
       title: entry.item.title,
@@ -278,7 +281,11 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       const notActionable = explicitTaskRefusal(entry.item);
       if (notActionable) refuse("not-actionable", notActionable);
     }
-    if (claim) refuse("claimed-elsewhere", new TaskClaimedElsewhereError(entry.item.id, claim, entry.item.title));
+    if (claim) {
+      const heldId = enclosing?.changeId ?? entry.item.id;
+      const heldTitle = enclosing ? findItem(prdItems, heldId)?.item.title : entry.item.title;
+      refuse("claimed-elsewhere", new TaskClaimedElsewhereError(heldId, claim, heldTitle));
+    }
   }
 
   const treeRefusal = prdItems ? await readTreeConformanceRefusal(rexDir) : null;

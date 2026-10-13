@@ -42,8 +42,8 @@
  * @module hench/process/task-claims
  */
 
-import { openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
-import type { ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason } from "../prd/rex-gateway.js";
+import { openClaimsStore, resolveClaimHolder, enclosingChangeIds } from "../prd/rex-gateway.js";
+import type { ClaimsStore, ClaimHolder, TaskClaim, ClaimHoldReason, V2Tree } from "../prd/rex-gateway.js";
 import { CLIError } from "../prd/llm-gateway.js";
 
 /** Thrown when an explicitly requested task is being worked on in another worktree. */
@@ -149,6 +149,24 @@ export class TaskClaims {
   /** Ids of tasks other worktrees currently hold — what autoselection passes over. */
   async foreignClaims(): Promise<Map<string, TaskClaim>> {
     return this.store.claimedElsewhere(this.holder.worktreeRoot);
+  }
+
+  /**
+   * The first change enclosing `taskId` that another worktree claims, with its
+   * claim, or null. On v2 a claim on a change covers the work inside it (rex
+   * refuses the same in claim_task), so the task's own id is not enough.
+   * Shared by selection and `--resolve` so a preview cannot drift from a run.
+   */
+  async heldByEnclosingChange(
+    tree: V2Tree,
+    taskId: string,
+  ): Promise<{ changeId: string; claim: TaskClaim } | null> {
+    const foreign = await this.foreignClaims();
+    for (const changeId of enclosingChangeIds(tree, taskId)) {
+      const claim = foreign.get(changeId);
+      if (claim) return { changeId, claim };
+    }
+    return null;
   }
 
   /** The live claim another worktree holds on `taskId`, or null. */
