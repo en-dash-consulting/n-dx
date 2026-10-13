@@ -160,18 +160,21 @@ function carryTouches(items: PRDItem[], sourceIds: string[], targetId: string): 
 }
 
 /**
- * Clear the target's `needsPlacement` (v2) when an absorbed change was placed:
- * {@link carryTouches} gives the target that change's confirmed targets, so it
- * is no longer in the Inbox. A merge where every change needs placement keeps
- * the flag. Call before {@link mergeItems}.
+ * Clear the target's `needsPlacement` (v2) when an absorbed change was placed
+ * and touches something: {@link carryTouches} gives the target those confirmed
+ * targets, so it is no longer in the Inbox. A merge where every change needs
+ * placement keeps the flag, as does absorbing a placed change with no touches
+ * (a spike), which would leave the target placed with no target. Call before
+ * {@link mergeItems}.
  */
 function carryPlacement(items: PRDItem[], sourceIds: string[], targetId: string): void {
   const target = findItem(items, targetId)!.item;
   if (!target.needsPlacement) return;
-  const placedSource = sourceIds.some(
-    (id) => id !== targetId && !findItem(items, id)?.item.needsPlacement,
-  );
-  if (placedSource) delete target.needsPlacement;
+  const placedWithTargets = sourceIds.some((id) => {
+    const item = id === targetId ? undefined : findItem(items, id)?.item;
+    return !!item && !item.needsPlacement && Array.isArray(item.touches) && item.touches.length > 0;
+  });
+  if (placedWithTargets) delete target.needsPlacement;
 }
 
 /**

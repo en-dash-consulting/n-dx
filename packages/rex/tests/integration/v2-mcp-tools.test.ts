@@ -160,6 +160,16 @@ describe("rex MCP tools on a v2 tree", () => {
       expect(json(next).item.id).toBe(task);
     });
 
+    it("merging a spike, which names no target, into an Inbox change keeps the target in the Inbox", async () => {
+      const spike = await addInboxChange("Investigate card vaults");
+      await ws.store.updateItem(spike, { spike: true, needsPlacement: undefined } as never);
+      expect(await node(spike)).not.toHaveProperty("needsPlacement");
+      const inbox = await addInboxChange("Remember my card");
+      const res = await call("merge_items", { sourceIds: [spike, inbox], targetId: inbox });
+      expect(res.isError, res.text).toBe(false);
+      expect(await node(inbox)).toMatchObject({ needsPlacement: true });
+    });
+
     it("a merge whose changes all need placement keeps the target in the Inbox", async () => {
       const a = await addInboxChange("Remember my card");
       const b = await addInboxChange("Remember my card again");
