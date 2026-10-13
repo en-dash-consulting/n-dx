@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { openRexWorkspace, type RexWorkspace } from "../../src/cli/mcp-workspace.js";
 import { REX_MCP_TOOLS } from "../../src/cli/mcp-tools/index.js";
 import { DEFAULT_CONFIG } from "../../src/schema/index.js";
+import { applyReshape, type ReshapeProposal } from "../../src/core/reshape.js";
 import { ChangeLayerStore } from "../../src/store/change-layer-store.js";
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 import { indexTree } from "../../src/schema/v2-rules.js";
@@ -55,6 +56,12 @@ async function addChange(title: string): Promise<string> {
   const res = await call("add_item", { type: "change", title, touches: ["a0000000-0000-4000-8000-000000000002"] });
   expect(res.isError).toBe(false);
   return json(res).id;
+}
+
+/** Apply one reshape merge on the change layer, as `rex reshape --accept` does. */
+function reshapeMerge(survivorId: string, mergedIds: string[]) {
+  const proposal: ReshapeProposal = { id: "p1", action: { action: "merge", survivorId, mergedIds, reason: "same work" } };
+  return ws.store.withTransaction(async (doc) => applyReshape(doc.items, [proposal], { changeLayer: true }));
 }
 
 describe("the MCP workspace on a v2 tree", () => {
@@ -158,6 +165,33 @@ describe("rex MCP tools on a v2 tree", () => {
     expect(res.isError, res.text).toBe(false);
     const model = await loadPrdModel(rexDir, quiet);
     expect(model.tree.changes.map((c) => c.id)).toContain(CHANGE);
+    expect(await node(CHANGE)).toMatchObject({ amends: [expect.objectContaining({ delta: "modified" })] });
+  });
+
+  it("reshape merging two changes keeps the absorbed change's touches, id, display id and aliases on the survivor", async () => {
+    const giftCards = "a0000000-0000-4000-8000-000000000003";
+    await writeFile(
+      join(rexDir, "product", "checkout", "gift-cards.md"),
+      `---\nid: "${giftCards}"\ntype: "capability"\ntitle: "Gift cards"\nslug: "gift-cards"\ndisplayId: "A1.2"\nstatement: "A shopper can pay with a gift card."\n---\n`,
+    );
+    const other = await addChange("Apple Pay, again");
+    await ws.store.updateItem(other, { displayId: "CH-7", aliases: ["CH-old"], touches: [giftCards] } as never);
+    const outcome = await reshapeMerge(CHANGE, [other]);
+    expect(outcome.errors).toEqual([]);
+    const survivor = (await node(CHANGE)) as { touches?: string[]; aliases?: string[] };
+    expect(survivor.touches).toEqual([giftCards]);
+    expect([...(survivor.aliases ?? [])].sort()).toEqual([other, "CH-7", "CH-old"].sort());
+  });
+
+  it("reshape refuses a merge that would absorb a change carrying amendments, and writes nothing", async () => {
+    const plain = await addChange("Apple Pay, again");
+    const before = await loadPrdModel(rexDir, quiet);
+    const outcome = await reshapeMerge(plain, [CHANGE]);
+    expect(outcome.errors).toEqual([{ proposal: expect.anything(), error: expect.stringMatching(/^Skipped: .*carries amendments/) }]);
+    expect(outcome.applied).toEqual([]);
+    expect(outcome.deletedIds).toEqual([]);
+    const after = await loadPrdModel(rexDir, quiet);
+    expect(after.tree.changes.map((c) => c.id).sort()).toEqual(before.tree.changes.map((c) => c.id).sort());
     expect(await node(CHANGE)).toMatchObject({ amends: [expect.objectContaining({ delta: "modified" })] });
   });
 

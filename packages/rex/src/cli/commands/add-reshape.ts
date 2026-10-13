@@ -21,7 +21,7 @@ import { findItem, walkTree } from "../../core/tree.js";
 import { applyReshape } from "../../core/reshape.js";
 import type { ReshapeProposal, MergeAction, GroupAction } from "../../core/reshape.js";
 import type { PRDItem, ItemLevel } from "../../schema/index.js";
-import type { PRDStore } from "../../store/index.js";
+import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
 import { appendArchiveBatch } from "../../core/archive.js";
 import type { RenameAuditEntry } from "../../core/archive.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
@@ -801,7 +801,7 @@ async function applyMergePhase(
   }
 
   // Apply proposals — applyReshape mutates doc.items in place
-  const reshapeResult = applyReshape(doc.items, proposals);
+  const reshapeResult = applyReshape(doc.items, proposals, { changeLayer: isChangeLayerStore(store) });
   if (reshapeResult.applied.length === 0) {
     return { mergedCount: 0, renamedCount, parentLabel, archivedIds: [], strategy: renamedCount > 0 ? "rename" : "none", reparentedChildCount: 0 };
   }
