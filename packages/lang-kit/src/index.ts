@@ -28,6 +28,9 @@ export * from "./java-gradle-build.js";
 export * from "./gradle-script.js";
 export * from "./gradle-catalog.js";
 
+// IaC resource kinds
+export * from "./iac-kinds.js";
+
 // Small parsers
 export * from "./toml-lite.js";
 export * from "./xml-lite.js";

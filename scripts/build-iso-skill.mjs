@@ -83,6 +83,11 @@ export async function buildIsoSkill() {
     // quietly growing by half a megabyte.
     alias: {
       "@n-dx/llm-client": join(ROOT, "packages/llm-client/src/git-remote-url.ts"),
+      // infrastructure.ts reads the IaC resource-kind table from lang-kit.
+      // Resolve it to that one data module: the bundle must not pull the rest
+      // of lang-kit (parsers, build readers), and must not depend on lang-kit's
+      // dist being built.
+      "@n-dx/lang-kit": join(ROOT, "packages/lang-kit/src/iac-kinds.ts"),
     },
     legalComments: "none",
     charset: "utf8",
