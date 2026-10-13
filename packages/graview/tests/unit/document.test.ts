@@ -51,6 +51,19 @@ describe("n-dx.graview.json", () => {
     }
   });
 
+  it("lists every kind and relation rex does not have in the doc's table of where the names differ", () => {
+    // Rex's own names: the v2 node types the projection keeps, and the stored relations it carries as they are.
+    const REX_KINDS = new Set(Object.values(NODE_KINDS));
+    const REX_EDGES = new Set(["dependsOn", "appliesTo", "amends", "touches", "blockedBy", "discoveredFrom"]);
+    const doc_ = readFileSync(new URL("../../../../docs/architecture/graview-projection.md", import.meta.url), "utf-8");
+    const start = doc_.indexOf("### Where the projection's names differ from rex's");
+    expect(start, "docs/architecture/graview-projection.md has no table of where the names differ").toBeGreaterThan(-1);
+    const table = doc_.slice(start, doc_.indexOf("\n#", start + 1) === -1 ? undefined : doc_.indexOf("\n#", start + 1));
+    const named = new Set([...table.matchAll(/`([A-Za-z]+)`/g)].map((m) => m[1]!));
+    for (const kind of Object.keys(doc.kinds)) if (!REX_KINDS.has(kind)) expect(named.has(kind), `kind "${kind}" is not rex's and the table does not name it`).toBe(true);
+    for (const edge of declaredEdges(doc).keys()) if (!REX_EDGES.has(edge)) expect(named.has(edge), `relation "${edge}" is not rex's and the table does not name it`).toBe(true);
+  });
+
   it("names kinds, fields and edges the way the format requires, and every edge target is a kind", () => {
     for (const [kind, spec] of Object.entries(doc.kinds)) {
       expect(kind).toMatch(KIND_NAME);
