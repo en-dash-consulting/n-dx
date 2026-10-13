@@ -18,8 +18,9 @@ acceptanceCriteria:
   - "`llm.routes[\"code.classify\"] = \"light\"` returns classification to the vendor's light tier even when the key is present"
   - "`LLM_VENDOR` in @n-dx/llm-client is unchanged and `ClaudeClient.complete` has no Jev implementation"
 description: "Sourcevision makes five LLM calls. Four are generative — zone names, descriptions and insights (`zone.enrich-scan`/`zone.enrich-deep` in `analyzers/enrich-batch.ts`, the per-zone fallback in `analyzers/enrich-per-zone.ts`), meta-evaluation (`zone.meta-eval`), and the CONTEXT.md distill (`context.distill` in `cli/commands/analyze.ts`). One is a judgment: `code.classify` in `analyzers/classify.ts` picks an archetype id from a fixed catalog, and today does so by asking for free-text JSON, validating each item, stamping every result with `confidence: 0.7`, and carrying a three-attempt prompt-degradation ladder that exists only because free text can come back malformed.\n\nTypeSafe's Jev (a System One model; `POST https://api.typesafe.ai/v1/systemone`, model `jev-latest`) returns typed answers — `choice` over up to 255 options, `noul` yes/no probability, `score` over 2–10 ordered levels — with a per-option probability distribution and a confidence value. It does not generate text, so it cannot replace the four generative calls; it is a direct fit for classification, and for the judgment-shaped fields (finding severity, finding category, zone fragility) that the generative prompts are currently asked to produce alongside prose.\n\nThis feature routes sourcevision's judgment-shaped calls to Jev and leaves generation on the configured vendor. Opt-in is `TYPESAFE_API_KEY` present in the environment; `llm.routes[\"<task class>\"]` in `.n-dx.json` can send a class back to a tier (e.g. `\"light\"`) or name `\"typesafe\"` explicitly. With no key, every path falls back to the current vendor and prints one notice line — output is otherwise identical to today. No new vendor is added to `LLM_VENDOR`, and `ClaudeClient.complete` is untouched: Jev is not a completion provider and does not pretend to be one."
-lastModified: "2026-09-22T04:42:28.074Z"
-lastModifiedBy: "Nick Daniel <nick@endash.us>"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-13T19:53:27.031Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children

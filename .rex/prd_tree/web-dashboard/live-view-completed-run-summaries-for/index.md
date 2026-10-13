@@ -13,8 +13,9 @@ acceptanceCriteria:
   - "A Live task or analysis link opened after the run ended shows the summary rather than a not-running state."
   - "Summaries only use data the run already recorded; no new LLM calls."
 description: "Deferred from the first Live tab cut, which covers running work only and links finished runs to Work's run history. When a run ends, the Live task page and the Live analysis page should turn into a summary at the same URL, so a link shared while the run was going still answers \"how did it go\".\n\nGoal: The page someone was watching tells them the outcome when the run ends, without a second navigation."
-lastModified: "2026-10-01T00:20:24.083Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-13T19:53:29.194Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
