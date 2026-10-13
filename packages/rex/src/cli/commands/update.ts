@@ -236,7 +236,10 @@ export async function cmdUpdate(
   // On a v2 tree completion follows the change layer's rules, applying a
   // completed change per rex.applyOn, as update_task_status does
   // (cli/v2-completion.ts). It writes the status and its timestamps; any
-  // other field is written after it.
+  // other field is written after it. The order is the rule: complete first,
+  // write the other fields only if the completion succeeded, so a refused
+  // completion writes nothing. Every refusal the field write could raise
+  // (dependencies, --run) is checked above, before the completion.
   let v2: V2Completion | undefined;
   let fieldUpdates = updates;
   if (updates.status === "completed" && isChangeLayerStore(store)) {

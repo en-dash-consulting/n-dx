@@ -90,4 +90,39 @@ describe("rex update --status on a v2 tree", () => {
     await cmdUpdate(cliDir, TASK, { status: "completed", format: "json" });
     expect(JSON.parse(output())).toMatchObject({ changeCompleted: true, applied: false, reason: expect.stringMatching(/"review"/) });
   });
+
+  describe("completes first, writes the other fields only if the completion succeeded", () => {
+    const loadNode = async (id: string) => indexTree((await loadPrdModel(join(cliDir, ".rex"), quiet)).tree).resolve(id);
+
+    it("a refused completion writes none of the other fields", async () => {
+      // CH-1 still holds its open task, so completing the change is refused.
+      await expect(cmdUpdate(cliDir, CHANGE, { status: "completed", title: "Renamed", priority: "low" })).rejects.toThrow(
+        /Cannot complete change CH-1: task .* is not completed/,
+      );
+      expect(await loadNode(CHANGE)).toMatchObject({ title: "Add Apple Pay", status: "pending", priority: "high" });
+    });
+
+    it.each([
+      ["a self-referencing --blockedBy", { blockedBy: TASK }, /Invalid dependencies/],
+      ["an unknown --blockedBy id", { blockedBy: "c0000000-0000-4000-8000-0000000000ff" }, /Invalid dependencies/],
+      ["an invalid --run", { run: '{"tier":"not-a-tier"}' }, /Invalid --run/],
+    ])("%s leaves the task uncompleted", async (_name, flags, message) => {
+      const before = await outcome(cliDir);
+      await expect(cmdUpdate(cliDir, TASK, { status: "completed", title: "Renamed", ...flags })).rejects.toThrow(message);
+      expect(await outcome(cliDir)).toEqual(before);
+      expect(await loadNode(TASK)).toMatchObject({ title: "Wire the button", status: "pending" });
+    });
+
+    it("the success path writes the completion and every other field", async () => {
+      await cmdUpdate(cliDir, TASK, { status: "completed", title: "Wired", priority: "low", description: "Done" }, { criterion: ["Works"] });
+      expect(await loadNode(TASK)).toMatchObject({
+        status: "completed",
+        title: "Wired",
+        priority: "low",
+        description: "Done",
+        acceptanceCriteria: ["Works"],
+      });
+      expect(await loadNode(CHANGE)).toMatchObject({ status: "completed" });
+    });
+  });
 });
