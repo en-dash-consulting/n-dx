@@ -1474,7 +1474,7 @@ function chargeSpawnToRun(
 }
 
 /** Per-invocation inputs that only exist once the task has actually run. */
-interface ReviewPassInvocation {
+export interface ReviewPassInvocation {
   run: RunRecord;
   taskId: string;
   projectDir: string;
@@ -1603,7 +1603,7 @@ async function runExecutorFix(
  * before the commit prompt, so it ships in the same commit as the work it
  * repairs.
  */
-async function runAdversarialReviewPass(
+export async function runAdversarialReviewPass(
   ctx: ReviewPassContext,
   inv: ReviewPassInvocation,
   step?: PairReviewStep,
