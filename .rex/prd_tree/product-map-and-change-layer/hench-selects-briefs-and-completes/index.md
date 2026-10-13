@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A v2 completion commit sweeps an operator's untracked draft into a node folder whose state.yaml it wrote](./a-v2-completion-commit-sweeps-an.md) | completed |
 | [An explicit --task on an Inbox change is refused before the run, not reported completed](./an-explicit-task-on-an-inbox-change-is.md) | completed |
 | [An explicit --task refuses a task whose enclosing change another worktree has claimed](./an-explicit-task-refuses-a-task-whose.md) | completed |
-| [Completing a placed change whose Inbox copy was committed leaves the Inbox path in HEAD, giving a duplicate node id](./completing-a-placed-change-whose-inbox.md) | pending |
+| [Completing a placed change whose Inbox copy was committed leaves the Inbox path in HEAD, giving a duplicate node id](./completing-a-placed-change-whose-inbox.md) | completed |
 | [gateways.md names hench's v2 rex surfaces and its export ceiling](./gateways-md-names-hench-s-v2-rex.md) | pending |
 | [hench briefs a v2 task from its change](./hench-briefs-a-v2-task-from-its-change.md) | completed |
 | [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | completed |
