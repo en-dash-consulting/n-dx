@@ -60,7 +60,8 @@ describe("Rex item routes on a v2 project", () => {
     const res = await send("POST", "items", { title: "Support gift cards", description: "Shoppers ask for them." });
     expect(res.status).toBe(201);
     const created = await res.json();
-    expect(created).toMatchObject({ ok: true, level: "change", title: "Support gift cards", needsPlacement: true });
+    expect(created).toMatchObject({ ok: true, type: "change", title: "Support gift cards", needsPlacement: true });
+    expect(created).not.toHaveProperty("level");
 
     const store = await resolveStore(rexDir);
     const item = await store.getItem(created.id);
@@ -70,7 +71,22 @@ describe("Rex item routes on a v2 project", () => {
   it("POST /items ignores the v1 level the viewer sends", async () => {
     const res = await send("POST", "items", { title: "From Quick Add", level: "task" });
     expect(res.status).toBe(201);
-    expect((await res.json()).level).toBe("change");
+    expect((await res.json()).type).toBe("change");
+  });
+
+  it("POST /items accepts type change", async () => {
+    const res = await send("POST", "items", { title: "Explicit change", type: "change" });
+    expect(res.status).toBe(201);
+    expect((await res.json()).type).toBe("change");
+  });
+
+  it.each(["capability", "task", "subtask"])("POST /items refuses type %s with a reason and writes nothing", async (type) => {
+    const count = async () => (await (await resolveStore(rexDir)).loadDocument()).items.length;
+    const before = await count();
+    const res = await send("POST", "items", { title: "Typed", type });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain(`not a ${type}`);
+    expect(await count()).toBe(before);
   });
 
   it("POST /items refuses a parent, which v2 does not take until type-aware CRUD", async () => {

@@ -316,6 +316,7 @@ async function handleItemAdd(
     const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       title?: string;
+      type?: string;
       level?: string;
       parentId?: string;
       description?: string;
@@ -339,14 +340,23 @@ async function handleItemAdd(
     const store = await resolveStore(ctx.rexDir);
 
     // v2: the item is a change in the Inbox, placed later. Levels are a v1
-    // notion and are ignored; a parent has no meaning until the type-aware
-    // CRUD of roadmap PR 21.
+    // notion and are ignored. Only a change can be added here: any other
+    // `type` is refused, and so is a parent.
     if (isChangeLayerStore(store)) {
+      if (input.type !== undefined && input.type !== "change") {
+        errorResponse(
+          res,
+          400,
+          `Quick Add on a v2 project creates a change, not a ${String(input.type)}. ` +
+            'Omit type (or send "change") for an Inbox change, or use `rex add --type=<type> --parent=<id>` (or MCP add_item).',
+        );
+        return true;
+      }
       if (input.parentId) {
         errorResponse(
           res,
           400,
-          "Adding a task under a change from the dashboard comes with roadmap PR 21. " +
+          "Quick Add does not add a task under a change. " +
             "Use Add with no parent for an Inbox change, or `rex add --type=task --parent=<id>` (or MCP add_item).",
         );
         return true;
@@ -475,7 +485,7 @@ async function addInboxChange(
     detail: `Added change: ${input.title} (via web)`,
   });
   if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
-  jsonResponse(res, 201, { ok: true, id, level: "change", title: input.title, needsPlacement: true });
+  jsonResponse(res, 201, { ok: true, id, type: "change", title: input.title, needsPlacement: true });
   return true;
 }
 
