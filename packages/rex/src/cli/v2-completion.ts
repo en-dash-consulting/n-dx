@@ -3,7 +3,8 @@
  * and `rex update --status` so the two behave the same.
  *
  * The node completes through `completeWork` (core/change-completion.ts)
- * inside one {@link withPrdModelTransaction}: completing the last live task
+ * inside one {@link ChangeLayerStore.withModelTransaction}, so the store's
+ * save report lists the files it wrote: completing the last live task
  * of a `pending` change completes the change (and each `pending` enclosing
  * change whose work is then all done), and under `rex.applyOn: complete`
  * (read with {@link loadApplyOn}) their amendments apply, innermost first, in
@@ -18,7 +19,6 @@ import { completeWork, type CompleteWorkResult } from "../core/change-completion
 import { findItem } from "../core/tree.js";
 import type { PRDItem, ResolutionType } from "../schema/index.js";
 import type { ChangeLayerStore } from "../store/change-layer-store.js";
-import { withPrdModelTransaction } from "../store/prd-model-transaction.js";
 
 export interface V2CompletionOptions {
   resolutionType?: ResolutionType;
@@ -49,8 +49,7 @@ export async function completeV2Work(store: ChangeLayerStore, id: string, option
   const clock = options.clock ?? (() => new Date());
   // Read inside the lock: a call that waited behind another writer is stamped when it wrote.
   let now!: Date;
-  const { result: out } = await withPrdModelTransaction<CompleteWorkResult>(
-    rexDir,
+  const { result: out } = await store.withModelTransaction<CompleteWorkResult>(
     (model) => {
       now = clock();
       const result = completeWork(model.tree, id, {

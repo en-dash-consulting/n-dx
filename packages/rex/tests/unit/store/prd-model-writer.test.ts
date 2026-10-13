@@ -90,7 +90,7 @@ describe.each(EOLS)("writePrdModel on a %s checkout", (eol) => {
     const rexDir = await copyFixture(eol);
     const before = await snapshot(rexDir);
     const result = await write(rexDir, await loadPrdModel(rexDir, quiet));
-    expect(result).toEqual({ written: [], removed: [] });
+    expect(result).toEqual({ written: [], removed: [], deletedFiles: [] });
     expect(await snapshot(rexDir)).toEqual(before);
   });
 
@@ -120,7 +120,7 @@ describe.each(EOLS)("writePrdModel on a %s checkout", (eol) => {
     const model = await loadPrdModel(rexDir, quiet);
     find(all(model), CHANGE).title = "Retitled";
 
-    expect(await write(rexDir, model)).toEqual({ written: ["changes/add-apple-pay/index.md"], removed: [] });
+    expect(await write(rexDir, model)).toEqual({ written: ["changes/add-apple-pay/index.md"], removed: [], deletedFiles: [] });
     const after = await snapshot(rexDir);
     expect(after["changes/add-apple-pay/index.md"]).not.toContain("\r");
     delete after["changes/add-apple-pay/index.md"];
@@ -462,6 +462,10 @@ describe("writePrdModel", () => {
     const result = await write(rexDir, model, { removed: new Set(["s1"]) });
 
     expect(result.removed).toEqual(["changes/add-apple-pay/wire-the-button"]);
+    expect(result.deletedFiles.sort()).toEqual([
+      "changes/add-apple-pay/wire-the-button/hide-on-chrome.md",
+      "changes/add-apple-pay/wire-the-button/index.md",
+    ]);
     expect(Object.keys(await snapshot(rexDir)).filter((p) => p.includes("wire-the-button"))).toEqual([
       "changes/add-apple-pay/wire-the-button.md",
     ]);

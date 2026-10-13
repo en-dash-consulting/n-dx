@@ -27,9 +27,16 @@ import { changeLayerFromItems, changeLayerItems, productLayerItems } from "../co
 import { pruneKeepReason } from "../core/prune.js";
 import { findItem, insertChild, removeFromTree, updateInTree, walkTree } from "../core/tree.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
-import type { PRDStore, StoreCapabilities } from "./contracts.js";
-import { loadPrdModel, prdLayout } from "./prd-model-reader.js";
-import { withPrdModelTransaction } from "./prd-model-transaction.js";
+import { dirname, join } from "node:path";
+import type { PRDStore, SaveFileReport, StoreCapabilities } from "./contracts.js";
+import { buildSaveFileReport, mergeSaveFileReports } from "./contracts.js";
+import { loadPrdModel, prdLayout, type PrdModel } from "./prd-model-reader.js";
+import {
+  withPrdModelTransaction,
+  type PrdModelEdit,
+  type PrdModelTransactionOptions,
+  type PrdModelTransactionResult,
+} from "./prd-model-transaction.js";
 
 /** Thrown when a change-layer write would break a v2 rule the tree did not break before. */
 export class ChangeLayerWriteError extends Error {
@@ -40,6 +47,9 @@ export class ChangeLayerWriteError extends Error {
 }
 
 export class ChangeLayerStore implements PRDStore {
+  /** Files written/deleted under `product/` and `changes/` since the last {@link takeSaveFileReport}. */
+  private pendingSaveReport: SaveFileReport | null = null;
+
   constructor(
     readonly rexDir: string,
     /** The v1 store, for config, log and workflow. */
@@ -57,9 +67,34 @@ export class ChangeLayerStore implements PRDStore {
     return (await loadPrdModel(this.rexDir)).tree;
   }
 
+  /**
+   * {@link withPrdModelTransaction} on this store's tree, recording the files
+   * the write touched for {@link takeSaveFileReport}. Every v2 write made
+   * through this store goes through here: the change-layer edits and
+   * `completeV2Work`'s completion and apply.
+   */
+  async withModelTransaction<T>(
+    mutate: (model: PrdModel) => PrdModelEdit<T> | Promise<PrdModelEdit<T>>,
+    options?: PrdModelTransactionOptions,
+  ): Promise<PrdModelTransactionResult<T>> {
+    const out = await withPrdModelTransaction(this.rexDir, mutate, options);
+    const abs = (paths: string[]) => paths.map((p) => join(this.rexDir, p));
+    this.pendingSaveReport = mergeSaveFileReports(
+      this.pendingSaveReport,
+      buildSaveFileReport({ writtenPaths: abs(out.written.written), deletedPaths: abs(out.written.deletedFiles) }, dirname(this.rexDir)),
+    );
+    return out;
+  }
+
+  /** Drain the files this store's writes touched since the last take; `null` when none did. */
+  takeSaveFileReport(): SaveFileReport | null {
+    const report = this.pendingSaveReport;
+    this.pendingSaveReport = null;
+    return report;
+  }
+
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
-    const { result } = await withPrdModelTransaction(
-      this.rexDir,
+    const { result } = await this.withModelTransaction(
       async (model) => {
         const doc: PRDDocument = { schema: SCHEMA_VERSION, title: model.title, items: changeLayerItems(model.tree.changes) };
         const value = await fn(doc);

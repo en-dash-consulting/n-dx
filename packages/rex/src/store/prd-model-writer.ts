@@ -117,8 +117,10 @@ export interface WritePrdModelOptions {
 export interface WritePrdModelResult {
   /** Files written, relative to `rexDir`. */
   written: string[];
-  /** Files and folders deleted, relative to `rexDir`. */
+  /** Files and folders deleted, relative to `rexDir`: a folder that went is listed alone. */
   removed: string[];
+  /** Every file deleted, relative to `rexDir`, those inside a removed folder included: what a git stage addresses. */
+  deletedFiles: string[];
 }
 
 const INDEX_FILE = "index.md";
@@ -181,7 +183,7 @@ export async function writePrdModel(
   }
   await assertStaleRemovable(plan.stale, collectIds(model), options.removed ?? new Set());
 
-  const result: WritePrdModelResult = { written: [], removed: [] };
+  const result: WritePrdModelResult = { written: [], removed: [], deletedFiles: [] };
   const rel = (path: string): string => relative(rexDir, path).split("\\").join("/");
   for (const dir of plan.dirs) await mkdir(dir, { recursive: true });
   for (const [path, text] of plan.files) {
@@ -195,12 +197,15 @@ export async function writePrdModel(
       if ((await readIfExists(path)) === null) continue;
       await rm(path);
       result.removed.push(rel(path));
+      result.deletedFiles.push(rel(path));
     } else if (await saveStateFile(dir, file, { rexDir, specs, now: options.now })) {
       result.written.push(rel(path));
     }
   }
   for (const { path, isDir } of plan.stale) {
-    for (const removed of await removeStale(path, isDir)) result.removed.push(rel(removed));
+    const { removed, files } = await removeStale(path, isDir);
+    result.removed.push(...removed.map(rel));
+    result.deletedFiles.push(...files.map(rel));
   }
   return result;
 }
@@ -472,29 +477,36 @@ async function assertStaleRemovable(
 /**
  * Delete a stale entry. A folder loses only its tree files (`.md`, `state.yaml`)
  * and is removed once empty, so anything else kept there survives and the
- * folder stays. Returns the paths deleted: the folder itself when it went,
- * else the files.
+ * folder stays. `removed` is the folder itself when it went, else the files;
+ * `files` is every file deleted.
  */
-async function removeStale(path: string, isDir: boolean): Promise<string[]> {
+async function removeStale(path: string, isDir: boolean): Promise<Removal> {
   if (!isDir) {
     await rm(path, { force: true });
-    return [path];
+    return { removed: [path], files: [path] };
   }
-  const files = await removeTreeFiles(path);
-  return (await removeIfEmpty(path)) ? [path] : files;
+  const inner = await removeTreeFiles(path);
+  return { removed: (await removeIfEmpty(path)) ? [path] : inner.removed, files: inner.files };
 }
 
-async function removeTreeFiles(dir: string): Promise<string[]> {
-  const out: string[] = [];
+interface Removal {
+  removed: string[];
+  files: string[];
+}
+
+async function removeTreeFiles(dir: string): Promise<Removal> {
+  const out: Removal = { removed: [], files: [] };
   for (const entry of (await listDir(dir)) ?? []) {
     if (entry.name.startsWith(".")) continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      const files = await removeTreeFiles(path);
-      out.push(...((await removeIfEmpty(path)) ? [path] : files));
+      const inner = await removeTreeFiles(path);
+      out.removed.push(...((await removeIfEmpty(path)) ? [path] : inner.removed));
+      out.files.push(...inner.files);
     } else if (entry.name.endsWith(".md") || entry.name === STATE_FILE_NAME) {
       await rm(path, { force: true });
-      out.push(path);
+      out.removed.push(path);
+      out.files.push(path);
     }
   }
   return out;
