@@ -33,14 +33,18 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Defer the PRD timeline view and re-scope it to the Changes view](./defer-the-prd-timeline-view-and-re.md) | completed |
 | [Derive area links and propose dependsOn from shared tests](./derive-area-links-and-propose.md) | pending |
 | [Diff two migration plans in words](./diff-two-migration-plans-in-words.md) | pending |
+| [FileStore and FolderTreeStore save reports are relative to .ndx/, not the project root, on the .ndx/ layout](./filestore-and-foldertreestore-save.md) | pending |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
+| [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | pending |
 | [Install the sv analyze stop handlers before the progress file says running](./install-the-sv-analyze-stop-handlers.md) | completed |
 | [Layout-literal wall misses a segmented join(root, ".ndx", "rex") path](./layout-literal-wall-misses-a-segmented.md) | pending |
 | [MCP Integration guide still says HTTP MCP is single-project until a 0.7.0 hub](./mcp-integration-guide-still-says-http.md) | pending |
 | [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | completed |
+| [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | pending |
 | [Record review decisions as calibration records on the run record](./record-review-decisions-as-calibration.md) | pending |
 | [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | deferred |
 | [Replace the v1 terminal screenshots in quickstart and existing-project with v2 ones](./replace-the-v1-terminal-screenshots-in.md) | pending |
+| [rex release stamp applies a container change before the changes nested in it](./rex-release-stamp-applies-a-container.md) | pending |
 | [rex release stamp runs git tag --contains for every historical unstamped change, on every release](./rex-release-stamp-runs-git-tag.md) | pending |
 | [rex update ignores unknown flags such as --resolution without an error](./rex-update-ignores-unknown-flags-such.md) | pending |
 | [rex usage ignores .n-dx.json rex overrides: token-store passes the wrong dir and key to loadProjectOverrides](./rex-usage-ignores-n-dx-json-rex.md) | pending |
@@ -54,7 +58,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
 | [Wire ndx migrate --plan to write the classified plan](./wire-ndx-migrate-plan-to-write-the.md) | completed |
 | [Write Inbox changes to the reserved changes/inbox/ folder, and move them out on placement](./write-inbox-changes-to-the-reserved.md) | completed |
-| [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | pending |
-| [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | pending |
-| [rex release stamp applies a container change before the changes nested in it](./rex-release-stamp-applies-a-container.md) | pending |
-| [FileStore and FolderTreeStore save reports are relative to .ndx/, not the project root, on the .ndx/ layout](./filestore-and-foldertreestore-save.md) | pending |
