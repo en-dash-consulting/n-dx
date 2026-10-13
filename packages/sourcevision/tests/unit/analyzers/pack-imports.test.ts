@@ -166,6 +166,40 @@ describe("buildPackImportGraph", () => {
     ]);
   });
 
+  it("degrades only its own language, with one notice naming the error, when a pack's analyzeProject rejects", async () => {
+    const broken: LanguagePackEntry = {
+      ...stubEntry(javaConfig, { facts: [], unparsed: [] }),
+      analyzeProject: async () => {
+        throw new Error("resolver blew up");
+      },
+    };
+    const healthy = stubEntry(goConfig, {
+      facts: [{ path: "a.go", imports: { files: [{ to: "b.go", symbols: [] }], external: [] } }],
+      unparsed: [],
+    });
+    const { graph, messages } = await run(
+      ["src/A.java", "a.go", "b.go"],
+      [knownPack(javaConfig, { entry: broken }), knownPack(goConfig, { entry: healthy })],
+    );
+    expect(graph.degraded).toEqual(["java"]);
+    expect(graph.edges).toEqual([{ from: "a.go", to: "b.go", type: "static", symbols: [] }]);
+    expect(messages).toEqual([
+      "Java: the pack failed (resolver blew up); Java files get inventory only. " +
+        `Reinstall it with \`npm install --prefix ${packDir} @n-dx/lang-java@${VERSION}\`.`,
+    ]);
+  });
+
+  it("hands Go to the regex parser when its pack's analyzeProject rejects", async () => {
+    const entry: LanguagePackEntry = {
+      ...stubEntry(goConfig, { facts: [], unparsed: [] }),
+      analyzeProject: () => Promise.reject(new Error("bad contract")),
+    };
+    const { graph, messages } = await run(["a.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
+    expect(graph.degraded).toEqual(["go"]);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("Go: the pack failed (bad contract); Go imports come from the regex import parser.");
+  });
+
   it("ends the notice after the outcome when the pack names no remedy", async () => {
     const entry = stubEntry(goConfig, { facts: [], unparsed: [], degraded: { reason: "the project's build files could not be read (go.mod unreadable)" } });
     const { messages } = await run(["a.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
