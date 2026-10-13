@@ -39,6 +39,7 @@
 
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative, extname, sep } from "node:path";
+import { IAC_KINDS } from "@n-dx/lang-kit";
 import { DATA_FILES } from "../schema/data-files.js";
 import type { InfraLink, InfraResource, InfrastructureData } from "../schema/v1.js";
 
@@ -161,33 +162,6 @@ export function readDeclaredConfig(root: string): {
 }
 
 // ── Infrastructure-as-code discovery ────────────────────────────────────────
-
-/**
- * Resource type → coarse kind, for every IaC dialect.
- *
- * Matched as substrings against the resource type so this stays useful across
- * AWS, GCP and Azure without enumerating every provider's naming.
- *
- * One table, not one per parser: the patterns are written in Terraform's
- * underscore form and `classifyResource` normalizes the other dialects into it
- * (`AWS::SQS::Queue` → `aws_sqs_queue`). Two tables would disagree within a
- * release — which is how the skill script and the package came to disagree
- * about zone colours.
- */
-const IAC_KINDS: Array<[RegExp, string]> = [
-  [/bucket|blob_container|storage_account/, "bucket"],
-  [/sqs|_queue|servicebus_queue|pubsub_subscription/, "queue"],
-  [/sns|pubsub_topic|eventgrid|event_bus|eventbridge/, "topic"],
-  [/dynamodb|rds|_sql|spanner|firestore|bigtable|cosmosdb|documentdb|database/, "database"],
-  [/elasticache|redis|memcache/, "cache"],
-  [/kinesis|kafka|msk|firehose/, "stream"],
-  [/cloudwatch_event_rule|events_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
-  [/secret|kms|vault|parameter/, "secrets"],
-  [
-    /lambda_function|serverless_function|cloud_run|cloudfunctions|container_app/,
-    "compute",
-  ],
-];
 
 /**
  * Classify a resource type from any dialect.
