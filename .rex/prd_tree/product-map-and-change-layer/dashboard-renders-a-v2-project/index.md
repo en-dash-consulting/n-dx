@@ -22,9 +22,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A completed but unapplied change shows as awaiting apply in the Changes view](./a-completed-but-unapplied-change-shows.md) | pending |
+| [A completed but unapplied change shows as awaiting apply in the Changes view](./a-completed-but-unapplied-change-shows.md) | completed |
 | [A v2 PATCH that both completes and edits a field must not half-apply](./a-v2-patch-that-both-completes-and.md) | completed |
 | [Bulk status PATCH completes v2 work without rex's v2 completion](./bulk-status-patch-completes-v2-work.md) | completed |
+| [Bulk status PATCH completing a v2 change under rex.applyOn review reports ok with no reason it was left unapplied](./bulk-status-patch-completing-a-v2.md) | pending |
 | [Dashboard misses v2 edits under changes/ when it was created after ndx start](./dashboard-misses-v2-edits-under.md) | completed |
 | [ndx start on a v2 tree with a stray prd.json creates no prd_tree/](./ndx-start-on-a-v2-tree-with-a-stray.md) | completed |
 | [POST /api/rex/restore and GET /api/rex/backups refuse on a v2 project](./post-api-rex-restore-and-get-api-rex.md) | completed |
