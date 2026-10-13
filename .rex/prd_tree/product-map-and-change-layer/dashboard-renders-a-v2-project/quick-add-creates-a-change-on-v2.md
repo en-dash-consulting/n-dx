@@ -12,6 +12,7 @@ blockedBy: []
 startedAt: "2026-10-12T11:25:36.307Z"
 completedAt: "2026-10-12T11:31:51.046Z"
 endedAt: "2026-10-12T11:31:51.046Z"
+resolutionType: "code-change"
 acceptanceCriteria:
   - "POST /api/rex/items on a v2 project creates an Inbox change through rex (test)"
   - "Status PATCH works on a v2 task (test)"

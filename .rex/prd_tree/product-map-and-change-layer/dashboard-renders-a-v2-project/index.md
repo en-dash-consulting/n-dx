@@ -22,16 +22,17 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A failed Product refetch replaces the loaded map and an open capability page with an error](./a-failed-product-refetch-replaces-the.md) | pending |
+| [A completed but unapplied change shows as awaiting apply in the Changes view](./a-completed-but-unapplied-change-shows.md) | pending |
 | [A v2 PATCH that both completes and edits a field must not half-apply](./a-v2-patch-that-both-completes-and.md) | completed |
 | [Bulk status PATCH completes v2 work without rex's v2 completion](./bulk-status-patch-completes-v2-work.md) | completed |
 | [Dashboard misses v2 edits under changes/ when it was created after ndx start](./dashboard-misses-v2-edits-under.md) | completed |
 | [ndx start on a v2 tree with a stray prd.json creates no prd_tree/](./ndx-start-on-a-v2-tree-with-a-stray.md) | completed |
 | [POST /api/rex/restore and GET /api/rex/backups refuse on a v2 project](./post-api-rex-restore-and-get-api-rex.md) | completed |
 | [Quick Add creates a change on v2](./quick-add-creates-a-change-on-v2.md) | completed |
-| [The Ask panel proposes v2 merges that the v1 rule allows and the v2 rule then refuses at apply](./the-ask-panel-proposes-v2-merges-that.md) | pending |
+| [The capability detail response says whether the node was met and whether its spec moved since](./the-capability-detail-response-says.md) | pending |
 | [The dashboard's merge route and refinement merge follow the v2 change-layer merge rules](./the-dashboard-s-merge-route-and.md) | completed |
 | [The PRD cache is built from the change-layer projection on v2](./the-prd-cache-is-built-from-the-change.md) | completed |
 | [The Product and Changes views stay stale after a PRD change until the page is reloaded](./the-product-and-changes-views-stay.md) | completed |
 | [The Product, Changes and capability views show real v2 data](./the-product-changes-and-capability.md) | completed |
+| [The v2 Quick Add answers type change and refuses any other type](./the-v2-quick-add-answers-type-change.md) | pending |
 | [The v2 refusal of parentId says what to do instead](./the-v2-refusal-of-parentid-says-what.md) | completed |

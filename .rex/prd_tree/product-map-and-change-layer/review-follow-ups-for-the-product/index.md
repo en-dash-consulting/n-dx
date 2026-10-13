@@ -56,6 +56,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Rex watcher stops following a PRD folder that is deleted and recreated while ndx start runs](./rex-watcher-stops-following-a-prd.md) | pending |
 | [Root README and docs/guide/mcp.md Rex MCP tool lists omit get_token_usage, and no test ties doc lists to the registry](./root-readme-and-docs-guide-mcp-md-rex.md) | pending |
 | [Stop the timed-out test gate test racing its fake gate startup](./stop-the-timed-out-test-gate-test.md) | completed |
+| [The Ask panel proposes v2 merges that the v1 rule allows and the v2 rule then refuses at apply](./the-ask-panel-proposes-v2-merges-that.md) | pending |
 | [The exported computeLanding still reports an open change as landed, because it takes ids rather than the change](./the-exported-computelanding-still.md) | pending |
 | [The .gitignore guide's snippets drift from the ndx.gitignore template](./the-gitignore-guide-s-snippets-drift.md) | pending |
 | [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | pending |
@@ -64,3 +65,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
 | [Wire ndx migrate --plan to write the classified plan](./wire-ndx-migrate-plan-to-write-the.md) | completed |
 | [Write Inbox changes to the reserved changes/inbox/ folder, and move them out on placement](./write-inbox-changes-to-the-reserved.md) | completed |
+| [A failed Product refetch replaces the loaded map and an open capability page with an error](./a-failed-product-refetch-replaces-the.md) | pending |
