@@ -38,7 +38,7 @@ export function AttentionScreen({ context }: { context: Ctx }) {
 export function InboxScreen({ context }: { context: Ctx }) {
   const { store } = context;
   useStoreTick(store);
-  const { inbox } = attention(store);
+  const { inbox, placedNever } = attention(store);
   return (
     <Page testId="inbox" narrow>
       <Hero eyebrow="Work" title={inbox.length === 0 ? "The Inbox is empty." : `${inbox.length} ${inbox.length === 1 ? "change waits" : "changes wait"} in the Inbox.`} lede="A change lands here when it neither amends nor touches a product node. A person confirms what it targets; until then nothing autonomous picks it up.">
@@ -47,6 +47,15 @@ export function InboxScreen({ context }: { context: Ctx }) {
         </Link>
       </Hero>
       {inbox.length === 0 ? <Empty command="ndx rex change place <change> --target <capability> --relation amends">Nothing to place.</Empty> : <Rows>{inbox.map((n, i) => <RecordRow key={n.id} context={context} node={n} i={i} end={<Badge plain>{said(n.priority ?? "")}</Badge>} />)}</Rows>}
+      {placedNever.length > 0 ? (
+        <Section title={`Finished, never placed (${placedNever.length})`} i={1}>
+          <p className="ndx-small ndx-muted" style={{ margin: 0 }}>
+            Done work the rules could not put on a capability. Nothing waits on it; the migration places it as history, so it is not counted as needing attention.
+          </p>
+          <Rows>{placedNever.slice(0, 40).map((n, i) => <RecordRow key={n.id} context={context} node={n} i={i} />)}</Rows>
+          {placedNever.length > 40 ? <p className="ndx-small ndx-muted">and {placedNever.length - 40} more</p> : null}
+        </Section>
+      ) : null}
     </Page>
   );
 }

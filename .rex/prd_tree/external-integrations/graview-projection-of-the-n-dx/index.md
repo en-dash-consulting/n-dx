@@ -34,5 +34,6 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Revisit: refuse ndx graview on a v1 PRD once n-dx's own tree has migrated](./revisit-refuse-ndx-graview-on-a-v1-prd.md) | pending |
 | [The face and the adapter take Graview 0.1.22 and drop the workarounds it answers](./the-face-and-the-adapter-take-graview.md) | completed |
 | [The graview binary never downloads silently: npx only on explicit opt-in, otherwise an install hint](./the-graview-binary-never-downloads.md) | completed |
+| [The Graview face says what is true at a glance: open Inbox only, open changes on the home, area cards by standing, the Ask field clear of the page's end](./the-graview-face-says-what-is-true-at.md) | completed |
 | [The isometric code map in the Graview face: a Code map page, and each zone page shows its place on it](./the-isometric-code-map-in-the-graview.md) | completed |
 | [Two-way writes through Graview's SyncEngine with rex as the system of record](./two-way-writes-through-graview-s.md) | completed |

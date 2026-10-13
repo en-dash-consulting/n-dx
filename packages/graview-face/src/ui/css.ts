@@ -70,7 +70,8 @@ export const CSS = `
 .ndx-tools > * { min-width: 0; }
 
 /* ── The page ─────────────────────────────────────────────────────────── */
-.ndx-main { min-width: 0; padding: 2rem clamp(1rem, 4vw, 3rem) 5rem; }
+/* The page's end scrolls clear of the "Ask" field: Graview's seat says the room it takes as --graview-foot-room. */
+.ndx-main { min-width: 0; padding: 2rem clamp(1rem, 4vw, 3rem) max(5rem, calc(var(--graview-foot-room, 0px) + 1.5rem)); }
 .ndx-page { max-width: var(--ndx-max); margin: 0 auto; display: grid; gap: 1.75rem; }
 .ndx-page.narrow { max-width: 54rem; }
 .ndx-hero { display: grid; gap: 0.55rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--graview-edge); }
@@ -251,7 +252,7 @@ a.ndx-card:hover { transform: translateY(-1px); }
   .ndx-nav a { white-space: nowrap; padding: 0.4rem 0.6rem; }
   .ndx-nav a[aria-current="page"]::before { display: none; }
   .ndx-tools { margin-left: auto; flex-wrap: nowrap; }
-  .ndx-main { padding: 1.25rem 1rem 3rem; }
+  .ndx-main { padding: 1.25rem 1rem max(3rem, calc(var(--graview-foot-room, 0px) + 1rem)); }
   .ndx-row { grid-template-columns: 1.15rem minmax(0, 1fr); }
   .ndx-row-end { grid-column: 2; justify-content: flex-start; }
 }

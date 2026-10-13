@@ -88,13 +88,17 @@ export function ZoneScreen({ context }: { context: Ctx; app: App }) {
         <IsoFrame title={`${facts.label} on the code map`} height="26rem" focus={node.id} />
       </Section>
 
-      <Section title={`Components${components.length ? ` (${components.length})` : ""}`} i={7}>
-        {components.length === 0 ? <Empty command="ndx analyze .">No components catalogued here.</Empty> : <Rows>{components.slice(0, 40).map((c, i) => <RecordRow key={c.id} context={context} node={c} i={i} sub={c.file ?? ""} end={<Badge plain>{c.role ?? ""}</Badge>} />)}</Rows>}
-        {components.length > 40 ? <p className="ndx-small ndx-muted">and {components.length - 40} more</p> : null}
-      </Section>
+      {/* sourcevision catalogues React components only, so most zones have none: an empty section would only say so. */}
+      {components.length > 0 ? (
+        <Section title={`Components (${components.length})`} i={7}>
+          <Rows>{components.slice(0, 40).map((c, i) => <RecordRow key={c.id} context={context} node={c} i={i} sub={c.file ?? ""} end={<Badge plain>{c.role ?? ""}</Badge>} />)}</Rows>
+          {components.length > 40 ? <p className="ndx-small ndx-muted">and {components.length - 40} more</p> : null}
+        </Section>
+      ) : null}
       {files.length > 0 ? (
         <Section title={`Files (${files.length})`} i={8}>
           <Rows>{files.slice(0, 40).map((f, i) => <RecordRow key={f.id} context={context} node={f} i={i} sub={`${f.language ?? ""} · ${f.lineCount ?? 0} lines`} end={null} />)}</Rows>
+          {files.length > 40 ? <p className="ndx-small ndx-muted">and {files.length - 40} more: each file's page names its zone</p> : null}
         </Section>
       ) : null}
       <Section title="Facts" i={9}>

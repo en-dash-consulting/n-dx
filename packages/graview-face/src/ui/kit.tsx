@@ -7,7 +7,8 @@ import type { AnySchema } from "@graview/core";
 import { recordPath, type PageContext } from "@graview/pages";
 import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { current, glance, label, raw, said, statusOf, tokens, toneOfStatus, when, type Node, type Tone } from "../model/graph.js";
+import { current, glance, label, raw, said, statusOf, tokens, toneOfStatus, when, type Node, type Of, type Tone } from "../model/graph.js";
+import { areaStanding } from "../model/work.js";
 
 export type Ctx = PageContext<AnySchema>;
 
@@ -182,7 +183,7 @@ export function RecordCard({ context, node, i = 0, children }: { context: Ctx; n
         {store.schema.tryDefinition(node.kind)?.noun ?? node.kind}
       </span>
       <h3>{label(store, node)}</h3>
-      {children ?? (
+      {children ?? (node.kind === "area" ? <AreaBadges context={context} area={node as Of<"area">} /> : (
         <div className="ndx-badges">
           {seen.map((f) => (
             <Badge key={f.key} tone={f.key === "status" || f.key === "intentStatus" || f.key === "health" ? toneOfStatus(raw(node, f.key)) : undefined} plain={!(f.key === "status" || f.key === "intentStatus" || f.key === "health")}>
@@ -190,8 +191,20 @@ export function RecordCard({ context, node, i = 0, children }: { context: Ctx; n
             </Badge>
           ))}
         </div>
-      )}
+      ))}
     </Link>
+  );
+}
+
+/** An area's card says what it holds, not its slug: a proposed area carries no standing of its own. */
+function AreaBadges({ context, area }: { context: Ctx; area: Of<"area"> }) {
+  const s = areaStanding(context.store, area);
+  if (s.capabilities === 0) return <div className="ndx-badges"><Badge plain>no capabilities yet</Badge></div>;
+  return (
+    <div className="ndx-badges">
+      <Badge tone={s.met === s.capabilities ? "good" : "accent"}>{s.met} of {s.capabilities} met</Badge>
+      {s.open > 0 ? <Badge tone="accent">{s.open} {s.open === 1 ? "change" : "changes"} open</Badge> : null}
+    </div>
   );
 }
 

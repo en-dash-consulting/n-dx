@@ -1383,13 +1383,13 @@
             "headline": "Needs attention"
           },
           {
-            "text": "{count(all('change') where inbox == true)} in the Inbox, {count(all('change') where status == 'blocked')} blocked, {count(all('capability') where health == 'defective')} capabilities defective."
+            "text": "{count(all('change') where inbox == true and status != 'completed' and status != 'cancelled' and status != 'deleted')} in the Inbox, {count(all('change') where status == 'blocked')} blocked, {count(all('capability') where health == 'defective')} capabilities defective."
           },
           {
             "title": "In the Inbox"
           },
           {
-            "list": "all('change') where inbox == true",
+            "list": "all('change') where inbox == true and status != 'completed' and status != 'cancelled' and status != 'deleted'",
             "as": "row",
             "empty": "Nothing waits in the Inbox."
           },
@@ -1477,7 +1477,7 @@
         "headline": "{count(all('capability') where intentStatus == 'met')} of {count(all('capability'))} capabilities met; {count(all('change') where status != 'completed' and status != 'cancelled' and status != 'deleted')} changes open."
       },
       {
-        "text": "{count(all('change') where inbox == true)} in the Inbox, {count(all('change') where status == 'blocked')} blocked, {count(all('run') where status == 'running')} running now."
+        "text": "{count(all('change') where inbox == true and status != 'completed' and status != 'cancelled' and status != 'deleted')} in the Inbox, {count(all('change') where status == 'blocked')} blocked, {count(all('run') where status == 'running')} running now."
       },
       {
         "group": [
@@ -1530,7 +1530,7 @@
         "key": "inbox"
       },
       {
-        "list": "all('change') where inbox == true",
+        "list": "all('change') where inbox == true and status != 'completed' and status != 'cancelled' and status != 'deleted'",
         "sort": {
           "by": "priority",
           "direction": "choices"
@@ -1540,14 +1540,18 @@
         "empty": "Nothing waits in the Inbox."
       },
       {
-        "title": "Changing now",
-        "key": "changing-now"
+        "title": "Open changes",
+        "key": "open-changes"
       },
       {
-        "list": "all('change') where status == 'in_progress'",
+        "list": "all('change') where status != 'completed' and status != 'cancelled' and status != 'deleted'",
+        "sort": {
+          "by": "status",
+          "direction": "choices"
+        },
         "limit": 8,
         "as": "row",
-        "empty": "Nothing is in progress. ndx work . picks the next task."
+        "empty": "No change is open. ndx capture . or ndx plan . adds one."
       },
       {
         "title": "Recent runs",
@@ -1721,7 +1725,7 @@
           "direction": "row"
         },
         {
-          "when": "inbox == true",
+          "when": "inbox == true and status != 'completed' and status != 'cancelled' and status != 'deleted'",
           "show": [
             {
               "text": "In the Inbox: a person confirms what it targets.",
