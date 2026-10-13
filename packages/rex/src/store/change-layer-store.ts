@@ -27,7 +27,8 @@ import { changeLayerFromItems, changeLayerItems, productLayerItems } from "../co
 import { pruneKeepReason } from "../core/prune.js";
 import { findItem, insertChild, removeFromTree, updateInTree, walkTree } from "../core/tree.js";
 import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
+import { projectRootOf } from "@n-dx/llm-client";
 import type { PRDStore, SaveFileReport, StoreCapabilities } from "./contracts.js";
 import { buildSaveFileReport, mergeSaveFileReports } from "./contracts.js";
 import { loadPrdModel, prdLayout, type PrdModel } from "./prd-model-reader.js";
@@ -79,9 +80,10 @@ export class ChangeLayerStore implements PRDStore {
   ): Promise<PrdModelTransactionResult<T>> {
     const out = await withPrdModelTransaction(this.rexDir, mutate, options);
     const abs = (paths: string[]) => paths.map((p) => join(this.rexDir, p));
+    // projectRootOf, not dirname: on the `.ndx/` layout rexDir's parent is the container.
     this.pendingSaveReport = mergeSaveFileReports(
       this.pendingSaveReport,
-      buildSaveFileReport({ writtenPaths: abs(out.written.written), deletedPaths: abs(out.written.deletedFiles) }, dirname(this.rexDir)),
+      buildSaveFileReport({ writtenPaths: abs(out.written.written), deletedPaths: abs(out.written.deletedFiles) }, projectRootOf(this.rexDir)),
     );
     return out;
   }

@@ -99,6 +99,16 @@ describe("ChangeLayerStore save report", () => {
     expect({ written: [...report.written].sort(), deleted: [...report.deleted].sort() }).toEqual(expected);
   });
 
+  it("is relative to the project root on the .ndx/ layout, not to the container", async () => {
+    const rexDir = await copyV2Fixture(join(projectDir, ".ndx", "rex"), "lf");
+    await writeFile(join(rexDir, "config.json"), toCanonicalJSON({ schema: SCHEMA_VERSION, project: "t", adapter: "file" }));
+    const ndxStore = (await resolveStore(rexDir)) as ChangeLayerStore;
+    expect(ndxStore).toBeInstanceOf(ChangeLayerStore);
+
+    await ndxStore.updateItem(TASK, { title: "Wire the Apple Pay button" });
+    expect(takeSaveFileReport(ndxStore)!.written).toContain(".ndx/rex/changes/add-apple-pay/wire-the-button.md");
+  });
+
   it("includes completeV2Work's completion and the product files its apply touched", async () => {
     // Only a pending change completes with its last task.
     await editText(join(projectDir, ".rex/changes/add-apple-pay/state.yaml"), (t) => t.replace('status: "in_progress"', 'status: "pending"'));
