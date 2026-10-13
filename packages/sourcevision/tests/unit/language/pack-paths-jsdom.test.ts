@@ -6,21 +6,23 @@ import { describe, expect, it } from "vitest";
 import { GRAMMAR_BUILD_DIR } from "../../../../lang-runtime/scripts/build-grammars.mjs";
 
 // Under jsdom the global URL is not Node's, so fileURLToPath(new URL(...))
-// throws. The library must still load and resolve its asset paths.
+// throws. The library must still load, find its packs and resolve their asset
+// paths.
 describe("language packs under jsdom", () => {
-  it("imports the pack loader and the Java pack", async () => {
-    const { BUILTIN_PACKS } = await import("../../../src/language/pack.js");
-    const { javaPack } = await import("../../../src/language/java-pack.js");
-    expect(BUILTIN_PACKS).toContain(javaPack);
+  it("loads the Java pack through the pack loader", async () => {
+    const { KNOWN_PACKS, loadPack } = await import("../../../src/language/pack-loader.js");
+    const load = await loadPack(KNOWN_PACKS.find((p) => p.id === "java")!);
+    expect(load.status).toBe("loaded");
   });
 
-  it("resolves the grammar directory", async () => {
-    const { grammarBuildDir } = await import("../../../src/language/package-paths.js");
+  it("resolves sourcevision's grammar directory and version", async () => {
+    const { grammarBuildDir, sourcevisionVersion } = await import("../../../src/language/package-paths.js");
     expect(grammarBuildDir()).toBe(GRAMMAR_BUILD_DIR);
+    expect(sourcevisionVersion()).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  it("resolves query paths to existing files", async () => {
-    const { javaPack } = await import("../../../src/language/java-pack.js");
+  it("resolves the Java pack's query paths to existing files", async () => {
+    const { javaPack } = await import("@n-dx/lang-java");
     expect(javaPack.queries.length).toBeGreaterThan(0);
     for (const q of javaPack.queries) {
       expect(isAbsolute(q.path)).toBe(true);

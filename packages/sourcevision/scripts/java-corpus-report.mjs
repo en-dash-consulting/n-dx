@@ -11,15 +11,16 @@
  * grammar is missing. Never touches the network; clone with
  * java-corpus-clone.mjs. Not part of the test run.
  *
- * Needs `pnpm --filter @n-dx/sourcevision build` and `build-grammars.mjs`.
+ * Needs `pnpm --filter @n-dx/lang-java build` and `pnpm --filter
+ * @n-dx/lang-java build:grammars`; the pack is imported from the workspace.
  */
 
 import { existsSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { grammarWasmPath } from "../../lang-runtime/scripts/build-grammars.mjs";
 import { CLONE_COMMAND, CORPUS_DIR_ENV, checkedOutSha, corpusDir, loadCorpus } from "./java-corpus.mjs";
+import { importWorkspacePack } from "./workspace-pack.mjs";
 
 /** Gate G1: share of files that must parse without ERROR or MISSING nodes. */
 const G1_CLEAN_SHARE = 0.98;
@@ -48,14 +49,10 @@ if (missing.length > 0) {
   process.exit(2);
 }
 
-const wasm = grammarWasmPath("tree-sitter-java");
+const { javaGrammarPath, javaPack } = await importWorkspacePack("@n-dx/lang-java");
+const wasm = javaGrammarPath();
 if (!existsSync(wasm)) {
-  console.error(`${wasm} is not built — run \`node packages/lang-runtime/scripts/build-grammars.mjs\``);
-  process.exit(2);
-}
-const distPack = new URL("../dist/language/java-pack.js", import.meta.url);
-if (!existsSync(distPack)) {
-  console.error("sourcevision is not built — run `pnpm --filter @n-dx/sourcevision build`");
+  console.error(`${wasm} is not built — run \`pnpm --filter @n-dx/lang-java build:grammars\``);
   process.exit(2);
 }
 const runtimeDist = new URL("../../lang-runtime/dist/index.js", import.meta.url);
@@ -64,7 +61,6 @@ if (!existsSync(runtimeDist)) {
   process.exit(2);
 }
 const { createTreeSitterRunner } = await import(runtimeDist.href);
-const { javaPack } = await import(new URL("../dist/language/java-pack.js", import.meta.url).href);
 
 const runner = createTreeSitterRunner({ maxFileBytes: MAX_FILE_BYTES });
 const target = { pack: javaPack, grammarPath: wasm };

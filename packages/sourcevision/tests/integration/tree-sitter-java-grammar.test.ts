@@ -1,17 +1,18 @@
 /**
- * The Java grammar built by scripts/build-grammars.mjs loads in Node through
- * web-tree-sitter and parses Java. The grammar is a local build artifact, so
- * the test skips (with the command to run) when it has not been built, unless
- * SV_REQUIRE_GRAMMARS=1, which CI sets and which makes a missing grammar fail.
+ * The Java grammar `@n-dx/lang-java` builds (its `build:grammars` script)
+ * loads in Node through web-tree-sitter and parses Java. The grammar is a
+ * local build artifact, so the test skips (with the command to run) when it
+ * has not been built, unless SV_REQUIRE_GRAMMARS=1, which CI sets and which
+ * makes a missing grammar fail.
  */
 
 import { describe, expect, it } from "vitest";
 import { Language, Parser } from "web-tree-sitter";
 
-import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
+import { javaGrammarPath } from "@n-dx/lang-java";
 import { skipUnlessGrammar } from "@n-dx/lang-runtime";
 
-const JAVA_WASM = grammarWasmPath("tree-sitter-java");
+const JAVA_WASM = javaGrammarPath();
 
 const SOURCE = `package com.example.orders;
 

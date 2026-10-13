@@ -31,8 +31,13 @@ export * from "./gradle-catalog.js";
 // IaC resource kinds
 export * from "./iac-kinds.js";
 
-// The pack contract: the facts a language pack returns per file
+// The pack contract: the facts a language pack returns per file, and the
+// entry a pack package exports
 export * from "./pack-contract.js";
+export * from "./pack-entry.js";
+
+// Table names in embedded SQL (pure text; shared by the Java and Go packs)
+export * from "./sql-references.js";
 
 // Small parsers
 export * from "./toml-lite.js";

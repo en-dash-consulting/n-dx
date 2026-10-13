@@ -1,179 +1,176 @@
 /**
- * Pack selection and the degrade paths of the pack import graph. The
- * parse-and-resolve path is covered by tests/integration/java-zones.test.ts
- * and tests/integration/imports-go-incremental.test.ts.
+ * Pack selection, how a pack's imports facts become edges, and every way a
+ * pack degrades, over stand-in packs. Real packs through the imports phase
+ * are covered by tests/integration/java-zones.test.ts and
+ * tests/integration/imports-go-incremental.test.ts; the packs' own failure
+ * modes (grammar, queries, build files) by the packs' tests.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { goConfig, javaConfig, type LanguagePackEntry, type PackProjectRequest, type PackProjectResult } from "@n-dx/lang-kit";
 import { buildPackImportGraph, isPackFile, packsFor } from "../../../src/analyzers/pack-imports.js";
-import { goPack } from "../../../src/language/go-pack.js";
-import { goResolver } from "../../../src/language/go-resolver.js";
-import { javaPack } from "../../../src/language/java-pack.js";
-import { grammarBuildDir } from "../../../src/language/package-paths.js";
-import { DEFAULT_MAX_FILE_BYTES, skipUnlessGrammar } from "@n-dx/lang-runtime";
+import { KNOWN_PACKS, type KnownPack } from "../../../src/language/pack-loader.js";
 import type { Inventory } from "../../../src/schema/v1.js";
+
+const VERSION = "1.2.3";
 
 const file = (path: string): Inventory["files"][number] =>
   ({ path, size: 1, language: "Java", lineCount: 1, hash: "x", role: "source", category: "code" }) as Inventory["files"][number];
 
-const GO_WASM = join(grammarBuildDir(), `${goPack.grammar.name}.wasm`);
-const GO_FALLBACK = new Map([[goPack.id, "the regex import parser"]]);
+const GO_FALLBACK = new Map([["go", "the regex import parser"]]);
+
+/** A known pack whose module exports `entry`, or whose import fails with `error`. */
+function knownPack(config: typeof javaConfig, found: { entry?: LanguagePackEntry; error?: Error }): KnownPack {
+  return {
+    id: config.id,
+    packageName: `@n-dx/lang-${config.id}`,
+    config,
+    importByResolution: () => (found.error ? Promise.reject(found.error) : Promise.resolve({ pack: found.entry })),
+  };
+}
+
+/** A pack entry answering every call with `result`, recording the requests. */
+function stubEntry(config: typeof javaConfig, result: PackProjectResult, requests: PackProjectRequest[] = []): LanguagePackEntry {
+  return {
+    packageName: `@n-dx/lang-${config.id}`,
+    version: VERSION,
+    id: config.id,
+    config,
+    produces: ["imports"],
+    analyzeProject: async (request) => (requests.push(request), result),
+  };
+}
+
+const notInstalled = (name: string): Error =>
+  Object.assign(new Error(`Cannot find package '${name}' imported from /x.js`), { code: "ERR_MODULE_NOT_FOUND" });
 
 describe("packsFor", () => {
   it("selects a pack only when the imports phase parses its extension", () => {
-    expect(packsFor(new Set([".ts", ".java"]))).toEqual([javaPack]);
-    expect(packsFor(new Set([".ts", ".go"]))).toEqual([goPack]);
+    const [java, go] = KNOWN_PACKS;
+    expect(packsFor(new Set([".ts", ".java"]))).toEqual([java]);
+    expect(packsFor(new Set([".ts", ".go"]))).toEqual([go]);
     expect(packsFor(new Set([".ts"]))).toEqual([]);
   });
 });
 
 describe("isPackFile", () => {
   it("matches a pack's extensions case-insensitively", () => {
-    expect(isPackFile("src/A.java", [javaPack])).toBe(true);
-    expect(isPackFile("src/A.JAVA", [javaPack])).toBe(true);
-    expect(isPackFile("src/a.ts", [javaPack])).toBe(false);
+    const java = [{ config: javaConfig }];
+    expect(isPackFile("src/A.java", java)).toBe(true);
+    expect(isPackFile("src/A.JAVA", java)).toBe(true);
+    expect(isPackFile("src/a.ts", java)).toBe(false);
     expect(isPackFile("src/A.java", [])).toBe(false);
   });
 });
 
 describe("buildPackImportGraph", () => {
-  let emptyGrammarDir: string;
-
+  let packDir: string;
   beforeAll(() => {
-    emptyGrammarDir = mkdtempSync(join(tmpdir(), "sv-pack-imports-"));
+    packDir = mkdtempSync(join(tmpdir(), "sv-pack-imports-"));
   });
-  afterAll(() => rmSync(emptyGrammarDir, { recursive: true, force: true }));
+  afterAll(() => rmSync(packDir, { recursive: true, force: true }));
+
+  const run = (files: string[], packs: KnownPack[], extra: { fallbacks?: ReadonlyMap<string, string> } = {}) => {
+    const messages: string[] = [];
+    const graph = buildPackImportGraph(files.map(file), "/project", {
+      packs,
+      loader: { packDir, version: VERSION },
+      warn: (m) => messages.push(m),
+      ...extra,
+    });
+    return graph.then((g) => ({ graph: g, messages }));
+  };
 
   it("loads no pack, and reports nothing, when no file belongs to one", async () => {
-    const messages: string[] = [];
-    const graph = await buildPackImportGraph([file("src/a.ts")], emptyGrammarDir, {
-      grammarDir: emptyGrammarDir,
-      warn: (m) => messages.push(m),
-    });
+    const { graph, messages } = await run(["src/a.ts"], [knownPack(javaConfig, { error: new Error("must not be loaded") })]);
     expect(graph).toEqual({ edges: [], external: [], degraded: [] });
     expect(messages).toEqual([]);
   });
 
-  it("reports a missing grammar once, however many files, and produces no edges", async () => {
-    const messages: string[] = [];
-    const graph = await buildPackImportGraph([file("src/A.java"), file("src/B.java")], emptyGrammarDir, {
-      grammarDir: emptyGrammarDir,
-      warn: (m) => messages.push(m),
+  it("hands the pack its language's files and asks only for imports", async () => {
+    const requests: PackProjectRequest[] = [];
+    const entry = stubEntry(javaConfig, { facts: [], unparsed: [] }, requests);
+    await run(["src/A.java", "src/a.ts", "src/B.java"], [knownPack(javaConfig, { entry })]);
+    expect(requests).toEqual([{ projectDir: "/project", files: ["src/A.java", "src/B.java"], kinds: ["imports"] }]);
+  });
+
+  it("turns imports facts into edges and merges externals across files", async () => {
+    const entry = stubEntry(javaConfig, {
+      facts: [
+        {
+          path: "src/A.java",
+          imports: { files: [{ to: "src/B.java", symbols: ["B"] }], external: [{ package: "java.util", symbols: ["List"] }] },
+        },
+        { path: "src/B.java", imports: { files: [], external: [{ package: "java.util", symbols: ["Map"] }] } },
+        { path: "src/C.java" },
+      ],
+      unparsed: [],
     });
+    const { graph, messages } = await run(["src/A.java", "src/B.java", "src/C.java"], [knownPack(javaConfig, { entry })]);
+    expect(graph).toEqual({
+      edges: [{ from: "src/A.java", to: "src/B.java", type: "static", symbols: ["B"] }],
+      external: [{ package: "java.util", importedBy: ["src/A.java", "src/B.java"], symbols: ["List", "Map"] }],
+      degraded: [],
+    });
+    expect(messages).toEqual([]);
+  });
+
+  it("reports a missing pack once, however many files, naming the install command, and produces no edges", async () => {
+    const { graph, messages } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })]);
     expect(graph).toEqual({ edges: [], external: [], degraded: ["java"] });
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("Java files get inventory only");
+    expect(messages).toEqual([
+      "Java: pack @n-dx/lang-java is not installed; Java files get inventory only. " +
+        `Install it with \`npm install --prefix ${packDir} @n-dx/lang-java@${VERSION}\`.`,
+    ]);
   });
 
   it("names the caller's fallback parser, not inventory-only, for a pack that has one", async () => {
-    const messages: string[] = [];
-    const graph = await buildPackImportGraph([file("a.go")], emptyGrammarDir, {
-      grammarDir: emptyGrammarDir,
-      warn: (m) => messages.push(m),
-      fallbacks: GO_FALLBACK,
-    });
+    const { graph, messages } = await run(["a.go"], [knownPack(goConfig, { error: notInstalled("@n-dx/lang-go") })], { fallbacks: GO_FALLBACK });
     expect(graph.degraded).toEqual(["go"]);
     expect(messages).toHaveLength(1);
     expect(messages[0]).toContain("Go imports come from the regex import parser");
     expect(messages[0]).not.toContain("inventory only");
   });
 
-  it("degrades, with one notice, a pack whose resolver it has but whose produces omits imports", async () => {
-    const messages: string[] = [];
-    const pack = { ...goPack, produces: [] };
-    const graph = await buildPackImportGraph([file("a.go")], emptyGrammarDir, {
-      packs: [pack],
-      grammarDir: emptyGrammarDir,
-      warn: (m) => messages.push(m),
-      fallbacks: GO_FALLBACK,
-    });
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["go"] });
+  it("refuses a pack of another version with one notice", async () => {
+    const entry = { ...stubEntry(javaConfig, { facts: [], unparsed: [] }), version: "1.0.0" };
+    const { graph, messages } = await run(["src/A.java"], [knownPack(javaConfig, { entry })]);
+    expect(graph.degraded).toEqual(["java"]);
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain('does not produce "imports"');
-    expect(messages[0]).toContain("Go imports come from the regex import parser");
+    expect(messages[0]).toContain(`pack @n-dx/lang-java@1.0.0 does not match @n-dx/sourcevision@${VERSION}`);
   });
 
-  it("reports an unloadable grammar once, names its path, and produces no edges", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "sv-pack-imports-bad-"));
-    try {
-      const grammarPath = join(dir, `${javaPack.grammar.name}.wasm`);
-      writeFileSync(grammarPath, "not a wasm module");
-      const messages: string[] = [];
-      const graph = await buildPackImportGraph([file("src/A.java"), file("src/B.java")], dir, {
-        grammarDir: dir,
-        warn: (m) => messages.push(m),
-      });
-      expect(graph).toEqual({ edges: [], external: [], degraded: ["java"] });
-      expect(messages).toHaveLength(1);
-      expect(messages[0]).toContain(grammarPath);
-      expect(messages[0]).toContain("could not be loaded");
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+  it("degrades, with one notice and without running it, a pack whose produces omits imports", async () => {
+    const requests: PackProjectRequest[] = [];
+    const entry = { ...stubEntry(goConfig, { facts: [], unparsed: [] }, requests), produces: [] };
+    const { graph, messages } = await run(["a.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["go"] });
+    expect(requests).toEqual([]);
+    expect(messages).toEqual(['Go: the pack does not produce "imports"; Go imports come from the regex import parser.']);
   });
 
-  it(
-    "degrades a pack whose query the loaded grammar rejects, with one notice naming the pack and the error",
-    async (ctx) => {
-      skipUnlessGrammar(ctx, join(grammarBuildDir(), `${javaPack.grammar.name}.wasm`));
-      const dir = mkdtempSync(join(tmpdir(), "sv-pack-imports-query-"));
-      try {
-        const queryPath = join(dir, "bad.scm");
-        writeFileSync(queryPath, "(no_such_node_type) @x");
-        const pack = { ...javaPack, queries: [{ name: "bad", path: queryPath }] };
-        const messages: string[] = [];
-        const graph = await buildPackImportGraph([file("src/A.java"), file("src/B.java")], dir, {
-          packs: [pack],
-          warn: (m) => messages.push(m),
-        });
-        expect(graph).toEqual({ edges: [], external: [], degraded: ["java"] });
-        expect(messages).toHaveLength(1);
-        expect(messages[0]).toContain("Java");
-        expect(messages[0]).toContain("no_such_node_type");
-      } finally {
-        rmSync(dir, { recursive: true, force: true });
-      }
-    },
-  );
-
-  it("degrades, rather than failing, a pack whose resolver cannot read the project's build files", async (ctx) => {
-    skipUnlessGrammar(ctx, GO_WASM);
-    const dir = mkdtempSync(join(tmpdir(), "sv-pack-imports-project-"));
-    try {
-      writeFileSync(join(dir, "a.go"), "package a\n");
-      const pack = { ...goPack, resolver: { ...goResolver, forProject: () => Promise.reject(new Error("go.mod unreadable")) } };
-      const messages: string[] = [];
-      const graph = await buildPackImportGraph([file("a.go")], dir, { packs: [pack], warn: (m) => messages.push(m), fallbacks: GO_FALLBACK });
-      expect(graph).toEqual({ edges: [], external: [], degraded: ["go"] });
-      expect(messages).toHaveLength(1);
-      expect(messages[0]).toContain("go.mod unreadable");
-      expect(messages[0]).toContain("Go imports come from the regex import parser");
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+  it("words a pack's own degraded result as one notice: what failed, what the language gets, how to fix it", async () => {
+    const entry = stubEntry(javaConfig, {
+      facts: [],
+      unparsed: [],
+      degraded: { reason: "grammar tree-sitter-java@0.23.5 is not built (expected /g/tree-sitter-java.wasm)", remedy: "Build it." },
+    });
+    const { graph, messages } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { entry })]);
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"] });
+    expect(messages).toEqual([
+      "Java: grammar tree-sitter-java@0.23.5 is not built (expected /g/tree-sitter-java.wasm); Java files get inventory only. Build it.",
+    ]);
   });
 
-  it("keeps the edge to a Go package whose only file is over the runner's size limit", async (ctx) => {
-    skipUnlessGrammar(ctx, GO_WASM);
-    const dir = mkdtempSync(join(tmpdir(), "sv-pack-imports-oversized-"));
-    try {
-      mkdirSync(join(dir, "pb"));
-      mkdirSync(join(dir, "cmd"));
-      writeFileSync(join(dir, "go.mod"), "module example.com/root\n");
-      writeFileSync(join(dir, "pb", "api.pb.go"), `package pb\n\n// ${"x".repeat(DEFAULT_MAX_FILE_BYTES)}\n`);
-      writeFileSync(join(dir, "cmd", "main.go"), 'package main\n\nimport "example.com/root/pb"\n');
-      const graph = await buildPackImportGraph([file("cmd/main.go"), file("pb/api.pb.go")], dir, { packs: [goPack] });
-      expect(graph).toEqual({
-        edges: [{ from: "cmd/main.go", to: "pb", type: "static", symbols: ["*"] }],
-        external: [],
-        degraded: [],
-      });
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+  it("ends the notice after the outcome when the pack names no remedy", async () => {
+    const entry = stubEntry(goConfig, { facts: [], unparsed: [], degraded: { reason: "the project's build files could not be read (go.mod unreadable)" } });
+    const { messages } = await run(["a.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
+    expect(messages).toEqual([
+      "Go: the project's build files could not be read (go.mod unreadable); Go imports come from the regex import parser.",
+    ]);
   });
 });

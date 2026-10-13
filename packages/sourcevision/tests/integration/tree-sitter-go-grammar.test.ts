@@ -1,17 +1,18 @@
 /**
- * The Go grammar built by scripts/build-grammars.mjs loads in Node through
- * web-tree-sitter and parses Go. The grammar is a local build artifact, so
- * the test skips (with the command to run) when it has not been built, unless
- * SV_REQUIRE_GRAMMARS=1, which CI sets and which makes a missing grammar fail.
+ * The Go grammar `@n-dx/lang-go` builds (its `build:grammars` script) loads in
+ * Node through web-tree-sitter and parses Go. The grammar is a local build
+ * artifact, so the test skips (with the command to run) when it has not been
+ * built, unless SV_REQUIRE_GRAMMARS=1, which CI sets and which makes a
+ * missing grammar fail.
  */
 
 import { describe, expect, it } from "vitest";
 import { Language, Parser } from "web-tree-sitter";
 
-import { grammarWasmPath } from "../../../lang-runtime/scripts/build-grammars.mjs";
+import { goGrammarPath } from "@n-dx/lang-go";
 import { skipUnlessGrammar } from "@n-dx/lang-runtime";
 
-const GO_WASM = grammarWasmPath("tree-sitter-go");
+const GO_WASM = goGrammarPath();
 
 const SOURCE = `package orders
 

@@ -16,6 +16,10 @@ export * from "./runner.js";
 export * from "./pack-calls.js";
 export * from "./pack-facts.js";
 
+// The pack entry a tree-sitter pack package exports, and where its assets live
+export * from "./pack-package.js";
+export * from "./pack-entry.js";
+
 // Test helpers for packs: the grammar gate and the golden harness
 export * from "./testing/grammar.js";
 export * from "./testing/pack-golden.js";

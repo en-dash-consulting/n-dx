@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { LANG_JAVA_PACKAGE } from "../../src/index.js";
+import { isLanguagePackEntry, javaConfig } from "@n-dx/lang-kit";
+import { pack } from "../../src/index.js";
 
 describe("@n-dx/lang-java barrel", () => {
-  it("exports the package name", () => {
-    expect(LANG_JAVA_PACKAGE).toBe("@n-dx/lang-java");
+  it("exports the Java pack entry", () => {
+    expect(isLanguagePackEntry(pack)).toBe(true);
+    expect(pack).toMatchObject({ packageName: "@n-dx/lang-java", id: "java", config: javaConfig, produces: ["imports", "symbols", "calls"] });
   });
 });
