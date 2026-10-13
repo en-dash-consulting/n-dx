@@ -97,6 +97,17 @@ describe("on a v2 project", () => {
     expect(root.querySelector(".pm-container")).not.toBeNull();
   });
 
+  it("a capability that fails to load still offers the way back to the map", async () => {
+    stubRoutes({ "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE } });
+    await mount(h(ProductPage, null));
+    act(() => { root.querySelector<HTMLButtonElement>(".pm-capability-link")!.click(); });
+    await settle();
+
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain("not found");
+    act(() => { root.querySelector<HTMLButtonElement>(".cap-back")!.click(); });
+    expect(root.querySelectorAll(".pm-area")).toHaveLength(PRODUCT_MAP_FIXTURE.areas.length);
+  });
+
   it("the Changes view renders the changes from GET /api/rex/changes", async () => {
     stubRoutes({ "/api/rex/changes": { layout: "v2", changes: CHANGES_FIXTURE } });
     const navigateTo = vi.fn();

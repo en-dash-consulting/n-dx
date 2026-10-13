@@ -86,7 +86,14 @@ function CapabilityFromRoute({ id, onBack }: { id: string; onBack: () => void })
     (body) => body.capability as CapabilityDetail,
   );
   if (load.state === "v1") return h(NoProductLayer, { title: "Product" });
-  if (load.state !== "ready") return h(Pending, { load });
+  if (load.state !== "ready") {
+    // A failed read (the capability was retired since the map loaded) keeps the
+    // way back to the map; without it the page is stuck until a reload.
+    return h("div", { class: "cap-container" },
+      h("button", { type: "button", class: "cap-back", onClick: onBack }, "Product"),
+      h(Pending, { load }),
+    );
+  }
   return h(CapabilityPage, { capability: load.data, onBack });
 }
 
