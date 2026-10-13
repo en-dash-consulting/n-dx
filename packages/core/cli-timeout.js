@@ -31,10 +31,22 @@ const COMMAND_TIMEOUT_DEFAULTS = new Map([
 
 /**
  * Commands that run indefinitely by design (servers, dev watchers).
- * These receive no default timeout — they can only be bounded if the user
- * explicitly sets cli.timeouts.<command> in .n-dx.json.
+ * These receive no default timeout, and the global cli.timeoutMs does not
+ * bound them either — they can only be bounded if the user explicitly sets
+ * cli.timeouts.<command> in .n-dx.json.
  */
 const NO_DEFAULT_TIMEOUT_COMMANDS = new Set(["start", "web", "dev"]);
+
+/**
+ * Subcommands that serve indefinitely under a command that otherwise runs
+ * once: `ndx graview serve` and `ndx graview mcp` are servers, while
+ * `ndx graview emit|check|describe` finish.
+ */
+const SERVER_SUBCOMMANDS = new Map([["graview", new Set(["serve", "mcp"])]]);
+
+function isServer(command, subcommand) {
+  return NO_DEFAULT_TIMEOUT_COMMANDS.has(command) || (SERVER_SUBCOMMANDS.get(command)?.has(subcommand) ?? false);
+}
 
 /**
  * Coerce a config value to a finite non-negative number of milliseconds.
@@ -55,8 +67,8 @@ function toTimeoutMs(value) {
  *
  * Priority (highest first):
  *  1. cli.timeouts.<command> in project config (per-command override)
- *  2. cli.timeoutMs in project config (global override)
- *  3. 0 / no timeout (for long-running server commands)
+ *  2. 0 / no timeout (for long-running server commands)
+ *  3. cli.timeoutMs in project config (global override)
  *  4. COMMAND_TIMEOUT_DEFAULTS (per-command code defaults, e.g. work / self-heal)
  *  5. DEFAULT_TIMEOUT_MS (global fallback)
  *
@@ -64,9 +76,10 @@ function toTimeoutMs(value) {
  *
  * @param {string} command - CLI command name (e.g. "analyze", "work")
  * @param {object} projectConfig - Parsed .n-dx.json content (or empty object)
+ * @param {string} [subcommand] - First positional after the command (e.g. "serve")
  * @returns {number} Timeout in milliseconds, or 0 for no timeout
  */
-export function resolveCommandTimeout(command, projectConfig) {
+export function resolveCommandTimeout(command, projectConfig, subcommand) {
   const cli = projectConfig?.cli ?? {};
 
   // 1. Per-command override takes highest precedence
@@ -76,15 +89,15 @@ export function resolveCommandTimeout(command, projectConfig) {
     return perCommand >= 0 ? perCommand : DEFAULT_TIMEOUT_MS;
   }
 
-  // 2. Global CLI timeout override
+  // 2. Long-running server commands have no timeout unless one names them
+  if (isServer(command, subcommand)) {
+    return 0;
+  }
+
+  // 3. Global CLI timeout override
   const global = toTimeoutMs(cli.timeoutMs);
   if (Number.isFinite(global) && global >= 0) {
     return global;
-  }
-
-  // 3. Long-running server commands have no built-in default timeout
-  if (NO_DEFAULT_TIMEOUT_COMMANDS.has(command)) {
-    return 0;
   }
 
   // 4. Per-command code default (e.g. work / self-heal use a higher threshold)
