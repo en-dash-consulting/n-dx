@@ -27,8 +27,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A failed commit after a held completion must not reopen an applied v2 change](./a-failed-commit-after-a-held.md) | completed |
 | [A placed follow-up's index.md is committed with its completion on v2](./a-placed-follow-up-s-index-md-is.md) | completed |
+| [A v2 completion commit sweeps an operator's untracked draft into a node folder whose state.yaml it wrote](./a-v2-completion-commit-sweeps-an.md) | completed |
 | [An explicit --task on an Inbox change is refused before the run, not reported completed](./an-explicit-task-on-an-inbox-change-is.md) | completed |
 | [An explicit --task refuses a task whose enclosing change another worktree has claimed](./an-explicit-task-refuses-a-task-whose.md) | completed |
+| [Completing a placed change whose Inbox copy was committed leaves the Inbox path in HEAD, giving a duplicate node id](./completing-a-placed-change-whose-inbox.md) | completed |
 | [gateways.md names hench's v2 rex surfaces and its export ceiling](./gateways-md-names-hench-s-v2-rex.md) | completed |
 | [hench briefs a v2 task from its change](./hench-briefs-a-v2-task-from-its-change.md) | completed |
 | [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | completed |
@@ -40,9 +42,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [ndx work --task --resolve on a v2 tree reports a task inside a change another worktree claims as runnable](./ndx-work-task-resolve-on-a-v2-tree.md) | completed |
 | [On a v2 tree hench's brief can drop workflow.md whole when rex's 4,000-token budget runs out](./on-a-v2-tree-hench-s-brief-can-drop.md) | completed |
 | [Pin the review-dedupe wiring to changes/ on a v2 tree](./pin-the-review-dedupe-wiring-to.md) | completed |
+| [prompt-census baseline is stale after the review brief's v2 Inbox clause (+11 tokens in buildReviewBrief)](./prompt-census-baseline-is-stale-after.md) | completed |
 | [Re-record the prompt-census baseline for hench's v2 brief](./re-record-the-prompt-census-baseline.md) | completed |
 | [The completion gate and review captures understand v2](./the-completion-gate-and-review.md) | completed |
 | [The review dedupe sees Inbox changes under changes/inbox/](./the-review-dedupe-sees-inbox-changes.md) | completed |
-| [A v2 completion commit sweeps an operator's untracked draft into a node folder whose state.yaml it wrote](./a-v2-completion-commit-sweeps-an.md) | completed |
-| [Completing a placed change whose Inbox copy was committed leaves the Inbox path in HEAD, giving a duplicate node id](./completing-a-placed-change-whose-inbox.md) | completed |
-| [prompt-census baseline is stale after the review brief's v2 Inbox clause (+11 tokens in buildReviewBrief)](./prompt-census-baseline-is-stale-after.md) | completed |
