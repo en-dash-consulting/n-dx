@@ -31,5 +31,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The Ask panel proposes v2 merges that the v1 rule allows and the v2 rule then refuses at apply](./the-ask-panel-proposes-v2-merges-that.md) | pending |
 | [The dashboard's merge route and refinement merge follow the v2 change-layer merge rules](./the-dashboard-s-merge-route-and.md) | completed |
 | [The PRD cache is built from the change-layer projection on v2](./the-prd-cache-is-built-from-the-change.md) | completed |
-| [The Product, Changes and capability views show real v2 data](./the-product-changes-and-capability.md) | pending |
+| [The Product and Changes views stay stale after a PRD change until the page is reloaded](./the-product-and-changes-views-stay.md) | pending |
+| [The Product, Changes and capability views show real v2 data](./the-product-changes-and-capability.md) | completed |
 | [The v2 refusal of parentId says what to do instead](./the-v2-refusal-of-parentid-says-what.md) | completed |
