@@ -22,7 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A v2 PATCH that both completes and edits a field must not half-apply](./a-v2-patch-that-both-completes-and.md) | pending |
+| [A v2 PATCH that both completes and edits a field must not half-apply](./a-v2-patch-that-both-completes-and.md) | completed |
 | [Bulk status PATCH completes v2 work without rex's v2 completion](./bulk-status-patch-completes-v2-work.md) | completed |
 | [Dashboard misses v2 edits under changes/ when it was created after ndx start](./dashboard-misses-v2-edits-under.md) | completed |
 | [ndx start on a v2 tree with a stray prd.json creates no prd_tree/](./ndx-start-on-a-v2-tree-with-a-stray.md) | pending |

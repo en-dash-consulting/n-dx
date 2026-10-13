@@ -27,12 +27,14 @@ plannedRelease: "1.0.0"
 | [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | completed |
 | [Cut 1.0.0 when the product is ready to advertise](./cut-1-0-0-when-the-product-is-ready-to/index.md) | deferred |
 | [Dashboard on the v2 model](./dashboard-on-the-v2-model/index.md) | pending |
+| [Dashboard renders a v2 project](./dashboard-renders-a-v2-project/index.md) | pending |
 | [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |
 | [Derived status, health and computed edges](./derived-status-health-and-computed-edges/index.md) | completed |
 | [Docs, skills and policies for the v2 model](./docs-skills-and-policies-for-the-v2/index.md) | pending |
 | [Every n-dx commit carries an item trailer](./every-n-dx-commit-carries-an-item/index.md) | completed |
 | [Every PRD tool opens a v2 tree, and none can split it](./every-prd-tool-opens-a-v2-tree-and/index.md) | completed |
 | [Generate the migration plan](./generate-the-migration-plan/index.md) | completed |
+| [hench selects, briefs and completes work on a v2 tree](./hench-selects-briefs-and-completes/index.md) | pending |
 | [MCP tools for the product layer and changes](./mcp-tools-for-the-product-layer-and/index.md) | completed |
 | [Merge driver and bundle format for v2](./merge-driver-and-bundle-format-for-v2/index.md) | completed |
 | [Migrate this repository](./migrate-this-repository/index.md) | pending |
@@ -55,5 +57,3 @@ plannedRelease: "1.0.0"
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
 | [v2 schema and rules before the freeze](./v2-schema-and-rules-before-the-freeze/index.md) | completed |
 | [v2 store transaction for the product and change layers](./v2-store-transaction-for-the-product/index.md) | completed |
-| [hench selects, briefs and completes work on a v2 tree](./hench-selects-briefs-and-completes/index.md) | pending |
-| [Dashboard renders a v2 project](./dashboard-renders-a-v2-project/index.md) | pending |
