@@ -1,0 +1,21 @@
+---
+id: "aa78a8da-4ff4-46b4-86b2-77e67a8814a5"
+level: "task"
+title: "A v2 completion commit sweeps an operator's untracked draft into a node folder whose state.yaml it wrote"
+status: "pending"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "pr-35"
+  - "lane-hench"
+  - "review-2026-10-13"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "A test: an untracked capability .md with no state row in a folder whose state.yaml the completion writes stays out of the completion commit and stays untracked"
+  - "The PROBE4 test in completion-metadata-commit.test.ts still passes unedited"
+description: "Verdict: should-fix (adversarial review of 3b82d7d8a; reachable only once a v2 tree exists, i.e. after the cut).\n\nScenario: while a run works a change that amends product/checkout, an operator drafts a new capability product/checkout/refunds.md (untracked). On completion, the apply writes product/checkout/state.yaml, so the report names it. untrackedIntentFiles (packages/hench/src/agent/lifecycle/shared.ts, called from scopePrdPathsToReport) stages every untracked .md in that folder, and refunds.md lands in \"chore(prd): ... (task X completed)\". This breaks 748b439c0's rule that an operator's in-flight edit under product/ or changes/ stays out of hench's commit. The same applies to a draft task file in the change's own folder.\n\nOptions:\n(a) Recommended: stage an untracked .md only when its frontmatter id has a row in the reported state.yaml. Rows exist only for nodes with state; an operator's draft has none. This is precise. The cost is reading row keys and frontmatter ids, ideally through a rex export via rex-gateway rather than a regex duplicating rex's format.\n(b) Stage only when the folder's index.md is itself untracked, meaning the node is unknown to git. This is cheaper, but it leaves an orphan row for a task file added through MCP to a tracked change."
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-13T18:03:38.906Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
