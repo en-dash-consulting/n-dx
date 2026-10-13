@@ -1,10 +1,26 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir, homedir } from "node:os";
 import { DEFAULT_TIMEOUT, withSandboxedClaudeConfig } from "./e2e-helpers.js";
+
+/**
+ * A full `ndx init` spawns rex, hench and sourcevision init in turn and tries
+ * the Claude MCP registration: two seconds on a developer machine, seven on
+ * the Windows CI runner. This file used to run one per test, several of them
+ * byte-for-byte identical (same fake binary, same flags, same environment) and
+ * differing only in which line of the output they asserted on: 31 runs for 25
+ * tests, 188 s on the Windows leg (run 38193308009), the second-longest file
+ * in the monorepo.
+ *
+ * Where several tests read the same run, that run is now made once in a
+ * `beforeAll` and the tests assert on its captured output. Runs that differ in
+ * their inputs — a failing fake, a missing key, a pre-existing file — are
+ * still made on their own. One `it` per contract is kept so a failure still
+ * names the line that broke.
+ */
 
 const isWin = process.platform === "win32";
 const PATH_SEP = isWin ? ";" : ":";
@@ -105,6 +121,29 @@ function runCapture(args, opts = {}) {
   return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", status: res.status };
 }
 
+/** `process.env` with `dirs` prepended to PATH. */
+function pathEnvWith(...dirs) {
+  return {
+    ...process.env,
+    PATH: `${dirs.join(PATH_SEP)}${PATH_SEP}${process.env.PATH ?? ""}`,
+  };
+}
+
+/**
+ * A fresh project dir and a bin dir holding one fake `codex` that answers "ok".
+ * The pair most runs in this file start from; the caller removes both.
+ */
+async function codexFixture(prefix, { captureArgs = false } = {}) {
+  const projectDir = await mkdtemp(join(tmpdir(), `${prefix}-`));
+  const binDir = await mkdtemp(join(tmpdir(), `${prefix}-bin-`));
+  await writeFakeBinary(join(binDir, "codex"), { stdout: "ok", captureArgs });
+  return { projectDir, binDir };
+}
+
+async function removeDirs(...dirs) {
+  for (const dir of dirs) await rm(dir, { recursive: true, force: true });
+}
+
 describe("fake-CLI fixture hygiene", () => {
   // The defect this pins: the shims captured argv via `$0.args` / `%~f0.args`.
   // Neither searches PATH — `%~f0` "fully qualifies" %0 by prefixing the CURRENT
@@ -142,65 +181,74 @@ describe("fake-CLI fixture hygiene", () => {
       expect(existsSync(join(cwdDir, "fakecli.args"))).toBe(false);
       expect(existsSync(join(cwdDir, "fakecli.cmd.args"))).toBe(false);
     } finally {
-      await rm(binDir, { recursive: true, force: true });
-      await rm(cwdDir, { recursive: true, force: true });
+      await removeDirs(binDir, cwdDir);
     }
   });
 });
 
 describe("n-dx init provider selection", () => {
-  let tmpDir;
+  // ── `init --provider=codex` with Claude registration short-circuited ──────
+  //
+  // Three tests read this one run: the banner, the LLM configuration summary
+  // and the non-TTY summary are all lines of the same output.
+  describe("codex, Claude registration short-circuited", () => {
+    let projectDir;
+    let binDir;
+    let output;
 
-  beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
-  });
-
-  afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
-  });
-
-  it("prompts with codex and claude options only", async () => {
-    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-prompt-"));
-    try {
-      await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
-
-      const output = run(["init", "--provider=codex", tmpDir], {
+    beforeAll(async () => {
+      ({ projectDir, binDir } = await codexFixture("ndx-init-codex"));
+      output = run(["init", "--provider=codex", projectDir], {
         env: {
-          ...process.env,
-          PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
-          // Short-circuit claude MCP registration; this test only asserts on
+          ...pathEnvWith(binDir),
+          // Short-circuit claude MCP registration; these tests only assert on
           // banner/LLM configuration output, not claude behavior. See
           // packages/core/claude-integration.js:306–320.
           CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
         },
       });
+    });
+
+    afterAll(async () => {
+      await removeDirs(binDir, projectDir);
+    });
+
+    it("prompts with codex and claude options only", () => {
       // Banner shows on every init invocation
       expect(output).toContain("En Dash DX");
       expect(output).toContain("n-dx init");
       // Unified summary shows LLM configuration
       expect(output).toContain("LLM configuration");
       expect(output).toMatch(/Provider\s+codex/);
-    } finally {
-      await rm(binDir, { recursive: true, force: true });
-    }
+    });
+
+    it("shows banner and LLM configuration in non-interactive mode", () => {
+      expect(output).toContain("LLM configuration");
+      expect(output).toMatch(/Provider\s+codex/);
+      // Banner always shows on every init invocation
+      expect(output).toContain("En Dash DX");
+    });
+
+    it("shows full summary even in non-TTY environments", () => {
+      expect(output).toContain("n-dx initialized");
+      expect(output).toContain("LLM configuration");
+      expect(output).toMatch(/Provider\s+codex/);
+    });
   });
 
   it("persists selected provider to project settings", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-persist-"));
     try {
       await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}' });
 
-      run(["init", "--provider=claude", tmpDir], {
-        env: {
-          ...process.env,
-          PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
-        },
-      });
+      run(["init", "--provider=claude", tmpDir], { env: pathEnvWith(binDir) });
+
+      const ndxConfig = JSON.parse(await readFile(projectConfigPath(tmpDir), "utf-8"));
+      expect(ndxConfig.llm.vendor).toBe("claude");
     } finally {
-      await rm(binDir, { recursive: true, force: true });
+      await removeDirs(binDir, tmpDir);
     }
-    const ndxConfig = JSON.parse(await readFile(projectConfigPath(tmpDir), "utf-8"));
-    expect(ndxConfig.llm.vendor).toBe("claude");
   });
 
   it("persists both providers through config get pathway", async () => {
@@ -215,81 +263,70 @@ describe("n-dx init provider selection", () => {
       try {
         await writeFakeBinary(join(binDir, provider), { stdout });
 
-        run(["init", `--provider=${provider}`, ...extraFlags, projectDir], {
-          env: {
-            ...process.env,
-            PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
-          },
-        });
+        run(["init", `--provider=${provider}`, ...extraFlags, projectDir], { env: pathEnvWith(binDir) });
 
         const configured = run(["config", "llm.vendor", projectDir]).trim();
         expect(configured).toBe(provider);
       } finally {
-        await rm(binDir, { recursive: true, force: true });
-        await rm(projectDir, { recursive: true, force: true });
+        await removeDirs(binDir, projectDir);
       }
     }
   });
 
-  it("exits non-zero with clear message when selection is cancelled", () => {
-    const result = runFail(["init", tmpDir], { input: "\n" });
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("Init cancelled: no provider selected");
-  });
-
-  it("shows banner and LLM configuration in non-interactive mode", async () => {
-    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-noninteractive-"));
+  it("exits non-zero with clear message when selection is cancelled", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
     try {
-      await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
-
-      const output = run(["init", "--provider=codex", tmpDir], {
-        env: {
-          ...process.env,
-          PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
-          // Short-circuit claude MCP registration to keep the child-process
-          // init under the 20s timeout. This test only checks banner/LLM
-          // output, not claude-specific behavior. See
-          // packages/core/claude-integration.js:306–320.
-          CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
-        },
-      });
-
-      expect(output).toContain("LLM configuration");
-      expect(output).toMatch(/Provider\s+codex/);
-      // Banner always shows on every init invocation
-      expect(output).toContain("En Dash DX");
+      const result = runFail(["init", tmpDir], { input: "\n" });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Init cancelled: no provider selected");
     } finally {
-      await rm(binDir, { recursive: true, force: true });
+      await removeDirs(tmpDir);
     }
   });
 
   describe("provider auth preflight during init", () => {
-    function pathEnvWith(...dirs) {
-      return {
-        ...process.env,
-        PATH: `${dirs.join(PATH_SEP)}${PATH_SEP}${process.env.PATH ?? ""}`,
-      };
-    }
+    // ── `init --provider=codex --no-claude`, authenticated ─────────────────
+    //
+    // The same run the branded-experience tests read: an authenticated codex
+    // init with the Claude surface skipped. `captureArgs` is on because the
+    // auth test's fixture had it; it changes nothing in the output.
+    describe("codex authenticated", () => {
+      let projectDir;
+      let binDir;
+      let output;
 
-    it("completes codex init when authenticated and does not show login prompt", async () => {
-      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-codex-ok-"));
-      try {
-        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok", captureArgs: true });
+      beforeAll(async () => {
+        ({ projectDir, binDir } = await codexFixture("ndx-init-codex-ok", { captureArgs: true }));
+        output = run(["init", "--provider=codex", "--no-claude", projectDir], { env: pathEnvWith(binDir) });
+      });
 
-        const output = run(
-          ["init", "--provider=codex", "--no-claude", tmpDir],
-          { env: pathEnvWith(binDir) },
-        );
+      afterAll(async () => {
+        await removeDirs(binDir, projectDir);
+      });
 
+      it("completes codex init when authenticated and does not show login prompt", () => {
         expect(output).toContain("LLM configuration");
         expect(output).toMatch(/Provider\s+codex/);
         expect(output).not.toContain("Next step: run");
-      } finally {
-        await rm(binDir, { recursive: true, force: true });
-      }
+      });
+
+      describe("branded init experience", () => {
+        it("shows trex mascot banner during init", () => {
+          expect(output).toContain("En Dash DX");
+          expect(output).toContain("n-dx init");
+          expect(output).toContain("n-dx initialized");
+        });
+
+        it("shows assistant surfaces in init summary", () => {
+          expect(output).toContain("Assistant surfaces:");
+          expect(output).toContain("Claude Code");
+          expect(output).toContain("Codex");
+        });
+      });
     });
 
     it("warns but still persists vendor when codex auth is missing (soft preflight)", async () => {
+      const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-codex-fail-"));
       try {
         await writeFakeBinary(join(binDir, "codex"), { stderrLine: "not logged in", exitCode: 7 });
@@ -309,11 +346,12 @@ describe("n-dx init provider selection", () => {
         const ndxConfig = JSON.parse(await readFile(projectConfigPath(tmpDir), "utf-8"));
         expect(ndxConfig.llm.vendor).toBe("codex");
       } finally {
-        await rm(binDir, { recursive: true, force: true });
+        await removeDirs(binDir, tmpDir);
       }
     });
 
     it("completes claude init when authenticated and does not show login prompt", async () => {
+      const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-claude-ok-"));
       try {
         await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}', captureArgs: true });
@@ -327,11 +365,12 @@ describe("n-dx init provider selection", () => {
         expect(output).toMatch(/Provider\s+claude/);
         expect(output).not.toContain("Next step: run");
       } finally {
-        await rm(binDir, { recursive: true, force: true });
+        await removeDirs(binDir, tmpDir);
       }
     });
 
     it("warns but still persists vendor when claude auth is missing (soft preflight)", async () => {
+      const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
       const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-claude-fail-"));
       try {
         await writeFakeBinary(join(binDir, "claude"), { stderrLine: "please login", exitCode: 9 });
@@ -349,7 +388,7 @@ describe("n-dx init provider selection", () => {
         const ndxConfig = JSON.parse(await readFile(projectConfigPath(tmpDir), "utf-8"));
         expect(ndxConfig.llm.vendor).toBe("claude");
       } finally {
-        await rm(binDir, { recursive: true, force: true });
+        await removeDirs(binDir, tmpDir);
       }
     });
   });
@@ -362,182 +401,98 @@ describe("n-dx init provider selection", () => {
      * the live HTTP call) and a format-valid GEMINI_API_KEY.  Missing-key tests
      * omit both so the preflight returns a key-not-found error before any HTTP.
      */
-    function pathEnvWith(...dirs) {
+    function googleEnv(overrides = {}) {
       return {
         ...process.env,
-        PATH: `${dirs.join(PATH_SEP)}${PATH_SEP}${process.env.PATH ?? ""}`,
         // Suppress accidental real HTTP calls in CI by default (overridden per test)
         GEMINI_API_KEY: undefined,
         NDX_TEST_GOOGLE_PREFLIGHT: undefined,
+        ...overrides,
       };
     }
 
-    it("completes google init and persists vendor to config (happy path)", async () => {
-      const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-google-ok-"));
-      try {
-        run(["init", "--provider=google", "--no-claude", projectDir], {
-          env: {
-            ...pathEnvWith(),
-            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
-            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
-          },
-        });
-        const ndxConfig = JSON.parse(await readFile(projectConfigPath(projectDir), "utf-8"));
-        expect(ndxConfig.llm.vendor).toBe("google");
-      } finally {
-        await rm(projectDir, { recursive: true, force: true });
-      }
-    });
+    const HAPPY = {
+      GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
+      NDX_TEST_GOOGLE_PREFLIGHT: "ok",
+    };
 
-    it("shows google in LLM configuration summary after init", async () => {
-      const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-google-summary-"));
-      try {
-        const output = run(["init", "--provider=google", "--no-claude", projectDir], {
-          env: {
-            ...pathEnvWith(),
-            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
-            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
-          },
-        });
-        expect(output).toContain("LLM configuration");
-        expect(output).toMatch(/Provider\s+google/);
-      } finally {
-        await rm(projectDir, { recursive: true, force: true });
-      }
+    // ── the happy path, then a second init over it ──────────────────────────
+    //
+    // One project carries three tests: the first init's config and output, and
+    // the re-init that must keep the vendor without re-prompting. The second
+    // init is made after the first-init assertions' inputs are captured, so
+    // the re-init cannot alter what they read.
+    describe("happy path", () => {
+      let projectDir;
+      let firstOutput;
+      let firstConfig;
+      let secondConfig;
+
+      beforeAll(async () => {
+        projectDir = await mkdtemp(join(tmpdir(), "ndx-init-google-ok-"));
+        // First init
+        firstOutput = run(["init", "--provider=google", "--no-claude", projectDir], { env: googleEnv(HAPPY) });
+        firstConfig = JSON.parse(await readFile(projectConfigPath(projectDir), "utf-8"));
+        // Second init — no --provider flag; should re-use existing config
+        run(["init", "--no-claude", projectDir], { env: googleEnv(HAPPY) });
+        secondConfig = JSON.parse(await readFile(projectConfigPath(projectDir), "utf-8"));
+      });
+
+      afterAll(async () => {
+        await removeDirs(projectDir);
+      });
+
+      it("completes google init and persists vendor to config (happy path)", () => {
+        expect(firstConfig.llm.vendor).toBe("google");
+      });
+
+      it("shows google in LLM configuration summary after init", () => {
+        expect(firstOutput).toContain("LLM configuration");
+        expect(firstOutput).toMatch(/Provider\s+google/);
+      });
+
+      it("skips provider re-prompt when existing config already has google vendor (idempotency)", () => {
+        expect(secondConfig.llm.vendor).toBe("google");
+      });
     });
 
     it("warns with an actionable message but still persists google when GEMINI_API_KEY is absent", async () => {
-      const result = runCapture(["init", "--provider=google", "--no-claude", tmpDir], {
-        env: {
-          ...pathEnvWith(),
-          // Explicitly strip the key and bypass flag so preflight runs for real
-          GEMINI_API_KEY: undefined,
-          NDX_TEST_GOOGLE_PREFLIGHT: undefined,
-        },
-      });
-      // init persists the chosen vendor (so `ndx add`/`work` use Gemini and the
-      // auth error surfaces clearly at use time) and emits a visible warning
-      // instead of silently aborting and reverting to the Claude default.
-      expect(result.status).toBe(0);
-      expect(result.stderr).toContain("No API key configured for Google");
-      expect(result.stderr).toContain("NDX_GOOGLE_PREFLIGHT_NO_KEY");
-      expect(result.stderr).toContain("aistudio.google.com/apikey");
-      expect(result.stderr).toContain("Proceeding anyway");
-
-      const ndxConfig = JSON.parse(await readFile(projectConfigPath(tmpDir), "utf-8"));
-      expect(ndxConfig.llm.vendor).toBe("google");
-    });
-
-    it("skips provider re-prompt when existing config already has google vendor (idempotency)", async () => {
-      const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-google-reuse-"));
+      const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
       try {
-        // First init
-        run(["init", "--provider=google", "--no-claude", projectDir], {
-          env: {
-            ...pathEnvWith(),
-            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
-            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
-          },
+        const result = runCapture(["init", "--provider=google", "--no-claude", tmpDir], {
+          // Explicitly strip the key and bypass flag so preflight runs for real
+          env: googleEnv({ GEMINI_API_KEY: undefined, NDX_TEST_GOOGLE_PREFLIGHT: undefined }),
         });
-        // Second init — no --provider flag; should re-use existing config
-        run(["init", "--no-claude", projectDir], {
-          env: {
-            ...pathEnvWith(),
-            GEMINI_API_KEY: "AIzaFakeTestKey12345678901234567890",
-            NDX_TEST_GOOGLE_PREFLIGHT: "ok",
-          },
-        });
-        const ndxConfig = JSON.parse(await readFile(projectConfigPath(projectDir), "utf-8"));
+        // init persists the chosen vendor (so `ndx add`/`work` use Gemini and the
+        // auth error surfaces clearly at use time) and emits a visible warning
+        // instead of silently aborting and reverting to the Claude default.
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("No API key configured for Google");
+        expect(result.stderr).toContain("NDX_GOOGLE_PREFLIGHT_NO_KEY");
+        expect(result.stderr).toContain("aistudio.google.com/apikey");
+        expect(result.stderr).toContain("Proceeding anyway");
+
+        const ndxConfig = JSON.parse(await readFile(projectConfigPath(tmpDir), "utf-8"));
         expect(ndxConfig.llm.vendor).toBe("google");
       } finally {
-        await rm(projectDir, { recursive: true, force: true });
+        await removeDirs(tmpDir);
       }
     });
   });
 
   describe("branded init experience", () => {
-    it("shows trex mascot banner during init", async () => {
-      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-phases-"));
-      try {
-        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
-
-        const output = run(["init", "--provider=codex", "--no-claude", tmpDir], {
-          env: {
-            ...process.env,
-            PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
-          },
-        });
-
-        expect(output).toContain("En Dash DX");
-        expect(output).toContain("n-dx init");
-        expect(output).toContain("n-dx initialized");
-      } finally {
-        await rm(binDir, { recursive: true, force: true });
-      }
-    });
-
-    it("shows assistant surfaces in init summary", async () => {
-      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-recap-"));
-      try {
-        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
-
-        const output = run(["init", "--provider=codex", "--no-claude", tmpDir], {
-          env: {
-            ...process.env,
-            PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
-          },
-        });
-
-        expect(output).toContain("Assistant surfaces:");
-        expect(output).toContain("Claude Code");
-        expect(output).toContain("Codex");
-      } finally {
-        await rm(binDir, { recursive: true, force: true });
-      }
-    });
-
     it("produces no ANSI escape codes when NO_COLOR is set", async () => {
-      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-nocolor-"));
+      const { projectDir, binDir } = await codexFixture("ndx-init-nocolor");
       try {
-        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
-
-        const output = run(["init", "--provider=codex", "--no-claude", tmpDir], {
-          env: {
-            ...process.env,
-            NO_COLOR: "1",
-            PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
-          },
+        const output = run(["init", "--provider=codex", "--no-claude", projectDir], {
+          env: { ...pathEnvWith(binDir), NO_COLOR: "1" },
         });
 
         expect(output).not.toMatch(/\x1b\[/);
         // Content still present
         expect(output).toContain("n-dx initialized");
       } finally {
-        await rm(binDir, { recursive: true, force: true });
-      }
-    });
-
-    it("shows full summary even in non-TTY environments", async () => {
-      const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-quiet-"));
-      try {
-        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
-
-        const output = run(["init", "--provider=codex", tmpDir], {
-          env: {
-            ...process.env,
-            PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
-            // Short-circuit claude MCP registration; this test checks the
-            // non-TTY summary, not claude-specific output. See
-            // packages/core/claude-integration.js:306–320.
-            CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
-          },
-        });
-
-        expect(output).toContain("n-dx initialized");
-        expect(output).toContain("LLM configuration");
-        expect(output).toMatch(/Provider\s+codex/);
-      } finally {
-        await rm(binDir, { recursive: true, force: true });
+        await removeDirs(binDir, projectDir);
       }
     });
   });
@@ -548,10 +503,7 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
     await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
     run(["init", "--provider=codex", "--no-claude", projectDir], {
       timeout: 50_000,
-      env: {
-        ...process.env,
-        PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
-      },
+      env: pathEnvWith(binDir),
     });
   }
 
@@ -585,8 +537,7 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
       const second = await readFile(attrPath, "utf-8");
       expect(second).toBe(first);
     } finally {
-      await rm(binDir, { recursive: true, force: true });
-      await rm(projectDir, { recursive: true, force: true });
+      await removeDirs(binDir, projectDir);
     }
   }, 120_000);
 
@@ -616,8 +567,7 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
       expect(gitConfig("merge.rex-prd.driver")).toBe("rex merge-driver %O %A %B");
       expect(gitConfig("merge.rex-state.driver")).toBe("rex merge-state %O %A %B %P");
     } finally {
-      await rm(binDir, { recursive: true, force: true });
-      await rm(projectDir, { recursive: true, force: true });
+      await removeDirs(binDir, projectDir);
     }
   }, 120_000);
 
@@ -640,8 +590,7 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
       }).trim();
       expect(driver).toBe("my-custom-driver %O %A %B");
     } finally {
-      await rm(binDir, { recursive: true, force: true });
-      await rm(projectDir, { recursive: true, force: true });
+      await removeDirs(binDir, projectDir);
     }
   }, 60_000);
 
@@ -663,8 +612,7 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
       expect(merged).toMatch(/\.ndx\/hench\/\*\*\/\*\.json\s+text eol=lf/);
       expect(merged).toMatch(/CLAUDE\.md\s+text eol=lf/);
     } finally {
-      await rm(binDir, { recursive: true, force: true });
-      await rm(projectDir, { recursive: true, force: true });
+      await removeDirs(binDir, projectDir);
     }
   }, 60_000);
 });
@@ -747,8 +695,7 @@ describe("claude CLI discovery diagnostics", () => {
 
       const result = runFail(["init", "--provider=codex", tmpDir], {
         env: {
-          ...process.env,
-          PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+          ...pathEnvWith(binDir),
           CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
         },
       });
@@ -784,8 +731,7 @@ describe("init establishes the folder layout", () => {
     return run(["init", "--provider=codex", projectDir], {
       timeout: 50_000,
       env: {
-        ...process.env,
-        PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}`,
+        ...pathEnvWith(binDir),
         CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
       },
     });
@@ -846,8 +792,7 @@ describe("init establishes the folder layout", () => {
       // the repository root, so it stays there on both layouts.
       expect(existsSync(join(projectDir, ".mcp.json"))).toBe(true);
     } finally {
-      await rm(binDir, { recursive: true, force: true });
-      await rm(projectDir, { recursive: true, force: true });
+      await removeDirs(binDir, projectDir);
     }
   }, 120_000);
 
@@ -880,8 +825,7 @@ describe("init establishes the folder layout", () => {
         ).toBe(true);
       }
     } finally {
-      await rm(binDir, { recursive: true, force: true });
-      await rm(projectDir, { recursive: true, force: true });
+      await removeDirs(binDir, projectDir);
     }
   }, 120_000);
 });

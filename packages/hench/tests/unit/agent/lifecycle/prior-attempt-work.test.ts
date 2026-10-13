@@ -23,9 +23,6 @@ describe("findPriorAttemptWork", () => {
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "hench-prior-attempt-"));
     git(dir, ["init"]);
-    git(dir, ["config", "user.email", "test@test.com"]);
-    git(dir, ["config", "user.name", "Test"]);
-    git(dir, ["config", "core.autocrlf", "false"]);
     git(dir, ["checkout", "-b", "main"]);
     await mkdir(join(dir, "src"));
     await writeFile(join(dir, "README.md"), "base\n");

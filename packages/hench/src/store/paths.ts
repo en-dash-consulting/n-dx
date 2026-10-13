@@ -29,6 +29,7 @@ import {
   type LayoutMode,
   type ResolveLayoutOptions,
 } from "../prd/llm-gateway.js";
+import { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../prd/rex-gateway.js";
 
 /** Which tool's state directory {@link stateDirNameUnder} is asked about. */
 export type StateDirKey = "rex" | "hench" | "sourcevision";
@@ -85,17 +86,36 @@ export function stateDirNameUnder(which: StateDirKey, mode: LayoutMode): string 
  * "no changes", skipped the test gate, and could never complete.
  */
 const REX_BOOKKEEPING_ENTRIES: readonly string[] = [
-  "prd_tree/",
-  ".cache/",
+  // Names rex owns, read from it rather than spelled again here: a rename on
+  // rex's side that this list did not follow would silently stop discounting
+  // the thing it names.
+  `${PRD_TREE_DIRNAME}/`,
+  `${PRD_CACHE_DIRNAME}/`,
   "execution-log.jsonl",
   // `core/execution-log.ts` rotates at 1 MB and keeps exactly one generation.
   // Listed rather than glob-matched: `matchesProjectPath` compares literals,
   // and a second generation would be a change in rex, not a silent gap here.
   "execution-log.1.jsonl",
-  "tree-meta.json",
+  TREE_META_FILENAME,
   "archive.json",
   "pending-proposals.json",
   "acknowledged-findings.json",
+  // Locks and the backup store. The blanket `.rex/` prefix this list replaced
+  // covered them; `rex init` does not, because it appends only
+  // n-dx_workflow.md, execution-log*.jsonl and the derived cache — the lock
+  // and backup patterns live in the ndx.gitignore block an operator pastes by
+  // hand. On a project that skipped that paste they are untracked, so a lock
+  // held while the end-of-run snapshot is taken (the dashboard, an MCP write)
+  // read as the run's own changed work and fired the full-suite gate.
+  //
+  // Literals rather than rex's constants: PRD_LOCK_FILENAME and
+  // RESHAPE_LOCK_FILENAME are not on rex's public surface, and widening it for
+  // three file names would cost more than it buys. Same reasoning as
+  // execution-log.1.jsonl above.
+  "prd.lock",
+  "prd.json.lock",
+  "reshape.lock",
+  ".backups/",
 ];
 
 /**

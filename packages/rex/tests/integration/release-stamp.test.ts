@@ -82,7 +82,6 @@ beforeEach(async () => {
   execFileSync("git", ["init", "-q", "-b", "main", repo]);
   git("config", "user.email", "dev@example.com");
   git("config", "user.name", "Dev");
-  git("config", "commit.gpgsign", "false");
   await cp(V2_FIXTURE, rexDir, { recursive: true });
   await editText(join(rexDir, CHANGE_STATE), (t) => t.replace('status: "in_progress"', 'status: "completed"'));
   git("add", ".rex");

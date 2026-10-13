@@ -14,10 +14,10 @@
  * @see packages/hench/src/cli/commands/run-resolve.ts
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
 import { resolveModel, NEWEST_MODELS, REVIEW_MODELS, TIER_MODELS } from "@n-dx/llm-client";
@@ -81,11 +81,35 @@ function codes(r: RunResolution): RunRefusalCode[] {
   return r.refusals.map((x) => x.code);
 }
 
+/**
+ * The project every test starts from: PRD, config and a baseline commit, built
+ * once and copied into a fresh directory per test. A test still gets a tree of
+ * its own to dirty, claim or corrupt; what it no longer pays for is the git
+ * init, add, commit and rev-parse that built the baseline, per test, for 41
+ * tests — about ten times dearer on the Windows CI runner, where this file
+ * took 71 s against 5 s on Linux (run 38193308009). A git repository is
+ * relocatable, so the copy reports the same toplevel, branch and HEAD a fresh
+ * build would.
+ */
+let templateDir: string;
+
+beforeAll(async () => {
+  let templateRexDir: string;
+  ({ projectDir: templateDir, rexDir: templateRexDir } = await setupProjectDir("hench-resolve-template-"));
+  await (await resolveStore(templateRexDir)).saveDocument(DOC as never);
+  await writeFile(join(templateDir, ".n-dx.json"), JSON.stringify({ llm: CLAUDE }), "utf-8");
+  commitGitFixtureBaseline(templateDir);
+});
+
+afterAll(async () => {
+  await cleanupProjectDir(templateDir);
+});
+
 beforeEach(async () => {
-  ({ projectDir, henchDir, rexDir } = await setupProjectDir("hench-resolve-"));
-  await (await resolveStore(rexDir)).saveDocument(DOC as never);
-  await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: CLAUDE }), "utf-8");
-  commitGitFixtureBaseline(projectDir);
+  projectDir = await mkdtemp(join(tmpdir(), "hench-resolve-"));
+  henchDir = join(projectDir, ".hench");
+  rexDir = join(projectDir, ".rex");
+  await cp(templateDir, projectDir, { recursive: true });
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 

@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -189,6 +189,47 @@ describe("repointRun over a rebased branch", () => {
     for (const match of report.moved) {
       expect(match.rule).toBe("author-date-subject");
     }
+  });
+
+  it("still re-points after the old objects are pruned, from the facts the run recorded", async () => {
+    // Review finding on #679. Rex rejects a SHA missing from the repository
+    // before any twin rule runs, so until the recorded facts were passed in
+    // they were never read — in exactly the case they exist for. The twin key
+    // is author email + author date + subject, which is why authorEmail is
+    // recorded alongside the other two.
+    //
+    // Pruning is destructive and the fixture repo is shared across this file,
+    // so it happens in a copy.
+    const pruned = join(root, "pruned-repo");
+    await cp(repo, pruned, { recursive: true });
+    const inPruned = (args: string[]): string =>
+      execFileSync("git", args, { cwd: pruned, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+
+    const record = recordBeforeRebase();
+    const email = inPruned(["log", "-1", "--format=%ae", after.startHead]);
+    record.startHeadCommit = {
+      ...record.startHeadCommit!,
+      authorEmail: email,
+      authorDate: inPruned(["log", "-1", "--format=%aI", before.startHead]),
+    };
+    record.commits = record.commits!.map((c) => ({
+      ...c,
+      authorEmail: email,
+      authorDate: inPruned(["log", "-1", "--format=%aI", c.sha]),
+    }));
+
+    // Drop every way back to the pre-rebase objects, then collect them.
+    inPruned(["checkout", "--quiet", "main"]);
+    inPruned(["update-ref", "-d", "refs/heads/feature"]);
+    inPruned(["reflog", "expire", "--expire=now", "--all"]);
+    inPruned(["gc", "--prune=now", "--quiet"]);
+    expect(() => inPruned(["cat-file", "-e", `${before.work}^{commit}`])).toThrow();
+
+    const { run, report } = await repointRun(record, { repoDir: pruned, ref: "main" });
+
+    expect(report.unmatched).toEqual([]);
+    expect(run.commits?.map((c) => c.sha)).toEqual([after.work, after.repair]);
+    for (const match of report.moved) expect(match.rule).toBe("author-date-subject");
   });
 
   it("drops the baseline's stale facts rather than keeping them beside a new SHA", async () => {
