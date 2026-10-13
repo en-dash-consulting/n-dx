@@ -148,6 +148,29 @@
 .live-peek-open { display: block; margin-top: var(--space-2); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border); color: var(--accent); font-weight: 600; font-size: 12px; text-decoration: none; }
 .live-peek-open:hover { text-decoration: underline; }
 
+/* Beside search on the right; search keeps its auto margin when the map is absent. */
+.topnav-map {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 5px var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.topnav-map:hover { border-color: var(--text-muted); }
+.topnav-map:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
+.topnav-map--quiet { color: var(--text-muted); }
+span.topnav-map--quiet { cursor: default; }
+.topnav-map-out { color: var(--text-muted); }
+.topnav-map + .topnav-search { margin-left: 0; }
+
 .topnav-search {
   margin-left: auto;
   min-width: 220px;
@@ -636,6 +659,7 @@
   /* The product hints drop; Live has none to drop, and keeps its dot and count. */
   .topnav-search-label, .topnav-subtitle, .topnav-tab-hint { display: none; }
   .topnav-search { min-width: 0; }
+  .topnav-map-label { display: none; }
   .settings-overlay-nav { width: 200px; }
 }
 

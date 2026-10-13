@@ -28,6 +28,7 @@ import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
 import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
+import { handleGraviewRoute, shutdownGraviewFace, startGraviewFaceAtBoot } from "./routes-graview.js";
 import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
 import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
@@ -162,6 +163,7 @@ export function registerShutdownHandlers(
     const [henchResult, rexResult] = await Promise.all([
       shutdownActiveExecutions(),
       shutdownRexExecution(),
+      shutdownGraviewFace(),
     ]);
     // Runs that just ended remove their notes file from a `.finally`; wait for it.
     await settleContextNotesRemovals();
@@ -786,6 +788,7 @@ async function handleApiRoutes(
   if (await handleWorkspacesRoute(req, res, registry)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
+  if (await handleGraviewRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
   if (await handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
@@ -1120,6 +1123,8 @@ export async function startServer(
   const token = opts.tokenFile ? ensureAuthToken(opts.tokenFile) : null;
   const ws = createWebSocketManager({ healthTracker: wsHealthTracker, token });
   const watcherHandles = registerWatchers(ctx, watcher, ws, assets.viewerPath);
+  // features.graview.productFace: the product map comes up with the dashboard.
+  startGraviewFaceAtBoot(ctx);
 
   // Start heartbeat monitor — periodically checks for unresponsive tasks and
   // broadcasts alerts via WebSocket.

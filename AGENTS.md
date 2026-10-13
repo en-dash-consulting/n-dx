@@ -234,6 +234,7 @@ The following skills are installed in `.agents/skills/`. Each skill directory co
 - **ndx-config** `[key] [value]` — View or change n-dx configuration with guided assistance
 - **ndx-reshape** — Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps, create new containers
 - **ndx-feedback** `[description]` — Submit feedback, bug reports, or feature requests for n-dx
+- **ndx-graview** — Run the product map (the Graview face) on this project, walk its pages and report what is wrong
 - **ndx-adversarial-review** `[task-id | name | topic]` — Attack a change or a completion claim, triage what breaks, and capture only what the user approves
 
 ## MCP Servers

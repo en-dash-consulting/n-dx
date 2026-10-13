@@ -237,6 +237,17 @@ depends on. So:
   on the fresh projection (`NDX_GRAVIEW_DIR`). The declaration carries
   glance, page groups, brand, the home and per-kind card, row and page
   blocks as data, so the face adds React and nothing about the graph.
+- **The dashboard links to it.** Once it listens, the face records its URL
+  and pid in `face.json` in the graview dir and removes it when it stops;
+  `ndx graview info` and the dashboard's `GET /api/graview/face` read it, and
+  the dashboard's top bar shows a **Product map** link while a face is
+  running. With `features.graview.productFace` on (experimental, off by
+  default), the dashboard starts `ndx graview serve` itself at startup, offers
+  **Start map** if none is running, and stops the face it started when it
+  shuts down. Without `--port` the face takes 5188 or the next free port, so
+  several checkouts each serve their own.
+
 ## Deferred
 
-- **Dashboard embed and graview.cloud publishing.**
+- **Dashboard embed and graview.cloud publishing.** The dashboard links to
+  the face; it does not frame it.

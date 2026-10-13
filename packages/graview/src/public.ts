@@ -36,6 +36,8 @@ export type { SnapshotHeader, SnapshotPart } from "./snapshot-file.js";
 export { resolveGraviewCommand, readGraviewConfig, GRAVIEW_BIN_ENV, GRAVIEW_NPX_ENV } from "./graview-bin.js";
 export type { GraviewCommand, GraviewBinSource, GraviewConfig, ResolveGraviewOptions } from "./graview-bin.js";
 export { canonicalJson } from "./canonical.js";
+export { runningFace, FACE_FILENAME } from "./face.js";
+export type { RunningFace } from "./face.js";
 export { rexMcpEndpoint, hubPort, DEFAULT_HUB_PORT } from "./hub.js";
 export type { RexEndpoint } from "./hub.js";
 export type { GraphSnapshot, SnapshotNode, SnapshotEdge } from "./types.js";

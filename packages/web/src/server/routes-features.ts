@@ -31,7 +31,7 @@ interface FeatureDefinition {
   label: string;
   description: string;
   impact: string;
-  package: "sourcevision" | "rex" | "hench";
+  package: "sourcevision" | "rex" | "hench" | "graview";
   stability: "experimental" | "stable" | "deprecated";
   defaultValue: boolean;
 }
@@ -140,6 +140,16 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     description: "Allow the agent to dynamically adjust its workflow based on task complexity and past performance.",
     impact: "May change execution parameters between runs. Provides better results but less predictable behavior.",
     package: "hench",
+    stability: "experimental",
+    defaultValue: false,
+  },
+  // ── Graview ───────────────────────────────────────────────────────
+  {
+    key: "graview.productFace",
+    label: "Product Map",
+    description: "Start the product map (the Graview face over this project's PRD, analysis and runs) with the dashboard, and link to it from the top bar. The link shows whenever a map is running, flag or not; this flag starts one.",
+    impact: "Runs `ndx graview serve` beside the dashboard: an emit of the projection, then a Vite server on port 5188 or the next free one. Needs @n-dx/graview-face installed.",
+    package: "graview",
     stability: "experimental",
     defaultValue: false,
   },
