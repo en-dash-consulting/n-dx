@@ -31,6 +31,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [n-dx on Graview: declared design and a custom pages face, in n-dx's own words](./n-dx-on-graview-declared-design-and-a.md) | completed |
 | [ndx graview check fits the emitted snapshot to the declaration, not only the declaration](./ndx-graview-check-fits-the-emitted.md) | pending |
 | [Promote the rex v2 reader and derived-edge computations to the public API](./promote-the-rex-v2-reader-and-derived.md) | completed |
+| [Reproducible graview checks and documented naming divergences from rex](./reproducible-graview-checks-and.md) | pending |
 | [The face and the adapter take Graview 0.1.22 and drop the workarounds it answers](./the-face-and-the-adapter-take-graview.md) | completed |
 | [The graview binary never downloads silently: npx only on explicit opt-in, otherwise an install hint](./the-graview-binary-never-downloads.md) | pending |
 | [Two-way writes through Graview's SyncEngine with rex as the system of record](./two-way-writes-through-graview-s.md) | completed |

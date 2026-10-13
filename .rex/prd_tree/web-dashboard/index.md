@@ -24,7 +24,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Geometric Decorative Design System for ndx UI](./geometric-decorative-design-system-for/index.md) | completed |
 | [Item completion timeline view](./item-completion-timeline-view/index.md) | completed |
 | [Live tab: watch every running task and analysis from one place](./live-tab-watch-every-running-task-and/index.md) | completed |
-| [Live view: completed-run summaries for tasks and analyses](./live-view-completed-run-summaries-for/index.md) | pending |
 | [Live view plumbing: stream running hench and analyze progress to the dashboard](./live-view-plumbing-stream-running/index.md) | pending |
 | [N-Rex Easter Egg — Triple-Click Dino Takeover](./n-rex-easter-egg-triple-click-dino/index.md) | completed |
 | [ndx as the single CLI interface](./ndx-as-the-single-cli-interface/index.md) | completed |

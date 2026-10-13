@@ -29,7 +29,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [a docs-only change to a page a full-root test validates (README.md, docs/guide/*.md, docs/cli-ui-gap.md) selects no suite](./a-docs-only-change-to-a-page-a-full.md) | pending |
-| [a new artifact read by a root-subset test but missing from VALIDATED_ARTIFACTS is not detected](./a-new-artifact-read-by-a-root-subset.md) | pending |
 | [a validated test or docs artifact changed on its own selects the suite that checks it](./a-validated-test-or-docs-artifact.md) | completed |
 | [Absorb gate flakes: re-run only the failed suites once before failing an unattended run](./absorb-gate-flakes-re-run-only-the.md) | completed |
 | [affected mode never runs run-options-contract, catalog-runtime-contract or prd-slug-conformance for the package-source change they police](./affected-mode-never-runs-run-options.md) | completed |

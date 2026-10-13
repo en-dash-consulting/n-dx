@@ -53,5 +53,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [The live analysis page's last-run times and estimate filter on exact mode, so cascade runs get none in phases 1-3 or an old run's](./the-live-analysis-page-s-last-run.md) | completed |
 | [The live analysis page shows an older dashboard run's output and error against a newer terminal-started run](./the-live-analysis-page-shows-an-older.md) | completed |
 | [The Live machine strip's vendor and model ignore the default vendor and hench model overrides, disagreeing with the effective config](./the-live-machine-strip-s-vendor-and.md) | completed |
+| [Turn the Live analysis page into a what-changed summary when the analysis finishes](./turn-the-live-analysis-page-into-a.md) | pending |
+| [Turn the Live task page into the run summary when the run finishes](./turn-the-live-task-page-into-the-run.md) | pending |
 | [vendorPid is not recorded while the review pass and the warm-parent orientation spawn are running](./vendorpid-is-not-recorded-while-the.md) | completed |
 | [Write the hench run log incrementally while the run is in progress](./write-the-hench-run-log-incrementally.md) | completed |
