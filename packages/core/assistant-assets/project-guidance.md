@@ -78,7 +78,8 @@ Rules:
 - **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in the owning package's `AGENTS.md` (e.g. "Web viewer gateway boundary" in `packages/web/AGENTS.md`).
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
-See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are in `packages/web/AGENTS.md`; core's injection-seam registry (the `cli.js` → `pair-programming.js` `registerChild` seam) is in `packages/core/AGENTS.md`; `@n-dx/llm-client`'s is in `packages/llm-client/AGENTS.md`.
+Per-package gateways, exemptions and seam registries are in that package's
+`AGENTS.md`; the pattern reference is `PACKAGE_GUIDELINES.md`.
 
 **Package-level guidance lives in `packages/<pkg>/AGENTS.md`.** Zone policies, seam registries and any other note that governs one package belong there, because every assistant reads a package's `AGENTS.md`. The `CLAUDE.md` beside it is a one-line `@AGENTS.md` import and holds nothing of its own; `tests/e2e/instruction-alignment.test.js` fails a package that breaks either half of that pair.
 
@@ -86,13 +87,8 @@ See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-pa
 
 When a new feature requires crossing a tier boundary, use this decision rule:
 
-| Signal | Use spawn (child process) | Use gateway module (direct import) |
-|--------|--------------------------|-----------------------------------|
-| Caller tier | Orchestration (cli.js, ci.js, web.js) | Execution or Domain |
-| Data flow | Fire-and-forget or exit-code only | Structured return values needed in-process |
-| Frequency | Per-command (once per CLI invocation) | Per-request (hot path, many calls per second) |
-| Error handling | Exit code + stderr is sufficient | Caller needs typed errors, retries, or partial results |
-| State sharing | None (each spawn is stateless) | Shared in-memory state (e.g. PRDStore instance) |
+The signal table — caller tier, data flow, frequency, error handling, state
+sharing — is in [docs/architecture/overview.md](docs/architecture/overview.md).
 
 **Rules of thumb:**
 - Orchestration-tier scripts **always spawn** — they must not `import` from packages (exception: `config.js` for cross-package config reads).
@@ -103,44 +99,31 @@ When a new feature requires crossing a tier boundary, use this decision rule:
 
 The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) share mutable state files on disk. Concurrent execution rules:
 
-| Command pair | Safe? | Notes |
-|-------------|-------|-------|
-| `ndx start` + `ndx status` | ✅ | Status is read-only |
-| `ndx start` + `ndx work` | ✅ | Hench writes to `.hench/runs/`; the server reads the folder tree via `.rex/.cache/prd.json` (refreshed by file watcher) |
-| `ndx start` + `ndx plan` | ⚠️ | Plan rewrites the folder tree; the server's tree watcher refreshes `.rex/.cache/prd.json` automatically, but a restart flushes all in-process caches. |
-| `ndx ci` + `ndx work` | ❌ | Both may write `.sourcevision/` plus the folder tree and sync files concurrently |
-| `ndx plan` + `ndx work` | ❌ | Both write the folder tree (`.rex/prd_tree/`) |
-| `ndx refresh` + any write command | ❌ | Refresh writes `.sourcevision/` and rebuilds web assets |
-| `ndx config` + `ndx config` | ❌ | Concurrent config writes may lose updates (no file locking) |
+`ndx status` and `ndx usage` are read-only and safe against anything. `ndx start` runs alongside `ndx work`, and tolerates `ndx plan` — though a restart is what flushes its in-process caches. Never pair two writers: `ndx ci` with `ndx work`, `ndx plan` with `ndx work`, `ndx refresh` with any write command, or two `ndx config` runs. The full table is in [docs/architecture/overview.md](docs/architecture/overview.md#concurrency).
 
 **General rule:** Commands that write to the PRD backend (`.rex/prd_tree/`), `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
 **MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced.
 
-**What the code enforces.** The MCP write tools, the dashboard's PRD-writing
-routes and the bulk restructurers (`reorganize`, `prune`, `reshape`) do their
-read-modify-write inside `store.withTransaction`, which holds the PRD file lock
-for the whole span. `saveDocument` always takes the lock, and a writer that
-cannot acquire it fails loudly naming the holder's PID rather than proceeding.
-
-**The lock is per workspace**, one per `rexDir`: two worktrees of the same
-repository write their own trees in parallel without contending, so the lock is
-no help across them. Every dashboard route and MCP session writes the worktree
-it was addressed for and no other.
-
-**What remains operator discipline.** Other CLI write paths (`analyze`/`plan`
-imports, `update`, `move`, `remove`, `fix`) still load→mutate→save: the lock
-serializes their write but does not merge concurrent changes, so the last
-full-document writer wins. Do not run them alongside another PRD writer.
-
-Full reasoning, including the bundle and narrative carve-outs:
+**What the code enforces, and what does not.** PRD-writing MCP tools,
+dashboard routes and bulk restructurers read-modify-write inside
+`store.withTransaction`, which holds the PRD file lock for the whole span; a
+writer that cannot take the lock fails loudly naming the holder's PID. The
+lock is per workspace, one per `rexDir`, so it does not serialize two
+worktrees. Other CLI write paths (`analyze`/`plan` imports, `update`, `move`,
+`remove`, `fix`) still load→mutate→save, so the last full-document writer
+wins — do not run them alongside another PRD writer. Full reasoning, and the
+bundle and narrative carve-outs:
 [docs/architecture/prd-write-concurrency.md](docs/architecture/prd-write-concurrency.md).
 
 **PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
 
-**Bundle carve-out.** `ndx prd export` (`rex export`) writes the PRD to a single JSON file, and this does not breach the invariant above: the bundle is a *transport artifact*, written only to an operator-chosen path outside `.rex/`, never read as a PRD backend and never a write target for a PRD mutation. `ndx prd import` (`rex import-bundle`) rebuilds the folder tree through the normal store write path, inside `store.withTransaction`. Refusing an output path anywhere inside `.rex/` is enforced in code — the tree is the obvious hazard, but the legacy backend paths `.rex/prd.md` and `.rex/prd.json` would be *read as the PRD* on a checkout without the tree. Note that `ndx export` is a different command — it publishes the static dashboard.
-
-**Narrative carve-out.** `ndx prd export --format=narrative` writes prose Markdown to an operator-chosen path outside `.rex/`, under the same refusal. It is a *report*, not a transport artifact: deliberately lossy and one-way, with ids, folder slugs and status/priority values omitted by construction. Nothing imports it — the JSON bundle is the only round-trip surface. Do not add a narrative parser.
+**Export carve-outs.** `ndx prd export` writes a JSON bundle, and
+`--format=narrative` writes prose Markdown; both go to an operator-chosen
+path outside `.rex/`, enforced in code, and neither is a PRD backend. The
+bundle round-trips through `rex import-bundle`; the narrative is one-way and
+lossy by construction — do not add a parser for it. (`ndx export` is a
+different command: it publishes the static dashboard.)
 
 <!-- ADDENDUM -->
 
@@ -163,7 +146,11 @@ Full reasoning, including the bundle and narrative carve-outs:
 
 **Design invariant:** Both `AGENTS.md` and `CLAUDE.md` derive their base project documentation (Packages, Architecture, Commands, Key Files) from `project-guidance.md`. Vendor-specific additions are layered on top — never inlined into the shared template. This prevents instruction drift between assistant surfaces.
 
-**What goes in `claude-addendum.md`:** only guidance about Claude Code's own behaviour — today, that it loads a package's `CLAUDE.md` when work happens under that directory. Anything describing the *codebase* (zone governance, gateway rules, the concurrency contract and PRD invariant) belongs in `project-guidance.md`, because a section placed in the addendum never reaches `AGENTS.md`. `tests/e2e/instruction-alignment.test.js` fails on an addendum heading that is not on its Claude-only allowlist.
+**What goes in `claude-addendum.md`:** only guidance about Claude Code's own
+behaviour. Anything describing the *codebase* belongs in
+`project-guidance.md`, because a section in the addendum never reaches
+`AGENTS.md`; `tests/e2e/instruction-alignment.test.js` fails an addendum
+heading that is not on its Claude-only allowlist.
 
 Re-run `ndx init` to regenerate all instruction files after changes to `packages/core/assistant-assets/`.
 
@@ -241,13 +228,6 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 | `.rex/prd.md` | (Legacy) flat Markdown PRD; migration source for `rex migrate-to-folder-tree`. Absent after migration. |
 | `.rex/prd.json` | (Legacy) JSON PRD; migration source when neither `prd.md` nor the tree exists. |
 | `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
-| `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
-| `.hench/usage-cursors/` | Per-session watermarks recording how far through a Claude Code transcript `hench record` has already attributed tokens (machine-local; safe to delete) |
-| `.sourcevision/.cache/judgments.json` | Content-addressed cache of Jev answers (question + the state slice it references → answer). Consulted per question inside `askJev`; only misses are sent. Machine-local; safe to delete — the next run re-asks |
-| `.sourcevision/.cache/narration.log` | Output of the detached `sv narrate` child that `analyze` spawns for escalated zones in cascade mode; `manifest.narration` holds its status. Machine-local; safe to delete |
-| `.sourcevision/.cache/analyses.jsonl` | One line per `sv analyze` run — mode, wall-clock per phase, calls/tokens/time per LLM task class (the same record as `manifest.lastAnalysis`, kept for the last 200 runs). Machine-local; safe to delete |
-| `.sourcevision/.cache/analyze-progress.json` | Live progress of the current or last `sv analyze` — phase, enrichment pass, batch k of n, LLM use so far — rewritten as the run moves and marked complete/failed at the end; served as `progress` on `GET /api/commands/sv-analyze/status`. Read it through `readAnalyzeProgress`, which reports a `running` file as `interrupted` when its pid is dead or, where `ps` can tell, now belongs to another program. Machine-local; safe to delete |
-| `.n-dx-web-usage.jsonl` | Dashboard LLM spend ledger — one line per Ask call (vendor, model, token classes, outcome). Read by the LLM Utilization view as the `web` package bucket; not attributed to any PRD item. Machine-local; safe to delete |
 | `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
 | `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |
@@ -256,5 +236,10 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 | `tests/e2e/cli-dev.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `OPEN_SOURCE_SCOPE.md` | Licensing boundaries, included/excluded components, and contribution expectations |
+
+Derived files an assistant never edits — the sourcevision caches, the hench
+usage cursors, the archive and the dashboard spend ledger — are described in
+[docs/architecture/generated-files.md](docs/architecture/generated-files.md).
+All of them are machine-local and safe to delete.
 
 > **PRD file layout.** Subtasks are encoded as sections within the parent task's `index.md` (not separate directories). `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running — do not read it from code outside the web server, and never commit it (`rex init` gitignores it; hench's completion gate discounts it, so a run made while the dashboard is up is not refused over the watcher's rewrite). See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
