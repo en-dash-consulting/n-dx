@@ -27,7 +27,7 @@ plannedRelease: "1.0.0"
 | [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | completed |
 | [Cut 1.0.0 when the product is ready to advertise](./cut-1-0-0-when-the-product-is-ready-to/index.md) | deferred |
 | [Dashboard on the v2 model](./dashboard-on-the-v2-model/index.md) | pending |
-| [Dashboard renders a v2 project](./dashboard-renders-a-v2-project/index.md) | completed |
+| [Dashboard renders a v2 project](./dashboard-renders-a-v2-project/index.md) | pending |
 | [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |
 | [Derived status, health and computed edges](./derived-status-health-and-computed-edges/index.md) | completed |
 | [Docs, skills and policies for the v2 model](./docs-skills-and-policies-for-the-v2/index.md) | pending |
