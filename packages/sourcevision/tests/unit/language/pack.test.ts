@@ -17,6 +17,7 @@ const pack: LanguagePack = {
   config: goConfig,
   grammar: { name: "tree-sitter-fake", version: "1.2.3" },
   queries: [{ name: "structure", path: "/packs/fake/structure.scm" }],
+  produces: [],
   provenance: {
     structure: {
       verifiedAgainst: ["tree-sitter-fake@1.2.3"],

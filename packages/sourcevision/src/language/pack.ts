@@ -3,8 +3,10 @@
  *
  * A pack bundles a language's {@link LanguageConfig} (unchanged) with what
  * structure extraction needs: a pinned grammar built to WASM, named query
- * files, an optional reference resolver, optional build-file readers, and a
- * provenance record for every rule it ships.
+ * files, an optional reference resolver, and a provenance record for every
+ * rule it ships. What a pack yields to the rest of sourcevision is lang-kit's
+ * per-file facts, read from its captures by `pack-facts.ts`; build files are
+ * read by lang-kit's build readers into `ModuleBuildModel`.
  *
  * Packs are internal to sourcevision: there is no public plugin API and no
  * loading of packs from outside this package. Languages without a pack keep
@@ -21,7 +23,15 @@ import { join } from "node:path";
 import { buildGrammarsScript, grammarBuildDir } from "./package-paths.js";
 import { goPack } from "./go-pack.js";
 import { javaPack } from "./java-pack.js";
-import type { LanguageConfig } from "@n-dx/lang-kit";
+import type {
+  ExternalModule,
+  ExternalReference,
+  FactProducer,
+  FileReference,
+  FileReferences,
+  LanguageConfig,
+  SourcePosition,
+} from "@n-dx/lang-kit";
 
 // ── Pack contract ───────────────────────────────────────────────────────────
 
@@ -51,17 +61,12 @@ export interface RuleProvenance {
   readonly source: string;
 }
 
-/** A position in a file. Matches the schema's call-graph positions. */
-export interface SourcePosition {
-  /** One-based line. */
-  readonly line: number;
-  /**
-   * Zero-based column in UTF-16 code units — web-tree-sitter parses the
-   * JavaScript string, so this indexes the line as `String.prototype` does,
-   * not by UTF-8 byte.
-   */
-  readonly column: number;
-}
+/**
+ * Positions are lang-kit's: one-based line, zero-based column in UTF-16 code
+ * units. web-tree-sitter parses the JavaScript string, so its columns already
+ * index the line as `String.prototype` does, not by UTF-8 byte.
+ */
+export type { SourcePosition };
 
 /** One node captured by a pack query. */
 export interface Capture {
@@ -85,40 +90,8 @@ export interface PackSourceFile {
   readonly captures: Readonly<Record<string, readonly Capture[]>>;
 }
 
-/** A project file one file refers to, with the names that led there. */
-export interface FileReference {
-  /**
-   * Project-relative path of the target file. A language whose imports name a
-   * package directory (Go) gives the directory; the zones phase expands it to
-   * the files beneath (`resolveEdgeTarget` in `analyzers/zones.ts`).
-   */
-  readonly to: string;
-  /** Sorted, distinct; `*` for a wildcard import. */
-  readonly symbols: readonly string[];
-}
-
-/** The build-system module an external package comes from, when the resolver knows it. */
-export interface ExternalModule {
-  readonly path: string;
-  readonly version?: string;
-}
-
-/** A package outside the project that one file refers to. */
-export interface ExternalReference {
-  /** Package name, e.g. `java.util`. No version. */
-  readonly package: string;
-  /** Sorted, distinct; `*` for a wildcard import. */
-  readonly symbols: readonly string[];
-  /** Held in memory only; the imports schema has no field for it. */
-  readonly module?: ExternalModule;
-}
-
-/** Everything one file refers to. Both lists are sorted and deduplicated. */
-export interface FileReferences {
-  /** Never contains the file itself. */
-  readonly files: readonly FileReference[];
-  readonly external: readonly ExternalReference[];
-}
+/** What a resolver returns is lang-kit's imports fact. */
+export type { ExternalModule, ExternalReference, FileReference, FileReferences };
 
 /**
  * Resolves references to files. Resolution needs an index of the whole
@@ -147,21 +120,6 @@ export interface PreparedResolver {
   resolve(fromFile: string): FileReferences;
 }
 
-/** A dependency declared in a build file. */
-export interface DeclaredDependency {
-  readonly name: string;
-  readonly version?: string;
-  readonly scope?: string;
-}
-
-/** Reads one kind of build file (e.g. `pom.xml`) into declared facts. */
-export interface BuildFileReader {
-  /** Filenames this reader handles. */
-  readonly filenames: readonly string[];
-  /** Parse a build file's content. `path` is project-relative. */
-  read(path: string, content: string): { readonly dependencies: readonly DeclaredDependency[] };
-}
-
 /** Reserved: framework rules layered on a language pack. Not implemented yet. */
 export interface FrameworkPack {
   readonly id: string;
@@ -173,8 +131,12 @@ export interface PreciseIndexSource {
   readonly kind: "scip";
 }
 
-/** Everything sourcevision needs to analyze one language through tree-sitter. */
-export interface LanguagePack {
+/**
+ * Everything sourcevision needs to analyze one language through tree-sitter.
+ * `produces` names the lang-kit fact kinds `pack-facts.ts` reads from this
+ * pack's captures (and, for `imports`, its resolver).
+ */
+export interface LanguagePack extends FactProducer {
   /** Same as `config.id`. */
   readonly id: string;
   /** The language's existing registry config, unchanged. */
@@ -182,7 +144,6 @@ export interface LanguagePack {
   readonly grammar: GrammarLocator;
   readonly queries: readonly PackQuery[];
   readonly resolver?: PackResolver;
-  readonly buildReaders?: readonly BuildFileReader[];
   /** One record per rule, keyed by rule name (every query name at least). */
   readonly provenance: Readonly<Record<string, RuleProvenance>>;
   /** Reserved — see {@link FrameworkPack}. */

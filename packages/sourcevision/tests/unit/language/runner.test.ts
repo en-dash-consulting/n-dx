@@ -71,6 +71,7 @@ function makePack(queries: { name: string; scm: string }[]): LanguagePack {
       writeFileSync(path, scm);
       return { name, path };
     }),
+    produces: [],
     provenance: {},
   };
 }
@@ -267,6 +268,7 @@ describe("size limit", () => {
       config: goConfig,
       grammar: { name: "no-such-grammar", version: "0.0.0" },
       queries: [],
+      produces: [],
       provenance: {},
     },
   };

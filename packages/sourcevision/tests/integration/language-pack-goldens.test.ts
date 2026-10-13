@@ -48,6 +48,7 @@ describe("harness over a stand-in pack", () => {
         config: { ...goConfig, extensions: new Set([".java"]) },
         grammar: { name: "tree-sitter-java", version: "0.23.5" },
         queries: [{ name: "methods", path: join(dir, "methods.scm") }],
+        produces: [],
         provenance: {},
       },
     };

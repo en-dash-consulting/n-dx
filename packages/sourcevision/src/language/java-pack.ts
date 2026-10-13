@@ -37,6 +37,7 @@ export const javaPack: LanguagePack = {
     return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
   },
   resolver: javaResolver,
+  produces: ["imports", "symbols", "calls"],
   provenance: {
     packages: VERIFIED,
     imports: VERIFIED,

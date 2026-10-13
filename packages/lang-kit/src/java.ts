@@ -20,8 +20,8 @@ import type { LanguageConfig } from "./registry.js";
  *   are inventoried as `generated`.
  * - `entryPointPatterns` is empty. A class is an entry point when it
  *   declares `public static void main`, which a file name cannot show; the
- *   Java pack's `entry_point.main` capture (`queries/java/methods.scm`)
- *   reports those methods instead.
+ *   Java pack's `entry_point.main` rule (sourcevision's
+ *   `queries/java/methods.scm`) reports those methods instead.
  */
 export const javaConfig: LanguageConfig = {
   id: "java",

@@ -16,6 +16,7 @@
  * @module sourcevision/language/java-sql
  */
 
+import type { CallFact } from "@n-dx/lang-kit";
 import type { Capture } from "./pack.js";
 import { contains, groupCalls, innermost } from "./pack-calls.js";
 import {
@@ -151,7 +152,7 @@ interface FileFacts {
   readonly imports: ReadonlySet<string>;
   readonly annotations: readonly Annotation[];
   readonly entities: readonly Entity[];
-  readonly calls: ReadonlyArray<ReturnType<typeof groupCalls>[number]>;
+  readonly calls: readonly CallFact[];
 }
 
 function readFile(file: ParsedFile): FileFacts {
@@ -258,7 +259,7 @@ export function extractJavaEmbeddedSql(files: readonly ParsedFile[]): JavaEmbedd
     }
 
     for (const call of file.calls) {
-      if (call.name === undefined || !JDBC_METHODS.has(call.name)) continue;
+      if (call.callee === undefined || !JDBC_METHODS.has(call.callee)) continue;
       if (call.receiver === undefined || !JDBC_RECEIVER.test(call.receiver)) continue;
       for (const literal of call.strings) {
         const { text, textBlock } = javaStringValue(literal.text);
@@ -270,7 +271,7 @@ export function extractJavaEmbeddedSql(files: readonly ParsedFile[]): JavaEmbedd
             path: file.path,
             line: ref.line,
             origin: "call",
-            via: `JdbcTemplate.${call.name}`,
+            via: `JdbcTemplate.${call.callee}`,
           });
         }
       }

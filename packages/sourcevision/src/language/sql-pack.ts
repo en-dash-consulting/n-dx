@@ -44,5 +44,7 @@ export const sqlPack: LanguagePack = {
   get queries() {
     return [{ name: "tables", path: join(queryDir("sql"), "tables.scm") }];
   },
+  // A CREATE TABLE is a symbol of kind "table"; see `pack-facts.ts`.
+  produces: ["symbols"],
   provenance: { tables: VERIFIED },
 };
