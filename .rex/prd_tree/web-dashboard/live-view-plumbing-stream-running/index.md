@@ -16,8 +16,9 @@ acceptanceCriteria:
   - "One endpoint lists every running hench run and long job across the repository's worktrees, with the same 5-minute stale rule the bottom bar uses today."
   - "Run records, manifests and run logs written before this change still load; every schema change is an optional field."
 description: "The dashboard cannot show what a running task or analysis is doing. Hench writes `.run-logs/<ts>-<runId>.log` once, at run end (`packages/hench/src/store/run-log.ts`, called from `agent/lifecycle/shared.ts`), and no route serves it. `RunRecord.events` is only filled in verbose mode. The run's pid exists only in the web server's audit entry, and only for dashboard-started runs. The one live line (`TaskExecutionStatus.lastOutput`) is parsed from stdout of dashboard-started runs, so terminal-started runs show nothing but heartbeat counters. Sourcevision analyze prints `[phase N] Name...` lines and sets `manifest.modules[*].status`, but the web server keeps only the last 3,000 characters of stdout for a dashboard-launched analyze and exposes no structured phase, pass or batch progress.\n\nThis feature adds the data the Live tab needs, all additive: an incremental run log, a structured per-run progress event stream, the pid on the run record, structured analyze progress, tail routes and WebSocket frames, and one aggregate endpoint listing everything live across the repository's worktrees. It must work the same for runs started from a terminal and from the dashboard.\n\nGoal: Every running hench task and sourcevision analysis can be watched step by step from the dashboard, whoever started it and in whichever worktree it runs."
-lastModified: "2026-10-01T00:17:38.610Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-13T19:53:28.396Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children

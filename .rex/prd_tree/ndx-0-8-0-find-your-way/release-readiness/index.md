@@ -15,7 +15,8 @@ acceptanceCriteria:
   - "The release note lists every redirect and every new config key."
   - "After the publish, every package has a 0.8.0 git tag and a GitHub release."
 description: "Gate work for the 0.8.0 release: audit the changesets (scoped package names, minor bumps where the epic calls for them), regenerate docs/cli-ui-gap.md, the viewer architecture document and the README command reference, run the navigation contract, compare each shipped page against its wireframe and record the differences in the task rather than dropping them, run the package vulnerability scan, and write the release note listing every redirect added and every new configuration key.\n\n0.7.1 fixed the release plumbing this relies on: a publish now creates one git tag and one GitHub release per package, and the dependency audit is clean, so for 0.8.0 the vulnerability scan confirms rather than fixes.\n\nGoal: 0.8.0 ships with its documentation, contracts and release note matching what was built."
-lastModified: "2026-09-25T18:12:46.000Z"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-13T19:52:33.736Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 

@@ -9,6 +9,7 @@ acceptanceCriteria:
   - "Three consecutive green local runs per package after the change"
   - "web's per-suite wall time on Windows drops by at least a third"
 description: "Each package vitest config becomes two test.projects: unit with isolate: false, and isolated holding every file that uses vi.mock, vi.doMock, vi.resetModules or process.chdir, listed as a literal include. Order: web, sourcevision, llm-client, rex, hench. State leaks are fixed in tests, never hidden by moving a file to the isolated project unless it mocks."
-lastModified: "2026-10-12T14:52:05.457Z"
+assignee: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-10-13T19:52:59.976Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

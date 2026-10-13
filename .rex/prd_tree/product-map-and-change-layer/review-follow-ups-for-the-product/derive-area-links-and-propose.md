@@ -15,6 +15,7 @@ acceptanceCriteria:
   - "The migration plan proposes dependsOn between two capabilities that share a test file (test)"
   - "Capabilities that share nothing get no proposed dependsOn and no area edge (test)"
 description: "v2 has no area-level edge and the migration proposes no dependsOn (0 of 309 capabilities in the 2026-10-09 run, while 67 test files are shared by capabilities in different areas). Roll capability coChanges and shared test files up to a computed area-level edge in packages/rex/src/core/product-edges.ts, and let the migration plan propose dependsOn where capabilities share tests or code. The roll-up is computed, so it adds no schema field; showing it in get_product would be an additive MCP change and needs a release-note entry under the soft freeze. Background: workshop rex-improvements.md RX18."
-lastModified: "2026-10-10T05:16:45.030Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-13T19:52:28.420Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
