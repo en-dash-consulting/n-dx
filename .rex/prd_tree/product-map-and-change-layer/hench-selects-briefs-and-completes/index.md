@@ -28,6 +28,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A failed commit after a held completion must not reopen an applied v2 change](./a-failed-commit-after-a-held.md) | pending |
 | [hench briefs a v2 task from its change](./hench-briefs-a-v2-task-from-its-change.md) | completed |
 | [hench's completion on a v2 tree bypasses change-completion and never applies the change](./hench-s-completion-on-a-v2-tree.md) | completed |
+| [hench's precise bookkeeping list discounts a v2 tree's product/ and changes/](./hench-s-precise-bookkeeping-list.md) | completed |
 | [hench selects v2 work and finds a task by id](./hench-selects-v2-work-and-finds-a-task.md) | completed |
 | [hench stages only the change-layer paths in rex's save report on a v2 completion](./hench-stages-only-the-change-layer.md) | pending |
 | [hench writes status, completion and claims through the v2 transaction](./hench-writes-status-completion-and.md) | completed |
@@ -36,4 +37,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Pin the review-dedupe wiring to changes/ on a v2 tree](./pin-the-review-dedupe-wiring-to.md) | pending |
 | [Re-record the prompt-census baseline for hench's v2 brief](./re-record-the-prompt-census-baseline.md) | completed |
 | [The completion gate and review captures understand v2](./the-completion-gate-and-review.md) | completed |
-| [hench's precise bookkeeping list discounts a v2 tree's product/ and changes/](./hench-s-precise-bookkeeping-list.md) | pending |
