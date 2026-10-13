@@ -285,11 +285,11 @@ describe("Quick Add on a v2 PRD", () => {
 
     await post(port, "/api/rex/smart-add-accept", {
       text: "Support refunds when paying by card",
-      parentId: "CH-12",
+      parentId: "epic-1",
     });
 
     const { args } = execCalls[0];
-    expect(args[args.indexOf("--parent") + 1]).toBe("CH-12");
+    expect(args[args.indexOf("--parent") + 1]).toBe("epic-1");
   });
 
   it("refuses an empty accept without spawning rex", async () => {
@@ -299,8 +299,8 @@ describe("Quick Add on a v2 PRD", () => {
     expect(execCalls).toHaveLength(0);
   });
 
-  it("refuses a parentId that is not an item id, so it can never reach argv as a flag", async () => {
-    for (const parentId of ["--parent", "-x", "CH 12", "a/b", ""]) {
+  it("refuses a parentId the PRD does not contain, so request text never reaches argv", async () => {
+    for (const parentId of ["--parent", "-x", "CH 12", "a/b", "", "epic-2", "EPIC-1"]) {
       const res = await post(port, "/api/rex/smart-add-accept", {
         text: "Support refunds when paying by card",
         parentId,

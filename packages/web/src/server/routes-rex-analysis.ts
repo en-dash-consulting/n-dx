@@ -117,18 +117,27 @@ function v2AcceptedChanges(parsed: unknown): RexChangeRow[] | null {
 }
 
 /**
- * Whether a request's `parentId` has the shape of a PRD item id, so it can be
- * handed to `rex add --parent` as one argv token.
+ * The PRD's own id for a request's `parentId`, or null when the PRD holds no
+ * such item.
  *
- * An item id is a UUID or a v2 display id (`CH-12`, `A1.2`): letters, digits,
- * dots and dashes, never a leading dash. The child is spawned without a shell,
- * so this is not about quoting — it is about a value that starts with `-`
- * being read by the CLI's own parser as a flag rather than as the parent, and
- * about keeping request text off the command line unchecked
- * (CodeQL js/command-line-injection).
+ * The value handed to `rex add --parent` is the string read from the PRD, not
+ * the one read from the request. The child is spawned without a shell, so this
+ * is not about quoting — it is that a request value starting with `-` would be
+ * read by the CLI's own parser as a flag, and more generally that nothing from
+ * the request belongs on a command line unchecked (CodeQL
+ * js/command-line-injection). A shape check (a regexp) would be enough in
+ * practice but is not something that analysis recognises; an id that provably
+ * came from the tree is. The dashboard can only offer a scope the loaded
+ * document contains, so a legitimate request always resolves.
  */
-function isValidParentId(value: unknown): value is string {
-  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9.-]{0,63}$/.test(value);
+function resolveParentId(ctx: ServerContext, requested: unknown): string | null {
+  if (typeof requested !== "string" || requested === "") return null;
+  const doc = loadPRDSync(ctx.rexDir);
+  if (!doc) return null;
+  for (const id of collectAllIds(doc.items)) {
+    if (id === requested) return id;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1035,8 +1044,9 @@ async function handleSmartAddPreview(
     // Use rex CLI add (smart mode) with --format=json (no --accept = preview mode).
     // Pass description via --description flag (not positional) to prevent any
     // stale UI text from being concatenated into the argument list.
-    if (input.parentId !== undefined && !isValidParentId(input.parentId)) {
-      errorResponse(res, 400, "parentId is not an item id");
+    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
+    if (parentId === null) {
+      errorResponse(res, 400, "parentId does not name an item in this PRD");
       return true;
     }
 
@@ -1046,7 +1056,7 @@ async function handleSmartAddPreview(
     // within the timeout from a daemonized server. The user-driven CLI
     // `n-dx add` keeps the configured top-tier model.
     const args = ["add", "--format=json", "--fast", "--description", description];
-    if (input.parentId) args.push("--parent", input.parentId);
+    if (parentId !== undefined) args.push("--parent", parentId);
     args.push(ctx.projectDir);
 
     const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
@@ -1159,8 +1169,9 @@ async function handleSmartAddAccept(
       errorResponse(res, 400, "Text is required");
       return true;
     }
-    if (input.parentId !== undefined && !isValidParentId(input.parentId)) {
-      errorResponse(res, 400, "parentId is not an item id");
+    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
+    if (parentId === null) {
+      errorResponse(res, 400, "parentId does not name an item in this PRD");
       return true;
     }
 
@@ -1176,7 +1187,7 @@ async function handleSmartAddAccept(
       writeFileSync(descriptionFile, description, "utf-8");
 
       const args = ["add", "--format=json", "--accept", `--file=${descriptionFile}`];
-      if (input.parentId !== undefined) args.push("--parent", input.parentId);
+      if (parentId !== undefined) args.push("--parent", parentId);
       args.push(ctx.projectDir);
 
       const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
@@ -1265,8 +1276,9 @@ async function handleBatchImport(
       }
     }
 
-    if (input.parentId !== undefined && !isValidParentId(input.parentId)) {
-      errorResponse(res, 400, "parentId is not an item id");
+    const parentId = input.parentId === undefined ? undefined : resolveParentId(ctx, input.parentId);
+    if (parentId === null) {
+      errorResponse(res, 400, "parentId does not name an item in this PRD");
       return true;
     }
 
@@ -1289,7 +1301,7 @@ async function handleBatchImport(
 
       // Build rex CLI args: add --format=json --file=<f1> --file=<f2> ...
       const args = ["add", "--format=json"];
-      if (input.parentId) args.push("--parent", input.parentId);
+      if (parentId !== undefined) args.push("--parent", parentId);
       if (input.accept) args.push("--accept");
       for (const fp of filePaths) {
         args.push(`--file=${fp}`);
