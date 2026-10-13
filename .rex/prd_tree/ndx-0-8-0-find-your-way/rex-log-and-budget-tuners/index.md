@@ -30,4 +30,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Fix the dashboard's duplicate tuners, which recommend a token budget below the arrival cost](./fix-the-dashboard-s-duplicate-tuners.md) | completed |
 | [Make the adaptive and workflow tuners measure run cost in the same token classes as checkTokenBudget](./make-the-adaptive-and-workflow-tuners.md) | completed |
 | [Make the tuners' context-write floor hold when no cached run completed, and harden the two threshold tests](./make-the-tuners-context-write-floor.md) | completed |
-| [Set the prune defaults from the 0.7.1 post-release measurement batch](./set-the-prune-defaults-from-the-0-7-1.md) | pending |
+| [Measure the prune defaults on an API-loop batch](./measure-the-prune-defaults-on-an-api.md) | pending |
+| [Set the prune defaults from the 0.7.1 post-release measurement batch](./set-the-prune-defaults-from-the-0-7-1.md) | completed |

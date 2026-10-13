@@ -347,6 +347,47 @@ describe("ConversationPruner", () => {
 });
 
 /**
+ * The values hench ships, pinned as literals.
+ *
+ * Every other test here is written against the exported symbols, so until this
+ * block none asserted the values themselves. Editing them does redden a few
+ * tests — the ones that hard-code `22`, the size of the dropped span — but
+ * that is incidental arithmetic, and updating those literals to match is the
+ * obvious way to get back to green. Nothing then says the pair changed, while
+ * every existing project's runs prune on a different cadence after upgrading.
+ * This is the assertion that makes such an edit deliberate.
+ *
+ * They are carried from the pre-configuration behavior rather than measured —
+ * the 0.7.1 post-release batch could not settle them, because `provider`
+ * defaults to `"cli"` and only the API loops prune. See `DEFAULT_PRUNE_CONFIG`
+ * in `schema/v1.ts` for why, and for what the pair does rest on: the gap below.
+ */
+describe("the shipped prune defaults", () => {
+  it("are 20 trigger-pairs, 10 retained and 2,000 transcript characters", () => {
+    expect(PRUNE_TRIGGER_PAIRS).toBe(20);
+    expect(PRUNE_RETAIN_PAIRS).toBe(10);
+    expect(TRANSCRIPT_MESSAGE_CHAR_LIMIT).toBe(2000);
+  });
+
+  it("leave ten turns of append-only growth after each prune", async () => {
+    const pruner = new ConversationPruner(anthropicPruneShape(), stubSummarizer);
+    const messages = conversation(PRUNE_TRIGGER_PAIRS + 1);
+    expect((await pruner.prune(messages)).summarized).toBe(true);
+
+    // Ten turns land on the end of the array without moving the cached prefix.
+    for (let turn = 0; turn < PRUNE_TRIGGER_PAIRS - PRUNE_RETAIN_PAIRS; turn++) {
+      extend(messages, 1, 300 + turn);
+      expect((await pruner.prune(messages)).dropped, `turn ${turn + 1}`).toBe(0);
+    }
+
+    // The next one crosses the trigger and pays for a summary.
+    extend(messages, 1, 400);
+    expect((await pruner.prune(messages)).summarized).toBe(true);
+    expect(pruner.summaries).toBe(2);
+  });
+});
+
+/**
  * The per-project tuning surface (`hench.prune.*`).
  *
  * How much verbatim history a run needs, against how often it is willing to

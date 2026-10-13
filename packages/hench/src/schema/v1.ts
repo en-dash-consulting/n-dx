@@ -126,8 +126,20 @@ export interface PruneConfig {
  * the per-field defaults in `validate.ts`'s PruneConfigSchema, and the exported
  * constants in `agent/lifecycle/context-prune.ts`.
  *
- * `20`/`10`: unchanged from the pre-configuration behavior, so peak context and
- * the cache cadence (one prune per ten turns) stay where they were measured.
+ * `20`/`10`: unchanged from the pre-configuration behavior — carried, not
+ * measured. The 0.7.1 post-release batch was meant to settle them and could
+ * not: {@link DEFAULT_HENCH_CONFIG} sets `provider: "cli"`, and only the API
+ * loops prune (`agent/lifecycle/cli-loop.ts` hands the window to the vendor
+ * binary and never constructs a `ConversationPruner`), so a batch of
+ * default-config runs fires no prune at all and reports nothing about these
+ * two numbers. Do not read the batch's cost figures as evidence for them.
+ *
+ * What the pair does rest on is arithmetic. The gap between them is twenty
+ * messages, so each prune is followed by ten turns of pure append — the shape
+ * the prompt cache rewards — and peak context is the trigger. Against the
+ * default `maxTurns: 50` that is a handful of prunes per run. Moving either
+ * number trades a known cadence for an unmeasured one, so it wants a batch
+ * that actually exercises an API loop first.
  *
  * `2000`: matches `MAX_TOOL_OUTPUT_STORED` in `agent/lifecycle/loop.ts`, the
  * size at which hench truncates a tool result for the run record. Below that the
