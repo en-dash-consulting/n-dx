@@ -1,0 +1,26 @@
+---
+id: "9fb62d5e-4468-40b3-a269-ab689c996172"
+level: "task"
+title: "Create the @n-dx/lang-kit package and wire it into the workspace, release and architecture policy"
+status: "pending"
+priority: "high"
+tags:
+  - "language-packs"
+  - "lang-kit"
+  - "architecture-policy"
+  - "pr-11"
+source: "roadmap"
+acceptanceCriteria:
+  - "`pnpm build` succeeds and its output builds @n-dx/lang-kit before @n-dx/sourcevision"
+  - "`cd packages/lang-kit && npx vitest run` passes"
+  - "`node -e \"const p=require('./packages/lang-kit/package.json');process.exit(p.dependencies||Object.keys(p.exports).join()!=='.'?1:0)\"` exits 0"
+  - "`grep -c '@n-dx/lang-kit' .changeset/config.json` is at least 1 and `grep -c 'lang-kit' .github/workflows/release.yml` is at least 2"
+  - "Adding `import \"@n-dx/llm-client\";` to a file in packages/lang-kit/src makes `npx vitest run --config vitest.config.js tests/e2e/architecture-policy.test.js` fail"
+  - "`grep -c 'lang-kit' packages/core/assistant-assets/project-guidance.md AGENTS.md CLAUDE.md` is at least 1 for each file"
+  - "`npx vitest run --config vitest.config.js tests/e2e/{architecture-policy,domain-isolation,instruction-alignment,layout-literal-policy,agents-md-size-budget,prd-line-endings,ci-merge-queue-trigger,iso-skill-drift}.test.js` passes"
+  - "`cd packages/sourcevision && SV_REQUIRE_GRAMMARS=1 npx vitest run` passes"
+run: {"models":{"claude":"claude-sonnet-5-5"},"review":true,"reviewModels":{"claude":"claude-opus-5-5"}}
+description: "Create packages/lang-kit as @n-dx/lang-kit, a foundation-tier package with no dependencies beyond Node. This task creates the empty package and its wiring only; the code moves in later tasks. Model it on packages/llm-client.\n\nThe package:\n- package.json: name @n-dx/lang-kit, version = the changesets `fixed` group's current version (read it from packages/llm-client/package.json), `type: module`, `exports` with \".\" only (import ./dist/index.js, types ./dist/index.d.ts; no \"./dist/*\" escape hatch), `files: [\"dist\", \"!dist/**/*.map\", \"!dist/.build-stamp.json\"]`, `publishConfig.access: public`, license, repository with `directory: packages/lang-kit`, `sideEffects: false`, the same scripts as llm-client (build = `tsc && node ../../scripts/write-build-stamp.mjs`, typecheck, test, validate, prepare). No `dependencies` key; devDependencies only (typescript, vitest, @types/node at the versions llm-client uses).\n- tsconfig.json like llm-client's; src/index.ts as the barrel, exporting a placeholder that later tasks replace (for example a `LANG_KIT_PACKAGE` name constant) so the build has output.\n- vitest.config.ts using `isolationProjects` from tests/vitest-isolation.mjs and the shared setup files, as llm-client does; a first test under tests/ so the suite runs.\n- AGENTS.md (what lang-kit is: pure language facts and the pack contract, foundation tier, imports nothing from @n-dx/*, never reads config, never needs a language SDK at run time; what it will hold), CLAUDE.md whose whole content is `@AGENTS.md`, README.md.\n\nWiring:\n- @n-dx/sourcevision depends on @n-dx/lang-kit (`workspace:*`) and `pnpm build` builds lang-kit before sourcevision (pnpm -r orders by the dependency; check the order in the build output). Update pnpm-lock.yaml with `pnpm install`.\n- .changeset/config.json: add @n-dx/lang-kit to the `fixed` group.\n- .github/workflows/release.yml: add `lang-kit` to both `PACKAGES` lists (lines with `PACKAGES: \"core rex sourcevision hench llm-client web\"`), placed where the publish order needs it (before sourcevision).\n- Any other workspace list of packages that CI or tests enumerate (grep for `llm-client` in scripts/, tests/e2e/ and .github/ and add lang-kit where a package list must be complete).\n- Changesets: one file bumping @n-dx/lang-kit and @n-dx/sourcevision, patch.\n\nArchitecture policy:\n- tests/e2e/architecture-policy.test.js: add `packages-lang-kit` to FOUNDATION_FAMILIES, and add a foundation-boundary test for lang-kit next to the existing \"foundation tier boundary (@n-dx/llm-client)\" block: it fails if any file under packages/lang-kit/src imports an `@n-dx/*` package, or if packages/lang-kit/package.json declares `dependencies`.\n- tests/e2e/domain-isolation.test.js: admit @n-dx/lang-kit as foundation wherever @n-dx/llm-client is (the rex and sourcevision \"may only import from\" rules and the ungated foundation imports). hench and web do not import it in this PR, so no gateway.\n- packages/core/assistant-assets/project-guidance.md: the tier diagram's Foundation row gains @n-dx/lang-kit, and the Packages list and gateway prose mention it (domain packages import it directly, as they do llm-client). Then regenerate the instruction files with the worktree CLI (`node packages/core/cli.js init .`). `ndx init .` also re-runs analyze: keep only the instruction-file changes (AGENTS.md, CLAUDE.md, .codex/config.toml and the like) and restore everything else with `git checkout -- <path>` / `git clean` on what init wrote outside them. Do not edit .claude/ (an agent cannot write there); if a .claude/rules/ file needs a change, say so in the run summary instead.\n\nDo not touch rex, hench, core (other than the assistant asset) or web source."
+lastModified: "2026-10-13T02:35:15.402Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
