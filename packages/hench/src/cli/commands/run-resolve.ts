@@ -30,7 +30,7 @@ import { resolveHenchPaths } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal } from "../../agent/planning/brief.js";
-import { findV2Entry, loadV2Tree } from "../../agent/planning/work-selection.js";
+import { findV2Entry, inboxRefusal, loadV2Tree } from "../../agent/planning/work-selection.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
 import { CLIError, requireLLMCLI } from "../errors.js";
@@ -277,6 +277,8 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       blockedBy: entry.item.blockedBy ?? [],
       claimedBy: claim ? { worktree: claim.worktreeRoot, pid: claim.pid, expiresAt: claim.expiresAt } : null,
     };
+    const inbox = v2Tree ? inboxRefusal(v2Tree, taskId) : undefined;
+    if (inbox) refuse("not-actionable", inbox);
     if (!(await wouldBeReset(entry.item, entry.parents, flags, dir))) {
       const notActionable = explicitTaskRefusal(entry.item);
       if (notActionable) refuse("not-actionable", notActionable);

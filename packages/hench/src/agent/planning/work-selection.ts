@@ -19,6 +19,8 @@ import {
   isChangeLayerStore,
   resolveWorkById,
 } from "../../prd/rex-gateway.js";
+import { CLIError } from "../../prd/llm-gateway.js";
+import { DEFAULT_CLI_NAME } from "./cli-identity.js";
 import type { PRDItem, PRDStore, SelectionExplanation, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
 
 /** Why the epic flags (`--epic`, `--epic-by-epic`) do not apply on a v2 tree. */
@@ -97,6 +99,21 @@ export function actionableV2Entries(
 export function findV2Entry(tree: V2Tree, items: PRDItem[], ref: string): TreeEntry | null {
   const unit = resolveWorkById(tree, ref);
   return unit ? findItem(items, unit.node.id) : null;
+}
+
+/**
+ * Why a ref cannot run: it names an Inbox change (`needsPlacement`), or a task
+ * inside one. Rex refuses to close such a change, so a run would work it and
+ * then end completed with the item still open. `undefined` when the ref is
+ * placed or names nothing.
+ */
+export function inboxRefusal(tree: V2Tree, ref: string, cliName = DEFAULT_CLI_NAME): CLIError | undefined {
+  const change = resolveWorkById(tree, ref)?.change;
+  if (!change?.needsPlacement) return undefined;
+  return new CLIError(
+    `"${change.title}" (${change.id}) is in the Inbox and needs placement, so it cannot be worked on.`,
+    `Place it first with 'rex change place' (MCP: place_change), then run '${cliName} work --task=${ref}' again.`,
+  );
 }
 
 /**
