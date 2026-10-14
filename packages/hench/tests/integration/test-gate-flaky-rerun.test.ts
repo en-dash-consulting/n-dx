@@ -200,10 +200,16 @@ describe("hench.testGate.rerunCommand", () => {
     const gate = await fakeGate({ second: "pass" });
     // The operator answers [a]bort at the rerun/abort/skip prompt.
     const answer = setInterval(() => process.stdin.emit("data", "a\n"), 50);
+    // readline writes the question to process.stdout directly, which no
+    // console capture sees: the prompt printed into every green run of this
+    // suite. Swallow it for the span that opens the prompt — the real
+    // interface and the real stdin still drive the path under test.
+    const stdout = vi.spyOn(process.stdout, "write").mockReturnValue(true);
     let run: RunRecord;
     try {
       run = await finalize(configWith(gate, RERUN(gate)), { autonomous: false, yes: false });
     } finally {
+      stdout.mockRestore();
       clearInterval(answer);
     }
 

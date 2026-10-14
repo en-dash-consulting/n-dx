@@ -548,6 +548,41 @@ describe("rolling window", () => {
     _overrideTTY(true); // restore for afterEach
   });
 
+  // ── Under vitest the window is off unless a test opts in ─────────────────
+
+  it("stays off under vitest on a real TTY with colour forced on", async () => {
+    // No _overrideTTY: this is what an ordinary test gets. The window renders
+    // with process.stdout.write, which the runner cannot attribute to the test
+    // that produced it, so a green run would print it to the terminal. Colour
+    // is on (enableRolling forced it) and stdout claims to be a TTY, so only
+    // the VITEST check can keep the window shut.
+    _overrideTTY(null);
+    const realIsTTY = process.stdout.isTTY;
+    Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    writeSpy.mockClear();
+
+    try {
+      stream("Agent", "line from an ordinary test");
+      expect(writeSpy).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      logSpy.mockRestore();
+      Object.defineProperty(process.stdout, "isTTY", { value: realIsTTY, configurable: true });
+      _overrideTTY(true); // restore for afterEach
+    }
+  });
+
+  it("an explicit _overrideTTY still opts a test into the window under vitest", () => {
+    // The window's own tests need it on; the VITEST default must yield to them.
+    expect(process.env.VITEST).toBeTruthy();
+    _overrideTTY(true);
+    writeSpy.mockClear();
+
+    stream("Agent", "line from a window test");
+    expect(writeSpy).toHaveBeenCalled();
+  });
+
   // ── Quiet mode suppresses rolling window output ───────────────────────────
 
   it("stream() is suppressed by quiet mode even in rolling mode", () => {

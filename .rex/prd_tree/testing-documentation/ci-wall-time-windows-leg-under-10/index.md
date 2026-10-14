@@ -19,7 +19,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [CI wall-time tail: hench quiet under vitest, the prd.md fixture warning, and the last two spawn-per-test e2e files](./ci-wall-time-tail-hench-quiet-under.md) | pending |
+| [CI wall-time tail: hench quiet under vitest, the prd.md fixture warning, and the last two spawn-per-test e2e files](./ci-wall-time-tail-hench-quiet-under.md) | in_progress |
 | [Layer 1 · Workflow only: parallel test jobs per OS, Defender exclusion, Node compile cache](./layer-1-workflow-only-parallel-test.md) | completed |
 | [Layer 3 · One global git config for every fixture repo](./layer-3-one-global-git-config-for.md) | completed |
 | [Layer 4 · Isolation off for unit projects, one package at a time](./layer-4-isolation-off-for-unit.md) | completed |

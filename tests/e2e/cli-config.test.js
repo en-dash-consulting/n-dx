@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -146,6 +146,22 @@ async function setupProject(dir) {
   );
 }
 
+/**
+ * `n-dx config --help` output, produced by one CLI spawn for the whole file.
+ *
+ * Twenty-two tests across the three `help` describes asserted on this text,
+ * each spawning its own CLI — about a second here and three on the Windows CI
+ * runner, for an invocation that reads nothing from the project and so returns
+ * the same string every time. The spawn runs once; every test keeps its own
+ * assertion, so the test count is unchanged and a failure still names the one
+ * documented key it owns.
+ */
+let helpOutput;
+
+beforeAll(() => {
+  helpOutput = run(["--help"]);
+});
+
 describe("n-dx config", () => {
   let tmpDir;
 
@@ -225,24 +241,41 @@ describe("n-dx config", () => {
   // ── Show all ───────────────────────────────────────────────────────────────
 
   describe("show all", () => {
+    /**
+     * Three tests read different parts of one `n-dx config <dir>` output, so
+     * the CLI runs once for all of them. The fixture is a project of this
+     * describe's own rather than the per-test `tmpDir`: the hoisted run
+     * happens before any `beforeEach`, and the two tests below that *do*
+     * mutate their directory keep using `tmpDir`.
+     */
+    let showAllDir;
+    let showAllOutput;
+
+    beforeAll(async () => {
+      showAllDir = await mkdtemp(join(tmpdir(), "ndx-config-e2e-show-all-"));
+      await setupProject(showAllDir);
+      showAllOutput = run([showAllDir]);
+    });
+
+    afterAll(async () => {
+      await rm(showAllDir, { recursive: true, force: true });
+    });
+
     it("displays all package configs", () => {
-      const output = run([tmpDir]);
-      expect(output).toContain("n-dx configuration:");
-      expect(output).toContain("rex");
-      expect(output).toContain("hench");
-      expect(output).toContain("sourcevision");
+      expect(showAllOutput).toContain("n-dx configuration:");
+      expect(showAllOutput).toContain("rex");
+      expect(showAllOutput).toContain("hench");
+      expect(showAllOutput).toContain("sourcevision");
     });
 
     it("shows rex settings", () => {
-      const output = run([tmpDir]);
-      expect(output).toContain("project");
-      expect(output).toContain("test-project");
+      expect(showAllOutput).toContain("project");
+      expect(showAllOutput).toContain("test-project");
     });
 
     it("shows hench settings", () => {
-      const output = run([tmpDir]);
-      expect(output).toContain("model");
-      expect(output).toContain("sonnet");
+      expect(showAllOutput).toContain("model");
+      expect(showAllOutput).toContain("sonnet");
     });
 
     it("outputs JSON with --json flag", () => {
@@ -437,7 +470,7 @@ describe("n-dx config", () => {
 
   describe("help", () => {
     it("shows help with --help flag", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("n-dx config");
       expect(output).toContain("dot notation");
     });
@@ -448,7 +481,7 @@ describe("n-dx config", () => {
     });
 
     it("documents all rex config keys", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("rex.project");
       expect(output).toContain("rex.adapter");
       expect(output).toContain("rex.validate");
@@ -458,7 +491,7 @@ describe("n-dx config", () => {
     });
 
     it("documents all hench config keys", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("hench.provider");
       expect(output).toContain("hench.model");
       expect(output).toContain("hench.maxTurns");
@@ -468,7 +501,7 @@ describe("n-dx config", () => {
     });
 
     it("documents all hench guard keys", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("hench.guard.blockedPaths");
       expect(output).toContain("hench.guard.allowedCommands");
       expect(output).toContain("hench.guard.commandTimeout");
@@ -476,7 +509,7 @@ describe("n-dx config", () => {
     });
 
     it("shows default values", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain('default: "file"');
       expect(output).toContain('default: "cli"');
       expect(output).toContain('default: "sonnet"');
@@ -487,20 +520,20 @@ describe("n-dx config", () => {
     });
 
     it("shows type information", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("string");
       expect(output).toContain("number");
       expect(output).toContain("string[]");
     });
 
     it("documents sourcevision zone config", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("sourcevision.zones.pins");
       expect(output).toContain("sourcevision.zones.mergeThreshold");
     });
 
     it("documents type coercion rules", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("Type coercion");
       expect(output).toContain("Numbers");
       expect(output).toContain("Booleans");
@@ -509,7 +542,7 @@ describe("n-dx config", () => {
     });
 
     it("includes usage examples", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("Examples:");
       expect(output).toContain("n-dx config hench.models.claude opus");
       expect(output).toContain("n-dx config hench.maxTurns 100");
@@ -517,7 +550,7 @@ describe("n-dx config", () => {
     });
 
     it("documents .n-dx.json project config", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain(".n-dx.json");
       expect(output).toContain("project root");
       expect(output).toContain("precedence");
@@ -933,22 +966,22 @@ describe("n-dx config", () => {
 
   describe("help — claude settings", () => {
     it("documents claude.cli_path", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("claude.cli_path");
     });
 
     it("documents claude.api_key", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("claude.api_key");
     });
 
     it("notes claude settings are shared across packages", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("shared across all packages");
     });
 
     it("states that api keys are stored in .n-dx.local.json", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).not.toContain("stored in .n-dx.json");
       const start = output.indexOf("claude.api_key");
       const apiKeyBlock = output.slice(start, output.indexOf("claude.api_endpoint", start));
@@ -956,7 +989,7 @@ describe("n-dx config", () => {
     });
 
     it("includes claude config examples", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("n-dx config claude.cli_path");
       expect(output).toContain("n-dx config claude.api_key");
     });
@@ -1042,23 +1075,23 @@ describe("n-dx config", () => {
 
     describe("help documents validation", () => {
       it("documents --force flag", () => {
-        const output = run(["--help"]);
+        const output = helpOutput;
         expect(output).toContain("--force");
       });
 
       it("documents --test-connection flag", () => {
-        const output = run(["--help"]);
+        const output = helpOutput;
         expect(output).toContain("--test-connection");
       });
 
       it("notes validation on cli_path", () => {
-        const output = run(["--help"]);
+        const output = helpOutput;
         expect(output).toContain("must exist and be");
         expect(output).toContain("executable");
       });
 
       it("notes validation on api_key", () => {
-        const output = run(["--help"]);
+        const output = helpOutput;
         expect(output).toContain('start with "sk-ant-"');
       });
     });
@@ -1240,33 +1273,33 @@ describe("n-dx config", () => {
 
   describe("help — api_endpoint and model", () => {
     it("documents claude.api_endpoint", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("claude.api_endpoint");
     });
 
     it("documents claude.model", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("claude.model");
     });
 
     it("shows default endpoint", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("https://api.anthropic.com");
     });
 
     it("shows model examples", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("claude-sonnet-5");
       expect(output).toContain("claude-opus-5");
     });
 
     it("includes api_endpoint example", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("n-dx config claude.api_endpoint");
     });
 
     it("includes model example", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("n-dx config claude.model");
     });
   });
@@ -1358,7 +1391,7 @@ describe("n-dx config", () => {
     });
 
     it("describes the actual protection for this platform in help text", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       // Claiming 0600 on Windows would be false: chmod cannot set it there.
       if (isWin) {
         expect(output).toContain("ACL restricted to your user account");
@@ -1544,14 +1577,14 @@ describe("n-dx config", () => {
     });
 
     it("shows autoFailover in help text", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("llm.autoFailover");
       expect(output).toContain("automatic");
       expect(output).toContain("failover");
     });
 
     it("includes examples for autoFailover", () => {
-      const output = run(["--help"]);
+      const output = helpOutput;
       expect(output).toContain("n-dx config llm.autoFailover true");
       expect(output).toContain("n-dx config llm.autoFailover false");
     });

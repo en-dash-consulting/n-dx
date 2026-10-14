@@ -7,13 +7,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { serializeDocument } from "../../src/store/markdown-serializer.js";
-import { readPRD } from "../helpers/rex-dir-test-support.js";
+import { readPRD, writePRD } from "../helpers/rex-dir-test-support.js";
 import type { PRDDocument } from "../../src/schema/index.js";
 
 const cliPath = join(
@@ -41,10 +40,22 @@ function run(args: string[], expectFail = false): string {
   }
 }
 
-/** Write a PRD with specific items for testing fix scenarios. */
+/**
+ * Write a PRD with specific items for testing fix scenarios.
+ *
+ * Goes through the shared fixture writer rather than dropping a `.rex/prd.md`
+ * beside the tree `rex init` just created. Both backends present is a state no
+ * project should be in, and every `rex fix` spawn below loaded it and printed
+ * the "prd.md exists alongside .rex/prd_tree/" warning to the terminal — six
+ * times per green run of this suite, from a fixture rather than a product
+ * defect. The helper writes the folder tree when the document fits it and
+ * `prd.json` when it does not (the deliberately malformed PRDs here, with
+ * non-epic roots or duplicate ids), so the loader reaches the same documents
+ * by the same paths, minus the warning.
+ */
 async function writePrd(dir: string, items: unknown[]): Promise<void> {
   const doc = { schema: "rex/v1", title: "Fix Test", items } as PRDDocument;
-  await writeFile(join(dir, ".rex", "prd.md"), serializeDocument(doc));
+  writePRD(dir, doc);
 }
 
 describe("rex fix", () => {
@@ -115,12 +126,16 @@ describe("rex fix", () => {
       },
     ]);
 
-    const before = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
+    // Compare the document the loader returns, not the bytes of `.rex/prd.md`.
+    // Nothing writes prd.md — the folder tree is the sole writable surface, and
+    // `prd-md-no-write-regression.test.ts` pins that — so a byte compare of it
+    // passed whether or not --dry-run was honoured.
+    const before = readPRD(tmpDir);
     const output = run(["fix", "--dry-run", tmpDir]);
-    const after = await readFile(join(tmpDir, ".rex", "prd.md"), "utf-8");
+    const after = readPRD(tmpDir);
 
     expect(output).toContain("Would fix");
-    expect(before).toEqual(after);
+    expect(after).toEqual(before);
   });
 
   it("JSON output includes summary with byKind breakdown", async () => {

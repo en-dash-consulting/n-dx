@@ -123,10 +123,30 @@ export function _overrideTTY(value: boolean | null): void {
  * Whether rolling-window mode is active.
  * Requires a real TTY (cursor control needs one) AND colour support enabled
  * (NO_COLOR=1 implies non-interactive scripting — skip the window).
+ *
+ * ## Under vitest
+ *
+ * The rolling window renders with `process.stdout.write`, which a test runner
+ * cannot attribute to the test that produced it. Vitest's `silent:
+ * "passed-only"` buffers `console.*` and prints it only for a failing test;
+ * raw stdout writes go straight past that and land in the terminal on a green
+ * run, where they read as output of the suite rather than of a fixture.
+ *
+ * So under vitest the window is off by default and every line goes through
+ * console.log — a green run stays silent, and a failing test still shows its
+ * full output. An explicit {@link _overrideTTY} wins over this: the tests that
+ * exercise the window itself opt in that way, and they assert on what they
+ * capture rather than leaking it.
+ *
+ * Until now nothing in this package read the runner's environment, and the
+ * window stayed off in tests only because the shared `tests/setup-color-env.js`
+ * sets `NO_COLOR` — a decision about colour that disabled raw stdout writes as
+ * a side effect, and that any test forcing colour on would undo.
  */
 function isRollingMode(): boolean {
-  const isTTY = _ttyOverride !== null ? _ttyOverride : Boolean(process.stdout.isTTY);
-  return isTTY && isColorEnabled();
+  if (_ttyOverride !== null) return _ttyOverride && isColorEnabled();
+  if (process.env.VITEST) return false;
+  return Boolean(process.stdout.isTTY) && isColorEnabled();
 }
 
 /**

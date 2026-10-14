@@ -23,7 +23,11 @@ import {
 import { RM_RETRY } from "../../../helpers/index.js";
 
 function git(dir: string, args: string[]): string {
-  return execFileSync("git", args, { cwd: dir, encoding: "utf-8" });
+  // stdio: execFileSync sends the child's stderr to the parent's unless told
+  // otherwise, and `checkout -b` reports "Switched to a new branch" there. That
+  // write leaves the process by fd 2, so no runner-level console capture can
+  // reach it, and it printed into every green run of this suite.
+  return execFileSync("git", args, { cwd: dir, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
 }
 
 function initRepo(dir: string): void {
