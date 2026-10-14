@@ -2,15 +2,14 @@
 id: "738f6000-aa94-41a0-86da-1d505e2674dd"
 level: "epic"
 title: "Testing & Documentation"
-status: "completed"
+status: "pending"
 startedAt: "2026-05-06T13:27:57.504Z"
-completedAt: "2026-10-14T15:07:41.770Z"
 endedAt: "2026-10-14T15:07:41.770Z"
 resolutionType: "acknowledgment"
 resolutionDetail: "Fixed final architecture policy test failure (PRD storage invariant violations). All child tasks completed. Test suite passes (1628 tests). Epic infrastructure and documentation goals met."
 description: "Local testing infrastructure (gauntlet config validation), platform/prerequisite documentation, and ongoing documentation refresh for PRD-related changes."
-lastModified: "2026-10-14T15:07:42.038Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-14T15:27:54.841Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -49,6 +48,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [TreeNodes DOM Performance Optimization](./treenodes-dom-performance-optimization/index.md) | completed |
 | [Update Documentation for New PRD Structure](./update-documentation-for-new-prd/index.md) | completed |
 | [Web Viewer Architecture: Package Extraction and Independent Viewers](./web-viewer-architecture-package/index.md) | completed |
+| [A rex test worker exits mid-run under pnpm validate concurrency, failing the suite with every test passing](./a-rex-test-worker-exits-mid-run-under.md) | pending |
 | [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-stale.md) | completed |
 | [Auto-Update Detection from npm Registry](./auto-update-detection-from-npm-registry.md) | completed |
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-the.md) | completed |
