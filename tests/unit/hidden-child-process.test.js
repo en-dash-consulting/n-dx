@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import cp, { spawnSync, execFileSync, execSync } from "node:child_process";
+import cp, { spawnSync, execFileSync, execSync, execFile } from "node:child_process";
 import { hidden, optionsIndex } from "../hidden-child-process.js";
+import { promisify } from "node:util";
 
 /**
  * Every spawn a test makes is hidden on Windows unless it asks not to be.
@@ -53,5 +54,29 @@ describe("tests spawn hidden on Windows", () => {
     expect(optionsIndex(["cmd", ["a"]])).toBe(-1);
     expect(optionsIndex(["cmd", ["a"], opts, cb])).toBe(2);
     expect(optionsIndex(["cmd", cb])).toBe(-1);
+  });
+
+  it("keeps promisify.custom, so promisified callers still get { stdout, stderr }", async () => {
+    // `exec` and `execFile` carry a util.promisify.custom symbol whose
+    // implementation resolves to an object. A wrapper that drops it sends
+    // promisify down its callback path, which resolves with only the first
+    // callback value — so `.stdout` reads undefined and the caller sees empty
+    // output with no error. That broke feature-gate-enforcement.test.ts.
+    const execFileAsync = promisify(execFile);
+    const { stdout } = await execFileAsync(process.execPath, [
+      "-e",
+      "process.stdout.write('ok')",
+    ]);
+    expect(stdout).toBe("ok");
+  });
+
+  it("hides the spawn on the promisified path too", async () => {
+    const execFileAsync = promisify(execFile);
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      ["-e", "process.stdout.write('ok')"],
+      { encoding: "utf-8" },
+    );
+    expect(stdout).toBe("ok");
   });
 });

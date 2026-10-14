@@ -24,6 +24,7 @@
  * @see scripts/lib/windows-hide-scan.mjs — its scanner
  */
 import { createRequire } from "node:module";
+import { promisify } from "node:util";
 
 const real = createRequire(import.meta.url)("child_process");
 
@@ -63,21 +64,55 @@ export function optionsIndex(args) {
 }
 
 /**
+ * `args` with `windowsHide` applied to its options bag, inserting one when the
+ * call passed none.
+ *
+ * @param {unknown[]} args
+ * @param {number} minArgs how many leading arguments precede `options`
+ * @returns {unknown[]}
+ */
+function applyHidden(args, minArgs) {
+  const at = optionsIndex(args);
+  if (at >= minArgs) {
+    args[at] = hidden(args[at]);
+  } else {
+    const insertAt = typeof args[args.length - 1] === "function" ? args.length - 1 : args.length;
+    args.splice(insertAt, 0, hidden(undefined));
+  }
+  return args;
+}
+
+/**
+ * Wrap a `child_process` function so its spawn is hidden.
+ *
+ * The wrapper has to carry `util.promisify.custom` across. `exec` and
+ * `execFile` each define that symbol, and Node's version of it resolves to
+ * `{ stdout, stderr }`; a plain wrapper without it sends `promisify` down its
+ * callback path, which resolves with only the first callback value — so
+ * `(await execFileAsync(...)).stdout` is `undefined` and the caller sees empty
+ * output rather than an error. The custom implementation here hides the spawn
+ * the same way before delegating, so promisified callers are covered too.
+ *
  * @param {Function} fn
  * @param {number} minArgs how many leading arguments the signature takes before `options`
  * @returns {Function}
  */
 function withHidden(fn, minArgs) {
-  return function (...args) {
-    const at = optionsIndex(args);
-    if (at >= minArgs) {
-      args[at] = hidden(args[at]);
-    } else {
-      const insertAt = typeof args[args.length - 1] === "function" ? args.length - 1 : args.length;
-      args.splice(insertAt, 0, hidden(undefined));
-    }
-    return fn.apply(this, args);
+  const wrapped = function (...args) {
+    return fn.apply(this, applyHidden(args, minArgs));
   };
+
+  const custom = fn[promisify.custom];
+  if (typeof custom === "function") {
+    Object.defineProperty(wrapped, promisify.custom, {
+      value: function (...args) {
+        return custom.apply(this, applyHidden(args, minArgs));
+      },
+      configurable: true,
+    });
+  }
+
+  return wrapped;
 }
 
 export const spawn = withHidden(real.spawn, 1);
