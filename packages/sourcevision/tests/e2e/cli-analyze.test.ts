@@ -23,7 +23,14 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
   let tmpDir: string;
 
   afterEach(async () => {
-    if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+    // maxRetries/retryDelay: the win32 cases below terminate an analyze child
+    // with TerminateProcess, and Windows releases the handles it held under
+    // .sourcevision slightly after the `exit` event fires — so a bare rm here
+    // failed with `EBUSY: resource busy or locked, rmdir` on CI after the
+    // assertions had all passed. fs.rm retries only the codes that mean exactly
+    // that (EBUSY/EPERM/ENOTEMPTY/EMFILE/ENFILE), so a genuine failure still
+    // surfaces promptly.
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("produces valid JSON outputs for small-ts-project", async () => {

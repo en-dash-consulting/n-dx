@@ -8,8 +8,9 @@ paths:
 # Web viewer gateway boundary
 
 The boundary is described in the **"Web viewer gateway boundary"** section of
-`packages/web/AGENTS.md`, which `packages/web/CLAUDE.md` imports — so Claude
-Code already has it loaded under this path. Read it there. It covers what
+`packages/web/AGENTS.md`, which points at `packages/web/src/viewer/AGENTS.md`
+where the rule sits beside the code. Both are nested `AGENTS.md` files, so
+every assistant reads them under this path. They cover what
 `src/viewer/external.ts` concentrates, and the two exemptions from the root
 gateway rule that apply here: the viewer's type-import exemption and the
 `src/viewer/messaging/` → `src/shared/` direct-import exemption.

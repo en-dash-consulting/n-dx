@@ -59,14 +59,40 @@ const BUDGET = CODEX_PROJECT_DOC_LIMIT - MARGIN;
 
 const bytes = (text) => Buffer.byteLength(text, "utf-8");
 
-/** Every package that ships its own `AGENTS.md`, with that file's size. */
-function nestedAgentsFiles() {
+/**
+ * Every `AGENTS.md` under `packages/`, at any depth, with its own size and the
+ * chain Codex reads to reach it: the root file plus every `AGENTS.md` between
+ * the package root and this one. A nested file does not replace its parents —
+ * Codex concatenates them — so the chain is what has to fit, not the file.
+ */
+function nestedAgentsFiles(rootSize) {
   const dir = join(ROOT, "packages");
   if (!existsSync(dir)) return [];
-  return readdirSync(dir)
-    .map((name) => ({ name, path: join(dir, name, "AGENTS.md") }))
-    .filter((p) => existsSync(p.path))
-    .map((p) => ({ ...p, size: bytes(readFileSync(p.path, "utf-8")) }));
+
+  const found = [];
+  const walk = (abs, rel, inherited) => {
+    const here = join(abs, "AGENTS.md");
+    const chain = existsSync(here)
+      ? [...inherited, { rel: `${rel}/AGENTS.md`, size: bytes(readFileSync(here, "utf-8")) }]
+      : inherited;
+    if (existsSync(here)) {
+      found.push({
+        name: rel,
+        size: chain.at(-1).size,
+        chain: rootSize + chain.reduce((n, f) => n + f.size, 0),
+        files: chain.map((f) => f.rel),
+      });
+    }
+    for (const entry of readdirSync(abs, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name === "node_modules" || entry.name === "dist") continue;
+      walk(join(abs, entry.name), `${rel}/${entry.name}`, chain);
+    }
+  };
+
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) walk(join(dir, entry.name), `packages/${entry.name}`, []);
+  }
+  return found;
 }
 
 /** What to do about it, named in the failure rather than left to the reader. */
@@ -88,37 +114,33 @@ describe("AGENTS.md stays inside Codex's project-doc budget", () => {
     ).toBeLessThanOrEqual(BUDGET);
   });
 
-  it("reports the chain each package costs, so a breach is visible before it is fixed", () => {
-    // Codex reads the root and the package's file together, so a package's real
-    // budget is what the root leaves behind. This is a measurement rather than
-    // an assertion: `packages/web/AGENTS.md` is over today, and trimming it is
-    // its own task (PRD fabfa3a2). Asserting here would make this guard red for
-    // a defect it is not the fix for — and a guard that cannot be committed
-    // green guards nothing.
-    //
-    // Turn this into an assertion as part of that task.
+  it("keeps every AGENTS.md chain inside the budget", () => {
+    // Codex reads the root and every nested `AGENTS.md` down to the working
+    // directory as one document, so a package's real budget is what the root
+    // leaves behind — and a file nested deeper spends what its parents left.
+    // This was a warning until `packages/web/AGENTS.md` was split by directory
+    // (PRD fabfa3a2); it is an assertion now that every chain fits.
     const rootSize = bytes(renderAgentsMd(ROOT));
-    const chains = nestedAgentsFiles().map((pkg) => ({
-      name: pkg.name,
-      chain: rootSize + pkg.size,
-      over: rootSize + pkg.size - CODEX_PROJECT_DOC_LIMIT,
-    }));
+    const chains = nestedAgentsFiles(rootSize);
 
     expect(chains.length).toBeGreaterThanOrEqual(4);
-    for (const c of chains) {
-      if (c.over > 0) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[agents-md-size] packages/${c.name}: chain ${c.chain} bytes, ` +
-            `${c.over} over the ${CODEX_PROJECT_DOC_LIMIT}-byte budget — Codex drops the tail.`,
-        );
-      }
-    }
 
-    // What this guard does assert: the root leaves room for a package file at
-    // all. At zero headroom every package is truncated and no per-package trim
-    // can fix it.
-    const headroom = CODEX_PROJECT_DOC_LIMIT - rootSize;
+    const over = chains
+      .filter((c) => c.chain > BUDGET)
+      .map((c) => `${c.name}: ${c.chain} bytes (${c.files.join(" + ")}, over by ${c.chain - BUDGET})`);
+
+    expect(
+      over,
+      `Codex reads root + nested AGENTS.md as one chain and drops the tail past ` +
+        `${CODEX_PROJECT_DOC_LIMIT} bytes. These chains exceed the ${BUDGET}-byte ` +
+        `budget. ${ADVICE}`,
+    ).toEqual([]);
+  });
+
+  it("leaves a package room for its own guidance", () => {
+    // At zero headroom every package is truncated and no per-package trim can
+    // fix it, so this fails on the root even when no package file exists yet.
+    const headroom = CODEX_PROJECT_DOC_LIMIT - bytes(renderAgentsMd(ROOT));
     expect(
       headroom,
       `The root AGENTS.md leaves only ${headroom} bytes for any package's own ` +
@@ -130,7 +152,7 @@ describe("AGENTS.md stays inside Codex's project-doc budget", () => {
     // If the renderer or the package scan broke, the assertions above would
     // pass by measuring nothing.
     expect(bytes(renderAgentsMd(ROOT))).toBeGreaterThan(5000);
-    const nested = nestedAgentsFiles();
+    const nested = nestedAgentsFiles(bytes(renderAgentsMd(ROOT)));
     expect(nested.length).toBeGreaterThanOrEqual(4);
     for (const pkg of nested) expect(pkg.size, pkg.name).toBeGreaterThan(0);
   });
