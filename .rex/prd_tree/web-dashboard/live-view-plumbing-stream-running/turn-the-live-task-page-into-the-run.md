@@ -2,7 +2,7 @@
 id: "304ab89a-7e51-4b25-b25d-000b9ed28526"
 level: "task"
 title: "Turn the Live task page into the run summary when the run finishes"
-status: "in_progress"
+status: "completed"
 priority: "low"
 tags:
   - "live"
@@ -11,12 +11,16 @@ tags:
 blockedBy:
   - "8050220c-7add-4547-8806-0fc6765acb82"
 startedAt: "2026-10-14T21:00:46.408Z"
+completedAt: "2026-10-14T21:19:01.077Z"
+endedAt: "2026-10-14T21:19:01.077Z"
+resolutionType: "code-change"
+resolutionDetail: "views/live-summary.ts + live-summary-model.ts (Summary tab: outcome, structuredSummary counts and file changes, review findings by action, metrics, commits); hooks/use-live-task.ts gains useRunRecord reading GET /api/hench/runs/:id once per finished run; live-task.ts adds the Summary tab, defaults to it for a finished run without overriding an explicit click, and Re-run unpins the URL's run and polls until the new record lands. Commit links move to viewer/utils/commit-link.ts, shared with the PRD tree's commits table. 15 new tests; no server change."
 acceptanceCriteria:
   - "A finished run's page shows the summary and metrics from the existing run route, with no new server data."
   - "The Work, Log and Review tabs still open for the finished run."
   - "Re-run starts the task again and the page switches to the new run."
 description: "At the same `/live/task/:taskId` URL, once the selected run has finished: the work summary (`structuredSummary`) and review findings with what was fixed and captured, then run metrics (wall time, turns, retries, tool calls, tokens by class, estimated cost, files changed, commit), with the run picker for tasks that ran more than once. Actions: Re-run, Open commit, Capture follow-up to the PRD. All of this is on `GET /api/hench/runs/:id` today. The Work, Log and Review tabs stay available for the finished run."
 assignee: "Sterling H <sterling.h@endash.us>"
-lastModified: "2026-10-14T21:00:46.967Z"
+lastModified: "2026-10-14T21:19:01.648Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
