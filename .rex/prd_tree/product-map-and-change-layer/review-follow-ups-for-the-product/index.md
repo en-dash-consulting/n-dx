@@ -52,7 +52,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Rex watcher stops following a PRD folder that is deleted and recreated while ndx start runs](./rex-watcher-stops-following-a-prd.md) | pending |
 | [Stop the timed-out test gate test racing its fake gate startup](./stop-the-timed-out-test-gate-test.md) | completed |
 | [The exported computeLanding still reports an open change as landed, because it takes ids rather than the change](./the-exported-computelanding-still.md) | pending |
-| [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | pending |
+| [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | in_progress |
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | pending |
 | [v2 isolation test misses imports of the core v2 modules and dynamic import() of any v2 module](./v2-isolation-test-misses-imports-of.md) | pending |
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |

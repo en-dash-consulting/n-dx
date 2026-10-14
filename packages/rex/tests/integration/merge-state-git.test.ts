@@ -76,9 +76,11 @@ describe("rex-state merge driver in a real repository", () => {
       `${JSON.stringify(process.execPath)} ${JSON.stringify(CLI_DIST)} merge-state %O %A %B %P`,
     );
     // Mirror `ndx init`: it pins `<rex>/**/*.yaml text eol=lf` alongside the merge
-    // driver (core/gitattributes-pins.js). Without the pin, Windows runners'
-    // core.autocrlf=true writes conflicted files with CRLF. Written literally
-    // because rex tests must not import from the orchestration tier (core).
+    // driver (core/gitattributes-pins.js). Without the pin, core.autocrlf=true
+    // writes conflicted files with CRLF — the conflict test below sets that
+    // config itself so dropping `text eol=lf` fails on every OS, not only on
+    // GitHub's Windows runners. Written literally because rex tests must not
+    // import from the orchestration tier (core).
     await writeFile(
       join(repo, ".gitattributes"),
       ".rex/product/**/state.yaml text eol=lf merge=rex-state\n",
@@ -144,6 +146,14 @@ describe("rex-state merge driver in a real repository", () => {
   });
 
   it("leaves conflict markers and an unmerged path when nothing decides a status", async () => {
+    // Reproduce the GitHub Windows runner, the only environment that would
+    // otherwise catch the `text eol=lf` pin going missing: without autocrlf the
+    // markers come out LF whether the fixture pins the file or not, so dropping
+    // the pin passes everywhere but one of nine CI jobs. Set here and not in
+    // beforeEach because index.md carries no pin — the clean-merge test above
+    // compares its bytes and would see CRLF.
+    git(repo, "config", "core.autocrlf", "true");
+
     git(repo, "checkout", "-b", "branch-a");
     await writeState({ [CAPABILITY]: { status: "deferred" } });
     git(repo, "commit", "-am", "defer");
