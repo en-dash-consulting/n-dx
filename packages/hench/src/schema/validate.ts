@@ -429,6 +429,15 @@ export const RunRecordSchema = z.object({
     restricted: z.boolean(),
     findings: z.array(z.string()),
   }).optional(),
+  // Where the run sits in a --iterations/--loop/--epic-by-epic invocation.
+  // `mode` is a bare string rather than an enum so a record written by a build
+  // that knows a fourth mode still loads with its position intact; the Live
+  // view shows the mode, it does not branch on it.
+  loop: z.object({
+    mode: z.string(),
+    iteration: z.number().int().positive(),
+    max: z.number().int().positive().optional(),
+  }).optional(),
   worktreeRoot: z.string().optional(),
   branch: z.string().optional(),
   startHead: z.string().optional(),

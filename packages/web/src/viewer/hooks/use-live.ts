@@ -109,6 +109,12 @@ export interface LiveRunFull extends LiveRunSummary {
   criteriaTotal: number | null;
   /** Milliseconds since the last heartbeat, or null when none was recorded. */
   heartbeatAgeMs: number | null;
+  /**
+   * Position in the `--iterations`/`--loop`/`--epic-by-epic` invocation that
+   * started the run. Null for a run started on its own. `max` is set only by
+   * `--iterations=N`; the other two modes run until the tree is out of tasks.
+   */
+  loop: { mode: string; iteration: number; max: number | null } | null;
 }
 
 /** The slice of the server's AnalyzeProgressReport the Live overview reads. */
@@ -131,6 +137,21 @@ export interface LiveNextTask {
   epicChain: LiveChainLink[];
 }
 
+/** Mirrors LiveQueuedRequest in server/routes-live.ts. */
+export interface LiveQueuedRequest {
+  taskId: string;
+  /** From the PRD when it knows the task, else null. */
+  taskTitle: string | null;
+  epicChain: LiveChainLink[];
+  /** Worktree key the request addressed, or null for the anchor. */
+  workspace: string | null;
+  enqueuedAt: string;
+  /** How many tasks the request works through; null means a single run. */
+  mode: string | null;
+  /** Task count for `mode: "iterations"`; null otherwise. */
+  iterations: number | null;
+}
+
 /** Mirrors LiveSnapshot in server/routes-live.ts — what `GET /api/live` answers. */
 export interface LiveSnapshot extends LiveSummary {
   generatedAt: string;
@@ -139,6 +160,12 @@ export interface LiveSnapshot extends LiveSummary {
   queue: {
     next: LiveNextTask[];
     starting: Array<{ taskId: string; taskTitle: string; startedAt: string; worktree: LiveWorktreeFull }>;
+    /**
+     * Execute requests the hub has queued for this project, oldest first.
+     * Empty standalone, and capped behind the hub — `machine.slots.queued`
+     * counts them all, so "3 of 40 waiting" stays truthful past the cut.
+     */
+    queued: LiveQueuedRequest[];
   };
   machine: {
     /** `machine`: the hub's admission gate; `repository`: live runs in every worktree. */

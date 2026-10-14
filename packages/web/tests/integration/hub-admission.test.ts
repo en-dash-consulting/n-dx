@@ -665,8 +665,15 @@ describe("hub admission gate", () => {
 
     const spoofed = JSON.stringify({ running: 0, maxSessions: 99, queued: 0 });
     await fetch(`http://127.0.0.1:${h.port}/p/beta/w/feature/api/live`, { headers: { "x-ndx-hub-admission": spoofed } });
-    expect(beta.liveAdmission).toEqual([
-      JSON.stringify({ running: 1, maxSessions: 1, queued: 1, availableBytes: 8 * 1024 ** 3, pressure: "normal", memoryPaused: false }),
+    expect(beta.liveAdmission).toHaveLength(1);
+    const header = JSON.parse(beta.liveAdmission[0]!);
+    // The hub's own numbers, not the client's 99.
+    expect(header).toMatchObject({ running: 1, maxSessions: 1, queued: 1, availableBytes: 8 * 1024 ** 3, pressure: "normal", memoryPaused: false });
+    // The counts are machine-wide; only the entry list narrows to the proxied
+    // project, so beta's queued task-2 rides along and alpha's running task-1
+    // does not appear at all.
+    expect(header.queue).toEqual([
+      { taskId: "task-2", workspace: null, enqueuedAt: expect.any(String) },
     ]);
   });
 
@@ -675,7 +682,7 @@ describe("hub admission gate", () => {
     freeMemory = 500;
     await fetch(`http://127.0.0.1:${h.port}/p/beta/api/hench/prep/task-1`);
     expect(beta.liveAdmission).toEqual([
-      JSON.stringify({ running: 0, maxSessions: 4, queued: 0, availableBytes: 500, pressure: "critical", memoryPaused: true }),
+      JSON.stringify({ running: 0, maxSessions: 4, queued: 0, queue: [], availableBytes: 500, pressure: "critical", memoryPaused: true }),
     ]);
   });
 
