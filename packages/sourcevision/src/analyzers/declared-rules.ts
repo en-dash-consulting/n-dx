@@ -258,12 +258,12 @@ export function edgeClasses(crossings: ZoneCrossing[]): EdgeClass[] {
   const byPair = new Map<string, ZoneCrossing[]>();
   for (const c of crossings) {
     if (c.fromZone === c.toZone) continue;
-    const key = `${c.fromZone} ${c.toZone}`;
+    const key = `${c.fromZone}\u0000${c.toZone}`;
     byPair.set(key, [...(byPair.get(key) ?? []), c]);
   }
   return [...byPair.entries()]
     .map(([key, cs]) => {
-      const [fromZone, toZone] = key.split(" ");
+      const [fromZone, toZone] = key.split("\u0000");
       return { fromZone, toZone, crossings: cs };
     })
     .sort((a, b) => b.crossings.length - a.crossings.length || a.fromZone.localeCompare(b.fromZone))
