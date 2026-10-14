@@ -1787,10 +1787,11 @@ const GIT_REMOTE_PARSER_FILES = new Map([
       "origin remote.",
   ],
   [
-    "packages/web/src/viewer/components/prd-tree/index-md-sections.ts",
+    "packages/web/src/viewer/utils/commit-link.ts",
     "Viewer code — bundled for the browser and limited to viewer/external.ts for imports, " +
       "so it cannot reach a foundation-tier module. It strips .git from the remote the " +
-      "server sent it to build a commit link. The fix is for the server to send an " +
+      "server sent it to build a commit link, for both the PRD tree's commits table and " +
+      "the Live page's finished-run summary. The fix is for the server to send an " +
       "already-normalized URL, which changes the server→viewer payload and belongs with " +
       "the dashboard's Bitbucket work rather than here.",
   ],

@@ -13,6 +13,9 @@
  * The snapshot — tokens, turns, heartbeat, log tail — is refetched on run
  * frames (no faster than once a second) and on a slower poll as the backstop.
  * Both requests are relative, so under `/w/<key>/` they address that worktree.
+ *
+ * {@link useRunRecord} reads a finished run's record once, for the summary the
+ * page shows in place of the live stream.
  */
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
@@ -114,6 +117,44 @@ export interface LiveTaskSnapshot {
   task: LiveTaskItem | null;
   runs: LiveTaskRun[];
   maxTurns: number | null;
+}
+
+/** Tool-call tallies hench derives at finalization (`structuredSummary.counts`). */
+export interface RunSummaryCounts {
+  filesRead: number;
+  filesChanged: number;
+  commandsExecuted: number;
+  testsRun: number;
+  toolCallsTotal: number;
+}
+
+/**
+ * The run record as `GET /api/hench/runs/:id` answers it, reduced to what the
+ * finished-run summary reads.
+ *
+ * Every field is optional. The route returns hench's record verbatim and the
+ * ones below are all v1 additive, so a record written before any of them
+ * simply arrives without it — the summary says so rather than showing a zero
+ * it did not measure.
+ */
+export interface RunRecordSummary {
+  status?: string;
+  summary?: string;
+  error?: string;
+  turns?: number;
+  startedAt?: string;
+  finishedAt?: string;
+  retryAttempts?: number;
+  spawnCount?: number;
+  spawnBreakdown?: Record<string, number>;
+  structuredSummary?: {
+    filesChanged?: string[];
+    fileChangesWithStatus?: string[];
+    counts?: Partial<RunSummaryCounts>;
+    postRunTests?: { ran?: boolean; passed?: boolean; command?: string };
+  };
+  commits?: Array<{ sha?: string; subject?: string }>;
+  uncommittedPaths?: string[];
 }
 
 /** One progress event as the tail route returns it (hench `RunEvent` plus its line number). */
@@ -312,4 +353,54 @@ export function useLiveTask(taskId: string, pick: (snapshot: LiveTaskSnapshot) =
   }, [running, fetchSnapshot]);
 
   return { snapshot, run, error, events, eventsAvailable, socketOpen, refresh: fetchSnapshot };
+}
+
+// ---------------------------------------------------------------------------
+// The finished run's own record
+// ---------------------------------------------------------------------------
+
+export interface RunRecordData {
+  record: RunRecordSummary | null;
+  /** Why the record could not be read; null while it loads and once it is read. */
+  error: string | null;
+  loading: boolean;
+}
+
+/**
+ * One run's record from `GET /api/hench/runs/:id` — the route the Work view
+ * already uses, so the summary adds no server data of its own.
+ *
+ * Read once per run id and not followed: a finished run's record does not
+ * change, and the page only asks for one after the run has ended. Pass null
+ * to ask for nothing.
+ */
+export function useRunRecord(runId: string | null): RunRecordData {
+  const [state, setState] = useState<RunRecordData>({ record: null, error: null, loading: runId !== null });
+
+  useEffect(() => {
+    if (!runId) {
+      setState({ record: null, error: null, loading: false });
+      return;
+    }
+    let live = true;
+    setState({ record: null, error: null, loading: true });
+    void (async () => {
+      try {
+        const res = await fetch(`/api/hench/runs/${encodeURIComponent(runId)}`);
+        const json: unknown = await res.json().catch(() => null);
+        if (!live) return;
+        if (!res.ok) {
+          const message = (json as { error?: string } | null)?.error ?? `Could not load the run (HTTP ${res.status})`;
+          setState({ record: null, error: message, loading: false });
+          return;
+        }
+        setState({ record: (json ?? {}) as RunRecordSummary, error: null, loading: false });
+      } catch (err) {
+        if (live) setState({ record: null, error: err instanceof Error ? err.message : "Could not load the run", loading: false });
+      }
+    })();
+    return () => { live = false; };
+  }, [runId]);
+
+  return state;
 }
