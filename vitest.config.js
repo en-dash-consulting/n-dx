@@ -1,6 +1,8 @@
 import { defineConfig } from "vitest/config";
+import { hiddenChildProcessAlias } from "./tests/hidden-child-process-alias.mjs";
 
 export default defineConfig({
+  resolve: { alias: [...hiddenChildProcessAlias] },
   test: {
     // Console output is kept for failing tests and dropped for passing ones.
     // A green run of the monorepo printed 7500 lines from hench and 5300 from

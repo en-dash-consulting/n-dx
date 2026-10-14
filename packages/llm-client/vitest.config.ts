@@ -1,9 +1,11 @@
 import { defineConfig } from "vitest/config";
 import { isolationProjects } from "../../tests/vitest-isolation.mjs";
+import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
 
 export default defineConfig({
   resolve: {
     alias: [
+      ...hiddenChildProcessAlias,
       // Map local .js imports to .ts files
       { find: /^(\..+)\.js$/, replacement: "$1.ts" },
     ],
