@@ -43,7 +43,7 @@ plannedRelease: "1.0.0"
 | [Placement engine for changes](./placement-engine-for-changes/index.md) | completed |
 | [Product, Changes and capability views on fixtures](./product-changes-and-capability-views/index.md) | completed |
 | [Read and write the v2 folder trees](./read-and-write-the-v2-folder-trees/index.md) | completed |
-| [Recommendations become changes](./recommendations-become-changes/index.md) | pending |
+| [Recommendations become changes](./recommendations-become-changes/index.md) | completed |
 | [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | completed |
 | [Review follow-ups for the product layer work](./review-follow-ups-for-the-product/index.md) | pending |
 | [rex correctness fixes off the migration path](./rex-correctness-fixes-off-the/index.md) | completed |
