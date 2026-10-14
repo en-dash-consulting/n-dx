@@ -2,7 +2,7 @@
 id: "a6a5ac6a-ca47-435e-8749-91505acad43f"
 level: "feature"
 title: "Live view plumbing: stream running hench and analyze progress to the dashboard"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "live"
@@ -10,6 +10,9 @@ tags:
   - "sourcevision"
   - "web-server"
 source: "Live tab design session 2026-09-30; mockups https://claude.ai/artifact/AvLo4pyFzfs9HT2zZaCTE7"
+startedAt: "2026-10-14T23:23:22.944Z"
+completedAt: "2026-10-14T23:23:22.944Z"
+endedAt: "2026-10-14T23:23:22.944Z"
 acceptanceCriteria:
   - "A hench run started from a terminal and one started from the dashboard both produce a growing log file, a progress event stream and a pid on the run record while they run."
   - "A sourcevision analyze started from a terminal or the dashboard reports its current phase, enrichment pass and batch to the dashboard within 2 seconds of the change."
@@ -17,7 +20,7 @@ acceptanceCriteria:
   - "Run records, manifests and run logs written before this change still load; every schema change is an optional field."
 description: "The dashboard cannot show what a running task or analysis is doing. Hench writes `.run-logs/<ts>-<runId>.log` once, at run end (`packages/hench/src/store/run-log.ts`, called from `agent/lifecycle/shared.ts`), and no route serves it. `RunRecord.events` is only filled in verbose mode. The run's pid exists only in the web server's audit entry, and only for dashboard-started runs. The one live line (`TaskExecutionStatus.lastOutput`) is parsed from stdout of dashboard-started runs, so terminal-started runs show nothing but heartbeat counters. Sourcevision analyze prints `[phase N] Name...` lines and sets `manifest.modules[*].status`, but the web server keeps only the last 3,000 characters of stdout for a dashboard-launched analyze and exposes no structured phase, pass or batch progress.\n\nThis feature adds the data the Live tab needs, all additive: an incremental run log, a structured per-run progress event stream, the pid on the run record, structured analyze progress, tail routes and WebSocket frames, and one aggregate endpoint listing everything live across the repository's worktrees. It must work the same for runs started from a terminal and from the dashboard.\n\nGoal: Every running hench task and sourcevision analysis can be watched step by step from the dashboard, whoever started it and in whichever worktree it runs."
 assignee: "Sterling H <sterling.h@endash.us>"
-lastModified: "2026-10-13T19:53:28.396Z"
+lastModified: "2026-10-14T23:23:23.568Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -53,7 +56,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [The live analysis page's last-run times and estimate filter on exact mode, so cascade runs get none in phases 1-3 or an old run's](./the-live-analysis-page-s-last-run.md) | completed |
 | [The live analysis page shows an older dashboard run's output and error against a newer terminal-started run](./the-live-analysis-page-shows-an-older.md) | completed |
 | [The Live machine strip's vendor and model ignore the default vendor and hench model overrides, disagreeing with the effective config](./the-live-machine-strip-s-vendor-and.md) | completed |
-| [Turn the Live analysis page into a what-changed summary when the analysis finishes](./turn-the-live-analysis-page-into-a.md) | pending |
+| [Turn the Live analysis page into a what-changed summary when the analysis finishes](./turn-the-live-analysis-page-into-a.md) | completed |
 | [Turn the Live task page into the run summary when the run finishes](./turn-the-live-task-page-into-the-run.md) | completed |
 | [vendorPid is not recorded while the review pass and the warm-parent orientation spawn are running](./vendorpid-is-not-recorded-while-the.md) | completed |
 | [Write the hench run log incrementally while the run is in progress](./write-the-hench-run-log-incrementally.md) | completed |
