@@ -2,12 +2,15 @@
 id: "bbb24b0b-47ad-4306-a083-8644da4cd1aa"
 level: "feature"
 title: "Release readiness"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "0.8.0"
   - "release-readiness"
 source: "caos work management: feature ndx 0.8.0 - Release readiness"
+startedAt: "2026-10-14T14:41:02.017Z"
+completedAt: "2026-10-14T14:41:02.017Z"
+endedAt: "2026-10-14T14:41:02.017Z"
 acceptanceCriteria:
   - "changeset status is clean and the bump computes to a minor."
   - "The required tests, boundary tests and navigation contract pass on the release commit."
@@ -16,7 +19,7 @@ acceptanceCriteria:
   - "After the publish, every package has a 0.8.0 git tag and a GitHub release."
 description: "Gate work for the 0.8.0 release: audit the changesets (scoped package names, minor bumps where the epic calls for them), regenerate docs/cli-ui-gap.md, the viewer architecture document and the README command reference, run the navigation contract, compare each shipped page against its wireframe and record the differences in the task rather than dropping them, run the package vulnerability scan, and write the release note listing every redirect added and every new configuration key.\n\n0.7.1 fixed the release plumbing this relies on: a publish now creates one git tag and one GitHub release per package, and the dependency audit is clean, so for 0.8.0 the vulnerability scan confirms rather than fixes.\n\nGoal: 0.8.0 ships with its documentation, contracts and release note matching what was built."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-13T19:52:33.736Z"
+lastModified: "2026-10-14T14:41:02.280Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -26,7 +29,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 |-------|--------|
 | [Audit the 0.8.0 changesets and run the package vulnerability scan](./audit-the-0-8-0-changesets-and-run-the.md) | completed |
 | [Lock the README and docs/guide command references to the help registry](./lock-the-readme-and-docs-guide-command.md) | completed |
-| [Make the ci child-cleanup e2e test deterministic under full-suite load](./make-the-ci-child-cleanup-e2e-test.md) | in_progress |
+| [Make the ci child-cleanup e2e test deterministic under full-suite load](./make-the-ci-child-cleanup-e2e-test.md) | completed |
 | [Make the command-docs parity and cli-ui-gap drift tests pass on Windows CRLF checkouts](./make-the-command-docs-parity-and-cli.md) | completed |
 | [Regenerate the 0.8.0 documents, run the navigation contract and compare pages against the wireframes](./regenerate-the-0-8-0-documents-run-the.md) | completed |
 | [Rewrite viewer-architecture.md for the shipped navigation model](./rewrite-viewer-architecture-md-for-the.md) | completed |

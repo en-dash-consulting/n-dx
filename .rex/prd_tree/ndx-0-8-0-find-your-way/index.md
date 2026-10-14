@@ -32,7 +32,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Machine memory reads true on macOS](./machine-memory-reads-true-on-macos/index.md) | completed |
 | [Navigation and landings](./navigation-and-landings/index.md) | completed |
 | [PRD storage additive](./prd-storage-additive/index.md) | pending |
-| [Release readiness](./release-readiness/index.md) | pending |
+| [Release readiness](./release-readiness/index.md) | completed |
 | [rex log and budget tuners](./rex-log-and-budget-tuners/index.md) | pending |
 | [Settings consolidation](./settings-consolidation/index.md) | completed |
 | [Settings pixel icons](./settings-pixel-icons/index.md) | completed |
