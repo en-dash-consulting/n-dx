@@ -11,6 +11,10 @@
  *   behaviour change made in the same commit as the test, so running against
  *   a dist built from the previous head reported "the fix doesn't work".
  *
+ * Freshness is content-based. The two cases below that set mtimes do so to
+ * falsify the mtime comparison this guard used to make: each one is a scenario
+ * packages/web produces where the mtime ordering and the truth disagree.
+ *
  * @see packages/web/tests/helpers/built-server-guard.ts
  * @see tests/e2e/verify-build.js — the repo-wide sibling this pattern follows
  */
@@ -19,6 +23,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, mkdir, writeFile, utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { writeBuildStamp } from "../../../../../scripts/lib/stale-dist.mjs";
 import { assertFreshServerBuild } from "../../helpers/built-server-guard.js";
 
 describe("assertFreshServerBuild", () => {
@@ -27,7 +32,7 @@ describe("assertFreshServerBuild", () => {
   let distDir: string;
   let entry: string;
 
-  /** Stamp a file's mtime to a fixed offset from a base, for deterministic ordering. */
+  /** Stamp a file's mtime to a fixed instant, for deterministic ordering. */
   async function stampMtime(path: string, epochMs: number): Promise<void> {
     await utimes(path, new Date(epochMs), new Date(epochMs));
   }
@@ -51,53 +56,72 @@ describe("assertFreshServerBuild", () => {
     );
   });
 
-  it("passes when the newest dist output is at least as new as the newest source", async () => {
-    const base = Date.now() - 60_000;
+  it("passes when dist carries a stamp of the current source", async () => {
     await writeFile(join(srcDir, "server", "start.ts"), "export {};");
-    await stampMtime(join(srcDir, "server", "start.ts"), base);
     await writeFile(entry, "export {};");
-    await stampMtime(entry, base + 10_000);
+    writeBuildStamp(srcDir, distDir);
 
     expect(() => assertFreshServerBuild({ srcDir, distDir, entry })).not.toThrow();
   });
 
-  it("fails with a build instruction when a source is newer than every dist output", async () => {
-    const base = Date.now() - 60_000;
-    await writeFile(entry, "export {};");
-    await stampMtime(entry, base);
+  it("fails with a build instruction when a source changed after the build", async () => {
     await writeFile(join(srcDir, "server", "start.ts"), "export {};");
-    await stampMtime(join(srcDir, "server", "start.ts"), base + 10_000);
+    await writeFile(entry, "export {};");
+    writeBuildStamp(srcDir, distDir);
+    await writeFile(join(srcDir, "server", "start.ts"), "export const changed = true;");
 
     expect(() => assertFreshServerBuild({ srcDir, distDir, entry })).toThrow(
       /Stale build output[\s\S]*pnpm --filter @n-dx\/web build/,
     );
   });
 
-  it("judges staleness against the newest file anywhere in dist, not the entry alone", async () => {
-    // packages/web builds incrementally: editing one source refreshes only its
-    // own output, leaving dist/server/start.js untouched. Comparing against
-    // that single file would report a fresh build as stale forever.
+  it("fails when a partial build wrote newer files into dist without recompiling", async () => {
+    // `pnpm --filter @n-dx/web build:landing` refreshes dist/landing/ and never
+    // writes the stamp. The newest file anywhere in dist/ is then younger than
+    // the edited source while dist/server/start.js is still the old compile —
+    // an mtime comparison passes and the test boots the stale server.
     const base = Date.now() - 60_000;
+    await writeFile(join(srcDir, "server", "start.ts"), "export {};");
+    await writeFile(entry, "export {};");
+    writeBuildStamp(srcDir, distDir);
+
+    await writeFile(join(srcDir, "server", "start.ts"), "export const changed = true;");
+    await stampMtime(join(srcDir, "server", "start.ts"), base + 10_000);
+
+    await mkdir(join(distDir, "landing"), { recursive: true });
+    await writeFile(join(distDir, "landing", "index.html"), "<!doctype html>");
+    await stampMtime(join(distDir, "landing", "index.html"), base + 20_000);
+
+    expect(() => assertFreshServerBuild({ srcDir, distDir, entry })).toThrow(
+      /Stale build output[\s\S]*pnpm --filter @n-dx\/web build/,
+    );
+  });
+
+  it("passes when a built source was rewritten with identical content", async () => {
+    // `git restore` of an already-built file: the content is what dist/ was
+    // compiled from, incremental tsc emits nothing, and the mtime is now newer
+    // than every output. An mtime comparison throws here and no rebuild clears
+    // it, because there is nothing left to emit.
+    const base = Date.now() - 60_000;
+    const source = join(srcDir, "server", "start.ts");
+    await writeFile(source, "export {};");
     await writeFile(entry, "export {};");
     await stampMtime(entry, base);
-    await writeFile(join(srcDir, "other.ts"), "export {};");
-    await stampMtime(join(srcDir, "other.ts"), base + 10_000);
-    // The incremental rebuild refreshed only other.js — the build IS current.
-    await writeFile(join(distDir, "other.js"), "export {};");
-    await stampMtime(join(distDir, "other.js"), base + 20_000);
+    writeBuildStamp(srcDir, distDir);
+    await stampMtime(join(distDir, ".build-stamp.json"), base);
+
+    await writeFile(source, "export {};");
+    await stampMtime(source, base + 10_000);
 
     expect(() => assertFreshServerBuild({ srcDir, distDir, entry })).not.toThrow();
   });
 
   it("ignores non-source files when deciding what counts as edited", async () => {
-    const base = Date.now() - 60_000;
     await writeFile(join(srcDir, "server", "start.ts"), "export {};");
-    await stampMtime(join(srcDir, "server", "start.ts"), base);
     await writeFile(entry, "export {};");
-    await stampMtime(entry, base + 10_000);
+    writeBuildStamp(srcDir, distDir);
     // A README edit after the build is not a reason to rebuild.
     await writeFile(join(srcDir, "NOTES.md"), "notes");
-    await stampMtime(join(srcDir, "NOTES.md"), base + 20_000);
 
     expect(() => assertFreshServerBuild({ srcDir, distDir, entry })).not.toThrow();
   });
