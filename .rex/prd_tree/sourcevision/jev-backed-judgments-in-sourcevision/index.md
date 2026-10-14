@@ -43,7 +43,8 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Re-run judgments: Jev decides what needs re-enrichment and which findings still hold](./re-run-judgments-jev-decides-what.md) | completed |
 | [Recursive levels: sub-zones split relative to their parent, clean and named at every depth, iso map expands any level in place](./recursive-levels-sub-zones-split.md) | completed |
 | [Route-aware partitioning: detect file-based routing, treat route directories as generic, group route modules by route subtree](./route-aware-partitioning-detect-file.md) | completed |
-| [Scan quality: symbol evidence, symbol/README name candidates, typed anchored findings, declared-rule checks](./scan-quality-symbol-evidence-symbol.md) | pending |
+| [Scan quality: symbol evidence, symbol/README name candidates, typed anchored findings, declared-rule checks](./scan-quality-symbol-evidence-symbol.md) | in_progress |
 | [Scan speed: one generation call per kind, narration off the critical path](./scan-speed-one-generation-call-per.md) | completed |
 | [Zone areas: a top level of 4–10 areas over the fine zones, tests join the area they test, iso map shows areas with drill-in](./zone-areas-a-top-level-of-410-areas.md) | completed |
 | [Zone identity: ids from the deepest distinguishing directory, clean filename ids, sub-zone ids follow their parent, stale fallback names not treated as chosen, numeric-suffix ids follow verified names](./zone-identity-ids-from-the-deepest.md) | completed |
+| [Live scan-quality measurement with a Jev route, on caos and n-dx](./live-scan-quality-measurement-with-a.md) | pending |

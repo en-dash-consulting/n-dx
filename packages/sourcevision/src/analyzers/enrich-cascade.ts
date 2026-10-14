@@ -215,6 +215,7 @@ export async function cascadeEnrichment(
     projectDir: projectProfile?.projectDir,
     fileArchetypes,
     crossings,
+    imports,
     skipGeneratedNames,
     deferGeneratedNames: options.deferNarration === true,
     routeLayout: routeLayoutFor(inventory.files.map((f) => f.path)),
@@ -249,7 +250,10 @@ export async function cascadeEnrichment(
   }));
 
   // 3. Fragility judged once; bands decide what happens next.
-  const assessment = await assessZoneFragility(named, remapped);
+  const assessment = await assessZoneFragility(named, remapped, {
+    imports,
+    projectDir: projectProfile?.projectDir,
+  });
   addUsage(tokenUsage, assessment.calls, assessment.tokenUsage);
   const fragility = fragilityFindings(named, assessment, CASCADE_PASS);
   prejudgedFindings.push(...fragility);

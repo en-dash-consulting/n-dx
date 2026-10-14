@@ -51,6 +51,7 @@ import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger
 import { readAnalysisOutcome } from "../../analyzers/analysis-outcome.js";
 import { configureJudgmentCache, setJevObserver } from "@n-dx/llm-client";
 import { configureRerunLog } from "../../analyzers/rerun-judge.js";
+import { configureRuleCache } from "../../analyzers/declared-rules.js";
 import {
   isAnalyzeProgressActive,
   startAnalyzeProgress,
@@ -156,6 +157,7 @@ export async function initAndLoadLLMConfig(absDir: string): Promise<{
   setProjectDir(absDir);
   configureJudgmentCache({ svDir: resolveSourcevisionPaths(absDir).svDir });
   configureRerunLog({ svDir: resolveSourcevisionPaths(absDir).svDir });
+  configureRuleCache({ svDir: resolveSourcevisionPaths(absDir).svDir });
   // The Jev client is foundation-tier and cannot import the run ledger, so the
   // accounting is handed to it here — once, beside the cache it also owns.
   setJevObserver({ onCall: recordLLMCall, onCacheStats: recordJudgmentCache });

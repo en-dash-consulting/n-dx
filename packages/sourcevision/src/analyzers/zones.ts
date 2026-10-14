@@ -64,6 +64,13 @@ import {
 import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
 import { judgeFindings, judgeZoneFragility, judgeHeuristicFindings, judgeMoves } from "./enrich-judge.js";
+import {
+  computeTypedFindings,
+  judgeTypedFindings,
+  noulAgreement,
+  probabilitiesByZone,
+} from "./typed-findings.js";
+import { checkDeclaredRules } from "./declared-rules.js";
 import { cascadeEnrichment } from "./enrich-cascade.js";
 import { applyFindingVerdict, findingKey } from "./rerun-judge.js";
 import type { RerunOutcome } from "./rerun-judge.js";
@@ -2443,15 +2450,14 @@ function assembleFindings(
         pass: 0,
         scope: zone.id,
         text,
-        severity: text.includes("Low cohesion") || text.includes("too broad")
-          ? "warning"
-          : text.includes("High coupling")
-            ? "warning"
-            : text.includes("entry points")
-              ? "warning"
-              : text.includes("Generic zone name")
-                ? "warning"
-                : "info",
+        // Cohesion, coupling, breadth and entry-point width used to be
+        // `warning`. They restate a metric in a sentence and name no file, so
+        // neither a reader nor the judgment that graded them could act on one;
+        // typed-findings.ts now covers the same ground from specific edges and
+        // carries anchors. These stay as context at `info`. A generic zone
+        // name is not a metric — it is a gap in the output of this pipeline —
+        // so it keeps its warning.
+        severity: text.includes("Generic zone name") ? "warning" : "info",
       });
     }
   }
@@ -3438,16 +3444,18 @@ export async function analyzeZones(
   // enrichment mode at once. Inert without a judgment route. Here — not inside
   // applyEnrichment — because the evidence a finding is judged against
   // (post-rename crossings, heuristic findings) only exists at this point.
+  const symbolOptions = { imports, projectDir: options?.projectProfile?.projectDir };
   const judged = await judgeFindings(aiFindings, {
     zones: pinnedFinalZones,
     crossings,
     heuristics: structural.findings,
     projectDir: options?.projectProfile?.projectDir,
+    imports,
   });
   const fragilityZones = enrichedFiles && !fragilityJudged
     ? pinnedFinalZones.filter((z) => z.files.some((f) => enrichedFiles.has(f)))
     : [];
-  const fragility = await judgeZoneFragility(fragilityZones, crossings, enrichmentPass);
+  const fragility = await judgeZoneFragility(fragilityZones, crossings, enrichmentPass, symbolOptions);
   aiFindings = [...judged.findings, ...fragility.findings, ...(enrichResult.prejudgedFindings ?? [])];
   for (const r of [judged, fragility]) {
     if (r.calls === 0) continue;
@@ -3483,6 +3491,7 @@ export async function analyzeZones(
     zones: pinnedFinalZones,
     crossings,
     projectDir: options?.projectProfile?.projectDir,
+    imports,
   });
   allFindings = heuristicJudged.findings;
   if (heuristicJudged.calls > 0) {
@@ -3490,6 +3499,59 @@ export async function analyzeZones(
     enrichTokenUsage.calls += heuristicJudged.calls;
     enrichTokenUsage.inputTokens += heuristicJudged.tokenUsage?.input ?? 0;
     enrichTokenUsage.outputTokens += heuristicJudged.tokenUsage?.output ?? 0;
+  }
+
+  // ── Typed findings (typed-findings.ts) ──
+  // Derived from specific edges and anchored on them, so the judgment that
+  // grades each one is shown the edges rather than a metric. Produced with or
+  // without a route; only the grading needs one.
+  const heuristicProbabilities = probabilitiesByZone(allFindings);
+  const typed = computeTypedFindings({
+    zones: pinnedFinalZones,
+    crossings,
+    imports,
+    projectDir: options?.projectProfile?.projectDir,
+    pass: Math.max(1, enrichmentPass),
+  });
+  const typedJudged = await judgeTypedFindings(typed, {
+    zones: pinnedFinalZones,
+    crossings,
+    projectDir: options?.projectProfile?.projectDir,
+    imports,
+  });
+  allFindings = [...allFindings, ...typedJudged.findings];
+  if (typedJudged.calls > 0) {
+    enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+    enrichTokenUsage.calls += typedJudged.calls;
+    enrichTokenUsage.inputTokens += typedJudged.tokenUsage?.input ?? 0;
+    enrichTokenUsage.outputTokens += typedJudged.tokenUsage?.output ?? 0;
+    // The band these two share was carried over from the heuristic judgment.
+    // Printing how often they agree on the same zone is the measurement that
+    // lets it be set from data instead.
+    const agreement = noulAgreement(heuristicProbabilities, probabilitiesByZone(typedJudged.findings));
+    if (agreement.compared > 0) {
+      const pct = Math.round((agreement.agreed / agreement.compared) * 100);
+      console.log(`  [judge] noul agreement: ${agreement.agreed}/${agreement.compared} zones (${pct}%) band the same way under both judgments`);
+    }
+    const anchored = typedJudged.findings.filter((f) => (f.anchors?.length ?? 0) > 0).length;
+    console.log(`  [judge] typed findings: ${anchored}/${typedJudged.findings.length} carry anchors`);
+  }
+
+  // ── Declared-rule checks (declared-rules.ts) ──
+  // The rules the project states about itself, checked against its own
+  // crossings. Silent and free on a repository that declares none.
+  const ruleCheck = await checkDeclaredRules(
+    options?.projectProfile?.projectDir,
+    pinnedFinalZones,
+    crossings,
+    Math.max(1, enrichmentPass),
+  );
+  allFindings = [...allFindings, ...ruleCheck.findings];
+  if (ruleCheck.calls > 0) {
+    enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+    enrichTokenUsage.calls += ruleCheck.calls;
+    enrichTokenUsage.inputTokens += ruleCheck.tokenUsage?.input ?? 0;
+    enrichTokenUsage.outputTokens += ruleCheck.tokenUsage?.output ?? 0;
   }
 
   // ── Back-populate findings into insights for backward compatibility ──
