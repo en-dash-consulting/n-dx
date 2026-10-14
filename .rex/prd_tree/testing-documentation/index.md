@@ -4,12 +4,12 @@ level: "epic"
 title: "Testing & Documentation"
 status: "pending"
 startedAt: "2026-05-06T13:27:57.504Z"
-endedAt: "2026-09-11T19:08:54.771Z"
+endedAt: "2026-10-14T15:07:41.770Z"
 resolutionType: "acknowledgment"
 resolutionDetail: "Fixed final architecture policy test failure (PRD storage invariant violations). All child tasks completed. Test suite passes (1628 tests). Epic infrastructure and documentation goals met."
 description: "Local testing infrastructure (gauntlet config validation), platform/prerequisite documentation, and ongoing documentation refresh for PRD-related changes."
-lastModified: "2026-09-22T23:43:37.188Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-14T15:27:54.841Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -17,7 +17,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Audit Recent Merges and Catalog Documentation Gaps](./audit-recent-merges-and-catalog/index.md) | completed |
-| [CI wall time: Windows leg under 10 minutes without dropping coverage](./ci-wall-time-windows-leg-under-10/index.md) | pending |
+| [CI wall time: Windows leg under 10 minutes without dropping coverage](./ci-wall-time-windows-leg-under-10/index.md) | completed |
 | [Claude and Codex Config Validation in Gauntlet](./claude-and-codex-config-validation-in/index.md) | completed |
 | [Contributor Page Section Expansion](./contributor-page-section-expansion/index.md) | completed |
 | [Developer Environment Prerequisites Documentation](./developer-environment-prerequisites/index.md) | completed |
@@ -36,7 +36,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Gauntlet Test Suite Audit and Cross-OS Validity Review](./gauntlet-test-suite-audit-and-cross-os/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main/index.md) | completed |
 | [macOS Local Docker Test Suite](./macos-local-docker-test-suite/index.md) | completed |
-| [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | pending |
+| [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | completed |
 | [`@n-dx/rex` fails intermittently under `pnpm test` but passes standalone](./n-dx-rex-fails-intermittently-under/index.md) | completed |
 | [Narrow jsonResponse utility scope](./narrow-jsonresponse-utility-scope/index.md) | completed |
 | [Open Source Scope Documentation Audit and Cross-Reference](./open-source-scope-documentation-audit/index.md) | completed |
@@ -48,6 +48,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [TreeNodes DOM Performance Optimization](./treenodes-dom-performance-optimization/index.md) | completed |
 | [Update Documentation for New PRD Structure](./update-documentation-for-new-prd/index.md) | completed |
 | [Web Viewer Architecture: Package Extraction and Independent Viewers](./web-viewer-architecture-package/index.md) | completed |
+| [A rex test worker exits mid-run under pnpm validate concurrency, failing the suite with every test passing](./a-rex-test-worker-exits-mid-run-under.md) | pending |
 | [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-stale.md) | completed |
 | [Auto-Update Detection from npm Registry](./auto-update-detection-from-npm-registry.md) | completed |
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-the.md) | completed |

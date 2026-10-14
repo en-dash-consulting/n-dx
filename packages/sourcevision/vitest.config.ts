@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { isolationProjects } from "../../tests/vitest-isolation.mjs";
 import { resolve } from "node:path";
+import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
 
 const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
 const sandboxBlocksNetwork = process.env["CODEX_SANDBOX_NETWORK_DISABLED"] === "1";
@@ -8,6 +9,7 @@ const sandboxBlocksNetwork = process.env["CODEX_SANDBOX_NETWORK_DISABLED"] === "
 export default defineConfig({
   resolve: {
     alias: [
+      ...hiddenChildProcessAlias,
       // Map @n-dx/llm-client to source public.ts for vitest
       { find: /^@n-dx\/llm-client$/, replacement: `${llmClientRoot}/src/public.ts` },
       // Map local .js imports to .ts files (only relative paths)

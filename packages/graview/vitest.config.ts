@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import { resolve } from "node:path";
+import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
 
 const rexRoot = resolve(import.meta.dirname, "../rex");
 const svRoot = resolve(import.meta.dirname, "../sourcevision");
@@ -9,6 +10,7 @@ const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
 export default defineConfig({
   resolve: {
     alias: [
+      ...hiddenChildProcessAlias,
       // Map bare package imports to their source public.ts barrels for vitest,
       // as hench and web do, so tests run against src rather than a stale dist.
       { find: /^@n-dx\/rex$/, replacement: `${rexRoot}/src/public.ts` },

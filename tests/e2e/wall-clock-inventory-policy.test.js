@@ -13,7 +13,7 @@
  * hand audit demonstrably misses sites. This scan makes the next new one a test
  * failure at the moment it is written instead of a mystery months later.
  *
- * There are two detectors, because there are two shapes.
+ * There are three detectors, because there are three shapes.
  *
  * **Detector 1 — the clock decides a bound.** Requires both:
  *   1. The file reads a clock — `performance.now()`, `Date.now()`, or
@@ -39,6 +39,31 @@
  * unlocked reader every chance to slip past and an explicit promise gate then
  * decides the verdict — has that gate's `await` in between and is not flagged.
  *
+ * **Detector 3 — a wall-clock deadline bounds a polling wait.** Requires both:
+ *   1. A deadline computed from a clock — `Date.now() + …`.
+ *   2. A loop or guard comparing a fresh clock read against it —
+ *      `while (Date.now() < deadline)`, `if (Date.now() >= deadline) throw`.
+ *
+ * This is the shape the other two are blind to, and it is how the whole family
+ * reaches a *spawned process*. Nothing names a duration (condition 2 of
+ * detector 1 fails) and nothing sleeps before an assertion (detector 2's run is
+ * broken by the loop's own `await`), yet the test's progress is still decided by
+ * a clock: if the child has not got there by the deadline, the suite fails with
+ * the code unchanged. `tests/e2e/cli-ci-child-cleanup.test.js` failed exactly
+ * this way under full-suite load on 2026-09-28 and had to be found by hand,
+ * which is the gap this detector closes.
+ *
+ * These are *mostly* legitimate — TESTING.md, Family 3 is explicit that a
+ * bounded poll around a real process is a hang guardrail — so being flagged
+ * here is not an accusation. It is the same contract as the other two: the site
+ * has to be written down. What the register is for is the distinction between a
+ * poll that bounds a hang and a poll whose expiry is the verdict, and that
+ * distinction is not visible in the regex.
+ *
+ * Both halves are needed. Condition 1 alone catches every `Date.now() + 90_000`
+ * used to build a fixture timestamp; condition 2 alone catches comparisons of
+ * two unrelated recorded times.
+ *
  * A flagged file satisfies the policy by being mentioned anywhere in the
  * inventory. The inventory itself records whether the mention is a conversion, a
  * justification, or an acknowledged open item — this scan only guarantees the
@@ -47,9 +72,9 @@
  * ### What these scans still cannot see
  *
  * A real sleep separated from its assertion by an unrelated `await`, and any
- * load-sensitivity that is not expressed as either a bounded duration or a
- * sleep — a fixed retry count, say. Do not read a green run here as proof the
- * suite is load-independent.
+ * load-sensitivity that is not expressed as a bounded duration, a sleep or a
+ * clock-bounded poll — a fixed retry count, say. Do not read a green run here as
+ * proof the suite is load-independent.
  *
  * @see tests/wall-clock-assertion-inventory.md
  * @see TESTING.md — Flake Resistance, Family 2
@@ -143,6 +168,24 @@ const SLEEP_THEN_ASSERT = new RegExp(
   "g",
 );
 
+/**
+ * A deadline computed from a clock: `Date.now() + TIMEOUT_MS`.
+ *
+ * `performance.now()` as well as `Date.now()`, because either can carry a poll
+ * — the detector should not depend on which clock a given author reached for.
+ */
+const CLOCK_DEADLINE = /(?:Date|performance)\.now\s*\(\s*\)\s*\+/;
+
+/**
+ * A loop or guard comparing a fresh clock read against that deadline.
+ *
+ * `[^;{}]{0,80}` keeps the match inside one condition, so a `while` further up
+ * the file cannot be paired with a clock comparison below it. `for` is included
+ * for the `for (;;)`-with-guard spelling of the same loop.
+ */
+const CLOCK_DEADLINE_GUARD =
+  /(?:while|for|if)\s*\([^;{}]{0,80}?(?:Date|performance)\.now\s*\(\s*\)\s*[<>]=?/;
+
 function walkTestFiles(dir, files = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === "node_modules" || entry.name === "dist" || entry.name.startsWith(".")) continue;
@@ -197,6 +240,21 @@ function findSleepDecidedTestFiles() {
       if (relPath === SELF) continue;
       SLEEP_THEN_ASSERT.lastIndex = 0;
       if (!SLEEP_THEN_ASSERT.test(readFileSync(file, "utf8"))) continue;
+      flagged.push(relPath);
+    }
+  }
+  return [...new Set(flagged)].sort();
+}
+
+function findDeadlinePolledTestFiles() {
+  const flagged = [];
+  for (const root of collectScanRoots()) {
+    for (const file of walkTestFiles(root)) {
+      const relPath = toPosixRelative(file);
+      if (relPath === SELF) continue;
+      const content = readFileSync(file, "utf8");
+      if (!CLOCK_DEADLINE.test(content)) continue;
+      if (!CLOCK_DEADLINE_GUARD.test(content)) continue;
       flagged.push(relPath);
     }
   }
@@ -289,6 +347,47 @@ describe("wall-clock assertion inventory completeness", () => {
         `production code resolves, or fake timers advanced by a named ` +
         `interval. If the sleep must stay, add a row to the inventory saying ` +
         `why load cannot flip the result.`,
+    ).toEqual([]);
+  });
+
+  it("flags the known deadline-polled suites (detector self-test)", () => {
+    const flagged = findDeadlinePolledTestFiles();
+    // Same vacuous-green guard as the two detectors above. These three poll for
+    // a killed process tree, an HTTP session and a daemon's pidfile — three
+    // unrelated reasons, so a narrowing that breaks one spelling is unlikely to
+    // break all three.
+    expect(flagged).toContain("tests/e2e/cli-ci-child-cleanup.test.js");
+    expect(flagged).toContain("tests/e2e/mcp-transport.test.js");
+    expect(flagged).toContain("packages/web/tests/integration/hub-daemon.test.ts");
+  });
+
+  it("does not flag a clock-stamped fixture with no deadline poll", () => {
+    const flagged = findDeadlinePolledTestFiles();
+    // Condition 2 earning its place. This file builds fixtures from
+    // `Date.now() - 90_000` and asserts on the field that results; there is no
+    // poll, and a detector that matched the arithmetic alone would flag most of
+    // the repo and train people to add inventory rows without reading them.
+    expect(flagged).not.toContain(
+      "packages/web/tests/unit/server/routes-hench-task-usage-rollup.test.ts",
+    );
+  });
+
+  it("every test file that polls against a wall-clock deadline is in the inventory", () => {
+    const inventory = readFileSync(INVENTORY_PATH, "utf8");
+    const missing = findDeadlinePolledTestFiles().filter((relPath) => !inventory.includes(relPath));
+
+    expect(
+      missing,
+      `Test file(s) bound a polling wait with a wall-clock deadline but have ` +
+        `no entry in tests/wall-clock-assertion-inventory.md:\n` +
+        missing.map((f) => `  - ${f}`).join("\n") +
+        `\nA poll that expires decides the test's progress: if the process ` +
+        `has not got there in time, the suite fails with the code unchanged. ` +
+        `Prefer a gate on the event itself — the record arriving, or the ` +
+        `process exiting, whichever comes first — as ` +
+        `tests/e2e/cli-ci-child-cleanup.test.js does in waitForPidRecords. ` +
+        `If the deadline must stay as a hang guardrail, scale it with ` +
+        `NDX_TEST_TIME_MULTIPLIER and add a row saying what it bounds.`,
     ).toEqual([]);
   });
 });

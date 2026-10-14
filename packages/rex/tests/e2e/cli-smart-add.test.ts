@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { cp, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -60,6 +60,39 @@ async function stubLLM(dir: string): Promise<void> {
 }
 
 /**
+ * An initialized project, built by a single `rex init` for the whole file.
+ *
+ * Every test here used to spawn its own `rex init` — 29 CLI starts costing
+ * about a second each locally and three on the Windows CI runner. The spawn
+ * produces the same directory every time, so it runs once into a template and
+ * each test that needs an initialized project copies it instead.
+ *
+ * The copy carries the template's basename: `rex init` writes it into
+ * `.rex/config.json` as `project` and into the prd_tree heading. Nothing here
+ * asserts on either, so a copy behaves as a fresh init would — a test that did
+ * assert on the project name would need its own init.
+ *
+ * Tests that exercise the *missing* `.rex/` path simply do not call
+ * {@link useTemplate} and keep the bare directory `beforeEach` gives them.
+ */
+let templateDir: string;
+
+beforeAll(async () => {
+  templateDir = await mkdtemp(join(tmpdir(), "rex-e2e-smart-add-template-"));
+  await stubLLM(templateDir);
+  run(["init", templateDir]);
+});
+
+afterAll(async () => {
+  await rm(templateDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+});
+
+/** Lay the initialized template over `dir`, replacing a `rex init` spawn. */
+async function useTemplate(dir: string): Promise<void> {
+  await cp(templateDir, dir, { recursive: true });
+}
+
+/**
  * Run command with a very short timeout — used for tests that trigger LLM calls
  * where we just want to verify routing, not wait for the LLM response.
  */
@@ -91,7 +124,7 @@ describe("rex add (smart mode routing)", () => {
   });
 
   it("manual mode still works: rex add epic --title=X", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const output = run(["add", "epic", "--title=Test Epic", tmpDir]);
 
@@ -104,7 +137,7 @@ describe("rex add (smart mode routing)", () => {
   });
 
   it("manual mode still works: rex add feature with parent", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
     const epicOutput = run(["add", "epic", "--title=My Epic", "--format=json", tmpDir]);
     const epicId = JSON.parse(epicOutput).id;
 
@@ -114,7 +147,7 @@ describe("rex add (smart mode routing)", () => {
   });
 
   it("--level flag routes to manual mode", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const output = run(["add", "--level=epic", "--title=Flag Epic", tmpDir]);
 
@@ -126,7 +159,7 @@ describe("rex add (smart mode routing)", () => {
   });
 
   it("--level flag with --parent creates correct child", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
     const epicOutput = run(["add", "--level=epic", "--title=Parent Epic", "--format=json", tmpDir]);
     const epicId = JSON.parse(epicOutput).id;
 
@@ -142,7 +175,7 @@ describe("rex add (smart mode routing)", () => {
   });
 
   it("--title only (no level) defaults to epic", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const output = run(["add", "--title=Auto Epic", "--format=json", tmpDir]);
     const parsed = JSON.parse(output);
@@ -152,7 +185,7 @@ describe("rex add (smart mode routing)", () => {
   });
 
   it("--title with --parent infers level from parent", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
     const epicOutput = run(["add", "epic", "--title=E", "--format=json", tmpDir]);
     const epicId = JSON.parse(epicOutput).id;
 
@@ -170,7 +203,7 @@ describe("rex add (smart mode routing)", () => {
   });
 
   it("--title bypasses LLM even with description-like text", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     // With --title, this should NOT trigger smart mode even though the title
     // looks like a natural language description
@@ -186,8 +219,8 @@ describe("rex add (smart mode routing)", () => {
     expect(output).not.toContain("LLM");
   });
 
-  it("smart mode with --parent validates parent exists", () => {
-    run(["init", tmpDir]);
+  it("smart mode with --parent validates parent exists", async () => {
+    await useTemplate(tmpDir);
 
     const { stderr } = runExpectFail([
       "add",
@@ -200,7 +233,7 @@ describe("rex add (smart mode routing)", () => {
   });
 
   it("smart mode with --parent rejects subtask parent", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     // Build a chain: epic → feature → task → subtask
     const epicOut = run(["add", "epic", "--title=E", "--format=json", tmpDir]);
@@ -226,7 +259,7 @@ describe("rex add (smart mode routing)", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("smart mode with valid --parent scopes to parent", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
     const epicOut = run(["add", "epic", "--title=Existing Epic", "--format=json", tmpDir]);
     const epicId = JSON.parse(epicOut).id;
 
@@ -264,7 +297,7 @@ describe("rex add (smart mode routing)", () => {
   });
 
   it("smart mode triggers for non-level first argument", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     // Run with short timeout — we just want to verify routing to smart add
     // The command will either print "Analyzing description..." before the LLM call
@@ -287,7 +320,7 @@ describe("rex add (smart mode routing)", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("smart mode with --description flag", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const { stderr, stdout, timedOut } = runQuick([
       "add",
@@ -332,7 +365,7 @@ describe("rex add with multiple descriptions", () => {
   });
 
   it("multiple positional descriptions trigger smart mode with multi label", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const { stderr, stdout, timedOut } = runQuick([
       "add",
@@ -353,7 +386,7 @@ describe("rex add with multiple descriptions", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("two descriptions route to multi-description mode", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const { stderr, stdout, timedOut } = runQuick([
       "add",
@@ -372,7 +405,7 @@ describe("rex add with multiple descriptions", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("--description flag combined with positional args", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const { stderr, stdout, timedOut } = runQuick([
       "add",
@@ -403,7 +436,7 @@ describe("rex add with multiple descriptions", () => {
   });
 
   it("single description still works normally", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const { stderr, stdout, timedOut } = runQuick([
       "add",
@@ -450,7 +483,7 @@ describe("rex add --file (idea import)", () => {
   });
 
   it("routes --file flag to idea import mode", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const ideasFile = join(tmpDir, "ideas.txt");
     await writeFile(
@@ -477,7 +510,7 @@ describe("rex add --file (idea import)", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("supports multiple --file flags", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const file1 = join(tmpDir, "ideas1.txt");
     const file2 = join(tmpDir, "ideas2.txt");
@@ -502,7 +535,7 @@ describe("rex add --file (idea import)", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("--file works alongside a description", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const ideasFile = join(tmpDir, "ideas.txt");
     await writeFile(ideasFile, "add charts");
@@ -526,7 +559,7 @@ describe("rex add --file (idea import)", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("--file=<path> without positional args routes correctly", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const ideasFile = join(tmpDir, "ideas.txt");
     await writeFile(ideasFile, "build a notifications system");
@@ -545,7 +578,7 @@ describe("rex add --file (idea import)", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("positional .md file path auto-detected as file import", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const mdFile = join(tmpDir, "requirements.md");
     await writeFile(mdFile, `# Auth\n## Login\n- Validate credentials\n`);
@@ -573,7 +606,7 @@ describe("rex add --file (idea import)", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("positional .txt file path auto-detected as file import", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const txtFile = join(tmpDir, "ideas.txt");
     await writeFile(txtFile, `Requirements:\n- Build the thing\n- Ship it\n`);
@@ -590,7 +623,7 @@ describe("rex add --file (idea import)", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("non-existent .md path treated as description, not file", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     // File does NOT exist — should be treated as description text
     const { stderr, stdout, timedOut } = runQuick([
@@ -623,7 +656,7 @@ describe("rex add with piped stdin", () => {
   });
 
   it("accepts piped stdin as description", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const result = spawnSync("node", [cliPath, "add", tmpDir], {
       input: "Add a notifications system with email and push support",
@@ -642,7 +675,7 @@ describe("rex add with piped stdin", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("piped multiline input is treated as single description", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const input = "Add user authentication\nwith OAuth and JWT support\nand password reset";
     const result = spawnSync("node", [cliPath, "add", tmpDir], {
@@ -664,7 +697,7 @@ describe("rex add with piped stdin", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("piped stdin combines with positional descriptions", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const result = spawnSync(
       "node",
@@ -688,7 +721,7 @@ describe("rex add with piped stdin", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("empty piped input is ignored", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const result = spawnSync(
       "node",
@@ -713,7 +746,7 @@ describe("rex add with piped stdin", () => {
   }, CLI_E2E_TIMEOUT);
 
   it("piped stdin without any other description triggers smart mode", async () => {
-    run(["init", tmpDir]);
+    await useTemplate(tmpDir);
 
     const result = spawnSync("node", [cliPath, "add", tmpDir], {
       input: "Build a REST API for user management",
@@ -734,8 +767,8 @@ describe("rex add with piped stdin", () => {
     ).toBe(true);
   }, CLI_E2E_TIMEOUT);
 
-  it("shows error with no piped input and no arguments", () => {
-    run(["init", tmpDir]);
+  it("shows error with no piped input and no arguments", async () => {
+    await useTemplate(tmpDir);
 
     // No stdin input, no positional args — should error
     const { stderr } = runExpectFail(["add", tmpDir]);

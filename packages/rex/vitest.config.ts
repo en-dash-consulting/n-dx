@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { isolationProjects } from "../../tests/vitest-isolation.mjs";
 import { resolve } from "node:path";
+import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
 
 const claudeClientRoot = resolve(import.meta.dirname, "../claude-client");
 const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
@@ -8,6 +9,7 @@ const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
 export default defineConfig({
   resolve: {
     alias: [
+      ...hiddenChildProcessAlias,
       // Map @n-dx/llm-client to source public.ts for vitest
       { find: /^@n-dx\/claude-client$/, replacement: `${claudeClientRoot}/src/public.ts` },
       // Map @n-dx/llm-client to source public.ts for vitest

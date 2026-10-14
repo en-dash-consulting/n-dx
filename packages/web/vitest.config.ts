@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { resolve } from "node:path";
 import { isolationProjects } from "../../tests/vitest-isolation.mjs";
+import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
 
 const rexRoot = resolve(import.meta.dirname, "../rex");
 const svRoot = resolve(import.meta.dirname, "../sourcevision");
@@ -11,6 +12,7 @@ const sandboxBlocksNetwork = process.env["CODEX_SANDBOX_NETWORK_DISABLED"] === "
 export default defineConfig({
   resolve: {
     alias: [
+      ...hiddenChildProcessAlias,
       // Map bare "@n-dx/rex" import to source public.ts barrel for vitest
       { find: /^@n-dx\/rex$/, replacement: `${rexRoot}/src/public.ts` },
       // Map rex subpath imports to source .ts files for vitest

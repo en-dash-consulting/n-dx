@@ -14,7 +14,11 @@ import type { RunRecord } from "../../../../src/schema/index.js";
 import { RM_RETRY } from "../../../helpers/index.js";
 
 function git(dir: string, args: string[]): string {
-  return execFileSync("git", args, { cwd: dir, encoding: "utf-8" }).trim();
+  // stdio: execFileSync inherits the parent's stderr unless told otherwise, and
+  // `checkout -b` reports "Switched to a new branch" there. That write leaves
+  // the process by fd 2, past any runner-level console capture, so it printed
+  // into every green run of this suite.
+  return execFileSync("git", args, { cwd: dir, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
 describe("findPriorAttemptWork", () => {

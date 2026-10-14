@@ -29,9 +29,25 @@
  * a NODE_OPTIONS=--import preload patches child_process.spawn so that any
  * node call to a sourcevision or rex CLI entry point, plus the initial docs
  * build, is redirected to a lightweight "double" script. The docs-build
- * double emits the first observable child-readiness signal, so the PID-record
- * deadline never includes the unrelated VitePress build duration. The double
- * records its PID and behaves according to NDX_TEST_CI_MODE.
+ * double emits the first observable child-readiness signal, so the wait for a
+ * tracked child never includes the unrelated VitePress build duration. The
+ * double records its PID and behaves according to NDX_TEST_CI_MODE.
+ *
+ * ### Why there is no deadline on the record wait
+ *
+ * Waiting for a real process to reach a real spawn is the load-sensitive part
+ * of this file, and it used to be a `while (Date.now() < deadline)` poll. That
+ * deadline is what failed under full-suite load on 2026-09-28 — the product
+ * worked, the machine was busy, and the suite said "Timed out waiting for
+ * required CI child records". {@link waitForPidRecords} replaced it with a gate
+ * whose only outcomes are events; see its header for what that buys and what it
+ * leaves to the per-test timeout.
+ *
+ * The file is still flagged by tests/e2e/wall-clock-inventory-policy.test.js —
+ * {@link waitForPidExit} is a deadline-bounded poll and is meant to be, because
+ * what it bounds is the product's own force-kill timer. The inventory records
+ * the distinction. Keep it that way: a new wait here either waits for an event
+ * or explains itself in tests/wall-clock-assertion-inventory.md.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -79,8 +95,24 @@ const CHILD_FORCE_KILL_TIMEOUT_MS = 5_000;
 /** Test-side allowance on top of the product's force-kill timer. */
 const SHUTDOWN_ASSERTION_BUFFER_MS = 1_500 * BUDGET_MULTIPLIER;
 
-/** How long to wait for a spawned fixture child to write its first PID record. */
-const PID_RECORD_TIMEOUT_MS = 3_000 * BUDGET_MULTIPLIER;
+/**
+ * How often {@link waitForPidRecords} re-reads the PID file.
+ *
+ * NOT a budget and deliberately unscaled: nothing ends because this elapses.
+ * It is only how often a file another process appends to is sampled, and the
+ * gate's two terminating conditions are both events.
+ */
+const RECORD_RECHECK_MS = 25;
+
+/**
+ * Hang ceiling for the SIGINT case's record gate — see
+ * {@link FORCE_KILL_TEST_TIMEOUT_MS}, the only place it is used.
+ *
+ * Before the gate this was the record wait's own deadline, and expiring it was
+ * the failure this file was rewritten for. It now bounds nothing but a true
+ * hang: `ndx ci` alive, forever, having never reached its first tracked spawn.
+ */
+const CHILD_STARTUP_GRACE_MS = 3_000 * BUDGET_MULTIPLIER;
 
 /** How long teardown waits for an already-killed child to leave the process table. */
 const ORPHAN_REAP_GRACE_MS = 2_000 * BUDGET_MULTIPLIER;
@@ -89,19 +121,25 @@ const ORPHAN_REAP_GRACE_MS = 2_000 * BUDGET_MULTIPLIER;
 const NORMAL_EXIT_GRACE_MS = 500 * BUDGET_MULTIPLIER;
 
 /**
- * Per-test ceiling for the SIGINT case, kept ABOVE the guardrails inside it so a
- * hang is reported by the helper that owns it — "timed out waiting for required
- * CI child records" — rather than as an opaque test timeout. TESTING.md requires
- * that ordering, and the previous constant no longer satisfied it once the
- * record deadline scaled. The sum is the file's worst sequential path: wait for
- * both PID records, then for the product's force-kill timer to complete.
+ * Per-test ceiling for the SIGINT case: the hang guardrail for the record gate,
+ * which no longer carries a deadline of its own.
  *
- * 100s at the default multiplier, inside the root config's 120s testTimeout. The
- * other case in this file needs no override: its guardrails sum to 70s, already
- * under that default.
+ * TESTING.md prefers a hang to be reported by the helper that owns it, and the
+ * gate still does that for every failure it can name — a parent that exits
+ * without registering a child is reported with that parent's exit code and
+ * stderr, which the old deadline could not distinguish from slowness. What is
+ * left for a timeout is the case nothing can name: parent alive, records never
+ * written, no event ever arriving. TESTING.md's Timeout Guardrails section is
+ * explicit that a per-test timeout is the right instrument when a single test
+ * owns the risky wait path.
+ *
+ * The sum is the file's worst sequential path: reach the first tracked spawn,
+ * then let the product's force-kill timer complete. 100s at the default
+ * multiplier, inside the root config's 120s testTimeout. The other case in this
+ * file needs no override: its waits sum to 70s, already under that default.
  */
 const FORCE_KILL_TEST_TIMEOUT_MS =
-  PID_RECORD_TIMEOUT_MS + CHILD_FORCE_KILL_TIMEOUT_MS + SHUTDOWN_ASSERTION_BUFFER_MS + 5_000;
+  CHILD_STARTUP_GRACE_MS + CHILD_FORCE_KILL_TIMEOUT_MS + SHUTDOWN_ASSERTION_BUFFER_MS + 5_000;
 
 function isPidRunning(pid) {
   if (!Number.isInteger(pid)) return false;
@@ -155,34 +193,52 @@ async function readPidRecords(pidFile) {
 }
 
 /**
- * Read the first PID record written by ci-child-double.mjs.
- * Polls until the record appears or the timeout elapses.
+ * Gate: resolve with the PID records as soon as `predicate` accepts them, or
+ * reject the moment the CLI parent exits without ever producing them.
+ *
+ * **No wall-clock deadline decides this.** The previous shape was
+ * `while (Date.now() < deadline)` around the same read, and that deadline is
+ * precisely what failed under full-suite load on 2026-09-28: "Timed out waiting
+ * for required CI child records", at 9277ms, on a run where the product was
+ * working and the machine was merely busy. Widening the deadline moves that
+ * failure, it does not remove it — the verdict was still a function of
+ * `(code, machine load)`.
+ *
+ * Both terminating conditions here are events, and load can reorder neither:
+ *
+ *   - the records arrive, however long `ndx ci` took to reach its first tracked
+ *     spawn — a slow machine makes this later, never wrong;
+ *   - the parent exits first, which is a real defect and is now reported as one,
+ *     with the exit code and the parent's stderr. The old deadline could not
+ *     tell that case from slowness and described both as a timeout.
+ *
+ * {@link RECORD_RECHECK_MS} is how a file another process appends to is
+ * sampled, not a budget: the loop never ends because it elapsed. A genuine hang
+ * — parent alive, records never written — has no event to wait for and is
+ * caught by the per-test timeout. See {@link FORCE_KILL_TEST_TIMEOUT_MS}.
  */
-async function readFirstPidRecord(pidFile, timeoutMs = PID_RECORD_TIMEOUT_MS) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const content = await readFile(pidFile, "utf8");
-      const line = content.trim().split("\n").find(Boolean);
-      if (line) return JSON.parse(line);
-    } catch {
-      // File not yet written — keep polling.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
+async function waitForPidRecords(run, predicate, description) {
+  let exit = null;
+  run.exited.then((result) => {
+    exit = result;
+  });
 
-  throw new Error(`Timed out waiting for CI child PID record at ${pidFile}`);
-}
-
-async function readPidRecordsUntil(pidFile, predicate, timeoutMs = PID_RECORD_TIMEOUT_MS) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const records = await readPidRecords(pidFile);
+  for (;;) {
+    const records = await readPidRecords(run.pidFile);
     if (predicate(records)) return records;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
 
-  throw new Error(`Timed out waiting for required CI child records at ${pidFile}`);
+    // Checked AFTER the read, so a parent that registered its child and exited
+    // in the same breath is a pass rather than a race.
+    if (exit) {
+      throw new Error(
+        `ndx ci exited (code ${exit.code}, signal ${exit.signal}) before ${description}.\n` +
+          `PID records written: ${JSON.stringify(records)}\n` +
+          `stderr:\n${run.stderr.join("")}`,
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, RECORD_RECHECK_MS));
+  }
 }
 
 function withImportedNodeOptions(preloadPath) {
@@ -270,6 +326,20 @@ function spawnCI(tmpDir, mode) {
   const run = {
     child,
     pidFile,
+    // Live buffers rather than only the joined strings on `done`: the record
+    // gate reports what the parent printed before it died, and cannot await
+    // `close` to get it without becoming the hang it is diagnosing.
+    stdout,
+    stderr,
+    // `exit`, not `close`: the process leaving the table is the event that
+    // matters to both callers — the gate's liveness check and teardown's
+    // release of the cwd handle on tmpDir. `close` additionally waits for the
+    // stdio pipes, which a detached descendant can hold open past the parent's
+    // death, and waiting for that here would reintroduce an indefinite wait at
+    // exactly the two points that must not have one.
+    exited: new Promise((resolve) => {
+      child.on("exit", (code, signal) => resolve({ code, signal }));
+    }),
     done: new Promise((resolve) => {
       child.on("close", (code, signal) => {
         resolve({ code, signal, stdout: stdout.join(""), stderr: stderr.join("") });
@@ -385,13 +455,25 @@ describe("n-dx ci child-process cleanup regression coverage", () => {
         // Raced us to exit.
       }
     }
+
+    // 3. Only now is tmpDir removable. The CLI parent is spawned with
+    //    `cwd: tmpDir` and every double inherits it, and on Windows a live
+    //    process's working directory is an open handle: rmdir fails EBUSY
+    //    while any of them is still exiting.
+    //    That is the second error in the 2026-09-28 failure — `EBUSY: resource
+    //    busy or locked, rmdir` immediately after the record timeout, teardown
+    //    racing a process tree that had not finished going away.
+    //
+    //    Waiting on `exited` removes the race rather than retrying through it.
+    //    It cannot hang on a parent that is already gone (the promise is
+    //    resolved) nor on one still running (it was SIGKILLed in step 1), and
+    //    the fixture children were awaited in step 2.
+    await Promise.all(activeRuns.map((run) => run.exited));
     activeRuns.length = 0;
 
-    // maxRetries/retryDelay: the CLI child is spawned with cwd: tmpDir, so on
-    // Windows the directory can still be handle-locked when teardown runs and
-    // rmdir fails with EBUSY. Under full-suite load this is the difference
-    // between green and an intermittent red that has nothing to do with the
-    // assertion under test.
+    // The retries stay as a backstop for the handles this test does not own:
+    // on Windows an antivirus or indexer scanning a just-written temp file
+    // holds it briefly, and that is nobody's process to wait for.
     await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
     // Loud, not silent. The processes above have already been reaped, so this
@@ -402,9 +484,13 @@ describe("n-dx ci child-process cleanup regression coverage", () => {
 
   it("terminates the ci subprocess after a successful run", async () => {
     const run = spawnCI(tmpDir, "success");
-    // The docs-build double is the first tracked CI child and emits the
-    // readiness record before this assertion's timeout begins.
-    const pidRecord = await readFirstPidRecord(run.pidFile);
+    // The docs-build double is the first tracked CI child, so one record is
+    // enough to know the pipeline reached a spawn the tracker owns.
+    const [pidRecord] = await waitForPidRecords(
+      run,
+      (records) => records.length > 0,
+      "registering its first tracked child",
+    );
     expect(pidRecord.kind).toBe("docs-build");
     const result = await run.done;
 
@@ -419,10 +505,11 @@ describe("n-dx ci child-process cleanup regression coverage", () => {
     { timeout: FORCE_KILL_TEST_TIMEOUT_MS },
     async () => {
       const run = spawnCI(tmpDir, "hang");
-      const records = await readPidRecordsUntil(
-        run.pidFile,
+      const records = await waitForPidRecords(
+        run,
         (candidate) => candidate.some((record) => record.kind === "docs-build") &&
           candidate.some((record) => record.kind === "docs-build-grandchild"),
+        "registering both the docs-build child and its grandchild",
       );
       const docsBuild = records.find((record) => record.kind === "docs-build");
       const docsBuildGrandchild = records.find((record) => record.kind === "docs-build-grandchild");
