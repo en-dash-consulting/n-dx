@@ -717,6 +717,29 @@ claude mcp list       # both should report ✔ Connected
 
 No manual JSON editing is needed, and nothing else in the config is touched.
 
+### The one place production code knows it is under test
+
+`isRollingMode()` in `packages/hench/src/types/output.ts` returns `false` when
+`process.env.VITEST` is set. It is the only production read of a test-runner
+variable in the monorepo, and it should stay the only one.
+
+**Why it is not the usual mistake.** The rolling window renders with
+`process.stdout.write`. Vitest's `silent: "passed-only"` buffers `console.*`
+and nothing else, so raw stdout writes land in the terminal on a green run,
+attributed to the suite rather than to the fixture that produced them.
+
+**Why the test seam cannot do it.** `_overrideTTY()` exists for exactly this
+and is the right tool *inside* the process running vitest. It cannot reach the
+case that matters: root e2e tests spawn the hench CLI as a child process, which
+inherits `VITEST` from the environment but never runs vitest's setup files. An
+override set in the parent is invisible to the child; the variable is not.
+
+**The rule.** `_overrideTTY()` still wins over the check, so a test of the
+window itself opts in and asserts on what it captures. Do not add a second
+`VITEST` branch: if some other output needs to be quiet under test, make it go
+through `console.*` so the runner can attribute it, or give it an explicit
+override seam and set it from the package's setup file.
+
 ### Integration Test Growth Policy
 
 The integration test count should grow proportionally with cross-package
