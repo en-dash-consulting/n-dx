@@ -1,11 +1,12 @@
 /**
- * E2E: the v1 CLI commands serve a v2 tree through the change-layer store, and
- * the three that cannot yet (analyze, recommend --accept, restore) refuse with
- * a sentence naming what to use instead.
+ * E2E: the v1 CLI commands serve a v2 tree through the change-layer store.
+ * `recommend --accept` creates a change per finding rather than an epic; the
+ * one that still cannot serve a v2 tree (restore) refuses with a sentence
+ * naming what to use instead.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -45,6 +46,27 @@ afterEach(async () => {
 
 const taskFile = () => join(tmp, ".rex", "changes", "add-apple-pay", "wire-the-button.md");
 const stateFile = () => join(tmp, ".rex", "changes", "add-apple-pay", "state.yaml");
+
+interface SourceVisionFinding {
+  severity: string;
+  category: string;
+  message: string;
+}
+
+/** The one file `rex recommend` reads findings from. */
+async function writeSourceVisionFindings(findings: SourceVisionFinding[]): Promise<void> {
+  await mkdir(join(tmp, ".sourcevision"), { recursive: true });
+  await writeFile(join(tmp, ".sourcevision", "zones.json"), JSON.stringify({ findings }), "utf-8");
+}
+
+interface TreeItem {
+  title: string;
+  children?: TreeItem[];
+}
+
+function flatten(items: readonly TreeItem[]): TreeItem[] {
+  return items.flatMap((item) => [item, ...flatten(item.children ?? [])]);
+}
 
 describe("rex on a v2 tree", () => {
   it("status shows the change and its task", () => {
@@ -148,16 +170,65 @@ describe("rex on a v2 tree", () => {
     expect(names).not.toContain("empty containers");
   });
 
-  it("analyze refuses, naming rex add and rex change", () => {
-    const out = run(["analyze", tmp], tmp, true);
-    expect(out).toContain("rex add");
-    expect(out).toContain("rex change");
+  it("recommend --accept creates a change per finding, and no epic", async () => {
+    await writeSourceVisionFindings([
+      { severity: "warning", category: "auth", message: "Token is read twice" },
+      { severity: "warning", category: "perf", message: "Inventory is scanned per file" },
+    ]);
+
+    const out = run(["recommend", "--accept", tmp], tmp);
+
+    // What was created, not the recommendation listing printed above it.
+    const created = out.slice(out.indexOf("Creating 2 changes"));
+    expect(created).toContain("Created change: Fix auth in global: Token is read twice");
+    expect(created).toContain("Created change: Fix perf in global: Inventory is scanned per file");
+    // The run's epic and its zone+category features are containers; v2 has none.
+    expect(created).not.toContain("Code Health:");
+    expect(created).not.toMatch(/Created (epic|feature)/);
+
+    const tree = JSON.parse(run(["tree", "--format=json", tmp], tmp)) as { items: TreeItem[] };
+    const titles = flatten(tree.items).map((i) => i.title);
+    expect(titles).toContain("Fix auth in global: Token is read twice");
+    expect(titles).toContain("Fix perf in global: Inventory is scanned per file");
+    expect(titles).not.toContain("Code Health: 2 findings across 1 zone");
+    // Written to the change layer's Inbox, not as a v1 tree beside it.
+    expect(existsSync(join(tmp, ".rex", "prd_tree"))).toBe(false);
+    expect(existsSync(join(tmp, ".rex", "changes", "inbox"))).toBe(true);
   });
 
-  it("recommend --accept refuses, naming rex add and rex change", () => {
-    const out = run(["recommend", "--accept", tmp], tmp, true);
-    expect(out).toContain("rex add");
-    expect(out).toContain("rex change");
+  it("recommend --accept ranks each new change against the product map", async () => {
+    await writeSourceVisionFindings([
+      { severity: "warning", category: "card", message: "A declined card is charged twice by the shopper basket" },
+    ]);
+
+    const out = run(["recommend", "--accept", tmp], tmp);
+    const created = out.slice(out.indexOf("Creating 1 change"));
+
+    expect(created).toContain("Placement: Inbox (needs placement). Suggested, best first:");
+    expect(created).toContain("A1.1 Pay by card");
+    expect(created).toMatch(/rex change place \S+ --target=A1\.1 --relation=(touches|amends)/);
+  });
+
+  it("analyze --accept creates changes for the gaps and no epic", async () => {
+    await mkdir(join(tmp, "tests"), { recursive: true });
+    await writeFile(
+      join(tmp, "tests", "billing.test.ts"),
+      'describe("Billing", () => { it("processes payments", () => {}); });\n',
+    );
+
+    const out = run(["analyze", "--no-llm", "--accept", tmp], tmp);
+
+    // The proposed feature has no tasks, so it is the deepest node naming
+    // work and becomes the change; its epic is a container and is not created.
+    expect(out).toContain("Created change: General Tests");
+    expect(out).toMatch(/Added \d+ changes? to the Inbox\./);
+    expect(out).not.toMatch(/Created (epic|feature)/);
+    expect(existsSync(join(tmp, ".rex", "prd_tree"))).toBe(false);
+
+    const tree = JSON.parse(run(["tree", "--format=json", tmp], tmp)) as { items: TreeItem[] };
+    const titles = flatten(tree.items).map((i) => i.title);
+    expect(titles).toContain("General Tests");
+    expect(titles).not.toContain("General");
   });
 
   it("restore refuses, saying it is v1-only", async () => {

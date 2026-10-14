@@ -23,5 +23,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Emit recommendations as changes and show the product layer delta in PR markdown](./emit-recommendations-as-changes-and.md) | pending |
+| [Emit recommendations as changes and show the product layer delta in PR markdown](./emit-recommendations-as-changes-and.md) | in_progress |
 | [Tag finding-derived changes with code-health when recommend or analyze create them](./tag-finding-derived-changes-with-code.md) | completed |

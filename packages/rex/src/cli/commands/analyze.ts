@@ -7,7 +7,9 @@ import { randomUUID } from "node:crypto";
 // (tests/integration/domain-layer-boundary.test.ts), and the barrel is already
 // on it, so this needs no new tracked exception.
 import { resolveStore, ensureLegacyPrdMigrated, withSelfHealTag, resolveRexPaths } from "../../store/index.js";
-import { refuseOnV2 } from "./v2-cli.js";
+import { isV2Dir } from "./v2-cli.js";
+import { addChanges, report } from "./add-change.js";
+import { changeInputsFromProposals, type ProposedWork } from "../../recommend/changes-from-proposals.js";
 import { stampModified } from "../../core/sync.js";
 
 import { CLIError, BudgetExceededError } from "../errors.js";
@@ -44,6 +46,7 @@ import {
 import type { ScanResult, Proposal } from "../../analyze/index.js";
 import type {PRDItem, AnalyzeTokenUsage, LoEConfig} from "../../schema/index.js";import { LOE_DEFAULTS } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "../../analyze/index.js";
+import type { PRDStore } from "../../store/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor, printVendorModelHeader, priceTokens, resolveModelPricing, resolveVendorModel, cyan, yellow, dim } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
@@ -380,6 +383,13 @@ async function acceptProposals(
   // clearSentinel(), the next run will detect the inconsistency.
   await writeSentinel(dir);
 
+  if (await isV2Dir(dir)) {
+    await acceptProposalsAsChanges(dir, proposals, store, batchRecord);
+    await clearPending(dir);
+    await clearSentinel(dir);
+    return;
+  }
+
   const { items, addedCount, completedCount } = await buildAcceptedItems(proposals);
 
   // One transaction for the whole accept, not one per item. Beyond halving the
@@ -428,6 +438,79 @@ async function acceptProposals(
     const pendingCount = addedCount - completedCount;
     info(`Baseline: ${completedCount} items marked completed (existing code), ${pendingCount} pending (gaps/improvements).`);
   }
+}
+
+/**
+ * Accept into a v2 tree: every proposal becomes a change, never an epic.
+ *
+ * A proposal's epic and features are containers, and the change layer has
+ * none, so only the leaves — the proposed tasks — are created, one change
+ * each, through the same `rex add` door (`cli/commands/add-change.ts`). Each
+ * lands in the Inbox and the placement rules rank the capability or constraint
+ * it amends or touches, so a scanner's finding enters the product map rather
+ * than beside it.
+ *
+ * The baseline a v1 accept writes — the items a scanner marks `completed`
+ * because the code already does them — is not written here: on v2 that is the
+ * product layer, which `rex migrate-plan` establishes and a change amends. It
+ * is reported as skipped rather than dropped silently.
+ */
+async function acceptProposalsAsChanges(
+  dir: string,
+  proposals: Proposal[],
+  store: PRDStore,
+  batchRecord?: BatchAcceptanceRecord,
+): Promise<void> {
+  const work: ProposedWork[] = proposals.map((p) => ({
+    title: p.epic.title,
+    description: p.epic.description,
+    status: p.epic.status,
+    source: p.epic.source,
+    children: p.features.map((f) => ({
+      title: f.title,
+      description: f.description,
+      status: f.status,
+      source: f.source,
+      children: f.tasks.map((t) => ({
+        title: t.title,
+        description: t.description,
+        acceptanceCriteria: t.acceptanceCriteria,
+        priority: t.priority as ProposedWork["priority"],
+        status: t.status,
+        source: t.source,
+        tags: t.tags,
+      })),
+    })),
+  }));
+  const inputs = changeInputsFromProposals(work);
+  const baselineCount = countProposedLeaves(work) - inputs.length;
+
+  if (inputs.length === 0) {
+    result("No proposals to create: every one describes code that already exists.");
+  } else {
+    report(await addChanges(dir, inputs), false);
+    result(`\nAdded ${inputs.length} change${inputs.length === 1 ? "" : "s"} to the Inbox.`);
+  }
+  if (baselineCount > 0) {
+    info(`${baselineCount} proposal${baselineCount === 1 ? "" : "s"} describing existing code were not created: on a v2 PRD that baseline is the product layer, not a change.`);
+  }
+
+  await store.appendLog({
+    timestamp: new Date().toISOString(),
+    event: "analyze_accept",
+    detail: batchRecord
+      ? JSON.stringify({ ...batchRecord, addedItemCount: inputs.length })
+      : `Added ${inputs.length} changes from analysis`,
+  });
+}
+
+/** Every leaf of `work`, closed ones included — the denominator for what was skipped. */
+function countProposedLeaves(work: readonly ProposedWork[]): number {
+  let count = 0;
+  for (const node of work) {
+    count += node.children?.length ? countProposedLeaves(node.children) : 1;
+  }
+  return count;
 }
 
 /**
@@ -484,13 +567,9 @@ async function runAnalyze(
   flags: Record<string, string>,
   multiFlags: Record<string, string[]>,
 ): Promise<void> {
-  await refuseOnV2(
-    resolveRexPaths(dir).rexDir,
-    "analyze",
-    "Capture work with 'rex add' (a new change) or 'rex change place' (place a change on the product map).",
-  );
-  // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading/writing PRD
-  await ensureLegacyPrdMigrated(dir);
+  // Ensure legacy .rex/prd.json is migrated to folder-tree format before
+  // reading/writing PRD. A v2 tree has no legacy file to migrate.
+  if (!(await isV2Dir(dir))) await ensureLegacyPrdMigrated(dir);
 
   const accept = flags.accept === "true";
   const noLlm = flags["no-llm"] === "true";

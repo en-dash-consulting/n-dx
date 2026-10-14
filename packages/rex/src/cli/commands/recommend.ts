@@ -4,7 +4,9 @@ import { access, readFile } from "node:fs/promises";
 import { resolveLayout } from "@n-dx/llm-client";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
 import { CODE_HEALTH_TAG } from "../../core/placement.js";
-import { refuseOnV2 } from "./v2-cli.js";
+import { isV2Dir } from "./v2-cli.js";
+import { addChanges, report } from "./add-change.js";
+import { changeInputsFromRecommendations } from "../../recommend/changes-from-proposals.js";
 
 import { parseIntList } from "../parse-utils.js";
 import { info, result, withCommandProgressReporter } from "../output.js";
@@ -728,6 +730,7 @@ function reportCreationResults(
 // ── Accept recommendations into the PRD ─────────────────────────────────
 
 async function acceptRecommendations(
+  dir: string,
   rexDir: string,
   acceptFlag: string,
   recommendations: Recommendation[],
@@ -735,6 +738,10 @@ async function acceptRecommendations(
 ): Promise<void> {
   const acceptedRecommendations = resolveAcceptedRecommendations(acceptFlag, recommendations);
   if (!acceptedRecommendations) return;
+
+  if (await isV2Dir(dir)) {
+    return acceptAsChanges(dir, acceptedRecommendations, flags);
+  }
 
   const totalTasks = recommendations.filter((r) => r.level === "task").length;
   const selectedTasks = acceptedRecommendations.filter((r) => r.level === "task").length;
@@ -779,6 +786,29 @@ async function acceptRecommendations(
   reportCreationResults(creationResult, selectedTasks, conflictStrategy);
 }
 
+/**
+ * Accept into a v2 tree: every recommendation becomes a change, never an epic.
+ *
+ * The run's epic and its zone+category features are containers, and the change
+ * layer has none — only the leaves name work, so only they are created, each
+ * one change through the same `rex add` door. Each lands in the Inbox and the
+ * rules rank the capability or constraint it amends or touches; the shortlist
+ * is printed so the operator confirms it with `rex change place`.
+ */
+async function acceptAsChanges(
+  dir: string,
+  accepted: Recommendation[],
+  flags: Record<string, string>,
+): Promise<void> {
+  const inputs = changeInputsFromRecommendations(accepted);
+  if (inputs.length === 0) {
+    result("No recommendations to create.");
+    return;
+  }
+  info(`\nCreating ${inputs.length} change${inputs.length === 1 ? "" : "s"}:\n`);
+  report(await addChanges(dir, inputs), flags.format === "json");
+}
+
 // ── Main command entry point ────────────────────────────────────────────
 
 export async function cmdRecommend(
@@ -798,13 +828,6 @@ async function runRecommend(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  if (flags.accept !== undefined) {
-    await refuseOnV2(
-      resolveRexPaths(dir).rexDir,
-      "recommend --accept",
-      "Capture each recommendation with 'rex add' (a new change) or 'rex change place' (place a change on the product map).",
-    );
-  }
   const hasSourceVision = await detectSourceVision(dir);
   if (!hasSourceVision) {
     result("SourceVision not detected.");
@@ -965,7 +988,7 @@ async function runRecommend(
   }
 
   if (flags.accept) {
-    await acceptRecommendations(rexDir, flags.accept, recommendations, flags);
+    await acceptRecommendations(dir, rexDir, flags.accept, recommendations, flags);
   } else {
     info("Run with --accept to add all recommendations to the PRD.");
     info("Cherry-pick by finding hash (partial accept within a group):");
