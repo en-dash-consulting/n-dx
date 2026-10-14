@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { access, readFile } from "node:fs/promises";
 import { resolveLayout } from "@n-dx/llm-client";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
+import { CODE_HEALTH_TAG } from "../../core/placement.js";
 import { refuseOnV2 } from "./v2-cli.js";
 
 import { parseIntList } from "../parse-utils.js";
@@ -54,6 +55,8 @@ interface Recommendation {
   description: string;
   priority: "critical" | "high" | "medium" | "low";
   source: string;
+  /** Tags for the created item. Every recommendation here is finding-derived. */
+  tags?: string[];
   /** Metadata from the underlying findings for traceability. */
   meta: RecommendationMeta;
 }
@@ -285,6 +288,12 @@ function groupSubject(items: Finding[]): string | undefined {
   return message ? message.slice(0, 60) : undefined;
 }
 
+/**
+ * Every recommendation this produces — the run's epic, its zone+category
+ * features and their tasks — exists only because sourcevision reported a
+ * finding, so all three carry `code-health`. Placement reads that tag and
+ * nothing else to recognise a finding-derived change.
+ */
 function mapFindingsToRecommendations(
   findings: Finding[],
   maxFindingsPerTask = 3,
@@ -311,6 +320,7 @@ function mapFindingsToRecommendations(
     description: `Automated recommendations from SourceVision analysis. ${grouped.size} zone+category groups covering ${findings.length} total findings.`,
     priority: findings.some((f) => f.severity === "critical") ? "critical" : "high",
     source: "sourcevision",
+    tags: [CODE_HEALTH_TAG],
     meta: { findingCount: findings.length },
   };
 
@@ -341,6 +351,7 @@ function mapFindingsToRecommendations(
       description: items.map((f) => `- ${f.message}`).join("\n"),
       priority: hasCritical ? "critical" : "high",
       source: "sourcevision",
+      tags: [CODE_HEALTH_TAG],
       meta: {
         findingHashes: featureHashes,
         category,
@@ -370,6 +381,7 @@ function mapFindingsToRecommendations(
         description: chunk.map((f) => `- ${f.message}`).join("\n"),
         priority: hasCritical ? "critical" : "high",
         source: "sourcevision",
+        tags: [CODE_HEALTH_TAG],
         meta: {
           findingHashes: chunk.map((f) => f.hash),
           category,
@@ -395,6 +407,7 @@ function toEnrichedRecommendation(rec: Recommendation): EnrichedRecommendation {
     description: rec.description,
     priority: rec.priority,
     source: rec.source,
+    tags: rec.tags,
     meta: rec.meta,
   };
 }
