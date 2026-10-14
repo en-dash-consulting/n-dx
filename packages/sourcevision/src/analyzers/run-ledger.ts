@@ -20,7 +20,7 @@
  */
 
 import { priceTokens, resolveModelPricing } from "@n-dx/llm-client";
-import type { AnalysisRun, LLMClassUsage, TokenUsage } from "../schema/index.js";
+import type { AnalysisRun, LLMClassUsage, RerunSummary, TokenUsage } from "../schema/index.js";
 
 /** One LLM call, as the client that made it saw it. */
 export interface LLMCallRecord {
@@ -39,6 +39,7 @@ let _byTaskClass: Record<string, LLMClassUsage> = {};
 let _cacheHits = 0;
 let _cacheMisses = 0;
 let _partition: AnalysisRun["partition"];
+let _rerun: RerunSummary | undefined;
 let _listener: (() => void) | null = null;
 
 /**
@@ -66,6 +67,7 @@ export function startRunLedger(mode: AnalysisRun["mode"] = "generative"): void {
   _cacheHits = 0;
   _cacheMisses = 0;
   _partition = undefined;
+  _rerun = undefined;
   changed();
 }
 
@@ -116,6 +118,12 @@ export function recordPartitionReview(partition: NonNullable<AnalysisRun["partit
   _partition = partition;
 }
 
+/** What the re-run judgments decided (`analyzers/rerun-judge.ts`); the last one wins. */
+export function recordRerun(summary: RerunSummary): void {
+  _rerun = summary;
+  changed();
+}
+
 export function recordJudgmentCache(hits: number, misses: number): void {
   _cacheHits += hits;
   _cacheMisses += misses;
@@ -135,6 +143,7 @@ export function snapshotRunLedger(): AnalysisRun {
     run.llm.judgmentCache = { hits: _cacheHits, misses: _cacheMisses };
   }
   if (_partition) run.partition = structuredClone(_partition);
+  if (_rerun) run.rerun = structuredClone(_rerun);
   const costUsd = priceRunLedger(run);
   if (costUsd !== undefined) run.llm.costUsd = costUsd;
   return run;
@@ -208,5 +217,23 @@ export function formatRunLedger(run: AnalysisRun): string[] {
     const { hits, misses } = run.llm.judgmentCache;
     lines.push(`  judgment cache: ${hits} hit${hits === 1 ? "" : "s"}, ${misses} miss${misses === 1 ? "" : "es"}`);
   }
+  const rerunLine = formatRerun(run.rerun);
+  if (rerunLine) lines.push(rerunLine);
   return lines;
+}
+
+/**
+ * The one `[rerun]` line: what the re-run judgments decided. Empty when the
+ * run made none (a first analysis, or no judgment route), so a reader never
+ * sees a row of zeroes that means "never asked".
+ */
+export function formatRerun(rerun: AnalysisRun["rerun"]): string {
+  if (!rerun) return "";
+  const uncertainZones = rerun.uncertainZones ?? [];
+  const zonePart = `${rerun.zonesJudged} changed zone${rerun.zonesJudged === 1 ? "" : "s"} judged, ` +
+    `${rerun.refreshed} re-narrated` +
+    (uncertainZones.length > 0 ? `, ${uncertainZones.length} kept unconfirmed (${uncertainZones.join(", ")})` : "");
+  const findingPart = `${rerun.findingsJudged} previous finding${rerun.findingsJudged === 1 ? "" : "s"} judged, ` +
+    `${rerun.carried} carried (${rerun.uncertain} with lowered confidence), ${rerun.resolved} resolved`;
+  return `  [rerun] ${zonePart}; ${findingPart}`;
 }

@@ -5,6 +5,7 @@ import {
   recordPhaseDuration,
   recordLLMCall,
   recordJudgmentCache,
+  recordRerun,
   snapshotRunLedger,
   formatRunLedger,
   priceRunLedger,
@@ -21,7 +22,37 @@ describe("run ledger", () => {
     expect(run.phases).toEqual({});
     expect(run.llm.byTaskClass).toEqual({});
     expect(run.llm.judgmentCache).toBeUndefined();
+    expect(run.rerun).toBeUndefined();
     expect(run.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("records the re-run summary and prints one [rerun] line", () => {
+    recordRerun({
+      zonesJudged: 4, refreshed: 1, findingsJudged: 7, carried: 5, resolved: 2, uncertain: 1,
+      uncertainZones: ["web-viewer"],
+    });
+
+    const run = snapshotRunLedger();
+    expect(run.rerun).toEqual({
+      zonesJudged: 4, refreshed: 1, findingsJudged: 7, carried: 5, resolved: 2, uncertain: 1,
+      uncertainZones: ["web-viewer"],
+    });
+
+    const rerunLines = formatRunLedger(run).filter((l) => l.includes("[rerun]"));
+    expect(rerunLines).toHaveLength(1);
+    expect(rerunLines[0]).toContain("4 changed zones judged, 1 re-narrated");
+    expect(rerunLines[0]).toContain("1 kept unconfirmed (web-viewer)");
+    expect(rerunLines[0]).toContain("7 previous findings judged, 5 carried (1 with lowered confidence), 2 resolved");
+  });
+
+  it("prints no [rerun] line when no re-run judgment was made", () => {
+    expect(formatRunLedger(snapshotRunLedger()).filter((l) => l.includes("[rerun]"))).toEqual([]);
+  });
+
+  it("clears the re-run summary when a new run starts", () => {
+    recordRerun({ zonesJudged: 1, refreshed: 1, findingsJudged: 0, carried: 0, resolved: 0, uncertain: 0 });
+    startRunLedger("cascade");
+    expect(snapshotRunLedger().rerun).toBeUndefined();
   });
 
   it("buckets calls by task class and keeps vendor and model per class", () => {

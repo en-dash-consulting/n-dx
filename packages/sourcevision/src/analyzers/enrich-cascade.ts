@@ -43,6 +43,15 @@ import type { AnalyzeTokenUsage } from "../schema/index.js";
 import { routeLayoutFor } from "./route-convention.js";
 import { dedupeZoneNames, isAlgorithmicName, zoneIdsOf } from "./zone-identity.js";
 import { markPass } from "./analyze-progress.js";
+import {
+  computeZoneDeltas,
+  computeZoneHeaderHash,
+  emptyRerunOutcome,
+  findingKey,
+  judgeRerun,
+  judgedPreviousFindings,
+} from "./rerun-judge.js";
+import type { RerunOutcome } from "./rerun-judge.js";
 
 /**
  * Fragility probabilities inside this band are neither a finding nor a
@@ -83,6 +92,12 @@ export interface CascadeOptions {
    * child. Zones carried from a previous run keep their insights either way.
    */
   deferNarration?: boolean;
+  /**
+   * Current per-zone content hashes, keyed by the pre-enrichment zone ids.
+   * The re-run judgment's pre-filter: a zone whose hash matches the previous
+   * run's is never put to a question.
+   */
+  contentHashes?: Record<string, string>;
 }
 
 export interface CascadeResult extends EnrichResult {
@@ -100,6 +115,12 @@ export interface CascadeResult extends EnrichResult {
    * paraphrase judgments the narrated findings go through.
    */
   prejudgedFindings: Finding[];
+  /**
+   * What the re-run judgments decided about changed zones and previous
+   * findings. Empty when there is no previous run or no judgment route, in
+   * which case the hash rules decide as they did before.
+   */
+  rerun: RerunOutcome;
 }
 
 /**
@@ -241,7 +262,40 @@ export async function cascadeEnrichment(
     })
     .filter((e) => e.top >= 0)
     .sort((a, b) => b.top - a.top);
-  const escalated = inBand.slice(0, ESCALATION_MAX_ZONES).map((e) => e.zone);
+
+  // 3b. Re-run judgments (rerun-judge.ts): of the zones that actually moved
+  //     since the previous run, which need their narrative refreshed, and do
+  //     the previous run's findings still hold? Both in one request per batch.
+  //     A zone whose hashes did not move is never asked.
+  const projectDir = projectProfile?.projectDir;
+  const deltas = previousZones
+    ? computeZoneDeltas({
+        pairs: named.flatMap((z) => {
+          const prev = previousMatch(z, previousZones.zones);
+          return prev ? [{ zone: z, previous: prev.zone }] : [];
+        }),
+        currentCrossings: remapped,
+        previousZones,
+        contentHashes: options.contentHashes ?? {},
+        projectDir,
+      })
+    : [];
+  const rerun = deltas.length > 0
+    ? await judgeRerun(deltas, judgedPreviousFindings(previousZones?.findings), projectDir)
+    : emptyRerunOutcome();
+  addUsage(tokenUsage, rerun.calls, rerun.tokenUsage);
+
+  // A zone judged to need refreshing is escalated whether or not fragility put
+  // it in the band, and ranked ahead of the band: "this changed materially" is
+  // a firmer reason to spend a narration call than a mid-band probability. The
+  // cap stays, so the cost ceiling does not move.
+  const refreshIds = new Set(
+    [...rerun.zones].filter(([, verdict]) => verdict === "refresh").map(([id]) => id),
+  );
+  const escalated = [
+    ...named.filter((z) => refreshIds.has(z.id)),
+    ...inBand.filter((e) => !refreshIds.has(e.zone.id)).map((e) => e.zone),
+  ].slice(0, ESCALATION_MAX_ZONES);
   if (assessment.calls > 0) {
     console.log(
       `  [cascade] fragility: ${named.length} zone(s) judged — ${fragility.length} finding(s), ` +
@@ -263,7 +317,11 @@ export async function cascadeEnrichment(
   const toNarrate: Zone[] = [];
   for (const z of escalated) {
     const prev = previousMatch(z, previousZones?.zones);
-    if (prev && prev.overlap >= UNCHANGED_ESCALATION_OVERLAP && prev.zone.insights && prev.zone.insights.length > 0) {
+    // The refresh judgment has the last word where it was made: it looked at
+    // what changed, which the overlap cannot see. Where it was not made — no
+    // route, or a zone whose hashes never moved — the overlap rule stands.
+    const mustRefresh = refreshIds.has(z.id);
+    if (!mustRefresh && prev && prev.overlap >= UNCHANGED_ESCALATION_OVERLAP && prev.zone.insights && prev.zone.insights.length > 0) {
       carried.set(z.id, prev.zone);
     } else {
       toNarrate.push(z);
@@ -282,13 +340,24 @@ export async function cascadeEnrichment(
     console.log(`  [cascade] ${toNarrate.length} zone(s) left for background narration`);
   } else if (toNarrate.length > 0) {
     // One call for all of them (enrich-multiplex.ts); the escalated zones are
-    // judged together and the CLI spawn floor is paid once.
+    // judged together and the CLI spawn floor is paid once. An undecided
+    // still-holds Noul rides along in the same call rather than costing one of
+    // its own: the prompt already has the zone open, so "what changed here?"
+    // and "is finding X still true?" are answered together.
+    const narratingIds = new Set(toNarrate.map((z) => z.id));
+    const confirmFindings = new Map<string, string[]>();
+    for (const f of judgedPreviousFindings(previousZones?.findings)) {
+      if (!narratingIds.has(f.scope)) continue;
+      if (rerun.findings.get(findingKey(f))?.verdict !== "uncertain") continue;
+      confirmFindings.set(f.scope, [...(confirmFindings.get(f.scope) ?? []), f.text]);
+    }
     const narrated = await narrateZones(toNarrate, {
       allZones: [...named, ...templated],
       crossings: remapped,
       fileArchetypes,
       hints,
       projectProfile,
+      ...(confirmFindings.size > 0 ? { confirmFindings } : {}),
     });
     addUsage(tokenUsage, narrated.tokenUsage.calls, narrated.tokenUsage);
     newFindings.push(...narrated.newFindings);
@@ -301,8 +370,21 @@ export async function cascadeEnrichment(
     });
   }
 
+  // The next run's delta needs this run's headers. Recomputing one costs up to
+  // ZONE_FILE_SAMPLE file reads, so a zone whose content hash matched the
+  // previous run carries its previous hash forward: identical content means
+  // identical leading comments.
+  const changedIds = new Set(deltas.map((d) => d.zone.id));
+  const stamped = [...finalNamed, ...templated].map((z) => {
+    const prev = previousMatch(z, previousZones?.zones);
+    const headerHash = prev && !changedIds.has(z.id) && prev.zone.headerHash !== undefined
+      ? prev.zone.headerHash
+      : computeZoneHeaderHash(z, projectDir);
+    return headerHash ? { ...z, headerHash } : z;
+  });
+
   return {
-    zones: dedupeZoneNames([...finalNamed, ...templated]),
+    zones: dedupeZoneNames(stamped),
     newZoneInsights,
     newGlobalInsights: [],
     newFindings,
@@ -314,5 +396,6 @@ export async function cascadeEnrichment(
     deferredZoneIds,
     deferredNameZoneIds,
     prejudgedFindings,
+    rerun,
   };
 }

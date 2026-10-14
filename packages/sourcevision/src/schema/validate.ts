@@ -60,6 +60,15 @@ const AnalysisRunSchema = z.object({
   }),
   partition: PartitionReviewSchema.extend({ reused: z.boolean() }).optional(),
   outcome: AnalysisOutcomeSchema.optional(),
+  rerun: z.object({
+    zonesJudged: z.number().int().nonnegative(),
+    refreshed: z.number().int().nonnegative(),
+    findingsJudged: z.number().int().nonnegative(),
+    carried: z.number().int().nonnegative(),
+    resolved: z.number().int().nonnegative(),
+    uncertain: z.number().int().nonnegative(),
+    uncertainZones: z.array(z.string()).optional(),
+  }).optional(),
 });
 
 const RepoIdentitySchema = z.object({

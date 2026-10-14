@@ -65,9 +65,11 @@ import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
 import { judgeFindings, judgeZoneFragility, judgeHeuristicFindings, judgeMoves } from "./enrich-judge.js";
 import { cascadeEnrichment } from "./enrich-cascade.js";
+import { applyFindingVerdict, findingKey } from "./rerun-judge.js";
+import type { RerunOutcome } from "./rerun-judge.js";
 import { dedupeZoneNames, deepestDistinguishingSegment, idFromStems, idsFollowNames, isAlgorithmicName, renameZoneRefs, reprefixSubZones, zoneIdsOf } from "./zone-identity.js";
 import { getJudgmentRoute } from "./claude-client.js";
-import { recordPartitionReview, setRunMode } from "./run-ledger.js";
+import { recordPartitionReview, recordRerun, setRunMode } from "./run-ledger.js";
 import { computeAreas } from "./zone-areas.js";
 import { nameAreas } from "./area-naming.js";
 import { nameSubZones } from "./subzone-naming.js";
@@ -2099,6 +2101,8 @@ interface EnrichmentResult {
   cascade?: boolean;
   /** Judgment-made findings that bypass the support/paraphrase judgment. */
   prejudgedFindings?: Finding[];
+  /** What the re-run judgments decided; absent off the cascade path. */
+  rerun?: RerunOutcome;
   /** Files of zones whose narration was deferred; mapped to final ids after pins. */
   deferredFiles?: Set<string>;
   /** Files of zones whose generated names were deferred; mapped to final ids after pins. */
@@ -2135,6 +2139,7 @@ async function applyEnrichment(
   let fragilityJudged = false;
   let cascadeRan = false;
   let prejudgedFindings: Finding[] | undefined;
+  let rerun: RerunOutcome | undefined;
   let deferredFiles: Set<string> | undefined;
   let deferredNameFiles: Set<string> | undefined;
 
@@ -2167,7 +2172,7 @@ async function applyEnrichment(
       setRunMode("cascade");
       const result = await cascadeEnrichment(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints, projectProfile,
-        { deferNarration },
+        { deferNarration, contentHashes: currentContentHashes },
       );
       if (result.deferredZoneIds.size > 0) {
         deferredFiles = new Set(result.zones.filter((z) => result.deferredZoneIds.has(z.id)).flatMap((z) => z.files));
@@ -2185,6 +2190,7 @@ async function applyEnrichment(
       fragilityJudged = result.fragilityJudged;
       cascadeRan = true;
       prejudgedFindings = result.prejudgedFindings;
+      rerun = result.rerun;
     } else if (perZone) {
       const result = await enrichZonesPerZone(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints,
@@ -2260,6 +2266,7 @@ async function applyEnrichment(
     fragilityJudged,
     cascade: cascadeRan,
     prejudgedFindings,
+    rerun,
     deferredFiles,
     deferredNameFiles,
   };
@@ -2406,6 +2413,14 @@ function mergeGlobalInsights(
 /**
  * Build the complete findings array: structural (pass 0) + preserved previous
  * AI findings + new AI findings. Handles stale-content detection and deduplication.
+ *
+ * A previous AI finding survives on one of two rules. Where the re-run
+ * judgment answered for it (`rerun-judge.ts` — it was judged in an earlier run,
+ * so it carries `confidence`, and its zone changed enough to be asked about),
+ * that answer decides: carried as it was, carried with `confidence` lowered to
+ * the probability, or dropped as resolved. Everything else — pass 0 findings,
+ * unjudged legacy findings, and any finding on a run with no judgment route —
+ * keeps the content-hash rule, where any change at all to the zone drops it.
  */
 function assembleFindings(
   finalZones: Zone[],
@@ -2415,7 +2430,8 @@ function assembleFindings(
   validPrevious: Zones | undefined,
   previousZones: Zones | undefined,
   zoneContentHashes: Record<string, string>,
-  globalContentHash: string
+  globalContentHash: string,
+  rerun?: RerunOutcome,
 ): Finding[] {
   const structuralFindings: Finding[] = [];
 
@@ -2466,19 +2482,23 @@ function assembleFindings(
     return prevHash !== currHash;
   }
 
+  /**
+   * The judgment where there is one, the hash rule where there is not. A
+   * judged finding whose zone did not change is absent from the verdicts and
+   * falls through to the hash rule, which keeps it — the two agree there.
+   */
+  function keepPrevious(finding: Finding): Finding | null {
+    if (finding.pass <= 0) return null;
+    if (rerun && rerun.findings.has(findingKey(finding))) {
+      return applyFindingVerdict(finding, rerun);
+    }
+    return isContentStale(finding) ? null : finding;
+  }
+
   const prevAiFindings: Finding[] = [];
-  if (metaUpdatedFindings) {
-    for (const f of metaUpdatedFindings) {
-      if (f.pass > 0 && !isContentStale(f)) {
-        prevAiFindings.push(f);
-      }
-    }
-  } else if (validPrevious?.findings) {
-    for (const f of validPrevious.findings) {
-      if (f.pass > 0 && !isContentStale(f)) {
-        prevAiFindings.push(f);
-      }
-    }
+  for (const f of metaUpdatedFindings ?? validPrevious?.findings ?? []) {
+    const kept = keepPrevious(f);
+    if (kept) prevAiFindings.push(kept);
   }
 
   return enforceSeverityRules(deduplicateFindings([...structuralFindings, ...structural.findings, ...prevAiFindings, ...aiFindings]));
@@ -3446,8 +3466,12 @@ export async function analyzeZones(
   // ── Assemble findings ──
   let allFindings = assembleFindings(
     pinnedFinalZones, structural, aiFindings, metaUpdatedFindings,
-    validPrevious, previousZones, remappedContentHashes, finalGlobalContentHash
+    validPrevious, previousZones, remappedContentHashes, finalGlobalContentHash,
+    enrichResult.rerun,
   );
+  if (enrichResult.rerun && enrichResult.rerun.calls > 0) {
+    recordRerun(enrichResult.rerun.summary);
+  }
 
   // ── Heuristic judgment (enrich-judge.ts) ──
   // After assembly, because assembleFindings builds the per-zone heuristic
