@@ -17,7 +17,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Audit Recent Merges and Catalog Documentation Gaps](./audit-recent-merges-and-catalog/index.md) | completed |
-| [CI wall time: Windows leg under 10 minutes without dropping coverage](./ci-wall-time-windows-leg-under-10/index.md) | pending |
+| [CI wall time: Windows leg under 10 minutes without dropping coverage](./ci-wall-time-windows-leg-under-10/index.md) | completed |
 | [Claude and Codex Config Validation in Gauntlet](./claude-and-codex-config-validation-in/index.md) | completed |
 | [Contributor Page Section Expansion](./contributor-page-section-expansion/index.md) | completed |
 | [Developer Environment Prerequisites Documentation](./developer-environment-prerequisites/index.md) | completed |
