@@ -1,0 +1,20 @@
+---
+id: "7db88b02-68c0-4f96-9da4-e70bb5af7044"
+level: "task"
+title: "Three unrelated suites failed under load in one session and passed on re-run: investigate the pattern, not each flake"
+status: "pending"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "ci-reliability"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "The three 2026-10-14 sightings are reproduced or ruled out from recorded evidence, not from memory: the rex worker exit under pnpm validate, the ed9a4a88 affected-gate failure, and cli-init-git-preflight's auto-commit-warning case"
+  - "A single cause is either identified across them or each is attributed separately, and the finding says which"
+  - "If the cause is shared — worker supervision, memory pressure, or a cross-suite kill — it is fixed once rather than per suite"
+  - "TESTING.md Family 3 records what was found, including the vitest version it was observed on, so the next sighting starts from evidence"
+description: "Found by the adversarial reviews of the Group A and Group B branches, 2026-10-14. **Sequencing: do this after Group D is pushed.**\n\n**The pattern.** Three unrelated suites failed in one working session, each passing standalone and on a re-run of the identical command:\n\n1. packages/rex/tests/integration/smart-add-vendor-model-selection.test.ts — 'Worker exited unexpectedly with exit code 1 during started state' under 'pnpm validate', with 6712 tests passing in that same run. Captured separately as 12f0e072.\n2. The affected gate for task ed9a4a88 failed twice in the hench run ('workspace; root failed again on a re-run'), then passed 4/4 when the same selection was re-run by hand minutes later.\n3. tests/e2e/cli-init-git-preflight.test.js, 'emits a persistent auto-commit warning when the target is not a git repo (non-interactive)' — failed in the affected gate at 25s, passed 6/6 standalone immediately after.\n\n**Why this is filed as one item rather than three.** Each is individually dismissible as a flake, and that is how the first two were handled. Three in one session, on a branch whose subject was test determinism, is evidence about the harness rather than about three tests. The shared shape is: heavy concurrency, a failure with no failing assertion or a timeout, and no reproduction at lower load. Filing a fourth one-off would repeat the mistake.\n\n**What is already known.** The repo has history here: d3a995ca (rex failing intermittently under pnpm test, fixed 2026-09 against file-lock TOCTOU and a stale-save guard, both of which produced real assertions) and killPortOccupant SIGKILLing any process holding a port. TESTING.md Family 3 covers subprocess guardrails too tight for a loaded machine. None of those explains a worker exiting with every test passing.\n\n**Options.** (a) Recommended: treat the three as one investigation. Run pnpm validate in a loop capturing each worker's stderr — vitest reports an exit code but not what the process printed before dying — and record heap usage per suite. Decide from evidence whether this is memory pressure, vitest worker supervision, or a cross-suite kill. Cost: machine time. Risk: it may not reproduce, in which case say so and close with what was ruled out. (b) Attribute each separately. Cheaper per sighting and already tried twice; it is how three unrelated-looking flakes accumulated. (c) Raise retries. Rejected: it converts a real crash into a slower green run and destroys the signal.\n\n**Related:** 12f0e072 holds the detail of sighting 1 and should be merged into this one if a shared cause is found.\n\nSeverity: medium — the suite fails, which blocks a push, and the failures name files that have nothing wrong with them."
+lastModified: "2026-10-14T19:09:56.738Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---
