@@ -59,5 +59,5 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Call graph covers C#, so god classes and methods are detected on .NET projects](./call-graph-covers-c-so-god-classes-and.md) | pending |
 | [Fix conditional hook order in the Problems and Suggestions views](./fix-conditional-hook-order-in-the.md) | completed |
 | [Optional 3D isometric architecture map generator](./optional-3d-isometric-architecture-map.md) | completed |
-| [sv analyze removes its stop handlers before the progress file stops saying running](./sv-analyze-removes-its-stop-handlers.md) | pending |
+| [sv analyze removes its stop handlers before the progress file stops saying running](./sv-analyze-removes-its-stop-handlers.md) | in_progress |
 | [sv analyze: skip git worktree checkouts in sub-analysis discovery](./sv-analyze-skip-git-worktree-checkouts.md) | completed |
