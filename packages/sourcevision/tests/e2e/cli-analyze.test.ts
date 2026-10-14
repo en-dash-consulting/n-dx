@@ -169,6 +169,18 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
     expect(Object.keys(second.previous!.phases)).toEqual(
       expect.arrayContaining(["inventory", "imports", "classifications", "zones", "components"]),
     );
+
+    // Each run records what it left behind, so the dashboard can say what the
+    // next one changed without a second copy of the data files.
+    const manifest = JSON.parse(readFileSync(join(svDir, "manifest.json"), "utf-8"));
+    const outcome = manifest.lastAnalysis?.outcome;
+    expect(outcome).toBeDefined();
+    expect(outcome.files).toBeGreaterThan(0);
+    expect(outcome.zoneIds.length).toBeGreaterThan(0);
+    expect(typeof outcome.importEdges).toBe("number");
+    expect(Object.values(outcome.findings).flat().every((key) => typeof key === "string")).toBe(true);
+    // …and the previous run's travels with it, which is the side a diff needs.
+    expect(second.previous?.outcome).toEqual(expect.objectContaining({ files: expect.any(Number), zoneIds: expect.any(Array) }));
   });
 
   // Windows has no POSIX signals: `child.kill("SIGTERM")` terminates the process

@@ -26,6 +26,32 @@ export interface LLMClassUsage {
 }
 
 /**
+ * What an analysis left in `.sourcevision/`, recorded so a later reader can
+ * say what the next run changed.
+ *
+ * Each run overwrites the data files, so by the time anyone asks "what changed"
+ * the previous state is gone. Keeping a second copy of `zones.json` per run
+ * would be the obvious fix and the wrong one — it is megabytes, and every
+ * question worth asking is about identity, not content. So this records only
+ * what a diff needs: the counts, the zone ids, and one stable key per finding.
+ * A run's line in `analyses.jsonl` is then enough to measure the next against,
+ * with no new files and no LLM call.
+ *
+ * Absent on runs recorded before the field existed, and on a run whose zones
+ * phase never wrote a file.
+ */
+export interface AnalysisOutcome {
+  /** Files in the inventory. */
+  files: number;
+  /** Edges in the import graph. */
+  importEdges: number;
+  /** Every zone id in the partition, sub-zones included. */
+  zoneIds: string[];
+  /** Finding keys ({@link findingKey}) grouped by severity. */
+  findings: Record<string, string[]>;
+}
+
+/**
  * What one `sv analyze` run cost, per phase and per LLM task class. The
  * aggregate `tokenUsage` bucket cannot say which model answered or how long
  * anything took; this can, which is what a decision to route a class
@@ -60,6 +86,8 @@ export interface AnalysisRun {
   };
   /** This run's partition review, when a previous partition existed; `reused` says whether its zones were kept verbatim. */
   partition?: PartitionReview & { reused: boolean };
+  /** What this run left in `.sourcevision/`, for the next run to be measured against. */
+  outcome?: AnalysisOutcome;
 }
 
 /** See `Manifest.narration`. */

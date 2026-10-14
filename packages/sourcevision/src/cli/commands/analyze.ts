@@ -48,6 +48,7 @@ import { detectOutbound } from "../../analyzers/outbound-detection.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
+import { readAnalysisOutcome } from "../../analyzers/analysis-outcome.js";
 import { configureJudgmentCache, setJevObserver } from "@n-dx/llm-client";
 import {
   isAnalyzeProgressActive,
@@ -330,6 +331,11 @@ function finalizeTokenUsage(
   }
   const run = snapshotRunLedger();
   for (const line of formatRunLedger(run)) info(dim(line));
+
+  // Read after the phases have written: this is the state the next run will be
+  // compared against, and the only moment it is both complete and still known.
+  const outcome = readAnalysisOutcome(ctx.svDir);
+  if (outcome) run.outcome = outcome;
 
   const manifest = readManifest(ctx.absDir);
   if (ctx.tokenUsage.calls > 0) {

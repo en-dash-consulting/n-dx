@@ -11,6 +11,14 @@
  * batch — and the output. The side column has model calls by task class,
  * judgment-cache reuse, the files written, notes and recent analyses.
  *
+ * Once the run has ended the page leads with what it changed against the
+ * previous analysis of this worktree — zones added, merged, renamed or
+ * removed, findings added and resolved by severity, file and import counts,
+ * the spend the run's own ledger recorded, and background narration while it
+ * is still going — over links to the Analysis stage pages that hold the
+ * detail. The difference is computed by the server (`analysis-changes.ts`)
+ * from the two runs' recorded outcomes; this page only lays it out.
+ *
  * One analysis per worktree: another worktree's is its own page under its
  * `/w/<key>/` prefix, reached from the running-now bar. Reading the data is
  * `live-analyze-model.ts`.
@@ -30,6 +38,8 @@ import {
   barSegments,
   batchLabel,
   cacheReuse,
+  changeLines,
+  changesHeadline,
   classRows,
   failureSummary,
   fileRows,
@@ -43,6 +53,8 @@ import {
   phaseTimeLabel,
   runState,
   runningNotes,
+  spendLabel,
+  zoneChangeLabel,
   type PassRow,
   type PhaseRow,
 } from "./live-analyze-model.js";
@@ -226,6 +238,69 @@ function OutputTail({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
   );
 }
 
+// ── What changed ─────────────────────────────────────────────────────
+
+const ZONE_GROUPS = [
+  { kind: "added", title: "Added" },
+  { kind: "merged", title: "Merged away" },
+  { kind: "renamed", title: "Renamed" },
+  { kind: "removed", title: "Removed" },
+] as const;
+
+function ZoneChanges({ zones }: { zones: NonNullable<LiveAnalyzeSnapshot["changes"]>["zones"] }) {
+  const groups = ZONE_GROUPS.filter((g) => zones[g.kind].length > 0);
+  if (groups.length === 0) return null;
+  return h("dl", { class: "live-analyze-zone-changes" }, groups.flatMap((group) => [
+    h("dt", { key: `${group.kind}-t` }, group.title),
+    h("dd", { key: group.kind },
+      h("ul", { class: "live-analyze-zone-list" }, zones[group.kind].map((change) =>
+        h("li", { key: change.id, class: "live-mono" }, zoneChangeLabel(change, group.kind))))),
+  ]));
+}
+
+/**
+ * What the finished run changed, and where to read the detail.
+ *
+ * Background narration is the second item rather than a note in the side
+ * column: it is still running when this page is first read, so it belongs
+ * where the operator is already looking for the run's outcome.
+ */
+function ChangeSummary({ snapshot, navigateTo }: { snapshot: LiveAnalyzeSnapshot; navigateTo: NavigateTo }) {
+  const changes = snapshot.changes;
+  const narration = narrationLine(snapshot.narration);
+  if (!changes && !narration) return null;
+  const spend = spendLabel(snapshot);
+
+  const stagePage = (view: Parameters<NavigateTo>[0], label: string) =>
+    h("a", {
+      key: view,
+      href: "#",
+      onClick: (e: MouseEvent) => { e.preventDefault(); navigateTo(view); },
+    }, label);
+
+  return h("section", { class: "live-main live-task-card live-analyze-summary", "aria-labelledby": "la-changed-h" },
+    h("div", { class: "live-log-tail-head" },
+      h("h3", { id: "la-changed-h", class: "live-side-title" }, "What changed"),
+      spend ? h("span", { class: "live-chip" }, `${spend} spent`) : null,
+    ),
+    changes
+      ? [
+        h("p", { key: "head", class: "live-step-detail" }, changesHeadline(changes, formatSince(changes.previousAt))),
+        h("ul", { key: "lines", class: "live-analyze-changes" }, changeLines(changes).map((line) =>
+          h("li", { key: line.key, class: `live-analyze-change${line.quiet ? " live-analyze-change-quiet" : ""}` }, line.label))),
+        h(ZoneChanges, { key: "zones", zones: changes.zones }),
+      ]
+      : h("p", { class: "live-muted" }, "This run recorded no result to compare; the pages below show what is on disk."),
+    narration ? h("p", { class: "live-analyze-narration", role: "status" }, narration) : null,
+    h("p", { class: "live-analyze-stage-links" },
+      "Detail: ",
+      stagePage("zones", "Zones"), ", ",
+      stagePage("problems", "Problems"), ", ",
+      stagePage("analysis", "Analysis"), ".",
+    ),
+  );
+}
+
 // ── Side column ──────────────────────────────────────────────────────
 
 function Section({ id, title, children }: { id: string; title: string; children?: ComponentChildren }) {
@@ -269,7 +344,9 @@ function NotesSection({ snapshot }: { snapshot: LiveAnalyzeSnapshot }) {
   const cliName = useCliName();
   const narration = narrationLine(snapshot.narration);
   const running = runState(snapshot.progress) === "running";
-  const notes = [...(running ? runningNotes(snapshot, cliName) : []), ...(narration ? [narration] : [])];
+  // Once the run has ended, narration is the summary's second item instead —
+  // where the operator is already reading the outcome.
+  const notes = running ? [...runningNotes(snapshot, cliName), ...(narration ? [narration] : [])] : [];
   if (notes.length === 0) return null;
   return h(Section, { id: "la-notes-h", title: "Notes" },
     h("ul", { class: "live-analyze-notes" }, notes.map((note, i) => h("li", { key: i }, note))));
@@ -328,6 +405,7 @@ export function LiveAnalyzeView({ navigateTo }: LiveAnalyzeViewProps) {
     progress === null
       ? h("p", { key: "none", class: "live-muted" }, `No analysis has run in this worktree yet. Run ${cliName} analyze, or start one from the Analysis stage.`)
       : h("div", { key: "body", class: "live-body" },
+        state === "running" ? null : h(ChangeSummary, { snapshot, navigateTo }),
         h("section", { class: "live-main live-task-card live-analyze-card", "aria-label": "Analysis" },
           h(OverallBar, { rows }),
           h(PhaseList, { rows, passes: passRows(snapshot), cache: cache?.label ?? null }),

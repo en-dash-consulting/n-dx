@@ -41,6 +41,13 @@ const PartitionReviewSchema = z.object({
   after: PartitionHealthSchema.optional(),
 });
 
+const AnalysisOutcomeSchema = z.object({
+  files: z.number().int().nonnegative(),
+  importEdges: z.number().int().nonnegative(),
+  zoneIds: z.array(z.string()),
+  findings: z.record(z.string(), z.array(z.string())),
+});
+
 const AnalysisRunSchema = z.object({
   at: z.string(),
   mode: z.enum(["fast", "generative", "narrate", "cascade", "narration"]),
@@ -52,6 +59,7 @@ const AnalysisRunSchema = z.object({
     costUsd: z.number().nonnegative().optional(),
   }),
   partition: PartitionReviewSchema.extend({ reused: z.boolean() }).optional(),
+  outcome: AnalysisOutcomeSchema.optional(),
 });
 
 const RepoIdentitySchema = z.object({
