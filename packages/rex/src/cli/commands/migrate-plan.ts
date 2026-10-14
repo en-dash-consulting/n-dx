@@ -49,7 +49,7 @@ import { findTestFiles } from "../../core/verify.js";
 import { findMigration, MIGRATIONS } from "../../migrations/registry.js";
 import { formatPlanFile, readPlanFile, writePlanFile, type PlanFile } from "../../migrations/plan-file.js";
 import { v1TreeSource, type V1ToV2Options } from "../../migrations/v1-to-v2/index.js";
-import { readCapabilityCodeFiles } from "../../migrations/v1-to-v2/code-files.js";
+import { readCapabilityCodeFiles, readCodeEvidenceProvenance } from "../../migrations/v1-to-v2/code-files.js";
 import { planSeams } from "../../migrations/v1-to-v2/seams.js";
 import { renderPlanSummary, type V1ToV2Plan } from "../../migrations/v1-to-v2/plan-summary.js";
 import { atomicWrite } from "../../store/atomic-write.js";
@@ -196,6 +196,21 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   // empty and the plan is what it was before the reader existed.
   const testFiles = await findTestFiles(dir);
   const codeFiles = await readCapabilityCodeFiles(dir, doc.items, { testFiles });
+  // A stale .sourcevision reads exactly like a fresh one — every file parses,
+  // every zone has files — so the specs come out looking equally authoritative.
+  // Say when the evidence was taken; the operator reviewing the plan cannot
+  // tell otherwise, and this repository's own analysis is routinely weeks old.
+  const evidenceCount = Object.keys(codeFiles).length;
+  if (evidenceCount > 0) {
+    const provenance = await readCodeEvidenceProvenance(dir);
+    const taken = provenance?.analyzedAt
+      ? `analysed ${provenance.analyzedAt.slice(0, 10)}`
+      : "analysis date unrecorded";
+    const at = provenance?.gitSha ? ` at ${provenance.gitSha.slice(0, 7)}` : "";
+    info(`Code evidence for ${evidenceCount} item(s) from .sourcevision (${taken}${at}).`);
+  } else {
+    info("No code evidence: .sourcevision has no analysis to read. Run `ndx analyze .` first if the specs should cite code.");
+  }
   const options: V1ToV2Options = { testFiles, codeFiles };
 
   info(`Planning ${migration.id} over ${doc.items.length} top-level items (cut at ${cutAt})…`);

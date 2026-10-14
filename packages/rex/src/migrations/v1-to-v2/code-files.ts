@@ -44,6 +44,7 @@ import { DEFAULT_MIN_TEST_SCORE, indexItems, isTestFile, linkedTests } from "./c
 /** Analysis artifacts this reader needs, by basename; both are optional. */
 const SV_ZONES_FILE = "zones.json";
 const SV_IMPORTS_FILE = "imports.json";
+const SV_MANIFEST_FILE = "manifest.json";
 
 /** Below this a zone shares one word with the item, which most zone names do. */
 export const DEFAULT_MIN_ZONE_SCORE = 2;
@@ -159,6 +160,37 @@ function rank(files: Iterable<string>, keywords: string[], maxFiles: number): st
  * a missing entry as no code evidence and says so in the capability's notes.
  * Items are keyed by v1 id; the drafter reads only the capability ones.
  */
+/** When the analysis this evidence comes from was taken, and of what commit. */
+export interface CodeEvidenceProvenance {
+  /** ISO timestamp the analysis recorded for itself. */
+  analyzedAt?: string;
+  /** The commit it analysed, when it recorded one. */
+  gitSha?: string;
+}
+
+/**
+ * The analysis's own account of when it ran.
+ *
+ * The evidence above is only as current as the scan it came from, and a stale
+ * `.sourcevision/` reads exactly like a fresh one: every file parses, every
+ * zone has files, and the capability specs come out looking authoritative. The
+ * caller reports this so an operator reviewing a plan can tell evidence drawn
+ * from this commit from evidence drawn from one weeks old.
+ *
+ * Absent when there is no manifest, which is the same case as no evidence.
+ */
+export async function readCodeEvidenceProvenance(dir: string): Promise<CodeEvidenceProvenance | undefined> {
+  const parsed = (await readJson(join(resolveLayout(dir).sourcevisionDir, SV_MANIFEST_FILE))) as
+    | { analyzedAt?: unknown; gitSha?: unknown; repo?: { gitSha?: unknown } }
+    | undefined;
+  if (!parsed) return undefined;
+  const analyzedAt = typeof parsed.analyzedAt === "string" ? parsed.analyzedAt : undefined;
+  const fromRepo = typeof parsed.repo?.gitSha === "string" ? parsed.repo.gitSha : undefined;
+  const gitSha = typeof parsed.gitSha === "string" ? parsed.gitSha : fromRepo;
+  if (analyzedAt === undefined && gitSha === undefined) return undefined;
+  return { ...(analyzedAt ? { analyzedAt } : {}), ...(gitSha ? { gitSha } : {}) };
+}
+
 export async function readCapabilityCodeFiles(
   dir: string,
   items: readonly PRDItem[],
