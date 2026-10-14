@@ -17,4 +17,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Fill capability codeFiles from .sourcevision output](./fill-capability-codefiles-from.md) | pending |
+| [Fill capability codeFiles from .sourcevision output](./fill-capability-codefiles-from.md) | in_progress |

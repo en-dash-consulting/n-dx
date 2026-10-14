@@ -1,7 +1,9 @@
 /**
  * `rex migrate-plan` — plan a schema migration and write it out for review.
  *
- * Reads the PRD, runs the registered migration's pipeline
+ * Reads the PRD and the outside facts the rules draw on — the repository's test
+ * files and the code evidence in the sourcevision analysis — runs the
+ * registered migration's pipeline
  * (`../../migrations/pipeline.ts`) and writes two files to an operator-chosen
  * path: the JSON plan file that `apply` will read, and a Markdown summary a
  * person reads first. It writes **nothing** to the PRD — planning is a pure
@@ -47,6 +49,7 @@ import { findTestFiles } from "../../core/verify.js";
 import { findMigration, MIGRATIONS } from "../../migrations/registry.js";
 import { formatPlanFile, readPlanFile, writePlanFile, type PlanFile } from "../../migrations/plan-file.js";
 import { v1TreeSource, type V1ToV2Options } from "../../migrations/v1-to-v2/index.js";
+import { readCapabilityCodeFiles } from "../../migrations/v1-to-v2/code-files.js";
 import { planSeams } from "../../migrations/v1-to-v2/seams.js";
 import { renderPlanSummary, type V1ToV2Plan } from "../../migrations/v1-to-v2/plan-summary.js";
 import { atomicWrite } from "../../store/atomic-write.js";
@@ -188,7 +191,12 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   const doc = await withLock(prdLockPath(rexDir), () => store.loadDocument());
 
   const seams = await buildSeams(dir, rexDir, flags);
-  const options: V1ToV2Options = { testFiles: await findTestFiles(dir) };
+  // Both outside facts the rules read are gathered here: the migration itself
+  // never touches the filesystem. Without an analysis the code evidence is
+  // empty and the plan is what it was before the reader existed.
+  const testFiles = await findTestFiles(dir);
+  const codeFiles = await readCapabilityCodeFiles(dir, doc.items, { testFiles });
+  const options: V1ToV2Options = { testFiles, codeFiles };
 
   info(`Planning ${migration.id} over ${doc.items.length} top-level items (cut at ${cutAt})…`);
   const plan = (await migration.plan(v1TreeSource(doc.items), { cutAt, seams, previous, options })) as V1ToV2Plan;

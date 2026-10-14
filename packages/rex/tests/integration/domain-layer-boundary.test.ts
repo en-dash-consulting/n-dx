@@ -224,6 +224,9 @@ describe("rex cli/commands import surface", () => {
     "../../migrations/v1-to-v2/index.js",
     "../../migrations/v1-to-v2/seams.js",
     "../../migrations/v1-to-v2/plan-summary.js",
+    // The code-evidence reader, for the same reason and by the same caller: the
+    // migration is pure, so the command gathers the outside facts it reads.
+    "../../migrations/v1-to-v2/code-files.js",
     // Loaded by migrate-plan through `await import()` so a --rules-only run
     // never pulls the model machinery in. The extractor above only matches
     // static `from "…"`, so these would otherwise sit outside the tracked
