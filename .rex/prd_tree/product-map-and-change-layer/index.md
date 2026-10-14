@@ -21,7 +21,7 @@ plannedRelease: "1.0.0"
 | [Agent brief from the product layer](./agent-brief-from-the-product-layer/index.md) | completed |
 | [Apply engine for change amendments](./apply-engine-for-change-amendments/index.md) | completed |
 | [Apply the migration](./apply-the-migration/index.md) | pending |
-| [Bootstrap the product layer from an established codebase](./bootstrap-the-product-layer-from-an/index.md) | pending |
+| [Bootstrap the product layer from an established codebase](./bootstrap-the-product-layer-from-an/index.md) | completed |
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
 | [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | completed |
 | [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | completed |
