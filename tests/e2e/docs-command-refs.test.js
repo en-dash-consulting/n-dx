@@ -82,12 +82,19 @@ const WORD_END = String.raw`(?=$|[\s` + "`" + String.raw`'"),;|&])`;
  * `<tool> <subcommand>` references in code text. The tool word must start a
  * command (line start, after `ndx`, or after a shell separator), so paths
  * such as `.rex/` and `@n-dx/rex` and keys such as `rex.applyOn` never match.
+ * It must also not be a flag's value, so the package selector in
+ * `pnpm --filter hench exec vitest` is not read as a `hench exec` command.
  * The tool and its subcommand are separated by exactly one space: wider gaps
  * are aligned columns in a diagram (`hench      agent loops`), and a newline
  * ends the command.
  */
+const NOT_A_FLAG_VALUE = String.raw`(?<!\s-{1,2}[a-z][a-z0-9-]* )`;
+
 export function subcommandRefs(chunk, tool) {
-  const re = new RegExp(String.raw`(?:^|[ \t;|&(]|\bndx )` + tool + String.raw` ([a-z][a-z0-9-]*)` + WORD_END, "gm");
+  const re = new RegExp(
+    String.raw`(?:^|[ \t;|&(]|\bndx )` + NOT_A_FLAG_VALUE + tool + String.raw` ([a-z][a-z0-9-]*)` + WORD_END,
+    "gm",
+  );
   return [...chunk.matchAll(re)].map((m) => m[1]);
 }
 
@@ -128,6 +135,15 @@ describe("docs reference parsing", () => {
     );
     expect(chunks.flatMap((c) => subcommandRefs(c, "rex"))).toEqual([]);
     expect(chunks.flatMap((c) => subcommandRefs(c, "hench"))).toEqual([]);
+  });
+
+  it("ignores a tool name passed as a flag's value", () => {
+    const chunks = codeText(
+      "```sh\npnpm --filter hench exec vitest run tests/unit/agent/token-usage.test.ts\n" +
+        "pnpm --filter rex test\n```\n",
+    );
+    expect(chunks.flatMap((c) => subcommandRefs(c, "hench"))).toEqual([]);
+    expect(chunks.flatMap((c) => subcommandRefs(c, "rex"))).toEqual([]);
   });
 
   it("finds MCP tool names with or without the client prefix", () => {
