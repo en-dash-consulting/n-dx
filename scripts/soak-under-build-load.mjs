@@ -31,6 +31,14 @@
  *   node scripts/soak-under-build-load.mjs             # 3 runs, 2 load workers
  *   node scripts/soak-under-build-load.mjs --runs=1
  *   node scripts/soak-under-build-load.mjs --workers=4
+ *   node scripts/soak-under-build-load.mjs --runs=5 -- tests/e2e/cli-foo.test.js
+ *
+ * Everything after `--` is a vitest file filter, and replaces `pnpm test` with
+ * `vitest run <files>` under the same load. The full-suite form is the closing
+ * check for the suite as a whole; the filtered form is for the other question,
+ * "does THIS file still read load as a defect", which a 7-minute run answers no
+ * better than a 10-second one. A filtered soak proves nothing about any file it
+ * did not run — say which form produced a result when recording one.
  *
  * Exits non-zero if any run failed.
  */
@@ -79,6 +87,20 @@ function flag(name, fallback) {
 
 const RUNS = flag("runs", 3);
 const WORKERS = flag("workers", 2);
+
+/** Vitest file filters given after `--`; empty means run the whole suite. */
+const FILTERS = process.argv.includes("--")
+  ? process.argv.slice(process.argv.indexOf("--") + 1)
+  : [];
+
+/**
+ * Unlike {@link TSC}, vitest IS a root devDependency — the single shared
+ * install every suite runs through — so the root path is the right one. Taken
+ * as a literal path rather than `require.resolve`, which rejects it: vitest's
+ * `exports` map does not publish `./vitest.mjs`. Same spelling as
+ * `scripts/run-vitest-bind-aware.mjs`, for the same reason.
+ */
+const VITEST = join(ROOT, "node_modules", "vitest", "vitest.mjs");
 
 /** Wall time as `4m 07s`, because a run's cost is read in minutes. */
 function human(ms) {
@@ -166,10 +188,18 @@ function stopLoad(state) {
   }
 }
 
-/** Run `pnpm test` to completion, streaming its output. */
+/**
+ * Run the suite — or just the filtered files — to completion, streaming output.
+ *
+ * The filtered branch calls vitest directly rather than going through
+ * `run-all-tests.mjs`, whose unit of selection is a suite label: there is no
+ * label that means "one file".
+ */
 function runSuite() {
   return new Promise((resolve) => {
-    const child = spawnCli("pnpm", ["test"], { cwd: ROOT, stdio: "inherit" });
+    const child = FILTERS.length > 0
+      ? spawnCli(process.execPath, [VITEST, "run", ...FILTERS], { cwd: ROOT, stdio: "inherit" })
+      : spawnCli("pnpm", ["test"], { cwd: ROOT, stdio: "inherit" });
     child.on("close", (code) => resolve(code ?? 1));
     child.on("error", () => resolve(1));
   });
@@ -183,7 +213,8 @@ for (let run = 1; run <= RUNS; run++) {
   const state = { stop: false, cycles: 0, failedCycles: 0, children: new Set() };
   const workers = Array.from({ length: WORKERS }, (_, i) => loadWorker(i, state));
 
-  console.log(`\n=== run ${run}/${RUNS} — suite under ${WORKERS} concurrent tsc workers ===\n`);
+  const target = FILTERS.length > 0 ? FILTERS.join(" ") : "suite";
+  console.log(`\n=== run ${run}/${RUNS} — ${target} under ${WORKERS} concurrent tsc workers ===\n`);
   const startedAt = Date.now();
   const exitCode = await runSuite();
   const elapsed = Date.now() - startedAt;

@@ -20,8 +20,8 @@ Resistance → Family 2.** Read it first. In short, and in preference order:
    scaled through
    `const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20)`.
 
-`tests/e2e/wall-clock-inventory-policy.test.js` scans for two shapes and fails
-if a file holding either is not named anywhere in this file:
+`tests/e2e/wall-clock-inventory-policy.test.js` scans for three shapes and fails
+if a file holding any of them is not named anywhere in this file:
 
 1. **A clock decides a bound** — the file reads a clock and an `expect` whose
    subject names a duration is bounded by a comparison matcher.
@@ -29,6 +29,12 @@ if a file holding either is not named anywhere in this file:
    `setTimeout`/`sleep` followed by an `expect(` with no `await` in between.
    Nothing here names a duration; the verdict is an ordering or a count that
    real timers produced, and the sleep is a bet on the event landing inside it.
+3. **A wall-clock deadline bounds a polling wait** — `Date.now() + timeout`
+   paired with a `while`/`if` that compares a fresh clock read against it.
+   Nothing names a duration and nothing sleeps before an assertion, so the
+   first two detectors are blind to it; the test's *progress* is what the clock
+   decides. This is how the family reaches a spawned process, and it is what
+   went wrong in `tests/e2e/cli-ci-child-cleanup.test.js` below.
 
 Being listed does not mean an assertion is *good* — it means somebody looked at
 it and wrote down why it is still there.
@@ -69,12 +75,37 @@ time-to-first-PID is 111ms.
 
 That fix removed the cost but not the exposure: the 3s deadline was still a raw
 constant, and the closing soak for 0.8.0 (`scripts/soak-under-build-load.mjs`)
-hit it at 8678ms under concurrent build load. Every wait in that file is now
+hit it at 8678ms under concurrent build load. Every wait in that file was then
 `BUDGET_MULTIPLIER`-scaled — the two PID-record deadlines, the orphan-reap grace,
 the normal-exit grace and the SIGINT case's per-test ceiling — except the mirror
-of the product's own 5s force-kill timer, which is not the test's to widen. These
-are Family 3 polling guardrails, not clock-decided assertions, so neither
-detector flags them and the file is listed here only for the narrative above.
+of the product's own 5s force-kill timer, which is not the test's to widen.
+
+**Scaling moved the failure; it did not remove it.** A 20x deadline is still a
+deadline, and the verdict was still a function of `(code, machine load)`. The
+wait for both PID records is now a promise gate (`waitForPidRecords`) with no
+deadline at all: it ends when the records arrive, however long `ndx ci` took to
+reach its first tracked spawn, or when the parent process exits without them —
+two events, neither of which load can reorder. A parent that dies early is now
+reported with its exit code, every record written so far and its stderr, where
+the deadline reported "Timed out waiting for required CI child records" for both
+that and ordinary slowness. Confirmed falsifiable by asking the gate for a
+record kind the fixture never writes: it fails in 1.07s with the exit code,
+against the 60s wait and uninformative message the deadline gave.
+
+The EBUSY that followed the timeout on the same run was the same race seen from
+teardown: `rm` of the temp directory while the process tree was still exiting,
+and every one of those processes is spawned with `cwd: tmpDir`, which on Windows
+is an open handle. Teardown now awaits each parent's `exit` before `rm` instead
+of retrying through the lock. The `maxRetries` stay for handles the test does not
+own — a scanner touching a just-written temp file is nobody's process to wait on.
+
+What remains in the file is `waitForPidExit`, which is a deadline-bounded poll
+and should be: what it bounds is the product's own 5s force-kill timer, a
+Family 3 guardrail, and it is `BUDGET_MULTIPLIER`-scaled. So the file still
+matches detector 3 — deliberately. That detector was added by this work, because
+the 2026-09-28 failure had to be found by hand: the deadline it blew named no
+duration and slept before no assertion, so neither existing detector could see
+it. The registered baseline is below.
 
 ---
 
@@ -192,6 +223,65 @@ Waiting on a viewer effect or render:
 - `packages/web/tests/unit/viewer/tree-event-delegate.test.ts`
 - `packages/web/tests/unit/viewer/workspace-switcher.test.ts`
 - `packages/web/tests/unit/viewer/workspaces-view.test.ts`
+
+---
+
+## Polling waits bounded by a wall-clock deadline
+
+A third family, and the last one to get a detector. `const deadline = Date.now()
++ TIMEOUT_MS` with a `while (Date.now() < deadline)` around a read: of a pidfile,
+an HTTP endpoint, a process table, a log. Nothing names a duration and nothing
+sleeps before an assertion, so detectors 1 and 2 are both blind — yet if the
+thing being waited for has not happened by the deadline, the suite fails with the
+code unchanged. That is the same `(code, machine load)` verdict the whole
+register exists for, reached by a different road.
+
+Most of these are legitimate: TESTING.md, Family 3 is explicit that a bounded
+poll around a real process is a hang guardrail, and a guardrail has to have a
+bound. **Being listed here is not an accusation.** The distinction that matters
+is between a poll that bounds a hang and a poll whose expiry *is* the verdict,
+and that distinction cannot be seen in a regex — which is why it is written down
+instead.
+
+### Converted
+
+| Site | Was | Now |
+|---|---|---|
+| `tests/e2e/cli-ci-child-cleanup.test.js` — `waitForPidRecords` | `while (Date.now() < deadline)` re-reading `ci-child-pids.jsonl` until the required records appeared, first at a raw 3000ms and then at `3000 * BUDGET_MULTIPLIER`. Failed at 9277ms under full-suite load on 2026-09-28 with "Timed out waiting for required CI child records", on a run where the product worked. | A promise gate with no deadline: it ends when the records arrive, or when the CLI parent exits without them. Both outcomes are events. The failure path gained the parent's exit code, the records written so far and its stderr. Falsification recorded in the narrative above. The file still matches this detector, by design — `waitForPidExit` bounds the product's own 5s force-kill timer and is a genuine guardrail. |
+
+### Registered baseline — not reviewed one by one
+
+Captured mechanically when the detector was added, exactly as the sleep list
+above was. They are listed so the gate ratchets: anything **not** on this list
+that matches must be converted or argued for. Do not read inclusion as approval.
+
+**One measured fact about all of them: none scales its deadline with
+`NDX_TEST_TIME_MULTIPLIER`.** The documented 20x load allowance reaches none of
+these waits, which is the same exposure `cli-ci-child-cleanup.test.js` had before
+it blew up. That is a finding, not a fix — converting or scaling fifteen files
+belongs in its own task, with each deadline measured rather than multiplied on
+sight.
+
+Waiting on a spawned process or CLI:
+
+- `tests/e2e/cli-child-cleanup.test.js`
+- `tests/e2e/cli-orphan-cleanup.test.js`
+- `packages/hench/tests/integration/rollback-prompt.test.ts`
+- `packages/hench/tests/unit/agent/lifecycle/rollback-prompt-message.test.ts`
+- `packages/hench/tests/unit/agent/shared-lifecycle.test.ts`
+- `packages/hench/tests/unit/store/run-log.test.ts`
+
+Waiting on a server, hub or daemon:
+
+- `tests/e2e/cli-start-hub.test.js`
+- `tests/e2e/cli-start-two-projects.test.js`
+- `tests/e2e/mcp-transport.test.js`
+- `tests/e2e/mcp-transport-hub.test.js`
+- `packages/web/tests/integration/hub-admission.test.ts`
+- `packages/web/tests/integration/hub-admission-auth.test.ts`
+- `packages/web/tests/integration/hub-daemon.test.ts`
+- `packages/web/tests/integration/workspace-scoped-prd-writes.test.ts`
+- `packages/web/tests/integration/workspace-slot-dispatch.test.ts`
 
 ---
 

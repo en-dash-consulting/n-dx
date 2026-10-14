@@ -309,6 +309,7 @@ busy machine" is not a reproduction.
 ```sh
 node scripts/soak-under-build-load.mjs           # 3 suite runs under concurrent build load
 node scripts/soak-under-build-load.mjs --runs=1
+node scripts/soak-under-build-load.mjs --runs=3 --workers=6 -- tests/e2e/cli-foo.test.js
 ```
 
 The script keeps the machine compiling the repo's TypeScript packages for as
@@ -317,6 +318,14 @@ compilations finished beside it — a cycle count of zero means the load never
 ran and the result proves nothing. It emits to a temp directory rather than
 `dist/`, so the e2e suite's CLI spawns are never handed a half-written entry
 point; see the header comment for why that distinction matters.
+
+Anything after `--` is a vitest filter and runs those files instead of the whole
+suite, for the narrower question "does this one file still read load as a
+defect". Two things to know before trusting the result. The load is restarted
+per run, so a run shorter than one `tsc` compile reports a cycle count of 1 and
+has not been loaded at all — add vitest's `--repeats=N` so the run outlasts the
+ramp, and check the count. And a filtered soak says nothing about any file it
+did not run: when recording a soak result, say which form produced it.
 
 ### Family 1 — Foreign responses in HTTP route tests
 
@@ -406,6 +415,24 @@ timers advanced by a named interval. A sleep that only widens the window for a
 *bug* to appear is sound and is not flagged, because the gate that follows it
 decides the verdict — see
 `packages/rex/tests/integration/concurrent-write-lost-update.test.ts`.
+
+**A polling wait with a wall-clock deadline is the third shape, and the one that
+reaches spawned processes.** `const deadline = Date.now() + 3_000` with a
+`while (Date.now() < deadline)` around a read of a pidfile, a port or a log
+names no duration and sleeps before no assertion, so neither scan above sees it
+— yet the test's progress is what the clock decides, and under load the deadline
+expires on a run where nothing is wrong. `tests/e2e/cli-ci-child-cleanup.test.js`
+failed exactly this way and had to be found by hand; the scan now flags the
+shape and holds it to the same register.
+
+Most such polls are legitimate hang guardrails (Family 3 below), so being
+flagged is not an accusation — it is a requirement to write down which kind it
+is. Prefer a gate whose outcomes are both events: in that file,
+`waitForPidRecords` ends when the child's record arrives, however slow the
+machine, or when the parent process exits without it, which is the actual
+defect and is now reported with the parent's exit code and stderr. Where a
+deadline genuinely bounds a hang, scale it with `NDX_TEST_TIME_MULTIPLIER` and
+say in the register what it bounds.
 
 Almost every wall-clock assertion in this repo is standing in for a *complexity*
 claim — "this must not go quadratic" — not a latency SLA. Three techniques can
