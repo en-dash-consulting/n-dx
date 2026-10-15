@@ -10,6 +10,11 @@
  * under it. The side column has the task and its criteria, its runs, where
  * the run is, what it has spent, and what happens after it.
  *
+ * Once the selected run has finished the card gains a Summary tab and opens
+ * on it — the run's closing words, what it changed, what the reviewer found,
+ * its metrics and its commits, with Re-run, Open commit and Capture follow-up
+ * (`live-summary.ts`). Work, Log and Review stay where they were.
+ *
  * The selected run is in the URL (`?run=<id>`); picking another replaces it
  * without a reload. Reading the data is `live-task-model.ts`.
  *
@@ -23,6 +28,7 @@ import type { NavigateTo } from "../types.js";
 import {
   useLive,
   useLiveTask,
+  useRunRecord,
   useTick,
   type LiveTaskRun,
   type LiveTaskSnapshot,
@@ -35,6 +41,7 @@ import { formatUsd } from "./live-model.js";
 import { LogTab } from "./live-log.js";
 import { ReviewSection, ReviewTab, StageStrip } from "./live-review.js";
 import { reviewStages, reviewTabMarker } from "./live-review-model.js";
+import { SummaryTab } from "./live-summary.js";
 import {
   afterRunItems,
   criteriaRows,
@@ -55,7 +62,19 @@ export interface LiveTaskViewProps {
   navigateTo: NavigateTo;
 }
 
-type TabId = "work" | "log" | "review";
+type TabId = "summary" | "work" | "log" | "review";
+
+/**
+ * How long the page keeps asking for a new run after Re-run, and how often.
+ *
+ * The snapshot's own backstop poll drops to 30 s once the shown run has
+ * finished, which is the state Re-run is pressed in — so without this the
+ * page would sit on the old run for half a minute after starting a new one.
+ * Bounded rather than open-ended: a start that produced no record is a
+ * failure to report, not a reason to poll for ever.
+ */
+const RERUN_POLL_MS = 1_000;
+const RERUN_POLL_TRIES = 20;
 
 async function errorOf(res: Response, fallback: string): Promise<string> {
   const body = await res.json().catch(() => null) as { error?: string } | null;
@@ -362,9 +381,15 @@ function AfterSection({ run, events }: { run: LiveTaskRun; events: RunEventLine[
 
 export function LiveTaskView({ taskId, navigateTo }: LiveTaskViewProps) {
   const [requested, setRequested] = useState<string | null>(() => readRunParam(location.search));
-  const [tab, setTab] = useState<TabId>("work");
+  // Null means "whichever tab suits the run": Work while it goes, Summary once
+  // it has finished. An explicit click pins a tab, so a run that ends while
+  // the log is open does not pull the page out from under the reader.
+  const [tab, setTab] = useState<TabId | null>(null);
+  const [awaitingRun, setAwaitingRun] = useState(0);
   const pick = useCallback((s: LiveTaskSnapshot) => selectRun(s.runs, requested), [requested]);
   const { snapshot, run, error, events, eventsAvailable, refresh } = useLiveTask(taskId, pick);
+  const finished = run !== null && run.status !== "running";
+  const { record, loading: recordLoading, error: recordError } = useRunRecord(finished ? run.runId : null);
 
   // The URL records the run on show, so a copied link opens this run even
   // when it was reached as the task's default.
@@ -376,16 +401,40 @@ export function LiveTaskView({ taskId, navigateTo }: LiveTaskViewProps) {
 
   const onPick = useCallback((runId: string) => {
     setRequested(runId);
-    setTab("work");
+    setTab(null);
   }, []);
 
+  // Re-run: unpin the URL's run so the page follows the new one as soon as its
+  // record lands, and ask for the snapshot until it does.
+  const onRerun = useCallback(() => {
+    setRequested(null);
+    setTab(null);
+    setAwaitingRun(RERUN_POLL_TRIES);
+    void refresh();
+  }, [refresh]);
+
+  const anyRunning = snapshot?.runs.some((r) => r.status === "running") ?? false;
+  useEffect(() => {
+    if (awaitingRun <= 0 || anyRunning) {
+      if (awaitingRun > 0 && anyRunning) setAwaitingRun(0);
+      return;
+    }
+    const id = setTimeout(() => { setAwaitingRun((n) => n - 1); void refresh(); }, RERUN_POLL_MS);
+    return () => clearTimeout(id);
+  }, [awaitingRun, anyRunning, refresh]);
+
   const review = run ? hasReview(run, events) : false;
-  const activeTab: TabId = tab === "review" && !review ? "work" : tab;
+  const fallbackTab: TabId = finished ? "summary" : "work";
+  const chosen: TabId = tab ?? fallbackTab;
+  const activeTab: TabId = (chosen === "review" && !review) || (chosen === "summary" && !finished)
+    ? fallbackTab
+    : chosen;
   // With a review, the tabs say where the run is: Work done once it has
   // moved on, Review waiting until the reviewer starts.
   const workDone = run !== null && review && run.status === "running" && reviewStages(run, events)[0].state === "done";
   const reviewMarker = run !== null && review ? reviewTabMarker(run, events) : null;
   const tabs: Array<{ id: TabId; label: string; marker: string | null }> = [
+    ...(finished ? [{ id: "summary" as const, label: "Summary", marker: null }] : []),
     { id: "work", label: "Work", marker: workDone ? "done" : null },
     { id: "log", label: "Log", marker: null },
     ...(review ? [{ id: "review" as const, label: "Review", marker: reviewMarker }] : []),
@@ -421,11 +470,18 @@ export function LiveTaskView({ taskId, navigateTo }: LiveTaskViewProps) {
                 onClick: () => setTab(t.id),
               }, t.label, t.marker ? h("span", { class: "live-tab-marker" }, ` · ${t.marker}`) : null))),
               h("div", { id: "live-task-panel", role: "tabpanel", "aria-labelledby": `live-task-tab-${activeTab}`, class: "live-task-panel" },
-                activeTab === "work"
-                  ? h(WorkTab, { run, events, eventsAvailable, onOpenLog: () => setTab("log") })
-                  : activeTab === "log"
-                    ? h(LogTab, { run, taskId })
-                    : h(ReviewTab, { run, events, taskId, navigateTo }),
+                activeTab === "summary"
+                  ? h(SummaryTab, {
+                    snapshot, run, record, loading: recordLoading, error: recordError, navigateTo,
+                    onOpenWork: () => setTab("work"),
+                    onOpenReview: () => setTab("review"),
+                    onRerun,
+                  })
+                  : activeTab === "work"
+                    ? h(WorkTab, { run, events, eventsAvailable, onOpenLog: () => setTab("log") })
+                    : activeTab === "log"
+                      ? h(LogTab, { run, taskId })
+                      : h(ReviewTab, { run, events, taskId, navigateTo }),
               ),
             ),
             h("aside", { class: "live-side", "aria-label": "Task and run" },

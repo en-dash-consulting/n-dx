@@ -94,7 +94,17 @@ export function renderPlanSummary(plan: V1ToV2Plan): string {
   lines.push(`- Migration: \`${header.migration}\``);
   lines.push(`- Source: \`${header.source.kind}\` \`${header.source.digest.slice(0, 12)}\``);
   lines.push(`- Cut at: ${header.cutAt}`);
-  lines.push(`- Passes: ${passLine(plan)}`, "");
+  lines.push(`- Passes: ${passLine(plan)}`);
+  // The reader cannot judge a capability spec without knowing how old the
+  // evidence behind it is, and a stale analysis looks exactly like a fresh one.
+  if (summary.codeEvidence) {
+    const { items, analyzedAt, gitSha, offHistory } = summary.codeEvidence;
+    const when = analyzedAt ? `analysed ${analyzedAt.slice(0, 10)}` : "analysis date unrecorded";
+    const at = gitSha ? ` at \`${gitSha.slice(0, 7)}\`` : "";
+    const warn = offHistory ? " — **not an ancestor of HEAD**" : "";
+    lines.push(`- Code evidence: ${items} item(s), ${when}${at}${warn}`);
+  }
+  lines.push("");
 
   const incomplete = header.passes.filter((p) => p.incomplete);
   if (incomplete.length > 0) {

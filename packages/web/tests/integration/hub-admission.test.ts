@@ -665,9 +665,35 @@ describe("hub admission gate", () => {
 
     const spoofed = JSON.stringify({ running: 0, maxSessions: 99, queued: 0 });
     await fetch(`http://127.0.0.1:${h.port}/p/beta/w/feature/api/live`, { headers: { "x-ndx-hub-admission": spoofed } });
-    expect(beta.liveAdmission).toEqual([
-      JSON.stringify({ running: 1, maxSessions: 1, queued: 1, availableBytes: 8 * 1024 ** 3, pressure: "normal", memoryPaused: false }),
+    expect(beta.liveAdmission).toHaveLength(1);
+    const header = JSON.parse(beta.liveAdmission[0]!);
+    // The hub's own numbers, not the client's 99.
+    expect(header).toMatchObject({ running: 1, maxSessions: 1, queued: 1, availableBytes: 8 * 1024 ** 3, pressure: "normal", memoryPaused: false });
+    // The counts are machine-wide; only the entry list narrows to the proxied
+    // project, so beta's queued task-2 rides along and alpha's running task-1
+    // does not appear at all.
+    expect(header.queue).toEqual([
+      { taskId: "task-2", workspace: null, enqueuedAt: expect.any(String) },
     ]);
+  });
+
+  it("narrows the queue to the proxied project when another project is queued too", async () => {
+    // The test above cannot catch a broken filter: alpha's task-1 is RUNNING,
+    // not queued, so beta's entry is the only one in the snapshot and
+    // `.filter(() => true)` passes. Queue a second alpha request so there is
+    // something to narrow away.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect((await execute(h.port, "/p/alpha/api/hench/execute", "task-1b")).status).toBe(202);
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-2")).status).toBe(202);
+
+    await fetch(`http://127.0.0.1:${h.port}/p/beta/w/feature/api/live`);
+    const header = JSON.parse(beta.liveAdmission[beta.liveAdmission.length - 1]!);
+
+    // The counts stay machine-wide: both queued requests are counted.
+    expect(header.queued).toBe(2);
+    // The entry list is this project's only.
+    expect(header.queue.map((e: { taskId: string }) => e.taskId)).toEqual(["task-2"]);
   });
 
   it("states it on a proxied prep read too, including that memory is what holds runs back", async () => {
@@ -675,7 +701,7 @@ describe("hub admission gate", () => {
     freeMemory = 500;
     await fetch(`http://127.0.0.1:${h.port}/p/beta/api/hench/prep/task-1`);
     expect(beta.liveAdmission).toEqual([
-      JSON.stringify({ running: 0, maxSessions: 4, queued: 0, availableBytes: 500, pressure: "critical", memoryPaused: true }),
+      JSON.stringify({ running: 0, maxSessions: 4, queued: 0, queue: [], availableBytes: 500, pressure: "critical", memoryPaused: true }),
     ]);
   });
 

@@ -68,6 +68,34 @@ export interface AnalyzeProgressFile {
   previous: { at: string; durationMs: number; phases: Record<string, number> } | null;
 }
 
+/** One zone that appeared, went, was renamed or was merged away. */
+export interface AnalysisZoneChange {
+  id: string;
+  /** Its display name, when this run still has the zone; null for one that is gone. */
+  name: string | null;
+  /** Renamed: the id it had before. Merged: the zone its files went into. */
+  related: string | null;
+}
+
+/** Severity → number of findings. */
+export type FindingCounts = Record<string, number>;
+
+/** What the finished run changed — mirrors server/analysis-changes.ts. */
+export interface AnalysisChanges {
+  /** When the run this is measured against started; null without a comparable previous run. */
+  previousAt: string | null;
+  files: { now: number; was: number | null };
+  importEdges: { now: number; was: number | null };
+  zones: {
+    total: number;
+    added: AnalysisZoneChange[];
+    removed: AnalysisZoneChange[];
+    merged: AnalysisZoneChange[];
+    renamed: AnalysisZoneChange[];
+  };
+  findings: { now: FindingCounts; added: FindingCounts; resolved: FindingCounts };
+}
+
 export interface LiveAnalyzeSnapshot {
   generatedAt: string;
   worktree: { key: string; name: string; path: string; branch: string | null; isAnchor: boolean; isServed: boolean };
@@ -81,6 +109,10 @@ export interface LiveAnalyzeSnapshot {
   enrichmentPass: number | null;
   narration: { status: string; zones: number; reason: string | null } | null;
   recent: Array<{ at: string; mode: string; durationMs: number; calls: number; costUsd: number | null }>;
+  /** Null while a run is going, and for one that recorded no outcome. */
+  changes: AnalysisChanges | null;
+  /** USD the finished run's own ledger recorded; null when it recorded none. */
+  spendUsd: number | null;
 }
 
 // ---------------------------------------------------------------------------

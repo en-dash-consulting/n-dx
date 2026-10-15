@@ -9,7 +9,6 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 lastModified: "2026-10-01T21:41:25.141Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
-
 ## Children
 
 | Title | Status |
@@ -24,7 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Geometric Decorative Design System for ndx UI](./geometric-decorative-design-system-for/index.md) | completed |
 | [Item completion timeline view](./item-completion-timeline-view/index.md) | completed |
 | [Live tab: watch every running task and analysis from one place](./live-tab-watch-every-running-task-and/index.md) | completed |
-| [Live view plumbing: stream running hench and analyze progress to the dashboard](./live-view-plumbing-stream-running/index.md) | pending |
+| [Live view plumbing: stream running hench and analyze progress to the dashboard](./live-view-plumbing-stream-running/index.md) | completed |
 | [N-Rex Easter Egg — Triple-Click Dino Takeover](./n-rex-easter-egg-triple-click-dino/index.md) | completed |
 | [ndx as the single CLI interface](./ndx-as-the-single-cli-interface/index.md) | completed |
 | [ndx Dashboard Refresh Orchestration](./ndx-dashboard-refresh-orchestration/index.md) | completed |
@@ -51,3 +50,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-before.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-contract-in.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-hench.md) | completed |
+

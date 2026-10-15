@@ -35,6 +35,24 @@ beforeEach(() => {
 });
 
 describe("narrateZones", () => {
+  it("names an undecided previous finding in the zone's own block, to confirm or refute", async () => {
+    mockedCallClaude.mockResolvedValueOnce({
+      text: JSON.stringify({ zones: [{ id: "core", newInsights: [], findings: [] }, { id: "ui", newInsights: [], findings: [] }] }),
+    });
+
+    await narrateZones([core, ui], {
+      ...opts,
+      confirmFindings: new Map([["core", ["Parsing and rendering are tangled."]]]),
+    });
+
+    const [prompt] = mockedCallClaude.mock.calls[0];
+    expect(prompt).toContain("Previously found, please confirm or refute");
+    expect(prompt).toContain('"Parsing and rendering are tangled."');
+    // Only the zone the finding is scoped to carries the section.
+    const uiBlock = prompt.slice(prompt.indexOf('Zone "ui"'));
+    expect(uiBlock).not.toContain("Previously found");
+  });
+
   it("narrates every zone in one call and merges insights, findings and a structure hash per zone", async () => {
     mockedCallClaude.mockResolvedValueOnce({
       text: JSON.stringify({ zones: [

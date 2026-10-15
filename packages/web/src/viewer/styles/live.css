@@ -457,6 +457,32 @@
 .live-finding-action-failed { color: var(--red); }
 .live-finding-action-fixed { color: var(--green); }
 
+/* ── Finished-run summary ───────────────────────────────────────────── */
+
+.live-summary { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.live-summary-actions { flex-wrap: wrap; align-items: flex-start; }
+.live-summary-block { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.live-summary-outcome { margin: 0; overflow-wrap: anywhere; }
+.live-summary-outcome-failed { color: var(--orange); }
+
+.live-summary-files,
+.live-summary-findings,
+.live-summary-commits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--font-sm); }
+.live-summary-file,
+.live-summary-findings li,
+.live-summary-commits li { display: flex; gap: var(--space-2); align-items: baseline; min-width: 0; overflow-wrap: anywhere; }
+.live-summary-file-status { flex: none; width: 1.2em; text-align: center; color: var(--text-muted); font-family: var(--font-mono); }
+.live-summary-file-status-A { color: var(--green); }
+.live-summary-file-status-M { color: var(--orange); }
+.live-summary-file-status-D { color: var(--red); }
+.live-summary-counts { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.live-capture { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.live-capture-form { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+.live-capture-note { width: 100%; min-width: 16rem; font: inherit; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); }
+.live-capture-error { margin: 0; color: var(--orange); font-size: var(--font-sm); overflow-wrap: anywhere; }
+.live-capture-done { margin: 0; font-size: var(--font-sm); }
+
 .live-task-run { display: flex; flex-direction: column; gap: 2px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); min-width: 0; }
 .live-task-run-current { background: var(--accent-subtle); }
 .live-task-outcome { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -519,3 +545,18 @@
 .live-analyze-file-error { color: var(--orange); }
 
 .live-analyze-notes { margin: 0; padding-left: var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--font-sm); color: var(--text-dim); }
+
+/* What a finished analysis changed, above the phases it changed it in. */
+.live-analyze-summary { padding: var(--space-3); gap: var(--space-2); }
+.live-analyze-changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.live-analyze-change { font-variant-numeric: tabular-nums; }
+/* Nothing moved on this measure: still shown, so a silent one is not mistaken for one that did not run. */
+.live-analyze-change-quiet { color: var(--text-muted); }
+
+.live-analyze-zone-changes { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1) var(--space-2); font-size: var(--font-sm); }
+.live-analyze-zone-changes dt { color: var(--text-muted); }
+.live-analyze-zone-changes dd { margin: 0; min-width: 0; }
+.live-analyze-zone-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); overflow-wrap: anywhere; }
+
+.live-analyze-narration { margin: 0; font-size: var(--font-sm); color: var(--text-dim); }
+.live-analyze-stage-links { margin: 0; font-size: var(--font-sm); color: var(--text-muted); }

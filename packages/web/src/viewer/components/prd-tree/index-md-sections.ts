@@ -16,6 +16,7 @@ import type {
   InfoField,
   SubtaskEntry,
 } from "../../utils/index-md-parser.js";
+import { commitLinkUrl } from "../../utils/commit-link.js";
 
 type SortColumn = "title" | "type" | "status" | "lastUpdated" | null;
 type SortDirection = "asc" | "desc";
@@ -177,12 +178,10 @@ export function CommitsList({ commits, gitRemoteUrl }: { commits: CommitRef[]; g
         null,
         commits.map((commit) => {
           const shortHash = commit.hash.slice(0, 7);
+          const commitUrl = commitLinkUrl(commit.hash, gitRemoteUrl);
           let hashCell;
 
-          if (gitRemoteUrl) {
-            // Generate GitHub/GitLab link
-            const repoUrl = gitRemoteUrl.replace(/\.git$/, "");
-            const commitUrl = `${repoUrl}/commit/${commit.hash}`;
+          if (commitUrl) {
             hashCell = h(
               "a",
               {

@@ -48,7 +48,10 @@ import { detectOutbound } from "../../analyzers/outbound-detection.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
+import { readAnalysisOutcome } from "../../analyzers/analysis-outcome.js";
 import { configureJudgmentCache, setJevObserver } from "@n-dx/llm-client";
+import { configureRerunLog } from "../../analyzers/rerun-judge.js";
+import { configureRuleCache } from "../../analyzers/declared-rules.js";
 import {
   isAnalyzeProgressActive,
   startAnalyzeProgress,
@@ -153,6 +156,8 @@ export async function initAndLoadLLMConfig(absDir: string): Promise<{
   setLLMConfig(llmConfig);
   setProjectDir(absDir);
   configureJudgmentCache({ svDir: resolveSourcevisionPaths(absDir).svDir });
+  configureRerunLog({ svDir: resolveSourcevisionPaths(absDir).svDir });
+  configureRuleCache({ svDir: resolveSourcevisionPaths(absDir).svDir });
   // The Jev client is foundation-tier and cannot import the run ledger, so the
   // accounting is handed to it here — once, beside the cache it also owns.
   setJevObserver({ onCall: recordLLMCall, onCacheStats: recordJudgmentCache });
@@ -331,6 +336,11 @@ function finalizeTokenUsage(
   const run = snapshotRunLedger();
   for (const line of formatRunLedger(run)) info(dim(line));
 
+  // Read after the phases have written: this is the state the next run will be
+  // compared against, and the only moment it is both complete and still known.
+  const outcome = readAnalysisOutcome(ctx.svDir);
+  if (outcome) run.outcome = outcome;
+
   const manifest = readManifest(ctx.absDir);
   if (ctx.tokenUsage.calls > 0) {
     const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
@@ -432,8 +442,9 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   // the dashboard. Same ownership rule as the reporter above: a --deep
   // sub-analysis reports into the outermost run's file (under markScope) and
   // leaves finishing it to that run. The stop handlers go in before the file
-  // first says `running`: a signal sent on seeing it must reach them, not the
-  // default disposition (#562).
+  // first says `running` and come out after it stops saying it: a signal sent
+  // on seeing `running` must reach them at either end of the run, not the
+  // default disposition (#562, and its end-of-run mirror in the finally below).
   const ownsProgressFile = !isAnalyzeProgressActive();
   const removeStopHandlers = ownsProgressFile ? installStopHandlers(absDir) : null;
   if (ownsProgressFile) startAnalyzeProgress(svDir, ["sv analyze", ...extraArgs].join(" "));
@@ -523,8 +534,15 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     throw err;
   } finally {
     if (ownsProgressReporter) setActiveProgressReporter(null);
-    removeStopHandlers?.();
+    // Finish the progress file before dropping the handlers, the mirror of the
+    // ordering at the start of the run. Reversed, a stop arriving as the run
+    // ends finds the file still `running` and no handler: the process dies with
+    // the default disposition and the file is left `running` with a dead pid,
+    // so readAnalyzeProgress calls a finished run `interrupted`. This way the
+    // same stop reaches a handler that finds no active run — noteAnalyzeError
+    // and openRootPhase are no-ops then — and exits 128 + signal.
     if (ownsProgressFile) finishAnalyzeProgress(completed ? "complete" : "failed");
+    removeStopHandlers?.();
   }
 }
 

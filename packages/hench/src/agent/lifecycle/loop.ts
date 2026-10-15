@@ -765,12 +765,13 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     // The tier of the model actually sent; see RunRecord.weight.
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
+    ...(opts.loop ? { loop: opts.loop } : {}),
   });
   const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
   section(
-    opts.runNumber !== undefined
-      ? `Agent Run #${opts.runNumber} (${model}) start`
+    opts.loop !== undefined
+      ? `Agent Run #${opts.loop.iteration} (${model}) start`
       : `Agent Run (${model})`,
   );
 
@@ -1370,12 +1371,13 @@ async function runLocalToolLoop(params: {
     // The tier of the model actually sent; see RunRecord.weight.
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
+    ...(opts.loop ? { loop: opts.loop } : {}),
   });
   const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
   section(
-    opts.runNumber !== undefined
-      ? `Agent Run #${opts.runNumber} (${model}) start`
+    opts.loop !== undefined
+      ? `Agent Run #${opts.loop.iteration} (${model}) start`
       : `Agent Run (${model})`,
   );
 
@@ -1809,6 +1811,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       // The tier of the model actually sent; see RunRecord.weight.
       ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
       ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
+      ...(opts.loop ? { loop: opts.loop } : {}),
     });
     await executeGateOnlyRetry({
       plan: gateOnly,
@@ -1920,6 +1923,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     // The tier of the model actually sent; see RunRecord.weight.
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
+    ...(opts.loop ? { loop: opts.loop } : {}),
   });
   const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
@@ -1946,8 +1950,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   );
 
   section(
-    opts.runNumber !== undefined
-      ? `Agent Run #${opts.runNumber} (${model}) start`
+    opts.loop !== undefined
+      ? `Agent Run #${opts.loop.iteration} (${model}) start`
       : `Agent Run (${model})`,
   );
 

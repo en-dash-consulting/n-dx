@@ -1,7 +1,9 @@
 /**
  * `rex migrate-plan` — plan a schema migration and write it out for review.
  *
- * Reads the PRD, runs the registered migration's pipeline
+ * Reads the PRD and the outside facts the rules draw on — the repository's test
+ * files and the code evidence in the sourcevision analysis — runs the
+ * registered migration's pipeline
  * (`../../migrations/pipeline.ts`) and writes two files to an operator-chosen
  * path: the JSON plan file that `apply` will read, and a Markdown summary a
  * person reads first. It writes **nothing** to the PRD — planning is a pure
@@ -39,7 +41,7 @@
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { TYPESAFE_API_KEY_ENV, askJev } from "@n-dx/llm-client";
+import { TYPESAFE_API_KEY_ENV, askJev, exec, resolveLayout, relativeToRoot } from "@n-dx/llm-client";
 import { prdLockPath, resolveRexPaths, resolveStore, withLock } from "../../store/index.js";
 import { hasV2Tree } from "../../store/prd-bundle-v2.js";
 import { loadPlacementSettings } from "../../core/placement-policy.js";
@@ -47,6 +49,7 @@ import { findTestFiles } from "../../core/verify.js";
 import { findMigration, MIGRATIONS } from "../../migrations/registry.js";
 import { formatPlanFile, readPlanFile, writePlanFile, type PlanFile } from "../../migrations/plan-file.js";
 import { v1TreeSource, type V1ToV2Options } from "../../migrations/v1-to-v2/index.js";
+import { readCodeEvidence, readCodeEvidenceProvenance } from "../../migrations/v1-to-v2/code-files.js";
 import { planSeams } from "../../migrations/v1-to-v2/seams.js";
 import { renderPlanSummary, type V1ToV2Plan } from "../../migrations/v1-to-v2/plan-summary.js";
 import { atomicWrite } from "../../store/atomic-write.js";
@@ -138,6 +141,29 @@ async function buildSeams(dir: string, rexDir: string, flags: Record<string, str
   }
 }
 
+
+/**
+ * Whether `sha` is HEAD or an ancestor of it.
+ *
+ * `merge-base --is-ancestor` answers both at once (a commit is its own
+ * ancestor). Anything that is not a clean "yes" — no git, a shallow clone, a
+ * commit this checkout never fetched — is treated as "cannot tell" and does
+ * not raise a warning, because a false alarm about stale evidence is worse
+ * than none.
+ */
+async function isAncestorOfHead(dir: string, sha: string): Promise<boolean> {
+  try {
+    const result = await exec("git", ["merge-base", "--is-ancestor", sha, "HEAD"], {
+      cwd: dir,
+      timeout: 10_000,
+    });
+    if (result.error) return true;
+    return result.exitCode === 0;
+  } catch {
+    return true;
+  }
+}
+
 export async function cmdMigratePlan(dir: string, flags: Record<string, string>): Promise<void> {
   // The whole argument shape settles before anything is read, so a malformed
   // command fails on the command rather than part-way through a paid run.
@@ -188,10 +214,54 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   const doc = await withLock(prdLockPath(rexDir), () => store.loadDocument());
 
   const seams = await buildSeams(dir, rexDir, flags);
-  const options: V1ToV2Options = { testFiles: await findTestFiles(dir) };
+  // Both outside facts the rules read are gathered here: the migration itself
+  // never touches the filesystem. Without an analysis the code evidence is
+  // empty and the plan is what it was before the reader existed.
+  const testFiles = await findTestFiles(dir);
+  const { files: codeFiles, analysisPresent } = await readCodeEvidence(dir, doc.items, { testFiles });
+  // A stale .sourcevision reads exactly like a fresh one — every file parses,
+  // every zone has files — so the specs come out looking equally authoritative.
+  // Say when the evidence was taken; the operator reviewing the plan cannot
+  // tell otherwise, and this repository's own analysis is routinely weeks old.
+  const layout = resolveLayout(dir);
+  const svName = relativeToRoot(layout, layout.sourcevisionDir);
+  const evidenceCount = Object.keys(codeFiles).length;
+  let evidenceSummary: V1ToV2Plan["summary"]["codeEvidence"];
+
+  if (evidenceCount > 0) {
+    const provenance = await readCodeEvidenceProvenance(dir);
+    const offHistory = provenance?.gitSha ? !(await isAncestorOfHead(dir, provenance.gitSha)) : false;
+    const taken = provenance?.analyzedAt
+      ? `analysed ${provenance.analyzedAt.slice(0, 10)}`
+      : "analysis date unrecorded";
+    const at = provenance?.gitSha ? ` at ${provenance.gitSha.slice(0, 7)}` : "";
+    info(`Code evidence for ${evidenceCount} item(s) from ${svName} (${taken}${at}).`);
+    if (offHistory) {
+      // Evidence from a commit this branch never had describes a different
+      // tree. Worth saying out loud before anyone reviews the specs.
+      info(`  \u26a0 That commit is not HEAD or an ancestor of it — the evidence is from another history.`);
+    }
+    evidenceSummary = {
+      items: evidenceCount,
+      ...(provenance?.analyzedAt ? { analyzedAt: provenance.analyzedAt } : {}),
+      ...(provenance?.gitSha ? { gitSha: provenance.gitSha } : {}),
+      ...(offHistory ? { offHistory: true } : {}),
+    };
+  } else if (analysisPresent) {
+    // The analysis is there; nothing in it scored high enough to cite. Telling
+    // the operator to run one they already have would waste their time.
+    info(`No code evidence: ${svName} has an analysis, but nothing scored high enough to cite. The specs will not reference code.`);
+  } else {
+    info(`No code evidence: ${svName} has no analysis to read. Run \`ndx analyze .\` first if the specs should cite code.`);
+  }
+  const options: V1ToV2Options = { testFiles, codeFiles };
 
   info(`Planning ${migration.id} over ${doc.items.length} top-level items (cut at ${cutAt})…`);
   const plan = (await migration.plan(v1TreeSource(doc.items), { cutAt, seams, previous, options })) as V1ToV2Plan;
+
+  // Recorded on the plan, not just printed: the cut-day apply and anyone
+  // reviewing migration-plan.json later need to know how old the evidence is.
+  if (evidenceSummary) plan.summary.codeEvidence = evidenceSummary;
 
   await mkdir(dirname(outPath), { recursive: true });
   await writePlanFile(outPath, plan);

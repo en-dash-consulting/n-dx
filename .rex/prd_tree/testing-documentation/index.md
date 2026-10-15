@@ -33,7 +33,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Fix observation in web-server (1 finding)](./fix-observation-in-web-server-1-finding/index.md) | completed |
 | [Fix observation in web-unit (1 finding)](./fix-observation-in-web-unit-1-finding/index.md) | completed |
 | [Fix suggestion in web-server (1 finding)](./fix-suggestion-in-web-server-1-finding/index.md) | completed |
-| [Four source files hold a NUL byte, so git shows them as binary and their diffs cannot be reviewed](./four-source-files-hold-a-nul-byte-so.md) | pending |
+| [Four source files hold a NUL byte, so git shows them as binary and their diffs cannot be reviewed](./four-source-files-hold-a-nul-byte-so.md) | completed |
 | [Gauntlet Test Cleanup and Suite Consolidation](./gauntlet-test-cleanup-and-suite/index.md) | completed |
 | [Gauntlet Test Suite Audit and Cross-OS Validity Review](./gauntlet-test-suite-audit-and-cross-os/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main/index.md) | completed |

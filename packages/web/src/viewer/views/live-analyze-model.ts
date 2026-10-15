@@ -7,7 +7,7 @@
  * @module web/viewer/views/live-analyze-model
  */
 
-import type { AnalyzeProgressFile, LiveAnalyzeSnapshot } from "../hooks/index.js";
+import type { AnalysisChanges, AnalyzeProgressFile, FindingCounts, LiveAnalyzeSnapshot } from "../hooks/index.js";
 import { formatTokenCount } from "../utils/format.js";
 import { formatUsd } from "./live-model.js";
 
@@ -289,6 +289,101 @@ export function narrationLine(narration: LiveAnalyzeSnapshot["narration"]): stri
   if (narration.status === "pending") return `Narrating ${zones} in the background.`;
   if (narration.status === "done") return `Narrated ${zones} in the background.`;
   return `Background narration of ${zones} failed${narration.reason ? `: ${narration.reason}` : ""}.`;
+}
+
+// ── What changed ─────────────────────────────────────────────────────
+
+/** Severities worst-first, so a summary leads with what matters. */
+export const FINDING_SEVERITIES = ["critical", "warning", "info"] as const;
+
+/** `{critical: 2, info: 1}` as "2 critical, 1 info"; empty string for none. */
+export function severityLine(counts: FindingCounts): string {
+  const known = FINDING_SEVERITIES.filter((s) => (counts[s] ?? 0) > 0).map((s) => `${counts[s]} ${s}`);
+  // A severity the analyzer invents later still shows, after the ones we rank.
+  const rest = Object.keys(counts)
+    .filter((s) => !FINDING_SEVERITIES.includes(s as typeof FINDING_SEVERITIES[number]) && counts[s] > 0)
+    .sort()
+    .map((s) => `${counts[s]} ${s}`);
+  return [...known, ...rest].join(", ");
+}
+
+export interface ChangeLine {
+  key: string;
+  label: string;
+  /** Nothing moved on this measure. */
+  quiet: boolean;
+}
+
+function countDelta(now: number, was: number | null, noun: string): ChangeLine {
+  const label = was === null || was === now
+    ? `${now.toLocaleString("en-US")} ${noun}`
+    : `${now.toLocaleString("en-US")} ${noun} (${now > was ? "+" : "−"}${Math.abs(now - was).toLocaleString("en-US")})`;
+  return { key: noun, label, quiet: was === null || was === now };
+}
+
+/**
+ * The summary's lines: zones, findings, files and import edges.
+ *
+ * Every line is shown even when nothing moved — "99 findings, none added or
+ * resolved" is an answer, and a list that hides its quiet rows makes an
+ * operator check whether the measure ran at all. `quiet` lets the view grey
+ * them rather than drop them.
+ */
+export function changeLines(changes: AnalysisChanges): ChangeLine[] {
+  const { zones, findings } = changes;
+  const zoneParts = [
+    zones.added.length > 0 ? `${zones.added.length} added` : null,
+    zones.merged.length > 0 ? `${zones.merged.length} merged` : null,
+    zones.renamed.length > 0 ? `${zones.renamed.length} renamed` : null,
+    zones.removed.length > 0 ? `${zones.removed.length} removed` : null,
+  ].filter((p): p is string => p !== null);
+  const findingParts = [
+    severityLine(findings.added) ? `${severityLine(findings.added)} added` : null,
+    severityLine(findings.resolved) ? `${severityLine(findings.resolved)} resolved` : null,
+  ].filter((p): p is string => p !== null);
+  const total = Object.values(findings.now).reduce((n, c) => n + c, 0);
+
+  return [
+    {
+      key: "zones",
+      label: `${zones.total} ${zones.total === 1 ? "zone" : "zones"}${zoneParts.length > 0 ? ` · ${zoneParts.join(", ")}` : ""}`,
+      quiet: zoneParts.length === 0,
+    },
+    {
+      key: "findings",
+      label: `${total} ${total === 1 ? "finding" : "findings"}${severityLine(findings.now) ? ` (${severityLine(findings.now)})` : ""}${findingParts.length > 0 ? ` · ${findingParts.join(", ")}` : ""}`,
+      quiet: findingParts.length === 0,
+    },
+    countDelta(changes.files.now, changes.files.was, "files"),
+    countDelta(changes.importEdges.now, changes.importEdges.was, "import edges"),
+  ];
+}
+
+/**
+ * How the summary introduces itself: what it is measured against, or that
+ * there is nothing to measure against yet.
+ *
+ * `since` is the previous run's age as `formatSince` renders it — passed in
+ * rather than computed, so this stays a pure function of the snapshot and the
+ * page keeps one relative-time formatter instead of two.
+ */
+export function changesHeadline(changes: AnalysisChanges, since: string | null): string {
+  if (changes.previousAt === null) {
+    return "No previous analysis of this worktree to compare with — this is what the run found.";
+  }
+  return `Against the previous analysis of this worktree${since ? `, ${since}` : ""}.`;
+}
+
+/** "zone-7 → web-server" for a rename, "cli-orchestration → core" for a merge, else the id. */
+export function zoneChangeLabel(change: AnalysisChanges["zones"]["added"][number], kind: "added" | "removed" | "merged" | "renamed"): string {
+  if (kind === "renamed") return `${change.related} → ${change.name ?? change.id}`;
+  if (kind === "merged") return `${change.id} → ${change.related}`;
+  return change.name && change.name !== change.id ? `${change.name} (${change.id})` : change.id;
+}
+
+/** The spend to quote for a finished run: what its own ledger recorded, or nothing. */
+export function spendLabel(snapshot: LiveAnalyzeSnapshot): string | null {
+  return snapshot.spendUsd === null ? null : formatUsd(snapshot.spendUsd);
 }
 
 /** "cascade · 4m 10s · 12 calls · $0.41" for a past run. */

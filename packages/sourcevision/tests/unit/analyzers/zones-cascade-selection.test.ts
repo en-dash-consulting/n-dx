@@ -89,7 +89,9 @@ describe("analyzeZones enrichment selection", () => {
       escalatedZoneIds: new Set([zones[0].id]), deferredZoneIds: new Set([zones[0].id]), deferredNameZoneIds: new Set([zones[1].id]),
     }));
     const res = await analyzeZones(inventory, imports, { enrich: true, deferNarration: true });
-    expect(mockedCascade.mock.calls[0][8]).toEqual({ deferNarration: true });
+    // The content hashes ride along as the re-run judgment's pre-filter.
+    expect(mockedCascade.mock.calls[0][8]).toMatchObject({ deferNarration: true });
+    expect(Object.keys(mockedCascade.mock.calls[0][8]!.contentHashes ?? {})).toEqual(["a", "b"]);
     expect(res.pendingNarration).toHaveLength(1);
     expect(res.pendingNames).toHaveLength(1);
     expect(res.zones.zones.map((z) => z.id)).toContain(res.pendingNarration![0]);

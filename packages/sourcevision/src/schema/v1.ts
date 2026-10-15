@@ -26,6 +26,32 @@ export interface LLMClassUsage {
 }
 
 /**
+ * What an analysis left in `.sourcevision/`, recorded so a later reader can
+ * say what the next run changed.
+ *
+ * Each run overwrites the data files, so by the time anyone asks "what changed"
+ * the previous state is gone. Keeping a second copy of `zones.json` per run
+ * would be the obvious fix and the wrong one — it is megabytes, and every
+ * question worth asking is about identity, not content. So this records only
+ * what a diff needs: the counts, the zone ids, and one stable key per finding.
+ * A run's line in `analyses.jsonl` is then enough to measure the next against,
+ * with no new files and no LLM call.
+ *
+ * Absent on runs recorded before the field existed, and on a run whose zones
+ * phase never wrote a file.
+ */
+export interface AnalysisOutcome {
+  /** Files in the inventory. */
+  files: number;
+  /** Edges in the import graph. */
+  importEdges: number;
+  /** Every zone id in the partition, sub-zones included. */
+  zoneIds: string[];
+  /** Finding keys ({@link findingKey}) grouped by severity. */
+  findings: Record<string, string[]>;
+}
+
+/**
  * What one `sv analyze` run cost, per phase and per LLM task class. The
  * aggregate `tokenUsage` bucket cannot say which model answered or how long
  * anything took; this can, which is what a decision to route a class
@@ -60,6 +86,39 @@ export interface AnalysisRun {
   };
   /** This run's partition review, when a previous partition existed; `reused` says whether its zones were kept verbatim. */
   partition?: PartitionReview & { reused: boolean };
+  /** What this run left in `.sourcevision/`, for the next run to be measured against. */
+  outcome?: AnalysisOutcome;
+  /** What the re-run judgments decided, when a previous run existed. */
+  rerun?: RerunSummary;
+}
+
+/**
+ * What `analyzers/rerun-judge.ts` decided this run: which changed zones needed
+ * their narrative refreshed, and which previously-found findings still hold.
+ *
+ * Absent on a first analysis (nothing to re-judge) and on a run with no
+ * judgment route, so a zero-filled block always means "judged, and nothing
+ * moved" rather than "never asked".
+ */
+export interface RerunSummary {
+  /** Zones whose hash changed and so were put to the refresh Noul. */
+  zonesJudged: number;
+  /** …of which were judged to need re-narrating. */
+  refreshed: number;
+  /** Previously-judged findings put to the still-holds Noul. */
+  findingsJudged: number;
+  /** …carried forward (at or above the hold threshold, or undecided). */
+  carried: number;
+  /** …dropped as resolved. */
+  resolved: number;
+  /** …carried with `confidence` lowered to the probability. */
+  uncertain: number;
+  /**
+   * Zones kept without re-narrating on an undecided refresh Noul. Their
+   * insights describe a zone that has moved somewhat: still the best
+   * description available, but not freshly confirmed.
+   */
+  uncertainZones?: string[];
 }
 
 /** See `Manifest.narration`. */
@@ -378,6 +437,13 @@ export interface Zone {
   insights?: string[];
   /** Hash of this zone's file list for incremental enrichment */
   structureHash?: string;
+  /**
+   * Hash of this zone's files' leading doc comments, over the same sample the
+   * judgments see. Lets a re-run tell a comment edit from a code edit without
+   * storing the comments themselves: the content hash says *something*
+   * changed, this says whether what the files claim to do changed with it.
+   */
+  headerHash?: string;
   /** Token usage from per-zone enrichment */
   tokenUsage?: ZoneTokenUsage;
   /** ID of the sub-analysis this zone came from (if promoted from a child). */

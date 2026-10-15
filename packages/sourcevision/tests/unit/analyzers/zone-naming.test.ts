@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vites
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Zone, ZoneCrossing } from "../../../src/schema/index.js";
+import type { Imports, Zone, ZoneCrossing } from "../../../src/schema/index.js";
 import { ClaudeClientError } from "@n-dx/llm-client";
 
 vi.mock("../../../src/analyzers/claude-client.js", async () => {
@@ -22,6 +22,7 @@ import { getJudgmentRoute, callClaude } from "../../../src/analyzers/claude-clie
 import { askJev } from "@n-dx/llm-client";
 import {
   buildNameCandidates,
+  labelFromProse,
   describeZoneFromFacts,
   candidatePairs,
   buildZoneNamingRequest,
@@ -39,11 +40,29 @@ function zone(id: string, files: string[], extra: Partial<Zone> = {}): Zone {
   return { id, name: id, description: "", files, entryPoints: [], cohesion: 0.5, coupling: 0.5, ...extra };
 }
 
+/** Inbound edges whose symbols all speak of one subject. */
+const standupImports: Imports = {
+  edges: [
+    { from: "app.ts", to: "packages/standup/src/service.ts", type: "static", symbols: ["StandupService"] },
+    { from: "app.ts", to: "packages/standup/src/repo.ts", type: "static", symbols: ["StandupRepo", "useStandup"] },
+  ],
+  external: [],
+  summary: { totalEdges: 2, totalExternal: 0, circularCount: 0, circulars: [], mostImported: [], avgImportsPerFile: 1 },
+};
+
 let projectDir: string;
 beforeAll(() => {
   projectDir = mkdtempSync(join(tmpdir(), "sv-naming-"));
   mkdirSync(join(projectDir, "packages/rex"), { recursive: true });
   writeFileSync(join(projectDir, "packages/rex/package.json"), JSON.stringify({ name: "@n-dx/rex" }));
+  mkdirSync(join(projectDir, "packages/standup/src"), { recursive: true });
+  writeFileSync(
+    join(projectDir, "packages/standup/package.json"),
+    JSON.stringify({ name: "standup-kit", description: "Standup scheduling for distributed teams" }),
+  );
+  writeFileSync(join(projectDir, "packages/standup/README.md"), "# Daily Standup\n\nWhat it does.\n");
+  mkdirSync(join(projectDir, "packages/echo"), { recursive: true });
+  writeFileSync(join(projectDir, "packages/echo/README.md"), "# Echo\n");
 });
 afterAll(() => rmSync(projectDir, { recursive: true, force: true }));
 
@@ -78,6 +97,55 @@ describe("buildNameCandidates", () => {
   it("skips the package candidate when most files are outside that package", () => {
     const mixed = zone("x", ["packages/rex/a.ts", "packages/hench/b.ts", "packages/hench/c.ts"]);
     expect(buildNameCandidates(mixed, { projectDir, crossings: [] }).map((x) => x.source)).not.toContain("package");
+  });
+
+  // What the code says it is, not where the files happen to sit. On caos 23 of
+  // 25 zones chose `none` over the directory candidates alone.
+  it("offers the symbol-noun, README-title and package-description forms, deduplicated with the directory ones", () => {
+    const standup = zone("standup", ["packages/standup/src/service.ts", "packages/standup/src/repo.ts"]);
+    const c = buildNameCandidates(standup, { projectDir, crossings: [], imports: standupImports });
+    expect(c.map((x) => [x.source, x.name])).toEqual([
+      ["package", "Standup Kit"],
+      ["symbol", "Standup"],
+      ["readme", "Daily Standup"],
+      ["package-description", "Standup Scheduling"],
+    ]);
+    // The directory also says "Standup"; the symbol candidate already did, so
+    // the label appears once and keeps the source that earned it.
+    expect(c.filter((x) => x.name === "Standup")).toEqual([
+      { name: "Standup", source: "symbol", why: expect.stringContaining("standup") },
+    ]);
+  });
+
+  it("drops a prose candidate that repeats a directory candidate", () => {
+    // The README under packages/echo/ is titled "Echo", which is also what the
+    // directory says. One candidate, not two.
+    const echo = zone("echo", ["packages/echo/a.ts", "packages/echo/b.ts"]);
+    const names = buildNameCandidates(echo, { projectDir, crossings: [] }).map((x) => x.name);
+    expect(names.filter((n) => n === "Echo")).toHaveLength(1);
+  });
+
+  it("offers no symbol candidate when the zone exports no shared subject", () => {
+    const standup = zone("standup", ["packages/standup/src/service.ts"]);
+    const scattered: Imports = {
+      ...standupImports,
+      edges: [{ from: "x.ts", to: "packages/standup/src/service.ts", type: "static", symbols: ["parseJson", "renderTable"] }],
+    };
+    expect(buildNameCandidates(standup, { projectDir, crossings: [], imports: scattered }).map((x) => x.source))
+      .not.toContain("symbol");
+  });
+});
+
+describe("labelFromProse", () => {
+  it("takes the leading noun phrase, cut at the first phrase-ending punctuation", () => {
+    expect(labelFromProse("# rex — PRD management")).toBe("Rex");
+    expect(labelFromProse("PRD management for humans")).toBe("PRD Management");
+    expect(labelFromProse("The standup scheduler")).toBe("Standup Scheduler");
+  });
+
+  it("keeps acronyms and returns nothing for a title with no words", () => {
+    expect(labelFromProse("# API Gateway")).toBe("API Gateway");
+    expect(labelFromProse("# ---")).toBeUndefined();
   });
 });
 
