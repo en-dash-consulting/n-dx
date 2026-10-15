@@ -272,6 +272,89 @@ describe("n-dx ci", () => {
       expect(arch.ok).toBe(true);
       expect(arch.violations).toBeUndefined();
     });
+
+    it("reports the step as skipped when no ci.restrictedImports rule is configured", () => {
+      const arch = report.steps.find((s) => s.name === "architecture-policy");
+      expect(arch.detail).toMatch(/^skipped \(no ci\.restrictedImports configured\)/);
+    });
+  });
+
+  // ── Restricted imports: a user project opting in through .n-dx.json ────────
+
+  describe("restricted-imports opt-in", () => {
+    const RELEASE_SCRIPT = 'import { execFileSync } from "node:child_process";\nexecFileSync("true");\n';
+
+    /** Write the shared config with one child_process rule allowing `allow`. */
+    async function configure(dir, allow) {
+      await writeFile(
+        join(dir, ".n-dx.json"),
+        JSON.stringify({ ci: { restrictedImports: [{ module: "node:child_process", allow }] } }) + "\n",
+      );
+    }
+
+    const CASES = {
+      "file outside the allow list": async (dir) => configure(dir, ["src/lib/exec.js"]),
+      "file in the allow list": async (dir) => configure(dir, ["src/lib/exec.js", "scripts/release.js"]),
+      "malformed rule": async (dir) => {
+        await writeFile(
+          join(dir, ".n-dx.json"),
+          JSON.stringify({ ci: { restrictedImports: [{ allow: ["scripts/release.js"] }] } }) + "\n",
+        );
+      },
+    };
+
+    /** @type {Map<string, { dir: string, code: number, step: object }>} */
+    const results = new Map();
+
+    beforeAll(async () => {
+      for (const [name, setup] of Object.entries(CASES)) {
+        const dir = await freshProject("ndx-ci-restricted-");
+        await mkdir(join(dir, "scripts"), { recursive: true });
+        await writeFile(join(dir, "scripts", "release.js"), RELEASE_SCRIPT);
+        await setup(dir);
+        const result = runResult(["--format=json", "--quiet", dir]);
+        const report = parseReport(result, ["--format=json", "--quiet", name]);
+        results.set(name, {
+          dir,
+          code: result.code,
+          step: report.steps.find((s) => s.name === "architecture-policy"),
+        });
+      }
+      // Three fixtures, three `ndx ci` runs in one hook; see config-secrets.
+    }, 300_000);
+
+    afterAll(async () => {
+      for (const { dir } of results.values()) await removeTmpDir(dir);
+    });
+
+    it("fails ndx ci on a file importing the module outside its allow list", () => {
+      const { code, step } = results.get("file outside the allow list");
+      expect(code).toBe(1);
+      expect(step.ok).toBe(false);
+      expect(step.violations).toHaveLength(1);
+      // Names the file, the module and the config entry, and says how to allow it.
+      const [message] = step.violations;
+      expect(message).toContain("scripts/release.js");
+      expect(message).toContain("node:child_process");
+      expect(message).toContain("ci.restrictedImports[0]");
+      expect(message).toContain(".n-dx.json");
+      expect(message).toMatch(/add .* to its allow list/);
+    });
+
+    it("passes once the file is in the allow list", () => {
+      const { code, step } = results.get("file in the allow list");
+      expect(code).toBe(0);
+      expect(step.ok).toBe(true);
+      expect(step.violations).toBeUndefined();
+      expect(step.detail).not.toMatch(/^skipped/);
+    });
+
+    it("fails on a rule it cannot read rather than skipping it", () => {
+      const { code, step } = results.get("malformed rule");
+      expect(code).toBe(1);
+      expect(step.ok).toBe(false);
+      expect(step.violations.join("\n")).toContain("ci.restrictedImports[0].module");
+    });
   });
 
   // ── Config secrets: one fixture per git state ───────────────────────────────

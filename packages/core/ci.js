@@ -12,6 +12,8 @@
  *   3. zone health check            (cohesion/coupling threshold assertions)
  *   3a. zone ID consistency         (zones.json ↔ zone output directories)
  *   3b. gateway import boundary     (cross-package imports must use gateways)
+ *   3c. architecture policy         (restricted imports: ci.restrictedImports, and
+ *                                    the child_process allowlist on n-dx itself)
  *   3e. config secrets              (no api_key in a git-tracked .n-dx.json)
  *   4. rex validate --format=json   (PRD health checks)
  *   5. rex status --format=json     (completion stats)
@@ -23,7 +25,7 @@ import { spawn, spawnSync } from "child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
-import { findSharedSecrets, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
+import { findSharedSecrets, loadProjectConfig, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
 import { isGitTracked } from "./gitignore.js";
 import { layoutStateNames, relativeToRoot, resolveLayout } from "./layout.js";
 
@@ -286,24 +288,24 @@ async function runBoundaryPhase(dir, info, isJSON) {
     }
   }
 
-  // Step 3c: architecture policy
+  // Step 3c: architecture policy — restricted imports. Applies only where a
+  // rule exists: n-dx's own child_process allowlist on the monorepo, and any
+  // rule a project configures under ci.restrictedImports.
   info("── architecture policy ──");
-  // The spawn rule is n-dx's own architecture; user projects never opted in.
-  const archApplies = isNdxMonorepo(dir);
-  const archResult = archApplies ? checkArchitecturePolicy(dir) : { ok: true, checked: 0, violations: [] };
+  const archResult = await checkRestrictedImports(dir);
   if (!archResult.ok) allOk = false;
   steps.push({
     name: "architecture-policy",
     ok: archResult.ok,
-    detail: !archApplies
-      ? "skipped (not the n-dx monorepo)"
+    detail: !archResult.applies
+      ? `skipped (no ${RESTRICTED_IMPORTS_KEY} configured)`
       : archResult.ok
-      ?`${archResult.checked} files checked, no unauthorized child_process imports`
-      : `${archResult.violations.length} unauthorized child_process import(s) found`,
+      ? `${archResult.checked} files checked against ${plural(archResult.rules, "restricted-import rule")}, no unauthorized imports`
+      : `${archResult.violations.length} restricted-import violation(s) found`,
     ...(archResult.violations.length > 0 ? { violations: archResult.violations } : {}),
   });
-  if (!archApplies) {
-    info("  ✓ architecture policy (skipped: not the n-dx monorepo)");
+  if (!archResult.applies) {
+    info(`  ✓ architecture policy (skipped: no ${RESTRICTED_IMPORTS_KEY} configured)`);
   } else if (archResult.ok) {
     info(`  ✓ architecture policy (${archResult.checked} files checked)`);
   } else {
@@ -525,6 +527,11 @@ export async function runCI(dir, flags, { run, tools, spawnTracked = spawn }) {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+/** "1 error", "2 errors". */
+function plural(n, word) {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
 /** Walk a PRD item tree and compute aggregate stats. */
 function computeStats(items) {
   const stats = { total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0, deleted: 0 };
@@ -561,7 +568,6 @@ export function summarizeTreeHealth(data) {
   const readerWarnings = Array.isArray(data.warnings) ? data.warnings : [];
   const errors = rules.filter((f) => f.severity === "error");
   const skipped = readerWarnings.filter((w) => w.skipped);
-  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
   const parts = [plural(errors.length, "error"), plural(rules.length - errors.length, "warning")];
   if (skipped.length > 0) parts.push(`${plural(skipped.length, "node")} skipped`);
   return {
@@ -998,11 +1004,23 @@ function checkGatewayImports(dir) {
   };
 }
 
-// ── Architecture policy (redundant enforcement) ──────────────────────────────
+// ── Architecture policy: restricted imports ──────────────────────────────────
 
 /**
- * Files allowed to import from node:child_process directly, and directories
- * the scan leaves out — loaded from child-process-allowlist.json.
+ * The config key a project sets to restrict where a module may be imported:
+ *
+ *   "ci": { "restrictedImports": [ { "module": "node:child_process", "allow": ["src/lib/exec.ts"] } ] }
+ *
+ * Each rule says "this module may be imported only from these files". With no
+ * rule the step is skipped. A rule is kept to `module` and `allow` so a later
+ * constraint can point at it by its index.
+ */
+export const RESTRICTED_IMPORTS_KEY = "ci.restrictedImports";
+
+/**
+ * n-dx's own instance of the rule: files allowed to import node:child_process
+ * directly, and directories the scan leaves out — loaded from
+ * child-process-allowlist.json.
  *
  * The JSON file is shared with architecture-policy.test.js. Each used to keep
  * its own list; ci.js's fell 26 files behind and the step failed on every run.
@@ -1010,8 +1028,14 @@ function checkGatewayImports(dir) {
  * architecture-policy.test.js checks that they reach the same verdict.
  */
 const _childProcessPolicy = JSON.parse(readFileSync(join(__dir, "child-process-allowlist.json"), "utf-8"));
-const CHILD_PROCESS_ALLOWED = new Set(_childProcessPolicy.allowed.map((e) => e.path));
-const CHILD_PROCESS_EXCLUDED_DIRS = new Set(Object.keys(_childProcessPolicy.excludeDirs));
+const CHILD_PROCESS_ALLOWLIST = "packages/core/child-process-allowlist.json";
+const NDX_CHILD_PROCESS_RULE = {
+  module: "node:child_process",
+  allow: new Set(_childProcessPolicy.allowed.map((e) => e.path)),
+  excludeDirs: Object.keys(_childProcessPolicy.excludeDirs),
+  entry: CHILD_PROCESS_ALLOWLIST,
+  howToAllow: `add the file, with a reason, to ${CHILD_PROCESS_ALLOWLIST}`,
+};
 
 /**
  * True when `dir` is the n-dx monorepo root, the only project the
@@ -1026,24 +1050,90 @@ export function isNdxMonorepo(dir) {
   }
 }
 
+/** Root-relative, forward slashes, no leading `./`. */
+function normalizeRel(p) {
+  return p.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
 /**
- * Check that no source files import from node:child_process outside the
- * allowed list. This is a redundant enforcement of the four-tier hierarchy's
- * process execution policy, complementing architecture-policy.test.js.
+ * Read `ci.restrictedImports` from the project config into rules, or the
+ * reasons it cannot be read. A malformed rule is an error, never skipped: a
+ * typo must not turn an enforced rule into a silent pass.
  *
- * If the test file is ever skipped, broken, or omitted from a CI run,
- * this check still catches violations.
- *
- * Exported for that parity test.
+ * @param {unknown} value  The configured value (undefined when absent).
+ * @param {string} configLabel  Root-relative name of the config file, for messages.
+ * @returns {{ rules: Array<{ module: string, allow: Set<string>, excludeDirs: string[], entry: string, howToAllow: string }>, errors: string[] }}
  */
-export function checkArchitecturePolicy(dir) {
+export function parseRestrictedImports(value, configLabel) {
+  const rules = [];
+  const errors = [];
+  if (value === undefined || value === null) return { rules, errors };
+  if (!Array.isArray(value)) {
+    errors.push(`${RESTRICTED_IMPORTS_KEY} in ${configLabel} must be a list of { "module", "allow" } rules`);
+    return { rules, errors };
+  }
+  value.forEach((rule, i) => {
+    const entry = `${RESTRICTED_IMPORTS_KEY}[${i}]`;
+    if (rule === null || typeof rule !== "object" || Array.isArray(rule)) {
+      errors.push(`${entry} in ${configLabel} must be an object with "module" and "allow"`);
+      return;
+    }
+    const problems = [];
+    const unknown = Object.keys(rule).filter((k) => k !== "module" && k !== "allow");
+    if (unknown.length > 0) {
+      problems.push(`${entry} in ${configLabel} has unknown key(s) ${unknown.join(", ")}; a rule takes only "module" and "allow"`);
+    }
+    if (typeof rule.module !== "string" || rule.module.trim() === "") {
+      problems.push(`${entry}.module in ${configLabel} must name the module to restrict, e.g. "node:child_process"`);
+    }
+    const allow = rule.allow ?? [];
+    if (!Array.isArray(allow) || allow.some((p) => typeof p !== "string" || p.trim() === "")) {
+      problems.push(`${entry}.allow in ${configLabel} must be a list of file paths relative to the project root`);
+    }
+    if (problems.length > 0) {
+      errors.push(...problems);
+      return;
+    }
+    rules.push({
+      module: rule.module.trim(),
+      allow: new Set(allow.map(normalizeRel)),
+      excludeDirs: [],
+      entry,
+      howToAllow: `add the file to its allow list in ${configLabel}`,
+    });
+  });
+  return errors.length > 0 ? { rules: [], errors } : { rules, errors };
+}
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Matches `… from "<module>"` (import and re-export) and `require("<module>")`.
+ * `child_process` and `node:child_process` name one module, so a rule for
+ * either spelling catches both.
+ */
+function importPattern(module) {
+  const bare = escapeRegExp(module.replace(/^node:/, ""));
+  return new RegExp(`(?:from\\s+["'](?:node:)?${bare}["']|require\\(["'](?:node:)?${bare}["']\\))`);
+}
+
+/**
+ * Scan production sources under `dir` against restricted-import rules.
+ * Test files and `test/`/`tests/` directories are exempt, as are node_modules,
+ * dist, .git, n-dx's state directories and every rule's `excludeDirs`.
+ *
+ * @returns {{ checked: number, violations: Array<{ file: string, rule: object }> }}
+ */
+function scanRestrictedImports(dir, rules) {
   const violations = [];
   let checked = 0;
-
   const skipDirs = sourceScanSkipDirs();
-  const childProcessPattern = /(?:from\s+["'](?:node:)?child_process["']|require\(["'](?:node:)?child_process["']\))/;
+  const excludedDirs = new Set(rules.flatMap((r) => r.excludeDirs));
+  const patterns = rules.map((r) => importPattern(r.module));
 
-  function walkSrc(d) {
+  (function walkSrc(d) {
     let entries;
     try {
       entries = readdirSync(d);
@@ -1059,37 +1149,82 @@ export function checkArchitecturePolicy(dir) {
       } catch {
         continue;
       }
+      const rel = relative(dir, full).replace(/\\/g, "/");
       if (st.isDirectory()) {
-        if (!CHILD_PROCESS_EXCLUDED_DIRS.has(relative(dir, full).replace(/\\/g, "/"))) walkSrc(full);
-      } else if (/\.(ts|js|mjs)$/.test(entry) && !entry.endsWith(".d.ts")) {
-        const rel = relative(dir, full).replace(/\\/g, "/");
+        if (!excludedDirs.has(rel)) walkSrc(full);
+        continue;
+      }
+      if (!/\.(ts|js|mjs)$/.test(entry) || entry.endsWith(".d.ts")) continue;
+      if (/\.test\.(ts|js|mjs)$/.test(rel) || /(?:^|\/)tests?\//.test(rel)) continue;
+      const applicable = rules.flatMap((rule, i) => (rule.allow.has(rel) ? [] : [[rule, patterns[i]]]));
+      if (applicable.length === 0) continue;
 
-        // Skip allowed files and test files
-        if (CHILD_PROCESS_ALLOWED.has(rel)) continue;
-        if (/\.test\.(ts|js|mjs)$/.test(rel) || /(?:^|[/\\])tests?[/\\]/.test(rel)) continue;
-
-        checked++;
-
-        let content;
-        try {
-          content = readFileSync(full, "utf-8");
-        } catch {
-          continue;
-        }
-
-        if (childProcessPattern.test(content)) {
-          violations.push(rel);
-        }
+      checked++;
+      let content;
+      try {
+        content = readFileSync(full, "utf-8");
+      } catch {
+        continue;
+      }
+      for (const [rule, pattern] of applicable) {
+        if (pattern.test(content)) violations.push({ file: rel, rule });
       }
     }
-  }
+  })(dir);
 
-  walkSrc(dir);
+  return { checked, violations };
+}
 
+/** What a violation tells the operator: the file, the module, the rule, and how to allow it. */
+function describeViolation({ file, rule }) {
+  return `${file} imports ${rule.module}, which ${rule.entry} allows only from its listed files — ${rule.howToAllow}`;
+}
+
+/**
+ * n-dx's child_process rule on its own: a redundant enforcement of the
+ * four-tier hierarchy's process execution policy, complementing
+ * architecture-policy.test.js, so a skipped or broken test file still leaves
+ * the rule enforced.
+ *
+ * Returns the violating paths. Exported for the parity test.
+ */
+export function checkArchitecturePolicy(dir) {
+  const { checked, violations } = scanRestrictedImports(dir, [NDX_CHILD_PROCESS_RULE]);
   return {
     ok: violations.length === 0,
     checked,
-    violations,
+    violations: violations.map((v) => v.file),
+  };
+}
+
+/**
+ * The `ndx ci` architecture-policy step: every restricted-import rule that
+ * applies to `dir` — n-dx's child_process allowlist on the monorepo, plus the
+ * project's `ci.restrictedImports` rules. `applies` is false when there is no
+ * rule, and the step is then reported as skipped.
+ *
+ * Exported for tests.
+ *
+ * @returns {Promise<{ applies: boolean, ok: boolean, rules: number, checked: number, violations: string[] }>}
+ */
+export async function checkRestrictedImports(dir) {
+  const config = await loadProjectConfig(dir);
+  const configLabel = projectConfigLabel(dir, PROJECT_CONFIG_FILE);
+  const { rules: configured, errors } = parseRestrictedImports(config?.ci?.restrictedImports, configLabel);
+  if (errors.length > 0) {
+    return { applies: true, ok: false, rules: 0, checked: 0, violations: errors };
+  }
+  const rules = [...(isNdxMonorepo(dir) ? [NDX_CHILD_PROCESS_RULE] : []), ...configured];
+  if (rules.length === 0) {
+    return { applies: false, ok: true, rules: 0, checked: 0, violations: [] };
+  }
+  const { checked, violations } = scanRestrictedImports(dir, rules);
+  return {
+    applies: true,
+    ok: violations.length === 0,
+    rules: rules.length,
+    checked,
+    violations: violations.map(describeViolation),
   };
 }
 

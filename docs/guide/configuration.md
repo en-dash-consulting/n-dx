@@ -252,6 +252,33 @@ ndx config web.port 8080 .         # dashboard port (default: 3117)
 
 Stored in `.n-dx.json` at the project root.
 
+## CI: Restricted Imports
+
+`ndx ci` can hold a module to the files allowed to import it — for example, all
+process spawning through one wrapper. Add rules under `ci.restrictedImports` in
+`.n-dx.json`:
+
+```json
+{
+  "ci": {
+    "restrictedImports": [
+      { "module": "node:child_process", "allow": ["src/lib/exec.ts", "scripts/release.js"] }
+    ]
+  }
+}
+```
+
+- `module` — the import specifier to restrict. `child_process` and `node:child_process` are one module.
+- `allow` — file paths, relative to the project root, that may import it. Omit it to allow none.
+
+The architecture-policy step fails on any other file that imports the module
+(`import … from` or `require()`), naming the file, the module and the rule
+(`ci.restrictedImports[0]`). Allow the file by adding it to that rule's `allow`
+list. Test files and `test/` / `tests/` directories are exempt, as are
+`node_modules`, `dist` and `.git`. A rule ndx cannot read — a missing `module`,
+an unknown key — fails the step rather than being skipped. With no rule
+configured the step reports `skipped`.
+
 ## Viewing Configuration
 
 ```sh

@@ -31,7 +31,7 @@ import { describe, it, expect } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { checkArchitecturePolicy, isNdxMonorepo } from "../../packages/core/ci.js";
+import { checkArchitecturePolicy, checkRestrictedImports, isNdxMonorepo } from "../../packages/core/ci.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 
@@ -845,6 +845,29 @@ describe("architecture policy: process execution", () => {
         // The scanner alone would flag it; the scope check is what spares it.
         expect(checkArchitecturePolicy(dir).violations).toEqual(["scripts/release.js"]);
         expect(isNdxMonorepo(dir)).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    // The step `ndx ci` runs: on the monorepo it is the allowlist rule plus any
+    // ci.restrictedImports rule, and the allowlist rule names its own file.
+    it("ndx ci's step enforces the allowlist on the monorepo", async () => {
+      const step = await checkRestrictedImports(ROOT);
+      expect(step.applies).toBe(true);
+      expect(step.ok).toBe(true);
+
+      const dir = mkdtempSync(join(tmpdir(), "ndx-arch-monorepo-"));
+      try {
+        writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "n-dx" }));
+        mkdirSync(join(dir, "packages", "core"), { recursive: true });
+        writeFileSync(join(dir, "packages", "core", "child-process-allowlist.json"), "{}");
+        writeFileSync(join(dir, "packages", "core", "rogue.js"), 'import { spawn } from "child_process";\n');
+        const rogue = await checkRestrictedImports(dir);
+        expect(rogue.ok).toBe(false);
+        expect(rogue.violations).toHaveLength(1);
+        expect(rogue.violations[0]).toContain("packages/core/rogue.js");
+        expect(rogue.violations[0]).toContain("packages/core/child-process-allowlist.json");
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
