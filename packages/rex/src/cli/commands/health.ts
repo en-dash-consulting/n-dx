@@ -24,7 +24,12 @@ function formatReaderWarnings(warnings: ParseWarning[]): string {
   return `Reader warnings:\n${warnings.map((w) => `  ${w.path}: ${w.message}`).join("\n")}\n\n`;
 }
 
-/** The project's package.json `version`, or undefined when there is no package.json or no version. */
+/**
+ * The project's package.json `version`, or undefined when there is no package.json,
+ * it is not valid JSON (a half-saved edit), or it has no string version. The
+ * release-token rule skips without a version; a broken package.json is not a PRD
+ * problem and must not hide the health report.
+ */
 async function readPackageVersion(dir: string): Promise<string | undefined> {
   let text: string;
   try {
@@ -33,7 +38,13 @@ async function readPackageVersion(dir: string): Promise<string | undefined> {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw err;
   }
-  const version: unknown = (JSON.parse(text) as { version?: unknown }).version;
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  const version = (manifest as { version?: unknown } | null)?.version;
   return typeof version === "string" ? version : undefined;
 }
 
