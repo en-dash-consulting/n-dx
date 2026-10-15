@@ -1,4 +1,5 @@
 import { h, Fragment } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { useCliName, resolveCliLabel } from "../hooks/index.js";
 
@@ -169,7 +170,7 @@ function FAQModal({ onClose, initialSection }: { onClose: () => void; initialSec
           class: "faq-close",
           onClick: onClose,
           "aria-label": "Close FAQ",
-        }, "\u2715"),
+        }, h(ActionIcon, { name: "close" })),
       ),
       h("div", { class: "faq-body" },
         FAQ_SECTIONS.map((section) => {
