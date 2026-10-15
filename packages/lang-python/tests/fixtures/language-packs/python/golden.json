@@ -1,0 +1,3208 @@
+{
+  "pack": "python",
+  "grammar": {
+    "name": "tree-sitter-python",
+    "version": "0.25.0"
+  },
+  "files": [
+    {
+      "status": "parsed",
+      "path": "src/common/__init__.py",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [],
+        "guards": [],
+        "definitions": [],
+        "variables": [
+          {
+            "name": "variable.declaration",
+            "nodeType": "expression_statement",
+            "text": "__all__ = (\"util\", \"helpers\")",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 29
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "identifier",
+            "text": "__all__",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 7
+            }
+          },
+          {
+            "name": "all.value",
+            "nodeType": "tuple",
+            "text": "(\"util\", \"helpers\")",
+            "start": {
+              "line": 1,
+              "column": 10
+            },
+            "end": {
+              "line": 1,
+              "column": 29
+            }
+          },
+          {
+            "name": "all.item",
+            "nodeType": "string",
+            "text": "\"util\"",
+            "start": {
+              "line": 1,
+              "column": 11
+            },
+            "end": {
+              "line": 1,
+              "column": 17
+            }
+          },
+          {
+            "name": "all.item",
+            "nodeType": "string",
+            "text": "\"helpers\"",
+            "start": {
+              "line": 1,
+              "column": 19
+            },
+            "end": {
+              "line": 1,
+              "column": 28
+            }
+          }
+        ],
+        "calls": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/common/helpers.py",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import re",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 9
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "re",
+            "start": {
+              "line": 1,
+              "column": 7
+            },
+            "end": {
+              "line": 1,
+              "column": 9
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from datetime import date",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 2,
+              "column": 25
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "dotted_name",
+            "text": "datetime",
+            "start": {
+              "line": 2,
+              "column": 5
+            },
+            "end": {
+              "line": 2,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "date",
+            "start": {
+              "line": 2,
+              "column": 21
+            },
+            "end": {
+              "line": 2,
+              "column": 25
+            }
+          }
+        ],
+        "guards": [],
+        "definitions": [
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "def slugify(text):\n    return re.sub(r\"[^a-z0-9]+\", \"-\", text.lower())",
+            "start": {
+              "line": 7,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 51
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "slugify",
+            "start": {
+              "line": 7,
+              "column": 4
+            },
+            "end": {
+              "line": 7,
+              "column": 11
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "def parse_date(value):\n    return date.fromisoformat(value)",
+            "start": {
+              "line": 11,
+              "column": 0
+            },
+            "end": {
+              "line": 12,
+              "column": 36
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "parse_date",
+            "start": {
+              "line": 11,
+              "column": 4
+            },
+            "end": {
+              "line": 11,
+              "column": 14
+            }
+          }
+        ],
+        "variables": [
+          {
+            "name": "variable.declaration",
+            "nodeType": "expression_statement",
+            "text": "__all__ = [\"slugify\"] + [\"parse_\" + \"date\"]",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 43
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "identifier",
+            "text": "__all__",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 7
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "re.sub(r\"[^a-z0-9]+\", \"-\", text.lower())",
+            "start": {
+              "line": 8,
+              "column": 11
+            },
+            "end": {
+              "line": 8,
+              "column": 51
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "re",
+            "start": {
+              "line": 8,
+              "column": 11
+            },
+            "end": {
+              "line": 8,
+              "column": 13
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "sub",
+            "start": {
+              "line": 8,
+              "column": 14
+            },
+            "end": {
+              "line": 8,
+              "column": 17
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(r\"[^a-z0-9]+\", \"-\", text.lower())",
+            "start": {
+              "line": 8,
+              "column": 17
+            },
+            "end": {
+              "line": 8,
+              "column": 51
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "r\"[^a-z0-9]+\"",
+            "start": {
+              "line": 8,
+              "column": 18
+            },
+            "end": {
+              "line": 8,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "\"-\"",
+            "start": {
+              "line": 8,
+              "column": 33
+            },
+            "end": {
+              "line": 8,
+              "column": 36
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "text.lower()",
+            "start": {
+              "line": 8,
+              "column": 38
+            },
+            "end": {
+              "line": 8,
+              "column": 50
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "text",
+            "start": {
+              "line": 8,
+              "column": 38
+            },
+            "end": {
+              "line": 8,
+              "column": 42
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "lower",
+            "start": {
+              "line": 8,
+              "column": 43
+            },
+            "end": {
+              "line": 8,
+              "column": 48
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "()",
+            "start": {
+              "line": 8,
+              "column": 48
+            },
+            "end": {
+              "line": 8,
+              "column": 50
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "date.fromisoformat(value)",
+            "start": {
+              "line": 12,
+              "column": 11
+            },
+            "end": {
+              "line": 12,
+              "column": 36
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "date",
+            "start": {
+              "line": 12,
+              "column": 11
+            },
+            "end": {
+              "line": 12,
+              "column": 15
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "fromisoformat",
+            "start": {
+              "line": 12,
+              "column": 16
+            },
+            "end": {
+              "line": 12,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(value)",
+            "start": {
+              "line": 12,
+              "column": 29
+            },
+            "end": {
+              "line": 12,
+              "column": 36
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/common/util.py",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [],
+        "guards": [],
+        "definitions": [
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "def identity(value):\n    return value",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 16
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "identity",
+            "start": {
+              "line": 4,
+              "column": 4
+            },
+            "end": {
+              "line": 4,
+              "column": 12
+            }
+          }
+        ],
+        "variables": [
+          {
+            "name": "variable.declaration",
+            "nodeType": "expression_statement",
+            "text": "__all__ = [\"identity\", f\"{__name__}_extra\"]",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 43
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "identifier",
+            "text": "__all__",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 7
+            }
+          },
+          {
+            "name": "all.value",
+            "nodeType": "list",
+            "text": "[\"identity\", f\"{__name__}_extra\"]",
+            "start": {
+              "line": 1,
+              "column": 10
+            },
+            "end": {
+              "line": 1,
+              "column": 43
+            }
+          },
+          {
+            "name": "all.item",
+            "nodeType": "string",
+            "text": "\"identity\"",
+            "start": {
+              "line": 1,
+              "column": 11
+            },
+            "end": {
+              "line": 1,
+              "column": 21
+            }
+          },
+          {
+            "name": "all.item",
+            "nodeType": "string",
+            "text": "f\"{__name__}_extra\"",
+            "start": {
+              "line": 1,
+              "column": 23
+            },
+            "end": {
+              "line": 1,
+              "column": 42
+            }
+          }
+        ],
+        "calls": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/shop/__init__.py",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from .orders import OrderService, place_order",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 45
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "relative_import",
+            "text": ".orders",
+            "start": {
+              "line": 3,
+              "column": 5
+            },
+            "end": {
+              "line": 3,
+              "column": 12
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "OrderService",
+            "start": {
+              "line": 3,
+              "column": 20
+            },
+            "end": {
+              "line": 3,
+              "column": 32
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "place_order",
+            "start": {
+              "line": 3,
+              "column": 34
+            },
+            "end": {
+              "line": 3,
+              "column": 45
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from . import models",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 20
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "relative_import",
+            "text": ".",
+            "start": {
+              "line": 4,
+              "column": 5
+            },
+            "end": {
+              "line": 4,
+              "column": 6
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "models",
+            "start": {
+              "line": 4,
+              "column": 14
+            },
+            "end": {
+              "line": 4,
+              "column": 20
+            }
+          }
+        ],
+        "guards": [],
+        "definitions": [],
+        "variables": [
+          {
+            "name": "variable.declaration",
+            "nodeType": "expression_statement",
+            "text": "__all__ = [\n    \"OrderService\",  # the service\n    \"place_order\",\n    'models',\n]",
+            "start": {
+              "line": 6,
+              "column": 0
+            },
+            "end": {
+              "line": 10,
+              "column": 1
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "identifier",
+            "text": "__all__",
+            "start": {
+              "line": 6,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 7
+            }
+          },
+          {
+            "name": "all.value",
+            "nodeType": "list",
+            "text": "[\n    \"OrderService\",  # the service\n    \"place_order\",\n    'models',\n]",
+            "start": {
+              "line": 6,
+              "column": 10
+            },
+            "end": {
+              "line": 10,
+              "column": 1
+            }
+          },
+          {
+            "name": "all.item",
+            "nodeType": "string",
+            "text": "\"OrderService\"",
+            "start": {
+              "line": 7,
+              "column": 4
+            },
+            "end": {
+              "line": 7,
+              "column": 18
+            }
+          },
+          {
+            "name": "all.item",
+            "nodeType": "comment",
+            "text": "# the service",
+            "start": {
+              "line": 7,
+              "column": 21
+            },
+            "end": {
+              "line": 7,
+              "column": 34
+            }
+          },
+          {
+            "name": "all.item",
+            "nodeType": "string",
+            "text": "\"place_order\"",
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 17
+            }
+          },
+          {
+            "name": "all.item",
+            "nodeType": "string",
+            "text": "'models'",
+            "start": {
+              "line": 9,
+              "column": 4
+            },
+            "end": {
+              "line": 9,
+              "column": 12
+            }
+          }
+        ],
+        "calls": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/shop/models.pyi",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from dataclasses import dataclass",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 33
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "dotted_name",
+            "text": "dataclasses",
+            "start": {
+              "line": 1,
+              "column": 5
+            },
+            "end": {
+              "line": 1,
+              "column": 16
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "dataclass",
+            "start": {
+              "line": 1,
+              "column": 24
+            },
+            "end": {
+              "line": 1,
+              "column": 33
+            }
+          }
+        ],
+        "guards": [],
+        "definitions": [
+          {
+            "name": "decorated.declaration",
+            "nodeType": "decorated_definition",
+            "text": "@dataclass(frozen=True)\nclass Order:\n    id: int\n    status: str\n\n    def total(self) -> float: ...",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 33
+            }
+          },
+          {
+            "name": "decorated.decorator",
+            "nodeType": "call",
+            "text": "dataclass(frozen=True)",
+            "start": {
+              "line": 3,
+              "column": 1
+            },
+            "end": {
+              "line": 3,
+              "column": 23
+            }
+          },
+          {
+            "name": "class.declaration",
+            "nodeType": "class_definition",
+            "text": "class Order:\n    id: int\n    status: str\n\n    def total(self) -> float: ...",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 33
+            }
+          },
+          {
+            "name": "decorated.definition",
+            "nodeType": "class_definition",
+            "text": "class Order:\n    id: int\n    status: str\n\n    def total(self) -> float: ...",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 33
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "identifier",
+            "text": "Order",
+            "start": {
+              "line": 4,
+              "column": 6
+            },
+            "end": {
+              "line": 4,
+              "column": 11
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "def total(self) -> float: ...",
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 33
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "total",
+            "start": {
+              "line": 8,
+              "column": 8
+            },
+            "end": {
+              "line": 8,
+              "column": 13
+            }
+          }
+        ],
+        "variables": [],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "dataclass(frozen=True)",
+            "start": {
+              "line": 3,
+              "column": 1
+            },
+            "end": {
+              "line": 3,
+              "column": 23
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "dataclass",
+            "start": {
+              "line": 3,
+              "column": 1
+            },
+            "end": {
+              "line": 3,
+              "column": 10
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(frozen=True)",
+            "start": {
+              "line": 3,
+              "column": 10
+            },
+            "end": {
+              "line": 3,
+              "column": 23
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/shop/orders.py",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "imports": [
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import functools",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 16
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "functools",
+            "start": {
+              "line": 3,
+              "column": 7
+            },
+            "end": {
+              "line": 3,
+              "column": 16
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import os, os.path",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 18
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import os, os.path",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 18
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "os",
+            "start": {
+              "line": 4,
+              "column": 7
+            },
+            "end": {
+              "line": 4,
+              "column": 9
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "os.path",
+            "start": {
+              "line": 4,
+              "column": 11
+            },
+            "end": {
+              "line": 4,
+              "column": 18
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import xml.etree.ElementTree as ET",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 34
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "xml.etree.ElementTree",
+            "start": {
+              "line": 5,
+              "column": 7
+            },
+            "end": {
+              "line": 5,
+              "column": 28
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from collections import OrderedDict, defaultdict as dd",
+            "start": {
+              "line": 6,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 54
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "dotted_name",
+            "text": "collections",
+            "start": {
+              "line": 6,
+              "column": 5
+            },
+            "end": {
+              "line": 6,
+              "column": 16
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "OrderedDict",
+            "start": {
+              "line": 6,
+              "column": 24
+            },
+            "end": {
+              "line": 6,
+              "column": 35
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "defaultdict",
+            "start": {
+              "line": 6,
+              "column": 37
+            },
+            "end": {
+              "line": 6,
+              "column": 48
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from typing import TYPE_CHECKING",
+            "start": {
+              "line": 7,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 32
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "dotted_name",
+            "text": "typing",
+            "start": {
+              "line": 7,
+              "column": 5
+            },
+            "end": {
+              "line": 7,
+              "column": 11
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "TYPE_CHECKING",
+            "start": {
+              "line": 7,
+              "column": 19
+            },
+            "end": {
+              "line": 7,
+              "column": 32
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from . import models",
+            "start": {
+              "line": 8,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 20
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "relative_import",
+            "text": ".",
+            "start": {
+              "line": 8,
+              "column": 5
+            },
+            "end": {
+              "line": 8,
+              "column": 6
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "models",
+            "start": {
+              "line": 8,
+              "column": 14
+            },
+            "end": {
+              "line": 8,
+              "column": 20
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from .models import Order",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 25
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "relative_import",
+            "text": ".models",
+            "start": {
+              "line": 9,
+              "column": 5
+            },
+            "end": {
+              "line": 9,
+              "column": 12
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "Order",
+            "start": {
+              "line": 9,
+              "column": 20
+            },
+            "end": {
+              "line": 9,
+              "column": 25
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from ..common import util",
+            "start": {
+              "line": 10,
+              "column": 0
+            },
+            "end": {
+              "line": 10,
+              "column": 25
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "relative_import",
+            "text": "..common",
+            "start": {
+              "line": 10,
+              "column": 5
+            },
+            "end": {
+              "line": 10,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "util",
+            "start": {
+              "line": 10,
+              "column": 21
+            },
+            "end": {
+              "line": 10,
+              "column": 25
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from ..common.helpers import (\n    slugify,\n    parse_date as parse,\n)",
+            "start": {
+              "line": 11,
+              "column": 0
+            },
+            "end": {
+              "line": 14,
+              "column": 1
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "relative_import",
+            "text": "..common.helpers",
+            "start": {
+              "line": 11,
+              "column": 5
+            },
+            "end": {
+              "line": 11,
+              "column": 21
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "slugify",
+            "start": {
+              "line": 12,
+              "column": 4
+            },
+            "end": {
+              "line": 12,
+              "column": 11
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "parse_date",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 14
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from json import *",
+            "start": {
+              "line": 15,
+              "column": 0
+            },
+            "end": {
+              "line": 15,
+              "column": 18
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "dotted_name",
+            "text": "json",
+            "start": {
+              "line": 15,
+              "column": 5
+            },
+            "end": {
+              "line": 15,
+              "column": 9
+            }
+          },
+          {
+            "name": "import.wildcard",
+            "nodeType": "wildcard_import",
+            "text": "*",
+            "start": {
+              "line": 15,
+              "column": 17
+            },
+            "end": {
+              "line": 15,
+              "column": 18
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import typing",
+            "start": {
+              "line": 16,
+              "column": 0
+            },
+            "end": {
+              "line": 16,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "typing",
+            "start": {
+              "line": 16,
+              "column": 7
+            },
+            "end": {
+              "line": 16,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import importlib",
+            "start": {
+              "line": 17,
+              "column": 0
+            },
+            "end": {
+              "line": 17,
+              "column": 16
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "importlib",
+            "start": {
+              "line": 17,
+              "column": 7
+            },
+            "end": {
+              "line": 17,
+              "column": 16
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from .repository import Repository",
+            "start": {
+              "line": 20,
+              "column": 4
+            },
+            "end": {
+              "line": 20,
+              "column": 38
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "relative_import",
+            "text": ".repository",
+            "start": {
+              "line": 20,
+              "column": 9
+            },
+            "end": {
+              "line": 20,
+              "column": 20
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "Repository",
+            "start": {
+              "line": 20,
+              "column": 28
+            },
+            "end": {
+              "line": 20,
+              "column": 38
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import decimal",
+            "start": {
+              "line": 25,
+              "column": 4
+            },
+            "end": {
+              "line": 25,
+              "column": 18
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "decimal",
+            "start": {
+              "line": 25,
+              "column": 11
+            },
+            "end": {
+              "line": 25,
+              "column": 18
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import ujson as json",
+            "start": {
+              "line": 28,
+              "column": 4
+            },
+            "end": {
+              "line": 28,
+              "column": 24
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "ujson",
+            "start": {
+              "line": 28,
+              "column": 11
+            },
+            "end": {
+              "line": 28,
+              "column": 16
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import json",
+            "start": {
+              "line": 30,
+              "column": 4
+            },
+            "end": {
+              "line": 30,
+              "column": 15
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "json",
+            "start": {
+              "line": 30,
+              "column": 11
+            },
+            "end": {
+              "line": 30,
+              "column": 15
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from yaml import CSafeLoader as Loader",
+            "start": {
+              "line": 33,
+              "column": 4
+            },
+            "end": {
+              "line": 33,
+              "column": 42
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "dotted_name",
+            "text": "yaml",
+            "start": {
+              "line": 33,
+              "column": 9
+            },
+            "end": {
+              "line": 33,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "CSafeLoader",
+            "start": {
+              "line": 33,
+              "column": 21
+            },
+            "end": {
+              "line": 33,
+              "column": 32
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from yaml import SafeLoader as Loader",
+            "start": {
+              "line": 35,
+              "column": 4
+            },
+            "end": {
+              "line": 35,
+              "column": 41
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "dotted_name",
+            "text": "yaml",
+            "start": {
+              "line": 35,
+              "column": 9
+            },
+            "end": {
+              "line": 35,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "SafeLoader",
+            "start": {
+              "line": 35,
+              "column": 21
+            },
+            "end": {
+              "line": 35,
+              "column": 31
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import orjson",
+            "start": {
+              "line": 38,
+              "column": 4
+            },
+            "end": {
+              "line": 38,
+              "column": 17
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "orjson",
+            "start": {
+              "line": 38,
+              "column": 11
+            },
+            "end": {
+              "line": 38,
+              "column": 17
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from lxml import etree",
+            "start": {
+              "line": 43,
+              "column": 4
+            },
+            "end": {
+              "line": 43,
+              "column": 26
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "dotted_name",
+            "text": "lxml",
+            "start": {
+              "line": 43,
+              "column": 9
+            },
+            "end": {
+              "line": 43,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "etree",
+            "start": {
+              "line": 43,
+              "column": 21
+            },
+            "end": {
+              "line": 43,
+              "column": 26
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import tomllib",
+            "start": {
+              "line": 48,
+              "column": 4
+            },
+            "end": {
+              "line": 48,
+              "column": 18
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "tomllib",
+            "start": {
+              "line": 48,
+              "column": 11
+            },
+            "end": {
+              "line": 48,
+              "column": 18
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_statement",
+            "text": "import shutil",
+            "start": {
+              "line": 84,
+              "column": 8
+            },
+            "end": {
+              "line": 84,
+              "column": 21
+            }
+          },
+          {
+            "name": "import.module",
+            "nodeType": "dotted_name",
+            "text": "shutil",
+            "start": {
+              "line": 84,
+              "column": 15
+            },
+            "end": {
+              "line": 84,
+              "column": 21
+            }
+          },
+          {
+            "name": "import.statement",
+            "nodeType": "import_from_statement",
+            "text": "from .events import emit",
+            "start": {
+              "line": 100,
+              "column": 8
+            },
+            "end": {
+              "line": 100,
+              "column": 32
+            }
+          },
+          {
+            "name": "import.from",
+            "nodeType": "relative_import",
+            "text": ".events",
+            "start": {
+              "line": 100,
+              "column": 13
+            },
+            "end": {
+              "line": 100,
+              "column": 20
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "dotted_name",
+            "text": "emit",
+            "start": {
+              "line": 100,
+              "column": 28
+            },
+            "end": {
+              "line": 100,
+              "column": 32
+            }
+          }
+        ],
+        "guards": [
+          {
+            "name": "guard.type_checking",
+            "nodeType": "block",
+            "text": "from .repository import Repository",
+            "start": {
+              "line": 20,
+              "column": 4
+            },
+            "end": {
+              "line": 20,
+              "column": 38
+            }
+          },
+          {
+            "name": "guard.type_checking",
+            "nodeType": "block",
+            "text": "import decimal",
+            "start": {
+              "line": 25,
+              "column": 4
+            },
+            "end": {
+              "line": 25,
+              "column": 18
+            }
+          },
+          {
+            "name": "guard.optional",
+            "nodeType": "block",
+            "text": "import ujson as json",
+            "start": {
+              "line": 28,
+              "column": 4
+            },
+            "end": {
+              "line": 28,
+              "column": 24
+            }
+          },
+          {
+            "name": "guard.optional",
+            "nodeType": "block",
+            "text": "from yaml import CSafeLoader as Loader",
+            "start": {
+              "line": 33,
+              "column": 4
+            },
+            "end": {
+              "line": 33,
+              "column": 42
+            }
+          },
+          {
+            "name": "guard.optional",
+            "nodeType": "block",
+            "text": "import orjson",
+            "start": {
+              "line": 38,
+              "column": 4
+            },
+            "end": {
+              "line": 38,
+              "column": 17
+            }
+          },
+          {
+            "name": "guard.optional",
+            "nodeType": "block",
+            "text": "from lxml import etree",
+            "start": {
+              "line": 43,
+              "column": 4
+            },
+            "end": {
+              "line": 43,
+              "column": 26
+            }
+          }
+        ],
+        "definitions": [
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "def plugin(name):\n    return importlib.import_module(name, package=__name__)",
+            "start": {
+              "line": 57,
+              "column": 0
+            },
+            "end": {
+              "line": 58,
+              "column": 58
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "plugin",
+            "start": {
+              "line": 57,
+              "column": 4
+            },
+            "end": {
+              "line": 57,
+              "column": 10
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "def legacy(name):\n    return __import__(name)",
+            "start": {
+              "line": 61,
+              "column": 0
+            },
+            "end": {
+              "line": 62,
+              "column": 27
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "legacy",
+            "start": {
+              "line": 61,
+              "column": 4
+            },
+            "end": {
+              "line": 61,
+              "column": 10
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "def register(cls):\n    _registry[cls.__name__] = cls\n    return cls",
+            "start": {
+              "line": 65,
+              "column": 0
+            },
+            "end": {
+              "line": 67,
+              "column": 14
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "register",
+            "start": {
+              "line": 65,
+              "column": 4
+            },
+            "end": {
+              "line": 65,
+              "column": 12
+            }
+          },
+          {
+            "name": "decorated.declaration",
+            "nodeType": "decorated_definition",
+            "text": "@register\nclass OrderService:\n    \"\"\"Places and fetches orders.\"\"\"\n\n    def __init__(self, repository: Repository) -> None:\n        self.repository = repository\n\n    @property\n    def count(self) -> int:\n        return len(self.repository.find_all(\"open\", status=DEFAULT_STATUS))\n\n    @staticmethod\n    @functools.cache\n    def build(path):\n        import shutil\n\n        return shutil.which(os.path.join(path, \"bin\"))\n\n    async def fetch(self, order_id):\n        async def inner():\n            return await self.repository.get(order_id)\n\n        return await inner()\n\n    class Meta:\n        ordering = [\"-created\"]",
+            "start": {
+              "line": 70,
+              "column": 0
+            },
+            "end": {
+              "line": 95,
+              "column": 31
+            }
+          },
+          {
+            "name": "decorated.decorator",
+            "nodeType": "identifier",
+            "text": "register",
+            "start": {
+              "line": 70,
+              "column": 1
+            },
+            "end": {
+              "line": 70,
+              "column": 9
+            }
+          },
+          {
+            "name": "class.declaration",
+            "nodeType": "class_definition",
+            "text": "class OrderService:\n    \"\"\"Places and fetches orders.\"\"\"\n\n    def __init__(self, repository: Repository) -> None:\n        self.repository = repository\n\n    @property\n    def count(self) -> int:\n        return len(self.repository.find_all(\"open\", status=DEFAULT_STATUS))\n\n    @staticmethod\n    @functools.cache\n    def build(path):\n        import shutil\n\n        return shutil.which(os.path.join(path, \"bin\"))\n\n    async def fetch(self, order_id):\n        async def inner():\n            return await self.repository.get(order_id)\n\n        return await inner()\n\n    class Meta:\n        ordering = [\"-created\"]",
+            "start": {
+              "line": 71,
+              "column": 0
+            },
+            "end": {
+              "line": 95,
+              "column": 31
+            }
+          },
+          {
+            "name": "decorated.definition",
+            "nodeType": "class_definition",
+            "text": "class OrderService:\n    \"\"\"Places and fetches orders.\"\"\"\n\n    def __init__(self, repository: Repository) -> None:\n        self.repository = repository\n\n    @property\n    def count(self) -> int:\n        return len(self.repository.find_all(\"open\", status=DEFAULT_STATUS))\n\n    @staticmethod\n    @functools.cache\n    def build(path):\n        import shutil\n\n        return shutil.which(os.path.join(path, \"bin\"))\n\n    async def fetch(self, order_id):\n        async def inner():\n            return await self.repository.get(order_id)\n\n        return await inner()\n\n    class Meta:\n        ordering = [\"-created\"]",
+            "start": {
+              "line": 71,
+              "column": 0
+            },
+            "end": {
+              "line": 95,
+              "column": 31
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "identifier",
+            "text": "OrderService",
+            "start": {
+              "line": 71,
+              "column": 6
+            },
+            "end": {
+              "line": 71,
+              "column": 18
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "def __init__(self, repository: Repository) -> None:\n        self.repository = repository",
+            "start": {
+              "line": 74,
+              "column": 4
+            },
+            "end": {
+              "line": 75,
+              "column": 36
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "__init__",
+            "start": {
+              "line": 74,
+              "column": 8
+            },
+            "end": {
+              "line": 74,
+              "column": 16
+            }
+          },
+          {
+            "name": "decorated.declaration",
+            "nodeType": "decorated_definition",
+            "text": "@property\n    def count(self) -> int:\n        return len(self.repository.find_all(\"open\", status=DEFAULT_STATUS))",
+            "start": {
+              "line": 77,
+              "column": 4
+            },
+            "end": {
+              "line": 79,
+              "column": 75
+            }
+          },
+          {
+            "name": "decorated.decorator",
+            "nodeType": "identifier",
+            "text": "property",
+            "start": {
+              "line": 77,
+              "column": 5
+            },
+            "end": {
+              "line": 77,
+              "column": 13
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "def count(self) -> int:\n        return len(self.repository.find_all(\"open\", status=DEFAULT_STATUS))",
+            "start": {
+              "line": 78,
+              "column": 4
+            },
+            "end": {
+              "line": 79,
+              "column": 75
+            }
+          },
+          {
+            "name": "decorated.definition",
+            "nodeType": "function_definition",
+            "text": "def count(self) -> int:\n        return len(self.repository.find_all(\"open\", status=DEFAULT_STATUS))",
+            "start": {
+              "line": 78,
+              "column": 4
+            },
+            "end": {
+              "line": 79,
+              "column": 75
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "count",
+            "start": {
+              "line": 78,
+              "column": 8
+            },
+            "end": {
+              "line": 78,
+              "column": 13
+            }
+          },
+          {
+            "name": "decorated.declaration",
+            "nodeType": "decorated_definition",
+            "text": "@staticmethod\n    @functools.cache\n    def build(path):\n        import shutil\n\n        return shutil.which(os.path.join(path, \"bin\"))",
+            "start": {
+              "line": 81,
+              "column": 4
+            },
+            "end": {
+              "line": 86,
+              "column": 54
+            }
+          },
+          {
+            "name": "decorated.decorator",
+            "nodeType": "identifier",
+            "text": "staticmethod",
+            "start": {
+              "line": 81,
+              "column": 5
+            },
+            "end": {
+              "line": 81,
+              "column": 17
+            }
+          },
+          {
+            "name": "decorated.decorator",
+            "nodeType": "attribute",
+            "text": "functools.cache",
+            "start": {
+              "line": 82,
+              "column": 5
+            },
+            "end": {
+              "line": 82,
+              "column": 20
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "def build(path):\n        import shutil\n\n        return shutil.which(os.path.join(path, \"bin\"))",
+            "start": {
+              "line": 83,
+              "column": 4
+            },
+            "end": {
+              "line": 86,
+              "column": 54
+            }
+          },
+          {
+            "name": "decorated.definition",
+            "nodeType": "function_definition",
+            "text": "def build(path):\n        import shutil\n\n        return shutil.which(os.path.join(path, \"bin\"))",
+            "start": {
+              "line": 83,
+              "column": 4
+            },
+            "end": {
+              "line": 86,
+              "column": 54
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "build",
+            "start": {
+              "line": 83,
+              "column": 8
+            },
+            "end": {
+              "line": 83,
+              "column": 13
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "async def fetch(self, order_id):\n        async def inner():\n            return await self.repository.get(order_id)\n\n        return await inner()",
+            "start": {
+              "line": 88,
+              "column": 4
+            },
+            "end": {
+              "line": 92,
+              "column": 28
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "fetch",
+            "start": {
+              "line": 88,
+              "column": 14
+            },
+            "end": {
+              "line": 88,
+              "column": 19
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "async def inner():\n            return await self.repository.get(order_id)",
+            "start": {
+              "line": 89,
+              "column": 8
+            },
+            "end": {
+              "line": 90,
+              "column": 54
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "inner",
+            "start": {
+              "line": 89,
+              "column": 18
+            },
+            "end": {
+              "line": 89,
+              "column": 23
+            }
+          },
+          {
+            "name": "class.declaration",
+            "nodeType": "class_definition",
+            "text": "class Meta:\n        ordering = [\"-created\"]",
+            "start": {
+              "line": 94,
+              "column": 4
+            },
+            "end": {
+              "line": 95,
+              "column": 31
+            }
+          },
+          {
+            "name": "class.name",
+            "nodeType": "identifier",
+            "text": "Meta",
+            "start": {
+              "line": 94,
+              "column": 10
+            },
+            "end": {
+              "line": 94,
+              "column": 14
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_definition",
+            "text": "async def place_order(service, *items):\n    if items:\n        from .events import emit\n\n        emit(f\"placed {len(items)}\", \"orders\")\n    return await service.fetch(items[0])",
+            "start": {
+              "line": 98,
+              "column": 0
+            },
+            "end": {
+              "line": 103,
+              "column": 40
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "place_order",
+            "start": {
+              "line": 98,
+              "column": 10
+            },
+            "end": {
+              "line": 98,
+              "column": 21
+            }
+          }
+        ],
+        "variables": [
+          {
+            "name": "variable.declaration",
+            "nodeType": "expression_statement",
+            "text": "DEFAULT_STATUS = \"open\"",
+            "start": {
+              "line": 52,
+              "column": 0
+            },
+            "end": {
+              "line": 52,
+              "column": 23
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "identifier",
+            "text": "DEFAULT_STATUS",
+            "start": {
+              "line": 52,
+              "column": 0
+            },
+            "end": {
+              "line": 52,
+              "column": 14
+            }
+          },
+          {
+            "name": "variable.declaration",
+            "nodeType": "expression_statement",
+            "text": "MAX_ITEMS: int = 50",
+            "start": {
+              "line": 53,
+              "column": 0
+            },
+            "end": {
+              "line": 53,
+              "column": 19
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "identifier",
+            "text": "MAX_ITEMS",
+            "start": {
+              "line": 53,
+              "column": 0
+            },
+            "end": {
+              "line": 53,
+              "column": 9
+            }
+          },
+          {
+            "name": "variable.declaration",
+            "nodeType": "expression_statement",
+            "text": "_registry = OrderedDict()",
+            "start": {
+              "line": 54,
+              "column": 0
+            },
+            "end": {
+              "line": 54,
+              "column": 25
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "identifier",
+            "text": "_registry",
+            "start": {
+              "line": 54,
+              "column": 0
+            },
+            "end": {
+              "line": 54,
+              "column": 9
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "OrderedDict()",
+            "start": {
+              "line": 54,
+              "column": 12
+            },
+            "end": {
+              "line": 54,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "OrderedDict",
+            "start": {
+              "line": 54,
+              "column": 12
+            },
+            "end": {
+              "line": 54,
+              "column": 23
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "()",
+            "start": {
+              "line": 54,
+              "column": 23
+            },
+            "end": {
+              "line": 54,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "importlib.import_module(name, package=__name__)",
+            "start": {
+              "line": 58,
+              "column": 11
+            },
+            "end": {
+              "line": 58,
+              "column": 58
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "importlib",
+            "start": {
+              "line": 58,
+              "column": 11
+            },
+            "end": {
+              "line": 58,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "import_module",
+            "start": {
+              "line": 58,
+              "column": 21
+            },
+            "end": {
+              "line": 58,
+              "column": 34
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(name, package=__name__)",
+            "start": {
+              "line": 58,
+              "column": 34
+            },
+            "end": {
+              "line": 58,
+              "column": 58
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "__import__(name)",
+            "start": {
+              "line": 62,
+              "column": 11
+            },
+            "end": {
+              "line": 62,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "__import__",
+            "start": {
+              "line": 62,
+              "column": 11
+            },
+            "end": {
+              "line": 62,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(name)",
+            "start": {
+              "line": 62,
+              "column": 21
+            },
+            "end": {
+              "line": 62,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "len(self.repository.find_all(\"open\", status=DEFAULT_STATUS))",
+            "start": {
+              "line": 79,
+              "column": 15
+            },
+            "end": {
+              "line": 79,
+              "column": 75
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "len",
+            "start": {
+              "line": 79,
+              "column": 15
+            },
+            "end": {
+              "line": 79,
+              "column": 18
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(self.repository.find_all(\"open\", status=DEFAULT_STATUS))",
+            "start": {
+              "line": 79,
+              "column": 18
+            },
+            "end": {
+              "line": 79,
+              "column": 75
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "self.repository.find_all(\"open\", status=DEFAULT_STATUS)",
+            "start": {
+              "line": 79,
+              "column": 19
+            },
+            "end": {
+              "line": 79,
+              "column": 74
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "attribute",
+            "text": "self.repository",
+            "start": {
+              "line": 79,
+              "column": 19
+            },
+            "end": {
+              "line": 79,
+              "column": 34
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "find_all",
+            "start": {
+              "line": 79,
+              "column": 35
+            },
+            "end": {
+              "line": 79,
+              "column": 43
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(\"open\", status=DEFAULT_STATUS)",
+            "start": {
+              "line": 79,
+              "column": 43
+            },
+            "end": {
+              "line": 79,
+              "column": 74
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "\"open\"",
+            "start": {
+              "line": 79,
+              "column": 44
+            },
+            "end": {
+              "line": 79,
+              "column": 50
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "shutil.which(os.path.join(path, \"bin\"))",
+            "start": {
+              "line": 86,
+              "column": 15
+            },
+            "end": {
+              "line": 86,
+              "column": 54
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "shutil",
+            "start": {
+              "line": 86,
+              "column": 15
+            },
+            "end": {
+              "line": 86,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "which",
+            "start": {
+              "line": 86,
+              "column": 22
+            },
+            "end": {
+              "line": 86,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(os.path.join(path, \"bin\"))",
+            "start": {
+              "line": 86,
+              "column": 27
+            },
+            "end": {
+              "line": 86,
+              "column": 54
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "os.path.join(path, \"bin\")",
+            "start": {
+              "line": 86,
+              "column": 28
+            },
+            "end": {
+              "line": 86,
+              "column": 53
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "attribute",
+            "text": "os.path",
+            "start": {
+              "line": 86,
+              "column": 28
+            },
+            "end": {
+              "line": 86,
+              "column": 35
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "join",
+            "start": {
+              "line": 86,
+              "column": 36
+            },
+            "end": {
+              "line": 86,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(path, \"bin\")",
+            "start": {
+              "line": 86,
+              "column": 40
+            },
+            "end": {
+              "line": 86,
+              "column": 53
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "\"bin\"",
+            "start": {
+              "line": 86,
+              "column": 47
+            },
+            "end": {
+              "line": 86,
+              "column": 52
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "self.repository.get(order_id)",
+            "start": {
+              "line": 90,
+              "column": 25
+            },
+            "end": {
+              "line": 90,
+              "column": 54
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "attribute",
+            "text": "self.repository",
+            "start": {
+              "line": 90,
+              "column": 25
+            },
+            "end": {
+              "line": 90,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "get",
+            "start": {
+              "line": 90,
+              "column": 41
+            },
+            "end": {
+              "line": 90,
+              "column": 44
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(order_id)",
+            "start": {
+              "line": 90,
+              "column": 44
+            },
+            "end": {
+              "line": 90,
+              "column": 54
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "inner()",
+            "start": {
+              "line": 92,
+              "column": 21
+            },
+            "end": {
+              "line": 92,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "inner",
+            "start": {
+              "line": 92,
+              "column": 21
+            },
+            "end": {
+              "line": 92,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "()",
+            "start": {
+              "line": 92,
+              "column": 26
+            },
+            "end": {
+              "line": 92,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "emit(f\"placed {len(items)}\", \"orders\")",
+            "start": {
+              "line": 102,
+              "column": 8
+            },
+            "end": {
+              "line": 102,
+              "column": 46
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "emit",
+            "start": {
+              "line": 102,
+              "column": 8
+            },
+            "end": {
+              "line": 102,
+              "column": 12
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(f\"placed {len(items)}\", \"orders\")",
+            "start": {
+              "line": 102,
+              "column": 12
+            },
+            "end": {
+              "line": 102,
+              "column": 46
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "len(items)",
+            "start": {
+              "line": 102,
+              "column": 23
+            },
+            "end": {
+              "line": 102,
+              "column": 33
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "len",
+            "start": {
+              "line": 102,
+              "column": 23
+            },
+            "end": {
+              "line": 102,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(items)",
+            "start": {
+              "line": 102,
+              "column": 26
+            },
+            "end": {
+              "line": 102,
+              "column": 33
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string",
+            "text": "\"orders\"",
+            "start": {
+              "line": 102,
+              "column": 37
+            },
+            "end": {
+              "line": 102,
+              "column": 45
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call",
+            "text": "service.fetch(items[0])",
+            "start": {
+              "line": 103,
+              "column": 17
+            },
+            "end": {
+              "line": 103,
+              "column": 40
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "service",
+            "start": {
+              "line": 103,
+              "column": 17
+            },
+            "end": {
+              "line": 103,
+              "column": 24
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "fetch",
+            "start": {
+              "line": 103,
+              "column": 25
+            },
+            "end": {
+              "line": 103,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(items[0])",
+            "start": {
+              "line": 103,
+              "column": 30
+            },
+            "end": {
+              "line": 103,
+              "column": 40
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "references": {
+    "src/common/__init__.py": {
+      "files": [],
+      "external": [],
+      "written": []
+    },
+    "src/common/helpers.py": {
+      "files": [],
+      "external": [],
+      "written": [
+        {
+          "specifier": "re",
+          "names": [],
+          "position": {
+            "line": 1,
+            "column": 7
+          }
+        },
+        {
+          "specifier": "datetime",
+          "names": [
+            "date"
+          ],
+          "position": {
+            "line": 2,
+            "column": 5
+          }
+        }
+      ]
+    },
+    "src/common/util.py": {
+      "files": [],
+      "external": [],
+      "written": []
+    },
+    "src/shop/__init__.py": {
+      "files": [],
+      "external": [],
+      "written": [
+        {
+          "specifier": ".orders",
+          "names": [
+            "OrderService",
+            "place_order"
+          ],
+          "position": {
+            "line": 3,
+            "column": 5
+          }
+        },
+        {
+          "specifier": ".",
+          "names": [
+            "models"
+          ],
+          "position": {
+            "line": 4,
+            "column": 5
+          }
+        }
+      ]
+    },
+    "src/shop/models.pyi": {
+      "files": [],
+      "external": [],
+      "written": [
+        {
+          "specifier": "dataclasses",
+          "names": [
+            "dataclass"
+          ],
+          "position": {
+            "line": 1,
+            "column": 5
+          }
+        }
+      ]
+    },
+    "src/shop/orders.py": {
+      "files": [],
+      "external": [],
+      "written": [
+        {
+          "specifier": "functools",
+          "names": [],
+          "position": {
+            "line": 3,
+            "column": 7
+          }
+        },
+        {
+          "specifier": "os",
+          "names": [],
+          "position": {
+            "line": 4,
+            "column": 7
+          }
+        },
+        {
+          "specifier": "os.path",
+          "names": [],
+          "position": {
+            "line": 4,
+            "column": 11
+          }
+        },
+        {
+          "specifier": "xml.etree.ElementTree",
+          "names": [],
+          "position": {
+            "line": 5,
+            "column": 7
+          }
+        },
+        {
+          "specifier": "collections",
+          "names": [
+            "OrderedDict",
+            "defaultdict"
+          ],
+          "position": {
+            "line": 6,
+            "column": 5
+          }
+        },
+        {
+          "specifier": "typing",
+          "names": [
+            "TYPE_CHECKING"
+          ],
+          "position": {
+            "line": 7,
+            "column": 5
+          }
+        },
+        {
+          "specifier": ".",
+          "names": [
+            "models"
+          ],
+          "position": {
+            "line": 8,
+            "column": 5
+          }
+        },
+        {
+          "specifier": ".models",
+          "names": [
+            "Order"
+          ],
+          "position": {
+            "line": 9,
+            "column": 5
+          }
+        },
+        {
+          "specifier": "..common",
+          "names": [
+            "util"
+          ],
+          "position": {
+            "line": 10,
+            "column": 5
+          }
+        },
+        {
+          "specifier": "..common.helpers",
+          "names": [
+            "slugify",
+            "parse_date"
+          ],
+          "position": {
+            "line": 11,
+            "column": 5
+          }
+        },
+        {
+          "specifier": "json",
+          "names": [
+            "*"
+          ],
+          "position": {
+            "line": 15,
+            "column": 5
+          }
+        },
+        {
+          "specifier": "typing",
+          "names": [],
+          "position": {
+            "line": 16,
+            "column": 7
+          }
+        },
+        {
+          "specifier": "importlib",
+          "names": [],
+          "position": {
+            "line": 17,
+            "column": 7
+          }
+        },
+        {
+          "specifier": ".repository",
+          "names": [
+            "Repository"
+          ],
+          "position": {
+            "line": 20,
+            "column": 9
+          },
+          "guard": "type-checking"
+        },
+        {
+          "specifier": "decimal",
+          "names": [],
+          "position": {
+            "line": 25,
+            "column": 11
+          },
+          "guard": "type-checking"
+        },
+        {
+          "specifier": "ujson",
+          "names": [],
+          "position": {
+            "line": 28,
+            "column": 11
+          },
+          "guard": "optional"
+        },
+        {
+          "specifier": "json",
+          "names": [],
+          "position": {
+            "line": 30,
+            "column": 11
+          }
+        },
+        {
+          "specifier": "yaml",
+          "names": [
+            "CSafeLoader"
+          ],
+          "position": {
+            "line": 33,
+            "column": 9
+          },
+          "guard": "optional"
+        },
+        {
+          "specifier": "yaml",
+          "names": [
+            "SafeLoader"
+          ],
+          "position": {
+            "line": 35,
+            "column": 9
+          }
+        },
+        {
+          "specifier": "orjson",
+          "names": [],
+          "position": {
+            "line": 38,
+            "column": 11
+          },
+          "guard": "optional"
+        },
+        {
+          "specifier": "lxml",
+          "names": [
+            "etree"
+          ],
+          "position": {
+            "line": 43,
+            "column": 9
+          },
+          "guard": "optional"
+        },
+        {
+          "specifier": "tomllib",
+          "names": [],
+          "position": {
+            "line": 48,
+            "column": 11
+          }
+        },
+        {
+          "specifier": "shutil",
+          "names": [],
+          "position": {
+            "line": 84,
+            "column": 15
+          }
+        },
+        {
+          "specifier": ".events",
+          "names": [
+            "emit"
+          ],
+          "position": {
+            "line": 100,
+            "column": 13
+          }
+        }
+      ]
+    }
+  }
+}

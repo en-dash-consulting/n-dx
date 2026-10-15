@@ -12,7 +12,7 @@ import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
 import { loadIgnoreFilter, projectSkipDirs, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
-import { csharpConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
+import { csharpConfig, pythonConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
 
 // ── Language detection ───────────────────────────────────────────────────────
 
@@ -554,11 +554,13 @@ export async function analyzeInventory(
   // detected primary language's own parser handles. Mirrors the extension set
   // analyzeImports() builds in imports.ts. Intersected with byLanguage so the
   // list only names languages actually present in this inventory.
-  const analysedExtensions = new Set<string>([
-    ...typescriptConfig.parseableExtensions,
-    ...csharpConfig.parseableExtensions,
-    ...langConfig.parseableExtensions,
-  ]);
+  // Python files reach the imports phase only through @n-dx/lang-python, whose
+  // imports are not resolved yet, so they take part in no graph: not analysed.
+  const analysedExtensions = new Set<string>(
+    [...typescriptConfig.parseableExtensions, ...csharpConfig.parseableExtensions, ...langConfig.parseableExtensions].filter(
+      (ext) => !pythonConfig.parseableExtensions.has(ext),
+    ),
+  );
   const analysedLanguageNames = new Set<string>();
   for (const ext of analysedExtensions) {
     const lang = EXT_TO_LANGUAGE[ext];

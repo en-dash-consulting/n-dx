@@ -27,7 +27,10 @@ yet produced). `OutboundCallFact.confidence` means what sourcevision's
 and `attributes` are filled by the Terraform pack; attribute values are kept
 as written, never normalised, except that an optional `instance` marks a fact
 whose attributes were resolved through module calls (one fact per distinct
-resolution, each attribute's `written` expression kept in `instance.resolved`). The contract names no parser type; `@n-dx/lang-runtime`'s
+resolution, each attribute's `written` expression kept in `instance.resolved`). The Python pack fills the optional
+`FileReferences.written` (imports as written, each with an `ImportGuard` when
+it might not run), `SymbolFact.decorators` and `SymbolFact.exports`
+(`__all__`), and the `variable` symbol kind. The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports

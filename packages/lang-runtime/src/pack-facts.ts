@@ -50,6 +50,12 @@ export interface PackSymbolRules {
    * one has no named container, rather than the named type around it.
    */
   readonly anonymousBody?: { readonly query: string; readonly capture: string };
+  /**
+   * A pass over the file's symbols once the rules have read them (in document
+   * order, containers filled), for what a rule cannot say: Python's decorators
+   * and `__all__`. Its result is sorted by span start again.
+   */
+  readonly refine?: (symbols: readonly SymbolFact[], file: PackSourceFile) => SymbolFact[];
 }
 
 /** Kinds whose symbols contain members: a member without an explicit container belongs to the nearest one. */
@@ -166,7 +172,7 @@ export function readSymbols(pack: LanguagePack, file: PackSourceFile, symbolRule
 
   symbols.sort((a, b) => before(a.span.start, b.span.start));
   const bodies = anonymous ? (file.captures[anonymous.query] ?? []).filter((c) => c.name === anonymous.capture) : [];
-  return symbols.map((symbol) => {
+  const contained = symbols.map((symbol) => {
     if (symbol.container !== undefined) return symbol;
     let enclosing: SymbolFact | undefined;
     for (const other of symbols) {
@@ -177,6 +183,7 @@ export function readSymbols(pack: LanguagePack, file: PackSourceFile, symbolRule
     const cut = bodies.some((b) => within(span(b), symbol.span) && (enclosing === undefined || within(enclosing.span, span(b))));
     return enclosing && !cut ? { ...symbol, container: enclosing.name } : symbol;
   });
+  return symbolRules.refine ? symbolRules.refine(contained, file).sort((a, b) => before(a.span.start, b.span.start)) : contained;
 }
 
 export interface ReadFactsOptions {

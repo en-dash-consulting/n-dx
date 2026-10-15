@@ -40,6 +40,18 @@ in `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs.
    `.tf` file: those resources get no model fields. Analysis never fails on a
    pack.
 
+### Python
+
+`.py` and `.pyi` are parseable (`pythonConfig.parseableExtensions`) only
+through `@n-dx/lang-python`, an opt-in `KNOWN_PACKS` entry with no fallback
+parser: without it, Python files get inventory only and the missing-pack
+notice. The pack reports imports as written but resolves none yet, so
+Python files get no edges or externals whether or not it is installed, and
+`analyzers/inventory.ts` leaves Python out of `analysedLanguages`; every
+artifact is the same as before Python was a pack. Its dynamic-import notice
+goes to the same `warn`. `scripts/python-corpus-report.mjs` measures the pack
+over the pinned corpus (`python-corpus.json`).
+
 ### The Terraform model in infrastructure.json
 
 The Terraform pack produces `resources` facts, not imports.
@@ -93,7 +105,7 @@ and resource types live in `TERRAFORM_ENGINE_TABLE` and
 
 `sv pack` (`src/cli/commands/pack.ts`, reached as `ndx sv pack …`) manages
 the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, terraform,
-sql; only `KNOWN_PACKS`, all but sql, are analyzed with today):
+python, sql; only `KNOWN_PACKS`, all but sql, are analyzed with today):
 
 - `add <lang>` runs `npm install --prefix <pack dir> @n-dx/lang-<lang>@<sourcevision version>`,
   creating the directory, then loads the pack from it with `loadPack`; a

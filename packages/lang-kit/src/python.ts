@@ -20,9 +20,9 @@ import type { LanguageConfig } from "./registry.js";
  * - `*_pb2.py` / `*_pb2_grpc.py` are generated (protobuf) files.
  * - `pyproject.toml` is the canonical module manifest.
  *
- * Note: `parseableExtensions` is intentionally empty — SourceVision has no
- * Python import parser (the import phase only parses JS/TS, Go, Swift and C#),
- * so `.py` files are inventoried and classified but not parsed for imports.
+ * - `.py` and `.pyi` are parseable, but only by the opt-in `@n-dx/lang-python`
+ *   pack: SourceVision has no other Python parser, so without the pack Python
+ *   files are inventoried and classified only.
  */
 export const pythonConfig: LanguageConfig = {
   id: "python",
@@ -30,7 +30,7 @@ export const pythonConfig: LanguageConfig = {
 
   extensions: new Set([".py", ".pyi"]),
 
-  parseableExtensions: new Set<string>(),
+  parseableExtensions: new Set([".py", ".pyi"]),
 
   testFilePatterns: [
     /(?:^|\/)test_[^/]*\.py$/,
