@@ -1,0 +1,21 @@
+---
+id: "e4b8dc92-d336-44eb-a5a6-48226bf36f23"
+level: "task"
+title: "Release verify step skips silently when the changesets `published` output is missing or renamed"
+status: "pending"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "release-plumbing"
+  - "ci"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "verify-release-sync exits non-zero with a clear error when PUBLISHED is unset or not 'true'/'false'"
+  - "A unit test in tests/unit/verify-release-sync.test.js covers the unset/invalid PUBLISHED case without spawning a process"
+  - "The Version-PR path (published=false) still exits 0"
+description: "Verdict: should-fix (adversarial review of e37dfec8).\n\nFailure scenario: scripts/verify-release-sync.mjs main() sets `published: process.env.PUBLISHED === \"true\"`. If `steps.changesets.outputs.published` is empty, because the action renames or drops the output on a future pin bump (v1→v2 already renamed every input) or the step id changes, PUBLISHED is \"\". The script then reports \"not published by this run; nothing to verify.\" and exits 0 on a run that did publish. That is the vacuous-green shape the step exists to catch.\n\nReachable: only after a changesets/action upgrade or a workflow edit. It is not reachable at the current pin, which per the operator note exposes `published`.\n\nOptions:\n(a) Fail with exit 2 when PUBLISHED is neither \"true\" nor \"false\". This is cheap. The risk is that it breaks the Version-PR path if the action only sets the output when it publishes; confirm that the action sets published=false on the version path first (v1 did).\n(b) Cross-check against `published-packages`: if PUBLISHED is empty but published-packages is non-empty, fail.\nRecommend (a), after confirming the action's behaviour at the pinned SHA.\n\nOperator note (overnight 2026-10-15): confirmed at the pinned SHA ae32849 — changesets/action src/index.ts calls core.setOutput(\"published\", \"false\") unconditionally (line 64) before choosing the version or publish path, and sets \"true\" only after a publish. So whenever the verify step runs, PUBLISHED is \"true\" or \"false\"; anything else means the output was renamed or the step id changed. Take option (a): exit 2 with a clear ::error:: naming steps.changesets.outputs.published when PUBLISHED is neither. Keep the logic testable: verifyReleaseSync should take the raw string (or main() should validate through an exported function) so the unit test covers it without spawning. Files: scripts/verify-release-sync.mjs, tests/unit/verify-release-sync.test.js, and RELEASING.md only if its step description needs a clause. Never run the release workflow, push a tag or publish. Run the six static root policy tests before committing."
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-15T05:47:08.285Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
