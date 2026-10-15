@@ -147,6 +147,32 @@ describe("Rex item routes on a v2 project", () => {
     expect(readFileSync(join(rexDir, "product", "checkout", "pay-by-card.md"), "utf-8")).toContain("Apple Pay is offered on Safari");
   });
 
+  it("bulk PATCH completing a change under rex.applyOn review reports why it was left unapplied", async () => {
+    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "review" } }));
+    expect((await send("PATCH", "items/bulk", { ids: [TASK_ID], updates: { status: "completed" } })).status).toBe(200);
+    const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID], updates: { status: "completed" } });
+    expect(res.status).toBe(200);
+    const [result] = (await res.json()).results;
+    expect(result).toMatchObject({ id: CHANGE_ID, ok: true, applied: false });
+    expect(result.reason).toEqual(expect.any(String));
+    expect(readFileSync(join(rexDir, "product", "checkout", "pay-by-card.md"), "utf-8")).not.toContain("Apple Pay is offered on Safari");
+  });
+
+  it.each([
+    ["run", { run: { tier: "heavy" } }, '"run"'],
+    ["id", { id: "other" }, '"id"'],
+    ["title", { title: "" }, '"title"'],
+    ["tags", { tags: "x" }, '"tags"'],
+  ])("bulk PATCH with an unacceptable %s answers 400 and writes nothing", async (_name, updates, named) => {
+    const store = await resolveStore(rexDir);
+    const before = JSON.stringify((await store.loadDocument()).items);
+    const res = await send("PATCH", "items/bulk", { ids: [TASK_ID], updates });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain(named);
+    expect(JSON.stringify((await store.loadDocument()).items)).toBe(before);
+    expect(frames).toEqual([]);
+  });
+
   it("bulk PATCH completed of a change with its tasks completes both when the change is listed first", async () => {
     const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID, TASK_ID], updates: { status: "completed" } });
     expect((await res.json()).results).toEqual([
