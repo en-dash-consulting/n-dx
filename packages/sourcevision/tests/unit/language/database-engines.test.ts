@@ -450,6 +450,19 @@ describe("Terraform resources", () => {
     expect(report.notices).toEqual(["modules/db_instance/main.tf:30 aws_db_instance.this has engine local.is_replica ? null : var.engine; no candidate"]);
   });
 
+  it("grades a value resolved from a module call under a test path as weak", () => {
+    const fromFixture: ResourceFact = {
+      ...resource("aws_db_instance", "this", 30, { engine: "postgres" }),
+      instance: {
+        call: { file: "tests/fixtures/db.tf", line: 1 },
+        resolved: { engine: { written: "var.engine", confidence: "literal", from: { file: "tests/fixtures/db.tf", line: 3 } } },
+      },
+    };
+    const c = only([tf("modules/db/main.tf", fromFixture)]);
+    expect(c).toMatchObject({ engine: "postgresql", grade: "low" });
+    expect(c.evidence[0].grade).toBe("weak");
+  });
+
   it("grades Terraform under a test path as weak", () => {
     const c = only([tf("tests/rds.tf", resource("aws_db_instance", "t", 1, { engine: "mysql", engineVersion: "8.0" }))]);
     expect(c).toMatchObject({ engine: "mysql", grade: "low" });

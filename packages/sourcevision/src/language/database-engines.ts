@@ -675,7 +675,14 @@ function terraformEvidence(facts: readonly Pick<FileFacts, "path" | "resources">
         engine,
         {
           signal: "terraform",
-          grade: mapped !== undefined && resolved?.confidence !== "conditional" && !AROUND_CODE.test(path) ? "strong" : "weak",
+          // A value written under a test or CI path (a fixture's module call) is weak, wherever the resource is.
+          grade:
+            mapped !== undefined &&
+            resolved?.confidence !== "conditional" &&
+            !AROUND_CODE.test(path) &&
+            !(resolved !== undefined && AROUND_CODE.test(resolved.from.file))
+              ? "strong"
+              : "weak",
           file: path,
           line: resource.position.line,
           ruleId: `terraform:${resource.type}`,
