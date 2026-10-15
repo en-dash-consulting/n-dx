@@ -146,15 +146,20 @@ describe("commitFailForward", () => {
     writeFileSync(join(dir, "f.txt"), "base\n");
     git(dir, ["add", "f.txt"]);
     git(dir, ["commit", "-m", "base"]);
+    // The fixture's first branch is whatever `init.defaultBranch` says, and
+    // the helper runs a bare `git init`. Hardcoding "main" passes only where
+    // the developer's git agrees and fails on a runner that still defaults to
+    // "master" — so read the name back instead of assuming it.
+    const base = git(dir, ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
     git(dir, ["checkout", "-qb", "feature"]);
     writeFileSync(join(dir, "f.txt"), "feature\n");
     git(dir, ["commit", "-qam", "feature"]);
-    git(dir, ["checkout", "-q", "main"]);
+    git(dir, ["checkout", "-q", base]);
     writeFileSync(join(dir, "f.txt"), "mainline\n");
     git(dir, ["commit", "-qam", "mainline"]);
     git(dir, ["checkout", "-q", "feature"]);
     try {
-      execSync("git rebase main", { cwd: dir, stdio: "ignore" });
+      execFileSync("git", ["rebase", base], { cwd: dir, stdio: "ignore" });
     } catch {
       // Expected: the rebase stops on the conflict.
     }
