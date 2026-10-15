@@ -26,12 +26,12 @@ The table below is derived from [`packages/core/assistant-assets/manifest.json`]
 | [`ndx-zone`](#ndx-zone) | Deep-dive into an architectural zone's structure and health | `/ndx-zone [zone-id]` |
 | [`ndx-work`](#ndx-work) | Pick up a task from the PRD and begin working on it | `/ndx-work [task-id]` |
 | [`ndx-config`](#ndx-config) | View or change n-dx configuration with guided assistance | `/ndx-config [key] [value]` |
-| [`ndx-reshape`](#ndx-reshape) | Restructure a v1 PRD tree — regroup epics, change levels, merge overlaps | `/ndx-reshape` |
+| [`ndx-reshape`](#ndx-reshape) | Restructure the PRD — regroup, reparent, merge overlaps and place changes | `/ndx-reshape` |
 | [`ndx-feedback`](#ndx-feedback) | Submit feedback, bug reports, or feature requests for n-dx | `/ndx-feedback [description]` |
 | [`ndx-adversarial-review`](#ndx-adversarial-review) | Attack a change or a completion claim, triage what breaks, capture what the user approves | `/ndx-adversarial-review [task-id \| name \| topic]` |
 
-::: info The PRD skills target v1 PRDs today
-`/ndx-capture`, `/ndx-plan` and `/ndx-reshape` are written for the v1 PRD that `ndx init` creates until the storage migration ships: one tree of items, each with a level (epic, feature, task, subtask) and a parent. On a v2 PRD, where every new item enters as a change in the Inbox (see [Changes and apply](./concepts/changes-and-apply)), add changes with `ndx add` or `add_item` and place them with `rex change place` or `place_change`. The skills' v2 versions ship with the migration.
+::: info The PRD skills work on v1 and v2 PRDs
+`/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-work` and `/ndx-adversarial-review` detect the layout from `get_prd_status` and branch on it. On a v1 PRD (the one `ndx init` creates) they add items with a level (epic, feature, task, subtask) and a parent. On a v2 PRD, where every new item enters as a change in the Inbox (see [Changes and apply](./concepts/changes-and-apply)), they add changes and place them with `place_change`.
 :::
 
 ---
@@ -176,7 +176,7 @@ they all share:
 
 ### ndx-reshape
 
-**Purpose:** LLM-assisted cleanup of a v1 PRD tree: regroup scattered epics, fix wrong levels, merge overlapping items, and normalize naming. A v2 PRD has no levels to fix: its structure is the product layer's areas and capabilities, which change only through applied changes.
+**Purpose:** LLM-assisted cleanup of the PRD. On a v1 tree it regroups scattered epics, fixes wrong levels, merges overlapping items, and normalizes naming. A v2 PRD has no levels to fix: its structure is the product layer's areas and capabilities, which change only through applied changes.
 
 **When it triggers:** Invoke with `/ndx-reshape` when the PRD has grown organically and needs structural cleanup. Typically run after a long feature sprint or after multiple `ndx plan --accept` cycles.
 
