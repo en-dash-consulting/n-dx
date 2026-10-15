@@ -51,6 +51,8 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [A rex test worker exits mid-run under pnpm validate concurrency, failing the suite with every test passing](./a-rex-test-worker-exits-mid-run-under.md) | pending |
 | [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-stale.md) | completed |
 | [Auto-Update Detection from npm Registry](./auto-update-detection-from-npm-registry.md) | completed |
+| [Five unrelated suites failed under load in one session and passed on re-run: investigate the pattern, not each flake](./five-unrelated-suites-failed-under.md) | pending |
+| [Four source files hold a NUL byte, so git shows them as binary and their diffs cannot be reviewed](./four-source-files-hold-a-nul-byte-so.md) | pending |
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-the.md) | completed |
 | [routes-commands ndx-ladder tests leak the ambient NDX_CLI_PATH env var](./routes-commands-ndx-ladder-tests-leak.md) | completed |
 | [Zone cohesion gate silently passes in CI instead of reporting it did not run](./zone-cohesion-gate-silently-passes-in.md) | completed |
