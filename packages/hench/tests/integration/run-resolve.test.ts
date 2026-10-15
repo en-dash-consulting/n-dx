@@ -562,6 +562,17 @@ describe("on a v2 tree", () => {
     }
   });
 
+  it("refuses a deferred change with an open task, unless --reset-deferred would reopen it", async () => {
+    const stateFile = join(rexDir, "changes/add-apple-pay/state.yaml");
+    await writeFile(stateFile, (await readFile(stateFile, "utf-8")).replace('status: "in_progress"', 'status: "deferred"'));
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "defer change");
+    const r = await resolve({ task: "CH-1" });
+    expect(codes(r)).toEqual(["not-actionable"]);
+    expect(r.refusals[0].message).toContain("Add Apple Pay");
+    expect(codes(await resolve({ task: "CH-1", "reset-deferred": "true" }))).toEqual([]);
+  });
+
   it("reports a task-less change as the unit", async () => {
     await rm(join(rexDir, "changes/add-apple-pay/wire-the-button.md"));
     git(projectDir, "add", "-A");

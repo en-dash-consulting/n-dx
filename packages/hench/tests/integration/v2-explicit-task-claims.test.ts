@@ -6,12 +6,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { appendFile, cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolveStore } from "@n-dx/rex";
 import type { ClaimsStore, TaskClaim } from "@n-dx/rex";
-import { selectTaskEntry } from "../../src/agent/planning/brief.js";
+import { selectTaskEntry, TaskNotActionableError } from "../../src/agent/planning/brief.js";
 import { ChangeTasksUnavailableError, loadV2Tree } from "../../src/agent/planning/work-selection.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../src/process/task-claims.js";
 import { RM_RETRY } from "../helpers/index.js";
@@ -143,6 +143,16 @@ describe("explicit --task naming a v2 change with open tasks", () => {
     const err = await select(claims, "CH-1").catch((e) => e);
     expect(err).toBeInstanceOf(TaskClaimedElsewhereError);
     expect(err.taskId).toBe(CHANGE_ID);
+    expect(claimed).toEqual([]);
+  });
+
+  it.each(["deferred", "blocked"])("refuses a %s change rather than running its open task, claiming nothing", async (status) => {
+    const stateFile = join(CHANGE_DIR(), "state.yaml");
+    await writeFile(stateFile, (await readFile(stateFile, "utf-8")).replace('status: "in_progress"', `status: "${status}"`));
+    const { claims, claimed } = claimsWith([]);
+    const err = await select(claims, "CH-1").catch((e) => e);
+    expect(err).toBeInstanceOf(TaskNotActionableError);
+    expect(err.message).toContain("Add Apple Pay");
     expect(claimed).toEqual([]);
   });
 

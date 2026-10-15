@@ -110,6 +110,17 @@ export function findV2Entry(tree: V2Tree, items: PRDItem[], ref: string, foreign
 }
 
 /**
+ * The change a ref names when {@link findV2Entry} resolved it to one of that
+ * change's tasks (`entry`). The change's own status still gates the run, as it
+ * did when the change was the unit: a deferred or blocked change is refused,
+ * not worked through its tasks. `null` when the ref names `entry` itself.
+ */
+export function namedChangeEntry(tree: V2Tree, items: PRDItem[], ref: string, entry: TreeEntry): TreeEntry | null {
+  const node = indexTree(tree).resolve(ref);
+  return node?.type === "change" && node.id !== entry.item.id ? findItem(items, node.id) : null;
+}
+
+/**
  * The priority rex ranks the unit a ref runs by: its own, else its change's,
  * as autoselection reports it (`explanation.priority.itemPriority`).
  */

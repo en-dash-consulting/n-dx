@@ -30,7 +30,7 @@ import { resolveHenchPaths } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal } from "../../agent/planning/brief.js";
-import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree } from "../../agent/planning/work-selection.js";
+import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry } from "../../agent/planning/work-selection.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
 import { CLIError, requireLLMCLI } from "../errors.js";
@@ -288,6 +288,12 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     if (!(await wouldBeReset(entry.item, entry.parents, flags, dir))) {
       const notActionable = explicitTaskRefusal(entry.item);
       if (notActionable) refuse("not-actionable", notActionable);
+    }
+    // A ref naming a change runs one of its tasks; the change's status still gates it, as in a run.
+    const named = v2Tree ? namedChangeEntry(v2Tree, prdItems, taskId, entry) : null;
+    if (named && !(await wouldBeReset(named.item, named.parents, flags, dir))) {
+      const changeNotActionable = explicitTaskRefusal(named.item);
+      if (changeNotActionable) refuse("not-actionable", changeNotActionable);
     }
     if (claim) {
       const heldId = enclosing?.changeId ?? entry.item.id;
