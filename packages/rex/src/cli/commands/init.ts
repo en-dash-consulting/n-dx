@@ -3,7 +3,7 @@ import { readFile, writeFile, access, mkdir } from "node:fs/promises";
 import { DEFAULT_CONFIG } from "../../schema/index.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
 import { relativeToRoot, resolveLayout } from "@n-dx/llm-client";
-import { PRD_CACHE_DIRNAME, ensureRexDir, prdLockPath, resolveRexPaths, withLock } from "../../store/index.js";
+import { PRD_CACHE_DIRNAME, discoverPRDFiles, ensureRexDir, prdLockPath, resolveRexPaths, withLock } from "../../store/index.js";
 import { prdLayout, rexDirHoldsPrd } from "../../store/prd-model-reader.js";
 import { writePrdModel } from "../../store/prd-model-writer.js";
 import { SCHEMA_VERSION_V2 } from "../../schema/v2.js";
@@ -78,7 +78,12 @@ export async function cmdInit(
   if ((await prdLayout(rexDir)) === "v2") {
     info("PRD is in the v2 layout (product/), skipping");
     v2 = true;
-  } else if (rexDirHoldsPrd(rexDir) || process.env[INIT_LAYOUT_ENV] === "v1") {
+  } else if (
+    rexDirHoldsPrd(rexDir)
+    // Branch-scoped legacy files are a v1 source too: a v2 tree beside them hides them.
+    || (await discoverPRDFiles(rexDir)).length > 0
+    || process.env[INIT_LAYOUT_ENV] === "v1"
+  ) {
     await scaffoldFolderTree(join(rexDir, FOLDER_TREE_SUBDIR), project);
     v2 = false;
   } else {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, readdir, access, rename } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, readFile, readdir, access, rename, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -312,6 +312,17 @@ describe("rex init on a new project (v2 default)", () => {
     expect(stdout).toContain("rex add epic");
     await expect(access(join(tmpDir, ".rex", "product"))).rejects.toThrow();
     expect(rex(["status", tmpDir]).stdout).toContain("Billing");
+  });
+
+  // A branch-scoped legacy file is a v1 PRD source too (FileStore reads it,
+  // migrate --apply refuses beside it); a v2 tree written next to it hides it.
+  it("leaves a project whose only PRD is a branch-scoped legacy file on v1", async () => {
+    const rexDir = join(tmpDir, ".rex");
+    await mkdir(rexDir);
+    await writeFile(join(rexDir, "prd_main_2026-01-01.json"), JSON.stringify({ schema: "rex/v1", title: "Old", items: [] }));
+
+    expect(rex(["init", tmpDir]).stdout).toContain("rex add epic");
+    await expect(access(join(rexDir, "product"))).rejects.toThrow();
   });
 
   it("lets rex next and rex update work a task", async () => {
