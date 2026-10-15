@@ -54,6 +54,7 @@ plannedRelease: "1.0.0"
 | [Split the rex MCP tools into one module per tool](./split-the-rex-mcp-tools-into-one/index.md) | completed |
 | [Stamp shippedIn from any CI](./stamp-shippedin-from-any-ci/index.md) | completed |
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | completed |
+| [The dashboard's watchers and routes hold up](./the-dashboard-s-watchers-and-routes/index.md) | pending |
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
 | [v2 completion and selection hold up](./v2-completion-and-selection-hold-up/index.md) | pending |
 | [v2 MCP tools take display ids and report v2 health](./v2-mcp-tools-take-display-ids-and/index.md) | completed |
