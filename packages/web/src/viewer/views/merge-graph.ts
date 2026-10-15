@@ -25,6 +25,7 @@
  */
 
 import { h, Fragment } from "preact";
+import { ActionIcon } from "../components/index.js";
 import { useState, useEffect, useMemo, useCallback, useRef } from "preact/hooks";
 import { usePanZoom, useGraphArrowNav } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
@@ -615,7 +616,7 @@ function PrdFrontMatterSummary({ item, fallback, itemType, origin, onClose }: {
         class: "mg-detail-close",
         onClick: onClose,
         "aria-label": "Close",
-      }, "×"),
+      }, h(ActionIcon, { name: "close" })),
     ),
     h("p", { class: "mg-detail-subject" }, title),
     h("dl", { class: "mg-frontmatter" },
@@ -753,7 +754,7 @@ function DetailPanelContent({ selection, prdData, origin, onClose }: {
           class: "mg-detail-close",
           onClick: onClose,
           "aria-label": "Close",
-        }, "×"),
+        }, h(ActionIcon, { name: "close" })),
       ),
       h("p", { class: "mg-detail-subject" }, mn.subject),
       h("div", { class: "mg-detail-meta" },
