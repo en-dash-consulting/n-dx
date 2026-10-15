@@ -21,9 +21,11 @@ import { extname } from "node:path";
 import type { LanguageConfig, PackDegradation, PackProjectResult } from "@n-dx/lang-kit";
 import type { ExternalImport, ImportEdge, Inventory } from "../schema/index.js";
 import {
+  INSTALLABLE_PACKS,
   KNOWN_PACKS,
   loadPack,
   packInstallCommand,
+  type InstallablePack,
   type KnownPack,
   type PackLoaderOptions,
 } from "../language/pack-loader.js";
@@ -59,6 +61,36 @@ export function packsFor(parseableExtensions: ReadonlySet<string>, packs: readon
 export function isPackFile(path: string, packs: readonly { readonly config: LanguageConfig }[]): boolean {
   const ext = extname(path).toLowerCase();
   return packs.some((pack) => pack.config.parseableExtensions.has(ext));
+}
+
+/**
+ * Report the packs the project lists (`sourcevision.packs`) that cannot be
+ * used, whether or not the project has files of their language yet: one
+ * notice per missing or refused pack, naming its `ndx sv pack add` command,
+ * and one warning for all unknown ids. `reported` holds the packs that had
+ * files, which {@link buildPackImportGraph} has already reported. A listed
+ * pack changes nothing else about the analysis.
+ */
+export async function noticeListedPacks(
+  listed: readonly string[],
+  reported: ReadonlySet<string>,
+  options: Pick<PackImportsOptions, "loader" | "warn"> & { /** Defaults to {@link INSTALLABLE_PACKS}. */ readonly installable?: readonly InstallablePack[] } = {},
+): Promise<void> {
+  const warn = options.warn ?? ((message: string) => console.warn(message));
+  const installable = options.installable ?? INSTALLABLE_PACKS;
+  const ids = [...new Set(listed)];
+  const unknown = ids.filter((id) => !installable.some((p) => p.id === id));
+  if (unknown.length > 0) {
+    const known = installable.map((p) => p.id).join(", ");
+    warn(`sourcevision.packs lists unknown pack${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")}; known packs: ${known}.`);
+  }
+  for (const pack of installable) {
+    if (!ids.includes(pack.id) || reported.has(pack.id)) continue;
+    const load = await loadPack(pack, options.loader);
+    if (load.status !== "loaded") {
+      warn(`sourcevision.packs lists ${pack.id}: ${load.notice.reason}. ${load.notice.remedy ?? ""}`.trimEnd());
+    }
+  }
 }
 
 /**

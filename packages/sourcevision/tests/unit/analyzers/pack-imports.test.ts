@@ -6,14 +6,16 @@
  * modes (grammar, queries, build files) by the packs' tests.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { goConfig, javaConfig, type LanguagePackEntry, type PackProjectRequest, type PackProjectResult } from "@n-dx/lang-kit";
-import { buildPackImportGraph, isPackFile, packsFor } from "../../../src/analyzers/pack-imports.js";
-import { KNOWN_PACKS, type KnownPack } from "../../../src/language/pack-loader.js";
+import { analyzeImports } from "../../../src/analyzers/imports.js";
+import { analyzeInventory } from "../../../src/analyzers/inventory.js";
+import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor } from "../../../src/analyzers/pack-imports.js";
+import { KNOWN_PACKS, type InstallablePack, type KnownPack } from "../../../src/language/pack-loader.js";
 import type { Inventory } from "../../../src/schema/v1.js";
 
 const VERSION = "1.2.3";
@@ -206,5 +208,78 @@ describe("buildPackImportGraph", () => {
     expect(messages).toEqual([
       "Go: the project's build files could not be read (go.mod unreadable); Go imports come from the regex import parser.",
     ]);
+  });
+});
+
+describe("sourcevision.packs", () => {
+  let project: string;
+  let emptyPackDir: string;
+  beforeAll(() => {
+    project = mkdtempSync(join(tmpdir(), "sv-pack-list-"));
+    emptyPackDir = mkdtempSync(join(tmpdir(), "sv-pack-list-dir-"));
+    mkdirSync(join(project, "src"));
+    writeFileSync(join(project, "src", "a.ts"), "export const a = 1;\n");
+  });
+  afterAll(() => {
+    rmSync(project, { recursive: true, force: true });
+    rmSync(emptyPackDir, { recursive: true, force: true });
+  });
+
+  const configure = (packs: unknown): void =>
+    writeFileSync(join(project, ".n-dx.json"), JSON.stringify(packs === undefined ? {} : { sourcevision: { packs } }));
+
+  /** `analyzeImports` on a TypeScript-only project; the loader looks for a version no pack has. */
+  async function analyze(): Promise<{ messages: string[]; imports: Awaited<ReturnType<typeof analyzeImports>> }> {
+    const inventory = await analyzeInventory(project);
+    const messages: string[] = [];
+    const imports = await analyzeImports(project, inventory, {
+      packs: { loader: { packDir: emptyPackDir, version: "9.9.9" }, warn: (m) => messages.push(m) },
+    });
+    return { messages, imports };
+  }
+
+  it("gives one notice naming `ndx sv pack add java` for a listed pack that is refused, with no Java files", async () => {
+    configure(["java"]);
+    const { messages } = await analyze();
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatch(/^sourcevision\.packs lists java: pack @n-dx\/lang-java@.* does not match @n-dx\/sourcevision@9\.9\.9.*`ndx sv pack add java`/);
+  });
+
+  it("gives one warning listing the known ids for an unknown id", async () => {
+    configure(["cobol", "fortran"]);
+    const { messages } = await analyze();
+    expect(messages).toEqual(["sourcevision.packs lists unknown packs cobol, fortran; known packs: java, go, sql, terraform."]);
+  });
+
+  it("says nothing with no list, an empty list or a non-array, and never changes the output", async () => {
+    configure(undefined);
+    const base = await analyze();
+    expect(base.messages).toEqual([]);
+    for (const value of [[], "java", { java: true }]) {
+      configure(value);
+      const { messages, imports } = await analyze();
+      expect(messages).toEqual([]);
+      expect(imports).toEqual(base.imports);
+    }
+    configure(["java"]);
+    expect((await analyze()).imports).toEqual(base.imports);
+  });
+});
+
+describe("noticeListedPacks", () => {
+  const installable = (id: string): InstallablePack => ({
+    id,
+    packageName: `@n-dx/lang-${id}`,
+    importByResolution: () => Promise.reject(notInstalled(`@n-dx/lang-${id}`)),
+  });
+
+  it("names the install command of a missing pack once, skipping packs already reported or not listed", async () => {
+    const messages: string[] = [];
+    await noticeListedPacks(["java", "java", "go"], new Set(["go"]), {
+      installable: [installable("java"), installable("go"), installable("sql")],
+      loader: { packDir: "/nonexistent", version: VERSION },
+      warn: (m) => messages.push(m),
+    });
+    expect(messages).toEqual(["sourcevision.packs lists java: pack @n-dx/lang-java is not installed. Install it with `ndx sv pack add java`."]);
   });
 });

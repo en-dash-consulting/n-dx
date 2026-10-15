@@ -30,7 +30,8 @@ sourcevision reset .                      # clear analysis data
 sourcevision workspace .                  # aggregate multiple repos into unified view
 sourcevision mcp .                        # start MCP server (stdio)
 sourcevision pack add java                # install a language pack (java, go, sql, terraform)
-sourcevision pack list                    # each pack: installed, resolved, missing or refused
+sourcevision pack add                     # install every pack the project lists (sourcevision.packs)
+sourcevision pack list                    # each pack: installed, resolved, missing or refused; listed packs marked
 sourcevision pack remove java             # remove a pack from the pack directory
 sourcevision pack bundle java             # archive the pack and its dependencies for offline use
 sourcevision pack add java --from <file>  # install a bundle with no network
@@ -53,6 +54,21 @@ manifest; grammars are WebAssembly, so a bundle serves every platform. On the
 offline machine, `sv pack add <lang> --from <file>` checks the manifest, refusing
 a bundle of another pack or version, replaces any installed copy and loads the
 pack, with no npm call.
+
+A project can list the packs it wants in its config file (`.n-dx.json`, or
+`.ndx/config.json`), by editing it; `ndx config` does not set the key:
+
+```json
+{ "sourcevision": { "packs": ["java", "go"] } }
+```
+
+`sv analyze` then reports, once per pack, a listed pack that is missing or
+refused (naming `ndx sv pack add <lang>`), even before the project has files of
+that language, and once for any id that is not a known pack. The list changes
+nothing else: what is analysed, and its output, are the same as with no list.
+`sv pack add` with no language installs each listed pack that is not already
+found (and says so when the list is empty or absent), and `sv pack list` marks
+the listed packs.
 
 ## Output Files
 

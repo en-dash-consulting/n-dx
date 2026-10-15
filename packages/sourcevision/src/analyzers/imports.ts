@@ -21,9 +21,9 @@ import { toPosix } from "../util/paths.js";
 import { extractGoImports, readGoModulePath } from "./go-imports.js";
 import { buildSwiftImportGraph } from "./swift-imports.js";
 import { buildCSharpImportGraph } from "./csharp-imports.js";
-import { buildPackImportGraph, isPackFile, packsFor, type PackImportsOptions } from "./pack-imports.js";
+import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, type PackImportsOptions } from "./pack-imports.js";
 import { readManifest } from "./manifest.js";
-import { detectLanguages } from "../language/detect.js";
+import { detectLanguages, loadInventoryConfig } from "../language/detect.js";
 import { csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, type LanguageConfig } from "@n-dx/lang-kit";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
@@ -754,6 +754,11 @@ export async function analyzeImports(
   await processGoFiles(goParseableFiles, targetDir, goModulePath, edgeMap, externalMap);
   await processSwiftFiles(swiftParseableFiles, targetDir, edgeMap, externalMap);
   await processCSharpFiles(csharpParseableFiles, inventory, targetDir, edgeMap, externalMap);
+  const listedPacks = (await loadInventoryConfig(targetDir)).packs;
+  if (listedPacks?.length) {
+    const withFiles = new Set(packs.filter((p) => packFiles.some((f) => isPackFile(f.path, [p]))).map((p) => p.id));
+    await noticeListedPacks(listedPacks, withFiles, { loader: options?.packs?.loader, warn: options?.packs?.warn });
+  }
   if (packFiles.length > 0) {
     const graph = await buildPackImportGraph(packFiles, targetDir, { ...options?.packs, packs, fallbacks: PACK_FALLBACKS });
     mergeGraph(graph, edgeMap, externalMap);

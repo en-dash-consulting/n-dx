@@ -70,6 +70,7 @@ const deps = (overrides: Partial<PackCommandDeps> = {}): PackCommandDeps => ({
   packDir,
   version: VERSION,
   importFile,
+  listed: [],
   write: (line) => lines.push(line),
   npm: fakeNpm(),
   ...overrides,
@@ -101,7 +102,7 @@ describe("sv pack add", () => {
       message: "Unknown language pack: cobol",
       suggestion: "Known packs: java, go, sql, terraform.",
     });
-    await expect(cmdPack(["add"], deps())).rejects.toThrow("Missing language");
+    await expect(cmdPack(["bundle"], deps())).rejects.toThrow("Missing language");
     expect(npmCalls).toEqual([]);
   });
 
@@ -174,6 +175,49 @@ describe("sv pack list", () => {
       ["sql", "missing", undefined, false],
       ["terraform", "refused", "1.0.0", false],
     ]);
+  });
+});
+
+describe("the project's pack list (sourcevision.packs)", () => {
+  it("add with no language installs each listed pack that is not installed, as add <lang> would", async () => {
+    installInPackDir("@n-dx/lang-sql");
+    const npm = fakeNpm((args) => installInPackDir(args[3]!.replace(/@[^@/]+$/, "")));
+    await cmdPack(["add"], deps({ listed: ["java", "go", "sql", "java"], npm }));
+    expect(npmCalls).toEqual([["install", "--prefix", packDir, `@n-dx/lang-java@${VERSION}`]]);
+    expect(lines).toEqual([
+      `Installed @n-dx/lang-java@${VERSION} into ${packDir} (produces imports, symbols).`,
+      "@n-dx/lang-go is already installed (module resolution).",
+      "@n-dx/lang-sql is already installed (pack directory).",
+    ]);
+  });
+
+  it("add with no language says so when the list is empty, and runs nothing", async () => {
+    await cmdPack(["add"], deps({ listed: [] }));
+    expect(lines).toEqual(["The project lists no packs: set `sourcevision.packs` in the project config, or run `sv pack add <lang>`."]);
+    expect(npmCalls).toEqual([]);
+  });
+
+  it("add with no language reads the list from the project config and refuses an unknown id before installing", async () => {
+    const project = mkdtempSync(join(tmpdir(), "sv-pack-project-"));
+    try {
+      writeFileSync(join(project, ".n-dx.json"), JSON.stringify({ sourcevision: { packs: ["java", "cobol"] } }));
+      await expect(cmdPack(["add"], { ...deps(), listed: undefined, cwd: project })).rejects.toMatchObject({
+        message: "sourcevision.packs lists unknown pack: cobol",
+        suggestion: "Known packs: java, go, sql, terraform.",
+      });
+      expect(npmCalls).toEqual([]);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it("list marks the listed packs, in text and JSON", async () => {
+    await cmdPack(["list"], deps({ listed: ["go"] }));
+    expect(lines.filter((l) => l.endsWith("[listed]")).map((l) => l.split(" ")[0])).toEqual(["go"]);
+    lines = [];
+    await cmdPack(["list", "--json"], deps({ listed: ["go"] }));
+    const out = JSON.parse(lines.join("\n")) as { packs: Array<{ id: string; listed: boolean }> };
+    expect(out.packs.map((p) => [p.id, p.listed])).toEqual([["java", false], ["go", true], ["sql", false], ["terraform", false]]);
   });
 });
 
