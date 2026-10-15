@@ -7,12 +7,15 @@
 
 import { describe, expect, it } from "vitest";
 
-import { type BuildDependency, type ModuleBuildModel, parseGoMod } from "@n-dx/lang-kit";
+import { type BuildDependency, type ModuleBuildModel, type ResourceFact, parseGoMod } from "@n-dx/lang-kit";
 import {
   DRIVER_TABLE,
   IMAGE_TABLE,
+  TERRAFORM_ENGINE_TABLE,
+  TERRAFORM_RESOURCE_TABLE,
   detectDatabaseEngines,
   parseImageRef,
+  terraformEngineOf,
   versionFromTag,
   type DatabaseCandidate,
 } from "../../../src/language/database-engines.js";
@@ -328,5 +331,125 @@ describe("image references", () => {
     [undefined, undefined],
   ])("reads the version of tag %s", (tag, version) => {
     expect(versionFromTag(tag)).toBe(version);
+  });
+});
+
+describe("Terraform resources", () => {
+  const resource = (type: string, name: string, line: number, attributes?: ResourceFact["attributes"]): ResourceFact => ({
+    type,
+    name,
+    position: { line, column: 0 },
+    ...(attributes && { attributes }),
+  });
+  const tf = (path: string, ...resources: ResourceFact[]) => ({ path, resources });
+  const detectTf = (...facts: ReturnType<typeof tf>[]) =>
+    detectDatabaseEngines({ buildModels: [], files: [], read: () => undefined, terraformFacts: facts });
+  const only = (facts: ReturnType<typeof tf>[]) => {
+    const [candidate, ...rest] = detectTf(...facts).candidates;
+    expect(rest).toEqual([]);
+    return candidate;
+  };
+
+  it("reads an RDS instance's engine and version as written", () => {
+    const c = only([tf("db/main.tf", resource("aws_db_instance", "main", 4, { engine: "postgres", engineVersion: "15.4" }))]);
+    expect(c).toMatchObject({ engine: "postgresql", grade: "medium", signals: ["terraform"], versions: ["15.4"] });
+    expect(c.evidence).toEqual([
+      {
+        signal: "terraform",
+        grade: "strong",
+        file: "db/main.tf",
+        line: 4,
+        ruleId: "terraform:aws_db_instance",
+        text: "aws_db_instance.main engine=postgres",
+        version: "15.4",
+      },
+    ]);
+  });
+
+  it.each([
+    ["aurora-postgresql", "postgresql"],
+    ["aurora-mysql", "mysql"],
+    ["aurora", "mysql"],
+    ["sqlserver-ex", "mssql"],
+    ["oracle-ee", "oracle"],
+    ["mariadb", "mariadb"],
+  ])("maps the Aurora and RDS engine %s to %s", (written, engine) => {
+    const c = only([tf("rds.tf", resource("aws_rds_cluster", "db", 1, { engine: written }))]);
+    expect(c.engine).toBe(engine);
+    expect(c.evidence[0].grade).toBe("strong");
+  });
+
+  it("reads the engine from a Cloud SQL database_version", () => {
+    const c = only([tf("sql.tf", resource("google_sql_database_instance", "main", 7, { engineVersion: "POSTGRES_15" }))]);
+    expect(c).toMatchObject({ engine: "postgresql", grade: "medium", versions: ["POSTGRES_15"] });
+    expect(c.evidence[0]).toMatchObject({ grade: "strong", line: 7, text: "google_sql_database_instance.main engine=POSTGRES_15" });
+  });
+
+  it("reads an Azure server's engine from its type, and a mapped attribute over it", () => {
+    const typed = only([tf("az.tf", resource("azurerm_mysql_flexible_server", "db", 2))]);
+    expect(typed).toMatchObject({ engine: "mysql", grade: "low", signals: ["terraform"] });
+    expect(typed.evidence[0]).toMatchObject({ grade: "weak", text: "azurerm_mysql_flexible_server.db" });
+    expect(typed.evidence[0]).not.toHaveProperty("version");
+    expect(only([tf("az.tf", resource("azurerm_postgresql_server", "db", 2, { engine: "postgres" }))]).grade).toBe("medium");
+  });
+
+  it("keeps the type's engine, as low grade, when an Azure server's engine expression is unmapped", () => {
+    const c = only([tf("az.tf", resource("azurerm_mssql_server", "db", 3, { engine: "var.engine", engineVersion: "var.v" }))]);
+    expect(c).toMatchObject({ engine: "mssql", grade: "low", versions: ["var.v"] });
+  });
+
+  it("yields nothing for a type that names no engine and a declaration that writes none", () => {
+    const bare = resource("aws_db_instance", "main", 1);
+    const expression = resource("aws_db_instance", "x", 5, { engine: "var.engine" });
+    const report = detectTf(tf("rds.tf", bare, expression));
+    expect(report.candidates).toEqual([]);
+    expect(report.notices).toEqual([
+      "rds.tf:1 aws_db_instance.main has no engine attribute; no candidate",
+      "rds.tf:5 aws_db_instance.x has engine var.engine; no candidate",
+    ]);
+    expect(detectTf(tf("c.tf", resource("aws_elasticache_cluster", "c", 1, { engine: "memcached" }))).candidates).toEqual([]);
+  });
+
+  it("ignores resources that are not databases and input without Terraform facts", () => {
+    expect(detectTf(tf("a.tf", resource("aws_s3_bucket", "b", 1, { engine: "postgres" }))).candidates).toEqual([]);
+    expect(detect({}).candidates).toEqual([]);
+  });
+
+  it("grades Terraform under a test path as weak", () => {
+    const c = only([tf("tests/rds.tf", resource("aws_db_instance", "t", 1, { engine: "mysql", engineVersion: "8.0" }))]);
+    expect(c).toMatchObject({ engine: "mysql", grade: "low" });
+  });
+
+  it("combines with another signal into a high-grade candidate and sorts text versions by name", () => {
+    const files: Files = { "docker-compose.yml": "services:\n  db:\n    image: postgres:16\n" };
+    const report = detectDatabaseEngines({
+      buildModels: [],
+      files: Object.keys(files),
+      read: (path) => files[path],
+      terraformFacts: [
+        tf("a.tf", resource("aws_db_instance", "a", 1, { engine: "postgres", engineVersion: "15.4" })),
+        tf("b.tf", resource("google_sql_database_instance", "b", 1, { engineVersion: "POSTGRES_14" })),
+      ],
+    });
+    expect(report.candidates).toHaveLength(1);
+    expect(report.candidates[0]).toMatchObject({ engine: "postgresql", grade: "high", signals: ["image", "terraform"] });
+    expect(report.candidates[0].versions).toEqual(["15.4", "16", "POSTGRES_14"]);
+  });
+});
+
+describe("Terraform tables", () => {
+  it("gives every resource type and engine string a provider page", () => {
+    for (const entry of TERRAFORM_RESOURCE_TABLE) expect(entry.provenance.url).toMatch(/^https:\/\/registry\.terraform\.io\//);
+    for (const entry of TERRAFORM_ENGINE_TABLE) {
+      expect(entry.provenance.length).toBeGreaterThan(0);
+      for (const page of entry.provenance) expect(page.url).toMatch(/^https:\/\/registry\.terraform\.io\//);
+    }
+  });
+
+  it("matches an engine by name, then by name and a separator, never by a bare prefix", () => {
+    expect(terraformEngineOf("POSTGRES_15")?.engine).toBe("postgresql");
+    expect(terraformEngineOf("aurora-postgresql")?.engine).toBe("postgresql");
+    expect(terraformEngineOf("postgresx")).toBeUndefined();
+    expect(terraformEngineOf("var.engine")).toBeUndefined();
   });
 });

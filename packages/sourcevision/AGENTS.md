@@ -55,6 +55,18 @@ model finds stay out. `analyzers/infrastructure.ts` and `IAC_KINDS` are not
 involved, so the iso-map bundle does not change. Without the pack the file is
 byte-identical. The field names await Sterling H's review (decision 3).
 
+### Terraform as a database-engine source
+
+`language/database-engines.ts` takes the Terraform pack's resource facts as
+`DatabaseEngineInput.terraformFacts`, supplied by the caller (today only
+`scripts/database-corpus-report.mjs`); it imports no pack, is not wired into
+`analyze` and writes nothing. A database resource yields a `terraform`-signal
+candidate: a mapped `engine` (Cloud SQL: `database_version`) is strong, an
+engine implied by the type alone (Azure servers) is weak, and a resource that
+gives neither (a reusable module's `var.engine`) adds a notice. Engine strings
+and resource types live in `TERRAFORM_ENGINE_TABLE` and
+`TERRAFORM_RESOURCE_TABLE`, each entry with its provider page.
+
 ### How packs are installed
 
 `sv pack` (`src/cli/commands/pack.ts`, reached as `ndx sv pack …`) manages

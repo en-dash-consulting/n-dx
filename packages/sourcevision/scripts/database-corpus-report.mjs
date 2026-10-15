@@ -2,19 +2,23 @@
 /**
  * Run database-engine detection over the corpus checkouts: spring-petclinic
  * and thingsboard (java-corpus.json), gitea and microservices-demo
- * (go-corpus.json).
+ * (go-corpus.json), terraform-aws-rds and cloud-foundation-fabric
+ * (tf-corpus.json).
  *
  *   node packages/sourcevision/scripts/database-corpus-report.mjs [--json]
  *
- * Reads ~/.cache/ndx-java-corpus/ and ~/.cache/ndx-go-corpus/ (override with
- * NDX_JAVA_CORPUS_DIR and NDX_GO_CORPUS_DIR). Dependencies come from the same
+ * Reads ~/.cache/ndx-java-corpus/, ~/.cache/ndx-go-corpus/ and
+ * ~/.cache/ndx-iac-corpus/ (override with NDX_JAVA_CORPUS_DIR,
+ * NDX_GO_CORPUS_DIR and NDX_IAC_CORPUS_DIR). Dependencies come from the same
  * build-model readers the packs use (Maven, Gradle, go.mod), plus
- * `package.json`. Per repository prints each engine candidate, its grade, the
+ * `package.json`; Terraform resources come from the workspace
+ * `@n-dx/lang-terraform` pack. Per repository prints each engine candidate, its grade, the
  * signals that found it, image versions and up to five evidence lines. Never
  * touches the network and writes nothing; not part of the test run. It has no
  * pass/fail gate: the candidates are the result, for the rex log.
  *
- * Needs `pnpm --filter @n-dx/sourcevision build`. Exits 2 when a checkout or
+ * Needs `pnpm --filter @n-dx/sourcevision build`, and the lang-terraform build
+ * and grammar (`build`, `build:grammars`) for Terraform candidates. Exits 2 when a checkout or
  * the build is missing.
  */
 
@@ -23,6 +27,8 @@ import { join, relative } from "node:path";
 
 import * as goCorpus from "./go-corpus.mjs";
 import * as javaCorpus from "./java-corpus.mjs";
+import * as tfCorpus from "./tf-corpus.mjs";
+import { importWorkspacePack } from "./workspace-pack.mjs";
 
 const REPOSITORIES = [
   [javaCorpus, "spring-petclinic"],
@@ -30,6 +36,8 @@ const REPOSITORIES = [
   [goCorpus, "gitea"],
   [goCorpus, "microservices-demo"],
 ];
+/** Terraform repositories from tf-corpus.json; microservices-demo is already listed above. */
+const TERRAFORM_REPOSITORIES = ["terraform-aws-rds", "cloud-foundation-fabric"];
 const SKIP_DIRS = new Set([".git", "node_modules", "target", "build", "vendor", "dist"]);
 /** Config and manifest files larger than this are not read; none of the corpus's are. */
 const MAX_FILE_BYTES = 1024 * 1024;
@@ -46,13 +54,20 @@ function* walk(dir) {
 }
 
 const json = process.argv.includes("--json");
-const repos = REPOSITORIES.map(([corpus, name]) => ({
-  name,
-  dir: join(corpus.corpusDir(), name),
-  pinnedSha: corpus.loadCorpus().find((r) => r.name === name).sha,
-  clone: corpus.CLONE_COMMAND,
-  checkedOutSha: corpus.checkedOutSha,
-}));
+const tfRepo = (name) => {
+  const repo = tfCorpus.loadCorpus().find((r) => r.name === name);
+  return { name, dir: tfCorpus.repoDir(repo), pinnedSha: repo.sha, clone: tfCorpus.cloneCommand(repo), checkedOutSha: tfCorpus.checkedOutSha };
+};
+const repos = [
+  ...REPOSITORIES.map(([corpus, name]) => ({
+    name,
+    dir: join(corpus.corpusDir(), name),
+    pinnedSha: corpus.loadCorpus().find((r) => r.name === name).sha,
+    clone: corpus.CLONE_COMMAND,
+    checkedOutSha: corpus.checkedOutSha,
+  })),
+  ...TERRAFORM_REPOSITORIES.map(tfRepo),
+];
 
 const missing = repos.filter((repo) => repo.checkedOutSha(repo.dir) === undefined);
 if (missing.length > 0) {
@@ -72,6 +87,7 @@ if (!existsSync(langKitDist)) {
 }
 const { detectDatabaseEngines } = await import(dist("database-engines").href);
 const { discoverJavaModules, readMavenBuildModels, readGradleBuildModels, readGoBuildModels } = await import(langKitDist.href);
+const { pack: terraformPack } = await importWorkspacePack("@n-dx/lang-terraform");
 
 async function buildModels(dir) {
   const layout = await discoverJavaModules(dir);
@@ -90,10 +106,27 @@ function readSmall(dir, file) {
   return readFileSync(path, "utf8");
 }
 
+/** The Terraform pack's resource facts for the repository's `.tf` files; none when the pack is not built. */
+async function terraformFacts(dir, files) {
+  const tfFiles = files.filter((file) => file.endsWith(".tf"));
+  if (tfFiles.length === 0) return [];
+  const analysis = await terraformPack.analyzeProject({ projectDir: dir, files: tfFiles, kinds: ["resources"] });
+  if (analysis.degraded) {
+    console.error(`terraform pack degraded in ${dir}: ${analysis.degraded.reason}`);
+    return [];
+  }
+  return analysis.facts;
+}
+
 const results = [];
 for (const repo of repos) {
   const files = [...walk(repo.dir)].map((file) => relative(repo.dir, file).split("\\").join("/"));
-  const report = detectDatabaseEngines({ buildModels: await buildModels(repo.dir), files, read: (file) => readSmall(repo.dir, file) });
+  const report = detectDatabaseEngines({
+    buildModels: await buildModels(repo.dir),
+    files,
+    read: (file) => readSmall(repo.dir, file),
+    terraformFacts: await terraformFacts(repo.dir, files),
+  });
   results.push({ name: repo.name, sha: repo.checkedOutSha(repo.dir), pinnedSha: repo.pinnedSha, ...report });
 }
 
