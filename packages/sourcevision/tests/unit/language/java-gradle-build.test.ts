@@ -210,7 +210,7 @@ describe("parseToml", () => {
     expect(Object.getOwnPropertyDescriptor(doc.a, "__proto__")?.value).toEqual({ x: "1" });
   });
 
-  it.each(["[a\nx=1", "x = ", "x = 'open", "x = 1 2", "[[a]]", 'x = """m"""', "x = 1\nx = 2", "x = bare"])("rejects %s", (src) => {
+  it.each(["[a\nx=1", "x = ", "x = 'open", "x = 1 2", "a = 1\n[[a]]", 'x = """open',"x = 1\nx = 2", "x = bare"])("rejects %s", (src) => {
     expect(() => parseToml(src)).toThrow(TomlSyntaxError);
   });
 });

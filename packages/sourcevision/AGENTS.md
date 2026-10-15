@@ -50,7 +50,9 @@ Python files get no edges or externals whether or not it is installed, and
 `analyzers/inventory.ts` leaves Python out of `analysedLanguages`; every
 artifact is the same as before Python was a pack. Its dynamic-import notice
 goes to the same `warn`. `scripts/python-corpus-report.mjs` measures the pack
-over the pinned corpus (`python-corpus.json`).
+over the pinned corpus (`python-corpus.json`), and
+`scripts/python-build-report.mjs` runs lang-kit's Python build readers over
+it (projects, roots, dependency counts, notices).
 
 ### The Terraform model in infrastructure.json
 
