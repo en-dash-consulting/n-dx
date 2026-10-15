@@ -359,10 +359,11 @@ describe("AskView", () => {
     expect(errorKind()).toBe("no_analysis");
     // The affordance, not just the command name: the same control the Overview
     // uses, so the user can start the run without leaving the panel.
-    const analyze = root.querySelector(".sv-ask-error-analyze .overview-reanalyze");
+    const analyze = root.querySelector(".sv-ask-error-analyze .analyze-control");
     expect(analyze).not.toBeNull();
     expect(analyze?.textContent).toContain("Re-analyze");
-    expect(analyze?.textContent).toContain("Full analysis");
+    // Full analysis is one click away, in the control's menu.
+    expect(analyze?.querySelector(".analyze-caret")?.getAttribute("aria-haspopup")).toBe("menu");
     // Retrying the question would hit the same absent data.
     expect(retryButton()).toBeNull();
   });

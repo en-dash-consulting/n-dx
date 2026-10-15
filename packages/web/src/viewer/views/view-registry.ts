@@ -22,6 +22,7 @@ import type { JobTray } from "../hooks/index.js";
 
 import {
   Overview,
+  AnalysisStatus,
   CodebaseStats,
   HealthDetail,
   MapPanel,
@@ -63,7 +64,7 @@ import { WorkspacesView } from "./domain-workspaces.js";
 import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
-import { PrepareTaskModal } from "../components/index.js";
+import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
 import { analyzeTileSummary } from "./tile-summaries.js";
 import type { TileGridApi } from "./stage-tiles.js";
@@ -141,6 +142,8 @@ function stage(id: StageId): ViewRenderer {
     renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
     renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data) : undefined,
     detailOpen: ctx.detailOpen ?? false,
+    headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
+    headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
   });
 }
 

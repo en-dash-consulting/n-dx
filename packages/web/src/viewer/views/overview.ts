@@ -369,7 +369,6 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
     return zones.zones.filter(z => z.cohesion < 0.4 || z.coupling > 0.5).length;
   }, [zones]);
 
-  const analyzedAgo = manifest ? formatSince(manifest.analyzedAt) : null;
   const narration = manifest ? narrationNotice(manifest.narration) : null;
 
   return h("div", { class: "overview-container overview--map-first" },
@@ -401,27 +400,10 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
         )
       : null,
 
-    // One line: which analysis this is, and the controls to refresh it.
-    h("div", { class: "overview-topbar" },
-      manifest
-        ? h("p", { class: "overview-meta" },
-            manifest.gitBranch ? h("span", { class: "overview-meta-branch" }, manifest.gitBranch) : null,
-            manifest.gitSha ? h("code", { class: "overview-meta-sha" }, manifest.gitSha.slice(0, 7)) : null,
-            h("span", { title: new Date(manifest.analyzedAt).toLocaleString() },
-              `analyzed ${analyzedAgo ?? new Date(manifest.analyzedAt).toLocaleString()}`,
-            ),
-            zones?.enrichmentPass
-              ? h("span", { class: "enrichment-badge" },
-                  `Pass ${zones.enrichmentPass}${zones.metaEvaluationCount ? ` + ${zones.metaEvaluationCount} meta` : ""}`,
-                )
-              : null,
-            zones?.lastReset
-              ? h("span", { class: "enrichment-badge reset-badge" },
-                  `Reset from Pass ${zones.lastReset.from} → ${zones.lastReset.to}`,
-                )
-              : null,
-          )
-        : h("span", null),
+    // Which analysis this is, and the control to refresh it. On the Analysis
+    // dashboard both sit in the page head instead (the `lead` variant).
+    lead ? null : h("div", { class: "overview-topbar" },
+      h(AnalysisStatus, { data }),
       h(AnalyzeControls, { jobs }),
     ),
     narration
@@ -850,6 +832,46 @@ export function HealthDetail({ data, openTile, setDetail }: HealthDetailProps): 
               c.cycle.flatMap((path, j) => [j > 0 ? h("span", { class: "health-arrow", "aria-hidden": "true" }, " → ") : null, fileButton(path)]),
             ))),
       cycles.length > 50 ? h("p", { class: "health-meta" }, `+${cycles.length - 50} more`) : null,
+    ),
+  );
+}
+
+// ── Analysis status line ─────────────────────────────────────
+
+/** Enrichment passes the full analysis runs; the meter fills toward this. */
+const ENRICHMENT_PASSES = 4;
+
+/**
+ * Which analysis the page shows, in one quiet line: branch, commit, age, and
+ * how far enrichment has got as a four-segment meter. A pass reset (zones
+ * changed, so enrichment started over) is told in the meter's tooltip.
+ */
+export function AnalysisStatus({ data }: { data: LoadedData }): ComponentChild {
+  const { manifest, zones } = data;
+  if (!manifest) return h("span", null);
+  const pass = zones?.enrichmentPass ?? 0;
+  const filled = Math.min(pass, ENRICHMENT_PASSES);
+  const meta = zones?.metaEvaluationCount ?? 0;
+  const reset = zones?.lastReset;
+  const meterTitle = [
+    `Enrichment pass ${pass} of ${ENRICHMENT_PASSES}`,
+    meta ? `${meta} meta-evaluation${meta === 1 ? "" : "s"}` : "",
+    reset ? `Reset from pass ${reset.from} to ${reset.to} when the zones changed` : "",
+  ].filter(Boolean).join(" · ");
+  const ago = formatSince(manifest.analyzedAt);
+  return h("p", { class: "analysis-status" },
+    manifest.gitBranch
+      ? h("span", { class: "analysis-status-branch" }, h(ActionIcon, { name: "branch", class: "action-icon-sm" }), manifest.gitBranch)
+      : null,
+    manifest.gitSha ? h("code", { class: "analysis-status-sha" }, manifest.gitSha.slice(0, 7)) : null,
+    h("span", { title: new Date(manifest.analyzedAt).toLocaleString() }, `analyzed ${ago ?? new Date(manifest.analyzedAt).toLocaleString()}`),
+    h("span", { class: "analysis-status-pass", title: meterTitle },
+      h("span", { class: "analysis-meter", "aria-hidden": "true" },
+        Array.from({ length: ENRICHMENT_PASSES }, (_, i) =>
+          h("span", { key: i, class: `analysis-meter-seg${i < filled ? " analysis-meter-seg--on" : ""}` })),
+      ),
+      `Pass ${pass} of ${ENRICHMENT_PASSES}${meta ? ` + ${meta} meta` : ""}`,
+      reset ? h("span", { class: "analysis-status-reset", "aria-hidden": "true" }, " ↺") : null,
     ),
   );
 }

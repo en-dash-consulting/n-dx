@@ -160,12 +160,16 @@ export interface StagePageProps {
   renderSummary?: RenderSummary;
   /** The detail panel is open beside the page; a full-screen tile leaves room for it. */
   detailOpen?: boolean;
+  /** A line under the stage's title (Analysis: which analysis this is). */
+  headStatus?: ComponentChild;
+  /** Controls at the right of the stage's head (Analysis: the analyze control). */
+  headActions?: ComponentChild;
 }
 
 const NO_PANEL: RenderPanel = () => null;
 const NO_SUMMARY: RenderSummary = () => null;
 
-export function StagePage({ stage, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false }: StagePageProps) {
+export function StagePage({ stage, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false, headStatus = null, headActions = null }: StagePageProps) {
   const def = STAGES[stage];
   const product = stageProduct(stage);
   const gates: Record<string, boolean> = {
@@ -191,10 +195,14 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
   return h("div", { class: `stage-page stage-page-${product}`, "data-stage": stage },
     h("div", { class: "stage-page-head" },
       h(ProductLogoPng, { product, size: 36, class: "stage-page-logo" }),
-      h("div", null,
-        h("h1", { class: "stage-page-title" }, viewLabel(stage)),
-        h("p", { class: "stage-page-blurb" }, viewBlurb(stage)),
+      h("div", { class: "stage-page-heading" },
+        h("div", { class: "stage-page-titles" },
+          h("h1", { class: "stage-page-title" }, viewLabel(stage)),
+          h("p", { class: "stage-page-blurb" }, viewBlurb(stage)),
+        ),
+        headStatus,
       ),
+      headActions ? h("div", { class: "stage-page-actions" }, headActions) : null,
     ),
     // Starting a run is the Work stage's job; the list sits above its sections.
     stage === "work" && !deployed

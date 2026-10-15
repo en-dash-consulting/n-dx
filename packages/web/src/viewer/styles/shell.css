@@ -514,8 +514,12 @@
 .page-title-glyph { color: var(--text-dim); }
 .page-title-text { font-size: 18px; font-weight: 600; margin: 0; }
 .page-title-blurb { font-size: 13px; color: var(--text-dim); margin: 0; }
-.stage-page-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
-.stage-page-head > div { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-3); min-width: 0; }
+/* Logo, then the title block (titles, and an optional status line under
+   them), then the stage's actions at the right. */
+.stage-page-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-5); }
+.stage-page-heading { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.stage-page-titles { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-3); min-width: 0; }
+.stage-page-actions { flex-shrink: 0; align-self: center; }
 .stage-page-logo { border-radius: var(--radius-md); width: 28px; height: 28px; flex-shrink: 0; }
 .stage-page-title { font-size: 18px; font-weight: 600; margin: 0; }
 .stage-page-blurb { margin: 0; color: var(--text-muted); font-size: 13px; }
