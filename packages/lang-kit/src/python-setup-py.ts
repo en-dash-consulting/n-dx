@@ -169,12 +169,14 @@ class ArgReader {
     private k: number,
   ) {}
 
-  call(line: number): SetupCall {
+  call(line: number): SetupCall | { notice: string } {
     const keywords = new Map<string, SetupArgument>();
     let spreads = false;
     for (;;) {
       const t = this.tokens[this.k];
       if (t === undefined || this.isOp(")")) break;
+      // A closer that matches nothing (`]` or `}` at the top level) stops every reader here: report it rather than loop.
+      if (this.isOp("]") || this.isOp("}")) return { notice: `line ${t.line}: unbalanced '${(t as { text: string }).text}' in setup(...)` };
       if (this.isOp("**") || this.isOp("*")) {
         spreads ||= this.isOp("**");
         this.k++;
