@@ -166,3 +166,4 @@ export { InfoTip } from "./info-tip.js";
 export type { InfoTipProps } from "./info-tip.js";
 export { RepoTrustStrip, buildTrustNotice } from "./repo-trust-strip.js";
 export type { RepoTrustStripProps, RepoTrustView, RepoTrustNotice, RepoTrustFindingView } from "./repo-trust-strip.js";
+export { RunCommandControl } from "./run-command-control.js";
