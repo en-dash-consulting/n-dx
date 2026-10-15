@@ -11,6 +11,7 @@ prevent future contributors from replacing injection with direct imports.
 | Injection site | Target module | Injected callbacks | Interface type |
 |-----------------|---------------|---------------------|-----------------|
 | `cli.js` | `pair-programming.js` | `registerChild` | `RegisterChild` (JSDoc `@callback`) |
+| `cli.js` | `migrate-chain.js` | `run`, `tools`, `migrateLayout` | `MigrateChainDeps` (JSDoc `@typedef`) |
 
 Rules:
 - **Prefer injection over import** when the target module would otherwise need to import

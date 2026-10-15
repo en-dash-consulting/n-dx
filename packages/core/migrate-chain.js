@@ -13,7 +13,7 @@
  * |-----------------|-------------------------|---------------------|----------------------------------------|
  * | `layout`        | legacy (`.rex/`, …)     | `.ndx/`             | `ndx migrate-layout`                   |
  * | `prd-tree`      | `prd.md` / `prd.json`   | `rex/v1` folder tree| `rex migrate-to-folder-tree`           |
- * | `schema-v2`     | `rex/v1` (`prd_tree/`)  | `rex/v2` (`product/`)| `rex migrate --plan`, then `--apply`  |
+ * | `schema-v2`     | `rex/v1` (`prd_tree/`)  | `rex/v2` (`product/`)| `rex migrate-plan`, then `migrate-apply` |
  *
  * `--dry-run` rehearses each link that can rehearse (layout prints its moves,
  * schema writes the plan file and rehearses the apply) and stops before the
@@ -46,9 +46,17 @@ const FLAT_PRD_FILE = /^(prd\.md|prd\.json|prd_.+_\d{4}-\d{2}-\d{2}\.md)$/;
  */
 const LEGACY_NOTICE_ENV = "NDX_LEGACY_NOTICE";
 
+/**
+ * Where `ndx migrate --plan` writes, `ndx migrate --apply` reads, and the
+ * chain plans to, when the operator names no `--out`. Relative, so rex
+ * resolves it against the caller's cwd as it does every `--out`.
+ */
+export const DEFAULT_MIGRATION_PLAN_OUT = "./migration-plan.json";
+
 /** Flags each link forwards, by prefix; a value flag arrives in its `--flag=value` form. */
 const LAYOUT_FLAGS = ["--dry-run", "--no-commit"];
-const PLAN_FLAGS = ["--rules-only", "--model=", "--cut-at=", "--out="];
+/** `rex migrate-plan`'s flags the chain forwards (`--summary` and `--migration` stay with `ndx migrate --plan`). */
+const PLAN_FLAGS = ["--rules-only", "--no-jev-review", "--model=", "--cut-at=", "--out="];
 
 /**
  * Spawn helpers, injected by cli.js so this module imports no package.
@@ -134,14 +142,12 @@ export const MIGRATION_LINKS = [
     rehearses: true,
     run: async (root, flags, deps) => {
       const planFlags = pick(flags, PLAN_FLAGS);
-      const planned = await deps.run(deps.tools.rex, ["migrate", "--plan", ...planFlags, root]);
+      const out = planFlags.find((flag) => flag.startsWith("--out="))?.slice("--out=".length);
+      const planPath = out ?? DEFAULT_MIGRATION_PLAN_OUT;
+      if (out === undefined) planFlags.push(`--out=${planPath}`);
+      const planned = await deps.run(deps.tools.rex, ["migrate-plan", ...planFlags, root]);
       if (planned !== 0) return planned;
-      const out = planFlags.find((flag) => flag.startsWith("--out="));
-      const applyFlags = [
-        ...(out ? [`--plan=${out.slice("--out=".length)}`] : []),
-        ...pick(flags, ["--dry-run"]),
-      ];
-      return deps.run(deps.tools.rex, ["migrate", "--apply", ...applyFlags, root]);
+      return deps.run(deps.tools.rex, ["migrate-apply", `--plan=${planPath}`, ...pick(flags, ["--dry-run"]), root]);
     },
   },
 ];
@@ -150,7 +156,7 @@ export const MIGRATION_LINKS = [
  * Run every link the project at `dir` still needs.
  *
  * @param {string} dir
- * @param {string[]} flags  `--dry-run`, `--no-commit`, and the plan flags (`--rules-only`, `--model=`, `--cut-at=`, `--out=`).
+ * @param {string[]} flags  `--dry-run`, `--no-commit`, and the plan flags (`--rules-only`, `--no-jev-review`, `--model=`, `--cut-at=`, `--out=`).
  * @param {MigrateChainDeps} deps
  * @param {readonly MigrationLink[]} [links]
  * @returns {Promise<number>} Exit code: the first failing link's, else 0.

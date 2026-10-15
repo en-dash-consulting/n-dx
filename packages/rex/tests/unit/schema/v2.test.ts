@@ -475,7 +475,8 @@ describe("isolation", () => {
     // get_next_task and `rex next`, in get_next_task's v1 shape
     // (core/change-next-task.ts), and v2 completion and apply-on-complete
     // behind update_task_status and `rex update --status`
-    // (cli/v2-completion.ts).
+    // (cli/v2-completion.ts), and the v1 deprecation notice, which reads the
+    // product folder name (cli/legacy-layout-notice.ts).
     // `public.ts` re-exports the reader, the node and tree types, the index
     // and the derived product computations: consumers of the product layer
     // (the dashboard's Product and Changes views, the Graview projection) read
@@ -547,6 +548,7 @@ describe("isolation", () => {
         "core/backup-snapshots.ts",
         "core/change-next-task.ts",
         "cli/v2-completion.ts",
+        "cli/legacy-layout-notice.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

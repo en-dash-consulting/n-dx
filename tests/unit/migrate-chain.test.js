@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { MIGRATION_LINKS, runMigrateChain } from "../../packages/core/migrate-chain.js";
+import { DEFAULT_MIGRATION_PLAN_OUT, MIGRATION_LINKS, runMigrateChain } from "../../packages/core/migrate-chain.js";
 
 const REX = "/rex.js";
 
@@ -22,7 +22,7 @@ function stubs(codes = {}) {
       tools: { rex: REX },
       run: async (script, args) => {
         calls.push([script === REX ? "rex" : script, ...args]);
-        return codes[args.slice(0, 2).join(" ")] ?? 0;
+        return codes[args[0]] ?? 0;
       },
       migrateLayout: async (root, flags) => {
         calls.push(["layout", root, ...flags]);
@@ -63,8 +63,8 @@ describe("runMigrateChain", () => {
     expect(code).toBe(0);
     expect(calls).toEqual([
       ["layout", root, "--no-commit"],
-      ["rex", "migrate", "--plan", "--rules-only", "--model=m", "--out=p.json", root],
-      ["rex", "migrate", "--apply", "--plan=p.json", root],
+      ["rex", "migrate-plan", "--rules-only", "--model=m", "--out=p.json", root],
+      ["rex", "migrate-apply", "--plan=p.json", root],
     ]);
     // rex's v1 notice would tell the operator to run the command already running.
     expect(process.env.NDX_LEGACY_NOTICE).toBe("off");
@@ -81,9 +81,19 @@ describe("runMigrateChain", () => {
 
   it("does not apply when the plan fails, and returns its code", async () => {
     mkdirSync(join(root, ".ndx", "rex", "prd_tree"), { recursive: true });
-    const { calls, deps } = stubs({ "migrate --plan": 3 });
+    const { calls, deps } = stubs({ "migrate-plan": 3 });
     expect(await runMigrateChain(root, [], deps)).toBe(3);
-    expect(calls.map((c) => c.slice(0, 3).join(" "))).toEqual(["rex migrate --plan"]);
+    expect(calls.map((c) => c.slice(0, 2).join(" "))).toEqual(["rex migrate-plan"]);
+  });
+
+  it("forwards --no-jev-review and --cut-at to the plan, and plans to the ndx migrate --plan default", async () => {
+    mkdirSync(join(root, ".rex", "prd_tree"), { recursive: true });
+    const { calls, deps } = stubs();
+    await runMigrateChain(root, ["--no-jev-review", "--cut-at=2026-10-09T00:00:00.000Z"], deps);
+    expect(calls.slice(1)).toEqual([
+      ["rex", "migrate-plan", "--no-jev-review", "--cut-at=2026-10-09T00:00:00.000Z", `--out=${DEFAULT_MIGRATION_PLAN_OUT}`, root],
+      ["rex", "migrate-apply", `--plan=${DEFAULT_MIGRATION_PLAN_OUT}`, root],
+    ]);
   });
 
   it("refuses a flag no link takes, before running anything", async () => {
@@ -106,8 +116,8 @@ describe("runMigrateChain", () => {
     await runMigrateChain(root, ["--dry-run"], deps);
     expect(calls).toEqual([
       ["layout", root, "--dry-run"],
-      ["rex", "migrate", "--plan", root],
-      ["rex", "migrate", "--apply", "--dry-run", root],
+      ["rex", "migrate-plan", `--out=${DEFAULT_MIGRATION_PLAN_OUT}`, root],
+      ["rex", "migrate-apply", `--plan=${DEFAULT_MIGRATION_PLAN_OUT}`, "--dry-run", root],
     ]);
   });
 

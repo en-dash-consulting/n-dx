@@ -106,6 +106,7 @@ import { runExport } from "./export.js";
 import { ensureGitignoreEntry } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
 import { initDirLabels, padInitDirLabel } from "./init-summary.js";
+import { DEFAULT_MIGRATION_PLAN_OUT, isLegacyV1Project, runMigrateChain } from "./migrate-chain.js";
 import { runMigrateLayout } from "./migrate-layout.js";
 import {
   resolveInitLLMSelection,
@@ -517,6 +518,29 @@ function childEnv() {
   return Object.keys(experimentalEnvFragment).length > 0
     ? { ...process.env, ...experimentalEnvFragment }
     : process.env;
+}
+
+/**
+ * ndx commands that spawn rex more than once. Each prints rex's v1 deprecation
+ * notice once itself and silences rex for its children. A delegated rex
+ * command (`ndx rex …`, `ndx validate`) is one spawn, so rex prints its own.
+ */
+const LEGACY_NOTICE_COMMANDS = new Set(["ci", "status", "plan", "add", "recommend", "refresh", "work", "analyze"]);
+
+/** Mirrors rex's LEGACY_LAYOUT_NOTICE (`cli/legacy-layout-notice.ts`); core spawns rex and cannot import it. */
+const LEGACY_LAYOUT_NOTICE =
+  "Deprecated: this PRD uses the v1 layout (prd_tree/). Run 'ndx migrate' to move it to v2; the next release refuses v1 PRDs.";
+
+/**
+ * Print the v1 notice once for `command` on a v1 project at `dir` (`--quiet`
+ * drops it, as in rex), then set NDX_LEGACY_NOTICE=off so every rex child
+ * stays quiet.
+ */
+function noteLegacyLayoutOnce(command, dir) {
+  if (!LEGACY_NOTICE_COMMANDS.has(command) || process.env.NDX_LEGACY_NOTICE === "off") return;
+  if (!isLegacyV1Project(dir)) return;
+  if (!updateCheckQuiet) console.error(LEGACY_LAYOUT_NOTICE);
+  process.env.NDX_LEGACY_NOTICE = "off";
 }
 
 /** BETA experimental flags to forward to children. Empty unless opted in. */
@@ -1807,9 +1831,6 @@ async function handleMigrateLayout(rest) {
   exitWithCleanup(code);
 }
 
-/** Where `ndx migrate --plan` writes, and `ndx migrate --apply` reads, when the operator names no path. */
-const DEFAULT_MIGRATION_PLAN_OUT = "./migration-plan.json";
-
 /** Flags of `ndx migrate` that take a value; `--out p` is rewritten to `--out=p` so `p` is not read as the project dir. */
 const MIGRATE_VALUE_FLAGS = new Set(["--out", "--summary", "--cut-at", "--model", "--migration"]);
 
@@ -1826,9 +1847,9 @@ const MIGRATE_VALUE_FLAGS = new Set(["--out", "--summary", "--cut-at", "--model"
  * `--apply`, `--plan` names the plan file, so `--plan p` is rewritten to
  * `--plan=p`; a bare `--plan` without `--apply` still plans.
  *
- * A mode is required rather than implied: making the read-only half one you
- * ask for by name means the bare verb can never grow into the destructive one
- * by default.
+ * `ndx migrate [dir]` with neither runs the whole chain (`migrate-chain.js`):
+ * layout, then the flat-file conversion, then plan and apply, each only when
+ * the project still needs it.
  *
  * `--out` and `--plan` default here rather than in rex, to the same path: an
  * orchestrator command an operator types by hand should produce a file and
@@ -1849,12 +1870,12 @@ async function handleMigrate(rest) {
   }
   const dir = resolveDir(args);
   const flags = extractFlags(args);
-  if (!apply && !flags.includes("--plan")) {
-    console.error("Error: ndx migrate needs --plan or --apply.");
-    console.error("Hint: 'ndx migrate --plan .' writes a reviewable plan and changes nothing; 'ndx migrate --apply .' applies it.");
-    exitWithCleanup(1);
-  }
   requireInit(dir, ["rex"]);
+  if (!apply && !flags.includes("--plan")) {
+    const migrateLayout = (root, layoutFlags) => runMigrateLayout(root, layoutFlags, { runCapture, tools });
+    exitWithCleanup(await runMigrateChain(dir, flags, { run, tools, migrateLayout }));
+    return;
+  }
   if (apply) {
     const forwarded = flags.filter((f) => f !== "--apply" && f !== "--plan");
     if (!forwarded.some((f) => f.startsWith("--plan="))) forwarded.push(`--plan=${DEFAULT_MIGRATION_PLAN_OUT}`);
@@ -3544,6 +3565,8 @@ async function main() {
       // Non-fatal — stale check failure never blocks command execution.
     }
   }
+
+  if (command && !hasHelp) noteLegacyLayoutOnce(command, dir);
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   const runCommand = async () => {
