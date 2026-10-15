@@ -1,9 +1,8 @@
-import { readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import type { ParseWarning } from "../../store/index.js";
-import { prdLayout, loadPrdModel } from "../../store/prd-model-reader.js";
-import { computeHealthScore, formatHealthScore, checkV2TreeHealth, formatV2Findings, checkChangeLandings, formatLandingHealth } from "../../core/health.js";
+import { prdLayout } from "../../store/prd-model-reader.js";
+import { computeHealthScore, formatHealthScore, formatV2Findings, formatLandingHealth } from "../../core/health.js";
+import { computeV2Health, v2HealthFails } from "../v2-health.js";
 
 import { result } from "../output.js";
 
@@ -11,19 +10,6 @@ import { result } from "../output.js";
 function formatReaderWarnings(warnings: ParseWarning[]): string {
   if (warnings.length === 0) return "";
   return `Reader warnings:\n${warnings.map((w) => `  ${w.path}: ${w.message}`).join("\n")}\n\n`;
-}
-
-/** The project's package.json `version`, or undefined when there is no package.json or no version. */
-async function readPackageVersion(dir: string): Promise<string | undefined> {
-  let text: string;
-  try {
-    text = await readFile(join(resolve(dir), "package.json"), "utf-8");
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw err;
-  }
-  const version: unknown = (JSON.parse(text) as { version?: unknown }).version;
-  return typeof version === "string" ? version : undefined;
 }
 
 /**
@@ -45,18 +31,14 @@ export async function cmdHealth(
   // A v2 tree has no level-based items to score; the v2 tree rules run instead.
   // A v1 tree takes the path below, unchanged.
   if ((await prdLayout(rexDir)) === "v2") {
-    const model = await loadPrdModel(rexDir);
-    const findings = checkV2TreeHealth(model.tree, (await store.loadConfig()).structureHealth, new Date(), await readPackageVersion(dir));
-    const landings = await checkChangeLandings(model.tree, { repoDir: resolve(dir), cacheDir: resolveRexPaths(dir).cacheDir });
+    const report = await computeV2Health(dir, rexDir, store);
     result(
       flags.format === "json"
-        ? JSON.stringify({ treeRules: findings, warnings: model.warnings, landings }, null, 2)
-        : `${formatV2Findings(findings)}\n${formatReaderWarnings(model.warnings)}${formatLandingHealth(landings)}`,
+        ? JSON.stringify(report, null, 2)
+        : `${formatV2Findings(report.treeRules)}\n${formatReaderWarnings(report.warnings)}${formatLandingHealth(report.landings)}`,
     );
     // Gate like `rex validate`: a rule error or a skipped node fails; warnings alone do not.
-    if (findings.some((f) => f.severity === "error") || model.warnings.some((w) => w.skipped)) {
-      process.exitCode = 1;
-    }
+    if (v2HealthFails(report)) process.exitCode = 1;
     return;
   }
 

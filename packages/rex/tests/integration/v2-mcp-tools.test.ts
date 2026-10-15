@@ -16,6 +16,7 @@ import { applyReshape, type ReshapeProposal } from "../../src/core/reshape.js";
 import { ChangeLayerStore } from "../../src/store/change-layer-store.js";
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 import { indexTree } from "../../src/schema/v2-rules.js";
+import { computeV2Health } from "../../src/cli/v2-health.js";
 import { copyV2Fixture, editText } from "../helpers/v2-fixture.js";
 
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
@@ -308,6 +309,14 @@ describe("rex MCP tools on a v2 tree", () => {
     const res = await call("health");
     expect(res.isError, res.text).toBe(false);
     expect(json(res)).toHaveProperty("overall");
+  });
+
+  it("health adds the v2 tree rules, reader warnings and landings the CLI shows", async () => {
+    const res = json(await call("health"));
+    for (const field of ["overall", "dimensions"]) expect(res).toHaveProperty(field);
+    const cli = await computeV2Health(tmp, rexDir, ws.store);
+    expect(res.v2).toEqual(JSON.parse(JSON.stringify(cli)));
+    expect(Object.keys(res.v2).sort()).toEqual(["landings", "treeRules", "warnings"]);
   });
 
   it("reorganize detects and applies on the change layer", async () => {
