@@ -3539,13 +3539,24 @@ export async function analyzeZones(
 
   // ── Declared-rule checks (declared-rules.ts) ──
   // The rules the project states about itself, checked against its own
-  // crossings. Silent and free on a repository that declares none.
-  const ruleCheck = await checkDeclaredRules(
-    options?.projectProfile?.projectDir,
-    pinnedFinalZones,
-    crossings,
-    Math.max(1, enrichmentPass),
-  );
+  // crossings.
+  //
+  // Gated on `enrich`, because extracting the rules is an LLM call and
+  // `--fast` promises none ("`fast`: no LLM", schema/v1.ts). It was not
+  // "free on a repository that declares none" as the comment here used to
+  // claim: `findRuleDocs` also reads `.sourcevision/hints.md`, which analyze
+  // writes itself on init, so every project always had exactly one document
+  // to extract from. That cost two calls on every `--fast` run — measured at
+  // 17s of an 18.8s analyze on an 8-file fixture — and timed out CI, where no
+  // vendor answers.
+  const ruleCheck = options?.enrich === false
+    ? { findings: [], calls: 0, tokenUsage: undefined, asked: 0, rules: [] }
+    : await checkDeclaredRules(
+        options?.projectProfile?.projectDir,
+        pinnedFinalZones,
+        crossings,
+        Math.max(1, enrichmentPass),
+      );
   allFindings = [...allFindings, ...ruleCheck.findings];
   if (ruleCheck.calls > 0) {
     enrichTokenUsage ??= emptyAnalyzeTokenUsage();

@@ -70,6 +70,16 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
 
     const components = JSON.parse(readFileSync(join(svDir, "components.json"), "utf-8"));
     expect(validateComponents(components).ok).toBe(true);
+
+    // `--fast` means no LLM (schema/v1.ts: "`fast`: no LLM"), and nothing
+    // asserted it. The declared-rule check called out regardless, and because
+    // `findRuleDocs` also reads the `.sourcevision/hints.md` that analyze
+    // writes on init, every project always had a document to extract from —
+    // so a fast run on an 8-file fixture spent 17 of its 18.8 seconds in two
+    // LLM calls, and timed out in CI where no vendor answers.
+    const manifest = JSON.parse(readFileSync(join(svDir, "manifest.json"), "utf-8"));
+    expect(manifest.lastAnalysis.mode).toBe("fast");
+    expect(Object.keys(manifest.lastAnalysis.llm?.byTaskClass ?? {})).toEqual([]);
   });
 
   /**
