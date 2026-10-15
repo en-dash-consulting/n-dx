@@ -1131,9 +1131,60 @@ const DECLARATION_FILE = /\.d\.[cm]?ts$/;
 const TEST_FILE = /\.test\.(?:[cm]?[jt]s|[jt]sx)$/;
 
 /**
+ * The files git would commit under `dir` — tracked plus untracked-but-not-
+ * ignored — root-relative, or null when git cannot answer: no git, not a work
+ * tree, or `dir` itself ignored by an enclosing repository (where ls-files
+ * lists nothing and every rule would pass unread).
+ *
+ * This is what keeps gitignored build output (build/, .next/, coverage/…) out
+ * of the scan: a compiled copy of an allowed file has a different path, so a
+ * walk reported it as a violation. Agent worktrees (.claude/worktrees/<name>)
+ * are nested work trees, which ls-files lists as a directory entry only.
+ */
+function gitListedFiles(dir) {
+  const opts = { cwd: dir, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], timeout: 60_000 };
+  // Exit 1 is "not ignored" inside a work tree; 0 is ignored, 128 is no repo.
+  const ignored = spawnSync("git", ["check-ignore", "-q", "--", "."], opts);
+  if (ignored.error || ignored.status !== 1) return null;
+  const listed = spawnSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
+    ...opts,
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  if (listed.error || listed.status !== 0) return null;
+  // Unmerged index entries repeat a path once per stage.
+  return [...new Set(listed.stdout.split("\0").filter(Boolean))];
+}
+
+/** Every file under `dir`, root-relative, not descending into `skipDirs` or `excludedDirs`. */
+function walkFiles(dir, skipDirs, excludedDirs) {
+  const files = [];
+  (function walk(d) {
+    let entries;
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (skipDirs.has(entry.name)) continue;
+      const full = join(d, entry.name);
+      const rel = relative(dir, full).replace(/\\/g, "/");
+      if (entry.isDirectory()) {
+        if (!excludedDirs.has(rel)) walk(full);
+      } else {
+        files.push(rel);
+      }
+    }
+  })(dir);
+  return files;
+}
+
+/**
  * Scan production sources under `dir` against restricted-import rules.
- * Test files and `test/`/`tests/` directories are exempt, as are node_modules,
- * dist, .git, n-dx's state directories and every rule's `excludeDirs`.
+ * Inside a git work tree the candidates are the files git would commit;
+ * elsewhere, a walk of the directory. Either way test files and
+ * `test/`/`tests/` directories are exempt, as are node_modules, dist, .git,
+ * n-dx's state directories and every rule's `excludeDirs`.
  *
  * @returns {{ checked: number, violations: Array<{ file: string, rule: object }> }}
  */
@@ -1144,44 +1195,31 @@ function scanRestrictedImports(dir, rules) {
   const excludedDirs = new Set(rules.flatMap((r) => r.excludeDirs));
   const patterns = rules.map((r) => importPattern(r.module));
 
-  (function walkSrc(d) {
-    let entries;
-    try {
-      entries = readdirSync(d);
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (skipDirs.has(entry)) continue;
-      const full = join(d, entry);
-      let st;
-      try {
-        st = statSync(full);
-      } catch {
-        continue;
-      }
-      const rel = relative(dir, full).replace(/\\/g, "/");
-      if (st.isDirectory()) {
-        if (!excludedDirs.has(rel)) walkSrc(full);
-        continue;
-      }
-      if (!SOURCE_FILE.test(entry) || DECLARATION_FILE.test(entry)) continue;
-      if (TEST_FILE.test(rel) || /(?:^|\/)tests?\//.test(rel)) continue;
-      const applicable = rules.flatMap((rule, i) => (rule.allow.has(rel) ? [] : [[rule, patterns[i]]]));
-      if (applicable.length === 0) continue;
+  const listed = gitListedFiles(dir);
+  const candidates = listed
+    ? listed.filter(
+        (rel) =>
+          !rel.split("/").slice(0, -1).some((p) => skipDirs.has(p)) &&
+          ![...excludedDirs].some((ex) => rel.startsWith(`${ex}/`)),
+      )
+    : walkFiles(dir, skipDirs, excludedDirs);
 
-      checked++;
-      let content;
-      try {
-        content = readFileSync(full, "utf-8");
-      } catch {
-        continue;
-      }
-      for (const [rule, pattern] of applicable) {
-        if (pattern.test(content)) violations.push({ file: rel, rule });
-      }
+  for (const rel of candidates) {
+    const name = rel.slice(rel.lastIndexOf("/") + 1);
+    if (!SOURCE_FILE.test(name) || DECLARATION_FILE.test(name)) continue;
+    if (TEST_FILE.test(rel) || /(?:^|\/)tests?\//.test(rel)) continue;
+    const applicable = rules.flatMap((rule, i) => (rule.allow.has(rel) ? [] : [[rule, patterns[i]]]));
+    if (applicable.length === 0) continue;
+
+    const full = join(dir, rel);
+    // A tracked file deleted from the work tree, or a submodule's gitlink.
+    if (!statSync(full, { throwIfNoEntry: false })?.isFile()) continue;
+    checked++;
+    const content = readFileSync(full, "utf-8");
+    for (const [rule, pattern] of applicable) {
+      if (pattern.test(content)) violations.push({ file: rel, rule });
     }
-  })(dir);
+  }
 
   return { checked, violations };
 }

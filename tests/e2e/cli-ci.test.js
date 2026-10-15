@@ -295,8 +295,44 @@ describe("n-dx ci", () => {
       );
     }
 
+    /** `git` in `dir` with a throwaway identity. */
+    function git(dir, args) {
+      execFileSync("git", ["-c", "user.email=ci@test", "-c", "user.name=ci", ...args], { cwd: dir, stdio: "pipe" });
+    }
+
+    /**
+     * A git repo whose allowed wrapper src/lib/exec.ts is committed. With
+     * `trackRelease`, scripts/release.js is committed too; otherwise it stays
+     * an untracked, non-ignored file.
+     */
+    async function gitProject(dir, { trackRelease }) {
+      await mkdir(join(dir, "src", "lib"), { recursive: true });
+      await writeFile(join(dir, "src", "lib", "exec.ts"), RELEASE_SCRIPT);
+      git(dir, ["init", "-q"]);
+      git(dir, ["add", "src", ...(trackRelease ? ["scripts"] : [])]);
+      git(dir, ["commit", "-q", "-m", "init"]);
+    }
+
     const CASES = {
       "file outside the allow list": async (dir) => configure(dir, ["src/lib/exec.js"]),
+      // A local tsc build: the compiled copy has a path the allow list never names.
+      "gitignored build output": async (dir) => {
+        await gitProject(dir, { trackRelease: true });
+        await writeFile(join(dir, ".gitignore"), "build/\n");
+        await mkdir(join(dir, "build", "lib"), { recursive: true });
+        await writeFile(join(dir, "build", "lib", "exec.js"), RELEASE_SCRIPT);
+        await configure(dir, ["src/lib/exec.ts", "scripts/release.js"]);
+      },
+      // A Claude agent worktree: a full second checkout inside the project.
+      "agent worktree": async (dir) => {
+        await gitProject(dir, { trackRelease: true });
+        git(dir, ["worktree", "add", "-q", join(".claude", "worktrees", "agent")]);
+        await configure(dir, ["src/lib/exec.ts", "scripts/release.js"]);
+      },
+      "untracked source file": async (dir) => {
+        await gitProject(dir, { trackRelease: false });
+        await configure(dir, ["src/lib/exec.ts"]);
+      },
       "file in the allow list": async (dir) => configure(dir, ["src/lib/exec.js", "scripts/release.js"]),
       "malformed rule": async (dir) => {
         await writeFile(
@@ -353,6 +389,28 @@ describe("n-dx ci", () => {
       expect(step.ok).toBe(true);
       expect(step.violations).toBeUndefined();
       expect(step.detail).not.toMatch(/^skipped/);
+    });
+
+    it("does not scan gitignored build output", () => {
+      const { code, step } = results.get("gitignored build output");
+      expect(step.violations).toBeUndefined();
+      expect(step.ok).toBe(true);
+      expect(code).toBe(0);
+    });
+
+    it("does not scan an agent worktree under .claude/worktrees", () => {
+      const { code, step } = results.get("agent worktree");
+      expect(step.violations).toBeUndefined();
+      expect(step.ok).toBe(true);
+      expect(code).toBe(0);
+    });
+
+    it("still fails an untracked, non-ignored source file outside the allow list", () => {
+      const { code, step } = results.get("untracked source file");
+      expect(code).toBe(1);
+      expect(step.ok).toBe(false);
+      expect(step.violations).toHaveLength(1);
+      expect(step.violations[0]).toMatch(/^scripts\/release\.js imports node:child_process/);
     });
 
     it("fails on a rule it cannot read rather than skipping it", () => {
