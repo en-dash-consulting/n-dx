@@ -22,7 +22,7 @@ acceptanceCriteria:
   - "Nothing is written to infrastructure.json"
   - "The six static root policy tests pass"
 description: "LS13 and LS14: find the databases a repository uses and the SQL dialect it writes, from five signals (IaC, container images, dependencies, config, schema and migrations), held in memory. Dialect and table names only: no full SQL parsing. NoSQL engines are detected from drivers and config. Persisting database resources and code-to-database links into infrastructure.json waits for the conversation with Sterling H. Config is read for key names and URL schemes only: hosts, users and passwords are never stored or logged.\n\nSide stack, PR 9. Uses the Java and Go packs' call captures for embedded SQL."
-lastModified: "2026-10-08T03:09:17.985Z"
+lastModified: "2026-10-15T05:58:31.292Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -31,7 +31,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add the missing changeset for Terraform zone, detection and role changes](./add-the-missing-changeset-for.md) | completed |
-| [Add the Terraform model as a database-engine source](./add-the-terraform-model-as-a-database.md) | pending |
 | [Classify SQL dialects with evidence](./classify-sql-dialects-with-evidence.md) | completed |
 | [Detect database engines from dependencies, images and config](./detect-database-engines-from.md) | completed |
 | [Extract table names from embedded SQL in Java and Go](./extract-table-names-from-embedded-sql.md) | completed |
