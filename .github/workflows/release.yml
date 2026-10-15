@@ -81,7 +81,7 @@ jobs:
         env:
           REGISTRY: https://registry.npmjs.org
           # Space-separated list of package names (without @n-dx/ prefix)
-          PACKAGES: "core rex lang-kit lang-runtime lang-java lang-go lang-sql lang-terraform sourcevision hench llm-client web"
+          PACKAGES: "core rex lang-kit lang-runtime lang-java lang-go lang-sql lang-terraform lang-python sourcevision hench llm-client web"
         run: |
           set -uo pipefail
           AUDIENCE="npm:registry.npmjs.org"
@@ -262,5 +262,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISHED: ${{ steps.changesets.outputs.published }}
-          PACKAGES: "core rex lang-kit lang-runtime lang-java lang-go lang-sql lang-terraform sourcevision hench llm-client web"
+          PACKAGES: "core rex lang-kit lang-runtime lang-java lang-go lang-sql lang-terraform lang-python sourcevision hench llm-client web"
         run: node scripts/verify-release-sync.mjs
