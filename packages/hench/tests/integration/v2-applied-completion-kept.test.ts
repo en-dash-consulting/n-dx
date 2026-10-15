@@ -285,6 +285,37 @@ describe("a failure after a v2 completion applied its change", () => {
     expect(error).toContain("notes.md");
   });
 
+  it("finalizeRun passes the pre-run baseline through to a kept completion's report", async () => {
+    // The dirty tree the pre-run gate let through, then a bypassed completion and a failed gate.
+    await writeFile(join(projectDir, "notes.md"), "operator draft\n");
+    const { finalizeRun, captureBaselineDirty } = await lifecycle();
+    const baselineDirty = await captureBaselineDirty(projectDir);
+    await claims.releaseAll();
+    const { toolRexUpdateStatus } = await import("../../src/tools/rex.js");
+    await toolRexUpdateStatus(await store(), WIRE_ID, { status: "completed", resolutionType: "code-change" });
+    await writeFile(join(projectDir, "src", "pay.ts"), "export const pay = 2;\n");
+
+    failTestGate();
+    const run = buildRun();
+    run.structuredSummary = {
+      filesChanged: ["src/pay.ts"],
+      counts: { filesChanged: 1, toolCalls: 0, testsRun: 0 },
+    } as unknown as RunRecord["structuredSummary"];
+    await finalizeRun({
+      run, henchDir, projectDir, store: await store(),
+      autoCommit: true, autonomous: true, rollbackOnFailure: false, startingHead: baseline, baselineDirty,
+    });
+
+    await expectCompletionKept();
+    expectKeptReport(run, "Test gate");
+    const error = run.error ?? "";
+    const commands = error.split("\n").filter((l) => /^\s+git (add|rm|commit)/.test(l));
+    expect(commands.join("\n")).toContain("src/pay.ts");
+    expect(commands.join("\n")).not.toContain("notes.md");
+    expect(error).toContain("Already dirty before the run, not part of this task");
+    expect(error).toContain("notes.md");
+  });
+
   it("keeps a bypassed completion when the test gate then fails", async () => {
     // No hold: the agent's completion is written straight through and applies the change.
     await claims.releaseAll();
