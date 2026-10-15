@@ -3,22 +3,14 @@
  * analysis, self-heal, ndx ci, rex reshape, refresh, Project Scan),
  * regardless of which view is active.
  *
- * Bottom-right, stacked above .refresh-queue-status (bottom: 1rem; right:
- * 1rem). Deliberately NOT bottom-left: .sidebar is a normal-flow flex
- * column spanning the full viewport height, so a fixed bottom-left
- * element sits on top of its nav items and intercepts their clicks —
- * confirmed live while verifying this component. Bottom-right stays clear
- * since neither the sidebar nor (in practice) the detail panel occupies
- * that corner.
+ * One pill in the bottom-right .status-dock (status-dock.css), which
+ * places it; its list opens above the pill.
  *
  * Uses CSS variables from tokens.css for theme compatibility.
  */
 
 .active-operations-tray {
-  position: fixed;
-  bottom: calc(4.5rem + var(--bottombar-h, 0px));
-  right: 1rem;
-  z-index: 998;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

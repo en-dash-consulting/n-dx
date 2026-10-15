@@ -1,20 +1,11 @@
 /* Sessions tray — worktrees of the served repository, with what each one is
- * running. Bottom-right, the fourth in the fixed stack that starts at
- * .refresh-queue-status (1rem) and continues through .active-operations-tray
- * (4.5rem) and .git-status-banner (8rem).
- *
- * The offsets are fixed rather than flow-based because each tray renders
- * independently and conditionally; see active-operations.css for why this
- * corner and not bottom-left.
+ * running. A pill in the bottom-right .status-dock (status-dock.css).
  *
  * Uses CSS variables from tokens.css for theme compatibility.
  */
 
 .sessions-panel {
-  position: fixed;
-  bottom: calc(11.5rem + var(--bottombar-h, 0px));
-  right: 1rem;
-  z-index: 996;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

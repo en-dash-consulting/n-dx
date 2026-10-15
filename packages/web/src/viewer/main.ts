@@ -311,11 +311,14 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     (refreshToast && !isFeatureDisabled("autoRefresh"))
       ? h("div", { class: "refresh-toast", role: "status", "aria-live": "polite" }, "Data updated")
       : null,
-    h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
-    h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
-    h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
-    h(SessionsPanel, { worktrees, claims, navigateTo, analyses, liveRuns, liveAvailable }),
+    // One bottom-right row for every floating status pill (styles/status-dock.css).
+    h("div", { class: "status-dock" },
+      h(SessionsPanel, { worktrees, claims, navigateTo, analyses, liveRuns, liveAvailable }),
+      h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
+      h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
+      h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
+    ),
     (showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },
