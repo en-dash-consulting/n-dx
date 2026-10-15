@@ -45,7 +45,7 @@ plannedRelease: "1.0.0"
 | [Recommendations become changes](./recommendations-become-changes/index.md) | pending |
 | [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | completed |
 | [Review follow-ups for the product layer work](./review-follow-ups-for-the-product/index.md) | pending |
-| [rex correctness fixes off the migration path](./rex-correctness-fixes-off-the/index.md) | pending |
+| [rex correctness fixes off the migration path](./rex-correctness-fixes-off-the/index.md) | completed |
 | [Route remaining state paths through the layout resolver](./route-remaining-state-paths-through/index.md) | completed |
 | [Route the remaining .n-dx config readers through the resolver](./route-the-remaining-n-dx-config/index.md) | completed |
 | [Select and complete work on changes](./select-and-complete-work-on-changes/index.md) | completed |
