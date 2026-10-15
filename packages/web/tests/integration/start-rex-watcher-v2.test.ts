@@ -33,6 +33,33 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
+describe("registerRexWatcher watcher errors", () => {
+  it("survives an 'error' on every watcher it returns, closing and dropping each", () => {
+    registerRexWatcher(
+      undefined,
+      rexDir,
+      { refresh: () => {} } as never,
+      { broadcast: () => {} } as never,
+      watchers,
+    );
+    const registered = [...watchers];
+    expect(registered.length).toBeGreaterThan(0);
+    const closes = registered.map((w) => vi.spyOn(w, "close"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      for (const w of registered) {
+        const err = Object.assign(new Error("EPERM: operation not permitted, watch"), { code: "EPERM" });
+        expect(() => w.emit("error", err)).not.toThrow();
+      }
+      for (const close of closes) expect(close).toHaveBeenCalled();
+      expect(watchers).toHaveLength(0);
+      expect(warn).toHaveBeenCalledTimes(registered.length);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
 describe("registerRexWatcher on a v2 tree", () => {
   it("refreshes the PRD cache when changes/ is created after boot", async () => {
     const cachePath = join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON);

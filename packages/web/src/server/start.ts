@@ -379,6 +379,21 @@ export async function refreshPRDCache(rexDir: string): Promise<void> {
   }
 }
 
+/**
+ * Attach the 'error' listener every FSWatcher needs: without one, an error
+ * emitted after `watch()` returned (Windows raises EPERM when a watched
+ * directory is deleted, nodejs/node#4337) is an uncaught exception that takes
+ * the server down; the try/catch around `watch()` only covers a synchronous
+ * throw. A failed watcher is closed and `onError` lets the owner forget it.
+ */
+function guardWatcher(w: FSWatcher, label: string, onError?: () => void): FSWatcher {
+  w.on("error", (err) => {
+    console.warn(`[watcher] ${label} watcher error, closing it: ${(err as Error).message}`);
+    w.close();
+    onError?.();
+  });
+  return w;
+}
 
 function registerSourcevisionWatcher(
   scope: ViewerScope | undefined,
@@ -395,11 +410,11 @@ function registerSourcevisionWatcher(
     });
   }, WATCHER_DEBOUNCE_MS);
   try {
-    return watch(svDir, (_eventType, filename) => {
+    return guardWatcher(watch(svDir, (_eventType, filename) => {
       if (filename && (ALL_DATA_FILES as readonly string[]).includes(String(filename))) {
         debouncedRefresh();
       }
-    });
+    }), "sourcevision");
   } catch {
     // fs.watch may not be supported everywhere
     return null;
@@ -442,13 +457,22 @@ export function registerRexWatcher(
 
   const prdDirNames = [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME];
   const watched = new Set<string>();
+  const forget = (w: FSWatcher): void => {
+    const i = into.indexOf(w);
+    if (i !== -1) into.splice(i, 1);
+  };
   const watchPrdFolder = (dirName: string): void => {
     const root = join(rexDir, dirName);
     if (watched.has(dirName) || !existsSync(root)) return;
     try {
-      into.push(watch(root, { recursive: true }, () => {
+      const w = guardWatcher(watch(root, { recursive: true }, () => {
         debouncedRefresh();
-      }));
+      }), `rex ${dirName}/`, () => {
+        forget(w);
+        // Let the .rex/ watcher re-watch the folder when it reappears.
+        watched.delete(dirName);
+      });
+      into.push(w);
       watched.add(dirName);
     } catch {
       // fs.watch recursive may not be supported on every platform — non-fatal
@@ -458,7 +482,7 @@ export function registerRexWatcher(
   // Watch .rex/ for legacy prd.md and tree-meta.json changes, and for a PRD
   // folder appearing after boot.
   try {
-    into.push(watch(rexDir, (_eventType, filename) => {
+    const w = guardWatcher(watch(rexDir, (_eventType, filename) => {
       const name = filename === null ? "" : String(filename);
       if (prdDirNames.includes(name)) {
         watchPrdFolder(name);
@@ -470,7 +494,8 @@ export function registerRexWatcher(
       ) {
         debouncedRefresh();
       }
-    }));
+    }), "rex", () => forget(w));
+    into.push(w);
   } catch {
     // ignore
   }
@@ -504,11 +529,11 @@ function registerHenchWatcher(
     });
   }, WATCHER_DEBOUNCE_MS);
   try {
-    return watch(henchRunsDir, (_eventType, filename) => {
+    return guardWatcher(watch(henchRunsDir, (_eventType, filename) => {
       if (filename && String(filename).endsWith(".json")) {
         debouncedBroadcast();
       }
-    });
+    }), "hench runs");
   } catch {
     // ignore
     return null;
@@ -530,11 +555,11 @@ function registerDevViewerWatcher(
     });
   }, WATCHER_DEBOUNCE_MS);
   try {
-    return watch(dirname(viewerPath), (_eventType, filename) => {
+    return guardWatcher(watch(dirname(viewerPath), (_eventType, filename) => {
       if (filename === "index.html") {
         debouncedRefresh();
       }
-    });
+    }), "dev viewer");
   } catch {
     // ignore
     return null;
