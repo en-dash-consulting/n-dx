@@ -2,7 +2,7 @@
 id: "1a326041-9ce2-490e-80ae-55fbdaf81543"
 level: "feature"
 title: "Detected run and build commands as a dashboard control"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "web"
@@ -10,6 +10,9 @@ tags:
   - "dx"
   - "run-commands"
 source: "ndx-capture"
+startedAt: "2026-10-15T14:53:05.572Z"
+completedAt: "2026-10-15T14:53:05.572Z"
+endedAt: "2026-10-15T14:53:05.572Z"
 acceptanceCriteria:
   - "Run and build commands are detected from the project's own manifest, covering at least the ecosystems the existing manifest reader already handles"
   - "A control appears next to Live when at least one run command is detected, and stays absent when none is"
@@ -20,6 +23,6 @@ acceptanceCriteria:
   - "Command execution is constrained so the control cannot be used to run arbitrary shell input"
   - "The detector is shared with or derived from the existing manifest reader rather than duplicated, and the tier boundary it crosses is handled explicitly"
 description: "When the project has a discoverable run command — `npm run dev`, `python3 file.py`, `cargo run`, `go run .` — surface a \"found run command\" button next to Live, with a dropdown to change or edit the command and to pick build commands too. Running one shows a spinner, then reports success or failure. If the command serves on localhost, give the user a link to open it.\n\nRequested as an idea rather than a defect, so the shape is open.\n\nDetection — extend what exists rather than writing a second detector. `packages/core/readme-generator.js` already reads manifests across ecosystems and derives commands from them: `readManifest` handles `package.json` scripts, Python, Go and Rust (see the manifest branches around `:90-181`), and the deriver at roughly `:208-245` returns `installCommand`, `testCommand` and `packageManager`. It does not yet derive a run/dev command or a build command — that is the gap to fill.\n\nNote the tier boundary rather than deciding it here: `readme-generator.js` is orchestration-tier core, and the dashboard is the web package, which under the repo's rules reaches other packages through a gateway or by spawning. Whether the detector moves, is spawned, or is reimplemented behind `packages/web/src/server/domain-gateway.ts` is an architecture call for the implementer.\n\nExecution — the infrastructure to follow already exists for analysis runs in `packages/web/src/server/routes-commands.ts`: `handleSvAnalyze` spawns a binary under a write lock, returns 202 for async work, and is paired with `/status` and `/stop` endpoints, with the job surfaced through `hooks/use-active-operations.ts` and progress through `routes-live-analyze.ts`. A long-running dev server is not the same shape as a one-shot analyze — it does not finish — so lifecycle needs thought: a build command completes and reports, a dev server stays up and needs a stop control and a way to not leak a process when the tab closes.\n\nLocalhost link: detect the bound port from the child's stdout rather than assuming one, since the port is frequently chosen at runtime or shifted when busy.\n\nSafety note worth settling early: this runs project-defined shell commands from a web UI. The dashboard is already token-authenticated (`X-Ndx-Token`), and the command set should come from detected manifest entries rather than free-form input, or the edit box becomes arbitrary command execution over HTTP."
-lastModified: "2026-10-15T14:01:24.834Z"
+lastModified: "2026-10-15T14:53:06.155Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
