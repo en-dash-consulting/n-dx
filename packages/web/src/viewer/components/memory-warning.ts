@@ -7,6 +7,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import type { MemorySnapshot, MemoryLevel } from "../performance/index.js";
 import { formatBytes, formatRatio } from "../performance/index.js";
 
@@ -76,7 +77,7 @@ export function MemoryWarningBanner({
           "aria-label": "Dismiss memory warning",
           type: "button",
         },
-        "\u2715"
+        h(ActionIcon, { name: "close" })
       ),
     ),
   );

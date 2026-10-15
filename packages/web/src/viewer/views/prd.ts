@@ -15,7 +15,9 @@
  * @see ../hooks/use-toast.ts — toast notification state
  */
 
-import {h} from "preact";import type { VNode } from "preact";
+import {h} from "preact";
+import type { VNode } from "preact";
+import { ActionIcon } from "../components/index.js";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { PRDTree, ALL_STATUSES } from "../components/prd-tree/index.js";
 import { AddItemForm } from "../components/prd-tree/add-item-form.js";
@@ -256,7 +258,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
             class: "prd-deep-link-error-dismiss",
             onClick: () => setDeepLinkError(null),
             "aria-label": "Dismiss",
-          }, "\u00d7"),
+          }, h(ActionIcon, { name: "close" })),
         )
       : null,
 
@@ -339,7 +341,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
                 onClick: () => { setSearchQuery(""); clearFacets(); searchInputRef.current?.focus(); },
                 "aria-label": "Clear search and facets",
                 title: "Clear search and facets",
-              }, "\u00d7")
+              }, h(ActionIcon, { name: "close" }))
             : null,
         ),
         // Facet filter chips (tags for search, statuses for tree visibility)

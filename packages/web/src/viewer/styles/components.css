@@ -443,3 +443,18 @@
 .metric-label--with-info { display: flex; align-items: center; justify-content: center; }
 .health-gauge-with-info { display: flex; align-items: flex-start; }
 .health-gauge-with-info > .info-tip { margin-top: 4px; }
+
+/* ── Action icons (components/action-icon.ts) ──
+   Sized by token, not by the button's font-size, so an icon-only button
+   reads the same everywhere. `.action-icon-sm` is for chip-sized controls. */
+.action-icon {
+  display: block;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  flex-shrink: 0;
+}
+
+.action-icon-sm {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}

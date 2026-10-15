@@ -10,6 +10,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../components/index.js";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { replaceAppHistory } from "../base-path.js";
 import { REX_STATE_DIRS, stateDirPrefixes } from "../state-paths.js";
@@ -1383,7 +1384,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
               class: "hench-deep-link-error-dismiss",
               onClick: () => setDeepLinkError(null),
               "aria-label": "Dismiss",
-            }, "×"),
+            }, h(ActionIcon, { name: "close" })),
           )
         : null,
       h("div", { class: "hench-empty" },
@@ -1467,7 +1468,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
             class: "hench-deep-link-error-dismiss",
             onClick: () => setDeepLinkError(null),
             "aria-label": "Dismiss",
-          }, "×"),
+          }, h(ActionIcon, { name: "close" })),
         )
       : null,
 

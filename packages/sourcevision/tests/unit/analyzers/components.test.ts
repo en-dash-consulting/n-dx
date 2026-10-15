@@ -885,3 +885,40 @@ describe("findRoutesConfig", () => {
     expect(result).toBeNull();
   });
 });
+
+describe("analyzeComponents incremental carry-over (#744)", () => {
+  let tmpDir: string;
+
+  afterEach(async () => {
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("drops definitions and usages from files no longer in the inventory", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-comp-pruned-"));
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+    await mkdir(join(tmpDir, "legacy"), { recursive: true });
+    await writeFile(join(tmpDir, "src", "Button.tsx"), `export function Button() { return <button>click</button>; }\n`);
+    await writeFile(
+      join(tmpDir, "legacy", "Widget.tsx"),
+      `import { Button } from "../src/Button.js";\nexport function Widget() { return <div><Button /></div>; }\n`,
+    );
+
+    const inv1 = await analyzeInventory(tmpDir);
+    const imp1 = await analyzeImports(tmpDir, inv1);
+    const comp1 = await analyzeComponents(tmpDir, inv1, imp1);
+    expect(comp1.components.some((c) => c.file === "legacy/Widget.tsx")).toBe(true);
+
+    const inv2 = { ...inv1, files: inv1.files.filter((f) => !f.path.startsWith("legacy/")) };
+    const imp2 = await analyzeImports(tmpDir, inv2);
+    const incremental = await analyzeComponents(tmpDir, inv2, imp2, {
+      previousComponents: comp1,
+      changedFiles: new Set(),
+      fileSetChanged: false,
+    });
+    const full = await analyzeComponents(tmpDir, inv2, imp2);
+
+    expect(incremental.components.some((c) => c.file === "legacy/Widget.tsx")).toBe(false);
+    expect(incremental.usageEdges.some((e) => e.from === "legacy/Widget.tsx")).toBe(false);
+    expect(incremental).toEqual(full);
+  });
+});

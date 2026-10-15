@@ -15,6 +15,7 @@
  */
 
 import { h, Fragment } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import { useState, useCallback } from "preact/hooks";
 import type { GitStatus, GitStatusFile } from "../hooks/index.js";
 
@@ -203,7 +204,7 @@ function GitStatusPanel({
     h("div", { class: "git-status-panel-header" },
       h("strong", null, `${status.files.length} uncommitted file${status.files.length === 1 ? "" : "s"}`),
       status.branch ? h("span", { class: "git-status-branch" }, ` on ${status.branch}`) : null,
-      h("button", { class: "git-status-close", type: "button", onClick: onClose, "aria-label": "Close" }, "✕"),
+      h("button", { class: "git-status-close", type: "button", onClick: onClose, "aria-label": "Close" }, h(ActionIcon, { name: "close" })),
     ),
     h("p", { class: "git-status-hint" },
       "Autonomous runs (Start Working, self-heal, etc.) refuse to start against a dirty tree. Commit here, or from a terminal.",

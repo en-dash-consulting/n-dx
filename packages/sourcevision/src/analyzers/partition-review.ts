@@ -55,6 +55,13 @@ export function oversizedShare(maxZonePercent = 15): number {
   return Math.max((2 * maxZonePercent) / 100, 0.3);
 }
 
+/**
+ * A top-level zone above this share of all zoned files is reported whatever
+ * its sub-zones look like: balanced sub-zones make it navigable, but they do
+ * not make one zone holding most of a project a map of it.
+ */
+export const DOMINANT_ZONE_SHARE = 0.5;
+
 /** Map Noul at or below which the partition is rejected. */
 export const MAP_REJECT_MAX_PROBABILITY = 0.3;
 
@@ -74,7 +81,11 @@ export function assessPartitionHealth(zones: Zone[], maxZonePercent?: number): P
   const smallShare = total > 0 ? round2(smallZones / total) : 0;
   const numericShare = total > 0 ? round2(numericIds / total) : 0;
   const limit = oversizedShare(maxZonePercent);
-  const oversized = zones.filter((z) => fileCount > 0 && z.files.length / fileCount > limit && !hasBalancedSubZones(z)).length;
+  const shareOf = (z: Zone) => (fileCount > 0 ? z.files.length / fileCount : 0);
+  const dominant = zones.filter((z) => shareOf(z) > DOMINANT_ZONE_SHARE);
+  const oversized = zones.filter(
+    (z) => shareOf(z) > limit && shareOf(z) <= DOMINANT_ZONE_SHARE && !hasBalancedSubZones(z),
+  ).length;
 
   let verdict: PartitionHealth["verdict"] = "healthy";
   const reasons: string[] = [];
@@ -93,8 +104,13 @@ export function assessPartitionHealth(zones: Zone[], maxZonePercent?: number): P
   }
   // Oversized zones matter at any zone count: one zone holding most of a
   // project is the opposite failure from fragmentation.
-  if (verdict !== "fragmented" && oversized > 0) {
-    reasons.push(`${oversized} zone${oversized === 1 ? "" : "s"} over ${Math.round(limit * 100)}% of files without a balanced subdivision`);
+  if (verdict !== "fragmented") {
+    for (const z of dominant) {
+      reasons.push(`zone ${z.id} holds ${Math.round(shareOf(z) * 100)}% of files`);
+    }
+    if (oversized > 0) {
+      reasons.push(`${oversized} zone${oversized === 1 ? "" : "s"} over ${Math.round(limit * 100)}% of files without a balanced subdivision`);
+    }
   }
   if (verdict === "healthy" && reasons.length > 0) verdict = "borderline";
 
@@ -228,6 +244,9 @@ export async function reviewPreviousPartition(
 export function formatPartitionLine(review: PartitionReview): string | undefined {
   const h = review.health;
   if (!review.rejected && h.verdict === "healthy") return undefined;
+  if (review.initial) {
+    return `  [partition] new partition is ${h.verdict} (${(h.reasons ?? []).join("; ")})`;
+  }
   const judged = review.mapProbability !== undefined ? `, map judged ${review.mapProbability}` : "";
   if (!review.rejected) {
     return `  [partition] kept previous partition (${(h.reasons ?? []).join("; ")}${judged})`;

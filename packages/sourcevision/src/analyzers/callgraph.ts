@@ -513,15 +513,20 @@ export async function analyzeCallGraph(
   const allCalls: CallEdge[] = [];
 
   if (canIncremental) {
-    // Keep functions and edges from unchanged files
+    // Keep functions and edges from unchanged files that are still inventoried.
+    // fileSetChanged compares against the previous inventory, not the previous
+    // call graph, so files pruned in an earlier run can still be in prev (#744).
+    const inventoried = new Set(inventory.files.map((f) => f.path));
     for (const fn of prev.functions) {
-      if (!changedFiles.has(fn.file)) {
+      if (!changedFiles.has(fn.file) && inventoried.has(fn.file)) {
         allFunctions.push(fn);
       }
     }
     for (const edge of prev.edges) {
-      if (!changedFiles.has(edge.callerFile)) {
-        allCalls.push(edge);
+      if (!changedFiles.has(edge.callerFile) && inventoried.has(edge.callerFile)) {
+        // A full run cannot resolve a call into a file outside the inventory.
+        const calleeFile = edge.calleeFile && inventoried.has(edge.calleeFile) ? edge.calleeFile : null;
+        allCalls.push(calleeFile === edge.calleeFile ? edge : { ...edge, calleeFile });
       }
     }
   }
