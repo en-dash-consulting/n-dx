@@ -9,11 +9,11 @@ import { dirname, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("ndx home is isolated for the test process", () => {
-  it("points NDX_HOME at an existing temp directory, not the user's home", () => {
-    const home = process.env["NDX_HOME"];
+  it("points N_DX_HOME at an existing temp directory and leaves NDX_HOME unset", () => {
+    const home = process.env["N_DX_HOME"];
     expect(home).toBeTruthy();
     expect(dirname(resolve(home!))).toBe(resolve(tmpdir()));
     expect(existsSync(home!)).toBe(true);
-    expect(process.env["N_DX_HOME"]).toBeUndefined();
+    expect(process.env["NDX_HOME"]).toBeUndefined();
   });
 });
