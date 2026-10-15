@@ -35,6 +35,7 @@ const PartitionHealthSchema = z.object({
 const PartitionReviewSchema = z.object({
   fingerprint: z.string(),
   health: PartitionHealthSchema,
+  initial: z.boolean().optional(),
   rejected: z.boolean(),
   mapProbability: z.number().min(0).max(1).optional(),
   after: PartitionHealthSchema.optional(),

@@ -7,6 +7,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useRef, useEffect } from "preact/hooks";
 import type { Priority } from "./types.js";
 import { type ItemType, childTypeOf, itemTypeLabel } from "../../external.js";
@@ -169,7 +170,7 @@ export function InlineAddForm({ parentType, parentId, depth, onSubmit, onCancel 
         title: showExtra ? "Hide extra fields" : "Show description & priority",
         "aria-label": showExtra ? "Hide extra fields" : "Show extra fields",
         disabled: submitting,
-      }, "⋯"),
+      }, h(ActionIcon, { name: "more" })),
 
       // Submit button
       h("button", {
@@ -189,7 +190,7 @@ export function InlineAddForm({ parentType, parentId, depth, onSubmit, onCancel 
         disabled: submitting,
         title: "Cancel (Esc)",
         "aria-label": "Cancel",
-      }, "✕"),
+      }, h(ActionIcon, { name: "close" })),
     ),
 
     // Extra fields (description + priority) — shown when expanded
