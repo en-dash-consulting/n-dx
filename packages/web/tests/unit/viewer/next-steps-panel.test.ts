@@ -130,6 +130,20 @@ describe("NextStepsPanel", () => {
     expect(copied).toContain("High coupling (0.82)");
   });
 
+  it("draws the copy button as an SVG icon that turns into a check once copied", async () => {
+    stubSteps();
+    await mount();
+
+    const copyBtn = root.querySelector<HTMLButtonElement>(".next-step-item .next-step-copy")!;
+    expect(copyBtn.textContent).toBe("");
+    expect(copyBtn.getAttribute("aria-label")).toContain("Files are tightly coupled");
+    const before = copyBtn.querySelector("svg.action-icon")!.innerHTML;
+    copyBtn.click();
+    await waitFor(() => {
+      expect(copyBtn.querySelector("svg.action-icon")!.innerHTML).not.toBe(before);
+    });
+  });
+
   it("copies all steps as a markdown list", async () => {
     stubSteps();
     await mount();
