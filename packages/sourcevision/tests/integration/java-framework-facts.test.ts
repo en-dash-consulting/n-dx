@@ -5,7 +5,7 @@
  * Java pack, both artifacts are what the detectors alone produce.
  */
 
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -18,6 +18,10 @@ import { detectOutbound } from "../../src/analyzers/outbound-detection.js";
 import { withPackOutbound } from "../../src/analyzers/pack-framework-facts.js";
 import { KNOWN_PACKS, loadPack, type KnownPack } from "../../src/language/pack-loader.js";
 import type { Inventory } from "../../src/schema/v1.js";
+import { packFrameworkFacts, runComponentsPhase, runImportsPhase, runInventoryPhase, type AnalyzeContext } from "../../src/cli/commands/analyze-phases.js";
+import { cmdInit } from "../../src/cli/commands/init.js";
+import { emptyAnalyzeTokenUsage } from "../../src/cli/sourcevision-core.js";
+import { resolveSourcevisionPaths } from "../../src/paths.js";
 import { skipUnlessPackRuns } from "../helpers/workspace-pack.js";
 
 const FIXTURE = join(import.meta.dirname, "../fixtures/java-spring-project");
@@ -132,6 +136,44 @@ describe("Java routes and outbound calls in serverRoutes and outbound.json", () 
     expect(outbound.dependencies.map((d) => [d.file, d.kind, d.client, d.confidence])).toEqual([
       [`${MAIN}/client/BillingClient.java`, "http", "RestTemplate", "certain"],
     ]);
+  });
+
+  it("through the phases, the imports phase's facts reach the components phase, which reads none itself", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "java");
+    const project = mkdtempSync(join(tmpdir(), "sv-java-phases-"));
+    try {
+      cpSync(dir, project, { recursive: true, filter: (p) => !p.includes(".sourcevision") });
+      cmdInit(project);
+      const run: AnalyzeContext = {
+        absDir: project,
+        svDir: resolveSourcevisionPaths(project).svDir,
+        fullMode: true,
+        fastMode: true,
+        narrate: false,
+        wait: false,
+        tokenUsage: emptyAnalyzeTokenUsage(),
+        inventoryResult: null,
+      };
+      await runInventoryPhase(run);
+      await runImportsPhase(run);
+      const collected = run.packFacts ?? [];
+      expect(collected.flatMap((f) => f.routes ?? []).map((r) => r.path).sort()).toEqual([
+        "/owners",
+        "/owners/{id}",
+        "/pets/{petId}/visits",
+        "/pets/{petId}/visits",
+      ]);
+
+      // A marker in place of the collected facts: the components phase must use what is on the context.
+      const marker = `${MAIN}/controller/OwnerController.java`;
+      run.packFacts = [{ path: marker, routes: [{ method: "PUT", path: "/marker", handler: "m", position: { line: 1, column: 0 } }] }];
+      await runComponentsPhase(run);
+      const components = JSON.parse(readFileSync(join(run.svDir, "components.json"), "utf-8")) as { serverRoutes: Array<{ routes: Array<{ path: string }> }> };
+      expect(components.serverRoutes.flatMap((g) => g.routes.map((r) => r.path))).toEqual(["/marker"]);
+      expect(await packFrameworkFacts(run, inventory)).toBe(run.packFacts);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
   });
 
   it("without the Java pack, records exactly what the detectors alone do", async () => {
