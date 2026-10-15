@@ -9,7 +9,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { terraformConfig, type FileFacts, type LanguagePackEntry, type PackProjectRequest, type PackProjectResult } from "@n-dx/lang-kit";
+import {
+  terraformConfig,
+  type FileFacts,
+  type LanguagePackEntry,
+  type PackProjectRequest,
+  type PackProjectResult,
+  type ResourceFact,
+} from "@n-dx/lang-kit";
 import { enrichTerraformInfrastructure } from "../../../src/analyzers/terraform-infrastructure.js";
 import type { KnownPack } from "../../../src/language/pack-loader.js";
 import type { InfraResource, InfrastructureData } from "../../../src/schema/v1.js";
@@ -135,6 +142,47 @@ describe("enrichTerraformInfrastructure", () => {
     expect(out.resources[1]).toEqual({ ...BUCKET, provider: { name: "aws" } });
     // No fact for the queue: the same object, no field added.
     expect(out.resources[2]).toBe(QUEUE);
+  });
+
+  it("stores a resolved attribute only when every module instance resolves it alike", async () => {
+    const instance = (engine: string, engineVersion: string, file: string): ResourceFact => ({
+      type: "aws_db_instance",
+      name: "main",
+      position,
+      module: "module.db",
+      attributes: { engine, engineVersion },
+      instance: {
+        module: "module.db",
+        call: { file, line: 1 },
+        resolved: {
+          engine: { written: "var.engine", confidence: "literal", from: { file, line: 2 } },
+          engineVersion: { written: "var.engine_version", confidence: "conditional", from: { file, line: 3 } },
+        },
+      },
+    });
+    const disagree = stubPack({
+      facts: [{ path: "infra/main.tf", resources: [instance("postgres", "16", "a/main.tf"), instance("mysql", "16", "b/main.tf")] }],
+    });
+    const { out } = await run(data([DB]), disagree);
+    expect(out.resources[0]).toEqual({ ...DB, module: "module.db", attributes: { engine: "var.engine", engineVersion: "16" } });
+
+    const agree = stubPack({ facts: [{ path: "infra/main.tf", resources: [instance("postgres", "16", "a/main.tf")] }] });
+    expect((await run(data([DB]), agree)).out.resources[0]).toEqual({
+      ...DB,
+      module: "module.db",
+      attributes: { engine: "postgres", engineVersion: "16" },
+    });
+  });
+
+  it("keeps the expression when some instances resolve an attribute and others do not", async () => {
+    const asWritten: ResourceFact = { type: "aws_db_instance", name: "main", position, attributes: { engine: "var.engine" } };
+    const resolved: ResourceFact = {
+      ...asWritten,
+      attributes: { engine: "postgres" },
+      instance: { resolved: { engine: { written: "var.engine", confidence: "literal", from: { file: "infra/main.tf", line: 9 } } } },
+    };
+    const stub = stubPack({ facts: [{ path: "infra/main.tf", resources: [resolved, asWritten] }] });
+    expect((await run(data([DB]), stub)).out.resources[0]).toEqual({ ...DB, attributes: { engine: "var.engine" } });
   });
 
   it("hands the pack the project's .tf files only, sorted, asking for resources", async () => {

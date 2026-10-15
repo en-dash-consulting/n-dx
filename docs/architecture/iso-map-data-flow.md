@@ -188,7 +188,10 @@ in a root module), `provider` (`{ name, version? }`, the version constraint from
 `required_providers`), `references` (ids of listed resources it references in
 the same module directory) and `attributes` (`engine`, `engineVersion`,
 `runtime`, `image`, `clusterVersion`). Values are as written in the Terraform,
-never normalised, and a field appears only when the model supplied a value. The
+never normalised, and a field appears only when the model supplied a value. An
+attribute written as `var.x`, `local.x` or a null ternary in a reusable module
+is stored resolved only when every module call that instantiates the module
+resolves it to the same string; otherwise it stays as written. The
 step never adds or removes a resource, link or seam, and never changes a
 field. Without the pack the file is exactly what discovery wrote. The iso-map
 export reads none of these fields, so its bundle is unchanged.

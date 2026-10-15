@@ -154,6 +154,9 @@
           "engine": "postgres",
           "engineVersion": "var.engine_version"
         },
+        "expressions": {
+          "engineVersion": "var.engine_version"
+        },
         "references": [
           "aws_db_subnet_group.main"
         ]
@@ -361,6 +364,16 @@
         "name": "db",
         "address": "module.db",
         "source": "./modules/db",
+        "arguments": {
+          "name": {
+            "expression": "local.name",
+            "line": 51
+          },
+          "vpc_id": {
+            "expression": "data.aws_vpc.default.id",
+            "line": 52
+          }
+        },
         "sourceKind": "local",
         "target": "src/modules/db",
         "followed": true
@@ -570,7 +583,11 @@
             "column": 1
           }
         },
-        "name": "region"
+        "name": "region",
+        "default": {
+          "expression": "\"us-east-1\"",
+          "line": 33
+        }
       },
       {
         "file": "src/main.tf",
@@ -679,7 +696,11 @@
             "column": 31
           }
         },
-        "name": "name"
+        "name": "name",
+        "value": {
+          "expression": "\"orders-${var.region}\"",
+          "line": 41
+        }
       },
       {
         "file": "src/main.tf",
@@ -694,7 +715,11 @@
             "column": 33
           }
         },
-        "name": "tags"
+        "name": "tags",
+        "value": {
+          "expression": "{ service = local.name }",
+          "line": 42
+        }
       }
     ],
     "references": [
@@ -801,7 +826,18 @@
     ],
     "modulePaths": {
       "src/modules/db": "module.db"
-    }
+    },
+    "instances": [
+      {
+        "directory": "src"
+      },
+      {
+        "directory": "src/modules/db",
+        "module": "module.db",
+        "parent": 0,
+        "call": 0
+      }
+    ]
   },
   "facts": {
     "src/gcp.tf": {

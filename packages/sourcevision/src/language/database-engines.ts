@@ -645,8 +645,14 @@ export function terraformEngineOf(value: string): TerraformEngineEntry | undefin
  * (Cloud SQL: `database_version`) is strong, weak under a test or CI path; an
  * engine implied only by the resource type is weak, because nothing says the
  * declaration was configured for it. A database resource whose engine neither
- * its type nor a mapped attribute gives (a reusable module's `var.engine`)
- * adds a notice and no evidence: the facts carry no variable values to resolve.
+ * its type nor a mapped attribute gives (a reusable module's `var.engine` that
+ * no module call resolves) adds a notice and no evidence.
+ *
+ * The pack gives a resource one fact per distinct resolution over its module's
+ * instances (`ResourceFact.instance`), so a reusable module yields a candidate
+ * per engine its callers pass. The evidence then names the resource and, in
+ * `text`, where the value is written; a `conditional` value (one branch of
+ * `cond ? null : var.engine`) is weak.
  */
 function terraformEvidence(facts: readonly Pick<FileFacts, "path" | "resources">[], notices: string[]): Array<[DatabaseEngine, EngineEvidence]> {
   const out: Array<[DatabaseEngine, EngineEvidence]> = [];
@@ -655,7 +661,9 @@ function terraformEvidence(facts: readonly Pick<FileFacts, "path" | "resources">
       const entry = TERRAFORM_RESOURCE_TABLE.find((e) => e.type === resource.type);
       if (!entry) continue;
       const { engine: written, engineVersion } = resource.attributes ?? {};
-      const source = written ?? (resource.type === "google_sql_database_instance" ? engineVersion : undefined);
+      const field = written !== undefined ? "engine" : resource.type === "google_sql_database_instance" ? "engineVersion" : undefined;
+      const source = field === undefined ? undefined : resource.attributes?.[field];
+      const resolved = field === undefined ? undefined : resource.instance?.resolved[field];
       const mapped = source === undefined ? undefined : terraformEngineOf(source);
       const engine = mapped?.engine ?? entry.engine;
       if (engine === undefined) {
@@ -667,11 +675,13 @@ function terraformEvidence(facts: readonly Pick<FileFacts, "path" | "resources">
         engine,
         {
           signal: "terraform",
-          grade: mapped !== undefined && !AROUND_CODE.test(path) ? "strong" : "weak",
+          grade: mapped !== undefined && resolved?.confidence !== "conditional" && !AROUND_CODE.test(path) ? "strong" : "weak",
           file: path,
           line: resource.position.line,
           ruleId: `terraform:${resource.type}`,
-          text: `${resource.type}.${resource.name}${mapped !== undefined ? ` engine=${source}` : ""}`,
+          text: `${resource.type}.${resource.name}${mapped !== undefined ? ` engine=${source}` : ""}${
+            mapped !== undefined && resolved !== undefined ? ` (${resolved.confidence}, from ${resolved.from.file}:${resolved.from.line})` : ""
+          }`,
           ...(engineVersion !== undefined && { version: engineVersion }),
         },
       ]);

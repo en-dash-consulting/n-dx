@@ -11,3 +11,4 @@ export { TERRAFORM_PACKAGE } from "./package-paths.js";
 export * from "./terraform-pack.js";
 export * from "./terraform-model.js";
 export * from "./terraform-facts.js";
+export * from "./terraform-resolve.js";

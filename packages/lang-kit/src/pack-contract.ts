@@ -206,11 +206,49 @@ export interface ResourceAttributes {
   readonly clusterVersion?: string;
 }
 
+/** A place in a project: a project-relative, forward-slash file and a one-based line. */
+export interface SourceLocation {
+  readonly file: string;
+  readonly line: number;
+}
+
+/**
+ * An attribute whose expression resolved to a string in one module instance:
+ * `var.x` through the module call's arguments or the variable's default,
+ * `local.x`, or one branch of `cond ? null : x`. Nothing is evaluated: no
+ * function, interpolation or arithmetic.
+ */
+export interface ResolvedAttribute {
+  /** The expression as written in the resource, e.g. `var.engine`. */
+  readonly written: string;
+  /** `conditional` when the value is one branch of a ternary whose other branch is `null`; else `literal`. */
+  readonly confidence: "literal" | "conditional";
+  /** Where the string is written: the module call argument, the variable's default or the local. */
+  readonly from: SourceLocation;
+}
+
+/**
+ * One instance of the module that declares a resource: the call path that
+ * reaches it, and the attributes that resolve there. Present only when at
+ * least one attribute resolves; `attributes` then carry the resolved values.
+ */
+export interface ResourceInstance {
+  /** The call path from a root module, e.g. `module.db.module.db_instance`; absent at a root module. */
+  readonly module?: string;
+  /** The module call in the root module that starts `module`; absent at a root module. */
+  readonly call?: SourceLocation;
+  readonly resolved: Readonly<Partial<Record<keyof ResourceAttributes, ResolvedAttribute>>>;
+}
+
 /**
  * A piece of infrastructure an IaC file declares. The coarse kind (bucket,
  * queue, …) is not part of the fact: consumers classify `type` with
  * `IAC_KINDS` (`iac-kinds.ts`). Every field after `position` is optional and
  * filled only by a pack that reads it.
+ *
+ * A resource in a module that several calls instantiate with different
+ * values has one fact per distinct set of resolved values, each with its
+ * `instance`; consumers that list a resource once read every fact for it.
  */
 export interface ResourceFact {
   /** Resource type as declared, e.g. `aws_db_instance`. */
@@ -231,8 +269,10 @@ export interface ResourceFact {
   readonly provider?: ResourceProvider;
   /** `<type>.<name>` of the resources in the same module that this one references; sorted, distinct. */
   readonly references?: readonly string[];
-  /** Absent when the resource writes none of them. */
+  /** Absent when the resource writes none of them. As written, unless `instance` resolves them. */
   readonly attributes?: ResourceAttributes;
+  /** The module instance whose values `attributes` carry; absent when nothing resolved. */
+  readonly instance?: ResourceInstance;
 }
 
 // ── Per-file facts ──────────────────────────────────────────────────────────

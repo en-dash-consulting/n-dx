@@ -24,7 +24,9 @@ pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls, resources)
 and `DECLARED_FACT_KINDS` (routes, components, outbound calls, typed but not
 yet produced). `ResourceFact`'s optional `module`, `provider`, `references`
 and `attributes` are filled by the Terraform pack; attribute values are kept
-as written, never normalised. The contract names no parser type; `@n-dx/lang-runtime`'s
+as written, never normalised, except that an optional `instance` marks a fact
+whose attributes were resolved through module calls (one fact per distinct
+resolution, each attribute's `written` expression kept in `instance.resolved`). The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports
