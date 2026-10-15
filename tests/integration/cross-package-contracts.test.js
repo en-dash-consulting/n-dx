@@ -231,6 +231,7 @@ describe("hench → rex gateway contract", () => {
     "findNextWorkTask",
     "findActionableWork",
     "resolveWorkById",
+    "openChangeTasks",
     // v2 agent brief
     "buildChangeBrief",
     // v2 completion — what update_task_status runs on a v2 tree
@@ -817,7 +818,7 @@ describe("gateway export auto-detection", () => {
         "findItem", "walkTree", "findNextTask", "findActionableTasks",
         "collectCompletedIds", "explainSelection", "matchesAssignee", "traversalBlock",
         "prdLayout", "isChangeLayerStore", "findNextWorkTask", "findActionableWork", "resolveWorkById",
-        "buildChangeBrief", "completeV2Work",
+        "openChangeTasks", "buildChangeBrief", "completeV2Work",
         "isAppliedChange", "indexTree", "enclosingChangeIds", "loadPrdModel",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
