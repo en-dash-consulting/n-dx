@@ -483,7 +483,7 @@ describe("itemFingerprint", () => {
 
   it("cannot be forged by a value containing the field separator", () => {
     const a: PRDItem = { id: "x", title: "A", level: "task", status: "pending", description: "B" };
-    const b: PRDItem = { id: "x", title: "A B", level: "task", status: "pending" };
+    const b: PRDItem = { id: "x", title: "A\u0000B", level: "task", status: "pending" };
     expect(itemFingerprint(a)).not.toBe(itemFingerprint(b));
   });
 });

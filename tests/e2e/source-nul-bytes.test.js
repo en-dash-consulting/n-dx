@@ -32,20 +32,15 @@ const ROOT = join(import.meta.dirname, "../..");
 const SOURCE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 
 /**
- * Files that already held a NUL before this guard existed. Each is the same
- * shape — a separator in a template literal or a `split()` — and each is
- * correct at runtime. They are listed rather than fixed here because they
- * belong to three other packages and are out of scope for the change that
- * added this guard.
+ * Files allowed to hold a NUL byte. Empty, and meant to stay that way.
  *
- * This list may shrink and must never grow.
+ * It held four entries when this guard shipped — each a separator in a
+ * template literal or a `split()`, each correct at runtime, each in a package
+ * other than the one that added the guard. All four are now written as the
+ * escape and the set is empty, so a new entry is not a grandfathered case: it
+ * is a decision to make a file unreviewable, and needs saying out loud.
  */
-const KNOWN = new Set([
-  "packages/hench/src/agent/analysis/livelock.ts",
-  "packages/rex/src/core/slug-migration.ts",
-  "packages/sourcevision/src/cli/commands/analyze-phases.ts",
-  "packages/web/tests/unit/server/prd-refinement.test.ts",
-]);
+const KNOWN = new Set([]);
 
 /** Everything git tracks, which is narrower and faster than walking the tree. */
 function trackedSourceFiles() {
