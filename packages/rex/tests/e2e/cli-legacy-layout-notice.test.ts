@@ -16,8 +16,15 @@ import { LEGACY_LAYOUT_NOTICE, LEGACY_NOTICE_ENV } from "../../src/cli/legacy-la
 
 const cliPath = join(fileURLToPath(import.meta.url), "..", "..", "..", "dist", "cli", "index.js");
 
+/** The inherited environment without the notice switch: `ndx work` on a v1 tree exports it as "off". */
+function cleanEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env[LEGACY_NOTICE_ENV];
+  return env;
+}
+
 function rex(args: string[]): { code: number | null; stdout: string; stderr: string } {
-  const out = spawnSync("node", [cliPath, ...args], { encoding: "utf-8", timeout: 20_000 });
+  const out = spawnSync("node", [cliPath, ...args], { encoding: "utf-8", timeout: 20_000, env: cleanEnv() });
   return { code: out.status, stdout: out.stdout, stderr: out.stderr };
 }
 
@@ -69,7 +76,7 @@ describe("rex on a v1 PRD", () => {
   it("finds the project when the last positional is an id, not a dir", () => {
     const id = JSON.parse(rex(["status", "--format=json", dir]).stdout).items[0].id as string;
     // From the project dir, `update <id>` has no dir positional: resolving the id as a path would find no PRD.
-    const out = spawnSync("node", [cliPath, "update", id, "--priority=high"], { cwd: dir, encoding: "utf-8", timeout: 20_000 });
+    const out = spawnSync("node", [cliPath, "update", id, "--priority=high"], { cwd: dir, encoding: "utf-8", timeout: 20_000, env: cleanEnv() });
     expect(out.status, out.stderr).toBe(0);
     expect(count(out.stderr)).toBe(1);
   });

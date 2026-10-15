@@ -15,11 +15,14 @@ const NOTICE = "Deprecated: this PRD uses the v1 layout (prd_tree/). Run 'ndx mi
 
 /** Unlike the shared runResult, keeps stderr of a successful run, which is where the notice goes. */
 function runResult(args, opts = {}) {
+  // `ndx work` on a v1 tree exports NDX_LEGACY_NOTICE=off; the notice must not depend on it.
+  const env = { ...process.env };
+  delete env.NDX_LEGACY_NOTICE;
   const out = spawnSync("node", [CLI_PATH, ...args], {
     encoding: "utf-8",
     timeout: 60_000,
     windowsHide: true,
-    ...withSandboxedClaudeConfig(opts),
+    ...withSandboxedClaudeConfig({ env, ...opts }),
   });
   return { stdout: out.stdout, stderr: out.stderr, status: out.status };
 }
