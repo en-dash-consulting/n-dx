@@ -29,6 +29,7 @@ import {
   type InstallablePack,
   type PackLoaderOptions,
 } from "../../language/pack-loader.js";
+import { loadInventoryConfig } from "../../language/detect.js";
 import { sourcevisionVersion } from "../../language/package-paths.js";
 import { CLIError } from "../errors.js";
 import { result } from "../output.js";
@@ -61,6 +62,8 @@ export interface PackCommandDeps {
   readonly write?: (line: string) => void;
   /** Resolves `--out` and `--from`; defaults to the process's working directory. */
   readonly cwd?: string;
+  /** The project's `sourcevision.packs`; defaults to what the project config at `cwd` lists. */
+  readonly listed?: readonly string[];
   /** Where `bundle` makes its temporary npm prefix; defaults to the OS temp directory. */
   readonly tempRoot?: string;
 }
@@ -115,6 +118,11 @@ async function runOrFail(npm: NpmRunner, args: readonly string[]): Promise<NpmRe
   return run;
 }
 
+/** The pack ids the project lists in `sourcevision.packs`, in the config's order. */
+async function listedPackIds(deps: PackCommandDeps): Promise<readonly string[]> {
+  return deps.listed ?? (await loadInventoryConfig(deps.cwd ?? process.cwd())).packs ?? [];
+}
+
 /** The pack's directory inside the pack directory. */
 const installedDir = (pack: InstallablePack, packDir: string): string =>
   join(packDir, "node_modules", ...pack.packageName.split("/"));
@@ -133,6 +141,8 @@ export interface PackListing {
   readonly version?: string;
   /** Whether sourcevision analyzes with this pack yet. */
   readonly analyzed: boolean;
+  /** Whether the project lists the pack in `sourcevision.packs`. */
+  readonly listed: boolean;
   /** Why a pack is missing or refused, and what to do. */
   readonly reason?: string;
   readonly remedy?: string;
@@ -144,10 +154,16 @@ export async function listPacks(
   packDir: string,
   version: string,
   importFile?: PackLoaderOptions["importFile"],
+  listed: readonly string[] = [],
 ): Promise<PackListing[]> {
   const listings: PackListing[] = [];
   for (const pack of packs) {
-    const base = { id: pack.id, packageName: pack.packageName, analyzed: KNOWN_PACKS.some((p) => p.id === pack.id) };
+    const base = {
+      id: pack.id,
+      packageName: pack.packageName,
+      analyzed: KNOWN_PACKS.some((p) => p.id === pack.id),
+      listed: listed.includes(pack.id),
+    };
     const load = await loadPack(pack, { packDir, version, importFile });
     if (load.status === "loaded") {
       listings.push({ ...base, status: load.source === "pack-dir" ? "installed" : "resolved", version: load.entry.version });
@@ -201,6 +217,39 @@ async function add(pack: InstallablePack, packDir: string, version: string, deps
   const run = await runOrFail(deps.npm ?? runNpm, args);
   const entry = await loadInstalled(pack, packDir, version, deps, `\`${npmCommandLine(args)}\``, npmOutput(run.output));
   reportInstalled(pack, entry, packDir, write);
+}
+
+/**
+ * `sv pack add` with no language: install each pack the project lists that is
+ * not installed, as `add <lang>` would. A pack the loader already finds (pack
+ * directory or module resolution) is left alone.
+ */
+async function addListed(
+  packs: readonly InstallablePack[],
+  packDir: string,
+  version: string,
+  deps: PackCommandDeps,
+  dryRun: boolean,
+): Promise<void> {
+  const write = deps.write ?? result;
+  const listed = [...new Set(await listedPackIds(deps))];
+  if (listed.length === 0) {
+    write("The project lists no packs: set `sourcevision.packs` in the project config, or run `sv pack add <lang>`.");
+    return;
+  }
+  const missing = listed.filter((id) => !packs.some((p) => p.id === id));
+  if (missing.length > 0) {
+    throw new CLIError(`sourcevision.packs lists unknown pack${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`, `Known packs: ${packs.map((p) => p.id).join(", ")}.`);
+  }
+  for (const id of listed) {
+    const pack = findPack(packs, id, "add");
+    const load = await loadPack(pack, { packDir, version, importFile: deps.importFile });
+    if (load.status === "loaded") {
+      write(`${pack.packageName} is already installed (${load.source === "pack-dir" ? "pack directory" : "module resolution"}).`);
+      continue;
+    }
+    await add(pack, packDir, version, deps, dryRun);
+  }
 }
 
 /** The file at the root of a bundle that says what it holds. */
@@ -364,7 +413,7 @@ async function remove(pack: InstallablePack, packDir: string, version: string, d
 
 async function list(packDir: string, version: string, deps: PackCommandDeps, json: boolean): Promise<void> {
   const write = deps.write ?? result;
-  const packs = await listPacks(deps.packs ?? INSTALLABLE_PACKS, packDir, version, deps.importFile);
+  const packs = await listPacks(deps.packs ?? INSTALLABLE_PACKS, packDir, version, deps.importFile, await listedPackIds(deps));
   if (json) {
     write(JSON.stringify({ packDir, version, packs }, null, 2));
     return;
@@ -378,7 +427,7 @@ async function list(packDir: string, version: string, deps: PackCommandDeps, jso
       : p.status === "resolved" ? "found by module resolution"
       : p.status === "missing" ? (p.remedy ?? "")
       : [p.reason, p.remedy].filter(Boolean).join(". ");
-    const note = p.analyzed ? "" : " (not analyzed yet)";
+    const note = (p.analyzed ? "" : " (not analyzed yet)") + (p.listed ? " [listed]" : "");
     write(`${p.id.padEnd(idWidth)}  ${p.status.padEnd(9)}  ${name}  ${detail}${note}`);
   }
 }
@@ -419,8 +468,9 @@ export async function cmdPack(args: readonly string[], deps: PackCommandDeps = {
 
   switch (sub) {
     case "add": {
-      const pack = findPack(packs, id, sub);
       const from = values.get("--from");
+      if (!id && !from) return addListed(packs, packDir, version, deps, dryRun);
+      const pack = findPack(packs, id, sub);
       return from ? addFromBundle(pack, packDir, version, deps, from, dryRun) : add(pack, packDir, version, deps, dryRun);
     }
     case "bundle":

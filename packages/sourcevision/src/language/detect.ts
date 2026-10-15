@@ -84,6 +84,8 @@ export interface InventoryConfigOverride {
   extraExtensions?: string[];
   /** Extra directory names to skip during the inventory walk. */
   extraSkipDirs?: string[];
+  /** Language pack ids the project wants (`sourcevision.packs`); reported on, never changes what is analysed. */
+  packs?: string[];
 }
 
 /**
@@ -105,6 +107,9 @@ export async function loadInventoryConfig(rootDir: string): Promise<InventoryCon
     }
     if (Array.isArray(s.extraSkipDirs)) {
       out.extraSkipDirs = s.extraSkipDirs.filter((e): e is string => typeof e === "string");
+    }
+    if (Array.isArray(s.packs)) {
+      out.packs = s.packs.filter((e): e is string => typeof e === "string");
     }
     return out;
   } catch {

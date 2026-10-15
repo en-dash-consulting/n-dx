@@ -69,6 +69,22 @@ not by a `tar` process: regular files and directories only, with pax long
 paths; reading refuses links, bad checksums, truncation and any path that is
 absolute or contains `..`.
 
+### The project pack list
+
+`sourcevision.packs` in the project config is an array of pack ids, read
+through the layout resolver by `loadInventoryConfig` (`src/language/detect.ts`),
+so `.ndx/config.json` projects work. It is set by editing the file; core's
+`ndx config` does not know the key. It never changes what is analysed:
+
+- `noticeListedPacks` (`src/analyzers/pack-imports.ts`, called by
+  `analyzeImports`) reports a listed pack that is missing or refused with the
+  `ndx sv pack add <lang>` remedy, once, even when the project has no files of
+  that language (a listed pack with files is reported by the normal degrade
+  path), and one warning for unknown ids listing the known ones.
+- `add` with no language installs each listed pack the loader does not find;
+  `list` marks listed packs (`listed` in `--json`).
+- No list, an empty list or a non-array: no notice, byte-identical output.
+
 npm runs through llm-client's `spawnCli` (cmd.exe on Windows, for npm's `.cmd`
 shim). The runner, pack list, pack directory and importer are injectable; tests
 (`tests/unit/cli/pack.test.ts`) use a fake npm and never the network.
