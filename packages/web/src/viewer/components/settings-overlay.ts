@@ -8,6 +8,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId } from "../api.js";
@@ -71,7 +72,7 @@ export function SettingsOverlay({ view, validViews, onNavigate, onClose, server 
         onClick: onClose,
         "aria-label": "Close settings",
         title: "Close (Esc)",
-      }, "✕"),
+      }, h(ActionIcon, { name: "close" })),
     ),
     h("div", { class: "settings-overlay-body" },
       h("nav", { class: "settings-overlay-nav", "aria-label": "Settings pages" },

@@ -1,4 +1,5 @@
 import { h, Fragment } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import { useState, useEffect, useRef } from "preact/hooks";
 import { useFocusTrap } from "../hooks/index.js";
 import type { Zone, ZoneCrossing } from "../external.js";
@@ -119,7 +120,7 @@ export function ZoneSlideout({
           onClick: onClose,
           "aria-label": "Close zone details",
           title: "Close (Esc)",
-        }, "\u2715"),
+        }, h(ActionIcon, { name: "close" })),
       ),
 
       // Description

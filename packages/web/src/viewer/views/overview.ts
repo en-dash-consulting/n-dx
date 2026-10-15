@@ -12,7 +12,7 @@ import { formatSince } from "../utils/format.js";
 import { narrationNotice } from "./narration-notice.js";
 import { IsoMapHero } from "./iso-map.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
-import { AnalyzeControls, BrandedHeader, InfoTip } from "../components/index.js";
+import { ActionIcon, AnalyzeControls, BrandedHeader, InfoTip } from "../components/index.js";
 import type { JobTray } from "../hooks/index.js";
 
 interface NextStep {
@@ -199,7 +199,7 @@ export function NextStepsPanel() {
               title: "Copy this recommendation",
               "aria-label": `Copy "${s.title}"`,
               type: "button",
-            }, copied === i ? "✓" : "⎘"),
+            }, h(ActionIcon, { name: copied === i ? "check" : "copy" })),
           ),
           h("div", { class: "next-step-desc" }, s.description),
         ),

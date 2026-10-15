@@ -7,6 +7,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useMemo, useRef, useEffect } from "preact/hooks";
 import type { PRDItemData, Priority } from "./types.js";
 import { type ItemType, childTypeOf, isRootType, isValidParentType, itemTypeLabel, itemTypeOf, parentTypesOf } from "../../external.js";
@@ -162,7 +163,7 @@ export function AddItemForm({ allItems, onSubmit, onCancel, defaultParentId }: A
         class: "rex-add-form-close",
         onClick: onCancel,
         "aria-label": "Close",
-      }, "\u00d7"),
+      }, h(ActionIcon, { name: "close" })),
     ),
 
     // Error display
