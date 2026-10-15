@@ -2,7 +2,7 @@
 id: "1dd4c58e-ee0b-4e9e-96d8-8e0f1f70f2e2"
 level: "task"
 title: "MCP schema watchers have no 'error' listener, so a dist/ watcher error crashes ndx start"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -10,11 +10,16 @@ tags:
   - "web"
   - "v2-hardening"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-15T07:27:37.393Z"
+completedAt: "2026-10-15T07:31:01.375Z"
+endedAt: "2026-10-15T07:31:01.375Z"
+resolutionType: "code-change"
+resolutionDetail: "Attached guarded 'error' listener to MCP schema dist/ watchers via shared watcher-guard.ts; failed watcher is closed and dropped; test added."
 acceptanceCriteria:
   - "Every FSWatcher returned by startMcpSchemaWatcher has an 'error' listener"
   - "A test that emits 'error' on a watcher returned by startMcpSchemaWatcher does not throw, and the watcher is closed"
 description: "Verdict: out-of-scope (pre-existing; found while reviewing 70eb342f, which guarded the register* watchers in start.ts). startServer always calls startMcpSchemaWatcher() (packages/web/src/server/start.ts:1223). Its watchDistDir (packages/web/src/server/mcp-schema-watcher.ts:68-83) watches the dist/ directories of @n-dx/rex and @n-dx/sourcevision but attaches no 'error' listener. The try/catch only covers a synchronous throw. If an FSWatcher later emits 'error' with no listener, that error becomes an uncaught exception and stops the server. Known trigger: on Windows, deleting a watched directory emits EPERM (nodejs/node#4337). Example: `pnpm install` or a clean rebuild removes packages/*/dist while `ndx start` is serving.\n\nOptions: (a, recommended) Attach an 'error' listener in watchDistDir: warn, close the watcher, and drop it from the returned list. Mirror start.ts's guardWatcher. If both modules need it, the two-consumer rule allows moving it to a shared server helper. Cost: small, plus a test. (b) A process-level uncaughtException guard. Rejected, because it hides unrelated faults.\n\nOperator notes from the parent feature apply: packages/web only; stay out of Hal's #742 files; add a patch changeset for @n-dx/web; run the six root policy tests.\n\nOperator notes (2026-10-14, v2 hardening 4/5): packages/web only, except tests. Hal's draft #742 edits packages/web/src/server/routes-live*.ts, routes-worktrees.ts, the hub proxy and the Live viewer files; stay out of them. Add a changeset (patch, @n-dx/web). Run the six static root policy tests before finishing: tests/e2e/architecture-policy, domain-isolation, shell-spawn-inventory-policy, wall-clock-inventory-policy, layout-literal-policy and obfuscated-code-policy."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-15T07:05:29.108Z"
+lastModified: "2026-10-15T07:31:01.662Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
