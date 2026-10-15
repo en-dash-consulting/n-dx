@@ -36,6 +36,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Defer the PRD timeline view and re-scope it to the Changes view](./defer-the-prd-timeline-view-and-re.md) | completed |
 | [Derive area links and propose dependsOn from shared tests](./derive-area-links-and-propose.md) | pending |
 | [Diff two migration plans in words](./diff-two-migration-plans-in-words.md) | pending |
+| [docs/guide/skills.md skill table descriptions can drift from manifest.json with no test to catch it](./docs-guide-skills-md-skill-table.md) | pending |
 | [FileStore and FolderTreeStore save reports are relative to .ndx/, not the project root, on the .ndx/ layout](./filestore-and-foldertreestore-save.md) | pending |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
 | [hench task-lookup.ts imports @n-dx/rex directly, bypassing rex-gateway](./hench-task-lookup-ts-imports-n-dx-rex.md) | pending |
