@@ -52,4 +52,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The interrupted-apply test compares normalised snapshot paths, so Windows CLI smoke passes](./the-interrupted-apply-test-compares.md) | pending |
 | [The migration plan's --out and --summary guard compares real paths and refuses n-dx state directories](./the-migration-plan-s-out-and-summary.md) | pending |
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | completed |
-| [Wire migrate apply onto #715's migrate-plan and #716's Inbox writer](./wire-migrate-apply-onto-715-s-migrate.md) | in_progress |
+| [Wire migrate apply onto #715's migrate-plan and #716's Inbox writer](./wire-migrate-apply-onto-715-s-migrate.md) | completed |

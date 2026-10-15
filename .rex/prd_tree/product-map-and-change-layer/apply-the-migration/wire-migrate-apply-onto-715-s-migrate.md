@@ -2,7 +2,7 @@
 id: "1aba5faa-aa60-4566-a045-928ab6c61795"
 level: "task"
 title: "Wire migrate apply onto #715's migrate-plan and #716's Inbox writer"
-status: "in_progress"
+status: "completed"
 priority: "critical"
 tags:
   - "pr-23"
@@ -10,6 +10,10 @@ tags:
   - "restack-2026-10-14"
 source: "restack-2026-10-14"
 startedAt: "2026-10-15T03:35:18.297Z"
+completedAt: "2026-10-15T03:57:20.244Z"
+endedAt: "2026-10-15T03:57:20.244Z"
+resolutionType: "code-change"
+resolutionDetail: "apply.ts compiles on #715/#716; rex migrate-apply command + ndx migrate --apply spawn; tests adapted to #715's planner and default plan path."
 acceptanceCriteria:
   - "pnpm build and tsc pass for packages/rex with the cherry-picked apply library"
   - "rex migrate-plan --rules-only --out=p.json then rex migrate-apply --plan=p.json migrates a fixture; a second apply is a no-op; --dry-run writes nothing (tests)"
@@ -18,6 +22,6 @@ acceptanceCriteria:
   - "docs/cli-ui-gap.md regenerated; the six root policy tests, domain-layer-boundary and the v2 isolation test pass"
 description: "Restack of the closed stack 2 onto main (2026-10-14). The migration apply library is cherry-picked onto this branch from feat/100-pr23b-migrate-apply (11c88bce, 1c70426e, fde93c35, a09e2a27, 3e5c1961, aa61a436, 5769af51; all completed there), but main replaced our plan command with Hal's #715 (packages/rex/src/cli/commands/migrate-plan.ts, `rex migrate-plan --out=<path>`, ndx default ./migration-plan.json plus a Markdown summary beside it) and our Inbox writer with Hal's #716. The picks dropped every hunk of the old packages/rex/src/cli/commands/migrate.ts, so apply has no CLI and rex does not compile.\n\nWhat breaks today (tsc on packages/rex):\n- src/migrations/v1-to-v2/apply.ts imports incompletePasses from ../plan-file.js; #715 removed it (and isPlanComplete). Filter header.passes for `incomplete` the way migrate-plan.ts does.\n- apply.ts imports freeChangeSlug from core/apply-amendments.js; #716 has no such helper and instead refuses an \"inbox\" slug in store/prd-model-writer.ts. Use freeSlug for the cut change.\n- #715's planner (migrations/v1-to-v2/migration-plan.ts) keeps a review-sourced epic (source ndx-adversarial-review) as an area instead of a dissolved delivery container, so apply.test.ts's expectations that e2 dissolves (containers [\"e2\",\"e3\"], byId(e2) undefined, \"Review findings (e2)\" in the cut body) no longer hold. Update the tests to #715's planner; do not change the planner.\n- #715 adds `met` on plan entries and `metAt` in plan data (migration-plan-data.ts). apply stamps metAt from the written spec; keep it consistent with the plan's metAt (constraints are stamped by apply).\n\nWire apply onto #715:\n- rex: a command module packages/rex/src/cli/commands/migrate-apply.ts, `rex migrate-apply --plan=<path.json> [--dry-run] [dir]` (plan required on a v1 tree, as migrate-plan requires --out; on a v2 tree it reports so and exits zero), dispatched beside migrate-plan in packages/rex/src/cli/index.ts and listed in REX_COMMANDS; help entry in packages/rex/src/cli/help.ts. The old module's apply and dry-run bodies (applyPlan, reportRehearsal) are in `git show 4646976ba:packages/rex/src/cli/commands/migrate.ts`.\n- core: packages/core/cli.js handleMigrate gains `--apply [--plan=<path>] [--dry-run]`, spawning rex migrate-apply with --plan defaulting to the same ./migration-plan.json migrate-plan writes; --plan alone still plans. Spawn only. Update packages/core/help.js, packages/core/command-effects.js (apply's write of {rex}/ when not --dry-run), README.md and docs/guide/commands.md, and regenerate docs/cli-ui-gap.md with node scripts/build-cli-ui-gap.mjs.\n- Allowlists: add ../../migrations/v1-to-v2/apply.js to the cli/commands tracked surface in packages/rex/tests/integration/domain-layer-boundary.test.ts, and migrations/v1-to-v2/apply.ts (plus the new command module if it imports v2 modules) to the v2 isolation list in packages/rex/tests/unit/schema/v2.test.ts. Check tests/e2e/architecture-policy.test.js and cross-package-contracts.\n- Tests: a unit test for the command (plan with cmdMigratePlan --rules-only --out, apply, second apply is a no-op, missing --plan refused and nothing written); tests/e2e/cli-migrate-apply.test.js and tests/e2e/cli-migrate-plan.test.js (both cherry-picked) adapted to #715's default plan path and flags.\n\nKeep it minimal: no new behaviour beyond wiring and the adaptations above. Record each #715/#716-forced change in the commit message."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-15T03:35:19.306Z"
+lastModified: "2026-10-15T03:57:21.140Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
