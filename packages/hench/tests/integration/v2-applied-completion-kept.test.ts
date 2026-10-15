@@ -341,6 +341,86 @@ describe("a failure after a v2 completion applied its change", () => {
   });
 });
 
+describe("a failed run with rollback enabled after a v2 completion applied its change", () => {
+  let originalIsTTY: boolean | undefined;
+
+  beforeEach(() => {
+    originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
+  });
+
+  afterEach(() => {
+    vi.doUnmock("node:readline");
+    Object.defineProperty(process.stdin, "isTTY", { value: originalIsTTY, configurable: true });
+  });
+
+  /**
+   * A readline that confirms the rollback prompt ("y") and takes the test
+   * gate's default (abort); `asked` collects the rollback prompts shown.
+   */
+  function confirmEveryPrompt(): { asked: string[] } {
+    const asked: string[] = [];
+    vi.doMock("node:readline", () => ({
+      createInterface: () => ({
+        question: (q: string, cb: (answer: string) => void) => {
+          if (/restore the pre-run/i.test(q)) {
+            asked.push(q);
+            cb("y");
+          } else {
+            cb("");
+          }
+        },
+        close: () => {},
+        on: () => {},
+        removeListener: () => {},
+      }),
+    }));
+    return { asked };
+  }
+
+  async function failBypassedCompletion(rollbackOnFailure: boolean): Promise<RunRecord> {
+    await claims.releaseAll();
+    const { toolRexUpdateStatus } = await import("../../src/tools/rex.js");
+    await toolRexUpdateStatus(await store(), WIRE_ID, { status: "completed", resolutionType: "code-change" });
+    failTestGate();
+    const { finalizeRun } = await lifecycle();
+    const run = buildRun();
+    run.structuredSummary = {
+      filesChanged: ["src/pay.ts"],
+      counts: { filesChanged: 1, toolCalls: 0, testsRun: 0 },
+    } as unknown as RunRecord["structuredSummary"];
+    await finalizeRun({
+      run, henchDir, projectDir, store: await store(),
+      autoCommit: true, rollbackOnFailure, startingHead: baseline,
+    });
+    return run;
+  }
+
+  it("keeps the applied change and the completed task although the operator confirms a rollback", async () => {
+    const { asked } = confirmEveryPrompt();
+    // The PRD writes the completion made are dirty, so a revert would have something to offer.
+    const run = await failBypassedCompletion(true);
+
+    expect(asked).toEqual([]);
+    expect(git("status", "--porcelain", "--", ".rex/product", ".rex/changes")).not.toBe("");
+    await expectCompletionKept();
+    expectKeptReport(run, "Test gate");
+  });
+
+  it("would offer the rollback were the completion not kept (the prompt is reachable)", async () => {
+    // Same run, but the change waits for a steward: nothing applied, so the
+    // rollback prompt is offered. Proves the test above is not vacuous.
+    await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "review" } }));
+    git("add", ".n-dx.json");
+    git("commit", "-q", "-m", "apply on review");
+    baseline = git("rev-parse", "HEAD").trim();
+    const { asked } = confirmEveryPrompt();
+    await failBypassedCompletion(true);
+
+    expect(asked).toHaveLength(1);
+  });
+});
+
 describe("a failure after a v2 completion that applied nothing", () => {
   it("withdraws the completion as before", async () => {
     // rex.applyOn: review — the change completes with its task but waits for a steward.

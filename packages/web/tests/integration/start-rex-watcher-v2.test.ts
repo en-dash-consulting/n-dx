@@ -108,6 +108,34 @@ describe("registerRexWatcher on a v2 tree", () => {
     }, { timeout: 8_000, interval: 1_000 });
   });
 
+  it("refreshes the PRD cache when a file under product/ is edited", async () => {
+    const cachePath = join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON);
+    registerRexWatcher(
+      undefined,
+      rexDir,
+      { refresh: () => {} } as never,
+      { broadcast: () => {} } as never,
+      watchers,
+    );
+    expect(existsSync(cachePath)).toBe(false);
+    // .rex/ and product/. The count is what pins product/: on macOS the
+    // recursive .rex/ watcher also reports a nested edit, so the refresh below
+    // alone would pass without it.
+    expect(watchers).toHaveLength(2);
+    const capabilityPath = join(rexDir, "product", "checkout", "pay-by-card.md");
+    const original = readFileSync(capabilityPath, "utf-8");
+    expect(original).toMatch(/^title:.*$/m);
+    // The cache projection does not carry capability fields, so the signal is
+    // the cache being rewritten, not its content. Retried for the FSEvents
+    // start-up gap described above.
+    let attempt = 0;
+    await vi.waitFor(() => {
+      attempt += 1;
+      writeFileSync(capabilityPath, original.replace(/^title:.*$/m, `title: "Edited ${attempt}"`));
+      expect(existsSync(cachePath)).toBe(true);
+    }, { timeout: 8_000, interval: 1_000 });
+  });
+
   it("follows changes/ deleted and recreated while running, without growing the list", async () => {
     // Start with changes/ present so it is watched at boot.
     const changesDir = join(rexDir, "changes");
