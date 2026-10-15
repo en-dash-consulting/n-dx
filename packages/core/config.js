@@ -288,11 +288,18 @@ export async function loadProjectConfigStrict(dir) {
   for (const which of [PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE]) {
     const path = projectConfigPath(dir, which);
     if (!(await fileExists(path))) continue;
+    let data;
     try {
-      layers.push(await loadJSON(path));
+      data = await loadJSON(path);
     } catch (err) {
       errors.push(`${projectConfigLabel(dir, which)}: cannot be read as JSON: ${err.message}`);
+      continue;
     }
+    if (data === null || typeof data !== "object" || Array.isArray(data)) {
+      errors.push(`${projectConfigLabel(dir, which)}: must hold a JSON object, found ${JSON.stringify(data)}`);
+      continue;
+    }
+    layers.push(data);
   }
   return { config: layers.reduce((merged, layer) => deepMerge(merged, layer), {}), errors };
 }
