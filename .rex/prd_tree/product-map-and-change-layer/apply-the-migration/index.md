@@ -59,4 +59,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The v1 notice tests strip NDX_LEGACY_NOTICE from the environment they spawn with](./the-v1-notice-tests-strip-ndx-legacy.md) | completed |
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | completed |
 | [Wire migrate apply onto #715's migrate-plan and #716's Inbox writer](./wire-migrate-apply-onto-715-s-migrate.md) | completed |
-| [Wire the migrate chain and the once-per-command v1 notice onto main's ndx migrate](./wire-the-migrate-chain-and-the-once.md) | pending |
+| [Wire the migrate chain and the once-per-command v1 notice onto main's ndx migrate](./wire-the-migrate-chain-and-the-once.md) | completed |
