@@ -211,6 +211,24 @@
   font-size: 20px;
 }
 
+/* One line per label, shortened rather than wrapped into the card's edge. */
+.stage-tile .overview-stat-body {
+  min-width: 0;
+}
+
+.stage-tile .overview-stat-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A tile is a summary: its info tips would sit on card edges and their
+   bubbles would be cut off by the tile. The opened tile keeps them. */
+.stage-tile .info-tip {
+  display: none;
+}
+
 /* ── Opened tile: a modal over the page ──
    The backdrop covers the page between the top nav and the bottom bar and
    closes the tile on click; the modal sits inset from it so it reads as a
