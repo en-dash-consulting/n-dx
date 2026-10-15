@@ -7,8 +7,12 @@
  * pack a test means to exercise. The root and web suites run sourcevision's
  * analysis (in process, or through the CLIs they spawn, which inherit this
  * environment), so they get the same isolation sourcevision's own suite has
- * (packages/sourcevision/tests/setup-ndx-home.ts). A test that needs a home of
- * its own sets `NDX_HOME` itself.
+ * (packages/sourcevision/tests/setup-ndx-home.ts).
+ *
+ * It sets `N_DX_HOME`, the lower-precedence of the two names resolveNdxHome
+ * reads, and clears `NDX_HOME`. A test that wants a home of its own sets either
+ * name and wins: the hub and token e2e tests pass `N_DX_HOME` to the CLIs they
+ * spawn, which an `NDX_HOME` set here would silently override.
  *
  * Once per worker process: the shared (`isolate: false`) projects re-run
  * setupFiles before every test file in the same process, and a directory and
@@ -26,5 +30,5 @@ if (globalThis[KEY] === undefined) {
   globalThis[KEY] = home;
   process.on("exit", () => rmSync(home, { recursive: true, force: true }));
 }
-process.env.NDX_HOME = globalThis[KEY];
-delete process.env.N_DX_HOME;
+process.env.N_DX_HOME = globalThis[KEY];
+delete process.env.NDX_HOME;
