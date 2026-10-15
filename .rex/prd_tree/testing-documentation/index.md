@@ -44,6 +44,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Refactor high-risk architectural zones](./refactor-high-risk-architectural-zones/index.md) | completed |
 | [Skills Reference and .gitignore Guidance in ndx Documentation](./skills-reference-and-gitignore/index.md) | completed |
 | [Skills Reference Documentation Page](./skills-reference-documentation-page/index.md) | completed |
+| [Test selection and docs drift](./test-selection-and-docs-drift/index.md) | pending |
 | [Timeout Guardrails for Hanging Tests](./timeout-guardrails-for-hanging-tests/index.md) | completed |
 | [TreeNodes DOM Performance Optimization](./treenodes-dom-performance-optimization/index.md) | completed |
 | [Update Documentation for New PRD Structure](./update-documentation-for-new-prd/index.md) | completed |
