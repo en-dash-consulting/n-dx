@@ -2,12 +2,17 @@
 id: "147027ae-ad5c-48a0-b0d2-2d449a75fbcf"
 level: "task"
 title: "A change applied while in progress can never be completed"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "v2-hardening"
   - "rex"
 source: "ndx-capture"
+startedAt: "2026-10-15T04:39:24.135Z"
+completedAt: "2026-10-15T04:55:41.504Z"
+endedAt: "2026-10-15T04:55:41.504Z"
+resolutionType: "code-change"
+resolutionDetail: "applyAmendments refuses an open change with unfinished live tasks/nested changes (dry run exempt via allowOpenWork); completeChange/closeEnclosing close an applied, not-abandoned change without re-applying."
 acceptanceCriteria:
   - "apply (rex change apply and MCP apply_change) refuses an open change that still has open tasks, naming them; nothing is written (test)"
   - "Completing a change that is already applied closes it (status completed, completedAt) without applying its amendments again (test)"
@@ -15,6 +20,6 @@ acceptanceCriteria:
   - "A change with no open tasks still applies as today, and v1 is unchanged (existing tests pass)"
 description: "Found 2026-10-14 (v2 migration-path page, \"A stuck state\"). Reproduced on a copy of packages/rex/tests/fixtures/v2-tree: CH-1 is in_progress with an open task. `rex change apply CH-1` succeeds and stamps appliedAt. Completing the task then leaves CH-1 in_progress, and `rex update CH-1 --status=completed --force` fails with \"Cannot complete change CH-1: it is not open\". The change can never be completed.\n\nCode: core/apply-amendments.ts applyAmendments (around lines 110-113) accepts any open change, including one with open tasks; core/change-completion.ts completeChange (around line 116) refuses an applied change because isOpenChange is false once appliedAt is set. The same applies through MCP apply_change and update_task_status.\n\nFix direction: apply refuses an open change whose live tasks are not all completed, naming them; completing a change that is already applied closes it (status completed, completedAt) without applying again. v1 is unaffected.\n\nOperator notes: do not touch packages/rex/src/migrations/, store/prd-model-writer.ts, the rex CLI migrate command or its dispatch line in packages/rex/src/cli/index.ts, or packages/rex/tests/unit/schema/v2.test.ts (another session owns them). Run the six static root policy tests before finishing: tests/e2e/architecture-policy, domain-isolation, shell-spawn-inventory-policy, wall-clock-inventory-policy, layout-literal-policy and obfuscated-code-policy. Add a changeset (patch, @n-dx/rex) if you change user-visible behaviour."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-15T04:38:44.726Z"
+lastModified: "2026-10-15T04:55:41.793Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
