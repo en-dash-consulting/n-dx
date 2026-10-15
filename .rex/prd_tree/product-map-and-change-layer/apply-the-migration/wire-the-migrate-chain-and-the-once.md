@@ -8,6 +8,8 @@ tags:
   - "pr-23"
   - "lane-migration"
   - "restack-2026-10-14"
+blockedBy:
+  - "6ffeb488-1333-4749-bb7f-b42e5323e4c8"
 source: "restack-2026-10-14"
 acceptanceCriteria:
   - "Bare ndx migrate on a legacy-layout v1 fixture runs layout, then plan (rex migrate-plan) and apply (rex migrate-apply), and a re-run reports every link already done (e2e)"

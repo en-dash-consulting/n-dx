@@ -8,8 +8,6 @@ tags:
   - "pr-23"
   - "lane-migration"
   - "review-2026-10-12"
-blockedBy:
-  - "7d0695e3-3ba0-43f5-9662-08b766f66f07"
 source: "review-2026-10-12"
 acceptanceCriteria:
   - "packages/rex/tests/e2e/cli-legacy-layout-notice.test.ts passes with NDX_LEGACY_NOTICE=off exported (fails at a7f2c007da: 3 of 6)"
