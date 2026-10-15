@@ -21,6 +21,7 @@ import { dirname, join } from "node:path";
 import { reloadMcpFactories, type McpRouteFactories } from "./routes-mcp.js";
 import { createSubprocessMcpProxy } from "./mcp-subprocess-proxy.js";
 import type { ServerContext } from "./types.js";
+import { guardWatcher } from "./watcher-guard.js";
 
 const DEBOUNCE_MS = 500;
 
@@ -65,17 +66,22 @@ function resolvePackageRoot(pkg: string): string | null {
  * @returns The created `FSWatcher`, or `null` if the dist directory
  *          does not exist or `fs.watch` is unavailable.
  */
-function watchDistDir(distDir: string, onRebuild: () => void): FSWatcher | null {
+function watchDistDir(
+  distDir: string,
+  label: string,
+  onRebuild: () => void,
+  onError: () => void,
+): FSWatcher | null {
   const debounced = debounce(onRebuild, DEBOUNCE_MS);
   const handler = (_event: unknown, filename: unknown): void => {
     if (typeof filename === "string" && filename.endsWith(".js")) debounced();
   };
   try {
-    return watch(distDir, { recursive: true }, handler);
+    return guardWatcher(watch(distDir, { recursive: true }, handler), label, onError);
   } catch {
     // recursive not supported (Linux) — watch the dist root only
     try {
-      return watch(distDir, handler);
+      return guardWatcher(watch(distDir, handler), label, onError);
     } catch {
       return null;
     }
@@ -124,7 +130,10 @@ export function startMcpSchemaWatcher(): FSWatcher[] {
       console.log(`[mcp-schema-watcher] ${pkg} rebuilt — new sessions will use updated schemas`);
     };
 
-    const w = watchDistDir(distDir, onRebuild);
+    const w: FSWatcher | null = watchDistDir(distDir, `${pkg} dist/`, onRebuild, () => {
+      // A failed watcher is already closed; stop handing it to shutdown.
+      if (w) watchers.splice(watchers.indexOf(w), 1);
+    });
     if (w) watchers.push(w);
   }
 

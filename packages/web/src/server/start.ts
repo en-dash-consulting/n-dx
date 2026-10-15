@@ -26,6 +26,7 @@ import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
 import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
+import { guardWatcher } from "./watcher-guard.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
@@ -377,22 +378,6 @@ export async function refreshPRDCache(rexDir: string): Promise<void> {
   } catch (err) {
     console.warn(`[prd-cache] failed to write cache: ${(err as Error).message}`);
   }
-}
-
-/**
- * Attach the 'error' listener every FSWatcher needs: without one, an error
- * emitted after `watch()` returned (Windows raises EPERM when a watched
- * directory is deleted, nodejs/node#4337) is an uncaught exception that takes
- * the server down; the try/catch around `watch()` only covers a synchronous
- * throw. A failed watcher is closed and `onError` lets the owner forget it.
- */
-function guardWatcher(w: FSWatcher, label: string, onError?: () => void): FSWatcher {
-  w.on("error", (err) => {
-    console.warn(`[watcher] ${label} watcher error, closing it: ${(err as Error).message}`);
-    w.close();
-    onError?.();
-  });
-  return w;
 }
 
 function registerSourcevisionWatcher(
