@@ -53,4 +53,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [One-click labelled commit when the dirty tree is only PRD or only scan output](./one-click-labelled-commit-when-the.md) | pending |
 | [Page content paints over the settings overlay instead of under it](./page-content-paints-over-the-settings.md) | pending |
 | [Detected run and build commands as a dashboard control](./detected-run-and-build-commands-as-a.md) | pending |
+| [Fail-forward mode: commit automatically at the end of every run, loop and settings change](./fail-forward-mode-commit-automatically.md) | pending |
 
