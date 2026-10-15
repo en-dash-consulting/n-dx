@@ -41,6 +41,7 @@ export interface AddItemArgs {
   acceptanceCriteria?: string[];
   tags?: string[];
   source?: string;
+  assignee?: string;
   blockedBy?: string[];
   run?: unknown;
   /** v2 only. */
@@ -112,6 +113,7 @@ async function addV2(store: PRDStore, rexDir: string, args: AddItemArgs, run: Ru
         acceptanceCriteria: args.acceptanceCriteria,
         tags: args.tags,
         source: args.source,
+        assignee: args.assignee?.trim() || undefined,
         blockedBy: args.blockedBy,
         priority: args.priority as Priority | undefined,
         run,
@@ -159,6 +161,7 @@ async function addV1(
   if (args.acceptanceCriteria) item.acceptanceCriteria = args.acceptanceCriteria;
   if (args.tags) item.tags = args.tags;
   if (args.source) item.source = args.source;
+  if (args.assignee?.trim()) item.assignee = args.assignee.trim();
   if (args.blockedBy) item.blockedBy = args.blockedBy;
   if (run) item.run = run;
 
@@ -208,6 +211,7 @@ export const addItemTool = defineTool({
     acceptanceCriteria: z.array(z.string()).optional().describe("Acceptance criteria (done when) for this item's own work, changes included. Distinct from a capability's capability criteria"),
     tags: z.array(z.string()).optional().describe("Tags"),
     source: z.string().optional().describe("Source of this item"),
+    assignee: z.string().optional().describe("Who the item belongs to. Matched exactly by task selection (ndx work --mine) and inherited by descendants"),
     blockedBy: z.array(z.string()).optional().describe("IDs of blocking items"),
     run: RunSettingsSchema.optional().describe("Saved run settings for this item. Vendor-agnostic. Keys (all optional, unknown keys rejected): tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id} exact per-vendor pins), provider, permissionMode, review, reviewMode (off|self|pair), reviewVendor (claude|codex: the pair reviewer), reviewTier, reviewModels (same shape as models), reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
     amends: z.array(AmendmentSchema).optional().describe("v2 change only: product-layer edits the change carries ({target, delta: added|modified|removed, summary, criteria?, proposed?, under?, title?, type?})"),
