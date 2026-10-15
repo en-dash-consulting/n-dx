@@ -21,14 +21,12 @@ import { extname } from "node:path";
 import type { LanguageConfig, PackDegradation, PackProjectResult } from "@n-dx/lang-kit";
 import type { ExternalImport, ImportEdge, Inventory } from "../schema/index.js";
 import {
-  defaultPackDir,
   KNOWN_PACKS,
   loadPack,
   packInstallCommand,
   type KnownPack,
   type PackLoaderOptions,
 } from "../language/pack-loader.js";
-import { sourcevisionVersion } from "../language/package-paths.js";
 
 export interface PackImportsOptions {
   /** Defaults to {@link KNOWN_PACKS}. */
@@ -109,11 +107,9 @@ export async function buildPackImportGraph(
     try {
       result = await load.entry.analyzeProject({ projectDir: targetDir, files: paths, kinds: ["imports"] });
     } catch (error) {
-      const version = options.loader?.version ?? sourcevisionVersion();
-      const install = packInstallCommand(pack, options.loader?.packDir ?? defaultPackDir(version), version);
       degrade(pack, {
         reason: `the pack failed (${error instanceof Error ? error.message : String(error)})`,
-        remedy: `Reinstall it with \`${install}\`.`,
+        remedy: `Reinstall it with \`${packInstallCommand(pack)}\`.`,
       });
       continue;
     }

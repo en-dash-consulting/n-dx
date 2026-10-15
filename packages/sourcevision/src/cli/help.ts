@@ -289,6 +289,35 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["analyze", "validate"],
   },
+  pack: {
+    tool: "sourcevision",
+    command: "pack",
+    summary: "install, list and remove language packs",
+    usage: "sourcevision pack <add <lang> | list | remove <lang>> [options]",
+    description:
+      "Manages opt-in language packs (java, go, sql, terraform) in the per-user\n" +
+      "pack directory, <ndx home>/packs/<sourcevision version>/, where analysis\n" +
+      "looks for a pack before module resolution.\n" +
+      "\n" +
+      "  add <lang>      npm install --prefix <pack dir> @n-dx/lang-<lang>@<version>,\n" +
+      "                  then loads the pack; a pack of another version or one that\n" +
+      "                  will not load is an error\n" +
+      "  list            Each pack: installed, resolved (e.g. the default Go pack),\n" +
+      "                  missing or refused, with its version\n" +
+      "  remove <lang>   npm uninstall --prefix <pack dir> @n-dx/lang-<lang>; a pack\n" +
+      "                  found only by module resolution is left alone",
+    options: [
+      { flag: "--dry-run", description: "Print the npm command without running it (add, remove)" },
+      { flag: "--json", description: "Machine-readable output (list)" },
+    ],
+    examples: [
+      { command: "ndx sv pack add java", description: "Install the Java pack" },
+      { command: "sv pack add java --dry-run", description: "Show the npm command it would run" },
+      { command: "sv pack list --json", description: "Every pack's state as JSON" },
+      { command: "sv pack remove java", description: "Remove the Java pack from the pack directory" },
+    ],
+    related: ["analyze"],
+  },
 };
 
 /** Related commands for each sourcevision command (shown as "See also"). */
@@ -351,6 +380,7 @@ export function usage(): void {
           { name: "sourcevision reset [dir]", description: "Remove .sourcevision/ and start fresh" },
           { name: "sourcevision workspace [dir]", description: "Aggregate multiple analyzed repos into a unified view" },
           { name: "sourcevision mcp [dir]", description: "Start MCP server for AI tool integration" },
+          { name: "sourcevision pack <add|list|remove>", description: "Install, list and remove language packs" },
         ],
       },
     ],

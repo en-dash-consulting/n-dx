@@ -124,7 +124,7 @@ describe("buildPackImportGraph", () => {
     expect(graph).toEqual({ edges: [], external: [], degraded: ["java"] });
     expect(messages).toEqual([
       "Java: pack @n-dx/lang-java is not installed; Java files get inventory only. " +
-        `Install it with \`npm install --prefix ${packDir} @n-dx/lang-java@${VERSION}\`.`,
+        "Install it with `ndx sv pack add java`.",
     ]);
   });
 
@@ -185,7 +185,7 @@ describe("buildPackImportGraph", () => {
     expect(graph.edges).toEqual([{ from: "a.go", to: "b.go", type: "static", symbols: [] }]);
     expect(messages).toEqual([
       "Java: the pack failed (resolver blew up); Java files get inventory only. " +
-        `Reinstall it with \`npm install --prefix ${packDir} @n-dx/lang-java@${VERSION}\`.`,
+        "Reinstall it with `ndx sv pack add java`.",
     ]);
   });
 

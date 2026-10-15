@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { javaConfig, type LanguagePackEntry } from "@n-dx/lang-kit";
 import { resolveNdxHome } from "@n-dx/llm-client";
-import { KNOWN_PACKS, defaultPackDir, loadPack, packInstallCommand, type KnownPack } from "../../../src/language/pack-loader.js";
+import { INSTALLABLE_PACKS, KNOWN_PACKS, defaultPackDir, loadPack, packInstallCommand, type KnownPack } from "../../../src/language/pack-loader.js";
 import { sourcevisionVersion } from "../../../src/language/package-paths.js";
 
 const VERSION = "1.2.3";
@@ -117,7 +117,7 @@ describe("loadPack", () => {
       status: "missing",
       notice: {
         reason: "pack @n-dx/lang-java is not installed",
-        remedy: `Install it with \`npm install --prefix ${packDir} @n-dx/lang-java@${VERSION}\`.`,
+        remedy: "Install it with `ndx sv pack add java`.",
       },
     });
   });
@@ -131,9 +131,10 @@ describe("loadPack", () => {
     });
     expect(load).toEqual({
       status: "mismatch",
+      found: "1.0.0",
       notice: {
         reason: `pack @n-dx/lang-java@1.0.0 does not match @n-dx/sourcevision@${VERSION} and was not used`,
-        remedy: `Install the matching pack with \`npm install --prefix ${packDir} @n-dx/lang-java@${VERSION}\`.`,
+        remedy: "Install the matching pack with `ndx sv pack add java`.",
       },
     });
   });
@@ -159,10 +160,13 @@ describe("pack locations", () => {
     expect(defaultPackDir("1.2.3")).toBe(join(resolveNdxHome(), "packs", "1.2.3"));
   });
 
-  it("quotes a pack directory with spaces in the install command", () => {
-    expect(packInstallCommand(KNOWN_PACKS[0]!, "/Users/a b/.ndx/packs/1.2.3", "1.2.3")).toBe(
-      'npm install --prefix "/Users/a b/.ndx/packs/1.2.3" @n-dx/lang-java@1.2.3',
-    );
+  it("names the sv pack add command for a pack, not a raw npm command", () => {
+    expect(INSTALLABLE_PACKS.map(packInstallCommand)).toEqual([
+      "ndx sv pack add java",
+      "ndx sv pack add go",
+      "ndx sv pack add sql",
+      "ndx sv pack add terraform",
+    ]);
   });
 });
 

@@ -14,6 +14,7 @@
  *   pr-markdown [dir]  - Regenerate PR markdown in .sourcevision/
  *   git-credential-helper - Interactive GitHub credential setup helper
  *   mcp [dir]          - Start MCP server for AI tool integration
+ *   pack add|list|remove - Manage language packs in the per-user pack directory
  */
 
 import { resolve } from "node:path";
@@ -29,6 +30,7 @@ import { cmdIso, parseIsoArgs } from "./commands/iso.js";
 import { cmdGitCredentialHelper } from "./commands/git-credential-helper.js";
 import { cmdPrMarkdown } from "./commands/pr-markdown.js";
 import { cmdWorkspace } from "./commands/workspace.js";
+import { cmdPack } from "./commands/pack.js";
 import { CLIError, handleCLIError, requireSvDir } from "./errors.js";
 import { setQuiet, setVerbose, setDebug } from "./output.js";
 import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "@n-dx/llm-client";
@@ -150,6 +152,9 @@ try {
     case "mcp":
       await cmdMcp(targetArg || ".");
       break;
+    case "pack":
+      await cmdPack(args.slice(1));
+      break;
     case "--help":
     case "-h":
     case undefined:
@@ -175,7 +180,7 @@ try {
         );
       }
 
-      const SV_COMMANDS = ["init", "analyze", "serve", "validate", "readiness", "reset", "export-pdf", "iso", "pr-markdown", "git-credential-helper", "mcp", "workspace"];
+      const SV_COMMANDS = ["init", "analyze", "serve", "validate", "readiness", "reset", "export-pdf", "iso", "pr-markdown", "git-credential-helper", "mcp", "workspace", "pack"];
       const typoHint = formatTypoSuggestion(command, SV_COMMANDS, "sourcevision ");
       throw new CLIError(
         `Unknown command: ${command}`,
