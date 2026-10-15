@@ -3279,6 +3279,16 @@ export async function analyzeZones(
     structureChanged = previousZones?.structureHash !== structureHash;
     if (partitionReview?.rejected && !trustPrevious) {
       partitionReview = { ...partitionReview, after: assessPartitionHealth(expandedZones, options?.maxZonePercent) };
+    } else if (!previousZones?.zones?.length || algorithmChanged) {
+      // Nothing to review: assess the partition this run produced, so a
+      // first run that lands one zone on most of the project still says so.
+      partitionReview = {
+        fingerprint: inputFingerprint,
+        health: assessPartitionHealth(expandedZones, options?.maxZonePercent),
+        initial: true,
+        rejected: false,
+      };
+      freshReview = true;
     }
   }
   if (partitionReview && freshReview) {
