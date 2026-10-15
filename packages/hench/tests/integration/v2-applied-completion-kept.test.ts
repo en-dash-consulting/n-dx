@@ -261,6 +261,30 @@ describe("a failure after a v2 completion applied its change", () => {
     expect(run.error).toContain("src/pay.ts");
   });
 
+  it("leaves a file dirty before the run out of the commit commands, and names it apart", async () => {
+    // The operator's in-flight edit, present before the run started.
+    await writeFile(join(projectDir, "notes.md"), "operator draft\n");
+    const { updateCompletedTaskStatus, performCommitPromptIfNeeded, captureBaselineDirty } = await lifecycle();
+    const baselineDirty = await captureBaselineDirty(projectDir);
+    expect(baselineDirty).toContain("notes.md");
+    await agentStagesWork();
+    const s = await store();
+    const run = buildRun();
+
+    await installFailingPreCommitHook();
+    expect(await updateCompletedTaskStatus(s, WIRE_ID, run)).toBe(true);
+    await performCommitPromptIfNeeded(run, projectDir, false, true, true, s, WIRE_ID, undefined, baselineDirty);
+
+    await expectCompletionKept();
+    expectKeptReport(run, "Commit failed");
+    const error =run.error ?? "";
+    const commands = error.split("\n").filter((l) => /^\s+git (add|rm|commit)/.test(l));
+    expect(commands.length).toBeGreaterThan(0);
+    expect(commands.join("\n")).not.toContain("notes.md");
+    expect(error).toContain("Already dirty before the run, not part of this task");
+    expect(error).toContain("notes.md");
+  });
+
   it("keeps a bypassed completion when the test gate then fails", async () => {
     // No hold: the agent's completion is written straight through and applies the change.
     await claims.releaseAll();
