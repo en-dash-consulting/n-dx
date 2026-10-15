@@ -61,8 +61,11 @@ Offline, for a machine with no registry access:
   `.tgz`, default `n-dx-lang-<lang>-<version>.tgz`. The prefix is removed.
 - `add <lang> --from <bundle>` makes no npm call. It reads the manifest first
   and refuses a bundle of another pack or version, or an archive that will not
-  read; then replaces the pack's `node_modules` copy, records the pack in the
-  pack directory's `package.json` and loads it as `add` does.
+  read (a manifest that is not a JSON object is "not a pack bundle"). It
+  extracts into `.sv-pack-stage-*` beside the pack directory and loads the pack
+  from there; only then does it rename the staged packages over the installed
+  ones, record the pack in the pack directory's `package.json` and load it as
+  `add` does. Any failure leaves the previous install untouched.
 
 The archive is written and read in Node (`src/cli/commands/pack-archive.ts`),
 not by a `tar` process: regular files and directories only, with pax long

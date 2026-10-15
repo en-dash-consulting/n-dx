@@ -15,7 +15,7 @@
  * @module sourcevision/cli/commands/pack
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { LanguagePackEntry } from "@n-dx/lang-kit";
@@ -323,11 +323,14 @@ function readBundle(file: string, pack: InstallablePack, version: string): Archi
     new CLIError(`${file} is not a pack bundle: ${why}.`, `Make one with \`sv pack bundle ${pack.id}\`.`);
   const manifestEntry = entries.find((e) => e.path === BUNDLE_MANIFEST);
   if (manifestEntry?.type !== "file") throw notABundle(`it has no ${BUNDLE_MANIFEST}`);
-  let manifest: Partial<BundleManifest>;
+  let manifest: Partial<BundleManifest> | null;
   try {
     manifest = JSON.parse(manifestEntry.data.toString("utf-8")) as Partial<BundleManifest>;
   } catch (error) {
     throw notABundle(`its ${BUNDLE_MANIFEST} is not JSON (${error instanceof Error ? error.message : String(error)})`);
+  }
+  if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest)) {
+    throw notABundle(`its ${BUNDLE_MANIFEST} is not a JSON object`);
   }
   if (manifest.format !== 1) throw notABundle(`its ${BUNDLE_MANIFEST} is of an unknown format ${JSON.stringify(manifest.format)}`);
   const holds = `${String(manifest.packageName)}@${String(manifest.version)}`;
@@ -371,24 +374,87 @@ async function addFromBundle(
     write(`Would install ${pack.packageName}@${version} from ${bundleFile} into ${packDir} (${entries.length} entries).`);
     return;
   }
-  rmSync(installedDir(pack, packDir), { recursive: true, force: true });
-  rmSync(join(packDir, "node_modules", ".package-lock.json"), { force: true });
-  for (const entry of entries) {
-    const target = join(packDir, ...entry.path.split("/"));
-    if (entry.type === "directory") {
-      mkdirSync(target, { recursive: true });
-    } else {
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, entry.data, { mode: entry.mode });
+  // Extract beside the pack directory and prove the pack loads from there; the
+  // installed copy is replaced only once it has. A bundle that fails anywhere
+  // leaves the previous install as it was (offline there is no re-download).
+  mkdirSync(dirname(packDir), { recursive: true });
+  const stage = mkdtempSync(join(dirname(packDir), ".sv-pack-stage-"));
+  try {
+    for (const entry of entries) {
+      const target = join(stage, ...entry.path.split("/"));
+      if (entry.type === "directory") {
+        mkdirSync(target, { recursive: true });
+      } else {
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, entry.data, { mode: entry.mode });
+      }
     }
+    const staged = await loadPack(pack, { packDir: stage, version, importFile: deps.importFile });
+    if (staged.status !== "loaded" || staged.source !== "pack-dir") {
+      const why = staged.status === "loaded" ? "it is not in the bundle's node_modules" : staged.notice.reason;
+      throw new CLIError(
+        `The bundle ${bundleFile} holds ${pack.packageName}@${version} but it cannot be used: ${why}.`,
+        "The installed copy was left as it was.",
+      );
+    }
+    const manifestFile = join(packDir, "package.json");
+    const manifest = existsSync(manifestFile) ? (JSON.parse(readFileSync(manifestFile, "utf-8")) as Record<string, unknown>) : {};
+    const dependencies = { ...((manifest["dependencies"] as Record<string, string> | undefined) ?? {}), [pack.packageName]: version };
+    replaceInstalled(stage, packDir);
+    writeFileSync(manifestFile, `${JSON.stringify({ ...manifest, dependencies }, null, 2)}\n`);
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
   }
-  const manifestFile = join(packDir, "package.json");
-  const manifest = existsSync(manifestFile) ? (JSON.parse(readFileSync(manifestFile, "utf-8")) as Record<string, unknown>) : {};
-  const dependencies = { ...((manifest["dependencies"] as Record<string, string> | undefined) ?? {}), [pack.packageName]: version };
-  writeFileSync(manifestFile, `${JSON.stringify({ ...manifest, dependencies }, null, 2)}\n`);
 
   const entry = await loadInstalled(pack, packDir, version, deps, `The bundle ${bundleFile}`);
   reportInstalled(pack, entry, packDir, write);
+}
+
+/** The package directories directly under `nodeModules`: `name`, or `@scope/name`. */
+function packageDirs(nodeModules: string): string[] {
+  if (!existsSync(nodeModules)) return [];
+  return readdirSync(nodeModules).flatMap((name) =>
+    name.startsWith("@")
+      ? readdirSync(join(nodeModules, name)).map((inner) => `${name}/${inner}`)
+      : name.startsWith(".")
+        ? []
+        : [name],
+  );
+}
+
+/**
+ * Move each package of `stage/node_modules` over its namesake in
+ * `packDir/node_modules` by rename (other packs stay). If a move fails, the
+ * ones already made are undone before the error is rethrown.
+ */
+function replaceInstalled(stage: string, packDir: string): void {
+  const from = join(stage, "node_modules");
+  const to = join(packDir, "node_modules");
+  const displaced = join(stage, ".displaced");
+  const done: string[] = [];
+  try {
+    for (const name of packageDirs(from)) {
+      const target = join(to, ...name.split("/"));
+      const old = join(displaced, ...name.split("/"));
+      mkdirSync(dirname(target), { recursive: true });
+      if (existsSync(target)) {
+        mkdirSync(dirname(old), { recursive: true });
+        renameSync(target, old);
+      }
+      done.push(name);
+      renameSync(join(from, ...name.split("/")), target);
+    }
+  } catch (error) {
+    for (const name of done.reverse()) {
+      const target = join(to, ...name.split("/"));
+      const old = join(displaced, ...name.split("/"));
+      rmSync(target, { recursive: true, force: true });
+      if (existsSync(old)) renameSync(old, target);
+    }
+    throw error;
+  }
+  // npm's hidden lockfile describes the old tree.
+  rmSync(join(to, ".package-lock.json"), { force: true });
 }
 
 async function remove(pack: InstallablePack, packDir: string, version: string, deps: PackCommandDeps, dryRun: boolean): Promise<void> {
