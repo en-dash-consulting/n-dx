@@ -59,6 +59,17 @@ describe("TileGrid", () => {
     expect(tile("files").querySelector(".stage-tile-body--view .view-files")).not.toBeNull();
   });
 
+  it("lets a chromeless panel open its own tile in the modal (the map's Expand)", () => {
+    mount({
+      renderPanel: (p, opened, grid) => opened
+        ? h("div", { class: `panel-${p}-opened` })
+        : h("button", { class: `expand-${p}`, onClick: () => grid.openTile(p) }, "Expand"),
+    });
+    act(() => tile("map").querySelector<HTMLButtonElement>(".expand-map")!.click());
+    expect(dialog()!.querySelector(".panel-map-opened")).not.toBeNull();
+    expect(dialog()!.querySelector("h2")?.textContent).toBe("Codebase map");
+  });
+
   it("renders a chromeless tile as its panel alone, with no header to open it", () => {
     mount();
     expect(tile("map").className).toContain("stage-tile--chromeless");

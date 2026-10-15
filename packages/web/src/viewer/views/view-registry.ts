@@ -150,7 +150,7 @@ function stage(id: StageId): ViewRenderer {
 /** The parts of a stage page that are not views of their own. */
 function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ctx: ViewRenderContext): ComponentChild {
   switch (panel) {
-    case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo });
+    case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo, opened, onExpand: () => grid.openTile("map") });
     case "health": return opened
       ? h(HealthDetail, { data: ctx.data, openTile: grid.openTile, setDetail: ctx.setDetail })
       : h(CodebaseStats, { data: ctx.data });

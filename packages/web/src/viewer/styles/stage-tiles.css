@@ -60,10 +60,31 @@
   min-height: 0;
 }
 
-.stage-tile--chromeless .iso-hero-stage {
+.stage-tile--chromeless .iso-hero-stage,
+.iso-hero--hosted .iso-hero-stage {
   flex: 1;
   height: auto;
   min-height: 0;
+}
+
+/* The map opened in its tile modal fills the modal's body. */
+.stage-tile-fullscreen-body:has(> .stage-tile-content > .iso-hero--hosted) {
+  padding: 0;
+  display: flex;
+}
+
+.stage-tile-fullscreen-body > .stage-tile-content:has(> .iso-hero--hosted) {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.iso-hero--hosted {
+  flex: 1;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* The whole header opens the tile full-screen. */

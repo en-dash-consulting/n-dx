@@ -528,8 +528,17 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
 
 // ── Dashboard panels ─────────────────────────────────────────
 
-/** The codebase map as the Analyze dashboard's hero tile. */
-export function MapPanel({ data, navigateTo }: { data: LoadedData; navigateTo?: NavigateTo }): ComponentChild {
+/**
+ * The codebase map as the Analyze dashboard's hero tile. Its Expand opens the
+ * map tile's modal (`onExpand`); inside the modal (`opened`) it fills the
+ * space and leaves the title and Expand to the modal.
+ */
+export function MapPanel({ data, navigateTo, opened = false, onExpand }: {
+  data: LoadedData;
+  navigateTo?: NavigateTo;
+  opened?: boolean;
+  onExpand?: () => void;
+}): ComponentChild {
   const { zones, imports, manifest } = data;
   if (!zones || zones.zones.length === 0) {
     return h("p", { class: "stage-tile-empty" }, "No zones yet — run an analysis to draw the map.");
@@ -542,6 +551,8 @@ export function MapPanel({ data, navigateTo }: { data: LoadedData; navigateTo?: 
       manifest?.gitBranch ?? "",
     ].filter(Boolean),
     onOpenOptions: navigateTo ? () => navigateTo("iso-map") : undefined,
+    onExpand: opened ? undefined : onExpand,
+    hosted: opened,
   });
 }
 
