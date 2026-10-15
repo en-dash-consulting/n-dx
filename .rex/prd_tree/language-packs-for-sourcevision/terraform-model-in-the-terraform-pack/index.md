@@ -32,5 +32,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add the Terraform model as a database-engine source](./add-the-terraform-model-as-a-database.md) | pending |
-| [Write Terraform structure queries and build the in-memory model](./write-terraform-structure-queries-and.md) | in_progress |
+| [Terraform model build is quadratic in resources × reference edges](./terraform-model-build-is-quadratic-in.md) | pending |
+| [Write Terraform structure queries and build the in-memory model](./write-terraform-structure-queries-and.md) | completed |
 | [Write the Terraform model into infrastructure.json as optional fields](./write-the-terraform-model-into.md) | pending |
