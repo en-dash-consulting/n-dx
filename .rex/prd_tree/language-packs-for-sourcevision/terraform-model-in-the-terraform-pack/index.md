@@ -32,7 +32,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A listed but missing Terraform pack gives two notices per analyze in a Terraform repo](./a-listed-but-missing-terraform-pack.md) | pending |
-| [Add the Terraform model as a database-engine source](./add-the-terraform-model-as-a-database.md) | pending |
+| [Add the Terraform model as a database-engine source](./add-the-terraform-model-as-a-database.md) | completed |
+| [database-corpus-report shows no Terraform candidates on terraform-aws-rds or cloud-foundation-fabric](./database-corpus-report-shows-no.md) | pending |
 | [Terraform model build is quadratic in resources × reference edges](./terraform-model-build-is-quadratic-in.md) | completed |
 | [Write Terraform structure queries and build the in-memory model](./write-terraform-structure-queries-and.md) | completed |
 | [Write the Terraform model into infrastructure.json as optional fields](./write-the-terraform-model-into.md) | completed |
