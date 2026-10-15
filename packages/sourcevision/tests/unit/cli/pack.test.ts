@@ -384,6 +384,37 @@ describe("sv pack bundle and add --from", () => {
     expect(existsSync(packDir)).toBe(false);
   });
 
+  it("leaves the previous install in place and loadable when the bundle's pack will not load", async () => {
+    const out = await makeBundle();
+    packDir = join(work, "ndx home", "packs", VERSION);
+    installPrefix(packDir, "@n-dx/lang-java");
+    const marker = join(packDir, "node_modules", "@n-dx", "lang-java", "previous.js");
+    writeFileSync(marker, "");
+    const failing = async (url: string): Promise<unknown> => {
+      if (url.includes(".sv-pack-stage-")) throw new Error("grammar will not load");
+      return importFile(url);
+    };
+
+    await expect(cmdPack(["add", "java", "--from", out], deps({ cwd: work, importFile: failing }))).rejects.toThrow(
+      /The bundle .*java\.tgz holds @n-dx\/lang-java@1\.2\.3 but it cannot be used/,
+    );
+    expect(existsSync(marker)).toBe(true);
+    expect(readdirSync(join(packDir, ".."))).toEqual([VERSION]);
+    lines = [];
+    await cmdPack(["list"], deps());
+    expect(lines[1]).toMatch(/^java\s+installed\s+@n-dx\/lang-java@1\.2\.3/);
+  });
+
+  it("refuses a bundle whose manifest is null or not an object as not a pack bundle", async () => {
+    for (const json of ["null", "[]", "7"]) {
+      const file = join(work, `manifest-${json}.tgz`);
+      writeFileSync(file, writeTarGz([{ type: "file", path: "n-dx-pack-bundle.json", mode: 0o644, data: Buffer.from(json) }]));
+      await expect(cmdPack(["add", "java", "--from", file], deps())).rejects.toThrow(
+        `${file} is not a pack bundle: its n-dx-pack-bundle.json is not a JSON object.`,
+      );
+    }
+  });
+
   it("refuses a corrupt archive, a truncated one, one with no manifest and a missing file", async () => {
     const out = await makeBundle();
     const archive = readFileSync(out);
