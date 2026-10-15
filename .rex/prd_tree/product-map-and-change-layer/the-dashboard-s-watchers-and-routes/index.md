@@ -20,7 +20,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A failed Product refetch replaces the loaded map and an open capability page with an error](./a-failed-product-refetch-replaces-the.md) | pending |
-| [Bulk PATCH /api/rex/items/bulk writes fields the single PATCH refuses](./bulk-patch-api-rex-items-bulk-writes.md) | pending |
+| [Bulk PATCH /api/rex/items/bulk writes fields the single PATCH refuses](./bulk-patch-api-rex-items-bulk-writes.md) | completed |
 | [Dashboard file watchers have no 'error' listener, so a watcher error crashes ndx start](./dashboard-file-watchers-have-no-error.md) | completed |
 | [MCP schema watchers have no 'error' listener, so a dist/ watcher error crashes ndx start](./mcp-schema-watchers-have-no-error.md) | pending |
 | [No test covers the PRD watcher refreshing the cache on product/ or changes/ edits](./no-test-covers-the-prd-watcher.md) | completed |
