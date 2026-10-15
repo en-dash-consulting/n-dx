@@ -12,7 +12,7 @@ import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import { refreshPRDCache } from "../../../src/server/prd-io.js";
-import { itemFingerprint, type RefinementProposal } from "../../../src/server/prd-refinement.js";
+import { REFINEMENT_FENCE_TAG, itemFingerprint, parseAnswerRefinements, type RefinementProposal } from "../../../src/server/prd-refinement.js";
 import { itemTypeOf } from "../../../src/shared/index.js";
 import { resolveStore, findItem, detectReorganizations, type PRDItem } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -340,6 +340,32 @@ describe("Rex item routes on a v2 project", () => {
       const target = (await itemById(CHANGE_ID)) as PRDItem & { touches?: string[]; aliases?: string[] };
       expect(target.touches).toEqual([PAY_BY_CARD]);
       expect([...(target.aliases ?? [])].sort()).toEqual([other, "CH-7"].sort());
+    });
+
+    describe("parseAnswerRefinements with the change-layer rule", () => {
+      const answer = (itemId: string, intoId: string) =>
+        `Same work.\n\`\`\`${REFINEMENT_FENCE_TAG}\n${JSON.stringify([{ op: "merge", itemId, intoId, rationale: "Duplicate." }])}\n\`\`\``;
+
+      it("offers no merge that absorbs an amending change, and notes rex's reason", async () => {
+        const other = await addChange("Apple Pay, again");
+        const doc = await (await resolveStore(rexDir)).loadDocument();
+        const parsed = parseAnswerRefinements(answer(CHANGE_ID, other), doc, { changeLayer: true });
+        expect(parsed.proposals).toEqual([]);
+        expect(parsed.notes).toHaveLength(1);
+        expect(parsed.notes[0]).toMatch(/carries amendments/);
+      });
+
+      it("skips a merge of two tasks with rex's reason", async () => {
+        const task2 = randomUUID();
+        await (await resolveStore(rexDir)).addItem(
+          { id: task2, title: "Style the button", status: "pending", level: "task", type: "task" } as PRDItem,
+          CHANGE_ID,
+        );
+        const doc = await (await resolveStore(rexDir)).loadDocument();
+        const parsed = parseAnswerRefinements(answer(TASK_ID, task2), doc, { changeLayer: true });
+        expect(parsed.proposals).toEqual([]);
+        expect(parsed.notes[0]).toMatch(/merges changes only/);
+      });
     });
 
     it("reorganize proposes no v1 orphan or single-child collapse, and its merge carries touches and ids", async () => {

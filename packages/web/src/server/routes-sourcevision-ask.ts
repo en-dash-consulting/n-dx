@@ -100,7 +100,7 @@ import { readCliName } from "./cli-name.js";
 import { assembleAskContext } from "./sourcevision-ask-context.js";
 import { ASK_COMMAND, recordDashboardUsage, tokenFields } from "./dashboard-usage.js";
 import type { DashboardUsageOutcome } from "./dashboard-usage.js";
-import { resolveStore } from "./rex-gateway.js";
+import { isChangeLayerStore, resolveStore } from "./rex-gateway.js";
 import type { PRDDocument } from "./rex-gateway.js";
 import { isFeatureEnabled } from "./routes-features.js";
 import {
@@ -658,11 +658,14 @@ async function handleAsk(
   // their fingerprints will be checked against.
   const refine = parsed.mode === "refine";
   let prdDoc: PRDDocument | null = null;
+  let changeLayer = false;
   let contextText = context.text;
   const contextSources = [...context.sources];
   if (refine) {
     try {
-      prdDoc = await (await resolveStore(ctx.rexDir)).loadDocument();
+      const store = await resolveStore(ctx.rexDir);
+      changeLayer = isChangeLayerStore(store);
+      prdDoc = await store.loadDocument();
     } catch {
       // An unreadable PRD is indistinguishable from an absent one here, and
       // both mean the same thing to the user: there is nothing to refine.
@@ -744,7 +747,7 @@ async function handleAsk(
     // rendered as diffs below the prose, and leaving the JSON in place would
     // show every change twice, once in a form nobody reviews.
     const refinements = refine && prdDoc
-      ? parseAnswerRefinements(result.text, prdDoc)
+      ? parseAnswerRefinements(result.text, prdDoc, { changeLayer })
       : null;
     const payload: AskSuccessResponse = {
       answer: refinements ? refinementAnswer(refinements, result.text) : result.text,

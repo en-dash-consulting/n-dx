@@ -152,6 +152,65 @@ describe("on a v2 project", () => {
     expect(root.textContent).toContain("(new)");
   });
 
+  describe("a refetch that fails after a successful load", () => {
+    const capabilityUrl = `/api/rex/product/capability/${CAPABILITY_DETAIL_FIXTURE.id}`;
+
+    /** Answer from `routes`, but 500 (or reject) every product read once `broken.on`. */
+    function stubBreakable(broken: { on: boolean; reject?: boolean }): void {
+      const routes: Record<string, unknown> = {
+        "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
+        [capabilityUrl]: { layout: "v2", capability: CAPABILITY_DETAIL_FIXTURE },
+      };
+      vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+        if (broken.on && broken.reject) throw new Error("network down");
+        if (broken.on) return { ok: false, status: 500, json: async () => ({ error: "Could not read the product" }) };
+        return { ok: true, status: 200, json: async () => routes[url] };
+      }));
+    }
+
+    it.each([
+      ["answers 500", false],
+      ["rejects", true],
+    ])("keeps the map on screen and reports it when the fetch %s", async (_name, reject) => {
+      const broken = { on: false, reject };
+      stubBreakable(broken);
+      await mount(h(ProductPage, null));
+      broken.on = true;
+      await flushFrames("rex:prd-changed");
+
+      expect(root.querySelectorAll(".pm-area")).toHaveLength(PRODUCT_MAP_FIXTURE.areas.length);
+      expect(root.querySelector('[role="alert"]')?.textContent).toContain("Could not refresh");
+    });
+
+    it("leaves an open capability page and its Back button rendered", async () => {
+      const broken = { on: false };
+      stubBreakable(broken);
+      await mount(h(ProductPage, null));
+      act(() => {
+        [...root.querySelectorAll<HTMLButtonElement>(".pm-capability-link")]
+          .find((b) => b.textContent === CAPABILITY_DETAIL_FIXTURE.title)!.click();
+      });
+      await settle();
+      broken.on = true;
+      await flushFrames("rex:prd-changed");
+
+      expect(root.querySelector(".cap-container")?.getAttribute("data-capability-id")).toBe(CAPABILITY_DETAIL_FIXTURE.id);
+      expect(root.querySelector(".cap-back")).not.toBeNull();
+      expect(root.querySelector('[role="alert"]')?.textContent).toContain("Could not read the product");
+    });
+
+    it("clears the notice once a later refetch succeeds", async () => {
+      const broken = { on: false };
+      stubBreakable(broken);
+      await mount(h(ProductPage, null));
+      broken.on = true;
+      await flushFrames("rex:prd-changed");
+      broken.on = false;
+      await flushFrames("rex:prd-changed");
+      expect(root.querySelector('[role="alert"]')).toBeNull();
+    });
+  });
+
   it("the Changes page lists a change added since it mounted", async () => {
     const added = { ...CHANGES_FIXTURE[0]!, id: "change-added-later", displayId: "CH-999", title: "Added later" };
     const routes: Record<string, unknown> = { "/api/rex/changes": { layout: "v2", changes: CHANGES_FIXTURE } };
