@@ -54,4 +54,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Page content paints over the settings overlay instead of under it](./page-content-paints-over-the-settings.md) | completed |
 | [Detected run and build commands as a dashboard control](./detected-run-and-build-commands-as-a.md) | completed |
 | [Fail-forward mode: commit automatically at the end of every run, loop and settings change](./fail-forward-mode-commit-automatically.md) | pending |
+| [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | pending |
 
