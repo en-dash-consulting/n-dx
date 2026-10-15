@@ -44,7 +44,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [ndx work --task=<change> --resolve refuses a change whose open tasks --reset-deferred would reopen](./ndx-work-task-change-resolve-refuses-a.md) | pending |
 | [No test covers the PRD watcher refreshing the cache on product/ or changes/ edits](./no-test-covers-the-prd-watcher.md) | pending |
 | [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | completed |
-| [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | pending |
 | [Record review decisions as calibration records on the run record](./record-review-decisions-as-calibration.md) | pending |
 | [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | deferred |
 | [rex release stamp applies a container change before the changes nested in it](./rex-release-stamp-applies-a-container.md) | pending |

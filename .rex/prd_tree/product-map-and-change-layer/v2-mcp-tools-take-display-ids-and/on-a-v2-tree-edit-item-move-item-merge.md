@@ -1,0 +1,26 @@
+---
+id: "52d7ea63-5637-4e35-a49a-3e86ad7a8c9f"
+level: "task"
+title: "On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts"
+status: "pending"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "pr-33"
+  - "rex"
+  - "v2-hardening"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "On the v2 fixture, edit_item({ id: \"CH-1\" }) edits change c0000000-0000-4000-8000-000000000001 (test)"
+  - "move_item, merge_items and claim_task accept a display id on a v2 tree, the same way get_item does (test per tool)"
+  - "`rex update CH-1 …` on a v2 tree resolves the display id (or an alias) to the change, through the same lookup get_item uses (test)"
+  - "v1 lookups are unchanged (existing tests pass)"
+  - "On a v2 tree, --resolve with a subtask id reports a refusal whose message matches the run's (\"is a subtask ... Run the task instead\") (test) (folded in from deba7cde)"
+  - "On a v2 tree, --resolve with a container change id reports a refusal whose message matches the run's (\"holds other changes\") (test) (folded in from deba7cde)"
+  - "--resolve on a v1 tree is unchanged (existing tests pass unedited) (folded in from deba7cde)"
+description: "Found by an adversarial review of c026ba0d (The rex MCP tools serve a v2 tree). Verdict: should-fix, severity low.\n\nScenario: on a v2 tree, get_item resolves a reference by id, display id or alias (cli/mcp-tools/get-item.ts getV2Item, using indexTree().resolve). edit_item, move_item, merge_items and claim_task look the reference up through ChangeLayerStore.getItem / findItem, which match by id only. An agent calls get_item(\"CH-1\") and gets the change. It then calls edit_item({ id: \"CH-1\", ... }) and gets \"Item \\\"CH-1\\\" not found. Use get_prd_status to see available items.\" No data is corrupted; the call is refused with a misleading message.\n\nReachable: any MCP client on a v2 tree that passes the displayId it read from get_item. Not covered by any test.\n\nOptions:\n1. (Recommended) Add a resolver, used by these four tools on the change-layer store, that maps a display id or alias to the node id through indexTree before the lookup. Cost: one helper plus one test per tool. Risk: low; v1 is unchanged if it is gated on isChangeLayerStore.\n2. Keep id-only lookup, but on a v2 miss say that these tools take the item id and name it when the reference is a known display id. Cheaper, but the two tool families still disagree.\n\nAlso the rex update CLI (review of 38978e4a, run daea9d78, 2026-10-12): packages/rex/src/cli/commands/update.ts:55 resolves the id with resolveItem over the projected items (id or title only), so `rex update CH-1 --status=completed` on the v2 fixture fails with `Item \"CH-1\" not found.` The review could not add this itself because the run was not permitted to edit PRD items.\n\nFolded in on 2026-10-13: deba7cde (On a v2 tree, --resolve reports a subtask or container-change ref as \"Task not found\" instead of the run's reason) covered the same surface and was carried here with its acceptance criteria.\n\nOperator notes (2026-10-14, v2 hardening 3/5): worked together with afb3ae88 (update_task_status takes a display id). Add one shared resolver, gated on the change-layer store, that maps a display id or alias to the node id through indexTree before the lookup, and use it in edit_item, move_item, merge_items, claim_task and update_task_status, and in rex update. The --resolve refusal criteria (folded from deba7cde) are in hench: packages/hench/src/cli/commands/run-resolve.ts; layer 2 of this stack changed --task on a change, so match the run's current messages. MCP tool shapes are soft-frozen; widening an input to accept a display id is allowed and needs a changeset line (patch, @n-dx/rex, and @n-dx/hench if hench changes) fit for the release notes. Do not touch packages/rex/src/migrations/, store/prd-model-writer.ts, the rex migrate command or packages/rex/tests/unit/schema/v2.test.ts. Run the six static root policy tests before finishing: tests/e2e/architecture-policy, domain-isolation, shell-spawn-inventory-policy, wall-clock-inventory-policy, layout-literal-policy and obfuscated-code-policy."
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-15T05:55:56.047Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
