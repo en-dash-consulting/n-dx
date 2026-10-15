@@ -248,7 +248,7 @@ describe("sourcevision.packs", () => {
   it("gives one warning listing the known ids for an unknown id", async () => {
     configure(["cobol", "fortran"]);
     const { messages } = await analyze();
-    expect(messages).toEqual(["sourcevision.packs lists unknown packs cobol, fortran; known packs: java, go, sql, terraform."]);
+    expect(messages).toEqual(["sourcevision.packs lists unknown packs cobol, fortran; known packs: java, go, terraform, sql."]);
   });
 
   it("says nothing with no list, an empty list or a non-array, and never changes the output", async () => {

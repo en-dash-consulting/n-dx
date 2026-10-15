@@ -1155,6 +1155,27 @@ export interface InfraResource {
    * zones — the IaC local name plus any `name`-ish attribute.
    */
   literals?: string[];
+  // The fields below come from the Terraform model, and only when
+  // @n-dx/lang-terraform is installed (`analyzers/terraform-infrastructure.ts`).
+  // Each is present only when the model supplied a value. Strings are as
+  // written in the Terraform, never normalised.
+  /** Module call path that declares the resource, e.g. `module.db`; absent in a root module. */
+  module?: string;
+  /** Provider local name, and the `required_providers` version constraint as written. */
+  provider?: { name: string; version?: string };
+  /**
+   * Ids (`infra:<type>.<name>`) of the resources it references that
+   * `infrastructure.json` lists from the same module directory; sorted.
+   */
+  references?: string[];
+  /** Audit settings the resource writes, as written (`postgres`, `var.engine_version`). */
+  attributes?: {
+    engine?: string;
+    engineVersion?: string;
+    runtime?: string;
+    image?: string;
+    clusterVersion?: string;
+  };
 }
 
 /**

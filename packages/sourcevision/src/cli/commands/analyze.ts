@@ -42,6 +42,7 @@ import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
+import { enrichTerraformInfrastructure } from "../../analyzers/terraform-infrastructure.js";
 import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-profile.js";
 import { computeReadinessScore } from "../../analyzers/readiness-score.js";
 import { detectOutbound } from "../../analyzers/outbound-detection.js";
@@ -735,14 +736,15 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // graph structurally cannot show. Discovered here rather than inside the
     // iso export so anything can read it, and written canonically so repeated
     // runs over an unchanged tree produce a byte-identical file.
-    writeFileSync(
-      join(ctx.svDir, DATA_FILES.infrastructure),
-      toCanonicalJSON(
-        toInfrastructureData(
-          computeInfrastructure(ctx.absDir, (inventory.files as Array<{ path: string }>).map((f) => f.path)),
-        ),
-      ),
+    // With the Terraform pack, Terraform resources gain the model's optional
+    // fields; without it the file is exactly what the scan found.
+    const inventoryPaths = (inventory.files as Array<{ path: string }>).map((f) => f.path);
+    const infrastructure = await enrichTerraformInfrastructure(
+      toInfrastructureData(computeInfrastructure(ctx.absDir, inventoryPaths)),
+      ctx.absDir,
+      inventoryPaths,
     );
+    writeFileSync(join(ctx.svDir, DATA_FILES.infrastructure), toCanonicalJSON(infrastructure));
 
     // SDLC readiness — commands, CI, deployment, quality gates and the rest,
     // each claim carrying the file that proves it. Its own bounded walk,

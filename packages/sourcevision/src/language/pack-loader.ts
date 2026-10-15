@@ -49,6 +49,8 @@ export interface KnownPack extends InstallablePack {
 export const KNOWN_PACKS: readonly KnownPack[] = [
   { id: javaConfig.id, packageName: "@n-dx/lang-java", config: javaConfig, importByResolution: () => import("@n-dx/lang-java") },
   { id: goConfig.id, packageName: "@n-dx/lang-go", config: goConfig, importByResolution: () => import("@n-dx/lang-go") },
+  // Not an imports pack: its resources enrich infrastructure.json (`analyzers/terraform-infrastructure.ts`).
+  { id: terraformConfig.id, packageName: "@n-dx/lang-terraform", config: terraformConfig, importByResolution: () => import("@n-dx/lang-terraform") },
 ];
 
 /**
@@ -58,7 +60,6 @@ export const KNOWN_PACKS: readonly KnownPack[] = [
 export const INSTALLABLE_PACKS: readonly InstallablePack[] = [
   ...KNOWN_PACKS,
   { id: "sql", packageName: "@n-dx/lang-sql", importByResolution: () => import("@n-dx/lang-sql") },
-  { id: terraformConfig.id, packageName: "@n-dx/lang-terraform", importByResolution: () => import("@n-dx/lang-terraform") },
 ];
 
 export interface PackLoaderOptions {
