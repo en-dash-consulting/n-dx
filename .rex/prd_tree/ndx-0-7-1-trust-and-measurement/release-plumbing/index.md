@@ -32,7 +32,8 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Correct every 0.7.1 changeset against the merged behaviour before the cut](./correct-every-0-7-1-changeset-against.md) | completed |
 | [Diagnose and fix the release workflow so publishes create git tags and GitHub releases](./diagnose-and-fix-the-release-workflow.md) | completed |
 | [Fix rex fix timestamp backfill inverting startedAt/completedAt (#375)](./fix-rex-fix-timestamp-backfill.md) | completed |
-| [Make the release verify step wait for npm instead of skipping when the version isn't visible yet](./make-the-release-verify-step-wait-for.md) | pending |
+| [Make the release verify step wait for npm instead of skipping when the version isn't visible yet](./make-the-release-verify-step-wait-for.md) | completed |
+| [Release verify step skips silently when the changesets `published` output is missing or renamed](./release-verify-step-skips-silently.md) | pending |
 | [Reproduce Windows near-port relocation never engaging (#367)](./reproduce-windows-near-port-relocation.md) | deferred |
 | [Stop the sourcevision cli-hints e2e test timing out under preflight load](./stop-the-sourcevision-cli-hints-e2e.md) | completed |
 | [Stop the Windows CI flakes: unset hookTimeout and bypassed rm retries](./stop-the-windows-ci-flakes-unset.md) | completed |
