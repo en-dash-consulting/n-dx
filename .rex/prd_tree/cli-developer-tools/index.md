@@ -65,7 +65,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-carries.md) | completed |
 | [Pre-dispatch project-dir resolution still lets a directory shadow a config key](./pre-dispatch-project-dir-resolution.md) | completed |
 | [resolveDir treats a tool subcommand as the project directory, so `ndx hench record` checks the wrong path](./resolvedir-treats-a-tool-subcommand-as.md) | completed |
-| [rex migrate-slugs help and JSDoc describe the slug rule it replaced, so the right tool reads as the wrong one](./rex-migrate-slugs-help-and-jsdoc.md) | pending |
+| [rex migrate-slugs help and JSDoc describe the slug rule it replaced, so the right tool reads as the wrong one](./rex-migrate-slugs-help-and-jsdoc.md) | in_progress |
 | [Skill commit steps prescribe a POSIX-only heredoc, which fails in PowerShell and can drop the attribution trailer](./skill-commit-steps-prescribe-a-posix.md) | completed |
 | [Skills that call add_item describe item content in prose instead of naming its parameters](./skills-that-call-add-item-describe.md) | completed |
 | [Skills that record runs omit --startedAt, so each one's first record claims the whole session](./skills-that-record-runs-omit-startedat.md) | completed |

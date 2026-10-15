@@ -1,4 +1,5 @@
 import { formatUsage } from "@n-dx/llm-client";
+import { SLUG_RULE_SUMMARY } from "../../store/index.js";
 
 export const TOOL_VERSION = "0.1.0";
 
@@ -44,7 +45,7 @@ export function usage(): void {
           { name: "health [dir]", description: "Show structure health score (depth, balance, completeness)" },
           { name: "migrate-to-md [dir]", description: "Create .rex/prd.md from .rex/prd.json without modifying JSON" },
           { name: "migrate-folder-tree-filenames [dir]", description: "Rename legacy index.md files to title-based filenames" },
-          { name: "migrate-slugs [dir]", description: "Rename the PRD tree to id-qualified slugs (one-shot, idempotent)" },
+          { name: "migrate-slugs [dir]", description: `Re-serialise the PRD tree at the current rule: ${SLUG_RULE_SUMMARY}` },
           { name: "merge-driver <ancestor> <ours> <theirs>", description: "Git merge driver: three-way frontmatter-aware merge of PRD markdown" },
           { name: "merge-state <ancestor> <ours> <theirs> [path]", description: "Git merge driver: merge v2 state.yaml rows by item id" },
           { name: "backfill-commit-attribution [dir]", description: "Report commits on the default branch that carry no item trailer" },
