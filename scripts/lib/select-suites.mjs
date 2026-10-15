@@ -108,14 +108,15 @@ export const ROOT_DRIFT_TEST_FILES = [
 /**
  * The root tests that read a documentation page and fail when it is stale or
  * incomplete: every command documented in the README and the guide, every guide
- * page linking the skills reference, the generated section of the CLI/UI gap
- * page. A docs-only change selects this label and nothing else, so it stays
+ * page linking the skills reference, every command a user doc names existing,
+ * the generated section of the CLI/UI gap page. A docs-only change selects this label and nothing else, so it stays
  * cheap; {@link VALIDATED_DOC_PAGES} says which pages select it. A unit test
  * fails if a listed file is missing.
  */
 export const ROOT_DOCS_TEST_FILES = [
   "tests/e2e/command-docs-parity.test.js",
   "tests/e2e/docs-skill-refs.test.js",
+  "tests/e2e/docs-command-refs.test.js",
   "tests/e2e/cli-ui-gap-drift.test.js",
 ];
 
@@ -189,7 +190,9 @@ export const VALIDATED_ARTIFACTS = {
  * - `command-docs-parity` reads the README, `packages/core/README.md` and
  *   `docs/guide/commands.md`.
  * - `docs-skill-refs` reads every `docs/guide/*.md` except `skills.md`, which it
- *   exempts, so `skills.md` is prose and selects nothing.
+ *   exempts.
+ * - `docs-command-refs` reads `docs/index.md` and every page under
+ *   `docs/guide/` and `docs/packages/`, nested ones and `skills.md` included.
  * - `cli-ui-gap-drift` reads `docs/cli-ui-gap.md`.
  * - `assistant-parity-smoke` is a root-drift file that also reads two pages.
  */
@@ -203,6 +206,11 @@ export const VALIDATED_DOC_PAGES = [
     label: ROOT_DOCS_LABEL,
     tests: ["tests/e2e/docs-skill-refs.test.js"],
     match: (file) => /^docs\/guide\/[^/]+\.md$/.test(file) && file !== "docs/guide/skills.md",
+  },
+  {
+    label: ROOT_DOCS_LABEL,
+    tests: ["tests/e2e/docs-command-refs.test.js"],
+    match: (file) => file === "docs/index.md" || /^docs\/(guide|packages)\/.+\.md$/.test(file),
   },
   {
     label: ROOT_DOCS_LABEL,

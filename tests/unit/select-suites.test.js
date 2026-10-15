@@ -57,7 +57,7 @@ describe("selectAffected", () => {
   });
 
   it("selects nothing for docs-only changes", () => {
-    expect(select("docs/analysis/x.md", "docs/index.md", "packages/rex/README.md", "packages/web/docs/a.png").suites).toEqual([]);
+    expect(select("docs/analysis/x.md", "docs/archive/x.md", "packages/rex/README.md", "packages/web/docs/a.png").suites).toEqual([]);
   });
 
   // #546 review finding F2: the Markdown/docs short-circuit ran before the
@@ -75,7 +75,7 @@ describe("selectAffected", () => {
   });
 
   it("still selects nothing for a plain docs or prose edit with no validated artifact", () => {
-    expect(select("docs/guide/skills.md").suites).toEqual([]);
+    expect(select("docs/architecture/overview.md").suites).toEqual([]);
     expect(select("docs/analysis/AUDIT-2026-09.md").suites).toEqual([]);
     // Live beside the policed inventories but no test reads either: the
     // layout-literal one stopped being an input when its ratchet became a wall
@@ -359,6 +359,11 @@ describe("validated docs pages", () => {
     ["docs/guide/commands.md", "tests/e2e/command-docs-parity.test.js"],
     ["docs/guide/workflow.md", "tests/e2e/docs-skill-refs.test.js"],
     ["docs/cli-ui-gap.md", "tests/e2e/cli-ui-gap-drift.test.js"],
+    ["docs/guide/workflow.md", "tests/e2e/docs-command-refs.test.js"],
+    ["docs/guide/skills.md", "tests/e2e/docs-command-refs.test.js"],
+    ["docs/guide/concepts/glossary.md", "tests/e2e/docs-command-refs.test.js"],
+    ["docs/packages/rex.md", "tests/e2e/docs-command-refs.test.js"],
+    ["docs/index.md", "tests/e2e/docs-command-refs.test.js"],
     ["docs/guide/troubleshooting.md", "tests/e2e/assistant-parity-smoke.test.js"],
   ])("%s selects a subset that runs %s, and nothing else", (page, test) => {
     const { suites } = select(page);
@@ -371,8 +376,10 @@ describe("validated docs pages", () => {
     expect(select("docs/guide/workflow.md").suites).toEqual(["root-docs"]);
   });
 
-  it("leaves the skills reference, which docs-skill-refs exempts, as prose", () => {
-    expect(select("docs/guide/skills.md").suites).toEqual([]);
+  // docs-skill-refs exempts the skills reference, but docs-command-refs still
+  // checks every command it names, so it is not prose.
+  it("selects root-docs for the skills reference, which docs-command-refs reads", () => {
+    expect(select("docs/guide/skills.md").suites).toEqual(["root-docs"]);
   });
 
   it("drops root-docs when root is selected too", () => {
