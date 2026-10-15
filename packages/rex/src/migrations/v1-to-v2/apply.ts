@@ -20,9 +20,10 @@
  * - **Product nodes.** Areas keep their v1 epic names. A capability ships its
  *   drafted spec, unreviewed unless the plan recorded an approval of that
  *   exact draft. A capability or constraint starts met (`metAt` is the hash of
- *   the spec written, which for a capability the plan marks `met` is the
- *   plan's `metAt`) when its v1 item was completed or an applied change sits
- *   on it, and proposed otherwise: never revised.
+ *   the spec written, never the plan's `metAt`, which hashes the rules-stage
+ *   draft and goes stale once a later pass redrafts the spec) when its v1
+ *   item was completed or an applied change sits on it, and proposed
+ *   otherwise: never revised.
  * - **The cut.** The first change, "Product map and change layer", is applied
  *   at the plan's `cutAt` and adds every capability and constraint, so the
  *   product layer's history starts with the migration.

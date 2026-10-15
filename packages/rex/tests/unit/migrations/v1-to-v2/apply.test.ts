@@ -6,7 +6,7 @@ import { computeProductStatus } from "../../../../src/core/product-status.js";
 import { findActionableWork } from "../../../../src/core/change-selection.js";
 import { isLossless } from "../../../../src/core/slug-migration.js";
 import type { PRDItem } from "../../../../src/schema/v1.js";
-import { isAppliedChange, type RuleNode, type V2Tree } from "../../../../src/schema/v2-rules.js";
+import { isAppliedChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../../src/schema/v2-rules.js";
 import { FileStore } from "../../../../src/store/index.js";
 import { loadPrdModel } from "../../../../src/store/prd-model-reader.js";
 import type { PlanFile } from "../../../../src/migrations/plan-file.js";
@@ -185,12 +185,23 @@ describe("buildV2Tree", () => {
     expect(computeProductStatus(tree).f1!.status).toBe("met");
   });
 
-  it("stamps a met capability's metAt as the plan recorded it", async () => {
+  it("stamps a met capability's metAt from the spec it writes, not the plan's rules-stage hash", async () => {
     const plan = await planOf(TREE);
-    const { tree } = buildV2Tree(TREE, plan);
     const planned = Object.entries(plan.entries).filter(([, e]) => e.data?.metAt !== undefined);
     expect(planned.length).toBeGreaterThan(0);
+    // Unchanged since the rules stage: the two hashes agree.
+    const { tree } = buildV2Tree(TREE, plan);
     for (const [id, entry] of planned) expect(byId(tree, id)!.metAt).toBe(entry.data!.metAt);
+
+    // A later pass redrafted the spec, so the plan's metAt is stale; the node must still read met.
+    for (const [, entry] of planned) entry.spec = { ...entry.spec!, statement: `${entry.spec!.statement ?? ""} Redrafted.` };
+    const redrafted = buildV2Tree(TREE, plan).tree;
+    for (const [id, entry] of planned) {
+      const node = byId(redrafted, id)!;
+      expect(node.metAt).toBe(specHash(nodeSpec(node)));
+      expect(node.metAt).not.toBe(entry.data!.metAt);
+      expect(computeProductStatus(redrafted)[id]!.status).toBe("met");
+    }
   });
 
   it("records the cut as an applied change that adds every product requirement", async () => {
