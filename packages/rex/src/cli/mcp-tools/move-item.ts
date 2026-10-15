@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { validateMove, moveItem, levelParentRule, changeLayerParentRule } from "../../core/move.js";
 import { changeLayerType } from "../../core/layer-projection.js";
-import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
+import { isChangeLayerStore, resolveItemRef, type PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
 
@@ -15,7 +15,8 @@ export async function handleMoveItem(
   args: { id: string; parentId?: string },
 ): Promise<McpResult> {
   try {
-    const { id, parentId } = args;
+    const id = await resolveItemRef(store, args.id);
+    const parentId = args.parentId === undefined ? undefined : await resolveItemRef(store, args.parentId);
     const rule = isChangeLayerStore(store) ? changeLayerParentRule : levelParentRule;
 
     // Validate and move inside one transaction so the lock covers the whole

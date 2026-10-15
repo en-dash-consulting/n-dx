@@ -203,7 +203,7 @@ describe("claims on the MCP path", () => {
     const after = JSON.parse((await handleGetNextTask(storeB, undefined, ctxFor(wtB))).content[0].text);
     expect(after.item.id, "B now passes over the claimed task").toBe("t-low");
 
-    const released = JSON.parse((await handleReleaseTask({ id: "t-high" }, ctxFor(wtA))).content[0].text);
+    const released = JSON.parse((await handleReleaseTask(storeA, { id: "t-high" }, ctxFor(wtA))).content[0].text);
     expect(released).toEqual({ id: "t-high", released: true });
     expect(JSON.parse((await handleGetNextTask(storeB, undefined, ctxFor(wtB))).content[0].text).item.id).toBe("t-high");
   });
@@ -255,7 +255,7 @@ describe("claims on the MCP path", () => {
     // Nor may B take the claim by asking for it directly, or drop A's.
     const stolen = await handleClaimTask(storeB, { id: "t-high" }, ctxFor(wtB));
     expect(stolen.isError).toBe(true);
-    expect(JSON.parse((await handleReleaseTask({ id: "t-high" }, ctxFor(wtB))).content[0].text).released).toBe(false);
+    expect(JSON.parse((await handleReleaseTask(storeB, { id: "t-high" }, ctxFor(wtB))).content[0].text).released).toBe(false);
     expect((await openClaimsStore(wtA).readClaims())[0]).toMatchObject({ taskId: "t-high", worktreeRoot: wtA });
 
     // force is the escape hatch for a run the operator knows is finished.

@@ -21,6 +21,13 @@
  * selected autonomously, but {@link resolveWorkById} still returns them, so
  * `ndx work --task` runs them.
  *
+ * ## Explicit refs
+ *
+ * {@link resolveWorkById} answers a ref by name. A ref naming a change with
+ * open tasks ({@link openChangeTasks}) answers that change's next runnable
+ * task, ranked as below, never the change: the change closes once its tasks
+ * do, so a run of the whole change could not complete it.
+ *
  * `ready` is informational. `readyOnly` and `assignee` (`--ready-only`,
  * `--mine`) narrow the candidates only when asked; a task inherits either
  * value from its change unless it sets its own `ready`.
@@ -38,6 +45,7 @@
 import { indexTree, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { PRIORITY_ORDER, type ItemStatus } from "../schema/v1.js";
 import type { ChangeNode, TaskNode } from "../schema/v2.js";
+import { SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
 
 export type WorkKind = "change" | "task";
 type ChangeRule = RuleNode & ChangeNode;
@@ -85,9 +93,7 @@ const ACTIONABLE: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["pending", "in_
 /** Every autonomous candidate, best first. */
 export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions = {}): WorkUnit[] {
   const index = indexTree(tree);
-  const blockerOpen = (node: RuleNode): boolean =>
-    (node.blockedBy ?? []).some((ref) => index.resolve(ref)?.status !== "completed");
-  const runnable = (node: RuleNode): boolean => ACTIONABLE.has(node.status ?? "pending") && !blockerOpen(node);
+  const runnable = (node: RuleNode): boolean => runnableIn(index, node);
 
   // Whether a change may yield work: its own gates and every enclosing change's.
   const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
@@ -104,24 +110,17 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
   const held = (change: RuleNode): boolean =>
     exclude.size > 0 && [change, ...enclosingChanges(change, parentOf)].some((c) => exclude.has(c.id));
 
-  const order = new Map<RuleNode, number>();
-  const dependents = new Map<RuleNode, number>();
   const units: WorkUnit[] = [];
-  index.entries.forEach(({ node }, i) => {
-    order.set(node, i);
-    for (const ref of node.blockedBy ?? []) {
-      const target = index.resolve(ref);
-      if (target) dependents.set(target, (dependents.get(target) ?? 0) + 1);
-    }
-    // Entries are in tree order, so an enclosing change is judged before what it holds.
-    if (node.type !== "change" || !changeWorkable(node)) return;
+  // Entries are in tree order, so an enclosing change is judged before what it holds.
+  for (const { node } of index.entries) {
+    if (node.type !== "change" || !changeWorkable(node)) continue;
     const change = node as ChangeRule;
     if (changeWorkShape(change) === "unit") units.push({ kind: "change", node: change, change });
     // A container's own tasks are units beside its nested changes.
     for (const task of node.children ?? []) {
       if (task.type === "task" && task.status !== "deleted" && runnable(task)) units.push({ kind: "task", node: task as TaskRule, change });
     }
-  });
+  }
 
   const candidates = units.filter(
     (u) =>
@@ -130,7 +129,23 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
       (!options.readyOnly || (u.node.ready ?? u.change.ready) === true) &&
       (!options.assignee || u.node.assignee === options.assignee || u.change.assignee === options.assignee),
   );
-  return candidates.sort(
+  return rank(index, candidates);
+}
+
+type TreeIndex = ReturnType<typeof indexTree>;
+
+/** `units` best first, in the documented order. */
+function rank(index: TreeIndex, units: WorkUnit[]): WorkUnit[] {
+  const order = new Map<RuleNode, number>();
+  const dependents = new Map<RuleNode, number>();
+  index.entries.forEach(({ node }, i) => {
+    order.set(node, i);
+    for (const ref of node.blockedBy ?? []) {
+      const target = index.resolve(ref);
+      if (target) dependents.set(target, (dependents.get(target) ?? 0) + 1);
+    }
+  });
+  return units.sort(
     (a, b) =>
       urgency(a.node) - urgency(b.node) ||
       priorityRank(a) - priorityRank(b) ||
@@ -140,26 +155,74 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
   );
 }
 
+/** The blocker refs of `node` naming something not completed; an unresolvable ref counts. */
+function openBlockers(index: TreeIndex, node: RuleNode): string[] {
+  return (node.blockedBy ?? []).filter((ref) => index.resolve(ref)?.status !== "completed");
+}
+
+/** Pending, in progress or failing, with every blocker completed. */
+function runnableIn(index: TreeIndex, node: RuleNode): boolean {
+  return ACTIONABLE.has(node.status ?? "pending") && openBlockers(index, node).length === 0;
+}
+
 /** The unit autonomous selection runs next, or `null` when none is actionable. */
 export function findNextWork(tree: V2Tree, options: WorkSelectionOptions = {}): WorkUnit | null {
   return findActionableWork(tree, options)[0] ?? null;
 }
 
+export interface ResolveWorkOptions {
+  /** Tasks to pass over when the ref names a change with open tasks, e.g. ones another worktree has claimed. */
+  excludeIds?: ReadonlySet<string>;
+}
+
 /**
- * The change or task a ref names (id, display id or alias), for an explicit
- * `ndx work --task`. Selection gates do not apply: a change awaiting placement
- * runs when asked for by name. `null` when the ref names no live change or
- * task, or names a container ({@link changeWorkShape}): its work is its nested
- * changes and tasks, so a caller explaining the refusal checks the shape.
+ * The unit an explicit `ndx work --task` runs for a ref (id, display id or
+ * alias). Selection gates do not apply: a change awaiting placement runs when
+ * asked for by name. A change with open tasks ({@link openChangeTasks})
+ * answers its best runnable task outside `excludeIds`, never itself. `null`
+ * when the ref names no live change or task, names a container
+ * ({@link changeWorkShape}: its work is its nested changes and tasks), or
+ * names a change none of whose open tasks can run; a caller explaining the
+ * refusal checks the shape or the open tasks.
  */
-export function resolveWorkById(tree: V2Tree, ref: string): WorkUnit | null {
+export function resolveWorkById(tree: V2Tree, ref: string, options: ResolveWorkOptions = {}): WorkUnit | null {
   const index = indexTree(tree);
   const node = index.resolve(ref);
   if (node?.type === "change" && changeWorkShape(node) === "container") return null;
-  if (node?.type === "change") return { kind: "change", node: node as ChangeRule, change: node as ChangeRule };
+  if (node?.type === "change") {
+    const change = node as ChangeRule;
+    const open = openTasks(change);
+    if (open.length === 0) return { kind: "change", node: change, change };
+    const runnable = open.filter((t) => !options.excludeIds?.has(t.id) && runnableIn(index, t));
+    return rank(index, runnable.map((t) => ({ kind: "task" as const, node: t, change })))[0] ?? null;
+  }
   if (node?.type !== "task") return null;
   const [change] = enclosingChanges(node, new Map(index.entries.map((e) => [e.node, e.parent])));
   return change ? { kind: "task", node: node as TaskRule, change: change as ChangeRule } : null;
+}
+
+/** A change's open task, with its blocker refs that are not completed. */
+export interface OpenChangeTask {
+  node: TaskRule;
+  openBlockers: string[];
+}
+
+/**
+ * The open tasks of the change a ref names: live and not completed, the work
+ * that keeps the change from closing. `[]` when the ref names no change, a
+ * container, or a change without open tasks, which runs as one unit.
+ */
+export function openChangeTasks(tree: V2Tree, ref: string): OpenChangeTask[] {
+  const index = indexTree(tree);
+  const node = index.resolve(ref);
+  if (node?.type !== "change" || changeWorkShape(node) === "container") return [];
+  return openTasks(node as ChangeRule).map((t) => ({ node: t, openBlockers: openBlockers(index, t) }));
+}
+
+function openTasks(change: ChangeRule): TaskRule[] {
+  return (change.children ?? []).filter(
+    (c): c is TaskRule => c.type === "task" && c.status !== "deleted" && !SUCCESSFUL_CHILD_STATUSES.has(c.status ?? "pending"),
+  );
 }
 
 /**

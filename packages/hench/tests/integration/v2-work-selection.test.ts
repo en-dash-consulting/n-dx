@@ -150,11 +150,13 @@ describe("v2 --task", () => {
     expect(taskId).toBe(WIRE_ID);
   });
 
-  it("accepts a display id and runs the real id", async () => {
+  it("accepts a change's display id and runs the change's open task", async () => {
     const s = await store();
     const { taskId } = await assembleTaskBrief(s, "CH-1");
-    expect(taskId).toBe(CHANGE_ID);
+    expect(taskId).toBe(WIRE_ID);
+    // The task sets no priority, so it is scheduled at its change's.
     expect(await peekNextTaskPriority(s, "CH-1")).toBe("high");
+    expect(await peekNextTaskPriority(s, WIRE_ID)).toBe("high");
   });
 
   it("refuses a ref that names nothing", async () => {

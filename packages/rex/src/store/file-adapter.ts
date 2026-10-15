@@ -1,5 +1,6 @@
 import { readFile, writeFile, appendFile, mkdir, rename, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
+import { projectRootOf } from "@n-dx/llm-client";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { SCHEMA_VERSION } from "../schema/index.js";
@@ -371,7 +372,7 @@ export class FileStore implements PRDStore {
       this.pendingSaveReport,
       buildSaveFileReport(
         { writtenPaths: [...writtenFiles.keys()], deletedPaths: [] },
-        dirname(this.rexDir),
+        projectRootOf(this.rexDir),
       ),
     );
     this.rebuildOwnershipFromItems(doc);
@@ -637,7 +638,8 @@ export class FileStore implements PRDStore {
     // between commit points and needs the union at take time.
     this.pendingSaveReport = mergeSaveFileReports(
       this.pendingSaveReport,
-      buildSaveFileReport(written, dirname(this.rexDir)),
+      // projectRootOf, not dirname: on the `.ndx/` layout rexDir's parent is the container.
+      buildSaveFileReport(written, projectRootOf(this.rexDir)),
     );
     this.rebuildOwnershipFromItems(doc);
   }

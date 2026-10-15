@@ -3152,6 +3152,7 @@ export async function performCommitPromptIfNeeded(
   store?: PRDStore,
   taskId?: string,
   commitWatcher?: CommitMsgWatcher,
+  baselineDirty?: string[],
 ): Promise<CommitPromptOutcome> {
   if (autoCommit || run.status !== "completed") return "not-applicable";
 
@@ -3190,7 +3191,7 @@ export async function performCommitPromptIfNeeded(
     run.error = `Could not stage review repairs: ${reviewStageFailure.message}`;
     info(`\n${run.error}`);
     if (store) {
-      await withdrawCompletionClaim(store, run, run.error, projectDir);
+      await withdrawCompletionClaim(store, run, run.error, projectDir, baselineDirty);
     }
     try { unlinkSync(msgPath); } catch { /* ignore */ }
     return "no-commit";
@@ -3281,7 +3282,7 @@ export async function performCommitPromptIfNeeded(
         run.status = "failed";
         run.error = `Could not stage PRD files: ${error.message}`;
         info(`\n${run.error}`);
-        await withdrawCompletionClaim(store, run, run.error, projectDir);
+        await withdrawCompletionClaim(store, run, run.error, projectDir, baselineDirty);
         try { unlinkSync(msgPath); } catch { /* ignore */ }
         return "no-commit";
       }
@@ -3391,7 +3392,7 @@ export async function performCommitPromptIfNeeded(
     run.error = `Commit failed: ${error.message}`;
     info(run.error);
     if (store) {
-      await withdrawCompletionClaim(store, run, run.error, projectDir);
+      await withdrawCompletionClaim(store, run, run.error, projectDir, baselineDirty);
     }
   } finally {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
@@ -3533,9 +3534,15 @@ async function keepAppliedCompletion(
   reason: string,
   changeId: string,
   projectDir: string,
+  baselineDirty: string[] = [],
 ): Promise<void> {
   const taskId = run.taskId!;
-  const { paths } = await findUncommittedWork({ projectDir });
+  // Dirty before the run is the operator's, not the task's: listed apart, so
+  // the commit commands cannot sweep it under the task's trailer (WM2048).
+  const preexisting = new Set(baselineDirty);
+  const found = (await findUncommittedWork({ projectDir })).paths;
+  const paths = found.filter((p) => !preexisting.has(p));
+  const preRun = found.filter((p) => preexisting.has(p));
   const deleted = deletedAmong(projectDir, paths);
   run.error = formatAppliedCompletionKept({
     cause: reason,
@@ -3544,6 +3551,7 @@ async function keepAppliedCompletion(
     paths,
     deleted,
     files: await prepareRecoveryPathspecs(projectDir, paths, deleted),
+    preRun,
   });
   info(`\n${run.error}`);
   await toolRexAppendLog(store, taskId, {
@@ -3574,6 +3582,7 @@ async function withdrawCompletionClaim(
   run: RunRecord,
   reason: string,
   projectDir: string,
+  baselineDirty?: string[],
 ): Promise<void> {
   if (!run.taskId) return;
   try {
@@ -3582,7 +3591,7 @@ async function withdrawCompletionClaim(
 
     const appliedChangeId = await appliedChangeOfCompletion(store, run.taskId);
     if (appliedChangeId) {
-      await keepAppliedCompletion(store, run, reason, appliedChangeId, projectDir);
+      await keepAppliedCompletion(store, run, reason, appliedChangeId, projectDir, baselineDirty);
       return;
     }
 
@@ -3774,7 +3783,7 @@ async function settleAfterTestGateFailure(
         "unless it applied a v2 change, which is kept. " +
         "If the agent committed it, that commit still records the task as completed.",
     );
-    await withdrawCompletionClaim(opts.store, run, run.error ?? "Test gate failed", opts.projectDir);
+    await withdrawCompletionClaim(opts.store, run, run.error ?? "Test gate failed", opts.projectDir, opts.baselineDirty);
   }
 
   const review = run.review;
@@ -4382,7 +4391,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     run.review.gated = true;
     info(`\n${run.error}`);
     if (opts.store) {
-      await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
+      await withdrawCompletionClaim(opts.store, run, run.error, projectDir, opts.baselineDirty);
     }
   }
 
@@ -4397,7 +4406,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     run.error = formatUnresolvedMustFixRefusal(run.review);
     info(`\n${run.error}`);
     if (opts.store) {
-      await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
+      await withdrawCompletionClaim(opts.store, run, run.error, projectDir, opts.baselineDirty);
     }
   }
 
@@ -4499,7 +4508,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         : formatUncommittedWorkRefusal(leaked.paths, leakedDeleted, pathspecs);
       info(`\n${run.error}`);
       if (opts.store) {
-        await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
+        await withdrawCompletionClaim(opts.store, run, run.error, projectDir, opts.baselineDirty);
       }
       // Hold the cross-worktree claim rather than letting the run's `finally`
       // release it. The refusal means finished work is sitting uncommitted in
@@ -4572,6 +4581,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     opts.store,
     run.taskId,
     opts.commitWatcher,
+    opts.baselineDirty,
   );
 
   // Review repairs: only the autoCommit path needs them swept here. The
@@ -4590,7 +4600,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       run.error = `Could not commit review repairs: ${error.message}`;
       info(`\n${run.error}`);
       if (opts.store) {
-        await withdrawCompletionClaim(opts.store, run, run.error, projectDir);
+        await withdrawCompletionClaim(opts.store, run, run.error, projectDir, opts.baselineDirty);
       }
     }
 

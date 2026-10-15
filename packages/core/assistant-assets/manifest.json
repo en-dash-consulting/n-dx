@@ -30,7 +30,7 @@
       "commits": true
     },
     "ndx-reshape": {
-      "description": "Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps, create new containers",
+      "description": "Restructure the PRD — regroup, reparent, merge overlaps and place changes",
       "commits": true
     },
     "ndx-feedback": {

@@ -1,0 +1,25 @@
+---
+id: "909927eb-12d6-450f-aa40-e95caa1aa138"
+level: "task"
+title: "Bundle v2 export blames a missing child when the folder's child was skipped as invalid, and drops the reader warning naming it"
+status: "completed"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "rex"
+  - "lane-rex-store"
+source: "ndx-adversarial-review"
+startedAt: "2026-10-15T06:12:23.385Z"
+completedAt: "2026-10-15T06:18:21.648Z"
+endedAt: "2026-10-15T06:18:21.648Z"
+resolutionType: "code-change"
+resolutionDetail: "Option (a): assertFolderStateOwners takes model.warnings and, for a stray folder, lists skipped files with reader warnings instead of \"Add a child back\". Commit 7ed280646."
+acceptanceCriteria:
+  - "Exporting a v2 tree whose folder's only child has invalid intent and whose state.yaml has an extra top-level key fails with a message that names the skipped child file and its reader warning (test)"
+  - "The refusal no longer tells the operator to add a child back when a child file exists but was skipped (test)"
+description: "Verdict: should-fix (low). Introduced by the dd28f982 fix (assertFolderStateOwners in packages/rex/src/store/prd-model-bundle-v2.ts → packages/rex/src/store/prd-bundle-v2.ts, buildBundleV2).\n\nFailure scenario (reproduced against the built dist): copy the v2 fixture, set `type: \"bogus\"` in product/checkout/pay-by-card.md, append `futureTop: 1` to product/checkout/state.yaml. exportV2Bundle throws \"Folders with no children keep top-level state.yaml keys ... product/checkout/ (futureTop). Add a child back, ...\" although product/checkout/pay-by-card.md is still on disk. The reader skipped it for invalid intent (readFolder only keeps nodes readNode returns), so the folder reads as childless. The reader's warning naming the invalid file is in model.warnings, but exportV2Bundle throws before returning them, so `rex export` (cli/commands/export.ts exportV2) never prints it. The operator is told to add a child that is already there, with no pointer to the real cause.\n\nReachable: `rex export` / `ndx prd export` on a hand-edited v2 tree whose folder's only children have invalid intent and whose state.yaml has an extra top-level key. Before dd28f982 the same tree exported (with the warning) a bundle import refused, so this is a worse message, not new data loss.\n\nOptions:\n(a) Recommended. When refusing, append the reader warnings for paths under the stray folder to the error (or say \"has no readable children\" and list skipped files). Cost: pass warnings into the check or catch in exportV2Bundle and enrich. Risk: none.\n(b) Have exportV2Bundle print/return warnings even when build throws (attach them to the BundleError). Cost: small API change. Risk: low.\n\nOperator note (overnight 2026-10-15): Take option (a). The v2 bundle format is soft-frozen: change only the refusal message and the reader warning it carries, never the bundle shape, field names or import behaviour. Files: packages/rex/src/store/prd-bundle-v2.ts (and prd-model-bundle-v2.ts if the check lives there) plus a test that builds the failing fixture in a temp copy. Do not edit these files, which other sessions own tonight: packages/rex/src/core/apply-amendments.ts, packages/rex/src/core/change-completion.ts, packages/rex/src/migrations/, packages/rex/src/store/prd-model-writer.ts, packages/rex/src/cli/index.ts, packages/rex/src/cli/help.ts, the rex MCP tool handlers (update_task_status, edit_item, move_item, merge_items, claim_task, health), packages/rex/tests/unit/schema/v2.test.ts, hench run and task-lookup source, packages/web, packages/sourcevision, packages/core/cli.js, help.js, command-effects.js, README.md, docs/guide/commands.md, tests/setup-session-env.js. If the fix needs one of them, stop and say so in your summary instead of editing it. The pinning test must fail on the code before your fix; say in your summary how you checked that. Run the six static root policy tests (tests/e2e/architecture-policy, domain-isolation, shell-spawn-inventory-policy, wall-clock-inventory-policy, layout-literal-policy, obfuscated-code-policy) before committing. Do not add a changeset; the operator adds one per layer."
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-15T06:18:22.395Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

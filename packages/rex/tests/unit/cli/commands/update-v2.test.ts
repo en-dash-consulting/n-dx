@@ -85,6 +85,12 @@ describe("rex update --status on a v2 tree", () => {
     expect(output()).toContain(`Applied change ${CHANGE}`);
   });
 
+  it("resolves a display id to its change, as get_item does", async () => {
+    await cmdUpdate(cliDir, "CH-1", { priority: "low" });
+    const { tree } = await loadPrdModel(join(cliDir, ".rex"), quiet);
+    expect(indexTree(tree).resolve(CHANGE)).toMatchObject({ priority: "low" });
+  });
+
   it("reports a change left unapplied under rex.applyOn review", async () => {
     await writeFile(join(cliDir, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "review" } }));
     await cmdUpdate(cliDir, TASK, { status: "completed", format: "json" });

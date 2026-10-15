@@ -61,7 +61,7 @@ export { readPerfFlags, clearPerfFlagCache } from "./perf-flags.js";
 export type { RexPerfFlags } from "./perf-flags.js";
 export { openClaimsStore, claimsStorePath, resolveClaimHolder } from "./claims.js";
 export type { ClaimsStore, ClaimHolder, TaskClaim, PendingCompletion } from "./claims.js";
-export { isChangeLayerStore } from "./change-layer-store.js";
+export { isChangeLayerStore, resolveItemRef } from "./change-layer-store.js";
 export {
   ensureLegacyPrdMigrated,
   LegacyPrdMigrationError,

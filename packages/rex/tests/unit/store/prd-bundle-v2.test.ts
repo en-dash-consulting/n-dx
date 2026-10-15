@@ -248,6 +248,16 @@ describe("envelope v2 round trip", () => {
     await expect(exportV2Bundle(src)).rejects.toThrow(/product\/checkout\/ \(futureTop\).*Add a child back/s);
   });
 
+  it("names the skipped child, not 'add a child back', when the folder's only child has invalid intent", async () => {
+    const src = await copyV2Fixture(join(tmp, "src"), "lf");
+    await editText(join(src, "product", "checkout", "pay-by-card.md"), (text) => text.replace(/^type: .*$/m, 'type: "bogus"'));
+    await editText(join(src, "product", "checkout", "state.yaml"), (text) => `${text}futureTop: 1\n`);
+    const refusal = exportV2Bundle(src);
+    await expect(refusal).rejects.toThrow(/product\/checkout\/ \(futureTop\)/);
+    await expect(refusal).rejects.toThrow(/pay-by-card\.md \(Invalid node intent, skipped:/);
+    await expect(refusal).rejects.not.toThrow(/Add a child back/);
+  });
+
   it("carries top-level keys from a childless change, which is always a folder", async () => {
     const src = await copyV2Fixture(join(tmp, "src"), "lf");
     await rm(join(src, "changes", "add-apple-pay", "wire-the-button.md"));
