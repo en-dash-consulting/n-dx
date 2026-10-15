@@ -32,6 +32,8 @@ sourcevision mcp .                        # start MCP server (stdio)
 sourcevision pack add java                # install a language pack (java, go, sql, terraform)
 sourcevision pack list                    # each pack: installed, resolved, missing or refused
 sourcevision pack remove java             # remove a pack from the pack directory
+sourcevision pack bundle java             # archive the pack and its dependencies for offline use
+sourcevision pack add java --from <file>  # install a bundle with no network
 ```
 
 The `sv` command is an alias for `sourcevision`.
@@ -42,6 +44,15 @@ runs `npm install --prefix <ndx home>/packs/<sourcevision version>
 the pack and fails if it is of another version or will not load. Analysis looks
 in that directory before module resolution. A missing or mismatched pack never
 fails analysis; its notice names `ndx sv pack add <lang>`.
+
+For a machine with no registry access, run `sv pack bundle <lang> [--out <file>]`
+on a connected machine with the same sourcevision version. It installs the pack
+into a temporary prefix and writes one `.tgz` (default
+`n-dx-lang-<lang>-<version>.tgz`) holding the pack, its dependencies and a
+manifest; grammars are WebAssembly, so a bundle serves every platform. On the
+offline machine, `sv pack add <lang> --from <file>` checks the manifest, refusing
+a bundle of another pack or version, replaces any installed copy and loads the
+pack, with no npm call.
 
 ## Output Files
 
