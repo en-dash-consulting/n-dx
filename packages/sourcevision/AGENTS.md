@@ -50,9 +50,10 @@ it, Python edges and externals reach `imports.json` through
 `buildPackImportGraph` like Go's and Java's (stdlib as `stdlib:<module>`, a
 `TYPE_CHECKING`-only target as a `type` edge), so Python files join zones;
 a Python repository beside TypeScript (root `pyproject.toml` and
-`package.json`) gets both. `analyzers/inventory.ts` still leaves Python out
-of `analysedLanguages`, since the inventory phase does not know whether the
-pack will load. Its dynamic-import and past-root notices go to the same
+`package.json`) gets both. The inventory phase cannot know whether the pack
+will load, so it leaves Python out of `analysedLanguages`; the imports phase
+adds it to inventory.json once the pack has run (`withPackAnalysedLanguages`),
+and leaves the file untouched otherwise. Its dynamic-import and past-root notices go to the same
 `warn`. `scripts/python-corpus-report.mjs` measures the pack
 over the pinned corpus (`python-corpus.json`), and
 `scripts/python-build-report.mjs` runs lang-kit's Python build readers over

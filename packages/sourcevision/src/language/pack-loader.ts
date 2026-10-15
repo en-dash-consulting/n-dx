@@ -51,7 +51,7 @@ export const KNOWN_PACKS: readonly KnownPack[] = [
   { id: goConfig.id, packageName: "@n-dx/lang-go", config: goConfig, importByResolution: () => import("@n-dx/lang-go") },
   // Not an imports pack: its resources enrich infrastructure.json (`analyzers/terraform-infrastructure.ts`).
   { id: terraformConfig.id, packageName: "@n-dx/lang-terraform", config: terraformConfig, importByResolution: () => import("@n-dx/lang-terraform") },
-  // Its imports are written but not yet resolved: Python files get no edges.
+  // No fallback parser: without it, Python files get inventory only.
   { id: pythonConfig.id, packageName: "@n-dx/lang-python", config: pythonConfig, importByResolution: () => import("@n-dx/lang-python") },
 ];
 

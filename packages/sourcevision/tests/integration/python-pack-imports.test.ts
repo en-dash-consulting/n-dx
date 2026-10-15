@@ -3,18 +3,23 @@
  * inventory.json and imports.json are what they were before Python was a
  * pack (no Python edges, externals or analysed language), and only the
  * notices differ. With it, Python edges and externals join the TypeScript
- * ones in the same imports.json.
+ * ones in the same imports.json, and the imports phase adds Python to
+ * inventory.json's analysedLanguages.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { pythonConfig } from "@n-dx/lang-kit";
 import { analyzeImports } from "../../src/analyzers/imports.js";
-import { analyzeInventory } from "../../src/analyzers/inventory.js";
+import { analyzeInventory, withPackAnalysedLanguages } from "../../src/analyzers/inventory.js";
+import { runImportsPhase, runInventoryPhase, type AnalyzeContext } from "../../src/cli/commands/analyze-phases.js";
+import { cmdInit } from "../../src/cli/commands/init.js";
+import { emptyAnalyzeTokenUsage } from "../../src/cli/sourcevision-core.js";
 import { KNOWN_PACKS, type KnownPack } from "../../src/language/pack-loader.js";
+import { resolveSourcevisionPaths } from "../../src/paths.js";
 import type { Imports, Inventory } from "../../src/schema/v1.js";
 import { toCanonicalJSON } from "../../src/util/sort.js";
 import { skipUnlessPackRuns } from "../helpers/workspace-pack.js";
@@ -65,13 +70,14 @@ describe("Python files through the Python pack", () => {
     rmSync(emptyPackDir, { recursive: true, force: true });
   });
 
-  async function imports(packs: KnownPack[]): Promise<{ imports: Imports; notices: string[] }> {
+  async function imports(packs: KnownPack[]): Promise<{ imports: Imports; notices: string[]; analysed: string[] }> {
     const notices: string[] = [];
+    const analysed: string[] = [];
     const result = await analyzeImports(dir, inventory, {
       language: "python",
-      packs: { packs, loader: { packDir: emptyPackDir }, warn: (m) => notices.push(m) },
+      packs: { packs, loader: { packDir: emptyPackDir }, warn: (m) => notices.push(m), analysed: (id) => analysed.push(id) },
     });
-    return { imports: result, notices };
+    return { imports: result, notices, analysed };
   }
 
   it("lists Python in the inventory but not as an analysed language, as before", async () => {
@@ -89,6 +95,42 @@ describe("Python files through the Python pack", () => {
     expect(missing.notices).toEqual([
       "Python: pack @n-dx/lang-python is not installed; Python files get inventory only. Install it with `ndx sv pack add python`.",
     ]);
+    // No pack ran, so the inventory summary keeps Python out of analysedLanguages.
+    expect(missing.analysed).toEqual([]);
+    expect(withPackAnalysedLanguages(inventory.summary, missing.analysed)).toBe(inventory.summary);
+  });
+
+  it("adds Python to analysedLanguages only once its pack has run", () => {
+    expect(withPackAnalysedLanguages(inventory.summary, ["python"]).analysedLanguages).toEqual(["Python", "TypeScript"]);
+    // Packs whose languages the inventory already lists, or that have no files here, change nothing.
+    expect(withPackAnalysedLanguages(inventory.summary, ["go", "java"])).toBe(inventory.summary);
+  });
+
+  it("through the phases, inventory.json lists Python as analysed when the pack ran", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "python");
+    const project = mkdtempSync(join(tmpdir(), "sv-python-phases-"));
+    try {
+      cpSync(dir, project, { recursive: true });
+      cmdInit(project);
+      const run: AnalyzeContext = {
+        absDir: project,
+        svDir: resolveSourcevisionPaths(project).svDir,
+        fullMode: true,
+        fastMode: true,
+        narrate: false,
+        wait: false,
+        tokenUsage: emptyAnalyzeTokenUsage(),
+        inventoryResult: null,
+      };
+      const readInventory = () => JSON.parse(readFileSync(join(run.svDir, "inventory.json"), "utf-8")) as Inventory;
+      await runInventoryPhase(run);
+      expect(readInventory().summary.analysedLanguages).toEqual(["TypeScript"]);
+      await runImportsPhase(run);
+      expect(readInventory().summary.analysedLanguages).toEqual(["Python", "TypeScript"]);
+      expect(run.inventoryResult?.summary.analysedLanguages).toEqual(["Python", "TypeScript"]);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
   });
 
   it("with the pack loaded, records Python edges and externals beside TypeScript, and counts the dynamic import", async (ctx) => {
@@ -109,5 +151,6 @@ describe("Python files through the Python pack", () => {
     expect(loaded.notices).toEqual([
       "Python: 1 dynamic import names its module at run time and is not an import fact: shop/orders.py:7 (importlib.import_module).",
     ]);
+    expect(loaded.analysed).toEqual(["python"]);
   });
 });
