@@ -54,7 +54,10 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     environment: npm
-    timeout-minutes: 20
+    # Covers the verify step's bounded npm wait (scripts/verify-release-sync.mjs,
+    # about 9 minutes at worst) on top of install, build, tests and publish, so
+    # a version that never appears fails with the script's error, not a timeout.
+    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write

@@ -17,8 +17,14 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export const SCOPE = "@n-dx";
-/** Backoff between npm lookups: 10s, 20s, 40s, then 60s — about 25 minutes in all. */
-export const DEFAULT_DELAYS_MS = [10, 20, 40, ...Array(22).fill(60)].map((s) => s * 1000);
+/**
+ * Backoff between npm lookups: 10s, 20s, 40s, then 60s — about 9 minutes in all.
+ * Must stay well inside the release job's timeout-minutes, or a version that
+ * never appears ends in a job cancellation instead of this script's error.
+ */
+export const DEFAULT_DELAYS_MS = [10, 20, 40, ...Array(8).fill(60)].map((s) => s * 1000);
+/** The most the default backoff may sleep in total: 10 of the job's 30 minutes. */
+export const MAX_TOTAL_WAIT_MS = 10 * 60 * 1000;
 
 /**
  * @param {object} o

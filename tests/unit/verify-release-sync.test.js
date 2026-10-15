@@ -6,7 +6,7 @@
  * @see scripts/verify-release-sync.mjs
  */
 import { describe, it, expect } from "vitest";
-import { verifyReleaseSync } from "../../scripts/verify-release-sync.mjs";
+import { verifyReleaseSync, DEFAULT_DELAYS_MS, MAX_TOTAL_WAIT_MS } from "../../scripts/verify-release-sync.mjs";
 
 const PACKAGES = ["core", "rex", "sourcevision", "hench", "llm-client", "web"];
 
@@ -64,6 +64,12 @@ describe("verifyReleaseSync", () => {
     expect(await h.run()).toBe(1);
     expect(h.sleeps).toEqual([1, 2, 3]);
     expect(h.logs.join("\n")).toContain("never appeared on npm");
+  });
+
+  it("keeps the default wait inside the release job's timeout budget", () => {
+    const total = DEFAULT_DELAYS_MS.reduce((a, b) => a + b, 0);
+    expect(total).toBeGreaterThan(0);
+    expect(total).toBeLessThanOrEqual(MAX_TOTAL_WAIT_MS);
   });
 
   it("fails when a tag or release is missing once npm has the version", async () => {
