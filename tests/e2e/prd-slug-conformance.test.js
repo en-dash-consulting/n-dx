@@ -42,6 +42,7 @@ import {
 } from "../../packages/rex/src/store/folder-tree-serializer.ts";
 import { parseFolderTree } from "../../packages/rex/src/store/folder-tree-parser.ts";
 import { readSlugRuleMarker } from "../../packages/rex/src/store/slug-rule-guard.ts";
+import { countItemsDeep, slugDriftMessage } from "../helpers/slug-drift-message.js";
 
 const REPO_ROOT = process.cwd();
 const REX_DIR = join(REPO_ROOT, ".rex");
@@ -59,25 +60,15 @@ describe("this repository's PRD tree matches the current slug rule", () => {
         .slice(0, 10)
         .map((m) => `  "${m.found}" should be "${m.expected}" in ${m.parentDir} (${m.title})`)
         .join("\n");
-      // Two faults land here and they want different fixes, so the message
-      // names which one the counts point at rather than reporting every
-      // failure as the rarer of the two. A rule change moves *every* path,
-      // because the rule decides all of them; a handful of paths is ordinary
-      // item drift. Reporting the latter as "a different rex build wrote this
-      // tree" once sent a reader past `rex migrate-slugs` — the command that
-      // fixes both — and into a hand-rename of the file and its parent's
-      // Children row.
-      const scale = `${mismatches.length} of ${items.length} path(s) do not match the current slug rule`;
+      // Count the whole tree, not the roots: `mismatches` spans every
+      // descendant, so comparing it against `items.length` measured the two
+      // sides on different scales.
       throw new Error(
-        mismatches.length > items.length / 2
-          ? `${scale}. At that scale the rule itself differs: a rex build using a ` +
-              `different slug rule wrote this tree. Run rex migrate-slugs on the ` +
-              `default branch.\n${detail}`
-          : `${scale}. At that scale this is item drift rather than a rule change. ` +
-              `The usual cause is a title edited without renaming the item's file ` +
-              `(and the parent's Children row that points at it). Run rex migrate-slugs ` +
-              `— it re-serialises the tree at the current rule and renames only what ` +
-              `has drifted.\n${detail}`,
+        slugDriftMessage({
+          mismatchCount: mismatches.length,
+          itemCount: countItemsDeep(items),
+          detail,
+        }),
       );
     }
 
