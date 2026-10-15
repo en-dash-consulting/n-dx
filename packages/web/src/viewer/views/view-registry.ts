@@ -62,7 +62,8 @@ import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import { PrepareTaskModal } from "../components/index.js";
-import { isSettingsView, STAGES, type StageId, type StagePanelId } from "./stages.js";
+import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
+import { analyzeTileSummary } from "./tile-summaries.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 
 import {
@@ -130,6 +131,7 @@ function stage(id: StageId): ViewRenderer {
       ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead" })
       : renderActiveView(view, ctx)),
     renderPanel: (panel: StagePanelId) => renderPanel(panel, ctx),
+    renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data) : undefined,
   });
 }
 
