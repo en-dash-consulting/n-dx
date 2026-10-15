@@ -677,6 +677,25 @@ describe("hub admission gate", () => {
     ]);
   });
 
+  it("narrows the queue to the proxied project when another project is queued too", async () => {
+    // The test above cannot catch a broken filter: alpha's task-1 is RUNNING,
+    // not queued, so beta's entry is the only one in the snapshot and
+    // `.filter(() => true)` passes. Queue a second alpha request so there is
+    // something to narrow away.
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect((await execute(h.port, "/p/alpha/api/hench/execute", "task-1b")).status).toBe(202);
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-2")).status).toBe(202);
+
+    await fetch(`http://127.0.0.1:${h.port}/p/beta/w/feature/api/live`);
+    const header = JSON.parse(beta.liveAdmission[beta.liveAdmission.length - 1]!);
+
+    // The counts stay machine-wide: both queued requests are counted.
+    expect(header.queued).toBe(2);
+    // The entry list is this project's only.
+    expect(header.queue.map((e: { taskId: string }) => e.taskId)).toEqual(["task-2"]);
+  });
+
   it("states it on a proxied prep read too, including that memory is what holds runs back", async () => {
     const h = await startTestHub(4);
     freeMemory = 500;

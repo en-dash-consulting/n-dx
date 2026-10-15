@@ -61,11 +61,16 @@ function CaptureFollowUp({ snapshot, run, navigateTo }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ id: string; title: string } | null>(null);
-  const parentId = followUpParentId(snapshot.task?.epicChain ?? []);
+  // On v2 a change has no parent to file under: `routes-rex/items.ts` refuses
+  // any parentId on Quick Add and tells the caller to open an Inbox change
+  // instead, which placement then ranks. Sending one is a flat HTTP 400.
+  const isV2 = snapshot.prdLayout === "v2";
+  const parentId = isV2 ? null : followUpParentId(snapshot.task?.epicChain ?? []);
 
   const submit = useCallback(async () => {
     const text = note.trim();
-    if (text.length === 0 || !parentId || !snapshot.task) return;
+    if (text.length === 0 || !snapshot.task) return;
+    if (!isV2 && !parentId) return;
     const firstLine = text.split("\n")[0].trim();
     setBusy(true);
     setError(null);
@@ -75,7 +80,9 @@ function CaptureFollowUp({ snapshot, run, navigateTo }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: firstLine.slice(0, MAX_FOLLOW_UP_TITLE),
-          parentId,
+          // Omitted on v2: the change lands in the Inbox and placement ranks
+          // the capability it belongs under.
+          ...(parentId ? { parentId } : {}),
           description: followUpDescription(snapshot.task.title, run.runId, text),
         }),
       });
@@ -92,9 +99,11 @@ function CaptureFollowUp({ snapshot, run, navigateTo }: {
     } finally {
       setBusy(false);
     }
-  }, [note, parentId, snapshot.task, run.runId]);
+  }, [note, parentId, isV2, snapshot.task, run.runId]);
 
-  if (!parentId) {
+  // Only v1 needs an ancestor. A v2 task-less change has an empty epicChain,
+  // so this branch used to fire there and call the change "this task".
+  if (!isV2 && !parentId) {
     return h("span", { class: "live-muted" },
       "A follow-up needs a parent to file under, and this task has no recorded ancestors.");
   }

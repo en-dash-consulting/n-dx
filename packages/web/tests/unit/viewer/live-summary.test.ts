@@ -47,6 +47,7 @@ function snapshot(over: Partial<LiveTaskSnapshot> = {}): LiveTaskSnapshot {
     },
     runs: [run()],
     maxTurns: 50,
+    prdLayout: "v1",
     ...over,
   };
 }
@@ -315,6 +316,44 @@ describe("the finished run's page", () => {
     const link = root.querySelector<HTMLAnchorElement>(".live-capture-done a")!;
     await act(async () => { link.click(); });
     expect(navigateTo).toHaveBeenCalledWith("prd", { taskId: "new-1" });
+  });
+
+  it("files an Inbox change with no parent on a v2 project", async () => {
+    // A v2 change has no parent to sit under, and routes-rex/items.ts refuses
+    // any parentId on Quick Add — this sent one and got a flat HTTP 400.
+    // The route's own advice is an Inbox change, which placement then ranks.
+    body = snapshot({ prdLayout: "v2" });
+    await mount();
+    const capture = [...root.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === "Capture follow-up")!;
+    await act(async () => { capture.click(); await flush(); });
+    const note = root.querySelector<HTMLTextAreaElement>(".live-capture-note")!;
+    await act(async () => {
+      note.value = "Follow up on this";
+      note.dispatchEvent(new Event("input"));
+      await flush();
+    });
+    const add = [...root.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === "Add to the PRD")!;
+    await act(async () => { add.click(); await flush(); });
+    await act(async () => { await flush(); });
+
+    const post = calls.find((c) => c.url === "/api/rex/items")!;
+    const sent = JSON.parse(String(post.init?.body));
+    expect(sent).not.toHaveProperty("parentId");
+    expect(sent.title).toBe("Follow up on this");
+  });
+
+  it("still offers the capture on a v2 change with no ancestors", async () => {
+    // A task-less v2 change has an empty epicChain. The v1 guard fired there
+    // and told the user the change had "no recorded ancestors", calling the
+    // change "this task".
+    body = snapshot({
+      prdLayout: "v2",
+      task: { ...snapshot().task!, epicChain: [] },
+    });
+    await mount();
+    const capture = [...root.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === "Capture follow-up");
+    expect(capture).toBeTruthy();
+    expect(root.textContent).not.toContain("no recorded ancestors");
   });
 
   it("shows the summary from the snapshot alone when the record cannot be read", async () => {

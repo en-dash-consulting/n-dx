@@ -27,7 +27,7 @@ import { readRunDigests, type RunDigestTokens } from "./routes-worktrees.js";
 import { dashboardExecutionsFor, loadHenchConfig } from "./routes-hench.js";
 import { heartbeatAgeMs, isRunStale } from "./run-staleness.js";
 import { isValidRunId, readLogTailLines, resolveRunLogFile } from "./run-tail.js";
-import { estimateCostFromTotals, walkTree } from "./rex-gateway.js";
+import { estimateCostFromTotals, walkTree, prdLayout } from "./rex-gateway.js";
 import { itemTypeOf } from "../shared/index.js";
 import { loadPRDSync } from "./prd-io.js";
 import { readLiveReviewReport, type LiveReviewReport } from "./live-review-report.js";
@@ -125,6 +125,14 @@ export interface LiveTaskSnapshot {
   runs: LiveTaskRun[];
   /** The configured turn limit, or null when hench has no config here. */
   maxTurns: number | null;
+  /**
+   * Which PRD layout this worktree keeps.
+   *
+   * The viewer needs it to file a follow-up: on v2 a parent is refused
+   * outright (`routes-rex/items.ts`), so the capture has to open an Inbox
+   * change instead. Nothing else in the viewer knew the layout.
+   */
+  prdLayout: "v1" | "v2";
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +226,15 @@ function maxTurnsOf(projectDir: string): number | null {
 }
 
 /** Build the answer for one task in the served worktree. Exported for tests. */
-export function buildLiveTaskSnapshot(ctx: ServerContext, taskId: string, now = Date.now()): LiveTaskSnapshot {
+export function buildLiveTaskSnapshot(
+  ctx: ServerContext,
+  taskId: string,
+  now = Date.now(),
+  // Passed in rather than read here: `prdLayout` is async and this builder
+  // is not. The route resolves it; v1 is the safe default for a caller that
+  // does not, since a v1 follow-up simply keeps its parent.
+  layout: "v1" | "v2" = "v1",
+): LiveTaskSnapshot {
   const henchDir = resolveLayout(ctx.projectDir).henchDir;
   const runsDir = join(henchDir, "runs");
   const execution = dashboardExecutionsFor(ctx.projectDir)
@@ -271,6 +287,7 @@ export function buildLiveTaskSnapshot(ctx: ServerContext, taskId: string, now = 
   return {
     generatedAt: new Date(now).toISOString(),
     taskId,
+    prdLayout: layout,
     task: findTask(ctx.rexDir, taskId),
     runs,
     maxTurns: maxTurnsOf(ctx.projectDir),
@@ -284,7 +301,7 @@ export function buildLiveTaskSnapshot(ctx: ServerContext, taskId: string, now = 
 const TASK_PATH = /^\/api\/live\/task\/([^/]+)$/;
 
 /** Handle GET /api/live/task/:taskId. Returns true if the request was handled. */
-export function handleLiveTaskRoute(req: IncomingMessage, res: ServerResponse, ctx: ServerContext): boolean {
+export async function handleLiveTaskRoute(req: IncomingMessage, res: ServerResponse, ctx: ServerContext): Promise<boolean> {
   const match = TASK_PATH.exec((req.url || "/").split("?")[0]);
   if (!match || (req.method || "GET") !== "GET") return false;
   let taskId: string;
@@ -294,6 +311,7 @@ export function handleLiveTaskRoute(req: IncomingMessage, res: ServerResponse, c
     errorResponse(res, 400, "Malformed task id");
     return true;
   }
-  jsonResponse(res, 200, buildLiveTaskSnapshot(ctx, taskId));
+  const layout = (await prdLayout(ctx.rexDir)) === "v2" ? "v2" : "v1";
+  jsonResponse(res, 200, buildLiveTaskSnapshot(ctx, taskId, Date.now(), layout));
   return true;
 }

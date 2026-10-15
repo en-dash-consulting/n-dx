@@ -117,6 +117,8 @@ export interface LiveTaskSnapshot {
   task: LiveTaskItem | null;
   runs: LiveTaskRun[];
   maxTurns: number | null;
+  /** Which PRD layout the served worktree keeps. Mirrors routes-live-task.ts. */
+  prdLayout: "v1" | "v2";
 }
 
 /** Tool-call tallies hench derives at finalization (`structuredSummary.counts`). */
