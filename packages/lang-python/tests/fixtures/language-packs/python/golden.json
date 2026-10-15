@@ -2904,7 +2904,20 @@
     },
     "src/common/helpers.py": {
       "files": [],
-      "external": [],
+      "external": [
+        {
+          "package": "stdlib:datetime",
+          "symbols": [
+            "date"
+          ]
+        },
+        {
+          "package": "stdlib:re",
+          "symbols": [
+            "*"
+          ]
+        }
+      ],
       "written": [
         {
           "specifier": "re",
@@ -2932,7 +2945,21 @@
       "written": []
     },
     "src/shop/__init__.py": {
-      "files": [],
+      "files": [
+        {
+          "to": "src/shop/models.pyi",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "to": "src/shop/orders.py",
+          "symbols": [
+            "OrderService",
+            "place_order"
+          ]
+        }
+      ],
       "external": [],
       "written": [
         {
@@ -2960,7 +2987,14 @@
     },
     "src/shop/models.pyi": {
       "files": [],
-      "external": [],
+      "external": [
+        {
+          "package": "stdlib:dataclasses",
+          "symbols": [
+            "dataclass"
+          ]
+        }
+      ],
       "written": [
         {
           "specifier": "dataclasses",
@@ -2975,8 +3009,117 @@
       ]
     },
     "src/shop/orders.py": {
-      "files": [],
-      "external": [],
+      "files": [
+        {
+          "to": "src/common/helpers.py",
+          "symbols": [
+            "parse_date",
+            "slugify"
+          ]
+        },
+        {
+          "to": "src/common/util.py",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "to": "src/shop/models.pyi",
+          "symbols": [
+            "*",
+            "Order"
+          ]
+        }
+      ],
+      "external": [
+        {
+          "package": "lxml",
+          "symbols": [
+            "etree"
+          ]
+        },
+        {
+          "package": "orjson",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:collections",
+          "symbols": [
+            "OrderedDict",
+            "defaultdict"
+          ]
+        },
+        {
+          "package": "stdlib:decimal",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:functools",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:importlib",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:json",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:os",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:shutil",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:tomllib",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:typing",
+          "symbols": [
+            "*",
+            "TYPE_CHECKING"
+          ]
+        },
+        {
+          "package": "stdlib:xml",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "ujson",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "yaml",
+          "symbols": [
+            "CSafeLoader",
+            "SafeLoader"
+          ]
+        }
+      ],
       "written": [
         {
           "specifier": "functools",

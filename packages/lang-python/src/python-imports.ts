@@ -1,16 +1,13 @@
 /**
- * Python imports as written, read from the `imports` and `guards` captures,
- * and the resolver that reports them.
- *
- * The resolver does not resolve yet: every file's references have no files
- * and no externals, only `written`. A `from __future__` import is never
+ * Python imports as written, read from the `imports` and `guards` captures.
+ * `python-resolver.ts` resolves them. A `from __future__` import is never
  * captured, so it is never listed.
  *
  * @module lang-python/python-imports
  */
 
-import type { FileReferences, ImportGuard, WrittenImport } from "@n-dx/lang-kit";
-import { contains, innermost, type Capture, type PackResolver, type PackSourceFile } from "@n-dx/lang-runtime";
+import type { ImportGuard, WrittenImport } from "@n-dx/lang-kit";
+import { contains, innermost, type Capture, type PackSourceFile } from "@n-dx/lang-runtime";
 
 const GUARDS: Readonly<Record<string, ImportGuard>> = {
   "guard.type_checking": "type-checking",
@@ -56,20 +53,3 @@ export function readWrittenImports(file: PackSourceFile): WrittenImport[] {
   }
   return written;
 }
-
-/**
- * Reports each file's written imports. Resolution to project files and
- * external packages is not implemented: `files` and `external` are empty, so
- * the imports phase records no Python edges or externals.
- */
-export const pythonResolver: PackResolver = {
-  prepare(files) {
-    const byPath = new Map(files.map((file) => [file.path, readWrittenImports(file)]));
-    return {
-      resolve(fromFile): FileReferences {
-        const written = byPath.get(fromFile);
-        return written === undefined ? { files: [], external: [] } : { files: [], external: [], written };
-      },
-    };
-  },
-};

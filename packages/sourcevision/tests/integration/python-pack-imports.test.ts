@@ -1,9 +1,9 @@
 /**
- * Python through inventory and imports while the Python pack reports imports
- * as written but resolves none: whether the pack is missing or loaded,
+ * Python through inventory and imports. Without the Python pack,
  * inventory.json and imports.json are what they were before Python was a
  * pack (no Python edges, externals or analysed language), and only the
- * notices differ.
+ * notices differ. With it, Python edges and externals join the TypeScript
+ * ones in the same imports.json.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -21,7 +21,8 @@ import { skipUnlessPackRuns } from "../helpers/workspace-pack.js";
 
 const FILES: Record<string, string> = {
   "pyproject.toml": '[project]\nname = "shop"\n',
-  "shop/__init__.py": "from .orders import place\n\n__all__ = [\"place\"]\n",
+  "shop/__init__.py":
+    "from typing import TYPE_CHECKING\nfrom .orders import place\n\nif TYPE_CHECKING:\n    from .models import Order\n\n__all__ = [\"place\"]\n",
   "shop/orders.py":
     "import importlib\nimport requests\nfrom . import models\nfrom .models import Order\n\n" +
     "def place(name):\n    return importlib.import_module(name)\n",
@@ -45,7 +46,7 @@ const PYTHON_MISSING: KnownPack[] = KNOWN_PACKS.map((p) =>
       },
 );
 
-describe("Python files while the Python pack resolves nothing", () => {
+describe("Python files through the Python pack", () => {
   let dir: string;
   let emptyPackDir: string;
   let inventory: Inventory;
@@ -90,11 +91,21 @@ describe("Python files while the Python pack resolves nothing", () => {
     ]);
   });
 
-  it("with the pack loaded, records no Python edge or external and counts the dynamic import", async (ctx) => {
+  it("with the pack loaded, records Python edges and externals beside TypeScript, and counts the dynamic import", async (ctx) => {
     await skipUnlessPackRuns(ctx, "python");
-    const before = await imports(WITHOUT_PYTHON);
     const loaded = await imports(KNOWN_PACKS.slice());
-    expect(toCanonicalJSON(loaded.imports)).toBe(toCanonicalJSON(before.imports));
+    expect(loaded.imports.edges.map((e) => [e.from, e.to, e.type, e.symbols])).toEqual([
+      // A TYPE_CHECKING-only import is a type edge; models.py wins over the stub beside it.
+      ["shop/__init__.py", "shop/models.py", "type", ["Order"]],
+      ["shop/__init__.py", "shop/orders.py", "static", ["place"]],
+      ["shop/orders.py", "shop/models.py", "static", ["*", "Order"]],
+      ["web/app.ts", "web/api.ts", "static", ["api"]],
+    ]);
+    expect(loaded.imports.external.map((e) => [e.package, e.importedBy])).toEqual([
+      ["requests", ["shop/orders.py"]],
+      ["stdlib:importlib", ["shop/orders.py"]],
+      ["stdlib:typing", ["shop/__init__.py"]],
+    ]);
     expect(loaded.notices).toEqual([
       "Python: 1 dynamic import names its module at run time and is not an import fact: shop/orders.py:7 (importlib.import_module).",
     ]);

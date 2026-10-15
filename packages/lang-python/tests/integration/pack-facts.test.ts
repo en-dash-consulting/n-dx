@@ -72,8 +72,16 @@ def f():
 describe("Python imports", () => {
   it("lists every form as written, with leading dots kept and no future import", async (ctx) => {
     const { imports } = await read(ctx, IMPORTS, { kinds: ["imports"] });
+    // A lone file at the root: nothing is a project module, and its relative imports climb past the root.
     expect(imports?.files).toEqual([]);
-    expect(imports?.external).toEqual([]);
+    expect(imports?.external.map((e) => [e.package, e.symbols])).toEqual([
+      ["a", ["*"]],
+      ["d", ["*"]],
+      ["e", ["g", "h"]],
+      ["j", ["*"]],
+      ["k", ["*"]],
+      ["l", ["m"]],
+    ]);
     expect(imports?.written?.map((w) => [w.specifier, w.names])).toEqual([
       ["a.b", []],
       ["a.b", []],
@@ -239,7 +247,7 @@ describe("Python pack entry", () => {
     "app/types.pyi": "def helper() -> None: ...\n",
   };
 
-  it("returns written imports with no files or externals, and counts dynamic imports in its notices", async (ctx) => {
+  it("returns resolved and written imports, and counts dynamic imports in its notices", async (ctx) => {
     skipUnlessGrammar(ctx, pythonGrammarPath());
     const projectDir = project(FILES);
     const result = await pack.analyzeProject({ projectDir, files: Object.keys(FILES), kinds: ["imports"] });
@@ -249,7 +257,11 @@ describe("Python pack entry", () => {
       ["app/util.py", ["importlib"]],
       ["app/types.pyi", []],
     ]);
-    expect(result.facts.every((f) => f.imports?.files.length === 0 && f.imports.external.length === 0)).toBe(true);
+    expect(result.facts.map((f) => [f.path, f.imports?.files, f.imports?.external.map((e) => e.package)])).toEqual([
+      ["app/main.py", [{ to: "app/util.py", symbols: ["helper"] }], ["stdlib:importlib"]],
+      ["app/util.py", [], ["stdlib:importlib"]],
+      ["app/types.pyi", [], []],
+    ]);
     expect(result.notices).toEqual([
       "Python: 3 dynamic imports name their module at run time and are not import facts: " +
         "app/main.py:4 (importlib.import_module), app/util.py:4 (__import__), app/util.py:4 (import_module).",

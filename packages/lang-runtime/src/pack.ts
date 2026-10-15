@@ -101,8 +101,10 @@ export interface PackResolver {
    * A resolver bound to what resolution needs from outside the source files
    * (build files such as `go.mod`), read from `projectDir`. Call once per
    * analysis, before {@link prepare}. Absent when sources are enough (Java).
+   * `files` are the pack's files in this request (project-relative), so a
+   * resolver can find build files beside them without walking the project.
    */
-  forProject?(projectDir: string): Promise<PackResolver>;
+  forProject?(projectDir: string, files: readonly string[]): Promise<PackResolver>;
   /**
    * Index every file of the project; call once per analysis. `unparsed` lists
    * the pack's files that produced no captures (over the size limit, unreadable):
@@ -116,6 +118,8 @@ export interface PackResolver {
 export interface PreparedResolver {
   /** References from a prepared file; empty for a path that was not prepared. */
   resolve(fromFile: string): FileReferences;
+  /** What resolution skipped, one sentence each, reported as the pack entry's `notices`. */
+  notices?(): readonly string[];
 }
 
 /** What a framework reads from a project: facts per file path, and what it skipped. */
