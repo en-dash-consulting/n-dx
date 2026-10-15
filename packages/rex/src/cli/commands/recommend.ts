@@ -872,20 +872,34 @@ async function runRecommend(
     let count = 0;
     // Build a hash→finding map for type+scope lookup
     const findingsByHash = new Map(allFindings.map((f) => [f.hash, f]));
+    /**
+     * The finding hashes an item carries, from either place they live.
+     *
+     * v1 items keep them on `recommendationMeta`; a v2 change has no such
+     * field and carries them as `finding:<hash>` tags, which is also what the
+     * v1 scanner writes and what hench reads when it defers one. Reading both
+     * keeps one acknowledge path across the two layouts.
+     */
+    const hashesOf = (item: { recommendationMeta?: unknown; tags?: string[] }): string[] => {
+      const meta = item.recommendationMeta as RecommendationMeta | undefined;
+      const fromTags = (item.tags ?? [])
+        .filter((tag) => tag.startsWith("finding:"))
+        .map((tag) => tag.slice("finding:".length))
+        .filter(Boolean);
+      return [...new Set([...(meta?.findingHashes ?? []), ...fromTags])];
+    };
+
     const walk = (items: typeof doc.items): void => {
       for (const item of items) {
         if (item.status === "completed" && item.source === "sourcevision") {
-          const meta = item.recommendationMeta as RecommendationMeta | undefined;
-          if (meta?.findingHashes) {
-            for (const hash of meta.findingHashes) {
-              if (!isAcknowledged(updated, hash)) {
-                const finding = findingsByHash.get(hash);
-                updated = acknowledgeFinding(
-                  updated, hash, item.title, "completed", "self-heal",
-                  finding?.type, finding?.scope,
-                );
-                count++;
-              }
+          for (const hash of hashesOf(item)) {
+            if (!isAcknowledged(updated, hash)) {
+              const finding = findingsByHash.get(hash);
+              updated = acknowledgeFinding(
+                updated, hash, item.title, "completed", "self-heal",
+                finding?.type, finding?.scope,
+              );
+              count++;
             }
           }
         }

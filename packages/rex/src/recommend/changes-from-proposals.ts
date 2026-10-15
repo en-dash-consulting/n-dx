@@ -21,6 +21,7 @@
  * @module rex/recommend/changes-from-proposals
  */
 
+import { withSelfHealTag } from "../store/self-heal-tag.js";
 import type { AddChangeNodeInput } from "../core/change-add.js";
 import type { Priority } from "./types.js";
 
@@ -32,6 +33,12 @@ export interface ProposedWork {
   priority?: Priority;
   source?: string;
   tags?: string[];
+  /**
+   * The recommendation's own metadata. Only the finding hashes cross into a
+   * change, as `finding:<hash>` tags — v2 has no `recommendationMeta` field,
+   * and tags are what the loop already reads at both ends.
+   */
+  meta?: { findingHashes?: string[] };
   /** A scanner marks work the codebase already does as `completed`. */
   status?: string;
   /** Proposed under this one. A node with children proposes no work of its own. */
@@ -64,15 +71,27 @@ export function changeInputsFromProposals(work: readonly ProposedWork[]): AddCha
     if (node.status && CLOSED_STATUSES.has(node.status)) continue;
     const title = node.title.trim();
     if (!title) continue;
-    inputs.push({
-      type: "change",
+    // The finding hashes are what closes the self-heal loop: hench
+    // acknowledges a deferred change by them, and `--acknowledge-completed`
+    // reads them off a finished one. They ride as tags because a v2 change
+    // has nowhere else to carry them.
+    const tags = [
+      ...(node.tags ?? []),
+      ...(node.meta?.findingHashes ?? []).map((hash) => `finding:${hash}`),
+    ];
+    // Stamped here rather than in the store: `addChangeNode` is shared by
+    // every v2 writer, and only an accepted recommendation during a self-heal
+    // run is self-heal work.
+    const input = withSelfHealTag({
+      type: "change" as const,
       title,
       ...(node.description ? { description: node.description } : {}),
       ...(node.acceptanceCriteria?.length ? { acceptanceCriteria: node.acceptanceCriteria } : {}),
       ...(node.priority ? { priority: node.priority } : {}),
       ...(node.source ? { source: node.source } : {}),
-      ...(node.tags?.length ? { tags: [...node.tags] } : {}),
+      ...(tags.length ? { tags } : {}),
     });
+    inputs.push(input as AddChangeNodeInput);
   }
   return inputs;
 }

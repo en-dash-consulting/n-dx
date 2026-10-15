@@ -35,6 +35,7 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/v1.js";
@@ -88,9 +89,15 @@ async function readJson(path: string): Promise<unknown> {
 
 /** Zones from either shape `zones.json` has had: the canonical `{ zones }` and the legacy flat array. */
 function zonesOf(parsed: unknown): ZoneEvidence[] {
-  if (Array.isArray(parsed)) return parsed as ZoneEvidence[];
-  const zones = (parsed as { zones?: unknown } | undefined)?.zones;
-  return Array.isArray(zones) ? (zones as ZoneEvidence[]) : [];
+  // Null entries are filtered here rather than guarded at each use: this
+  // module promises never to fail the plan over a malformed analysis, and a
+  // `{"zones":[null]}` threw a TypeError downstream.
+  const list = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray((parsed as { zones?: unknown } | undefined)?.zones)
+      ? ((parsed as { zones: unknown[] }).zones)
+      : [];
+  return list.filter((z): z is ZoneEvidence => z !== null && typeof z === "object");
 }
 
 /** For each test file, the files it imports: what that test exercises. */
@@ -98,7 +105,8 @@ function testImportsOf(parsed: unknown): Map<string, string[]> {
   const edges = (parsed as { edges?: unknown } | undefined)?.edges;
   const out = new Map<string, string[]>();
   if (!Array.isArray(edges)) return out;
-  for (const edge of edges as ImportEdge[]) {
+  for (const edge of edges as (ImportEdge | null)[]) {
+    if (edge === null || typeof edge !== "object") continue;
     const { from, to } = edge;
     if (!from || !to || !isTestFile(from) || isTestFile(to)) continue;
     const existing = out.get(from);
@@ -191,17 +199,40 @@ export async function readCodeEvidenceProvenance(dir: string): Promise<CodeEvide
   return { ...(analyzedAt ? { analyzedAt } : {}), ...(gitSha ? { gitSha } : {}) };
 }
 
-export async function readCapabilityCodeFiles(
+/** {@link readCodeEvidence}'s result: the evidence, and whether there was any to read. */
+export interface CodeEvidence {
+  /** Item id -> the paths that evidence it. Items with no evidence are absent. */
+  files: Record<string, string[]>;
+  /**
+   * Whether an analysis was readable at all.
+   *
+   * Distinguishes "no analysis on disk" from "an analysis that matched
+   * nothing" — both produce an empty `files`, and the caller's advice to the
+   * operator differs completely ("run ndx analyze" vs "the analysis is there,
+   * it just scored nothing above the threshold").
+   */
+  analysisPresent: boolean;
+}
+
+/**
+ * Capability code evidence, with whether an analysis existed to read.
+ *
+ * Prefer this over {@link readCapabilityCodeFiles} where the answer "none"
+ * needs explaining.
+ */
+export async function readCodeEvidence(
   dir: string,
   items: readonly PRDItem[],
   options: CodeFilesOptions = {},
-): Promise<Record<string, string[]>> {
+): Promise<CodeEvidence> {
   const svDir = resolveLayout(dir).sourcevisionDir;
   const [zonesRaw, importsRaw] = await Promise.all([
     readJson(join(svDir, SV_ZONES_FILE)),
     readJson(join(svDir, SV_IMPORTS_FILE)),
   ]);
-  if (zonesRaw === undefined && importsRaw === undefined) return {};
+  if (zonesRaw === undefined && importsRaw === undefined) {
+    return { files: {}, analysisPresent: false };
+  }
 
   const zones = zonesOf(zonesRaw);
   const imports = testImportsOf(importsRaw);
@@ -210,6 +241,22 @@ export async function readCapabilityCodeFiles(
   const minTestScore = options.minTestScore ?? DEFAULT_MIN_TEST_SCORE;
   const maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES;
 
+  // An analysis goes stale: a zone keeps listing a file long after it is
+  // deleted. Citing one in a capability spec reads as authoritative, and
+  // worse, any surviving file suppressed the drafter's "confirm this
+  // capability still exists" note — so staleness hid itself. Filter to paths
+  // that are actually on disk, the same check `scanners.ts` makes with
+  // `isStaleFinding`. Memoised: zones share files, and this runs per item.
+  const onDisk = new Map<string, boolean>();
+  const stillExists = (file: string): boolean => {
+    let known = onDisk.get(file);
+    if (known === undefined) {
+      known = existsSync(join(dir, file));
+      onDisk.set(file, known);
+    }
+    return known;
+  };
+
   const out: Record<string, string[]> = {};
   for (const item of indexItems(items).values()) {
     const keywords = itemKeywords(item);
@@ -217,7 +264,7 @@ export async function readCapabilityCodeFiles(
       [
         ...zoneFiles(zones, extractKeywords(item.title), minZoneScore),
         ...testedFiles(item, testFiles, imports, minTestScore),
-      ],
+      ].filter(stillExists),
       keywords,
       maxFiles,
     );
@@ -225,5 +272,14 @@ export async function readCapabilityCodeFiles(
     // the drafter reads a missing entry the same way and the plan stays smaller.
     if (files.length > 0) out[item.id] = files;
   }
-  return out;
+  return { files: out, analysisPresent: true };
+}
+
+/** {@link readCodeEvidence}'s evidence alone, for callers that do not need the flag. */
+export async function readCapabilityCodeFiles(
+  dir: string,
+  items: readonly PRDItem[],
+  options: CodeFilesOptions = {},
+): Promise<Record<string, string[]>> {
+  return (await readCodeEvidence(dir, items, options)).files;
 }

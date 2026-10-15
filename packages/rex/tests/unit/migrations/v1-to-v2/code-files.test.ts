@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
 import { classifyV1Tree } from "../../../../src/migrations/v1-to-v2/migration-plan.js";
 import { draftCapabilitySpecs } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
-import { readCapabilityCodeFiles } from "../../../../src/migrations/v1-to-v2/code-files.js";
+import { readCapabilityCodeFiles, readCodeEvidence } from "../../../../src/migrations/v1-to-v2/code-files.js";
 
 let seq = 0;
 function item(level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {
@@ -54,6 +54,28 @@ const IMPORTS = {
   ],
 };
 
+/**
+ * Create the files an analysis cites.
+ *
+ * Evidence is filtered to paths that still exist, so a fixture that only
+ * names a file in zones.json now yields nothing — which is the point: a
+ * stale analysis must not put deleted files into a capability spec.
+ */
+async function writeSourceFiles(dir: string, paths: readonly string[]): Promise<void> {
+  for (const rel of paths) {
+    const full = join(dir, rel);
+    await mkdir(join(full, ".."), { recursive: true });
+    await writeFile(full, "// fixture\n", "utf-8");
+  }
+}
+
+/** Every path the fixtures above cite. */
+const CITED_FILES = [
+  ...ZONES.zones.flatMap((z) => z.files),
+  ...IMPORTS.edges.flatMap((e) => [e.from, e.to]),
+  ...TEST_FILES,
+];
+
 async function writeAnalysis(dir: string, files: Record<string, unknown>): Promise<void> {
   const svDir = join(dir, ".sourcevision");
   await mkdir(svDir, { recursive: true });
@@ -75,6 +97,7 @@ describe("readCapabilityCodeFiles", () => {
 
   it("builds the map from zones and the files a capability's tests exercise, and the drafter's specs carry it", async () => {
     await writeAnalysis(tempDir, { "zones.json": ZONES, "imports.json": IMPORTS });
+    await writeSourceFiles(tempDir, CITED_FILES);
     const items = tree();
 
     const codeFiles = await readCapabilityCodeFiles(tempDir, items, { testFiles: TEST_FILES });
@@ -109,6 +132,7 @@ describe("readCapabilityCodeFiles", () => {
 
   it("reads the legacy flat zone array and survives a missing imports.json", async () => {
     await writeAnalysis(tempDir, { "zones.json": ZONES.zones });
+    await writeSourceFiles(tempDir, CITED_FILES);
     const items = tree();
 
     const codeFiles = await readCapabilityCodeFiles(tempDir, items, { testFiles: TEST_FILES });
@@ -158,6 +182,7 @@ describe("readCapabilityCodeFiles", () => {
       ],
     };
     await writeAnalysis(tempDir, { "zones.json": wide });
+    await writeSourceFiles(tempDir, wide.zones[0]!.files);
     const items = tree();
 
     const codeFiles = await readCapabilityCodeFiles(tempDir, items, { testFiles: TEST_FILES, maxFiles: 2 });
@@ -166,4 +191,51 @@ describe("readCapabilityCodeFiles", () => {
     expect(files).toHaveLength(2);
     expect(files).toContain("packages/rex/src/core/selection.ts");
   });
+
+  it("drops files the analysis still lists but the repository no longer has", async () => {
+    // The defect: a zone keeps citing a deleted file, and the spec presents it
+    // as current. Worse, one surviving file suppressed the drafter's "confirm
+    // this capability still exists" note, so the staleness hid itself.
+    await writeAnalysis(tempDir, { "zones.json": ZONES, "imports.json": IMPORTS });
+    await writeSourceFiles(
+      tempDir,
+      CITED_FILES.filter((f) => f !== "packages/rex/src/core/ready.ts"),
+    );
+
+    const codeFiles = await readCapabilityCodeFiles(tempDir, tree(), { testFiles: TEST_FILES });
+    const evidenced = Object.values(codeFiles).flat();
+    expect(evidenced).not.toContain("packages/rex/src/core/ready.ts");
+    expect(evidenced).toContain("packages/rex/src/core/next-task.ts");
+  });
+
+  it("yields nothing when every cited file is gone", async () => {
+    await writeAnalysis(tempDir, { "zones.json": ZONES, "imports.json": IMPORTS });
+    // No source files written at all: the analysis describes a tree that moved on.
+    expect(await readCapabilityCodeFiles(tempDir, tree(), { testFiles: TEST_FILES })).toEqual({});
+  });
+
+  it("separates no analysis from an analysis that matched nothing", async () => {
+    // Both produce empty evidence, and the operator's next step differs:
+    // run `ndx analyze`, versus the analysis is there and scored nothing.
+    const absent = await readCodeEvidence(tempDir, tree(), { testFiles: TEST_FILES });
+    expect(absent).toEqual({ files: {}, analysisPresent: false });
+
+    await writeAnalysis(tempDir, { "zones.json": { zones: [] }, "imports.json": { edges: [] } });
+    const empty = await readCodeEvidence(tempDir, tree(), { testFiles: TEST_FILES });
+    expect(empty.analysisPresent).toBe(true);
+    expect(empty.files).toEqual({});
+  });
+
+  it("survives a null entry in zones or edges", async () => {
+    // This module promises never to fail the plan over a malformed analysis.
+    await writeAnalysis(tempDir, {
+      "zones.json": { zones: [null, ...ZONES.zones] },
+      "imports.json": { edges: [null, ...IMPORTS.edges] },
+    });
+    await writeSourceFiles(tempDir, CITED_FILES);
+
+    const codeFiles = await readCapabilityCodeFiles(tempDir, tree(), { testFiles: TEST_FILES });
+    expect(Object.values(codeFiles).flat()).toContain("packages/rex/src/core/next-task.ts");
+  });
+
 });

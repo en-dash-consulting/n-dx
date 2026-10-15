@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { SELF_HEAL_TAG, SELF_HEAL_ENV_VAR } from "../../../src/store/self-heal-tag.js";
 import {
   changeInputsFromProposals,
   changeInputsFromRecommendations,
@@ -118,4 +119,64 @@ describe("changeInputsFromRecommendations", () => {
     ]);
     expect(inputs.map((i) => i.title)).toEqual(["Task"]);
   });
+
+  // ── The self-heal loop's identity on v2 ──────────────────────────
+
+  describe("self-heal identity", () => {
+    /** Run `fn` with NDX_SELF_HEAL set, restoring whatever was there. */
+    function withSelfHealEnv<T>(fn: () => T): T {
+      const prev = process.env[SELF_HEAL_ENV_VAR];
+      process.env[SELF_HEAL_ENV_VAR] = "1";
+      try {
+        return fn();
+      } finally {
+        if (prev === undefined) delete process.env[SELF_HEAL_ENV_VAR];
+        else process.env[SELF_HEAL_ENV_VAR] = prev;
+      }
+    }
+
+    it("carries finding hashes across as finding: tags", () => {
+      // v2 has no recommendationMeta, so the hashes travel as tags — the same
+      // format the v1 scanner writes and hench reads back.
+      const inputs = changeInputsFromProposals([
+        { title: "Fix the thing", meta: { findingHashes: ["abc123def456", "0f0f0f0f0f0f"] } },
+      ]);
+      expect(inputs[0]!.tags).toEqual(["finding:abc123def456", "finding:0f0f0f0f0f0f"]);
+    });
+
+    it("keeps the proposal's own tags alongside the hashes", () => {
+      const inputs = changeInputsFromProposals([
+        { title: "Fix", tags: ["code-health"], meta: { findingHashes: ["abc123def456"] } },
+      ]);
+      expect(inputs[0]!.tags).toEqual(["code-health", "finding:abc123def456"]);
+    });
+
+    it("adds no tags when there are no hashes and no tags", () => {
+      expect(changeInputsFromProposals([{ title: "Fix" }])[0]!.tags).toBeUndefined();
+    });
+
+    it("stamps the self-heal tag during a self-heal run", () => {
+      // Without this, `hench --tags=self-heal` cannot select the change the
+      // self-heal run just filed, so the loop never works it.
+      const inputs = withSelfHealEnv(() =>
+        changeInputsFromProposals([{ title: "Fix", meta: { findingHashes: ["abc123def456"] } }]),
+      );
+      expect(inputs[0]!.tags).toContain(SELF_HEAL_TAG);
+      expect(inputs[0]!.tags).toContain("finding:abc123def456");
+    });
+
+    it("does not stamp the self-heal tag outside a self-heal run", () => {
+      const inputs = changeInputsFromProposals([{ title: "Fix", tags: ["code-health"] }]);
+      expect(inputs[0]!.tags).not.toContain(SELF_HEAL_TAG);
+    });
+
+    it("carries hashes through the flat recommendation shape too", () => {
+      // `rex recommend --accept` builds this shape; it is the path that broke.
+      const inputs = changeInputsFromRecommendations([
+        { title: "Fix", meta: { findingHashes: ["abc123def456"] } },
+      ]);
+      expect(inputs[0]!.tags).toEqual(["finding:abc123def456"]);
+    });
+  });
+
 });
