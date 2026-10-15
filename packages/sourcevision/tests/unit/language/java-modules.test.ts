@@ -73,6 +73,18 @@ describe("discoverJavaModules", () => {
     expect(get("web")?.dir).toBe("services/web");
   });
 
+  it("strips nested comment fragments until none remain, so a hidden module is not read", async () => {
+    // One pass removes the inner comment and leaves `<!-- <module>hidden</module> -->` behind.
+    await file(
+      "pom.xml",
+      "<project><artifactId>root</artifactId><modules><module>core</module><!<!-- x -->-- <module>hidden</module> --></modules></project>",
+    );
+    await file("core/pom.xml", "<project><artifactId>core</artifactId></project>");
+    await file("hidden/pom.xml", "<project><artifactId>hidden</artifactId></project>");
+    const { layout } = await discover();
+    expect(layout.modules.map((m) => m.name).sort()).toEqual(["core", "root"]);
+  });
+
   it("ignores sourceDirectory set in plugin configuration", async () => {
     await file(
       "pom.xml",
