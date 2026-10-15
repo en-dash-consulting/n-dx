@@ -16,7 +16,7 @@ import { applyReshape, type ReshapeProposal } from "../../src/core/reshape.js";
 import { ChangeLayerStore } from "../../src/store/change-layer-store.js";
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 import { indexTree } from "../../src/schema/v2-rules.js";
-import { computeV2Health } from "../../src/cli/v2-health.js";
+import { computeV2Health } from "../../src/cli/commands/health.js";
 import { copyV2Fixture, editText } from "../helpers/v2-fixture.js";
 
 const CHANGE = "c0000000-0000-4000-8000-000000000001";

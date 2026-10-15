@@ -1,15 +1,53 @@
+import { readFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
-import type { ParseWarning } from "../../store/index.js";
-import { prdLayout } from "../../store/prd-model-reader.js";
-import { computeHealthScore, formatHealthScore, formatV2Findings, formatLandingHealth } from "../../core/health.js";
-import { computeV2Health, v2HealthFails } from "../v2-health.js";
+import type { PRDStore, ParseWarning } from "../../store/index.js";
+import { prdLayout, loadPrdModel } from "../../store/prd-model-reader.js";
+import { computeHealthScore, formatHealthScore, checkV2TreeHealth, formatV2Findings, checkChangeLandings, formatLandingHealth } from "../../core/health.js";
 
 import { result } from "../output.js";
+
+/**
+ * The v2 health report: tree rules, reader warnings and landing check.
+ * `rex health` and the MCP `health` tool both build it here, so a person and
+ * an agent see the same findings for the same tree.
+ */
+export interface V2HealthReport {
+  treeRules: ReturnType<typeof checkV2TreeHealth>;
+  warnings: ParseWarning[];
+  landings: Awaited<ReturnType<typeof checkChangeLandings>>;
+}
 
 /** Reader warnings; nodes it skipped never reach the tree rules, so "no findings" alone would hide them. */
 function formatReaderWarnings(warnings: ParseWarning[]): string {
   if (warnings.length === 0) return "";
   return `Reader warnings:\n${warnings.map((w) => `  ${w.path}: ${w.message}`).join("\n")}\n\n`;
+}
+
+/** The project's package.json `version`, or undefined when there is no package.json or no version. */
+async function readPackageVersion(dir: string): Promise<string | undefined> {
+  let text: string;
+  try {
+    text = await readFile(join(resolve(dir), "package.json"), "utf-8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw err;
+  }
+  const version: unknown = (JSON.parse(text) as { version?: unknown }).version;
+  return typeof version === "string" ? version : undefined;
+}
+
+/** Whether the report should fail a gate: a rule error or a skipped node. Warnings alone do not. */
+export function v2HealthFails(report: V2HealthReport): boolean {
+  return report.treeRules.some((f) => f.severity === "error") || report.warnings.some((w) => w.skipped);
+}
+
+/** Run the v2 tree rules, reader warnings and landing check for the project at `dir`. */
+export async function computeV2Health(dir: string, rexDir: string, store: PRDStore): Promise<V2HealthReport> {
+  const model = await loadPrdModel(rexDir);
+  const treeRules = checkV2TreeHealth(model.tree, (await store.loadConfig()).structureHealth, new Date(), await readPackageVersion(dir));
+  const landings = await checkChangeLandings(model.tree, { repoDir: resolve(dir), cacheDir: resolveRexPaths(dir).cacheDir });
+  return { treeRules, warnings: model.warnings, landings };
 }
 
 /**
