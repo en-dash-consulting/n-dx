@@ -56,6 +56,7 @@ const EXPECTED_EXPORTS = [
   "findNextWorkTask",
   "findActionableWork",
   "resolveWorkById",
+  "openChangeTasks",
   // v2 agent brief
   "buildChangeBrief",
   // v2 completion — what update_task_status runs on a v2 tree

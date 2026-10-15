@@ -1,17 +1,18 @@
 /**
  * `ndx work --task=<id>` on a v2 tree: a claim another worktree holds on the
- * task's enclosing change covers the task, as it does in rex's claim_task.
+ * task's enclosing change covers the task, as it does in rex's claim_task;
+ * a ref naming a change with open tasks runs and claims one of those tasks.
  * The claims store is an in-memory stub; what is under test is selectTaskEntry.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolveStore } from "@n-dx/rex";
 import type { ClaimsStore, TaskClaim } from "@n-dx/rex";
 import { selectTaskEntry } from "../../src/agent/planning/brief.js";
-import { loadV2Tree } from "../../src/agent/planning/work-selection.js";
+import { ChangeTasksUnavailableError, loadV2Tree } from "../../src/agent/planning/work-selection.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../src/process/task-claims.js";
 import { RM_RETRY } from "../helpers/index.js";
 
@@ -43,10 +44,21 @@ function claimsWith(existing: TaskClaim[]): { claims: TaskClaims; claimed: strin
   return { claims: new TaskClaims(store, { worktreeRoot: MINE, pid: process.pid }), claimed };
 }
 
-async function select(claims: TaskClaims) {
+async function select(claims: TaskClaims, taskId = WIRE_ID) {
   const s = await resolveStore(rexDir);
   const tree = (await loadV2Tree(s))!;
-  return selectTaskEntry((await s.loadDocument()).items, { tree, taskId: WIRE_ID, claims });
+  return selectTaskEntry((await s.loadDocument()).items, { tree, taskId, claims });
+}
+
+const CHANGE_DIR = () => join(rexDir, "changes", "add-apple-pay");
+const SHIP_ID = "c0000000-0000-4000-8000-000000000003";
+
+/** A second task under CH-1, after the fixture's WIRE. */
+async function addShipTask(extra = ""): Promise<void> {
+  await writeFile(
+    join(CHANGE_DIR(), "ship-it.md"),
+    `---\nid: "${SHIP_ID}"\ntype: "task"\ntitle: "Ship it"\nslug: "ship-it"\n${extra}---\n`,
+  );
 }
 
 beforeEach(async () => {
@@ -81,5 +93,63 @@ describe("explicit --task on a v2 tree", () => {
     const { claims, claimed } = claimsWith([claimOf(CHANGE_ID, MINE)]);
     expect((await select(claims)).item.id).toBe(WIRE_ID);
     expect(claimed).toEqual([WIRE_ID]);
+  });
+});
+
+describe("explicit --task naming a v2 change with open tasks", () => {
+  it("runs and claims the change's next task, never the change", async () => {
+    const { claims, claimed } = claimsWith([]);
+    expect((await select(claims, "CH-1")).item.id).toBe(WIRE_ID);
+    expect(claimed).toEqual([WIRE_ID]);
+  });
+
+  it("passes over a task another worktree holds and claims the next one", async () => {
+    await addShipTask();
+    const { claims, claimed } = claimsWith([claimOf(WIRE_ID, THEIRS)]);
+    expect((await select(claims, "CH-1")).item.id).toBe(SHIP_ID);
+    expect(claimed).toEqual([SHIP_ID]);
+  });
+
+  it("is refused, naming each task, when every open task is claimed elsewhere or blocked", async () => {
+    await addShipTask(`blockedBy: ["${WIRE_ID}"]\n`);
+    const { claims, claimed } = claimsWith([claimOf(WIRE_ID, THEIRS)]);
+    const err = await select(claims, "CH-1").catch((e) => e);
+    expect(err).toBeInstanceOf(ChangeTasksUnavailableError);
+    expect(err.allClaimed).toBe(false);
+    expect(err.message).toContain(`"Wire the button" (claimed by another worktree: ${THEIRS})`);
+    expect(err.message).toContain(`"Ship it" (pending, blocked by ${WIRE_ID})`);
+    expect(claimed).toEqual([]);
+  });
+
+  it("names a task's status when that is why it cannot run", async () => {
+    await addShipTask();
+    await appendFile(join(CHANGE_DIR(), "state.yaml"), `  "${SHIP_ID}":\n    status: "deferred"\n`);
+    const { claims } = claimsWith([claimOf(WIRE_ID, THEIRS)]);
+    const err = await select(claims, "CH-1").catch((e) => e);
+    expect(err).toBeInstanceOf(ChangeTasksUnavailableError);
+    expect(err.message).toContain(`"Ship it" (deferred)`);
+  });
+
+  it("says all are claimed when they are", async () => {
+    const { claims, claimed } = claimsWith([claimOf(WIRE_ID, THEIRS)]);
+    const err = await select(claims, "CH-1").catch((e) => e);
+    expect(err).toBeInstanceOf(ChangeTasksUnavailableError);
+    expect(err.allClaimed).toBe(true);
+    expect(claimed).toEqual([]);
+  });
+
+  it("is refused when another worktree claims the change itself, claiming nothing", async () => {
+    const { claims, claimed } = claimsWith([claimOf(CHANGE_ID, THEIRS)]);
+    const err = await select(claims, "CH-1").catch((e) => e);
+    expect(err).toBeInstanceOf(TaskClaimedElsewhereError);
+    expect(err.taskId).toBe(CHANGE_ID);
+    expect(claimed).toEqual([]);
+  });
+
+  it("runs a task-less change as one unit, claiming the change", async () => {
+    await rm(join(CHANGE_DIR(), "wire-the-button.md"));
+    const { claims, claimed } = claimsWith([]);
+    expect((await select(claims, "CH-1")).item.id).toBe(CHANGE_ID);
+    expect(claimed).toEqual([CHANGE_ID]);
   });
 });

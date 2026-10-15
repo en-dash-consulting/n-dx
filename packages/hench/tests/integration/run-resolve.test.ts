@@ -503,8 +503,10 @@ describe("refusals are reported, not thrown", () => {
 
 describe("on a v2 tree", () => {
   const FIXTURE = join(import.meta.dirname, "../../../rex/tests/fixtures/v2-tree");
-  /** The fixture's change CH-1, which `--task=CH-1` runs. */
+  /** The fixture's change CH-1. */
   const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
+  /** CH-1's one task, which `--task=CH-1` runs while it is open. */
+  const WIRE_ID = "c0000000-0000-4000-8000-000000000002";
 
   beforeEach(async () => {
     await rm(join(rexDir, PRD_TREE_DIRNAME), { recursive: true, force: true });
@@ -513,22 +515,68 @@ describe("on a v2 tree", () => {
     git(projectDir, "commit", "-q", "-m", "v2 tree");
   });
 
-  it("reports the unit a display id runs, by its real id", async () => {
+  /** A worktree beside the project, holding claims on `ids`. */
+  async function otherWorktreeClaiming(...ids: string[]): Promise<{ claims: TaskClaims; root: string }> {
+    const other = `${projectDir}-wt`;
+    extraDirs.push(other);
+    git(projectDir, "worktree", "add", "-q", "-b", "other", other);
+    const claims = TaskClaims.forProject(other);
+    for (const id of ids) expect(await claims.claim(id)).toBeNull();
+    return { claims, root: gitToplevel(other) };
+  }
+
+  it("reports the task a change with an open task runs, not the change", async () => {
+    const r = await resolve({ task: "CH-1" });
+    expect(codes(r)).toEqual([]);
+    expect(r.task?.id).toBe(WIRE_ID);
+    expect(r.task?.level).toBe("task");
+  });
+
+  it("reports the next task, passing over one another worktree holds", async () => {
+    const shipId = "c0000000-0000-4000-8000-000000000003";
+    await writeFile(
+      join(rexDir, "changes/add-apple-pay/ship-it.md"),
+      `---\nid: "${shipId}"\ntype: "task"\ntitle: "Ship it"\nslug: "ship-it"\n---\n`,
+    );
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "second task");
+    const { claims } = await otherWorktreeClaiming(WIRE_ID);
+    try {
+      const r = await resolve({ task: "CH-1" });
+      expect(codes(r)).toEqual([]);
+      expect(r.task?.id).toBe(shipId);
+    } finally {
+      await claims.releaseAll();
+    }
+  });
+
+  it("refuses a change whose every open task another worktree holds, naming them", async () => {
+    const { claims, root } = await otherWorktreeClaiming(WIRE_ID);
+    try {
+      const r = await resolve({ task: "CH-1" });
+      expect(codes(r)).toEqual(["claimed-elsewhere"]);
+      expect(r.task).toBeNull();
+      expect(r.refusals[0].message).toContain(`"Wire the button" (claimed by another worktree: ${root})`);
+    } finally {
+      await claims.releaseAll();
+    }
+  });
+
+  it("reports a task-less change as the unit", async () => {
+    await rm(join(rexDir, "changes/add-apple-pay/wire-the-button.md"));
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "task-less");
     const r = await resolve({ task: "CH-1" });
     expect(codes(r)).toEqual([]);
     expect(r.task?.id).toBe(CHANGE_ID);
   });
 
   it("checks the claim on the real id, not the display id", async () => {
-    const other = `${projectDir}-wt`;
-    extraDirs.push(other);
-    git(projectDir, "worktree", "add", "-q", "-b", "other", other);
-    const claims = TaskClaims.forProject(other);
-    expect(await claims.claim(CHANGE_ID)).toBeNull();
+    const { claims, root } = await otherWorktreeClaiming(CHANGE_ID);
     try {
       const r = await resolve({ task: "CH-1" });
       expect(codes(r)).toEqual(["claimed-elsewhere"]);
-      expect(r.task?.claimedBy?.worktree).toBe(gitToplevel(other));
+      expect(r.task?.claimedBy?.worktree).toBe(root);
     } finally {
       await claims.releaseAll();
     }

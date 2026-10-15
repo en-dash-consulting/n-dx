@@ -288,7 +288,10 @@ export async function selectTaskEntry(
 
   if (taskId) {
     // On v2 the ref may be a display id or alias; the entry carries the real id.
-    const entry = tree ? resolveV2Entry(tree, items, taskId) : findItem(items, taskId);
+    // A change with open tasks runs its next one no other worktree holds, so
+    // the claim below is on that task, never on the change.
+    const foreign = tree && claims ? await claims.foreignClaims() : undefined;
+    const entry = tree ? resolveV2Entry(tree, items, taskId, foreign, cliName) : findItem(items, taskId);
     if (!entry) throw new Error(`Task not found: ${taskId}`);
     const inbox = tree ? inboxRefusal(tree, taskId, cliName) : undefined;
     if (inbox) throw inbox;

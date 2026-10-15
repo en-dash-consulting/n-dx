@@ -672,8 +672,8 @@ export { withPrdModelTransaction, PrdLayoutError } from "./store/prd-model-trans
 export type { PrdModelEdit, PrdModelTransactionOptions, PrdModelTransactionResult } from "./store/prd-model-transaction.js";
 
 // Selection
-export { findNextWork, findActionableWork, resolveWorkById, changeWorkShape, enclosingChangeIds } from "./core/change-selection.js";
-export type { WorkUnit, WorkKind, WorkSelectionOptions, ChangeWorkShape, WorkShapeChild } from "./core/change-selection.js";
+export { findNextWork, findActionableWork, resolveWorkById, openChangeTasks, changeWorkShape, enclosingChangeIds } from "./core/change-selection.js";
+export type { WorkUnit, WorkKind, WorkSelectionOptions, ResolveWorkOptions, OpenChangeTask, ChangeWorkShape, WorkShapeChild } from "./core/change-selection.js";
 export { findNextWorkTask, completedWorkIds } from "./core/change-next-task.js";
 export type { NextWorkTask, NextWorkOptions } from "./core/change-next-task.js";
 

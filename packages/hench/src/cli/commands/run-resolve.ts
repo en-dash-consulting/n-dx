@@ -30,7 +30,7 @@ import { resolveHenchPaths } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal } from "../../agent/planning/brief.js";
-import { findV2Entry, inboxRefusal, loadV2Tree } from "../../agent/planning/work-selection.js";
+import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree } from "../../agent/planning/work-selection.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
 import { CLIError, requireLLMCLI } from "../errors.js";
@@ -258,14 +258,20 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
       ),
     );
   }
-  const entry = !prdItems ? null : v2Tree ? findV2Entry(v2Tree, prdItems, taskId) : findItem(prdItems, taskId);
+  const claims = TaskClaims.forProject(dir, { readOnly: true });
+  // A change with open tasks reports the task a run would pick, passing over
+  // the ones other worktrees hold, as the run does.
+  const foreign = v2Tree ? await claims.foreignClaims() : undefined;
+  const entry = !prdItems ? null : v2Tree ? findV2Entry(v2Tree, prdItems, taskId, foreign) : findItem(prdItems, taskId);
+  const unavailable = !entry && v2Tree ? changeTasksRefusal(v2Tree, taskId, foreign) : undefined;
   let task: RunResolution["task"] = null;
   if (!prdItems) {
     // Already refused above; there is no task to describe.
+  } else if (unavailable) {
+    refuse(unavailable.allClaimed ? "claimed-elsewhere" : "not-actionable", unavailable);
   } else if (!entry) {
     refuse("task-not-found", new CLIError(`Task not found: ${taskId}`, "Check the id with 'ndx status'."));
   } else {
-    const claims = TaskClaims.forProject(dir, { readOnly: true });
     // On v2 a claim on an enclosing change refuses the task, as a run does.
     const enclosing = v2Tree ? await claims.heldByEnclosingChange(v2Tree, entry.item.id) : null;
     const claim = enclosing?.claim ?? (await claims.heldElsewhere(entry.item.id));
