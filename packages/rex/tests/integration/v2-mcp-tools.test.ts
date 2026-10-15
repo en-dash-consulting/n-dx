@@ -314,7 +314,7 @@ describe("rex MCP tools on a v2 tree", () => {
   it("health adds the v2 tree rules, reader warnings and landings the CLI shows", async () => {
     const res = json(await call("health"));
     for (const field of ["overall", "dimensions"]) expect(res).toHaveProperty(field);
-    const cli = await computeV2Health(tmp, rexDir, ws.store);
+    const cli = await computeV2Health(tmp, rexDir, (await ws.store.loadConfig()).structureHealth);
     expect(res.v2).toEqual(JSON.parse(JSON.stringify(cli)));
     expect(Object.keys(res.v2).sort()).toEqual(["landings", "treeRules", "warnings"]);
   });
@@ -326,7 +326,15 @@ describe("rex MCP tools on a v2 tree", () => {
     const body = json(res);
     for (const field of ["overall", "dimensions", "v2"]) expect(body).toHaveProperty(field);
     // `rex health` builds the same report, so it no longer throws either.
-    await expect(computeV2Health(tmp, rexDir, ws.store)).resolves.toMatchObject({ treeRules: expect.any(Array) });
+    await expect(computeV2Health(tmp, rexDir, undefined)).resolves.toMatchObject({ treeRules: expect.any(Array) });
+  });
+
+  it("health returns the score and the v2 report, on default thresholds, when .rex/config.json is absent", async () => {
+    const withConfig = json(await call("health"));
+    await rm(join(rexDir, "config.json"));
+    const res = await call("health");
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toEqual(withConfig);
   });
 
   it("reorganize detects and applies on the change layer", async () => {

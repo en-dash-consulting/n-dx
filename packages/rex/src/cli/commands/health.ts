@@ -5,6 +5,7 @@ import type { PRDStore, ParseWarning } from "../../store/index.js";
 import { prdLayout, loadPrdModel } from "../../store/prd-model-reader.js";
 import { computeHealthScore, formatHealthScore, checkV2TreeHealth, formatV2Findings, checkChangeLandings, formatLandingHealth } from "../../core/health.js";
 
+import type { StructureHealthThresholds } from "../../schema/index.js";
 import { result } from "../output.js";
 
 /**
@@ -54,9 +55,13 @@ export function v2HealthFails(report: V2HealthReport): boolean {
 }
 
 /** Run the v2 tree rules, reader warnings and landing check for the project at `dir`. */
-export async function computeV2Health(dir: string, rexDir: string, store: PRDStore): Promise<V2HealthReport> {
+export async function computeV2Health(
+  dir: string,
+  rexDir: string,
+  structureHealth: StructureHealthThresholds | undefined,
+): Promise<V2HealthReport> {
   const model = await loadPrdModel(rexDir);
-  const treeRules = checkV2TreeHealth(model.tree, (await store.loadConfig()).structureHealth, new Date(), await readPackageVersion(dir));
+  const treeRules = checkV2TreeHealth(model.tree, structureHealth, new Date(), await readPackageVersion(dir));
   const landings = await checkChangeLandings(model.tree, { repoDir: resolve(dir), cacheDir: resolveRexPaths(dir).cacheDir });
   return { treeRules, warnings: model.warnings, landings };
 }
@@ -80,7 +85,7 @@ export async function cmdHealth(
   // A v2 tree has no level-based items to score; the v2 tree rules run instead.
   // A v1 tree takes the path below, unchanged.
   if ((await prdLayout(rexDir)) === "v2") {
-    const report = await computeV2Health(dir, rexDir, store);
+    const report = await computeV2Health(dir, rexDir, (await store.loadConfig()).structureHealth);
     result(
       flags.format === "json"
         ? JSON.stringify(report, null, 2)
