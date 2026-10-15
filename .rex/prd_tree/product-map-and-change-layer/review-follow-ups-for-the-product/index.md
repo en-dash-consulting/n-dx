@@ -21,7 +21,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 |-------|--------|
 | [A change's touches and amends name a capability or constraint](./a-change-s-touches-and-amends-name-a.md) | completed |
 | [A failed Product refetch replaces the loaded map and an open capability page with an error](./a-failed-product-refetch-replaces-the.md) | pending |
-| [A kept v2 completion's commit commands sweep the operator's pre-run edits into the task's commit](./a-kept-v2-completion-s-commit-commands.md) | pending |
 | [An open fix: true change that adds a capability marks the new capability defective while its kind is feature](./an-open-fix-true-change-that-adds-a.md) | completed |
 | [Apply refuses removing one member of a pre-existing dependsOn knot that stays cyclic](./apply-refuses-removing-one-member-of-a.md) | pending |
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | completed |
@@ -39,10 +38,8 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [docs/guide/skills.md skill table descriptions can drift from manifest.json with no test to catch it](./docs-guide-skills-md-skill-table.md) | pending |
 | [FileStore and FolderTreeStore save reports are relative to .ndx/, not the project root, on the .ndx/ layout](./filestore-and-foldertreestore-save.md) | pending |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
-| [hench task-lookup.ts imports @n-dx/rex directly, bypassing rex-gateway](./hench-task-lookup-ts-imports-n-dx-rex.md) | pending |
 | [Install the sv analyze stop handlers before the progress file says running](./install-the-sv-analyze-stop-handlers.md) | completed |
 | [MCP Integration guide still says HTTP MCP is single-project until a 0.7.0 hub](./mcp-integration-guide-still-says-http.md) | pending |
-| [ndx work --task on a v2 change with tasks claims the change while another worktree holds one of its tasks](./ndx-work-task-on-a-v2-change-with.md) | pending |
 | [No test covers the PRD watcher refreshing the cache on product/ or changes/ edits](./no-test-covers-the-prd-watcher.md) | pending |
 | [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | completed |
 | [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | pending |
