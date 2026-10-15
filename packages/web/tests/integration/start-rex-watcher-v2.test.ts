@@ -150,4 +150,33 @@ describe("registerRexWatcher on a v2 tree", () => {
     }, { timeout: 8_000, interval: 1_000 });
     expect(watchers).toHaveLength(bootWatchers);
   });
+
+  it("drops the watch on a PRD folder once it is deleted", async () => {
+    // The re-watch must not hinge on the recreated directory getting a new
+    // inode number (ext4 reuses freed ones): the deletion alone retires the
+    // dead watcher, so whatever appears next is watched afresh.
+    const changesDir = join(rexDir, "changes");
+    mkdirSync(changesDir);
+    registerRexWatcher(
+      undefined,
+      rexDir,
+      { refresh: () => {} } as never,
+      { broadcast: () => {} } as never,
+      watchers,
+    );
+    expect(watchers).toHaveLength(3);
+    const changesWatcher = watchers[watchers.length - 1]!;
+    const close = vi.spyOn(changesWatcher, "close");
+    // Retried for the FSEvents start-up gap described above: each retry
+    // recreates and deletes the folder, another .rex/ event naming it.
+    await vi.waitFor(() => {
+      if (close.mock.calls.length === 0) {
+        mkdirSync(changesDir, { recursive: true });
+        rmSync(changesDir, { recursive: true, force: true });
+      }
+      expect(close).toHaveBeenCalled();
+    }, { timeout: 8_000, interval: 1_000 });
+    expect(watchers).not.toContain(changesWatcher);
+    expect(watchers).toHaveLength(2);
+  });
 });

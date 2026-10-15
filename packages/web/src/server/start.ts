@@ -456,29 +456,37 @@ export function registerRexWatcher(
   }, WATCHER_DEBOUNCE_MS);
 
   const prdDirNames = [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME];
-  // Folder name -> its recursive watcher and the inode it was opened on. On
-  // inotify and Windows a watch dies with its directory, so a folder deleted
-  // and recreated (a branch switch) is a new inode and needs a new watch.
-  const watched = new Map<string, { watcher: FSWatcher; ino: number }>();
+  // Folder name -> its recursive watcher and the identity of the directory it
+  // was opened on. On inotify and Windows a watch dies with its directory, so a
+  // folder deleted and recreated (a branch switch) needs a new watch. The
+  // identity pairs inode with birth time because ext4 can hand a just-freed
+  // inode number straight back to the recreated directory.
+  const watched = new Map<string, { watcher: FSWatcher; id: string }>();
   const forget = (w: FSWatcher): void => {
     const i = into.indexOf(w);
     if (i !== -1) into.splice(i, 1);
   };
+  const unwatchPrdFolder = (dirName: string): void => {
+    const current = watched.get(dirName);
+    if (!current) return;
+    current.watcher.close();
+    forget(current.watcher);
+    watched.delete(dirName);
+  };
   const watchPrdFolder = (dirName: string): void => {
     const root = join(rexDir, dirName);
-    let ino: number;
+    let id: string;
     try {
-      ino = statSync(root).ino;
+      const st = statSync(root);
+      id = `${st.ino}:${st.birthtimeMs}`;
     } catch {
-      return; // not there (yet); the .rex/ watcher calls again when it appears
+      // Gone (or not there yet): a watch on a deleted directory is dead, so
+      // drop it; the .rex/ watcher calls again when the folder appears.
+      unwatchPrdFolder(dirName);
+      return;
     }
-    const current = watched.get(dirName);
-    if (current) {
-      if (current.ino === ino) return;
-      current.watcher.close();
-      forget(current.watcher);
-      watched.delete(dirName);
-    }
+    if (watched.get(dirName)?.id === id) return;
+    unwatchPrdFolder(dirName);
     try {
       const w = guardWatcher(watch(root, { recursive: true }, () => {
         debouncedRefresh();
@@ -488,7 +496,7 @@ export function registerRexWatcher(
         watched.delete(dirName);
       });
       into.push(w);
-      watched.set(dirName, { watcher: w, ino });
+      watched.set(dirName, { watcher: w, id });
     } catch {
       // fs.watch recursive may not be supported on every platform — non-fatal
     }
