@@ -23,6 +23,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A change applied while in progress can never be completed](./a-change-applied-while-in-progress-can.md) | completed |
 | [A kept v2 completion's commit commands sweep the operator's pre-run edits into the task's commit](./a-kept-v2-completion-s-commit-commands.md) | completed |
 | [hench task-lookup.ts imports @n-dx/rex directly, bypassing rex-gateway](./hench-task-lookup-ts-imports-n-dx-rex.md) | completed |
-| [ndx ci gateway-imports step misses dynamic import() that domain-isolation now flags](./ndx-ci-gateway-imports-step-misses.md) | pending |
 | [ndx work --task on a change with open tasks runs the whole change, then cannot complete it](./ndx-work-task-on-a-change-with-open.md) | completed |
 | [ndx work --task on a v2 change with tasks claims the change while another worktree holds one of its tasks](./ndx-work-task-on-a-v2-change-with.md) | completed |
