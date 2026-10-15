@@ -6,7 +6,8 @@
  * resolver to the project's build files, parses every requested file and
  * reads the captures into lang-kit facts: per file, then the pack's project
  * facts reader (if any) and each wanted framework over every parsed file at
- * once; frameworks' skips come back as `notices`. Each step that can fail for the
+ * once; frameworks' skips and the pack's `projectNotices` come back as
+ * `notices`. Each step that can fail for the
  * whole language — a grammar not built or not loadable, a query the grammar
  * rejects, build files that cannot be read — ends the call with a degraded
  * result instead of an exception. A file that cannot be read or is over the
@@ -38,6 +39,12 @@ export interface TreeSitterEntryOptions {
   readonly symbolRules?: PackSymbolRules;
   /** Required when the pack produces a kind read over the whole project (`resources`). */
   readonly projectFacts?: ProjectFactsReader;
+  /**
+   * What the pack read but does not report as facts (Python's dynamic
+   * imports), one sentence each, from every parsed file and the kinds wanted;
+   * returned as the entry's `notices` after the frameworks'.
+   */
+  readonly projectNotices?: (files: readonly PackSourceFile[], kinds: readonly FactKind[]) => readonly string[];
   readonly runner?: RunnerOptions;
 }
 
@@ -130,7 +137,7 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
         mergeFileFacts(readPackFacts(pack, file, { kinds, resolver: prepared, symbolRules }), project?.get(file.path)),
       ),
     );
-    const notices = framed.flatMap((f) => f.notices);
+    const notices = [...framed.flatMap((f) => f.notices), ...(options.projectNotices?.(parsed, kinds) ?? [])];
     return notices.length === 0 ? { facts, unparsed } : { facts, unparsed, notices };
   } finally {
     runner.dispose();

@@ -1,0 +1,929 @@
+{
+  "facts": [
+    {
+      "path": "src/common/__init__.py",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": []
+      },
+      "symbols": [
+        {
+          "name": "__all__",
+          "kind": "variable",
+          "position": {
+            "line": 1,
+            "column": 0
+          },
+          "span": {
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 29
+            }
+          },
+          "exports": [
+            "util",
+            "helpers"
+          ]
+        }
+      ],
+      "calls": []
+    },
+    {
+      "path": "src/common/helpers.py",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": [
+          {
+            "specifier": "re",
+            "names": [],
+            "position": {
+              "line": 1,
+              "column": 7
+            }
+          },
+          {
+            "specifier": "datetime",
+            "names": [
+              "date"
+            ],
+            "position": {
+              "line": 2,
+              "column": 5
+            }
+          }
+        ]
+      },
+      "symbols": [
+        {
+          "name": "__all__",
+          "kind": "variable",
+          "position": {
+            "line": 4,
+            "column": 0
+          },
+          "span": {
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 43
+            }
+          }
+        },
+        {
+          "name": "slugify",
+          "kind": "function",
+          "position": {
+            "line": 7,
+            "column": 4
+          },
+          "span": {
+            "start": {
+              "line": 7,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 51
+            }
+          }
+        },
+        {
+          "name": "parse_date",
+          "kind": "function",
+          "position": {
+            "line": 11,
+            "column": 4
+          },
+          "span": {
+            "start": {
+              "line": 11,
+              "column": 0
+            },
+            "end": {
+              "line": 12,
+              "column": 36
+            }
+          }
+        }
+      ],
+      "calls": [
+        {
+          "callee": "sub",
+          "receiver": "re",
+          "strings": [
+            {
+              "text": "r\"[^a-z0-9]+\"",
+              "start": {
+                "line": 8,
+                "column": 18
+              },
+              "end": {
+                "line": 8,
+                "column": 31
+              }
+            },
+            {
+              "text": "\"-\"",
+              "start": {
+                "line": 8,
+                "column": 33
+              },
+              "end": {
+                "line": 8,
+                "column": 36
+              }
+            }
+          ]
+        },
+        {
+          "callee": "lower",
+          "receiver": "text",
+          "strings": []
+        },
+        {
+          "callee": "fromisoformat",
+          "receiver": "date",
+          "strings": []
+        }
+      ]
+    },
+    {
+      "path": "src/common/util.py",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": []
+      },
+      "symbols": [
+        {
+          "name": "__all__",
+          "kind": "variable",
+          "position": {
+            "line": 1,
+            "column": 0
+          },
+          "span": {
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 43
+            }
+          }
+        },
+        {
+          "name": "identity",
+          "kind": "function",
+          "position": {
+            "line": 4,
+            "column": 4
+          },
+          "span": {
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 16
+            }
+          }
+        }
+      ],
+      "calls": []
+    },
+    {
+      "path": "src/shop/__init__.py",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": [
+          {
+            "specifier": ".orders",
+            "names": [
+              "OrderService",
+              "place_order"
+            ],
+            "position": {
+              "line": 3,
+              "column": 5
+            }
+          },
+          {
+            "specifier": ".",
+            "names": [
+              "models"
+            ],
+            "position": {
+              "line": 4,
+              "column": 5
+            }
+          }
+        ]
+      },
+      "symbols": [
+        {
+          "name": "__all__",
+          "kind": "variable",
+          "position": {
+            "line": 6,
+            "column": 0
+          },
+          "span": {
+            "start": {
+              "line": 6,
+              "column": 0
+            },
+            "end": {
+              "line": 10,
+              "column": 1
+            }
+          },
+          "exports": [
+            "OrderService",
+            "place_order",
+            "models"
+          ]
+        }
+      ],
+      "calls": []
+    },
+    {
+      "path": "src/shop/models.pyi",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": [
+          {
+            "specifier": "dataclasses",
+            "names": [
+              "dataclass"
+            ],
+            "position": {
+              "line": 1,
+              "column": 5
+            }
+          }
+        ]
+      },
+      "symbols": [
+        {
+          "name": "Order",
+          "kind": "class",
+          "position": {
+            "line": 4,
+            "column": 6
+          },
+          "span": {
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 33
+            }
+          },
+          "decorators": [
+            "dataclass(frozen=True)"
+          ]
+        },
+        {
+          "name": "total",
+          "kind": "method",
+          "position": {
+            "line": 8,
+            "column": 8
+          },
+          "span": {
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 33
+            }
+          },
+          "container": "Order"
+        }
+      ],
+      "calls": [
+        {
+          "callee": "dataclass",
+          "strings": []
+        }
+      ]
+    },
+    {
+      "path": "src/shop/orders.py",
+      "imports": {
+        "files": [],
+        "external": [],
+        "written": [
+          {
+            "specifier": "functools",
+            "names": [],
+            "position": {
+              "line": 3,
+              "column": 7
+            }
+          },
+          {
+            "specifier": "os",
+            "names": [],
+            "position": {
+              "line": 4,
+              "column": 7
+            }
+          },
+          {
+            "specifier": "os.path",
+            "names": [],
+            "position": {
+              "line": 4,
+              "column": 11
+            }
+          },
+          {
+            "specifier": "xml.etree.ElementTree",
+            "names": [],
+            "position": {
+              "line": 5,
+              "column": 7
+            }
+          },
+          {
+            "specifier": "collections",
+            "names": [
+              "OrderedDict",
+              "defaultdict"
+            ],
+            "position": {
+              "line": 6,
+              "column": 5
+            }
+          },
+          {
+            "specifier": "typing",
+            "names": [
+              "TYPE_CHECKING"
+            ],
+            "position": {
+              "line": 7,
+              "column": 5
+            }
+          },
+          {
+            "specifier": ".",
+            "names": [
+              "models"
+            ],
+            "position": {
+              "line": 8,
+              "column": 5
+            }
+          },
+          {
+            "specifier": ".models",
+            "names": [
+              "Order"
+            ],
+            "position": {
+              "line": 9,
+              "column": 5
+            }
+          },
+          {
+            "specifier": "..common",
+            "names": [
+              "util"
+            ],
+            "position": {
+              "line": 10,
+              "column": 5
+            }
+          },
+          {
+            "specifier": "..common.helpers",
+            "names": [
+              "slugify",
+              "parse_date"
+            ],
+            "position": {
+              "line": 11,
+              "column": 5
+            }
+          },
+          {
+            "specifier": "json",
+            "names": [
+              "*"
+            ],
+            "position": {
+              "line": 15,
+              "column": 5
+            }
+          },
+          {
+            "specifier": "typing",
+            "names": [],
+            "position": {
+              "line": 16,
+              "column": 7
+            }
+          },
+          {
+            "specifier": "importlib",
+            "names": [],
+            "position": {
+              "line": 17,
+              "column": 7
+            }
+          },
+          {
+            "specifier": ".repository",
+            "names": [
+              "Repository"
+            ],
+            "position": {
+              "line": 20,
+              "column": 9
+            },
+            "guard": "type-checking"
+          },
+          {
+            "specifier": "decimal",
+            "names": [],
+            "position": {
+              "line": 25,
+              "column": 11
+            },
+            "guard": "type-checking"
+          },
+          {
+            "specifier": "ujson",
+            "names": [],
+            "position": {
+              "line": 28,
+              "column": 11
+            },
+            "guard": "optional"
+          },
+          {
+            "specifier": "json",
+            "names": [],
+            "position": {
+              "line": 30,
+              "column": 11
+            }
+          },
+          {
+            "specifier": "yaml",
+            "names": [
+              "CSafeLoader"
+            ],
+            "position": {
+              "line": 33,
+              "column": 9
+            },
+            "guard": "optional"
+          },
+          {
+            "specifier": "yaml",
+            "names": [
+              "SafeLoader"
+            ],
+            "position": {
+              "line": 35,
+              "column": 9
+            }
+          },
+          {
+            "specifier": "orjson",
+            "names": [],
+            "position": {
+              "line": 38,
+              "column": 11
+            },
+            "guard": "optional"
+          },
+          {
+            "specifier": "lxml",
+            "names": [
+              "etree"
+            ],
+            "position": {
+              "line": 43,
+              "column": 9
+            },
+            "guard": "optional"
+          },
+          {
+            "specifier": "tomllib",
+            "names": [],
+            "position": {
+              "line": 48,
+              "column": 11
+            }
+          },
+          {
+            "specifier": "shutil",
+            "names": [],
+            "position": {
+              "line": 84,
+              "column": 15
+            }
+          },
+          {
+            "specifier": ".events",
+            "names": [
+              "emit"
+            ],
+            "position": {
+              "line": 100,
+              "column": 13
+            }
+          }
+        ]
+      },
+      "symbols": [
+        {
+          "name": "DEFAULT_STATUS",
+          "kind": "variable",
+          "position": {
+            "line": 52,
+            "column": 0
+          },
+          "span": {
+            "start": {
+              "line": 52,
+              "column": 0
+            },
+            "end": {
+              "line": 52,
+              "column": 23
+            }
+          }
+        },
+        {
+          "name": "MAX_ITEMS",
+          "kind": "variable",
+          "position": {
+            "line": 53,
+            "column": 0
+          },
+          "span": {
+            "start": {
+              "line": 53,
+              "column": 0
+            },
+            "end": {
+              "line": 53,
+              "column": 19
+            }
+          }
+        },
+        {
+          "name": "_registry",
+          "kind": "variable",
+          "position": {
+            "line": 54,
+            "column": 0
+          },
+          "span": {
+            "start": {
+              "line": 54,
+              "column": 0
+            },
+            "end": {
+              "line": 54,
+              "column": 25
+            }
+          }
+        },
+        {
+          "name": "plugin",
+          "kind": "function",
+          "position": {
+            "line": 57,
+            "column": 4
+          },
+          "span": {
+            "start": {
+              "line": 57,
+              "column": 0
+            },
+            "end": {
+              "line": 58,
+              "column": 58
+            }
+          }
+        },
+        {
+          "name": "legacy",
+          "kind": "function",
+          "position": {
+            "line": 61,
+            "column": 4
+          },
+          "span": {
+            "start": {
+              "line": 61,
+              "column": 0
+            },
+            "end": {
+              "line": 62,
+              "column": 27
+            }
+          }
+        },
+        {
+          "name": "register",
+          "kind": "function",
+          "position": {
+            "line": 65,
+            "column": 4
+          },
+          "span": {
+            "start": {
+              "line": 65,
+              "column": 0
+            },
+            "end": {
+              "line": 67,
+              "column": 14
+            }
+          }
+        },
+        {
+          "name": "OrderService",
+          "kind": "class",
+          "position": {
+            "line": 71,
+            "column": 6
+          },
+          "span": {
+            "start": {
+              "line": 70,
+              "column": 0
+            },
+            "end": {
+              "line": 95,
+              "column": 31
+            }
+          },
+          "decorators": [
+            "register"
+          ]
+        },
+        {
+          "name": "__init__",
+          "kind": "method",
+          "position": {
+            "line": 74,
+            "column": 8
+          },
+          "span": {
+            "start": {
+              "line": 74,
+              "column": 4
+            },
+            "end": {
+              "line": 75,
+              "column": 36
+            }
+          },
+          "container": "OrderService"
+        },
+        {
+          "name": "count",
+          "kind": "method",
+          "position": {
+            "line": 78,
+            "column": 8
+          },
+          "span": {
+            "start": {
+              "line": 77,
+              "column": 4
+            },
+            "end": {
+              "line": 79,
+              "column": 75
+            }
+          },
+          "container": "OrderService",
+          "decorators": [
+            "property"
+          ]
+        },
+        {
+          "name": "build",
+          "kind": "method",
+          "position": {
+            "line": 83,
+            "column": 8
+          },
+          "span": {
+            "start": {
+              "line": 81,
+              "column": 4
+            },
+            "end": {
+              "line": 86,
+              "column": 54
+            }
+          },
+          "container": "OrderService",
+          "decorators": [
+            "staticmethod",
+            "functools.cache"
+          ]
+        },
+        {
+          "name": "fetch",
+          "kind": "method",
+          "position": {
+            "line": 88,
+            "column": 14
+          },
+          "span": {
+            "start": {
+              "line": 88,
+              "column": 4
+            },
+            "end": {
+              "line": 92,
+              "column": 28
+            }
+          },
+          "container": "OrderService"
+        },
+        {
+          "name": "inner",
+          "kind": "function",
+          "position": {
+            "line": 89,
+            "column": 18
+          },
+          "span": {
+            "start": {
+              "line": 89,
+              "column": 8
+            },
+            "end": {
+              "line": 90,
+              "column": 54
+            }
+          },
+          "container": "OrderService"
+        },
+        {
+          "name": "Meta",
+          "kind": "class",
+          "position": {
+            "line": 94,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 94,
+              "column": 4
+            },
+            "end": {
+              "line": 95,
+              "column": 31
+            }
+          },
+          "container": "OrderService"
+        },
+        {
+          "name": "place_order",
+          "kind": "function",
+          "position": {
+            "line": 98,
+            "column": 10
+          },
+          "span": {
+            "start": {
+              "line": 98,
+              "column": 0
+            },
+            "end": {
+              "line": 103,
+              "column": 40
+            }
+          }
+        }
+      ],
+      "calls": [
+        {
+          "callee": "OrderedDict",
+          "strings": []
+        },
+        {
+          "callee": "import_module",
+          "receiver": "importlib",
+          "strings": []
+        },
+        {
+          "callee": "__import__",
+          "strings": []
+        },
+        {
+          "callee": "len",
+          "strings": []
+        },
+        {
+          "callee": "find_all",
+          "receiver": "self.repository",
+          "strings": [
+            {
+              "text": "\"open\"",
+              "start": {
+                "line": 79,
+                "column": 44
+              },
+              "end": {
+                "line": 79,
+                "column": 50
+              }
+            }
+          ]
+        },
+        {
+          "callee": "which",
+          "receiver": "shutil",
+          "strings": []
+        },
+        {
+          "callee": "join",
+          "receiver": "os.path",
+          "strings": [
+            {
+              "text": "\"bin\"",
+              "start": {
+                "line": 86,
+                "column": 47
+              },
+              "end": {
+                "line": 86,
+                "column": 52
+              }
+            }
+          ]
+        },
+        {
+          "callee": "get",
+          "receiver": "self.repository",
+          "strings": []
+        },
+        {
+          "callee": "inner",
+          "strings": []
+        },
+        {
+          "callee": "emit",
+          "strings": [
+            {
+              "text": "\"orders\"",
+              "start": {
+                "line": 102,
+                "column": 37
+              },
+              "end": {
+                "line": 102,
+                "column": 45
+              }
+            }
+          ]
+        },
+        {
+          "callee": "len",
+          "strings": []
+        },
+        {
+          "callee": "fetch",
+          "receiver": "service",
+          "strings": []
+        }
+      ]
+    }
+  ],
+  "unparsed": [],
+  "notices": [
+    "Python: 2 dynamic imports name their module at run time and are not import facts: src/shop/orders.py:58 (importlib.import_module), src/shop/orders.py:62 (__import__)."
+  ]
+}

@@ -42,9 +42,10 @@ describe("pack contract", () => {
     expect(isFactKind("outbound-calls")).toBe(false);
   });
 
-  it("keeps SQL tables and Go structs as their own symbol kinds", () => {
+  it("keeps SQL tables, Go structs and Python module-level names as their own symbol kinds", () => {
     expect(SYMBOL_KINDS).toContain("table");
     expect(SYMBOL_KINDS).toContain("struct");
+    expect(SYMBOL_KINDS).toContain("variable");
     expect(new Set(SYMBOL_KINDS).size).toBe(SYMBOL_KINDS.length);
   });
 

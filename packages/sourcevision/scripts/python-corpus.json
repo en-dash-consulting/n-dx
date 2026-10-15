@@ -1,0 +1,35 @@
+{
+  "comment": "Python drift corpus: public repositories pinned by commit SHA. Cloned by python-corpus-clone.mjs, measured by python-corpus-report.mjs. Neither runs in the test suite.",
+  "repositories": [
+    {
+      "name": "django",
+      "url": "https://github.com/django/django.git",
+      "sha": "d430084791a61b31cecec132bce3dca19194f7f2",
+      "shape": "framework, one package plus a large test tree"
+    },
+    {
+      "name": "netbox",
+      "url": "https://github.com/netbox-community/netbox.git",
+      "sha": "9023ed4972f6f8ba67673ad0bbff1bc36036dda2",
+      "shape": "Django application, many apps"
+    },
+    {
+      "name": "poetry",
+      "url": "https://github.com/python-poetry/poetry.git",
+      "sha": "38a86661d2ae58694c76d0bb4e628e1400d6dc6f",
+      "shape": "src layout, pyproject.toml"
+    },
+    {
+      "name": "full-stack-fastapi-template",
+      "url": "https://github.com/fastapi/full-stack-fastapi-template.git",
+      "sha": "b1125d8839482cb7bbae603ddc6d0081bf87532e",
+      "shape": "FastAPI backend beside a TypeScript frontend"
+    },
+    {
+      "name": "home-assistant-core",
+      "url": "https://github.com/home-assistant/core.git",
+      "sha": "e92f1bfeca5a9fb31f9c43c07094b4a649757649",
+      "shape": "scale and timing only: thousands of integrations"
+    }
+  ]
+}
