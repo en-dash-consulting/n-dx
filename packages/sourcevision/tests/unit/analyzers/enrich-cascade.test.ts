@@ -17,15 +17,21 @@ vi.mock("../../../src/analyzers/enrich-judge.js", async () => {
 vi.mock("../../../src/analyzers/enrich-multiplex.js", () => ({
   narrateZones: vi.fn(),
 }));
+vi.mock("../../../src/analyzers/rerun-judge.js", async () => {
+  const actual = await import("../../../src/analyzers/rerun-judge.js");
+  return { ...actual, judgeRerun: vi.fn(async () => actual.emptyRerunOutcome()) };
+});
 
 import { nameZonesBySelection } from "../../../src/analyzers/zone-naming.js";
 import { assessZoneFragility } from "../../../src/analyzers/enrich-judge.js";
 import { narrateZones } from "../../../src/analyzers/enrich-multiplex.js";
+import { emptyRerunOutcome, findingKey, judgeRerun } from "../../../src/analyzers/rerun-judge.js";
 import { cascadeEnrichment, dedupeZoneNames, ESCALATION_BAND, ESCALATION_MAX_ZONES } from "../../../src/analyzers/enrich-cascade.js";
 
 const mockedNaming = vi.mocked(nameZonesBySelection);
 const mockedFragility = vi.mocked(assessZoneFragility);
 const mockedPerZone = vi.mocked(narrateZones);
+const mockedRerun = vi.mocked(judgeRerun);
 
 function zone(id: string, files: string[]): Zone {
   return { id, name: id, description: "algo", files, entryPoints: [], cohesion: 0.5, coupling: 0.5 };
@@ -47,6 +53,8 @@ beforeEach(() => {
   mockedNaming.mockReset();
   mockedFragility.mockReset();
   mockedPerZone.mockReset();
+  mockedRerun.mockReset();
+  mockedRerun.mockResolvedValue(emptyRerunOutcome());
   vi.spyOn(console, "log").mockImplementation(() => {});
   mockedNaming.mockImplementation(async (zones) => ({
     zones: zones.map((z) => ({ ...z, name: `Named ${z.id}` })),
@@ -171,6 +179,94 @@ describe("cascadeEnrichment", () => {
     }));
     const res = await cascadeEnrichment([src, ui], crossings, inventory, imports, undefined, undefined, undefined, undefined, { deferNarration: true });
     expect(res.deferredNameZoneIds).toEqual(new Set(["ui"]));
+  });
+});
+
+describe("cascadeEnrichment — re-run judgments", () => {
+  /** A previous run of `src`, narrated, with one judged finding in it. */
+  const previousRun = {
+    zones: [{ ...src, structureHash: "prev-hash", insights: ["old"] }],
+    crossings: [],
+    unzoned: [],
+    enrichmentPass: 1,
+    zoneContentHashes: { core: "old-content" },
+    findings: [
+      { type: "anti-pattern" as const, pass: 2, scope: "core", text: "Parsing and rendering are tangled.", confidence: 0.8 },
+    ],
+  };
+
+  it("re-narrates an unchanged-by-overlap zone the refresh judgment says has moved", async () => {
+    mockedFragility.mockResolvedValueOnce({ probabilities: new Map([["core", { unrelated: 0.5 }]]), calls: 1 });
+    mockedRerun.mockResolvedValueOnce({
+      ...emptyRerunOutcome(),
+      zones: new Map([["core", "refresh"]]),
+      calls: 1,
+    });
+    mockedPerZone.mockResolvedValueOnce({
+      zones: [], newZoneInsights: new Map(), newFindings: [], tokenUsage: { calls: 1, input: 0, output: 0 }, success: true,
+    });
+
+    // Identical files, so the overlap rule alone would carry the insights.
+    await cascadeEnrichment([src], [], inventory, imports, previousRun, undefined, undefined, undefined, {
+      contentHashes: { core: "new-content" },
+    });
+
+    expect(mockedPerZone).toHaveBeenCalledTimes(1);
+    expect(mockedPerZone.mock.calls[0][0].map((z) => z.id)).toEqual(["core"]);
+  });
+
+  it("carries the previous insights when the refresh judgment says the zone has not moved", async () => {
+    mockedFragility.mockResolvedValueOnce({ probabilities: new Map([["core", { unrelated: 0.5 }]]), calls: 1 });
+    mockedRerun.mockResolvedValueOnce({
+      ...emptyRerunOutcome(),
+      zones: new Map([["core", "keep"]]),
+      calls: 1,
+    });
+
+    const res = await cascadeEnrichment([src], [], inventory, imports, previousRun, undefined, undefined, undefined, {
+      contentHashes: { core: "new-content" },
+    });
+
+    expect(mockedPerZone).not.toHaveBeenCalled();
+    expect(res.zones.find((z) => z.id === "core")).toMatchObject({ insights: ["old"] });
+  });
+
+  it("puts a refreshed zone and its undecided finding in the same narration call", async () => {
+    mockedFragility.mockResolvedValueOnce({ probabilities: new Map(), calls: 1 });
+    mockedRerun.mockResolvedValueOnce({
+      ...emptyRerunOutcome(),
+      zones: new Map([["core", "refresh"]]),
+      findings: new Map([
+        [findingKey(previousRun.findings[0]), { verdict: "uncertain" as const, probability: 0.5 }],
+      ]),
+      calls: 1,
+    });
+    mockedPerZone.mockResolvedValueOnce({
+      zones: [], newZoneInsights: new Map(), newFindings: [], tokenUsage: { calls: 1, input: 0, output: 0 }, success: true,
+    });
+
+    await cascadeEnrichment([src], [], inventory, imports, previousRun, undefined, undefined, undefined, {
+      contentHashes: { core: "new-content" },
+    });
+
+    // One call, not two: the zone's refresh and the finding's confirmation are
+    // the same question of the same files.
+    expect(mockedPerZone).toHaveBeenCalledTimes(1);
+    const [zones, opts] = mockedPerZone.mock.calls[0];
+    expect(zones.map((z) => z.id)).toEqual(["core"]);
+    expect(opts.confirmFindings?.get("core")).toEqual(["Parsing and rendering are tangled."]);
+  });
+
+  it("asks nothing when every zone's hashes are unchanged", async () => {
+    mockedFragility.mockResolvedValueOnce({ probabilities: new Map(), calls: 1 });
+
+    const res = await cascadeEnrichment([src], [], inventory, imports, previousRun, undefined, undefined, undefined, {
+      contentHashes: { core: "old-content" },
+    });
+
+    expect(mockedRerun).not.toHaveBeenCalled();
+    expect(mockedPerZone).not.toHaveBeenCalled();
+    expect(res.rerun.calls).toBe(0);
   });
 });
 

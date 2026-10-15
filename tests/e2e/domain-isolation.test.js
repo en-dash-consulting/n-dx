@@ -93,6 +93,29 @@ function hasRuntimeImportFrom(content, pkg) {
   return false;
 }
 
+/**
+ * Find dynamic `import("pkg")` calls of a specific package. Separate from
+ * hasRuntimeImportFrom because only the gateway rules apply it: the
+ * orchestration-tier `config.js` is spawn-exempt and imports dynamically on purpose.
+ */
+function hasDynamicImportOf(content, pkg) {
+  const call = new RegExp(`\\bimport\\s*\\(\\s*["']${pkg}["']\\s*\\)`);
+  return content.split("\n").some((line) => {
+    const trimmed = line.trim();
+    return !trimmed.startsWith("//") && !trimmed.startsWith("*") && call.test(trimmed);
+  });
+}
+
+describe("hasDynamicImportOf self-tests", () => {
+  it("detects a dynamic import() of the package only", () => {
+    expect(hasDynamicImportOf('const { x } = await import("@n-dx/rex");', "@n-dx/rex")).toBe(true);
+    expect(hasDynamicImportOf("const m = await import('@n-dx/rex')", "@n-dx/rex")).toBe(true);
+    expect(hasDynamicImportOf('const m = await import("@n-dx/rex/dist/x.js")', "@n-dx/rex")).toBe(false);
+    expect(hasDynamicImportOf('const m = await import("./local.js")', "@n-dx/rex")).toBe(false);
+    expect(hasDynamicImportOf('// await import("@n-dx/rex")', "@n-dx/rex")).toBe(false);
+  });
+});
+
 describe("hasRuntimeImportFrom self-tests", () => {
   it("detects runtime import from a package", () => {
     expect(hasRuntimeImportFrom('import { foo } from "@n-dx/rex"', "@n-dx/rex")).toBe(true);
@@ -470,7 +493,7 @@ describe("architecture policy: gateway enforcement", () => {
         if (rule.allowedNonGatewayFiles.has(rel)) continue;
 
         const content = readFileSync(file, "utf-8");
-        if (hasRuntimeImportFrom(content, rule.externalPkg)) {
+        if (hasRuntimeImportFrom(content, rule.externalPkg) || hasDynamicImportOf(content, rule.externalPkg)) {
           violations.push(rel);
         }
       }
@@ -479,7 +502,7 @@ describe("architecture policy: gateway enforcement", () => {
         const gw = [...rule.gatewayFiles][0];
         expect.fail(
           [
-            `Runtime imports from '${rule.externalPkg}' found outside the gateway.`,
+            `Runtime imports (static or dynamic import()) from '${rule.externalPkg}' found outside the gateway.`,
             `All runtime imports must go through: ${gw}`,
             "`import type` is fine anywhere (erased at compile time).",
             "",

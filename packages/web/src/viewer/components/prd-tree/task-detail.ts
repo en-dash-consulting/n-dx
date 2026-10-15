@@ -7,6 +7,7 @@
  */
 
 import { h, Fragment } from "preact";
+import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useEffect } from "preact/hooks";
 import type { PRDItemData, ItemStatus, Priority, RequirementData, RequirementCategory, RequirementValidationType, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
 import type { NavigateTo } from "../../types.js";
@@ -176,7 +177,7 @@ function TagEditor({
             "aria-label": `Remove tag ${tag}`,
             title: "Remove",
           },
-          "\u00d7",
+          h(ActionIcon, { name: "close" }),
         ),
       ),
     ),
@@ -475,7 +476,7 @@ function EditableAcceptanceCriteria({
                         onClick: (e: Event) => { e.stopPropagation(); handleRemove(i); },
                         "aria-label": `Remove criterion ${i + 1}`,
                         title: "Remove",
-                      }, "\u00d7")
+                      }, h(ActionIcon, { name: "close" }))
                     : null,
                 ),
           ),
@@ -498,7 +499,7 @@ function EditableAcceptanceCriteria({
               ref: (el: HTMLInputElement | null) => el?.focus(),
             }),
             h("button", { class: "task-criterion-add-confirm", onClick: handleAdd, disabled: !addDraft.trim(), "aria-label": "Confirm add criterion", title: "Confirm" }, "\u2713"),
-            h("button", { class: "task-criterion-add-cancel", onClick: () => { setAdding(false); setAddDraft(""); }, "aria-label": "Cancel add criterion", title: "Cancel" }, "\u00d7"),
+            h("button", { class: "task-criterion-add-cancel", onClick: () => { setAdding(false); setAddDraft(""); }, "aria-label": "Cancel add criterion", title: "Cancel" }, h(ActionIcon, { name: "close" })),
           )
         : h("button", { class: "task-criterion-add-btn", onClick: () => setAdding(true) }, "+ criterion")
       : null,
@@ -663,7 +664,7 @@ function AddChildForm({
         title: showExtra ? "Hide extra fields" : "Show description & priority",
         "aria-label": showExtra ? "Hide extra fields" : "Show description & priority",
         disabled: submitting,
-      }, "\u22ef"),
+      }, h(ActionIcon, { name: "more" })),
       h("button", {
         type: "button",
         class: "task-add-child-submit",
@@ -898,7 +899,7 @@ function RequirementsList({
                 "aria-label": `Remove requirement ${req.title}`,
                 title: "Remove",
               },
-              "\u00d7",
+              h(ActionIcon, { name: "close" }),
             )
           : null,
       ),

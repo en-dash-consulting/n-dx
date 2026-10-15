@@ -142,6 +142,87 @@ describe("GET /api/live/analyze", () => {
     expect(buildLiveAnalyzeSnapshot(ctx, sources).results).toEqual({});
   });
 
+  describe("what the finished run changed", () => {
+    const PREVIOUS_AT = "2026-09-30T10:00:00.000Z";
+
+    /** A finished run, its manifest record, and one previous run to measure against. */
+    function writeFinishedRun(opts: { lastAnalysisAt?: string; previousOutcome?: unknown; costUsd?: number } = {}): void {
+      writeProgress({
+        status: "complete",
+        pid: 1,
+        endedAt: at(120_000),
+        phase: null,
+        phases: [{ index: 1, name: "zones", startedAt: STARTED, endedAt: at(120_000), durationMs: 120_000, outcome: "ok" }],
+      });
+      mkdirSync(join(svDir, ".cache"), { recursive: true });
+      writeFileSync(join(svDir, ".cache", "analyses.jsonl"), JSON.stringify({
+        at: PREVIOUS_AT,
+        mode: "generative",
+        durationMs: 250_000,
+        phases: { zones: 150_000 },
+        llm: { byTaskClass: {} },
+        ...(opts.previousOutcome === undefined ? {} : { outcome: opts.previousOutcome }),
+      }) + "\n");
+      writeJson(join(svDir, "zones.json"), {
+        zones: [{ id: "core", name: "Core" }, { id: "viewer-hub", name: "Viewer Hub", previousIds: ["zone-7"] }],
+        stability: { reassignedFiles: [["a.js", "cli-orchestration", "core"], ["b.js", "cli-orchestration", "core"]] },
+      });
+      writeJson(join(svDir, "manifest.json"), {
+        modules: {},
+        lastAnalysis: {
+          at: opts.lastAnalysisAt ?? STARTED,
+          mode: "generative",
+          durationMs: 120_000,
+          phases: { zones: 120_000 },
+          llm: { byTaskClass: {}, ...(opts.costUsd === undefined ? {} : { costUsd: opts.costUsd }) },
+          outcome: { files: 412, importEdges: 1150, zoneIds: ["core", "viewer-hub"], findings: { critical: ["k1"], info: ["k2"] } },
+        },
+      });
+    }
+
+    it("diffs zones, findings and counts against the previous run, with the spend it recorded", () => {
+      writeFinishedRun({
+        costUsd: 0.4123,
+        previousOutcome: { files: 400, importEdges: 1200, zoneIds: ["core", "zone-7", "cli-orchestration"], findings: { critical: ["k1"], warning: ["gone"] } },
+      });
+      const { changes, spendUsd } = buildLiveAnalyzeSnapshot(ctx, sources);
+      expect(spendUsd).toBe(0.4123);
+      expect(changes?.previousAt).toBe(PREVIOUS_AT);
+      expect(changes?.files).toEqual({ now: 412, was: 400 });
+      expect(changes?.importEdges).toEqual({ now: 1150, was: 1200 });
+      expect(changes?.zones.renamed).toEqual([{ id: "viewer-hub", name: "Viewer Hub", related: "zone-7" }]);
+      expect(changes?.zones.merged).toEqual([{ id: "cli-orchestration", name: null, related: "core" }]);
+      expect(changes?.zones.added).toEqual([]);
+      expect(changes?.findings).toEqual({ now: { critical: 1, info: 1 }, added: { info: 1 }, resolved: { warning: 1 } });
+    });
+
+    it("reports the run's own result when the previous run recorded no outcome", () => {
+      writeFinishedRun();
+      const { changes, spendUsd } = buildLiveAnalyzeSnapshot(ctx, sources);
+      expect(spendUsd).toBeNull();
+      // The previous run exists and is found, but said nothing about its result.
+      expect(changes?.previousAt).toBeNull();
+      expect(changes?.files).toEqual({ now: 412, was: null });
+      expect(changes?.zones).toEqual({ total: 2, added: [], removed: [], merged: [], renamed: [] });
+      expect(changes?.findings).toEqual({ now: { critical: 1, info: 1 }, added: {}, resolved: {} });
+    });
+
+    it("has no summary while the analysis is still running", () => {
+      writeFinishedRun();
+      writeProgress();
+      expect(buildLiveAnalyzeSnapshot(ctx, sources).changes).toBeNull();
+    });
+
+    it("refuses a manifest record that belongs to a different run", () => {
+      // A run that died before writing the manifest leaves lastAnalysis naming
+      // its predecessor; diffing that would credit this run with its work.
+      writeFinishedRun({ lastAnalysisAt: "2026-01-01T00:00:00.000Z" });
+      const snapshot = buildLiveAnalyzeSnapshot(ctx, sources);
+      expect(snapshot.changes).toBeNull();
+      expect(snapshot.spendUsd).toBeNull();
+    });
+  });
+
   it("carries the enrichment pass zones.json records once the zones phase has ended", () => {
     writeProgress({
       phase: null,

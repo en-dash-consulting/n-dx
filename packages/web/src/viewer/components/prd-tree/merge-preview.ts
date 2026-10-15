@@ -13,6 +13,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../action-icon.js";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import type { PRDItemData } from "./types.js";
 import { itemTypeLabel, itemTypeOf } from "../../external.js";
@@ -165,7 +166,7 @@ export function MergePreview({ selectedItems, onMergeComplete, onCancel }: Merge
         onClick: onCancel,
         title: "Cancel",
         "aria-label": "Cancel merge",
-      }, "\u00d7"),
+      }, h(ActionIcon, { name: "close" })),
     ),
 
     // Error message

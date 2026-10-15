@@ -21,7 +21,7 @@ plannedRelease: "1.0.0"
 | [Agent brief from the product layer](./agent-brief-from-the-product-layer/index.md) | completed |
 | [Apply engine for change amendments](./apply-engine-for-change-amendments/index.md) | completed |
 | [Apply the migration](./apply-the-migration/index.md) | pending |
-| [Bootstrap the product layer from an established codebase](./bootstrap-the-product-layer-from-an/index.md) | pending |
+| [Bootstrap the product layer from an established codebase](./bootstrap-the-product-layer-from-an/index.md) | completed |
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
 | [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | completed |
 | [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | completed |
@@ -31,6 +31,7 @@ plannedRelease: "1.0.0"
 | [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |
 | [Derived status, health and computed edges](./derived-status-health-and-computed-edges/index.md) | completed |
 | [Docs, skills and policies for the v2 model](./docs-skills-and-policies-for-the-v2/index.md) | pending |
+| [Edit a capability's spec from the dashboard](./edit-a-capability-s-spec-from-the/index.md) | completed |
 | [Every n-dx commit carries an item trailer](./every-n-dx-commit-carries-an-item/index.md) | completed |
 | [Every PRD tool opens a v2 tree, and none can split it](./every-prd-tool-opens-a-v2-tree-and/index.md) | completed |
 | [Generate the migration plan](./generate-the-migration-plan/index.md) | completed |
@@ -42,9 +43,10 @@ plannedRelease: "1.0.0"
 | [Placement engine for changes](./placement-engine-for-changes/index.md) | completed |
 | [Product, Changes and capability views on fixtures](./product-changes-and-capability-views/index.md) | completed |
 | [Read and write the v2 folder trees](./read-and-write-the-v2-folder-trees/index.md) | completed |
-| [Recommendations become changes](./recommendations-become-changes/index.md) | pending |
+| [Recommendations become changes](./recommendations-become-changes/index.md) | completed |
 | [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | completed |
 | [Review follow-ups for the product layer work](./review-follow-ups-for-the-product/index.md) | pending |
+| [rex correctness fixes off the migration path](./rex-correctness-fixes-off-the/index.md) | completed |
 | [Route remaining state paths through the layout resolver](./route-remaining-state-paths-through/index.md) | completed |
 | [Route the remaining .n-dx config readers through the resolver](./route-the-remaining-n-dx-config/index.md) | completed |
 | [Select and complete work on changes](./select-and-complete-work-on-changes/index.md) | completed |
@@ -54,6 +56,9 @@ plannedRelease: "1.0.0"
 | [Split the rex MCP tools into one module per tool](./split-the-rex-mcp-tools-into-one/index.md) | completed |
 | [Stamp shippedIn from any CI](./stamp-shippedin-from-any-ci/index.md) | completed |
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | completed |
+| [The dashboard's watchers and routes hold up](./the-dashboard-s-watchers-and-routes/index.md) | completed |
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
+| [v2 completion and selection hold up](./v2-completion-and-selection-hold-up/index.md) | pending |
+| [v2 MCP tools take display ids and report v2 health](./v2-mcp-tools-take-display-ids-and/index.md) | completed |
 | [v2 schema and rules before the freeze](./v2-schema-and-rules-before-the-freeze/index.md) | completed |
 | [v2 store transaction for the product and change layers](./v2-store-transaction-for-the-product/index.md) | completed |

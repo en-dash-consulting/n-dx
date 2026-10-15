@@ -195,7 +195,7 @@
   border-radius: 20px;
   font-size: 13px;
   font-weight: 500;
-  z-index: 1000;
+  z-index: var(--z-toast);
   animation: toast-fade 3s ease-in-out forwards;
 }
 

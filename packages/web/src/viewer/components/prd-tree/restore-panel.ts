@@ -8,6 +8,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../action-icon.js";
 import { useState, useEffect, useCallback } from "preact/hooks";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ export function RestorePanel({ open, onClose, onRestored }: RestorePanelProps) {
         h("button", {
           class: "reorg-close", onClick: onClose, "aria-label": "Close",
           disabled: restoring,
-        }, "×"),
+        }, h(ActionIcon, { name: "close" })),
       ),
 
       h("div", { class: "reorg-body restore-panel-body" },

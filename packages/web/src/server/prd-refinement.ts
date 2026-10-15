@@ -514,6 +514,7 @@ function buildMerge(
   doc: PRDDocument,
   raw: RawRefinement,
   id: string,
+  changeLayer: boolean,
 ): { proposal: MergeRefinement } | { note: string } {
   const entry = findItem(doc.items, raw.itemId);
   if (!entry) return { note: `Skipped a merge of unknown item "${raw.itemId}".` };
@@ -521,7 +522,9 @@ function buildMerge(
   const target = findItem(doc.items, raw.intoId);
   if (!target) return { note: `Skipped a merge of "${entry.item.title}": unknown target "${raw.intoId}".` };
 
-  const check = validateMerge(doc.items, [raw.itemId, raw.intoId], raw.intoId);
+  // The same rule apply enforces, so a merge rex would refuse is never offered.
+  const validate = changeLayer ? validateChangesMerge : validateMerge;
+  const check = validate(doc.items, [raw.itemId, raw.intoId], raw.intoId);
   if (!check.valid) {
     return { note: `Skipped a merge of "${entry.item.title}": ${check.error ?? "not mergeable"}` };
   }
@@ -581,9 +584,15 @@ export interface ParsedRefinements {
  * Read an answer into prose plus reviewable proposals.
  *
  * `doc` must be the document the answer was generated against — every `before`
- * value and every fingerprint is read out of it.
+ * value and every fingerprint is read out of it. `changeLayer` selects the v2
+ * merge rule, as in {@link applyRefinements}.
  */
-export function parseAnswerRefinements(answer: string, doc: PRDDocument): ParsedRefinements {
+export function parseAnswerRefinements(
+  answer: string,
+  doc: PRDDocument,
+  options: ApplyRefinementsOptions = {},
+): ParsedRefinements {
+  const changeLayer = options.changeLayer === true;
   const { prose, block } = splitRefinementBlock(answer);
   if (block === null) return { prose, proposals: [], notes: [] };
 
@@ -619,7 +628,7 @@ export function parseAnswerRefinements(answer: string, doc: PRDDocument): Parsed
       ? buildEdit(doc, validated.data, id)
       : validated.data.op === "reparent"
         ? buildReparent(doc, validated.data, id)
-        : buildMerge(doc, validated.data, id);
+        : buildMerge(doc, validated.data, id, changeLayer);
 
     if ("note" in built) notes.push(built.note);
     else proposals.push(built.proposal);

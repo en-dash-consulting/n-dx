@@ -1254,3 +1254,63 @@ describe("cmdRecommend feature titles name their subject", () => {
     expect(feature.title).toBe("Fix move-file in web-viewer (2 findings)");
   });
 });
+
+// ── code-health tagging ──────────────────────────────────────────────────────
+
+/**
+ * Placement treats a change as a code-health finding only when it carries the
+ * `code-health` tag — `source: "sourcevision"` no longer means anything to it.
+ * Everything `rex recommend` emits exists because the analysis reported a
+ * finding, so the whole hierarchy it creates has to be tagged.
+ */
+describe("cmdRecommend tags what it creates as code-health", () => {
+  let tmpDir: string;
+  let cmdRecommend: typeof import("../../../../src/cli/commands/recommend.js")["cmdRecommend"];
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.doMock("@n-dx/llm-client", async () => ({
+      ...(await vi.importActual<typeof import("@n-dx/llm-client")>("@n-dx/llm-client")),
+      PROJECT_DIRS: { REX: ".rex", SOURCEVISION: ".sourcevision" },
+      formatUsage: () => "",
+      toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
+      result: () => {},
+      info: () => {},
+      setQuiet: () => {},
+      isQuiet: () => false,
+    }));
+    ({ cmdRecommend } = await import("../../../../src/cli/commands/recommend.js"));
+
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-recommend-code-health-"));
+    await writeFixtureProject(tmpDir);
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("tags the epic, the features and the tasks it accepts", async () => {
+    await cmdRecommend(tmpDir, { accept: "=all" });
+
+    const items = flattenItems(await readPrdItems(tmpDir));
+    expect(items.length).toBeGreaterThan(0);
+
+    for (const level of ["epic", "feature", "task"] as const) {
+      const atLevel = items.filter((i) => i.level === level);
+      expect(atLevel.length).toBeGreaterThan(0);
+      for (const item of atLevel) {
+        expect(item.tags).toContain("code-health");
+      }
+    }
+  });
+
+  it("tags a cherry-picked subset too", async () => {
+    await cmdRecommend(tmpDir, { accept: "=2" });
+
+    const items = flattenItems(await readPrdItems(tmpDir));
+    for (const item of items) {
+      expect(item.tags).toContain("code-health");
+    }
+  });
+});

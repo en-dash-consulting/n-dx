@@ -6,6 +6,7 @@ import { computeFindingHash, loadAcknowledged, isAcknowledged } from "./acknowle
 import type { AcknowledgedStore } from "./acknowledge.js";
 import { cleanHeading, extractJsonItems, extractYamlItems } from "./analyze-shared.js";
 import { resolveRexPaths } from "../store/index.js";
+import { CODE_HEALTH_TAG } from "../core/placement.js";
 
 export interface ScanResult {
   name: string;
@@ -719,6 +720,9 @@ export async function scanSourceVision(
           tags.push(`finding:${hash}`);
           if (finding.category) tags.push(`finding-category:${finding.category}`);
           if (finding.type === "move-file") tags.push("structural-debt");
+          // This task repairs what the analysis found; placement reads the tag
+          // to route it to the architecture constraint as `touches`.
+          tags.push(CODE_HEALTH_TAG);
 
           results.push({
             name: `${prefix}: ${finding.text}`,
@@ -791,7 +795,7 @@ export async function scanSourceVision(
           sourceFile: uniqueFiles[0] ?? sourceFiles.imports,
           kind: "task",
           priority: "high",
-          tags: ["tech-debt"],
+          tags: ["tech-debt", CODE_HEALTH_TAG],
           acceptanceCriteria: [
             `Break circular dependency cycle: ${dep.cycle.join(" → ")}`,
             ...uniqueFiles.map((f) => `File: ${f}`),
@@ -815,7 +819,7 @@ export async function scanSourceVision(
           sourceFile: sourceFiles.imports,
           kind: "task",
           priority: "high",
-          tags: ["tech-debt"],
+          tags: ["tech-debt", CODE_HEALTH_TAG],
         });
       }
     }
@@ -830,7 +834,7 @@ export async function scanSourceVision(
           sourceFile: sourceFiles.imports,
           kind: "task",
           priority: "high",
-          tags: ["tech-debt"],
+          tags: ["tech-debt", CODE_HEALTH_TAG],
         });
       }
     }
@@ -1148,7 +1152,7 @@ function processLegacyZones(
           sourceFile: finding.file ?? zonesSourceFile,
           kind: "task",
           priority,
-          tags: [zone.name],
+          tags: [zone.name, CODE_HEALTH_TAG],
         });
       }
     }

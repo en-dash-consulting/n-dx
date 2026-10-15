@@ -1,0 +1,5 @@
+---
+"@n-dx/sourcevision": patch
+---
+
+Re-run decisions are judgments rather than hashes. On a cascade re-run, Jev is asked per changed zone whether the delta alters what a maintainer would say about its purpose, boundaries or risks — at or above 0.7 the zone is re-narrated, at or below 0.3 its description stands, in between it is kept and named as unconfirmed — and per previously-judged finding whether it still holds, carrying it forward, lowering its confidence to the probability, or dropping it as resolved below 0.3. Both go in one request per batch over one shared zone state, and a finding Jev could not decide is named in the zone's own narration call to confirm or refute. The content and header hashes remain as a pre-filter, so an unchanged zone is never asked about. Pass 0 and unjudged findings keep the content-hash rule. Counts land on `manifest.lastAnalysis.rerun` and the CLI prints one `[rerun]` line; resolved findings are logged to `.sourcevision/.cache/rerun-log.jsonl`. Inert without `TYPESAFE_API_KEY`.

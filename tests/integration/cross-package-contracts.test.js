@@ -231,6 +231,7 @@ describe("hench → rex gateway contract", () => {
     "findNextWorkTask",
     "findActionableWork",
     "resolveWorkById",
+    "openChangeTasks",
     // v2 agent brief
     "buildChangeBrief",
     // v2 completion — what update_task_status runs on a v2 tree
@@ -817,7 +818,7 @@ describe("gateway export auto-detection", () => {
         "findItem", "walkTree", "findNextTask", "findActionableTasks",
         "collectCompletedIds", "explainSelection", "matchesAssignee", "traversalBlock",
         "prdLayout", "isChangeLayerStore", "findNextWorkTask", "findActionableWork", "resolveWorkById",
-        "buildChangeBrief", "completeV2Work",
+        "openChangeTasks", "buildChangeBrief", "completeV2Work",
         "isAppliedChange", "indexTree", "enclosingChangeIds", "loadPrdModel",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
@@ -914,6 +915,7 @@ describe("gateway export auto-detection", () => {
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
         "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS",
         "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE", "SECRET_PATH_PATTERNS",
+        "isFailForwardEnabled",
         "NDX_CONTAINER_DIRNAME"],
       ...["DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"],
     ]);
@@ -948,6 +950,7 @@ describe("gateway export auto-detection", () => {
         "validateChangesMerge", "mergeChanges",
         "loadPrdModel", "productReport", "capabilityReport", "indexTree",
         "isOpenChange", "isAppliedChange", "specHash", "nodeSpec",
+        "handleProductEdit", "ProductEditError", "withPrdModelTransaction",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
         "computeRequirementsSummary", "computeHealthScore",
         "detectReorganizations", "applyProposals", "applyReshape",

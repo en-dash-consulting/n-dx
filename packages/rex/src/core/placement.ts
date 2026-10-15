@@ -104,7 +104,13 @@ export interface PlacementResult {
 
 export const PLACEMENT_SHORTLIST_SIZE = 5;
 
-const CODE_HEALTH_TAG = "code-health";
+/**
+ * The marker that makes a change a code-health finding. Placement reads only
+ * this tag, never the change's source, so whoever creates a finding-derived
+ * change must stamp it: `recommend` and `analyze` do (see
+ * `analyze/scanners.ts` and `cli/commands/recommend.ts`).
+ */
+export const CODE_HEALTH_TAG = "code-health";
 const ARCHITECTURE = "architecture";
 
 // File evidence and a code-health finding on the architecture constraint

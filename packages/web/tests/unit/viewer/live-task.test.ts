@@ -46,6 +46,7 @@ function snapshot(over: Partial<LiveTaskSnapshot> = {}): LiveTaskSnapshot {
     },
     runs: [run(), run({ runId: "r1", status: "failed", finishedAt: "2026-10-01T09:30:00.000Z", startedAt: "2026-10-01T09:00:00.000Z", pid: null, startedFrom: null, outcome: "Tests failed" })],
     maxTurns: 50,
+    prdLayout: "v1",
     ...over,
   };
 }

@@ -8,6 +8,38 @@
   --brand-orange: #ff5926;
   --panel-w: 320px;
 
+  /* ── App-level stacking order ──────────────────────────────────────────
+   * One scale for everything that is `position: fixed` and competes with the
+   * rest of the app. Read top to bottom: a layer always paints over the ones
+   * above it in this list.
+   *
+   * This exists because the settings overlay sat at a bare z-index 60 while
+   * the status trays and toasts that render as its siblings sat at 996-10001,
+   * so the page underneath painted straight over an open settings page.
+   *
+   * Local stacking *inside* one component — a graph node over its edges, a
+   * decoration behind its card — is not part of this scale and stays a plain
+   * small number.
+   */
+  --z-header: 40;
+  --z-header-action: 41;   /* a header control that must stay clickable over a scrim */
+  --z-sticky: 50;          /* sticky table headers and toolbars */
+  --z-slideout-backdrop: 399;
+  --z-slideout: 400;
+  --z-detail-backdrop: 499;
+  --z-detail: 500;
+  --z-tray: 600;           /* bottom-right status trays */
+  --z-banner: 700;         /* full-width warning banners */
+  --z-toast: 800;          /* transient toasts */
+  --z-page-modal: 850;     /* a dialog owned by the page, so a full-page
+                            * surface opened over that page still covers it */
+  --z-overlay: 900;        /* full-page surfaces: search, settings */
+  --z-modal-backdrop: 1000;
+  --z-modal: 1001;         /* dialogs, including ones opened from an overlay */
+  --z-critical: 1100;      /* crash recovery — must outrank a stuck overlay */
+  --z-easter-egg: 1200;
+  --z-skip-link: 1300;     /* the a11y skip link outranks everything */
+
   /* ── Typography scale (modular, 1.25 ratio) ── */
   --font-xs: 11px;
   --font-sm: 11px;
@@ -56,6 +88,10 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
+
+  /* ── Icon sizes (components/action-icon.ts) ── */
+  --icon-size: 16px;
+  --icon-size-sm: 12px;
 
   /* ── Border radii ── */
   --radius-sm: 4px;

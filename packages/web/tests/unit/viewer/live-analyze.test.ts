@@ -8,13 +8,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import type { AnalyzeProgressFile, LiveAnalyzeSnapshot } from "../../../src/viewer/hooks/use-live-analyze.js";
+import type { AnalysisChanges, AnalyzeProgressFile, LiveAnalyzeSnapshot } from "../../../src/viewer/hooks/use-live-analyze.js";
 import { LIVE_ANALYZE_POLL_RUNNING_MS } from "../../../src/viewer/hooks/use-live-analyze.js";
 import { LiveAnalyzeView } from "../../../src/viewer/views/live-analyze.js";
 import {
   analyzeTitle,
   barSegments,
   cacheReuse,
+  changeLines,
+  changesHeadline,
   classRows,
   failureSummary,
   fileRows,
@@ -26,6 +28,8 @@ import {
   phaseTimeLabel,
   runState,
   runningNotes,
+  severityLine,
+  zoneChangeLabel,
 } from "../../../src/viewer/views/live-analyze-model.js";
 
 const START = "2026-10-01T10:00:00.000Z";
@@ -76,6 +80,41 @@ function snapshot(over: Partial<LiveAnalyzeSnapshot> = {}): LiveAnalyzeSnapshot 
     enrichmentPass: null,
     narration: null,
     recent: [{ at: "2026-09-30T10:00:00.000Z", mode: "generative", durationMs: 250_000, calls: 9, costUsd: 0.5 }],
+    // A running analysis has nothing to compare yet; the summary tests below
+    // supply their own.
+    changes: null,
+    spendUsd: null,
+    ...over,
+  };
+}
+
+/** The same run, ended well: every phase `ok` and the process gone. */
+function finished(over: Partial<AnalyzeProgressFile> = {}): AnalyzeProgressFile {
+  return progress({
+    running: false,
+    status: "complete",
+    phase: null,
+    pass: null,
+    batch: null,
+    endedAt: "2026-10-01T10:04:10.000Z",
+    phases: progress().phases.map((p) => ({ ...p, endedAt: START, durationMs: 1, outcome: "ok" as const })),
+    ...over,
+  });
+}
+
+function changes(over: Partial<AnalysisChanges> = {}): AnalysisChanges {
+  return {
+    previousAt: "2026-09-30T10:00:00.000Z",
+    files: { now: 412, was: 400 },
+    importEdges: { now: 1150, was: 1200 },
+    zones: {
+      total: 42,
+      added: [{ id: "hench-guard", name: "Hench Guard", related: null }],
+      removed: [],
+      merged: [{ id: "cli-orchestration", name: null, related: "core" }],
+      renamed: [{ id: "viewer-hub", name: "Viewer Hub", related: "zone-7" }],
+    },
+    findings: { now: { critical: 3, warning: 11, info: 85 }, added: { critical: 2, info: 1 }, resolved: { warning: 1 } },
     ...over,
   };
 }
@@ -239,6 +278,52 @@ describe("reading the side column", () => {
   });
 });
 
+describe("reading what changed", () => {
+  it("orders severities worst first and keeps one the analyzer invents later", () => {
+    expect(severityLine({ info: 3, critical: 1, warning: 2 })).toBe("1 critical, 2 warning, 3 info");
+    expect(severityLine({ info: 1, blocker: 2 })).toBe("1 info, 2 blocker");
+    expect(severityLine({ warning: 0 })).toBe("");
+    expect(severityLine({})).toBe("");
+  });
+
+  it("writes one line per measure, saying which way each moved", () => {
+    const lines = changeLines(changes());
+    expect(lines.map((l) => l.label)).toEqual([
+      "42 zones · 1 added, 1 merged, 1 renamed",
+      "99 findings (3 critical, 11 warning, 85 info) · 2 critical, 1 info added, 1 warning resolved",
+      "412 files (+12)",
+      "1,150 import edges (−50)",
+    ]);
+    expect(lines.every((l) => !l.quiet)).toBe(true);
+  });
+
+  it("still writes the line when a measure did not move, marked quiet", () => {
+    // Dropping a silent row would leave an operator unable to tell "nothing
+    // changed" from "this was not measured".
+    const lines = changeLines(changes({
+      zones: { total: 42, added: [], removed: [], merged: [], renamed: [] },
+      findings: { now: { info: 1 }, added: {}, resolved: {} },
+      files: { now: 412, was: 412 },
+      importEdges: { now: 1150, was: null },
+    }));
+    expect(lines.map((l) => l.label)).toEqual(["42 zones", "1 finding (1 info)", "412 files", "1,150 import edges"]);
+    expect(lines.every((l) => l.quiet)).toBe(true);
+  });
+
+  it("names what it is measured against, or that there is nothing to measure against", () => {
+    expect(changesHeadline(changes(), "2h ago")).toBe("Against the previous analysis of this worktree, 2h ago.");
+    expect(changesHeadline(changes(), null)).toBe("Against the previous analysis of this worktree.");
+    expect(changesHeadline(changes({ previousAt: null }), null)).toContain("No previous analysis of this worktree");
+  });
+
+  it("writes a rename and a merge in the direction they happened", () => {
+    expect(zoneChangeLabel({ id: "viewer-hub", name: "Viewer Hub", related: "zone-7" }, "renamed")).toBe("zone-7 → Viewer Hub");
+    expect(zoneChangeLabel({ id: "cli-orchestration", name: null, related: "core" }, "merged")).toBe("cli-orchestration → core");
+    expect(zoneChangeLabel({ id: "hench-guard", name: "Hench Guard", related: null }, "added")).toBe("Hench Guard (hench-guard)");
+    expect(zoneChangeLabel({ id: "misc", name: null, related: null }, "removed")).toBe("misc");
+  });
+});
+
 describe("the rendered page", () => {
   let root: HTMLDivElement;
   let body: LiveAnalyzeSnapshot;
@@ -364,6 +449,66 @@ describe("the rendered page", () => {
     body = snapshot({ progress: null, startedFrom: null, modules: [], results: {}, recent: [] });
     await mount();
     expect(root.textContent).toContain("No analysis has run in this worktree yet");
+  });
+
+  it("becomes a what-changed summary once the analysis has finished", async () => {
+    body = snapshot({
+      startedFrom: null,
+      progress: finished(),
+      narration: { status: "pending", zones: 3, reason: null },
+      spendUsd: 0.4123,
+      changes: changes(),
+    });
+    const navigateTo = await mount();
+    const summary = root.querySelector(".live-analyze-summary")!;
+    expect(summary).not.toBeNull();
+    expect(summary.textContent).toContain("Against the previous analysis of this worktree");
+    // Zone and finding changes, both named (acceptance criterion 1).
+    expect(summary.textContent).toContain("1 added, 1 merged, 1 renamed");
+    expect(summary.textContent).toContain("2 critical, 1 info added");
+    expect(summary.textContent).toContain("1 warning resolved");
+    expect(summary.textContent).toContain("zone-7 → Viewer Hub");
+    expect(summary.textContent).toContain("cli-orchestration → core");
+    // File and import counts, with the direction they moved.
+    expect(summary.textContent).toContain("412 files (+12)");
+    expect(summary.textContent).toContain("1,150 import edges (−50)");
+    // Model spend as manifest.lastAnalysis recorded it.
+    expect(summary.textContent).toContain("$0.41 spent");
+    // Background narration, as its own item (acceptance criterion 2).
+    expect(summary.querySelector(".live-analyze-narration")?.textContent).toBe("Narrating 3 zones in the background.");
+    // …and not also repeated in the side column's notes.
+    expect(root.querySelector(".live-analyze-notes")).toBeNull();
+
+    const zonesLink = [...summary.querySelectorAll("a")].find((a) => a.textContent === "Zones")!;
+    await act(async () => { zonesLink.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("zones");
+  });
+
+  it("keeps no summary while the analysis is still running", async () => {
+    // Mid-run the data files are half-rewritten, so a difference read off them
+    // compares the run against its own inputs.
+    await mount();
+    expect(root.querySelector(".live-analyze-summary")).toBeNull();
+    expect(root.querySelector(".live-analyze-notes")).not.toBeNull();
+  });
+
+  it("still summarises a finished run that has no previous analysis to compare with", async () => {
+    body = snapshot({
+      startedFrom: null,
+      progress: finished(),
+      changes: changes({ previousAt: null, files: { now: 412, was: null }, importEdges: { now: 1150, was: null } }),
+    });
+    await mount();
+    const summary = root.querySelector(".live-analyze-summary")!;
+    expect(summary.textContent).toContain("No previous analysis of this worktree to compare with");
+    expect(summary.textContent).toContain("412 files");
+    expect(summary.textContent).not.toContain("(+");
+  });
+
+  it("says so when a finished run recorded no result to compare", async () => {
+    body = snapshot({ startedFrom: null, progress: finished(), changes: null, narration: { status: "done", zones: 1, reason: null } });
+    await mount();
+    expect(root.querySelector(".live-analyze-summary")?.textContent).toContain("recorded no result to compare");
   });
 
   it("refetches within the polling interval while running", async () => {

@@ -412,6 +412,12 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
  * The admission header for a `GET /api/live` or a prep read, measured now; none for anything
  * else. Measured rather than read from the gate's last decision, which may be
  * minutes old on an idle machine — the same reason `GET /api/hub/queue` does.
+ *
+ * The queue rides along narrowed to the project being proxied, the same
+ * narrowing `GET /api/hub/queue` applies under `/p/<id>/`: a project's Live
+ * view can neither act on nor identify another project's queued task. The
+ * counts beside it stay machine-wide, so a project waiting behind another
+ * project's run still sees why.
  */
 async function admissionHeadersFor(
   req: IncomingMessage,
@@ -423,11 +429,21 @@ async function admissionHeadersFor(
   if (path !== LIVE_PATH && !PREP_PATH.test(path)) return {};
   await hub.admission.measure();
   const snapshot = hub.admission.snapshot();
+  const projectId = decision.project.id;
   return {
     [HUB_ADMISSION_HEADER]: formatHubAdmissionHeader({
       running: snapshot.running,
       maxSessions: snapshot.limits.maxSessions,
       queued: snapshot.entries.length,
+      queue: snapshot.entries
+        .filter((entry) => entry.projectId === projectId)
+        .map((entry) => ({
+          taskId: entry.taskId,
+          workspace: entry.workspace,
+          enqueuedAt: entry.enqueuedAt,
+          ...(entry.mode !== undefined ? { mode: entry.mode } : {}),
+          ...(entry.iterations !== undefined ? { iterations: entry.iterations } : {}),
+        })),
       availableBytes: snapshot.availableBytes,
       pressure: snapshot.pressure,
       memoryPaused: snapshot.memoryPaused,

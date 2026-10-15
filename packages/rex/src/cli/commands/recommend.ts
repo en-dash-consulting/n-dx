@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 import { access, readFile } from "node:fs/promises";
 import { resolveLayout } from "@n-dx/llm-client";
 import { resolveStore, resolveRexPaths } from "../../store/index.js";
-import { refuseOnV2 } from "./v2-cli.js";
+import { CODE_HEALTH_TAG } from "../../core/placement.js";
+import { isV2Dir } from "./v2-cli.js";
+import { addChanges, report } from "./add-change.js";
+import { changeInputsFromRecommendations } from "../../recommend/changes-from-proposals.js";
 
 import { parseIntList } from "../parse-utils.js";
 import { info, result, withCommandProgressReporter } from "../output.js";
@@ -54,6 +57,8 @@ interface Recommendation {
   description: string;
   priority: "critical" | "high" | "medium" | "low";
   source: string;
+  /** Tags for the created item. Every recommendation here is finding-derived. */
+  tags?: string[];
   /** Metadata from the underlying findings for traceability. */
   meta: RecommendationMeta;
 }
@@ -285,6 +290,12 @@ function groupSubject(items: Finding[]): string | undefined {
   return message ? message.slice(0, 60) : undefined;
 }
 
+/**
+ * Every recommendation this produces — the run's epic, its zone+category
+ * features and their tasks — exists only because sourcevision reported a
+ * finding, so all three carry `code-health`. Placement reads that tag and
+ * nothing else to recognise a finding-derived change.
+ */
 function mapFindingsToRecommendations(
   findings: Finding[],
   maxFindingsPerTask = 3,
@@ -311,6 +322,7 @@ function mapFindingsToRecommendations(
     description: `Automated recommendations from SourceVision analysis. ${grouped.size} zone+category groups covering ${findings.length} total findings.`,
     priority: findings.some((f) => f.severity === "critical") ? "critical" : "high",
     source: "sourcevision",
+    tags: [CODE_HEALTH_TAG],
     meta: { findingCount: findings.length },
   };
 
@@ -341,6 +353,7 @@ function mapFindingsToRecommendations(
       description: items.map((f) => `- ${f.message}`).join("\n"),
       priority: hasCritical ? "critical" : "high",
       source: "sourcevision",
+      tags: [CODE_HEALTH_TAG],
       meta: {
         findingHashes: featureHashes,
         category,
@@ -370,6 +383,7 @@ function mapFindingsToRecommendations(
         description: chunk.map((f) => `- ${f.message}`).join("\n"),
         priority: hasCritical ? "critical" : "high",
         source: "sourcevision",
+        tags: [CODE_HEALTH_TAG],
         meta: {
           findingHashes: chunk.map((f) => f.hash),
           category,
@@ -395,6 +409,7 @@ function toEnrichedRecommendation(rec: Recommendation): EnrichedRecommendation {
     description: rec.description,
     priority: rec.priority,
     source: rec.source,
+    tags: rec.tags,
     meta: rec.meta,
   };
 }
@@ -715,6 +730,7 @@ function reportCreationResults(
 // ── Accept recommendations into the PRD ─────────────────────────────────
 
 async function acceptRecommendations(
+  dir: string,
   rexDir: string,
   acceptFlag: string,
   recommendations: Recommendation[],
@@ -722,6 +738,10 @@ async function acceptRecommendations(
 ): Promise<void> {
   const acceptedRecommendations = resolveAcceptedRecommendations(acceptFlag, recommendations);
   if (!acceptedRecommendations) return;
+
+  if (await isV2Dir(dir)) {
+    return acceptAsChanges(dir, acceptedRecommendations, flags);
+  }
 
   const totalTasks = recommendations.filter((r) => r.level === "task").length;
   const selectedTasks = acceptedRecommendations.filter((r) => r.level === "task").length;
@@ -766,6 +786,29 @@ async function acceptRecommendations(
   reportCreationResults(creationResult, selectedTasks, conflictStrategy);
 }
 
+/**
+ * Accept into a v2 tree: every recommendation becomes a change, never an epic.
+ *
+ * The run's epic and its zone+category features are containers, and the change
+ * layer has none — only the leaves name work, so only they are created, each
+ * one change through the same `rex add` door. Each lands in the Inbox and the
+ * rules rank the capability or constraint it amends or touches; the shortlist
+ * is printed so the operator confirms it with `rex change place`.
+ */
+async function acceptAsChanges(
+  dir: string,
+  accepted: Recommendation[],
+  flags: Record<string, string>,
+): Promise<void> {
+  const inputs = changeInputsFromRecommendations(accepted);
+  if (inputs.length === 0) {
+    result("No recommendations to create.");
+    return;
+  }
+  info(`\nCreating ${inputs.length} change${inputs.length === 1 ? "" : "s"}:\n`);
+  report(await addChanges(dir, inputs), flags.format === "json");
+}
+
 // ── Main command entry point ────────────────────────────────────────────
 
 export async function cmdRecommend(
@@ -785,13 +828,6 @@ async function runRecommend(
   dir: string,
   flags: Record<string, string>,
 ): Promise<void> {
-  if (flags.accept !== undefined) {
-    await refuseOnV2(
-      resolveRexPaths(dir).rexDir,
-      "recommend --accept",
-      "Capture each recommendation with 'rex add' (a new change) or 'rex change place' (place a change on the product map).",
-    );
-  }
   const hasSourceVision = await detectSourceVision(dir);
   if (!hasSourceVision) {
     result("SourceVision not detected.");
@@ -836,20 +872,34 @@ async function runRecommend(
     let count = 0;
     // Build a hash→finding map for type+scope lookup
     const findingsByHash = new Map(allFindings.map((f) => [f.hash, f]));
+    /**
+     * The finding hashes an item carries, from either place they live.
+     *
+     * v1 items keep them on `recommendationMeta`; a v2 change has no such
+     * field and carries them as `finding:<hash>` tags, which is also what the
+     * v1 scanner writes and what hench reads when it defers one. Reading both
+     * keeps one acknowledge path across the two layouts.
+     */
+    const hashesOf = (item: { recommendationMeta?: unknown; tags?: string[] }): string[] => {
+      const meta = item.recommendationMeta as RecommendationMeta | undefined;
+      const fromTags = (item.tags ?? [])
+        .filter((tag) => tag.startsWith("finding:"))
+        .map((tag) => tag.slice("finding:".length))
+        .filter(Boolean);
+      return [...new Set([...(meta?.findingHashes ?? []), ...fromTags])];
+    };
+
     const walk = (items: typeof doc.items): void => {
       for (const item of items) {
         if (item.status === "completed" && item.source === "sourcevision") {
-          const meta = item.recommendationMeta as RecommendationMeta | undefined;
-          if (meta?.findingHashes) {
-            for (const hash of meta.findingHashes) {
-              if (!isAcknowledged(updated, hash)) {
-                const finding = findingsByHash.get(hash);
-                updated = acknowledgeFinding(
-                  updated, hash, item.title, "completed", "self-heal",
-                  finding?.type, finding?.scope,
-                );
-                count++;
-              }
+          for (const hash of hashesOf(item)) {
+            if (!isAcknowledged(updated, hash)) {
+              const finding = findingsByHash.get(hash);
+              updated = acknowledgeFinding(
+                updated, hash, item.title, "completed", "self-heal",
+                finding?.type, finding?.scope,
+              );
+              count++;
             }
           }
         }
@@ -952,7 +1002,7 @@ async function runRecommend(
   }
 
   if (flags.accept) {
-    await acceptRecommendations(rexDir, flags.accept, recommendations, flags);
+    await acceptRecommendations(dir, rexDir, flags.accept, recommendations, flags);
   } else {
     info("Run with --accept to add all recommendations to the PRD.");
     info("Cherry-pick by finding hash (partial accept within a group):");

@@ -56,7 +56,16 @@ async function writeRexLog(detail, timestamp = new Date().toISOString()) {
 
 describe("collectRunSummary — files written", () => {
   it("reports only the declared paths that the run touched", async () => {
-    const startedAt = Date.now();
+    // A second of slack, the same cushion the overwrite case below uses.
+    // Windows stamps file times from a clock it caches at ~15.6ms, so a
+    // `Date.now()` taken just past a second boundary can be newer than the
+    // mtime the very next mkdir records — and `collectRunSummary` floors its
+    // threshold to the second, which then sits above that mtime and reports
+    // the directory as untouched. Measured here: the margin drops to 0.4ms,
+    // so it fails roughly one run in sixty. That a path *predating* the run is
+    // excluded is pinned by the next test, which controls mtime with utimes
+    // rather than racing the clock.
+    const startedAt = Date.now() - 1000;
     await mkdir(join(dir, ".sourcevision"), { recursive: true });
     // .rex/pending-proposals.json and .rex/prd_tree/ were never written.
 

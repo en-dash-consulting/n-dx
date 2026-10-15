@@ -59,6 +59,13 @@ export interface NarrateZonesOptions {
   fileArchetypes?: Map<string, string | null>;
   hints?: string;
   projectProfile?: ProjectProfile;
+  /**
+   * Zone id → previous findings the re-run judgment could not decide
+   * (`rerun-judge.ts`). They are named in the prompt to be confirmed or
+   * refuted, so a zone that is being narrated anyway answers "what changed
+   * here?" and "is finding X still true?" in the same call.
+   */
+  confirmFindings?: Map<string, string[]>;
 }
 
 export interface NarrateZonesResult {
@@ -100,12 +107,20 @@ function renderZoneBlock(
     .join("\n");
 
   const known = zone.insights ?? [];
+  const confirm = opts.confirmFindings?.get(zone.id) ?? [];
   return [
     `Zone "${zone.id}" — ${zone.name} (cohesion: ${zone.cohesion}, coupling: ${zone.coupling}, ${zone.files.length} files)`,
     `  Files: ${filesStr}`,
     `  Known insights: ${known.length > 0 ? known.map((i) => `"${i}"`).join("; ") : "(none)"}`,
     `  Boundary crossings:\n${crossingLines || "    (none)"}`,
     ...(headerLines ? [`  File headers (leading doc comments — authoritative about each file's purpose):\n${headerLines}`] : []),
+    ...(confirm.length > 0
+      ? [
+          `  Previously found, please confirm or refute — for each, say in your findings whether it still holds for the files above, and if it does not, do not repeat it:\n${
+            confirm.map((t) => `    - "${t}"`).join("\n")
+          }`,
+        ]
+      : []),
   ].join("\n");
 }
 

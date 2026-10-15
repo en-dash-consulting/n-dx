@@ -2,7 +2,7 @@
 id: "bba223a0-f8a3-4bee-af4d-95d7d45646e9"
 level: "feature"
 title: "Recommendations become changes"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "product-map"
@@ -12,10 +12,13 @@ tags:
 blockedBy:
   - "5cfa1d83-839a-47a1-ae42-4353cd1acf83"
 source: "roadmap"
+startedAt: "2026-10-14T20:11:51.538Z"
+completedAt: "2026-10-14T20:11:51.538Z"
+endedAt: "2026-10-14T20:11:51.538Z"
 acceptanceCriteria: []
 description: "sourcevision's recommendations enter through the one door: as changes with suggested amends or touches.\n\nRoadmap PR 20 · wave 2 · lane models-analysis."
 assignee: "Sterling H <sterling.h@endash.us>"
-lastModified: "2026-10-06T15:51:46.926Z"
+lastModified: "2026-10-14T20:11:51.789Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -23,5 +26,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Emit recommendations as changes and show the product layer delta in PR markdown](./emit-recommendations-as-changes-and.md) | pending |
-| [Tag finding-derived changes with code-health when recommend or analyze create them](./tag-finding-derived-changes-with-code.md) | pending |
+| [Emit recommendations as changes and show the product layer delta in PR markdown](./emit-recommendations-as-changes-and.md) | completed |
+| [Tag finding-derived changes with code-health when recommend or analyze create them](./tag-finding-derived-changes-with-code.md) | completed |

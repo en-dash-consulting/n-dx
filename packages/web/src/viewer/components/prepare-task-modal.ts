@@ -30,6 +30,7 @@
  */
 
 import { h, Fragment } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
 import { useFocusTrap } from "../hooks/index.js";
@@ -432,7 +433,7 @@ function Header({ prep, taskId, onClose }: { prep: PrepResponse | null; taskId: 
         h("span", { class: "prep-chip prep-chip-id", title: taskId }, taskId.slice(0, 8)),
       ),
     ),
-    h("button", { type: "button", class: "prep-close", onClick: onClose, "aria-label": "Close" }, "×"),
+    h("button", { type: "button", class: "prep-close", onClick: onClose, "aria-label": "Close" }, h(ActionIcon, { name: "close" })),
   );
 }
 

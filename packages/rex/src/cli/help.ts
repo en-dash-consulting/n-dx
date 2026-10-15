@@ -14,7 +14,7 @@
 
 import { formatHelp } from "@n-dx/llm-client";
 import type { HelpDefinition } from "@n-dx/llm-client";
-import { PRD_TREE_DIRNAME } from "../store/index.js";
+import { PRD_TREE_DIRNAME, SLUG_RULE_SUMMARY } from "../store/index.js";
 
 /** Map of command name → help definition. */
 const COMMAND_DEFS: Record<string, HelpDefinition> = {
@@ -233,7 +233,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "update an existing PRD item",
     usage: "rex update <id> [options] [dir]",
     description:
-      "Modify the status, priority, title, description, acceptance criteria, or source of a PRD item.\n" +
+      "Modify the status, priority, title, description, acceptance criteria, source, or assignee of a PRD item.\n" +
       "Status transitions are validated (e.g. completed → pending requires --force).",
     options: [
       { flag: "--status=<s>", description: "New status: pending, in_progress, completed, failing, deferred, blocked, deleted" },
@@ -242,6 +242,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--description=\"...\"", description: "New description" },
       { flag: "--criterion=\"...\"", description: "Acceptance criterion; repeat per criterion. Replaces the whole list; --criterion= on its own clears it" },
       { flag: "--source=\"...\"", description: "Where the item came from; --source= removes it" },
+      { flag: "--assignee=\"...\"", description: "Who the item belongs to, matched by 'ndx work --mine' and inherited by children; --assignee= removes it" },
       { flag: "--reason=\"...\"", description: "Failure reason (when setting status to failing)" },
       { flag: "--run='<json>'", description: "Saved run settings (replaces the whole block): tier (light|standard|heavy), models (per-vendor pins), provider, permissionMode, review, reviewMode (off|self|pair), reviewVendor (claude|codex), reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes. --run= or --run=null clears it" },
       { flag: "--force", description: "Override status transition rules" },
@@ -254,6 +255,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex update abc123 --status=completed", description: "Mark a task as done" },
       { command: "rex update abc123 --status=in_progress", description: "Start working on a task" },
       { command: "rex update abc123 --priority=critical --title=\"Urgent fix\"", description: "Update priority and title" },
+      { command: "rex update abc123 --assignee=\"Sterling H\"", description: "Assign a task so 'ndx work --mine' selects it" },
     ],
     related: ["add", "next"],
   },
@@ -960,6 +962,45 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex migrate-to-md ./my-project", description: "Migrate to markdown in a specific project (deprecated)" },
     ],
     related: ["init", "validate", "status"],
+  },
+  "migrate-slugs": {
+    tool: "rex",
+    command: "migrate-slugs",
+    summary: "re-serialise the PRD tree at the current slug rule",
+    usage: "rex migrate-slugs [options] [dir]",
+    description:
+      `Rewrites every path in .rex/${PRD_TREE_DIRNAME}/ at the slug rule this build\n` +
+      `implements: ${SLUG_RULE_SUMMARY} on the same\n` +
+      "40-character base slug — the normalised title, truncated at a word\n" +
+      "boundary. Two titles that share their first 40 characters both get a\n" +
+      "suffix.\n" +
+      "\n" +
+      "It encodes no rule of its own. The mechanics are a round-trip — load the\n" +
+      "tree, save it back — so it follows the serializer automatically and renames\n" +
+      "only the entries the current rule puts somewhere else. That makes it the\n" +
+      "right command both for a single path whose title was edited without the\n" +
+      "file being renamed, and for a whole tree written under a superseded rule.\n" +
+      "It is the only command allowed past the write-time slug guard.\n" +
+      "\n" +
+      "Idempotent: a second run finds every entry already canonical and changes\n" +
+      "nothing. Refuses a tree written under a *newer* rule rather than rewriting\n" +
+      "it backwards. Snapshots first, so 'rex restore' can undo it, and verifies\n" +
+      "the rename was lossless by reading the tree back.\n" +
+      "\n" +
+      "v1 folder trees only. A v2 tree's slugs are frozen, and this command\n" +
+      "answers \"No PRD tree found\" there before any v2 check runs — use\n" +
+      "'ndx migrate' to move a v1 tree to v2.",
+    options: [
+      { flag: "--allow-on-branch", description: "Run off the default branch; only paths the current rule moves are renamed" },
+      { flag: "--no-snapshot=true", description: "Skip the pre-migration snapshot" },
+      { flag: "--format=json", description: "Report counts as JSON instead of prose" },
+    ],
+    examples: [
+      { command: "rex migrate-slugs", description: "Bring every path onto the current rule" },
+      { command: "rex migrate-slugs --format=json", description: "Report what moved, for a script or a CI gate" },
+      { command: "rex migrate-slugs ./my-project", description: "Migrate a specific project" },
+    ],
+    related: ["validate", "restore", "migrate-to-folder-tree"],
   },
   mcp: {
     tool: "rex",

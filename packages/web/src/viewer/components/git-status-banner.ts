@@ -15,6 +15,7 @@
  */
 
 import { h, Fragment } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import { useState, useCallback } from "preact/hooks";
 import type { GitStatus, GitStatusFile } from "../hooks/index.js";
 
@@ -158,6 +159,17 @@ function GitStatusPanel({
 
   const busy = committing || discarding;
 
+  /**
+   * The one-click offer, when every dirty file came from the same tool.
+   * A mixed tree gets nothing: committing it wholesale would carry the
+   * user's own work along under a label that does not describe it.
+   */
+  const quickCommit = status.scope === "prd"
+    ? { label: `All ${status.files.length} changed files are PRD files.`, action: "Commit PRD update" }
+    : status.scope === "analysis"
+      ? { label: `All ${status.files.length} changed files are scan output.`, action: "Commit scan refresh" }
+      : null;
+
   const handleCommit = useCallback(async () => {
     if (!message.trim()) return;
     setCommitting(true);
@@ -178,6 +190,34 @@ function GitStatusPanel({
       setCommitting(false);
     }
   }, [message, onCommitted]);
+
+  /**
+   * Commit a homogeneous dirty tree in one click.
+   *
+   * No message is sent: the server picks the constant subject for the scope,
+   * and re-derives the paths from its own status read rather than trusting
+   * anything from here, so a tree that changed in between is refused instead
+   * of being swept into a commit labelled as one thing.
+   */
+  const handleQuickCommit = useCallback(async () => {
+    if (!status.scope || status.scope === "other") return;
+    setCommitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/git/commit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: status.scope }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      onCommitted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCommitting(false);
+    }
+  }, [status.scope, onCommitted]);
 
   const handleDiscard = useCallback(async () => {
     setDiscarding(true);
@@ -203,7 +243,7 @@ function GitStatusPanel({
     h("div", { class: "git-status-panel-header" },
       h("strong", null, `${status.files.length} uncommitted file${status.files.length === 1 ? "" : "s"}`),
       status.branch ? h("span", { class: "git-status-branch" }, ` on ${status.branch}`) : null,
-      h("button", { class: "git-status-close", type: "button", onClick: onClose, "aria-label": "Close" }, "✕"),
+      h("button", { class: "git-status-close", type: "button", onClick: onClose, "aria-label": "Close" }, h(ActionIcon, { name: "close" })),
     ),
     h("p", { class: "git-status-hint" },
       "Autonomous runs (Start Working, self-heal, etc.) refuse to start against a dirty tree. Commit here, or from a terminal.",
@@ -237,6 +277,17 @@ function GitStatusPanel({
           ),
         )
       : h("div", { class: "git-commit-form" },
+          quickCommit
+            ? h("div", { class: "git-quick-commit" },
+                h("span", { class: "git-quick-commit-label" }, quickCommit.label),
+                h("button", {
+                  class: "git-quick-commit-btn",
+                  type: "button",
+                  disabled: busy,
+                  onClick: handleQuickCommit,
+                }, committing ? "Committing…" : quickCommit.action),
+              )
+            : null,
           h("textarea", {
             class: "git-commit-message",
             placeholder: "Commit message…",

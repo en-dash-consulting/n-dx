@@ -10,7 +10,7 @@ import { changeWorkShape } from "../../core/change-selection.js";
 import { changeLayerType } from "../../core/layer-projection.js";
 import type { PRDItem } from "../../schema/index.js";
 import type { ChangeNodeType } from "../../schema/v2.js";
-import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
+import { isChangeLayerStore, resolveItemRef, type PRDStore } from "../../store/index.js";
 import { acquireWorkClaim, describeHeldClaim, type ClaimsContext } from "./claims.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
@@ -28,6 +28,7 @@ export async function handleClaimTask(
   claims?: ClaimsContext,
 ): Promise<McpResult> {
   try {
+    args = { id: await resolveItemRef(store, args.id) };
     const existing = await store.getItem(args.id);
     if (!existing) {
       return textResult(`Item "${args.id}" not found. Use get_prd_status to see available items.`, true);

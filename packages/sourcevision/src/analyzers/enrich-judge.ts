@@ -22,6 +22,7 @@ import type {
   Finding,
   FindingCategory,
   FindingType,
+  Imports,
   MoveFileFinding,
   TokenUsage,
   Zone,
@@ -33,6 +34,8 @@ import { askJev, choice, noul, score } from "@n-dx/llm-client";
 import type { JevQuestion, JevResponse, JsonValue } from "@n-dx/llm-client";
 import { collectFileHeaders } from "./file-headers.js";
 import { markBatch } from "./analyze-progress.js";
+import { collectZoneSymbols, emptyZoneSymbols, isEmptyZoneSymbols } from "./zone-symbols.js";
+import type { ZoneSymbolOptions } from "./zone-symbols.js";
 
 // ── Thresholds ───────────────────────────────────────────────────────────────
 
@@ -162,8 +165,10 @@ export interface FindingEvidence {
   crossings?: ZoneCrossing[];
   /** Pass 0 heuristic findings; a finding that only restates one is dropped. */
   heuristics?: Finding[];
-  /** Enables file headers in the evidence; without it only paths are shown. */
+  /** Enables file headers and declarations in the evidence; without it only paths are shown. */
   projectDir?: string;
+  /** Import graph; adds the symbols each zone exports to the evidence. */
+  imports?: Imports;
 }
 
 // ── Findings: severity + category ────────────────────────────────────────────
@@ -175,8 +180,15 @@ export interface FindingJudgeRequest {
   anchorFiles: Map<string, string[]>;
 }
 
-/** The evidence state for the zones a set of scopes names: file sample, headers, imports. */
-function buildZoneEvidence(scopes: string[], evidence: FindingEvidence): Record<string, JsonValue> {
+/**
+ * The evidence state for the zones a set of scopes names: file sample,
+ * headers, crossing counts, and — when the import graph or a project
+ * directory is at hand — what the zone's own code calls itself
+ * (zone-symbols.ts). The symbol block is omitted entirely when nothing was
+ * found, so a run without either input produces the state it always did and
+ * the judgment cache keys on it unchanged.
+ */
+export function buildZoneEvidence(scopes: string[], evidence: FindingEvidence): Record<string, JsonValue> {
   const zonesById = new Map(evidence.zones.map((z) => [z.id, z]));
   const crossingCounts = new Map<string, Record<string, number>>();
   for (const c of evidence.crossings ?? []) {
@@ -190,11 +202,19 @@ function buildZoneEvidence(scopes: string[], evidence: FindingEvidence): Record<
     // No name or description here: both change between runs (selection,
     // identity preservation, partner renames) and would make the cache key
     // differ for identical evidence. Files, metrics and imports are the evidence.
+    const symbols = collectZoneSymbols(zone, { imports: evidence.imports, projectDir: evidence.projectDir });
     zoneState[id] = {
       fileCount: zone.files.length,
       files: zone.files.slice(0, ZONE_FILE_SAMPLE),
       headers: collectFileHeaders(zone.files.slice(0, ZONE_FILE_SAMPLE), evidence.projectDir),
       importsTo: crossingCounts.get(id) ?? {},
+      ...(isEmptyZoneSymbols(symbols)
+        ? {}
+        : {
+            exportedSymbols: symbols.exportedSymbols,
+            declarations: symbols.declarations.map((d) => `${d.kind} ${d.name}`),
+            testFiles: symbols.testFiles,
+          }),
     };
   }
   return zoneState;
@@ -255,7 +275,9 @@ export function buildFindingJudgeRequest(
     if (!evidence) return;
 
     const zone = zonesById.get(f.scope);
-    const evidenceRef = zone ? `\`zones.${f.scope}\` (its files, their leading comments, and its imports)` : "the zone list";
+    const evidenceRef = zone
+      ? `\`zones.${f.scope}\` (its files, their leading comments, what it exports and declares, and its imports)`
+      : "the zone list";
     questions[`v${i}`] = noul(
       `Is finding \`findings.${id}\` supported by the evidence in ${evidenceRef}? Answer no if it asserts something the evidence does not show, or hedges with "if" or "might" instead of observing.`,
     );
@@ -503,6 +525,7 @@ export interface ZoneFragilityRequest {
 export function buildZoneFragilityRequest(
   zones: Zone[],
   crossings: ZoneCrossing[],
+  symbolOptions?: ZoneSymbolOptions,
 ): ZoneFragilityRequest {
   const importsTo = new Map<string, Record<string, number>>();
   const importedFrom = new Map<string, Record<string, number>>();
@@ -521,6 +544,7 @@ export function buildZoneFragilityRequest(
   zones.forEach((zone, i) => {
     const id = `z${i}`;
     // Name and description are omitted on purpose — see buildZoneEvidence.
+    const symbols = symbolOptions ? collectZoneSymbols(zone, symbolOptions) : emptyZoneSymbols();
     zState[id] = {
       id: zone.id,
       fileCount: zone.files.length,
@@ -529,6 +553,13 @@ export function buildZoneFragilityRequest(
       coupling: zone.coupling,
       importsTo: importsTo.get(zone.id) ?? {},
       importedFrom: importedFrom.get(zone.id) ?? {},
+      ...(isEmptyZoneSymbols(symbols)
+        ? {}
+        : {
+            exportedSymbols: symbols.exportedSymbols,
+            declarations: symbols.declarations.map((d) => `${d.kind} ${d.name}`),
+            testFiles: symbols.testFiles,
+          }),
     };
     for (const kind of Object.keys(FRAGILITY) as FragilityKind[]) {
       const qid = `${FRAGILITY[kind].prefix}${i}`;
@@ -554,6 +585,7 @@ export interface ZoneFragilityAssessment {
 export async function assessZoneFragility(
   zones: Zone[],
   crossings: ZoneCrossing[],
+  symbolOptions?: ZoneSymbolOptions,
 ): Promise<ZoneFragilityAssessment> {
   const probabilities = new Map<string, Partial<Record<FragilityKind, number>>>();
   if (zones.length === 0 || getJudgmentRoute("zone.judge") !== "typesafe") {
@@ -566,7 +598,7 @@ export async function assessZoneFragility(
   for (let start = 0; start < zones.length; start += ZONES_PER_REQUEST) {
     markBatch("zone fragility", start / ZONES_PER_REQUEST, requestCount);
     const batch = zones.slice(start, start + ZONES_PER_REQUEST);
-    const { state, questions, ids } = buildZoneFragilityRequest(batch, crossings);
+    const { state, questions, ids } = buildZoneFragilityRequest(batch, crossings, symbolOptions);
     let response;
     try {
       response = await askJev({ state, questions }, { taskClass: "zone.judge" });
@@ -631,8 +663,9 @@ export async function judgeZoneFragility(
   zones: Zone[],
   crossings: ZoneCrossing[],
   passNumber: number,
+  symbolOptions?: ZoneSymbolOptions,
 ): Promise<JudgeResult> {
-  const assessment = await assessZoneFragility(zones, crossings);
+  const assessment = await assessZoneFragility(zones, crossings, symbolOptions);
   const findings = fragilityFindings(zones, assessment, passNumber);
   if (assessment.calls > 0) {
     const u = assessment.tokenUsage ?? { input: 0, output: 0 };

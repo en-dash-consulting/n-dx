@@ -2,6 +2,7 @@ import type { Priority, ItemLevel, ItemStatus } from "../schema/index.js";
 import { PRIORITY_ORDER } from "../schema/index.js";
 import type { ScanResult } from "./scanners.js";
 import { deduplicateScanResults } from "./dedupe.js";
+import { CODE_HEALTH_TAG } from "../core/placement.js";
 
 export type DuplicateReasonType =
   | "exact_title_match"
@@ -119,13 +120,14 @@ function normalize(s: string): string {
  * epic title. `finding:<hash>` and `finding-category:<category>` (see
  * scanners.ts) are internal correlation IDs, not display names — pushed
  * onto a result's `tags` purely for the accept/re-analyze feedback loop.
- * When a global-scope finding has no zone, these can end up as `tags[0]`,
- * so any fallback that reads "the first tag" as a grouping/display name
- * must skip them (confirmed live: a Project Scan proposal titled its epic
- * literally "finding:c508fa330029").
+ * `code-health` is the kind marker placement reads. When a global-scope
+ * finding has no zone, any of these can end up as `tags[0]`, so a fallback
+ * that reads "the first tag" as a grouping/display name must skip them
+ * (confirmed live: a Project Scan proposal titled its epic literally
+ * "finding:c508fa330029").
  */
 function isDisplayableTag(tag: string): boolean {
-  return !tag.startsWith("finding:") && !tag.startsWith("finding-category:");
+  return !tag.startsWith("finding:") && !tag.startsWith("finding-category:") && tag !== CODE_HEALTH_TAG;
 }
 
 /** First tag suitable for display/grouping, skipping internal ID markers. */
