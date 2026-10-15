@@ -23,5 +23,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Bulk PATCH /api/rex/items/bulk writes fields the single PATCH refuses](./bulk-patch-api-rex-items-bulk-writes.md) | pending |
 | [Dashboard file watchers have no 'error' listener, so a watcher error crashes ndx start](./dashboard-file-watchers-have-no-error.md) | completed |
 | [MCP schema watchers have no 'error' listener, so a dist/ watcher error crashes ndx start](./mcp-schema-watchers-have-no-error.md) | pending |
-| [No test covers the PRD watcher refreshing the cache on product/ or changes/ edits](./no-test-covers-the-prd-watcher.md) | pending |
+| [No test covers the PRD watcher refreshing the cache on product/ or changes/ edits](./no-test-covers-the-prd-watcher.md) | completed |
 | [Rex watcher stops following a PRD folder that is deleted and recreated while ndx start runs](./rex-watcher-stops-following-a-prd.md) | completed |
