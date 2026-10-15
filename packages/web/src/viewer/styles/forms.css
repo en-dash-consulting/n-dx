@@ -146,3 +146,51 @@
   font-size: 13px;
   color: var(--accent);
 }
+
+/* ── Select arrow ──
+   The native arrow ignores padding, so it sat against the border. Every
+   single-value select draws the same chevron instead, with room reserved
+   for it. The attribute selectors outrank the per-component select classes
+   (.filter-select, .ps-select, …), whose `background` shorthand would
+   otherwise clear the image. */
+select:not([multiple]):not([size]) {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 28px;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 12px;
+}
+
+/* ── Archetype cell (views/files.ts) ──
+   Shows the value as the select it becomes when clicked, so edited and
+   unedited rows look the same. */
+.archetype-edit-btn {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: var(--space-1) 28px var(--space-1) var(--space-2-5);
+  background: var(--bg-surface) var(--select-chevron) no-repeat right 10px center / 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.archetype-edit-btn:hover {
+  border-color: color-mix(in srgb, var(--text-dim) 40%, var(--border));
+}
+
+.archetype-edit-btn:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.archetype-select {
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1);
+  padding-left: var(--space-2-5);
+}

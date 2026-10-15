@@ -25,7 +25,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [A full-screen tile splits with the open PRD item as a sidebar](./a-full-screen-tile-splits-with-the.md) | pending |
 | [Analyze page renders as a tile dashboard with the iso map as hero](./analyze-page-renders-as-a-tile.md) | pending |
 | [Analyze tiles show a purpose-built summary before they are expanded](./analyze-tiles-show-a-purpose-built.md) | pending |
-| [Archetype cells and select controls look like styled selects, with room for the arrow](./archetype-cells-and-select-controls.md) | pending |
+| [Archetype cells and select controls look like styled selects, with room for the arrow](./archetype-cells-and-select-controls.md) | completed |
 | [Changeset for the dashboard UI cleanup and Analyze tiles](./changeset-for-the-dashboard-ui-cleanup.md) | pending |
 | [Findings list items have no stray list bullets](./findings-list-items-have-no-stray-list.md) | completed |
 | [Floating status pills share one dock instead of overlapping](./floating-status-pills-share-one-dock.md) | pending |
