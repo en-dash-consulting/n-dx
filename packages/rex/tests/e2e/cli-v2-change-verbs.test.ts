@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { copyV2Fixture } from "../helpers/v2-fixture.js";
+import { FIXTURE_CHANGE, FIXTURE_TASK, completeFixtureTask, copyV2Fixture } from "../helpers/v2-fixture.js";
 
 const cliPath = join(fileURLToPath(import.meta.url), "..", "..", "..", "dist", "cli", "index.js");
 
@@ -55,10 +55,18 @@ describe("on a v2 tree", () => {
     expect(run(["product", "show", tmp], tmp)).toMatch(/A1\.1 Pay by card \(capability\)/);
     expect(run(["product", "show", "A1.1", tmp], tmp)).toContain("Capability criteria:");
     expect(run(["change", "place", "CH-1"], tmp)).toContain("CH-1 Add Apple Pay");
+    expect(run(["change", "apply", "CH-1", tmp], tmp, true)).toMatch(/Cannot apply change CH-1: task \S+ is not completed/);
+    run(["update", FIXTURE_TASK, "--status=completed", tmp], tmp);
     expect(run(["change", "apply", "CH-1", tmp], tmp)).toContain("Applied CH-1 Add Apple Pay.");
+    // Applied while in progress: completing it closes it without applying again.
+    const closed = run(["update", FIXTURE_CHANGE, "--status=completed", "--format=json", tmp], tmp);
+    expect(closed).toMatch(/"changeCompleted": true/);
+    expect(closed).toMatch(/"applied": false/);
+    expect(closed).toMatch(/"reason": "already applied at /);
   });
 
-  it("rex product edit takes repeatable --capability-criterion", () => {
+  it("rex product edit takes repeatable --capability-criterion", async () => {
+    await completeFixtureTask(join(tmp, ".rex"));
     run(["change", "apply", "CH-1"], tmp);
     const out = run(["product", "edit", "A1.1", "--capability-criterion", "c9: A refund reaches the card", "--capability-criterion=c1: Charged once"], tmp);
     expect(out).toMatch(/it now reads revised/);
