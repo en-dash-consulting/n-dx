@@ -41,6 +41,7 @@ import {
   useRefreshThrottle,
   useActiveOperations,
   useGitStatus,
+  useAutoCommitGenerated,
   useWorktrees,
   useClaims,
   useLive,
@@ -156,6 +157,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Suggestions cannot read it themselves either — both return early from an
   // enrichment gate before their hooks run.
   const askEnabled = useFeatureToggle("sourcevision.ask", false);
+  useAutoCommitGenerated(gitStatus, useFeatureToggle("git.autoCommitGenerated", false), refetchGitStatus);
   const {
     showRecovery,
     crashLoop,

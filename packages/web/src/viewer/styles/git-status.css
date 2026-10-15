@@ -326,3 +326,44 @@
   font-size: 0.75rem;
   color: var(--red);
 }
+
+/* ── One-click commit for a homogeneous dirty tree ──────────────────────
+ * Offered only when every changed file came from the same tool (the PRD
+ * tree, or SourceVision scan output), so there is nothing of the user's own
+ * work to sweep along. A mixed tree shows the ordinary message box instead.
+ */
+.git-quick-commit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.65rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent-subtle);
+}
+
+.git-quick-commit-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.git-quick-commit-btn {
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: var(--bg-surface);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.git-quick-commit-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

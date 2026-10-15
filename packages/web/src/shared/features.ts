@@ -20,7 +20,7 @@ export interface FeatureToggle {
   /** Impact warning — shown to explain consequences. */
   impact: string;
   /** Which package owns this toggle. */
-  package: "sourcevision" | "rex" | "hench";
+  package: "sourcevision" | "rex" | "hench" | "git";
   /** Whether this is experimental, stable, or deprecated. */
   stability: "experimental" | "stable" | "deprecated";
   /** Current value (true = enabled). */

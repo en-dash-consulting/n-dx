@@ -36,6 +36,11 @@ const PACKAGE_META: Record<string, { label: string; icon: string; description: s
     icon: "▶",
     description: "Autonomous agent execution, retry policies, and guard rails",
   },
+  git: {
+    label: "Version control",
+    icon: "◈",
+    description: "How n-dx commits the files it generates",
+  },
 };
 
 const PACKAGE_ORDER = ["sourcevision", "rex", "hench"];
