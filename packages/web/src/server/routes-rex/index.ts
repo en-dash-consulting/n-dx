@@ -7,7 +7,7 @@
  * sub-modules for each domain area:
  *
  *   reads.ts        — PRD read routes (prd, stats, dashboard, next, log)
- *   product.ts      — v2 product reads (product, changes, capability)
+ *   product.ts      — v2 product reads (product, changes, capability) and the capability edit POST
  *   items.ts        — Item CRUD (add, get, patch, bulk, merge, delete)
  *   requirements.ts — Requirements CRUD, coverage, traceability
  *   prune.ts        — Prune preview and execution
@@ -24,7 +24,7 @@ import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 
 import { routePrdReads } from "./reads.js";
-import { routeProductReads } from "./product.js";
+import { routeProductReads, routeProductEdit } from "./product.js";
 import { routeItems } from "./items.js";
 import { routeItemRequirements, routeRequirementsAnalytics } from "./requirements.js";
 import { routePrune } from "./prune.js";
@@ -71,6 +71,9 @@ export function handleRexRoute(
 
   const productResult = routeProductReads(path, method, res, ctx);
   if (productResult !== false) return productResult;
+
+  const productEditResult = routeProductEdit(path, method, req, res, ctx, broadcast);
+  if (productEditResult !== false) return productEditResult;
 
   const itemsResult = routeItems(path, method, req, res, ctx, broadcast, routeItemRequirements);
   if (itemsResult !== false) return itemsResult;

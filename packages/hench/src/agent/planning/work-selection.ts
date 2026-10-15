@@ -16,12 +16,14 @@ import {
   findActionableWork,
   findItem,
   findNextWorkTask,
+  indexTree,
   isChangeLayerStore,
+  openChangeTasks,
   resolveWorkById,
 } from "../../prd/rex-gateway.js";
 import { CLIError } from "../../prd/llm-gateway.js";
 import { DEFAULT_CLI_NAME } from "./cli-identity.js";
-import type { PRDItem, PRDStore, SelectionExplanation, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
+import type { PRDItem, PRDStore, SelectionExplanation, TaskClaim, TreeEntry, V2Tree } from "../../prd/rex-gateway.js";
 
 /** Why the epic flags (`--epic`, `--epic-by-epic`) do not apply on a v2 tree. */
 export const V2_HAS_NO_EPICS =
@@ -91,14 +93,87 @@ export function actionableV2Entries(
   return units.flatMap((u) => findItem(items, u.node.id) ?? []);
 }
 
+/** Claims other worktrees hold, by task id (`TaskClaims.foreignClaims`). */
+type ForeignClaims = ReadonlyMap<string, TaskClaim>;
+
 /**
- * The entry an explicit `--task` names: an id, a display id (`CH-1`) or an
- * alias. Selection gates do not apply — a change awaiting placement runs when
- * asked for by name. `null` when the ref names nothing that runs on its own.
+ * The entry an explicit `--task` runs for a ref: an id, a display id (`CH-1`)
+ * or an alias. Selection gates do not apply — a change awaiting placement runs
+ * when asked for by name. A change with open tasks runs its next actionable
+ * task that no other worktree holds (`foreign`), never itself: the change
+ * closes once its tasks do. `null` when the ref names nothing that runs on its
+ * own; {@link changeTasksRefusal} explains a change whose tasks cannot run.
  */
-export function findV2Entry(tree: V2Tree, items: PRDItem[], ref: string): TreeEntry | null {
-  const unit = resolveWorkById(tree, ref);
+export function findV2Entry(tree: V2Tree, items: PRDItem[], ref: string, foreign?: ForeignClaims): TreeEntry | null {
+  const unit = resolveWorkById(tree, ref, foreign?.size ? { excludeIds: new Set(foreign.keys()) } : {});
   return unit ? findItem(items, unit.node.id) : null;
+}
+
+/**
+ * The change a ref names when {@link findV2Entry} resolved it to one of that
+ * change's tasks (`entry`). The change's own status still gates the run, as it
+ * did when the change was the unit: a deferred or blocked change is refused,
+ * not worked through its tasks. `null` when the ref names `entry` itself.
+ */
+export function namedChangeEntry(tree: V2Tree, items: PRDItem[], ref: string, entry: TreeEntry): TreeEntry | null {
+  const node = indexTree(tree).resolve(ref);
+  return node?.type === "change" && node.id !== entry.item.id ? findItem(items, node.id) : null;
+}
+
+/**
+ * The priority rex ranks the unit a ref runs by: its own, else its change's,
+ * as autoselection reports it (`explanation.priority.itemPriority`).
+ */
+export function v2RefPriority(tree: V2Tree, ref: string): PRDItem["priority"] {
+  const unit = resolveWorkById(tree, ref);
+  return unit ? (unit.node.priority ?? unit.change.priority) : undefined;
+}
+
+/** `--task` named a change whose open tasks are all claimed elsewhere, blocked or not actionable. */
+export class ChangeTasksUnavailableError extends CLIError {
+  /** Every open task is claimed by another worktree. */
+  readonly allClaimed: boolean;
+
+  constructor(message: string, suggestion: string, allClaimed: boolean) {
+    super(message, suggestion);
+    this.name = "ChangeTasksUnavailableError";
+    this.allClaimed = allClaimed;
+  }
+}
+
+/**
+ * Why `--task` naming a change runs nothing: the change has open tasks and
+ * none of them can run, each named with its reason. `undefined` when the ref
+ * names no such change, or one of its tasks can run ({@link findV2Entry}).
+ */
+export function changeTasksRefusal(
+  tree: V2Tree,
+  ref: string,
+  foreign: ForeignClaims = new Map(),
+  cliName = DEFAULT_CLI_NAME,
+): ChangeTasksUnavailableError | undefined {
+  const open = openChangeTasks(tree, ref);
+  if (open.length === 0 || resolveWorkById(tree, ref, { excludeIds: new Set(foreign.keys()) })) return undefined;
+  const change = indexTree(tree).resolve(ref);
+  const reasons = open.map(({ node, openBlockers }) => {
+    // Not claimed and not runnable: rex found open blockers, or its status is not one selection runs.
+    const claim = foreign.get(node.id);
+    const status = node.status ?? "pending";
+    const why = claim
+      ? `claimed by another worktree: ${claim.worktreeRoot}`
+      : openBlockers.length > 0
+        ? `${status}, blocked by ${openBlockers.join(", ")}`
+        : status;
+    return `${node.displayId ?? node.id} "${node.title}" (${why})`;
+  });
+  const allClaimed = open.every(({ node }) => foreign.has(node.id));
+  return new ChangeTasksUnavailableError(
+    `"${change?.title ?? ref}" (${ref}) has no task to run: ${reasons.join("; ")}.`,
+    allClaimed
+      ? `Wait for those runs to finish, or run '${cliName} work --task=<task>' from the worktree that holds it.`
+      : `Unblock or reopen one of its tasks, then run '${cliName} work --task=${ref}' again.`,
+    allClaimed,
+  );
 }
 
 /**
@@ -120,18 +195,36 @@ export function inboxRefusal(tree: V2Tree, ref: string, cliName = DEFAULT_CLI_NA
  * {@link findV2Entry}, refusing with the reason when the ref names nothing
  * that runs on its own.
  */
-export function resolveV2Entry(tree: V2Tree, items: PRDItem[], ref: string): TreeEntry {
-  const found = findV2Entry(tree, items, ref);
+export function resolveV2Entry(
+  tree: V2Tree,
+  items: PRDItem[],
+  ref: string,
+  foreign?: ForeignClaims,
+  cliName = DEFAULT_CLI_NAME,
+): TreeEntry {
+  const found = findV2Entry(tree, items, ref, foreign);
   if (found) return found;
-  const entry = findItem(items, ref);
+  const unavailable = changeTasksRefusal(tree, ref, foreign, cliName);
+  if (unavailable) throw unavailable;
+  throw notRunnableRefusal(tree, items, ref) ?? new Error(`Task not found: ${ref}`);
+}
+
+/**
+ * Why a ref that exists cannot run on its own: a container change (it holds
+ * other changes) or a subtask (it runs with its task). `undefined` when the
+ * ref names neither. The run throws it; `--resolve` reports it.
+ */
+export function notRunnableRefusal(tree: V2Tree, items: PRDItem[], ref: string): Error | undefined {
+  const node = indexTree(tree).resolve(ref);
+  const entry = node ? findItem(items, node.id) : null;
   if (entry?.item.type === "change") {
-    throw new Error(
+    return new Error(
       `"${entry.item.title}" (${ref}) holds other changes, so it is not a unit of work. ` +
         "Run one of its nested changes or tasks.",
     );
   }
   if (entry?.item.type === "subtask") {
-    throw new Error(`"${entry.item.title}" (${ref}) is a subtask; it runs with its task. Run the task instead.`);
+    return new Error(`"${entry.item.title}" (${ref}) is a subtask; it runs with its task. Run the task instead.`);
   }
-  throw new Error(`Task not found: ${ref}`);
+  return undefined;
 }

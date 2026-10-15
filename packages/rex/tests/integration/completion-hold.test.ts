@@ -177,7 +177,7 @@ describe("releasing a live hench run's claim", () => {
     const store = openClaimsStore(dir);
     await store.claim("t1", { worktreeRoot, pid: run.pid!, holdsCompletion: true });
 
-    const out = await handleReleaseTask({ id: "t1" }, ctx());
+    const out = await handleReleaseTask(await resolveStore(join(dir, ".rex")), { id: "t1" }, ctx());
     const body = JSON.parse(out.content[0].text);
     expect(body.released).toBe(false);
     expect(body.reason).toMatch(new RegExp(`pid ${run.pid}`));
@@ -218,7 +218,7 @@ describe("releasing a live hench run's claim", () => {
     const store = openClaimsStore(dir);
     const interactive = runProcess();
     await store.claim("t1", { worktreeRoot, pid: interactive.pid! });
-    const out = await handleReleaseTask({ id: "t1" }, ctx());
+    const out = await handleReleaseTask(await resolveStore(join(dir, ".rex")), { id: "t1" }, ctx());
     expect(JSON.parse(out.content[0].text)).toEqual({ id: "t1", released: true });
   });
 });

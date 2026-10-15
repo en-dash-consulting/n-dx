@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { validateMerge, previewMerge, mergeItems, validateChangesMerge, mergeChanges, type ChangesMergeOutcome } from "../../core/merge.js";
-import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
+import { isChangeLayerStore, resolveItemRef, type PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
 
@@ -16,7 +16,9 @@ export async function handleMergeItems(
   },
 ): Promise<McpResult> {
   try {
-    const { sourceIds, targetId, preview, title, description } = args;
+    const { preview, title, description } = args;
+    const sourceIds = await Promise.all(args.sourceIds.map((ref) => resolveItemRef(store, ref)));
+    const targetId = await resolveItemRef(store, args.targetId);
 
     const options = {
       ...(title ? { title } : {}),

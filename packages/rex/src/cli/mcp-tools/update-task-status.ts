@@ -6,7 +6,7 @@ import { findAutoCompletions } from "../../core/parent-completion.js";
 import { holdCompletionForRun, describeHeldCompletion } from "../completion-hold.js";
 import { completeV2Work } from "../v2-completion.js";
 import type { PRDItem, ItemStatus, ResolutionType } from "../../schema/index.js";
-import { isChangeLayerStore, type PRDStore, type TaskClaim } from "../../store/index.js";
+import { isChangeLayerStore, resolveItemRef, type PRDStore, type TaskClaim } from "../../store/index.js";
 import {
   acquireWorkClaim,
   describeHeldClaim,
@@ -26,7 +26,10 @@ export async function handleUpdateTaskStatus(
   clock: Clock = systemClock,
 ): Promise<McpResult> {
   try {
-    const { id, status, force, reason, resolutionType, resolutionDetail } = args;
+    const { status, force, reason, resolutionType, resolutionDetail } = args;
+    // A v2 display id or alias names the change's node id; every write below
+    // and the reply use the node id.
+    const id = await resolveItemRef(store, args.id);
     const existing = await store.getItem(id);
     if (!existing) {
       return textResult(`Item "${id}" not found. Use get_prd_status to see available items.`, true);

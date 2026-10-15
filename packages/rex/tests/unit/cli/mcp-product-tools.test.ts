@@ -5,10 +5,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { createStore, ensureRexDir } from "../../../src/store/index.js";
+import { createStore, ensureRexDir, resolveStore } from "../../../src/store/index.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import {
   handleAddItem,
@@ -18,8 +18,9 @@ import {
   handleGetPrdStatus,
   handleGetProduct,
   handlePlaceChange,
+  handleUpdateTaskStatus,
 } from "../../../src/cli/mcp-tools/index.js";
-import { copyV2Fixture } from "../../helpers/v2-fixture.js";
+import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture } from "../../helpers/v2-fixture.js";
 
 const AREA = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
@@ -43,6 +44,14 @@ const json = (r: { content: { text: string }[]; isError?: boolean }) => {
 const error = (r: { content: { text: string }[]; isError?: boolean }) => {
   expect(r.isError).toBe(true);
   return r.content[0].text;
+};
+/** Every file under the rex directory, by relative path. */
+const files = async () => {
+  const out: Record<string, string> = {};
+  for (const entry of await readdir(rexDir, { recursive: true, withFileTypes: true })) {
+    if (entry.isFile()) out[relative(rexDir, join(entry.parentPath, entry.name))] = await readFile(join(entry.parentPath, entry.name), "utf-8");
+  }
+  return out;
 };
 const log = async () => (await readFile(join(rexDir, "execution-log.jsonl"), "utf-8").catch(() => "")).trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
 
@@ -137,6 +146,7 @@ describe("place_change", () => {
   it("refuses relation or summary without a target, and a closed change", async () => {
     const id = await inboxChange("Tidy the card form");
     expect(error(await handlePlaceChange(store(), rexDir, { id, relation: "touches" }))).toMatch(/pass target/);
+    await completeFixtureTask(rexDir);
     json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
     expect(error(await handlePlaceChange(store(), rexDir, { id: "CH-1", target: "A1.1" }))).toMatch(/CH-1 is applied at/);
   });
@@ -182,6 +192,7 @@ describe("place_change", () => {
     expect(json(await handleGetItem(store(), rexDir, { id: added.id })).item.amends).toHaveLength(1);
 
     expect(error(await handleApplyChange(store(), rexDir, { id: added.id }))).toMatch(/open-change-refs-live/);
+    await completeFixtureTask(rexDir);
     json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
     expect(json(await handleApplyChange(store(), rexDir, { id: added.id })).applied).toMatchObject([{ delta: "removed", nodeId: CAPABILITY }]);
   });
@@ -201,7 +212,28 @@ describe("place_change", () => {
 });
 
 describe("apply_change", () => {
+  it("refuses a change with an open task, naming it, and writes nothing", async () => {
+    const before = await files();
+    expect(error(await handleApplyChange(store(), rexDir, { id: "CH-1" }))).toBe(
+      `Cannot apply change CH-1: task ${FIXTURE_TASK} is not completed; a change applies once its work is done`,
+    );
+    expect(await files()).toEqual(before);
+  });
+
+  it("an applied change still in progress completes through update_task_status, without applying again", async () => {
+    await completeFixtureTask(rexDir);
+    json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
+    const applied = json(await handleGetCapability(rexDir, { id: CAPABILITY })).node;
+
+    json(await handleUpdateTaskStatus(await resolveStore(rexDir), tmp, { id: CHANGE, status: "completed" }));
+    const { item } = json(await handleGetItem(store(), rexDir, { id: CHANGE }));
+    expect(item).toMatchObject({ status: "completed", completedAt: expect.any(String), appliedAt: expect.any(String) });
+    expect(json(await handleGetCapability(rexDir, { id: CAPABILITY })).node).toEqual(applied);
+    expect((await log()).filter((e) => e.event === "change_applied")).toHaveLength(1);
+  });
+
   it("applies the change's amendments, stamps appliedAt and logs it", async () => {
+    await completeFixtureTask(rexDir);
     const body = json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
     expect(body).toMatchObject({ change: CHANGE, applied: [{ delta: "modified", nodeId: CAPABILITY, summary: "Wallets count as cards" }] });
     expect(body.appliedAt).toEqual(expect.any(String));
@@ -214,6 +246,7 @@ describe("apply_change", () => {
   });
 
   it("refuses a change already applied, and an unknown one", async () => {
+    await completeFixtureTask(rexDir);
     json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
     expect(error(await handleApplyChange(store(), rexDir, { id: "CH-1" }))).toMatch(/Cannot apply change CH-1: already applied at/);
     expect(error(await handleApplyChange(store(), rexDir, { id: "CH-404" }))).toMatch(/no live change "CH-404"/);

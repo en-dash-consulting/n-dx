@@ -106,6 +106,35 @@ describe("completeChange", () => {
   it("refuses while a live task is not completed", () => {
     expect(() => completeChange(tree(change({ children: [task("t", { status: "cancelled" })] })), "ch", opts())).toThrow(/task t is not completed/);
   });
+
+  describe("a change a steward applied before it completed", () => {
+    const APPLIED = "2026-10-01T00:00:00.000Z";
+    // As apply leaves it: product layer already amended, the change stamped and still in flight.
+    const applied = (extra: Record<string, unknown> = {}) =>
+      tree(change({ status: "in_progress", appliedAt: APPLIED, children: [task("t", { status: "completed" })], ...extra }));
+
+    it("closes with completedAt, without applying its amendments again", () => {
+      const input = applied();
+      const result = completeChange(input, "ch", opts());
+      expect(result.completed).toEqual(["ch"]);
+      expect(theChange(result.tree)).toMatchObject({ status: "completed", completedAt: NOW.toISOString(), appliedAt: APPLIED });
+      expect(result.apply).toEqual({ applied: false, reason: `already applied at ${APPLIED}` });
+      expect(result.tree.product).toEqual(input.product);
+    });
+
+    it("closes through completeWork, and with its last task when pending", () => {
+      expect(theChange(completeWork(applied(), "ch", opts()).tree).status).toBe("completed");
+      const pending = completeTask(applied({ status: undefined, children: [task("t")] }), "t", opts());
+      expect(pending.completed).toEqual(["t", "ch"]);
+      expect(theChange(pending.tree).appliedAt).toBe(APPLIED);
+      expect(statement(pending.tree)).toBe(OLD);
+    });
+
+    it("still refuses while a live task is open, or once cancelled", () => {
+      expect(() => completeChange(applied({ children: [task("t")] }), "ch", opts())).toThrow(/task t is not completed/);
+      expect(() => completeChange(applied({ status: "cancelled" }), "ch", opts())).toThrow(/Cannot complete change ch: it is cancelled/);
+    });
+  });
 });
 
 describe("a change that holds a nested change", () => {
