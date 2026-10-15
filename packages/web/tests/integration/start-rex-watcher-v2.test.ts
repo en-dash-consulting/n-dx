@@ -107,4 +107,47 @@ describe("registerRexWatcher on a v2 tree", () => {
       expect(readFileSync(cachePath, "utf-8")).toContain("Renamed ");
     }, { timeout: 8_000, interval: 1_000 });
   });
+
+  it("follows changes/ deleted and recreated while running, without growing the list", async () => {
+    // Start with changes/ present so it is watched at boot.
+    const changesDir = join(rexDir, "changes");
+    const source = join(FIXTURE, "changes", "add-apple-pay");
+    mkdirSync(changesDir);
+    cpSync(source, join(changesDir, "add-apple-pay"), { recursive: true });
+    const cachePath = join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON);
+    registerRexWatcher(
+      undefined,
+      rexDir,
+      { refresh: () => {} } as never,
+      { broadcast: () => {} } as never,
+      watchers,
+    );
+    const bootWatchers = watchers.length;
+    expect(bootWatchers).toBe(3); // .rex/, product/, changes/
+    const original = readFileSync(join(source, "index.md"), "utf-8");
+    const closes = watchers.map((w) => vi.spyOn(w, "close"));
+
+    // Replace the directory (new inode). Retried: see the note above on
+    // FSEvents; a replacement is only needed until the .rex/ event is seen.
+    const indexPath = join(changesDir, "add-apple-pay", "index.md");
+    await vi.waitFor(() => {
+      if (!closes.some((c) => c.mock.calls.length > 0)) {
+        rmSync(changesDir, { recursive: true, force: true });
+        mkdirSync(changesDir);
+        cpSync(source, join(changesDir, "add-apple-pay"), { recursive: true });
+      }
+      expect(closes.some((c) => c.mock.calls.length > 0)).toBe(true);
+    }, { timeout: 8_000, interval: 1_000 });
+    // The replaced watcher was closed and dropped; its successor took its place.
+    expect(watchers).toHaveLength(bootWatchers);
+
+    rmSync(cachePath, { force: true });
+    let attempt = 0;
+    await vi.waitFor(() => {
+      attempt += 1;
+      writeFileSync(indexPath, original.replace(/^title:.*$/m, `title: "Recreated ${attempt}"`));
+      expect(readFileSync(cachePath, "utf-8")).toContain("Recreated ");
+    }, { timeout: 8_000, interval: 1_000 });
+    expect(watchers).toHaveLength(bootWatchers);
+  });
 });

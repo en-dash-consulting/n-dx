@@ -3,7 +3,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
+import { existsSync, statSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
 import { writeFile, unlink } from "node:fs/promises";
 import { resolve, join, dirname, basename } from "node:path";
 import { isVerbose, verbose, resolveLayout, ensureAuthToken } from "@n-dx/llm-client";
@@ -456,14 +456,29 @@ export function registerRexWatcher(
   }, WATCHER_DEBOUNCE_MS);
 
   const prdDirNames = [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME];
-  const watched = new Set<string>();
+  // Folder name -> its recursive watcher and the inode it was opened on. On
+  // inotify and Windows a watch dies with its directory, so a folder deleted
+  // and recreated (a branch switch) is a new inode and needs a new watch.
+  const watched = new Map<string, { watcher: FSWatcher; ino: number }>();
   const forget = (w: FSWatcher): void => {
     const i = into.indexOf(w);
     if (i !== -1) into.splice(i, 1);
   };
   const watchPrdFolder = (dirName: string): void => {
     const root = join(rexDir, dirName);
-    if (watched.has(dirName) || !existsSync(root)) return;
+    let ino: number;
+    try {
+      ino = statSync(root).ino;
+    } catch {
+      return; // not there (yet); the .rex/ watcher calls again when it appears
+    }
+    const current = watched.get(dirName);
+    if (current) {
+      if (current.ino === ino) return;
+      current.watcher.close();
+      forget(current.watcher);
+      watched.delete(dirName);
+    }
     try {
       const w = guardWatcher(watch(root, { recursive: true }, () => {
         debouncedRefresh();
@@ -473,7 +488,7 @@ export function registerRexWatcher(
         watched.delete(dirName);
       });
       into.push(w);
-      watched.add(dirName);
+      watched.set(dirName, { watcher: w, ino });
     } catch {
       // fs.watch recursive may not be supported on every platform — non-fatal
     }
