@@ -292,15 +292,47 @@ const within = (outer: SourceSpan, inner: SourceSpan): boolean =>
 const named = (file: PackSourceFile, query: string, name: string): Capture[] =>
   (file.captures[query] ?? []).filter((c) => c.name === name);
 
-/** The first capture named `name` inside `outer`. */
+/** The first capture named `name` inside `outer`; the file's captures must be ordered by start. */
 const inside = (file: PackSourceFile, query: string, name: string, outer: SourceSpan): Capture | undefined =>
-  (file.captures[query] ?? []).find((c) => c.name === name && within(outer, span(c)));
+  firstWithin(file.captures[query] ?? [], outer, (c) => c.name === name);
+
+/** Anything with a position, as a capture and an {@link Argument} both are. */
+interface Positioned {
+  readonly start: SourceSpan["start"];
+  readonly end: SourceSpan["end"];
+}
+
+const byStart = (a: Positioned, b: Positioned): number => before(a.start, b.start);
+
+/**
+ * The first of `sorted` (ordered by start) within `outer` that satisfies
+ * `test`. A binary search finds where `outer` begins and the scan stops where
+ * it ends, so a lookup costs the block's own size, not the file's.
+ */
+function firstWithin<T extends Positioned>(sorted: readonly T[], outer: SourceSpan, test: (item: T) => boolean = () => true): T | undefined {
+  return allWithin(sorted, outer).find(test);
+}
+
+/** Every item of `sorted` (ordered by start) within `outer`, in order. */
+function allWithin<T extends Positioned>(sorted: readonly T[], outer: SourceSpan): T[] {
+  let low = 0;
+  let high = sorted.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (before(sorted[middle].start, outer.start) < 0) low = middle + 1;
+    else high = middle;
+  }
+  const found: T[] = [];
+  for (let i = low; i < sorted.length && before(sorted[i].start, outer.end) <= 0; i++) {
+    if (within(outer, sorted[i])) found.push(sorted[i]);
+  }
+  return found;
+}
 
 /** An argument of a top-level block: nested block types from the outside in, then its name. */
-interface Argument {
+interface Argument extends Positioned {
   readonly path: readonly string[];
   readonly value: string;
-  readonly span: SourceSpan;
 }
 
 /** Every argument inside the file's top-level blocks, read from the `arguments` query. */
@@ -323,12 +355,26 @@ function readArguments(file: PackSourceFile): Argument[] {
       else if (capture.name === "argument.value") argument.value ??= capture.text;
     }
   }
-  return found.flatMap((argument) => {
-    if (argument.name === undefined || argument.value === undefined) return [];
-    const blocks = nested.filter((b) => b.type !== undefined && within(b.span, argument.span));
-    blocks.sort((a, b) => before(a.span.start, b.span.start));
-    return [{ span: argument.span, path: [...blocks.map((b) => b.type!), argument.name], value: argument.value }];
-  });
+  // One sweep in document order, with the nested blocks around the argument
+  // being read kept on a stack, outermost first.
+  const blocks = [...nested].sort((a, b) => byStart(a.span, b.span));
+  const open: Array<{ span: SourceSpan; type?: string }> = [];
+  const closeUnless = (inner: SourceSpan): void => {
+    while (open.length > 0 && !within(open[open.length - 1].span, inner)) open.pop();
+  };
+  let next = 0;
+  const read: Argument[] = [];
+  for (const argument of [...found].sort((a, b) => byStart(a.span, b.span))) {
+    for (; next < blocks.length && before(blocks[next].span.start, argument.span.start) <= 0; next++) {
+      closeUnless(blocks[next].span);
+      open.push(blocks[next]);
+    }
+    closeUnless(argument.span);
+    if (argument.name === undefined || argument.value === undefined) continue;
+    const types = open.flatMap((b) => (b.type === undefined ? [] : [b.type]));
+    read.push({ ...argument.span, path: [...types, argument.name], value: argument.value });
+  }
+  return read;
 }
 
 const samePath = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((part, i) => part === b[i]);
@@ -363,10 +409,15 @@ interface FileModel {
 }
 
 /** Read one file's declarations. Provider versions, references and module targets are settled across files later. */
-function readFile(file: PackSourceFile): FileModel {
+function readFile(parsed: PackSourceFile): FileModel {
+  // Every lookup below is a range search, which needs each query's captures ordered by start.
+  const file: PackSourceFile = {
+    ...parsed,
+    captures: Object.fromEntries(Object.entries(parsed.captures).map(([query, list]) => [query, [...list].sort(byStart)])),
+  };
   const where = (capture: Capture): TerraformBlock => ({ file: file.path, directory: directoryOf(file.path), span: span(capture) });
   const args = readArguments(file);
-  const argumentsIn = (outer: SourceSpan): Argument[] => args.filter((a) => within(outer, a.span));
+  const argumentsIn = (outer: SourceSpan): Argument[] => allWithin(args, outer);
   /** Address of each block (or local) that can hold references, for the reference graph. */
   const owners: Array<{ span: SourceSpan; address: string }> = [];
 
@@ -479,9 +530,24 @@ function readFile(file: PackSourceFile): FileModel {
     return [{ ...where(entry), name }];
   });
 
+  // Owners never nest (a resource, module, output or local entry holds no other), so the
+  // one that holds a reference is the last to start at or before it.
+  owners.sort((a, b) => byStart(a.span, b.span));
+  const ownerOf = (at: SourceSpan): { span: SourceSpan; address: string } | undefined => {
+    let low = 0;
+    let high = owners.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (before(owners[middle].span.start, at.start) <= 0) low = middle + 1;
+      else high = middle;
+    }
+    const owner = owners[low - 1];
+    return owner !== undefined && within(owner.span, at) ? owner : undefined;
+  };
+
   const referencesFrom = named(file, "references", "reference").flatMap((reference) => {
     const to = referenceTarget(reference.text);
-    const owner = owners.find((o) => within(o.span, span(reference)));
+    const owner = ownerOf(span(reference));
     return to === undefined || owner === undefined || owner.address === to ? [] : [{ from: owner.address, to }];
   });
 
@@ -565,14 +631,25 @@ export function buildTerraformModel(files: readonly PackSourceFile[]): Terraform
   }
   references.sort(byAddress);
 
-  const versionOf = (directory: string, provider: string): string | undefined =>
-    requirements.find((r) => r.directory === directory && r.name === provider)?.version;
+  // Indexed once: `settle` runs per resource, so a scan of either list there is quadratic.
+  const key = (directory: string, name: string): string => `${directory}\0${name}`;
+  const requirementOf = new Map<string, ProviderRequirement>();
+  for (const r of requirements) {
+    const k = key(r.directory, r.name);
+    if (!requirementOf.has(k)) requirementOf.set(k, r);
+  }
+  // References are already distinct and sorted by `to`, so each list is too.
+  const managedReferencesOf = new Map<string, string[]>();
+  for (const e of references) {
+    if (!isManagedAddress(e.to)) continue;
+    const k = key(e.directory, e.from);
+    const list = managedReferencesOf.get(k);
+    if (list) list.push(e.to);
+    else managedReferencesOf.set(k, [e.to]);
+  }
   const settle = (resource: TerraformResource): TerraformResource => {
-    const version = versionOf(resource.directory, resource.provider.name);
-    // References are already distinct and sorted by `to`.
-    const referenced = references
-      .filter((e) => e.directory === resource.directory && e.from === resource.address && isManagedAddress(e.to))
-      .map((e) => e.to);
+    const version = requirementOf.get(key(resource.directory, resource.provider.name))?.version;
+    const referenced = managedReferencesOf.get(key(resource.directory, resource.address)) ?? [];
     return {
       ...resource,
       provider: { ...resource.provider, ...(version === undefined ? {} : { version }) },

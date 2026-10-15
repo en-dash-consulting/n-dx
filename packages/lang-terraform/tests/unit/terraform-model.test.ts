@@ -100,3 +100,55 @@ describe("module paths", () => {
     expect(model.modulePaths.size).toBe(0);
   });
 });
+
+describe("scale", () => {
+  const RESOURCES = 20_000;
+  const FILES = 200;
+  const PER_FILE = RESOURCES / FILES;
+  const TYPE = "aws_thing";
+  const name = (i: number): string => `r${String(i).padStart(5, "0")}`;
+  /** Resource `i` references the `7 + (i % 2)` resources after it: 150k edges in all. */
+  const targets = (i: number): string[] =>
+    Array.from({ length: 7 + (i % 2) }, (_, k) => `${TYPE}.${name((i + 1 + k) % RESOURCES)}`);
+
+  /** One directory of `FILES` files, each with `PER_FILE` resource blocks that hold their references on separate lines. */
+  function directory(): PackSourceFile[] {
+    const files: PackSourceFile[] = [];
+    for (let f = 0; f < FILES; f++) {
+      const resources: Capture[] = [];
+      const references: Capture[] = [];
+      let line = 1;
+      for (let i = f * PER_FILE; i < (f + 1) * PER_FILE; i++) {
+        const refs = targets(i);
+        resources.push(
+          { name: "resource.block", nodeType: "block", text: "", start: at(line), end: at(line + refs.length + 1, 1) },
+          { name: "resource.type", nodeType: "string_lit", text: TYPE, start: at(line, 10), end: at(line, 10 + TYPE.length) },
+          { name: "resource.name", nodeType: "string_lit", text: name(i), start: at(line, 30), end: at(line, 36) },
+        );
+        refs.forEach((ref, k) => {
+          references.push({ name: "reference", nodeType: "variable_expr", text: `${ref}.id`, start: at(line + 1 + k, 4), end: at(line + 1 + k, 30) });
+        });
+        line += refs.length + 3;
+      }
+      files.push({ path: `infra/part${String(f).padStart(3, "0")}.tf`, captures: { resources, references } });
+    }
+    const requirement: Capture[] = [
+      { name: "requirement", nodeType: "attribute", text: "", start: at(2), end: at(2, 40) },
+      { name: "requirement.name", nodeType: "identifier", text: "aws", start: at(2), end: at(2, 3) },
+      { name: "requirement.version", nodeType: "expression", text: '"~> 5.0"', start: at(2, 30), end: at(2, 38) },
+    ];
+    files.push({ path: "infra/versions.tf", captures: { terraform: requirement } });
+    return files;
+  }
+
+  // A scan of the 150k edges per resource costs minutes here; the indexed build takes about a second.
+  // The test timeout is the bound, so no clock is read.
+  it("builds 20k resources and 150k reference edges in one directory", { timeout: 10_000 }, () => {
+    const model = buildTerraformModel(directory());
+    expect(model.resources).toHaveLength(RESOURCES);
+    expect(model.references).toHaveLength(150_000);
+    expect(model.resources[0].references).toEqual(targets(0).sort());
+    expect(model.resources[RESOURCES - 1].references).toEqual(targets(RESOURCES - 1).sort());
+    expect(new Set(model.resources.map((r) => r.provider.version))).toEqual(new Set(["~> 5.0"]));
+  });
+});
