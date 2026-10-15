@@ -44,6 +44,16 @@ says what each field means for a pack that is not tree-sitter based (a TS/JS
 pack on the compiler, a SCIP tier); keep it parser-neutral. sourcevision checks
 what it imports with `isLanguagePackEntry`.
 
+The Python build readers (`src/python-build.ts`, `readPythonProjects(projectDir,
+files)`) read `pyproject.toml` (PEP 621, PEP 735, Poetry, setuptools, hatch,
+uv workspace), `setup.cfg` (`src/ini-lite.ts`), requirements files with
+`-r`/`-c` includes (`src/python-requirements.ts`) and the literal arguments of
+`setup.py`'s `setup(...)` (`src/python-setup-py.ts`; never executed, a
+non-literal is a notice). Projects, includes and uv member globs are matched
+against the `files` inventory, not the disk. Dependencies reuse
+`BuildDependency` (`group` empty, `artifact` PEP 503-normalised, specifier as
+written) with file and line. `parseTomlLocated` gives each value's line.
+
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
 so the Java and Go packs share it without depending on each other.
 

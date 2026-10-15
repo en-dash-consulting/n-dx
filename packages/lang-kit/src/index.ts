@@ -27,6 +27,9 @@ export * from "./java-maven-build.js";
 export * from "./java-gradle-build.js";
 export * from "./gradle-script.js";
 export * from "./gradle-catalog.js";
+export * from "./python-build.js";
+export * from "./python-requirements.js";
+export * from "./python-setup-py.js";
 
 // IaC resource kinds
 export * from "./iac-kinds.js";
@@ -41,5 +44,6 @@ export * from "./sql-references.js";
 
 // Small parsers
 export * from "./toml-lite.js";
+export * from "./ini-lite.js";
 export * from "./xml-lite.js";
 export * from "./yaml-subset.js";
