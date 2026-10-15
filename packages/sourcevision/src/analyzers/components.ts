@@ -700,8 +700,12 @@ export async function analyzeComponents(
 
   // Incremental: keep definitions and usages from unchanged files
   if (canIncremental) {
+    // Files pruned from the inventory in an earlier run are not deletions this
+    // run, so they must be filtered out explicitly (#744).
+    const inventoried = new Set(inventory.files.map((f) => f.path));
+    const unchanged = (f: string) => !changedFiles.has(f) && inventoried.has(f);
     for (const def of prev.components) {
-      if (!changedFiles.has(def.file)) {
+      if (unchanged(def.file)) {
         allComponents.push(def);
         if (!componentFileMap.has(def.name)) {
           componentFileMap.set(def.name, new Map());
@@ -710,7 +714,7 @@ export async function analyzeComponents(
       }
     }
     for (const edge of prev.usageEdges) {
-      if (!changedFiles.has(edge.from)) {
+      if (unchanged(edge.from)) {
         allUsages.push({
           file: edge.from,
           componentName: edge.componentName,

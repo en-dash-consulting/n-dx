@@ -507,3 +507,42 @@ export function a2() { }
     expect(incremental.summary).toEqual(full.summary);
   });
 });
+
+describe("analyzeCallGraph incremental carry-over (#744)", () => {
+  let tmpDir: string;
+
+  afterEach(async () => {
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("drops functions and edges from files no longer in the inventory", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-cg-pruned-"));
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+    await mkdir(join(tmpDir, "legacy"), { recursive: true });
+    await writeFile(join(tmpDir, "legacy", "lib.ts"), `export function helper() { inner(); }\nfunction inner() { }\n`);
+    await writeFile(join(tmpDir, "src", "app.ts"), `import { helper } from "../legacy/lib.js";\nexport function run() { helper(); }\n`);
+
+    const inv1 = await analyzeInventory(tmpDir) as InventoryResult;
+    const imp1 = await analyzeImports(tmpDir, inv1);
+    const cg1 = await analyzeCallGraph(tmpDir, inv1, imp1);
+    expect(cg1.functions.some((f) => f.file === "legacy/lib.ts")).toBe(true);
+
+    // The inventory was pruned in an earlier run (.sourcevisionignore), so this
+    // run sees no adds or deletes against the previous inventory.
+    const inv2 = { ...inv1, files: inv1.files.filter((f) => !f.path.startsWith("legacy/")) };
+    const imp2 = await analyzeImports(tmpDir, inv2);
+
+    const incremental = await analyzeCallGraph(tmpDir, inv2, imp2, {
+      previousCallGraph: cg1,
+      changedFiles: new Set(),
+      fileSetChanged: false,
+    });
+    const full = await analyzeCallGraph(tmpDir, inv2, imp2);
+
+    expect(incremental.functions.some((f) => f.file === "legacy/lib.ts")).toBe(false);
+    expect(incremental.edges.some((e) => e.callerFile === "legacy/lib.ts" || e.calleeFile === "legacy/lib.ts")).toBe(false);
+    expect(incremental.functions).toEqual(full.functions);
+    expect(incremental.edges).toEqual(full.edges);
+    expect(incremental.summary).toEqual(full.summary);
+  });
+});

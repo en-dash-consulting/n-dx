@@ -15,6 +15,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../components/index.js";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { useCliName } from "../hooks/index.js";
 
@@ -297,7 +298,7 @@ function PinEditor({ form }: { form: ProjectSettingsForm }) {
                     onClick: () => form.removePin(row.id),
                     "aria-label": "Remove pin",
                     title: "Remove",
-                  }, "✕"),
+                  }, h(ActionIcon, { name: "close" })),
                 ),
               ),
             ),
