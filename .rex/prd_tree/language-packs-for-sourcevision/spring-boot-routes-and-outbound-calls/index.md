@@ -30,5 +30,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Spring Boot module in @n-dx/lang-java: routes and outbound call facts](./spring-boot-module-in-n-dx-lang-java.md) | in_progress |
+| [Spring Boot module in @n-dx/lang-java: routes and outbound call facts](./spring-boot-module-in-n-dx-lang-java.md) | completed |
 | [Wire Java routes and outbound calls into serverRoutes and outbound.json](./wire-java-routes-and-outbound-calls.md) | pending |
