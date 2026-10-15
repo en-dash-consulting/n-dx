@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { getSkillBody, renderSkill } from "../../packages/core/assistant-assets.js";
+import { getManifest, getSkillBody, renderSkill } from "../../packages/core/assistant-assets.js";
 
 const PRD_SKILLS = ["ndx-capture", "ndx-plan", "ndx-reshape", "ndx-work", "ndx-adversarial-review"];
 const ITEM_CREATING = ["ndx-capture", "ndx-plan", "ndx-reshape", "ndx-adversarial-review"];
@@ -140,6 +140,18 @@ describe("v2 PRD paths are covered by the overlap checks and commits", () => {
       const body = getSkillBody(name);
       const para = lineAt(body, body.indexOf("ask the user to commit or stash"));
       for (const p of V2_PATHS) expect(para).toContain(p);
+    });
+  }
+});
+
+describe("manifest descriptions stay layout-neutral", () => {
+  // The description becomes the skill's frontmatter and is how an assistant picks
+  // it, so it must not promise an epic or a level change a v2 tree refuses.
+  for (const name of PRD_SKILLS) {
+    it(`${name}: description names no epic or level change`, () => {
+      const { description } = getManifest().skills[name];
+      expect(description).not.toMatch(/\bepics?\b/i);
+      expect(description).not.toMatch(/\blevels?\b/i);
     });
   }
 });
