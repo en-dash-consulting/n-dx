@@ -8,6 +8,8 @@ tags:
   - "pr-23"
   - "lane-migration"
   - "review-2026-10-12"
+blockedBy:
+  - "1aba5faa-aa60-4566-a045-928ab6c61795"
 source: "review-2026-10-12"
 acceptanceCriteria:
   - "rex migrate --plan on the malformed-frontmatter fixture refuses and names the skipped file (test; fails at 4646976bad)"

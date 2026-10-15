@@ -8,6 +8,8 @@ tags:
   - "pr-23"
   - "lane-migration"
   - "review-2026-10-12"
+blockedBy:
+  - "1aba5faa-aa60-4566-a045-928ab6c61795"
 source: "review-2026-10-12"
 acceptanceCriteria:
   - "snapshot() keys in apply.test.ts use forward slashes on every platform (relative + split(sep).join('/'))"

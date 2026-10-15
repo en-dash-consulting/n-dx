@@ -8,6 +8,8 @@ tags:
   - "pr-23"
   - "lane-migration"
   - "review-2026-10-12"
+blockedBy:
+  - "1aba5faa-aa60-4566-a045-928ab6c61795"
 source: "review-2026-10-12"
 acceptanceCriteria:
   - "A held (needsPlacement) change completed before the cut reports change-placed-at-close as a warning, and rex health exits 0 on it (test; fails at 4646976bad)"

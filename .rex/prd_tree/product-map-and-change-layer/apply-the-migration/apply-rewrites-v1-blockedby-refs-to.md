@@ -8,6 +8,8 @@ tags:
   - "pr-23"
   - "lane-migration"
   - "review-2026-10-12"
+blockedBy:
+  - "1aba5faa-aa60-4566-a045-928ab6c61795"
 source: "review-2026-10-12"
 acceptanceCriteria:
   - "A v1 task blockedBy a feature that becomes a capability is, after apply, blockedBy that capability's open changes; with none open the ref is dropped and reported (fixture test; fails at 4646976bad)"

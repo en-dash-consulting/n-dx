@@ -8,6 +8,8 @@ tags:
   - "pr-23"
   - "lane-migration"
   - "review-2026-10-12"
+blockedBy:
+  - "1aba5faa-aa60-4566-a045-928ab6c61795"
 source: "review-2026-10-12"
 acceptanceCriteria:
   - "A restored prd_tree/ holding a new epic beside product/, with a plan whose source.digest does not match, is refused, kept on disk, and the refusal names the new epic's id (test; fails at 4646976bad)"
