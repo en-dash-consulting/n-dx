@@ -686,6 +686,29 @@ export function isUsableFrozenSlug(slug: string): boolean {
 export const SLUG_RULE_VERSION = 2;
 
 /**
+ * One-line statement of the rule {@link SLUG_RULE_VERSION} names, for the CLI
+ * surfaces that have to tell an operator what `rex migrate-slugs` does.
+ *
+ * It lives beside the rule so that changing the rule and restating it are the
+ * same edit. `rex --help`'s command summary and `rex migrate-slugs --help`
+ * both read this string rather than paraphrasing it, because paraphrases
+ * drifted once already: both still described the unconditional `-{id6}` rule
+ * that version 2 replaced, so a reader who followed a slug-conformance failure
+ * to the command found help for the wrong tool, rejected it, and edited the
+ * tree by hand instead. `migrate-slugs-docs.test.ts` fails if either surface
+ * stops agreeing with this string.
+ *
+ * **Restate this whenever {@link SLUG_RULE_VERSION} moves.**
+ *
+ * Kept to one clause because `rex --help` prints it on a command row that is
+ * already the widest in the list. The precise form — siblings collide on a
+ * *normalised* title — is spelled out by `rex migrate-slugs --help`, which has
+ * the room, and by the rule's own documentation above.
+ */
+export const SLUG_RULE_SUMMARY =
+  "title-only, with a -{id6} suffix only where siblings collide";
+
+/**
  * Convert a title into the slug it would use before ID-based uniqueness rules.
  * This is deterministic for a title alone and never returns an empty string.
  */

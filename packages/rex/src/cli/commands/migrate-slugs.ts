@@ -41,7 +41,14 @@ import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js
 /**
  * `rex migrate-slugs [dir]`
  *
- * Rename every folder-tree entry to its id-qualified slug.
+ * Re-serialise every folder-tree entry at the current slug rule — title-only,
+ * with a `-{id6}` suffix only where siblings collide on a normalised title.
+ *
+ * Encodes no rule of its own: it round-trips the tree through the serializer,
+ * so it renames whatever the current rule says has drifted and nothing else.
+ * That makes it the right command for a single path whose title was edited
+ * without the file being renamed, as well as for a whole tree written under a
+ * superseded rule. Idempotent.
  */
 export async function cmdMigrateSlugs(
   dir: string,
