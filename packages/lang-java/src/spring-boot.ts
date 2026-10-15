@@ -296,10 +296,10 @@ const UNKNOWN: Target = { target: "", targetSource: "unknown" };
 /** A leading Spring placeholder: `${orders.url}`, `${orders.url:default}`. */
 const PLACEHOLDER = /^\$\{([^}:]+)(?::[^}]*)?\}/;
 
-/** Where a string argument points: a literal, a leading placeholder's key, else unknown. */
+/** Where a string argument points: a literal, a leading placeholder's key, else unknown. An empty literal names nothing. */
 export function targetOf(node: Capture | undefined): Target {
   const text = node === undefined ? undefined : literal(node);
-  if (text === undefined) return UNKNOWN;
+  if (text === undefined || text === "") return UNKNOWN;
   const placeholder = PLACEHOLDER.exec(text);
   return placeholder ? { target: placeholder[1]!.trim(), targetSource: "config" } : { target: text, targetSource: "literal" };
 }
@@ -362,8 +362,8 @@ const CLIENT_RULES: readonly ClientRule[] = [
     methods: {
       convertAndSend: (args) => {
         if (args.length < 2) return UNKNOWN;
-        const exchange = targetOf(args[0]);
-        return args.length >= 3 && exchange.targetSource === "literal" && exchange.target === "" ? targetOf(args[1]) : exchange;
+        const defaultExchange = args[0] !== undefined && literal(args[0]) === "";
+        return args.length >= 3 && defaultExchange ? targetOf(args[1]) : targetOf(args[0]);
       },
     },
   },
@@ -506,7 +506,9 @@ function readOutbound(file: PackSourceFile, annotations: readonly Annotation[], 
   for (const type of declarations.types) {
     const feign = type.annotations.find((a) => a.name === "FeignClient");
     if (!feign) continue;
-    const url = element(feign, "url")?.values[0];
+    // `url = ""` is Feign's default: no url, so the name is the target.
+    const written = element(feign, "url")?.values[0];
+    const url = written !== undefined && literal(written) === "" ? undefined : written;
     const name = element(feign, "name", "value")?.values[0];
     const byName = targetOf(name);
     const target = url ? targetOf(url) : byName.targetSource === "unknown" ? UNKNOWN : { target: byName.target, targetSource: "config" as const };

@@ -5,6 +5,8 @@
  * whole output is pinned by the golden in `pack-golden.test.ts`.
  */
 
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { FactKind, FileFacts, OutboundCallFact, RouteFact } from "@n-dx/lang-kit";
@@ -114,6 +116,27 @@ describe("Spring Boot outbound calls", () => {
       "http FeignClient config:inventory.url certain",
       "http FeignClient config:catalog certain",
     ]);
+  });
+
+  it("treats an empty string as naming nothing: unknown, and Feign's default url as no url", async (ctx) => {
+    skipUnlessGrammar(ctx, javaGrammarPath());
+    const projectDir = mkdtempSync(join(tmpdir(), "lang-java-spring-"));
+    try {
+      writeFileSync(
+        join(projectDir, "Empty.java"),
+        [
+          "class Empty {",
+          "  private final org.springframework.web.client.RestTemplate rest;",
+          "  @FeignClient(name = \"catalog\", url = \"\") interface Catalog {}",
+          "  void call() { rest.getForObject(\"\", String.class); }",
+          "}",
+        ].join("\n"),
+      );
+      const { facts } = await pack.analyzeProject({ projectDir, files: ["Empty.java"], kinds: ["outboundCalls"] });
+      expect(facts[0]?.outboundCalls?.map(call)).toEqual(["http FeignClient config:catalog certain", "http RestTemplate unknown: certain"]);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+    }
   });
 
   it("reads a leading placeholder's key, with or without a default, and nothing else as config", () => {
