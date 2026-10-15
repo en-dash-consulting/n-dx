@@ -12,8 +12,8 @@ tags:
   - "pr-11"
 source: "roadmap"
 startedAt: "2026-10-13T16:20:57.533Z"
-completedAt: "2026-10-17T01:33:51.791Z"
-endedAt: "2026-10-17T01:33:51.791Z"
+completedAt: "2026-10-15T22:45:44.475Z"
+endedAt: "2026-10-15T22:45:44.475Z"
 acceptanceCriteria:
   - "`pnpm build` builds packages/lang-kit before packages/sourcevision, and `cd packages/lang-kit && npx vitest run` passes"
   - "`grep -rE \"from \\\"@n-dx/\" packages/lang-kit/src` finds nothing, and packages/lang-kit/package.json has no `dependencies` key"
@@ -21,7 +21,7 @@ acceptanceCriteria:
   - "The Java corpus report gives 99.93% clean parse and the Go corpus report on gitea gives 98.69% clean with import parity 3130 of 3131, as on PR 10"
   - "The root policy suites listed in the description pass"
 description: "Decided with Sterling H on 2026-10-12 (all nine decisions): sourcevision becomes a language-neutral engine, and languages and frameworks arrive as packs on top of a new foundation-tier package, @n-dx/lang-kit. This feature creates the package with no dependencies beyond Node, moves sourcevision's pure language facts into it, defines the facts-out pack contract there, and makes sourcevision use it. Analysis output must stay byte-identical.\n\nThis supersedes the epic's earlier rule \"no new package, the pack interface stays inside sourcevision\": the new package is @n-dx/lang-kit, and the architecture policy tests change to admit it as foundation tier. The epic's other rules still apply.\n\nOut of scope (later PRs): the parser runtime package, per-language pack packages, `ndx sv pack add` and opt-in installs (PR 12). Resolvers (java-resolver.ts, go-resolver.ts), runner.ts, pack.ts's loader, the *-pack.ts files, queries, grammars and the SQL modules stay in sourcevision. The Terraform model (PR 13). rex, hench, core and web adoption of lang-kit, including 9b692c8a (one go.mod parser), happens later off main: do not touch rex, hench, core or web source. No language SDK or toolchain may be required at run time (LS16).\n\nThe bar for every task: analysis output byte-identical (every language-pack golden and analysis fixture), and the Java and Go corpus reports give PR 10's numbers (Java 99.93% clean parse; Go on gitea 98.69% clean, import parity 3130 of 3131).\n\nGates after every task (rebuild first with `pnpm build`):\n- `cd packages/lang-kit && npx vitest run`\n- `cd packages/sourcevision && SV_REQUIRE_GRAMMARS=1 npx vitest run`\n- `npx vitest run --config vitest.config.js tests/e2e/{architecture-policy,domain-isolation,instruction-alignment,layout-literal-policy,agents-md-size-budget,prd-line-endings,ci-merge-queue-trigger,iso-skill-drift}.test.js`\n- The epic's static policy tests: shell-spawn-inventory-policy, wall-clock-inventory-policy, obfuscated-code-policy.\n\nSide stack, PR 11, branched from PR 10's tip. Session doc: https://claude.ai/artifact/Cnn6si8Bnqzm3ujQ2uf5Pp"
-lastModified: "2026-10-17T01:33:52.120Z"
+lastModified: "2026-10-15T22:45:44.784Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -39,4 +39,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Move language ids, configs, detection, build-file readers and the small TOML/XML/YAML parsers into lang-kit](./move-language-ids-configs-detection.md) | completed |
 | [Move the IaC resource-kind table into lang-kit as data](./move-the-iac-resource-kind-table-into.md) | completed |
 | [pack-facts gives a method inside a Java anonymous class the enclosing named class as its container](./pack-facts-gives-a-method-inside-a.md) | completed |
+| [toml-lite throws RangeError, not TomlSyntaxError, on a \U escape above U+10FFFF, so readVersionCatalogs rethrows it](./toml-lite-throws-rangeerror-not.md) | completed |
 | [web and graview vitest load sourcevision source but resolve @n-dx/lang-kit to its built dist](./web-and-graview-vitest-load.md) | completed |
