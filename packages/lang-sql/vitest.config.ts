@@ -1,12 +1,14 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vitest/config";
 import { isolationProjects } from "../../tests/vitest-isolation.mjs";
+import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
 
 const packagesRoot = resolve(import.meta.dirname, "..");
 
 export default defineConfig({
   resolve: {
     alias: [
+      ...hiddenChildProcessAlias,
       // Map @n-dx/lang-kit and @n-dx/lang-runtime to their source barrels, as
       // sourcevision does: the relative-import rule below would otherwise
       // rewrite their dist imports to .ts
