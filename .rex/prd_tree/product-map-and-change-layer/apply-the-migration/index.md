@@ -48,10 +48,12 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [ndx migrate --apply --dry-run says what moves and what is dropped](./ndx-migrate-apply-dry-run-says-what.md) | completed |
 | [ndx migrate --plan has no automated test of its spawn path](./ndx-migrate-plan-has-no-automated-test.md) | completed |
 | [ndx migrate --plan shows the preflight banner and an honest run summary, and llm.routes can turn Jev off](./ndx-migrate-plan-shows-the-preflight.md) | pending |
-| [ndx self-heal, start and web silence the v1 notice for their children, and ndx migrate refuses inside an agent run](./ndx-self-heal-start-and-web-silence.md) | pending |
+| [ndx pair-programming's hench runs carry no NDX_AGENT_RUN marker, so its agent can run ndx migrate](./ndx-pair-programming-s-hench-runs.md) | pending |
+| [ndx self-heal, start and web silence the v1 notice for their children, and ndx migrate refuses inside an agent run](./ndx-self-heal-start-and-web-silence.md) | completed |
 | [Placement reads code evidence: commits and zones of a held change rank the capabilities realized in the same zones](./placement-reads-code-evidence-commits.md) | pending |
 | [Remove the prd.md and prd.json read fallbacks and the old migrate commands](./remove-the-prd-md-and-prd-json-read.md) | pending |
 | [rex health warns, not errors, on completed changes the migration held for placement](./rex-health-warns-not-errors-on.md) | pending |
+| [rex migrate-plan / migrate-apply and ndx migrate-layout still run inside an agent run](./rex-migrate-plan-migrate-apply-and-ndx.md) | pending |
 | [tests/e2e/cli-migrate-apply.test.js fails 3 of 5: its fixture keeps .rex/prd.json, which apply now refuses](./tests-e2e-cli-migrate-apply-test-js.md) | completed |
 | [The bare ndx migrate chain shows the preflight banner and its --dry-run runs no model unless asked](./the-bare-ndx-migrate-chain-shows-the.md) | pending |
 | [The interrupted-apply test compares normalised snapshot paths, so Windows CLI smoke passes](./the-interrupted-apply-test-compares.md) | pending |
