@@ -375,21 +375,25 @@ interface IncrementalState {
 /**
  * Build starting edge/external maps from a previous run, carrying forward only
  * the entries for unchanged files. Files in changedFiles are excluded so they
- * can be re-parsed fresh.
+ * can be re-parsed fresh. Only files still in `fileSet` count as unchanged: a
+ * file pruned from the inventory in an earlier run is absent from it without
+ * showing up as deleted (#744).
  */
-function buildIncrementalState(prev: Imports, changedFiles: Set<string>): IncrementalState {
+function buildIncrementalState(prev: Imports, changedFiles: Set<string>, fileSet: Set<string>): IncrementalState {
   const edgeMap = new Map<string, ImportEdge>();
   const externalMap = new Map<string, ExternalImport>();
   const unchangedExternalFiles = new Set<string>();
 
+  const unchanged = (f: string) => !changedFiles.has(f) && fileSet.has(f);
+
   for (const edge of prev.edges) {
-    if (!changedFiles.has(edge.from)) {
+    if (unchanged(edge.from) && fileSet.has(edge.to)) {
       edgeMap.set(`${edge.from}\0${edge.to}\0${edge.type}`, edge);
     }
   }
 
   for (const ext of prev.external) {
-    const unchangedImporters = ext.importedBy.filter((f) => !changedFiles.has(f));
+    const unchangedImporters = ext.importedBy.filter(unchanged);
     if (unchangedImporters.length === 0) continue;
 
     const hasChangedImporters = unchangedImporters.length < ext.importedBy.length;
@@ -707,7 +711,7 @@ export async function analyzeImports(
   const externalMap = new Map<string, ExternalImport>();
 
   if (canIncremental) {
-    const state = buildIncrementalState(prev, changedFiles);
+    const state = buildIncrementalState(prev, changedFiles, fileSet);
     for (const [k, v] of state.edgeMap) edgeMap.set(k, v);
     for (const [k, v] of state.externalMap) externalMap.set(k, v);
     await reExtractUnchangedExternals(state.unchangedExternalFiles, targetDir, goModulePath, externalMap);
