@@ -56,6 +56,6 @@ plannedRelease: "1.0.0"
 | [Stewards and code-owner files](./stewards-and-code-owner-files/index.md) | completed |
 | [User docs and docs.n-dx.dev for the v2 model](./user-docs-and-docs-n-dx-dev-for-the-v2/index.md) | pending |
 | [v2 completion and selection hold up](./v2-completion-and-selection-hold-up/index.md) | pending |
-| [v2 MCP tools take display ids and report v2 health](./v2-mcp-tools-take-display-ids-and/index.md) | completed |
+| [v2 MCP tools take display ids and report v2 health](./v2-mcp-tools-take-display-ids-and/index.md) | pending |
 | [v2 schema and rules before the freeze](./v2-schema-and-rules-before-the-freeze/index.md) | completed |
 | [v2 store transaction for the product and change layers](./v2-store-transaction-for-the-product/index.md) | completed |
