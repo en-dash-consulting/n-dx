@@ -540,6 +540,15 @@ describe("rex MCP tools take a display id on a v2 tree, as get_item does", () =>
     expect(json(res)).toMatchObject({ id: lone, claimed: true, type: "change" });
   });
 
+  it("release_task releases the claim claim_task took by the same display id", async () => {
+    const lone = await addChange("Add a gift card");
+    const ref = await displayIdOf(lone);
+    expect((await call("claim_task", { id: ref })).isError).toBe(false);
+    const res = await call("release_task", { id: ref });
+    expect(json(res)).toEqual({ id: lone, released: true });
+    expect(await ws.claims.store.readClaims()).toEqual([]);
+  });
+
   it("update_task_status updates the change CH-1 names", async () => {
     const res = await call("update_task_status", { id: "CH-1", status: "pending" });
     expect(res.isError, res.text).toBe(false);

@@ -1,14 +1,18 @@
 import { z } from "zod";
+import { resolveItemRef, type PRDStore } from "../../store/index.js";
 import type { ClaimsContext } from "./claims.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
 
 /** `release_task` — give a claim back without moving the task's status. */
 export async function handleReleaseTask(
+  store: PRDStore,
   args: { id: string },
   claims?: ClaimsContext,
 ): Promise<McpResult> {
   try {
+    // Claims are keyed by node id; a v2 display id or alias is what claim_task accepted.
+    args = { id: await resolveItemRef(store, args.id) };
     const released = claims ? await claims.store.release(args.id, { worktreeRoot: claims.worktreeRoot }) : false;
     if (!released && claims) {
       const runClaim = (await claims.store.readClaims()).find(
@@ -35,5 +39,5 @@ export const releaseTaskTool = defineTool({
     id: z.string().describe("Task ID to release"),
   },
   access: "write",
-  run: (ws, args) => handleReleaseTask(args, ws.claims),
+  run: (ws, args) => handleReleaseTask(ws.store, args, ws.claims),
 });
