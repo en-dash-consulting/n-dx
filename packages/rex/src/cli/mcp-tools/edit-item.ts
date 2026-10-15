@@ -4,7 +4,7 @@ import { validateDAG } from "../../core/dag.js";
 import { validateRunSettings, RunSettingsSchema } from "../../schema/validate.js";
 import type { PRDItem, Priority } from "../../schema/index.js";
 import { changeLayerType } from "../../core/layer-projection.js";
-import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
+import { isChangeLayerStore, resolveItemRef, type PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
 
@@ -26,6 +26,7 @@ export async function handleEditItem(
   },
 ): Promise<McpResult> {
   try {
+    args = { ...args, id: await resolveItemRef(store, args.id) };
     const existing = await store.getItem(args.id);
     if (!existing) {
       return textResult(

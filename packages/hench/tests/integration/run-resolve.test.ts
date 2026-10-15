@@ -647,6 +647,42 @@ describe("on a v2 tree", () => {
     }
   });
 
+  it("refuses a subtask with the run's message, not task-not-found", async () => {
+    const taskDir = join(rexDir, "changes/add-apple-pay/wire-the-button");
+    await mkdir(taskDir);
+    await rename(join(rexDir, "changes/add-apple-pay/wire-the-button.md"), join(taskDir, "index.md"));
+    const subId = "c0000000-0000-4000-8000-000000000021";
+    await writeFile(join(taskDir, "press.md"), `---\nid: "${subId}"\ntype: "subtask"\ntitle: "Press"\nslug: "press"\n---\n`);
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "subtask");
+    const r = await resolve({ task: subId });
+    expect(codes(r)).toEqual(["not-actionable"]);
+    expect(r.refusals[0].message).toContain('"Press"');
+    expect(r.refusals[0].message).toContain("is a subtask");
+    expect(r.refusals[0].message).toContain("Run the task instead.");
+  });
+
+  it("refuses a container change with the run's message, by id or display id", async () => {
+    const umbrella = join(rexDir, "changes/umbrella");
+    const innerId = "c0000000-0000-4000-8000-000000000031";
+    await mkdir(join(umbrella, "inner"), { recursive: true });
+    const umbrellaId = "c0000000-0000-4000-8000-000000000030";
+    await writeFile(
+      join(umbrella, "index.md"),
+      `---\nid: "${umbrellaId}"\ntype: "change"\ntitle: "Umbrella"\nslug: "umbrella"\ndisplayId: "CH-2"\n---\n`,
+    );
+    await writeFile(join(umbrella, "inner/index.md"), `---\nid: "${innerId}"\ntype: "change"\ntitle: "Inner"\nslug: "inner"\n---\n`);
+    await writeFile(join(umbrella, "inner/state.yaml"), `schema: "rex/v2"\nitems:\n  "${innerId}":\n    status: "completed"\n`);
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "container change");
+    for (const ref of [umbrellaId, "CH-2"]) {
+      const r = await resolve({ task: ref });
+      expect(codes(r), ref).toEqual(["not-actionable"]);
+      expect(r.refusals[0].message).toContain('"Umbrella"');
+      expect(r.refusals[0].message).toContain("holds other changes");
+    }
+  });
+
   it("still refuses a ref that names nothing", async () => {
     const r = await resolve({ task: "CH-404" });
     expect(r.task).toBeNull();

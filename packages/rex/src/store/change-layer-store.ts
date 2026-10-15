@@ -26,7 +26,7 @@ import { newErrors } from "../core/apply-amendments.js";
 import { changeLayerFromItems, changeLayerItems, productLayerItems } from "../core/layer-projection.js";
 import { pruneKeepReason } from "../core/prune.js";
 import { findItem, insertChild, removeFromTree, updateInTree, walkTree } from "../core/tree.js";
-import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
+import { indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { join } from "node:path";
 import { projectRootOf } from "@n-dx/llm-client";
 import type { PRDStore, SaveFileReport, StoreCapabilities } from "./contracts.js";
@@ -119,6 +119,17 @@ export class ChangeLayerStore implements PRDStore {
     });
   }
 
+  /**
+   * The node id of the live change a reference names: its id, display id or
+   * alias, as `get_item` resolves it. A reference that names no change comes
+   * back unchanged, so the caller's own not-found path reports it.
+   */
+  async resolveRef(ref: string): Promise<string> {
+    const { entries, resolve } = indexTree(await this.loadTree());
+    const node = resolve(ref);
+    return node && entries.some((e) => e.node === node && e.root === "changes") ? node.id : ref;
+  }
+
   async getItem(id: string): Promise<PRDItem | null> {
     return findItem((await this.loadDocument()).items, id)?.item ?? null;
   }
@@ -174,6 +185,15 @@ export class ChangeLayerStore implements PRDStore {
 /** Whether `store` serves the change layer of a v2 tree. */
 export function isChangeLayerStore(store: PRDStore): store is ChangeLayerStore {
   return store instanceof ChangeLayerStore;
+}
+
+/**
+ * `ref` as the id the store looks items up by: on a v2 tree a display id or
+ * alias maps to its change's node id. A v1 store, and a reference that names
+ * no change, return it unchanged.
+ */
+export async function resolveItemRef(store: PRDStore, ref: string): Promise<string> {
+  return isChangeLayerStore(store) ? store.resolveRef(ref) : ref;
 }
 
 /**

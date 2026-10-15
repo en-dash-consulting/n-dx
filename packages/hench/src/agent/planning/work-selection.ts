@@ -206,15 +206,25 @@ export function resolveV2Entry(
   if (found) return found;
   const unavailable = changeTasksRefusal(tree, ref, foreign, cliName);
   if (unavailable) throw unavailable;
-  const entry = findItem(items, ref);
+  throw notRunnableRefusal(tree, items, ref) ?? new Error(`Task not found: ${ref}`);
+}
+
+/**
+ * Why a ref that exists cannot run on its own: a container change (it holds
+ * other changes) or a subtask (it runs with its task). `undefined` when the
+ * ref names neither. The run throws it; `--resolve` reports it.
+ */
+export function notRunnableRefusal(tree: V2Tree, items: PRDItem[], ref: string): Error | undefined {
+  const node = indexTree(tree).resolve(ref);
+  const entry = node ? findItem(items, node.id) : null;
   if (entry?.item.type === "change") {
-    throw new Error(
+    return new Error(
       `"${entry.item.title}" (${ref}) holds other changes, so it is not a unit of work. ` +
         "Run one of its nested changes or tasks.",
     );
   }
   if (entry?.item.type === "subtask") {
-    throw new Error(`"${entry.item.title}" (${ref}) is a subtask; it runs with its task. Run the task instead.`);
+    return new Error(`"${entry.item.title}" (${ref}) is a subtask; it runs with its task. Run the task instead.`);
   }
-  throw new Error(`Task not found: ${ref}`);
+  return undefined;
 }

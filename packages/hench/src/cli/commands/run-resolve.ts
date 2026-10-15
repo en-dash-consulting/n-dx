@@ -30,7 +30,7 @@ import { resolveHenchPaths } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal } from "../../agent/planning/brief.js";
-import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry } from "../../agent/planning/work-selection.js";
+import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry, notRunnableRefusal } from "../../agent/planning/work-selection.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
 import { CLIError, requireLLMCLI } from "../errors.js";
@@ -270,7 +270,10 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   } else if (unavailable) {
     refuse(unavailable.allClaimed ? "claimed-elsewhere" : "not-actionable", unavailable);
   } else if (!entry) {
-    refuse("task-not-found", new CLIError(`Task not found: ${taskId}`, "Check the id with 'ndx status'."));
+    // On v2 a subtask or a container change exists but does not run on its own; say so, as the run does.
+    const notRunnable = v2Tree ? notRunnableRefusal(v2Tree, prdItems, taskId) : undefined;
+    if (notRunnable) refuse("not-actionable", new CLIError(notRunnable.message));
+    else refuse("task-not-found", new CLIError(`Task not found: ${taskId}`, "Check the id with 'ndx status'."));
   } else {
     // On v2 a claim on an enclosing change refuses the task, as a run does.
     const enclosing = v2Tree ? await claims.heldByEnclosingChange(v2Tree, entry.item.id) : null;

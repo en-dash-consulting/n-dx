@@ -503,3 +503,46 @@ describe("rex MCP tools on a v2 tree", () => {
     expect(res.isError, res.text).toBe(false);
   });
 });
+
+describe("rex MCP tools take a display id on a v2 tree, as get_item does", () => {
+  /** Added changes carry no display id; stamp CH-<n> into the change's index.md and return it. */
+  const displayIdOf = async (id: string, displayId = "CH-7") => {
+    const slug = (await node(id))?.slug as string;
+    await editText(join(rexDir, "changes", slug, "index.md"), (t) => t.replace(/^(slug: .*)$/m, `$1\ndisplayId: "${displayId}"`));
+    return displayId;
+  };
+
+  it("edit_item edits the change CH-1 names", async () => {
+    const res = await call("edit_item", { id: "CH-1", priority: "low" });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({ id: CHANGE, item: { id: CHANGE, displayId: "CH-1", priority: "low" } });
+    expect(await node(CHANGE)).toMatchObject({ priority: "low" });
+  });
+
+  it("move_item moves a task under the change a display id names", async () => {
+    const other = await addChange("Add Google Pay");
+    const res = await call("move_item", { id: TASK, parentId: await displayIdOf(other) });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({ id: TASK, previousParentId: CHANGE, newParentId: other });
+  });
+
+  it("merge_items merges changes named by display id", async () => {
+    const other = await addChange("Apple Pay, again");
+    const res = await call("merge_items", { sourceIds: ["CH-1", await displayIdOf(other)], targetId: "CH-1" });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res).absorbedIds).toEqual([other]);
+  });
+
+  it("claim_task claims the change a display id names", async () => {
+    const lone = await addChange("Add a gift card");
+    const res = await call("claim_task", { id: await displayIdOf(lone) });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({ id: lone, claimed: true, type: "change" });
+  });
+
+  it("a reference that names nothing still reports not found under the reference given", async () => {
+    const res = await call("edit_item", { id: "CH-99", priority: "low" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toMatch(/Item "CH-99" not found/);
+  });
+});
