@@ -55,4 +55,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Detected run and build commands as a dashboard control](./detected-run-and-build-commands-as-a.md) | completed |
 | [Fail-forward mode: commit automatically at the end of every run, loop and settings change](./fail-forward-mode-commit-automatically.md) | pending |
 | [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | pending |
+| [On a v2 project /api/live's next list uses v1 selection, so it shows Inbox changes and ignores change priority](./on-a-v2-project-api-live-s-next-list.md) | pending |
 
