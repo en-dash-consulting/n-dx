@@ -7,7 +7,7 @@
  * `<%@ … %>` directives, which link a page to its code-behind, its master
  * page and the user controls it registers.
  *
- * @module sourcevision/language/csharp
+ * @module lang-kit/csharp
  */
 
 import type { LanguageConfig } from "./registry.js";

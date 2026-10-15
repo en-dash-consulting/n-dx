@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { detectLanguage, detectLanguages, getLanguageConfig } from "../../../src/language/detect.js";
-import { csharpConfig } from "../../../src/language/csharp.js";
+import { csharpConfig } from "@n-dx/lang-kit";
 
 let tmpDir: string | undefined;
 
