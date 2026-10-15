@@ -8,9 +8,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { goGrammarPath, pack } from "@n-dx/lang-go";
-import { skipUnlessGrammar } from "@n-dx/lang-runtime";
 import { extractGoImports } from "../../src/analyzers/go-imports.js";
+import { skipUnlessPackRuns, workspacePack } from "../helpers/workspace-pack.js";
 
 const GO_PROJECT = join(import.meta.dirname, "../fixtures/go-project");
 
@@ -25,7 +24,8 @@ function goFiles(dir: string): string[] {
 
 describe("go pack — parity with the regex parser", () => {
   it("produces the regex parser's edges and external packages for a single-module project", async (ctx) => {
-    skipUnlessGrammar(ctx, goGrammarPath());
+    await skipUnlessPackRuns(ctx, "go");
+    const pack = await workspacePack("go");
     const paths = goFiles(GO_PROJECT);
     const result = await pack.analyzeProject({ projectDir: GO_PROJECT, files: paths, kinds: ["imports"] });
     expect(result.degraded).toBeUndefined();

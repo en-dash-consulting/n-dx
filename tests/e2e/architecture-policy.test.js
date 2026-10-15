@@ -311,6 +311,10 @@ const DOCUMENTED_POLICIES = [
     enforcedBy: "architecture-policy.test.js → architecture policy: pack tier boundary (@n-dx/lang-runtime and packs)",
   },
   {
+    rule: "Packs are loaded, never imported: no static import of @n-dx/lang-runtime, a pack or web-tree-sitter outside packages/lang-*; dynamic pack imports only in sourcevision's pack loader; web-tree-sitter is a dependency of @n-dx/lang-runtime only",
+    enforcedBy: "architecture-policy.test.js → architecture policy: packs are loaded, never imported",
+  },
+  {
     rule: "Domain-layer files must not import from CLI layer (intra-package layering)",
     enforcedBy: "architecture-policy.test.js → architecture policy: intra-package layering",
   },
@@ -448,6 +452,107 @@ describe("architecture policy: pack tier boundary (@n-dx/lang-runtime and packs)
   }
 });
 
+/**
+ * Packs are loaded, never imported. Outside packages/lang-*, nothing imports
+ * the parser runtime, a pack or web-tree-sitter statically, so an install
+ * without packs never loads the parser. sourcevision reaches a pack only by a
+ * dynamic `import()` in its pack loader, which finds the pack at run time and
+ * degrades when it is missing. Scripts and tests may import a pack
+ * dynamically (the corpus scripts measure the workspace packs).
+ */
+describe("architecture policy: packs are loaded, never imported", () => {
+  /** Every package outside the pack tier, by directory under packages/. */
+  const NON_PACK_PACKAGES = ["sourcevision", "rex", "hench", "web", "core", "llm-client", "lang-kit", "graview", "graview-face"];
+  const LOADER = "packages/sourcevision/src/language/pack-loader.ts";
+  // The runtime, any pack (every @n-dx/lang-* but lang-kit), or web-tree-sitter.
+  const TARGET = String.raw`["'](@n-dx\/lang-(?!kit["'])[a-z-]+|web-tree-sitter)["']`;
+  // `from "…"`, `import "…"` and `require("…")`; not `import("…")`.
+  const STATIC = new RegExp(String.raw`(?:\bfrom\s*|\bimport\s+|\brequire\s*\(\s*)` + TARGET, "g");
+  const DYNAMIC = new RegExp(String.raw`\bimport\s*\(\s*` + TARGET, "g");
+  const SOURCE_SKIP = new Set([...SKIP_DIRS, "fixtures", "build", "coverage", "public"]);
+
+  /** Source files under `dir`, test fixtures and build output excluded. */
+  function sources(dir, files = []) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (SOURCE_SKIP.has(entry.name)) continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) sources(full, files);
+      else if (/\.(?:[cm]?[jt]s|[jt]sx)$/.test(entry.name) && !entry.name.endsWith(".d.ts")) files.push(full);
+    }
+    return files;
+  }
+
+  /** Each `[file:line: text, specifier]` matching `pattern` in `files`, comment lines skipped. */
+  function matches(files, pattern) {
+    const found = [];
+    for (const file of files) {
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
+      for (const [i, line] of readFileSync(file, "utf-8").split("\n").entries()) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) continue;
+        for (const m of line.matchAll(pattern)) found.push({ where: `${rel}:${i + 1}: ${trimmed}`, rel, specifier: m[1] });
+      }
+    }
+    return found;
+  }
+
+  for (const dir of NON_PACK_PACKAGES) {
+    it(`packages/${dir} imports no runtime, pack or web-tree-sitter statically`, () => {
+      const pkgDir = join(ROOT, "packages", dir);
+      expect(existsSync(pkgDir), `packages/${dir} is missing`).toBe(true);
+      const violations = matches(sources(pkgDir), STATIC).map((m) => `  ${m.where}`);
+      if (violations.length > 0) {
+        expect.fail(
+          [
+            `@n-dx/${dir} must not import @n-dx/lang-runtime, a language pack or web-tree-sitter statically.`,
+            "sourcevision loads packs at run time through src/language/pack-loader.ts; tests reach them",
+            "through the loader (packages/sourcevision/tests/helpers/workspace-pack.ts).",
+            "",
+            "Violations:",
+            ...violations,
+          ].join("\n"),
+        );
+      }
+    });
+
+    it(`packages/${dir}/src imports a pack dynamically only from sourcevision's pack loader`, () => {
+      const srcDir = join(ROOT, "packages", dir, "src");
+      const files = existsSync(srcDir) ? sources(srcDir) : dir === "core" ? sources(join(ROOT, "packages", dir)) : [];
+      const violations = matches(files, DYNAMIC)
+        .filter((m) => m.rel !== LOADER || !/^@n-dx\/lang-/.test(m.specifier) || m.specifier === "@n-dx/lang-runtime")
+        .map((m) => `  ${m.where}`);
+      if (violations.length > 0) {
+        expect.fail(
+          [
+            `Only ${LOADER} may import a language pack, and only dynamically; nothing imports the runtime or web-tree-sitter.`,
+            "",
+            "Violations:",
+            ...violations,
+          ].join("\n"),
+        );
+      }
+    });
+  }
+
+  it("sourcevision's pack loader imports every pack it knows dynamically", () => {
+    const found = matches([join(ROOT, LOADER)], DYNAMIC).map((m) => m.specifier);
+    expect(found.length, `${LOADER} has no dynamic pack import`).toBeGreaterThan(0);
+    expect(found.every((s) => s !== "@n-dx/lang-runtime" && s !== "web-tree-sitter")).toBe(true);
+  });
+
+  it("web-tree-sitter is a dependency of @n-dx/lang-runtime only", () => {
+    const fields = ["dependencies", "optionalDependencies", "peerDependencies", "devDependencies"];
+    const dependents = readdirSync(join(ROOT, "packages"), { withFileTypes: true })
+      .filter((e) => e.isDirectory() && existsSync(join(ROOT, "packages", e.name, "package.json")))
+      .filter((e) => {
+        const pkg = JSON.parse(readFileSync(join(ROOT, "packages", e.name, "package.json"), "utf-8"));
+        return fields.some((field) => "web-tree-sitter" in (pkg[field] ?? {}));
+      })
+      .map((e) => e.name);
+    expect(dependents).toEqual(["lang-runtime"]);
+  });
+});
+
 describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
   it("all documented tier boundary rules have enforcement tests", () => {
     // This is a declarative registry — it does not parse CLAUDE.md.
@@ -455,7 +560,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
     // add an entry to DOCUMENTED_POLICIES above. If this test has
     // fewer entries than the rules in CLAUDE.md, the gap is visible
     // in code review. Minimum: 12 policies.
-    expect(DOCUMENTED_POLICIES.length).toBe(23);
+    expect(DOCUMENTED_POLICIES.length).toBe(24);
   });
 
   for (const policy of DOCUMENTED_POLICIES) {

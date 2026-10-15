@@ -8,7 +8,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { javaGrammarPath } from "@n-dx/lang-java";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeZones } from "../../src/analyzers/zones.js";
@@ -18,11 +17,10 @@ import { sourcevisionVersion } from "../../src/language/package-paths.js";
 import { javaConfig, javaSecondaryConfig, typescriptConfig } from "@n-dx/lang-kit";
 import type { Imports, Inventory } from "../../src/schema/v1.js";
 import { validate, ZonesSchema } from "../../src/schema/validate.js";
-import { skipUnlessGrammar } from "@n-dx/lang-runtime";
+import { skipUnlessPackRuns } from "../helpers/workspace-pack.js";
 
 const FIXTURE = join(import.meta.dirname, "../fixtures/java-spring-project");
 const TS_FIXTURE = join(import.meta.dirname, "../fixtures/small-ts-project");
-const JAVA_WASM = javaGrammarPath();
 
 /** The Java pack as if it were not installed. */
 const NOT_INSTALLED_JAVA: KnownPack = {
@@ -42,7 +40,7 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
   });
 
   it("writes file-to-file edges across the controller, service, repository and entity layers", async (ctx) => {
-    skipUnlessGrammar(ctx, JAVA_WASM);
+    await skipUnlessPackRuns(ctx, "java");
     const imports = await analyzeImports(FIXTURE, inventory, { language: "java" });
     const edges = edgeKeys(imports);
 
@@ -66,7 +64,7 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
   });
 
   it("writes external imports attributed by package", async (ctx) => {
-    skipUnlessGrammar(ctx, JAVA_WASM);
+    await skipUnlessPackRuns(ctx, "java");
     const imports = await analyzeImports(FIXTURE, inventory, { language: "java" });
     const byPackage = new Map(imports.external.map((e) => [e.package, e]));
 
@@ -83,7 +81,7 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
   });
 
   it("produces schema-valid zones that cover every layer", async (ctx) => {
-    skipUnlessGrammar(ctx, JAVA_WASM);
+    await skipUnlessPackRuns(ctx, "java");
     const imports = await analyzeImports(FIXTURE, inventory, { language: "java" });
     const { zones } = await analyzeZones(inventory, imports, { enrich: false });
 
@@ -96,7 +94,7 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
   });
 
   it("re-resolves unchanged Java files on an incremental run, dropping their stale edges", async (ctx) => {
-    skipUnlessGrammar(ctx, JAVA_WASM);
+    await skipUnlessPackRuns(ctx, "java");
     const full = await analyzeImports(FIXTURE, inventory, { language: "java" });
     // PetType references nothing: an edge or external from it can only be stale.
     const petType = `${MAIN}/entity/PetType.java`;
@@ -158,7 +156,7 @@ describe("Java beside a package.json (Spring Boot with a bundled frontend)", () 
   });
 
   it("analyzes the .java files with the detected language set", async (ctx) => {
-    skipUnlessGrammar(ctx, JAVA_WASM);
+    await skipUnlessPackRuns(ctx, "java");
     const merged = mergeLanguageConfigs(await detectLanguages(dir));
     const inventory = await analyzeInventory(dir, { languageConfig: merged });
     const imports = await analyzeImports(dir, inventory);
