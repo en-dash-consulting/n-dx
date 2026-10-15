@@ -9,7 +9,8 @@
  * `.tf` and `.tfvars` file counts, the share of each parsed without ERROR or
  * MISSING nodes, and the failing constructs (file, position, first line of the
  * node). Then the Terraform model over the `.tf` files: resources, data
- * sources and module calls by source kind, and the comparison with
+ * sources, module calls by source kind, module instances and the resource
+ * facts resolved through them, and the comparison with
  * `analyzers/infrastructure.ts`'s resources (`discoverFromIaC`). The model must
  * be a superset: every resource infrastructure.ts finds is listed if the model
  * misses it, and every resource only the model has is listed by type.
@@ -83,7 +84,7 @@ if (!existsSync(infrastructureDist)) {
 const { createTreeSitterRunner } = await import(runtimeDist.href);
 const { discoverFromIaC } = await import(infrastructureDist.href);
 const { IAC_KINDS } = await importWorkspacePack("@n-dx/lang-kit");
-const { buildTerraformModel, terraformGrammarPath, terraformPack } = await importWorkspacePack("@n-dx/lang-terraform");
+const { buildTerraformModel, terraformGrammarPath, terraformPack, terraformResourceFacts } = await importWorkspacePack("@n-dx/lang-terraform");
 
 const wasm = terraformGrammarPath();
 if (!existsSync(wasm)) {
@@ -132,6 +133,11 @@ function modelReport(dir, parsed) {
     moduleDirectories: model.modulePaths.size,
     withAttributes: model.resources.filter((r) => Object.keys(r.attributes).length > 0).length,
     references: model.references.length,
+    instances: model.instances.length,
+    rootInstances: model.instances.filter((i) => i.parent === undefined).length,
+    resolvedFacts: [...terraformResourceFacts(model, parsed.map((f) => f.path)).values()]
+      .flatMap((f) => f.resources ?? [])
+      .filter((fact) => fact.instance !== undefined).length,
     infrastructure: infraIds.size,
     missing,
     extraByType: Object.fromEntries(Object.entries(extraByType).sort(([a], [b]) => a.localeCompare(b))),
@@ -211,6 +217,7 @@ if (json) {
       `  module calls:        ${m.modules.local} local (${m.modules.followed} followed), ${m.modules.registry} registry ` +
         `(${m.registryModulesMatched} in the table), ${m.modules.other} other; ${m.moduleDirectories} directories reached by a call`,
     );
+    console.log(`  module instances:    ${m.instances} (${m.rootInstances} root); ${m.resolvedFacts} resource facts resolved per instance`);
     console.log(`  reference edges:     ${m.references}`);
     console.log(`  infrastructure.ts:   ${m.infrastructure} resources; missing from the model: ${m.missing.length}`);
     for (const id of m.missing) console.log(`    missing ${id}`);

@@ -17,7 +17,7 @@
  */
 
 import { extname, posix } from "node:path";
-import { terraformConfig, type PackDegradation, type ResourceFact } from "@n-dx/lang-kit";
+import { terraformConfig, type PackDegradation, type ResourceAttributes, type ResourceFact } from "@n-dx/lang-kit";
 import type { InfraResource, InfrastructureData } from "../schema/v1.js";
 import { noticeListedPacks } from "./pack-imports.js";
 import { KNOWN_PACKS, loadPack, packInstallCommand, type KnownPack, type PackLoaderOptions } from "../language/pack-loader.js";
@@ -77,6 +77,27 @@ function modelFields(
 }
 
 /**
+ * One fact for a declaration the pack resolved per module instance.
+ * infrastructure.json lists the resource once, so an attribute keeps a
+ * resolved value only when every instance's fact gives the same value; else
+ * it is the expression as written. The other fields are the first fact's
+ * (`instance` is never written).
+ */
+function agreedFact(instances: readonly ResourceFact[]): ResourceFact {
+  const [first] = instances;
+  if (instances.length === 1) return first;
+  const fields = new Set(instances.flatMap((f) => Object.keys(f.attributes ?? {}))) as Set<keyof ResourceAttributes>;
+  const attributes: Partial<Record<keyof ResourceAttributes, string>> = {};
+  for (const field of fields) {
+    const values = new Set(instances.map((f) => f.attributes?.[field]));
+    const written = instances.find((f) => f.instance?.resolved[field] !== undefined)?.instance?.resolved[field]?.written;
+    const value = values.size === 1 ? [...values][0] : (written ?? first.attributes?.[field]);
+    if (value !== undefined) attributes[field] = value;
+  }
+  return { ...first, attributes };
+}
+
+/**
  * Add the Terraform model's fields to the resources of `data` declared in
  * the project's `.tf` files. `paths` are the inventory's project-relative
  * paths. Returns `data` itself when there is nothing to add.
@@ -114,14 +135,18 @@ export async function enrichTerraformInfrastructure(
   }
   if (result.degraded) return skip(result.degraded);
 
-  // The first declaration wins, as it does in the shallow scan.
-  const facts = new Map<string, ResourceFact>();
+  // The first declaration wins, as it does in the shallow scan; facts at its
+  // position are its module instances, merged into one.
+  const declarations = new Map<string, ResourceFact[]>();
   for (const { path, resources } of result.facts) {
     for (const fact of resources ?? []) {
       const key = placeKey(path, `${fact.type}.${fact.name}`);
-      if (!facts.has(key)) facts.set(key, fact);
+      const list = declarations.get(key);
+      if (list === undefined) declarations.set(key, [fact]);
+      else if (list[0].position.line === fact.position.line && list[0].position.column === fact.position.column) list.push(fact);
     }
   }
+  const facts = new Map([...declarations].map(([key, list]) => [key, agreedFact(list)]));
   const listed = new Map(data.resources.filter((r) => terraformAddress(r, files) !== undefined).map((r) => [r.id, r]));
 
   let changed = false;

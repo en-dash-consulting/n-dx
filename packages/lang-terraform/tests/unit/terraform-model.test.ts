@@ -5,7 +5,23 @@
 
 import { describe, expect, it } from "vitest";
 import type { Capture, PackSourceFile } from "@n-dx/lang-runtime";
-import { buildTerraformModel, parseRegistrySource, referenceTarget, valueAsWritten } from "../../src/index.js";
+import { buildTerraformModel, conditionalBranches, parseRegistrySource, referenceTarget, valueAsWritten } from "../../src/index.js";
+
+describe("conditionalBranches", () => {
+  it("splits a top-level conditional, matching a nested one in the true branch", () => {
+    expect(conditionalBranches("local.is_replica ? null : var.engine")).toEqual(["null", "var.engine"]);
+    expect(conditionalBranches("a ? b ? c : d : null")).toEqual(["b ? c : d", "null"]);
+    expect(conditionalBranches("a ? null : b ? c : d")).toEqual(["null", "b ? c : d"]);
+  });
+
+  it("ignores ? and : inside strings, templates and brackets", () => {
+    expect(conditionalBranches('"a ? b : c"')).toBeUndefined();
+    expect(conditionalBranches('"${var.x ? "y" : "z"}"')).toBeUndefined();
+    expect(conditionalBranches("{ a = b ? c : d }")).toBeUndefined();
+    expect(conditionalBranches('var.x == "a:b" ? "c" : null')).toEqual(['"c"', "null"]);
+    expect(conditionalBranches("var.engine")).toBeUndefined();
+  });
+});
 
 describe("valueAsWritten", () => {
   it("gives a plain quoted string's content and any other expression as written", () => {

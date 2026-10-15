@@ -415,6 +415,41 @@ describe("Terraform resources", () => {
     expect(detect({}).candidates).toEqual([]);
   });
 
+  it("gives a candidate per engine a module's instances resolve, naming where each value is written", () => {
+    const instance = (engine: string, confidence: "literal" | "conditional", file: string): ResourceFact => ({
+      ...resource("aws_db_instance", "this", 30, { engine }),
+      instance: {
+        module: "module.db.module.db_instance",
+        call: { file, line: 1 },
+        resolved: { engine: { written: "local.is_replica ? null : var.engine", confidence, from: { file, line: 12 } } },
+      },
+    });
+    const report = detectTf(
+      tf(
+        "modules/db_instance/main.tf",
+        instance("postgres", "literal", "examples/pg/main.tf"),
+        instance("mysql", "conditional", "examples/mysql/main.tf"),
+        resource("aws_db_instance", "this", 30, { engine: "local.is_replica ? null : var.engine" }),
+      ),
+    );
+    expect(report.candidates.map((c) => [c.engine, c.grade])).toEqual([
+      ["mysql", "low"],
+      ["postgresql", "medium"],
+    ]);
+    expect(report.candidates[0].evidence[0]).toMatchObject({
+      grade: "weak",
+      file: "modules/db_instance/main.tf",
+      line: 30,
+      text: "aws_db_instance.this engine=mysql (conditional, from examples/mysql/main.tf:12)",
+    });
+    expect(report.candidates[1].evidence[0]).toMatchObject({
+      grade: "strong",
+      text: "aws_db_instance.this engine=postgres (literal, from examples/pg/main.tf:12)",
+    });
+    // The instances that resolve nothing keep today's notice.
+    expect(report.notices).toEqual(["modules/db_instance/main.tf:30 aws_db_instance.this has engine local.is_replica ? null : var.engine; no candidate"]);
+  });
+
   it("grades Terraform under a test path as weak", () => {
     const c = only([tf("tests/rds.tf", resource("aws_db_instance", "t", 1, { engine: "mysql", engineVersion: "8.0" }))]);
     expect(c).toMatchObject({ engine: "mysql", grade: "low" });

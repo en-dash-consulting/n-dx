@@ -41,8 +41,20 @@ export interface TerraformResource extends TerraformBlock {
   /** Local name from the `provider` argument or the type's prefix; version from the directory's `required_providers`. */
   readonly provider: { readonly name: string; readonly alias?: string; readonly version?: string };
   readonly attributes: ResourceAttributes;
+  /**
+   * The audit attributes written as an expression rather than a plain string,
+   * by field: what `terraform-resolve.ts` resolves per module instance. Absent
+   * when every attribute is a plain string.
+   */
+  readonly expressions?: Partial<Record<keyof ResourceAttributes, string>>;
   /** `type.name` of the managed resources in the same directory this block references; sorted, distinct. */
   readonly references: readonly string[];
+}
+
+/** An expression as written, and the one-based line its argument starts on. */
+export interface TerraformExpression {
+  readonly expression: string;
+  readonly line: number;
 }
 
 /** A module source in the registry address form `[hostname/]namespace/name/provider[//subdirectory]`. */
@@ -75,6 +87,8 @@ export interface TerraformModuleCall extends TerraformBlock {
   readonly registry?: RegistrySource;
   /** Resource types the called registry module declares, from {@link REGISTRY_MODULES}. */
   readonly declares?: readonly string[];
+  /** The input variables the call sets, by name; meta-arguments (`source`, `count`, …) excluded. Absent when none. */
+  readonly arguments?: Readonly<Record<string, TerraformExpression>>;
 }
 
 /** A `provider` configuration block. */
@@ -100,6 +114,32 @@ export interface TerraformNamed extends TerraformBlock {
   readonly name: string;
 }
 
+/** An input variable. */
+export interface TerraformVariable extends TerraformNamed {
+  /** The `default` argument as written; absent when there is none. */
+  readonly default?: TerraformExpression;
+}
+
+/** A local value. */
+export interface TerraformLocal extends TerraformNamed {
+  readonly value?: TerraformExpression;
+}
+
+/**
+ * One instance of a module directory: a root module (a directory no followed
+ * local call reaches) with its defaults only, or a directory reached through
+ * one call path from a root, with the values that path's calls pass.
+ */
+export interface TerraformModuleInstance {
+  readonly directory: string;
+  /** The call path from the root, e.g. `module.app.module.db`; absent at a root. */
+  readonly module?: string;
+  /** Index in {@link TerraformModel.instances} of the calling instance; absent at a root. */
+  readonly parent?: number;
+  /** Index in {@link TerraformModel.modules} of the call that makes this instance; absent at a root. */
+  readonly call?: number;
+}
+
 /** One edge of the reference graph, between two addresses in the same directory. */
 export interface TerraformReference {
   readonly directory: string;
@@ -117,9 +157,9 @@ export interface TerraformModel {
   readonly providers: readonly TerraformProviderConfig[];
   readonly requirements: readonly ProviderRequirement[];
   readonly backends: readonly TerraformBackend[];
-  readonly variables: readonly TerraformNamed[];
+  readonly variables: readonly TerraformVariable[];
   readonly outputs: readonly TerraformNamed[];
-  readonly locals: readonly TerraformNamed[];
+  readonly locals: readonly TerraformLocal[];
   /** Sorted by directory, from, to; distinct. */
   readonly references: readonly TerraformReference[];
   /**
@@ -128,6 +168,13 @@ export interface TerraformModel {
    * followed call reaches), then the alphabetically first. Root modules are absent.
    */
   readonly modulePaths: ReadonlyMap<string, string>;
+  /**
+   * Every instance of every module directory: each root in path order, then
+   * depth first through its followed local calls in model order. A call into a
+   * directory already on the path is not followed (a cycle), so a directory
+   * reached only from a cycle has no instance. At most {@link MAX_MODULE_INSTANCES}.
+   */
+  readonly instances: readonly TerraformModuleInstance[];
 }
 
 // ── Tables ──────────────────────────────────────────────────────────────────
@@ -233,8 +280,11 @@ const PUBLIC_REGISTRY = "registry.terraform.io";
  * (escapes kept as written), any other expression its source text.
  */
 export function valueAsWritten(text: string): string {
-  return PLAIN_STRING.test(text) ? text.slice(1, -1) : text;
+  return isPlainString(text) ? text.slice(1, -1) : text;
 }
+
+/** True for one quoted string without interpolation; see {@link valueAsWritten}. */
+export const isPlainString = (text: string): boolean => PLAIN_STRING.test(text);
 
 /**
  * One quoted string, no interpolation (`${`, `%{`): an unescaped quote can
@@ -379,16 +429,30 @@ function readArguments(file: PackSourceFile): Argument[] {
 
 const samePath = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((part, i) => part === b[i]);
 
-/** The audit attributes a resource writes, by {@link AUDIT_ATTRIBUTE_RULES}. */
-function auditAttributes(type: string, args: readonly Argument[]): ResourceAttributes {
-  const attributes: Partial<Record<keyof ResourceAttributes, string>> = {};
+type AttributeTexts = Partial<Record<keyof ResourceAttributes, string>>;
+
+/** The audit attributes a resource writes, by {@link AUDIT_ATTRIBUTE_RULES}, and those written as an expression. */
+function auditAttributes(type: string, args: readonly Argument[]): { attributes: AttributeTexts; expressions?: AttributeTexts } {
+  const attributes: AttributeTexts = {};
+  const expressions: AttributeTexts = {};
   for (const rule of AUDIT_ATTRIBUTE_RULES) {
     if (attributes[rule.field] !== undefined || (rule.types && !rule.types.includes(type))) continue;
     const argument = args.find((a) => samePath(a.path, rule.path));
-    if (argument) attributes[rule.field] = valueAsWritten(argument.value);
+    if (!argument) continue;
+    attributes[rule.field] = valueAsWritten(argument.value);
+    if (!isPlainString(argument.value)) expressions[rule.field] = argument.value;
   }
-  return attributes;
+  return Object.keys(expressions).length === 0 ? { attributes } : { attributes, expressions };
 }
+
+/** Arguments of a `module` block that are not input variables. */
+const MODULE_META_ARGUMENTS = new Set(["source", "version", "count", "for_each", "providers", "depends_on"]);
+
+const expressionOf = (argument: Argument): TerraformExpression => ({ expression: argument.value, line: argument.start.line });
+
+/** The block's own argument (not a nested block's) named `name`. */
+const ownArgument = (args: readonly Argument[], name: string): Argument | undefined =>
+  args.find((a) => a.path.length === 1 && a.path[0] === name);
 
 // ── Building ────────────────────────────────────────────────────────────────
 
@@ -401,9 +465,9 @@ interface FileModel {
   readonly providers: TerraformProviderConfig[];
   readonly requirements: ProviderRequirement[];
   readonly backends: TerraformBackend[];
-  readonly variables: TerraformNamed[];
+  readonly variables: TerraformVariable[];
   readonly outputs: TerraformNamed[];
-  readonly locals: TerraformNamed[];
+  readonly locals: TerraformLocal[];
   /** Reference expressions with the address of the block (or local) holding them. */
   readonly referencesFrom: Array<{ readonly from: string; readonly to: string }>;
 }
@@ -441,7 +505,7 @@ function readFile(parsed: PackSourceFile): FileModel {
           name,
           address,
           provider: { name: providerName, ...(alias === undefined ? {} : { alias }) },
-          attributes: auditAttributes(type, blockArgs),
+          ...auditAttributes(type, blockArgs),
           references: [],
         },
       ];
@@ -459,12 +523,20 @@ function readFile(parsed: PackSourceFile): FileModel {
     const sourceText = inside(file, "modules", "module.source", at)?.text;
     const versionText = inside(file, "modules", "module.version", at)?.text;
     const source = sourceText === undefined ? undefined : valueAsWritten(sourceText);
+    const passed: Record<string, TerraformExpression> = {};
+    for (const argument of argumentsIn(at)) {
+      const [input] = argument.path;
+      // The first of a repeated name wins; Terraform refuses the block anyway.
+      if (argument.path.length !== 1 || MODULE_META_ARGUMENTS.has(input) || Object.hasOwn(passed, input)) continue;
+      Object.defineProperty(passed, input, { value: expressionOf(argument), enumerable: true });
+    }
     const call = {
       ...where(block),
       name,
       address: `module.${name}`,
       ...(source === undefined ? {} : { source }),
       ...(versionText === undefined ? {} : { version: valueAsWritten(versionText) }),
+      ...(Object.keys(passed).length === 0 ? {} : { arguments: passed }),
     };
     if (source !== undefined && (source.startsWith("./") || source.startsWith("../"))) {
       const target = posix.normalize(posix.join(call.directory, source)).replace(/\/$/, "");
@@ -512,22 +584,26 @@ function readFile(parsed: PackSourceFile): FileModel {
   });
 
   /** `owner`: the address its references are recorded from; variables hold none worth recording. */
-  const declared = (blockName: string, labelName: string, owner?: string): TerraformNamed[] =>
+  const declared = (blockName: string, labelName: string, owner?: string): Array<{ named: TerraformNamed; at: SourceSpan }> =>
     named(file, "declarations", blockName).flatMap((block) => {
       const at = span(block);
       const name = inside(file, "declarations", labelName, at)?.text;
       if (name === undefined) return [];
       if (owner !== undefined) owners.push({ span: at, address: `${owner}.${name}` });
-      return [{ ...where(block), name }];
+      return [{ named: { ...where(block), name }, at }];
     });
-  const variables = declared("variable.block", "variable.name");
-  const outputs = declared("output.block", "output.name", "output");
-  const locals = named(file, "declarations", "local").flatMap((entry): TerraformNamed[] => {
+  const variables = declared("variable.block", "variable.name").map(({ named: variable, at }): TerraformVariable => {
+    const fallback = ownArgument(argumentsIn(at), "default");
+    return fallback === undefined ? variable : { ...variable, default: expressionOf(fallback) };
+  });
+  const outputs = declared("output.block", "output.name", "output").map((d) => d.named);
+  const locals = named(file, "declarations", "local").flatMap((entry): TerraformLocal[] => {
     const at = span(entry);
     const name = inside(file, "declarations", "local.name", at)?.text;
     if (name === undefined) return [];
     owners.push({ span: at, address: `local.${name}` });
-    return [{ ...where(entry), name }];
+    const value = ownArgument(argumentsIn(at), name);
+    return [{ ...where(entry), name, ...(value === undefined ? {} : { value: expressionOf(value) }) }];
   });
 
   // Owners never nest (a resource, module, output or local entry holds no other), so the
@@ -589,6 +665,42 @@ function modulePathsOf(calls: readonly TerraformModuleCall[], directories: Reado
     }
   }
   return paths;
+}
+
+/**
+ * The most instances a model enumerates. Call paths multiply where modules
+ * share submodules; past this many the remaining paths are dropped, and a
+ * resource they reach keeps the values of the instances already listed.
+ */
+export const MAX_MODULE_INSTANCES = 10_000;
+
+/** See {@link TerraformModel.instances}. */
+function instancesOf(calls: readonly TerraformModuleCall[], directories: ReadonlySet<string>): TerraformModuleInstance[] {
+  const callsFrom = new Map<string, number[]>();
+  const called = new Set<string>();
+  calls.forEach((call, index) => {
+    if (!call.followed || call.target === call.directory) return;
+    called.add(call.target!);
+    const list = callsFrom.get(call.directory);
+    if (list) list.push(index);
+    else callsFrom.set(call.directory, [index]);
+  });
+  const instances: TerraformModuleInstance[] = [];
+  const onPath = new Set<string>();
+  const visit = (instance: TerraformModuleInstance): void => {
+    if (instances.length >= MAX_MODULE_INSTANCES) return;
+    const index = instances.push(instance) - 1;
+    onPath.add(instance.directory);
+    for (const c of callsFrom.get(instance.directory) ?? []) {
+      const call = calls[c];
+      if (onPath.has(call.target!)) continue;
+      const module = instance.module === undefined ? call.address : `${instance.module}.${call.address}`;
+      visit({ directory: call.target!, module, parent: index, call: c });
+    }
+    onPath.delete(instance.directory);
+  };
+  for (const root of [...directories].filter((d) => !called.has(d)).sort()) visit({ directory: root });
+  return instances;
 }
 
 /** A managed resource's address, `type.name`: every other address starts with a reserved root. */
@@ -675,5 +787,6 @@ export function buildTerraformModel(files: readonly PackSourceFile[]): Terraform
     locals: read.flatMap(({ model }) => model.locals),
     references,
     modulePaths: modulePathsOf(modules, directories),
+    instances: instancesOf(modules, directories),
   };
 }
