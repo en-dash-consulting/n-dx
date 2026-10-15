@@ -2,7 +2,7 @@
 id: "b6564c07-4cae-4f11-903e-ada8957aa99c"
 level: "task"
 title: "hench task-lookup.ts imports @n-dx/rex directly, bypassing rex-gateway"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "ndx-adversarial-review"
@@ -10,11 +10,16 @@ tags:
   - "hench"
   - "v2-hardening"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-15T05:39:09.977Z"
+completedAt: "2026-10-15T05:45:26.469Z"
+endedAt: "2026-10-15T05:45:26.469Z"
+resolutionType: "code-change"
+resolutionDetail: "task-lookup.ts imports via rex-gateway; domain-isolation gateway rule now flags dynamic import() of the guarded package."
 acceptanceCriteria:
   - "task-lookup.ts has no import of \"@n-dx/rex\", static or dynamic"
   - "A policy test fails on a dynamic import(\"@n-dx/rex\") in hench outside src/prd/rex-gateway.ts"
 description: "Found by the adversarial review of bf377f39 (run 03cb3ce3). Verdict: out-of-scope. The defect predates that change.\n\npackages/hench/src/cli/commands/task-lookup.ts:14 and :45 use `await import(\"@n-dx/rex\")` for resolveStore and findItem. Every hench runtime import from rex is meant to go through packages/hench/src/prd/rex-gateway.ts. domain-isolation.test.js does not catch dynamic imports, so the bypass is invisible to the policy tests. Nothing fails today, but a rex API change would break these lookups outside the gateway's contract test.\n\nOption (recommended): import resolveStore and findItem from ../../prd/rex-gateway.js. Both are already re-exported, so the fix is about two lines and low risk. Optionally, extend domain-isolation to flag dynamic `import(\"@n-dx/rex\")` outside the gateway.\n\nOperator notes (2026-10-14): Hal's draft #742 also edits packages/hench/src/agent/lifecycle/shared.ts, cli-loop.ts, loop.ts and run.ts; keep the diff in those files narrow. Keep hench's rex imports in src/prd/rex-gateway.ts; a new gateway export goes into GATEWAY_FUNCTIONS in tests/integration/cross-package-contracts.test.js and the cap in tests/e2e/architecture-policy.test.js. Add a changeset (patch, @n-dx/hench). Run the six static root policy tests before finishing: tests/e2e/architecture-policy, domain-isolation, shell-spawn-inventory-policy, wall-clock-inventory-policy, layout-literal-policy and obfuscated-code-policy."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-15T05:30:39.714Z"
+lastModified: "2026-10-15T05:45:27.526Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
