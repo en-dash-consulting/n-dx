@@ -2,7 +2,7 @@
 id: "3e7f093b-4ca3-42cf-8dab-3c7803698480"
 level: "task"
 title: "A failed Product refetch replaces the loaded map and an open capability page with an error"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "ndx-adversarial-review"
@@ -12,6 +12,11 @@ tags:
   - "review-2026-10-12"
   - "v2-hardening"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-15T07:20:49.741Z"
+completedAt: "2026-10-15T07:26:58.233Z"
+endedAt: "2026-10-15T07:26:58.233Z"
+resolutionType: "code-change"
+resolutionDetail: "useProductRead keeps ready data on a failed refetch and sets refreshError; pages show a StaleNotice. parseAnswerRefinements takes {changeLayer}; the Ask route passes it. Commit 81bac3da4."
 acceptanceCriteria:
   - "After a successful load, a refetch answering 500 keeps the previously rendered Product map on screen (viewer test)"
   - "With a capability page open, a failed map refetch leaves the capability page and its Back button rendered (viewer test)"
@@ -21,6 +26,6 @@ acceptanceCriteria:
   - "v1 parse-time merge proposals are unchanged; existing prd-refinement tests pass unedited (folded in from 4965aeda)"
 description: "Verdict: should-fix (adversarial review of 54cc1a166, run 9842f0db). Scenario: on a v2 project the Product page is loaded and a capability page is open. A rex:prd-changed frame triggers a refetch of GET /api/rex/product (packages/web/src/viewer/views/product-pages.ts, useProductRead). If that refetch answers 500 (routes-rex/product.ts:351 returns errorResponse(500) when the model load throws, e.g. read mid-write) or the fetch rejects, setLoad({state:\"error\"}) replaces the ready data. ProductPage checks `load.state !== \"ready\"` before `capabilityId`, so the open capability page vanishes into an alert with no Back button, and the map stays replaced until the next frame or a reload. Before 54cc1a166 a page fetched only on mount, so a loaded page could not regress to an error. Reachable whenever a refetch fails after a v2 write; how often a read hits a half-written tree is unverified. Options: (a) on a refetch (revision > 0) failure, keep the last ready data and surface the error inline, e.g. a small stale notice (small; recommended); (b) only move ProductPage's capabilityId check ahead of the map's load state (smaller, fixes only the lost-capability half).\n\nFolded in on 2026-10-13: 4965aeda (The Ask panel proposes v2 merges that the v1 rule allows and the v2 rule then refuses at apply) covered the same surface and was carried here with its acceptance criteria.\n\nOperator notes (2026-10-14, v2 hardening 4/5): packages/web only, except the criteria's tests. Hal's draft #742 edits packages/web/src/server/routes-live*.ts, routes-worktrees.ts, the hub proxy and the Live viewer files; stay out of them. Do not edit packages/rex/tests/unit/schema/v2.test.ts. Add a changeset (patch, @n-dx/web). Run the six static root policy tests before finishing: tests/e2e/architecture-policy, domain-isolation, shell-spawn-inventory-policy, wall-clock-inventory-policy, layout-literal-policy and obfuscated-code-policy."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-15T07:00:46.751Z"
+lastModified: "2026-10-15T07:26:59.150Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
