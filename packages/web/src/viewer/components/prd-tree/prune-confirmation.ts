@@ -16,6 +16,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback } from "preact/hooks";
 import { itemTypeLabel, itemTypePlural } from "../../external.js";
 import { PruneDiffTree } from "./prune-diff-tree.js";
@@ -244,7 +245,7 @@ export function PruneConfirmation({ onPruneComplete, onCancel }: PruneConfirmati
         title: "Cancel",
         "aria-label": "Cancel prune",
         disabled: pruning,
-      }, "\u00d7"),
+      }, h(ActionIcon, { name: "close" })),
     );
 
   // ── Render: Loading ────────────────────────────────────────────────

@@ -8,6 +8,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import type { MemoryLevel, DegradableFeature } from "../performance/index.js";
 
 export interface DegradationBannerProps {
@@ -92,7 +93,7 @@ export function DegradationBanner({
           "aria-label": "Dismiss degradation notice",
           type: "button",
         },
-        "\u2715"
+        h(ActionIcon, { name: "close" })
       ),
     ),
   );

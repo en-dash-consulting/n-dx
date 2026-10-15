@@ -8,6 +8,7 @@
  */
 
 import { h, Fragment } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import { useState, useEffect } from "preact/hooks";
 import type { ViewId } from "../api.js";
 import { viewLabel } from "../api.js";
@@ -191,7 +192,7 @@ export function Guide({ view }: GuideProps) {
           h("div", { class: "guide-modal", onClick: (e: Event) => e.stopPropagation() },
             h("div", { class: "guide-header" },
               h("h2", null, title),
-              h("button", { class: "guide-close", onClick: () => setOpen(false), "aria-label": "Close guide" }, "\u2715"),
+              h("button", { class: "guide-close", onClick: () => setOpen(false), "aria-label": "Close guide" }, h(ActionIcon, { name: "close" })),
             ),
             h("div", { class: "guide-body" },
               h("section", null,

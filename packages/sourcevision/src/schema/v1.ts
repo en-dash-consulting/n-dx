@@ -576,8 +576,13 @@ export interface PartitionHealth {
 export interface PartitionReview {
   /** `inputFingerprint` the review was made for. */
   fingerprint: string;
-  /** Health of the partition that was reviewed (the previous one). */
+  /**
+   * Health of the partition that was reviewed: the previous one, or — when
+   * `initial` — the one this run produced, there being no previous one.
+   */
   health: PartitionHealth;
+  /** True when there was no previous partition to review (first run, or a zone algorithm change). */
+  initial?: boolean;
   /** True when the reviewed partition was discarded and re-derived without stability bias. */
   rejected: boolean;
   /** Jev's probability that the map is sensible, when it was asked. */

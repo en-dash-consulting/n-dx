@@ -12,6 +12,7 @@
  */
 
 import { h, Fragment } from "preact";
+import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback, useRef } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
@@ -600,7 +601,7 @@ export function BatchItemRow({ item, onUpdate, onRemove }: BatchItemRowProps) {
         type: "button",
         title: "Remove item",
         "aria-label": "Remove item",
-      }, "\u2715"),
+      }, h(ActionIcon, { name: "close" })),
     ),
 
     // Editable content for text entries

@@ -39,13 +39,27 @@ describe("assessPartitionHealth", () => {
   });
 
   it("is borderline when a zone is oversized without a balanced subdivision, at any zone count", () => {
-    const big = makeZone("core", Array.from({ length: 60 }, (_, i) => `src/core/f${i}.ts`));
+    // 10 of 22 files: oversized (over 30%) but not dominant (over 50%).
+    const big = makeZone("core", Array.from({ length: 10 }, (_, i) => `src/core/f${i}.ts`));
     const zones = [big, ...zonesOf(3, 0)];
     const h = assessPartitionHealth(zones);
     expect(h.verdict).toBe("borderline");
     expect(h.reasons?.join(" ")).toContain("over 30%");
-    const split = { ...big, subZones: [makeZone("core/a", big.files.slice(0, 30)), makeZone("core/b", big.files.slice(30))] };
+    const split = { ...big, subZones: [makeZone("core/a", big.files.slice(0, 5)), makeZone("core/b", big.files.slice(5))] };
     expect(assessPartitionHealth([split, ...zonesOf(3, 0)]).verdict).toBe("healthy");
+  });
+
+  it("reports a zone holding most of the files even when its sub-zones are balanced", () => {
+    const big = makeZone("core", Array.from({ length: 76 }, (_, i) => `src/core/f${i}.ts`));
+    const split = {
+      ...big,
+      subZones: [0, 1, 2, 3].map((k) => makeZone(`core/s${k}`, big.files.slice(k * 19, (k + 1) * 19))),
+    };
+    const rest = Array.from({ length: 6 }, (_, i) => makeZone(`z${i}`, Array.from({ length: 4 }, (_, j) => `src/z${i}/f${j}.ts`)));
+    const h = assessPartitionHealth([split, ...rest]);
+    expect(h.verdict).toBe("borderline");
+    expect(h.largestShare).toBe(0.76);
+    expect(h.reasons).toEqual(["zone core holds 76% of files"]);
   });
 
   it("is borderline when a quarter of ids carry a numeric suffix", () => {
@@ -118,6 +132,17 @@ describe("formatPartitionLine", () => {
     expect(formatPartitionLine({ fingerprint: "f", rejected: false, health: assessPartitionHealth(zonesOf(10, 0)) })).toBeUndefined();
   });
 
+  it("reports an unhealthy first partition", () => {
+    const big = makeZone("core", Array.from({ length: 30 }, (_, i) => `src/core/f${i}.ts`));
+    const line = formatPartitionLine({
+      fingerprint: "f",
+      rejected: false,
+      initial: true,
+      health: assessPartitionHealth([big, ...zonesOf(2, 0)]),
+    });
+    expect(line).toBe("  [partition] new partition is borderline (zone core holds 79% of files)");
+  });
+
   it("names the reason and the result of a re-partition", () => {
     const line = formatPartitionLine({
       fingerprint: "f",
@@ -154,6 +179,19 @@ describe("analyzeZones partition review", () => {
     }
     return { ...fresh, zones: shards, structureHash: computeStructureHash(shards), partitionReview: undefined };
   }
+
+  it("assesses the partition a first run produces", async () => {
+    startRunLedger("fast");
+    const result = await analyzeZones(inventory, imports, { enrich: false });
+    expect(result.zones.partitionReview).toMatchObject({
+      initial: true,
+      rejected: false,
+      fingerprint: result.zones.inputFingerprint,
+      health: { verdict: "healthy", smallZones: 0 },
+    });
+    expect(snapshotRunLedger().partition).toMatchObject({ initial: true, reused: false });
+    expect(validateModule("zones", result.zones).ok).toBe(true);
+  });
 
   it("re-partitions a fragmented previous partition even when inputs are unchanged", async () => {
     const previousZones = await fragmentedPrevious();
