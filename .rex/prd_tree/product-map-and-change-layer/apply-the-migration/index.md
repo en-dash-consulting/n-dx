@@ -42,10 +42,11 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Chain layout and schema steps in ndx migrate; v1 PRDs warn now and are refused one release later](./chain-layout-and-schema-steps-in-ndx.md) | completed |
 | [Convert stray v1 files and warn on unreachable apply commits](./convert-stray-v1-files-and-warn-on.md) | pending |
 | [Dissolved containers keep their description, criteria and blockedBy](./dissolved-containers-keep-their.md) | pending |
+| [Docs say ndx init creates v1 projects; it now creates v2](./docs-say-ndx-init-creates-v1-projects.md) | pending |
 | [Migrated product nodes read met when their v1 item completed](./migrated-product-nodes-read-met-when.md) | completed |
 | [Migration plan, dry run and apply refuse when the v1 parser skipped an item file](./migration-plan-dry-run-and-apply.md) | pending |
 | [ndx commands that spawn rex several times print the v1 deprecation notice once per spawn](./ndx-commands-that-spawn-rex-several.md) | completed |
-| [ndx init scaffolds a v2 project (product/index.md, never prd_tree/)](./ndx-init-scaffolds-a-v2-project.md) | pending |
+| [ndx init scaffolds a v2 project (product/index.md, never prd_tree/)](./ndx-init-scaffolds-a-v2-project.md) | in_progress |
 | [ndx migrate --apply --dry-run says what moves and what is dropped](./ndx-migrate-apply-dry-run-says-what.md) | completed |
 | [ndx migrate --plan has no automated test of its spawn path](./ndx-migrate-plan-has-no-automated-test.md) | completed |
 | [ndx migrate --plan shows the preflight banner and an honest run summary, and llm.routes can turn Jev off](./ndx-migrate-plan-shows-the-preflight.md) | pending |
@@ -64,3 +65,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | completed |
 | [Wire migrate apply onto #715's migrate-plan and #716's Inbox writer](./wire-migrate-apply-onto-715-s-migrate.md) | completed |
 | [Wire the migrate chain and the once-per-command v1 notice onto main's ndx migrate](./wire-the-migrate-chain-and-the-once.md) | completed |
+| [ndx install-sample writes a v1 prd_tree/ beside a fresh v2 product/](./ndx-install-sample-writes-a-v1-prd.md) | pending |

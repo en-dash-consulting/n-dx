@@ -39,6 +39,14 @@ delete process.env.CLAUDE_CONFIG_DIR;
 // the refusal set the variable on the spawn (tests/e2e/cli-agent-run-env.test.js).
 delete process.env.NDX_AGENT_RUN;
 
+// `rex init` (and so `ndx init`) gives a new project an empty v2 tree. Most
+// fixtures init a project and then build a v1 PRD on it with `rex add epic`,
+// so the suites keep v1 as their init default. Tests of the v2 default delete
+// it from their spawn env (packages/rex/tests/e2e/cli-init.test.ts,
+// tests/e2e/cli-init.test.js). See INIT_LAYOUT_ENV in
+// packages/rex/src/cli/commands/init.ts.
+process.env.NDX_INIT_LAYOUT = "v1";
+
 // ---------------------------------------------------------------------------
 // One git config for every fixture repository
 // ---------------------------------------------------------------------------
