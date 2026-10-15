@@ -335,21 +335,14 @@ describe("rendered surfaces take their labels from the model", () => {
       });
       await settle();
       for (const tile of (STAGES[stage].tiles ?? []).filter((t) => t.tabs?.length)) {
-        // Expand it only if it is collapsed: a tile remembers its state in
-        // localStorage, which is not reset between cases.
-        const toggle = root.querySelector<HTMLButtonElement>(
-          `.stage-tile[data-tile="${tile.view}"] .stage-tile-toggle`,
-        );
-        if (toggle?.getAttribute("aria-expanded") !== "true") {
-          act(() => { toggle?.click(); });
-          await settle();
-        }
-        const tabButtons = [...root.querySelectorAll<HTMLButtonElement>(
-          `.stage-tile[data-tile="${tile.view}"] .stage-section-tab`,
-        )];
+        // Tabs live in the full-screen view; open it, read them, close it.
+        act(() => { root.querySelector<HTMLButtonElement>(`.stage-tile[data-tile="${tile.view}"] .stage-tile-head`)?.click(); });
+        await settle();
+        const tabButtons = [...root.querySelectorAll<HTMLButtonElement>(".stage-tile-fullscreen .stage-section-tab")];
+        act(() => { root.querySelector<HTMLButtonElement>(".stage-tile-fullscreen .stage-tile-icon-btn")?.click(); });
         const expectedViews = [tile.view, ...tile.tabs!.map((t) => t.view)];
-        // A collapsed tile renders no tabs, so this comparison also fails
-        // loudly rather than passing having checked nothing.
+        // A tile that did not open renders no tabs, so this comparison also
+        // fails loudly rather than passing having checked nothing.
         if (tabButtons.map((b) => b.textContent).join("|") !== expectedViews.map((v) => viewLabel(v)).join("|")) {
           wrong.push(`${stage}/${tile.view}: tabs ${tabButtons.map((b) => b.textContent).join(", ")}`);
         }
@@ -422,18 +415,20 @@ describe("the Analysis stage is a tile dashboard", () => {
   it("leads with Overview and lays every SourceVision view out as tiles", () => {
     expect(STAGES.analyze.sections.map((s) => s.view)).toEqual(["overview"]);
     expect(tiles.map((t) => t.panel ?? t.view)).toEqual([
-      "map", "next-steps", "problems", "suggestions", "zones", "files",
-      "architecture", "languages", "pr-markdown", "ask",
+      "map", "health", "next-steps", "problems", "suggestions", "zones",
+      "architecture", "files", "languages", "pr-markdown", "ask",
     ]);
     expect(placed).toEqual([
-      "iso-map", "problems", "suggestions", "zones", "files",
-      "architecture", "routes", "pr-markdown", "ask",
+      "iso-map", "problems", "suggestions", "zones",
+      "architecture", "routes", "files", "pr-markdown", "ask",
     ]);
   });
 
-  it("makes the codebase map a chromeless hero, dropped in a static export", () => {
+  it("puts the codebase map in the top rows, two thirds wide, chromeless, dropped in a static export", () => {
     const map = tiles[0]!;
-    expect(map).toMatchObject({ view: "iso-map", panel: "map", size: "hero", chromeless: true, hiddenWhenDeployed: true });
+    expect(map).toMatchObject({ view: "iso-map", panel: "map", cols: 8, rows: 3, chromeless: true, hiddenWhenDeployed: true });
+    // The column beside it holds health and next steps, three rows together.
+    expect(tiles.slice(1, 3).map((t) => [t.panel, t.cols ?? 4, t.rows ?? 1])).toEqual([["health", 4, 1], ["next-steps", 4, 2]]);
   });
 
   it("drops the flat repository map from the page but keeps it in the stage", () => {

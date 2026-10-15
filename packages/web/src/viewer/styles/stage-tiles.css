@@ -1,59 +1,81 @@
 /* Stage tile grid (views/stage-tiles.ts).
  *
- * Collapsed tiles share a row, each a fixed-height card showing its summary;
- * `hero`, `wide` and expanded tiles take the full row. The full-screen layer
- * sits between the top nav and the bottom bar, like the Commands sheet. */
+ * Twelve columns, rows of one fixed height. Tiles span cols × rows of it;
+ * dense packing fills the column beside a tall tile. Content that outgrows
+ * its tile fades out at the bottom — the whole view is one click away,
+ * full-screen. The full-screen layer sits between the top nav and the bottom
+ * bar, like the Commands sheet. */
 
 .stage-tiles {
+  --tile-row: 232px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: var(--tile-row);
+  grid-auto-flow: row dense;
   gap: var(--space-4);
-  align-items: start;
 }
 
 .stage-tile {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
   overflow: hidden;
 }
 
-.stage-tile--hero,
-.stage-tile--wide,
-.stage-tile--expanded {
-  grid-column: 1 / -1;
+.stage-tile--c4 { grid-column: span 4; }
+.stage-tile--c6 { grid-column: span 6; }
+.stage-tile--c8 { grid-column: span 8; }
+.stage-tile--c12 { grid-column: span 12; }
+.stage-tile--r1 { grid-row: span 1; }
+.stage-tile--r2 { grid-row: span 2; }
+.stage-tile--r3 { grid-row: span 3; }
+
+/* Two tiles a row on mid widths; the map takes the full row. */
+@media (max-width: 1180px) {
+  .stage-tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .stage-tile--c4, .stage-tile--c6 { grid-column: span 3; }
+  .stage-tile--c8, .stage-tile--c12 { grid-column: span 6; }
 }
 
-.stage-tile--expanded {
-  border-color: var(--border-strong, var(--border));
+/* One column on phones; the map keeps a usable height. */
+@media (max-width: 700px) {
+  .stage-tiles { grid-template-columns: minmax(0, 1fr); }
+  .stage-tile--c4, .stage-tile--c6, .stage-tile--c8, .stage-tile--c12 { grid-column: auto; }
+  .stage-tile--r3 { grid-row: span 2; }
 }
 
-/* The codebase map draws its own card, header and full-screen. */
+/* The codebase map draws its own card, header and full-screen, and fills
+   its cell. */
 .stage-tile--chromeless {
   border: none;
   background: none;
-  overflow: visible;
 }
 
-.stage-tile-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-2) var(--space-2) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.stage-tile-toggle {
+.stage-tile--chromeless > .iso-hero {
   flex: 1;
-  min-width: 0;
+  min-height: 0;
+}
+
+.stage-tile--chromeless .iso-hero-stage {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+/* The whole header opens the tile full-screen. */
+.stage-tile-head {
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  flex-shrink: 0;
+  width: 100%;
+  padding: var(--space-3) var(--space-4) var(--space-2-5);
   border: none;
+  border-bottom: 1px solid var(--border);
   background: none;
   color: var(--text);
   font: inherit;
@@ -61,10 +83,13 @@
   cursor: pointer;
 }
 
-.stage-tile-toggle:focus-visible {
+.stage-tile-head:hover {
+  background: var(--bg-hover);
+}
+
+.stage-tile-head:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
-  border-radius: var(--radius-md, 6px);
 }
 
 .stage-tile-glyph {
@@ -82,6 +107,7 @@
 }
 
 .stage-tile-blurb {
+  flex: 1;
   min-width: 0;
   font-size: 12px;
   color: var(--text-muted, var(--text-dim));
@@ -90,11 +116,43 @@
   white-space: nowrap;
 }
 
-.stage-tile-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-shrink: 0;
+.stage-tile-open {
+  margin-left: auto;
+  align-self: center;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.stage-tile-head:hover .stage-tile-open,
+.stage-tile-head:focus-visible .stage-tile-open {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.stage-tile-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--space-3) var(--space-4);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+
+/* A view in a tile is a preview: not interactive until opened. */
+.stage-tile-body--view {
+  pointer-events: none;
+}
+
+.stage-tile-tablist {
+  margin-bottom: var(--space-3);
+}
+
+/* The views' own page headers repeat the tile title. */
+.stage-tile .view-header,
+.stage-tile-fullscreen .view-header {
+  display: none;
 }
 
 .stage-tile-btn {
@@ -129,31 +187,28 @@
   outline-offset: 1px;
 }
 
-.stage-tile-body {
-  min-width: 0;
-  padding: var(--space-3) var(--space-4);
+/* ── Codebase health tile: Overview's stat row, compacted ── */
+
+.stage-tile .overview-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
 }
 
-/* A collapsed tile with no summary shows the view itself, cut to the tile. */
-.stage-tile-body--clip {
-  height: 280px;
-  overflow: hidden;
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
+.stage-tile .overview-stat {
+  padding: var(--space-2);
+  gap: var(--space-1);
+  box-shadow: none;
 }
 
-.stage-tile-summary {
-  min-height: 120px;
-}
-
-.stage-tile-tablist {
-  margin-bottom: var(--space-3);
-}
-
-/* The views' own page headers repeat the tile title. */
-.stage-tile .view-header,
-.stage-tile-fullscreen .view-header {
+.stage-tile .overview-stat-glyph,
+.stage-tile .overview-stat-sub,
+.stage-tile .overview-stat--signals {
   display: none;
+}
+
+.stage-tile .overview-stat-value {
+  font-size: 20px;
 }
 
 /* ── Full-screen ── */
@@ -163,24 +218,24 @@
   inset: var(--topnav-h) 0 var(--bottombar-h) 0;
   z-index: 60;
   display: flex;
+  flex-direction: column;
   background: var(--bg);
 }
 
-.stage-tile-fullscreen-main {
-  flex: 1;
-  min-width: 0;
+.stage-tile-fullscreen-head {
   display: flex;
-  flex-direction: column;
-}
-
-.stage-tile-fullscreen .stage-tile-head {
-  padding-left: var(--space-4);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
   background: var(--bg-surface);
 }
 
-.stage-tile-fullscreen .stage-tile-title {
+.stage-tile-fullscreen-title {
   flex: 1;
+  margin: 0;
   font-size: 16px;
+  font-weight: 600;
 }
 
 .stage-tile-fullscreen-body {
@@ -200,6 +255,36 @@
   .stage-tile-fullscreen--beside-detail {
     right: 0;
   }
+}
+
+.stage-tile-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* Overview pieces inside a tile: the tile is the card. */
+.stage-tile .overview-section::after {
+  content: none;
+}
+
+.overview-next-steps--embedded {
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+.overview-next-steps--embedded .next-steps-summary {
+  padding: 0 0 var(--space-3);
+  cursor: default;
+}
+
+.overview-next-steps--embedded .next-steps-list,
+.overview-next-steps--embedded .next-steps-footer {
+  padding: 0;
 }
 
 /* ── Tile summaries (views/tile-summaries.ts) ── */
@@ -320,10 +405,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Next steps while collapsed: titles only, top three. */
-.stage-tile:not(.stage-tile--expanded) .overview-next-steps--embedded .next-step-desc,
-.stage-tile:not(.stage-tile--expanded) .overview-next-steps--embedded .next-steps-footer,
-.stage-tile:not(.stage-tile--expanded) .overview-next-steps--embedded .next-step-item:nth-child(n+4) {
+/* Next steps in a tile: titles only. */
+.stage-tile .overview-next-steps--embedded .next-step-desc,
+.stage-tile .overview-next-steps--embedded .next-steps-footer {
   display: none;
 }
 

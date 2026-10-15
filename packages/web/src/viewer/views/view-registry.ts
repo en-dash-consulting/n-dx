@@ -22,6 +22,7 @@ import type { JobTray } from "../hooks/index.js";
 
 import {
   Overview,
+  CodebaseStats,
   MapPanel,
   LanguagesPanel,
   NextStepsPanel,
@@ -145,6 +146,7 @@ function stage(id: StageId): ViewRenderer {
 function renderPanel(panel: StagePanelId, ctx: ViewRenderContext): ComponentChild {
   switch (panel) {
     case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo });
+    case "health": return h(CodebaseStats, { data: ctx.data });
     case "next-steps": return h(NextStepsPanel, { embedded: true });
     case "languages": return h(LanguagesPanel, { data: ctx.data });
   }

@@ -143,12 +143,10 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
    * run, leaving nothing to assert on: the tab assertions below ran zero
    * times and still reported green until this read the state first.
    */
+  /** Open a tile full-screen, where its tabs are. */
   function openTile(key: string): void {
-    const toggle = root.querySelector<HTMLButtonElement>(
-      `.stage-tile[data-tile="${key}"] .stage-tile-toggle`,
-    );
-    if (toggle?.getAttribute("aria-expanded") === "true") return;
-    act(() => { toggle?.click(); });
+    const head = root.querySelector<HTMLButtonElement>(`.stage-tile[data-tile="${key}"] .stage-tile-head`);
+    act(() => { head?.click(); });
   }
 
   function openSection(view: string): void {
@@ -248,9 +246,7 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
           }));
           for (const tile of (STAGES[stage].tiles ?? []).filter((t) => t.tabs?.length)) {
             openTile(tile.view);
-            const tabs = [...root.querySelectorAll(
-              `.stage-tile[data-tile="${tile.view}"] [role="tab"]`,
-            )];
+            const tabs = [...root.querySelectorAll(".stage-tile-fullscreen [role=\"tab\"]")];
             expect(tabs, `${tile.view} rendered no tabs`).toHaveLength(tile.tabs!.length + 1);
             for (const tab of tabs) {
               const view = tab.getAttribute("data-tab")!;

@@ -264,9 +264,10 @@ interface OverviewProps {
   /** Shared job tray — AnalyzeControls starts and reads the full run there. */
   jobs: JobTray;
   /**
-   * `lead`: only the analysis line, its controls and the stats strip — the
-   * Analyze dashboard's lead, whose map, Next steps and Languages are tiles
-   * of their own (MapPanel, NextStepsPanel, LanguagesPanel). Default `full`.
+   * `lead`: only the analysis line and its controls — the Analyze
+   * dashboard's lead, whose map, health, Next steps and Languages are tiles
+   * of their own (MapPanel, CodebaseStats, NextStepsPanel, LanguagesPanel).
+   * Default `full`.
    */
   variant?: "full" | "lead";
 }
@@ -332,56 +333,7 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
   const showGettingStarted = manifest && (!hasImports || !hasZones);
 
   // Calculate overall health metrics
-  const healthMetrics = useMemo(() => {
-    if (!zones) return null;
-
-    const avgCohesion = zones.zones.length > 0
-      ? zones.zones.reduce((s, z) => s + z.cohesion, 0) / zones.zones.length
-      : 0;
-
-    const avgCoupling = zones.zones.length > 0
-      ? zones.zones.reduce((s, z) => s + z.coupling, 0) / zones.zones.length
-      : 0;
-
-    // Count patterns and antipatterns from findings
-    const patterns: string[] = [];
-    const antipatterns: string[] = [];
-
-    // High cohesion zones
-    const highCohesionZones = zones.zones.filter(z => z.cohesion >= 0.8);
-    if (highCohesionZones.length > zones.zones.length / 2) {
-      patterns.push("Well-structured modules");
-    }
-
-    // Low coupling zones
-    const lowCouplingZones = zones.zones.filter(z => z.coupling <= 0.3);
-    if (lowCouplingZones.length > zones.zones.length / 2) {
-      patterns.push("Clean boundaries");
-    }
-
-    // Check for circular deps
-    if (imports && imports.summary.circularCount > 0) {
-      antipatterns.push(`${imports.summary.circularCount} circular deps`);
-    }
-
-    // Hub files (too many importers)
-    if (imports && imports.summary.mostImported.length > 0) {
-      const hubs = imports.summary.mostImported.filter(f => f.count > 10);
-      if (hubs.length > 0) {
-        antipatterns.push(`${hubs.length} hub file${hubs.length > 1 ? "s" : ""}`);
-      }
-    }
-
-    // Bidirectional coupling from findings
-    const bidirectionalFindings = (zones.findings ?? []).filter(
-      f => f.text.includes("Bidirectional")
-    );
-    if (bidirectionalFindings.length > 0) {
-      antipatterns.push(`${bidirectionalFindings.length} bidirectional couplings`);
-    }
-
-    return { avgCohesion, avgCoupling, patterns, antipatterns };
-  }, [zones, imports]);
+  const healthMetrics = useMemo(() => computeHealthMetrics(zones, imports), [zones, imports]);
 
   // Top zones by size
   const topZones = useMemo(() => {
@@ -473,70 +425,7 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
       : null,
 
     // Headline numbers and architecture health, as one row of tiles.
-    h("div", { class: "overview-stats", role: "list", "aria-label": "Codebase summary" },
-      inventory
-        ? h(StatTile, {
-            glyph: "▤",
-            label: "Files",
-            value: inventory.summary.totalFiles.toLocaleString(),
-            sub: `${Math.round(inventory.summary.totalLines / 1000).toLocaleString()}k lines`,
-          })
-        : null,
-      zones
-        ? h(StatTile, {
-            glyph: "◇",
-            label: "Zones",
-            value: String(zones.zones.length),
-            sub: attentionCount > 0 ? `${attentionCount} need attention` : "all healthy",
-            tone: attentionCount > 0 ? "var(--orange)" : undefined,
-            info: h(InfoTip, { term: "zone", label: "zones" }),
-          })
-        : null,
-      imports
-        ? h(StatTile, {
-            glyph: "⟲",
-            label: "Circular deps",
-            value: String(imports.summary.circularCount),
-            sub: imports.summary.circularCount > 0 ? "cycles to break" : "no import cycles",
-            tone: imports.summary.circularCount > 0 ? "var(--orange)" : "var(--green)",
-          })
-        : null,
-      healthMetrics && zones
-        ? h(StatTile, {
-            glyph: "◉",
-            label: "Avg cohesion",
-            value: healthMetrics.avgCohesion.toFixed(2),
-            sub: "higher is better",
-            tone: healthColor(healthMetrics.avgCohesion),
-            meter: healthMetrics.avgCohesion,
-            info: h(InfoTip, { term: "cohesion" }),
-          })
-        : null,
-      healthMetrics && zones
-        ? h(StatTile, {
-            glyph: "⇄",
-            label: "Avg coupling",
-            value: healthMetrics.avgCoupling.toFixed(2),
-            sub: "lower is better",
-            tone: healthColor(1 - healthMetrics.avgCoupling),
-            meter: healthMetrics.avgCoupling,
-            info: h(InfoTip, { term: "coupling" }),
-          })
-        : null,
-      healthMetrics && (healthMetrics.patterns.length > 0 || healthMetrics.antipatterns.length > 0)
-        ? h("div", { class: "overview-stat overview-stat--signals", role: "listitem" },
-            h("span", { class: "overview-stat-label" }, "Signals"),
-            h("div", { class: "pattern-list" },
-              healthMetrics.patterns.map(p =>
-                h(PatternBadge, { key: p, type: "pattern", label: p })
-              ),
-              healthMetrics.antipatterns.map(p =>
-                h(PatternBadge, { key: p, type: "antipattern", label: p })
-              ),
-            ),
-          )
-        : null,
-    ),
+    lead ? null : h(CodebaseStats, { data }),
 
     // Prioritized recommendations (hidden until analysis data exists)
     lead ? null : h(NextStepsPanel, null),
@@ -671,4 +560,129 @@ function languageChartData(data: LoadedData): Array<{ label: string; value: numb
     .sort(([, a], [, b]) => b - a)
     .slice(0, 8)
     .map(([lang, count]) => ({ label: lang, value: count, color: LANG_COLORS[lang] || "var(--accent)" }));
+}
+
+/** Headline numbers and architecture health: Overview's stats row, and the dashboard's health tile. */
+export function CodebaseStats({ data }: { data: LoadedData }): ComponentChild {
+  const { inventory, imports, zones } = data;
+  const healthMetrics = useMemo(() => computeHealthMetrics(zones, imports), [zones, imports]);
+  const attentionCount = useMemo(
+    () => (zones ? zones.zones.filter((z) => z.cohesion < 0.4 || z.coupling > 0.5).length : 0),
+    [zones],
+  );
+  return h("div", { class: "overview-stats", role: "list", "aria-label": "Codebase summary" },
+      inventory
+        ? h(StatTile, {
+            glyph: "▤",
+            label: "Files",
+            value: inventory.summary.totalFiles.toLocaleString(),
+            sub: `${Math.round(inventory.summary.totalLines / 1000).toLocaleString()}k lines`,
+          })
+        : null,
+      zones
+        ? h(StatTile, {
+            glyph: "◇",
+            label: "Zones",
+            value: String(zones.zones.length),
+            sub: attentionCount > 0 ? `${attentionCount} need attention` : "all healthy",
+            tone: attentionCount > 0 ? "var(--orange)" : undefined,
+            info: h(InfoTip, { term: "zone", label: "zones" }),
+          })
+        : null,
+      imports
+        ? h(StatTile, {
+            glyph: "⟲",
+            label: "Circular deps",
+            value: String(imports.summary.circularCount),
+            sub: imports.summary.circularCount > 0 ? "cycles to break" : "no import cycles",
+            tone: imports.summary.circularCount > 0 ? "var(--orange)" : "var(--green)",
+          })
+        : null,
+      healthMetrics && zones
+        ? h(StatTile, {
+            glyph: "◉",
+            label: "Avg cohesion",
+            value: healthMetrics.avgCohesion.toFixed(2),
+            sub: "higher is better",
+            tone: healthColor(healthMetrics.avgCohesion),
+            meter: healthMetrics.avgCohesion,
+            info: h(InfoTip, { term: "cohesion" }),
+          })
+        : null,
+      healthMetrics && zones
+        ? h(StatTile, {
+            glyph: "⇄",
+            label: "Avg coupling",
+            value: healthMetrics.avgCoupling.toFixed(2),
+            sub: "lower is better",
+            tone: healthColor(1 - healthMetrics.avgCoupling),
+            meter: healthMetrics.avgCoupling,
+            info: h(InfoTip, { term: "coupling" }),
+          })
+        : null,
+      healthMetrics && (healthMetrics.patterns.length > 0 || healthMetrics.antipatterns.length > 0)
+        ? h("div", { class: "overview-stat overview-stat--signals", role: "listitem" },
+            h("span", { class: "overview-stat-label" }, "Signals"),
+            h("div", { class: "pattern-list" },
+              healthMetrics.patterns.map(p =>
+                h(PatternBadge, { key: p, type: "pattern", label: p })
+              ),
+              healthMetrics.antipatterns.map(p =>
+                h(PatternBadge, { key: p, type: "antipattern", label: p })
+              ),
+            ),
+          )
+        : null,
+    );
+}
+
+function computeHealthMetrics(zones: LoadedData["zones"], imports: LoadedData["imports"]) {
+    if (!zones) return null;
+
+    const avgCohesion = zones.zones.length > 0
+      ? zones.zones.reduce((s, z) => s + z.cohesion, 0) / zones.zones.length
+      : 0;
+
+    const avgCoupling = zones.zones.length > 0
+      ? zones.zones.reduce((s, z) => s + z.coupling, 0) / zones.zones.length
+      : 0;
+
+    // Count patterns and antipatterns from findings
+    const patterns: string[] = [];
+    const antipatterns: string[] = [];
+
+    // High cohesion zones
+    const highCohesionZones = zones.zones.filter(z => z.cohesion >= 0.8);
+    if (highCohesionZones.length > zones.zones.length / 2) {
+      patterns.push("Well-structured modules");
+    }
+
+    // Low coupling zones
+    const lowCouplingZones = zones.zones.filter(z => z.coupling <= 0.3);
+    if (lowCouplingZones.length > zones.zones.length / 2) {
+      patterns.push("Clean boundaries");
+    }
+
+    // Check for circular deps
+    if (imports && imports.summary.circularCount > 0) {
+      antipatterns.push(`${imports.summary.circularCount} circular deps`);
+    }
+
+    // Hub files (too many importers)
+    if (imports && imports.summary.mostImported.length > 0) {
+      const hubs = imports.summary.mostImported.filter(f => f.count > 10);
+      if (hubs.length > 0) {
+        antipatterns.push(`${hubs.length} hub file${hubs.length > 1 ? "s" : ""}`);
+      }
+    }
+
+    // Bidirectional coupling from findings
+    const bidirectionalFindings = (zones.findings ?? []).filter(
+      f => f.text.includes("Bidirectional")
+    );
+    if (bidirectionalFindings.length > 0) {
+      antipatterns.push(`${bidirectionalFindings.length} bidirectional couplings`);
+    }
+
+    return { avgCohesion, avgCoupling, patterns, antipatterns };
 }

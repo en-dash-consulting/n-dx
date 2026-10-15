@@ -77,10 +77,12 @@ export interface StageSection {
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "map" | "next-steps" | "languages";
+export type StagePanelId = "map" | "health" | "next-steps" | "languages";
 
-/** How much of the tile grid a tile spans: the full row (hero, wide) or one cell. */
-export type TileSize = "hero" | "wide" | "normal";
+/** Columns a tile spans on the 12-column dashboard grid. */
+export type TileCols = 4 | 6 | 8 | 12;
+/** Fixed-height grid rows a tile spans. */
+export type TileRows = 1 | 2 | 3;
 
 export interface StageTile {
   /**
@@ -94,13 +96,16 @@ export interface StageTile {
   title?: string;
   /**
    * The panel brings its own header, controls and full-screen (the codebase
-   * map), so the tile draws no header or border around it and cannot be
-   * expanded — the panel is its view's embedded form.
+   * map), so the tile draws no header or border around it and does not open
+   * full-screen itself — the panel is its view's embedded form.
    */
   chromeless?: boolean;
-  size?: TileSize;
+  /** Grid columns spanned, of 12 (default 4: three tiles a row). */
+  cols?: TileCols;
+  /** Grid rows spanned (default 1). Every row has the same fixed height. */
+  rows?: TileRows;
   /**
-   * Further views shown as tabs once the tile is expanded (Architecture's
+   * Further views shown as tabs once the tile is open full-screen (Architecture's
    * Routes). Each tab is still one view, reused unchanged, with its own route
    * and full page.
    */
@@ -141,19 +146,22 @@ export const STAGE_ORDER: readonly StageId[] = ["analyze", "plan", "work"];
 export const STAGES: Readonly<Record<StageId, StageDef>> = {
   analyze: {
     id: "analyze",
-    // A dashboard: the lead line and stats, then tiles.
+    // A dashboard: the analysis line and its controls, then tiles.
     sections: [{ view: "overview", plain: true }],
+    // The map takes the top-left two thirds across three rows; health and
+    // next steps fill the column beside it; the rest sit three to a row.
     tiles: [
-      { view: "iso-map", panel: "map", title: "Codebase map", size: "hero", chromeless: true, hiddenWhenDeployed: true },
-      { view: "suggestions", panel: "next-steps", title: "Next steps" },
+      { view: "iso-map", panel: "map", title: "Codebase map", cols: 8, rows: 3, chromeless: true, hiddenWhenDeployed: true },
+      { view: "overview", panel: "health", title: "Codebase health" },
+      { view: "suggestions", panel: "next-steps", title: "Next steps", rows: 2 },
       { view: "problems" },
       { view: "suggestions" },
       { view: "zones" },
-      { view: "files" },
       { view: "architecture", tabs: [{ view: "routes" }] },
+      { view: "files" },
       { view: "files", panel: "languages", title: "Languages" },
-      { view: "pr-markdown", featureGate: "sourcevision.prMarkdown" },
-      { view: "ask", featureGate: "sourcevision.ask", requiresServer: true },
+      { view: "pr-markdown", cols: 6, featureGate: "sourcevision.prMarkdown" },
+      { view: "ask", cols: 6, featureGate: "sourcevision.ask", requiresServer: true },
     ],
     alsoOwns: ["graph"],
   },

@@ -328,8 +328,8 @@ describe("StagePage", () => {
     await mount(page("analyze"));
     expect(sectionViews()).toEqual(["overview"]);
     const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
-    expect(tiles).toEqual(["map", "next-steps", "problems", "suggestions", "zones", "files", "architecture", "languages"]);
-    expect(root.querySelector('.stage-tile[data-tile="map"]')?.className).toContain("stage-tile--hero");
+    expect(tiles).toEqual(["map", "health", "next-steps", "problems", "suggestions", "zones", "architecture", "files", "languages"]);
+    expect(root.querySelector('.stage-tile[data-tile="map"]')?.className).toContain("stage-tile--c8 stage-tile--r3");
   });
 
   it("drops the codebase map tile in deployed mode", async () => {
@@ -343,19 +343,18 @@ describe("StagePage", () => {
     }
   });
 
-  it("shows Architecture and Routes as tabs of the expanded Architecture tile, moving with the arrow keys", async () => {
-    localStorage.setItem("ndx.stage-tiles", JSON.stringify({ "analyze:architecture": true }));
+  it("opens a tile full-screen with its tabs: Architecture and Routes", async () => {
     await mount(page("analyze"));
     const arch = root.querySelector('.stage-tile[data-tile="architecture"]')!;
     expect(arch.querySelector(".stage-tile-title")?.textContent).toBe("Architecture");
-    const tabs = Array.from(arch.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    // The preview shows the tile's own view, without tabs.
+    expect(arch.querySelector('[role="tab"]')).toBeNull();
+    act(() => { arch.querySelector<HTMLButtonElement>(".stage-tile-head")!.click(); });
+    const full = root.querySelector(".stage-tile-fullscreen")!;
+    const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
     expect(tabs.map((t) => t.textContent)).toEqual(["Architecture", "Routes"]);
     act(() => { tabs[1]!.click(); });
-    expect(arch.querySelector('[data-rendered="routes"]')).not.toBeNull();
-
-    act(() => { tabs[1]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true })); });
-    expect(tabs[0]!.getAttribute("aria-selected")).toBe("true");
-    expect(arch.querySelector('[data-rendered="architecture"]')).not.toBeNull();
+    expect(full.querySelector('[data-rendered="routes"]')).not.toBeNull();
   });
 
   it("renders the map tile as its panel alone, with no tile header", async () => {

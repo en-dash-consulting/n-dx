@@ -7,9 +7,9 @@ import type { StageTile } from "../../../src/viewer/views/stages.js";
 import type { ViewId } from "../../../src/viewer/types.js";
 
 const TILES: StageTile[] = [
-  { view: "iso-map", size: "hero" },
+  { view: "iso-map", panel: "map", title: "Codebase map", cols: 8, rows: 3, chromeless: true },
   { view: "problems" },
-  { view: "files" },
+  { view: "files", rows: 2 },
   { view: "architecture", tabs: [{ view: "routes" }] },
 ];
 
@@ -24,7 +24,7 @@ function mount(extra: Partial<Parameters<typeof TileGrid>[0]> = {}) {
       tabsOf: (t) => [{ view: t.view }, ...(t.tabs ?? [])],
       navigateTo,
       renderView: (v: ViewId) => h("div", { class: `view view-${v}` }, `view:${v}`),
-      renderPanel: () => null,
+      renderPanel: (p) => h("div", { class: `panel panel-${p}` }),
       renderSummary: (t) => (t.view === "problems" ? h("p", { class: "summary" }, "5 critical") : null),
       ...extra,
     }), root);
@@ -32,104 +32,89 @@ function mount(extra: Partial<Parameters<typeof TileGrid>[0]> = {}) {
 }
 
 const tile = (key: string) => root.querySelector<HTMLElement>(`[data-tile="${key}"]`)!;
-const toggle = (key: string) => tile(key).querySelector<HTMLButtonElement>(".stage-tile-toggle")!;
+const head = (key: string) => tile(key).querySelector<HTMLButtonElement>(".stage-tile-head")!;
+const dialog = () => root.querySelector<HTMLElement>(".stage-tile-fullscreen");
 
 beforeEach(() => {
-  localStorage.clear();
   root = document.createElement("div");
   document.body.appendChild(root);
+  navigateTo.mockReset();
 });
 
 afterEach(() => {
   render(null, root);
   root.remove();
-  vi.restoreAllMocks();
 });
 
 describe("TileGrid", () => {
-  it("lays tiles out by size and shows a summary where one exists, else the view", () => {
+  it("spans each tile over its columns and rows", () => {
     mount();
-    expect(tile("iso-map").className).toContain("stage-tile--hero");
-    expect(tile("problems").className).toContain("stage-tile--normal");
+    expect(tile("map").className).toContain("stage-tile--c8");
+    expect(tile("map").className).toContain("stage-tile--r3");
+    expect(tile("problems").className).toContain("stage-tile--c4 stage-tile--r1");
+    expect(tile("files").className).toContain("stage-tile--r2");
+  });
+
+  it("shows a summary where one exists, else the view as a preview", () => {
+    mount();
     expect(tile("problems").querySelector(".summary")?.textContent).toBe("5 critical");
     expect(tile("problems").querySelector(".view")).toBeNull();
-    expect(tile("files").querySelector(".view-files")).not.toBeNull();
-    expect(tile("files").querySelector(".stage-tile-body--clip")).not.toBeNull();
-    // The hero tile is never clipped.
-    expect(tile("iso-map").querySelector(".stage-tile-body--clip")).toBeNull();
+    expect(tile("files").querySelector(".stage-tile-body--view .view-files")).not.toBeNull();
   });
 
-  it("expands a tile in place to the full row showing the real view, and collapses it again", () => {
+  it("renders a chromeless tile as its panel alone, with no header to open it", () => {
     mount();
-    act(() => toggle("problems").click());
-    expect(toggle("problems").getAttribute("aria-expanded")).toBe("true");
-    expect(tile("problems").className).toContain("stage-tile--expanded");
-    expect(tile("problems").querySelector(".view-problems")).not.toBeNull();
-    expect(tile("problems").querySelector(".summary")).toBeNull();
-
-    act(() => toggle("problems").click());
-    expect(tile("problems").className).toContain("stage-tile--normal");
-    expect(tile("problems").querySelector(".summary")).not.toBeNull();
+    expect(tile("map").className).toContain("stage-tile--chromeless");
+    expect(tile("map").querySelector(".panel-map")).not.toBeNull();
+    expect(tile("map").querySelector(".stage-tile-head")).toBeNull();
   });
 
-  it("shows an expanded tile's extra views as tabs", () => {
+  it("opens a tile full-screen from its header — its one action — and closes with Esc, returning focus", () => {
     mount();
-    act(() => toggle("architecture").click());
-    const tabs = tile("architecture").querySelectorAll<HTMLButtonElement>("[role=tab]");
-    expect([...tabs].map((t) => t.textContent)).toHaveLength(2);
-    act(() => tabs[1]!.click());
-    expect(tile("architecture").querySelector(".view-routes")).not.toBeNull();
-  });
+    expect(head("problems").getAttribute("aria-label")).toBe("Open Problems full-screen");
+    // No separate expand or Open control on the tile itself.
+    expect(tile("problems").querySelectorAll("button")).toHaveLength(1);
 
-  it("remembers expanded tiles per stage across mounts", () => {
-    mount();
-    act(() => toggle("files").click());
-    render(null, root);
-    mount();
-    expect(toggle("files").getAttribute("aria-expanded")).toBe("true");
-    expect(toggle("problems").getAttribute("aria-expanded")).toBe("false");
-  });
-
-  it("still works when storage throws", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
-    mount();
-    act(() => toggle("files").click());
-    expect(toggle("files").getAttribute("aria-expanded")).toBe("true");
-  });
-
-  it("opens a tile full-screen, closes it with Esc, and returns focus to the opener", () => {
-    mount();
-    const opener = tile("problems").querySelector<HTMLButtonElement>('[aria-label="Open Problems full-screen"]')
-      ?? tile("problems").querySelector<HTMLButtonElement>(".stage-tile-icon-btn")!;
-    opener.focus();
-    act(() => opener.click());
-    const dialog = root.querySelector<HTMLElement>(".stage-tile-fullscreen")!;
-    expect(dialog.getAttribute("role")).toBe("dialog");
-    expect(dialog.querySelector(".view-problems")).not.toBeNull();
-    expect(document.activeElement?.getAttribute("aria-label")).toContain("Close full-screen");
+    head("problems").focus();
+    act(() => head("problems").click());
+    expect(dialog()?.getAttribute("role")).toBe("dialog");
+    expect(dialog()!.querySelector(".view-problems")).not.toBeNull();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Close full-screen Problems");
 
     act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
-    expect(root.querySelector(".stage-tile-fullscreen")).toBeNull();
-    expect(document.activeElement).toBe(opener);
+    expect(dialog()).toBeNull();
+    expect(document.activeElement).toBe(head("problems"));
+  });
+
+  it("goes to the view's own page from Open ↗ in the full-screen header", () => {
+    mount();
+    act(() => head("files").click());
+    const open = [...dialog()!.querySelectorAll<HTMLButtonElement>(".stage-tile-btn")].find((b) => b.textContent === "Open ↗")!;
+    act(() => open.click());
+    expect(navigateTo).toHaveBeenCalledWith("files");
+    expect(dialog()).toBeNull();
+  });
+
+  it("shows a tile's extra views as tabs full-screen, moving with the arrow keys", () => {
+    mount();
+    act(() => head("architecture").click());
+    const tabs = [...dialog()!.querySelectorAll<HTMLButtonElement>("[role=tab]")];
+    expect(tabs.map((t) => t.textContent)).toHaveLength(2);
+    act(() => tabs[1]!.click());
+    expect(dialog()!.querySelector(".view-routes")).not.toBeNull();
+    act(() => { tabs[1]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true })); });
+    expect(tabs[0]!.getAttribute("aria-selected")).toBe("true");
   });
 
   it("leaves room for the open detail panel when full-screen", () => {
     mount({ besideDetail: true });
-    act(() => tile("files").querySelector<HTMLButtonElement>(".stage-tile-icon-btn")!.click());
-    expect(root.querySelector(".stage-tile-fullscreen")!.className).toContain("stage-tile-fullscreen--beside-detail");
+    act(() => head("files").click());
+    expect(dialog()!.className).toContain("stage-tile-fullscreen--beside-detail");
   });
 
   it("takes the whole page when no detail is open", () => {
     mount();
-    act(() => tile("files").querySelector<HTMLButtonElement>(".stage-tile-icon-btn")!.click());
-    expect(root.querySelector(".stage-tile-fullscreen")!.className).not.toContain("--beside-detail");
-  });
-
-  it("navigates to the view's own page from Open", () => {
-    mount();
-    const open = [...tile("files").querySelectorAll<HTMLButtonElement>(".stage-tile-btn")].find((b) => b.textContent === "Open ↗")!;
-    act(() => open.click());
-    expect(navigateTo).toHaveBeenCalledWith("files");
+    act(() => head("files").click());
+    expect(dialog()!.className).not.toContain("--beside-detail");
   });
 });
