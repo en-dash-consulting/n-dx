@@ -102,6 +102,10 @@
       "reason": "One-off release repair run by an operator, not by any package: drives the `git` and `gh` CLIs (tag, push, release create) and must not depend on llm-client being built, since it is used when the release pipeline itself is broken."
     },
     {
+      "path": "scripts/verify-release-sync.mjs",
+      "reason": "Release workflow step: asks the `npm`, `git` and `gh` CLIs whether each published version is on npm, tagged on origin and released on GitHub. It runs in CI after a publish and must not depend on llm-client being built; the lookups are injected so its unit test spawns nothing."
+    },
+    {
       "path": "packages/hench/src/process/memory-monitor.ts",
       "reason": "Process monitoring \u2014 needs raw execFile for system commands (vm_stat, sysctl)"
     },

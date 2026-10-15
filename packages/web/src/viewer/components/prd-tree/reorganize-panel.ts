@@ -7,6 +7,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../action-icon.js";
 import { useState, useEffect, useCallback } from "preact/hooks";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -193,7 +194,7 @@ export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelPro
       // Header
       h("div", { class: "reorg-header" },
         h("h3", null, "Reorganize PRD"),
-        h("button", { class: "reorg-close", onClick: onClose, "aria-label": "Close" }, "×"),
+        h("button", { class: "reorg-close", onClick: onClose, "aria-label": "Close" }, h(ActionIcon, { name: "close" })),
       ),
 
       // Content

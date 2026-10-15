@@ -50,6 +50,8 @@ export {
 export { ConfigFooter, installRootLabel, identityLine, identityTooltip } from "./config-footer.js";
 export type { ConfigFooterProps, ServerIdentity } from "./config-footer.js";
 export { ElapsedTime } from "./elapsed-time.js";
+export { ActionIcon } from "./action-icon.js";
+export type { ActionIconName } from "./action-icon.js";
 export { updateFavicon, resetFavicon, FAVICON_PNGS, VIEW_TO_PRODUCT } from "./favicon.js";
 export { ThemeToggle, initTheme } from "./theme-toggle.js";
 export type { ThemePref } from "./theme-toggle.js";

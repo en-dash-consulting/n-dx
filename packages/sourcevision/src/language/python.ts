@@ -21,7 +21,7 @@ import type { LanguageConfig } from "./registry.js";
  * - `pyproject.toml` is the canonical module manifest.
  *
  * Note: `parseableExtensions` is intentionally empty — SourceVision has no
- * Python import parser (the import phase only parses JS/TS, Go, and Swift),
+ * Python import parser (the import phase only parses JS/TS, Go, Swift and C#),
  * so `.py` files are inventoried and classified but not parsed for imports.
  */
 export const pythonConfig: LanguageConfig = {

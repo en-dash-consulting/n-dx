@@ -261,12 +261,16 @@
 }
 
 .next-step-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
   background: none;
   border: none;
   color: var(--text-dim);
-  font-size: 13px;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: var(--space-1);
   border-radius: 4px;
   flex-shrink: 0;
 }

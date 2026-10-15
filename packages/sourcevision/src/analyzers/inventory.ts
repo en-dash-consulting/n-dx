@@ -12,6 +12,7 @@ import { computeInventorySummary } from "../util/merge.js";
 import { toPosix } from "../util/paths.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { typescriptConfig } from "../language/typescript.js";
+import { csharpConfig } from "../language/csharp.js";
 import type { LanguageConfig } from "../language/registry.js";
 
 // ── Skip patterns ────────────────────────────────────────────────────────────
@@ -78,6 +79,11 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   ".cxx": "C++",
   ".hpp": "C++",
   ".cs": "C#",
+  ".aspx": "ASP.NET",
+  ".ascx": "ASP.NET",
+  ".ashx": "ASP.NET",
+  ".asmx": "ASP.NET",
+  ".master": "ASP.NET",
   ".php": "PHP",
   ".lua": "Lua",
   ".r": "R",
@@ -214,6 +220,7 @@ const PROGRAMMING_LANGUAGES = new Set([
   "C",
   "C++",
   "C#",
+  "ASP.NET",
   "PHP",
   "Lua",
   "R",
@@ -692,12 +699,14 @@ export async function analyzeInventory(
   }
 
   // Languages whose files take part in import-graph and zone analysis: JS/TS
-  // is always parseable (backward-compatible default), plus whatever the
+  // and C# are always parseable (JS/TS as the backward-compatible default),
+  // plus whatever the
   // detected primary language's own parser handles. Mirrors the extension set
   // analyzeImports() builds in imports.ts. Intersected with byLanguage so the
   // list only names languages actually present in this inventory.
   const analysedExtensions = new Set<string>([
     ...typescriptConfig.parseableExtensions,
+    ...csharpConfig.parseableExtensions,
     ...langConfig.parseableExtensions,
   ]);
   const analysedLanguageNames = new Set<string>();

@@ -6,6 +6,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 
@@ -45,7 +46,7 @@ export function CommandsSheet({ open, onClose, children }: CommandsSheetProps) {
           onClick: onClose,
           "aria-label": "Close commands",
           title: "Close (Esc)",
-        }, "✕"),
+        }, h(ActionIcon, { name: "close" })),
       ),
       h("div", { class: "commands-sheet-body" }, open ? children : null),
     ),
