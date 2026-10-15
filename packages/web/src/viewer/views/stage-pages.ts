@@ -158,14 +158,14 @@ export interface StagePageProps {
   renderPanel?: RenderPanel;
   /** A tile's collapsed summary; null shows the view itself, clipped. */
   renderSummary?: RenderSummary;
-  /** Shown beside a full-screen tile when non-null (the open PRD item). */
-  renderAside?: () => ComponentChild | null;
+  /** The detail panel is open beside the page; a full-screen tile leaves room for it. */
+  detailOpen?: boolean;
 }
 
 const NO_PANEL: RenderPanel = () => null;
 const NO_SUMMARY: RenderSummary = () => null;
 
-export function StagePage({ stage, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, renderAside }: StagePageProps) {
+export function StagePage({ stage, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false }: StagePageProps) {
   const def = STAGES[stage];
   const product = stageProduct(stage);
   const gates: Record<string, boolean> = {
@@ -211,7 +211,7 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
       return h(Section, { key: s.view, stage, section: s, navigateTo, renderView });
     }),
     def.tiles
-      ? h(TileGrid, { stage, tiles, tabsOf, navigateTo, renderView, renderPanel, renderSummary, renderAside })
+      ? h(TileGrid, { stage, tiles, tabsOf, navigateTo, renderView, renderPanel, renderSummary, besideDetail: detailOpen })
       : null,
   );
 }

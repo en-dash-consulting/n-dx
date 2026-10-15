@@ -190,55 +190,16 @@
   padding: var(--space-4) var(--space-5);
 }
 
-.stage-tile-fullscreen-aside {
-  width: min(420px, 40%);
-  flex-shrink: 0;
-  overflow: auto;
-  border-left: 1px solid var(--border);
-  background: var(--bg-surface);
+/* The detail panel (a PRD item, file or zone) stays open beside it. Below
+   768px the panel is its own full-screen layer (responsive.css). */
+.stage-tile-fullscreen--beside-detail {
+  right: var(--panel-w);
 }
 
-/* Narrow screens: the item stacks under the view instead of squeezing it. */
-@media (max-width: 860px) {
-  .stage-tile-fullscreen--split {
-    flex-direction: column;
+@media (max-width: 768px) {
+  .stage-tile-fullscreen--beside-detail {
+    right: 0;
   }
-  .stage-tile-fullscreen-aside {
-    width: auto;
-    max-height: 45%;
-    border-left: none;
-    border-top: 1px solid var(--border);
-  }
-}
-
-.stage-tile-empty {
-  margin: 0;
-  color: var(--text-dim);
-  font-size: 13px;
-}
-
-/* Overview pieces inside a tile: the tile is the card. */
-.stage-tile .overview-section::after {
-  content: none;
-}
-
-.overview-next-steps--embedded {
-  margin: 0;
-  padding: 0;
-  overflow: visible;
-  border: none;
-  background: none;
-  box-shadow: none;
-}
-
-.overview-next-steps--embedded .next-steps-summary {
-  padding: 0 0 var(--space-3);
-  cursor: default;
-}
-
-.overview-next-steps--embedded .next-steps-list,
-.overview-next-steps--embedded .next-steps-footer {
-  padding: 0;
 }
 
 /* ── Tile summaries (views/tile-summaries.ts) ── */

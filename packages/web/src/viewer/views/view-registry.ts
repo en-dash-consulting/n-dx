@@ -87,6 +87,11 @@ export interface ViewRenderContext {
   selectedZone: string | null;
   selectedRunId: string | null;
   selectedTaskId: string | null;
+  /**
+   * Whether the detail panel (a file, zone or PRD item) is showing beside the
+   * page, so a full-screen dashboard tile leaves room for it.
+   */
+  detailOpen?: boolean;
   /** Finding the Ask panel was entered with, when it was entered from one. */
   askSeed: AskSeed | null;
   navigateTo: NavigateTo;
@@ -132,6 +137,7 @@ function stage(id: StageId): ViewRenderer {
       : renderActiveView(view, ctx)),
     renderPanel: (panel: StagePanelId) => renderPanel(panel, ctx),
     renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data) : undefined,
+    detailOpen: ctx.detailOpen ?? false,
   });
 }
 

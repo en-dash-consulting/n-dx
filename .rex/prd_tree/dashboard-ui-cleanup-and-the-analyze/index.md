@@ -22,7 +22,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A full-screen tile splits with the open PRD item as a sidebar](./a-full-screen-tile-splits-with-the.md) | pending |
+| [A full-screen tile splits with the open PRD item as a sidebar](./a-full-screen-tile-splits-with-the.md) | completed |
 | [Analyze page renders as a tile dashboard with the iso map as hero](./analyze-page-renders-as-a-tile.md) | completed |
 | [Analyze tiles show a purpose-built summary before they are expanded](./analyze-tiles-show-a-purpose-built.md) | completed |
 | [Archetype cells and select controls look like styled selects, with room for the arrow](./archetype-cells-and-select-controls.md) | completed |

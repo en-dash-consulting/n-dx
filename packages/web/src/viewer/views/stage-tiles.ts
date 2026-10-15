@@ -11,8 +11,9 @@
  *  - **expanded** — the same tile across the full grid width, rendering the
  *    real view (remembered per tile, like the stacked sections' open state);
  *  - **full-screen** — the view over the page, closed with Esc or the close
- *    button, with `renderAside` beside it when the caller has something to
- *    show there (the open PRD item).
+ *    button. When the detail panel (a PRD item, file or zone) is open, the
+ *    full-screen layer stops short of it, so the two sit side by side and
+ *    each closes on its own.
  *
  * Views render through `renderView` and panels through `renderPanel`, both
  * passed in by the registry — nothing is re-implemented here, and this module
@@ -122,11 +123,11 @@ function TileContent({ tile, tabs, renderView, renderPanel, idBase }: TileBodyPr
 
 interface FullScreenProps extends TileBodyProps {
   onClose: () => void;
-  aside: ComponentChild | null;
+  besideDetail: boolean;
   navigateTo: NavigateTo;
 }
 
-function FullScreenTile({ tile, onClose, aside, navigateTo, ...body }: FullScreenProps) {
+function FullScreenTile({ tile, onClose, besideDetail, navigateTo, ...body }: FullScreenProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -142,7 +143,7 @@ function FullScreenTile({ tile, onClose, aside, navigateTo, ...body }: FullScree
 
   const title = tileTitle(tile);
   return h("div", {
-    class: `stage-tile-fullscreen${aside ? " stage-tile-fullscreen--split" : ""}`,
+    class: `stage-tile-fullscreen${besideDetail ? " stage-tile-fullscreen--beside-detail" : ""}`,
     role: "dialog",
     "aria-modal": "true",
     "aria-label": title,
@@ -171,7 +172,6 @@ function FullScreenTile({ tile, onClose, aside, navigateTo, ...body }: FullScree
       ),
       h("div", { class: "stage-tile-fullscreen-body" }, h(TileContent, { tile, ...body })),
     ),
-    aside ? h("aside", { class: "stage-tile-fullscreen-aside", "aria-label": "Selected item" }, aside) : null,
   );
 }
 
@@ -260,11 +260,11 @@ export interface TileGridProps {
   renderView: (view: ViewId) => ComponentChild;
   renderPanel: RenderPanel;
   renderSummary: RenderSummary;
-  /** Shown beside a full-screen tile when non-null (the open PRD item). */
-  renderAside?: () => ComponentChild | null;
+  /** The detail panel is open beside the page; full-screen leaves room for it. */
+  besideDetail?: boolean;
 }
 
-export function TileGrid({ stage, tiles, tabsOf, navigateTo, renderView, renderPanel, renderSummary, renderAside }: TileGridProps) {
+export function TileGrid({ stage, tiles, tabsOf, navigateTo, renderView, renderPanel, renderSummary, besideDetail = false }: TileGridProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => readExpanded());
   const [fullScreen, setFullScreen] = useState<string | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -309,7 +309,7 @@ export function TileGrid({ stage, tiles, tabsOf, navigateTo, renderView, renderP
           renderPanel,
           idBase: `stage-tile-${stage}-${tileKey(full)}-full`,
           onClose: closeFullScreen,
-          aside: renderAside?.() ?? null,
+          besideDetail,
           navigateTo,
         })
       : null,

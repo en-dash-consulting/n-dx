@@ -114,12 +114,16 @@ describe("TileGrid", () => {
     expect(document.activeElement).toBe(opener);
   });
 
-  it("splits full-screen with the aside when the caller has one", () => {
-    mount({ renderAside: () => h("div", { class: "prd-item" }, "Task X") });
+  it("leaves room for the open detail panel when full-screen", () => {
+    mount({ besideDetail: true });
     act(() => tile("files").querySelector<HTMLButtonElement>(".stage-tile-icon-btn")!.click());
-    const dialog = root.querySelector<HTMLElement>(".stage-tile-fullscreen")!;
-    expect(dialog.className).toContain("stage-tile-fullscreen--split");
-    expect(dialog.querySelector("aside .prd-item")?.textContent).toBe("Task X");
+    expect(root.querySelector(".stage-tile-fullscreen")!.className).toContain("stage-tile-fullscreen--beside-detail");
+  });
+
+  it("takes the whole page when no detail is open", () => {
+    mount();
+    act(() => tile("files").querySelector<HTMLButtonElement>(".stage-tile-icon-btn")!.click());
+    expect(root.querySelector(".stage-tile-fullscreen")!.className).not.toContain("--beside-detail");
   });
 
   it("navigates to the view's own page from Open", () => {
