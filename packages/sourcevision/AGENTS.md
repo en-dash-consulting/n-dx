@@ -52,6 +52,23 @@ terraform; only `KNOWN_PACKS` are analyzed with today):
 - `remove <lang>` runs `npm uninstall --prefix`; a pack found only by module
   resolution is left alone.
 
+Offline, for a machine with no registry access:
+
+- `bundle <lang> [--out <file>]` (connected machine) runs the same npm install
+  into a fresh temporary prefix, loads the pack from it, writes
+  `n-dx-pack-bundle.json` (pack, package, version, sourcevision version,
+  `platform: "any"`: grammars are WASM) and archives the whole prefix as one
+  `.tgz`, default `n-dx-lang-<lang>-<version>.tgz`. The prefix is removed.
+- `add <lang> --from <bundle>` makes no npm call. It reads the manifest first
+  and refuses a bundle of another pack or version, or an archive that will not
+  read; then replaces the pack's `node_modules` copy, records the pack in the
+  pack directory's `package.json` and loads it as `add` does.
+
+The archive is written and read in Node (`src/cli/commands/pack-archive.ts`),
+not by a `tar` process: regular files and directories only, with pax long
+paths; reading refuses links, bad checksums, truncation and any path that is
+absolute or contains `..`.
+
 npm runs through llm-client's `spawnCli` (cmd.exe on Windows, for npm's `.cmd`
 shim). The runner, pack list, pack directory and importer are injectable; tests
 (`tests/unit/cli/pack.test.ts`) use a fake npm and never the network.

@@ -14,7 +14,7 @@
  *   pr-markdown [dir]  - Regenerate PR markdown in .sourcevision/
  *   git-credential-helper - Interactive GitHub credential setup helper
  *   mcp [dir]          - Start MCP server for AI tool integration
- *   pack add|list|remove - Manage language packs in the per-user pack directory
+ *   pack add|bundle|list|remove - Manage language packs in the per-user pack directory
  */
 
 import { resolve } from "node:path";

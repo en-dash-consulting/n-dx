@@ -1,6 +1,6 @@
 /**
- * `sv pack add|list|remove`: manage the language packs in the per-user pack
- * directory, `<ndx home>/packs/<sourcevision version>/`.
+ * `sv pack add|bundle|list|remove`: manage the language packs in the per-user
+ * pack directory, `<ndx home>/packs/<sourcevision version>/`.
  *
  * `add` and `remove` run `npm install|uninstall --prefix <pack dir>`; the
  * loader (`src/language/pack-loader.ts`) then finds a pack there before module
@@ -8,12 +8,19 @@
  * `add` loads it after installing, so a pack that is of another version or
  * will not load is an error rather than a silent success.
  *
+ * Offline: `bundle` installs a pack into a temporary prefix and archives it
+ * with its dependencies and a manifest (`pack-archive.ts`, Node only, no `tar`
+ * process); `add --from <bundle>` installs that archive with no npm call.
+ *
  * @module sourcevision/cli/commands/pack
  */
 
-import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import type { LanguagePackEntry } from "@n-dx/lang-kit";
 import { CLI_ERROR_CODES, spawnCli } from "@n-dx/llm-client";
+import { ArchiveError, collectTree, readTarGz, writeTarGz, type ArchiveEntry } from "./pack-archive.js";
 import {
   defaultPackDir,
   INSTALLABLE_PACKS,
@@ -52,6 +59,10 @@ export interface PackCommandDeps {
   readonly importFile?: PackLoaderOptions["importFile"];
   /** Writes one line of output; defaults to stdout. */
   readonly write?: (line: string) => void;
+  /** Resolves `--out` and `--from`; defaults to the process's working directory. */
+  readonly cwd?: string;
+  /** Where `bundle` makes its temporary npm prefix; defaults to the OS temp directory. */
+  readonly tempRoot?: string;
 }
 
 /** Runs npm through llm-client's spawn helper, which goes through cmd.exe on Windows for npm's `.cmd` shim. */
@@ -71,9 +82,12 @@ export const runNpm: NpmRunner = (args) =>
     child.on("close", (code) => resolve({ launched: true, exitCode: code, output }));
   });
 
+/** `token` in double quotes when it holds whitespace, as a user would type it. */
+const quoted = (token: string): string => (/\s/.test(token) ? `"${token}"` : token);
+
 /** `npm <args>` as a user would type it, quoting tokens with whitespace. */
 export function npmCommandLine(args: readonly string[]): string {
-  return ["npm", ...args].map((token) => (/\s/.test(token) ? `"${token}"` : token)).join(" ");
+  return ["npm", ...args].map(quoted).join(" ");
 }
 
 function findPack(packs: readonly InstallablePack[], id: string | undefined, sub: string): InstallablePack {
@@ -146,6 +160,36 @@ export async function listPacks(
   return listings;
 }
 
+/**
+ * Prove an install by loading the pack from `packDir`: what analysis would
+ * load is what counts. `how` names the install and `detail` is appended to an
+ * error (npm's output).
+ */
+async function loadInstalled(
+  pack: InstallablePack,
+  packDir: string,
+  version: string,
+  deps: PackCommandDeps,
+  how: string,
+  detail = "",
+): Promise<LanguagePackEntry> {
+  const load = await loadPack(pack, { packDir, version, importFile: deps.importFile });
+  if (load.status !== "loaded") {
+    throw new CLIError(`${pack.packageName} was installed but cannot be used: ${load.notice.reason}.${detail}`);
+  }
+  if (load.source !== "pack-dir") {
+    throw new CLIError(`${how} did not install ${pack.packageName} into ${packDir}.${detail}`);
+  }
+  return load.entry;
+}
+
+function reportInstalled(pack: InstallablePack, entry: LanguagePackEntry, packDir: string, write: (line: string) => void): void {
+  write(`Installed ${pack.packageName}@${entry.version} into ${packDir} (produces ${entry.produces.join(", ")}).`);
+  if (!KNOWN_PACKS.some((p) => p.id === pack.id)) {
+    write(`sourcevision does not analyze ${pack.id} with a pack yet; the pack is ready for when it does.`);
+  }
+}
+
 async function add(pack: InstallablePack, packDir: string, version: string, deps: PackCommandDeps, dryRun: boolean): Promise<void> {
   const write = deps.write ?? result;
   const args = ["install", "--prefix", packDir, `${pack.packageName}@${version}`];
@@ -155,19 +199,147 @@ async function add(pack: InstallablePack, packDir: string, version: string, deps
   }
   mkdirSync(packDir, { recursive: true });
   const run = await runOrFail(deps.npm ?? runNpm, args);
+  const entry = await loadInstalled(pack, packDir, version, deps, `\`${npmCommandLine(args)}\``, npmOutput(run.output));
+  reportInstalled(pack, entry, packDir, write);
+}
 
-  // Prove the install by loading it: what analysis would load is what counts.
-  const load = await loadPack(pack, { packDir, version, importFile: deps.importFile });
-  if (load.status !== "loaded") {
-    throw new CLIError(`${pack.packageName} was installed but cannot be used: ${load.notice.reason}.${npmOutput(run.output)}`);
+/** The file at the root of a bundle that says what it holds. */
+export const BUNDLE_MANIFEST = "n-dx-pack-bundle.json";
+
+/** What a bundle holds, written into it as {@link BUNDLE_MANIFEST}. */
+export interface BundleManifest {
+  readonly format: 1;
+  /** The pack's language id. */
+  readonly pack: string;
+  readonly packageName: string;
+  /** The pack's version, which is also the sourcevision version it was made for. */
+  readonly version: string;
+  readonly sourcevisionVersion: string;
+  /** The contents are JavaScript and WebAssembly grammars, so one bundle serves every platform. */
+  readonly platform: "any";
+}
+
+/** The default bundle file name: `n-dx-lang-<lang>-<version>.tgz`. */
+export const bundleFileName = (pack: InstallablePack, version: string): string => `n-dx-lang-${pack.id}-${version}.tgz`;
+
+/**
+ * `sv pack bundle <lang>`: install the pack with npm into a fresh temporary
+ * prefix, prove it loads, add the manifest and archive the whole prefix (the
+ * pack and every dependency) as one `.tgz` for a machine with no registry.
+ */
+async function bundle(pack: InstallablePack, version: string, deps: PackCommandDeps, out: string | undefined): Promise<void> {
+  const write = deps.write ?? result;
+  const file = resolve(deps.cwd ?? process.cwd(), out ?? bundleFileName(pack, version));
+  const prefix = mkdtempSync(join(deps.tempRoot ?? tmpdir(), "sv-pack-bundle-"));
+  try {
+    const args = ["install", "--prefix", prefix, `${pack.packageName}@${version}`];
+    const run = await runOrFail(deps.npm ?? runNpm, args);
+    await loadInstalled(pack, prefix, version, deps, `\`${npmCommandLine(args)}\``, npmOutput(run.output));
+    const manifest: BundleManifest = {
+      format: 1,
+      pack: pack.id,
+      packageName: pack.packageName,
+      version,
+      sourcevisionVersion: version,
+      platform: "any",
+    };
+    writeFileSync(join(prefix, BUNDLE_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
+    const entries = collectTree(prefix);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, writeTarGz(entries));
+    const files = entries.filter((e) => e.type === "file").length;
+    write(`Bundled ${pack.packageName}@${version} and its dependencies (${files} files) into ${file}.`);
+    write(`Install it with no network: ndx sv pack add ${pack.id} --from ${quoted(file)}`);
+  } finally {
+    rmSync(prefix, { recursive: true, force: true });
   }
-  if (load.source !== "pack-dir") {
-    throw new CLIError(`\`${npmCommandLine(args)}\` did not install ${pack.packageName} into ${packDir}.${npmOutput(run.output)}`);
+}
+
+/** The bundle's manifest and entries, or an error naming what is wrong with it. */
+function readBundle(file: string, pack: InstallablePack, version: string): ArchiveEntry[] {
+  let archive: Buffer;
+  try {
+    archive = readFileSync(file);
+  } catch (error) {
+    throw new CLIError(`Cannot read the bundle ${file}: ${error instanceof Error ? error.message : String(error)}`);
   }
-  write(`Installed ${pack.packageName}@${load.entry.version} into ${packDir} (produces ${load.entry.produces.join(", ")}).`);
-  if (!KNOWN_PACKS.some((p) => p.id === pack.id)) {
-    write(`sourcevision does not analyze ${pack.id} with a pack yet; the pack is ready for when it does.`);
+  let entries: ArchiveEntry[];
+  try {
+    entries = readTarGz(archive);
+  } catch (error) {
+    if (!(error instanceof ArchiveError)) throw error;
+    throw new CLIError(`${file} is not a usable pack bundle: ${error.message}.`, `Make it again with \`sv pack bundle ${pack.id}\`.`);
   }
+  const notABundle = (why: string): CLIError =>
+    new CLIError(`${file} is not a pack bundle: ${why}.`, `Make one with \`sv pack bundle ${pack.id}\`.`);
+  const manifestEntry = entries.find((e) => e.path === BUNDLE_MANIFEST);
+  if (manifestEntry?.type !== "file") throw notABundle(`it has no ${BUNDLE_MANIFEST}`);
+  let manifest: Partial<BundleManifest>;
+  try {
+    manifest = JSON.parse(manifestEntry.data.toString("utf-8")) as Partial<BundleManifest>;
+  } catch (error) {
+    throw notABundle(`its ${BUNDLE_MANIFEST} is not JSON (${error instanceof Error ? error.message : String(error)})`);
+  }
+  if (manifest.format !== 1) throw notABundle(`its ${BUNDLE_MANIFEST} is of an unknown format ${JSON.stringify(manifest.format)}`);
+  const holds = `${String(manifest.packageName)}@${String(manifest.version)}`;
+  if (manifest.pack !== pack.id || manifest.packageName !== pack.packageName) {
+    throw new CLIError(`${file} is a bundle of ${holds}, not of ${pack.packageName}.`, `Install it with \`sv pack add ${String(manifest.pack)} --from <bundle>\`.`);
+  }
+  if (manifest.version !== version) {
+    throw new CLIError(
+      `${file} is a bundle of ${holds}, made for sourcevision ${String(manifest.sourcevisionVersion)}; this is sourcevision ${version}.`,
+      `Make a bundle with \`sv pack bundle ${pack.id}\` on a connected machine running sourcevision ${version}.`,
+    );
+  }
+  const packJson = `node_modules/${pack.packageName}/package.json`;
+  if (!entries.some((e) => e.type === "file" && e.path === packJson)) {
+    throw new CLIError(`${file} names ${holds} but does not contain it (${packJson} is missing).`);
+  }
+  return entries;
+}
+
+/**
+ * `sv pack add <lang> --from <bundle>`: no network. Check the bundle's
+ * manifest, replace any installed copy of the pack with the bundle's
+ * `node_modules`, record the pack in the pack directory's `package.json` so
+ * npm keeps it, and load it.
+ */
+async function addFromBundle(
+  pack: InstallablePack,
+  packDir: string,
+  version: string,
+  deps: PackCommandDeps,
+  file: string,
+  dryRun: boolean,
+): Promise<void> {
+  const write = deps.write ?? result;
+  const bundleFile = resolve(deps.cwd ?? process.cwd(), file);
+  const entries = readBundle(bundleFile, pack, version).filter(
+    // npm's hidden lockfile describes the bundle's own prefix, not this one.
+    (e) => e.path.startsWith("node_modules/") && e.path !== "node_modules/.package-lock.json",
+  );
+  if (dryRun) {
+    write(`Would install ${pack.packageName}@${version} from ${bundleFile} into ${packDir} (${entries.length} entries).`);
+    return;
+  }
+  rmSync(installedDir(pack, packDir), { recursive: true, force: true });
+  rmSync(join(packDir, "node_modules", ".package-lock.json"), { force: true });
+  for (const entry of entries) {
+    const target = join(packDir, ...entry.path.split("/"));
+    if (entry.type === "directory") {
+      mkdirSync(target, { recursive: true });
+    } else {
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, entry.data, { mode: entry.mode });
+    }
+  }
+  const manifestFile = join(packDir, "package.json");
+  const manifest = existsSync(manifestFile) ? (JSON.parse(readFileSync(manifestFile, "utf-8")) as Record<string, unknown>) : {};
+  const dependencies = { ...((manifest["dependencies"] as Record<string, string> | undefined) ?? {}), [pack.packageName]: version };
+  writeFileSync(manifestFile, `${JSON.stringify({ ...manifest, dependencies }, null, 2)}\n`);
+
+  const entry = await loadInstalled(pack, packDir, version, deps, `The bundle ${bundleFile}`);
+  reportInstalled(pack, entry, packDir, write);
 }
 
 async function remove(pack: InstallablePack, packDir: string, version: string, deps: PackCommandDeps, dryRun: boolean): Promise<void> {
@@ -211,26 +383,56 @@ async function list(packDir: string, version: string, deps: PackCommandDeps, jso
   }
 }
 
-/** `sv pack <add|list|remove> [lang] [--dry-run] [--json]`; `args` are the arguments after `pack`. */
+/** Options that take a value, as `--opt <value>` or `--opt=<value>`. */
+const VALUE_OPTIONS = ["--out", "--from"] as const;
+
+/** Split `args` into positionals, flags and the values of {@link VALUE_OPTIONS}. */
+function parseArgs(args: readonly string[]): { positional: string[]; flags: Set<string>; values: Map<string, string> } {
+  const positional: string[] = [];
+  const flags = new Set<string>();
+  const values = new Map<string, string>();
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    const option = VALUE_OPTIONS.find((o) => arg === o || arg.startsWith(`${o}=`));
+    if (option) {
+      const value = arg === option ? args[++i] : arg.slice(option.length + 1);
+      if (!value || (arg === option && value.startsWith("-"))) throw new CLIError(`Missing value for ${option}`);
+      values.set(option, value);
+    } else if (arg.startsWith("-")) {
+      flags.add(arg);
+    } else {
+      positional.push(arg);
+    }
+  }
+  return { positional, flags, values };
+}
+
+/** `sv pack <add|bundle|list|remove> [lang] [--from <bundle>] [--out <file>] [--dry-run] [--json]`; `args` follow `pack`. */
 export async function cmdPack(args: readonly string[], deps: PackCommandDeps = {}): Promise<void> {
-  const positional = args.filter((a) => !a.startsWith("-"));
+  const { positional, flags, values } = parseArgs(args);
   const [sub, id] = positional;
-  const dryRun = args.includes("--dry-run");
-  const json = args.includes("--json");
+  const dryRun = flags.has("--dry-run");
+  const json = flags.has("--json");
   const version = deps.version ?? sourcevisionVersion();
   const packDir = deps.packDir ?? defaultPackDir(version);
+  const packs = deps.packs ?? INSTALLABLE_PACKS;
 
   switch (sub) {
-    case "add":
-      return add(findPack(deps.packs ?? INSTALLABLE_PACKS, id, sub), packDir, version, deps, dryRun);
+    case "add": {
+      const pack = findPack(packs, id, sub);
+      const from = values.get("--from");
+      return from ? addFromBundle(pack, packDir, version, deps, from, dryRun) : add(pack, packDir, version, deps, dryRun);
+    }
+    case "bundle":
+      return bundle(findPack(packs, id, sub), version, deps, values.get("--out"));
     case "remove":
-      return remove(findPack(deps.packs ?? INSTALLABLE_PACKS, id, sub), packDir, version, deps, dryRun);
+      return remove(findPack(packs, id, sub), packDir, version, deps, dryRun);
     case "list":
       return list(packDir, version, deps, json);
     default:
       throw new CLIError(
         sub ? `Unknown pack command: ${sub}` : "Missing pack command",
-        "Run 'sourcevision pack --help': pack add <lang>, pack list, pack remove <lang>.",
+        "Run 'sourcevision pack --help': pack add <lang> [--from <bundle>], pack bundle <lang>, pack list, pack remove <lang>.",
         CLI_ERROR_CODES.UNKNOWN_COMMAND,
       );
   }
