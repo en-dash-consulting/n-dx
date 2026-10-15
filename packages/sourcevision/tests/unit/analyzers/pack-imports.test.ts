@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { goConfig, javaConfig, type LanguagePackEntry, type PackProjectRequest, type PackProjectResult } from "@n-dx/lang-kit";
 import { analyzeImports } from "../../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../../src/analyzers/inventory.js";
-import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor } from "../../../src/analyzers/pack-imports.js";
+import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, readPackFrameworkFacts } from "../../../src/analyzers/pack-imports.js";
 import { KNOWN_PACKS, type InstallablePack, type KnownPack } from "../../../src/language/pack-loader.js";
 import type { Inventory } from "../../../src/schema/v1.js";
 
@@ -98,6 +98,39 @@ describe("buildPackImportGraph", () => {
     const entry = stubEntry(javaConfig, { facts: [], unparsed: [] }, requests);
     await run(["src/A.java", "src/a.ts", "src/B.java"], [knownPack(javaConfig, { entry })]);
     expect(requests).toEqual([{ projectDir: "/project", files: ["src/A.java", "src/B.java"], kinds: ["imports"] }]);
+  });
+
+  it("with a framework sink, asks the same call for the framework kinds the pack produces and hands over its facts and notices", async () => {
+    const requests: PackProjectRequest[] = [];
+    const facts = [{ path: "src/A.java", routes: [{ path: "/a", position: { line: 1, column: 0 } }] }];
+    const entry = {
+      ...stubEntry(javaConfig, { facts, unparsed: [], notices: ["Spring Boot: 1 skipped."] }, requests),
+      produces: ["imports", "routes", "outboundCalls"] as const,
+    };
+    const collected: unknown[] = [];
+    const messages: string[] = [];
+    await buildPackImportGraph([file("src/A.java")], "/project", {
+      packs: [knownPack(javaConfig, { entry: entry as LanguagePackEntry })],
+      loader: { packDir, version: VERSION },
+      warn: (m) => messages.push(m),
+      framework: (f) => collected.push(...f),
+    });
+    expect(requests.map((r) => r.kinds)).toEqual([["imports", "routes", "outboundCalls"]]);
+    expect(collected).toEqual(facts);
+    expect(messages).toEqual(["Spring Boot: 1 skipped."]);
+  });
+
+  it("with a framework sink, asks a pack producing no framework kinds for imports only and hands over nothing", async () => {
+    const requests: PackProjectRequest[] = [];
+    const entry = stubEntry(javaConfig, { facts: [], unparsed: [] }, requests);
+    const collected: unknown[] = [];
+    await buildPackImportGraph([file("src/A.java")], "/project", {
+      packs: [knownPack(javaConfig, { entry })],
+      loader: { packDir, version: VERSION },
+      framework: (f) => collected.push(...f),
+    });
+    expect(requests.map((r) => r.kinds)).toEqual([["imports"]]);
+    expect(collected).toEqual([]);
   });
 
   it("turns imports facts into edges and merges externals across files", async () => {
@@ -281,5 +314,50 @@ describe("noticeListedPacks", () => {
       warn: (m) => messages.push(m),
     });
     expect(messages).toEqual(["sourcevision.packs lists java: pack @n-dx/lang-java is not installed. Install it with `ndx sv pack add java`."]);
+  });
+});
+
+describe("readPackFrameworkFacts", () => {
+  const framework = (result: PackProjectResult | Error, requests: PackProjectRequest[] = []): LanguagePackEntry => ({
+    ...stubEntry(javaConfig, { facts: [], unparsed: [] }),
+    produces: ["imports", "routes", "outboundCalls"],
+    analyzeProject: async (request) => {
+      requests.push(request);
+      if (result instanceof Error) throw result;
+      return result;
+    },
+  });
+  const read = async (packs: KnownPack[]) => {
+    const messages: string[] = [];
+    const facts = await readPackFrameworkFacts([file("src/A.java"), file("src/a.ts")], "/project", {
+      packs,
+      loader: { packDir: "/nonexistent", version: VERSION },
+      warn: (m) => messages.push(m),
+    });
+    return { facts, messages };
+  };
+
+  it("asks only for the framework kinds, on the pack's files", async () => {
+    const requests: PackProjectRequest[] = [];
+    const facts = [{ path: "src/A.java", outboundCalls: [] }];
+    const result = await read([knownPack(javaConfig, { entry: framework({ facts, unparsed: [] }, requests) })]);
+    expect(requests).toEqual([{ projectDir: "/project", files: ["src/A.java"], kinds: ["routes", "outboundCalls"] }]);
+    expect(result).toEqual({ facts, messages: [] });
+  });
+
+  it("passes over quietly a pack that cannot load or produces no framework kinds", async () => {
+    const requests: PackProjectRequest[] = [];
+    expect(await read([knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })])).toEqual({ facts: [], messages: [] });
+    expect(await read([knownPack(javaConfig, { entry: stubEntry(javaConfig, { facts: [], unparsed: [] }, requests) })])).toEqual({ facts: [], messages: [] });
+    expect(requests).toEqual([]);
+  });
+
+  it("gives one notice when the pack degrades or rejects", async () => {
+    const degraded = await read([knownPack(javaConfig, { entry: framework({ facts: [], unparsed: [], degraded: { reason: "grammar not built" } }) })]);
+    expect(degraded).toEqual({ facts: [], messages: ["Java: grammar not built; Java routes and outbound calls are not recorded."] });
+    const rejected = await read([knownPack(javaConfig, { entry: framework(new Error("boom")) })]);
+    expect(rejected.messages).toEqual([
+      "Java: the pack failed (boom); Java routes and outbound calls are not recorded. Reinstall it with `ndx sv pack add java`.",
+    ]);
   });
 });
