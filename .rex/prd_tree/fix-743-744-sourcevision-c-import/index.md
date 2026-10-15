@@ -27,7 +27,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [C# is detected as the project language and WebForms markup links to its code](./c-is-detected-as-the-project-language.md) | completed |
 | [Changeset and docs for the #743 #744 sourcevision fixes](./changeset-and-docs-for-the-743-744.md) | completed |
 | [Find out why narrate passes 2 and 3 leave no findings](./find-out-why-narrate-passes-2-and-3.md) | pending |
-| [Hub files with very high fan-in no longer pull a project into one Louvain community](./hub-files-with-very-high-fan-in-no.md) | pending |
+| [Hub files with very high fan-in no longer pull a project into one Louvain community](./hub-files-with-very-high-fan-in-no.md) | completed |
 | [Incremental analyzers drop carried-over entries for files no longer in the inventory](./incremental-analyzers-drop-carried.md) | completed |
 | [Partition review runs on a fresh partition and flags a zone holding most of the files](./partition-review-runs-on-a-fresh.md) | completed |
 | [WebForms code-behind classes are scoped to their page, not merged as partials across pages](./webforms-code-behind-classes-are.md) | completed |

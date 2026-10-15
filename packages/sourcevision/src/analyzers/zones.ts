@@ -1293,7 +1293,7 @@ export function computeStructureHash(zones: Zone[]): string {
  * silently keep stale zones — and, e.g., an empty codebase map — until they
  * delete `.sourcevision`. Monotonic integer; history is intentionally terse.
  */
-export const ZONE_ALGORITHM_VERSION = 5;
+export const ZONE_ALGORITHM_VERSION = 6; // 6: hub fan-in damping
 
 /**
  * Hash the analysis inputs that determine the Louvain partition, independent
@@ -2577,6 +2577,38 @@ export const DEFAULT_MAX_ZONE_PERCENT = 15;
  * This is the shared pipeline used by both root-level analysis and (future)
  * recursive zone subdivision.
  */
+/** Fewest distinct importers that make a file a hub, whatever the project size. */
+export const HUB_MIN_FAN_IN = 20;
+/** Share of the scope's files that must import a file for it to count as a hub. */
+export const HUB_FAN_IN_SHARE = 0.03;
+
+/**
+ * Damping factor for each hub file: a file imported by more than
+ * `max(HUB_MIN_FAN_IN, HUB_FAN_IN_SHARE × files)` distinct files gets
+ * `threshold / fanIn`, and Louvain sees every edge touching it at that
+ * fraction of its weight. A base page, data service or shared model that
+ * most of a project imports is infrastructure, not a module boundary;
+ * left at full weight its edges outvote the edges inside each feature
+ * folder, and the partition follows who uses the hub rather than what
+ * belongs together. Only the partitioning input is damped — the import
+ * graph and the cohesion/coupling metrics keep the real weights.
+ */
+export function computeHubDamping(edges: ImportEdge[], fileCount: number): Map<string, number> {
+  const importers = new Map<string, Set<string>>();
+  for (const e of edges) {
+    if (e.from === e.to) continue;
+    let set = importers.get(e.to);
+    if (!set) importers.set(e.to, (set = new Set()));
+    set.add(e.from);
+  }
+  const threshold = Math.max(HUB_MIN_FAN_IN, Math.ceil(fileCount * HUB_FAN_IN_SHARE));
+  const damping = new Map<string, number>();
+  for (const [file, from] of importers) {
+    if (from.size > threshold) damping.set(file, threshold / from.size);
+  }
+  return damping;
+}
+
 export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResult {
   const {
     edges,
@@ -2688,13 +2720,16 @@ export function runZonePipeline(options: ZonePipelineOptions): ZonePipelineResul
   }
   // Filter AFTER proximity + stability edges are added so production files
   // without imports still appear in productionGraph via proximity links.
+  // Edges touching a hub are damped here, in the partitioning input only.
+  const hubDamping = computeHubDamping(resolvedEdges, scopeFileSet.size);
   const productionGraph: Map<string, Map<string, number>> = new Map();
   for (const [node, neighbors] of graph) {
     if (quarantineTests.has(node)) continue;
     const filtered = new Map<string, number>();
+    const nodeFactor = hubDamping.get(node) ?? 1;
     for (const [n, w] of neighbors) {
       if (quarantineTests.has(n)) continue;
-      filtered.set(n, w);
+      filtered.set(n, w * Math.min(nodeFactor, hubDamping.get(n) ?? 1));
     }
     productionGraph.set(node, filtered);
   }
