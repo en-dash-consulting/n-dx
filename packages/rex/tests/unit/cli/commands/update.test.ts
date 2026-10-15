@@ -484,6 +484,44 @@ describe("cmdUpdate", () => {
     });
   });
 
+  describe("--assignee", () => {
+    const item = () => readPRD(tmp).items[0] as { assignee?: string; source?: string };
+    const quiet = { quiet: "true" };
+
+    it("sets the assignee and round-trips it through the folder tree", async () => {
+      await cmdUpdate(tmp, itemId, { assignee: "Sterling H", ...quiet });
+      expect(item().assignee).toBe("Sterling H");
+    });
+
+    it("trims surrounding whitespace, since selection matches exactly", async () => {
+      await cmdUpdate(tmp, itemId, { assignee: "  Ryan Keith  ", ...quiet });
+      expect(item().assignee).toBe("Ryan Keith");
+    });
+
+    it("removes the assignee when the value is empty", async () => {
+      await cmdUpdate(tmp, itemId, { assignee: "Sterling H", ...quiet });
+      await cmdUpdate(tmp, itemId, { assignee: "", ...quiet });
+      expect(item().assignee).toBeUndefined();
+      // The cleared item is still readable by a later update.
+      await expect(cmdUpdate(tmp, itemId, { priority: "high", ...quiet })).resolves.toBeUndefined();
+    });
+
+    it("leaves the assignee untouched without the flag", async () => {
+      await cmdUpdate(tmp, itemId, { assignee: "Sterling H", ...quiet });
+      await cmdUpdate(tmp, itemId, { priority: "high", ...quiet });
+      expect(item().assignee).toBe("Sterling H");
+    });
+
+    it("counts --assignee alone as an update", async () => {
+      await expect(cmdUpdate(tmp, itemId, { assignee: "x", ...quiet })).resolves.toBeUndefined();
+    });
+
+    it("names --assignee in the no-updates hint", async () => {
+      const err = await cmdUpdate(tmp, itemId, {}).catch((e) => e);
+      expect(err.suggestion).toContain("--assignee");
+    });
+  });
+
   describe("--criterion and --source", () => {
     const item = () => readPRD(tmp).items[0] as { acceptanceCriteria?: string[]; source?: string };
     const quiet = { quiet: "true" };

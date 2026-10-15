@@ -202,6 +202,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
           "description": "Source of this item",
           "type": "string"
         },
+        "assignee": {
+          "description": "Who the item belongs to. Matched exactly by task selection (ndx work --mine) and inherited by descendants",
+          "type": "string"
+        },
         "blockedBy": {
           "description": "IDs of blocking items",
           "type": "array",
@@ -437,7 +441,7 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
   },
   {
     "name": "edit_item",
-    "description": "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
+    "description": "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -489,6 +493,10 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
         },
         "source": {
           "description": "New source",
+          "type": "string"
+        },
+        "assignee": {
+          "description": "Who the item belongs to. Matched exactly by task selection (ndx work --mine) and inherited by descendants. An empty string removes it.",
           "type": "string"
         },
         "blockedBy": {
