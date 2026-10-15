@@ -19,7 +19,7 @@ Rules that follow:
 - `VIEW_META` is `as const satisfies Record<ViewId, ViewMeta>`. A missing or misspelt view is a compile error, and lookups stay narrow, so `stageProduct` in `stages.ts` returns `VIEW_META[stage].product` typed as one of the three package products.
 - Labels are unique across views (`navigation-model.test.ts` fails otherwise). A label may contain `{cli}`, which callers resolve with `resolveCliLabel`. Accessors: `viewMeta`, `viewLabel`, `viewBlurb`, `viewGlyph`, `viewProduct`, `viewProductLabel`. `PRODUCT_LABELS` gives the display name per product.
 - `stages.ts` re-exports `view-meta.ts`, so callers need one import. Both files are pure data and functions with no Preact. Components reach them through `packages/web/src/viewer/api.ts`.
-- The top nav, stage pages, Home cards, breadcrumb, `document.title`, guide and settings overlay all read the model. Renaming a view is an edit to `VIEW_META` and nowhere else.
+- The top nav, stage pages, Home cards, page titles, `document.title`, guide and settings overlay all read the model. Renaming a view is an edit to `VIEW_META` and nowhere else.
 
 ## Stages
 
@@ -35,21 +35,21 @@ The dashboard is a loop of three stages, `STAGE_ORDER = ["analyze", "plan", "wor
 | `featureGate` | Hidden when the toggle is off (same keys as `useFeatureToggle`) |
 | `requiresServer` | Absent from a static export |
 
-A stage may instead be a dashboard: when `STAGES[stage].tiles` is set, the page renders its plain lead section and then a grid of `StageTile`s (`views/stage-tiles.ts`) in place of the other sections. A tile names a `view` (its "Open" target and what it expands into), and may set:
+A stage may instead be a dashboard: when `STAGES[stage].tiles` is set, the page renders its plain lead section and then a grid of `StageTile`s (`views/stage-tiles.ts`) in place of the other sections. A tile names a `view` (what it opens full-screen, and its "Open" target), and may set:
 
 | Field | Effect |
 |-------|--------|
-| `size` | `hero` and `wide` span the row; `normal` (default) takes one cell |
-| `panel`, `title` | Render a stage panel (`renderPanel`: `map`, `next-steps`, `languages`) instead of the view, named by `title` |
+| `cols`, `rows` | Columns of 12 (4, 6, 8, 12; default 4) and fixed-height rows (1–3; default 1) the tile spans |
+| `panel`, `title` | Render a stage panel (`renderPanel`: `map`, `health`, `next-steps`, `languages`) instead of the view, named by `title` |
 | `chromeless` | The panel brings its own header and full-screen (the codebase map), so the tile draws none |
-| `tabs` | Further views shown as tabs once the tile is expanded |
+| `tabs` | Further views shown as tabs when the tile is open full-screen |
 | `featureGate`, `requiresServer`, `hiddenWhenDeployed` | As for sections |
 
-A collapsed tile shows `renderSummary(tile)` (`views/tile-summaries.ts` for Analyze), else its panel, else the view clipped. Clicking expands it in place across the grid; its full-screen control opens it over the page, stopping short of the detail panel when one is open. Expanded state is remembered per tile (`ndx.stage-tiles`). `alsoOwns` lists views a stage owns without placing them (they still resolve to the stage for the breadcrumb).
+The grid has twelve columns and fixed-height rows; a tile spans `cols` × `rows` of it (defaults 4 × 1) and dense packing fills the column beside a tall tile. A tile shows `renderSummary(tile)` (`views/tile-summaries.ts` for Analyze), else its panel, else its view cut to the tile. Its one action is its header, which opens it full-screen — the whole view with the tile's tabs, and "Open ↗" to the view's own page — stopping short of the detail panel when one is open. `alsoOwns` lists views a stage owns without placing them (they still light the stage's top-bar tab).
 
 Current composition:
 
-- **Analyze (tiles):** lead `overview` (its `lead` variant: analysis line, controls, stats); tiles `map` (hero, chromeless, `iso-map`, dropped in static exports), `next-steps`, `problems`, `suggestions`, `zones`, `files`, `architecture` (tab `routes`), `languages`, `pr-markdown` (gate `sourcevision.prMarkdown`), `ask` (gate `sourcevision.ask`, requires server). Owns `graph` off-page.
+- **Analyze (tiles):** lead `overview` (its `lead` variant: analysis line and controls); tiles `map` (8 × 3, chromeless, `iso-map`, dropped in static exports), `health` (the stats), `next-steps` (4 × 2), then `problems`, `suggestions`, `zones`, `architecture` (tab `routes`), `files`, `languages`, `pr-markdown` (6 wide, gate `sourcevision.prMarkdown`), `ask` (6 wide, gate `sourcevision.ask`, requires server). Owns `graph` off-page.
 - **Plan:** `analysis` (plain); `prd`; `command-reference`; `hench-runs`; `merge-graph`; `validation`; `requirements`.
 - **Work:** `rex-dashboard` (plain); `activity`; `token-usage`; `hench-audit`; `hench-optimization`; `hench-adaptive`; `workspaces` (requires server).
 
@@ -83,7 +83,8 @@ All in `packages/web/src/viewer/components/`:
 | `TopNav` | `top-nav.ts` | Brand (also the way home), the three stage tabs, a divider, the Live tab, search. A stage tab is lit on its own page and on any view the stage lists |
 | Live tab | `live-tab.ts` | Idle, running and attention states, with a peek of what is running |
 | `StageLinks` | `stage-links.ts` | Edge buttons stepping around the loop. Hidden when a scoped viewer has a single stage |
-| `Breadcrumb` | `breadcrumb.ts` | "project > stage > view", and `document.title`. Behind the hub it adds a Hub link and a project switcher (`project-switcher.ts`) |
+| `ProjectContext` | `project-context.ts` | In the top bar: the project name (a project switcher behind a hub with several, `project-switcher.ts`), a Hub link behind the hub, the worktree · branch chip (`workspace-switcher.ts`), and `document.title` |
+| `PageTitle` | `page-title.ts` | The glyph, name and blurb of a view's own page; none on stage pages, Home or Live |
 | `BottomBar` | `bottom-bar.ts` | Server identity, settings cog, per-stage status indicators, theme, help, and the Commands button |
 | `SettingsOverlay` | `settings-overlay.ts` | Full overlay listing `SETTINGS_ENTRIES` filtered by `validViews` |
 | `CommandsSheet` | `commands-sheet.ts` | Sheet that lifts over the page and renders `command-reference` |
@@ -131,7 +132,7 @@ Layering and barrel rules for `src/shared/` and the viewer are in `packages/web/
 | Test | Covers |
 |------|--------|
 | `packages/web/tests/e2e-ui/navigation.spec.ts` | **Required test** (see `TESTING.md`). Deep-links every view in `VIEW_META` with no console errors, and checks each redirect alias lands on its target |
-| `packages/web/tests/unit/viewer/navigation-model.test.ts` | `VIEW_META` coverage and completeness, unique labels, each view placed once, one lead section per stage, rendered surfaces (breadcrumb, `document.title`, top nav, Home, stage pages, settings overlay, guide) using the model's labels, and the Analysis stage composition |
+| `packages/web/tests/unit/viewer/navigation-model.test.ts` | `VIEW_META` coverage and completeness, unique labels, each view placed once, one lead section per stage, rendered surfaces (`document.title`, top nav, Home, stage pages, settings overlay, guide) using the model's labels, and the Analysis stage composition |
 | `packages/web/tests/unit/shared/view-routing.test.ts` | Scope view lists, Live views in every scope, and alias resolution including the rex-scoped `rex-dashboard` exception |
 | `packages/web/tests/unit/viewer/navigation-a11y.test.ts` | Keyboard and screen-reader access to the navigation surfaces (`pnpm --filter @n-dx/web test:a11y`) |
 | `packages/web/tests/unit/viewer/shell.test.ts` | `stages.ts` ordering and registry coverage, `TopNav`, `StageLinks`, `StagePage` and `HomeView` |

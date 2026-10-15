@@ -44,9 +44,8 @@
 .topnav-brand:focus-visible .topnav-logo,
 .topnav-brand--active .topnav-logo { outline-color: var(--accent); }
 .topnav-brand:focus-visible { outline: none; }
-.topnav-brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.topnav-project { font-weight: 600; font-size: 14px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
-.topnav-subtitle { font-size: 11px; color: var(--text-muted); }
+.topnav-guide { display: flex; align-items: center; margin-left: auto; padding-right: var(--space-2); }
+.topnav-guide + .topnav-search { margin-left: 0; }
 
 .topnav-tabs { display: flex; align-self: stretch; }
 .topnav-tab {
@@ -510,6 +509,11 @@
 
 /* The breadcrumb already names the stage, so the head is one compact line:
    mark, name and blurb, wrapping the blurb under the name on a narrow screen. */
+/* A view's own page title (components/page-title.ts). */
+.page-title { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: var(--space-3); row-gap: var(--space-1); margin-bottom: var(--space-4); }
+.page-title-glyph { color: var(--text-dim); }
+.page-title-text { font-size: 18px; font-weight: 600; margin: 0; }
+.page-title-blurb { font-size: 13px; color: var(--text-dim); margin: 0; }
 .stage-page-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
 .stage-page-head > div { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-3); min-width: 0; }
 .stage-page-logo { border-radius: var(--radius-md); width: 28px; height: 28px; flex-shrink: 0; }

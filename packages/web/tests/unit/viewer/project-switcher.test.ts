@@ -10,7 +10,7 @@ import {
   useHubProjects,
   type HubProjects,
 } from "../../../src/viewer/components/project-switcher.js";
-import { Breadcrumb } from "../../../src/viewer/components/breadcrumb.js";
+import { ProjectContext } from "../../../src/viewer/components/project-context.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
 
@@ -189,7 +189,7 @@ describe("ProjectSwitcher", () => {
   });
 });
 
-describe("Breadcrumb hub segment", () => {
+describe("top bar project context: hub link", () => {
   let root: HTMLDivElement | null = null;
   beforeEach(() => {
     clearProjectMetadataCache();
@@ -207,18 +207,17 @@ describe("Breadcrumb hub segment", () => {
   });
 
   it("starts with a Hub link to /hub and a project menu behind a hub with several projects", async () => {
-    root = renderToDiv(h(Breadcrumb, { view: "prd", navigateTo: () => {}, hubFetcher: hubFetch(HUB_BODY) }));
+    root = renderToDiv(h(ProjectContext, { view: "prd", hubFetcher: hubFetch(HUB_BODY) }));
     await flush();
-    const first = root.querySelector(".breadcrumb-list > li")!;
-    const link = first.querySelector("a")!;
+    const link = root.querySelector(".project-context-name a")!;
     expect(link.textContent).toBe("Hub");
     expect(link.getAttribute("href")).toBe("/hub");
     expect(root.querySelector(".breadcrumb-project-trigger")!.textContent).toContain("Alpha");
   });
 
   it("shows the Hub link but a plain name with one project", async () => {
-    root = renderToDiv(h(Breadcrumb, {
-      view: "prd", navigateTo: () => {}, hubFetcher: hubFetch({ projects: [HUB_BODY.projects[0]] }),
+    root = renderToDiv(h(ProjectContext, {
+      view: "prd", hubFetcher: hubFetch({ projects: [HUB_BODY.projects[0]] }),
     }));
     await flush();
     expect(root.querySelector(".breadcrumb-hub")).not.toBeNull();
@@ -227,8 +226,8 @@ describe("Breadcrumb hub segment", () => {
   });
 
   it("has no Hub link without a hub", async () => {
-    root = renderToDiv(h(Breadcrumb, {
-      view: "prd", navigateTo: () => {}, hubFetcher: hubFetch({ error: "no route" }, false),
+    root = renderToDiv(h(ProjectContext, {
+      view: "prd", hubFetcher: hubFetch({ error: "no route" }, false),
     }));
     await flush();
     expect(root.querySelector(".breadcrumb-hub")).toBeNull();

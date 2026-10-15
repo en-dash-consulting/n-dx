@@ -206,15 +206,16 @@ describe("TopNav", () => {
     expect(onOpenSearch).toHaveBeenCalledOnce();
   });
 
-  it("scoped: one tab, and the brand says standalone viewer", async () => {
+  it("scoped: one tab, and the brand is the product's mark", async () => {
     await mount(nav("overview", { validViews: buildValidViews("sourcevision"), scope: "sourcevision" }));
     expect(tabLabels()).toEqual(["Analysis"]);
-    expect(root.querySelector(".topnav-subtitle")?.textContent).toBe("standalone viewer");
+    expect(root.querySelector(".topnav-brand img")).not.toBeNull();
   });
 
-  it("names the project in the brand", async () => {
+  it("names the project in the top bar, beside the page's guide", async () => {
     await mount(nav("home"));
-    expect(root.querySelector(".topnav-project")?.textContent).toBe("demo-project");
+    expect(root.querySelector(".project-context .breadcrumb-project")?.textContent).toBe("demo-project");
+    expect(root.querySelector(".topnav-guide .guide-btn")).not.toBeNull();
   });
 });
 

@@ -36,7 +36,7 @@ import {
   tilePlacesView,
   type StageId,
 } from "../../../src/viewer/views/index.js";
-import { Breadcrumb } from "../../../src/viewer/components/breadcrumb.js";
+import { ProjectContext } from "../../../src/viewer/components/project-context.js";
 import { Guide, GUIDE_VIEWS } from "../../../src/viewer/components/guide.js";
 import { TopNav } from "../../../src/viewer/components/top-nav.js";
 import { SettingsOverlay } from "../../../src/viewer/components/settings-overlay.js";
@@ -199,22 +199,10 @@ describe("rendered surfaces take their labels from the model", () => {
     vi.unstubAllGlobals();
   });
 
-  it("the breadcrumb's current segment is the model's label, for every view", async () => {
-    const wrong: string[] = [];
-    for (const view of ALL_VIEWS) {
-      act(() => { render(h(Breadcrumb, { view, navigateTo: () => {} }), root); });
-      await settle();
-      const current = root.querySelector(".breadcrumb-current")?.textContent ?? "";
-      const expected = resolveCliLabel(viewLabel(view), "n-dx");
-      if (current !== expected) wrong.push(`${view}: rendered "${current}", model says "${expected}"`);
-    }
-    expect(wrong).toEqual([]);
-  });
-
   it("document.title carries the model's label and product, for every view", async () => {
     const wrong: string[] = [];
     for (const view of ALL_VIEWS) {
-      act(() => { render(h(Breadcrumb, { view, navigateTo: () => {} }), root); });
+      act(() => { render(h(ProjectContext, { view }), root); });
       await settle();
       const label = resolveCliLabel(viewLabel(view), "n-dx");
       const expected = viewProduct(view) === "global" ? `${label} | ` : `${label} — ${PRODUCT_LABELS[viewProduct(view)]}`;
@@ -229,20 +217,19 @@ describe("rendered surfaces take their labels from the model", () => {
     // The crash-recovery banner restores a nav state read from localStorage
     // with an unchecked cast and passes it to `navigateTo`, which does not
     // check it against `validViews`. A key written by an older build, naming
-    // a view since removed, reaches the breadcrumb — and a blind lookup would
+    // a view since removed, reaches the top bar — and a blind lookup would
     // throw through the render, blanking the dashboard during a crash
-    // recovery. The project segment survives; the view's own is dropped.
+    // recovery. The project context survives; the title names no view.
     const onError = vi.fn();
     window.addEventListener("error", onError);
     act(() => {
-      render(h(Breadcrumb, { view: "a-view-that-was-removed" as ViewId, navigateTo: () => {} }), root);
+      render(h(ProjectContext, { view: "a-view-that-was-removed" as ViewId }), root);
     });
     await settle();
     window.removeEventListener("error", onError);
 
     expect(onError).not.toHaveBeenCalled();
-    expect(root.querySelector(".breadcrumb")).not.toBeNull();
-    expect(root.querySelector(".breadcrumb-current")).toBeNull();
+    expect(root.querySelector(".project-context")).not.toBeNull();
     expect(root.textContent).toContain("demo");
     // No view segment: the title keeps whatever else it has, but emits no
     // "<label> — <product>" pair for a view the model cannot name.

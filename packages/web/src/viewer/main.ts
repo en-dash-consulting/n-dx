@@ -5,13 +5,12 @@ import type { DetailItem, ViewId } from "./types.js";
 import { ALL_DATA_FILES } from "./external.js";
 import {
   TopNav,
+  PageTitle,
   StageLinks,
   BottomBar,
   SettingsOverlay,
   CommandsSheet,
   DetailPanel,
-  Guide,
-  Breadcrumb,
   updateFavicon,
   MemoryWarningBanner,
   CrashRecoveryBanner,
@@ -237,7 +236,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     document.getElementById("main-content")?.scrollTo(0, 0);
   }, [pageView]);
 
-  // document.title is owned by <Breadcrumb>, which has the project name and
+  // document.title is owned by <ProjectContext> in the top bar, which has the project name and
   // product context. A second writer here raced it: whichever effect ran last
   // won, so the title silently lost its product segment.
 
@@ -277,13 +276,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
         "aria-label": "Main content",
         onClick: handleTripleClick,
       },
-        // Page-context bar: breadcrumb navigation + help buttons
-        h("div", { class: "page-context-bar", role: "group", "aria-label": "Page navigation and help" },
-          h(Breadcrumb, { view: pageView, navigateTo, scope }),
-          h("div", { class: "page-context-actions" },
-            h(Guide, { view: pageView }),
-          ),
-        ),
+        h(PageTitle, { view: pageView }),
         renderViewContent(pageView, loading, viewCtx),
       ),
       h(StageLinks, { stage, validViews, onNavigate: handleSidebarNav }),

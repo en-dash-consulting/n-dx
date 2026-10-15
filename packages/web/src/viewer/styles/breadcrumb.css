@@ -1,36 +1,36 @@
-/* ── Breadcrumb navigation ── */
+/* ── Top bar project context (components/project-context.ts) ──
+   Hub link / project switcher above the worktree · branch chip. The
+   switchers keep their breadcrumb-* class names from the breadcrumb row
+   they used to sit in. */
 
-.breadcrumb {
+.project-context {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
   min-width: 0;
+  max-width: 260px;
+  padding: 0 var(--space-4);
+  border-right: 1px solid var(--border);
+  align-self: stretch;
 }
 
-.breadcrumb-list {
+.project-context-name {
   display: flex;
   align-items: center;
-  gap: 0;
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  gap: 6px;
   min-width: 0;
-}
-
-.breadcrumb-item {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  min-width: 0;
-  font-size: var(--font-base);
-  color: var(--text-dim);
+  font-size: 14px;
   white-space: nowrap;
 }
 
-/* Chevron separator */
-.breadcrumb-sep {
-  flex-shrink: 0;
+.project-context-sep {
   color: var(--text-muted);
-  margin: 0 6px;
+}
+
+.project-context .breadcrumb-branch {
+  margin-left: 0;
+  align-self: flex-start;
 }
 
 /* Project name — prominent styling */
@@ -64,44 +64,6 @@
 .breadcrumb-branch-icon {
   flex-shrink: 0;
   opacity: 0.7;
-}
-
-/* Product link — clickable, styled per product */
-.breadcrumb-link {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  font-size: var(--font-base);
-  font-weight: var(--weight-medium);
-  color: var(--text-dim);
-  transition: color var(--transition-normal);
-  font-family: inherit;
-}
-
-.breadcrumb-link:hover {
-  color: var(--text);
-}
-
-/* Product-specific accent on hover */
-.breadcrumb-product-sourcevision:hover {
-  color: var(--brand-teal);
-}
-
-.breadcrumb-product-rex:hover {
-  color: var(--brand-purple);
-}
-
-.breadcrumb-product-hench:hover {
-  color: var(--brand-orange);
-}
-
-/* Current page segment — prominent, acts as page title */
-.breadcrumb-current {
-  color: var(--text);
-  font-weight: var(--weight-bold);
-  font-size: var(--font-xl);
 }
 
 /* ── Workspace switcher (the branch chip as a menu) ── */
