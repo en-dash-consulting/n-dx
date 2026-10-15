@@ -482,7 +482,7 @@ export async function cmdPack(args: readonly string[], deps: PackCommandDeps = {
     default:
       throw new CLIError(
         sub ? `Unknown pack command: ${sub}` : "Missing pack command",
-        "Run 'sourcevision pack --help': pack add <lang> [--from <bundle>], pack bundle <lang>, pack list, pack remove <lang>.",
+        "Run 'sourcevision pack --help': pack add [<lang>] [--from <bundle>], pack bundle <lang>, pack list, pack remove <lang>.",
         CLI_ERROR_CODES.UNKNOWN_COMMAND,
       );
   }

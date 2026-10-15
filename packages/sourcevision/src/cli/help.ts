@@ -293,7 +293,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     tool: "sourcevision",
     command: "pack",
     summary: "install, bundle, list and remove language packs",
-    usage: "sourcevision pack <add <lang> [--from <bundle>] | bundle <lang> | list | remove <lang>> [options]",
+    usage: "sourcevision pack <add [<lang>] [--from <bundle>] | bundle <lang> | list | remove <lang>> [options]",
     description:
       "Manages opt-in language packs (java, go, sql, terraform) in the per-user\n" +
       "pack directory, <ndx home>/packs/<sourcevision version>/, where analysis\n" +
@@ -302,8 +302,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "  add <lang>      npm install --prefix <pack dir> @n-dx/lang-<lang>@<version>,\n" +
       "                  then loads the pack; a pack of another version or one that\n" +
       "                  will not load is an error\n" +
+      "  add             Installs each pack the project lists in sourcevision.packs\n" +
+      "                  (project config) that is not already found\n" +
       "  list            Each pack: installed, resolved (e.g. the default Go pack),\n" +
-      "                  missing or refused, with its version\n" +
+      "                  missing or refused, with its version; listed packs marked\n" +
       "  remove <lang>   npm uninstall --prefix <pack dir> @n-dx/lang-<lang>; a pack\n" +
       "                  found only by module resolution is left alone\n" +
       "\n" +
@@ -323,6 +325,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     examples: [
       { command: "ndx sv pack add java", description: "Install the Java pack" },
+      { command: "sv pack add", description: "Install the packs the project lists in sourcevision.packs" },
       { command: "sv pack bundle java --out java.tgz", description: "Make an offline bundle of the Java pack" },
       { command: "sv pack add java --from java.tgz", description: "Install that bundle with no network" },
       { command: "sv pack add java --dry-run", description: "Show the npm command it would run" },

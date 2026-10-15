@@ -33,6 +33,14 @@ describe("sourcevision CLI help", () => {
     }
   });
 
+  it("pack: documents the project pack list (add with no language, listed packs marked)", () => {
+    showCommandHelp("pack");
+    const output = logSpy.mock.calls[0][0] as string;
+    expect(output).toContain("add [<lang>]");
+    expect(output).toContain("sourcevision.packs");
+    expect(output).toContain("listed packs marked");
+  });
+
   it("returns false for unknown commands", () => {
     expect(showCommandHelp("nonexistent")).toBe(false);
     expect(logSpy).not.toHaveBeenCalled();
