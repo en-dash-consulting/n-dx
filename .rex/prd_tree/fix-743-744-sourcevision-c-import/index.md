@@ -30,4 +30,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Hub files with very high fan-in no longer pull a project into one Louvain community](./hub-files-with-very-high-fan-in-no.md) | pending |
 | [Incremental analyzers drop carried-over entries for files no longer in the inventory](./incremental-analyzers-drop-carried.md) | completed |
 | [Partition review runs on a fresh partition and flags a zone holding most of the files](./partition-review-runs-on-a-fresh.md) | pending |
-| [WebForms code-behind classes are scoped to their page, not merged as partials across pages](./webforms-code-behind-classes-are.md) | pending |
+| [WebForms code-behind classes are scoped to their page, not merged as partials across pages](./webforms-code-behind-classes-are.md) | completed |

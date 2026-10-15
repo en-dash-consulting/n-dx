@@ -258,3 +258,68 @@ describe("WebForms markup", () => {
     expect(pairs(imports.edges)).toEqual(["Web/Default.aspx -> Web/Default.aspx.cs"]);
   });
 });
+
+describe("WebForms code-behind scoping", () => {
+  const page = (name: string, cls = "_Default") => ({
+    [`Web/${name}.aspx`]: `<%@ Page CodeFile="${name}.aspx.cs" Inherits="${cls}" %>`,
+    [`Web/${name}.aspx.cs`]: `public partial class ${cls} : SecurePage { void Page_Load() { new Helper(); } }`,
+  });
+
+  it("does not link copy-pasted pages that declare the same class", async () => {
+    const result = await graph({
+      ...page("Orders"),
+      ...page("Invoices"),
+      "Web/Orders.aspx.designer.cs": `public partial class _Default { protected Label Title; }`,
+      "App_Code/SecurePage.cs": `public class SecurePage { }`,
+      "App_Code/Helper.cs": `public class Helper { }`,
+    });
+    expect(pairs(result.edges)).toEqual([
+      "Web/Invoices.aspx -> Web/Invoices.aspx.cs",
+      "Web/Invoices.aspx.cs -> App_Code/Helper.cs",
+      "Web/Invoices.aspx.cs -> App_Code/SecurePage.cs",
+      "Web/Orders.aspx -> Web/Orders.aspx.cs",
+      "Web/Orders.aspx -> Web/Orders.aspx.designer.cs",
+      "Web/Orders.aspx.cs -> App_Code/Helper.cs",
+      "Web/Orders.aspx.cs -> App_Code/SecurePage.cs",
+      "Web/Orders.aspx.cs -> Web/Orders.aspx.designer.cs",
+      "Web/Orders.aspx.designer.cs -> Web/Orders.aspx.cs",
+    ]);
+  });
+
+  it("reports no cycle between pages sharing a class name", async () => {
+    const dir = await project({
+      "Site.sln": "",
+      ...page("A"),
+      ...page("B"),
+      ...page("C"),
+      "App_Code/SecurePage.cs": `public class SecurePage { }`,
+      "App_Code/Helper.cs": `public class Helper { }`,
+    });
+    const imports = await analyzeImports(dir, await analyzeInventory(dir));
+    expect(imports.edges.some((e) => e.from.endsWith(".aspx.cs") && e.to.endsWith(".aspx.cs"))).toBe(false);
+    expect(imports.summary.circularCount).toBe(0);
+  });
+
+  it("resolves an outside reference to a page class only when one page declares it", async () => {
+    const result = await graph({
+      ...page("Orders"),
+      ...page("Invoices"),
+      ...page("Login", "LoginPage"),
+      "App_Code/Nav.cs": `public class Nav { _Default d; LoginPage l; }`,
+    });
+    expect(pairs(result.edges).filter((p) => p.startsWith("App_Code/"))).toEqual([
+      "App_Code/Nav.cs -> Web/Login.aspx.cs",
+    ]);
+  });
+
+  it("still links every part of a partial class outside code-behind files", async () => {
+    const result = await graph({
+      "App_Code/Order.cs": `public partial class Order { }`,
+      "App_Code/Order.Pricing.cs": `public partial class Order { }`,
+    });
+    expect(pairs(result.edges)).toEqual([
+      "App_Code/Order.Pricing.cs -> App_Code/Order.cs",
+      "App_Code/Order.cs -> App_Code/Order.Pricing.cs",
+    ]);
+  });
+});

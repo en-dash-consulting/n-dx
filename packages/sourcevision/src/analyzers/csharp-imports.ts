@@ -23,6 +23,14 @@
  * (the class behind it), `MasterPageFile` (its master page) and
  * `<%@ Register Src=… %>` (each user control it uses).
  *
+ * A code-behind class belongs to its page. A Web Site project compiles each
+ * page on its own, so copy-pasted pages that each declare
+ * `partial class _Default` hold different classes, not parts of one: a type
+ * declared in a code-behind file (`X.aspx.cs`, `X.aspx.designer.cs`, or a file
+ * a markup directive binds) pairs only with the other parts of the same page,
+ * and a reference from elsewhere to a page class that several pages declare
+ * resolves to none of them.
+ *
  * A `using` of a namespace the project does not declare is an external
  * import (`System.*` is the standard library). This is a lexer pass, not a
  * compiler: a name declared twice in visible namespaces links to both, and
@@ -292,6 +300,9 @@ function resolveMarkupPath(from: string, written: string, known: ReadonlySet<str
   }
 }
 
+/** `Default.aspx.cs` / `Default.aspx.designer.cs` → the page `Default.aspx`. */
+const CODE_BEHIND_RE = /^(.*\.(?:aspx|ascx|master|ashx|asmx))(?:\.designer)?\.cs$/i;
+
 const isMarkup = (path: string) => {
   const dot = path.lastIndexOf(".");
   return dot !== -1 && WEBFORMS_EXTENSIONS.has(path.slice(dot).toLowerCase());
@@ -339,17 +350,44 @@ export async function buildCSharpImportGraph(
   }
   const known = new Set(allFiles.map((f) => f.path));
 
-  // Index: fully qualified type → declaring files; every namespace the
-  // project declares (with parents); last segments, to skip tokens cheaply.
+  // Page of every markup file (itself) and code-behind file (the markup that
+  // binds it, else the page its name implies).
+  const pageOf = new Map<string, string>();
+  for (const [path, refs] of markup) {
+    pageOf.set(path, path);
+    for (const written of refs.paths) {
+      const to = resolveMarkupPath(path, written, known);
+      if (to && facts.has(to)) pageOf.set(to, path);
+    }
+  }
+  for (const path of facts.keys()) {
+    const m = pageOf.has(path) ? null : CODE_BEHIND_RE.exec(path);
+    if (m) pageOf.set(path, m[1]);
+  }
+
+  // Index: fully qualified type → declaring files (page types per page);
+  // every namespace the project declares (with parents); last segments, to
+  // skip tokens cheaply.
   const typeIndex = new Map<string, string[]>();
+  const pageTypeIndex = new Map<string, Map<string, string[]>>();
   const projectNamespaces = new Set<string>();
   const shortNames = new Set<string>();
   const globalUsings = new Set<string>();
+  const addTo = (index: Map<string, string[]>, key: string, path: string) => {
+    const files = index.get(key) ?? [];
+    if (!files.includes(path)) files.push(path);
+    index.set(key, files);
+  };
   for (const [path, f] of facts) {
+    const page = pageOf.get(path);
     for (const t of f.types) {
-      const files = typeIndex.get(t) ?? [];
-      if (!files.includes(path)) files.push(path);
-      typeIndex.set(t, files);
+      if (page === undefined) {
+        addTo(typeIndex, t, path);
+      } else {
+        const byPage = pageTypeIndex.get(t) ?? new Map<string, string[]>();
+        addTo(byPage, page, path);
+        pageTypeIndex.set(t, byPage);
+      }
       shortNames.add(t.slice(t.lastIndexOf(".") + 1));
     }
     for (const ns of f.namespaces) {
@@ -372,9 +410,23 @@ export async function buildCSharpImportGraph(
       edgeMap.set(key, { from, to, type: "static", symbols: [symbol], weight: count });
     }
   };
+  /**
+   * Files declaring `typeName` as seen from `page` (undefined outside any
+   * page): the page's own parts first, then a shared type, then a page type
+   * only one page declares. A page type several pages declare is ambiguous.
+   */
+  const declaringFiles = (typeName: string, page: string | undefined): string[] | undefined => {
+    const byPage = pageTypeIndex.get(typeName);
+    if (page !== undefined && byPage?.has(page)) return byPage.get(page);
+    const shared = typeIndex.get(typeName);
+    if (shared) return shared;
+    if (byPage?.size === 1) return byPage.values().next().value;
+    return undefined;
+  };
+  const isProjectType = (typeName: string) => typeIndex.has(typeName) || pageTypeIndex.has(typeName);
   const addEdge = (from: string, typeName: string, count: number) => {
     const short = typeName.slice(typeName.lastIndexOf(".") + 1);
-    for (const to of typeIndex.get(typeName) ?? []) link(from, to, short, count);
+    for (const to of declaringFiles(typeName, pageOf.get(from)) ?? []) link(from, to, short, count);
   };
 
   for (const [path, refs] of markup) {
@@ -394,22 +446,24 @@ export async function buildCSharpImportGraph(
       for (const n of namespaceChain(ns)) scopes.add(n);
     }
     const imported = [...new Set([...f.usings, ...globalUsings])];
+    const page = pageOf.get(path);
+    const resolves = (full: string) => declaringFiles(full, page) !== undefined;
 
     const lookup = (name: string): string | undefined => {
       for (const s of scopes) {
         const full = qualify(s, name);
-        if (typeIndex.has(full)) return full;
+        if (resolves(full)) return full;
       }
       for (const u of imported) {
         const full = qualify(u, name);
-        if (typeIndex.has(full)) return full;
+        if (resolves(full)) return full;
       }
       const dot = name.indexOf(".");
       const head = dot === -1 ? name : name.slice(0, dot);
       const alias = f.aliases.get(head);
       if (alias !== undefined) {
         const full = dot === -1 ? alias : alias + name.slice(dot);
-        if (typeIndex.has(full)) return full;
+        if (resolves(full)) return full;
       }
       return undefined;
     };
@@ -431,11 +485,11 @@ export async function buildCSharpImportGraph(
     }
 
     for (const target of [...f.staticUsings, ...f.aliases.values()]) {
-      if (typeIndex.has(target)) addEdge(path, target, 1);
+      if (resolves(target)) addEdge(path, target, 1);
     }
 
     const externalNamespaces = [...f.usings, ...f.globalUsings, ...f.staticUsings, ...f.aliases.values()]
-      .filter((ns) => !projectNamespaces.has(ns) && !typeIndex.has(ns));
+      .filter((ns) => !projectNamespaces.has(ns) && !isProjectType(ns));
     for (const ns of externalNamespaces) {
       // `using static`/alias targets name a type; the package is its namespace.
       const pkgNs = f.staticUsings.includes(ns) || [...f.aliases.values()].includes(ns)

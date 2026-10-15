@@ -56,8 +56,8 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Zone Detection Validation for Go Projects](./zone-detection-validation-for-go/index.md) | completed |
 | [Allowlist workspace.ts in the child_process architecture policy (PR #354 CI fix)](./allowlist-workspace-ts-in-the-child.md) | completed |
 | [ArchitectureView calls useMemo after its enrichment-gate early return](./architectureview-calls-usememo-after.md) | completed |
+| [Call graph covers C#, so god classes and methods are detected on .NET projects](./call-graph-covers-c-so-god-classes-and.md) | pending |
 | [Fix conditional hook order in the Problems and Suggestions views](./fix-conditional-hook-order-in-the.md) | completed |
 | [Optional 3D isometric architecture map generator](./optional-3d-isometric-architecture-map.md) | completed |
 | [sv analyze removes its stop handlers before the progress file stops saying running](./sv-analyze-removes-its-stop-handlers.md) | pending |
 | [sv analyze: skip git worktree checkouts in sub-analysis discovery](./sv-analyze-skip-git-worktree-checkouts.md) | completed |
-| [Call graph covers C#, so god classes and methods are detected on .NET projects](./call-graph-covers-c-so-god-classes-and.md) | pending |
