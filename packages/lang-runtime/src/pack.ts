@@ -22,7 +22,9 @@ import { join } from "node:path";
 import type {
   ExternalModule,
   ExternalReference,
+  FactKind,
   FactProducer,
+  FileFacts,
   FileReference,
   FileReferences,
   LanguageConfig,
@@ -116,10 +118,32 @@ export interface PreparedResolver {
   resolve(fromFile: string): FileReferences;
 }
 
-/** Reserved: framework rules layered on a language pack. Not implemented yet. */
-export interface FrameworkPack {
+/** What a framework reads from a project: facts per file path, and what it skipped. */
+export interface FrameworkFacts {
+  /** Merged into each file's facts; a list kind another reader also fills is concatenated. */
+  readonly facts: ReadonlyMap<string, Omit<FileFacts, "path">>;
+  /** One sentence each, reported as the pack entry's `notices`. */
+  readonly notices: readonly string[];
+}
+
+/**
+ * Framework rules layered on a language pack (Spring Boot on Java). Its
+ * queries run in the same parse as the language pack's, and only when a kind
+ * it produces is wanted, so a caller asking for imports alone pays nothing
+ * for it; the golden harness runs the language pack's queries only. Query
+ * names must differ from the language pack's: captures are keyed by them.
+ * Every kind it produces is listed in the language pack's `produces` too.
+ */
+export interface FrameworkPack extends FactProducer {
   readonly id: string;
+  readonly queries: readonly PackQuery[];
+  /** One record per rule, keyed by rule name (every query name at least). */
   readonly provenance: Readonly<Record<string, RuleProvenance>>;
+  /**
+   * Read every parsed file's captures (the language pack's and this
+   * framework's) into the wanted kinds it produces. Called once per analysis.
+   */
+  read(files: readonly PackSourceFile[], kinds: readonly FactKind[]): FrameworkFacts;
 }
 
 /** Reserved: an optional precise (SCIP) index tier. Not implemented yet. */
@@ -142,7 +166,7 @@ export interface LanguagePack extends FactProducer {
   readonly resolver?: PackResolver;
   /** One record per rule, keyed by rule name (every query name at least). */
   readonly provenance: Readonly<Record<string, RuleProvenance>>;
-  /** Reserved — see {@link FrameworkPack}. */
+  /** Framework rules over this language; see {@link FrameworkPack}. */
   readonly frameworks?: readonly FrameworkPack[];
   /** Reserved — see {@link PreciseIndexSource}. */
   readonly precise?: PreciseIndexSource;

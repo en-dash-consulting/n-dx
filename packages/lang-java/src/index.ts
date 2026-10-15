@@ -12,3 +12,4 @@ export { JAVA_PACKAGE } from "./package-paths.js";
 export * from "./java-pack.js";
 export * from "./java-resolver.js";
 export * from "./java-sql.js";
+export * from "./spring-boot.js";

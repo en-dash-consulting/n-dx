@@ -73,6 +73,12 @@ export interface PackProjectResult {
    */
   readonly unparsed: readonly string[];
   /**
+   * What the pack read but chose not to report, one sentence each: a Spring
+   * route whose path is not a string literal is skipped and counted here,
+   * never guessed. Absent when there is nothing to say.
+   */
+  readonly notices?: readonly string[];
+  /**
    * Set when the pack could not run at all — for a grammar-based pack a grammar
    * that is missing or will not load, a query that will not compile, build
    * files that cannot be read; for a compiler-based pack a compiler that will

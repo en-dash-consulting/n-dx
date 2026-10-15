@@ -11,6 +11,7 @@ import { javaConfig } from "@n-dx/lang-kit";
 import { typeRule, type LanguagePack, type PackSymbolRules, type RuleProvenance } from "@n-dx/lang-runtime";
 import { javaResolver } from "./java-resolver.js";
 import { JAVA_PACKAGE } from "./package-paths.js";
+import { springBoot } from "./spring-boot.js";
 
 const QUERY_NAMES = ["packages", "imports", "declarations", "methods", "calls", "annotations", "type-references"] as const;
 
@@ -38,7 +39,9 @@ export const javaPack: LanguagePack = {
     return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
   },
   resolver: javaResolver,
-  produces: ["imports", "symbols", "calls"],
+  // Routes and outbound calls come from the Spring Boot framework, whose query runs only when they are wanted.
+  produces: ["imports", "symbols", "calls", "routes", "outboundCalls"],
+  frameworks: [springBoot],
   provenance: {
     packages: VERIFIED,
     imports: VERIFIED,

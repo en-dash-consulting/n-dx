@@ -12,9 +12,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { goConfig, isLanguagePackEntry } from "@n-dx/lang-kit";
 import { createPackEntry } from "../../src/pack-entry.js";
-import { factGaps } from "../../src/pack-facts.js";
+import { factGaps, mergeFileFacts } from "../../src/pack-facts.js";
 import { packPackage, type PackPackage } from "../../src/pack-package.js";
-import type { LanguagePack } from "../../src/pack.js";
+import type { FrameworkPack, LanguagePack } from "../../src/pack.js";
 
 const pack: LanguagePack = {
   id: "go",
@@ -111,5 +111,33 @@ describe("factGaps", () => {
 
   it("is empty once the pack has a project facts reader", () => {
     expect(factGaps(resourcesPack, undefined, () => new Map())).toEqual([]);
+  });
+
+  const framework = (produces: FrameworkPack["produces"]): FrameworkPack => ({
+    id: "web",
+    queries: [],
+    provenance: {},
+    produces,
+    read: () => ({ facts: new Map(), notices: [] }),
+  });
+
+  it("counts a framework as the reader of the kinds it produces", () => {
+    const routesPack: LanguagePack = { ...resourcesPack, produces: ["routes"], frameworks: [framework(["routes"])] };
+    expect(factGaps(routesPack, undefined)).toEqual([]);
+  });
+
+  it("names a framework kind the pack does not list", () => {
+    const routesPack: LanguagePack = { ...resourcesPack, produces: [], frameworks: [framework(["routes"])] };
+    expect(factGaps(routesPack, undefined)).toEqual(['framework "web" produces "routes", which the pack does not list']);
+  });
+});
+
+describe("mergeFileFacts", () => {
+  const at = { line: 1, column: 0 };
+  it("concatenates a list both fill and keeps the rest", () => {
+    const base = { path: "a", routes: [{ path: "/a", position: at }], calls: [] };
+    const merged = mergeFileFacts(base, { routes: [{ path: "/b", position: at }] });
+    expect(merged).toEqual({ path: "a", routes: [{ path: "/a", position: at }, { path: "/b", position: at }], calls: [] });
+    expect(mergeFileFacts(base, undefined)).toBe(base);
   });
 });

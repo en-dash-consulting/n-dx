@@ -110,7 +110,8 @@ export function createTreeSitterRunner(options: RunnerOptions = {}): TreeSitterR
   let disposed = false;
 
   function compile(target: RunnablePack): Promise<CompiledPack> {
-    const key = `${target.pack.id}\0${target.grammarPath}`;
+    // Query names are in the key: a pack runs with its framework queries added only when they are wanted.
+    const key = [target.pack.id, target.grammarPath, ...target.pack.queries.map((q) => q.name)].join("\0");
     let entry = compiled.get(key);
     if (!entry) {
       entry = loadGrammar(target.grammarPath).then((language) => {

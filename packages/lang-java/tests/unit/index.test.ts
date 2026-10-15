@@ -5,6 +5,6 @@ import { pack } from "../../src/index.js";
 describe("@n-dx/lang-java barrel", () => {
   it("exports the Java pack entry", () => {
     expect(isLanguagePackEntry(pack)).toBe(true);
-    expect(pack).toMatchObject({ packageName: "@n-dx/lang-java", id: "java", config: javaConfig, produces: ["imports", "symbols", "calls"] });
+    expect(pack).toMatchObject({ packageName: "@n-dx/lang-java", id: "java", config: javaConfig, produces: ["imports", "symbols", "calls", "routes", "outboundCalls"] });
   });
 });

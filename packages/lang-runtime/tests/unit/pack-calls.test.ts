@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Capture, SourcePosition } from "../../src/pack.js";
-import { groupCalls } from "../../src/pack-calls.js";
+import { callSites, groupCalls } from "../../src/pack-calls.js";
 
 let reads = 0;
 
@@ -42,6 +42,13 @@ describe("groupCalls", () => {
       { callee: "Query", receiver: "db", strings: [{ text: '"s1"', start: { line: 1, column: 9 }, end: { line: 1, column: 14 } }] },
       { callee: "Query", receiver: "db", strings: [{ text: '"s2"', start: { line: 2, column: 9 }, end: { line: 2, column: 14 } }] },
     ]);
+  });
+
+  it("keeps each call's captures as call sites, for rules that need positions", () => {
+    const [site] = callSites(call(3));
+    expect(site?.invocation?.text).toBe('db.Query("s3")');
+    expect([site?.receiver?.text, site?.name?.text, site?.arguments.text]).toEqual(["db", "Query", '("s3")']);
+    expect(site?.strings.map((s) => s.text)).toEqual(['"s3"']);
   });
 
   it("does work quadratic, not cubic, in the number of calls", () => {
