@@ -31,5 +31,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Python build readers in lang-kit: pyproject.toml, setup.cfg, requirements and setup.py](./python-build-readers-in-lang-kit.md) | completed |
 | [Python pack: grammar, structure queries, goldens and opt-in registration](./python-pack-grammar-structure-queries.md) | completed |
 | [Resolve Python imports to files and feed Python edges into analyze](./resolve-python-imports-to-files-and.md) | completed |
-| [The pinned Python 3.13 stdlib list was transcribed, not checked against CPython's stdlib_module_names.h](./the-pinned-python-3-13-stdlib-list-was.md) | pending |
+| [The pinned Python 3.13 stdlib list was transcribed, not checked against CPython's stdlib_module_names.h](./the-pinned-python-3-13-stdlib-list-was.md) | completed |
 | [toml-lite accepts [[a]] and [a] headers that extend a static array or an inline table](./toml-lite-accepts-a-and-a-headers-that.md) | completed |
+| [Python skip directories hide real packages named env (or build, dist)](./python-skip-directories-hide-real.md) | pending |
