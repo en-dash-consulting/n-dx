@@ -80,20 +80,23 @@ describe("change-has-target", () => {
 });
 
 describe("change-placed-at-close", () => {
+  /** Runs the rule on a product layer a change can be placed on. */
+  const placeable = (changes: RuleNode[]) => check("change-placed-at-close", { product: [cap()], changes });
+
   it("passes an open Inbox change and a completed placed change", () => {
     const changes = [
       node("change", { needsPlacement: true, status: "in_progress" }),
       node("change", { status: "completed", touches: ["a"] }),
       node("change", { status: "completed", needsPlacement: false, touches: ["a"] }),
     ];
-    expect(check("change-placed-at-close", { changes })).toEqual([]);
+    expect(placeable(changes)).toEqual([]);
   });
 
   it("fails a completed change still needing placement, and says when it also has no target", () => {
     const placedTargets = node("change", { status: "completed", needsPlacement: true, touches: ["a"] });
     const spike = node("change", { status: "completed", needsPlacement: true, spike: true });
     const untargeted = node("change", { status: "completed", needsPlacement: true });
-    const findings = check("change-placed-at-close", { changes: [placedTargets, spike, untargeted] });
+    const findings = placeable([placedTargets, spike, untargeted]);
     expect(ids(findings)).toEqual([placedTargets.id, spike.id, untargeted.id]);
     expect(findings[0].severity).toBe("error");
     expect(findings[0].message).not.toContain("must also amend or touch");
@@ -103,7 +106,7 @@ describe("change-placed-at-close", () => {
 
   it("fails an applied change still needing placement, whatever its status", () => {
     const applied = node("change", { status: "in_progress", appliedAt: "2026-10-05T00:00:00.000Z", needsPlacement: true, touches: ["a"] });
-    const findings = check("change-placed-at-close", { changes: [applied] });
+    const findings = placeable([applied]);
     expect(ids(findings)).toEqual([applied.id]);
     expect(findings[0].message).toContain("is applied but still needs placement");
   });
@@ -113,6 +116,15 @@ describe("change-placed-at-close", () => {
     const tree: V2Tree = { product: [], changes: [bare] };
     const findings = checkV2Rules(tree, { now: NOW }, ["change-has-target", "change-placed-at-close"]);
     expect(findings.map((f) => [f.rule, f.nodeId])).toEqual([["change-has-target", bare.id]]);
+  });
+
+  it("passes a closed Inbox change while the product layer has no capability or constraint, and fails it once one exists", () => {
+    const completed = node("change", { status: "completed", needsPlacement: true });
+    const applied = node("change", { appliedAt: "2026-10-05T00:00:00.000Z", needsPlacement: true });
+    const changes = [completed, applied];
+    expect(check("change-placed-at-close", { changes })).toEqual([]);
+    expect(check("change-placed-at-close", { product: [node("area")], changes })).toEqual([]);
+    expect(ids(check("change-placed-at-close", { product: [node("constraint", { statement: "s" })], changes }))).toEqual([completed.id, applied.id]);
   });
 });
 

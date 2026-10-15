@@ -65,6 +65,8 @@ const EXPECTED_EXPORTS = [
   "isAppliedChange",
   "indexTree",
   "enclosingChangeIds",
+  // the Inbox hold `--task` refuses on
+  "awaitsPlacement",
   // v2 reader — which untracked intent files a completion's state.yaml holds rows for
   "loadPrdModel",
   // Cross-worktree task claims

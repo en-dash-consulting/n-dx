@@ -13,6 +13,7 @@
  */
 
 import {
+  awaitsPlacement,
   findActionableWork,
   findItem,
   findNextWorkTask,
@@ -177,14 +178,15 @@ export function changeTasksRefusal(
 }
 
 /**
- * Why a ref cannot run: it names an Inbox change (`needsPlacement`), or a task
- * inside one. Rex refuses to close such a change, so a run would work it and
- * then end completed with the item still open. `undefined` when the ref is
- * placed or names nothing.
+ * Why a ref cannot run: it names a change held for placement
+ * (`awaitsPlacement`), or a task inside one. Rex refuses to close such a
+ * change, so a run would work it and then end completed with the item still
+ * open. `undefined` when the ref is not held or names nothing; on a product
+ * layer with no capability or constraint an Inbox change is not held.
  */
 export function inboxRefusal(tree: V2Tree, ref: string, cliName = DEFAULT_CLI_NAME): CLIError | undefined {
   const change = resolveWorkById(tree, ref)?.change;
-  if (!change?.needsPlacement) return undefined;
+  if (!change || !awaitsPlacement(indexTree(tree), change)) return undefined;
   return new CLIError(
     `"${change.title}" (${change.id}) is in the Inbox and needs placement, so it cannot be worked on.`,
     `Place it first with 'rex change place' (MCP: place_change), then run '${cliName} work --task=${ref}' again.`,
