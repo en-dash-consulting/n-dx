@@ -45,6 +45,7 @@ const NOT_PACKS = new Set(["lang-kit", "lang-runtime"]);
 const SAMPLES: Record<string, Record<string, string>> = {
   java: { "src/A.java": "package a;\n\nclass A {}\n" },
   go: { "go.mod": "module example.com/a\n", "a.go": "package a\n" },
+  terraform: { "main.tf": 'resource "aws_s3_bucket" "a" {}\n' },
 };
 
 interface Report {

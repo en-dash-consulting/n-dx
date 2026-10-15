@@ -34,14 +34,32 @@ in `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs.
    built or not loadable, a query that will not compile, unreadable build
    files) or its `analyzeProject` rejects. `src/analyzers/pack-imports.ts`
    reports it once per run: Java files get inventory only, Go edges come from
-   the regex parser (`src/analyzers/go-imports.ts`). Analysis never fails on a
+   the regex parser (`src/analyzers/go-imports.ts`).
+   `src/analyzers/terraform-infrastructure.ts` reports a Terraform pack the
+   same way, once, and only when `infrastructure.json` lists a resource from a
+   `.tf` file: those resources get no model fields. Analysis never fails on a
    pack.
+
+### The Terraform model in infrastructure.json
+
+The Terraform pack produces `resources` facts, not imports.
+`enrichTerraformInfrastructure` (called by `analyze` after
+`computeInfrastructure`) adds optional `module`, `provider` (`{ name,
+version? }`), `references` (`infra:<type>.<name>` ids of listed resources in the
+same module directory) and `attributes` (`engine`, `engineVersion`, `runtime`,
+`image`, `clusterVersion`) to each resource it lists from a `.tf` file whose file
+and `<type>.<name>` match a fact. Values are as written, never normalised; a
+field appears only when the pack supplied it. It never adds or removes a
+resource, link or seam or changes an existing field, so resources only the
+model finds stay out. `analyzers/infrastructure.ts` and `IAC_KINDS` are not
+involved, so the iso-map bundle does not change. Without the pack the file is
+byte-identical. The field names await Sterling H's review (decision 3).
 
 ### How packs are installed
 
 `sv pack` (`src/cli/commands/pack.ts`, reached as `ndx sv pack …`) manages
-the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, sql,
-terraform; only `KNOWN_PACKS` are analyzed with today):
+the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, terraform,
+sql; only `KNOWN_PACKS`, all but sql, are analyzed with today):
 
 - `add <lang>` runs `npm install --prefix <pack dir> @n-dx/lang-<lang>@<sourcevision version>`,
   creating the directory, then loads the pack from it with `loadPack`; a
