@@ -31,7 +31,7 @@ plannedRelease: "1.0.0"
 | [Define the v2 PRD schema](./define-the-v2-prd-schema/index.md) | completed |
 | [Derived status, health and computed edges](./derived-status-health-and-computed-edges/index.md) | completed |
 | [Docs, skills and policies for the v2 model](./docs-skills-and-policies-for-the-v2/index.md) | pending |
-| [Edit a capability's spec from the dashboard](./edit-a-capability-s-spec-from-the/index.md) | pending |
+| [Edit a capability's spec from the dashboard](./edit-a-capability-s-spec-from-the/index.md) | completed |
 | [Every n-dx commit carries an item trailer](./every-n-dx-commit-carries-an-item/index.md) | completed |
 | [Every PRD tool opens a v2 tree, and none can split it](./every-prd-tool-opens-a-v2-tree-and/index.md) | completed |
 | [Generate the migration plan](./generate-the-migration-plan/index.md) | completed |
