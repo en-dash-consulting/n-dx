@@ -39,7 +39,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Pair-Programming Command Mode (rename from single-command)](./pair-programming-command-mode-rename/index.md) | completed |
 | [Plan-Mode Prevention Skill for LLM Agents](./plan-mode-prevention-skill-for-llm/index.md) | completed |
 | [Pre-Execution Confirmation Prompt for ndx self-heal](./pre-execution-confirmation-prompt-for/index.md) | completed |
-| [rex migrate-slugs help and JSDoc describe the slug rule it replaced, so the right tool reads as the wrong one](./rex-migrate-slugs-help-and-jsdoc.md) | pending |
+| [rex migrate-slugs help and JSDoc describe the slug rule it replaced, so the right tool reads as the wrong one](./rex-migrate-slugs-help-and-jsdoc.md) | completed |
 | [Self-Heal Scoped Task Selection and Auto-Termination](./self-heal-scoped-task-selection-and/index.md) | completed |
 | [Self-Heal Tag Attribution on Created PRD Items](./self-heal-tag-attribution-on-created/index.md) | completed |
 | [Shared Unit Test Utilities](./shared-unit-test-utilities/index.md) | completed |
