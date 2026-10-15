@@ -37,13 +37,24 @@ export default defineConfig({
     // imports of @anthropic-ai/sdk, or call vi.resetModules() take 2-4 seconds
     // on their own. Under full-monorepo parallel load (pnpm -r test) the first
     // module-load per worker can push past 5 s, causing spurious timeouts.
-    testTimeout: 30_000,
+    //
+    // Raised again from 30s to match the root config's allowance for
+    // integration work. 30s still failed on the Windows runner, and the test
+    // it failed moved between runs — codex-resume-contract's five UNSAFE
+    // cases and v2-task-less-change's beforeEach in one run, then
+    // recovery-commands-shell-exec's powershell case in the next, on an
+    // unchanged tree. None is hung: each passes standalone in seconds, and
+    // the same suite passes on Linux in 4m31s against Windows' 15m24s. The
+    // limit was below what a loaded Windows runner needs, not a symptom of a
+    // test that stopped making progress. A genuine hang still fails, later.
+    testTimeout: 120_000,
     // Never below testTimeout. Vitest defaults hookTimeout to 10s, which gave a
     // beforeEach a third of the budget of the test it prepares. These hooks run
     // mkdtemp plus initGitFixtureRepo's git init/add/commit as subprocesses; on
     // a loaded Windows CI runner that exceeds 10s, which is what produced
-    // "Hook timed out in 10000ms" in the integration suites.
-    hookTimeout: 30_000,
+    // "Hook timed out in 10000ms" in the integration suites — and at 30s it
+    // produced "Hook timed out in 30000ms" from the same hooks.
+    hookTimeout: 120_000,
     // Two projects over the same files: the ones that mock modules or globals
     // get a worker each, everything else shares workers. See
     // tests/vitest-isolation.mjs for the split and the numbers behind it.
