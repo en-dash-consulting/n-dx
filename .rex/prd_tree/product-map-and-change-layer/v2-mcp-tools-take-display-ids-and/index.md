@@ -20,5 +20,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [MCP health on a v2 tree scores the change projection with v1 dimensions](./mcp-health-on-a-v2-tree-scores-the.md) | pending |
-| [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | pending |
+| [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | completed |
+| [On a v2 tree, release_task leaves a claim held when given the display id claim_task accepted](./on-a-v2-tree-release-task-leaves-a.md) | pending |
 | [update_task_status rejects a v2 display id that get_item accepts](./update-task-status-rejects-a-v2.md) | pending |
