@@ -1,8 +1,12 @@
 /**
- * `ndx migrate --apply` through the real CLI: it spawns `rex migrate --apply`
+ * `ndx migrate --apply` through the real CLI: it spawns `rex migrate-apply`
  * with the same flags (a space-separated `--plan <path>` rewritten to the `=`
- * form) and forwards rex's exit code; `--dry-run` reports per v1 kind and
- * writes nothing.
+ * form, and `--plan` defaulting to ./migration-plan.json, where
+ * `ndx migrate --plan` writes) and forwards rex's exit code; `--dry-run`
+ * reports per v1 kind and writes nothing.
+ *
+ * Every run is from the project directory, so the default plan path lands
+ * there rather than in the test runner's cwd.
  *
  * @see packages/core/cli.js handleMigrate
  */
@@ -35,7 +39,8 @@ describe("ndx migrate --apply", () => {
     await setupHenchDir(dir);
     await setupSourcevisionDir(dir);
     run(["rex", "migrate-to-folder-tree", dir]);
-    run(["migrate", "--plan", "--rules-only", dir]);
+    run(["migrate", "--plan", "--rules-only", dir], { cwd: dir });
+    expect(existsSync(join(dir, "migration-plan.json"))).toBe(true);
   });
 
   afterEach(async () => {
@@ -44,7 +49,7 @@ describe("ndx migrate --apply", () => {
 
   it("--dry-run prints per kind what becomes what, the Inbox holds and the dropped values, and writes nothing", () => {
     const before = snapshot(dir);
-    const out = run(["migrate", "--apply", "--dry-run", dir]);
+    const out = run(["migrate", "--apply", "--dry-run", dir], { cwd: dir });
 
     expect(out).toContain("Nothing was written");
     expect(out).toMatch(/epic \(1\): 1 area; held for the Inbox 0; dropped 0 droppedMeta, 0 droppedLog/);
@@ -58,21 +63,21 @@ describe("ndx migrate --apply", () => {
   it("rewrites --plan <path> to --plan=<path> and applies that plan", () => {
     // Away from the default path, so a bare --plan (the path dropped) would find no plan.
     const plan = join(dir, "elsewhere.json");
-    renameSync(join(dir, ".ndx-migration", "plan.json"), plan);
-    const out = run(["migrate", "--apply", "--plan", plan, "--dry-run", dir]);
+    renameSync(join(dir, "migration-plan.json"), plan);
+    const out = run(["migrate", "--apply", "--plan", plan, "--dry-run", dir], { cwd: dir });
     expect(out).toContain("apply would migrate 3 v1 items");
   });
 
   it("forwards rex's exit code and message when the plan is missing", () => {
     const missing = join(dir, "nowhere.json");
-    const result = runResult(["migrate", "--apply", "--plan", missing, dir]);
+    const result = runResult(["migrate", "--apply", "--plan", missing, dir], { cwd: dir });
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(`No migration plan at ${missing}`);
     expect(existsSync(join(dir, ".rex", "prd_tree"))).toBe(true);
   });
 
   it("without --dry-run writes the v2 tree and removes the v1 tree", () => {
-    run(["migrate", "--apply", dir]);
+    run(["migrate", "--apply", dir], { cwd: dir });
     expect(existsSync(join(dir, ".rex", "product"))).toBe(true);
     expect(existsSync(join(dir, ".rex", "prd_tree"))).toBe(false);
   });
@@ -83,7 +88,7 @@ describe("ndx migrate --apply", () => {
     renameSync(`${prdJson}.migrated`, prdJson);
     const before = snapshot(dir);
 
-    const result = runResult(["migrate", "--apply", dir]);
+    const result = runResult(["migrate", "--apply", dir], { cwd: dir });
 
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(`Legacy PRD source beside the tree: ${prdJson}`);

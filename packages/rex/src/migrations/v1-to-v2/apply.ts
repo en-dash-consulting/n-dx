@@ -14,15 +14,15 @@
  * - **Moved items.** An item whose planned parent is gone, or can no longer
  *   hold its type, is re-fitted: change-layer work becomes a task or subtask
  *   of its new parent, and anything else lands in the Inbox as a change.
- * - **Delivery containers.** A dissolved release epic, or an epic filed by an
- *   adversarial review, is no node: its children are placed or held like any
- *   change, a release epic stamps its release as their `plannedRelease`, and
- *   the cut change lists every container by id.
+ * - **Delivery containers.** A dissolved release epic is no node: its children
+ *   are placed or held like any change, its release is stamped as their
+ *   `plannedRelease`, and the cut change lists every container by id.
  * - **Product nodes.** Areas keep their v1 epic names. A capability ships its
  *   drafted spec, unreviewed unless the plan recorded an approval of that
- *   exact draft. A capability or constraint starts met (`metAt` is its spec
- *   hash) when its v1 item was completed or an applied change sits on it, and
- *   proposed otherwise: never revised.
+ *   exact draft. A capability or constraint starts met (`metAt` is the hash of
+ *   the spec written, which for a capability the plan marks `met` is the
+ *   plan's `metAt`) when its v1 item was completed or an applied change sits
+ *   on it, and proposed otherwise: never revised.
  * - **The cut.** The first change, "Product map and change layer", is applied
  *   at the plan's `cutAt` and adds every capability and constraint, so the
  *   product layer's history starts with the migration.
@@ -47,7 +47,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { amendsHash, freeChangeSlug } from "../../core/apply-amendments.js";
+import { amendsHash, freeSlug } from "../../core/apply-amendments.js";
 import { diffFingerprints, fingerprintTree, isLossless, type FingerprintDiff } from "../../core/slug-migration.js";
 import type { PRDItem } from "../../schema/v1.js";
 import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
@@ -57,7 +57,7 @@ import { discoverPRDFiles } from "../../store/prd-discovery.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "../../store/paths.js";
 import { CHANGES_DIRNAME, PRODUCT_DIRNAME, loadPrdModel, type PrdModel } from "../../store/prd-model-reader.js";
 import { writePrdModel } from "../../store/prd-model-writer.js";
-import { incompletePasses, type PlanFile } from "../plan-file.js";
+import type { PlanFile } from "../plan-file.js";
 import type { V1ToV2Entry, V1ToV2Summary } from "./index.js";
 import { countCorrupt, dropCorrupt, legacyLoeBucket, legacyLoeRationale, v2Slugs, type SlugEntry } from "./migration-plan-data.js";
 
@@ -76,7 +76,7 @@ const RETIRED_STATE_KEYS = ["commits"] as const;
 export interface DeliveryContainer {
   id: string;
   title: string;
-  /** The release its changes carry as `plannedRelease`; absent for a review container. */
+  /** The release its changes carry as `plannedRelease`; absent when the plan recorded none. */
   plannedRelease?: string;
 }
 
@@ -434,7 +434,7 @@ function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], plan:
     id,
     type: "change",
     title: CUT_CHANGE_TITLE,
-    slug: freeChangeSlug(CUT_CHANGE_TITLE, id, tree.changes),
+    slug: freeSlug(CUT_CHANGE_TITLE, id, tree.changes),
     intent: "Define the product capabilities: the product layer starts here, as built at the cut.",
     ...(amends.length > 0 ? { amends } : { spike: true }),
     body: lines.join("\n"),
@@ -513,10 +513,10 @@ export function assertApplicable(plan: PlanFile): asserts plan is V1ToV2Plan {
   if (plan.header.migration !== "v1-to-v2") {
     throw new MigrationApplyError(`The plan is for migration ${plan.header.migration}, not v1-to-v2.`);
   }
-  const stopped = incompletePasses(plan);
+  const stopped = plan.header.passes.filter((p) => p.incomplete);
   if (stopped.length > 0) {
     throw new MigrationApplyError(
-      `The plan is incomplete: ${stopped.map((p) => `the ${p.name} pass stopped (${p.incomplete.error})`).join("; ")}. Plan again before applying. Nothing was written.`,
+      `The plan is incomplete: ${stopped.map((p) => `the ${p.name} pass stopped (${p.incomplete!.error})`).join("; ")}. Plan again before applying. Nothing was written.`,
     );
   }
 }

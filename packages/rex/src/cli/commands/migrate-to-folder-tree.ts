@@ -38,7 +38,7 @@ const PRD_JSON_FILENAME = "prd.json";
  *
  * A converted prd.json is renamed to `prd.json.migrated`, the marker
  * `ensureLegacyPrdMigrated` leaves: a prd.json beside the tree is a legacy
- * source that `rex migrate --apply` refuses and the v1 load fallback reads.
+ * source that `rex migrate-apply` refuses and the v1 load fallback reads.
  *
  * Idempotent: re-running on an already-migrated project (even after prd.md has
  * been deleted) is a no-op with an informational message.

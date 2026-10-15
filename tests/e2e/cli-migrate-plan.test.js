@@ -1,7 +1,8 @@
 /**
- * `ndx migrate --plan` through the real CLI: it spawns `rex migrate --plan`,
+ * `ndx migrate --plan` through the real CLI: it spawns `rex migrate-plan`,
  * rewriting a space-separated `--out <path>` to `--out=<path>` (else `<path>`
- * is read as the project dir), and forwards rex's exit code and reason.
+ * is read as the project dir), and forwards rex's exit code and reason. A
+ * model pass that stops is recorded in the plan, which apply then refuses.
  *
  * @see packages/core/cli.js handleMigrate
  */
@@ -48,10 +49,10 @@ describe("ndx migrate --plan", () => {
     const tree = join(dir, ".rex", "prd_tree");
     const before = snapshot(tree);
 
-    run(["migrate", "--plan", "--rules-only", "--out", plan, dir]);
+    run(["migrate", "--plan", "--rules-only", "--out", plan, dir], { cwd: dir });
 
     expect(existsSync(plan)).toBe(true);
-    expect(existsSync(join(dir, ".ndx-migration", "plan.json"))).toBe(false);
+    expect(existsSync(join(dir, "migration-plan.json"))).toBe(false);
     expect(snapshot(tree)).toEqual(before);
   });
 
@@ -65,7 +66,7 @@ describe("ndx migrate --plan", () => {
   });
 
   // The stub is a POSIX shell script; Windows would resolve a real `claude` past it.
-  it.skipIf(process.platform === "win32")("exits non-zero when the model pass stops, keeping the plan for a re-run", () => {
+  it.skipIf(process.platform === "win32")("records a stopped model pass in the plan it keeps for a re-run, and apply refuses that plan", () => {
     // A `claude` that always fails, ahead of any real one on PATH.
     const bin = join(outDir, "bin");
     mkdirSync(bin);
@@ -78,11 +79,17 @@ describe("ndx migrate --plan", () => {
     // so nothing reaches a paid API.
     const env = { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` };
     for (const key of ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "TYPESAFE_API_KEY"]) delete env[key];
-    const result = runResult(["migrate", "--plan", "--out", plan, dir], { env });
+    run(["migrate", "--plan", "--out", plan, dir], { env });
 
+    const { header } = JSON.parse(readFileSync(plan, "utf-8"));
+    const stopped = header.passes.filter((p) => p.incomplete);
+    expect(stopped.length).toBeGreaterThan(0);
+    expect(stopped.map((p) => p.incomplete.error).join("\n")).toContain("stub claude: unavailable");
+
+    const before = snapshot(join(dir, ".rex"));
+    const result = runResult(["migrate", "--apply", "--plan", plan, dir], { env });
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain("The plan is incomplete");
-    expect(result.stderr).toContain("stub claude: unavailable");
-    expect(existsSync(plan)).toBe(true);
+    expect(snapshot(join(dir, ".rex"))).toEqual(before);
   });
 });

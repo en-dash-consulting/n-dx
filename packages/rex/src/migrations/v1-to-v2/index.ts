@@ -9,7 +9,7 @@
  * settled placements; the text pass redrafts them (`./spec-pass.ts`); Jev
  * reviews the plan (`./jev-review-pass.ts`). The caller supplies the seams
  * with `planSeams` (`./seams.ts`). The summary ends with the review queue.
- * `./apply.ts` applies a reviewed plan (`rex migrate --apply`).
+ * `./apply.ts` applies a reviewed plan (`rex migrate-apply`).
  *
  * @module migrations/v1-to-v2
  */

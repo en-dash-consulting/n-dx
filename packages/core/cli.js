@@ -1807,8 +1807,11 @@ async function handleMigrateLayout(rest) {
   exitWithCleanup(code);
 }
 
-/** Where `ndx migrate --plan` writes when the operator names no path. */
+/** Where `ndx migrate --plan` writes, and `ndx migrate --apply` reads, when the operator names no path. */
 const DEFAULT_MIGRATION_PLAN_OUT = "./migration-plan.json";
+
+/** Flags of `ndx migrate` that take a value; `--out p` is rewritten to `--out=p` so `p` is not read as the project dir. */
+const MIGRATE_VALUE_FLAGS = new Set(["--out", "--summary", "--cut-at", "--model", "--migration"]);
 
 /**
  * `ndx migrate --plan` — plan the schema migration and write it out for review.
@@ -1817,24 +1820,47 @@ const DEFAULT_MIGRATION_PLAN_OUT = "./migration-plan.json";
  * classifies it into the v2 layers, and writes the JSON plan plus a Markdown
  * summary. Nothing is written to the PRD.
  *
- * `--plan` is required rather than implied. The other half of a migration is
- * applying a reviewed plan, which does rewrite the PRD; making the read-only
- * half the one you have to ask for means the bare verb can never grow into
- * the destructive one by default.
+ * `ndx migrate --apply [--plan=<path>] [--dry-run]` — delegates to
+ * `rex migrate-apply`, which writes the v2 tree from the reviewed plan and
+ * removes the v1 tree (with `--dry-run`, rehearses and writes nothing). With
+ * `--apply`, `--plan` names the plan file, so `--plan p` is rewritten to
+ * `--plan=p`; a bare `--plan` without `--apply` still plans.
  *
- * `--out` defaults here rather than in rex: an orchestrator command an
- * operator types by hand should produce a file, while the tool CLI stays
- * explicit about where it writes.
+ * A mode is required rather than implied: making the read-only half one you
+ * ask for by name means the bare verb can never grow into the destructive one
+ * by default.
+ *
+ * `--out` and `--plan` default here rather than in rex, to the same path: an
+ * orchestrator command an operator types by hand should produce a file and
+ * find it again, while the tool CLI stays explicit about where it writes.
  */
 async function handleMigrate(rest) {
-  const dir = resolveDir(rest);
-  const flags = extractFlags(rest);
-  if (!flags.includes("--plan")) {
-    console.error("Error: ndx migrate needs --plan.");
-    console.error("Hint: Only planning is implemented — 'ndx migrate --plan .' writes a reviewable plan and changes nothing.");
+  const apply = rest.includes("--apply");
+  const valueFlags = apply ? new Set([...MIGRATE_VALUE_FLAGS, "--plan"]) : MIGRATE_VALUE_FLAGS;
+  const args = [];
+  for (let i = 0; i < rest.length; i++) {
+    const next = rest[i + 1];
+    if (valueFlags.has(rest[i]) && next !== undefined && !next.startsWith("-")) {
+      args.push(`${rest[i]}=${next}`);
+      i++;
+    } else {
+      args.push(rest[i]);
+    }
+  }
+  const dir = resolveDir(args);
+  const flags = extractFlags(args);
+  if (!apply && !flags.includes("--plan")) {
+    console.error("Error: ndx migrate needs --plan or --apply.");
+    console.error("Hint: 'ndx migrate --plan .' writes a reviewable plan and changes nothing; 'ndx migrate --apply .' applies it.");
     exitWithCleanup(1);
   }
   requireInit(dir, ["rex"]);
+  if (apply) {
+    const forwarded = flags.filter((f) => f !== "--apply" && f !== "--plan");
+    if (!forwarded.some((f) => f.startsWith("--plan="))) forwarded.push(`--plan=${DEFAULT_MIGRATION_PLAN_OUT}`);
+    await runOrDie(tools.rex, ["migrate-apply", ...forwarded, dir]);
+    exitWithCleanup(0);
+  }
   const forwarded = flags.filter((f) => f !== "--plan");
   if (!forwarded.some((f) => f === "--out" || f.startsWith("--out="))) {
     forwarded.push(`--out=${DEFAULT_MIGRATION_PLAN_OUT}`);

@@ -49,7 +49,7 @@ const item = (id: string, level: PRDItem["level"], title: string, children: PRDI
   ...extra,
 });
 
-/** Areas, a capability with history, an unbuilt feature (held), a release umbrella and a review container. */
+/** Areas, a capability with history, an unbuilt feature (held), a release umbrella and a review-sourced epic (an area). */
 const TREE: PRDItem[] = [
   item("e1", "epic", "Storage", [
     item("f1", "feature", "Offline cache", [item("t1", "task", "Write the cache", [item("s1", "subtask", "Pick a format")])], {
@@ -96,7 +96,7 @@ describe("buildV2Tree", () => {
   it("keeps every v1 id, as a node or a listed delivery container", async () => {
     const built = buildV2Tree(TREE, await planOf(TREE));
     expect(isLossless(everyV1Id(TREE, built.tree, built.containers, built.cut))).toBe(true);
-    expect(built.containers.map((c) => c.id).sort()).toEqual(["e2", "e3"]);
+    expect(built.containers.map((c) => c.id)).toEqual(["e3"]);
   });
 
   it("reports a lost id", async () => {
@@ -119,11 +119,11 @@ describe("buildV2Tree", () => {
     }
   });
 
-  it("stamps a release umbrella's plannedRelease, never a review container's", async () => {
+  it("stamps a release umbrella's plannedRelease and keeps a review-sourced epic as an area", async () => {
     const { tree } = buildV2Tree(TREE, await planOf(TREE));
     expect(byId(tree, "f5")!.plannedRelease).toBe("0.9.0");
     expect(byId(tree, "f3")!.plannedRelease).toBeUndefined();
-    expect(byId(tree, "e2")).toBeUndefined();
+    expect(byId(tree, "e2")).toMatchObject({ type: "area" });
   });
 
   describe("blockedBy a dissolved container", () => {
@@ -136,11 +136,12 @@ describe("buildV2Tree", () => {
     it("names the container's children, not the container", async () => {
       const { tree, containers } = buildV2Tree(WITH_BLOCKER, await planOf(WITH_BLOCKER));
       const dissolved = new Set(containers.map((c) => c.id));
-      expect(dissolved).toEqual(new Set(["e2", "e3"]));
+      expect(dissolved).toEqual(new Set(["e3"]));
       for (const node of all(tree)) {
         for (const ref of node.blockedBy ?? []) expect(dissolved.has(ref)).toBe(false);
       }
-      expect(byId(tree, "f6")!.blockedBy).toEqual(["f5", "f3"]);
+      // e2 is an area, a node, so its ref stays.
+      expect(byId(tree, "f6")!.blockedBy).toEqual(["f5", "e2"]);
     });
 
     it("is selectable once every child of the container is completed", async () => {
@@ -184,13 +185,21 @@ describe("buildV2Tree", () => {
     expect(computeProductStatus(tree).f1!.status).toBe("met");
   });
 
+  it("stamps a met capability's metAt as the plan recorded it", async () => {
+    const plan = await planOf(TREE);
+    const { tree } = buildV2Tree(TREE, plan);
+    const planned = Object.entries(plan.entries).filter(([, e]) => e.data?.metAt !== undefined);
+    expect(planned.length).toBeGreaterThan(0);
+    for (const [id, entry] of planned) expect(byId(tree, id)!.metAt).toBe(entry.data!.metAt);
+  });
+
   it("records the cut as an applied change that adds every product requirement", async () => {
     const { tree, cut } = buildV2Tree(TREE, await planOf(TREE));
     const node = byId(tree, cut)!;
     expect(node).toMatchObject({ type: "change", title: CUT_CHANGE_TITLE, appliedAt: CUT_AT, status: "completed" });
     expect(isAppliedChange(node)).toBe(true);
     expect(node.amends).toEqual([expect.objectContaining({ target: "f1", delta: "added", under: "e1" })]);
-    expect(node.body).toContain("Review findings (e2)");
+    expect(node.body).not.toContain("Review findings (e2)");
     expect(node.body).toContain("ndx 0.9.0 (e3): plannedRelease 0.9.0");
   });
 
@@ -423,8 +432,8 @@ describe("applyV1ToV2", () => {
         const t = outcome.kinds[kind];
         expect(Object.values(t.become).reduce((n, c) => n + c, 0)).toBe(t.total);
       }
-      // e1 is an area; e3 and e2 are a release umbrella and a review container.
-      expect(outcome.kinds.epic.become).toMatchObject({ area: 1, release: 2 });
+      // e1 and the review-sourced e2 are areas; e3 is a release umbrella.
+      expect(outcome.kinds.epic.become).toMatchObject({ area: 2, release: 1 });
       // Held changes are the Inbox changes the real apply writes.
       const held = V1_KINDS.reduce((n, k) => n + outcome.kinds[k].held, 0);
       expect(held).toBe(outcome.built.inbox);
