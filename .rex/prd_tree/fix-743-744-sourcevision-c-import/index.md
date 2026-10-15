@@ -21,7 +21,7 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [C# import resolution through declared types and using directives](./c-import-resolution-through-declared.md) | pending |
+| [C# import resolution through declared types and using directives](./c-import-resolution-through-declared.md) | completed |
 | [C# is detected as the project language and WebForms markup links to its code](./c-is-detected-as-the-project-language.md) | pending |
 | [Changeset and docs for the #743 #744 sourcevision fixes](./changeset-and-docs-for-the-743-744.md) | pending |
 | [Incremental analyzers drop carried-over entries for files no longer in the inventory](./incremental-analyzers-drop-carried.md) | completed |
