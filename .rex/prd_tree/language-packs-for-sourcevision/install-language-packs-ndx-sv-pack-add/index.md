@@ -31,6 +31,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add `sv pack add`, `pack list` and `pack remove` over the per-user pack directory](./add-sv-pack-add-pack-list-and-pack.md) | completed |
 | [Install packs offline: `sv pack bundle` and `sv pack add --from <bundle>`](./install-packs-offline-sv-pack-bundle.md) | completed |
-| [Read the project's pack list from .n-dx.json and isolate NDX_HOME in tests that run sourcevision](./read-the-project-s-pack-list-from-n-dx.md) | pending |
-| [`sv pack` CLI dispatch has no test: a broken `pack` case in cli/index.ts would pass every suite](./sv-pack-cli-dispatch-has-no-test-a.md) | pending |
 | [pack add --from keeps the working install until the new bundle loads, and refuses a null manifest cleanly](./pack-add-from-keeps-the-working.md) | pending |
+| [Read the project's pack list from .n-dx.json and isolate NDX_HOME in tests that run sourcevision](./read-the-project-s-pack-list-from-n-dx.md) | completed |
+| [`sv pack` CLI dispatch has no test: a broken `pack` case in cli/index.ts would pass every suite](./sv-pack-cli-dispatch-has-no-test-a.md) | pending |
