@@ -1,0 +1,27 @@
+---
+id: "2d0cf3c4-dbb8-4aab-a500-57fcea1be005"
+level: "task"
+title: "rex update and MCP edit_item/add_item cannot set assignee"
+status: "completed"
+priority: "high"
+tags:
+  - "rex"
+  - "cli"
+  - "mcp"
+  - "assignee"
+source: "ndx-capture"
+startedAt: "2026-10-15T14:41:11.937Z"
+completedAt: "2026-10-15T14:41:11.937Z"
+endedAt: "2026-10-15T14:41:11.937Z"
+acceptanceCriteria:
+  - "`rex update <id> --assignee=<name>` sets the field, and `--assignee=` with an empty value clears it"
+  - "`--assignee` is accepted by `UPDATE_FLAGS` in `packages/rex/src/cli/validate-input.ts` so it is not rejected as an unknown flag"
+  - "`rex update --help` documents the option, and the command's usage string and its \"nothing to update\" hint both list it"
+  - "MCP `edit_item` accepts `assignee` in its args interface, handler and zod schema"
+  - "MCP `add_item` accepts `assignee` in `AddItemArgs`, applies it to the new item, and declares it in its zod schema"
+  - "A test sets an assignee through the CLI and through MCP, then confirms `get_next_task`/`--mine` selection returns the item for that assignee and skips it for another"
+  - "The value round-trips through a save/load cycle in both the v1 folder tree and the v2 state layout"
+description: "`assignee` is defined on the item schema and read by task selection, but nothing can write it.\n\nRead paths that depend on it:\n- `packages/rex/src/schema/v1.ts:407` (`assignee?: string`), `v2.ts:561` / `:595` (`ItemState.assignee`, `ItemStateSchema`).\n- `packages/rex/src/core/next-task.ts:443-450` `matchesAssignee` (inherited down the parent chain, exact match), `filterByAssignee` at `:453`, applied at `:473-474` and `:496-497`; exported via `public.ts:326`.\n- `packages/rex/src/core/change-selection.ts:131` — v2 units match `u.node.assignee` or `u.change.assignee`.\n- hench `--mine`: `src/agent/planning/work-selection.ts`, `planning/brief.ts`, `cli/commands/run.ts`, `cli/commands/run-resolve.ts`.\n\nWrite paths — none:\n- `packages/rex/src/cli/commands/update.ts:69-203` handles only status, priority, title, description, blockedBy, criterion, source, run, reason, force.\n- `packages/rex/src/cli/mcp-tools/edit-item.ts` and `add-item.ts` have zero `assignee` matches in their args interfaces or zod schemas.\n- `packages/web/src/server/routes-rex/items.ts:125-128` `PATCHABLE_FIELDS` omits it and rejects unknown keys at `:140-141`.\n\nEffect: `ndx work --mine` filters on a field that only hand-editing frontmatter can set. That is the route #630 had to take, and it contradicts the standing rule that `rex update` owns the slug, the YAML escaping and the parent tables.\n\nPersistence already works — no serializer change is needed. In v1 `assignee` rides the \"unknown extra fields\" path in `folder-tree-serializer.ts` `emitFrontmatter` (pinned by `tests/unit/store/folder-tree-serializer.test.ts:840-870`); in v2 it routes to `state.yaml` automatically because `STATE_KEYS` is derived from `ItemStateSchema.shape`.\n\nSuggested shape: follow the `--source` pattern at `update.ts:173-176` so `--assignee=` clears the field. A bare `--assignee` with no value resolving to the current actor via `resolveActor` is worth considering."
+lastModified: "2026-10-15T14:41:12.535Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---

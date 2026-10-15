@@ -10,7 +10,7 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 1001;
+  z-index: var(--z-critical);
   padding: 0.75rem 1rem;
   font-size: 0.85rem;
   line-height: 1.4;

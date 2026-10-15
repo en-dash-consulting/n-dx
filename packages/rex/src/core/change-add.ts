@@ -44,6 +44,8 @@ export interface AddChangeNodeInput {
   acceptanceCriteria?: string[];
   tags?: string[];
   source?: string;
+  /** Who the node belongs to; matched by selection and inherited by descendants. */
+  assignee?: string;
   blockedBy?: string[];
   /** Change and task only. */
   priority?: Priority;
@@ -171,6 +173,7 @@ function fields(input: AddChangeNodeInput): Record<string, unknown> {
   if (input.acceptanceCriteria?.length) out.acceptanceCriteria = input.acceptanceCriteria;
   if (input.tags?.length) out.tags = input.tags;
   if (input.source) out.source = input.source;
+  if (input.assignee) out.assignee = input.assignee;
   if (input.blockedBy?.length) out.blockedBy = input.blockedBy;
   if (input.priority) out.priority = input.priority;
   if (input.run) out.run = input.run;

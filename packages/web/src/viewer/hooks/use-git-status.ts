@@ -12,10 +12,14 @@ import { usePolling } from "../views/use-polling.js";
 export type GitFileStatus =
   | "modified" | "added" | "deleted" | "renamed" | "untracked" | "unmerged" | "other";
 
+/** Which tool owns a dirty file. Mirrors server/routes-git.ts. */
+export type GitFileOrigin = "prd" | "analysis" | "other";
+
 export interface GitStatusFile {
   path: string;
   code: string;
   status: GitFileStatus;
+  origin: GitFileOrigin;
 }
 
 export interface GitStatus {
@@ -23,6 +27,8 @@ export interface GitStatus {
   branch: string | null;
   dirty: boolean;
   files: GitStatusFile[];
+  /** The one origin every dirty file shares, or null when clean or mixed. */
+  scope: GitFileOrigin | null;
 }
 
 const POLL_INTERVAL_MS = 15_000;

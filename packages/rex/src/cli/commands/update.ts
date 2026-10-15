@@ -175,6 +175,13 @@ export async function cmdUpdate(
     updates.source = flags.source.trim() || undefined;
   }
 
+  if (flags.assignee !== undefined) {
+    // Empty removes it (undefined is not serialized). Selection matches on an
+    // exact string and inherits down the parent chain, so the value is stored
+    // verbatim rather than normalized — see core/next-task.ts matchesAssignee.
+    updates.assignee = flags.assignee.trim() || undefined;
+  }
+
   if (flags.run !== undefined) {
     // Replaces the whole block; empty or `null` removes it (undefined is not serialized).
     const raw = flags.run.trim();
@@ -211,7 +218,7 @@ export async function cmdUpdate(
   if (Object.keys(updates).length === 0) {
     throw new CLIError(
       "No updates specified.",
-      "Use --status, --priority, --title, --description, --blockedBy, --criterion, --source, --run, or --reason (with --status=failing).",
+      "Use --status, --priority, --title, --description, --blockedBy, --criterion, --source, --assignee, --run, or --reason (with --status=failing).",
     );
   }
 

@@ -30,10 +30,11 @@ function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-const CLEAN: GitStatus = { isRepo: true, branch: "main", dirty: false, files: [] };
+const CLEAN: GitStatus = { isRepo: true, branch: "main", dirty: false, files: [], scope: null };
 const DIRTY: GitStatus = {
   isRepo: true, branch: "main", dirty: true,
-  files: [{ path: "a.txt", code: " M", status: "modified" }],
+  files: [{ path: "a.txt", code: " M", status: "modified", origin: "other" }],
+  scope: "other",
 };
 
 describe("useGitStatus", () => {

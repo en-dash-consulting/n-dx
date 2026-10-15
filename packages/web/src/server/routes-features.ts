@@ -11,8 +11,14 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolveLayout } from "@n-dx/llm-client";
+import {
+  resolveLayout,
+  isProjectFeatureEnabled,
+  FAIL_FORWARD_FEATURE,
+  FAIL_FORWARD_DEFAULT,
+} from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
+import { commitSettingsChange } from "./settings-commit.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 
 // ---------------------------------------------------------------------------
@@ -31,7 +37,9 @@ interface FeatureDefinition {
   label: string;
   description: string;
   impact: string;
-  package: "sourcevision" | "rex" | "hench";
+  /** Longer explanation revealed by the toggle's info control. */
+  details?: string;
+  package: "sourcevision" | "rex" | "hench" | "git";
   stability: "experimental" | "stable" | "deprecated";
   defaultValue: boolean;
 }
@@ -143,6 +151,40 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     stability: "experimental",
     defaultValue: false,
   },
+  // ── Git ───────────────────────────────────────────────────────────
+  {
+    key: FAIL_FORWARD_FEATURE,
+    label: "Fail-forward mode",
+    description: "Commit automatically at the end of every run, every loop iteration, and every settings change, using a fixed message for each kind. Work is saved as it happens instead of piling up uncommitted.",
+    impact: "Commits only the paths each step touched, and never pushes. Your own in-progress work is left alone. History gains one small commit per step.",
+    details: [
+      "What gets committed, and when:",
+      "\u2022 After each autonomous run, and after each iteration of a loop \u2014 so an "
+        + "interrupted loop still leaves its finished iterations committed.",
+      "\u2022 After a settings change, including one made from the pre-run menu.",
+      "\u2022 After the PRD or a SourceVision scan is rewritten.",
+      "",
+      "Each commit uses a fixed message for its kind and stages only the paths that "
+        + "step touched, so anything you are in the middle of is left untouched and "
+        + "unstaged. Commits carry the usual N-DX trailers. Nothing is ever pushed \u2014 "
+        + "committing is the whole promise.",
+      "",
+      "Off by default. With it off, nothing is committed automatically and behaviour "
+        + "is exactly as before.",
+    ].join("\n"),
+    package: "git",
+    stability: "experimental",
+    defaultValue: FAIL_FORWARD_DEFAULT,
+  },
+  {
+    key: "git.autoCommitGenerated",
+    label: "Auto-commit generated files",
+    description: "When every uncommitted file came from the same tool — all PRD files, or all SourceVision scan output — commit them automatically with a constant message instead of waiting for the button in the git panel.",
+    impact: "Only ever commits a tree that contains nothing else, and never pushes. A tree holding any of your own work is left alone.",
+    package: "git",
+    stability: "experimental",
+    defaultValue: false,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -206,6 +248,7 @@ function buildToggles(projectDir: string): FeatureToggle[] {
       label: def.label,
       description: def.description,
       impact: def.impact,
+      ...(def.details ? { details: def.details } : {}),
       package: def.package,
       stability: def.stability,
       enabled,
@@ -227,14 +270,25 @@ function buildToggles(projectDir: string): FeatureToggle[] {
  * unknown key yields `false`. A gate that opens when it cannot tell is not a
  * gate.
  */
+/**
+ * Every distinct `package` the registry uses.
+ *
+ * The settings page renders package sections in a fixed order and drops any
+ * package missing from that order, so a toggle in a package the viewer does
+ * not list is invisible. This is the list the viewer is checked against.
+ */
+export function featureRegistryPackages(): string[] {
+  return [...new Set(FEATURE_REGISTRY.map((d) => d.package))];
+}
+
 export function isFeatureEnabled(projectDir: string, key: string): boolean {
   const def = FEATURE_REGISTRY.find((d) => d.key === key);
   if (!def) return false;
 
-  const config = readNdxConfig(projectDir);
-  const features = (config.features ?? {}) as Record<string, unknown>;
-  const stored = getByPath(features, key);
-  return typeof stored === "boolean" ? stored : def.defaultValue;
+  // The read itself lives in llm-client, because `ndx work` and the hench run
+  // loop need the same answer and never go through this server. Two readers
+  // of one toggle would eventually disagree.
+  return isProjectFeatureEnabled(projectDir, key, def.defaultValue);
 }
 
 // ---------------------------------------------------------------------------
@@ -301,6 +355,12 @@ export async function handleFeaturesRoute(
       }
 
       writeNdxConfig(ctx.projectDir, config);
+      // Fail-forward commits the change; a no-op when the mode is off.
+      await commitSettingsChange(
+        ctx.projectDir,
+        resolveLayout(ctx.projectDir).configFile,
+        "features",
+      );
 
       jsonResponse(res, 200, { applied });
       return true;

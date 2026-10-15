@@ -71,6 +71,7 @@ import {
   type MemoryPressure,
 } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
+import { commitSettingsChange } from "./settings-commit.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
   CONFIG_FIELD_META,
@@ -1092,6 +1093,11 @@ async function handleConfigUpdate(
     return true;
   }
 
+  // Fail-forward commits the change; a no-op when the mode is off. The
+  // pre-run menu writes this same file through this same handler, so both
+  // surfaces commit by one path.
+  await commitSettingsChange(ctx.projectDir, configPath, "hench");
+
   jsonResponse(res, 200, { applied, config: current });
   return true;
 }
@@ -1373,11 +1379,11 @@ async function handleTemplateCreate(
 }
 
 /** POST /api/hench/templates/:id/apply — apply template to current config. */
-function handleTemplateApply(
+async function handleTemplateApply(
   id: string,
   res: ServerResponse,
   ctx: ServerContext,
-): boolean {
+): Promise<boolean> {
   const template = findTemplate(ctx.projectDir, id);
   if (!template) {
     errorResponse(res, 404, `Template "${id}" not found`);
@@ -1417,6 +1423,9 @@ function handleTemplateApply(
     errorResponse(res, 500, `Failed to write config: ${err instanceof Error ? err.message : String(err)}`);
     return true;
   }
+
+  // Fail-forward commits the change; a no-op when the mode is off.
+  await commitSettingsChange(ctx.projectDir, configPath, "hench");
 
   jsonResponse(res, 200, {
     applied: template.id,

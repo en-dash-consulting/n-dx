@@ -12,6 +12,7 @@ import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
+import { commitFailForward } from "../../agent/lifecycle/fail-forward.js";
 import {
   PRD_COMMIT_PATHS,
   deletedAmong,
@@ -39,7 +40,7 @@ import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
 import { info, result as output, setQuiet, warn } from "../output.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
-import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
+import { evaluateRepoTrust, isFailForwardEnabled } from "../../prd/llm-gateway.js";
 import { section, detail } from "../../types/output.js";
 import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
 import {
@@ -2336,7 +2337,7 @@ export async function cmdRun(
     };
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, wouldResetIds, settingsCtx);
+      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, wouldResetIds, settingsCtx, allowDirty);
       return;
     }
 
@@ -2350,9 +2351,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds, settingsCtx);
+      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds, settingsCtx, allowDirty);
     } else {
-      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds, settingsCtx);
+      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds, settingsCtx, allowDirty);
     }
   } finally {
     await limiter.release();
@@ -2394,6 +2395,7 @@ export async function cmdRun(
 export async function shouldStopForUncommittedWork(
   projectDir: string,
   autonomous: boolean | undefined,
+  allowDirty = false,
 ): Promise<boolean> {
   if (!autonomous) return false;
   const leftover = await findUncommittedWork({
@@ -2401,6 +2403,36 @@ export async function shouldStopForUncommittedWork(
     discountPaths: PRD_COMMIT_PATHS,
   });
   if (leftover.clean) return false;
+
+  // Fail-forward turns this refusal into a commit. The leftover is staged and
+  // committed under a constant message, scoped to exactly these paths, and the
+  // loop continues — so an interrupted loop still leaves each finished
+  // iteration committed rather than one long-running loop stalling on a file.
+  //
+  // The toggle is re-read here rather than captured at startup: a loop can run
+  // for a long time, and an operator turning it off should be obeyed at the
+  // next boundary.
+  // `--allow-dirty` is the operator saying "go, but do not touch my tree".
+  // Honour it here as the pre-run gate does, or fail-forward would commit at
+  // the first boundary the very work they told it to leave alone.
+  if (!allowDirty && isFailForwardEnabled(projectDir)) {
+    const result = await commitFailForward(projectDir, leftover.paths, "loop-leftover");
+    if (result.committed) {
+      info(colorSuccess(
+        `\nFail-forward: committed ${result.paths.length} leftover `
+        + `${result.paths.length === 1 ? "path" : "paths"} and continued.`,
+      ));
+      return false;
+    }
+    // The commit failed (mid-merge, a hook, a lock). Fall through to the
+    // ordinary refusal rather than looping on work that is still sitting
+    // there: stopping is the safe outcome, and the message below names it.
+    info(colorWarn(
+      `\nFail-forward could not commit the leftover work`
+      + `${result.error ? `: ${result.error.message}` : ""}.`,
+    ));
+  }
+
   const deleted = deletedAmong(projectDir, leftover.paths);
   info(`\n${colorWarn(formatLoopRefusal(
     leftover.paths,
@@ -2441,6 +2473,9 @@ async function runIterations(
   assignee?: string,
   wouldResetIds?: ReadonlySet<string>,
   settingsCtx?: TaskRunContext,
+  /** `--allow-dirty`: the operator asked for their tree to be left alone,
+   *  which suppresses fail-forward at the iteration boundary. */
+  allowDirty = false,
 ): Promise<void> {
   // Track attempt counts per task ID within this run invocation
   const attemptTracker = createAttemptTracker();
@@ -2453,7 +2488,7 @@ async function runIterations(
     // Not emitted before the first iteration (i === 0).
     if (i > 0) {
       info(`\n${formatIterationBanner(i + 1, iterations)}`);
-      if (await shouldStopForUncommittedWork(dir, autonomous)) break;
+      if (await shouldStopForUncommittedWork(dir, autonomous, allowDirty)) break;
     }
 
     // For autoselected iterations, skip stuck tasks
@@ -2560,6 +2595,9 @@ async function runLoop(
   assignee?: string,
   wouldResetIds?: ReadonlySet<string>,
   settingsCtx?: TaskRunContext,
+  /** `--allow-dirty`: the operator asked for their tree to be left alone,
+   *  which suppresses fail-forward at the iteration boundary. */
+  allowDirty = false,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -2609,7 +2647,7 @@ async function runLoop(
       // Banner between iterations: not emitted before the first iteration.
       if (completed > 1) {
         info(`\n${formatIterationBanner(completed)}`);
-        if (await shouldStopForUncommittedWork(dir, autonomous)) break;
+        if (await shouldStopForUncommittedWork(dir, autonomous, allowDirty)) break;
       }
 
       // Show queue status if there are pending tasks
@@ -2861,6 +2899,9 @@ async function runEpicByEpic(
   skipTestGate?: boolean,
   wouldResetIds?: ReadonlySet<string>,
   settingsCtx?: TaskRunContext,
+  /** `--allow-dirty`: the operator asked for their tree to be left alone,
+   *  which suppresses fail-forward at the iteration boundary. */
+  allowDirty = false,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -2980,7 +3021,7 @@ async function runEpicByEpic(
         // Same between-task guard the fixed-iteration and loop modes run
         // (#363). `stopping` ends the outer epic loop too, so the refusal
         // stops the invocation rather than just this epic.
-        if (tasksStarted > 0 && await shouldStopForUncommittedWork(dir, autonomous)) {
+        if (tasksStarted > 0 && await shouldStopForUncommittedWork(dir, autonomous, allowDirty)) {
           stopping = true;
           break;
         }

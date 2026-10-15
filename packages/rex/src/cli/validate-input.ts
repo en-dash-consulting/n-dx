@@ -130,7 +130,7 @@ export function parseIntSafe(
 /*  Update helpers                                                     */
 /* ------------------------------------------------------------------ */
 
-const UPDATE_FLAGS = ["--status", "--priority", "--title", "--description", "--blockedBy"] as const;
+const UPDATE_FLAGS = ["--status", "--priority", "--title", "--description", "--blockedBy", "--assignee"] as const;
 
 /**
  * Ensure at least one update field is present.

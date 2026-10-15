@@ -2958,6 +2958,12 @@ export async function performPreRunCommitGateIfNeeded(
   // --yes and non-TTY runs still can't prompt and keep the fail-fast below.
   const isInteractive = isTTY && !yes && (!autonomous || autonomousDirty);
   if (!isInteractive) {
+    // Fail-forward deliberately does NOT act here. At this point the run has
+    // not started, so it has touched nothing, and committing the tree would be
+    // `git add -A` with extra steps — exactly what the comment below, and
+    // stageRunWork's baseline rule, exist to prevent. Fail-forward commits
+    // work a run *produced*; a tree someone else left dirty is what
+    // --allow-dirty is for.
     // Autonomous runs must not fold a pre-existing dirty tree into hench's own
     // commits. They can't prompt (that would hang an unattended loop), so fail
     // fast instead — unless the operator explicitly opted in with --allow-dirty.
