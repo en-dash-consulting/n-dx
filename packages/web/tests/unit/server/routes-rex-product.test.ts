@@ -307,8 +307,22 @@ describe("v2 product reads", () => {
       ["no id", { statement: EDITED }],
       ["an empty statement", { id: CAPABILITY_ID, statement: "  " }],
       ["malformed criteria", { id: CAPABILITY_ID, statement: EDITED, criteria: [{ id: "c1" }] }],
+      ["an emptied criterion", { id: CAPABILITY_ID, statement: EDITED, criteria: [{ id: "c1", text: "   " }] }],
     ])("answers 400 for %s", async (_name, payload) => {
+      const before = readFileSync(capabilityFile(), "utf-8");
       expect((await post(payload)).status).toBe(400);
+      expect(readFileSync(capabilityFile(), "utf-8")).toBe(before);
+    });
+
+    it("stores criterion text trimmed, as rex product edit does", async () => {
+      meetCapability();
+      const { body } = await post(edit(false, {
+        statement: "A shopper can pay for a basket with a card.",
+        criteria: [{ id: "c1", text: "  A valid card is charged once  " }],
+      }));
+      expect(body.outcome).toBe("unchanged");
+      expect((body.capability as CapabilityDetailWire).criteria.find((c) => c.id === "c1")?.text)
+        .toBe("A valid card is charged once");
     });
   });
 });

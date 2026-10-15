@@ -157,8 +157,15 @@ function CapabilityFromRoute({ id, onBack }: { id: string; onBack: () => void })
     editError
       ? h("div", { class: "empty-state pm-stale", role: "alert" }, `Could not save the edit: ${editError}`)
       : null,
-    // Keyed by the spec so the form reseeds from the saved capability, not the one it was opened on.
-    h(CapabilityPage, { key: `${load.data.id}:${load.data.statement ?? ""}`, capability: load.data, onBack, onEdit }),
+    // Keyed by the whole spec so the form reseeds whenever the statement or a
+    // criterion changes (a save here, or an edit made elsewhere): a form left
+    // holding the old text would write it back over the newer spec on its next save.
+    h(CapabilityPage, {
+      key: JSON.stringify([load.data.id, load.data.statement ?? "", load.data.criteria]),
+      capability: load.data,
+      onBack,
+      onEdit,
+    }),
   );
 }
 

@@ -407,7 +407,11 @@ function parseEditBody(raw: string): ProductEditBody | string {
   if (!Array.isArray(criteria) || !criteria.every((c) => c && typeof c.id === "string" && typeof c.text === "string")) {
     return "criteria must be an array of { id, text }";
   }
-  return { id: body.id, statement: body.statement, criteria, editorial: body.editorial === true };
+  // As `rex product edit` does: text is trimmed, and an empty criterion is refused rather than written.
+  const trimmed = criteria.map((c) => ({ id: c.id, text: c.text.trim() }));
+  const empty = trimmed.find((c) => !c.text);
+  if (empty) return `Criterion ${empty.id} is empty.`;
+  return { id: body.id, statement: body.statement, criteria: trimmed, editorial: body.editorial === true };
 }
 
 /**

@@ -311,6 +311,17 @@ describe("on a v2 project", () => {
       expect(posts[0].body.editorial).toBe(true);
     });
 
+    it("reseeds the form when a refetch brings a criterion edited elsewhere", async () => {
+      stubEditable(met);
+      await openAndType();
+      const own = met.criteria.find((c) => !c.inheritedFrom)!;
+      const edited = { ...met, criteria: met.criteria.map((c) => (c.id === own.id ? { ...c, text: "Edited elsewhere" } : c)) };
+      stubEditable(edited);
+      await flushFrames("rex:prd-changed");
+      const input = root.querySelector<HTMLInputElement>(`.cap-edit-criterion[data-criterion-id="${own.id}"]`)!;
+      expect(input.value).toBe("Edited elsewhere");
+    });
+
     it("shows why a save was refused and does not refetch", async () => {
       stubEditable(met, 409);
       await openAndType();
