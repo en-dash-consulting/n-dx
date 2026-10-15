@@ -49,9 +49,11 @@ describe("sv pack (built CLI)", () => {
     () => {
       const run = runPack(["add", "java", "--dry-run"]);
       expect(run.status).toBe(0);
-      expect(run.stdout.trim()).toBe(
-        `npm install --prefix ${join(ndxHome, "packs", version)} @n-dx/lang-java@${version}`,
-      );
+      // The CLI double-quotes a prefix holding whitespace (a temp dir under a
+      // user name with a space), as a user would type it.
+      const prefix = join(ndxHome, "packs", version);
+      const quotedPrefix = /\s/.test(prefix) ? `"${prefix}"` : prefix;
+      expect(run.stdout.trim()).toBe(`npm install --prefix ${quotedPrefix} @n-dx/lang-java@${version}`);
     },
     TEST_TIMEOUT,
   );
