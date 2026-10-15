@@ -283,6 +283,9 @@ describe("n-dx ci", () => {
 
   describe("restricted-imports opt-in", () => {
     const RELEASE_SCRIPT = 'import { execFileSync } from "node:child_process";\nexecFileSync("true");\n';
+    // A configured rule behind a trailing comma: the rule must not silently vanish.
+    const UNPARSEABLE_CONFIG =
+      '{ "ci": { "restrictedImports": [{ "module": "node:child_process", "allow": [] }] }, }\n';
 
     /** Write the shared config with one child_process rule allowing `allow`. */
     async function configure(dir, allow) {
@@ -300,6 +303,9 @@ describe("n-dx ci", () => {
           join(dir, ".n-dx.json"),
           JSON.stringify({ ci: { restrictedImports: [{ allow: ["scripts/release.js"] }] } }) + "\n",
         );
+      },
+      "unparseable config": async (dir) => {
+        await writeFile(join(dir, ".n-dx.json"), UNPARSEABLE_CONFIG);
       },
     };
 
@@ -320,7 +326,7 @@ describe("n-dx ci", () => {
           step: report.steps.find((s) => s.name === "architecture-policy"),
         });
       }
-      // Three fixtures, three `ndx ci` runs in one hook; see config-secrets.
+      // One `ndx ci` run per fixture, all in one hook; see config-secrets.
     }, 300_000);
 
     afterAll(async () => {
@@ -354,6 +360,22 @@ describe("n-dx ci", () => {
       expect(code).toBe(1);
       expect(step.ok).toBe(false);
       expect(step.violations.join("\n")).toContain("ci.restrictedImports[0].module");
+    });
+
+    it("fails on a config file it cannot parse, naming the file and the parse error", () => {
+      const { code, step } = results.get("unparseable config");
+      let parseError;
+      try {
+        JSON.parse(UNPARSEABLE_CONFIG);
+      } catch (err) {
+        parseError = err.message;
+      }
+      expect(code).toBe(1);
+      expect(step.ok).toBe(false);
+      expect(step.detail).not.toMatch(/^skipped/);
+      const message = step.violations.join("\n");
+      expect(message).toContain(".n-dx.json");
+      expect(message).toContain(parseError);
     });
   });
 

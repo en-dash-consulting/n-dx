@@ -25,7 +25,7 @@ import { spawn, spawnSync } from "child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
-import { findSharedSecrets, loadProjectConfig, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
+import { findSharedSecrets, loadProjectConfigStrict, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
 import { isGitTracked } from "./gitignore.js";
 import { layoutStateNames, relativeToRoot, resolveLayout } from "./layout.js";
 
@@ -1219,7 +1219,11 @@ export function checkArchitecturePolicy(dir) {
  * @returns {Promise<{ applies: boolean, ok: boolean, rules: number, checked: number, violations: string[] }>}
  */
 export async function checkRestrictedImports(dir) {
-  const config = await loadProjectConfig(dir);
+  // Strict: an unparseable config would otherwise read as "no rules" and skip.
+  const { config, errors: configErrors } = await loadProjectConfigStrict(dir);
+  if (configErrors.length > 0) {
+    return { applies: true, ok: false, rules: 0, checked: 0, violations: configErrors };
+  }
   const configLabel = projectConfigLabel(dir, PROJECT_CONFIG_FILE);
   const { rules: configured, errors } = parseRestrictedImports(config?.ci?.restrictedImports, configLabel);
   if (errors.length > 0) {
