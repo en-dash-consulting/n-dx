@@ -30,16 +30,26 @@ The dashboard is a loop of three stages, `STAGE_ORDER = ["analyze", "plan", "wor
 | Field | Effect |
 |-------|--------|
 | `plain` | Lead section, rendered in the page with no header and never collapsible. One per stage, first |
-| `open`, `collapsedOnLoad` | Initial state. `collapsedOnLoad` ignores remembered state |
-| `tabs` | Further views sharing the section as tabs (`StageTab`; `hiddenWhenDeployed` drops a server-built tab from static exports) |
-| `group` | `{ heading, blurb }` for a tab group with no page of its own. Only Terrain uses it |
+| `open` | Expanded when the page first opens; the open state is remembered after that |
 | `scroll`, `fill` | Bounded scroll region with an Expand control; full-height body for views that size themselves |
 | `featureGate` | Hidden when the toggle is off (same keys as `useFeatureToggle`) |
 | `requiresServer` | Absent from a static export |
 
+A stage may instead be a dashboard: when `STAGES[stage].tiles` is set, the page renders its plain lead section and then a grid of `StageTile`s (`views/stage-tiles.ts`) in place of the other sections. A tile names a `view` (its "Open" target and what it expands into), and may set:
+
+| Field | Effect |
+|-------|--------|
+| `size` | `hero` and `wide` span the row; `normal` (default) takes one cell |
+| `panel`, `title` | Render a stage panel (`renderPanel`: `map`, `next-steps`, `languages`) instead of the view, named by `title` |
+| `chromeless` | The panel brings its own header and full-screen (the codebase map), so the tile draws none |
+| `tabs` | Further views shown as tabs once the tile is expanded |
+| `featureGate`, `requiresServer`, `hiddenWhenDeployed` | As for sections |
+
+A collapsed tile shows `renderSummary(tile)` (`views/tile-summaries.ts` for Analyze), else its panel, else the view clipped. Clicking expands it in place across the grid; its full-screen control opens it over the page, stopping short of the detail panel when one is open. Expanded state is remembered per tile (`ndx.stage-tiles`). `alsoOwns` lists views a stage owns without placing them (they still resolve to the stage for the breadcrumb).
+
 Current composition:
 
-- **Analyze:** `overview` (plain); Terrain (`graph` with tabs `iso-map` and `zones`); `files`; `problems`; `suggestions`; `architecture` (tab `routes`); `pr-markdown` (gate `sourcevision.prMarkdown`); `ask` (gate `sourcevision.ask`, requires server).
+- **Analyze (tiles):** lead `overview` (its `lead` variant: analysis line, controls, stats); tiles `map` (hero, chromeless, `iso-map`, dropped in static exports), `next-steps`, `problems`, `suggestions`, `zones`, `files`, `architecture` (tab `routes`), `languages`, `pr-markdown` (gate `sourcevision.prMarkdown`), `ask` (gate `sourcevision.ask`, requires server). Owns `graph` off-page.
 - **Plan:** `analysis` (plain); `prd`; `command-reference`; `hench-runs`; `merge-graph`; `validation`; `requirements`.
 - **Work:** `rex-dashboard` (plain); `activity`; `token-usage`; `hench-audit`; `hench-optimization`; `hench-adaptive`; `workspaces` (requires server).
 
@@ -47,6 +57,7 @@ Each view is listed by at most one stage. Lookups in `stages.ts`:
 
 - `stageForView(view, validViews?)` returns the owning stage, or null for home, settings, Live and unlisted views.
 - `visibleStages(validViews)` returns the stages that have a page in the current scope.
+- `stageViews(stage)` lists every view a stage names: sections, tiles and their tabs, and `alsoOwns`.
 - `isStageId`, `stageProduct` and `STAGE_ORDER` support the loop.
 
 `packages/web/src/viewer/views/stage-pages.ts` exports `StagePage` and `HomeView`. It mounts a section's view only while the section is open, and receives the view renderer as a parameter to avoid a cycle with the registry.
