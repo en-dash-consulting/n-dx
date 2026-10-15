@@ -31,7 +31,7 @@ The table below is derived from [`packages/core/assistant-assets/manifest.json`]
 | [`ndx-adversarial-review`](#ndx-adversarial-review) | Attack a change or a completion claim, triage what breaks, capture what the user approves | `/ndx-adversarial-review [task-id \| name \| topic]` |
 
 ::: info The PRD skills work on v1 and v2 PRDs
-`/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-work` and `/ndx-adversarial-review` detect the layout from `get_prd_status` and branch on it. On a v1 PRD (the one `ndx init` creates) they add items with a level (epic, feature, task, subtask) and a parent. On a v2 PRD, where every new item enters as a change in the Inbox (see [Changes and apply](./concepts/changes-and-apply)), they add changes and place them with `place_change`.
+`/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-work` and `/ndx-adversarial-review` detect the layout from `get_prd_status` and branch on it. On a v1 PRD (the one `ndx init` creates) they add items with a level (epic, feature, task, subtask) and a parent. On a v2 PRD, where every new item enters as a change in the Inbox (see [Changes and apply](./concepts/changes-and-apply)), the authoring skills add changes and place them with `place_change`, and `/ndx-work` picks up only placed changes and their tasks.
 :::
 
 ---
@@ -176,7 +176,7 @@ they all share:
 
 ### ndx-reshape
 
-**Purpose:** LLM-assisted cleanup of the PRD. On a v1 tree it regroups scattered epics, fixes wrong levels, merges overlapping items, and normalizes naming. A v2 PRD has no levels to fix: its structure is the product layer's areas and capabilities, which change only through applied changes.
+**Purpose:** LLM-assisted cleanup of the PRD. On a v1 tree it regroups scattered epics, fixes wrong levels, merges overlapping items, and normalizes naming. On a v2 tree it places Inbox or misplaced changes on the product layer with `place_change`, merges duplicate changes, and regroups changes and tasks; a node's type is fixed, so there are no levels to fix.
 
 **When it triggers:** Invoke with `/ndx-reshape` when the PRD has grown organically and needs structural cleanup. Typically run after a long feature sprint or after multiple `ndx plan --accept` cycles.
 
