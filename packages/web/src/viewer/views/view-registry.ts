@@ -23,6 +23,7 @@ import type { JobTray } from "../hooks/index.js";
 import {
   Overview,
   CodebaseStats,
+  HealthDetail,
   MapPanel,
   LanguagesPanel,
   NextStepsPanel,
@@ -65,6 +66,7 @@ import { HomeView, StagePage } from "./stage-pages.js";
 import { PrepareTaskModal } from "../components/index.js";
 import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
 import { analyzeTileSummary } from "./tile-summaries.js";
+import type { TileGridApi } from "./stage-tiles.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 
 import {
@@ -136,17 +138,19 @@ function stage(id: StageId): ViewRenderer {
     renderView: (view: ViewId) => (view === "overview" && STAGES[id].tiles
       ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead" })
       : renderActiveView(view, ctx)),
-    renderPanel: (panel: StagePanelId, opened: boolean) => renderPanel(panel, opened, ctx),
+    renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
     renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data) : undefined,
     detailOpen: ctx.detailOpen ?? false,
   });
 }
 
 /** The parts of a stage page that are not views of their own. */
-function renderPanel(panel: StagePanelId, opened: boolean, ctx: ViewRenderContext): ComponentChild {
+function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ctx: ViewRenderContext): ComponentChild {
   switch (panel) {
     case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo });
-    case "health": return h(CodebaseStats, { data: ctx.data });
+    case "health": return opened
+      ? h(HealthDetail, { data: ctx.data, openTile: grid.openTile, setDetail: ctx.setDetail })
+      : h(CodebaseStats, { data: ctx.data });
     case "next-steps": return h(NextStepsPanel, { embedded: true });
     case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
   }

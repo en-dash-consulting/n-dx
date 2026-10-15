@@ -313,11 +313,16 @@ interface StatTileProps {
   /** 0–1 fill for a meter under the value (cohesion, coupling). */
   meter?: number;
   info?: ComponentChild;
+  /** Makes the whole card a control; the info tip stays its own button above it. */
+  onOpen?: () => void;
 }
 
-function StatTile({ glyph, label, value, sub, tone, meter, info }: StatTileProps) {
+function StatTile({ glyph, label, value, sub, tone, meter, info, onOpen }: StatTileProps) {
   const color = tone ?? "var(--accent)";
-  return h("div", { class: "overview-stat", role: "listitem", style: `--stat-tone: ${color}` },
+  return h("div", { class: `overview-stat${onOpen ? " overview-stat--action" : ""}`, role: "listitem", style: `--stat-tone: ${color}` },
+    onOpen
+      ? h("button", { type: "button", class: "overview-stat-open", onClick: onOpen, "aria-label": `${label}: ${value} — show` })
+      : null,
     h("span", { class: "overview-stat-glyph", "aria-hidden": "true" }, glyph),
     h("div", { class: "overview-stat-body" },
       h("span", { class: "overview-stat-label" }, label, info ?? null),
@@ -629,8 +634,11 @@ function languageChartData(data: LoadedData): Array<{ label: string; value: numb
     .map(([lang, count]) => ({ label: lang, value: count, color: LANG_COLORS[lang] || "var(--accent)" }));
 }
 
+export type StatKey = "files" | "zones" | "cycles" | "cohesion" | "coupling";
+
 /** Headline numbers and architecture health: Overview's stats row, and the dashboard's health tile. */
-export function CodebaseStats({ data }: { data: LoadedData }): ComponentChild {
+export function CodebaseStats({ data, onStat }: { data: LoadedData; onStat?: (stat: StatKey) => void }): ComponentChild {
+  const open = (stat: StatKey) => (onStat ? () => onStat(stat) : undefined);
   const { inventory, imports, zones } = data;
   const healthMetrics = useMemo(() => computeHealthMetrics(zones, imports), [zones, imports]);
   const attentionCount = useMemo(
@@ -641,7 +649,7 @@ export function CodebaseStats({ data }: { data: LoadedData }): ComponentChild {
       inventory
         ? h(StatTile, {
             glyph: "▤",
-            label: "Files",
+            label: "Files", onOpen: open("files"),
             value: inventory.summary.totalFiles.toLocaleString(),
             sub: `${Math.round(inventory.summary.totalLines / 1000).toLocaleString()}k lines`,
           })
@@ -649,7 +657,7 @@ export function CodebaseStats({ data }: { data: LoadedData }): ComponentChild {
       zones
         ? h(StatTile, {
             glyph: "◇",
-            label: "Zones",
+            label: "Zones", onOpen: open("zones"),
             value: String(zones.zones.length),
             sub: attentionCount > 0 ? `${attentionCount} need attention` : "all healthy",
             tone: attentionCount > 0 ? "var(--orange)" : undefined,
@@ -659,7 +667,7 @@ export function CodebaseStats({ data }: { data: LoadedData }): ComponentChild {
       imports
         ? h(StatTile, {
             glyph: "⟲",
-            label: "Circular deps",
+            label: "Circular deps", onOpen: open("cycles"),
             value: String(imports.summary.circularCount),
             sub: imports.summary.circularCount > 0 ? "cycles to break" : "no import cycles",
             tone: imports.summary.circularCount > 0 ? "var(--orange)" : "var(--green)",
@@ -668,7 +676,7 @@ export function CodebaseStats({ data }: { data: LoadedData }): ComponentChild {
       healthMetrics && zones
         ? h(StatTile, {
             glyph: "◉",
-            label: "Avg cohesion",
+            label: "Avg cohesion", onOpen: open("cohesion"),
             value: healthMetrics.avgCohesion.toFixed(2),
             sub: "higher is better",
             tone: healthColor(healthMetrics.avgCohesion),
@@ -679,7 +687,7 @@ export function CodebaseStats({ data }: { data: LoadedData }): ComponentChild {
       healthMetrics && zones
         ? h(StatTile, {
             glyph: "⇄",
-            label: "Avg coupling",
+            label: "Avg coupling", onOpen: open("coupling"),
             value: healthMetrics.avgCoupling.toFixed(2),
             sub: "lower is better",
             tone: healthColor(1 - healthMetrics.avgCoupling),
@@ -752,4 +760,96 @@ function computeHealthMetrics(zones: LoadedData["zones"], imports: LoadedData["i
     }
 
     return { avgCohesion, avgCoupling, patterns, antipatterns };
+}
+
+// ── Codebase health, opened ──────────────────────────────────
+
+interface HealthDetailProps {
+  data: LoadedData;
+  /** Switch the open tile to another of the stage's tiles. */
+  openTile: (key: string) => void;
+  /** Show a zone or file in the detail panel beside the modal. */
+  setDetail: (item: DetailItem) => void;
+}
+
+/**
+ * The opened Codebase health tile: the stats, each leading to the tile that
+ * explains it, then what they summarise — the zones needing attention, the
+ * import cycles and the hub files — each zone and file opening its detail.
+ */
+export function HealthDetail({ data, openTile, setDetail }: HealthDetailProps): ComponentChild {
+  const { zones, imports, inventory } = data;
+  const files = useMemo(() => new Map((inventory?.files ?? []).map((f) => [f.path, f])), [inventory]);
+  const attention = useMemo(
+    () => (zones?.zones ?? [])
+      .filter((z) => z.cohesion < 0.4 || z.coupling > 0.5)
+      .sort((a, b) => (a.cohesion - a.coupling) - (b.cohesion - b.coupling)),
+    [zones],
+  );
+  const cycles = imports?.summary.circulars ?? [];
+  const hubs = imports?.summary.mostImported.slice(0, 12) ?? [];
+
+  const showFile = (path: string) => {
+    const f = files.get(path);
+    setDetail({
+      type: "file", title: basename(path), path,
+      language: f?.language, lines: f?.lineCount, role: f?.role, category: f?.category, hash: f?.hash,
+    });
+  };
+  const fileButton = (path: string) =>
+    h("button", { type: "button", class: "health-link health-file", onClick: () => showFile(path), title: path }, path);
+
+  return h("div", { class: "health-detail" },
+    h(CodebaseStats, {
+      data,
+      onStat: (stat) => {
+        if (stat === "files") openTile("files");
+        else if (stat === "cycles") document.getElementById("health-cycles")?.scrollIntoView({ block: "start", behavior: "smooth" });
+        else openTile("zones");
+      },
+    }),
+    h("div", { class: "health-columns" },
+      h("section", { class: "health-section", "aria-labelledby": "health-attention" },
+        h("h3", { id: "health-attention" }, `Zones needing attention`, h("span", { class: "health-count" }, String(attention.length))),
+        attention.length === 0
+          ? h("p", { class: "stage-tile-empty" }, "Every zone holds together and keeps to itself.")
+          : h("table", { class: "languages-table health-table" },
+              h("thead", null, h("tr", null,
+                h("th", null, "Zone"), h("th", { class: "num" }, "Files"),
+                h("th", { class: "num" }, "Cohesion"), h("th", { class: "num" }, "Coupling"))),
+              h("tbody", null, attention.map((z) => h("tr", { key: z.id },
+                h("td", null, h("button", {
+                  type: "button",
+                  class: "health-link",
+                  onClick: () => setDetail({
+                    type: "zone", title: z.name, id: z.id, zoneId: z.id, description: z.description,
+                    files: z.files.length, entryPoints: z.entryPoints,
+                    cohesion: z.cohesion.toFixed(2), coupling: z.coupling.toFixed(2),
+                  }),
+                }, z.name)),
+                h("td", { class: "num" }, z.files.length.toLocaleString()),
+                h("td", { class: "num", style: `color: ${healthColor(z.cohesion)}` }, z.cohesion.toFixed(2)),
+                h("td", { class: "num", style: `color: ${healthColor(1 - z.coupling)}` }, z.coupling.toFixed(2)),
+              ))),
+            ),
+      ),
+      h("section", { class: "health-section", "aria-labelledby": "health-hubs" },
+        h("h3", { id: "health-hubs" }, "Hub files", h("span", { class: "health-count" }, String(hubs.length))),
+        hubs.length === 0
+          ? h("p", { class: "stage-tile-empty" }, "No file is imported widely.")
+          : h("ol", { class: "health-list" }, hubs.map((hub) =>
+              h("li", { key: hub.path }, fileButton(hub.path), h("span", { class: "health-meta" }, `${hub.count} importers`)))),
+      ),
+    ),
+    h("section", { class: "health-section", id: "health-cycles", "aria-labelledby": "health-cycles-title" },
+      h("h3", { id: "health-cycles-title" }, "Import cycles", h("span", { class: "health-count" }, String(imports?.summary.circularCount ?? 0))),
+      cycles.length === 0
+        ? h("p", { class: "stage-tile-empty" }, "No import cycles.")
+        : h("ol", { class: "health-list health-cycles" }, cycles.slice(0, 50).map((c, i) =>
+            h("li", { key: i },
+              c.cycle.flatMap((path, j) => [j > 0 ? h("span", { class: "health-arrow", "aria-hidden": "true" }, " → ") : null, fileButton(path)]),
+            ))),
+      cycles.length > 50 ? h("p", { class: "health-meta" }, `+${cycles.length - 50} more`) : null,
+    ),
+  );
 }

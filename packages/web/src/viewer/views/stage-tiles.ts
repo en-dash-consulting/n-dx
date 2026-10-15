@@ -28,8 +28,13 @@ import type { ViewId } from "../types.js";
 import { viewLabel, viewBlurb, viewGlyph, type StageId, type StageTile, type StagePanelId, type StageTab } from "./stages.js";
 import { ActionIcon } from "../components/index.js";
 
+/** What a panel can ask of the grid: open (or switch the modal to) another tile, by key. */
+export interface TileGridApi {
+  openTile: (key: string) => void;
+}
+
 /** A stage panel; `opened` is true in the opened tile, false in the tile itself. */
-export type RenderPanel = (panel: StagePanelId, opened: boolean) => ComponentChild;
+export type RenderPanel = (panel: StagePanelId, opened: boolean, grid: TileGridApi) => ComponentChild;
 /** A tile's summary, or null to show its panel or its view cut to the tile. */
 export type RenderSummary = (tile: StageTile) => ComponentChild | null;
 
@@ -45,6 +50,7 @@ export function tileTitle(tile: StageTile): string {
 // ── Full content ───────────────────────────────────────────────
 
 interface TileContentProps {
+  grid: TileGridApi;
   tile: StageTile;
   /** In the opened tile (the modal), as opposed to the tile's own preview. */
   opened: boolean;
@@ -70,9 +76,9 @@ function tabListKeyDown(e: KeyboardEvent, tabs: readonly StageTab[], activeIndex
 }
 
 /** A tile's whole content: its panel, or its view with the tile's tabs. */
-function TileContent({ tile, opened, tabs, renderView, renderPanel, idBase }: TileContentProps) {
+function TileContent({ grid, tile, opened, tabs, renderView, renderPanel, idBase }: TileContentProps) {
   const [active, setActive] = useState<ViewId>(tile.view);
-  if (tile.panel) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel, opened));
+  if (tile.panel) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel, opened, grid));
   const shown = tabs.some((t) => t.view === active) ? active : tile.view;
   return h("div", { class: "stage-tile-content" },
     tabs.length > 1
@@ -160,6 +166,7 @@ function FullScreenTile({ stage, tile, onClose, besideDetail, ...content }: Full
 // ── Tile ───────────────────────────────────────────────────────
 
 interface TileProps {
+  grid: TileGridApi;
   stage: StageId;
   tile: StageTile;
   onOpen: (opener: HTMLElement) => void;
@@ -168,7 +175,7 @@ interface TileProps {
   renderSummary: RenderSummary;
 }
 
-function Tile({ stage, tile, onOpen, renderView, renderPanel, renderSummary }: TileProps) {
+function Tile({ grid, stage, tile, onOpen, renderView, renderPanel, renderSummary }: TileProps) {
   const key = tileKey(tile);
   const idBase = `stage-tile-${stage}-${key}`;
   const title = tileTitle(tile);
@@ -176,7 +183,7 @@ function Tile({ stage, tile, onOpen, renderView, renderPanel, renderSummary }: T
 
   if (tile.chromeless && tile.panel) {
     return h("section", { class: `stage-tile stage-tile--chromeless ${span}`, "data-tile": key, "aria-label": title },
-      renderPanel(tile.panel, false),
+      renderPanel(tile.panel, false, grid),
     );
   }
 
@@ -198,7 +205,7 @@ function Tile({ stage, tile, onOpen, renderView, renderPanel, renderSummary }: T
       summary !== null
         ? summary
         // A preview: the tile's own view only; its tabs are for full-screen.
-        : h(TileContent, { tile, opened: false, tabs: [], renderView, renderPanel, idBase }),
+        : h(TileContent, { grid, tile, opened: false, tabs: [], renderView, renderPanel, idBase }),
     ),
   );
 }
@@ -228,12 +235,16 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
   }, []);
 
   const full = fullScreen ? tiles.find((t) => tileKey(t) === fullScreen) : undefined;
+  // Switching tiles from inside the modal keeps the original opener, so
+  // closing still returns focus to the tile the reader started from.
+  const grid: TileGridApi = { openTile: (key) => { if (tiles.some((t) => tileKey(t) === key)) setFullScreen(key); } };
 
   return h("div", { class: "stage-tiles", "data-stage": stage },
     tiles.map((tile) => {
       const key = tileKey(tile);
       return h(Tile, {
         key,
+        grid,
         stage,
         tile,
         onOpen: (opener: HTMLElement) => { openerRef.current = opener; setFullScreen(key); },
@@ -244,6 +255,9 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
     }),
     full
       ? h(FullScreenTile, {
+          // Keyed by tile, so switching tiles remounts the content (tabs reset).
+          key: tileKey(full),
+          grid,
           stage,
           tile: full,
           opened: true,
