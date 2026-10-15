@@ -48,7 +48,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [ndx migrate --apply --dry-run says what moves and what is dropped](./ndx-migrate-apply-dry-run-says-what.md) | completed |
 | [ndx migrate --plan has no automated test of its spawn path](./ndx-migrate-plan-has-no-automated-test.md) | completed |
 | [ndx migrate --plan shows the preflight banner and an honest run summary, and llm.routes can turn Jev off](./ndx-migrate-plan-shows-the-preflight.md) | pending |
-| [ndx pair-programming's hench runs carry no NDX_AGENT_RUN marker, so its agent can run ndx migrate](./ndx-pair-programming-s-hench-runs.md) | pending |
+| [ndx pair-programming's hench runs carry no NDX_AGENT_RUN marker, so its agent can run ndx migrate](./ndx-pair-programming-s-hench-runs.md) | completed |
+| [ndx pair-programming's remediation hench run has no test pinning NDX_AGENT_RUN](./ndx-pair-programming-s-remediation.md) | pending |
 | [ndx self-heal, start and web silence the v1 notice for their children, and ndx migrate refuses inside an agent run](./ndx-self-heal-start-and-web-silence.md) | completed |
 | [Placement reads code evidence: commits and zones of a held change rank the capabilities realized in the same zones](./placement-reads-code-evidence-commits.md) | pending |
 | [Remove the prd.md and prd.json read fallbacks and the old migrate commands](./remove-the-prd-md-and-prd-json-read.md) | pending |
