@@ -24,5 +24,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Dashboard file watchers have no 'error' listener, so a watcher error crashes ndx start](./dashboard-file-watchers-have-no-error.md) | completed |
 | [MCP schema watchers have no 'error' listener, so a dist/ watcher error crashes ndx start](./mcp-schema-watchers-have-no-error.md) | pending |
 | [No test covers the PRD watcher refreshing the cache on product/ or changes/ edits](./no-test-covers-the-prd-watcher.md) | completed |
-| [No test pins the Ask route passing the v2 merge rule to parseAnswerRefinements](./no-test-pins-the-ask-route-passing-the.md) | pending |
 | [Rex watcher stops following a PRD folder that is deleted and recreated while ndx start runs](./rex-watcher-stops-following-a-prd.md) | completed |
