@@ -464,7 +464,7 @@ async function flushAndExit(code = 0) {
   return exitPromise;
 }
 
-function run(script, args) {
+function run(script, args, extraEnv = {}) {
   const scriptPath = isAbsolute(script) ? script : resolve(MONOREPO_ROOT, script);
 
   // Build-artifact guard: when the resolved script is a packages/*/dist/* path
@@ -486,7 +486,7 @@ function run(script, args) {
   return new Promise((res) => {
     const child = spawnTracked(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
-      env: childEnv(),
+      env: { ...childEnv(), ...extraEnv },
     });
 
     let heartbeat = null;
@@ -521,11 +521,26 @@ function childEnv() {
 }
 
 /**
- * ndx commands that spawn rex more than once. Each prints rex's v1 deprecation
+ * ndx commands that spawn rex more than once, directly or through hench and the
+ * dashboard server. Each prints rex's v1 deprecation
  * notice once itself and silences rex for its children. A delegated rex
  * command (`ndx rex …`, `ndx validate`) is one spawn, so rex prints its own.
  */
-const LEGACY_NOTICE_COMMANDS = new Set(["ci", "status", "plan", "add", "recommend", "refresh", "work", "analyze"]);
+const LEGACY_NOTICE_COMMANDS = new Set([
+  "ci", "status", "plan", "add", "recommend", "refresh", "work", "analyze", "self-heal", "start", "web",
+]);
+
+/**
+ * Environment for the hench agent run that `ndx work` and `ndx self-heal`
+ * spawn. NDX_AGENT_RUN marks the run so `ndx migrate` refuses inside it, and
+ * the agent's shelled-out rex commands never print the v1 notice.
+ */
+const AGENT_RUN_ENV = { NDX_AGENT_RUN: "1", NDX_LEGACY_NOTICE: "off" };
+
+/** Spawn `hench <args>` as an agent run; exits on a non-zero code. */
+function runAgentOrDie(args) {
+  return runOrDie(tools.hench, args, AGENT_RUN_ENV);
+}
 
 /** Mirrors rex's LEGACY_LAYOUT_NOTICE (`cli/legacy-layout-notice.ts`); core spawns rex and cannot import it. */
 const LEGACY_LAYOUT_NOTICE =
@@ -546,8 +561,8 @@ function noteLegacyLayoutOnce(command, dir) {
 /** BETA experimental flags to forward to children. Empty unless opted in. */
 let experimentalEnvFragment = {};
 
-async function runOrDie(script, args) {
-  const code = await run(script, args);
+async function runOrDie(script, args, extraEnv) {
+  const code = await run(script, args, extraEnv);
   if (code !== 0) exitWithCleanup(code);
 }
 
@@ -1856,6 +1871,11 @@ const MIGRATE_VALUE_FLAGS = new Set(["--out", "--summary", "--cut-at", "--model"
  * find it again, while the tool CLI stays explicit about where it writes.
  */
 async function handleMigrate(rest) {
+  if (process.env.NDX_AGENT_RUN) {
+    console.error("Error: ndx migrate refuses inside an agent run (NDX_AGENT_RUN is set).");
+    console.error("Hint: An operator runs the migration from their own shell.");
+    exitWithCleanup(1);
+  }
   const apply = rest.includes("--apply");
   const valueFlags = apply ? new Set([...MIGRATE_VALUE_FLAGS, "--plan"]) : MIGRATE_VALUE_FLAGS;
   const args = [];
@@ -2310,7 +2330,7 @@ async function handleWork(rest) {
       console.error("Hint: ndx work --task=<id> --resolve .");
       exitWithCleanup(1);
     }
-    await runOrDie(tools.hench, ["run", ...flags, dir]);
+    await runAgentOrDie(["run", ...flags, dir]);
     exitWithCleanup(0);
   }
 
@@ -2338,7 +2358,7 @@ async function handleWork(rest) {
 
   const disposeInterrupt = isDryRun ? () => {} : installWorkInterruptHandler(dir);
   try {
-    await runOrDie(tools.hench, ["run", ...flags, dir]);
+    await runAgentOrDie(["run", ...flags, dir]);
   } finally {
     disposeInterrupt();
   }
@@ -2778,7 +2798,7 @@ async function handleSelfHeal(rest) {
 
     const modelFlagSummary = modelFlags.length > 0 ? ` ${modelFlags.join(" ")}` : "";
     console.log(`\n${shTag} step 4/5: hench run --auto --loop --self-heal --tags=self-heal${yes ? " --yes" : ""}${modelFlagSummary}`);
-    await runOrDie(tools.hench, ["run", "--auto", "--loop", "--self-heal", "--tags=self-heal", ...yesFlag, ...modelFlags, ...verboseFlag, dir]);
+    await runAgentOrDie(["run", "--auto", "--loop", "--self-heal", "--tags=self-heal", ...yesFlag, ...modelFlags, ...verboseFlag, dir]);
 
     console.log(`\n${shTag} step 5/5: acknowledge completed findings`);
     await runOrDie(tools.rex, ["recommend", "--acknowledge-completed", ...verboseFlag, dir]);
