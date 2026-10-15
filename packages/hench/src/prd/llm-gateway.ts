@@ -50,6 +50,7 @@ export {
   mergeWithOverrides,
   PROJECT_CONFIG_FILE,
   LOCAL_CONFIG_FILE,
+  isFailForwardEnabled,
 } from "@n-dx/llm-client";
 export type { ProjectOverrideSource } from "@n-dx/llm-client";
 

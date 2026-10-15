@@ -15,6 +15,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
+import { commitSettingsChange } from "./settings-commit.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 
 // ---------------------------------------------------------------------------
@@ -245,6 +246,18 @@ export async function handleProjectSettingsRoute(
       }
 
       writeNdxConfig(ctx.projectDir, config);
+
+      // Fail-forward commits the change; a no-op when the mode is off.
+
+      await commitSettingsChange(
+
+        ctx.projectDir,
+
+        resolveLayout(ctx.projectDir).configFile,
+
+        "project",
+
+      );
       jsonResponse(res, 200, {
         applied,
         settings: extractProjectSettings(ctx.projectDir),

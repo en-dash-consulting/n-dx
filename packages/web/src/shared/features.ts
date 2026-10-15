@@ -19,6 +19,12 @@ export interface FeatureToggle {
   description: string;
   /** Impact warning — shown to explain consequences. */
   impact: string;
+  /**
+   * Longer explanation, revealed by an info control on the toggle. Present
+   * only where the one-line description genuinely is not enough — a toggle
+   * that changes behaviour outside the dashboard, say.
+   */
+  details?: string;
   /** Which package owns this toggle. */
   package: "sourcevision" | "rex" | "hench" | "git";
   /** Whether this is experimental, stable, or deprecated. */

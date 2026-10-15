@@ -16,7 +16,7 @@
 
 import { randomUUID } from "node:crypto";
 import { trustSummaryForRun } from "../../store/trust.js";
-import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
+import { evaluateRepoTrust, isFailForwardEnabled } from "../../prd/llm-gateway.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -2958,6 +2958,34 @@ export async function performPreRunCommitGateIfNeeded(
   // --yes and non-TTY runs still can't prompt and keep the fail-fast below.
   const isInteractive = isTTY && !yes && (!autonomous || autonomousDirty);
   if (!isInteractive) {
+    // Fail-forward answers the question this gate exists to ask. Rather than
+    // refusing to start over a tree someone left dirty, commit it — scoped to
+    // exactly the dirty paths, under a constant message — and proceed.
+    //
+    // This is the mode's whole point, and it is why the mode and this gate do
+    // not contradict each other: with it on there is nothing left for the gate
+    // to refuse over. `--allow-dirty` still means "just go, do not touch it",
+    // so it keeps the silent proceed below rather than committing.
+    if (!allowDirty && isFailForwardEnabled(projectDir)) {
+      // Imported here rather than at module scope: fail-forward.ts imports
+      // buildCoAuthoredByTrailerLine from this module.
+      const { commitFailForward } = await import("./fail-forward.js");
+      const paths = dirty.map(parsePorcelainPath);
+      const result = await commitFailForward(projectDir, paths, "pre-run");
+      if (result.committed) {
+        info(
+          `Fail-forward: committed ${result.paths.length} pre-existing ` +
+            `${result.paths.length === 1 ? "change" : "changes"} before starting.`,
+        );
+        return "proceed";
+      }
+      info(
+        `⚠ Fail-forward could not commit the working tree` +
+          `${result.error ? `: ${result.error.message}` : ""}.`,
+      );
+      // Fall through to the ordinary refusal below.
+    }
+
     // Autonomous runs must not fold a pre-existing dirty tree into hench's own
     // commits. They can't prompt (that would hang an unattended loop), so fail
     // fast instead — unless the operator explicitly opted in with --allow-dirty.

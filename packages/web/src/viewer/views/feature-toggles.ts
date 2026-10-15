@@ -168,6 +168,10 @@ function ToggleItem({ toggle, isUnsaved, onToggle }: {
 }) {
   const isNonDefault = toggle.enabled !== toggle.defaultValue;
   const stability = STABILITY_META[toggle.stability] ?? STABILITY_META.stable;
+  // Collapsed by default: the long form is for a toggle whose effects reach
+  // outside the dashboard, and it would crowd the page if always open.
+  const [showDetails, setShowDetails] = useState(false);
+  const detailsId = `ft-details-${toggle.key.replace(/[^a-zA-Z0-9]/g, "-")}`;
 
   const handleChange = useCallback(() => {
     onToggle(toggle.key, !toggle.enabled);
@@ -183,6 +187,17 @@ function ToggleItem({ toggle, isUnsaved, onToggle }: {
           : null,
         isUnsaved
           ? h("span", { class: "ft-badge ft-badge-unsaved" }, "unsaved")
+          : null,
+        toggle.details
+          ? h("button", {
+              type: "button",
+              class: `ft-toggle-info${showDetails ? " ft-toggle-info--open" : ""}`,
+              onClick: () => setShowDetails(!showDetails),
+              "aria-expanded": String(showDetails),
+              "aria-controls": detailsId,
+              "aria-label": `More about ${toggle.label}`,
+              title: `More about ${toggle.label}`,
+            }, "\u24d8")
           : null,
       ),
       h("label", { class: "ft-toggle-switch" },
@@ -201,6 +216,9 @@ function ToggleItem({ toggle, isUnsaved, onToggle }: {
       h("span", { class: "ft-toggle-impact-icon", "aria-hidden": "true" }, "⚠"),
       h("span", null, toggle.impact),
     ),
+    toggle.details && showDetails
+      ? h("div", { class: "ft-toggle-details", id: detailsId }, toggle.details)
+      : null,
   );
 }
 

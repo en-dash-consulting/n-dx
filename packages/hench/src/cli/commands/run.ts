@@ -12,6 +12,7 @@ import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
+import { commitFailForward } from "../../agent/lifecycle/fail-forward.js";
 import {
   PRD_COMMIT_PATHS,
   deletedAmong,
@@ -39,7 +40,7 @@ import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { offerSlugMigration } from "../slug-migration-offer.js";
 import { info, result as output, setQuiet, warn } from "../output.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
-import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
+import { evaluateRepoTrust, isFailForwardEnabled } from "../../prd/llm-gateway.js";
 import { section, detail } from "../../types/output.js";
 import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
 import {
@@ -2401,6 +2402,33 @@ export async function shouldStopForUncommittedWork(
     discountPaths: PRD_COMMIT_PATHS,
   });
   if (leftover.clean) return false;
+
+  // Fail-forward turns this refusal into a commit. The leftover is staged and
+  // committed under a constant message, scoped to exactly these paths, and the
+  // loop continues — so an interrupted loop still leaves each finished
+  // iteration committed rather than one long-running loop stalling on a file.
+  //
+  // The toggle is re-read here rather than captured at startup: a loop can run
+  // for a long time, and an operator turning it off should be obeyed at the
+  // next boundary.
+  if (isFailForwardEnabled(projectDir)) {
+    const result = await commitFailForward(projectDir, leftover.paths, "loop-leftover");
+    if (result.committed) {
+      info(colorSuccess(
+        `\nFail-forward: committed ${result.paths.length} leftover `
+        + `${result.paths.length === 1 ? "path" : "paths"} and continued.`,
+      ));
+      return false;
+    }
+    // The commit failed (mid-merge, a hook, a lock). Fall through to the
+    // ordinary refusal rather than looping on work that is still sitting
+    // there: stopping is the safe outcome, and the message below names it.
+    info(colorWarn(
+      `\nFail-forward could not commit the leftover work`
+      + `${result.error ? `: ${result.error.message}` : ""}.`,
+    ));
+  }
+
   const deleted = deletedAmong(projectDir, leftover.paths);
   info(`\n${colorWarn(formatLoopRefusal(
     leftover.paths,
