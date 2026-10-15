@@ -60,3 +60,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
 | [Wire ndx migrate --plan to write the classified plan](./wire-ndx-migrate-plan-to-write-the.md) | completed |
 | [Write Inbox changes to the reserved changes/inbox/ folder, and move them out on placement](./write-inbox-changes-to-the-reserved.md) | completed |
+| [The migration plan's metAt hashes the rules-stage spec draft and goes stale once a later pass redrafts the spec](./the-migration-plan-s-metat-hashes-the.md) | pending |
