@@ -405,7 +405,7 @@ describe("validated docs pages", () => {
     for (const file of ROOT_POLICY_TEST_FILES) {
       const source = readFileSync(resolve(ROOT, file), "utf8");
       for (const name of inventories) {
-        if (new RegExp(`["'\`](?:tests/)?${name.replace(/\./g, "\\.")}["'\`]`).test(source)) {
+        if (new RegExp(`["'\`](?:tests/)?${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'\`]`).test(source)) {
           reads.push({ file, artifact: `tests/${name}` });
         }
       }
