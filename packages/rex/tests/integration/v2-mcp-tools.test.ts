@@ -540,6 +540,13 @@ describe("rex MCP tools take a display id on a v2 tree, as get_item does", () =>
     expect(json(res)).toMatchObject({ id: lone, claimed: true, type: "change" });
   });
 
+  it("update_task_status updates the change CH-1 names", async () => {
+    const res = await call("update_task_status", { id: "CH-1", status: "pending" });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({ id: CHANGE, previousStatus: "in_progress", newStatus: "pending" });
+    expect(await node(CHANGE)).toMatchObject({ status: "pending" });
+  });
+
   it("a reference that names nothing still reports not found under the reference given", async () => {
     const res = await call("edit_item", { id: "CH-99", priority: "low" });
     expect(res.isError).toBe(true);
