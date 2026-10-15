@@ -28,5 +28,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Python build readers in lang-kit: pyproject.toml, setup.cfg, requirements and setup.py](./python-build-readers-in-lang-kit.md) | pending |
-| [Python pack: grammar, structure queries, goldens and opt-in registration](./python-pack-grammar-structure-queries.md) | in_progress |
+| [Python pack: grammar, structure queries, goldens and opt-in registration](./python-pack-grammar-structure-queries.md) | completed |
 | [Resolve Python imports to files and feed Python edges into analyze](./resolve-python-imports-to-files-and.md) | pending |
