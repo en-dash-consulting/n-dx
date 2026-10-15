@@ -113,7 +113,10 @@ so `.ndx/config.json` projects work. It is set by editing the file; core's
   `analyzeImports`) reports a listed pack that is missing or refused with the
   `ndx sv pack add <lang>` remedy, once, even when the project has no files of
   that language (a listed pack with files is reported by the normal degrade
-  path), and one warning for unknown ids listing the known ones.
+  path), and one warning for unknown ids listing the known ones. With `.tf`
+  files the imports phase leaves Terraform to `enrichTerraformInfrastructure`
+  (its `listed` option), which reports it once: the degrade notice when
+  `infrastructure.json` lists a `.tf` resource, the listed-pack notice when not.
 - `add` with no language installs each listed pack the loader does not find;
   `list` marks listed packs (`listed` in `--json`).
 - No list, an empty list or a non-array: no notice, byte-identical output.

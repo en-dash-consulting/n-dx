@@ -43,6 +43,8 @@ import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
 import { enrichTerraformInfrastructure } from "../../analyzers/terraform-infrastructure.js";
+import { terraformConfig } from "@n-dx/lang-kit";
+import { loadInventoryConfig } from "../../language/detect.js";
 import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-profile.js";
 import { computeReadinessScore } from "../../analyzers/readiness-score.js";
 import { detectOutbound } from "../../analyzers/outbound-detection.js";
@@ -743,6 +745,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
       toInfrastructureData(computeInfrastructure(ctx.absDir, inventoryPaths)),
       ctx.absDir,
       inventoryPaths,
+      { listed: ((await loadInventoryConfig(ctx.absDir)).packs ?? []).includes(terraformConfig.id) },
     );
     writeFileSync(join(ctx.svDir, DATA_FILES.infrastructure), toCanonicalJSON(infrastructure));
 

@@ -24,7 +24,8 @@ import { buildCSharpImportGraph } from "./csharp-imports.js";
 import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, type PackImportsOptions } from "./pack-imports.js";
 import { readManifest } from "./manifest.js";
 import { detectLanguages, loadInventoryConfig } from "../language/detect.js";
-import { csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, type LanguageConfig } from "@n-dx/lang-kit";
+import { type LanguageConfig, csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, terraformConfig } from "@n-dx/lang-kit";
+import { isTerraformSource } from "./terraform-infrastructure.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
@@ -763,6 +764,8 @@ export async function analyzeImports(
   const listedPacks = (await loadInventoryConfig(targetDir)).packs;
   if (listedPacks?.length) {
     const withFiles = new Set(packs.filter((p) => packFiles.some((f) => isPackFile(f.path, [p]))).map((p) => p.id));
+    // Terraform produces no imports; with `.tf` files, the infrastructure step reports its pack.
+    if (inventory.files.some((f) => isTerraformSource(f.path))) withFiles.add(terraformConfig.id);
     await noticeListedPacks(listedPacks, withFiles, { loader: options?.packs?.loader, warn: options?.packs?.warn });
   }
   if (packFiles.length > 0) {

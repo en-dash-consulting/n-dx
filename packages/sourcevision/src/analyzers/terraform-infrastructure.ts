@@ -19,6 +19,7 @@
 import { extname, posix } from "node:path";
 import { terraformConfig, type PackDegradation, type ResourceFact } from "@n-dx/lang-kit";
 import type { InfraResource, InfrastructureData } from "../schema/v1.js";
+import { noticeListedPacks } from "./pack-imports.js";
 import { KNOWN_PACKS, loadPack, packInstallCommand, type KnownPack, type PackLoaderOptions } from "../language/pack-loader.js";
 
 export interface TerraformInfrastructureOptions {
@@ -28,11 +29,18 @@ export interface TerraformInfrastructureOptions {
   readonly loader?: PackLoaderOptions;
   /** Receives the notice when the pack cannot be used. Defaults to `console.warn`. */
   readonly warn?: (message: string) => void;
+  /**
+   * The project lists the pack in `sourcevision.packs`. With `.tf` files but
+   * no listed Terraform resource this step has nothing to report, so it makes
+   * the listed-pack notice itself (the imports phase leaves Terraform to it).
+   */
+  readonly listed?: boolean;
 }
 
 const ID_PREFIX = "infra:";
 
-const isTerraformSource = (path: string): boolean => extname(path).toLowerCase() === ".tf";
+/** True for a Terraform source file (`.tf`). */
+export const isTerraformSource = (path: string): boolean => extname(path).toLowerCase() === ".tf";
 
 /** `<file>\0<type>.<name>`: where a resource is declared. */
 const placeKey = (file: string, address: string): string => `${file}\0${address}`;
@@ -80,10 +88,12 @@ export async function enrichTerraformInfrastructure(
   options: TerraformInfrastructureOptions = {},
 ): Promise<InfrastructureData> {
   const files = new Set(paths.filter(isTerraformSource));
-  if (!data.resources.some((r) => terraformAddress(r, files) !== undefined)) return data;
-
   const pack = options.pack ?? KNOWN_PACKS.find((p) => p.id === terraformConfig.id)!;
   const warn = options.warn ?? ((message: string) => console.warn(message));
+  if (!data.resources.some((r) => terraformAddress(r, files) !== undefined)) {
+    if (options.listed && files.size > 0) await noticeListedPacks([pack.id], new Set(), { installable: [pack], loader: options.loader, warn });
+    return data;
+  }
   const skip = (notice: PackDegradation): InfrastructureData => {
     const name = pack.config.displayName;
     warn(`${name}: ${notice.reason}; infrastructure.json gets no ${name} model fields.${notice.remedy === undefined ? "" : ` ${notice.remedy}`}`);
