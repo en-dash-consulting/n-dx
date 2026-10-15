@@ -20,4 +20,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [a docs-only change to a page a full-root test validates (README.md, docs/guide/*.md, docs/cli-ui-gap.md) selects no suite](./a-docs-only-change-to-a-page-a-full.md) | completed |
 | [MCP Integration guide still says HTTP MCP is single-project until a 0.7.0 hub](./mcp-integration-guide-still-says-http.md) | pending |
-| [VALIDATED_DOC_PAGES is hand-maintained: a root test that starts reading a new docs page selects nothing until someone adds a group](./validated-doc-pages-is-hand-maintained.md) | pending |
