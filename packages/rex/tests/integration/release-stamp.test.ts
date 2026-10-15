@@ -13,7 +13,7 @@ import { cmdRelease } from "../../src/cli/commands/release.js";
 import { CLIError } from "../../src/cli/errors.js";
 import { computeLandings, resolveShippedIn } from "../../src/core/change-landing.js";
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
-import { V2_FIXTURE, editText } from "../helpers/v2-fixture.js";
+import { V2_FIXTURE, completeFixtureTask, editText } from "../helpers/v2-fixture.js";
 
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
 const CHANGE_STATE = "changes/add-apple-pay/state.yaml";
@@ -84,6 +84,7 @@ beforeEach(async () => {
   git("config", "user.name", "Dev");
   await cp(V2_FIXTURE, rexDir, { recursive: true });
   await editText(join(rexDir, CHANGE_STATE), (t) => t.replace('status: "in_progress"', 'status: "completed"'));
+  await completeFixtureTask(rexDir);
   git("add", ".rex");
   await commit("base.txt", "Initial commit");
   output = [];

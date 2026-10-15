@@ -21,7 +21,7 @@ import type { NavigateTo } from "../types.js";
 import { ProductView } from "./product.js";
 import { CapabilityPage } from "./capability.js";
 import { ChangesView } from "./changes.js";
-import type { CapabilityDetail, ChangeRow, ProductMap } from "./product-model.js";
+import type { CapabilityDetail, ChangeRow, ProductEdit, ProductMap } from "./product-model.js";
 
 /** What every product read answers on a v1 tree. */
 interface V1Answer { layout: "v1" }
@@ -30,14 +30,37 @@ type Load<T> =
   | { state: "loading" }
   | { state: "error"; message: string }
   | { state: "v1" }
-  | { state: "ready"; data: T };
+  | { state: "ready"; data: T; refreshError?: string };
+
+/** Why a read failed, for the user. */
+function failureMessage(status: number, body: unknown): string {
+  const error = (body as { error?: unknown } | null)?.error;
+  return typeof error === "string" ? error : `HTTP ${status}`;
+}
+
+/**
+ * A failed read. Data already on screen stays, with the failure alongside it:
+ * a refetch that fails (a read mid-write) must not replace a loaded page.
+ */
+function failed<T>(prev: Load<T>, message: string): Load<T> {
+  return prev.state === "ready" ? { ...prev, refreshError: message } : { state: "error", message };
+}
 
 /**
  * Fetch one product read; `pick` takes the payload out of a v2 answer. It
  * reads again on each `rex:prd-changed`, keeping the current data on screen
- * until the new answer arrives, so the view follows the Tasks tree.
+ * until the new answer arrives, so the view follows the Tasks tree. A refetch
+ * that fails keeps that data and reports through `refreshError`.
  */
 function useProductRead<T>(url: string, pick: (body: Record<string, unknown>) => T): Load<T> {
+  return useRefetchableProductRead(url, pick).load;
+}
+
+/** `useProductRead` plus a `refetch` for a page that writes and must show the result. */
+function useRefetchableProductRead<T>(
+  url: string,
+  pick: (body: Record<string, unknown>) => T,
+): { load: Load<T>; refetch: () => void } {
   const [load, setLoad] = useState<Load<T>>({ state: "loading" });
   const [revision, setRevision] = useState(0);
   const refetch = useCallback(() => setRevision((n) => n + 1), []);
@@ -55,19 +78,18 @@ function useProductRead<T>(url: string, pick: (body: Record<string, unknown>) =>
       const body = await res.json() as Record<string, unknown> | V1Answer;
       if (!live) return;
       if (!res.ok) {
-        const error = (body as { error?: unknown }).error;
-        setLoad({ state: "error", message: typeof error === "string" ? error : `HTTP ${res.status}` });
+        setLoad((prev) => failed(prev, failureMessage(res.status, body)));
       } else if (body.layout === "v1") {
         setLoad({ state: "v1" });
       } else {
         setLoad({ state: "ready", data: pick(body as Record<string, unknown>) });
       }
     })().catch((err: unknown) => {
-      if (live) setLoad({ state: "error", message: err instanceof Error ? err.message : String(err) });
+      if (live) setLoad((prev) => failed(prev, err instanceof Error ? err.message : String(err)));
     });
     return () => { live = false; };
   }, [url, revision]);
-  return load;
+  return { load, refetch };
 }
 
 /** The v1 empty state: the product layer exists only after migrating. */
@@ -92,11 +114,35 @@ function Pending<T>({ load }: { load: Exclude<Load<T>, { state: "ready" | "v1" }
     : h("div", { class: "empty-state", role: "alert" }, `Could not load: ${load.message}`);
 }
 
+/** Shown above a page whose latest refetch failed; the page is the last good read. */
+function StaleNotice({ message }: { message?: string }) {
+  return message
+    ? h("div", { class: "empty-state pm-stale", role: "alert" }, `Could not refresh: ${message}. Showing the last loaded data.`)
+    : null;
+}
+
+/** Post a spec edit; resolves on success, rejects with the server's reason. */
+async function postProductEdit(edit: ProductEdit): Promise<void> {
+  const res = await fetch("/api/rex/product/edit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(edit),
+  });
+  if (!res.ok) throw new Error(failureMessage(res.status, await res.json().catch(() => null)));
+}
+
 function CapabilityFromRoute({ id, onBack }: { id: string; onBack: () => void }) {
-  const load = useProductRead(
+  const { load, refetch } = useRefetchableProductRead(
     `/api/rex/product/capability/${encodeURIComponent(id)}`,
     (body) => body.capability as CapabilityDetail,
   );
+  const [editError, setEditError] = useState<string | null>(null);
+  const onEdit = useCallback((edit: ProductEdit) => {
+    postProductEdit(edit).then(
+      () => { setEditError(null); refetch(); },
+      (err: unknown) => setEditError(err instanceof Error ? err.message : String(err)),
+    );
+  }, [refetch]);
   if (load.state === "v1") return h(NoProductLayer, { title: "Product" });
   if (load.state !== "ready") {
     // A failed read (the capability was retired since the map loaded) keeps the
@@ -106,7 +152,21 @@ function CapabilityFromRoute({ id, onBack }: { id: string; onBack: () => void })
       h(Pending, { load }),
     );
   }
-  return h(CapabilityPage, { capability: load.data, onBack });
+  return h("div", null,
+    h(StaleNotice, { message: load.refreshError }),
+    editError
+      ? h("div", { class: "empty-state pm-stale", role: "alert" }, `Could not save the edit: ${editError}`)
+      : null,
+    // Keyed by the whole spec so the form reseeds whenever the statement or a
+    // criterion changes (a save here, or an edit made elsewhere): a form left
+    // holding the old text would write it back over the newer spec on its next save.
+    h(CapabilityPage, {
+      key: JSON.stringify([load.data.id, load.data.statement ?? "", load.data.criteria]),
+      capability: load.data,
+      onBack,
+      onEdit,
+    }),
+  );
 }
 
 /** The Product page, and a capability's page opened from one of its rows. */
@@ -116,7 +176,10 @@ export function ProductPage() {
   if (load.state === "v1") return h(NoProductLayer, { title: "Product" });
   if (load.state !== "ready") return h(Pending, { load });
   if (capabilityId) return h(CapabilityFromRoute, { id: capabilityId, onBack: () => setCapabilityId(null) });
-  return h(ProductView, { map: load.data, onSelectCapability: setCapabilityId });
+  return h("div", null,
+    h(StaleNotice, { message: load.refreshError }),
+    h(ProductView, { map: load.data, onSelectCapability: setCapabilityId }),
+  );
 }
 
 /** The Changes view; a change opens as its item in the Tasks tree. */
@@ -124,8 +187,11 @@ export function ChangesPage({ navigateTo }: { navigateTo?: NavigateTo }) {
   const load = useProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
   if (load.state === "v1") return h(NoProductLayer, { title: "Changes" });
   if (load.state !== "ready") return h(Pending, { load });
-  return h(ChangesView, {
-    changes: load.data,
-    onSelectChange: navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined,
-  });
+  return h("div", null,
+    h(StaleNotice, { message: load.refreshError }),
+    h(ChangesView, {
+      changes: load.data,
+      onSelectChange: navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined,
+    }),
+  );
 }

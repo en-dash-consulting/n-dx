@@ -220,6 +220,8 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
     const placed = await call("place_change", { id, target: "A1.1", relation: "touches" });
     expect(placed).toEqual({ change: id, target: capability.node.id, relation: "touches" });
 
+    // Apply refuses a change with open work: finish CH-1's one task first.
+    await call("update_task_status", { id: "c0000000-0000-4000-8000-000000000002", status: "completed" });
     const applied = await call("apply_change", { id: "CH-1" });
     expect(applied.applied).toEqual([expect.objectContaining({ delta: "modified", nodeId: capability.node.id })]);
   });

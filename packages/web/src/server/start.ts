@@ -3,7 +3,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
+import { existsSync, statSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
 import { writeFile, unlink } from "node:fs/promises";
 import { resolve, join, dirname, basename } from "node:path";
 import { isVerbose, verbose, resolveLayout, ensureAuthToken } from "@n-dx/llm-client";
@@ -26,6 +26,7 @@ import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
 import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
+import { guardWatcher } from "./watcher-guard.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
@@ -379,7 +380,6 @@ export async function refreshPRDCache(rexDir: string): Promise<void> {
   }
 }
 
-
 function registerSourcevisionWatcher(
   scope: ViewerScope | undefined,
   svDir: string,
@@ -395,11 +395,11 @@ function registerSourcevisionWatcher(
     });
   }, WATCHER_DEBOUNCE_MS);
   try {
-    return watch(svDir, (_eventType, filename) => {
+    return guardWatcher(watch(svDir, (_eventType, filename) => {
       if (filename && (ALL_DATA_FILES as readonly string[]).includes(String(filename))) {
         debouncedRefresh();
       }
-    });
+    }), "sourcevision");
   } catch {
     // fs.watch may not be supported everywhere
     return null;
@@ -441,15 +441,47 @@ export function registerRexWatcher(
   }, WATCHER_DEBOUNCE_MS);
 
   const prdDirNames = [PRD_TREE_DIRNAME, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME];
-  const watched = new Set<string>();
+  // Folder name -> its recursive watcher and the identity of the directory it
+  // was opened on. On inotify and Windows a watch dies with its directory, so a
+  // folder deleted and recreated (a branch switch) needs a new watch. The
+  // identity pairs inode with birth time because ext4 can hand a just-freed
+  // inode number straight back to the recreated directory.
+  const watched = new Map<string, { watcher: FSWatcher; id: string }>();
+  const forget = (w: FSWatcher): void => {
+    const i = into.indexOf(w);
+    if (i !== -1) into.splice(i, 1);
+  };
+  const unwatchPrdFolder = (dirName: string): void => {
+    const current = watched.get(dirName);
+    if (!current) return;
+    current.watcher.close();
+    forget(current.watcher);
+    watched.delete(dirName);
+  };
   const watchPrdFolder = (dirName: string): void => {
     const root = join(rexDir, dirName);
-    if (watched.has(dirName) || !existsSync(root)) return;
+    let id: string;
     try {
-      into.push(watch(root, { recursive: true }, () => {
+      const st = statSync(root);
+      id = `${st.ino}:${st.birthtimeMs}`;
+    } catch {
+      // Gone (or not there yet): a watch on a deleted directory is dead, so
+      // drop it; the .rex/ watcher calls again when the folder appears.
+      unwatchPrdFolder(dirName);
+      return;
+    }
+    if (watched.get(dirName)?.id === id) return;
+    unwatchPrdFolder(dirName);
+    try {
+      const w = guardWatcher(watch(root, { recursive: true }, () => {
         debouncedRefresh();
-      }));
-      watched.add(dirName);
+      }), `rex ${dirName}/`, () => {
+        forget(w);
+        // Let the .rex/ watcher re-watch the folder when it reappears.
+        watched.delete(dirName);
+      });
+      into.push(w);
+      watched.set(dirName, { watcher: w, id });
     } catch {
       // fs.watch recursive may not be supported on every platform — non-fatal
     }
@@ -458,7 +490,7 @@ export function registerRexWatcher(
   // Watch .rex/ for legacy prd.md and tree-meta.json changes, and for a PRD
   // folder appearing after boot.
   try {
-    into.push(watch(rexDir, (_eventType, filename) => {
+    const w = guardWatcher(watch(rexDir, (_eventType, filename) => {
       const name = filename === null ? "" : String(filename);
       if (prdDirNames.includes(name)) {
         watchPrdFolder(name);
@@ -470,7 +502,8 @@ export function registerRexWatcher(
       ) {
         debouncedRefresh();
       }
-    }));
+    }), "rex", () => forget(w));
+    into.push(w);
   } catch {
     // ignore
   }
@@ -504,11 +537,11 @@ function registerHenchWatcher(
     });
   }, WATCHER_DEBOUNCE_MS);
   try {
-    return watch(henchRunsDir, (_eventType, filename) => {
+    return guardWatcher(watch(henchRunsDir, (_eventType, filename) => {
       if (filename && String(filename).endsWith(".json")) {
         debouncedBroadcast();
       }
-    });
+    }), "hench runs");
   } catch {
     // ignore
     return null;
@@ -530,11 +563,11 @@ function registerDevViewerWatcher(
     });
   }, WATCHER_DEBOUNCE_MS);
   try {
-    return watch(dirname(viewerPath), (_eventType, filename) => {
+    return guardWatcher(watch(dirname(viewerPath), (_eventType, filename) => {
       if (filename === "index.html") {
         debouncedRefresh();
       }
-    });
+    }), "dev viewer");
   } catch {
     // ignore
     return null;

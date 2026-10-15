@@ -41,6 +41,11 @@
  * hashes to it, unless the caller passes `force`: another edit changed the
  * node since, and applying would silently revert it.
  *
+ * An open change whose live work ({@link unfinishedWork}) is not all completed
+ * is refused, naming it: an applied change takes no new task and leaves the
+ * change in flight, so its work closes first. A dry run passes
+ * `allowOpenWork`, since it judges the amendments alone.
+ *
  * Any problem refuses the whole apply with {@link ApplyAmendmentsError},
  * listing every problem found. Last, the v2 rules run on the result: an error
  * finding the input tree did not have refuses the apply too, with the findings.
@@ -55,6 +60,7 @@ import { RequirementSchema } from "../schema/validate.js";
 import { isDisplayId, type Amendment, type ChangeNode, type CriteriaDelta, type Criterion } from "../schema/v2.js";
 import { checkV2Rules, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { isUsableFrozenSlug, slugifyTitle } from "../store/folder-tree-serializer.js";
+import { SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
 
 export interface ApplyAmendmentsOptions {
   /** ISO timestamp stamped as the change's `appliedAt`. */
@@ -67,6 +73,8 @@ export interface ApplyAmendmentsOptions {
   force?: boolean;
   /** Ids of live product nodes treated as retired by this change's removals too: a dry run's stand-in for other open changes' removals. */
   alsoRemoving?: ReadonlySet<string>;
+  /** Apply although live tasks or nested changes are not completed: a dry run judging the amendments alone. */
+  allowOpenWork?: boolean;
 }
 
 export interface AppliedAmendment {
@@ -112,6 +120,10 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
     const edited = editedAfterApply(change);
     const problems = isAppliedChange(change) ? [`already applied at ${change.appliedAt}`, ...(edited ? [edited] : [])] : [`it is ${change.status}`];
     throw new ApplyAmendmentsError(label, problems);
+  }
+  const unfinished = options.allowOpenWork ? [] : unfinishedWork(change);
+  if (unfinished.length > 0) {
+    throw new ApplyAmendmentsError(label, [`${describeWork(unfinished)} not completed; a change applies once its work is done`]);
   }
 
   const amends = change.amends ?? [];
@@ -214,12 +226,24 @@ export function applyAmendmentsProblems(tree: V2Tree, changeRef: string, now: Da
 
 function dryRun(tree: V2Tree, changeRef: string, now: Date, alsoRemoving?: ReadonlySet<string>): readonly string[] {
   try {
-    applyAmendments(tree, changeRef, { appliedAt: now.toISOString(), now, force: true, ...(alsoRemoving ? { alsoRemoving } : {}) });
+    applyAmendments(tree, changeRef, { appliedAt: now.toISOString(), now, force: true, allowOpenWork: true, ...(alsoRemoving ? { alsoRemoving } : {}) });
     return [];
   } catch (error) {
     if (error instanceof ApplyAmendmentsError) return error.problems;
     throw error;
   }
+}
+
+/** The live tasks and nested changes under `change` that are not completed: what its completion and its apply wait on. */
+export function unfinishedWork(change: RuleNode): RuleNode[] {
+  return (change.children ?? []).filter(
+    (c) => (c.type === "task" || c.type === "change") && c.status !== "deleted" && !SUCCESSFUL_CHILD_STATUSES.has(c.status ?? "pending"),
+  );
+}
+
+/** Names `nodes` for a refusal, with the verb: `task T-1, change CH-2 are`. */
+export function describeWork(nodes: readonly RuleNode[]): string {
+  return `${nodes.map((c) => `${c.type} ${c.displayId ?? c.id}`).join(", ")} ${nodes.length > 1 ? "are" : "is"}`;
 }
 
 type OpenChange = ChangeNode & RuleNode;

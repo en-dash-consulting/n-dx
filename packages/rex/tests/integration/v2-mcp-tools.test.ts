@@ -16,6 +16,7 @@ import { applyReshape, type ReshapeProposal } from "../../src/core/reshape.js";
 import { ChangeLayerStore } from "../../src/store/change-layer-store.js";
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 import { indexTree } from "../../src/schema/v2-rules.js";
+import { computeV2Health } from "../../src/cli/commands/health.js";
 import { copyV2Fixture, editText } from "../helpers/v2-fixture.js";
 
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
@@ -310,6 +311,32 @@ describe("rex MCP tools on a v2 tree", () => {
     expect(json(res)).toHaveProperty("overall");
   });
 
+  it("health adds the v2 tree rules, reader warnings and landings the CLI shows", async () => {
+    const res = json(await call("health"));
+    for (const field of ["overall", "dimensions"]) expect(res).toHaveProperty(field);
+    const cli = await computeV2Health(tmp, rexDir, (await ws.store.loadConfig()).structureHealth);
+    expect(res.v2).toEqual(JSON.parse(JSON.stringify(cli)));
+    expect(Object.keys(res.v2).sort()).toEqual(["landings", "treeRules", "warnings"]);
+  });
+
+  it("health keeps the score and the v2 report when package.json is malformed", async () => {
+    await writeFile(join(tmp, "package.json"), '{ "name": "shop", "version": ');
+    const res = await call("health");
+    expect(res.isError, res.text).toBe(false);
+    const body = json(res);
+    for (const field of ["overall", "dimensions", "v2"]) expect(body).toHaveProperty(field);
+    // `rex health` builds the same report, so it no longer throws either.
+    await expect(computeV2Health(tmp, rexDir, undefined)).resolves.toMatchObject({ treeRules: expect.any(Array) });
+  });
+
+  it("health returns the score and the v2 report, on default thresholds, when .rex/config.json is absent", async () => {
+    const withConfig = json(await call("health"));
+    await rm(join(rexDir, "config.json"));
+    const res = await call("health");
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toEqual(withConfig);
+  });
+
   it("reorganize detects and applies on the change layer", async () => {
     const detect = await call("reorganize", { mode: "fast" });
     expect(detect.isError, detect.text).toBe(false);
@@ -501,5 +528,64 @@ describe("rex MCP tools on a v2 tree", () => {
     expect((await call("get_next_task")).isError).toBe(false);
     const res = await call("update_task_status", { id: TASK, status: "in_progress" });
     expect(res.isError, res.text).toBe(false);
+  });
+});
+
+describe("rex MCP tools take a display id on a v2 tree, as get_item does", () => {
+  /** Added changes carry no display id; stamp CH-<n> into the change's index.md and return it. */
+  const displayIdOf = async (id: string, displayId = "CH-7") => {
+    const slug = (await node(id))?.slug as string;
+    await editText(join(rexDir, "changes", slug, "index.md"), (t) => t.replace(/^(slug: .*)$/m, `$1\ndisplayId: "${displayId}"`));
+    return displayId;
+  };
+
+  it("edit_item edits the change CH-1 names", async () => {
+    const res = await call("edit_item", { id: "CH-1", priority: "low" });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({ id: CHANGE, item: { id: CHANGE, displayId: "CH-1", priority: "low" } });
+    expect(await node(CHANGE)).toMatchObject({ priority: "low" });
+  });
+
+  it("move_item moves a task under the change a display id names", async () => {
+    const other = await addChange("Add Google Pay");
+    const res = await call("move_item", { id: TASK, parentId: await displayIdOf(other) });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({ id: TASK, previousParentId: CHANGE, newParentId: other });
+  });
+
+  it("merge_items merges changes named by display id", async () => {
+    const other = await addChange("Apple Pay, again");
+    const res = await call("merge_items", { sourceIds: ["CH-1", await displayIdOf(other)], targetId: "CH-1" });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res).absorbedIds).toEqual([other]);
+  });
+
+  it("claim_task claims the change a display id names", async () => {
+    const lone = await addChange("Add a gift card");
+    const res = await call("claim_task", { id: await displayIdOf(lone) });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({ id: lone, claimed: true, type: "change" });
+  });
+
+  it("release_task releases the claim claim_task took by the same display id", async () => {
+    const lone = await addChange("Add a gift card");
+    const ref = await displayIdOf(lone);
+    expect((await call("claim_task", { id: ref })).isError).toBe(false);
+    const res = await call("release_task", { id: ref });
+    expect(json(res)).toEqual({ id: lone, released: true });
+    expect(await ws.claims.store.readClaims()).toEqual([]);
+  });
+
+  it("update_task_status updates the change CH-1 names", async () => {
+    const res = await call("update_task_status", { id: "CH-1", status: "pending" });
+    expect(res.isError, res.text).toBe(false);
+    expect(json(res)).toMatchObject({ id: CHANGE, previousStatus: "in_progress", newStatus: "pending" });
+    expect(await node(CHANGE)).toMatchObject({ status: "pending" });
+  });
+
+  it("a reference that names nothing still reports not found under the reference given", async () => {
+    const res = await call("edit_item", { id: "CH-99", priority: "low" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toMatch(/Item "CH-99" not found/);
   });
 });

@@ -29,7 +29,7 @@ import {
 } from "../../process/claude-mcp-registration.js";
 import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
-import { actionableV2Entries, findV2Entry, loadV2Tree, nextV2Entry, V2_HAS_NO_EPICS } from "../../agent/planning/work-selection.js";
+import { actionableV2Entries, findV2Entry, loadV2Tree, nextV2Entry, v2RefPriority, V2_HAS_NO_EPICS } from "../../agent/planning/work-selection.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 import { safeParseInt } from "./constants.js";
@@ -993,7 +993,8 @@ export async function peekNextTaskPriority(
     const entry = tree ? findV2Entry(tree, doc.items, taskId) : findItem(doc.items, taskId);
     if (entry) {
       return resolveSchedulingPriority({
-        taskPriority: entry.item.priority,
+        // On v2 a task without its own priority runs at its change's, as selection ranks it.
+        taskPriority: tree ? v2RefPriority(tree, taskId) : entry.item.priority,
         tags: entry.item.tags,
         cliOverride,
       });

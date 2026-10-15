@@ -19,7 +19,8 @@
  * under `complete`, left open and unapplied under `review` or `release`. A
  * refused apply (`ApplyAmendmentsError`) is reported, and the change stays
  * completed and unapplied for a steward. A container is never applied while a
- * nested change is unapplied: inner amendments land first.
+ * nested change is unapplied: inner amendments land first. A change a steward
+ * applied before it completed closes the same way, without applying again.
  *
  * {@link completeWork} is what a status update to `completed` runs on a v2
  * tree (`update_task_status`, `rex update --status`): it dispatches on the
@@ -44,12 +45,12 @@
  * @module rex/core/change-completion
  */
 
-import { indexTree, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { indexTree, isAppliedChange, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import type { ResolutionType } from "../schema/index.js";
 import { AUTO_COMPLETABLE_STATUSES, SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
 import { computeTimestampUpdates } from "./timestamps.js";
 import { applyOnTrigger, type ApplyOnTriggerOptions, type ApplyOnTriggerResult } from "./apply-policy.js";
-import { ApplyAmendmentsError } from "./apply-amendments.js";
+import { ApplyAmendmentsError, describeWork, unfinishedWork } from "./apply-amendments.js";
 
 export type ChangeCompletionOptions = ApplyOnTriggerOptions;
 
@@ -107,18 +108,16 @@ export function completeTask(tree: V2Tree, taskRef: string, options: ChangeCompl
 /**
  * Complete the change `changeRef` on its own: a task-less change whose work
  * is done, or a change (such as an `in_progress` one) whose live tasks are all
- * completed. Throws when a live task is not completed or the change is not open.
+ * completed. A change already applied closes without applying again. Throws
+ * when a live task is not completed or the change is cancelled or deleted.
  */
 export function completeChange(tree: V2Tree, changeRef: string, options: ChangeCompletionOptions): ChangeCompletionResult {
   const next = structuredClone(tree);
   const { node: change } = locate(next, changeRef, "change");
   const label = change.displayId ?? change.id;
-  if (!isOpenChange(change)) throw new ChangeCompletionError(`Cannot complete change ${label}: it is not open`);
-  const open = liveWork(change).filter((c) => !SUCCESSFUL_CHILD_STATUSES.has(c.status ?? "pending"));
-  if (open.length > 0) {
-    const named = open.map((c) => `${c.type} ${c.displayId ?? c.id}`).join(", ");
-    throw new ChangeCompletionError(`Cannot complete change ${label}: ${named} ${open.length > 1 ? "are" : "is"} not completed`);
-  }
+  if (!closable(change)) throw new ChangeCompletionError(`Cannot complete change ${label}: it is ${change.status}`);
+  const open = unfinishedWork(change);
+  if (open.length > 0) throw new ChangeCompletionError(`Cannot complete change ${label}: ${describeWork(open)} not completed`);
   const result = emptyResult(next, []);
   if (change.status === "completed") return result;
   closeChange(result, change, options);
@@ -278,9 +277,9 @@ function liveTasks(change: RuleNode): RuleNode[] {
   return (change.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
 }
 
-/** The live tasks and nested changes a change waits on: the work `changeWorkShape` (change-selection) sees. */
-function liveWork(change: RuleNode): RuleNode[] {
-  return (change.children ?? []).filter((c) => (c.type === "task" || c.type === "change") && c.status !== "deleted");
+/** Whether completion may close `change`: neither cancelled nor deleted. An applied one closes too: a steward applied it before it completed. */
+function closable(change: RuleNode): boolean {
+  return isOpenChange(change) || (isAppliedChange(change) && change.status !== "cancelled" && change.status !== "deleted");
 }
 
 /**
@@ -290,8 +289,8 @@ function liveWork(change: RuleNode): RuleNode[] {
  */
 function closeEnclosing(result: ChangeCompletionResult, change: RuleNode | undefined, options: ChangeCompletionOptions): ChangeCompletionResult {
   for (let at = change; at; at = enclosingChange(result.tree, at.id)) {
-    if ((at.status ?? "pending") !== "pending" || !isOpenChange(at)) break;
-    if (!liveWork(at).every((c) => SUCCESSFUL_CHILD_STATUSES.has(c.status ?? "pending"))) break;
+    if ((at.status ?? "pending") !== "pending" || !closable(at)) break;
+    if (unfinishedWork(at).length > 0) break;
     closeChange(result, at, options);
     if (result.held) break;
   }
@@ -316,7 +315,9 @@ function closeChange(result: ChangeCompletionResult, change: RuleNode, options: 
   result.completed.push(change.id);
   const unapplied = (change.children ?? []).filter((c) => c.type === "change" && c.status !== "deleted" && isOpenChange(c));
   let apply: CompletionApplyResult;
-  if (unapplied.length > 0) {
+  if (isAppliedChange(change)) {
+    apply = { applied: false, reason: `already applied at ${change.appliedAt}` };
+  } else if (unapplied.length > 0) {
     const named = unapplied.map((c) => `change ${c.displayId ?? c.id}`).join(", ");
     apply = { applied: false, reason: `${named} ${unapplied.length > 1 ? "are" : "is"} not applied; a change applies after the changes nested in it` };
   } else {
