@@ -20,6 +20,9 @@ The registry is the backbone of multi-language support. Every downstream subsyst
 language/
   registry.ts      # LanguageConfig interface definition
   go.ts            # Go configuration
+  swift.ts         # Swift configuration
+  python.ts        # Python configuration (inventory only, no import parser)
+  csharp.ts        # C# and ASP.NET WebForms markup configuration
   typescript.ts    # TypeScript/JavaScript configuration (backward-compatible defaults)
   detect.ts        # Auto-detection, multi-language detection, config merging
   index.ts         # Barrel exports
@@ -52,11 +55,10 @@ Detection runs at the start of `ndx analyze` and writes the result to `manifest.
 
 ### Detection Chain
 
-1. **Explicit override** — `.n-dx.json` contains `"language": "go"` → use that
-2. **Single marker** — `go.mod` present without `package.json` → Go
-3. **Single marker** — `package.json` present without `go.mod` → TypeScript
-4. **Both present** — count `.go` vs `.ts`/`.tsx`/`.js`/`.jsx` files in top 2 directory levels → majority wins as primary
-5. **Neither present** — TypeScript fallback (backward compatible)
+1. **Explicit override** — `.n-dx.json` contains `"language": "go"` (or `typescript`, `javascript`, `swift`, `python`, `csharp`) → use that
+2. **Single marker** — exactly one of `go.mod`, `package.json`, `Package.swift`/`*.xcodeproj`, a Python manifest, or a `*.sln`/`*.csproj` within three levels → that language
+3. **Several markers** — count each language's source files down to three levels below the root (skipping dependency and build directories, and not counting `*.min.js`) → majority wins as primary
+4. **No marker** — TypeScript fallback (backward compatible)
 
 ### Single-Language vs Multi-Language
 
@@ -91,11 +93,15 @@ The import analyzer uses language detection to route files to the correct parser
 For each source file in inventory:
   if extension is .go        → extractGoImports()
   if extension is .ts/.tsx/… → TypeScript compiler API
+  if extension is .swift     → buildSwiftImportGraph()   (declared-symbol references)
+  if extension is .cs or WebForms markup → buildCSharpImportGraph()
 
 Merge results into unified imports.json
 ```
 
-Both parsers produce the same output types (`ImportEdge[]`, `ExternalImport[]`), so the zone detection algorithm receives a single merged graph regardless of how many languages contributed edges.
+JS/TS and C# are parsed whatever the detected language; Go and Swift only when detected. C# has no file-level imports, so `csharp-imports.ts` indexes every file's namespace-qualified types and resolves each type name the way the compiler looks it up — enclosing namespaces, then `using` / `global using` namespaces, then aliases. WebForms `.aspx`/`.ascx`/`.master`/`.ashx`/`.asmx` files link to their code-behind, master page, registered controls and `Inherits`/`Class` type through their `<%@ … %>` directives.
+
+All parsers produce the same output types (`ImportEdge[]`, `ExternalImport[]`), so the zone detection algorithm receives a single merged graph regardless of how many languages contributed edges.
 
 ### Cross-Language Isolation
 

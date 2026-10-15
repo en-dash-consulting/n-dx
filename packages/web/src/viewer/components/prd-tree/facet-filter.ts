@@ -20,6 +20,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../action-icon.js";
 import { useCallback, useState, useRef, useEffect, useMemo } from "preact/hooks";
 import type { ItemStatus } from "./types.js";
 
@@ -297,7 +298,7 @@ export function FacetFilter({
                       },
                       h("span", { class: "prd-facet-chip-icon" }, "#"),
                       h("span", { class: "prd-facet-chip-label" }, tag),
-                      h("span", { class: "prd-tag-remove" }, "\u00d7"),
+                      h("span", { class: "prd-tag-remove" }, h(ActionIcon, { name: "close", class: "action-icon-sm" })),
                     ),
                   ),
                 )

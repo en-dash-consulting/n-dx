@@ -19,9 +19,11 @@ import { detectCirculars } from "../util/merge.js";
 import { toPosix } from "../util/paths.js";
 import { extractGoImports, readGoModulePath } from "./go-imports.js";
 import { buildSwiftImportGraph } from "./swift-imports.js";
+import { buildCSharpImportGraph } from "./csharp-imports.js";
 import { readManifest } from "./manifest.js";
 import { getLanguageConfig, detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
 import type { LanguageConfig } from "../language/registry.js";
+import { csharpConfig } from "../language/csharp.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
@@ -375,21 +377,25 @@ interface IncrementalState {
 /**
  * Build starting edge/external maps from a previous run, carrying forward only
  * the entries for unchanged files. Files in changedFiles are excluded so they
- * can be re-parsed fresh.
+ * can be re-parsed fresh. Only files still in `fileSet` count as unchanged: a
+ * file pruned from the inventory in an earlier run is absent from it without
+ * showing up as deleted (#744).
  */
-function buildIncrementalState(prev: Imports, changedFiles: Set<string>): IncrementalState {
+function buildIncrementalState(prev: Imports, changedFiles: Set<string>, fileSet: Set<string>): IncrementalState {
   const edgeMap = new Map<string, ImportEdge>();
   const externalMap = new Map<string, ExternalImport>();
   const unchangedExternalFiles = new Set<string>();
 
+  const unchanged = (f: string) => !changedFiles.has(f) && fileSet.has(f);
+
   for (const edge of prev.edges) {
-    if (!changedFiles.has(edge.from)) {
+    if (unchanged(edge.from) && fileSet.has(edge.to)) {
       edgeMap.set(`${edge.from}\0${edge.to}\0${edge.type}`, edge);
     }
   }
 
   for (const ext of prev.external) {
-    const unchangedImporters = ext.importedBy.filter((f) => !changedFiles.has(f));
+    const unchangedImporters = ext.importedBy.filter(unchanged);
     if (unchangedImporters.length === 0) continue;
 
     const hasChangedImporters = unchangedImporters.length < ext.importedBy.length;
@@ -595,22 +601,12 @@ async function processGoFiles(
   }
 }
 
-/**
- * Parse Swift files: extract `import X` (external modules) and infer
- * file→file edges from symbol references. Same-module file relationships are
- * implicit in Swift (no `import` between sibling files), so symbol references
- * are the only way to reconstruct an internal graph short of a full compiler
- * frontend. The result is heuristic but produces a usable graph for Louvain.
- */
-async function processSwiftFiles(
-  files: Inventory["files"],
-  targetDir: string,
+/** Merge a symbol-based resolver's edges and externals into the shared maps. */
+function mergeResolverResult(
+  result: { edges: ImportEdge[]; external: ExternalImport[] },
   edgeMap: Map<string, ImportEdge>,
   externalMap: Map<string, ExternalImport>,
-): Promise<void> {
-  if (files.length === 0) return;
-  const result = await buildSwiftImportGraph(files, targetDir);
-
+): void {
   for (const edge of result.edges) {
     const key = `${edge.from}\0${edge.to}\0${edge.type}`;
     const existing = edgeMap.get(key);
@@ -636,6 +632,42 @@ async function processSwiftFiles(
       externalMap.set(ext.package, { ...ext });
     }
   }
+}
+
+/**
+ * Resolve C# files through declared types and `using` directives, and
+ * WebForms markup through its `<%@ … %>` directives. Types are indexed over
+ * every inventoried C# file, so a changed file's references resolve against
+ * unchanged ones; edges are emitted for `files` only.
+ */
+async function processCSharpFiles(
+  files: Inventory["files"],
+  inventory: Inventory,
+  targetDir: string,
+  edgeMap: Map<string, ImportEdge>,
+  externalMap: Map<string, ExternalImport>,
+): Promise<void> {
+  if (files.length === 0) return;
+  const allCSharp = inventory.files.filter((f) => csharpConfig.parseableExtensions.has(extname(f.path).toLowerCase()));
+  const result = await buildCSharpImportGraph(allCSharp, targetDir, new Set(files.map((f) => f.path)));
+  mergeResolverResult(result, edgeMap, externalMap);
+}
+
+/**
+ * Parse Swift files: extract `import X` (external modules) and infer
+ * file→file edges from symbol references. Same-module file relationships are
+ * implicit in Swift (no `import` between sibling files), so symbol references
+ * are the only way to reconstruct an internal graph short of a full compiler
+ * frontend. The result is heuristic but produces a usable graph for Louvain.
+ */
+async function processSwiftFiles(
+  files: Inventory["files"],
+  targetDir: string,
+  edgeMap: Map<string, ImportEdge>,
+  externalMap: Map<string, ExternalImport>,
+): Promise<void> {
+  if (files.length === 0) return;
+  mergeResolverResult(await buildSwiftImportGraph(files, targetDir), edgeMap, externalMap);
 }
 
 /** Compute ImportsSummary statistics from collected edges and external packages. */
@@ -683,8 +715,9 @@ export async function analyzeImports(
   const manifest = readManifest(targetDir);
   const langConfig = await resolveLanguageConfig(targetDir, manifest, options);
 
-  // Always include JS/TS for backward compatibility; add resolved language extensions.
-  const parseableExts = new Set<string>(JS_TS_EXTENSIONS);
+  // Always include JS/TS for backward compatibility, and C#, whose resolver has
+  // no per-language setup to gate; add resolved language extensions.
+  const parseableExts = new Set<string>([...JS_TS_EXTENSIONS, ...csharpConfig.parseableExtensions]);
   for (const ext of langConfig.parseableExtensions) parseableExts.add(ext);
 
   // Read go.mod once if any Go files exist in the inventory.
@@ -707,7 +740,7 @@ export async function analyzeImports(
   const externalMap = new Map<string, ExternalImport>();
 
   if (canIncremental) {
-    const state = buildIncrementalState(prev, changedFiles);
+    const state = buildIncrementalState(prev, changedFiles, fileSet);
     for (const [k, v] of state.edgeMap) edgeMap.set(k, v);
     for (const [k, v] of state.externalMap) externalMap.set(k, v);
     await reExtractUnchangedExternals(state.unchangedExternalFiles, targetDir, goModulePath, externalMap);
@@ -721,14 +754,16 @@ export async function analyzeImports(
     return true;
   });
 
-  // Partition into JS/TS, Go, and Swift to prevent cross-language contamination
+  // Partition into JS/TS, Go, Swift and C# to prevent cross-language contamination
   const jsTsFiles = parseable.filter((f) => JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase()));
   const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
   const swiftParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === SWIFT_EXTENSION);
+  const csharpParseableFiles = parseable.filter((f) => csharpConfig.parseableExtensions.has(extname(f.path).toLowerCase()));
 
   await processJsTsFiles(jsTsFiles, targetDir, resolver, edgeMap, externalMap);
   await processGoFiles(goParseableFiles, targetDir, goModulePath, edgeMap, externalMap);
   await processSwiftFiles(swiftParseableFiles, targetDir, edgeMap, externalMap);
+  await processCSharpFiles(csharpParseableFiles, inventory, targetDir, edgeMap, externalMap);
 
   // Incremental cleanup: remove packages whose importers were all changed
   if (canIncremental) {
