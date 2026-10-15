@@ -46,7 +46,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http.md) | completed |
 | [Make the Live route's run-liveness check correct on Windows](./make-the-live-route-s-run-liveness.md) | completed |
 | [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-to-the.md) | completed |
+| [One-click labelled commit when the dirty tree is only PRD or only scan output](./one-click-labelled-commit-when-the.md) | pending |
 | [Overview Next Steps panel: consistent formatting, copyable items, and capture-to-PRD action](./overview-next-steps-panel-consistent.md) | completed |
+| [Page content paints over the settings overlay instead of under it](./page-content-paints-over-the-settings.md) | pending |
 | [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-before.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-contract-in.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-hench.md) | completed |
+| [Detected run and build commands as a dashboard control](./detected-run-and-build-commands-as-a.md) | pending |

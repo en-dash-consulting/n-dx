@@ -2,13 +2,12 @@
 id: "bf053fb2-509d-4acf-aa61-7243e66027e5"
 level: "epic"
 title: "Rex"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-24T20:09:27.774Z"
-completedAt: "2026-09-17T03:46:13.946Z"
 endedAt: "2026-09-17T03:46:13.946Z"
 description: "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json."
-lastModified: "2026-09-17T03:46:13.952Z"
-lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+lastModified: "2026-10-15T13:57:45.740Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -48,5 +47,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Concurrent stale-lock reclaim can unlink a replacement live lock](./concurrent-stale-lock-reclaim-can.md) | completed |
 | [Fix --mode=fast being ignored when --accept is passed to reorganize](./fix-mode-fast-being-ignored-when.md) | completed |
 | [Investigate flaky store-roundtrip concurrency test (0 items after serialized mutations)](./investigate-flaky-store-roundtrip.md) | completed |
+| [Nothing guards CLI and MCP write surfaces against new mutable PRDItem fields](./nothing-guards-cli-and-mcp-write.md) | pending |
 | [rex add hangs indefinitely when stdin is an open pipe](./rex-add-hangs-indefinitely-when-stdin.md) | completed |
+| [rex update and MCP edit_item/add_item cannot set assignee](./rex-update-and-mcp-edit-item-add-item.md) | pending |
 | [Stamp lastModified on tree mutations made inside store.withTransaction](./stamp-lastmodified-on-tree-mutations.md) | completed |
