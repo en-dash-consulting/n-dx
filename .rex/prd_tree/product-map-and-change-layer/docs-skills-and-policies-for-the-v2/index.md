@@ -26,6 +26,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Layout-literal wall lets a hardcoded .ndx/rex, .ndx/hench or .ndx/sourcevision path through](./layout-literal-wall-lets-a-hardcoded.md) | completed |
+| [/ndx-reshape's manifest description offers "change levels", which a v2 tree refuses](./ndx-reshape-s-manifest-description.md) | pending |
 | [Rewrite the guidance, schema doc, public surface and policies](./rewrite-the-guidance-schema-doc-public.md) | pending |
 | [Rewrite the PRD skills for the v2 model for every vendor](./rewrite-the-prd-skills-for-the-v2.md) | pending |
 | [Rex MCP tool lists in the CLI/UI gap inventory and @n-dx/core README omit claim_task, release_task and get_token_usage](./rex-mcp-tool-lists-in-the-cli-ui-gap.md) | completed |

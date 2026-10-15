@@ -9,6 +9,7 @@ tags:
   - "lane-core-docs"
   - "core"
 source: "roadmap"
+startedAt: "2026-10-15T03:59:50.147Z"
 acceptanceCriteria:
   - "Each skill creates or works changes, never epics"
   - "Codex and Claude receive the same skill content"
@@ -20,6 +21,6 @@ acceptanceCriteria:
   - "On a v1 tree every skill keeps working exactly as today: each skill branches on the layout it finds (test)"
 description: "Rewrite /ndx-capture, /ndx-plan, /ndx-reshape and /ndx-work around changes, placement and the product layer, generated for every vendor from the shared assets.\n\nScope (v2 hardening 1/5, 2026-10-14): packages/core/assistant-assets/skills/ndx-capture.md, ndx-plan.md, ndx-reshape.md, ndx-work.md and ndx-adversarial-review.md, plus the .agents/skills copies and any test that pins skill wording.\n- On a v2 tree (.rex/product/ and .rex/changes/ exist) add_item refuses level (packages/rex/src/cli/mcp-tools/add-item.ts addV2); it takes type (change or task), and an item with no parentId lands in the Inbox with needsPlacement. edit_item refuses a level change on v2.\n- Each skill branches on the layout it finds. On a v1 tree (.rex/prd_tree/ only) every skill keeps its current behaviour and wording.\n\nOperator notes:\n- Do not edit anything under .claude/. The agent cannot write there; the operator regenerates .claude/skills/<name>/SKILL.md with renderSkill(name, \"claude\") from packages/core/assistant-assets.js after the run. A skill-sync failure caused only by the stale .claude copy is expected.\n- Do not touch packages/core/assistant-assets/project-guidance.md, the root AGENTS.md/CLAUDE.md guidance or policy tests about the post-cut invariant: that is task a1107d3c, which waits for the cut.\n- Do not touch packages/core migrate or init code, packages/rex/src/migrations/, or docs/cli-ui-gap.md (another session owns them).\n- Run the six static root policy tests before finishing: tests/e2e/architecture-policy, domain-isolation, shell-spawn-inventory-policy, wall-clock-inventory-policy, layout-literal-policy and obfuscated-code-policy."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-15T03:59:03.049Z"
+lastModified: "2026-10-15T04:17:52.595Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
