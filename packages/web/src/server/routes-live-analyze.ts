@@ -6,8 +6,10 @@
  *   publishes (phase, pass, batch, LLM use, the previous same-mode run's
  *   timings), plus what the progress file does not carry: who started the run,
  *   the stdout tail (dashboard-started runs only), the `.sourcevision/` files
- *   the manifest says were written, background narration, and recent runs
- *   from `analyses.jsonl`.
+ *   the manifest says were written, background narration, recent runs
+ *   from `analyses.jsonl`, and — once a run has ended — what it changed
+ *   against the one before it (`analysis-changes.ts`), with the spend its own
+ *   ledger recorded.
  * POST /api/live/analyze/stop — stop a run this server did not start, by the
  *   pid its progress file records. Dashboard-started runs stop through
  *   `POST /api/commands/sv-analyze/stop`, which owns the child handle.
@@ -33,6 +35,12 @@ import {
   type AnalyzeProgressReport,
   type ProcessCommandLine,
 } from "./domain-gateway.js";
+import {
+  computeAnalysisChanges,
+  type AnalysisChanges,
+  type AnalysisOutcome,
+  type RecordedAnalysisRun,
+} from "./analysis-changes.js";
 import { svAnalyzeRunOf, type SvAnalyzeRunSnapshot } from "./routes-commands.js";
 import { lastActiveAgentModel, resolveActiveAgentModel } from "./routes-llm.js";
 import { estimateCostFromTotals } from "./rex-gateway.js";
@@ -89,6 +97,21 @@ export interface LiveAnalyzeSnapshot {
   narration: LiveAnalyzeNarration | null;
   /** Newest first. */
   recent: LiveAnalyzeHistoryRun[];
+  /**
+   * What this run changed against the previous one. Null while a run is going
+   * (the data files are half-rewritten and a diff of them means nothing), and
+   * for a run that recorded no outcome — one that failed before its zones
+   * phase, or that ran before outcomes were recorded at all.
+   */
+  changes: AnalysisChanges | null;
+  /**
+   * USD `manifest.lastAnalysis` records for this run, or null when it recorded
+   * none. Distinct from {@link LiveAnalyzeSnapshot.costUsd}, which this server
+   * prices from the progress file so a *running* analysis can show a number:
+   * once the run has ended the recorded figure is the one to quote, because
+   * the tool that spent it priced it per task class at the model that answered.
+   */
+  spendUsd: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +331,40 @@ function phaseResults(
   return { results, enrichmentPass };
 }
 
+// ── What changed ─────────────────────────────────────────────────────────
+
+/**
+ * The run `manifest.lastAnalysis` describes, when that is the run the progress
+ * file is about.
+ *
+ * Both carry the ledger's start time (`startAnalyzeProgress` takes its
+ * `startedAt` from it), so equal timestamps identify the same run. They differ
+ * whenever a run died before writing the manifest, and then `lastAnalysis` is
+ * the run *before* this one — which would make a diff of it against its own
+ * predecessor read as this run's work.
+ */
+export function recordedRunOf(manifest: Record<string, unknown> | null, progress: AnalyzeProgressReport | null): RecordedAnalysisRun | null {
+  if (!progress) return null;
+  const last = manifest?.lastAnalysis;
+  if (!last || typeof last !== "object") return null;
+  const run = last as Partial<RecordedAnalysisRun>;
+  return run.at === progress.startedAt ? run as RecordedAnalysisRun : null;
+}
+
+/**
+ * The summary of what this run changed — only once it has ended.
+ *
+ * While the analyzer is going, the zone facts it needs are the previous run's
+ * until the zones phase rewrites them, so a diff made mid-run compares this
+ * run's counts against its own inputs.
+ */
+function changesOf(svDir: string, run: RecordedAnalysisRun | null, progress: AnalyzeProgressReport | null): AnalysisChanges | null {
+  if (!run?.outcome || progress?.running !== false) return null;
+  const previous: AnalysisOutcome | null = progress.previous?.outcome ?? null;
+  const zones = readJsonObject(join(svDir, "zones.json")) ?? {};
+  return computeAnalysisChanges(run.outcome, previous, progress.previous?.at ?? null, zones);
+}
+
 /** USD for the run's LLM use so far. Cache tokens are not tracked per class, so this prices input and output only. */
 export function priceAnalyzeUsage(progress: AnalyzeProgressReport | null): number {
   if (!progress) return 0;
@@ -358,6 +415,7 @@ export function buildLiveAnalyzeSnapshot(ctx: ServerContext, sources: LiveSource
   const dashboardRun = slot?.running === true;
   const manifest = readJsonObject(join(ctx.svDir, "manifest.json"));
   const outputAvailable = slot !== null && (dashboardRun || !running) && slotOutputIsCurrent(slot, progress);
+  const recordedRun = recordedRunOf(manifest, progress);
   return {
     generatedAt: new Date(now).toISOString(),
     worktree,
@@ -373,6 +431,8 @@ export function buildLiveAnalyzeSnapshot(ctx: ServerContext, sources: LiveSource
     ...phaseResults(ctx.svDir, progress),
     narration: narrationOf(manifest),
     recent: recentRuns(ctx.svDir),
+    changes: changesOf(ctx.svDir, recordedRun, progress),
+    spendUsd: typeof recordedRun?.llm.costUsd === "number" ? recordedRun.llm.costUsd : null,
   };
 }
 

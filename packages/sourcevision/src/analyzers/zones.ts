@@ -64,10 +64,19 @@ import {
 import type { MergeLogEntry } from "./louvain.js";
 import { enrichZonesWithAI, enrichZonesPerZone } from "./enrich.js";
 import { judgeFindings, judgeZoneFragility, judgeHeuristicFindings, judgeMoves } from "./enrich-judge.js";
+import {
+  computeTypedFindings,
+  judgeTypedFindings,
+  noulAgreement,
+  probabilitiesByZone,
+} from "./typed-findings.js";
+import { checkDeclaredRules } from "./declared-rules.js";
 import { cascadeEnrichment } from "./enrich-cascade.js";
+import { applyFindingVerdict, findingKey } from "./rerun-judge.js";
+import type { RerunOutcome } from "./rerun-judge.js";
 import { dedupeZoneNames, deepestDistinguishingSegment, idFromStems, idsFollowNames, isAlgorithmicName, renameZoneRefs, reprefixSubZones, zoneIdsOf } from "./zone-identity.js";
 import { getJudgmentRoute } from "./claude-client.js";
-import { recordPartitionReview, setRunMode } from "./run-ledger.js";
+import { recordPartitionReview, recordRerun, setRunMode } from "./run-ledger.js";
 import { computeAreas } from "./zone-areas.js";
 import { nameAreas } from "./area-naming.js";
 import { nameSubZones } from "./subzone-naming.js";
@@ -2099,6 +2108,8 @@ interface EnrichmentResult {
   cascade?: boolean;
   /** Judgment-made findings that bypass the support/paraphrase judgment. */
   prejudgedFindings?: Finding[];
+  /** What the re-run judgments decided; absent off the cascade path. */
+  rerun?: RerunOutcome;
   /** Files of zones whose narration was deferred; mapped to final ids after pins. */
   deferredFiles?: Set<string>;
   /** Files of zones whose generated names were deferred; mapped to final ids after pins. */
@@ -2135,6 +2146,7 @@ async function applyEnrichment(
   let fragilityJudged = false;
   let cascadeRan = false;
   let prejudgedFindings: Finding[] | undefined;
+  let rerun: RerunOutcome | undefined;
   let deferredFiles: Set<string> | undefined;
   let deferredNameFiles: Set<string> | undefined;
 
@@ -2167,7 +2179,7 @@ async function applyEnrichment(
       setRunMode("cascade");
       const result = await cascadeEnrichment(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints, projectProfile,
-        { deferNarration },
+        { deferNarration, contentHashes: currentContentHashes },
       );
       if (result.deferredZoneIds.size > 0) {
         deferredFiles = new Set(result.zones.filter((z) => result.deferredZoneIds.has(z.id)).flatMap((z) => z.files));
@@ -2185,6 +2197,7 @@ async function applyEnrichment(
       fragilityJudged = result.fragilityJudged;
       cascadeRan = true;
       prejudgedFindings = result.prejudgedFindings;
+      rerun = result.rerun;
     } else if (perZone) {
       const result = await enrichZonesPerZone(
         expandedZones, preCrossings, inventory, imports, validPrevious, fileArchetypes, hints,
@@ -2260,6 +2273,7 @@ async function applyEnrichment(
     fragilityJudged,
     cascade: cascadeRan,
     prejudgedFindings,
+    rerun,
     deferredFiles,
     deferredNameFiles,
   };
@@ -2406,6 +2420,14 @@ function mergeGlobalInsights(
 /**
  * Build the complete findings array: structural (pass 0) + preserved previous
  * AI findings + new AI findings. Handles stale-content detection and deduplication.
+ *
+ * A previous AI finding survives on one of two rules. Where the re-run
+ * judgment answered for it (`rerun-judge.ts` — it was judged in an earlier run,
+ * so it carries `confidence`, and its zone changed enough to be asked about),
+ * that answer decides: carried as it was, carried with `confidence` lowered to
+ * the probability, or dropped as resolved. Everything else — pass 0 findings,
+ * unjudged legacy findings, and any finding on a run with no judgment route —
+ * keeps the content-hash rule, where any change at all to the zone drops it.
  */
 function assembleFindings(
   finalZones: Zone[],
@@ -2415,7 +2437,8 @@ function assembleFindings(
   validPrevious: Zones | undefined,
   previousZones: Zones | undefined,
   zoneContentHashes: Record<string, string>,
-  globalContentHash: string
+  globalContentHash: string,
+  rerun?: RerunOutcome,
 ): Finding[] {
   const structuralFindings: Finding[] = [];
 
@@ -2427,15 +2450,14 @@ function assembleFindings(
         pass: 0,
         scope: zone.id,
         text,
-        severity: text.includes("Low cohesion") || text.includes("too broad")
-          ? "warning"
-          : text.includes("High coupling")
-            ? "warning"
-            : text.includes("entry points")
-              ? "warning"
-              : text.includes("Generic zone name")
-                ? "warning"
-                : "info",
+        // Cohesion, coupling, breadth and entry-point width used to be
+        // `warning`. They restate a metric in a sentence and name no file, so
+        // neither a reader nor the judgment that graded them could act on one;
+        // typed-findings.ts now covers the same ground from specific edges and
+        // carries anchors. These stay as context at `info`. A generic zone
+        // name is not a metric — it is a gap in the output of this pipeline —
+        // so it keeps its warning.
+        severity: text.includes("Generic zone name") ? "warning" : "info",
       });
     }
   }
@@ -2466,19 +2488,23 @@ function assembleFindings(
     return prevHash !== currHash;
   }
 
+  /**
+   * The judgment where there is one, the hash rule where there is not. A
+   * judged finding whose zone did not change is absent from the verdicts and
+   * falls through to the hash rule, which keeps it — the two agree there.
+   */
+  function keepPrevious(finding: Finding): Finding | null {
+    if (finding.pass <= 0) return null;
+    if (rerun && rerun.findings.has(findingKey(finding))) {
+      return applyFindingVerdict(finding, rerun);
+    }
+    return isContentStale(finding) ? null : finding;
+  }
+
   const prevAiFindings: Finding[] = [];
-  if (metaUpdatedFindings) {
-    for (const f of metaUpdatedFindings) {
-      if (f.pass > 0 && !isContentStale(f)) {
-        prevAiFindings.push(f);
-      }
-    }
-  } else if (validPrevious?.findings) {
-    for (const f of validPrevious.findings) {
-      if (f.pass > 0 && !isContentStale(f)) {
-        prevAiFindings.push(f);
-      }
-    }
+  for (const f of metaUpdatedFindings ?? validPrevious?.findings ?? []) {
+    const kept = keepPrevious(f);
+    if (kept) prevAiFindings.push(kept);
   }
 
   return enforceSeverityRules(deduplicateFindings([...structuralFindings, ...structural.findings, ...prevAiFindings, ...aiFindings]));
@@ -3418,16 +3444,18 @@ export async function analyzeZones(
   // enrichment mode at once. Inert without a judgment route. Here — not inside
   // applyEnrichment — because the evidence a finding is judged against
   // (post-rename crossings, heuristic findings) only exists at this point.
+  const symbolOptions = { imports, projectDir: options?.projectProfile?.projectDir };
   const judged = await judgeFindings(aiFindings, {
     zones: pinnedFinalZones,
     crossings,
     heuristics: structural.findings,
     projectDir: options?.projectProfile?.projectDir,
+    imports,
   });
   const fragilityZones = enrichedFiles && !fragilityJudged
     ? pinnedFinalZones.filter((z) => z.files.some((f) => enrichedFiles.has(f)))
     : [];
-  const fragility = await judgeZoneFragility(fragilityZones, crossings, enrichmentPass);
+  const fragility = await judgeZoneFragility(fragilityZones, crossings, enrichmentPass, symbolOptions);
   aiFindings = [...judged.findings, ...fragility.findings, ...(enrichResult.prejudgedFindings ?? [])];
   for (const r of [judged, fragility]) {
     if (r.calls === 0) continue;
@@ -3446,8 +3474,12 @@ export async function analyzeZones(
   // ── Assemble findings ──
   let allFindings = assembleFindings(
     pinnedFinalZones, structural, aiFindings, metaUpdatedFindings,
-    validPrevious, previousZones, remappedContentHashes, finalGlobalContentHash
+    validPrevious, previousZones, remappedContentHashes, finalGlobalContentHash,
+    enrichResult.rerun,
   );
+  if (enrichResult.rerun && enrichResult.rerun.calls > 0) {
+    recordRerun(enrichResult.rerun.summary);
+  }
 
   // ── Heuristic judgment (enrich-judge.ts) ──
   // After assembly, because assembleFindings builds the per-zone heuristic
@@ -3459,6 +3491,7 @@ export async function analyzeZones(
     zones: pinnedFinalZones,
     crossings,
     projectDir: options?.projectProfile?.projectDir,
+    imports,
   });
   allFindings = heuristicJudged.findings;
   if (heuristicJudged.calls > 0) {
@@ -3466,6 +3499,70 @@ export async function analyzeZones(
     enrichTokenUsage.calls += heuristicJudged.calls;
     enrichTokenUsage.inputTokens += heuristicJudged.tokenUsage?.input ?? 0;
     enrichTokenUsage.outputTokens += heuristicJudged.tokenUsage?.output ?? 0;
+  }
+
+  // ── Typed findings (typed-findings.ts) ──
+  // Derived from specific edges and anchored on them, so the judgment that
+  // grades each one is shown the edges rather than a metric. Produced with or
+  // without a route; only the grading needs one.
+  const heuristicProbabilities = probabilitiesByZone(allFindings);
+  const typed = computeTypedFindings({
+    zones: pinnedFinalZones,
+    crossings,
+    imports,
+    projectDir: options?.projectProfile?.projectDir,
+    pass: Math.max(1, enrichmentPass),
+  });
+  const typedJudged = await judgeTypedFindings(typed, {
+    zones: pinnedFinalZones,
+    crossings,
+    projectDir: options?.projectProfile?.projectDir,
+    imports,
+  });
+  allFindings = [...allFindings, ...typedJudged.findings];
+  if (typedJudged.calls > 0) {
+    enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+    enrichTokenUsage.calls += typedJudged.calls;
+    enrichTokenUsage.inputTokens += typedJudged.tokenUsage?.input ?? 0;
+    enrichTokenUsage.outputTokens += typedJudged.tokenUsage?.output ?? 0;
+    // The band these two share was carried over from the heuristic judgment.
+    // Printing how often they agree on the same zone is the measurement that
+    // lets it be set from data instead.
+    const agreement = noulAgreement(heuristicProbabilities, probabilitiesByZone(typedJudged.findings));
+    if (agreement.compared > 0) {
+      const pct = Math.round((agreement.agreed / agreement.compared) * 100);
+      console.log(`  [judge] noul agreement: ${agreement.agreed}/${agreement.compared} zones (${pct}%) band the same way under both judgments`);
+    }
+    const anchored = typedJudged.findings.filter((f) => (f.anchors?.length ?? 0) > 0).length;
+    console.log(`  [judge] typed findings: ${anchored}/${typedJudged.findings.length} carry anchors`);
+  }
+
+  // ── Declared-rule checks (declared-rules.ts) ──
+  // The rules the project states about itself, checked against its own
+  // crossings.
+  //
+  // Gated on `enrich`, because extracting the rules is an LLM call and
+  // `--fast` promises none ("`fast`: no LLM", schema/v1.ts). It was not
+  // "free on a repository that declares none" as the comment here used to
+  // claim: `findRuleDocs` also reads `.sourcevision/hints.md`, which analyze
+  // writes itself on init, so every project always had exactly one document
+  // to extract from. That cost two calls on every `--fast` run — measured at
+  // 17s of an 18.8s analyze on an 8-file fixture — and timed out CI, where no
+  // vendor answers.
+  const ruleCheck = options?.enrich === false
+    ? { findings: [], calls: 0, tokenUsage: undefined, asked: 0, rules: [] }
+    : await checkDeclaredRules(
+        options?.projectProfile?.projectDir,
+        pinnedFinalZones,
+        crossings,
+        Math.max(1, enrichmentPass),
+      );
+  allFindings = [...allFindings, ...ruleCheck.findings];
+  if (ruleCheck.calls > 0) {
+    enrichTokenUsage ??= emptyAnalyzeTokenUsage();
+    enrichTokenUsage.calls += ruleCheck.calls;
+    enrichTokenUsage.inputTokens += ruleCheck.tokenUsage?.input ?? 0;
+    enrichTokenUsage.outputTokens += ruleCheck.tokenUsage?.output ?? 0;
   }
 
   // ── Back-populate findings into insights for backward compatibility ──

@@ -30,9 +30,14 @@
  * `live:changed` frame when a run or job starts, finishes, or goes stale; the
  * frame announces, the client refetches.
  *
- * Not here yet: hench records no loop position for `--loop` runs, and the
- * execute requests queued by the hub's admission gate are only counted
- * (`machine.slots.queued`), not listed (the viewer polls `/api/hub/queue`).
+ * Two parts of the answer are laid over the cached snapshot per request rather
+ * than built into it, because neither is a property of this workspace:
+ * `machine.llm` (so a config change shows on the next read) and, behind the
+ * hub, `machine.slots` and `queue.queued` — the hub's proxy states its
+ * admission gate's numbers and this project's queued execute requests in
+ * {@link HUB_ADMISSION_HEADER}. The project server never imports hub code and
+ * has no other way to learn them; reading the header costs no I/O, so the
+ * request stays as fast as the cache makes it.
  *
  * @module web/server/routes-live
  */
@@ -45,7 +50,7 @@ import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { workspaceKeyOf } from "./workspace-scoped.js";
-import { readRunDigests, type RunDigest, type RunDigestTokens } from "./routes-worktrees.js";
+import { readRunDigests, type RunDigest, type RunDigestLoop, type RunDigestTokens } from "./routes-worktrees.js";
 import { heartbeatAgeMs, isPidAlive, isRunStale } from "./run-staleness.js";
 import {
   collectLiveLocks,
@@ -75,7 +80,7 @@ import type { PRDDocument } from "./rex-gateway.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
 import { readLastEvent, resolveRunEventsFile } from "./run-tail.js";
 import { hubConfigPath, readHubConfig, resolveHubHome } from "../hub/index.js";
-import { HUB_ADMISSION_HEADER, itemTypeOf, parseHubAdmissionHeader, type HubAdmissionHeader } from "../shared/index.js";
+import { HUB_ADMISSION_HEADER, itemTypeOf, parseHubAdmissionHeader, type HubAdmissionHeader, type HubQueuedRequest } from "../shared/index.js";
 
 // ---------------------------------------------------------------------------
 // Response shape
@@ -149,6 +154,12 @@ export interface LiveRun {
   criteriaTotal: number | null;
   /** Newest progress event summary, else the dashboard's last stdout line. */
   lastProgress: string | null;
+  /**
+   * Where the run sits in the `--iterations`/`--loop`/`--epic-by-epic`
+   * invocation that started it. Null for a run started on its own, and for a
+   * record written before hench recorded this.
+   */
+  loop: RunDigestLoop | null;
 }
 
 export type LiveJobKind = CommandJobKind | "analyze";
@@ -183,6 +194,28 @@ export interface LiveStartingExecution {
   taskTitle: string;
   startedAt: string;
   worktree: LiveWorktree;
+}
+
+/**
+ * An execute request the hub's admission gate is holding for this project.
+ *
+ * Only ever non-empty behind the hub: standalone there is no gate and nothing
+ * queues. `taskTitle` and `epicChain` are filled from the served worktree's
+ * PRD when it knows the task — a queued request names a task id, and the
+ * worktree it addressed may be one this server does not index.
+ */
+export interface LiveQueuedRequest {
+  taskId: string;
+  /** From the PRD when it knows the task, else null. */
+  taskTitle: string | null;
+  epicChain: LiveChainLink[];
+  /** Worktree key the request addressed, or null for the anchor. */
+  workspace: string | null;
+  enqueuedAt: string;
+  /** How many tasks the request works through; null means a single run. */
+  mode: string | null;
+  /** Task count for `mode: "iterations"`; null otherwise. */
+  iterations: number | null;
 }
 
 /**
@@ -225,6 +258,14 @@ export interface LiveSnapshot {
     next: LiveNextTask[];
     /** Dashboard executions spawned but not yet writing a run record. */
     starting: LiveStartingExecution[];
+    /**
+     * Execute requests the hub has queued for this project, oldest first.
+     * Always empty standalone, and capped behind the hub at the admission
+     * header's `MAX_HEADER_QUEUE_ENTRIES` (`shared/hub-admission.ts`) —
+     * `machine.slots.queued` counts them all, so a viewer showing "3 of 40
+     * waiting" stays truthful past the cut.
+     */
+    queued: LiveQueuedRequest[];
   };
   machine: {
     /** Hench slots, over the scope the run list beside it covers or wider. */
@@ -294,6 +335,8 @@ interface PrdIndex {
   /** The cache file's `mtimeMs:size` when parsed; "absent" when there was none. */
   signature: string;
   chains: Map<string, LiveChainLink[]>;
+  /** Title per item — what names a task the run records do not cover, such as a queued one. */
+  titles: Map<string, string>;
   /** Acceptance criteria per item, for items that list any. */
   criteria: Map<string, number>;
   doc: PRDDocument | null;
@@ -352,10 +395,11 @@ function prdIndexFor(rexDir: string): PrdIndex {
   const cached = prdIndexes.get(rexDir);
   if (cached && cached.signature === signature) return cached;
   const doc = signature === "absent" ? null : loadPRDSync(rexDir);
-  const index: PrdIndex = { signature, chains: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set() };
+  const index: PrdIndex = { signature, chains: new Map(), titles: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set() };
   if (doc) {
     for (const { item, parents } of walkTree(doc.items)) {
       index.chains.set(item.id, parents.map((p) => ({ id: p.id, title: p.title, itemType: itemTypeOf(p) })));
+      index.titles.set(item.id, item.title);
       const criteria = item.acceptanceCriteria?.length ?? 0;
       if (criteria > 0) index.criteria.set(item.id, criteria);
     }
@@ -561,6 +605,7 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
         canEnd: verdict?.canEnd ?? null,
         criteriaTotal: digest.taskId ? prdIndexFor(layout.rexDir).criteria.get(digest.taskId) ?? null : null,
         lastProgress: running ? lastProgressOf(digest, ws.path, roots, execution) : null,
+        loop: digest.loop,
       };
       if (running) {
         runs.push(entry);
@@ -641,7 +686,9 @@ export function buildLiveSnapshot(ctx: ServerContext, sources: LiveSources, now 
     generatedAt: new Date(now).toISOString(),
     runs,
     jobs,
-    queue: { next, starting },
+    // `queued` is the hub's to fill: handleLiveRoute lays it over from the
+    // admission header, which a standalone server never receives.
+    queue: { next, starting, queued: [] },
     machine: {
       // Standalone; handleLiveRoute replaces it with the hub's when served through one.
       slots: liveSlots("repository", liveRuns, getEffectiveMaxConcurrent(ctx.projectDir)),
@@ -694,13 +741,40 @@ export function getLiveSnapshot(ctx: ServerContext, sources: LiveSources, now = 
 const LIVE_PATH = "/api/live";
 
 /**
+ * Name the hub's queued requests from the served worktree's PRD.
+ *
+ * The index is the one every other part of the answer reads, already parsed
+ * and cached against the PRD cache file's mtime, so this costs no I/O. A task
+ * the PRD does not know (queued for another worktree, or removed while it
+ * waited) keeps its id and is listed without a title rather than dropped —
+ * it is still holding a slot.
+ */
+function queuedRequests(entries: readonly HubQueuedRequest[], rexDir: string): LiveQueuedRequest[] {
+  const index = prdIndexFor(rexDir);
+  return entries.map((entry) => ({
+    taskId: entry.taskId,
+    taskTitle: index.titles.get(entry.taskId) ?? null,
+    epicChain: index.chains.get(entry.taskId) ?? [],
+    workspace: entry.workspace,
+    enqueuedAt: entry.enqueuedAt,
+    mode: entry.mode ?? null,
+    iterations: entry.iterations ?? null,
+  }));
+}
+
+/**
  * Handle GET /api/live. Resolves true if the request was handled.
  *
  * The agent's vendor and model are resolved per request and laid over the
  * cached snapshot, so a config change shows on the next read rather than
- * after the cache turns over. So are the hench slots when the request came
- * through the hub, whose proxy states its admission gate's numbers in
+ * after the cache turns over. So are the hench slots and the queued execute
+ * requests when the request came through the hub, whose proxy states its
+ * admission gate's numbers and this project's queue in
  * {@link HUB_ADMISSION_HEADER}: one snapshot can be read both ways.
+ *
+ * None of the three reads the filesystem — the snapshot behind them is the
+ * cached one and the header is already parsed — so the request stays as fast
+ * as {@link LIVE_CACHE_TTL_MS} makes it.
  */
 export async function handleLiveRoute(
   req: IncomingMessage,
@@ -714,7 +788,12 @@ export async function handleLiveRoute(
   const snapshot = getLiveSnapshot(ctx, sources);
   const admission = parseHubAdmissionHeader(req.headers[HUB_ADMISSION_HEADER]);
   const slots = admission ? hubSlots(admission, snapshot.machine.slots.inUse) : snapshot.machine.slots;
-  jsonResponse(res, 200, { ...snapshot, machine: { ...snapshot.machine, llm, slots } });
+  const queued = admission?.queue ? queuedRequests(admission.queue, ctx.rexDir) : snapshot.queue.queued;
+  jsonResponse(res, 200, {
+    ...snapshot,
+    queue: { ...snapshot.queue, queued },
+    machine: { ...snapshot.machine, llm, slots },
+  });
   return true;
 }
 

@@ -204,6 +204,13 @@ describe.skipIf(!gitSupportsPathspecFromFile())(
         expect(stashes.trim()).not.toBe("");
         expectNothingExecuted();
       },
+      // Three real shell spawns plus a handful of git calls, per shell. On a
+      // Windows runner that is ~36s against hench's 30s default
+      // (`packages/hench/vitest.config.ts`), so this failed on `main` as a
+      // timeout rather than an assertion — the suite was red for a test that
+      // was merely slow. 120s matches the root config's allowance for
+      // integration work; a genuine hang still fails, just later.
+      120_000,
     );
   },
 );

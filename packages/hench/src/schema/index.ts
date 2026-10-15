@@ -53,6 +53,7 @@ export type {
   RunReviewRound,
   RunReviewSpend,
   RunRecord,
+  RunLoopPosition,
   RunTrustRecord,
   RunCommitRecord,
   RunCommitAttribution,

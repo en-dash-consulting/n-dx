@@ -393,7 +393,7 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
 
       const fingerprint = (z: typeof zones): string => {
         const names = z.zones.map((zo) => `${zo.id}:${zo.name}`).sort().join("|");
-        return `${names} f=${z.findings?.length ?? 0} i=${z.insights?.length ?? 0}`;
+        return `${names}\u0000f=${z.findings?.length ?? 0}\u0000i=${z.insights?.length ?? 0}`;
       };
 
       let prevFingerprint = fingerprint(zones);

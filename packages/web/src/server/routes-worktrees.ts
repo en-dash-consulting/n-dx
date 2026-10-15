@@ -137,6 +137,18 @@ export interface RunDigestTokens {
 }
 
 /**
+ * Where a run sits in a `--iterations`/`--loop`/`--epic-by-epic` invocation,
+ * as the run record carries it (hench's `RunLoopPosition`). Null for a run
+ * started on its own, and for a record written before hench recorded this.
+ */
+export interface RunDigestLoop {
+  mode: string;
+  iteration: number;
+  /** Total runs planned — `--iterations=N` only; null when the loop is unbounded. */
+  max: number | null;
+}
+
+/**
  * The small, fixed slice of a run file that the worktree summary and the Live
  * overview read (`GET /api/worktrees`, `GET /api/live`). Both count running
  * runs from this one digest, so their counts agree.
@@ -162,6 +174,8 @@ export interface RunDigest {
   worktreeRoot: string | null;
   /** Recorded path of the structured progress events file, unconfined. */
   eventsPath: string | null;
+  /** Position in the loop that started this run, or null when it was started on its own. */
+  loop: RunDigestLoop | null;
 }
 
 /**
@@ -240,6 +254,26 @@ function claimLostHolder(value: unknown): string | null {
 }
 
 /**
+ * A run record's loop position, or null.
+ *
+ * Tolerant like {@link claimLostHolder}: an entry missing a mode or an
+ * iteration is no position rather than a partial one, since "iteration ?" is
+ * worse than saying nothing. `max` is optional by design — only `--iterations`
+ * knows one — so a missing or unusable one leaves the rest intact.
+ */
+function loopPosition(value: unknown): RunDigestLoop | null {
+  if (!value || typeof value !== "object") return null;
+  const { mode, iteration, max } = value as Record<string, unknown>;
+  if (typeof mode !== "string" || mode.length === 0) return null;
+  if (typeof iteration !== "number" || !Number.isFinite(iteration)) return null;
+  return {
+    mode,
+    iteration,
+    max: typeof max === "number" && Number.isFinite(max) ? max : null,
+  };
+}
+
+/**
  * The digest fields of one parsed run record. Tolerant of every field being
  * missing or mistyped: records come from other worktrees and hench versions.
  */
@@ -271,6 +305,7 @@ function digestRun(run: Record<string, unknown>): RunDigest {
     branch: str(run.branch),
     worktreeRoot: str(run.worktreeRoot),
     eventsPath: str(run.eventsPath),
+    loop: loopPosition(run.loop),
   };
 }
 

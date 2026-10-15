@@ -2351,6 +2351,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
     criteriaCount: brief.task.acceptanceCriteria?.length,
     permissionMode: opts.permissionMode,
+    ...(opts.loop ? { loop: opts.loop } : {}),
   });
 
   // The brief as sent: the run's commit trailers included, so the agent's own
@@ -2573,8 +2574,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Retries are surfaced as lighter subsection lines inside the loop so a
   // single run renders as one start banner, N attempt markers, one end.
   section(
-    opts.runNumber !== undefined
-      ? `Agent Run #${opts.runNumber}${opts.spawnModel ? ` (${opts.spawnModel})` : ""} start`
+    opts.loop !== undefined
+      ? `Agent Run #${opts.loop.iteration}${opts.spawnModel ? ` (${opts.spawnModel})` : ""} start`
       : `Agent Run${opts.spawnModel ? ` (${opts.spawnModel})` : ""}`,
   );
 

@@ -1152,6 +1152,92 @@ describe("scanSourceVision", () => {
     expect(tasks.length).toBe(1);
     expect(staleCount).toBe(0);
   });
+
+  // Placement recognises a code-health finding by the `code-health` tag alone,
+  // never by `source: "sourcevision"`. Everything the analysis reports as a
+  // problem must therefore carry it; the zones and categories it merely
+  // describes must not, because they are new work rather than repairs.
+  describe("code-health tagging", () => {
+    it("tags findings, and leaves zone features and category epics untagged", async () => {
+      await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+      await writeFile(
+        join(tempDir, ".sourcevision", "zones.json"),
+        JSON.stringify({
+          zones: [
+            { id: "core", name: "Core", description: "Core module", files: ["src/core.ts"], entryPoints: [], cohesion: 0.9, coupling: 0.1 },
+          ],
+          findings: [
+            { type: "anti-pattern", pass: 1, scope: "core", text: "God object detected", severity: "warning", category: "structural" },
+            { type: "suggestion", pass: 1, scope: "core", text: "Add input validation", severity: "warning" },
+            { type: "move-file", pass: 0, scope: "core", text: "Move util.ts to lib/", severity: "info", from: "src/util.ts", to: "lib/util.ts" },
+          ],
+        }),
+      );
+      await writeFile(
+        join(tempDir, ".sourcevision", "inventory.json"),
+        JSON.stringify({
+          files: [
+            { path: "src/core.ts", category: "source", role: "source" },
+            { path: "src/util.ts", category: "source", role: "source" },
+          ],
+        }),
+      );
+
+      const { results } = await scanSourceVision(tempDir);
+
+      const tasks = results.filter((r) => r.kind === "task");
+      expect(tasks.length).toBe(3);
+      for (const task of tasks) {
+        expect(task.tags).toContain("code-health");
+      }
+
+      // The zone is a description of what exists, not a finding.
+      const zoneFeature = results.find((r) => r.kind === "feature" && r.name === "Core")!;
+      expect(zoneFeature.tags ?? []).not.toContain("code-health");
+
+      // Nor is the inventory category epic.
+      const categoryEpic = results.find((r) => r.kind === "epic")!;
+      expect(categoryEpic.tags ?? []).not.toContain("code-health");
+    });
+
+    it("tags circular-dependency tasks alongside tech-debt", async () => {
+      await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+      await writeFile(
+        join(tempDir, ".sourcevision", "imports.json"),
+        JSON.stringify({
+          summary: { circulars: [{ cycle: ["src/a.ts", "src/b.ts", "src/a.ts"] }] },
+          circularDependencies: [{ from: "src/c.ts", to: "src/d.ts" }],
+          circular: [["src/e.ts", "src/f.ts"]],
+        }),
+      );
+
+      const { results } = await scanSourceVision(tempDir);
+      const tasks = results.filter((r) => r.kind === "task");
+
+      expect(tasks.length).toBe(3);
+      for (const task of tasks) {
+        expect(task.tags).toEqual(["tech-debt", "code-health"]);
+      }
+    });
+
+    it("tags legacy-format zone findings but not the legacy zone feature", async () => {
+      await mkdir(join(tempDir, ".sourcevision"), { recursive: true });
+      await writeFile(
+        join(tempDir, ".sourcevision", "zones.json"),
+        JSON.stringify([
+          { name: "Legacy", description: "d", findings: [{ message: "Leaky abstraction", severity: "warning" }] },
+        ]),
+      );
+
+      const { results } = await scanSourceVision(tempDir);
+
+      const task = results.find((r) => r.kind === "task")!;
+      expect(task.tags).toEqual(["Legacy", "code-health"]);
+
+      const feature = results.find((r) => r.kind === "feature")!;
+      expect(feature.tags ?? []).not.toContain("code-health");
+    });
+  });
 });
 
 describe("scanPackageJson", () => {

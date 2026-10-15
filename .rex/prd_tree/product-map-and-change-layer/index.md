@@ -21,7 +21,7 @@ plannedRelease: "1.0.0"
 | [Agent brief from the product layer](./agent-brief-from-the-product-layer/index.md) | completed |
 | [Apply engine for change amendments](./apply-engine-for-change-amendments/index.md) | completed |
 | [Apply the migration](./apply-the-migration/index.md) | pending |
-| [Bootstrap the product layer from an established codebase](./bootstrap-the-product-layer-from-an/index.md) | pending |
+| [Bootstrap the product layer from an established codebase](./bootstrap-the-product-layer-from-an/index.md) | completed |
 | [Capture the product map roadmap](./capture-the-product-map-roadmap/index.md) | completed |
 | [CLI for the product layer and changes](./cli-for-the-product-layer-and-changes/index.md) | completed |
 | [Correct the v2 schema before files are written](./correct-the-v2-schema-before-files-are/index.md) | completed |
@@ -43,7 +43,7 @@ plannedRelease: "1.0.0"
 | [Placement engine for changes](./placement-engine-for-changes/index.md) | completed |
 | [Product, Changes and capability views on fixtures](./product-changes-and-capability-views/index.md) | completed |
 | [Read and write the v2 folder trees](./read-and-write-the-v2-folder-trees/index.md) | completed |
-| [Recommendations become changes](./recommendations-become-changes/index.md) | pending |
+| [Recommendations become changes](./recommendations-become-changes/index.md) | completed |
 | [Remove the unused tracker integrations](./remove-the-unused-tracker-integrations/index.md) | completed |
 | [Review follow-ups for the product layer work](./review-follow-ups-for-the-product/index.md) | pending |
 | [rex correctness fixes off the migration path](./rex-correctness-fixes-off-the/index.md) | completed |

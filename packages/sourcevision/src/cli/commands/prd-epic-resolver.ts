@@ -1,8 +1,23 @@
+/**
+ * Which epics a branch worked on, for the pull-request markdown.
+ *
+ * **No code path here reads `.rex/prd.md` or `.rex/prd.json`.** The PRD comes
+ * from `readPRDViaRex` — one `rex tree --format=json` spawn, rex's own parser
+ * on the other side of it — the same seam `branch-work-collector.ts` uses, and
+ * the only sanctioned route across the sourcevision↔rex boundary. The previous
+ * implementation parsed `.rex/prd.md` itself and fell back to `prd.json`: both
+ * are legacy formats a folder-tree or v2 project does not have, so it found
+ * nothing there and said so silently. Legacy projects are still handled, by
+ * rex, which migrates them before reading.
+ *
+ * @module sourcevision/cli/commands/prd-epic-resolver
+ */
+
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
-import { execFileSyncCli } from "../../util/exec-cli.js";
+import { readPRDViaRex } from "../../analyzers/branch-work-collector.js";
 
 /**
  * Where rex keeps its state for this project.
@@ -67,46 +82,6 @@ function runGit(projectDir: string, args: string[]): string | null {
   } catch {
     return null;
   }
-}
-
-function readJSONFile<T>(path: string): T | null {
-  try {
-    const raw = readFileSync(path, "utf-8");
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Read the PRD document, preferring `.rex/prd.md` (current source of truth)
- * and falling back to `.rex/prd.json` for legacy projects. Markdown is parsed
- * by spawning `rex parse-md --stdin` so we never import rex at the code level.
- */
-function readPRDDocument(projectDir: string): PRDDocumentLike | null {
-  const rexDir = rexDirFor(projectDir);
-  const mdPath = join(rexDir, "prd.md");
-  const jsonPath = join(rexDir, "prd.json");
-
-  try {
-    const md = readFileSync(mdPath, "utf-8");
-    if (md.trim().startsWith("---")) {
-      try {
-        const out = execFileSyncCli("rex", ["parse-md", "--stdin"], {
-          input: md,
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-        return JSON.parse(out as string) as PRDDocumentLike;
-      } catch {
-        // fall through to JSON
-      }
-    }
-  } catch {
-    // prd.md not readable — fall back to JSON
-  }
-
-  return readJSONFile<PRDDocumentLike>(jsonPath);
 }
 
 function readJSONLFile<T>(path: string): T[] {
@@ -321,7 +296,7 @@ function resolveWorkedEpicTitlesForRange(projectDir: string, comparisonRange: st
   }
 
   const logPath = join(rexDirFor(projectDir), "execution-log.jsonl");
-  const prd = readPRDDocument(projectDir);
+  const prd: PRDDocumentLike | null = readPRDViaRex(projectDir);
   if (!prd?.items) {
     return {
       status: "empty",

@@ -22,7 +22,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, enclosingChangeIds, findItem, findParentResets, indexTree, isAppliedChange, isChangeLayerStore, loadPrdModel, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunLoopPosition, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD, DEFAULT_GIT_COMMIT_MESSAGE_SOURCE } from "../../schema/index.js";
 import type { GitCommitMessageSource, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -325,12 +325,13 @@ export interface SharedLoopOptions {
    */
   extraContext?: string;
   /**
-   * 1-based ordinal of this run within the current `ndx work --loop`
-   * invocation. When set, the Agent Run banner uses the
-   * `#N … start` / `#N … end` format; when undefined (non-loop callers),
-   * the original banner is preserved.
+   * Where this run sits in a multi-task invocation (`--iterations`, `--loop`,
+   * `--epic-by-epic`). When set, the Agent Run banner uses the
+   * `#N … start` / `#N … end` format and the run record carries the position
+   * ({@link RunRecord.loop}); when undefined (a run started on its own), the
+   * original banner is preserved and the record carries no loop block.
    */
-  runNumber?: number;
+  loop?: RunLoopPosition;
 }
 
 // ---------------------------------------------------------------------------
@@ -573,6 +574,12 @@ export interface InitRunOptions {
   permissionMode?: string;
   /** The review pass the run was launched with (`--review`), recorded on the run from its first save. */
   reviewPlan?: RunReviewPlan;
+  /**
+   * Where this run sits in a `--iterations`/`--loop`/`--epic-by-epic`
+   * invocation — see {@link RunRecord.loop}. Absent for a run started on its
+   * own.
+   */
+  loop?: RunLoopPosition;
 }
 
 /**
@@ -754,6 +761,7 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     modelSource: opts.modelSource,
     session: opts.session,
     ...(opts.reviewPlan ? { reviewPlan: opts.reviewPlan } : {}),
+    ...(opts.loop ? { loop: opts.loop } : {}),
     actor: await resolveActor(opts.projectDir ?? "."),
     host: resolveHost(),
     pid: process.pid,

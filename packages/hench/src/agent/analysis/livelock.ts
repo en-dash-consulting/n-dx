@@ -226,8 +226,8 @@ function stableStringify(value: unknown): string {
 function signatureOf(observation: LivelockObservation): string {
   const args = stableStringify(observation.input ?? {}).slice(0, MAX_SIGNATURE_FIELD);
   const result =
-    observation.output === undefined ? "" : ` ${observation.output.slice(0, MAX_SIGNATURE_FIELD)}`;
-  return `${observation.tool} ${args}${result}`;
+    observation.output === undefined ? "" : `\u0000${observation.output.slice(0, MAX_SIGNATURE_FIELD)}`;
+  return `${observation.tool}\u0000${args}${result}`;
 }
 
 /** Short, single-line rendering of a call for the failure message. */

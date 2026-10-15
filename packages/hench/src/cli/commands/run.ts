@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor, traversalBlock, prdLayout } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore, TraversalBlock } from "../../prd/rex-gateway.js";
 import { collectEpicTaskIds as collectEpicTasks, selectTaskEntry } from "../../agent/planning/brief.js";
-import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
+import type { PermissionMode, RunLoopPosition, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
 import type { FileCategory } from "../../store/file-classifier.js";
 import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
@@ -1441,7 +1441,8 @@ async function runOne(
   yes?: boolean,
   extraContext?: string,
   autonomous?: boolean,
-  runNumber?: number,
+  /** Where this task sits in a multi-task invocation; absent for a lone run. */
+  loop?: RunLoopPosition,
   permissionMode?: PermissionMode,
   skipTestGate?: boolean,
   assignee?: string,
@@ -1596,7 +1597,7 @@ async function runOne(
         yes,
         autonomous,
         extraContext,
-        runNumber,
+        ...(loop ? { loop } : {}),
         permissionMode,
         claims,
         wouldResetIds,
@@ -1624,7 +1625,7 @@ async function runOne(
         yes,
         autonomous,
         extraContext,
-        runNumber,
+        ...(loop ? { loop } : {}),
         claims,
         wouldResetIds,
       });
@@ -2481,7 +2482,10 @@ async function runIterations(
       yes,
       extraContext,
       autonomous,
-      undefined,
+      // `--iterations=N` is the one mode whose length is known up front, so it
+      // is also the one that can report a `max`. A lone run (`iterations === 1`)
+      // is not a loop and reports no position at all.
+      iterations > 1 ? { mode: "iterations", iteration: i + 1, max: iterations } : undefined,
       permissionMode,
       skipTestGate,
       assignee,
@@ -2651,7 +2655,9 @@ async function runLoop(
             yes,
             extraContext,
             autonomous,
-            completed,
+            // `--loop`/`--auto` run until the tree is out of actionable tasks,
+            // so there is no `max` to report at the start of any iteration.
+            { mode: "loop", iteration: completed },
             permissionMode,
             skipTestGate,
             assignee,
@@ -3009,7 +3015,10 @@ async function runEpicByEpic(
               yes,
               extraContext,
               autonomous,
-              undefined,
+              // Position across the whole invocation, not within this epic:
+              // `tasksStarted` counts every task run so far, and is incremented
+              // after this call returns. Unbounded, like `--loop`.
+              { mode: "epic-by-epic", iteration: tasksStarted + 1 },
               permissionMode,
               skipTestGate,
               undefined, // assignee — --mine is refused with --epic-by-epic

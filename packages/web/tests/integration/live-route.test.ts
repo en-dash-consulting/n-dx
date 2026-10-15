@@ -55,6 +55,8 @@ interface RunFixture {
   tokens?: { input: number; output: number };
   events?: string[];
   pid?: number;
+  /** Position in the invocation that started it, as hench records it. */
+  loop?: { mode: string; iteration: number; max?: number };
 }
 
 /** A pid no process can hold: above every platform's pid limit, so `kill(pid, 0)` is ESRCH. */
@@ -81,6 +83,7 @@ function writeRun(worktree: string, run: RunFixture): void {
     tokenUsage: run.tokens ?? { input: 1000, output: 200 },
     branch: "side",
     pid: run.pid ?? 4242,
+    ...(run.loop ? { loop: run.loop } : {}),
     ...(eventsPath ? { eventsPath } : {}),
   }));
 }
@@ -151,8 +154,8 @@ describe("GET /api/live", () => {
 
   beforeAll(async () => {
     // Served worktree: one fresh run, one stale, one finished recently, one long ago.
-    writeRun(repo, { id: "fresh", status: "running", taskId: "task-a", startedAt: now - 2 * MINUTE, lastActivityAt: now - 10_000, events: ["Brief loaded", "Ran 12 tests"], pid: process.pid });
-    writeRun(repo, { id: "stuck", status: "running", startedAt: now - 30 * MINUTE, lastActivityAt: now - 10 * MINUTE });
+    writeRun(repo, { id: "fresh", status: "running", taskId: "task-a", startedAt: now - 2 * MINUTE, lastActivityAt: now - 10_000, events: ["Brief loaded", "Ran 12 tests"], pid: process.pid, loop: { mode: "iterations", iteration: 2, max: 5 } });
+    writeRun(repo, { id: "stuck", status: "running", startedAt: now - 30 * MINUTE, lastActivityAt: now - 10 * MINUTE, loop: { mode: "loop", iteration: 7 } });
     // Killed hard: the record still says running with a fresh heartbeat.
     writeRun(repo, { id: "ghost", status: "running", startedAt: now - 3 * MINUTE, lastActivityAt: now - 5_000, pid: DEAD_PID });
     writeRun(repo, { id: "done", status: "completed", startedAt: now - 20 * MINUTE, finishedAt: now - 10 * MINUTE });
@@ -215,6 +218,20 @@ describe("GET /api/live", () => {
     });
     expect(fresh.heartbeatAgeMs).not.toBeNull();
     expect(live.runs.find((r) => r.runId === "stuck")?.stale).toBe(true);
+  });
+
+  it("reports each running run's position in the loop that started it", async () => {
+    const live = await fetchLive();
+    // --iterations=N knows its length, so it reports a max.
+    expect(live.runs.find((r) => r.runId === "fresh")?.loop).toEqual({ mode: "iterations", iteration: 2, max: 5 });
+    // --loop runs until the tree is empty: a position, but no end to count towards.
+    expect(live.runs.find((r) => r.runId === "stuck")?.loop).toEqual({ mode: "loop", iteration: 7, max: null });
+  });
+
+  it("reports no loop position for a run started on its own", async () => {
+    const live = await fetchLive();
+    expect(live.runs.find((r) => r.runId === "ghost")?.loop).toBeNull();
+    expect(live.runs.find((r) => r.runId === "elsewhere")?.loop).toBeNull();
   });
 
   it("reports a running record whose pid is dead as pidAlive false, without making it stale", async () => {
@@ -374,6 +391,117 @@ describe("GET /api/live machine.slots", () => {
 
   it("ignores a malformed admission header", async () => {
     expect((await slots({ [HUB_ADMISSION_HEADER]: "{\"running\":-1}" })).scope).toBe("repository");
+  });
+});
+
+describe("GET /api/live queue.queued", () => {
+  let root: string;
+  let served: string;
+  let server: RouteTestServer;
+
+  beforeAll(async () => {
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), "ndx-live-queued-")));
+    served = join(root, "served");
+    mkdirSync(served);
+    writePrd(served, ["task-a"]);
+    const queueSources: LiveSources = {
+      listWorkspaces: () => [{ key: "served", path: served, branch: "main", isAnchor: true }],
+      memoryFloorBytes: () => null,
+    };
+    server = await startRouteTestServer((req, res) => handleLiveRoute(req, res, ctxFor(served, "served"), queueSources));
+  });
+
+  afterAll(async () => {
+    await server?.close();
+    if (root) await removeTempDir(root);
+  });
+
+  async function queued(headers: Record<string, string> = {}): Promise<LiveSnapshot["queue"]["queued"]> {
+    return ((await (await fetch(`${server.baseUrl}/api/live`, { headers })).json()) as LiveSnapshot).queue.queued;
+  }
+
+  function header(queue: Array<Record<string, unknown>>): Record<string, string> {
+    return {
+      [HUB_ADMISSION_HEADER]: formatHubAdmissionHeader({
+        running: 1,
+        maxSessions: 2,
+        queued: queue.length,
+        queue: queue as never,
+      }),
+    };
+  }
+
+  it("is empty standalone — without a hub there is no gate and nothing queues", async () => {
+    expect(await queued()).toEqual([]);
+  });
+
+  it("lists the execute requests the hub has queued for this project, named from the PRD", async () => {
+    const list = await queued(header([
+      { taskId: "task-a", workspace: null, enqueuedAt: "2026-10-14T10:00:00.000Z" },
+      { taskId: "next-1", workspace: "side", enqueuedAt: "2026-10-14T10:01:00.000Z", mode: "iterations", iterations: 3 },
+    ]));
+    expect(list).toEqual([
+      {
+        taskId: "task-a",
+        taskTitle: "task task-a",
+        epicChain: [
+          { id: "epic-1", title: "Epic one", itemType: "epic" },
+          { id: "feature-1", title: "Feature one", itemType: "feature" },
+        ],
+        workspace: null,
+        enqueuedAt: "2026-10-14T10:00:00.000Z",
+        mode: null,
+        iterations: null,
+      },
+      {
+        taskId: "next-1",
+        taskTitle: "Next task",
+        epicChain: [
+          { id: "epic-1", title: "Epic one", itemType: "epic" },
+          { id: "feature-1", title: "Feature one", itemType: "feature" },
+        ],
+        workspace: "side",
+        enqueuedAt: "2026-10-14T10:01:00.000Z",
+        mode: "iterations",
+        iterations: 3,
+      },
+    ]);
+  });
+
+  it("still lists a request whose task this PRD does not know — it is holding a slot either way", async () => {
+    const list = await queued(header([{ taskId: "ghost-task", workspace: null, enqueuedAt: "2026-10-14T10:00:00.000Z" }]));
+    expect(list).toEqual([
+      { taskId: "ghost-task", taskTitle: null, epicChain: [], workspace: null, enqueuedAt: "2026-10-14T10:00:00.000Z", mode: null, iterations: null },
+    ]);
+  });
+
+  it("is empty behind a hub whose queue holds nothing for this project, though others wait", async () => {
+    const res = await fetch(`${server.baseUrl}/api/live`, {
+      headers: { [HUB_ADMISSION_HEADER]: formatHubAdmissionHeader({ running: 1, maxSessions: 2, queued: 4, queue: [] }) },
+    });
+    const live = (await res.json()) as LiveSnapshot;
+    expect(live.queue.queued).toEqual([]);
+    // The count stays machine-wide: this project is waiting behind other projects' runs.
+    expect(live.machine.slots.queued).toBe(4);
+  });
+
+  it("is empty behind a hub too old to send a queue, which says nothing about this project", async () => {
+    expect(await queued({ [HUB_ADMISSION_HEADER]: formatHubAdmissionHeader({ running: 1, maxSessions: 2, queued: 3 }) })).toEqual([]);
+  });
+
+  // Counting work rather than timing it: the acceptance claim is that the
+  // queue is served from cached data, and a parse count is exact on every
+  // machine where a millisecond budget is a bet on the load. Same reason the
+  // 25-worktree case below counts run-file reads. See TESTING.md, Family 2.
+  it("adds no filesystem read to the request — the queue is laid over cached data", async () => {
+    const headers = header([{ taskId: "task-a", workspace: null, enqueuedAt: "2026-10-14T10:00:00.000Z" }]);
+    writeRun(served, { id: "warm", status: "running", startedAt: Date.now() - MINUTE, lastActivityAt: Date.now() - 5_000, pid: process.pid });
+    clearLiveCaches();
+    clearWorktreesCache();
+    await fetch(`${server.baseUrl}/api/live`, { headers }); // warm both caches
+    const warmed = runFileParseCountForTests();
+    expect(await queued(headers)).toHaveLength(1);
+    expect(runFileParseCountForTests()).toBe(warmed);
   });
 });
 
