@@ -25,7 +25,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [docs/guide/skills.md says the PRD skills' v2 versions have not shipped and lists ndx-reshape as v1-only](./docs-guide-skills-md-says-the-prd.md) | pending |
+| [docs/guide/skills.md says the PRD skills' v2 versions have not shipped and lists ndx-reshape as v1-only](./docs-guide-skills-md-says-the-prd.md) | completed |
+| [docs/guide/skills.md skill table descriptions can drift from manifest.json with no test to catch it](./docs-guide-skills-md-skill-table.md) | pending |
 | [Layout-literal wall lets a hardcoded .ndx/rex, .ndx/hench or .ndx/sourcevision path through](./layout-literal-wall-lets-a-hardcoded.md) | completed |
 | [/ndx-reshape's manifest description offers "change levels", which a v2 tree refuses](./ndx-reshape-s-manifest-description.md) | completed |
 | [Rewrite the guidance, schema doc, public surface and policies](./rewrite-the-guidance-schema-doc-public.md) | pending |
