@@ -30,7 +30,7 @@ import { guardWatcher } from "./watcher-guard.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
-import { handleRunCommandsRoute } from "./routes-run-commands.js";
+import { handleRunCommandsRoute, shutdownRunCommands } from "./routes-run-commands.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
 import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
 import { handleLiveTaskRoute } from "./routes-live-task.js";
@@ -162,9 +162,12 @@ export function registerShutdownHandlers(
     // Step 1 — terminate hench child processes (highest priority: avoids orphaned agents)
     // Covers both hench-route executions and the rex epic-by-epic execution engine.
     console.log("[shutdown] step 1/4 — child processes");
-    const [henchResult, rexResult] = await Promise.all([
+    const [henchResult, rexResult, runCommandResult] = await Promise.all([
       shutdownActiveExecutions(),
       shutdownRexExecution(),
+      // Dev servers started from the run control: no timeout by design, so
+      // nothing else would ever stop them.
+      shutdownRunCommands(),
     ]);
     // Runs that just ended remove their notes file from a `.finally`; wait for it.
     await settleContextNotesRemovals();
@@ -173,6 +176,10 @@ export function registerShutdownHandlers(
       component: "rex-execution",
       ok: !rexResult.hadActiveProcess || rexResult.terminated,
     });
+    componentStatus.push({ component: "run-commands", ok: true });
+    if (runCommandResult.terminated > 0) {
+      console.log(`[shutdown] stopped ${runCommandResult.terminated} run command(s)`);
+    }
 
     // Step 2 — close WebSocket connections (sends close frames, frees sockets)
     console.log("[shutdown] step 2/4 — WebSocket connections");

@@ -7,12 +7,18 @@
  *
  * ## Why this cannot run arbitrary commands
  *
- * The caller names an **id** from the detected list, never a binary. The
- * executable and its base arguments come from `detectCommands()` on this
- * side. Extra arguments are appended as separate argv entries and the spawn
- * uses no shell, so nothing a caller sends is ever interpreted as a command.
- * Combined with the dashboard's existing token auth, "run the dev server"
- * stays that and does not become remote execution.
+ * The caller names an **id** from the detected list and nothing else. The
+ * executable and *all* of its arguments come from `detectCommands()` on this
+ * side, and the spawn uses no shell.
+ *
+ * There is deliberately no way to pass extra arguments. An earlier revision
+ * allowed them on the reasoning that, without a shell, an argument is only
+ * ever one literal argv entry — which is true and beside the point: flags are
+ * the attack surface. `make --eval='$(shell ...)'` and
+ * `cargo --config build.rustc-wrapper=...` both execute an arbitrary program
+ * with no shell and no file on disk. A per-tool allowlist of safe flags would
+ * be a guess that silently stops being true when a tool adds one, so the
+ * control runs a detected command exactly as detected.
  *
  * ## Why this spawns through `spawnCli`
  *
@@ -40,7 +46,6 @@ import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
   detectCommands,
   findLocalUrl,
-  isSafeExtraArg,
   type DetectedCommand,
 } from "./run-command-detect.js";
 
@@ -142,29 +147,13 @@ async function handleStart(
   ctx: ServerContext,
 ): Promise<boolean> {
   let id: string;
-  let extraArgs: string[] = [];
   try {
-    const input = JSON.parse(await readBody(req, res)) as {
-      id?: unknown;
-      extraArgs?: unknown;
-    };
+    const input = JSON.parse(await readBody(req, res)) as { id?: unknown };
     if (typeof input.id !== "string" || !input.id) {
       errorResponse(res, 400, "id is required");
       return true;
     }
     id = input.id;
-    if (input.extraArgs !== undefined) {
-      if (!Array.isArray(input.extraArgs) || input.extraArgs.some((a) => typeof a !== "string")) {
-        errorResponse(res, 400, "extraArgs must be an array of strings");
-        return true;
-      }
-      extraArgs = input.extraArgs as string[];
-      const bad = extraArgs.find((a) => !isSafeExtraArg(a));
-      if (bad !== undefined) {
-        errorResponse(res, 400, `Argument rejected: ${JSON.stringify(bad)}`);
-        return true;
-      }
-    }
   } catch {
     errorResponse(res, 400, "Invalid JSON body");
     return true;
@@ -192,7 +181,7 @@ async function handleStart(
     startedAt: new Date().toISOString(),
     finishedAt: null,
     commandId: command.id,
-    label: [command.label, ...extraArgs].join(" "),
+    label: command.label,
     kind: command.kind,
     output: "",
     exitCode: null,
@@ -217,7 +206,7 @@ async function handleStart(
     if (!status.url) status.url = findLocalUrl(status.output);
   };
 
-  const child = spawnCli(command.bin, [...command.args, ...extraArgs], {
+  const child = spawnCli(command.bin, command.args, {
     cwd: ctx.projectDir,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -282,6 +271,31 @@ export async function handleRunCommandsRoute(
   if (path === "/api/run-commands/stop" && method === "POST") return handleStop(res, ctx);
 
   return false;
+}
+
+/**
+ * Terminate every run this process started, across all workspaces.
+ *
+ * Called from the dashboard's shutdown sequence. A run command has no timeout
+ * — a dev server is meant to stay up — so without this a Ctrl-C leaves the
+ * child alive holding its port, and the restarted server has no handle to it:
+ * Stop answers 409 and Start cannot bind.
+ */
+export async function shutdownRunCommands(): Promise<{ terminated: number }> {
+  let terminated = 0;
+  for (const slot of runSlots.values()) {
+    if (!slot.status.running || !slot.child) continue;
+    slot.stopRequested = true;
+    try {
+      await terminateProcessTree(slot.child);
+      terminated += 1;
+    } catch {
+      // Already gone, or beyond reach; shutdown continues either way.
+    }
+    slot.child = null;
+    slot.status.running = false;
+  }
+  return { terminated };
 }
 
 /** Test seam: forget every workspace's job between cases. */

@@ -142,25 +142,6 @@
   flex: none;
 }
 
-.runcmd-extra {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.68rem;
-  color: var(--text-dim);
-  margin-bottom: 0.5rem;
-}
-
-.runcmd-extra-input {
-  padding: 0.3rem 0.45rem;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 0.75rem;
-  font-family: var(--mono, monospace);
-}
-
 .runcmd-actions {
   display: flex;
   justify-content: flex-end;

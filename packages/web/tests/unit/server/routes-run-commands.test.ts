@@ -103,17 +103,34 @@ describe("/api/run-commands", () => {
       expect(res.status).toBe(400);
     });
 
-    it("rejects extra arguments that are not strings", async () => {
-      await nodeProject({ dev: "node -e 0" });
-      const res = await post("/start", { id: "npm:dev", extraArgs: [{ evil: true }] });
-      expect(res.status).toBe(400);
-    });
+    it("ignores any argument a caller tries to attach to the id", async () => {
+      // Flags alone are code execution for make and cargo, so the route takes
+      // an id and nothing else. Anything extra in the body is inert.
+      await nodeProject({ build: "node -e 0" });
+      const res = await post("/start", {
+        id: "npm:build",
+        extraArgs: ["--eval=$(shell calc.exe)"],
+        args: ["--config", "build.rustc-wrapper=calc.exe"],
+        bin: "calc.exe",
+      });
+      // Accepted as a plain start of the detected command; the extras are
+      // simply not read.
+      expect(res.status).toBe(202);
 
-    it("rejects an extra argument carrying a newline", async () => {
-      await nodeProject({ dev: "node -e 0" });
-      const res = await post("/start", { id: "npm:dev", extraArgs: ["--port\n--inspect"] });
-      expect(res.status).toBe(400);
-    });
+      const status = await (await fetch(`${base()}/status`)).json();
+      // The label is the detected command alone, with nothing appended.
+      expect(status.label).toBe("npm run build");
+      expect(status.commandId).toBe("npm:build");
+
+      // Stop and let it settle, or the spawned child holds the temp dir open
+      // and the afterEach cleanup fails with EBUSY.
+      await post("/stop");
+      for (let i = 0; i < 100; i++) {
+        const s = await (await fetch(`${base()}/status`)).json();
+        if (!s.running) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    }, 20_000);
   });
 
   describe("POST /api/run-commands/stop", () => {

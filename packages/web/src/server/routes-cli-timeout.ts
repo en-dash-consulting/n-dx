@@ -241,17 +241,11 @@ export async function handleCliTimeoutRoute(
       }
 
       writeNdxConfig(ctx.projectDir, config);
-
       // Fail-forward commits the change; a no-op when the mode is off.
-
       await commitSettingsChange(
-
         ctx.projectDir,
-
         resolveLayout(ctx.projectDir).configFile,
-
         "cli",
-
       );
 
       jsonResponse(res, 200, { applied });

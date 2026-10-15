@@ -58,6 +58,17 @@ const LOCKFILES: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /**
+ * The only package managers this will ever spawn.
+ *
+ * `packageManager` is repo content, and a checkout is not trusted input —
+ * `evaluateRepoTrust` does not even inventory `package.json`, so a field
+ * naming an arbitrary executable would reach `spawn` with nothing to warn the
+ * operator. An unrecognised declaration falls back to npm rather than being
+ * honoured.
+ */
+const KNOWN_PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
+
+/**
  * Which package manager this project uses.
  *
  * The lockfile is the strongest signal — it is what the project actually
@@ -71,8 +82,9 @@ export function detectPackageManager(projectDir: string): string {
   const pkg = readJson(join(projectDir, "package.json"));
   const declared = typeof pkg?.packageManager === "string" ? pkg.packageManager : null;
   if (declared) {
+    // Name only: the field is conventionally `name@version`.
     const name = declared.split("@")[0].trim();
-    if (name) return name;
+    if (KNOWN_PACKAGE_MANAGERS.has(name)) return name;
   }
   return "npm";
 }
@@ -208,19 +220,6 @@ export function detectCommands(projectDir: string): DetectedCommand[] {
   // Ids are the execution key, so a duplicate would make the target ambiguous.
   const seen = new Set<string>();
   return found.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
-}
-
-/**
- * Extra arguments a caller may append to a detected command.
- *
- * Commands are spawned without a shell, so metacharacters are never
- * interpreted — an argument is only ever one literal argv entry. This check
- * exists so an argument cannot masquerade as something else in the UI or the
- * logs (a newline, a NUL, a control character), not to prevent shell
- * injection, which the absence of a shell already prevents.
- */
-export function isSafeExtraArg(arg: string): boolean {
-  return arg.length > 0 && arg.length <= 200 && !/[\0\r\n]/.test(arg);
 }
 
 /**

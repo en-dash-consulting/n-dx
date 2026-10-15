@@ -27,7 +27,8 @@
  * @module web/server/settings-commit
  */
 
-import { relative, sep } from "node:path";
+import { readFileSync } from "node:fs";
+import { isAbsolute, relative, sep } from "node:path";
 import { exec, isFailForwardEnabled } from "@n-dx/llm-client";
 
 /** Which settings area changed. Drives the constant commit subject. */
@@ -48,6 +49,31 @@ const SUBJECT: Record<SettingsArea, string> = {
   features: "chore(settings): update feature toggles",
   cli: "chore(settings): update CLI timeouts",
 };
+
+/**
+ * Key names whose value must never be committed.
+ *
+ * `.n-dx.json` is meant to be committed — which is why `packages/core/config.js`
+ * routes `*.api_key` to `.n-dx.local.json` instead, and why `ndx ci` ships a
+ * step that fails a tracked config holding one. A legacy install or a hand
+ * edit can still leave a key there, and an automatic commit must not be the
+ * thing that carries it to a remote.
+ */
+const SECRET_KEY_PATTERN = /(api[_-]?key|secret|password|token|credential)/i;
+
+/** Whether any key anywhere in the parsed config looks like a credential. */
+function carriesSecret(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(carriesSecret);
+  if (value === null || typeof value !== "object") return false;
+  for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+    // A key with an empty or absent value is a placeholder, not a secret.
+    if (SECRET_KEY_PATTERN.test(key) && typeof inner === "string" && inner.trim() !== "") {
+      return true;
+    }
+    if (carriesSecret(inner)) return true;
+  }
+  return false;
+}
 
 async function git(
   projectDir: string,
@@ -76,9 +102,22 @@ export async function commitSettingsChange(
     // git reports and accepts repo-relative paths with forward slashes on
     // every platform.
     const rel = relative(projectDir, configPath).split(sep).join("/");
-    // A path outside the project is not ours to commit — and `relative` is the
-    // only thing standing between a caller's path and a commit elsewhere.
-    if (!rel || rel.startsWith("..")) return false;
+    // A path outside the project is not ours to commit. `startsWith("..")`
+    // alone is not enough: across Windows drive letters and for a UNC path
+    // `relative` returns an absolute path, which passes that test — and it
+    // also wrongly rejects a legitimate in-project file named `..config.json`.
+    if (!rel || isAbsolute(rel) || rel === ".." || rel.startsWith(".." + "/")) return false;
+
+    // Never auto-commit a config that carries a credential. Refusing leaves
+    // the change on disk and visible in the git panel, which is the safe
+    // outcome: the operator can move the key to .n-dx.local.json and commit
+    // deliberately.
+    try {
+      if (carriesSecret(JSON.parse(readFileSync(configPath, "utf-8")))) return false;
+    } catch {
+      // Unreadable or unparseable: do not commit something we cannot inspect.
+      return false;
+    }
 
     // Nothing to do when the write changed nothing, which is the common case
     // for a save that re-submits the same values.

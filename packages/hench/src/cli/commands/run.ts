@@ -2337,7 +2337,7 @@ export async function cmdRun(
     };
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, wouldResetIds, settingsCtx);
+      await runEpicByEpic(dir, henchDir, rexDir, gateTree, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, wouldResetIds, settingsCtx, allowDirty);
       return;
     }
 
@@ -2351,9 +2351,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds, settingsCtx);
+      await runLoop(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds, settingsCtx, allowDirty);
     } else {
-      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds, settingsCtx);
+      await runIterations(dir, henchDir, rexDir, gateTree, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate, assignee, wouldResetIds, settingsCtx, allowDirty);
     }
   } finally {
     await limiter.release();
@@ -2395,6 +2395,7 @@ export async function cmdRun(
 export async function shouldStopForUncommittedWork(
   projectDir: string,
   autonomous: boolean | undefined,
+  allowDirty = false,
 ): Promise<boolean> {
   if (!autonomous) return false;
   const leftover = await findUncommittedWork({
@@ -2411,7 +2412,10 @@ export async function shouldStopForUncommittedWork(
   // The toggle is re-read here rather than captured at startup: a loop can run
   // for a long time, and an operator turning it off should be obeyed at the
   // next boundary.
-  if (isFailForwardEnabled(projectDir)) {
+  // `--allow-dirty` is the operator saying "go, but do not touch my tree".
+  // Honour it here as the pre-run gate does, or fail-forward would commit at
+  // the first boundary the very work they told it to leave alone.
+  if (!allowDirty && isFailForwardEnabled(projectDir)) {
     const result = await commitFailForward(projectDir, leftover.paths, "loop-leftover");
     if (result.committed) {
       info(colorSuccess(
@@ -2469,6 +2473,9 @@ async function runIterations(
   assignee?: string,
   wouldResetIds?: ReadonlySet<string>,
   settingsCtx?: TaskRunContext,
+  /** `--allow-dirty`: the operator asked for their tree to be left alone,
+   *  which suppresses fail-forward at the iteration boundary. */
+  allowDirty = false,
 ): Promise<void> {
   // Track attempt counts per task ID within this run invocation
   const attemptTracker = createAttemptTracker();
@@ -2481,7 +2488,7 @@ async function runIterations(
     // Not emitted before the first iteration (i === 0).
     if (i > 0) {
       info(`\n${formatIterationBanner(i + 1, iterations)}`);
-      if (await shouldStopForUncommittedWork(dir, autonomous)) break;
+      if (await shouldStopForUncommittedWork(dir, autonomous, allowDirty)) break;
     }
 
     // For autoselected iterations, skip stuck tasks
@@ -2588,6 +2595,9 @@ async function runLoop(
   assignee?: string,
   wouldResetIds?: ReadonlySet<string>,
   settingsCtx?: TaskRunContext,
+  /** `--allow-dirty`: the operator asked for their tree to be left alone,
+   *  which suppresses fail-forward at the iteration boundary. */
+  allowDirty = false,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -2637,7 +2647,7 @@ async function runLoop(
       // Banner between iterations: not emitted before the first iteration.
       if (completed > 1) {
         info(`\n${formatIterationBanner(completed)}`);
-        if (await shouldStopForUncommittedWork(dir, autonomous)) break;
+        if (await shouldStopForUncommittedWork(dir, autonomous, allowDirty)) break;
       }
 
       // Show queue status if there are pending tasks
@@ -2889,6 +2899,9 @@ async function runEpicByEpic(
   skipTestGate?: boolean,
   wouldResetIds?: ReadonlySet<string>,
   settingsCtx?: TaskRunContext,
+  /** `--allow-dirty`: the operator asked for their tree to be left alone,
+   *  which suppresses fail-forward at the iteration boundary. */
+  allowDirty = false,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -3008,7 +3021,7 @@ async function runEpicByEpic(
         // Same between-task guard the fixed-iteration and loop modes run
         // (#363). `stopping` ends the outer epic loop too, so the refusal
         // stops the invocation rather than just this epic.
-        if (tasksStarted > 0 && await shouldStopForUncommittedWork(dir, autonomous)) {
+        if (tasksStarted > 0 && await shouldStopForUncommittedWork(dir, autonomous, allowDirty)) {
           stopping = true;
           break;
         }

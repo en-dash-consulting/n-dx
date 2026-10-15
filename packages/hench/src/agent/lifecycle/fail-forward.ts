@@ -1,5 +1,5 @@
 /**
- * Fail-forward mode: commit what a step produced instead of stopping over it.
+ * Fail-forward mode: commit what a run produced instead of stopping over it.
  *
  * With the mode off, an autonomous loop that finds work left in the tree after
  * an iteration refuses to continue — the leftover might be something the
@@ -10,23 +10,50 @@
  * With the mode on, that leftover is committed on the spot, scoped to exactly
  * the paths that were dirty, with a constant message, and the loop carries on.
  *
- * Three properties this must keep, because they are what make the mode safe to
- * leave on:
+ * ## What this refuses to touch, and why
  *
- * - **Scoped.** Staging and the commit both name the paths explicitly. An
- *   operator's half-finished `git add -p` stays staged and uncommitted.
+ * An adversarial review found three ways an unattended commit here could
+ * destroy work rather than save it. Each has a guard:
+ *
+ * - **A conflicted path.** `git add` on an unmerged file is git's way of
+ *   *marking the conflict resolved* — it collapses the index stages using the
+ *   working-tree bytes, markers and all. Mid-merge the follow-up partial
+ *   commit then fails, leaving the operator without `git checkout --merge`;
+ *   mid-*rebase* there is no `MERGE_HEAD`, so the commit **succeeds** and the
+ *   conflict markers land in history. Verified by reproduction. So an
+ *   in-progress merge, rebase, cherry-pick or revert refuses outright, and any
+ *   unmerged path is skipped even outside one.
+ * - **Staged or partially staged work.** A file the operator staged by hand —
+ *   especially a `git add -p` hunk selection, which porcelain reports as
+ *   `MM` — belongs to them. `git add` would overwrite the selection with the
+ *   whole working-tree file, and a pathspec commit would commit the
+ *   working-tree content regardless. Anything with content in the index is
+ *   left alone.
+ * - **A half-staged index after a failure.** The add loop is not atomic. If a
+ *   later path fails, what was already staged is unstaged again, so a failed
+ *   fail-forward leaves the index exactly as it found it.
+ *
+ * ## The properties that make it safe to leave on
+ *
+ * - **Scoped.** Staging and the commit both name paths explicitly, with
+ *   `:(literal)` on both so a filename containing a glob character cannot
+ *   widen the commit.
  * - **Constant messages.** Nothing is generated per commit, so there is
  *   nothing to review before it lands and the history reads uniformly.
- * - **Never pushes.** Committing is the whole promise.
+ * - **Never pushes.** Committing is the whole promise. Nothing in this module
+ *   runs `git push`, and a test asserts the remote never moves.
  *
  * @module hench/agent/lifecycle/fail-forward
  */
 
+import { existsSync } from "node:fs";
+
 import { execGitMutation } from "../../process/git-mutation.js";
+import { execStdout } from "../../process/exec.js";
 import { buildCoAuthoredByTrailerLine } from "./shared.js";
 
 /** Why a fail-forward commit was made. One constant message per kind. */
-export type FailForwardKind = "loop-leftover" | "pre-run";
+export type FailForwardKind = "loop-leftover";
 
 /**
  * Commit subjects, fixed per kind.
@@ -37,28 +64,120 @@ export type FailForwardKind = "loop-leftover" | "pre-run";
  */
 const SUBJECT: Record<FailForwardKind, string> = {
   "loop-leftover": "chore(run): fail-forward commit of work left after the run",
-  "pre-run": "chore(run): fail-forward commit of work found before the run",
 };
 
 /** What the producer trailer says, so these commits are greppable by kind. */
 const PRODUCER: Record<FailForwardKind, string> = {
   "loop-leftover": "fail-forward (loop boundary)",
-  "pre-run": "fail-forward (pre-run gate)",
 };
+
+/** Git state files that mean an operation is mid-flight. */
+const IN_PROGRESS_REFS = ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"] as const;
+const IN_PROGRESS_DIRS = ["rebase-merge", "rebase-apply"] as const;
 
 export interface FailForwardCommitResult {
   /** True when a commit was actually made. */
   committed: boolean;
-  /** Paths staged and committed. */
+  /** Paths staged and committed. Empty when nothing was eligible. */
   paths: string[];
+  /** Paths deliberately left alone, with the reason, for the caller to report. */
+  skipped: Array<{ path: string; reason: "unmerged" | "staged" }>;
   /** Set when git refused; the caller falls back to its normal behaviour. */
   error?: Error;
 }
 
+async function git(projectDir: string, args: string[]): Promise<string> {
+  return execStdout("git", args, { cwd: projectDir, timeout: 15_000 });
+}
+
 /**
- * Stage and commit exactly `paths`.
+ * Whether a merge, rebase, cherry-pick or revert is mid-flight.
  *
- * @param projectDir Repository root.
+ * `git rev-parse --git-path` resolves each name inside the real git directory,
+ * which is a file rather than a directory in a linked worktree — so asking git
+ * is the only way to get this right in a worktree.
+ */
+async function operationInProgress(projectDir: string): Promise<string | null> {
+  for (const ref of IN_PROGRESS_REFS) {
+    try {
+      // `rev-parse -q --verify` exits non-zero AND prints nothing when the ref
+      // is absent. The exit code does not always surface as a throw here, so
+      // the emptiness of the output is what decides — testing only for a throw
+      // reported every clean repository as mid-merge.
+      const sha = (await git(projectDir, ["rev-parse", "-q", "--verify", ref])).trim();
+      if (sha) return ref;
+    } catch {
+      // Not present — which is the normal case.
+    }
+  }
+  for (const dir of IN_PROGRESS_DIRS) {
+    try {
+      // `--path-format=absolute` so the answer does not depend on this
+      // process's cwd, which is not the project directory.
+      const path = (await git(projectDir, [
+        "rev-parse", "--path-format=absolute", "--git-path", dir,
+      ])).trim();
+      if (path && existsSync(path)) return dir;
+    } catch {
+      // Treated as not in progress.
+    }
+  }
+  return null;
+}
+
+/**
+ * Split `paths` into those safe to commit and those that belong to someone
+ * else, by re-reading each one's porcelain status.
+ *
+ * `core.quotepath=false` matters: without it git renders a non-ASCII path as
+ * an escaped, quoted string that matches no file, so a repository with a
+ * unicode filename would silently fail every fail-forward commit.
+ */
+async function partitionPaths(
+  projectDir: string,
+  paths: string[],
+): Promise<{ eligible: string[]; skipped: FailForwardCommitResult["skipped"] }> {
+  const eligible: string[] = [];
+  const skipped: FailForwardCommitResult["skipped"] = [];
+
+  for (const path of paths) {
+    let line: string;
+    try {
+      line = (await git(projectDir, [
+        "-c", "core.quotepath=false",
+        "status", "--porcelain", "--untracked-files=all",
+        "--", `:(literal)${path}`,
+      ])).split("\n").find((l) => l.trim().length > 0) ?? "";
+    } catch {
+      // Unreadable status for this path: leave it alone rather than guess.
+      skipped.push({ path, reason: "staged" });
+      continue;
+    }
+    if (!line) continue; // No longer dirty — nothing to do.
+
+    const index = line[0] ?? " ";
+    const worktree = line[1] ?? " ";
+
+    // Unmerged, in any of its porcelain spellings.
+    if (index === "U" || worktree === "U" || line.startsWith("AA") || line.startsWith("DD")) {
+      skipped.push({ path, reason: "unmerged" });
+      continue;
+    }
+    // Anything with content already in the index is the operator's.
+    if (index !== " " && index !== "?") {
+      skipped.push({ path, reason: "staged" });
+      continue;
+    }
+    eligible.push(path);
+  }
+
+  return { eligible, skipped };
+}
+
+/**
+ * Stage and commit exactly the eligible subset of `paths`.
+ *
+ * @param projectDir Repository root for the git invocations.
  * @param paths Project-relative paths, as the dirty-work scan reports them.
  * @param kind Which constant message and producer trailer to use.
  * @param itemId PRD item the work belongs to, when it belongs to one.
@@ -69,19 +188,49 @@ export async function commitFailForward(
   kind: FailForwardKind,
   itemId?: string,
 ): Promise<FailForwardCommitResult> {
-  if (paths.length === 0) return { committed: false, paths: [] };
+  if (paths.length === 0) return { committed: false, paths: [], skipped: [] };
+
+  const operation = await operationInProgress(projectDir);
+  if (operation) {
+    // Committing into a conflicted tree is how markers reach history.
+    return {
+      committed: false,
+      paths: [],
+      skipped: [],
+      error: new Error(
+        `a ${operation.toLowerCase().replace(/_head$/, "").replace("rebase-", "rebase ")} is in progress`,
+      ),
+    };
+  }
+
+  const { eligible, skipped } = await partitionPaths(projectDir, paths);
+  if (eligible.length === 0) return { committed: false, paths: [], skipped };
+
+  /** Staged so far, so a later failure can put the index back. */
+  const staged: string[] = [];
+  const unstage = async (): Promise<void> => {
+    if (staged.length === 0) return;
+    try {
+      await execGitMutation(projectDir, ["reset", "-q", "--", ...staged], 15_000);
+    } catch {
+      // Best effort. The caller is already reporting a failure, and leaving
+      // the index as-is is better than throwing over the cleanup.
+    }
+  };
 
   try {
-    // One `git add` per path, pathspec-literal, matching stageRunWork: a path
-    // is a path here and never a glob, a file named with a bracket or a star
-    // stages as itself, and `--` stops a leading-dash name reading as a flag.
-    // A deleted file stages as a deletion, which is what `git add` does for a
-    // missing path given explicitly.
-    for (const path of paths) {
+    // One `git add` per path, pathspec-literal: a path is a path here and
+    // never a glob, a file named with a bracket or a star stages as itself,
+    // and `--` stops a leading-dash name reading as a flag. A deleted file
+    // stages as a deletion, which is what `git add` does for a missing path
+    // given explicitly.
+    for (const path of eligible) {
       await execGitMutation(projectDir, ["add", "--", `:(literal)${path}`], 15_000);
+      staged.push(path);
     }
   } catch (err) {
-    return { committed: false, paths, error: err as Error };
+    await unstage();
+    return { committed: false, paths: [], skipped, error: err as Error };
   }
 
   try {
@@ -94,20 +243,23 @@ export async function commitFailForward(
       buildCoAuthoredByTrailerLine(),
     ].join("\n");
 
-    // The pathspec is load-bearing twice over. It keeps anything the operator
-    // had staged before out of this commit, and it makes this a *partial*
-    // commit, which git refuses mid-merge — the right outcome, since an
-    // unattended run should not quietly extend a merge commit.
+    // `:(literal)` on the commit pathspec too: without it a filename holding a
+    // glob character would widen the commit to every path it matches, taking
+    // their working-tree content even though they were never added.
     await execGitMutation(
       projectDir,
-      ["commit", "-m", SUBJECT[kind], "-m", trailers, "--", ...paths],
+      [
+        "commit", "-m", SUBJECT[kind], "-m", trailers,
+        "--", ...eligible.map((p) => `:(literal)${p}`),
+      ],
       30_000,
     );
   } catch (err) {
-    return { committed: false, paths, error: err as Error };
+    await unstage();
+    return { committed: false, paths: [], skipped, error: err as Error };
   }
 
-  return { committed: true, paths };
+  return { committed: true, paths: eligible, skipped };
 }
 
 /** The subject a given kind commits under. Exported for tests and messages. */

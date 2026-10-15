@@ -36,7 +36,7 @@ export interface RunCommandsState {
   status: RunCommandStatus | null;
   /** Rejection text from the last start/stop attempt, if any. */
   error: string | null;
-  start: (id: string, extraArgs?: string[]) => Promise<void>;
+  start: (id: string) => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -91,13 +91,13 @@ export function useRunCommands(enabled = true): RunCommandsState {
     return () => clearInterval(timer);
   }, [enabled, status?.running, refreshStatus]);
 
-  const start = useCallback(async (id: string, extraArgs: string[] = []) => {
+  const start = useCallback(async (id: string) => {
     setError(null);
     try {
       const res = await fetch("/api/run-commands/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, extraArgs }),
+        body: JSON.stringify({ id }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);

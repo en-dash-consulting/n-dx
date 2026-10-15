@@ -6,10 +6,10 @@
  * server actually detected something, so a project with no conventional entry
  * point gets no empty affordance.
  *
- * Extra arguments are allowed; the command itself is not editable here. The
- * server runs a detected entry by id and takes no binary from the browser, so
- * the dropdown offers what exists rather than a text box that would amount to
- * remote execution. See `server/routes-run-commands.ts`.
+ * The dropdown offers the commands the server detected and nothing else.
+ * There is no free-text field and no extra-argument field: flags alone are
+ * enough to turn a build tool into arbitrary execution, so the server accepts
+ * only an id. See `server/routes-run-commands.ts`.
  */
 import { h, Fragment } from "preact";
 import { useState, useCallback } from "preact/hooks";
@@ -24,7 +24,6 @@ export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
   const { commands, status, error, start, stop } = useRunCommands(enabled);
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [extra, setExtra] = useState("");
 
   const running = status?.running === true;
   // Default to the first run command, falling back to whatever exists.
@@ -35,10 +34,9 @@ export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
 
   const handleStart = useCallback(async () => {
     if (!chosen) return;
-    const args = extra.trim() ? extra.trim().split(/\s+/) : [];
-    await start(chosen.id, args);
+    await start(chosen.id);
     setOpen(false);
-  }, [chosen, extra, start]);
+  }, [chosen, start]);
 
   if (!enabled || commands.length === 0) return null;
 
@@ -97,18 +95,6 @@ export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
                 ),
               ),
             ),
-          ),
-
-          h("label", { class: "runcmd-extra" },
-            "Extra arguments",
-            h("input", {
-              type: "text",
-              class: "runcmd-extra-input",
-              value: extra,
-              placeholder: "--port 5174",
-              disabled: running,
-              onInput: (e: Event) => setExtra((e.target as HTMLInputElement).value),
-            }),
           ),
 
           h("div", { class: "runcmd-actions" },

@@ -230,17 +230,11 @@ export async function handleRexSettingsRoute(
     if (Object.keys(rex).length === 0) delete config["rex"];
 
     writeNdxConfig(ctx.projectDir, config);
-
     // Fail-forward commits the change; a no-op when the mode is off.
-
     await commitSettingsChange(
-
       ctx.projectDir,
-
       resolveLayout(ctx.projectDir).configFile,
-
       "rex",
-
     );
     jsonResponse(res, 200, { applied, settings: extractRexSettings(ctx.projectDir) });
     return true;

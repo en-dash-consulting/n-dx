@@ -20,7 +20,7 @@ import type { FeatureToggle, FeaturesResponse } from "../external.js";
 
 // ── Package metadata ─────────────────────────────────────────────────
 
-const PACKAGE_META: Record<string, { label: string; icon: string; description: string }> = {
+export const PACKAGE_META: Record<string, { label: string; icon: string; description: string }> = {
   sourcevision: {
     label: "{cli} analyze / plan",
     icon: "▣",
@@ -43,7 +43,10 @@ const PACKAGE_META: Record<string, { label: string; icon: string; description: s
   },
 };
 
-const PACKAGE_ORDER = ["sourcevision", "rex", "hench"];
+// Order the settings page renders package sections in. A package missing
+// from this list is silently dropped by the filter below, so every key in
+// PACKAGE_META belongs here — that omission is what hid the git toggles.
+export const PACKAGE_ORDER = ["sourcevision", "rex", "hench", "git"];
 
 const STABILITY_META: Record<string, { label: string; class: string }> = {
   experimental: { label: "Experimental", class: "ft-badge-experimental" },

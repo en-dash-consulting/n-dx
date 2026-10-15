@@ -84,6 +84,11 @@ const MAX_DIFF_BYTES = 200_000;
 /** New/untracked files are read raw (no diff exists yet) — cap the preview. */
 const MAX_UNTRACKED_PREVIEW_BYTES = 20_000;
 
+// Paths come back from `git status` and go straight back out as pathspecs,
+// so `core.quotepath=false` is load-bearing: with git's default, a non-ASCII
+// path is rendered as an escaped, quoted string that matches no file and
+// classifies as "other" — which makes the tree look permanently mixed and
+// silently disables both the quick commit and auto-commit for the repo.
 async function gitCommand(
   projectDir: string,
   args: string[],
@@ -208,7 +213,7 @@ async function handleGitStatus(res: ServerResponse, ctx: ServerContext): Promise
   }
 
   const [status, branch] = await Promise.all([
-    gitCommand(ctx.projectDir, ["status", "--porcelain"]),
+    gitCommand(ctx.projectDir, ["-c", "core.quotepath=false", "status", "--porcelain"]),
     gitCommand(ctx.projectDir, ["rev-parse", "--abbrev-ref", "HEAD"]),
   ]);
   const files = parsePorcelainStatus(status.stdout, makeOriginClassifier(ctx.projectDir));
@@ -234,7 +239,7 @@ async function handleGitDiff(
     return true;
   }
 
-  const statusResult = await gitCommand(ctx.projectDir, ["status", "--porcelain", "--", file]);
+  const statusResult = await gitCommand(ctx.projectDir, ["-c", "core.quotepath=false", "status", "--porcelain", "--", file]);
   const isUntracked = statusResult.stdout.startsWith("??");
 
   if (isUntracked) {
@@ -317,7 +322,7 @@ async function handleGitCommit(
     // Re-read status here rather than trusting paths from the client: this is
     // the only thing deciding what gets staged, and a scoped commit that
     // staged a caller-supplied list would be a way to commit anything.
-    const current = await gitCommand(ctx.projectDir, ["status", "--porcelain"]);
+    const current = await gitCommand(ctx.projectDir, ["-c", "core.quotepath=false", "status", "--porcelain"]);
     if (!current.ok) {
       errorResponse(res, 500, `git status failed: ${current.stderr.trim() || "unknown error"}`);
       return true;
@@ -365,7 +370,7 @@ async function handleGitCommit(
     return true;
   }
 
-  const status = await gitCommand(ctx.projectDir, ["status", "--porcelain"]);
+  const status = await gitCommand(ctx.projectDir, ["-c", "core.quotepath=false", "status", "--porcelain"]);
   jsonResponse(res, 200, {
     ok: true,
     output: commit.stdout.trim(),
@@ -393,7 +398,7 @@ async function handleGitDiscard(
     return true;
   }
 
-  const statusBefore = await gitCommand(ctx.projectDir, ["status", "--porcelain"]);
+  const statusBefore = await gitCommand(ctx.projectDir, ["-c", "core.quotepath=false", "status", "--porcelain"]);
   const filesBefore = parsePorcelainStatus(statusBefore.stdout);
   if (filesBefore.length === 0) {
     jsonResponse(res, 200, { ok: true, discarded: 0, dirty: false });
@@ -424,7 +429,7 @@ async function handleGitDiscard(
     return true;
   }
 
-  const statusAfter = await gitCommand(ctx.projectDir, ["status", "--porcelain"]);
+  const statusAfter = await gitCommand(ctx.projectDir, ["-c", "core.quotepath=false", "status", "--porcelain"]);
   jsonResponse(res, 200, {
     ok: true,
     discarded: filesBefore.length,
@@ -481,7 +486,7 @@ async function handleGitIgnore(
   // `:(literal)` because a pathspec is glob-matched by default — a file
   // genuinely named `report[1].txt` would otherwise look absent and be
   // refused as "not untracked".
-  const fileStatus = await gitCommand(ctx.projectDir, ["status", "--porcelain", "--", `:(literal)${bare}`]);
+  const fileStatus = await gitCommand(ctx.projectDir, ["-c", "core.quotepath=false", "status", "--porcelain", "--", `:(literal)${bare}`]);
   if (!fileStatus.stdout.startsWith("??")) {
     errorResponse(
       res, 409,
@@ -517,7 +522,7 @@ async function handleGitIgnore(
     }
   }
 
-  const status = await gitCommand(ctx.projectDir, ["status", "--porcelain"]);
+  const status = await gitCommand(ctx.projectDir, ["-c", "core.quotepath=false", "status", "--porcelain"]);
   jsonResponse(res, 200, {
     ok: true,
     pattern,

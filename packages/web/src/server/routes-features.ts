@@ -270,6 +270,17 @@ function buildToggles(projectDir: string): FeatureToggle[] {
  * unknown key yields `false`. A gate that opens when it cannot tell is not a
  * gate.
  */
+/**
+ * Every distinct `package` the registry uses.
+ *
+ * The settings page renders package sections in a fixed order and drops any
+ * package missing from that order, so a toggle in a package the viewer does
+ * not list is invisible. This is the list the viewer is checked against.
+ */
+export function featureRegistryPackages(): string[] {
+  return [...new Set(FEATURE_REGISTRY.map((d) => d.package))];
+}
+
 export function isFeatureEnabled(projectDir: string, key: string): boolean {
   const def = FEATURE_REGISTRY.find((d) => d.key === key);
   if (!def) return false;
@@ -344,17 +355,11 @@ export async function handleFeaturesRoute(
       }
 
       writeNdxConfig(ctx.projectDir, config);
-
       // Fail-forward commits the change; a no-op when the mode is off.
-
       await commitSettingsChange(
-
         ctx.projectDir,
-
         resolveLayout(ctx.projectDir).configFile,
-
         "features",
-
       );
 
       jsonResponse(res, 200, { applied });

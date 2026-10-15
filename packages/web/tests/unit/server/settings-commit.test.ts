@@ -119,6 +119,39 @@ describe("commitSettingsChange", () => {
     expect(git(dir, ["diff", "--cached", "--name-only"])).toContain("README.md");
   });
 
+  it("refuses to commit a config that carries a credential", async () => {
+    // .n-dx.json is meant to be committed, which is why core routes api_key
+    // to .n-dx.local.json and `ndx ci` fails a tracked config holding one. An
+    // automatic commit must not be what carries a hand-edited key to a remote.
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: { git: { failForward: true } },
+        claude: { api_key: "sk-ant-not-a-real-key" },
+      }, null, 2) + "\n",
+      "utf-8",
+    );
+
+    expect(await commitSettingsChange(dir, configPath, "llm")).toBe(false);
+    // Left on disk and visible in the git panel, for a deliberate commit.
+    expect(git(dir, ["status", "--porcelain"])).toContain(".n-dx.json");
+  });
+
+  it("commits normally when a credential-shaped key is empty", async () => {
+    // A placeholder left by init is not a secret.
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: { git: { failForward: true } },
+        claude: { api_key: "" },
+        web: { port: 4000 },
+      }, null, 2) + "\n",
+      "utf-8",
+    );
+
+    expect(await commitSettingsChange(dir, configPath, "llm")).toBe(true);
+  });
+
   it("refuses a path outside the project", async () => {
     writeConfig(true, { web: { port: 4000 } });
     const outside = join(tmpdir(), "somewhere-else.json");
