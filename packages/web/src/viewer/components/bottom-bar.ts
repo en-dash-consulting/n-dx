@@ -18,6 +18,7 @@ import {
 } from "../api.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { isCurrentWorktree } from "./live-tab.js";
+import { RunCommandControl } from "./run-command-control.js";
 import { identityLine, identityTooltip, type ServerIdentity } from "./config-footer.js";
 import { PixelIcon } from "./pixel-icons.js";
 import { ThemeToggle } from "./theme-toggle.js";
@@ -87,6 +88,9 @@ export function BottomBar({
     ),
 
     h("div", { class: "bottombar-controls" },
+      // Beside the live indicators, and never in a published static export —
+      // there is no server there to run anything.
+      h(RunCommandControl, { enabled: !isDeployedMode() }),
       h(ThemeToggle, null),
       h(GlobalFAQ, null),
       h("button", {

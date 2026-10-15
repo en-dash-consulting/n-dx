@@ -30,6 +30,7 @@ import { guardWatcher } from "./watcher-guard.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
+import { handleRunCommandsRoute } from "./routes-run-commands.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
 import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
 import { handleLiveTaskRoute } from "./routes-live-task.js";
@@ -844,6 +845,7 @@ async function handleApiRoutes(
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(true, () => handleRunCommandsRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
   if (await handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
   if (isInScope(ctx.scope, "hench") && await handleLiveTaskRoute(req, res, ctx)) return true;
