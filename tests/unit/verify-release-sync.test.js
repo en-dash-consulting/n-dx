@@ -6,7 +6,7 @@
  * @see scripts/verify-release-sync.mjs
  */
 import { describe, it, expect } from "vitest";
-import { verifyReleaseSync, DEFAULT_DELAYS_MS, MAX_TOTAL_WAIT_MS } from "../../scripts/verify-release-sync.mjs";
+import { verifyReleaseSync, parsePublished,DEFAULT_DELAYS_MS, MAX_TOTAL_WAIT_MS } from "../../scripts/verify-release-sync.mjs";
 
 const PACKAGES = ["core", "rex", "sourcevision", "hench", "llm-client", "web"];
 
@@ -77,5 +77,16 @@ describe("verifyReleaseSync", () => {
     const h = harness({ releases: false });
     expect(await h.run()).toBe(1);
     expect(h.logs.join("\n")).toContain("missing GitHub release @n-dx/core@1.2.3");
+  });
+});
+
+describe("parsePublished", () => {
+  it("accepts only the strings the changesets action sets", () => {
+    expect(parsePublished("true")).toBe(true);
+    expect(parsePublished("false")).toBe(false);
+  });
+
+  it.each([undefined, "", "TRUE", "1", "null"])("rejects %j so main() exits 2 instead of skipping", (raw) => {
+    expect(parsePublished(raw)).toBeNull();
   });
 });

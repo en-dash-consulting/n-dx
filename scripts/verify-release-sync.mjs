@@ -9,7 +9,7 @@
  * "nothing was published". When the run did publish, the npm lookup is retried
  * with backoff for a bounded time and a version that never appears fails.
  *
- * Env: PUBLISHED ("true"/"false"), PACKAGES (space-separated short names),
+ * Env: PUBLISHED ("true"/"false"; anything else exits 2), PACKAGES (space-separated short names),
  *      GH_TOKEN (for gh).
  */
 import { execFileSync } from "node:child_process";
@@ -25,6 +25,20 @@ export const SCOPE = "@n-dx";
 export const DEFAULT_DELAYS_MS = [10, 20, 40, ...Array(8).fill(60)].map((s) => s * 1000);
 /** The most the default backoff may sleep in total: 10 of the job's 30 minutes. */
 export const MAX_TOTAL_WAIT_MS = 10 * 60 * 1000;
+
+/**
+ * Parse the changesets action's `published` output. The action sets it to
+ * "true" or "false" on every run, so anything else means the output was
+ * renamed or the step id changed. Returning null lets the caller fail rather
+ * than read a missing output as "nothing published".
+ * @param {string | undefined} raw
+ * @returns {boolean | null}
+ */
+export function parsePublished(raw) {
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  return null;
+}
 
 /**
  * @param {object} o
@@ -106,8 +120,15 @@ async function main() {
     console.error("::error::PACKAGES is empty");
     return 2;
   }
+  const published = parsePublished(process.env.PUBLISHED);
+  if (published === null) {
+    console.error(
+      `::error::PUBLISHED is ${JSON.stringify(process.env.PUBLISHED ?? null)}, expected "true" or "false". steps.changesets.outputs.published is missing: the changesets action may have renamed the output, or the step id changed`,
+    );
+    return 2;
+  }
   return verifyReleaseSync({
-    published: process.env.PUBLISHED === "true",
+    published,
     packages,
     versionOf: (pkg) => JSON.parse(readFileSync(`packages/${pkg}/package.json`, "utf8")).version,
     npmHas: (spec) => succeeds("npm", ["view", spec, "version"]),

@@ -38,7 +38,7 @@ After merging PRs with changeset files to `main`:
    - Publishes all packages to npm (using `pnpm publish`, which resolves `workspace:*` to real versions)
    - Creates git tags on the runner and reports them to `changesets/action@v2` through the `CHANGESETS_OUTPUT` NDJSON file
 5. `changesets/action@v2` pushes every reported tag to origin and creates one **GitHub release per package** (`@n-dx/core@0.7.0`, `@n-dx/rex@0.7.0`, …), using that package's `CHANGELOG.md` section as the release body
-6. A final **"Verify tags and GitHub releases match npm"** step (`scripts/verify-release-sync.mjs`) decides from the changesets action's `published` output whether this run published; if not, it exits 0. If it did, it waits up to about 9 minutes, inside the job's 30-minute timeout, (backoff, 10 s to 60 s) for all six packages to appear on npm, since the registry can lag a publish by minutes. It then fails the job if any package never appears, or if origin lacks a tag or GitHub lacks a release, so npm and GitHub cannot drift silently
+6. A final **"Verify tags and GitHub releases match npm"** step (`scripts/verify-release-sync.mjs`) decides from the changesets action's `published` output whether this run published; if not, it exits 0. The action always sets it to `true` or `false`, so any other value (output renamed, step id changed) exits 2 rather than skipping. If it did, it waits up to about 9 minutes, inside the job's 30-minute timeout, (backoff, 10 s to 60 s) for all six packages to appear on npm, since the registry can lag a publish by minutes. It then fails the job if any package never appears, or if origin lacks a tag or GitHub lacks a release, so npm and GitHub cannot drift silently
 
 ### Required secrets
 
