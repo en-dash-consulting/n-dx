@@ -42,6 +42,7 @@ import {
 } from "../../packages/rex/src/store/folder-tree-serializer.ts";
 import { parseFolderTree } from "../../packages/rex/src/store/folder-tree-parser.ts";
 import { readSlugRuleMarker } from "../../packages/rex/src/store/slug-rule-guard.ts";
+import { countItemsDeep, slugDriftMessage } from "../helpers/slug-drift-message.js";
 
 const REPO_ROOT = process.cwd();
 const REX_DIR = join(REPO_ROOT, ".rex");
@@ -59,10 +60,15 @@ describe("this repository's PRD tree matches the current slug rule", () => {
         .slice(0, 10)
         .map((m) => `  "${m.found}" should be "${m.expected}" in ${m.parentDir} (${m.title})`)
         .join("\n");
+      // Count the whole tree, not the roots: `mismatches` spans every
+      // descendant, so comparing it against `items.length` measured the two
+      // sides on different scales.
       throw new Error(
-        `${mismatches.length} path(s) do not match the current slug rule — ` +
-          `a rex build using a different slug rule wrote this tree. ` +
-          `Run rex migrate-slugs on the default branch.\n${detail}`,
+        slugDriftMessage({
+          mismatchCount: mismatches.length,
+          itemCount: countItemsDeep(items),
+          detail,
+        }),
       );
     }
 
