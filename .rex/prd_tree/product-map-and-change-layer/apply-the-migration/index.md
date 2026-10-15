@@ -46,7 +46,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Migrated product nodes read met when their v1 item completed](./migrated-product-nodes-read-met-when.md) | completed |
 | [Migration plan, dry run and apply refuse when the v1 parser skipped an item file](./migration-plan-dry-run-and-apply.md) | pending |
 | [ndx commands that spawn rex several times print the v1 deprecation notice once per spawn](./ndx-commands-that-spawn-rex-several.md) | completed |
-| [ndx init scaffolds a v2 project (product/index.md, never prd_tree/)](./ndx-init-scaffolds-a-v2-project.md) | in_progress |
+| [ndx init scaffolds a v2 project (product/index.md, never prd_tree/)](./ndx-init-scaffolds-a-v2-project.md) | completed |
+| [ndx install-sample writes a v1 prd_tree/ beside a fresh v2 product/](./ndx-install-sample-writes-a-v1-prd.md) | pending |
 | [ndx migrate --apply --dry-run says what moves and what is dropped](./ndx-migrate-apply-dry-run-says-what.md) | completed |
 | [ndx migrate --plan has no automated test of its spawn path](./ndx-migrate-plan-has-no-automated-test.md) | completed |
 | [ndx migrate --plan shows the preflight banner and an honest run summary, and llm.routes can turn Jev off](./ndx-migrate-plan-shows-the-preflight.md) | pending |
@@ -56,6 +57,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Placement reads code evidence: commits and zones of a held change rank the capabilities realized in the same zones](./placement-reads-code-evidence-commits.md) | pending |
 | [Remove the prd.md and prd.json read fallbacks and the old migrate commands](./remove-the-prd-md-and-prd-json-read.md) | pending |
 | [rex health warns, not errors, on completed changes the migration held for placement](./rex-health-warns-not-errors-on.md) | pending |
+| [rex init --help says it writes prd.json; it writes product/index.md (v2) or prd_tree/](./rex-init-help-says-it-writes-prd-json.md) | pending |
 | [rex migrate-plan / migrate-apply and ndx migrate-layout still run inside an agent run](./rex-migrate-plan-migrate-apply-and-ndx.md) | pending |
 | [tests/e2e/cli-migrate-apply.test.js fails 3 of 5: its fixture keeps .rex/prd.json, which apply now refuses](./tests-e2e-cli-migrate-apply-test-js.md) | completed |
 | [The bare ndx migrate chain shows the preflight banner and its --dry-run runs no model unless asked](./the-bare-ndx-migrate-chain-shows-the.md) | pending |
@@ -65,4 +67,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | completed |
 | [Wire migrate apply onto #715's migrate-plan and #716's Inbox writer](./wire-migrate-apply-onto-715-s-migrate.md) | completed |
 | [Wire the migrate chain and the once-per-command v1 notice onto main's ndx migrate](./wire-the-migrate-chain-and-the-once.md) | completed |
-| [ndx install-sample writes a v1 prd_tree/ beside a fresh v2 product/](./ndx-install-sample-writes-a-v1-prd.md) | pending |
