@@ -18,7 +18,8 @@
  */
 
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
+import { projectRootOf } from "@n-dx/llm-client";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { SCHEMA_VERSION } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
@@ -140,7 +141,8 @@ export class FolderTreeStore implements PRDStore {
     // between commit points and needs the union at take time.
     this.pendingSaveReport = mergeSaveFileReports(
       this.pendingSaveReport,
-      buildSaveFileReport(written, dirname(this.rexDir)),
+      // projectRootOf, not dirname: on the `.ndx/` layout rexDir's parent is the container.
+      buildSaveFileReport(written, projectRootOf(this.rexDir)),
     );
   }
 
