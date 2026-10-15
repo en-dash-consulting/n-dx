@@ -11,3 +11,5 @@ WebForms code-behind classes are scoped to their page. Copy-pasted pages that ea
 Zone detection damps files imported by a large share of the project (base pages, data services, shared models), so feature folders that all lean on the same hubs are zoned by folder rather than by who uses the hub. The zone algorithm version is bumped, so existing partitions are re-derived. A first analysis now records a partition review, and a zone holding more than half the files is reported even when its sub-zones are balanced.
 
 Findings from earlier enrichment passes are no longer dropped by later ones. Content hashes were keyed to the enriched zone ids by array position, which put each hash under another zone's id whenever enrichment reordered zones; every carried global finding then read as stale.
+
+The isometric map zooms faster on a trackpad pinch and slightly faster on ⌘/Ctrl + scroll; no single wheel event zooms more than 2×.
