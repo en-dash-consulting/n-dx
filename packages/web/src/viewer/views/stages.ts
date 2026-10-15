@@ -43,38 +43,17 @@ export interface StageSection {
   /**
    * View rendered in the section and opened full-page by its "Open" link —
    * the first tab when `tabs` is set. The section's heading and blurb come
-   * from this view's entry in `view-meta.ts`, unless `group` overrides them;
-   * there is no other per-section override.
+   * from this view's entry in `view-meta.ts`; there is no per-section
+   * override.
    */
   view: ViewId;
   /** Expanded when the stage page first opens. */
   open?: boolean;
   /**
-   * Always starts collapsed, ignoring the remembered open state — for a
-   * section whose content the page already leads with (Terrain, now that the
-   * Overview opens on the isometric map). It still opens on click.
-   */
-  collapsedOnLoad?: boolean;
-  /**
    * The stage's lead section, shown in the page itself with no dropdown
    * header: always rendered, never collapsible. One per stage, first.
    */
   plain?: boolean;
-  /**
-   * Further views sharing this section as tabs alongside `view` — the
-   * Terrain section's Isometric map and Zones, the Architecture section's
-   * Routes. Generalises the old two-way 2D/3D projection toggle into an
-   * N-way tab strip; each tab is still one view, reused unchanged, and
-   * still keeps its own route and full page.
-   */
-  tabs?: readonly StageTab[];
-  /**
-   * Heading and blurb for a section whose tabs form a named group with no
-   * page of its own — Terrain has no route; only its tabs do. Omitted when
-   * the section's identity is simply `view`'s own (Architecture's merged
-   * section needs no override: it is still named by the `architecture` view).
-   */
-  group?: { heading: string; blurb: string };
   /**
    * A long list (run history, the execution log): the open section is a
    * bounded scroll region, with an Expand control in its header that shows it
@@ -98,7 +77,7 @@ export interface StageSection {
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "next-steps" | "languages";
+export type StagePanelId = "map" | "next-steps" | "languages";
 
 /** How much of the tile grid a tile spans: the full row (hero, wide) or one cell. */
 export type TileSize = "hero" | "wide" | "normal";
@@ -113,8 +92,18 @@ export interface StageTile {
   panel?: StagePanelId;
   /** Heading for a panel tile, which is not named by its view. */
   title?: string;
+  /**
+   * The panel brings its own header, controls and full-screen (the codebase
+   * map), so the tile draws no header or border around it and cannot be
+   * expanded — the panel is its view's embedded form.
+   */
+  chromeless?: boolean;
   size?: TileSize;
-  /** Further views shown as tabs once the tile is expanded (Architecture's Routes). */
+  /**
+   * Further views shown as tabs once the tile is expanded (Architecture's
+   * Routes). Each tab is still one view, reused unchanged, with its own route
+   * and full page.
+   */
   tabs?: readonly StageTab[];
   featureGate?: string;
   requiresServer?: boolean;
@@ -129,6 +118,21 @@ export interface StageDef {
    * plain lead section, instead of the stacked collapsible `sections`.
    */
   tiles?: readonly StageTile[];
+  /**
+   * Views that belong to this stage with no place on its page — still opened
+   * by route and named under this stage in the breadcrumb (the flat Graph,
+   * which the Analyze dashboard dropped in favour of the codebase map).
+   */
+  alsoOwns?: readonly ViewId[];
+}
+
+/**
+ * Whether a tile puts its view on the page. A view tile does, and so does a
+ * chromeless panel, which is its view's embedded form (the map); a panel that
+ * only links to its view through "Open" (Next steps, Languages) does not.
+ */
+export function tilePlacesView(tile: StageTile): boolean {
+  return !tile.panel || !!tile.chromeless;
 }
 
 /** Loop order. The side stage links step through it and wrap. */
@@ -137,27 +141,21 @@ export const STAGE_ORDER: readonly StageId[] = ["analyze", "plan", "work"];
 export const STAGES: Readonly<Record<StageId, StageDef>> = {
   analyze: {
     id: "analyze",
-    sections: [
-      { view: "overview", plain: true },
-      {
-        view: "graph",
-        collapsedOnLoad: true,
-        tabs: [
-          { view: "iso-map", hiddenWhenDeployed: true },
-          { view: "zones" },
-        ],
-        group: {
-          heading: "Terrain",
-          blurb: "The import graph — flat, in 3D, or clustered into zones.",
-        },
-      },
-      { view: "files", scroll: true },
+    // A dashboard: the lead line and stats, then tiles.
+    sections: [{ view: "overview", plain: true }],
+    tiles: [
+      { view: "iso-map", panel: "map", title: "Codebase map", size: "hero", chromeless: true, hiddenWhenDeployed: true },
+      { view: "suggestions", panel: "next-steps", title: "Next steps" },
       { view: "problems" },
       { view: "suggestions" },
+      { view: "zones" },
+      { view: "files" },
       { view: "architecture", tabs: [{ view: "routes" }] },
+      { view: "files", panel: "languages", title: "Languages" },
       { view: "pr-markdown", featureGate: "sourcevision.prMarkdown" },
       { view: "ask", featureGate: "sourcevision.ask", requiresServer: true },
     ],
+    alsoOwns: ["graph"],
   },
   plan: {
     id: "plan",
@@ -243,7 +241,7 @@ export function isStageId(view: ViewId): view is StageId {
 
 /**
  * The stage a view belongs to: the stage itself for a stage page, else the
- * stage listing it as a section. Each view is listed by at most one stage, so
+ * stage listing it as a section, a tile, or in `alsoOwns`. Each view is listed by at most one stage, so
  * the answer never depends on where the user came from — a view listed twice
  * would light the first stage in loop order even when opened from the second.
  * Given `validViews`, only stages this viewer has count: Token Usage is on
@@ -254,9 +252,22 @@ export function stageForView(view: ViewId, validViews?: ReadonlySet<ViewId>): St
   if (isStageId(view)) return view;
   for (const id of STAGE_ORDER) {
     if (validViews && !validViews.has(id)) continue;
-    if (STAGES[id].sections.some((s) => s.view === view || s.tabs?.some((t) => t.view === view))) return id;
+    if (stageViews(id).includes(view)) return id;
   }
   return null;
+}
+
+/**
+ * Every view a stage lists, once each: its sections, its tiles and their tabs
+ * (a panel tile's view included — it is where "Open" goes), and `alsoOwns`.
+ */
+export function stageViews(id: StageId): ViewId[] {
+  const def = STAGES[id];
+  return [...new Set<ViewId>([
+    ...def.sections.map((s) => s.view),
+    ...(def.tiles ?? []).flatMap((t) => [t.view, ...(t.tabs ?? []).map((x) => x.view)]),
+    ...(def.alsoOwns ?? []),
+  ])];
 }
 
 /** Stages with a page in this scope — the stage id is only a valid view in its own scope. */

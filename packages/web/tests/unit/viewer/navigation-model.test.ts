@@ -32,6 +32,8 @@ import {
   SETTINGS_ENTRIES,
   isLiveView,
   ENRICHMENT_THRESHOLDS,
+  stageForView,
+  tilePlacesView,
   type StageId,
 } from "../../../src/viewer/views/index.js";
 import { Breadcrumb } from "../../../src/viewer/components/breadcrumb.js";
@@ -93,8 +95,12 @@ function placementsOf(view: ViewId): string[] {
   for (const stage of STAGE_ORDER) {
     for (const section of STAGES[stage].sections) {
       if (section.view === view) places.push(`section:${stage}`);
-      if (section.tabs?.some((t) => t.view === view)) places.push(`tab:${stage}`);
     }
+    for (const tile of STAGES[stage].tiles ?? []) {
+      if (tile.view === view && tilePlacesView(tile)) places.push(`tile:${stage}`);
+      if (tile.tabs?.some((t) => t.view === view)) places.push(`tab:${stage}`);
+    }
+    if (STAGES[stage].alsoOwns?.includes(view)) places.push(`owned:${stage}`);
   }
   if (SETTINGS_ENTRIES.some((e) => e.view === view)) places.push("settings");
   return places;
@@ -308,9 +314,8 @@ describe("rendered surfaces take their labels from the model", () => {
       await settle();
       for (const el of root.querySelectorAll(".stage-section[data-view]:not(.stage-section--plain)")) {
         const view = el.getAttribute("data-view") as ViewId;
-        const section = STAGES[stage].sections.find((s) => s.view === view)!;
-        const expectedTitle = section.group?.heading ?? viewLabel(view);
-        const expectedBlurb = section.group?.blurb ?? viewBlurb(view);
+        const expectedTitle = viewLabel(view);
+        const expectedBlurb = viewBlurb(view);
         const title = el.querySelector(".stage-section-title")?.textContent;
         const blurb = el.querySelector(".stage-section-blurb")?.textContent;
         if (title !== expectedTitle) wrong.push(`${stage}/${view}: titled "${title}"`);
@@ -320,7 +325,7 @@ describe("rendered surfaces take their labels from the model", () => {
     expect(wrong).toEqual([]);
   });
 
-  it("every tab in a section is named by its own view", async () => {
+  it("every tab in a tile is named by its own view", async () => {
     const wrong: string[] = [];
     for (const stage of STAGE_ORDER) {
       act(() => {
@@ -329,25 +334,24 @@ describe("rendered surfaces take their labels from the model", () => {
         }), root);
       });
       await settle();
-      for (const section of STAGES[stage].sections.filter((s) => s.tabs?.length)) {
-        // Open it only if it is closed: a section remembers its open state in
-        // localStorage, which is not reset between cases, so a blind click
-        // closes an already-open section and leaves nothing to assert on.
+      for (const tile of (STAGES[stage].tiles ?? []).filter((t) => t.tabs?.length)) {
+        // Expand it only if it is collapsed: a tile remembers its state in
+        // localStorage, which is not reset between cases.
         const toggle = root.querySelector<HTMLButtonElement>(
-          `.stage-section[data-view="${section.view}"] .stage-section-toggle`,
+          `.stage-tile[data-tile="${tile.view}"] .stage-tile-toggle`,
         );
         if (toggle?.getAttribute("aria-expanded") !== "true") {
           act(() => { toggle?.click(); });
           await settle();
         }
         const tabButtons = [...root.querySelectorAll<HTMLButtonElement>(
-          `.stage-section[data-view="${section.view}"] .stage-section-tab`,
+          `.stage-tile[data-tile="${tile.view}"] .stage-section-tab`,
         )];
-        const expectedViews = [section.view, ...section.tabs!.map((t) => t.view)];
-        // A closed section renders no tabs, so this comparison also fails
+        const expectedViews = [tile.view, ...tile.tabs!.map((t) => t.view)];
+        // A collapsed tile renders no tabs, so this comparison also fails
         // loudly rather than passing having checked nothing.
         if (tabButtons.map((b) => b.textContent).join("|") !== expectedViews.map((v) => viewLabel(v)).join("|")) {
-          wrong.push(`${stage}/${section.view}: tabs ${tabButtons.map((b) => b.textContent).join(", ")}`);
+          wrong.push(`${stage}/${tile.view}: tabs ${tabButtons.map((b) => b.textContent).join(", ")}`);
         }
       }
     }
@@ -410,38 +414,36 @@ describe("rendered surfaces take their labels from the model", () => {
 
 // ── Moved from sourcevision-tabs.test.ts ───────────────────────
 
-describe("the Analysis stage carries what SOURCEVISION_TABS used to", () => {
-  const sectionViews = STAGES.analyze.sections.map((s) => s.view);
-  const section = (view: ViewId) => STAGES.analyze.sections.find((s) => s.view === view)!;
-  // Every view the stage shows, sections and their tabs flattened — the
-  // successor to the old flat `sectionViews` list now that Zones, Routes and
-  // the isometric map are tabs rather than sections of their own.
-  const allViews = STAGES.analyze.sections.flatMap((s) => [s.view, ...(s.tabs ?? []).map((t) => t.view)]);
+describe("the Analysis stage is a tile dashboard", () => {
+  const tiles = STAGES.analyze.tiles!;
+  const tile = (view: ViewId) => tiles.find((t) => t.view === view && !t.panel)!;
+  const placed = tiles.filter(tilePlacesView).flatMap((t) => [t.view, ...(t.tabs ?? []).map((x) => x.view)]);
 
-  it("lists every SourceVision view, sections and tabs", () => {
-    expect(sectionViews).toEqual([
-      "overview", "graph", "files", "problems",
-      "suggestions", "architecture", "pr-markdown", "ask",
+  it("leads with Overview and lays every SourceVision view out as tiles", () => {
+    expect(STAGES.analyze.sections.map((s) => s.view)).toEqual(["overview"]);
+    expect(tiles.map((t) => t.panel ?? t.view)).toEqual([
+      "map", "next-steps", "problems", "suggestions", "zones", "files",
+      "architecture", "languages", "pr-markdown", "ask",
     ]);
-    expect(allViews).toEqual([
-      "overview", "graph", "iso-map", "zones", "files", "problems",
-      "suggestions", "architecture", "routes", "pr-markdown", "ask",
+    expect(placed).toEqual([
+      "iso-map", "problems", "suggestions", "zones", "files",
+      "architecture", "routes", "pr-markdown", "ask",
     ]);
   });
 
-  it("folds the repository map, isometric map and zones into one Terrain section", () => {
-    const terrain = section("graph");
-    expect(terrain.tabs?.map((t) => t.view)).toEqual(["iso-map", "zones"]);
-    expect(terrain.group?.heading).toBe("Terrain");
-    expect(terrain.tabs?.find((t) => t.view === "iso-map")?.hiddenWhenDeployed).toBe(true);
+  it("makes the codebase map a chromeless hero, dropped in a static export", () => {
+    const map = tiles[0]!;
+    expect(map).toMatchObject({ view: "iso-map", panel: "map", size: "hero", chromeless: true, hiddenWhenDeployed: true });
   });
 
-  it("folds architecture and routes into one section named by Architecture", () => {
-    const arch = section("architecture");
-    expect(arch.tabs?.map((t) => t.view)).toEqual(["routes"]);
-    // No group override: the merged section keeps the `architecture` view's
-    // own identity, unlike Terrain, which names no view of its own.
-    expect(arch.group).toBeUndefined();
+  it("drops the flat repository map from the page but keeps it in the stage", () => {
+    expect(tiles.some((t) => t.view === "graph")).toBe(false);
+    expect(STAGES.analyze.alsoOwns).toEqual(["graph"]);
+    expect(stageForView("graph")).toBe("analyze");
+  });
+
+  it("shows Routes as a tab of the Architecture tile", () => {
+    expect(tile("architecture").tabs?.map((t) => t.view)).toEqual(["routes"]);
   });
 
   it("names the repository map and isometric map as the navigation model has them", () => {
@@ -449,43 +451,40 @@ describe("the Analysis stage carries what SOURCEVISION_TABS used to", () => {
     expect(viewLabel("iso-map")).toBe("Isometric Map");
   });
 
-  it("section views are unique", () => {
-    expect(new Set(sectionViews).size).toBe(sectionViews.length);
-  });
-
-  it("every view in the stage appears exactly once, sections and tabs together", () => {
-    expect(new Set(allViews).size).toBe(allViews.length);
+  it("places every view in the stage once", () => {
+    expect(new Set(placed).size).toBe(placed.length);
   });
 
   it("keeps thresholds for the enrichment-gated views", () => {
     // The views gate themselves on these constants (architecture.ts,
-    // problems.ts, suggestions.ts); the tab table's parallel `minPass` copy
-    // was config nothing read.
+    // problems.ts, suggestions.ts).
     for (const view of ["architecture", "problems", "suggestions"] as const) {
-      expect(sectionViews, view).toContain(view);
+      expect(placed, view).toContain(view);
       expect(ENRICHMENT_THRESHOLDS[view], view).toBeGreaterThan(0);
     }
   });
 
   it("gates PR Markdown behind a default-off feature flag", () => {
-    expect(section("pr-markdown").featureGate).toBe("sourcevision.prMarkdown");
-    expect(section("pr-markdown").requiresServer).toBeUndefined();
+    expect(tile("pr-markdown").featureGate).toBe("sourcevision.prMarkdown");
+    expect(tile("pr-markdown").requiresServer).toBeUndefined();
   });
 
   it("gates Ask behind a default-off flag and marks it server-rendered", () => {
     // The answer is an on-demand LLM call, so a static export cannot serve it.
-    expect(section("ask").featureGate).toBe("sourcevision.ask");
-    expect(section("ask").requiresServer).toBe(true);
+    expect(tile("ask").featureGate).toBe("sourcevision.ask");
+    expect(tile("ask").requiresServer).toBe(true);
     expect(viewLabel("ask")).toBe("Ask");
   });
 
   it("marks the server-built views so static exports hide them", () => {
-    // The isometric map is hidden in a static export by its section's `alt`
-    // being dropped there, and Ask, Product, Changes and Workspaces by
-    // `requiresServer` (Product and Changes read rex's v2 model per request).
-    const serverBuilt = STAGE_ORDER.flatMap((stage: StageId) =>
-      STAGES[stage].sections.filter((s) => s.requiresServer).map((s) => s.view),
-    );
-    expect(serverBuilt).toEqual(["ask", "product", "changes", "workspaces"]);
+    // The isometric map is hidden by `hiddenWhenDeployed`; Ask, Product,
+    // Changes and Workspaces by `requiresServer` (Product and Changes read
+    // rex's v2 model per request).
+    const serverBuilt = STAGE_ORDER.flatMap((stage: StageId) => [
+      ...STAGES[stage].sections.filter((s) => s.requiresServer).map((s) => s.view),
+      ...(STAGES[stage].tiles ?? []).filter((t) => t.requiresServer).map((t) => t.view),
+    ]);
+    expect(serverBuilt.sort()).toEqual(["ask", "changes", "product", "workspaces"]);
   });
 });
+

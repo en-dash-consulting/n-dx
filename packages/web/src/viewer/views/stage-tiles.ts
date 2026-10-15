@@ -2,7 +2,9 @@
  * The dashboard tile grid a stage page renders when its `StageDef` lists
  * `tiles` (stages.ts).
  *
- * A tile has three sizes of attention:
+ * A chromeless tile (the codebase map) is its panel alone: the panel brings
+ * its own header, controls and full-screen. Every other tile has three sizes
+ * of attention:
  *  - **collapsed** — a cell (or a full row, for `hero`/`wide`) showing its
  *    summary: `renderSummary(tile)`, or the view itself clipped to the tile
  *    when no summary exists;
@@ -69,6 +71,21 @@ interface TileBodyProps {
   idBase: string;
 }
 
+/** Move the active tab with the arrow keys — the roving-tabindex tablist pattern. */
+function tabListKeyDown(e: KeyboardEvent, tabs: readonly StageTab[], activeIndex: number, activate: (view: ViewId) => void): void {
+  let next: number | null = null;
+  if (e.key === "ArrowRight") next = (activeIndex + 1) % tabs.length;
+  else if (e.key === "ArrowLeft") next = (activeIndex - 1 + tabs.length) % tabs.length;
+  else if (e.key === "Home") next = 0;
+  else if (e.key === "End") next = tabs.length - 1;
+  if (next === null || next === activeIndex) return;
+  e.preventDefault();
+  const view = tabs[next]!.view;
+  activate(view);
+  const list = (e.currentTarget as HTMLElement).closest(".stage-tile-tablist");
+  list?.querySelector<HTMLButtonElement>(`[data-tab="${view}"]`)?.focus();
+}
+
 /** A tile's full content: its panel, or its view with the tile's tabs. */
 function TileContent({ tile, tabs, renderView, renderPanel, idBase }: TileBodyProps) {
   const [active, setActive] = useState<ViewId>(tile.view);
@@ -77,22 +94,25 @@ function TileContent({ tile, tabs, renderView, renderPanel, idBase }: TileBodyPr
   return h("div", { class: "stage-tile-content" },
     tabs.length > 1
       ? h("div", { class: "stage-section-tablist stage-tile-tablist", role: "tablist", "aria-label": `${tileTitle(tile)} views` },
-          tabs.map((t) => {
+          tabs.map((t, i) => {
             const selected = t.view === shown;
             return h("button", {
               key: t.view,
               type: "button",
               role: "tab",
               id: `${idBase}-tab-${t.view}`,
+              "data-tab": t.view,
               class: `stage-section-tab${selected ? " active" : ""}`,
               "aria-selected": String(selected),
+              "aria-controls": `${idBase}-panel`,
               tabIndex: selected ? 0 : -1,
               onClick: () => setActive(t.view),
+              onKeyDown: (e: KeyboardEvent) => tabListKeyDown(e, tabs, i, setActive),
             }, viewLabel(t.view));
           }),
         )
       : null,
-    h("div", tabs.length > 1 ? { role: "tabpanel", "aria-labelledby": `${idBase}-tab-${shown}` } : {},
+    h("div", tabs.length > 1 ? { id: `${idBase}-panel`, role: "tabpanel", "aria-labelledby": `${idBase}-tab-${shown}` } : {},
       renderView(shown),
     ),
   );
@@ -176,6 +196,12 @@ function Tile({ stage, tile, tabs, expanded, onToggle, onFullScreen, navigateTo,
   const title = tileTitle(tile);
   const summary = expanded ? null : renderSummary(tile);
   const size = expanded ? "expanded" : (tile.size ?? "normal");
+
+  if (tile.chromeless && tile.panel) {
+    return h("section", { class: `stage-tile stage-tile--${tile.size ?? "normal"} stage-tile--chromeless`, "data-tile": key, "aria-label": title },
+      renderPanel(tile.panel),
+    );
+  }
 
   return h("section", {
     class: `stage-tile stage-tile--${size}`,

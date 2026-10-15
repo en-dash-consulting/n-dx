@@ -22,6 +22,9 @@ import type { JobTray } from "../hooks/index.js";
 
 import {
   Overview,
+  MapPanel,
+  LanguagesPanel,
+  NextStepsPanel,
   Graph,
   IsoMapView,
   ZonesView,
@@ -59,7 +62,7 @@ import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
 import { PrepareTaskModal } from "../components/index.js";
-import { isSettingsView, type StageId } from "./stages.js";
+import { isSettingsView, STAGES, type StageId, type StagePanelId } from "./stages.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 
 import {
@@ -116,14 +119,27 @@ function validViewsOf(ctx: ViewRenderContext): ReadonlySet<ViewId> {
   return ctx.validViews ?? buildValidViewsForScope(null);
 }
 
-/** A stage page, rendering each of its sections through this registry. */
+/** A stage page, rendering each of its sections and tiles through this registry. */
 function stage(id: StageId): ViewRenderer {
   return (ctx) => h(StagePage, {
     stage: id,
     validViews: validViewsOf(ctx),
     navigateTo: ctx.navigateTo,
-    renderView: (view: ViewId) => renderActiveView(view, ctx),
+    // On a tiled stage the lead Overview drops what its tiles show.
+    renderView: (view: ViewId) => (view === "overview" && STAGES[id].tiles
+      ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead" })
+      : renderActiveView(view, ctx)),
+    renderPanel: (panel: StagePanelId) => renderPanel(panel, ctx),
   });
+}
+
+/** The parts of a stage page that are not views of their own. */
+function renderPanel(panel: StagePanelId, ctx: ViewRenderContext): ComponentChild {
+  switch (panel) {
+    case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo });
+    case "next-steps": return h(NextStepsPanel, { embedded: true });
+    case "languages": return h(LanguagesPanel, { data: ctx.data });
+  }
 }
 
 const REGISTRY: Record<string, ViewRenderer> = {

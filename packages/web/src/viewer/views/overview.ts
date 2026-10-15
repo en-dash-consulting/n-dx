@@ -95,7 +95,11 @@ function priorityCounts(steps: NextStep[]): [string, number][] {
  * top step's title — so the map above it stays the first thing on the page.
  * The open state is remembered per browser.
  */
-export function NextStepsPanel() {
+/**
+ * `embedded`: inside a dashboard tile, which already names it — always open,
+ * no caret or heading of its own, the counts and Copy all kept.
+ */
+export function NextStepsPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const [steps, setSteps] = useState<NextStep[] | null>(null);
   const [copied, setCopied] = useState<number | "all" | null>(null);
   const [capture, setCapture] = useState<"idle" | "confirm" | "capturing" | "done" | "error">("idle");
@@ -155,24 +159,27 @@ export function NextStepsPanel() {
 
   const counts = priorityCounts(steps);
 
-  return h("details", {
-    class: "overview-section overview-next-steps",
-    open,
-    onToggle: (e: Event) => {
-      const next = (e.currentTarget as HTMLDetailsElement).open;
-      setOpen(next);
-      writeNextStepsOpen(next);
-    },
+  const shown = embedded || open;
+  return h(embedded ? "div" : "details", {
+    class: `overview-section overview-next-steps${embedded ? " overview-next-steps--embedded" : ""}`,
+    ...(embedded ? {} : {
+      open,
+      onToggle: (e: Event) => {
+        const next = (e.currentTarget as HTMLDetailsElement).open;
+        setOpen(next);
+        writeNextStepsOpen(next);
+      },
+    }),
   },
-    h("summary", { class: "section-header-row next-steps-summary" },
-      h("span", { class: "next-steps-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
-      h("h3", null, "Next Steps"),
+    h(embedded ? "div" : "summary", { class: "section-header-row next-steps-summary" },
+      embedded ? null : h("span", { class: "next-steps-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
+      embedded ? null : h("h3", null, "Next Steps"),
       h("span", { class: "next-steps-counts" },
         counts.map(([priority, n]) =>
           h("span", { key: priority, class: `next-step-priority next-step-priority-${priority}` }, `${n} ${priority}`),
         ),
       ),
-      !open
+      !shown
         ? h("span", { class: "next-steps-preview" }, steps[0]!.title)
         : null,
       h("button", {
@@ -256,6 +263,12 @@ interface OverviewProps {
   onSelect?: (detail: DetailItem | null) => void;
   /** Shared job tray — AnalyzeControls starts and reads the full run there. */
   jobs: JobTray;
+  /**
+   * `lead`: only the analysis line, its controls and the stats strip — the
+   * Analyze dashboard's lead, whose map, Next steps and Languages are tiles
+   * of their own (MapPanel, NextStepsPanel, LanguagesPanel). Default `full`.
+   */
+  variant?: "full" | "lead";
 }
 
 const LANG_COLORS: Record<string, string> = {
@@ -306,7 +319,8 @@ function StatTile({ glyph, label, value, sub, tone, meter, info }: StatTileProps
   );
 }
 
-export function Overview({ data, navigateTo, onSelect, jobs }: OverviewProps) {
+export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }: OverviewProps) {
+  const lead = variant === "lead";
   const { manifest, inventory, imports, zones, components } = data;
 
   if (!manifest && !inventory && !imports && !zones) {
@@ -378,17 +392,7 @@ export function Overview({ data, navigateTo, onSelect, jobs }: OverviewProps) {
   }, [zones]);
 
   // Language breakdown
-  const langChartData = useMemo(() => {
-    if (!inventory) return [];
-    return Object.entries(inventory.summary.byLanguage)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 8)
-      .map(([lang, count]) => ({
-        label: lang,
-        value: count,
-        color: LANG_COLORS[lang] || "var(--accent)",
-      }));
-  }, [inventory]);
+  const langChartData = useMemo(() => languageChartData(data), [inventory]);
 
   // Zones needing attention count
   const attentionCount = useMemo(() => {
@@ -456,7 +460,7 @@ export function Overview({ data, navigateTo, onSelect, jobs }: OverviewProps) {
       : null,
 
     // The map leads: the codebase's shape before any number about it.
-    hasZones
+    hasZones && !lead
       ? h(IsoMapHero, {
           analysisStamp: isoMapAnalysisStamp(data),
           facts: [
@@ -535,10 +539,10 @@ export function Overview({ data, navigateTo, onSelect, jobs }: OverviewProps) {
     ),
 
     // Prioritized recommendations (hidden until analysis data exists)
-    h(NextStepsPanel, null),
+    lead ? null : h(NextStepsPanel, null),
 
     // Two-column layout: Languages + Zone summary
-    h("div", { class: "overview-columns" },
+    lead ? null : h("div", { class: "overview-columns" },
       // Left column - Languages
       langChartData.length > 0
         ? h("div", { class: "overview-col" },
@@ -614,7 +618,7 @@ export function Overview({ data, navigateTo, onSelect, jobs }: OverviewProps) {
     ),
 
     // Circular dependencies (compact)
-    imports?.summary.circulars.length
+    !lead && imports?.summary.circulars.length
       ? h("div", { class: "overview-section" },
           h("h3", null, `${imports.summary.circularCount} Circular Dep${imports.summary.circularCount > 1 ? "s" : ""}`),
           h("div", { class: "circular-list" },
@@ -632,4 +636,39 @@ export function Overview({ data, navigateTo, onSelect, jobs }: OverviewProps) {
         )
       : null
   );
+}
+
+// ── Dashboard panels ─────────────────────────────────────────
+
+/** The codebase map as the Analyze dashboard's hero tile. */
+export function MapPanel({ data, navigateTo }: { data: LoadedData; navigateTo?: NavigateTo }): ComponentChild {
+  const { zones, imports, manifest } = data;
+  if (!zones || zones.zones.length === 0) {
+    return h("p", { class: "stage-tile-empty" }, "No zones yet — run an analysis to draw the map.");
+  }
+  return h(IsoMapHero, {
+    analysisStamp: isoMapAnalysisStamp(data),
+    facts: [
+      `${zones.zones.length} zones`,
+      imports ? `${imports.edges.length.toLocaleString()} imports` : "",
+      manifest?.gitBranch ?? "",
+    ].filter(Boolean),
+    onOpenOptions: navigateTo ? () => navigateTo("iso-map") : undefined,
+  });
+}
+
+/** Source files by language, top eight. */
+export function LanguagesPanel({ data }: { data: LoadedData }): ComponentChild {
+  const chart = useMemo(() => languageChartData(data), [data.inventory]);
+  if (chart.length === 0) return h("p", { class: "stage-tile-empty" }, "No inventory yet.");
+  return h(BarChart, { data: chart });
+}
+
+function languageChartData(data: LoadedData): Array<{ label: string; value: number; color: string }> {
+  const inventory = data.inventory;
+  if (!inventory) return [];
+  return Object.entries(inventory.summary.byLanguage)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 8)
+    .map(([lang, count]) => ({ label: lang, value: count, color: LANG_COLORS[lang] || "var(--accent)" }));
 }

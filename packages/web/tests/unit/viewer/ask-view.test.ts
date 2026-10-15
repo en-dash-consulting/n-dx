@@ -928,13 +928,13 @@ describe("Ask view registration", () => {
     expect(renderActiveView("ask", ctx)).not.toBeNull();
   });
 
-  it("is the Analysis section after PR Markdown", () => {
-    const ids = STAGES.analyze.sections.map((s) => s.view);
+  it("is the Analysis tile after PR Markdown", () => {
+    const ids = STAGES.analyze.tiles!.map((t) => t.panel ?? t.view);
     expect(ids.indexOf("ask")).toBe(ids.indexOf("pr-markdown") + 1);
   });
 
   it("is gated and server-built, as the retired tab table recorded", () => {
-    const ask = STAGES.analyze.sections.find((s) => s.view === "ask")!;
+    const ask = STAGES.analyze.tiles!.find((t) => t.view === "ask")!;
     expect(ask.featureGate).toBe("sourcevision.ask");
     expect(ask.requiresServer).toBe(true);
   });
@@ -994,9 +994,12 @@ describe("Ask section feature gate", () => {
     return root;
   }
 
-  /** Views the Analysis page lists as sections. */
+  /** Views the Analysis page lists, as its lead section and its tiles. */
   function sectionViews(): string[] {
-    return Array.from(root.querySelectorAll<HTMLElement>(".stage-section")).map((el) => el.dataset.view ?? "");
+    return [
+      ...Array.from(root.querySelectorAll<HTMLElement>(".stage-section")).map((el) => el.dataset.view ?? ""),
+      ...Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile ?? ""),
+    ];
   }
 
   beforeEach(() => {
