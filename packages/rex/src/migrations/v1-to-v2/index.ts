@@ -77,6 +77,23 @@ export interface V1ToV2Summary {
   flagCounts: PlanData["flagCounts"];
   legacyLoe: PlanData["legacyLoe"];
   corrupt: PlanData["corrupt"];
+  /**
+   * Where the capability code evidence came from, and when.
+   *
+   * A stale analysis reads exactly like a fresh one — every file parses,
+   * every zone has files — so a reader of the plan (or the cut-day apply)
+   * has no way to judge the specs without this. Absent when nothing was read.
+   */
+  codeEvidence?: {
+    /** Items the evidence covered. */
+    items: number;
+    /** ISO timestamp the analysis recorded, when it recorded one. */
+    analyzedAt?: string;
+    /** Commit the analysis was taken at, when it recorded one. */
+    gitSha?: string;
+    /** True when `gitSha` is neither HEAD nor an ancestor: the evidence is off this history. */
+    offHistory?: boolean;
+  };
   /** Held items first, then entries Jev judged by ascending confidence: reviewers start with the weakest calls. */
   reviewQueue: ReviewQueueItem[];
   /** What the Jev review flagged and dropped; absent when Jev reviewed nothing. */

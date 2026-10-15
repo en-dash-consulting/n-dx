@@ -24,6 +24,13 @@ export const ROOT_POLICY_LABEL = "root-policy";
 export const ROOT_DRIFT_LABEL = "root-drift";
 
 /**
+ * Label of the root tests that parse a documentation page (the README, the
+ * guide, the CLI/UI gap page) and fail when it disagrees with the code. Also a
+ * subset of `root`.
+ */
+export const ROOT_DOCS_LABEL = "root-docs";
+
+/**
  * The root tests that police package sources and tests (spawn-only, gateways,
  * shell/wall-clock/layout inventories, obfuscation, integration-tier growth).
  * About 2 s together. A package-only change still has to run them: without them
@@ -99,6 +106,21 @@ export const ROOT_DRIFT_TEST_FILES = [
 ];
 
 /**
+ * The root tests that read a documentation page and fail when it is stale or
+ * incomplete: every command documented in the README and the guide, every guide
+ * page linking the skills reference, every command a user doc names existing,
+ * the generated section of the CLI/UI gap page. A docs-only change selects this label and nothing else, so it stays
+ * cheap; {@link VALIDATED_DOC_PAGES} says which pages select it. A unit test
+ * fails if a listed file is missing.
+ */
+export const ROOT_DOCS_TEST_FILES = [
+  "tests/e2e/command-docs-parity.test.js",
+  "tests/e2e/docs-skill-refs.test.js",
+  "tests/e2e/docs-command-refs.test.js",
+  "tests/e2e/cli-ui-gap-drift.test.js",
+];
+
+/**
  * Every label that runs a subset of `root`'s files, mapped to those files, in
  * run order. `root` supersedes all of them, and `all` / `packages` leave them
  * out. A unit test fails if a listed file is missing or appears twice.
@@ -106,6 +128,7 @@ export const ROOT_DRIFT_TEST_FILES = [
 export const ROOT_SUBSET_TEST_FILES = {
   [ROOT_POLICY_LABEL]: ROOT_POLICY_TEST_FILES,
   [ROOT_DRIFT_LABEL]: ROOT_DRIFT_TEST_FILES,
+  [ROOT_DOCS_LABEL]: ROOT_DOCS_TEST_FILES,
 };
 
 /** The root-subset labels, in run order. */
@@ -156,6 +179,50 @@ export const VALIDATED_ARTIFACTS = {
     test: "tests/e2e/prompt-census.test.js",
   },
 };
+
+/**
+ * Documentation pages a root test reads, as groups: `match` says which paths
+ * belong and `tests` names the tests that read them (all in `label`'s subset).
+ * The exact-path map above cannot express "every page in docs/guide/", and
+ * listing them would go stale the day a page is added. Same rule as there:
+ * selects one subset, never full `root`.
+ *
+ * - `command-docs-parity` reads the README, `packages/core/README.md` and
+ *   `docs/guide/commands.md`.
+ * - `docs-skill-refs` reads every `docs/guide/*.md` except `skills.md`, which it
+ *   exempts.
+ * - `docs-command-refs` reads `docs/index.md` and every page under
+ *   `docs/guide/` and `docs/packages/`, nested ones and `skills.md` included.
+ * - `cli-ui-gap-drift` reads `docs/cli-ui-gap.md`.
+ * - `assistant-parity-smoke` is a root-drift file that also reads two pages.
+ */
+export const VALIDATED_DOC_PAGES = [
+  {
+    label: ROOT_DOCS_LABEL,
+    tests: ["tests/e2e/command-docs-parity.test.js"],
+    match: (file) => file === "README.md" || file === "packages/core/README.md" || file === "docs/guide/commands.md",
+  },
+  {
+    label: ROOT_DOCS_LABEL,
+    tests: ["tests/e2e/docs-skill-refs.test.js"],
+    match: (file) => /^docs\/guide\/[^/]+\.md$/.test(file) && file !== "docs/guide/skills.md",
+  },
+  {
+    label: ROOT_DOCS_LABEL,
+    tests: ["tests/e2e/docs-command-refs.test.js"],
+    match: (file) => file === "docs/index.md" || /^docs\/(guide|packages)\/.+\.md$/.test(file),
+  },
+  {
+    label: ROOT_DOCS_LABEL,
+    tests: ["tests/e2e/cli-ui-gap-drift.test.js"],
+    match: (file) => file === "docs/cli-ui-gap.md",
+  },
+  {
+    label: ROOT_DRIFT_LABEL,
+    tests: ["tests/e2e/assistant-parity-smoke.test.js"],
+    match: (file) => file === "docs/guide/troubleshooting.md" || file === "packages/web/README.md",
+  },
+];
 
 /** A change to any of these can alter every suite, so every suite runs. */
 export const RUN_EVERYTHING_FILES = [
@@ -297,6 +364,11 @@ export function selectAffected(changedFiles, manifests) {
     const validated = VALIDATED_ARTIFACTS[file];
     if (validated) {
       mark(validated.label, file);
+      continue;
+    }
+    const pages = VALIDATED_DOC_PAGES.filter((g) => g.match(file));
+    if (pages.length > 0) {
+      for (const g of pages) mark(g.label, file);
       continue;
     }
     if (STATE_PREFIXES.some((p) => file.startsWith(p))) continue;

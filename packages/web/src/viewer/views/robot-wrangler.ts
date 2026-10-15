@@ -12,6 +12,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../components/index.js";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { PixelIcon, SettingsFrame } from "../components/index.js";
@@ -1525,7 +1526,7 @@ function ProfileChips({
             onClick: () => del(p.name),
             title: `Delete "${p.name}"`,
             "aria-label": `Delete profile "${p.name}"`,
-          }, "✕"),
+          }, h(ActionIcon, { name: "close" })),
         );
       }),
       showInput

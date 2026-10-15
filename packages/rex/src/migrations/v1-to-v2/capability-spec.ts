@@ -85,10 +85,15 @@ export interface CriterionCandidate {
  * Below this, a test shares one word with the criterion: on this repository
  * that links most of a package's tests to any criterion naming the package.
  */
-const DEFAULT_MIN_TEST_SCORE = 2;
+export const DEFAULT_MIN_TEST_SCORE = 2;
 /** More equally good matches than this means the words are generic, not that the tests are linked. */
 const MAX_LINKED_TESTS = 3;
 const TEST_FILE_SUFFIX = /[._](?:test|spec)\.[cm]?[jt]sx?$/;
+
+/** The path names a test file. */
+export function isTestFile(file: string): boolean {
+  return TEST_FILE_SUFFIX.test(file);
+}
 
 const EARS_OPENERS = /^(?:when|while|if|where)\b/i;
 const TEST_MARKER = /\s*\((?:tests?|tested|unit tests?|e2e)\)$/i;
@@ -282,7 +287,7 @@ export function scopedTestFiles(testFiles: readonly string[], codeFiles: readonl
  * `unit`, a package name) match most criteria and so say nothing. A tie wider
  * than `MAX_LINKED_TESTS` is not a clear match and links nothing.
  */
-function linkedTests(criterion: string, testFiles: readonly string[], minScore: number): string[] {
+export function linkedTests(criterion: string, testFiles: readonly string[], minScore: number): string[] {
   const keywords = extractKeywords(criterion);
   if (keywords.length === 0) return [];
   let best = minScore;

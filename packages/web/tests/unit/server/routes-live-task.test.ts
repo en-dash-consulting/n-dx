@@ -160,8 +160,10 @@ describe("the routes", () => {
   it("serves GET /api/live/task/:taskId and ignores other paths", async () => {
     writePrd();
     writeRun("r1", { startedAt: new Date().toISOString(), lastActivityAt: new Date().toISOString() });
-    server = await startRouteTestServer((req, res) => {
-      if (handleLiveTaskRoute(req, res, ctx())) return true;
+    server = await startRouteTestServer(async (req, res) => {
+      // The handler is async now: it resolves the PRD layout before building
+      // the snapshot, so the follow-up capture knows whether a parent is legal.
+      if (await handleLiveTaskRoute(req, res, ctx())) return true;
       res.statusCode = 418;
       res.end();
       return true;

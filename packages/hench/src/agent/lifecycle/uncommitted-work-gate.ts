@@ -774,13 +774,20 @@ export function formatAppliedCompletionKept(opts: {
   paths: string[];
   deleted?: ReadonlySet<string>;
   files?: RecoveryPathspecs;
+  /** Paths dirty before the run started: named, never committed by the commands. */
+  preRun?: string[];
 }): string {
-  const { cause, changeId, taskId, paths, deleted = new Set(), files } = opts;
+  const { cause, changeId, taskId, paths, deleted = new Set(), files, preRun = [] } = opts;
   const head =
     `⚠ Completion kept: Change ${changeId} was applied to the product layer when this task completed, ` +
     `and an applied change is never reopened. The task stays completed; the run failed.\n` +
     `  ${cause}\n`;
-  if (paths.length === 0) return head + "Nothing is left uncommitted.";
+  const aside =
+    preRun.length === 0
+      ? ""
+      : `\nAlready dirty before the run, not part of this task (${preRun.length} path(s), left out of the commands above):\n` +
+        renderPaths(preRun);
+  if (paths.length === 0) return head + "Nothing of this task is left uncommitted." + aside;
   return (
     head +
     `Still uncommitted (${paths.length} path(s)):\n` +
@@ -789,7 +796,8 @@ export function formatAppliedCompletionKept(opts: {
     renderRecoveryCommands(paths, deleted, files, {
       setAside: false,
       message: [`Land the work of task ${taskId}`, `N-DX-Item: ${taskId}`],
-    })
+    }) +
+    aside
   );
 }
 

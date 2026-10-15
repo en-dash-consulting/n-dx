@@ -45,7 +45,7 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import type { AnalysisRun, LLMClassUsage } from "../schema/index.js";
+import type { AnalysisOutcome, AnalysisRun, LLMClassUsage } from "../schema/index.js";
 import { execFileSyncCli } from "../util/exec-cli.js";
 import { describePass } from "./enrich-config.js";
 import { setRunLedgerListener, snapshotRunLedger } from "./run-ledger.js";
@@ -125,6 +125,11 @@ export interface PreviousAnalyzeRun {
   durationMs: number;
   /** Phase name → wall-clock ms. */
   phases: Record<string, number>;
+  /**
+   * What that run left in `.sourcevision/`, for a reader measuring this run
+   * against it. Absent on runs recorded before the field existed.
+   */
+  outcome?: AnalysisOutcome;
 }
 
 /** What {@link readAnalyzeProgress} returns: the file, judged against its pid, plus the last comparable run. */
@@ -547,7 +552,12 @@ function previousRun(svDir: string, mode: AnalysisRun["mode"], startedAt: string
       continue;
     }
     if (modeFamily(run.mode) !== family || typeof run.at !== "string" || !(Date.parse(run.at) < before)) continue;
-    return { at: run.at, durationMs: run.durationMs ?? 0, phases: { ...(run.phases ?? {}) } };
+    return {
+      at: run.at,
+      durationMs: run.durationMs ?? 0,
+      phases: { ...(run.phases ?? {}) },
+      ...(run.outcome ? { outcome: run.outcome } : {}),
+    };
   }
   return null;
 }

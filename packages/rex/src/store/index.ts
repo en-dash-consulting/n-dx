@@ -41,7 +41,7 @@ export {
   slugifyTitle,
   resolveSiblingSlugs,
 } from "./folder-tree-serializer.js";
-export { findNonConformingSlugs, findTreeIdentityFaults, isUsableFrozenSlug, isWindowsSafeSegment, SLUG_RULE_VERSION } from "./folder-tree-serializer.js";
+export { findNonConformingSlugs, findTreeIdentityFaults, isUsableFrozenSlug, isWindowsSafeSegment, SLUG_RULE_VERSION, SLUG_RULE_SUMMARY } from "./folder-tree-serializer.js";
 export { assertSlugRuleWritable, assertSlugRuleAdoptable, checkTreeConformance, readSlugRuleMarker, SlugRuleMismatchError, SLUG_RULE_MARKER_MISSING } from "./slug-rule-guard.js";
 export type { TreeConformanceRefusal } from "./slug-rule-guard.js";
 export type { SlugMismatch } from "./folder-tree-serializer.js";
@@ -61,7 +61,7 @@ export { readPerfFlags, clearPerfFlagCache } from "./perf-flags.js";
 export type { RexPerfFlags } from "./perf-flags.js";
 export { openClaimsStore, claimsStorePath, resolveClaimHolder } from "./claims.js";
 export type { ClaimsStore, ClaimHolder, TaskClaim, PendingCompletion } from "./claims.js";
-export { isChangeLayerStore } from "./change-layer-store.js";
+export { isChangeLayerStore, resolveItemRef } from "./change-layer-store.js";
 export {
   ensureLegacyPrdMigrated,
   LegacyPrdMigrationError,

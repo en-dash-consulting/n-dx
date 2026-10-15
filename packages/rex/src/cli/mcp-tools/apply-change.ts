@@ -56,7 +56,7 @@ export const applyChangeTool = defineTool({
   description:
     "Apply an open v2 change's amendments to the product layer as a steward, whatever rex.applyOn says: added nodes are created, " +
     "modified ones edited, removed ones retired, and the change is stamped appliedAt. The whole apply is refused, listing every problem, " +
-    "when an amendment does not fit or its target's spec moved since it was drafted (force overrides that last check).",
+    "when a live task or nested change is not completed yet, when an amendment does not fit, or when its target's spec moved since it was drafted (force overrides that last check).",
   schema: {
     id: z.string().describe("Change id, display id (e.g. CH-12) or alias"),
     force: z.boolean().optional().describe("Apply amendments whose base no longer matches their target's spec"),

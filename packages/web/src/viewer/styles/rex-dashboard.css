@@ -730,7 +730,7 @@
 .reorg-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: var(--z-page-modal);
   display: flex;
   align-items: stretch;
   justify-content: flex-end;

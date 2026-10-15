@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { loadProjectOverrides, mergeWithOverrides, PROJECT_DIRS } from "@n-dx/llm-client";
+import { join } from "node:path";
+import { loadProjectOverrides, mergeWithOverrides } from "@n-dx/llm-client";
 import { validateConfig, validateLogEntry } from "../schema/validate.js";
 import type { BudgetConfig, TokenUsageLogEntry } from "./token-usage.js";
 
@@ -18,7 +18,7 @@ export async function loadTokenUsageConfig(rexDir: string): Promise<TokenUsageCo
     throw new Error(`Invalid config.json: ${result.errors.message}`);
   }
 
-  const overrides = await loadProjectOverrides(dirname(rexDir), PROJECT_DIRS.REX);
+  const overrides = await loadProjectOverrides(rexDir, "rex");
   return mergeWithOverrides(result.data, overrides) as TokenUsageConfig;
 }
 

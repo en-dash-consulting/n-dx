@@ -261,6 +261,61 @@ describe("a failure after a v2 completion applied its change", () => {
     expect(run.error).toContain("src/pay.ts");
   });
 
+  it("leaves a file dirty before the run out of the commit commands, and names it apart", async () => {
+    // The operator's in-flight edit, present before the run started.
+    await writeFile(join(projectDir, "notes.md"), "operator draft\n");
+    const { updateCompletedTaskStatus, performCommitPromptIfNeeded, captureBaselineDirty } = await lifecycle();
+    const baselineDirty = await captureBaselineDirty(projectDir);
+    expect(baselineDirty).toContain("notes.md");
+    await agentStagesWork();
+    const s = await store();
+    const run = buildRun();
+
+    await installFailingPreCommitHook();
+    expect(await updateCompletedTaskStatus(s, WIRE_ID, run)).toBe(true);
+    await performCommitPromptIfNeeded(run, projectDir, false, true, true, s, WIRE_ID, undefined, baselineDirty);
+
+    await expectCompletionKept();
+    expectKeptReport(run, "Commit failed");
+    const error =run.error ?? "";
+    const commands = error.split("\n").filter((l) => /^\s+git (add|rm|commit)/.test(l));
+    expect(commands.length).toBeGreaterThan(0);
+    expect(commands.join("\n")).not.toContain("notes.md");
+    expect(error).toContain("Already dirty before the run, not part of this task");
+    expect(error).toContain("notes.md");
+  });
+
+  it("finalizeRun passes the pre-run baseline through to a kept completion's report", async () => {
+    // The dirty tree the pre-run gate let through, then a bypassed completion and a failed gate.
+    await writeFile(join(projectDir, "notes.md"), "operator draft\n");
+    const { finalizeRun, captureBaselineDirty } = await lifecycle();
+    const baselineDirty = await captureBaselineDirty(projectDir);
+    await claims.releaseAll();
+    const { toolRexUpdateStatus } = await import("../../src/tools/rex.js");
+    await toolRexUpdateStatus(await store(), WIRE_ID, { status: "completed", resolutionType: "code-change" });
+    await writeFile(join(projectDir, "src", "pay.ts"), "export const pay = 2;\n");
+
+    failTestGate();
+    const run = buildRun();
+    run.structuredSummary = {
+      filesChanged: ["src/pay.ts"],
+      counts: { filesChanged: 1, toolCalls: 0, testsRun: 0 },
+    } as unknown as RunRecord["structuredSummary"];
+    await finalizeRun({
+      run, henchDir, projectDir, store: await store(),
+      autoCommit: true, autonomous: true, rollbackOnFailure: false, startingHead: baseline, baselineDirty,
+    });
+
+    await expectCompletionKept();
+    expectKeptReport(run, "Test gate");
+    const error = run.error ?? "";
+    const commands = error.split("\n").filter((l) => /^\s+git (add|rm|commit)/.test(l));
+    expect(commands.join("\n")).toContain("src/pay.ts");
+    expect(commands.join("\n")).not.toContain("notes.md");
+    expect(error).toContain("Already dirty before the run, not part of this task");
+    expect(error).toContain("notes.md");
+  });
+
   it("keeps a bypassed completion when the test gate then fails", async () => {
     // No hold: the agent's completion is written straight through and applies the change.
     await claims.releaseAll();
@@ -283,6 +338,86 @@ describe("a failure after a v2 completion applied its change", () => {
     expect(run.completionHold?.outcome).toBe("bypassed");
     await expectCompletionKept();
     expectKeptReport(run, "Test gate");
+  });
+});
+
+describe("a failed run with rollback enabled after a v2 completion applied its change", () => {
+  let originalIsTTY: boolean | undefined;
+
+  beforeEach(() => {
+    originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
+  });
+
+  afterEach(() => {
+    vi.doUnmock("node:readline");
+    Object.defineProperty(process.stdin, "isTTY", { value: originalIsTTY, configurable: true });
+  });
+
+  /**
+   * A readline that confirms the rollback prompt ("y") and takes the test
+   * gate's default (abort); `asked` collects the rollback prompts shown.
+   */
+  function confirmEveryPrompt(): { asked: string[] } {
+    const asked: string[] = [];
+    vi.doMock("node:readline", () => ({
+      createInterface: () => ({
+        question: (q: string, cb: (answer: string) => void) => {
+          if (/restore the pre-run/i.test(q)) {
+            asked.push(q);
+            cb("y");
+          } else {
+            cb("");
+          }
+        },
+        close: () => {},
+        on: () => {},
+        removeListener: () => {},
+      }),
+    }));
+    return { asked };
+  }
+
+  async function failBypassedCompletion(rollbackOnFailure: boolean): Promise<RunRecord> {
+    await claims.releaseAll();
+    const { toolRexUpdateStatus } = await import("../../src/tools/rex.js");
+    await toolRexUpdateStatus(await store(), WIRE_ID, { status: "completed", resolutionType: "code-change" });
+    failTestGate();
+    const { finalizeRun } = await lifecycle();
+    const run = buildRun();
+    run.structuredSummary = {
+      filesChanged: ["src/pay.ts"],
+      counts: { filesChanged: 1, toolCalls: 0, testsRun: 0 },
+    } as unknown as RunRecord["structuredSummary"];
+    await finalizeRun({
+      run, henchDir, projectDir, store: await store(),
+      autoCommit: true, rollbackOnFailure, startingHead: baseline,
+    });
+    return run;
+  }
+
+  it("keeps the applied change and the completed task although the operator confirms a rollback", async () => {
+    const { asked } = confirmEveryPrompt();
+    // The PRD writes the completion made are dirty, so a revert would have something to offer.
+    const run = await failBypassedCompletion(true);
+
+    expect(asked).toEqual([]);
+    expect(git("status", "--porcelain", "--", ".rex/product", ".rex/changes")).not.toBe("");
+    await expectCompletionKept();
+    expectKeptReport(run, "Test gate");
+  });
+
+  it("would offer the rollback were the completion not kept (the prompt is reachable)", async () => {
+    // Same run, but the change waits for a steward: nothing applied, so the
+    // rollback prompt is offered. Proves the test above is not vacuous.
+    await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "review" } }));
+    git("add", ".n-dx.json");
+    git("commit", "-q", "-m", "apply on review");
+    baseline = git("rev-parse", "HEAD").trim();
+    const { asked } = confirmEveryPrompt();
+    await failBypassedCompletion(true);
+
+    expect(asked).toHaveLength(1);
   });
 });
 

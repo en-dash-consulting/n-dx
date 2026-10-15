@@ -171,7 +171,7 @@ export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {
   if (options.branch) provenance.branch = options.branch;
   if (options.commit) provenance.commit = options.commit;
   const header = carriedHeader(model.header);
-  if (options.folderState) assertFolderStateOwners(model.tree, options.folderState);
+  if (options.folderState) assertFolderStateOwners(model.tree, options.folderState, model.warnings);
   const folderState = options.folderState ? carriedFolderState(options.folderState) : undefined;
 
   return {
@@ -193,22 +193,35 @@ export function buildBundleV2(model: PrdModel, options: BuildBundleV2Options = {
  * area or capability folder, which a hand edit can leave. Import refuses such
  * a bundle (its `state.yaml` would have no folder), so the tree is fixed first.
  */
-function assertFolderStateOwners(tree: V2Tree, keys: FolderStateKeys): void {
+function assertFolderStateOwners(tree: V2Tree, keys: FolderStateKeys, warnings: readonly ParseWarning[]): void {
   if (keys.nodes.size === 0) return;
   const stray: string[] = [];
+  const skipped: string[] = [];
   const visit = (node: RuleNode, dir: string): void => {
     const path = `${dir}/${node.slug}`;
     const extra = keys.nodes.get(node.id);
-    if (extra && !isFolderNode(node)) stray.push(`${path}/ (${Object.keys(extra).join(", ")})`);
+    if (extra && !isFolderNode(node)) {
+      stray.push(`${path}/ (${Object.keys(extra).join(", ")})`);
+      skipped.push(...skippedUnder(warnings, path));
+    }
     node.children?.forEach((child) => visit(child, path));
   };
   LAYERS.forEach((layer) => tree[layer].forEach((node) => visit(node, layer)));
-  if (stray.length > 0) {
-    throw new BundleError(
-      `Folders with no children keep top-level state.yaml keys a bundle cannot carry, because the tree stores such a node as a leaf file: ${stray.join("; ")}. ` +
-        `Add a child back, or turn the folder into a leaf file (<slug>.md) and move or drop its extra state.yaml keys, then export again. Nothing was written.`,
-    );
-  }
+  if (stray.length === 0) return;
+  const why = `Folders with no children keep top-level state.yaml keys a bundle cannot carry, because the tree stores such a node as a leaf file: ${stray.join("; ")}. `;
+  // A child file may still be on disk, skipped by the reader for invalid intent; "add a child back" would mislead.
+  const fix =
+    skipped.length > 0
+      ? `The folder has no readable children: the reader skipped ${skipped.join("; ")}. Fix the skipped file, or turn the folder into a leaf file (<slug>.md) and move or drop its extra state.yaml keys, then export again. Nothing was written.`
+      : `Add a child back, or turn the folder into a leaf file (<slug>.md) and move or drop its extra state.yaml keys, then export again. Nothing was written.`;
+  throw new BundleError(why + fix);
+}
+
+/** The reader's skipped-node warnings for files under the tree-relative folder `path`, as "file (message)". */
+function skippedUnder(warnings: readonly ParseWarning[], path: string): string[] {
+  return warnings
+    .filter((w) => w.skipped && `/${w.path.split("\\").join("/")}`.includes(`/${path}/`))
+    .map((w) => `${w.path} (${w.message})`);
 }
 
 /** The reader's folder keys in envelope form, deep-cloned, or undefined when there are none. */

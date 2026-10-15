@@ -8,9 +8,10 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { V2Tree } from "../../src/schema/v2-rules.js";
+import type { RuleNode, V2Tree } from "../../src/schema/v2-rules.js";
 import {
   CHANGE_LANDING_CACHE_FILENAME,
+  type LandingChange,
   computeLanding,
   computeLandings,
   firstReleaseContaining,
@@ -22,8 +23,14 @@ const MERGED_TASK = "9f1c2a3b-0000-4000-8000-0000000000a2";
 const FAST = "9f1c2a3b-0000-4000-8000-0000000000b1";
 const SQUASHED = "9f1c2a3b-0000-4000-8000-0000000000c1";
 const REBASED = "9f1c2a3b-0000-4000-8000-0000000000d1";
-const permalink = (id: string) => `http://localhost:3117/#/rex/item/${id}`;
+const OTHER_TASK = "9f1c2a3b-0000-4000-8000-0000000000a3";
+const permalink =(id: string) => `http://localhost:3117/#/rex/item/${id}`;
 const trailer = (id: string) => `\n\nN-DX-Item: ${permalink(id)}`;
+
+/** A change node with the given status and task ids, as `computeLanding` reads it. */
+function change(id: string, status: LandingChange["status"] = "completed", ...taskIds: string[]): LandingChange {
+  return { id, status, children: taskIds.map((taskId) => ({ id: taskId }) as RuleNode) };
+}
 
 let repo: string;
 let cacheDir: string;
@@ -77,7 +84,7 @@ describe("computeLanding", () => {
     const merge = head();
     await commit("after.txt", "Later work");
 
-    const landing = await computeLanding([MERGED, MERGED_TASK], options());
+    const landing = await computeLanding(change(MERGED, "completed", MERGED_TASK), options());
     expect(landing).toEqual({ landed: true, commit: merge, lastCommit: last });
   });
 
@@ -87,7 +94,7 @@ describe("computeLanding", () => {
     git("checkout", "-q", "main");
     await commit("other.txt", "Unrelated work on main");
     git("merge", "--no-ff", "-q", "-m", "Merge pull request #9 from org/feature\n\nA long description.", "feature");
-    expect(await computeLanding([MERGED], options())).toMatchObject({ landed: true, commit: head() });
+    expect(await computeLanding(change(MERGED), options())).toMatchObject({ landed: true, commit: head() });
   });
 
   it("reports the commit itself for a fast-forward merge", async () => {
@@ -97,7 +104,7 @@ describe("computeLanding", () => {
     git("checkout", "-q", "main");
     git("merge", "--ff-only", "-q", "quick");
 
-    expect(await computeLanding([FAST], options())).toEqual({ landed: true, commit: tip, lastCommit: tip });
+    expect(await computeLanding(change(FAST), options())).toEqual({ landed: true, commit: tip, lastCommit: tip });
   });
 
   it("lands with the newest of a change's commits", async () => {
@@ -110,7 +117,7 @@ describe("computeLanding", () => {
     git("checkout", "-q", "main");
     git("merge", "--no-ff", "-q", "-m", "merge second", "second");
 
-    expect(await computeLanding([MERGED, MERGED_TASK], options())).toEqual({ landed: true, commit: head(), lastCommit: task });
+    expect(await computeLanding(change(MERGED, "completed", MERGED_TASK), options())).toEqual({ landed: true, commit: head(), lastCommit: task });
   });
 
   it("reports a squash-merged change as not reachable from main, with the reason", async () => {
@@ -121,7 +128,7 @@ describe("computeLanding", () => {
     git("merge", "--squash", "-q", "squashed");
     git("commit", "-q", "-m", "Squashed feature (#12)");
 
-    const landing = await computeLanding([SQUASHED], options());
+    const landing = await computeLanding(change(SQUASHED), options());
     expect(landing.landed).toBe(false);
     if (!landing.landed) expect(landing.reason).toMatch(/reachable from main.*squash/);
   });
@@ -135,7 +142,7 @@ describe("computeLanding", () => {
     const twin = head();
     expect(twin).not.toBe(original);
 
-    expect(await computeLanding([REBASED], options())).toEqual({ landed: true, commit: twin, lastCommit: twin });
+    expect(await computeLanding(change(REBASED), options())).toEqual({ landed: true, commit: twin, lastCommit: twin });
   });
 
   it("caches landings under the cache dir and rebuilds when main moves", async () => {
@@ -144,7 +151,7 @@ describe("computeLanding", () => {
     git("checkout", "-q", "main");
     git("merge", "--no-ff", "-q", "-m", "merge", "feature");
     const merge = head();
-    await computeLanding([MERGED], options());
+    await computeLanding(change(MERGED), options());
 
     const cache = JSON.parse(await readFile(join(cacheDir, CHANGE_LANDING_CACHE_FILENAME), "utf-8"));
     expect(cache.tip).toBe(merge);
@@ -153,7 +160,36 @@ describe("computeLanding", () => {
     await commit("n.txt", `Next${trailer(FAST)}`);
     git("checkout", "-q", "main");
     git("merge", "--ff-only", "-q", "next");
-    expect(await computeLanding([FAST], options())).toMatchObject({ landed: true, commit: head() });
+    expect(await computeLanding(change(FAST), options())).toMatchObject({ landed: true, commit: head() });
+  });
+
+  describe("an open change", () => {
+    /** Task one merged and tagged v0.9.0; task two still on its branch. */
+    async function halfMerged(): Promise<void> {
+      git("checkout", "-q", "-b", "part-one");
+      await commit("a.txt", `Task one${trailer(MERGED_TASK)}`);
+      git("checkout", "-q", "main");
+      git("merge", "--no-ff", "-q", "-m", "merge part one", "part-one");
+      git("tag", "v0.9.0");
+      git("checkout", "-q", "-b", "part-two");
+      await commit("b.txt", `Task two${trailer(OTHER_TASK)}`);
+      git("checkout", "-q", "main");
+    }
+
+    it("has not landed, whatever its merged commits show", async () => {
+      await halfMerged();
+      const open = change(MERGED, "in_progress", MERGED_TASK, OTHER_TASK);
+      const landing = await computeLanding(open, options());
+      expect(landing).toEqual({ landed: false, reason: "change still open" });
+      expect(await resolveShippedIn({}, landing, repo)).toBeUndefined();
+    });
+
+    it("lands once completed, at the merge commit of its merged work", async () => {
+      await halfMerged();
+      const merge = git("rev-parse", "main");
+      const done = change(MERGED, "completed", MERGED_TASK, OTHER_TASK);
+      expect(await computeLanding(done, options())).toMatchObject({ landed: true, commit: merge });
+    });
   });
 });
 
@@ -229,7 +265,7 @@ describe("resolveShippedIn", () => {
     await commit("a.txt", `Add a${trailer(MERGED)}`);
     git("checkout", "-q", "main");
     git("merge", "--no-ff", "-q", "-m", "merge", "feature");
-    return computeLanding([MERGED], options());
+    return computeLanding(change(MERGED), options());
   }
 
   it("prefers a stamped shippedIn", async () => {

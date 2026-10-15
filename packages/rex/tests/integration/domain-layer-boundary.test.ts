@@ -171,6 +171,11 @@ describe("rex cli/commands import surface", () => {
     "../../fix/index.js",
     "../../recommend/conflict-detection.js",
     "../../recommend/create-from-recommendations.js",
+    // `rex analyze --accept` and `rex recommend --accept` on a v2 tree map
+    // their proposals to change-layer adds here. It sits beside the v1 creation
+    // module it mirrors, is pure, and has no caller outside those two commands
+    // — public.ts would hand hench and web a mapper neither one calls.
+    "../../recommend/changes-from-proposals.js",
     "../../schema/index.js",
     "../../schema/validate.js",
     "../../store/atomic-write.js",
@@ -224,6 +229,9 @@ describe("rex cli/commands import surface", () => {
     "../../migrations/v1-to-v2/index.js",
     "../../migrations/v1-to-v2/seams.js",
     "../../migrations/v1-to-v2/plan-summary.js",
+    // The code-evidence reader, for the same reason and by the same caller: the
+    // migration is pure, so the command gathers the outside facts it reads.
+    "../../migrations/v1-to-v2/code-files.js",
     // `rex migrate-apply` (ndx migrate --apply) writes the v2 tree from a
     // reviewed plan, through the apply library; its only caller, and kept off
     // public.ts for the same reason as the plan machinery above.

@@ -362,6 +362,14 @@ export {
 } from "./process-tree.js";
 export type { TerminateTreeOptions } from "./process-tree.js";
 
+// Project feature toggles - read by the dashboard and by the run loop alike.
+export {
+  isProjectFeatureEnabled,
+  isFailForwardEnabled,
+  FAIL_FORWARD_FEATURE,
+  FAIL_FORWARD_DEFAULT,
+} from "./project-features.js";
+
 // Project directory constants
 export { PROJECT_DIRS } from "./project-dirs.js";
 export type { ProjectDir } from "./project-dirs.js";

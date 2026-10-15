@@ -380,6 +380,28 @@ describe("buildProposals", () => {
     expect(proposals[0].epic.title).toBe("SourceVision");
   });
 
+  it("never surfaces the code-health kind marker as the epic title", () => {
+    // `code-health` is the kind marker placement reads, pushed onto every
+    // scanner finding's tags. On a zone-less global finding it can be the
+    // only tag left after the finding: markers are skipped, so without the
+    // exclusion the epic is titled literally "code-health". Nothing covered
+    // this: removing it from isDisplayableTag left the suite green.
+    const results: ScanResult[] = [
+      makeScanResult({
+        name: "Circular dependency between modules",
+        kind: "task",
+        source: "sourcevision",
+        tags: ["finding:c508fa330029", "code-health"],
+        sourceFile: "src/app.ts",
+      }),
+    ];
+
+    const proposals = buildProposals(results);
+    expect(proposals.length).toBe(1);
+    expect(proposals[0].epic.title).not.toBe("code-health");
+    expect(proposals[0].epic.title).toBe("SourceVision");
+  });
+
   it("groups multiple zone-less findings under the same shared epic instead of one epic each", () => {
     // Before the fix, each finding's unique hash tag made it its own
     // grouping key, so N unrelated global findings produced N separate

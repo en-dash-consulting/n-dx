@@ -34,7 +34,8 @@ export function isChangeNodeType(value: string | undefined): value is ChangeNode
   return CHANGE_NODE_TYPES.includes(value as ChangeNodeType);
 }
 
-interface Added {
+/** A node `rex add` created, with the placement shortlist when it needs one. */
+export interface Added {
   node: RuleNode;
   /** Rules' shortlist for a new change still in the Inbox. */
   suggestion?: PlacementSuggestion;
@@ -131,8 +132,16 @@ function planChanges(start: V2Tree, inputs: AddChangeNodeInput[], now: Date): { 
   return { tree, added };
 }
 
-/** Add every input in one transaction, logging each, and rank placement for each new change. */
-async function addChanges(dir: string, inputs: AddChangeNodeInput[]): Promise<Added[]> {
+/**
+ * Add every input in one transaction, logging each, and rank placement for each
+ * new change.
+ *
+ * Also the v2 accept path for `rex analyze` and `rex recommend`: a proposal
+ * crossing into a v2 tree is an ordinary `rex add`, so it goes through one
+ * door rather than a second creation pipeline that could place changes
+ * differently. See `recommend/changes-from-proposals.ts`.
+ */
+export async function addChanges(dir: string, inputs: AddChangeNodeInput[]): Promise<Added[]> {
   const rexDir = resolveRexPaths(dir).rexDir;
   let now!: Date;
   const { result: added } = await withPrdModelTransaction(rexDir, (model) => {
@@ -173,7 +182,8 @@ function labelOf(target: Pick<RuleNode, "id" | "displayId" | "title"> | undefine
   return { title: target.title, ...(target.displayId ? { displayId: target.displayId } : {}) };
 }
 
-function report(added: Added[], json: boolean): void {
+/** What was created, with each new change's placement shortlist. */
+export function report(added: Added[], json: boolean): void {
   if (json) {
     const rows = jsonRows(added);
     return result(JSON.stringify(rows.length === 1 ? rows[0] : rows, null, 2));

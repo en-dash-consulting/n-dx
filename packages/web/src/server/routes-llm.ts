@@ -20,6 +20,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
+import { commitSettingsChange } from "./settings-commit.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { invalidateAuthCheckCache } from "./routes-commands.js";
 import {
@@ -1391,6 +1392,14 @@ export async function handleLlmRoute(
       }
 
       writeNdxConfig(ctx.projectDir, config);
+      // Fail-forward commits the change; a no-op when the mode is off. Model
+      // settings live in the same .n-dx.json as every other settings surface,
+      // so they commit by the same path rather than being left dirty.
+      await commitSettingsChange(
+        ctx.projectDir,
+        resolveLayout(ctx.projectDir).configFile,
+        "llm",
+      );
       // The credential check's answer depends on this config — drop the
       // cached result so the auth chip re-verifies against the new settings.
       invalidateAuthCheckCache();

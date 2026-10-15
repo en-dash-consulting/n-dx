@@ -29,6 +29,17 @@ export async function copyV2Fixture(dest: string, eol: Eol): Promise<string> {
   return dest;
 }
 
+/** The fixture's change CH-1 (in progress) and its one task, open in the fixture. */
+export const FIXTURE_CHANGE = "c0000000-0000-4000-8000-000000000001";
+export const FIXTURE_TASK = "c0000000-0000-4000-8000-000000000002";
+
+/** Complete CH-1's task in the fixture copied to `rexDir`, so CH-1 can be applied: apply refuses a change with open work. */
+export async function completeFixtureTask(rexDir: string): Promise<void> {
+  await editText(join(rexDir, "changes", "add-apple-pay", "state.yaml"), (text) =>
+    `${text.trimEnd()}\n  "${FIXTURE_TASK}":\n    status: "completed"\n    startedAt: "2026-10-01T09:00:00.000Z"\n    completedAt: "2026-10-02T09:00:00.000Z"\n`,
+  );
+}
+
 /** Rewrite `path` through `edit`, which sees and returns LF text; the file keeps its line ending. */
 export async function editText(path: string, edit: (text: string) => string): Promise<void> {
   const text = await readFile(path, "utf-8");

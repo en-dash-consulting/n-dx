@@ -1,12 +1,17 @@
 /**
- * `rex migrate-slugs` — one-shot rename of an existing tree to id-qualified slugs.
+ * `rex migrate-slugs` — re-serialise an existing tree at the current slug rule.
  *
- * slugify() used to emit title-only slugs, so same-titled items created on
- * divergent branches collided on identical paths. New writes now always carry
- * the -{id6} suffix; this command renames an existing tree in one deliberate
+ * The rule is title-only, with a `-{id6}` suffix only where siblings collide
+ * on a normalised title; it replaced one that suffixed every slug
+ * unconditionally. This command renames an existing tree in one deliberate
  * pass instead of letting the next ordinary save produce a surprise mass diff.
+ * It encodes no rule of its own — it round-trips the tree through the
+ * serializer — so it is equally the tool for one path whose title was edited
+ * without its file being renamed.
  *
  * @see packages/rex/src/cli/commands/migrate-slugs.ts
+ * @see packages/rex/tests/unit/cli/commands/migrate-slugs-docs.test.ts — the
+ *   pin holding this command's operator-facing descriptions to that rule.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";

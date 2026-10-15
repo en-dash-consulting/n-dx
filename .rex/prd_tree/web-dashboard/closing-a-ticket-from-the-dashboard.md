@@ -1,0 +1,25 @@
+---
+id: "366c66ff-3158-4362-8d9f-342fa2c4a5d5"
+level: "task"
+title: "Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails"
+status: "pending"
+priority: "high"
+tags:
+  - "web"
+  - "prd"
+  - "rex"
+  - "loop"
+  - "bug"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "The failure is reproduced and written down: which dashboard action, what the PRD file contains afterwards, what `git status` shows, and the exact error or stall from `ndx loop`"
+  - "It is established whether the PRD write fails to land or lands uncommitted, and the item says which"
+  - "Closing a ticket from the dashboard persists the status change to `.rex/prd_tree/<slug>/index.md`, readable by a fresh process"
+  - "Any parent auto-completion the close-out implies is persisted too"
+  - "`ndx loop` runs to completion across a dashboard-driven close-out without stopping or re-selecting the closed task"
+  - "A test covers the dashboard close-out path end to end, reading the item back from the store rather than from the response body"
+  - "The fix does not depend on fail-forward mode being on"
+description: "Reported from use: closing out a ticket in the dashboard does not save the PRD items that the close-out produces, and `ndx loop` then fails.\n\nNot yet reproduced — the report is the starting point, and the first job is to establish which of two different failures this is, because they have different fixes:\n\n1. **The write never lands.** The dashboard's status change does not reach `.rex/prd_tree/` at all (a route that returns 200 without saving, a save that targets the wrong workspace, or a cache the viewer reads back instead of the store). The loop then fails because the task it just completed still reads as open and is selected again, or because a parent never auto-completes.\n2. **The write lands but is never committed.** The item is saved and left dirty, and the loop stops on the uncommitted-work guard — `shouldStopForUncommittedWork` discounts `PRD_COMMIT_PATHS`, so a *pure* PRD write should not stop it, which makes this the less likely half on its own. A PRD write plus anything else in the tree does stop it.\n\nEstablish which by making the dashboard change and then reading `.rex/prd_tree/<slug>/index.md` directly, plus `git status --porcelain`, before changing anything.\n\nStart from the dashboard's PRD write path: `packages/web/src/server/routes-rex/items.ts` (`PATCHABLE_FIELDS`, the PATCH handler) and the rex gateway it writes through. Worth checking whether the write goes through `store.withTransaction` like the MCP tools do, or the load-mutate-save path that CLAUDE.md warns is last-writer-wins.\n\nCapture the exact failure text from `ndx loop` — \"failing\" could be a refusal to start, a stop between iterations, or an error, and each points at a different place.\n\nRelationship to fail-forward mode (`566ba657-0ea2-4f0e-88f9-b719c6a2ecfa`): if this turns out to be case 2, fail-forward already commits leftover work at the loop boundary and would mask it. That is not a fix — a status write that is never committed is still a bug, and masking it with an automatic commit would hide a persistence problem behind a convenience. Fix the save path first, whatever fail-forward does."
+lastModified: "2026-10-15T16:13:47.336Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---

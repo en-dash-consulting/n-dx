@@ -31,9 +31,33 @@ describe("shouldStopForUncommittedWork", () => {
   let treeMetaPath: string;
 
   /** Import fresh so the module's colour memoisation can't leak across files. */
-  async function guard(autonomous: boolean | undefined = true): Promise<boolean> {
+  async function guard(
+    autonomous: boolean | undefined = true,
+    allowDirty = false,
+  ): Promise<boolean> {
     const { shouldStopForUncommittedWork } = await import("../../src/cli/commands/run.js");
-    return shouldStopForUncommittedWork(projectDir, autonomous);
+    return shouldStopForUncommittedWork(projectDir, autonomous, allowDirty);
+  }
+
+  /** Turn fail-forward on for this project. */
+  async function enableFailForward(): Promise<void> {
+    await writeFile(
+      join(projectDir, ".n-dx.json"),
+      JSON.stringify({ features: { git: { failForward: true } } }, null, 2),
+      "utf-8",
+    );
+    await execAsync("git add .n-dx.json", { cwd: projectDir });
+    await execAsync('git commit -m "enable fail-forward"', { cwd: projectDir });
+  }
+
+  async function headSubject(): Promise<string> {
+    const { stdout } = await execAsync("git log -1 --pretty=%s", { cwd: projectDir });
+    return stdout.trim();
+  }
+
+  async function porcelain(): Promise<string> {
+    const { stdout } = await execAsync("git status --porcelain", { cwd: projectDir });
+    return stdout;
   }
 
   /** Rewrite the task's status the way `handleRunFailure` does — no commit. */
@@ -95,6 +119,71 @@ describe("shouldStopForUncommittedWork", () => {
 
     await expect(guard()).resolves.toBe(true);
     expect(process.exitCode).toBe(1);
+  });
+
+  // ── Fail-forward at the loop boundary ────────────────────────────
+
+  describe("with fail-forward on", () => {
+    it("commits the leftover and continues instead of stopping", async () => {
+      await enableFailForward();
+      await writeStatus("deferred");
+      await writeFile(join(projectDir, "leaked.ts"), "export const leaked = true;\n", "utf-8");
+
+      // Without the mode this is the case that stops the loop.
+      await expect(guard()).resolves.toBe(false);
+      expect(process.exitCode).toBeUndefined();
+
+      expect(await headSubject()).toBe(
+        "chore(run): fail-forward commit of work left after the run",
+      );
+      expect(await porcelain()).not.toContain("leaked.ts");
+    });
+
+    it("leaves the tree alone and still stops when --allow-dirty was passed", async () => {
+      // The operator said "go, but do not touch my tree". Committing their
+      // work one iteration later through a different door would be the gate
+      // and the mode contradicting each other.
+      await enableFailForward();
+      await writeFile(join(projectDir, "operator-wip.ts"), "export const wip = 1;\n", "utf-8");
+      const before = await headSubject();
+
+      await expect(guard(true, true)).resolves.toBe(true);
+      expect(process.exitCode).toBe(1);
+      expect(await headSubject()).toBe(before);
+      expect(await porcelain()).toContain("operator-wip.ts");
+    });
+
+    it("re-reads the toggle at each boundary, so turning it off is obeyed", async () => {
+      await enableFailForward();
+      await writeFile(join(projectDir, "first.ts"), "export const a = 1;\n", "utf-8");
+      await expect(guard()).resolves.toBe(false);
+
+      // Operator turns it off mid-loop.
+      await writeFile(
+        join(projectDir, ".n-dx.json"),
+        JSON.stringify({ features: { git: { failForward: false } } }, null, 2),
+        "utf-8",
+      );
+      await execAsync("git add .n-dx.json", { cwd: projectDir });
+      await execAsync('git commit -m "disable"', { cwd: projectDir });
+
+      await writeFile(join(projectDir, "second.ts"), "export const b = 2;\n", "utf-8");
+      await expect(guard()).resolves.toBe(true);
+      expect(process.exitCode).toBe(1);
+      expect(await porcelain()).toContain("second.ts");
+    });
+
+    it("does nothing for an attended run, as before", async () => {
+      await enableFailForward();
+      await writeFile(join(projectDir, "leaked.ts"), "export const leaked = true;\n", "utf-8");
+      const before = await headSubject();
+
+      // An attended run: the guard returns early and never reaches the mode.
+      // (Passing `undefined` would hit the parameter's `= true` default.)
+      await expect(guard(false)).resolves.toBe(false);
+      expect(await headSubject()).toBe(before);
+      expect(await porcelain()).toContain("leaked.ts");
+    });
   });
 
   it("still stops on operator .rex content outside the PRD paths", async () => {

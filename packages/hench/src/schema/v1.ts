@@ -1524,6 +1524,28 @@ export interface RecordCommitPending {
   error: string;
 }
 
+/**
+ * Which multi-task invocation a run belongs to, and where in it the run sits.
+ *
+ * Written at run start, so a run that is still going already says it is the
+ * third of five rather than only saying so once it ends. A run started on its
+ * own (`ndx work`, `ndx work --task=…`, the dashboard) carries no loop block
+ * at all — "position 1 of 1" would be a loop that does not exist.
+ *
+ * `max` is set only by `--iterations=N`, the one mode that knows its length up
+ * front. `--loop` and `--epic-by-epic` run until the tree is out of actionable
+ * tasks, so their end is not knowable at the start of any iteration and is
+ * left absent rather than guessed.
+ */
+export interface RunLoopPosition {
+  /** The flag that drove the invocation. */
+  mode: "iterations" | "loop" | "epic-by-epic";
+  /** 1-based position of this run within the invocation. */
+  iteration: number;
+  /** Total runs planned — `--iterations=N` only. */
+  max?: number;
+}
+
 /** Repository-trust summary captured on a run record. */
 export interface RunTrustRecord {
   state: "baseline" | "trusted" | "untrusted" | "changed";
@@ -1577,6 +1599,13 @@ export interface RunRecord {
    * `.hench/config.json` said. v1 additive field.
    */
   trust?: RunTrustRecord;
+  /**
+   * Where this run sits in a `--iterations`/`--loop`/`--epic-by-epic`
+   * invocation. Absent for a run started on its own. Written at run start so
+   * the Live view can say "3 of 5" while the run is still going.
+   * v1 additive field — old records without this field load normally.
+   */
+  loop?: RunLoopPosition;
   /**
    * Realpath-resolved root of the git worktree this run started in.
    *

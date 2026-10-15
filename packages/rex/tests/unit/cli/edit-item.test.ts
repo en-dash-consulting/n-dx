@@ -247,6 +247,34 @@ describe("handleEditItem", () => {
     expect((await store.getItem("item-1"))?.run).toBeUndefined();
   });
 
+  // ── Assignee ────────────────────────────────────────────────────
+
+  it("sets an assignee", async () => {
+    await handleEditItem(store, tmpDir, { id: "item-1", assignee: "Sterling H" });
+    expect((await store.getItem("item-1"))?.assignee).toBe("Sterling H");
+  });
+
+  it("trims the assignee, since selection matches it exactly", async () => {
+    await handleEditItem(store, tmpDir, { id: "item-1", assignee: "  Ryan Keith  " });
+    expect((await store.getItem("item-1"))?.assignee).toBe("Ryan Keith");
+  });
+
+  it("removes the assignee when given an empty string", async () => {
+    await handleEditItem(store, tmpDir, { id: "item-1", assignee: "Sterling H" });
+    await handleEditItem(store, tmpDir, { id: "item-1", assignee: "" });
+    expect((await store.getItem("item-1"))?.assignee).toBeUndefined();
+  });
+
+  it("counts assignee alone as a field to update", async () => {
+    const res = await handleEditItem(store, tmpDir, { id: "item-1", assignee: "Sterling H" });
+    expect(res.isError).toBeFalsy();
+  });
+
+  it("names assignee in the no-fields message", async () => {
+    const res = await handleEditItem(store, tmpDir, { id: "item-1" });
+    expect((res.content[0] as { text: string }).text).toContain("assignee");
+  });
+
   // ── Logging ─────────────────────────────────────────────────────
 
   it("appends an item_edited log entry", async () => {
