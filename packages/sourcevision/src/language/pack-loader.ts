@@ -7,10 +7,11 @@
  * opt-in packs are installed with `npm install --prefix`, then through normal
  * module resolution (an optional dependency, or the n-dx workspace). The pack
  * must carry sourcevision's own version, since the two are released together.
+ * `sv pack add` ({@link INSTALLABLE_PACKS}) installs packs there.
  *
  * A pack that is missing, of another version or not a pack entry is never
  * fatal: the result carries a notice, worded like the notices of a pack that
- * cannot run, naming the command that installs the right one.
+ * cannot run, naming the `ndx sv pack add` command that installs the right one.
  *
  * @module sourcevision/language/pack-loader
  */
@@ -18,21 +19,16 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { goConfig, isLanguagePackEntry, javaConfig, type LanguageConfig, type LanguagePackEntry, type PackDegradation } from "@n-dx/lang-kit";
+import { goConfig, isLanguagePackEntry, javaConfig, terraformConfig, type LanguageConfig, type LanguagePackEntry, type PackDegradation } from "@n-dx/lang-kit";
 import { resolveNdxHome } from "@n-dx/llm-client";
 import { sourcevisionVersion } from "./package-paths.js";
 
-/** A language pack sourcevision knows by name. */
-export interface KnownPack {
-  /** Language id; the pack's entry carries the same. */
+/** A language pack `sv pack` can install, list and remove. */
+export interface InstallablePack {
+  /** Language id; the pack's entry carries the same. `sv pack add <id>` names it. */
   readonly id: string;
   /** npm package name. */
   readonly packageName: string;
-  /**
-   * The language's config, from lang-kit: which inventory files belong to the
-   * pack is known before the pack is loaded.
-   */
-  readonly config: LanguageConfig;
   /**
    * Import the package by normal module resolution. Each is written with a
    * literal specifier so that bundler and test aliases apply.
@@ -40,10 +36,29 @@ export interface KnownPack {
   readonly importByResolution: () => Promise<unknown>;
 }
 
+/** A language pack sourcevision analyzes with. */
+export interface KnownPack extends InstallablePack {
+  /**
+   * The language's config, from lang-kit: which inventory files belong to the
+   * pack is known before the pack is loaded.
+   */
+  readonly config: LanguageConfig;
+}
+
 /** The packs sourcevision loads, in the order their languages are analyzed. */
 export const KNOWN_PACKS: readonly KnownPack[] = [
   { id: javaConfig.id, packageName: "@n-dx/lang-java", config: javaConfig, importByResolution: () => import("@n-dx/lang-java") },
   { id: goConfig.id, packageName: "@n-dx/lang-go", config: goConfig, importByResolution: () => import("@n-dx/lang-go") },
+];
+
+/**
+ * Every pack `sv pack add` accepts: the analyzed {@link KNOWN_PACKS}, then
+ * packs that are published but not analyzed with yet.
+ */
+export const INSTALLABLE_PACKS: readonly InstallablePack[] = [
+  ...KNOWN_PACKS,
+  { id: "sql", packageName: "@n-dx/lang-sql", importByResolution: () => import("@n-dx/lang-sql") },
+  { id: terraformConfig.id, packageName: "@n-dx/lang-terraform", importByResolution: () => import("@n-dx/lang-terraform") },
 ];
 
 export interface PackLoaderOptions {
@@ -60,17 +75,17 @@ export type PackSource = "pack-dir" | "resolution";
 
 export type PackLoad =
   | { readonly status: "loaded"; readonly entry: LanguagePackEntry; readonly source: PackSource }
-  | { readonly status: "missing" | "mismatch" | "invalid"; readonly notice: PackDegradation };
+  | { readonly status: "missing" | "invalid"; readonly notice: PackDegradation }
+  | { readonly status: "mismatch"; readonly notice: PackDegradation; /** The version found. */ readonly found: string };
 
 /** `<ndx home>/packs/<version>`: where opt-in packs for this sourcevision version are installed. */
 export function defaultPackDir(version: string = sourcevisionVersion()): string {
   return join(resolveNdxHome(), "packs", version);
 }
 
-/** The command that installs the pack matching `version` into `packDir`. */
-export function packInstallCommand(pack: KnownPack, packDir: string, version: string): string {
-  const prefix = /\s/.test(packDir) ? `"${packDir}"` : packDir;
-  return `npm install --prefix ${prefix} ${pack.packageName}@${version}`;
+/** The command that installs the pack matching this sourcevision into the pack directory. */
+export function packInstallCommand(pack: InstallablePack): string {
+  return `ndx sv pack add ${pack.id}`;
 }
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -102,20 +117,22 @@ function entryFile(manifest: PackManifest): string {
  * Find `pack` and load its entry: from the pack directory when it is
  * installed there, else by module resolution. Never throws.
  */
-export async function loadPack(pack: KnownPack, options: PackLoaderOptions = {}): Promise<PackLoad> {
+export async function loadPack(pack: InstallablePack, options: PackLoaderOptions = {}): Promise<PackLoad> {
   const version = options.version ?? sourcevisionVersion();
   const packDir = options.packDir ?? defaultPackDir(version);
-  const install = packInstallCommand(pack, packDir, version);
-  const notice = (status: "missing" | "mismatch" | "invalid", reason: string, remedy: string): PackLoad => ({
+  const install = packInstallCommand(pack);
+  const notice = (status: "missing" | "invalid", reason: string, remedy: string): PackLoad => ({
     status,
     notice: { reason, remedy },
   });
-  const mismatch = (found: string): PackLoad =>
-    notice(
-      "mismatch",
-      `pack ${pack.packageName}@${found} does not match @n-dx/sourcevision@${version} and was not used`,
-      `Install the matching pack with \`${install}\`.`,
-    );
+  const mismatch = (found: string): PackLoad => ({
+    status: "mismatch",
+    found,
+    notice: {
+      reason: `pack ${pack.packageName}@${found} does not match @n-dx/sourcevision@${version} and was not used`,
+      remedy: `Install the matching pack with \`${install}\`.`,
+    },
+  });
   const invalid = (detail: string): PackLoad =>
     notice("invalid", `pack ${pack.packageName} could not be loaded (${detail})`, `Reinstall it with \`${install}\`.`);
 

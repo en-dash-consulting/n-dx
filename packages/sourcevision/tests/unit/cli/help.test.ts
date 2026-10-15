@@ -22,6 +22,7 @@ describe("sourcevision CLI help", () => {
     "pr-markdown",
     "git-credential-helper",
     "mcp",
+    "pack",
   ];
 
   it("returns true for all known commands", () => {

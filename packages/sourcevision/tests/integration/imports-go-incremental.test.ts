@@ -102,8 +102,7 @@ describe("Go pack in the imports phase", () => {
       expect(edgeKeys(imports)).toEqual(REGEX_EDGES);
       expect(messages).toHaveLength(1);
       expect(messages[0]).toContain("Go imports come from the regex import parser");
-      expect(messages[0]).toContain("npm install --prefix ");
-      expect(messages[0]).toContain("@n-dx/lang-go@");
+      expect(messages[0]).toContain("`ndx sv pack add go`");
     });
 
     it("when the pack reports it cannot run", async () => {

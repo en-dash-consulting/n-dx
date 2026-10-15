@@ -13,7 +13,6 @@ import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeZones } from "../../src/analyzers/zones.js";
 import { detectLanguage, detectLanguages, mergeLanguageConfigs } from "../../src/language/detect.js";
 import { KNOWN_PACKS, type KnownPack } from "../../src/language/pack-loader.js";
-import { sourcevisionVersion } from "../../src/language/package-paths.js";
 import { javaConfig, javaSecondaryConfig, typescriptConfig } from "@n-dx/lang-kit";
 import type { Imports, Inventory } from "../../src/schema/v1.js";
 import { validate, ZonesSchema } from "../../src/schema/validate.js";
@@ -129,7 +128,7 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
 
       expect(messages).toEqual([
         `Java: pack @n-dx/lang-java is not installed; Java files get inventory only. ` +
-          `Install it with \`npm install --prefix ${packDir} @n-dx/lang-java@${sourcevisionVersion()}\`.`,
+          "Install it with `ndx sv pack add java`.",
       ]);
       expect(imports.edges).toEqual([]);
       expect(imports.external).toEqual([]);

@@ -29,10 +29,29 @@ in `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs.
 2. **Refused** when its version differs from sourcevision's (checked from
    `package.json` before a pack-directory copy is imported, and again on the
    entry) or when it exports no matching lang-kit `LanguagePackEntry`. The
-   notice names the `npm install --prefix … <package>@<version>` command.
+   notice names `ndx sv pack add <lang>` (`packInstallCommand`).
 3. **Degraded** when it is missing, refused, reports `degraded` (grammar not
    built or not loadable, a query that will not compile, unreadable build
    files) or its `analyzeProject` rejects. `src/analyzers/pack-imports.ts`
    reports it once per run: Java files get inventory only, Go edges come from
    the regex parser (`src/analyzers/go-imports.ts`). Analysis never fails on a
    pack.
+
+### How packs are installed
+
+`sv pack` (`src/cli/commands/pack.ts`, reached as `ndx sv pack …`) manages
+the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, sql,
+terraform; only `KNOWN_PACKS` are analyzed with today):
+
+- `add <lang>` runs `npm install --prefix <pack dir> @n-dx/lang-<lang>@<sourcevision version>`,
+  creating the directory, then loads the pack from it with `loadPack`; a
+  mismatch, a load failure or a pack npm did not put there is an error carrying
+  npm's output. `--dry-run` prints the command.
+- `list [--json]` reports each pack as installed (pack directory), resolved
+  (module resolution), missing or refused, with its version.
+- `remove <lang>` runs `npm uninstall --prefix`; a pack found only by module
+  resolution is left alone.
+
+npm runs through llm-client's `spawnCli` (cmd.exe on Windows, for npm's `.cmd`
+shim). The runner, pack list, pack directory and importer are injectable; tests
+(`tests/unit/cli/pack.test.ts`) use a fake npm and never the network.
