@@ -17,6 +17,12 @@
  *      first, then the namespaces it (or any `global using`) imports, then
  *      aliases. A hit yields one file → file edge per declaring file.
  *
+ * ASP.NET WebForms markup (`.aspx`, `.ascx`, `.master`, `.ashx`, `.asmx`)
+ * has no C# body to tokenize; its `<%@ … %>` directives name what it depends
+ * on: `CodeBehind`/`CodeFile`/`Src` (the code-behind file), `Inherits`/`Class`
+ * (the class behind it), `MasterPageFile` (its master page) and
+ * `<%@ Register Src=… %>` (each user control it uses).
+ *
  * A `using` of a namespace the project does not declare is an external
  * import (`System.*` is the standard library). This is a lexer pass, not a
  * compiler: a name declared twice in visible namespaces links to both, and
@@ -25,7 +31,8 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, posix } from "node:path";
+import { WEBFORMS_EXTENSIONS } from "../language/csharp.js";
 import type { ImportEdge, ExternalImport } from "../schema/index.js";
 
 export interface CSharpImportResult {
@@ -230,6 +237,66 @@ export function extractCSharpFacts(src: string): CSharpFileFacts {
   };
 }
 
+// ── WebForms markup ─────────────────────────────────────────────────────────
+
+export interface WebFormsReferences {
+  /** Paths as written: code-behind, master page, registered controls. */
+  paths: string[];
+  /** Fully qualified class names from `Inherits=` / `Class=`. */
+  classes: string[];
+}
+
+const DIRECTIVE_RE = /<%@\s*(\w+)([\s\S]*?)%>/g;
+const ATTRIBUTE_RE = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+
+/** Read the file and class references out of a markup file's directives. */
+export function extractWebFormsReferences(src: string): WebFormsReferences {
+  const paths: string[] = [];
+  const classes: string[] = [];
+  for (const d of src.matchAll(DIRECTIVE_RE)) {
+    const directive = d[1].toLowerCase();
+    for (const a of d[2].matchAll(ATTRIBUTE_RE)) {
+      const name = a[1].toLowerCase();
+      const value = (a[2] ?? a[3]).trim();
+      if (!value) continue;
+      if (name === "inherits" || name === "class") {
+        classes.push(value.split(",")[0].trim());
+      } else if (
+        name === "codebehind" || name === "codefile" || name === "masterpagefile" ||
+        (name === "src" && directive !== "assembly")
+      ) {
+        paths.push(value);
+      }
+    }
+  }
+  return { paths, classes };
+}
+
+/**
+ * Resolve a markup path to an inventoried file. Relative paths are taken from
+ * the markup file's directory; `~/` is the web application root, which is not
+ * known here, so each ancestor of the markup file is tried, nearest first.
+ */
+function resolveMarkupPath(from: string, written: string, known: ReadonlySet<string>): string | undefined {
+  const value = written.replace(/\\/g, "/");
+  const dir = posix.dirname(from);
+  if (!value.startsWith("~/")) {
+    const candidate = posix.normalize(value.startsWith("/") ? value.slice(1) : posix.join(dir, value));
+    return known.has(candidate) ? candidate : undefined;
+  }
+  const rest = value.slice(2);
+  for (let base = dir; ; base = posix.dirname(base)) {
+    const candidate = posix.normalize(base === "." ? rest : posix.join(base, rest));
+    if (known.has(candidate)) return candidate;
+    if (base === "." || base === "/" || base === "") return undefined;
+  }
+}
+
+const isMarkup = (path: string) => {
+  const dot = path.lastIndexOf(".");
+  return dot !== -1 && WEBFORMS_EXTENSIONS.has(path.slice(dot).toLowerCase());
+};
+
 // ── Resolution ───────────────────────────────────────────────────────────────
 
 /** `A.B.C` → [`A.B.C`, `A.B`, `A`, ``]: the lookup order for enclosing namespaces. */
@@ -259,13 +326,18 @@ export async function buildCSharpImportGraph(
   emitFor?: ReadonlySet<string>,
 ): Promise<CSharpImportResult> {
   const facts = new Map<string, CSharpFileFacts>();
+  const markup = new Map<string, WebFormsReferences>();
   for (const f of allFiles) {
+    let text: string;
     try {
-      facts.set(f.path, extractCSharpFacts(await readFile(join(targetDir, f.path), "utf-8")));
+      text = await readFile(join(targetDir, f.path), "utf-8");
     } catch {
-      // Unreadable files contribute nothing.
+      continue; // Unreadable files contribute nothing.
     }
+    if (isMarkup(f.path)) markup.set(f.path, extractWebFormsReferences(text));
+    else facts.set(f.path, extractCSharpFacts(text));
   }
+  const known = new Set(allFiles.map((f) => f.path));
 
   // Index: fully qualified type → declaring files; every namespace the
   // project declares (with parents); last segments, to skip tokens cheaply.
@@ -289,20 +361,30 @@ export async function buildCSharpImportGraph(
   const edgeMap = new Map<string, ImportEdge>();
   const externalMap = new Map<string, ExternalImport>();
 
-  const addEdge = (from: string, typeName: string, count: number) => {
-    const short = typeName.slice(typeName.lastIndexOf(".") + 1);
-    for (const to of typeIndex.get(typeName) ?? []) {
-      if (to === from) continue;
-      const key = `${from}\0${to}\0static`;
-      const existing = edgeMap.get(key);
-      if (existing) {
-        if (!existing.symbols.includes(short)) existing.symbols.push(short);
-        existing.weight = (existing.weight ?? 0) + count;
-      } else {
-        edgeMap.set(key, { from, to, type: "static", symbols: [short], weight: count });
-      }
+  const link = (from: string, to: string, symbol: string, count: number) => {
+    if (to === from) return;
+    const key = `${from}\0${to}\0static`;
+    const existing = edgeMap.get(key);
+    if (existing) {
+      if (!existing.symbols.includes(symbol)) existing.symbols.push(symbol);
+      existing.weight = (existing.weight ?? 0) + count;
+    } else {
+      edgeMap.set(key, { from, to, type: "static", symbols: [symbol], weight: count });
     }
   };
+  const addEdge = (from: string, typeName: string, count: number) => {
+    const short = typeName.slice(typeName.lastIndexOf(".") + 1);
+    for (const to of typeIndex.get(typeName) ?? []) link(from, to, short, count);
+  };
+
+  for (const [path, refs] of markup) {
+    if (emitFor && !emitFor.has(path)) continue;
+    for (const written of refs.paths) {
+      const to = resolveMarkupPath(path, written, known);
+      if (to) link(path, to, posix.basename(to), 1);
+    }
+    for (const cls of refs.classes) addEdge(path, cls, 1);
+  }
 
   for (const [path, f] of facts) {
     if (emitFor && !emitFor.has(path)) continue;

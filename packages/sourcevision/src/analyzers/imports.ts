@@ -23,13 +23,13 @@ import { buildCSharpImportGraph } from "./csharp-imports.js";
 import { readManifest } from "./manifest.js";
 import { getLanguageConfig, detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
 import type { LanguageConfig } from "../language/registry.js";
+import { csharpConfig } from "../language/csharp.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
 const JS_TS_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 const GO_EXTENSION = ".go";
 const SWIFT_EXTENSION = ".swift";
-const CSHARP_EXTENSION = ".cs";
 const PROBE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
 
 // ── AST extraction ───────────────────────────────────────────────────────────
@@ -635,9 +635,10 @@ function mergeResolverResult(
 }
 
 /**
- * Resolve C# files through declared types and `using` directives. Types are
- * indexed over every inventoried `.cs` file, so a changed file's references
- * resolve against unchanged ones; edges are emitted for `files` only.
+ * Resolve C# files through declared types and `using` directives, and
+ * WebForms markup through its `<%@ … %>` directives. Types are indexed over
+ * every inventoried C# file, so a changed file's references resolve against
+ * unchanged ones; edges are emitted for `files` only.
  */
 async function processCSharpFiles(
   files: Inventory["files"],
@@ -647,7 +648,7 @@ async function processCSharpFiles(
   externalMap: Map<string, ExternalImport>,
 ): Promise<void> {
   if (files.length === 0) return;
-  const allCSharp = inventory.files.filter((f) => extname(f.path).toLowerCase() === CSHARP_EXTENSION);
+  const allCSharp = inventory.files.filter((f) => csharpConfig.parseableExtensions.has(extname(f.path).toLowerCase()));
   const result = await buildCSharpImportGraph(allCSharp, targetDir, new Set(files.map((f) => f.path)));
   mergeResolverResult(result, edgeMap, externalMap);
 }
@@ -716,7 +717,7 @@ export async function analyzeImports(
 
   // Always include JS/TS for backward compatibility, and C#, whose resolver has
   // no per-language setup to gate; add resolved language extensions.
-  const parseableExts = new Set<string>([...JS_TS_EXTENSIONS, CSHARP_EXTENSION]);
+  const parseableExts = new Set<string>([...JS_TS_EXTENSIONS, ...csharpConfig.parseableExtensions]);
   for (const ext of langConfig.parseableExtensions) parseableExts.add(ext);
 
   // Read go.mod once if any Go files exist in the inventory.
@@ -757,7 +758,7 @@ export async function analyzeImports(
   const jsTsFiles = parseable.filter((f) => JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase()));
   const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
   const swiftParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === SWIFT_EXTENSION);
-  const csharpParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === CSHARP_EXTENSION);
+  const csharpParseableFiles = parseable.filter((f) => csharpConfig.parseableExtensions.has(extname(f.path).toLowerCase()));
 
   await processJsTsFiles(jsTsFiles, targetDir, resolver, edgeMap, externalMap);
   await processGoFiles(goParseableFiles, targetDir, goModulePath, edgeMap, externalMap);

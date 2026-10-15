@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import {
   buildCSharpImportGraph,
   extractCSharpFacts,
+  extractWebFormsReferences,
   stripCSharpCommentsAndStrings,
 } from "../../../src/analyzers/csharp-imports.js";
 import { analyzeImports } from "../../../src/analyzers/imports.js";
@@ -208,5 +209,52 @@ describe("analyzeImports on a C# project", () => {
       "src/App/Program.cs -> src/App/Services/UserService.cs",
       "src/App/Services/UserService.cs -> src/App/Models/User.cs",
     ]);
+  });
+});
+
+describe("WebForms markup", () => {
+  it("reads code-behind, class, master page and registered controls from directives", () => {
+    const refs = extractWebFormsReferences(`
+<%@ Page Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true"
+    CodeBehind="Default.aspx.cs" Inherits="Shop.Web._Default" %>
+<%@ Register TagPrefix="uc" TagName="Cart" Src="~/Controls/Cart.ascx" %>
+<%@ Register Assembly="Telerik.Web.UI" Namespace="Telerik.Web.UI" TagPrefix="t" %>
+<%@ Import Namespace="System.Linq" %>
+`);
+    expect(refs.paths).toEqual(["~/Site.Master", "Default.aspx.cs", "~/Controls/Cart.ascx"]);
+    expect(refs.classes).toEqual(["Shop.Web._Default"]);
+  });
+
+  it("links pages, controls, masters and handlers to their code", async () => {
+    const result = await graph({
+      "Web/Site.Master": `<%@ Master Language="C#" CodeFile="Site.Master.cs" Inherits="Shop.Web.SiteMaster" %>`,
+      "Web/Site.Master.cs": `namespace Shop.Web { public partial class SiteMaster { } }`,
+      "Web/Pages/Default.aspx": `<%@ Page MasterPageFile="~/Site.Master" CodeBehind="Default.aspx.cs" Inherits="Shop.Web._Default" %>\n<%@ Register TagPrefix="uc" Src="../Controls/Cart.ascx" TagName="Cart" %>`,
+      "Web/Pages/Default.aspx.cs": `namespace Shop.Web { public partial class _Default { } }`,
+      "Web/Controls/Cart.ascx": `<%@ Control CodeBehind="Cart.ascx.cs" Inherits="Shop.Web.Controls.Cart" %>`,
+      "Web/Controls/Cart.ascx.cs": `namespace Shop.Web.Controls { public partial class Cart { } }`,
+      "Web/Api/Ping.ashx": `<%@ WebHandler Language="C#" Class="Shop.Web.Api.Ping" %>`,
+      "Web/Api/Ping.cs": `namespace Shop.Web.Api { public class Ping { } }`,
+    });
+    expect(pairs(result.edges)).toEqual([
+      "Web/Api/Ping.ashx -> Web/Api/Ping.cs",
+      "Web/Controls/Cart.ascx -> Web/Controls/Cart.ascx.cs",
+      "Web/Pages/Default.aspx -> Web/Controls/Cart.ascx",
+      "Web/Pages/Default.aspx -> Web/Pages/Default.aspx.cs",
+      "Web/Pages/Default.aspx -> Web/Site.Master",
+      "Web/Site.Master -> Web/Site.Master.cs",
+    ]);
+  });
+
+  it("are inventoried and take part in the import graph", async () => {
+    const dir = await project({
+      "Shop.sln": "",
+      "Web/Default.aspx": `<%@ Page CodeBehind="Default.aspx.cs" Inherits="Shop._Default" %>`,
+      "Web/Default.aspx.cs": `namespace Shop { public partial class _Default { } }`,
+    });
+    const inventory = await analyzeInventory(dir);
+    expect(inventory.files.map((f) => f.path)).toContain("Web/Default.aspx");
+    const imports = await analyzeImports(dir, inventory);
+    expect(pairs(imports.edges)).toEqual(["Web/Default.aspx -> Web/Default.aspx.cs"]);
   });
 });
