@@ -24,10 +24,12 @@ import {
   type StageId,
   type StageSection,
   type StageTab,
+  type StageTile,
 } from "./stages.js";
 import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from "../components/index.js";
 import { useFeatureToggle, useCliName, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import { TileGrid, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
 
 export type RenderView = (view: ViewId) => ComponentChild;
 
@@ -204,9 +206,18 @@ export interface StagePageProps {
   validViews: ReadonlySet<ViewId>;
   navigateTo: NavigateTo;
   renderView: RenderView;
+  /** Panels a tiled stage lists (`StageTile.panel`). */
+  renderPanel?: RenderPanel;
+  /** A tile's collapsed summary; null shows the view itself, clipped. */
+  renderSummary?: RenderSummary;
+  /** Shown beside a full-screen tile when non-null (the open PRD item). */
+  renderAside?: () => ComponentChild | null;
 }
 
-export function StagePage({ stage, validViews, navigateTo, renderView }: StagePageProps) {
+const NO_PANEL: RenderPanel = () => null;
+const NO_SUMMARY: RenderSummary = () => null;
+
+export function StagePage({ stage, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, renderAside }: StagePageProps) {
   const def = STAGES[stage];
   const product = stageProduct(stage);
   const gates: Record<string, boolean> = {
@@ -220,6 +231,14 @@ export function StagePage({ stage, validViews, navigateTo, renderView }: StagePa
     && (!s.featureGate || gates[s.featureGate])
     && !(s.requiresServer && deployed),
   );
+  const tiles = (def.tiles ?? []).filter((t) =>
+    validViews.has(t.view)
+    && (!t.featureGate || gates[t.featureGate])
+    && !(t.requiresServer && deployed)
+    && !(t.hiddenWhenDeployed && deployed),
+  );
+  const tabsOf = (tile: StageTile): StageTab[] =>
+    [{ view: tile.view }, ...(tile.tabs ?? [])].filter((t) => validViews.has(t.view) && !(deployed && t.hiddenWhenDeployed));
 
   return h("div", { class: `stage-page stage-page-${product}`, "data-stage": stage },
     h("div", { class: "stage-page-head" },
@@ -239,8 +258,13 @@ export function StagePage({ stage, validViews, navigateTo, renderView }: StagePa
       : null,
     sections.map((s) => {
       if (s.plain) return h(PlainSection, { key: s.view, section: s, renderView });
+      // A tiled stage keeps only its plain lead section; the tiles replace the rest.
+      if (def.tiles) return null;
       return h(Section, { key: s.view, stage, section: s, validViews, deployed, navigateTo, renderView });
     }),
+    def.tiles
+      ? h(TileGrid, { stage, tiles, tabsOf, navigateTo, renderView, renderPanel, renderSummary, renderAside })
+      : null,
   );
 }
 

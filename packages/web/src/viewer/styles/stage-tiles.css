@@ -1,0 +1,205 @@
+/* Stage tile grid (views/stage-tiles.ts).
+ *
+ * Collapsed tiles share a row, each a fixed-height card showing its summary;
+ * `hero`, `wide` and expanded tiles take the full row. The full-screen layer
+ * sits between the top nav and the bottom bar, like the Commands sheet. */
+
+.stage-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.stage-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.stage-tile--hero,
+.stage-tile--wide,
+.stage-tile--expanded {
+  grid-column: 1 / -1;
+}
+
+.stage-tile--expanded {
+  border-color: var(--border-strong, var(--border));
+}
+
+.stage-tile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.stage-tile-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stage-tile-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-md, 6px);
+}
+
+.stage-tile-glyph {
+  flex-shrink: 0;
+  width: 16px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.stage-tile-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stage-tile-blurb {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-muted, var(--text-dim));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-tile-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.stage-tile-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.stage-tile-icon-btn {
+  min-width: 28px;
+  padding: 0;
+}
+
+.stage-tile-btn:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.stage-tile-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.stage-tile-body {
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+}
+
+/* A collapsed tile with no summary shows the view itself, cut to the tile. */
+.stage-tile-body--clip {
+  height: 280px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
+}
+
+.stage-tile-summary {
+  min-height: 120px;
+}
+
+.stage-tile-tablist {
+  margin-bottom: var(--space-3);
+}
+
+/* The views' own page headers repeat the tile title. */
+.stage-tile .view-header,
+.stage-tile-fullscreen .view-header {
+  display: none;
+}
+
+/* ── Full-screen ── */
+
+.stage-tile-fullscreen {
+  position: fixed;
+  inset: var(--topnav-h) 0 var(--bottombar-h) 0;
+  z-index: 60;
+  display: flex;
+  background: var(--bg);
+}
+
+.stage-tile-fullscreen-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-tile-fullscreen .stage-tile-head {
+  padding-left: var(--space-4);
+  background: var(--bg-surface);
+}
+
+.stage-tile-fullscreen .stage-tile-title {
+  flex: 1;
+  font-size: 16px;
+}
+
+.stage-tile-fullscreen-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4) var(--space-5);
+}
+
+.stage-tile-fullscreen-aside {
+  width: min(420px, 40%);
+  flex-shrink: 0;
+  overflow: auto;
+  border-left: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+/* Narrow screens: the item stacks under the view instead of squeezing it. */
+@media (max-width: 860px) {
+  .stage-tile-fullscreen--split {
+    flex-direction: column;
+  }
+  .stage-tile-fullscreen-aside {
+    width: auto;
+    max-height: 45%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+}

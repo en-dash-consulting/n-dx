@@ -29,4 +29,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Changeset for the dashboard UI cleanup and Analyze tiles](./changeset-for-the-dashboard-ui-cleanup.md) | pending |
 | [Findings list items have no stray list bullets](./findings-list-items-have-no-stray-list.md) | completed |
 | [Floating status pills share one dock instead of overlapping](./floating-status-pills-share-one-dock.md) | completed |
-| [Reusable dashboard tile grid with in-place and full-screen expansion](./reusable-dashboard-tile-grid-with-in.md) | pending |
+| [Reusable dashboard tile grid with in-place and full-screen expansion](./reusable-dashboard-tile-grid-with-in.md) | completed |

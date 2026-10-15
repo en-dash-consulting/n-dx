@@ -93,9 +93,42 @@ export interface StageSection {
   requiresServer?: boolean;
 }
 
+/**
+ * A part of the page that is not a view of its own — a panel the stage page
+ * renders through the registry (`renderPanel`). Overview's Next steps and
+ * Languages, split out so they can sit in tiles of their own.
+ */
+export type StagePanelId = "next-steps" | "languages";
+
+/** How much of the tile grid a tile spans: the full row (hero, wide) or one cell. */
+export type TileSize = "hero" | "wide" | "normal";
+
+export interface StageTile {
+  /**
+   * The view the tile opens to — in place, full-screen, and on its own page
+   * through "Open". Its label, blurb and glyph name the tile.
+   */
+  view: ViewId;
+  /** Render this panel instead of `view` itself; "Open" still goes to `view`. */
+  panel?: StagePanelId;
+  /** Heading for a panel tile, which is not named by its view. */
+  title?: string;
+  size?: TileSize;
+  /** Further views shown as tabs once the tile is expanded (Architecture's Routes). */
+  tabs?: readonly StageTab[];
+  featureGate?: string;
+  requiresServer?: boolean;
+  hiddenWhenDeployed?: boolean;
+}
+
 export interface StageDef {
   id: StageId;
   sections: readonly StageSection[];
+  /**
+   * When set, the stage page renders these as a dashboard grid after its
+   * plain lead section, instead of the stacked collapsible `sections`.
+   */
+  tiles?: readonly StageTile[];
 }
 
 /** Loop order. The side stage links step through it and wrap. */
