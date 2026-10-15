@@ -754,9 +754,10 @@ function childProcessViolations() {
         if (!excluded.has(rel)) scan(full);
         continue;
       }
-      if (!/\.(ts|js|mjs)$/.test(entry) || entry.endsWith(".d.ts")) continue;
+      // Same file set as ci.js's scanner: every JS/TS module flavour.
+      if (!/\.(?:[cm]?[jt]s|[jt]sx)$/.test(entry) || /\.d\.[cm]?ts$/.test(entry)) continue;
       if (ALLOWED.has(rel)) continue;
-      if (/\.test\.(ts|js|mjs)$/.test(rel) || /(?:^|\/)tests?\//.test(rel)) continue;
+      if (/\.test\.(?:[cm]?[jt]s|[jt]sx)$/.test(rel) || /(?:^|\/)tests?\//.test(rel)) continue;
 
       const content = readFileSync(full, "utf-8");
       if (
@@ -868,6 +869,32 @@ describe("architecture policy: process execution", () => {
         expect(rogue.violations).toHaveLength(1);
         expect(rogue.violations[0]).toContain("packages/core/rogue.js");
         expect(rogue.violations[0]).toContain("packages/core/child-process-allowlist.json");
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    // A configured rule must see every JS/TS module flavour a project has, not
+    // only .ts/.js/.mjs — a React app's .tsx imports used to pass unchecked.
+    it("a configured rule checks .tsx, .jsx, .cjs, .mts and .cts sources", async () => {
+      const dir = mkdtempSync(join(tmpdir(), "ndx-arch-flavours-"));
+      try {
+        writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "my-app" }));
+        writeFileSync(
+          join(dir, ".n-dx.json"),
+          JSON.stringify({ ci: { restrictedImports: [{ module: "axios", allow: [] }] } }),
+        );
+        mkdirSync(join(dir, "src"));
+        const files = ["App.tsx", "View.jsx", "legacy.cjs", "api.mts", "cfg.cts"];
+        for (const f of files) {
+          const body = f.endsWith("cjs") || f.endsWith("cts") ? 'const a = require("axios");\n' : 'import a from "axios";\n';
+          writeFileSync(join(dir, "src", f), body);
+        }
+        writeFileSync(join(dir, "src", "types.d.mts"), 'import type { AxiosInstance } from "axios";\n');
+        writeFileSync(join(dir, "src", "App.test.tsx"), 'import a from "axios";\n');
+        const step = await checkRestrictedImports(dir);
+        const flagged = step.violations.map((v) => v.split(" ")[0]).sort();
+        expect(flagged).toEqual(files.map((f) => `src/${f}`).sort());
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }

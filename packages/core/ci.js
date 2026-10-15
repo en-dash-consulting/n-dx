@@ -1120,6 +1120,17 @@ function importPattern(module) {
 }
 
 /**
+ * JavaScript and TypeScript sources in every module flavour — .js .mjs .cjs
+ * .jsx .ts .mts .cts .tsx. A rule a project opts in to must see the files it
+ * actually has: scanning .ts/.js/.mjs alone passed a React app's .tsx imports
+ * unchecked. Shared in spirit with architecture-policy.test.js, whose scanner
+ * matches the same set so the parity test compares like with like.
+ */
+const SOURCE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
+const DECLARATION_FILE = /\.d\.[cm]?ts$/;
+const TEST_FILE = /\.test\.(?:[cm]?[jt]s|[jt]sx)$/;
+
+/**
  * Scan production sources under `dir` against restricted-import rules.
  * Test files and `test/`/`tests/` directories are exempt, as are node_modules,
  * dist, .git, n-dx's state directories and every rule's `excludeDirs`.
@@ -1154,8 +1165,8 @@ function scanRestrictedImports(dir, rules) {
         if (!excludedDirs.has(rel)) walkSrc(full);
         continue;
       }
-      if (!/\.(ts|js|mjs)$/.test(entry) || entry.endsWith(".d.ts")) continue;
-      if (/\.test\.(ts|js|mjs)$/.test(rel) || /(?:^|\/)tests?\//.test(rel)) continue;
+      if (!SOURCE_FILE.test(entry) || DECLARATION_FILE.test(entry)) continue;
+      if (TEST_FILE.test(rel) || /(?:^|\/)tests?\//.test(rel)) continue;
       const applicable = rules.flatMap((rule, i) => (rule.allow.has(rel) ? [] : [[rule, patterns[i]]]));
       if (applicable.length === 0) continue;
 
