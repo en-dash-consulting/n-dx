@@ -20,9 +20,10 @@ Language ids and configs, file-to-language detection, build-file readers and
 the small TOML/XML/YAML parsers, and the IaC resource-kind table (`IAC_KINDS`,
 which the iso-map bundle aliases to `src/iac-kinds.ts` alone), and the
 facts-out pack contract (`src/pack-contract.ts`): the per-file `FileFacts` a
-pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls, resources)
-and `DECLARED_FACT_KINDS` (routes, components, outbound calls, typed but not
-yet produced). `ResourceFact`'s optional `module`, `provider`, `references`
+pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls, resources,
+routes, outbound calls) and `DECLARED_FACT_KINDS` (components, typed but not
+yet produced). `OutboundCallFact.confidence` means what sourcevision's
+`Confidence` means: how sure the pack is that it is an outbound call at all. `ResourceFact`'s optional `module`, `provider`, `references`
 and `attributes` are filled by the Terraform pack; attribute values are kept
 as written, never normalised, except that an optional `instance` marks a fact
 whose attributes were resolved through module calls (one fact per distinct
@@ -33,7 +34,8 @@ The pack entry (`src/pack-entry.ts`) is the one object a pack package exports
 as `pack`: `LanguagePackEntry` carries the package name and version, the
 language id and config, `produces`, and `analyzeProject({ projectDir, files,
 kinds })`, which returns `FileFacts` per file read, the files it could not
-read, and a `degraded` notice (reason, remedy) when it could not run at all.
+read, optional `notices` for what it read but skipped, and a `degraded` notice
+(reason, remedy) when it could not run at all.
 It is per project because resolution needs the whole project. Its doc comment
 says what each field means for a pack that is not tree-sitter based (a TS/JS
 pack on the compiler, a SCIP tier); keep it parser-neutral. sourcevision checks

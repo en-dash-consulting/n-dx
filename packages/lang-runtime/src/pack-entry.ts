@@ -5,7 +5,8 @@
  * `analyzeProject` loads the pack's grammar, compiles its queries, binds its
  * resolver to the project's build files, parses every requested file and
  * reads the captures into lang-kit facts: per file, then the pack's project
- * facts reader (if any) over every parsed file at once. Each step that can fail for the
+ * facts reader (if any) and each wanted framework over every parsed file at
+ * once; frameworks' skips come back as `notices`. Each step that can fail for the
  * whole language — a grammar not built or not loadable, a query the grammar
  * rejects, build files that cannot be read — ends the call with a degraded
  * result instead of an exception. A file that cannot be read or is over the
@@ -26,7 +27,7 @@ import type {
 } from "@n-dx/lang-kit";
 import type { LanguagePack, PackResolver, PackSourceFile, PreparedResolver } from "./pack.js";
 import type { PackPackage } from "./pack-package.js";
-import { readPackFacts, type PackSymbolRules, type ProjectFactsReader } from "./pack-facts.js";
+import { mergeFileFacts, readPackFacts, type PackSymbolRules, type ProjectFactsReader } from "./pack-facts.js";
 import { createTreeSitterRunner, loadGrammar, type RunnablePack, type RunnerOptions } from "./runner.js";
 
 export interface TreeSitterEntryOptions {
@@ -80,9 +81,14 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
     return degraded(`grammar ${grammarPath} could not be loaded (${errorText(error)})`, pkg.rebuildStep());
   }
 
+  // Framework queries join the parse only when a kind they produce is wanted.
+  const frameworks = (pack.frameworks ?? []).filter((f) => f.produces.some((kind) => kinds.includes(kind)));
+  const runnable: LanguagePack =
+    frameworks.length === 0 ? pack : { ...pack, queries: [...pack.queries, ...frameworks.flatMap((f) => f.queries)] };
+
   const runner = createTreeSitterRunner(options.runner);
   try {
-    const target: RunnablePack = { pack, grammarPath };
+    const target: RunnablePack = { pack: runnable, grammarPath };
     // A loadable grammar can still reject a query (a stale build that predates a query edit).
     try {
       await runner.prepare(target);
@@ -117,11 +123,15 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
 
     const prepared: PreparedResolver | undefined = resolver?.prepare(parsed, unparsed);
     const project = options.projectFacts?.(parsed, kinds);
-    const facts: FileFacts[] = parsed.map((file) => ({
-      ...readPackFacts(pack, file, { kinds, resolver: prepared, symbolRules }),
-      ...project?.get(file.path),
-    }));
-    return { facts, unparsed };
+    const framed = frameworks.map((f) => f.read(parsed, kinds));
+    const facts: FileFacts[] = parsed.map((file) =>
+      framed.reduce(
+        (merged, { facts: byPath }) => mergeFileFacts(merged, byPath.get(file.path)),
+        mergeFileFacts(readPackFacts(pack, file, { kinds, resolver: prepared, symbolRules }), project?.get(file.path)),
+      ),
+    );
+    const notices = framed.flatMap((f) => f.notices);
+    return notices.length === 0 ? { facts, unparsed } : { facts, unparsed, notices };
   } finally {
     runner.dispose();
   }

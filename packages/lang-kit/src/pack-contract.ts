@@ -141,7 +141,7 @@ export interface CallFact {
   readonly strings: readonly StringArgument[];
 }
 
-// ── Declared kinds (no pack produces them yet) ──────────────────────────────
+// ── Routes (produced) ───────────────────────────────────────────────────────
 
 /** A request route a file serves (a Spring `@GetMapping`, a Go `mux.HandleFunc`). */
 export interface RouteFact {
@@ -154,6 +154,8 @@ export interface RouteFact {
   readonly position: SourcePosition;
 }
 
+// ── Components (declared: no pack produces them yet) ────────────────────────
+
 /** A framework-managed unit a file declares (a React component, a Spring bean). */
 export interface ComponentFact {
   readonly name: string;
@@ -161,6 +163,8 @@ export interface ComponentFact {
   readonly kind: string;
   readonly position: SourcePosition;
 }
+
+// ── Outbound calls (produced) ───────────────────────────────────────────────
 
 /** A call that leaves the process. Mirrors sourcevision's outbound dependency, per file. */
 export interface OutboundCallFact {
@@ -173,6 +177,14 @@ export interface OutboundCallFact {
   readonly targetSource: "literal" | "env" | "config" | "unknown";
   /** The client making the call: `fetch`, `RestTemplate`, `pgx`, … */
   readonly client: string;
+  /**
+   * How sure the pack is that this is an outbound call at all, not where it
+   * points (that is `targetSource`); sourcevision's `Confidence`. `certain`
+   * for a call on a receiver known to be the client, `likely` when the
+   * receiver is not known but the call's shape matches, `inferred` for
+   * weaker evidence. Absent when the pack does not grade.
+   */
+  readonly confidence?: "certain" | "likely" | "inferred";
   readonly position: SourcePosition;
 }
 
@@ -292,10 +304,10 @@ export interface FileFacts {
 }
 
 /** Fact kinds a pack produces today. */
-export const PRODUCED_FACT_KINDS = ["imports", "symbols", "calls", "resources"] as const;
+export const PRODUCED_FACT_KINDS = ["imports", "symbols", "calls", "resources", "routes", "outboundCalls"] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */
-export const DECLARED_FACT_KINDS = ["routes", "components", "outboundCalls"] as const;
+export const DECLARED_FACT_KINDS = ["components"] as const;
 
 export type ProducedFactKind = (typeof PRODUCED_FACT_KINDS)[number];
 export type DeclaredFactKind = (typeof DECLARED_FACT_KINDS)[number];

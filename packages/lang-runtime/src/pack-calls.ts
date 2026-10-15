@@ -34,8 +34,28 @@ export function innermost(candidates: readonly Capture[], inner: Capture): Captu
 
 const stringArgument = (capture: Capture): StringArgument => ({ text: capture.text, start: capture.start, end: capture.end });
 
+/** One call's captures, paired as {@link groupCalls} pairs them; for framework rules that need positions. */
+export interface CallSite {
+  /** The whole call, receiver included; absent when the query did not capture one. */
+  readonly invocation?: Capture;
+  readonly name?: Capture;
+  readonly receiver?: Capture;
+  readonly arguments: Capture;
+  /** String literals passed directly to this call, in order. */
+  readonly strings: readonly Capture[];
+}
+
 /** Rebuild the calls of one file from its `calls` captures, as lang-kit calls facts. */
 export function groupCalls(captures: readonly Capture[]): CallFact[] {
+  return callSites(captures).map((site) => ({
+    ...(site.name ? { callee: site.name.text } : {}),
+    ...(site.receiver ? { receiver: site.receiver.text } : {}),
+    strings: site.strings.map(stringArgument),
+  }));
+}
+
+/** The calls of one file from its `calls` captures, one per argument list in document order. */
+export function callSites(captures: readonly Capture[]): CallSite[] {
   const named = (name: string): Capture[] => captures.filter((c) => c.name === name);
   const invocations = named("call.invocation");
   const names = named("call.name");
@@ -58,9 +78,11 @@ export function groupCalls(captures: readonly Capture[]): CallFact[] {
       ? receivers.find((r) => invocation !== undefined && samePosition(r.start, invocation.start) && atOrBefore(r.end, name.start))
       : undefined;
     return {
-      ...(name ? { callee: name.text } : {}),
-      ...(receiver ? { receiver: receiver.text } : {}),
-      strings: (stringsByList.get(list) ?? []).map(stringArgument),
+      ...(invocation ? { invocation } : {}),
+      ...(name ? { name } : {}),
+      ...(receiver ? { receiver } : {}),
+      arguments: list,
+      strings: stringsByList.get(list) ?? [],
     };
   });
 }

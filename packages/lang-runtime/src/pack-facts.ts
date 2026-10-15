@@ -83,11 +83,13 @@ const PER_FILE_KINDS: ReadonlySet<FactKind> = new Set(["imports", "symbols", "ca
 const IMPORTS_GAP = 'has a resolver but does not produce "imports"';
 const SYMBOLS_GAP = 'produces "symbols" but has no symbol rules';
 const projectGap = (kind: FactKind): string => `produces "${kind}" but has no project facts reader`;
+const frameworkGap = (id: string, kind: FactKind): string => `framework "${id}" produces "${kind}", which the pack does not list`;
 
 /**
  * Where a pack's `produces` disagrees with what can be read for it: a resolver
  * whose imports would never be read, symbols with no rules (`symbolRules`
- * undefined), or a kind no per-file read covers with no `projectFacts`.
+ * undefined), a kind neither a per-file read nor a framework covers with no
+ * `projectFacts`, or a framework kind missing from the pack's `produces`.
  * Empty for a consistent pack.
  */
 export function factGaps(
@@ -95,11 +97,28 @@ export function factGaps(
   symbolRules: PackSymbolRules | undefined,
   projectFacts?: ProjectFactsReader,
 ): string[] {
+  const frameworks = pack.frameworks ?? [];
+  const covered = new Set<FactKind>([...PER_FILE_KINDS, ...frameworks.flatMap((f) => f.produces)]);
   return [
     ...(pack.resolver !== undefined && !pack.produces.includes("imports") ? [IMPORTS_GAP] : []),
     ...(pack.produces.includes("symbols") && symbolRules === undefined ? [SYMBOLS_GAP] : []),
-    ...(projectFacts === undefined ? pack.produces.filter((kind) => !PER_FILE_KINDS.has(kind)).map(projectGap) : []),
+    ...(projectFacts === undefined ? pack.produces.filter((kind) => !covered.has(kind)).map(projectGap) : []),
+    ...frameworks.flatMap((f) => f.produces.filter((kind) => !pack.produces.includes(kind)).map((kind) => frameworkGap(f.id, kind))),
   ];
+}
+
+/**
+ * `extra`'s facts laid over `base`: a list both fill is concatenated, `base`
+ * first; anything else in `extra` replaces `base`'s.
+ */
+export function mergeFileFacts<T extends FileFactFields>(base: T, extra: FileFactFields | undefined): T {
+  if (extra === undefined) return base;
+  const merged: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(extra)) {
+    const prior = merged[key];
+    merged[key] = Array.isArray(prior) && Array.isArray(value) ? [...prior, ...value] : value;
+  }
+  return merged as T;
 }
 
 /**
