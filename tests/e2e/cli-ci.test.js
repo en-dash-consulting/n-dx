@@ -272,6 +272,169 @@ describe("n-dx ci", () => {
       expect(arch.ok).toBe(true);
       expect(arch.violations).toBeUndefined();
     });
+
+    it("reports the step as skipped when no ci.restrictedImports rule is configured", () => {
+      const arch = report.steps.find((s) => s.name === "architecture-policy");
+      expect(arch.detail).toMatch(/^skipped \(no ci\.restrictedImports configured\)/);
+    });
+  });
+
+  // ── Restricted imports: a user project opting in through .n-dx.json ────────
+
+  describe("restricted-imports opt-in", () => {
+    const RELEASE_SCRIPT = 'import { execFileSync } from "node:child_process";\nexecFileSync("true");\n';
+    // A configured rule behind a trailing comma: the rule must not silently vanish.
+    const UNPARSEABLE_CONFIG =
+      '{ "ci": { "restrictedImports": [{ "module": "node:child_process", "allow": [] }] }, }\n';
+
+    /** Write the shared config with one child_process rule allowing `allow`. */
+    async function configure(dir, allow) {
+      await writeFile(
+        join(dir, ".n-dx.json"),
+        JSON.stringify({ ci: { restrictedImports: [{ module: "node:child_process", allow }] } }) + "\n",
+      );
+    }
+
+    /** `git` in `dir` with a throwaway identity. */
+    function git(dir, args) {
+      execFileSync("git", ["-c", "user.email=ci@test", "-c", "user.name=ci", ...args], { cwd: dir, stdio: "pipe" });
+    }
+
+    /**
+     * A git repo whose allowed wrapper src/lib/exec.ts is committed. With
+     * `trackRelease`, scripts/release.js is committed too; otherwise it stays
+     * an untracked, non-ignored file.
+     */
+    async function gitProject(dir, { trackRelease }) {
+      await mkdir(join(dir, "src", "lib"), { recursive: true });
+      await writeFile(join(dir, "src", "lib", "exec.ts"), RELEASE_SCRIPT);
+      git(dir, ["init", "-q"]);
+      git(dir, ["add", "src", ...(trackRelease ? ["scripts"] : [])]);
+      git(dir, ["commit", "-q", "-m", "init"]);
+    }
+
+    const CASES = {
+      "file outside the allow list": async (dir) => configure(dir, ["src/lib/exec.js"]),
+      // A local tsc build: the compiled copy has a path the allow list never names.
+      "gitignored build output": async (dir) => {
+        await gitProject(dir, { trackRelease: true });
+        await writeFile(join(dir, ".gitignore"), "build/\n");
+        await mkdir(join(dir, "build", "lib"), { recursive: true });
+        await writeFile(join(dir, "build", "lib", "exec.js"), RELEASE_SCRIPT);
+        await configure(dir, ["src/lib/exec.ts", "scripts/release.js"]);
+      },
+      // A Claude agent worktree: a full second checkout inside the project.
+      "agent worktree": async (dir) => {
+        await gitProject(dir, { trackRelease: true });
+        git(dir, ["worktree", "add", "-q", join(".claude", "worktrees", "agent")]);
+        await configure(dir, ["src/lib/exec.ts", "scripts/release.js"]);
+      },
+      "untracked source file": async (dir) => {
+        await gitProject(dir, { trackRelease: false });
+        await configure(dir, ["src/lib/exec.ts"]);
+      },
+      "file in the allow list": async (dir) => configure(dir, ["src/lib/exec.js", "scripts/release.js"]),
+      "malformed rule": async (dir) => {
+        await writeFile(
+          join(dir, ".n-dx.json"),
+          JSON.stringify({ ci: { restrictedImports: [{ allow: ["scripts/release.js"] }] } }) + "\n",
+        );
+      },
+      "unparseable config": async (dir) => {
+        await writeFile(join(dir, ".n-dx.json"), UNPARSEABLE_CONFIG);
+      },
+    };
+
+    /** @type {Map<string, { dir: string, code: number, step: object }>} */
+    const results = new Map();
+
+    beforeAll(async () => {
+      for (const [name, setup] of Object.entries(CASES)) {
+        const dir = await freshProject("ndx-ci-restricted-");
+        await mkdir(join(dir, "scripts"), { recursive: true });
+        await writeFile(join(dir, "scripts", "release.js"), RELEASE_SCRIPT);
+        await setup(dir);
+        const result = runResult(["--format=json", "--quiet", dir]);
+        const report = parseReport(result, ["--format=json", "--quiet", name]);
+        results.set(name, {
+          dir,
+          code: result.code,
+          step: report.steps.find((s) => s.name === "architecture-policy"),
+        });
+      }
+      // One `ndx ci` run per fixture, all in one hook; see config-secrets.
+    }, 300_000);
+
+    afterAll(async () => {
+      for (const { dir } of results.values()) await removeTmpDir(dir);
+    });
+
+    it("fails ndx ci on a file importing the module outside its allow list", () => {
+      const { code, step } = results.get("file outside the allow list");
+      expect(code).toBe(1);
+      expect(step.ok).toBe(false);
+      expect(step.violations).toHaveLength(1);
+      // Names the file, the module and the config entry, and says how to allow it.
+      const [message] = step.violations;
+      expect(message).toContain("scripts/release.js");
+      expect(message).toContain("node:child_process");
+      expect(message).toContain("ci.restrictedImports[0]");
+      expect(message).toContain(".n-dx.json");
+      expect(message).toMatch(/add .* to its allow list/);
+    });
+
+    it("passes once the file is in the allow list", () => {
+      const { code, step } = results.get("file in the allow list");
+      expect(code).toBe(0);
+      expect(step.ok).toBe(true);
+      expect(step.violations).toBeUndefined();
+      expect(step.detail).not.toMatch(/^skipped/);
+    });
+
+    it("does not scan gitignored build output", () => {
+      const { code, step } = results.get("gitignored build output");
+      expect(step.violations).toBeUndefined();
+      expect(step.ok).toBe(true);
+      expect(code).toBe(0);
+    });
+
+    it("does not scan an agent worktree under .claude/worktrees", () => {
+      const { code, step } = results.get("agent worktree");
+      expect(step.violations).toBeUndefined();
+      expect(step.ok).toBe(true);
+      expect(code).toBe(0);
+    });
+
+    it("still fails an untracked, non-ignored source file outside the allow list", () => {
+      const { code, step } = results.get("untracked source file");
+      expect(code).toBe(1);
+      expect(step.ok).toBe(false);
+      expect(step.violations).toHaveLength(1);
+      expect(step.violations[0]).toMatch(/^scripts\/release\.js imports node:child_process/);
+    });
+
+    it("fails on a rule it cannot read rather than skipping it", () => {
+      const { code, step } = results.get("malformed rule");
+      expect(code).toBe(1);
+      expect(step.ok).toBe(false);
+      expect(step.violations.join("\n")).toContain("ci.restrictedImports[0].module");
+    });
+
+    it("fails on a config file it cannot parse, naming the file and the parse error", () => {
+      const { code, step } = results.get("unparseable config");
+      let parseError;
+      try {
+        JSON.parse(UNPARSEABLE_CONFIG);
+      } catch (err) {
+        parseError = err.message;
+      }
+      expect(code).toBe(1);
+      expect(step.ok).toBe(false);
+      expect(step.detail).not.toMatch(/^skipped/);
+      const message = step.violations.join("\n");
+      expect(message).toContain(".n-dx.json");
+      expect(message).toContain(parseError);
+    });
   });
 
   // ── Config secrets: one fixture per git state ───────────────────────────────

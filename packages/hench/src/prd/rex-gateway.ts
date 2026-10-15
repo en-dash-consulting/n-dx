@@ -149,14 +149,17 @@ export {
 // ignore change gates, so hench selects with rex's v2 selector instead — the
 // entry point `get_next_task` uses on v2 (findNextWorkTask), the ranked list
 // behind it (findActionableWork, for the menu and `--mine`), and the explicit
-// `--task` resolver (resolveWorkById: id, display id or alias). `prdLayout`
-// answers "is this tree v2" without reading it, for the flags v2 refuses.
+// `--task` resolver (resolveWorkById: id, display id or alias; a change with
+// open tasks resolves to one of them, and openChangeTasks names them when none
+// can run). `prdLayout` answers "is this tree v2" without reading it, for the
+// flags v2 refuses.
 export {
   prdLayout,
   isChangeLayerStore,
   findNextWorkTask,
   findActionableWork,
   resolveWorkById,
+  openChangeTasks,
 } from "@n-dx/rex";
 
 // ---- v2 agent brief -----------------------------------------------------------

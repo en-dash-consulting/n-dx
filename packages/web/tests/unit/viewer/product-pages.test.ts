@@ -152,6 +152,65 @@ describe("on a v2 project", () => {
     expect(root.textContent).toContain("(new)");
   });
 
+  describe("a refetch that fails after a successful load", () => {
+    const capabilityUrl = `/api/rex/product/capability/${CAPABILITY_DETAIL_FIXTURE.id}`;
+
+    /** Answer from `routes`, but 500 (or reject) every product read once `broken.on`. */
+    function stubBreakable(broken: { on: boolean; reject?: boolean }): void {
+      const routes: Record<string, unknown> = {
+        "/api/rex/product": { layout: "v2", map: PRODUCT_MAP_FIXTURE },
+        [capabilityUrl]: { layout: "v2", capability: CAPABILITY_DETAIL_FIXTURE },
+      };
+      vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+        if (broken.on && broken.reject) throw new Error("network down");
+        if (broken.on) return { ok: false, status: 500, json: async () => ({ error: "Could not read the product" }) };
+        return { ok: true, status: 200, json: async () => routes[url] };
+      }));
+    }
+
+    it.each([
+      ["answers 500", false],
+      ["rejects", true],
+    ])("keeps the map on screen and reports it when the fetch %s", async (_name, reject) => {
+      const broken = { on: false, reject };
+      stubBreakable(broken);
+      await mount(h(ProductPage, null));
+      broken.on = true;
+      await flushFrames("rex:prd-changed");
+
+      expect(root.querySelectorAll(".pm-area")).toHaveLength(PRODUCT_MAP_FIXTURE.areas.length);
+      expect(root.querySelector('[role="alert"]')?.textContent).toContain("Could not refresh");
+    });
+
+    it("leaves an open capability page and its Back button rendered", async () => {
+      const broken = { on: false };
+      stubBreakable(broken);
+      await mount(h(ProductPage, null));
+      act(() => {
+        [...root.querySelectorAll<HTMLButtonElement>(".pm-capability-link")]
+          .find((b) => b.textContent === CAPABILITY_DETAIL_FIXTURE.title)!.click();
+      });
+      await settle();
+      broken.on = true;
+      await flushFrames("rex:prd-changed");
+
+      expect(root.querySelector(".cap-container")?.getAttribute("data-capability-id")).toBe(CAPABILITY_DETAIL_FIXTURE.id);
+      expect(root.querySelector(".cap-back")).not.toBeNull();
+      expect(root.querySelector('[role="alert"]')?.textContent).toContain("Could not read the product");
+    });
+
+    it("clears the notice once a later refetch succeeds", async () => {
+      const broken = { on: false };
+      stubBreakable(broken);
+      await mount(h(ProductPage, null));
+      broken.on = true;
+      await flushFrames("rex:prd-changed");
+      broken.on = false;
+      await flushFrames("rex:prd-changed");
+      expect(root.querySelector('[role="alert"]')).toBeNull();
+    });
+  });
+
   it("the Changes page lists a change added since it mounted", async () => {
     const added = { ...CHANGES_FIXTURE[0]!, id: "change-added-later", displayId: "CH-999", title: "Added later" };
     const routes: Record<string, unknown> = { "/api/rex/changes": { layout: "v2", changes: CHANGES_FIXTURE } };
@@ -180,6 +239,96 @@ describe("on a v2 project", () => {
     await flushFrames("rex:prd-changed");
     expect(fetched.filter((u) => u === capabilityUrl)).toHaveLength(2);
     expect(root.querySelector(".cap-container")).not.toBeNull();
+  });
+
+  describe("editing a capability's spec", () => {
+    const capabilityUrl = `/api/rex/product/capability/${CAPABILITY_DETAIL_FIXTURE.id}`;
+    const met = { ...CAPABILITY_DETAIL_FIXTURE, status: "met" as const, specChangedSinceMet: false };
+    let posts: Array<{ url: string; body: Record<string, unknown> }>;
+
+    /** Serve the capability read and answer `POST /api/rex/product/edit` with `editStatus`. */
+    function stubEditable(capability: typeof met, editStatus = 200): void {
+      posts = [];
+      fetched = [];
+      vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
+        fetched.push(url);
+        if (init?.method === "POST") {
+          posts.push({ url, body: JSON.parse(init.body ?? "{}") });
+          return { ok: editStatus === 200, status: editStatus, json: async () => (editStatus === 200 ? { layout: "v2" } : { error: "refused by rex" }) };
+        }
+        const body = url === "/api/rex/product"
+          ? { layout: "v2", map: PRODUCT_MAP_FIXTURE }
+          : url === capabilityUrl ? { layout: "v2", capability } : undefined;
+        return { ok: body !== undefined, status: body ? 200 : 404, json: async () => body ?? { error: "not found" } };
+      }));
+    }
+
+    async function openAndType(): Promise<void> {
+      await mount(h(ProductPage, null));
+      act(() => {
+        [...root.querySelectorAll<HTMLButtonElement>(".pm-capability-link")]
+          .find((b) => b.textContent === CAPABILITY_DETAIL_FIXTURE.title)!.click();
+      });
+      await settle();
+      const statement = root.querySelector<HTMLTextAreaElement>(".cap-edit-statement")!;
+      act(() => {
+        statement.value = "A reworded statement.";
+        statement.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+
+    const save = async () => {
+      await act(async () => {
+        root.querySelector<HTMLFormElement>(".cap-edit-form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        // The post resolves, then the refetch it triggers; both inside this act.
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      await settle();
+    };
+
+    it("renders the edit form, and a submit posts the edit and refetches the page", async () => {
+      stubEditable(met);
+      await openAndType();
+      await save();
+
+      expect(posts).toEqual([{
+        url: "/api/rex/product/edit",
+        body: {
+          id: met.id,
+          statement: "A reworded statement.",
+          criteria: met.criteria.filter((c) => !c.inheritedFrom).map(({ id, text }) => ({ id, text })),
+          editorial: false,
+        },
+      }]);
+      expect(fetched.filter((u) => u === capabilityUrl)).toHaveLength(2);
+    });
+
+    it("sends editorial: true when the checkbox is checked", async () => {
+      stubEditable(met);
+      await openAndType();
+      act(() => { root.querySelector<HTMLInputElement>(".cap-edit-editorial-check")!.click(); });
+      await save();
+      expect(posts[0].body.editorial).toBe(true);
+    });
+
+    it("reseeds the form when a refetch brings a criterion edited elsewhere", async () => {
+      stubEditable(met);
+      await openAndType();
+      const own = met.criteria.find((c) => !c.inheritedFrom)!;
+      const edited = { ...met, criteria: met.criteria.map((c) => (c.id === own.id ? { ...c, text: "Edited elsewhere" } : c)) };
+      stubEditable(edited);
+      await flushFrames("rex:prd-changed");
+      const input = root.querySelector<HTMLInputElement>(`.cap-edit-criterion[data-criterion-id="${own.id}"]`)!;
+      expect(input.value).toBe("Edited elsewhere");
+    });
+
+    it("shows why a save was refused and does not refetch", async () => {
+      stubEditable(met, 409);
+      await openAndType();
+      await save();
+      expect(root.textContent).toContain("Could not save the edit: refused by rex");
+      expect(fetched.filter((u) => u === capabilityUrl)).toHaveLength(1);
+    });
   });
 
   it("ignores a flush that carries no rex:prd-changed frame", async () => {

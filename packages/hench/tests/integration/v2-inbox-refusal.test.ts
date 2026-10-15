@@ -38,8 +38,8 @@ afterEach(async () => {
 });
 
 describe("explicit --task on a v2 tree", () => {
-  it("accepts a placed change and its task", async () => {
-    expect((await select(CHANGE_ID)).item.id).toBe(CHANGE_ID);
+  it("accepts a placed change, running its open task, and the task itself", async () => {
+    expect((await select(CHANGE_ID)).item.id).toBe(TASK_ID);
     expect((await select(TASK_ID)).item.id).toBe(TASK_ID);
   });
 

@@ -507,7 +507,7 @@ async function addInboxChange(
   return true;
 }
 
-/** Handle PATCH /api/rex/items/bulk — bulk status update */
+/** Handle PATCH /api/rex/items/bulk — the single PATCH's fields, applied to many ids */
 async function handleBulkUpdate(
   req: IncomingMessage,
   res: ServerResponse,
@@ -530,9 +530,11 @@ async function handleBulkUpdate(
       return true;
     }
 
-    // Validate status if provided
-    if (input.updates.status && !API_SETTABLE_STATUSES.has(input.updates.status as string)) {
-      errorResponse(res, 400, `Invalid status: ${input.updates.status}`);
+    // The same field rules as the single PATCH, so the bulk route cannot write
+    // what that one refuses (`run`, ids, timestamps, an empty title).
+    const problem = validateItemPatch(input.updates);
+    if (problem) {
+      errorResponse(res, 400, problem);
       return true;
     }
 
@@ -540,7 +542,9 @@ async function handleBulkUpdate(
     // (prd_tree/ or prd.md) rather than always writing to prd.md via
     // savePRDSync.
     const store = await resolveStore(ctx.rexDir);
-    const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+    // `applied` and `reason` appear only when rex held a change open or left it
+    // unapplied (rex.applyOn), as in the single PATCH's answer.
+    const results: Array<{ id: string; ok: boolean; error?: string; applied?: boolean; reason?: string }> = [];
     // As the single PATCH: on a v2 tree "completed" goes through rex's
     // completion (closes a change with its last task, applies amendments to the
     // product layer); any other field or status goes through the store.
@@ -562,8 +566,12 @@ async function handleBulkUpdate(
         const refused: typeof pending = [];
         for (const result of pending) {
           try {
-            await completeV2Work(store, result.id);
+            const completion = await completeV2Work(store, result.id);
             delete result.error;
+            if (completion.reason) {
+              result.applied = completion.applied;
+              result.reason = completion.reason;
+            }
           } catch (err) {
             result.error = err instanceof Error ? err.message : String(err);
             refused.push(result);

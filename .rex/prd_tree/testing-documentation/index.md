@@ -23,6 +23,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Developer Environment Prerequisites Documentation](./developer-environment-prerequisites/index.md) | completed |
 | [Documentation improvements](./documentation-improvements/index.md) | completed |
 | [End-User Platform Requirements](./end-user-platform-requirements/index.md) | completed |
+| [Five unrelated suites failed under load in one session and passed on re-run: investigate the pattern, not each flake](./five-unrelated-suites-failed-under.md) | pending |
 | [Fix MCP server re-registration during ndx init](./fix-mcp-server-re-registration-during/index.md) | completed |
 | [Fix move-file in web-server (1 finding)](./fix-move-file-in-web-server-1-finding/index.md) | completed |
 | [Fix observation in refresh (1 finding)](./fix-observation-in-refresh-1-finding/index.md) | completed |
@@ -32,6 +33,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Fix observation in web-server (1 finding)](./fix-observation-in-web-server-1-finding/index.md) | completed |
 | [Fix observation in web-unit (1 finding)](./fix-observation-in-web-unit-1-finding/index.md) | completed |
 | [Fix suggestion in web-server (1 finding)](./fix-suggestion-in-web-server-1-finding/index.md) | completed |
+| [Four source files hold a NUL byte, so git shows them as binary and their diffs cannot be reviewed](./four-source-files-hold-a-nul-byte-so.md) | pending |
 | [Gauntlet Test Cleanup and Suite Consolidation](./gauntlet-test-cleanup-and-suite/index.md) | completed |
 | [Gauntlet Test Suite Audit and Cross-OS Validity Review](./gauntlet-test-suite-audit-and-cross-os/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main/index.md) | completed |
@@ -44,6 +46,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Refactor high-risk architectural zones](./refactor-high-risk-architectural-zones/index.md) | completed |
 | [Skills Reference and .gitignore Guidance in ndx Documentation](./skills-reference-and-gitignore/index.md) | completed |
 | [Skills Reference Documentation Page](./skills-reference-documentation-page/index.md) | completed |
+| [Test selection and docs drift](./test-selection-and-docs-drift/index.md) | completed |
 | [Timeout Guardrails for Hanging Tests](./timeout-guardrails-for-hanging-tests/index.md) | completed |
 | [TreeNodes DOM Performance Optimization](./treenodes-dom-performance-optimization/index.md) | completed |
 | [Update Documentation for New PRD Structure](./update-documentation-for-new-prd/index.md) | completed |
@@ -51,8 +54,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [A rex test worker exits mid-run under pnpm validate concurrency, failing the suite with every test passing](./a-rex-test-worker-exits-mid-run-under.md) | pending |
 | [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-stale.md) | completed |
 | [Auto-Update Detection from npm Registry](./auto-update-detection-from-npm-registry.md) | completed |
-| [Five unrelated suites failed under load in one session and passed on re-run: investigate the pattern, not each flake](./five-unrelated-suites-failed-under.md) | pending |
-| [Four source files hold a NUL byte, so git shows them as binary and their diffs cannot be reviewed](./four-source-files-hold-a-nul-byte-so.md) | pending |
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-the.md) | completed |
 | [routes-commands ndx-ladder tests leak the ambient NDX_CLI_PATH env var](./routes-commands-ndx-ladder-tests-leak.md) | completed |
 | [Zone cohesion gate silently passes in CI instead of reporting it did not run](./zone-cohesion-gate-silently-passes-in.md) | completed |

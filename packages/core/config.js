@@ -272,6 +272,39 @@ export async function loadProjectConfig(dir) {
 }
 
 /**
+ * Load the merged project config, reporting files that exist but cannot be
+ * read or parsed instead of treating them as empty.
+ *
+ * `loadProjectConfig` reads an unparseable file as `{}`, so a gate built on it
+ * cannot tell "not configured" from "configured, but broken" and passes when a
+ * trailing comma hides its rules. A gate reads through this instead and fails
+ * on `errors`. Each error names the file root-relative and gives the reason.
+ *
+ * @returns {Promise<{ config: object, errors: string[] }>}
+ */
+export async function loadProjectConfigStrict(dir) {
+  const errors = [];
+  const layers = [];
+  for (const which of [PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE]) {
+    const path = projectConfigPath(dir, which);
+    if (!(await fileExists(path))) continue;
+    let data;
+    try {
+      data = await loadJSON(path);
+    } catch (err) {
+      errors.push(`${projectConfigLabel(dir, which)}: cannot be read as JSON: ${err.message}`);
+      continue;
+    }
+    if (data === null || typeof data !== "object" || Array.isArray(data)) {
+      errors.push(`${projectConfigLabel(dir, which)}: must hold a JSON object, found ${JSON.stringify(data)}`);
+      continue;
+    }
+    layers.push(data);
+  }
+  return { config: layers.reduce((merged, layer) => deepMerge(merged, layer), {}), errors };
+}
+
+/**
  * Known config paths whose values must be finite numbers.
  * Used by repairProjectConfig() to re-type string values that should have
  * been stored as numbers (e.g. from first-time sets before coerceValue

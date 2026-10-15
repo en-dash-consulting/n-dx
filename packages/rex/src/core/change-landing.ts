@@ -40,6 +40,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { indexTree, type V2Tree } from "../schema/v2-rules.js";
 import type { ChangeNode } from "../schema/v2.js";
+import type { RuleNode } from "../schema/v2-rules.js";
 import { atomicWrite } from "../store/atomic-write.js";
 import {
   assertFullHistory,
@@ -155,16 +156,25 @@ function landingFrom(itemIds: Iterable<string>, inputs: LandingInputs): ChangeLa
   return { landed: true, commit: latest.landed.commit, lastCommit: latest.hash };
 }
 
-/**
- * Where a set of item ids (a change's id and its tasks', plus aliases) landed
- * on main. Throws when the ref does not resolve or the clone is shallow, like
- * `computeChangeCommits`: a truncated history would read as not landed.
- */
-export async function computeLanding(itemIds: Iterable<string>, options: ChangeCommitsOptions): Promise<ChangeLanding> {
-  return landingFrom(itemIds, await loadLandingInputs(options));
-}
+/** What landing reads of a change: its status, and the ids its commits may name. */
+export type LandingChange = Pick<RuleNode, "id" | "status" | "appliedAt" | "aliases" | "children">;
 
 const OPEN_CHANGE: ChangeLanding = { landed: false, reason: "change still open" };
+
+/** A change that is neither completed nor applied is still open and has not landed, whatever its commits show. */
+const isFinished = (change: LandingChange): boolean => change.status === "completed" || change.appliedAt !== undefined;
+
+/**
+ * Where one change landed on main. Its commits are those naming it, its tasks
+ * or subtasks, or an alias of any; an open change has not landed, whatever its
+ * commits show, and touches no git. Throws when the ref does not resolve or
+ * the clone is shallow, like `computeChangeCommits`: a truncated history would
+ * read as not landed.
+ */
+export async function computeLanding(change: LandingChange, options: ChangeCommitsOptions): Promise<ChangeLanding> {
+  if (!isFinished(change)) return OPEN_CHANGE;
+  return landingFrom(trailerIds(change), await loadLandingInputs(options));
+}
 
 /**
  * The landing of every live change (cancelled and retired ones will never
@@ -179,8 +189,7 @@ export async function computeLandings(tree: V2Tree, options: ChangeCommitsOption
   const out: Record<string, ChangeLanding> = {};
   for (const { node, retired } of indexTree(tree, { includeTombstones: true }).entries) {
     if (node.type !== "change" || retired || node.status === "cancelled") continue;
-    const finished = node.status === "completed" || node.appliedAt !== undefined;
-    if (!finished) {
+    if (!isFinished(node)) {
       out[node.id] = OPEN_CHANGE;
       continue;
     }

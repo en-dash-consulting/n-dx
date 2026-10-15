@@ -39,6 +39,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Pair-Programming Command Mode (rename from single-command)](./pair-programming-command-mode-rename/index.md) | completed |
 | [Plan-Mode Prevention Skill for LLM Agents](./plan-mode-prevention-skill-for-llm/index.md) | completed |
 | [Pre-Execution Confirmation Prompt for ndx self-heal](./pre-execution-confirmation-prompt-for/index.md) | completed |
+| [rex migrate-slugs help and JSDoc describe the slug rule it replaced, so the right tool reads as the wrong one](./rex-migrate-slugs-help-and-jsdoc.md) | completed |
 | [Self-Heal Scoped Task Selection and Auto-Termination](./self-heal-scoped-task-selection-and/index.md) | completed |
 | [Self-Heal Tag Attribution on Created PRD Items](./self-heal-tag-attribution-on-created/index.md) | completed |
 | [Shared Unit Test Utilities](./shared-unit-test-utilities/index.md) | completed |
@@ -58,14 +59,15 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [hench init must gitignore .hench/locks/ or the first autonomous run self-blocks](./hench-init-must-gitignore-hench-locks.md) | completed |
 | [`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record](./hench-record-no-tokens-leaves-the.md) | completed |
 | [`hench record` with no usage window silently claims the entire session transcript](./hench-record-with-no-usage-window.md) | completed |
-| [Let a project opt in to restricted-import rules in ndx ci](./let-a-project-opt-in-to-restricted.md) | pending |
+| [Let a project opt in to restricted-import rules in ndx ci](./let-a-project-opt-in-to-restricted.md) | completed |
 | [`ndx ci` architecture-policy step always fails: ci.js child_process allowlist has drifted from the e2e test's](./ndx-ci-architecture-policy-step-always.md) | completed |
 | [`ndx ci` fails any user project that imports child_process: its allowlist only names n-dx's own files and cannot be configured](./ndx-ci-fails-any-user-project-that.md) | completed |
+| [`ndx ci` reports restricted imports as "skipped" when .n-dx.json is not valid JSON, so configured rules silently stop applying](./ndx-ci-reports-restricted-imports-as.md) | completed |
+| [`ndx ci` restricted-import scan walks gitignored build output and agent worktrees, reporting false violations](./ndx-ci-restricted-import-scan-walks.md) | completed |
 | [`node packages/core/ci.js .` is a silent no-op, yet `pnpm verify` and CONTRIBUTING.md run the CI gate that way](./node-packages-core-ci-js-is-a-silent.md) | completed |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-carries.md) | completed |
 | [Pre-dispatch project-dir resolution still lets a directory shadow a config key](./pre-dispatch-project-dir-resolution.md) | completed |
 | [resolveDir treats a tool subcommand as the project directory, so `ndx hench record` checks the wrong path](./resolvedir-treats-a-tool-subcommand-as.md) | completed |
-| [rex migrate-slugs help and JSDoc describe the slug rule it replaced, so the right tool reads as the wrong one](./rex-migrate-slugs-help-and-jsdoc.md) | completed |
 | [Skill commit steps prescribe a POSIX-only heredoc, which fails in PowerShell and can drop the attribution trailer](./skill-commit-steps-prescribe-a-posix.md) | completed |
 | [Skills that call add_item describe item content in prose instead of naming its parameters](./skills-that-call-add-item-describe.md) | completed |
 | [Skills that record runs omit --startedAt, so each one's first record claims the whole session](./skills-that-record-runs-omit-startedat.md) | completed |

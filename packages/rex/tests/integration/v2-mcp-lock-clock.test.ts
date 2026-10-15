@@ -13,7 +13,7 @@ import { handleAddItem, handleApplyChange, handlePlaceChange, handleUpdateTaskSt
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 import { prdLockPath } from "../../src/store/paths.js";
 import { indexTree } from "../../src/schema/v2-rules.js";
-import { copyV2Fixture, editText } from "../helpers/v2-fixture.js";
+import { completeFixtureTask, copyV2Fixture, editText } from "../helpers/v2-fixture.js";
 
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
 const TASK = "c0000000-0000-4000-8000-000000000002";
@@ -130,6 +130,7 @@ describe("place_change on v2 reads its clock inside the lock", () => {
 
 describe("apply_change on v2 reads its clock inside the lock", () => {
   it("stamps appliedAt and the log with the post-lock time", async () => {
+    await completeFixtureTask(rexDir);
     const clock = movableClock(BEFORE_WAIT);
     const res = await behindHolder(
       () => handleApplyChange(store(), rexDir, { id: "CH-1" }, clock.read),

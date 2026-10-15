@@ -14,6 +14,7 @@ import {
   actionableV2Entries,
   inboxRefusal,
   loadV2Tree,
+  namedChangeEntry,
   nextV2Entry,
   readTreeAsReset,
   resolveV2Entry,
@@ -288,12 +289,19 @@ export async function selectTaskEntry(
 
   if (taskId) {
     // On v2 the ref may be a display id or alias; the entry carries the real id.
-    const entry = tree ? resolveV2Entry(tree, items, taskId) : findItem(items, taskId);
+    // A change with open tasks runs its next one no other worktree holds, so
+    // the claim below is on that task, never on the change.
+    const foreign = tree && claims ? await claims.foreignClaims() : undefined;
+    const entry = tree ? resolveV2Entry(tree, items, taskId, foreign, cliName) : findItem(items, taskId);
     if (!entry) throw new Error(`Task not found: ${taskId}`);
     const inbox = tree ? inboxRefusal(tree, taskId, cliName) : undefined;
     if (inbox) throw inbox;
     const notActionable = explicitTaskRefusal(entry.item, cliName);
     if (notActionable) throw notActionable;
+    // A ref naming a change runs one of its tasks; the change's status still gates it.
+    const named = tree ? namedChangeEntry(tree, items, taskId, entry) : null;
+    const changeNotActionable = named ? explicitTaskRefusal(named.item, cliName) : undefined;
+    if (changeNotActionable) throw changeNotActionable;
     // An explicit task another worktree is working on is refused, not stolen.
     // Claiming is the check: the store answers atomically under its lock.
     if (claims) {

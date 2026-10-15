@@ -1,12 +1,15 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import {
+  ROOT_DOCS_TEST_FILES,
   ROOT_DRIFT_TEST_FILES,
   ROOT_POLICY_TEST_FILES,
+  ROOT_SUBSET_LABELS,
   ROOT_SUBSET_TEST_FILES,
   VALIDATED_ARTIFACTS,
+  VALIDATED_DOC_PAGES,
   parsePorcelainZ,
   resolveLabels,
   selectAffected,
@@ -34,7 +37,7 @@ const MANIFESTS = [
 ];
 
 /** Every suite `all` and run-everything selections run: the root subsets are inside root. */
-const everySuite = validLabels(MANIFESTS).filter((l) => l !== "root-policy" && l !== "root-drift");
+const everySuite = validLabels(MANIFESTS).filter((l) => !ROOT_SUBSET_LABELS.includes(l));
 
 const select = (...files) => selectAffected(files, MANIFESTS);
 
@@ -54,7 +57,7 @@ describe("selectAffected", () => {
   });
 
   it("selects nothing for docs-only changes", () => {
-    expect(select("docs/guide/x.md", "README.md", "packages/rex/README.md", "packages/web/docs/a.png").suites).toEqual([]);
+    expect(select("docs/analysis/x.md", "docs/archive/x.md", "packages/rex/README.md", "packages/web/docs/a.png").suites).toEqual([]);
   });
 
   // #546 review finding F2: the Markdown/docs short-circuit ran before the
@@ -72,7 +75,7 @@ describe("selectAffected", () => {
   });
 
   it("still selects nothing for a plain docs or prose edit with no validated artifact", () => {
-    expect(select("docs/guide/skills.md").suites).toEqual([]);
+    expect(select("docs/architecture/overview.md").suites).toEqual([]);
     expect(select("docs/analysis/AUDIT-2026-09.md").suites).toEqual([]);
     // Live beside the policed inventories but no test reads either: the
     // layout-literal one stopped being an input when its ratchet became a wall
@@ -196,7 +199,7 @@ describe("selectAffected", () => {
 
   it("maps core changes to root, ignoring core docs", () => {
     expect(select("packages/core/cli.js").suites).toEqual(["root"]);
-    expect(select("packages/core/README.md").suites).toEqual([]);
+    expect(select("packages/core/CHANGELOG.md").suites).toEqual([]);
   });
 
   it("selects the package, dependents and root for a package.json change", () => {
@@ -284,7 +287,11 @@ describe("root subset test files", () => {
   });
 
   it("covers both subsets and never runs the same file twice", () => {
-    expect(Object.values(ROOT_SUBSET_TEST_FILES)).toEqual([ROOT_POLICY_TEST_FILES, ROOT_DRIFT_TEST_FILES]);
+    expect(Object.values(ROOT_SUBSET_TEST_FILES)).toEqual([
+      ROOT_POLICY_TEST_FILES,
+      ROOT_DRIFT_TEST_FILES,
+      ROOT_DOCS_TEST_FILES,
+    ]);
     const all = Object.values(ROOT_SUBSET_TEST_FILES).flat();
     expect(new Set(all).size).toBe(all.length);
   });
@@ -342,6 +349,73 @@ describe("validated artifacts", () => {
     for (const artifact of Object.keys(VALIDATED_ARTIFACTS)) {
       expect(artifact.endsWith(".md") || artifact.startsWith("docs/"), artifact).toBe(true);
     }
+  });
+});
+
+describe("validated docs pages", () => {
+  it.each([
+    ["README.md", "tests/e2e/command-docs-parity.test.js"],
+    ["packages/core/README.md", "tests/e2e/command-docs-parity.test.js"],
+    ["docs/guide/commands.md", "tests/e2e/command-docs-parity.test.js"],
+    ["docs/guide/workflow.md", "tests/e2e/docs-skill-refs.test.js"],
+    ["docs/cli-ui-gap.md", "tests/e2e/cli-ui-gap-drift.test.js"],
+    ["docs/guide/workflow.md", "tests/e2e/docs-command-refs.test.js"],
+    ["docs/guide/skills.md", "tests/e2e/docs-command-refs.test.js"],
+    ["docs/guide/concepts/glossary.md", "tests/e2e/docs-command-refs.test.js"],
+    ["docs/packages/rex.md", "tests/e2e/docs-command-refs.test.js"],
+    ["docs/index.md", "tests/e2e/docs-command-refs.test.js"],
+    ["docs/guide/troubleshooting.md", "tests/e2e/assistant-parity-smoke.test.js"],
+  ])("%s selects a subset that runs %s, and nothing else", (page, test) => {
+    const { suites } = select(page);
+    expect(suites).toHaveLength(suites.filter((s) => ROOT_SUBSET_LABELS.includes(s)).length);
+    expect(suites.length).toBeGreaterThan(0);
+    expect(suites.flatMap((s) => ROOT_SUBSET_TEST_FILES[s])).toContain(test);
+  });
+
+  it("selects root-docs, not root, for a guide page", () => {
+    expect(select("docs/guide/workflow.md").suites).toEqual(["root-docs"]);
+  });
+
+  // docs-skill-refs exempts the skills reference, but docs-command-refs still
+  // checks every command it names, so it is not prose.
+  it("selects root-docs for the skills reference, which docs-command-refs reads", () => {
+    expect(select("docs/guide/skills.md").suites).toEqual(["root-docs"]);
+  });
+
+  it("drops root-docs when root is selected too", () => {
+    expect(select("README.md", "scripts/a.mjs").suites).toEqual(["root"]);
+  });
+
+  it("maps each group to a subset that runs tests which exist and read a page it matches", () => {
+    for (const { label, tests } of VALIDATED_DOC_PAGES) {
+      for (const test of tests) {
+        expect(ROOT_SUBSET_TEST_FILES[label], `${label} should run ${test}`).toContain(test);
+        expect(existsSync(resolve(ROOT, test)), test).toBe(true);
+      }
+    }
+  });
+
+  // A `tests/*.md` file that a root-policy test reads must be mapped, or editing
+  // it alone selects nothing while CI fails. Derived from the test sources: a
+  // quoted `"<name>.md"` (as in `join(ROOT, "tests", "<name>.md")`) or quoted
+  // `"tests/<name>.md"` counts as a read.
+  it("has a VALIDATED_ARTIFACTS entry for every tests/*.md a policy test reads", () => {
+    const inventories = readdirSync(resolve(ROOT, "tests")).filter((f) => f.endsWith(".md"));
+    const reads = [];
+    for (const file of ROOT_POLICY_TEST_FILES) {
+      const source = readFileSync(resolve(ROOT, file), "utf8");
+      for (const name of inventories) {
+        if (new RegExp(`["'\`](?:tests/)?${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'\`]`).test(source)) {
+          reads.push({ file, artifact: `tests/${name}` });
+        }
+      }
+    }
+    // Guards the scan itself: it must see the two inventories the policy tests read today.
+    expect(reads.map((r) => r.artifact)).toEqual(
+      expect.arrayContaining(["tests/shell-spawn-inventory.md", "tests/wall-clock-assertion-inventory.md"]),
+    );
+    const missing = reads.filter(({ file, artifact }) => VALIDATED_ARTIFACTS[artifact]?.test !== file);
+    expect(missing).toEqual([]);
   });
 });
 

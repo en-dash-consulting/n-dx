@@ -17,7 +17,8 @@ import { loadPrdModel } from "../../../../src/store/prd-model-reader.js";
 import { indexTree, type RuleNode } from "../../../../src/schema/v2-rules.js";
 import { ensureRexDir, createStore } from "../../../../src/store/index.js";
 import { SCHEMA_VERSION } from "../../../../src/schema/index.js";
-import { copyV2Fixture } from "../../../helpers/v2-fixture.js";
+import { cmdUpdate } from "../../../../src/cli/commands/update.js";
+import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture } from "../../../helpers/v2-fixture.js";
 
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
@@ -82,6 +83,7 @@ describe("rex product show", () => {
 describe("rex product edit", () => {
   beforeEach(async () => {
     // Applying CH-1 makes the capability met, so a spec edit revises it.
+    await completeFixtureTask(rexDir);
     await cmdChange(tmp, "apply", "CH-1", {});
     out.length = 0;
   });
@@ -160,9 +162,27 @@ describe("rex change place", () => {
 
 describe("rex change apply", () => {
   it("applies the change's amendments and names them", async () => {
+    await completeFixtureTask(rexDir);
     await cmdChange(tmp, "apply", "CH-1", {});
     expect(text()).toMatch(/Applied CH-1 Add Apple Pay\.\n {2}modified A1\.1 Pay by card/);
     expect((await node(CHANGE)).appliedAt).toEqual(expect.any(String));
+  });
+
+  it("refuses a change with an open task, naming it, and writes nothing", async () => {
+    const before = await loadPrdModel(rexDir);
+    await expect(cmdChange(tmp, "apply", "CH-1", {})).rejects.toThrow(
+      `Cannot apply change CH-1: task ${FIXTURE_TASK} is not completed; a change applies once its work is done`,
+    );
+    expect(await loadPrdModel(rexDir)).toEqual(before);
+  });
+
+  it("an applied change still in progress completes through rex update, without applying again", async () => {
+    await completeFixtureTask(rexDir);
+    await cmdChange(tmp, "apply", "CH-1", {});
+    const applied = await node(CAPABILITY);
+    await cmdUpdate(tmp, CHANGE, { status: "completed" });
+    expect(await node(CHANGE)).toMatchObject({ status: "completed", completedAt: expect.any(String), appliedAt: expect.any(String) });
+    expect(await node(CAPABILITY)).toEqual(applied);
   });
 
   it("refuses an amends placement with nothing to modify (c3c42584), so apply never meets one", async () => {
@@ -203,6 +223,7 @@ describe("rex change place refusals", () => {
       await refuse("CH-404", { target: "A1.1" }),
       await refuse("CH-1", { target: "A1.1", relation: "touches" }), // CH-1 amends A1.1 already: not open once applied below
     ];
+    await completeFixtureTask(rexDir);
     await cmdChange(tmp, "apply", "CH-1", {});
     refusals.push(await refuse("CH-1", { target: "A1.1", relation: "touches" }));
     for (const err of refusals) {

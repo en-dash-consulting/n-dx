@@ -227,7 +227,7 @@ The following skills are installed in `.agents/skills/`. Each skill directory co
 - **ndx-zone** `[zone-id]` — Deep-dive into an architectural zone's structure and health
 - **ndx-work** `[task-id]` — Pick up a task from the PRD and begin working on it
 - **ndx-config** `[key] [value]` — View or change n-dx configuration with guided assistance
-- **ndx-reshape** — Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps, create new containers
+- **ndx-reshape** — Restructure the PRD — regroup, reparent, merge overlaps and place changes
 - **ndx-feedback** `[description]` — Submit feedback, bug reports, or feature requests for n-dx
 - **ndx-adversarial-review** `[task-id | name | topic]` — Attack a change or a completion claim, triage what breaks, and capture only what the user approves
 
