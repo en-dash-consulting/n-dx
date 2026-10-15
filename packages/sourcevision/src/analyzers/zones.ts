@@ -2080,44 +2080,6 @@ function computeContentHashes(
   return { zoneContentHashes, globalContentHash };
 }
 
-/**
- * Remap content hash keys from pre-enrichment zone IDs to post-enrichment IDs.
- *
- * Enrichment (AI or fast-mode preservation) may rename zone IDs. This function
- * builds a mapping by matching zones positionally (same index = same zone) and
- * returns a new hash record keyed by the final zone IDs.
- *
- * If no IDs changed, the original record is returned as-is for efficiency.
- */
-function remapContentHashKeys(
-  originalHashes: Record<string, string>,
-  preEnrichmentZones: Zone[],
-  postEnrichmentZones: Zone[],
-): Record<string, string> {
-  // Build old→new ID mapping. Zones are matched by array position since
-  // enrichment preserves zone order and count.
-  const idMap = new Map<string, string>();
-  let anyChanged = false;
-  const limit = Math.min(preEnrichmentZones.length, postEnrichmentZones.length);
-  for (let i = 0; i < limit; i++) {
-    const oldId = preEnrichmentZones[i].id;
-    const newId = postEnrichmentZones[i].id;
-    if (oldId !== newId) {
-      anyChanged = true;
-    }
-    idMap.set(oldId, newId);
-  }
-
-  if (!anyChanged) return originalHashes;
-
-  const remapped: Record<string, string> = {};
-  for (const [key, hash] of Object.entries(originalHashes)) {
-    const newKey = idMap.get(key) ?? key;
-    remapped[newKey] = hash;
-  }
-  return remapped;
-}
-
 // ── Helper: AI enrichment ────────────────────────────────────────────────────
 
 /** Result of enrichment or preservation of previous zone data. */
@@ -3341,9 +3303,8 @@ export async function analyzeZones(
     options.onReset(previousZones.enrichmentPass, 1);
   }
 
-  // ── Content hashes for stale-finding detection ──
-  const { zoneContentHashes, globalContentHash } =
-    computeContentHashes(expandedZones, inventory);
+  // ── Content hashes of the pre-enrichment zones (enrichment skip check) ──
+  const { zoneContentHashes } = computeContentHashes(expandedZones, inventory);
 
   // ── AI enrichment or preserve previous ──
   const enrichResult = await applyEnrichment(
@@ -3396,10 +3357,15 @@ export async function analyzeZones(
     }
   }
 
-  // ── Remap content hashes to post-enrichment zone IDs ──
-  const remappedContentHashes = remapContentHashKeys(
-    zoneContentHashes, expandedZones, finalZones,
-  );
+  // ── Content hashes keyed by post-enrichment zone IDs ──
+  // A zone's content hash depends only on its files, so hash the enriched
+  // zones directly. Matching pre- and post-enrichment zones by position
+  // stored each hash under the wrong id whenever enrichment reordered the
+  // zones (templated zones go last), so findings were checked for staleness
+  // against another zone's content, and every carried global finding read
+  // as stale and was dropped by the next pass.
+  const { zoneContentHashes: remappedContentHashes, globalContentHash: finalGlobalContentHash } =
+    computeContentHashes(finalZones, inventory);
 
   // ── Force declared anchor zones to exist (before pins resolve) ──
   const { zones: anchoredZones, emptyAnchors } =
@@ -3480,7 +3446,7 @@ export async function analyzeZones(
   // ── Assemble findings ──
   let allFindings = assembleFindings(
     pinnedFinalZones, structural, aiFindings, metaUpdatedFindings,
-    validPrevious, previousZones, remappedContentHashes, globalContentHash
+    validPrevious, previousZones, remappedContentHashes, finalGlobalContentHash
   );
 
   // ── Heuristic judgment (enrich-judge.ts) ──
