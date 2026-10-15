@@ -1,5 +1,5 @@
 /**
- * The hench agent run that `ndx work` and `ndx self-heal` spawn carries
+ * The hench agent run that `ndx work`, `ndx self-heal` and `ndx pair-programming` spawn carries
  * NDX_AGENT_RUN=1 and NDX_LEGACY_NOTICE=off, and `ndx migrate` refuses while
  * NDX_AGENT_RUN is set. Child CLIs are replaced by a double that records the
  * environment it receives.
@@ -85,6 +85,21 @@ describe("agent run environment", () => {
   it("ndx work's hench child receives NDX_LEGACY_NOTICE=off and NDX_AGENT_RUN=1", () => {
     const out = ndxWithDoubles(["work", "--auto", dir]);
     expect(out.status, out.stderr).toBe(0);
+    const hench = records().filter((r) => r.tool === "hench");
+    expect(hench).toHaveLength(1);
+    expect(hench[0]).toMatchObject({ NDX_LEGACY_NOTICE: "off", NDX_AGENT_RUN: "1" });
+  });
+
+  it("ndx pair-programming prints the v1 notice once and marks its hench run", () => {
+    // The rex `add` child is a double and creates nothing, so seed the task it would add.
+    const status = ndx(["rex", "status", "--format=json", dir]);
+    const epicId = JSON.parse(status.stdout).items.find((item) => item.level === "epic").id;
+    expect(ndx(["rex", "add", "task", "--title=fix it", `--parent=${epicId}`, dir]).status).toBe(0);
+
+    const out = ndxWithDoubles(["pair-programming", "fix it", "--skip-review", dir]);
+    expect(out.status, out.stderr).toBe(0);
+    expect(out.stderr.split(NOTICE).length - 1).toBe(1);
+
     const hench = records().filter((r) => r.tool === "hench");
     expect(hench).toHaveLength(1);
     expect(hench[0]).toMatchObject({ NDX_LEGACY_NOTICE: "off", NDX_AGENT_RUN: "1" });

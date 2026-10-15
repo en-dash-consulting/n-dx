@@ -528,11 +528,12 @@ function childEnv() {
  */
 const LEGACY_NOTICE_COMMANDS = new Set([
   "ci", "status", "plan", "add", "recommend", "refresh", "work", "analyze", "self-heal", "start", "web",
+  "pair-programming", "bicker",
 ]);
 
 /**
- * Environment for the hench agent run that `ndx work` and `ndx self-heal`
- * spawn. NDX_AGENT_RUN marks the run so `ndx migrate` refuses inside it, and
+ * Environment for the hench agent run that `ndx work`, `ndx self-heal` and
+ * `ndx pair-programming` spawn. NDX_AGENT_RUN marks the run so `ndx migrate` refuses inside it, and
  * the agent's shelled-out rex commands never print the v1 notice.
  */
 const AGENT_RUN_ENV = { NDX_AGENT_RUN: "1", NDX_LEGACY_NOTICE: "off" };
@@ -3250,7 +3251,7 @@ async function handlePairProgramming(rest) {
     process.stderr.write(`✓ created task ${createdTaskId}\n`);
 
     // ── Step 1: primary vendor work ────────────────────────────────────────
-    const primaryCode = await run(tools.hench, ["run", `--task=${createdTaskId}`, ...henchArgs]);
+    const primaryCode = await run(tools.hench, ["run", `--task=${createdTaskId}`, ...henchArgs], AGENT_RUN_ENV);
     if (primaryCode !== 0) {
       exitWithCleanup(primaryCode);
       return;
@@ -3310,7 +3311,7 @@ async function handlePairProgramming(rest) {
             .filter((a) => !a.startsWith("--context-file="))
             .concat(`--context-file=${remediationContextPath}`);
 
-          await run(tools.hench, ["run", `--task=${createdTaskId}`, ...remediationArgs]);
+          await run(tools.hench, ["run", `--task=${createdTaskId}`, ...remediationArgs], AGENT_RUN_ENV);
         },
       });
 
