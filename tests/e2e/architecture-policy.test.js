@@ -424,6 +424,7 @@ describe("architecture policy: pack tier boundary (@n-dx/lang-runtime and packs)
     "lang-go": ["@n-dx/lang-kit", "@n-dx/lang-runtime"],
     "lang-sql": ["@n-dx/lang-kit", "@n-dx/lang-runtime"],
     "lang-terraform": ["@n-dx/lang-kit", "@n-dx/lang-runtime"],
+    "lang-python": ["@n-dx/lang-kit", "@n-dx/lang-runtime"],
   };
 
   for (const [dir, allowed] of Object.entries(PACK_TIER)) {

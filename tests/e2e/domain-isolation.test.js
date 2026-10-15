@@ -14,7 +14,7 @@
  *   Foundation      @n-dx/llm-client · @n-dx/lang-kit  (shared types, API client · language facts)
  *
  *   Packs (beside domain; loaded at run time, never imported)
- *                   @n-dx/lang-runtime · @n-dx/lang-java · lang-go · lang-sql · lang-terraform
+ *                   @n-dx/lang-runtime · @n-dx/lang-java · lang-go · lang-sql · lang-terraform · lang-python
  * ```
  *
  * sourcevision reaches a pack only through a dynamic `import()` in its pack
