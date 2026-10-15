@@ -136,19 +136,19 @@ function stage(id: StageId): ViewRenderer {
     renderView: (view: ViewId) => (view === "overview" && STAGES[id].tiles
       ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead" })
       : renderActiveView(view, ctx)),
-    renderPanel: (panel: StagePanelId) => renderPanel(panel, ctx),
+    renderPanel: (panel: StagePanelId, opened: boolean) => renderPanel(panel, opened, ctx),
     renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data) : undefined,
     detailOpen: ctx.detailOpen ?? false,
   });
 }
 
 /** The parts of a stage page that are not views of their own. */
-function renderPanel(panel: StagePanelId, ctx: ViewRenderContext): ComponentChild {
+function renderPanel(panel: StagePanelId, opened: boolean, ctx: ViewRenderContext): ComponentChild {
   switch (panel) {
     case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo });
     case "health": return h(CodebaseStats, { data: ctx.data });
     case "next-steps": return h(NextStepsPanel, { embedded: true });
-    case "languages": return h(LanguagesPanel, { data: ctx.data });
+    case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
   }
 }
 

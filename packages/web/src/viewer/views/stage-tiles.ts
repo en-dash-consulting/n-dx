@@ -28,7 +28,8 @@ import type { ViewId } from "../types.js";
 import { viewLabel, viewBlurb, viewGlyph, type StageId, type StageTile, type StagePanelId, type StageTab } from "./stages.js";
 import { ActionIcon } from "../components/index.js";
 
-export type RenderPanel = (panel: StagePanelId) => ComponentChild;
+/** A stage panel; `opened` is true in the opened tile, false in the tile itself. */
+export type RenderPanel = (panel: StagePanelId, opened: boolean) => ComponentChild;
 /** A tile's summary, or null to show its panel or its view cut to the tile. */
 export type RenderSummary = (tile: StageTile) => ComponentChild | null;
 
@@ -45,6 +46,8 @@ export function tileTitle(tile: StageTile): string {
 
 interface TileContentProps {
   tile: StageTile;
+  /** In the opened tile (the modal), as opposed to the tile's own preview. */
+  opened: boolean;
   tabs: readonly StageTab[];
   renderView: (view: ViewId) => ComponentChild;
   renderPanel: RenderPanel;
@@ -67,9 +70,9 @@ function tabListKeyDown(e: KeyboardEvent, tabs: readonly StageTab[], activeIndex
 }
 
 /** A tile's whole content: its panel, or its view with the tile's tabs. */
-function TileContent({ tile, tabs, renderView, renderPanel, idBase }: TileContentProps) {
+function TileContent({ tile, opened, tabs, renderView, renderPanel, idBase }: TileContentProps) {
   const [active, setActive] = useState<ViewId>(tile.view);
-  if (tile.panel) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel));
+  if (tile.panel) return h("div", { class: "stage-tile-content" }, renderPanel(tile.panel, opened));
   const shown = tabs.some((t) => t.view === active) ? active : tile.view;
   return h("div", { class: "stage-tile-content" },
     tabs.length > 1
@@ -173,7 +176,7 @@ function Tile({ stage, tile, onOpen, renderView, renderPanel, renderSummary }: T
 
   if (tile.chromeless && tile.panel) {
     return h("section", { class: `stage-tile stage-tile--chromeless ${span}`, "data-tile": key, "aria-label": title },
-      renderPanel(tile.panel),
+      renderPanel(tile.panel, false),
     );
   }
 
@@ -195,7 +198,7 @@ function Tile({ stage, tile, onOpen, renderView, renderPanel, renderSummary }: T
       summary !== null
         ? summary
         // A preview: the tile's own view only; its tabs are for full-screen.
-        : h(TileContent, { tile, tabs: [], renderView, renderPanel, idBase }),
+        : h(TileContent, { tile, opened: false, tabs: [], renderView, renderPanel, idBase }),
     ),
   );
 }
@@ -243,6 +246,7 @@ export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, render
       ? h(FullScreenTile, {
           stage,
           tile: full,
+          opened: true,
           tabs: tabsOf(full),
           renderView,
           renderPanel,

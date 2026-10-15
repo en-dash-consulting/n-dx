@@ -275,6 +275,18 @@ interface OverviewProps {
 const LANG_COLORS: Record<string, string> = {
   TypeScript: "#3178c6",
   JavaScript: "#f7df1e",
+  "C#": "#9b4f96",
+  "ASP.NET": "#512bd4",
+  SQL: "#e38c00",
+  Java: "#b07219",
+  Kotlin: "#a97bff",
+  Swift: "#f05138",
+  Ruby: "#cc342d",
+  PHP: "#777bb4",
+  Shell: "#89e051",
+  "C++": "#f34b7d",
+  C: "#555555",
+  Vue: "#41b883",
   CSS: "var(--purple)",
   HTML: "#e34f26",
   JSON: "#8b90a8",
@@ -546,11 +558,66 @@ export function MapPanel({ data, navigateTo }: { data: LoadedData; navigateTo?: 
   });
 }
 
-/** Source files by language, top eight. */
-export function LanguagesPanel({ data }: { data: LoadedData }): ComponentChild {
+/**
+ * Source files by language. In the tile, the top languages as bars; opened,
+ * every language with its files, lines and share, whether its imports are
+ * analysed, and the extensions the inventory skipped.
+ */
+export function LanguagesPanel({ data, opened = false }: { data: LoadedData; opened?: boolean }): ComponentChild {
   const chart = useMemo(() => languageChartData(data), [data.inventory]);
-  if (chart.length === 0) return h("p", { class: "stage-tile-empty" }, "No inventory yet.");
-  return h(BarChart, { data: chart });
+  const rows = useMemo(() => languageRows(data), [data.inventory]);
+  if (chart.length === 0) return h("p", { class: "stage-tile-empty" }, "No inventory loaded.");
+  if (!opened) return h(BarChart, { data: chart.slice(0, 5) });
+
+  const skipped = Object.entries(data.inventory?.summary.skippedExtensions ?? {}).sort(([, a], [, b]) => b - a);
+  return h("div", { class: "languages-breakdown" },
+    h(BarChart, { data: chart }),
+    h("table", { class: "languages-table" },
+      h("thead", null, h("tr", null,
+        h("th", null, "Language"),
+        h("th", { class: "num" }, "Files"),
+        h("th", { class: "num" }, "Lines"),
+        h("th", { class: "num" }, "Share"),
+        h("th", null, "Imports"),
+      )),
+      h("tbody", null, rows.map((r) => h("tr", { key: r.language },
+        h("td", null,
+          h("span", { class: "languages-swatch", style: `background: ${r.color}`, "aria-hidden": "true" }),
+          r.language),
+        h("td", { class: "num" }, r.files.toLocaleString()),
+        h("td", { class: "num" }, r.lines.toLocaleString()),
+        h("td", { class: "num" }, `${r.share}%`),
+        h("td", { class: r.analysed ? "languages-analysed" : "languages-inventoried" },
+          r.analysed ? "analysed" : "inventoried only"),
+      ))),
+    ),
+    skipped.length > 0
+      ? h("p", { class: "languages-skipped" },
+          h("strong", null, "Skipped: "),
+          skipped.map(([ext, n]) => `${ext} (${n.toLocaleString()})`).join(" · "))
+      : null,
+  );
+}
+
+interface LanguageRow { language: string; files: number; lines: number; share: number; analysed: boolean; color: string }
+
+function languageRows(data: LoadedData): LanguageRow[] {
+  const inventory = data.inventory;
+  if (!inventory) return [];
+  const lines = new Map<string, number>();
+  for (const f of inventory.files) lines.set(f.language, (lines.get(f.language) ?? 0) + (f.lineCount ?? 0));
+  const total = inventory.summary.totalFiles || 1;
+  const analysed = new Set(inventory.summary.analysedLanguages ?? []);
+  return Object.entries(inventory.summary.byLanguage)
+    .sort(([, a], [, b]) => b - a)
+    .map(([language, files]) => ({
+      language,
+      files,
+      lines: lines.get(language) ?? 0,
+      share: Math.round((files / total) * 1000) / 10,
+      analysed: analysed.has(language),
+      color: LANG_COLORS[language] || "var(--accent)",
+    }));
 }
 
 function languageChartData(data: LoadedData): Array<{ label: string; value: number; color: string }> {

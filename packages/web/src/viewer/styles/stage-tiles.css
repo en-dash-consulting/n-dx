@@ -483,3 +483,62 @@
 .overview-next-steps--embedded .next-steps-summary {
   flex-wrap: wrap;
 }
+
+/* ── Languages, opened: the chart beside the full table ── */
+
+.languages-breakdown {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .languages-breakdown { grid-template-columns: minmax(0, 1fr); }
+}
+
+.languages-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.languages-table th,
+.languages-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.languages-table th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.languages-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.languages-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: var(--space-2);
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.languages-analysed { color: var(--green); }
+.languages-inventoried { color: var(--text-dim); }
+
+.languages-skipped {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
