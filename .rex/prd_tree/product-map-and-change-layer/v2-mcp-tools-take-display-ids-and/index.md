@@ -19,6 +19,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [MCP health on a v2 tree returns an error instead of the score when package.json is malformed](./mcp-health-on-a-v2-tree-returns-an.md) | pending |
 | [MCP health on a v2 tree scores the change projection with v1 dimensions](./mcp-health-on-a-v2-tree-scores-the.md) | pending |
 | [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | completed |
 | [On a v2 tree, release_task leaves a claim held when given the display id claim_task accepted](./on-a-v2-tree-release-task-leaves-a.md) | completed |
