@@ -18,9 +18,10 @@ const DIRTY: GitStatus = {
   branch: "UI-Upgrade",
   dirty: true,
   files: [
-    { path: "a.txt", code: " M", status: "modified" },
-    { path: "b.txt", code: "??", status: "untracked" },
+    { path: "a.txt", code: " M", status: "modified", origin: "other" },
+    { path: "b.txt", code: "??", status: "untracked", origin: "other" },
   ],
+  scope: null,
 };
 
 describe("GitStatusBanner", () => {
@@ -47,7 +48,7 @@ describe("GitStatusBanner", () => {
 
   it("renders nothing when the tree is clean", () => {
     render(h(GitStatusBanner, {
-      status: { isRepo: true, branch: "main", dirty: false, files: [] },
+      status: { isRepo: true, branch: "main", dirty: false, files: [], scope: null },
       onCommitted: vi.fn(),
     }), root);
     expect(root.children.length).toBe(0);
@@ -55,7 +56,7 @@ describe("GitStatusBanner", () => {
 
   it("renders nothing outside a git repository", () => {
     render(h(GitStatusBanner, {
-      status: { isRepo: false, branch: null, dirty: false, files: [] },
+      status: { isRepo: false, branch: null, dirty: false, files: [], scope: null },
       onCommitted: vi.fn(),
     }), root);
     expect(root.children.length).toBe(0);

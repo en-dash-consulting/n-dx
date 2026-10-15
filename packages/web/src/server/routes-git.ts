@@ -31,9 +31,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import { exec } from "@n-dx/llm-client";
+import { exec, resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { isFeatureEnabled } from "./routes-features.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,11 +43,23 @@ import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 export type GitFileStatus =
   | "modified" | "added" | "deleted" | "renamed" | "untracked" | "unmerged" | "other";
 
+/**
+ * Where a dirty file came from.
+ *
+ * `prd` and `analysis` are files n-dx itself rewrites — the PRD tree, and the
+ * tracked SourceVision outputs an analyze run regenerates. They are the bulk
+ * of the noise in a working tree, and committing them needs no review, so the
+ * dashboard offers a one-click labelled commit when the whole dirty set is one
+ * of them. `other` is the user's own work and never gets that treatment.
+ */
+export type GitFileOrigin = "prd" | "analysis" | "other";
+
 export interface GitStatusFile {
   path: string;
   /** Raw two-character porcelain status code, e.g. " M", "??", "A ". */
   code: string;
   status: GitFileStatus;
+  origin: GitFileOrigin;
 }
 
 export interface GitStatusResponse {
@@ -54,6 +67,13 @@ export interface GitStatusResponse {
   branch: string | null;
   dirty: boolean;
   files: GitStatusFile[];
+  /**
+   * The single origin every dirty file shares, or null when the tree is clean
+   * or mixed. Only a non-null value of `prd` or `analysis` offers a quick
+   * commit — a mixed tree must never be committed wholesale, because the
+   * user's own work would ride along.
+   */
+  scope: GitFileOrigin | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +103,10 @@ function classify(code: string): GitFileStatus {
 }
 
 /** Parse `git status --porcelain` output (v1, unquoted paths). */
-export function parsePorcelainStatus(output: string): GitStatusFile[] {
+export function parsePorcelainStatus(
+  output: string,
+  originOf: (path: string) => GitFileOrigin = () => "other",
+): GitStatusFile[] {
   return output
     .split("\n")
     .filter(Boolean)
@@ -92,9 +115,51 @@ export function parsePorcelainStatus(output: string): GitStatusFile[] {
       const rest = line.slice(3);
       // Renamed entries read "old -> new" — surface the new path.
       const path = rest.includes(" -> ") ? rest.split(" -> ")[1] : rest;
-      return { path, code, status: classify(code) };
+      return { path, code, status: classify(code), origin: originOf(path) };
     });
 }
+
+/**
+ * Classify a repo-relative path by which tool owns it.
+ *
+ * Built from the project's own layout rather than hardcoded `.rex` /
+ * `.sourcevision` spellings, because a v2 project keeps both under `.ndx/`.
+ * git reports paths with forward slashes on every platform, so the layout's
+ * absolute directories are reduced to forward-slash prefixes to compare.
+ */
+export function makeOriginClassifier(projectDir: string): (path: string) => GitFileOrigin {
+  const layout = resolveLayout(projectDir);
+  const prefix = (dir: string): string => {
+    const rel = relative(projectDir, dir).split(sep).join("/");
+    return rel.endsWith("/") ? rel : rel + "/";
+  };
+  const prd = prefix(layout.rexDir);
+  const analysis = prefix(layout.sourcevisionDir);
+
+  return (path) => {
+    let p = path.split(sep).join("/");
+    if (p.startsWith("./")) p = p.slice(2);
+    if (p.startsWith(prd)) return "prd";
+    if (p.startsWith(analysis)) return "analysis";
+    return "other";
+  };
+}
+
+/** The one origin every dirty file shares, or null when clean or mixed. */
+export function scopeOf(files: GitStatusFile[]): GitFileOrigin | null {
+  if (files.length === 0) return null;
+  const first = files[0].origin;
+  return files.every((f) => f.origin === first) ? first : null;
+}
+
+/**
+ * Commit subjects for a scoped commit. Constant by design — these commits
+ * record a regeneration, so there is nothing per-commit worth composing.
+ */
+export const SCOPE_MESSAGE: Record<Exclude<GitFileOrigin, "other">, string> = {
+  prd: "chore(prd): update the PRD tree",
+  analysis: "chore(analysis): refresh the SourceVision scan output",
+};
 
 /**
  * Resolve `file` (untrusted query param) against `projectDir` and refuse
@@ -138,7 +203,7 @@ export function toGitignorePattern(relPath: string): string {
 async function handleGitStatus(res: ServerResponse, ctx: ServerContext): Promise<boolean> {
   const isRepo = await gitCommand(ctx.projectDir, ["rev-parse", "--is-inside-work-tree"]);
   if (!isRepo.ok) {
-    jsonResponse(res, 200, { isRepo: false, branch: null, dirty: false, files: [] } satisfies GitStatusResponse);
+    jsonResponse(res, 200, { isRepo: false, branch: null, dirty: false, files: [], scope: null } satisfies GitStatusResponse);
     return true;
   }
 
@@ -146,13 +211,14 @@ async function handleGitStatus(res: ServerResponse, ctx: ServerContext): Promise
     gitCommand(ctx.projectDir, ["status", "--porcelain"]),
     gitCommand(ctx.projectDir, ["rev-parse", "--abbrev-ref", "HEAD"]),
   ]);
-  const files = parsePorcelainStatus(status.stdout);
+  const files = parsePorcelainStatus(status.stdout, makeOriginClassifier(ctx.projectDir));
 
   jsonResponse(res, 200, {
     isRepo: true,
     branch: branch.ok ? branch.stdout.trim() : null,
     dirty: files.length > 0,
     files,
+    scope: scopeOf(files),
   } satisfies GitStatusResponse);
   return true;
 }
@@ -213,26 +279,87 @@ async function handleGitCommit(
   ctx: ServerContext,
 ): Promise<boolean> {
   let message: string;
+  let scope: Exclude<GitFileOrigin, "other"> | undefined;
+  // An unattended commit, fired by the toggle rather than by a click.
+  let auto = false;
   try {
     const body = await readBody(req, res);
-    const input = JSON.parse(body) as { message?: string };
+    const input = JSON.parse(body) as { message?: string; scope?: string; auto?: boolean };
     message = (input.message ?? "").trim();
+    if (input.scope !== undefined) {
+      if (input.scope !== "prd" && input.scope !== "analysis") {
+        errorResponse(res, 400, 'scope must be "prd" or "analysis"');
+        return true;
+      }
+      scope = input.scope;
+    }
+    auto = input.auto === true;
   } catch {
     errorResponse(res, 400, "Invalid JSON body");
     return true;
   }
+
+  if (auto) {
+    if (!scope) {
+      errorResponse(res, 400, "An automatic commit must name a scope.");
+      return true;
+    }
+    if (!isFeatureEnabled(ctx.projectDir, "git.autoCommitGenerated")) {
+      errorResponse(res, 403, "Auto-commit of generated files is turned off.");
+      return true;
+    }
+  }
+
+  // Paths to stage. Undefined means the historical whole-tree commit.
+  let paths: string[] | undefined;
+
+  if (scope) {
+    // Re-read status here rather than trusting paths from the client: this is
+    // the only thing deciding what gets staged, and a scoped commit that
+    // staged a caller-supplied list would be a way to commit anything.
+    const current = await gitCommand(ctx.projectDir, ["status", "--porcelain"]);
+    if (!current.ok) {
+      errorResponse(res, 500, `git status failed: ${current.stderr.trim() || "unknown error"}`);
+      return true;
+    }
+    const files = parsePorcelainStatus(current.stdout, makeOriginClassifier(ctx.projectDir));
+    if (files.length === 0) {
+      errorResponse(res, 409, "Nothing to commit — the working tree is clean.");
+      return true;
+    }
+    const actual = scopeOf(files);
+    if (actual !== scope) {
+      // The tree changed under us, or the caller guessed. Either way, refuse
+      // rather than sweep a mixed tree into a commit labelled as one thing.
+      const offending = files.filter((f) => f.origin !== scope).map((f) => f.path);
+      errorResponse(
+        res,
+        409,
+        `The working tree is no longer only ${scope} files. Not committing. ` +
+          `Unexpected: ${offending.slice(0, 5).join(", ")}${offending.length > 5 ? ", …" : ""}`,
+      );
+      return true;
+    }
+    paths = files.map((f) => f.path);
+    if (!message) message = SCOPE_MESSAGE[scope];
+  }
+
   if (!message) {
     errorResponse(res, 400, "message is required");
     return true;
   }
 
-  const add = await gitCommand(ctx.projectDir, ["add", "-A"]);
+  const add = paths
+    ? await gitCommand(ctx.projectDir, ["add", "--", ...paths])
+    : await gitCommand(ctx.projectDir, ["add", "-A"]);
   if (!add.ok) {
     errorResponse(res, 500, `git add failed: ${add.stderr.trim() || "unknown error"}`);
     return true;
   }
 
-  const commit = await gitCommand(ctx.projectDir, ["commit", "-m", message]);
+  const commit = paths
+    ? await gitCommand(ctx.projectDir, ["commit", "-m", message, "--", ...paths])
+    : await gitCommand(ctx.projectDir, ["commit", "-m", message]);
   if (!commit.ok) {
     errorResponse(res, 500, `git commit failed: ${(commit.stderr || commit.stdout).trim() || "unknown error"}`);
     return true;

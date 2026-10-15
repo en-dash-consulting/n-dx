@@ -31,7 +31,7 @@ interface FeatureDefinition {
   label: string;
   description: string;
   impact: string;
-  package: "sourcevision" | "rex" | "hench";
+  package: "sourcevision" | "rex" | "hench" | "git";
   stability: "experimental" | "stable" | "deprecated";
   defaultValue: boolean;
 }
@@ -140,6 +140,16 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     description: "Allow the agent to dynamically adjust its workflow based on task complexity and past performance.",
     impact: "May change execution parameters between runs. Provides better results but less predictable behavior.",
     package: "hench",
+    stability: "experimental",
+    defaultValue: false,
+  },
+  // ── Git ───────────────────────────────────────────────────────────
+  {
+    key: "git.autoCommitGenerated",
+    label: "Auto-commit generated files",
+    description: "When every uncommitted file came from the same tool — all PRD files, or all SourceVision scan output — commit them automatically with a constant message instead of waiting for the button in the git panel.",
+    impact: "Only ever commits a tree that contains nothing else, and never pushes. A tree holding any of your own work is left alone.",
+    package: "git",
     stability: "experimental",
     defaultValue: false,
   },
