@@ -17,17 +17,19 @@ import {
   detectLanguage as detectLanguageWith,
   detectLanguages as detectLanguagesWith,
   isTerraformFile,
+  mergeLanguageConfigs as mergeLanguageConfigsWith,
   terraformConfig,
   type LanguageConfig,
 } from "@n-dx/lang-kit";
-import { loadIgnoreFilter, projectSkipDirs, walkProjectFiles } from "../util/project-walk.js";
+import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 
 export { getLanguageConfig, languageConfigsFromIds, mergeLanguageConfigs, VALID_LANGUAGE_IDS } from "@n-dx/lang-kit";
 
 /**
  * Terraform marker present? Any file `isTerraformFile` accepts, at any depth,
  * found by the inventory's own walk: the same skipped directories (base,
- * vendored, `otherConfigs`' and Terraform's `skipDirectories`, the
+ * vendored, `otherConfigs`' and Terraform's `skipDirectories` and
+ * `skipUnlessContains`, the
  * user's `extraSkipDirs`) and the same `.gitignore` / `.sourcevisionignore`
  * filter. `otherConfigs` are the languages detected without Terraform, so the
  * skip set equals the one the analyze-phase inventory uses with the result.
@@ -38,13 +40,10 @@ export { getLanguageConfig, languageConfigsFromIds, mergeLanguageConfigs, VALID_
  */
 async function hasTerraformMarker(rootDir: string, otherConfigs: readonly LanguageConfig[]): Promise<boolean> {
   const { extraSkipDirs } = await loadInventoryConfig(rootDir);
-  const skipDirs = projectSkipDirs(
-    [...otherConfigs, terraformConfig].flatMap((c) => [...c.skipDirectories]),
-    extraSkipDirs,
-  );
+  const skip = projectSkip(mergeLanguageConfigsWith([...otherConfigs, terraformConfig]), extraSkipDirs);
   const ig = await loadIgnoreFilter(rootDir);
   try {
-    for await (const relPath of walkProjectFiles(rootDir, rootDir, ig, skipDirs)) {
+    for await (const relPath of walkProjectFiles(rootDir, rootDir, ig, skip)) {
       if (isTerraformFile(basename(relPath))) return true;
     }
   } catch {

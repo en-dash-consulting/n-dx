@@ -10,7 +10,7 @@ import { isVerbose, verbose } from "@n-dx/llm-client";
 import type { FileEntry, FileRole, Inventory } from "../schema/index.js";
 import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
-import { loadIgnoreFilter, projectSkipDirs, walkProjectFiles } from "../util/project-walk.js";
+import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { csharpConfig, pythonConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
 
@@ -455,7 +455,7 @@ export async function analyzeInventory(
   const extraSkipDirs = options?.extraSkipDirs ?? inventoryConfig.extraSkipDirs ?? [];
 
   // Build skip set: always-skipped dirs + vendored deps + language-specific dirs + user extras
-  const skipDirs = projectSkipDirs(langConfig.skipDirectories, extraSkipDirs);
+  const skip = projectSkip(langConfig, extraSkipDirs);
 
   // Extensions rejected by the code-only filter below, tallied by extension —
   // surfaced on the summary as `skippedExtensions` so a project whose files
@@ -478,7 +478,7 @@ export async function analyzeInventory(
   const ig = await loadIgnoreFilter(absDir);
   // Code-only filter applied before files are stat'd/read.
   const filePaths: string[] = [];
-  for await (const relPath of walkProjectFiles(absDir, absDir, ig, skipDirs)) {
+  for await (const relPath of walkProjectFiles(absDir, absDir, ig, skip)) {
     if (acceptFile(relPath)) filePaths.push(relPath);
   }
 

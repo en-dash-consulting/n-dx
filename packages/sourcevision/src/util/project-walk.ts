@@ -9,9 +9,11 @@
  * @module sourcevision/util/project-walk
  */
 
+import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { PROJECT_DIRS } from "@n-dx/llm-client";
+import { skipsDirectory, type LanguageConfig } from "@n-dx/lang-kit";
 import { toPosix } from "./paths.js";
 
 // ── Skip patterns ────────────────────────────────────────────────────────────
@@ -56,15 +58,21 @@ const VENDOR_SKIP_DIRS: ReadonlySet<string> = new Set([
   ".terraform",
 ]);
 
+/** The directories a walk skips, in the language config's terms. */
+export type ProjectSkip = Pick<LanguageConfig, "skipDirectories" | "skipUnlessContains">;
+
 /**
- * Directory names the walk skips: the base and vendored sets, the language
- * config's own `skipDirectories`, and the user's `extraSkipDirs`.
+ * What the walk skips: the base and vendored sets, the language config's own
+ * `skipDirectories` and `skipUnlessContains`, and the user's `extraSkipDirs`.
  */
-export function projectSkipDirs(
-  languageSkipDirs: Iterable<string>,
+export function projectSkip(
+  language: ProjectSkip,
   extraSkipDirs: Iterable<string> = [],
-): Set<string> {
-  return new Set([...BASE_SKIP_DIRS, ...VENDOR_SKIP_DIRS, ...languageSkipDirs, ...extraSkipDirs]);
+): ProjectSkip {
+  return {
+    skipDirectories: new Set([...BASE_SKIP_DIRS, ...VENDOR_SKIP_DIRS, ...language.skipDirectories, ...extraSkipDirs]),
+    ...(language.skipUnlessContains ? { skipUnlessContains: language.skipUnlessContains } : {}),
+  };
 }
 
 // ── Ignore filter ────────────────────────────────────────────────────────────
@@ -198,29 +206,31 @@ export async function loadIgnoreFilter(rootDir: string): Promise<IgnoreFilter> {
 
 /**
  * Yield every file under `dir` as a POSIX path relative to `rootDir`, depth
- * first in `readdir` order. Skips directories named in `skipDirs`, paths the
- * ignore filter rejects, and `.gitkeep`. Symlinks are not followed. A consumer
- * that stops early (`break` / `return`) stops the walk.
+ * first in `readdir` order. Skips the directories `skip` names (see
+ * `skipsDirectory`), paths the ignore filter rejects, and `.gitkeep`. A file
+ * named like a skipped directory is skipped too. Symlinks are not followed. A
+ * consumer that stops early (`break` / `return`) stops the walk.
  */
 export async function* walkProjectFiles(
   dir: string,
   rootDir: string,
   ig: IgnoreFilter,
-  skipDirs: ReadonlySet<string>,
+  skip: ProjectSkip,
 ): AsyncGenerator<string> {
   const entries = await readdir(dir, { withFileTypes: true });
 
   for (const entry of entries) {
-    if (skipDirs.has(entry.name)) continue;
     if (entry.name === ".gitkeep") continue;
 
     const fullPath = join(dir, entry.name);
     const relPath = toPosix(relative(rootDir, fullPath));
 
     if (entry.isDirectory()) {
+      if (skipsDirectory(skip, entry.name, (file) => existsSync(join(fullPath, file)))) continue;
       if (ig.ignores(relPath + "/")) continue;
-      yield* walkProjectFiles(fullPath, rootDir, ig, skipDirs);
+      yield* walkProjectFiles(fullPath, rootDir, ig, skip);
     } else if (entry.isFile()) {
+      if (skip.skipDirectories.has(entry.name) || skip.skipUnlessContains?.has(entry.name)) continue;
       if (ig.ignores(relPath)) continue;
       yield relPath;
     }

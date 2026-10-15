@@ -55,6 +55,10 @@ against the `files` inventory, not the disk. Dependencies reuse
 `BuildDependency` (`group` empty, `artifact` PEP 503-normalised, specifier as
 written) with file and line. `parseTomlLocated` gives each value's line.
 
+A config's `skipUnlessContains` names directories skipped unless they directly
+hold a marker file (Python's `env`, `build` and `dist` without `__init__.py`);
+`skipsDirectory` applies it and `skipDirectories`, the caller doing the I/O.
+
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
 so the Java and Go packs share it without depending on each other.
 

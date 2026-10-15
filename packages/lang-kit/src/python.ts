@@ -16,6 +16,7 @@ import type { LanguageConfig } from "./registry.js";
  * - Virtualenv and tool-cache directories (`venv/`, `.venv/`, `site-packages/`,
  *   `.tox/`, `.mypy_cache/`, …) are in `skipDirectories`. These hold vendored
  *   dependency code that would otherwise be inventoried as source files.
+ *   `env/`, `build/` and `dist/` are skipped only when they are not packages.
  * - `test_*.py` / `*_test.py` and `tests/` identify test files.
  * - `*_pb2.py` / `*_pb2_grpc.py` are generated (protobuf) files.
  * - `pyproject.toml` is the canonical module manifest.
@@ -58,7 +59,6 @@ export const pythonConfig: LanguageConfig = {
   skipDirectories: new Set([
     "venv",
     ".venv",
-    "env",
     "site-packages",
     "__pycache__",
     ".tox",
@@ -67,9 +67,14 @@ export const pythonConfig: LanguageConfig = {
     ".pytest_cache",
     ".ruff_cache",
     ".hypothesis",
-    "build",
-    "dist",
   ]),
+
+  // A virtualenv or build output, unless the directory is a regular package
+  // (poetry's `src/poetry/utils/env/`). A namespace package of these names,
+  // with no `__init__`, is still skipped.
+  skipUnlessContains: new Map(
+    ["env", "build", "dist"].map((name) => [name, ["__init__.py", "__init__.pyi"]]),
+  ),
 
   generatedFilePatterns: [
     /_pb2\.py$/,

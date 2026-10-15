@@ -16,7 +16,7 @@
  * Needs `pnpm --filter @n-dx/lang-kit build`.
  */
 
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { performance } from "node:perf_hooks";
 
@@ -34,13 +34,14 @@ if (missing.length > 0) {
   process.exit(2);
 }
 
-const { pythonConfig, readPythonProjects } = await importWorkspacePack("@n-dx/lang-kit");
-const SKIP_DIRS = new Set([".git", "node_modules", ...pythonConfig.skipDirectories]);
+const { pythonConfig, readPythonProjects, skipsDirectory } = await importWorkspacePack("@n-dx/lang-kit");
+const SKIP = { ...pythonConfig, skipDirectories: new Set([".git", "node_modules", ...pythonConfig.skipDirectories]) };
 
 function* walk(dir, base) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) yield* walk(join(dir, entry.name), base);
+      const sub = join(dir, entry.name);
+      if (!skipsDirectory(SKIP, entry.name, (file) => existsSync(join(sub, file)))) yield* walk(sub, base);
     } else if (entry.isFile()) {
       yield relative(base, join(dir, entry.name)).split(sep).join("/");
     }
