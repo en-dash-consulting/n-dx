@@ -370,7 +370,7 @@
   gap: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   animation: toast-in 0.2s ease-out;
-  z-index: 1000;
+  z-index: var(--z-toast);
 }
 
 .hench-template-toast-icon {

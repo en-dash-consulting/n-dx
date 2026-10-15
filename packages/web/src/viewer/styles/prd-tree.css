@@ -1855,7 +1855,7 @@
   border-radius: 6px;
   font-size: var(--font-base);
   font-weight: var(--weight-medium);
-  z-index: 1000;
+  z-index: var(--z-toast);
   animation: rex-toast-in 0.2s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
@@ -5242,7 +5242,7 @@
 .delete-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: var(--z-page-modal);
   display: flex;
   align-items: center;
   justify-content: center;

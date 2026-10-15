@@ -1,7 +1,7 @@
 /* Degradation banner styles.
  *
  * Displayed when features are automatically disabled under memory pressure.
- * Positioned below the memory warning banner (z-index 999 vs 1000).
+ * Positioned one layer below the memory warning banner; both sit on --z-banner.
  * Uses CSS variables from tokens.css for theme compatibility.
  */
 
@@ -10,7 +10,7 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 999;
+  z-index: calc(var(--z-banner) - 1); /* one under the memory warning */
   padding: 0.5rem 1rem;
   font-size: 0.85rem;
   line-height: 1.4;

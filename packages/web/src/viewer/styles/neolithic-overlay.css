@@ -3,7 +3,7 @@
 .neolithic-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10001; /* Above all other layers: search (900), modals (10000) */
+  z-index: var(--z-easter-egg); /* above every layer but the a11y skip link */
   background: #08040f; /* Near-black with deep purple tint */
   display: flex;
   align-items: center;

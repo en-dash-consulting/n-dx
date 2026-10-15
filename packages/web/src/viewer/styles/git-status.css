@@ -9,7 +9,7 @@
   position: fixed;
   bottom: calc(8rem + var(--bottombar-h, 0px));
   right: 1rem;
-  z-index: 997;
+  z-index: var(--z-tray);
   display: flex;
   flex-direction: column;
   align-items: flex-end;

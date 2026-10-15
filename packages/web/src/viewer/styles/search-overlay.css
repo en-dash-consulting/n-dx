@@ -3,7 +3,7 @@
 .search-overlay {
   position: fixed;
   inset: 0;
-  z-index: 900;
+  z-index: var(--z-overlay);
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: flex-start;
