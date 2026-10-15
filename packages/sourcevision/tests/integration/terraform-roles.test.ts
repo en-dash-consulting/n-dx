@@ -2,7 +2,8 @@
  * Terraform files in a TypeScript repo must not change classifications or zones.
  *
  * Terraform is inventoried with the role `config` (or `test` under a test
- * path), and classification reads only `source` files. Zone detection leaves
+ * path: another language's in a mixed repo, Terraform's own in a
+ * Terraform-first one), and classification reads only `source` files. Zone detection leaves
  * Terraform out entirely (task 43a98ad8, decision 3), as main did when it did
  * not inventory Terraform at all. This runs the real analyze command on the
  * same fixture with and without the Terraform files.
@@ -111,5 +112,26 @@ describe("analyze a TypeScript repo with and without Terraform", () => {
     expect(inventory.files.filter((f) => f.language === "Terraform").map((f) => f.path).sort())
       .toEqual(Object.keys(terraform).sort());
     expect(readOutput(mixed, DATA_FILES.zones)).toEqual(readOutput(plain, DATA_FILES.zones));
+  }, 120_000);
+
+  it("gives Terraform under test paths the test role in a Terraform-first repo, and zones none of it", async () => {
+    const terraform: Record<string, string> = {
+      "main.tf": 'module "queue" {\n  source = "./modules/queue"\n}\n',
+      "modules/queue/main.tf": SQS_QUEUE,
+      "modules/queue/tests/main.tf": SQS_QUEUE,
+      "test/fixture/main.tf": 'module "queue" {\n  source = "../../modules/queue"\n}\n',
+      "tests/queue.tftest.hcl": 'run "plan" {\n  command = plan\n}\n',
+    };
+    const out = await analyze(terraform);
+    const inventory = readOutput(out, DATA_FILES.inventory) as { files: { path: string; role: string }[] };
+    expect(Object.fromEntries(inventory.files.map((f) => [f.path, f.role]))).toEqual({
+      "main.tf": "config",
+      "modules/queue/main.tf": "config",
+      "modules/queue/tests/main.tf": "test",
+      "test/fixture/main.tf": "test",
+      "tests/queue.tftest.hcl": "test",
+    });
+    const zones = readOutput(out, DATA_FILES.zones) as ZonesOutput;
+    for (const zone of zones.zones) expect(zone.files.filter((f) => f in terraform)).toEqual([]);
   }, 120_000);
 });

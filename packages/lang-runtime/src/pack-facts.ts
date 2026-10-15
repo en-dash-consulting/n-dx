@@ -62,18 +62,43 @@ const before = (a: SourceSpan["start"], b: SourceSpan["start"]): number => a.lin
 const within = (outer: SourceSpan, inner: SourceSpan): boolean =>
   before(outer.start, inner.start) <= 0 && before(inner.end, outer.end) <= 0;
 
-const IMPORTS_GAP = 'has a resolver but does not produce "imports"';
-const SYMBOLS_GAP = 'produces "symbols" but has no symbol rules';
+/** The fields of `FileFacts` other than `path`. */
+export type FileFactFields = Omit<FileFacts, "path">;
 
 /**
- * Where a pack's `produces` disagrees with what this adapter can read for it:
- * a resolver whose imports would never be read, or symbols with no rules
- * (`symbolRules` undefined). Empty for a consistent pack.
+ * Reads fact kinds that need every file of the project at once rather than
+ * one file's captures (Terraform's resources: module calls cross directories).
+ * Called once per analysis with every parsed file and the kinds wanted; what
+ * it returns for a path is merged into that file's facts. A path it omits gets
+ * nothing from it.
  */
-export function factGaps(pack: LanguagePack, symbolRules: PackSymbolRules | undefined): string[] {
+export type ProjectFactsReader = (
+  files: readonly PackSourceFile[],
+  kinds: readonly FactKind[],
+) => ReadonlyMap<string, FileFactFields>;
+
+/** Kinds {@link readPackFacts} reads from one file; any other produced kind needs a {@link ProjectFactsReader}. */
+const PER_FILE_KINDS: ReadonlySet<FactKind> = new Set(["imports", "symbols", "calls"]);
+
+const IMPORTS_GAP = 'has a resolver but does not produce "imports"';
+const SYMBOLS_GAP = 'produces "symbols" but has no symbol rules';
+const projectGap = (kind: FactKind): string => `produces "${kind}" but has no project facts reader`;
+
+/**
+ * Where a pack's `produces` disagrees with what can be read for it: a resolver
+ * whose imports would never be read, symbols with no rules (`symbolRules`
+ * undefined), or a kind no per-file read covers with no `projectFacts`.
+ * Empty for a consistent pack.
+ */
+export function factGaps(
+  pack: LanguagePack,
+  symbolRules: PackSymbolRules | undefined,
+  projectFacts?: ProjectFactsReader,
+): string[] {
   return [
     ...(pack.resolver !== undefined && !pack.produces.includes("imports") ? [IMPORTS_GAP] : []),
     ...(pack.produces.includes("symbols") && symbolRules === undefined ? [SYMBOLS_GAP] : []),
+    ...(projectFacts === undefined ? pack.produces.filter((kind) => !PER_FILE_KINDS.has(kind)).map(projectGap) : []),
   ];
 }
 

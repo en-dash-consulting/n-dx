@@ -4,7 +4,8 @@
  *
  * `analyzeProject` loads the pack's grammar, compiles its queries, binds its
  * resolver to the project's build files, parses every requested file and
- * reads the captures into lang-kit facts. Each step that can fail for the
+ * reads the captures into lang-kit facts: per file, then the pack's project
+ * facts reader (if any) over every parsed file at once. Each step that can fail for the
  * whole language — a grammar not built or not loadable, a query the grammar
  * rejects, build files that cannot be read — ends the call with a degraded
  * result instead of an exception. A file that cannot be read or is over the
@@ -25,7 +26,7 @@ import type {
 } from "@n-dx/lang-kit";
 import type { LanguagePack, PackResolver, PackSourceFile, PreparedResolver } from "./pack.js";
 import type { PackPackage } from "./pack-package.js";
-import { readPackFacts, type PackSymbolRules } from "./pack-facts.js";
+import { readPackFacts, type PackSymbolRules, type ProjectFactsReader } from "./pack-facts.js";
 import { createTreeSitterRunner, loadGrammar, type RunnablePack, type RunnerOptions } from "./runner.js";
 
 export interface TreeSitterEntryOptions {
@@ -34,6 +35,8 @@ export interface TreeSitterEntryOptions {
   readonly pack: LanguagePack;
   /** Required when the pack produces `symbols`. */
   readonly symbolRules?: PackSymbolRules;
+  /** Required when the pack produces a kind read over the whole project (`resources`). */
+  readonly projectFacts?: ProjectFactsReader;
   readonly runner?: RunnerOptions;
 }
 
@@ -113,7 +116,11 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
     }
 
     const prepared: PreparedResolver | undefined = resolver?.prepare(parsed, unparsed);
-    const facts: FileFacts[] = parsed.map((file) => readPackFacts(pack, file, { kinds, resolver: prepared, symbolRules }));
+    const project = options.projectFacts?.(parsed, kinds);
+    const facts: FileFacts[] = parsed.map((file) => ({
+      ...readPackFacts(pack, file, { kinds, resolver: prepared, symbolRules }),
+      ...project?.get(file.path),
+    }));
     return { facts, unparsed };
   } finally {
     runner.dispose();

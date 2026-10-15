@@ -176,10 +176,41 @@ export interface OutboundCallFact {
   readonly position: SourcePosition;
 }
 
+// ── Resources (produced) ────────────────────────────────────────────────────
+
+/** The provider a resource belongs to. */
+export interface ResourceProvider {
+  /** The provider's local name, e.g. `aws` (from the type's prefix, or the resource's `provider` argument). */
+  readonly name: string;
+  /** The version constraint exactly as written in the declaring module's `required_providers`, e.g. `>= 5.0`. */
+  readonly version?: string;
+}
+
+/**
+ * Settings an audit reads from a resource. Each value is the text as written
+ * in the declaration, never normalised: a quoted string without interpolation
+ * gives its content (`"postgres"` → `postgres`), any other expression its
+ * source text (`var.engine_version`). A setting the resource does not write is
+ * absent.
+ */
+export interface ResourceAttributes {
+  /** Database or cache engine, e.g. `postgres` (`engine` on `aws_db_instance`). */
+  readonly engine?: string;
+  /** Engine version, e.g. `15.4`, or Cloud SQL's `database_version` (`POSTGRES_15`). */
+  readonly engineVersion?: string;
+  /** Function runtime, e.g. `python3.12` (Lambda, Cloud Functions). */
+  readonly runtime?: string;
+  /** Container image, e.g. `nginx:1.27` or a Lambda `image_uri`. */
+  readonly image?: string;
+  /** Kubernetes version of a managed cluster, e.g. `1.30` (EKS `version`, GKE `min_master_version`). */
+  readonly clusterVersion?: string;
+}
+
 /**
  * A piece of infrastructure an IaC file declares. The coarse kind (bucket,
  * queue, …) is not part of the fact: consumers classify `type` with
- * `IAC_KINDS` (`iac-kinds.ts`).
+ * `IAC_KINDS` (`iac-kinds.ts`). Every field after `position` is optional and
+ * filled only by a pack that reads it.
  */
 export interface ResourceFact {
   /** Resource type as declared, e.g. `aws_db_instance`. */
@@ -188,7 +219,20 @@ export interface ResourceFact {
   readonly name: string;
   /** Names the resource is known by at run time (a `name` attribute), for matching source. */
   readonly literals?: readonly string[];
+  /** Where the declaration starts. */
   readonly position: SourcePosition;
+  /**
+   * The module call path that declares the resource, e.g. `module.db` or
+   * `module.app.module.db`; absent in a root module (a directory no module
+   * call in the project reaches). When several call paths reach the file's
+   * directory, the shortest, then the alphabetically first.
+   */
+  readonly module?: string;
+  readonly provider?: ResourceProvider;
+  /** `<type>.<name>` of the resources in the same module that this one references; sorted, distinct. */
+  readonly references?: readonly string[];
+  /** Absent when the resource writes none of them. */
+  readonly attributes?: ResourceAttributes;
 }
 
 // ── Per-file facts ──────────────────────────────────────────────────────────
@@ -208,10 +252,10 @@ export interface FileFacts {
 }
 
 /** Fact kinds a pack produces today. */
-export const PRODUCED_FACT_KINDS = ["imports", "symbols", "calls"] as const;
+export const PRODUCED_FACT_KINDS = ["imports", "symbols", "calls", "resources"] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */
-export const DECLARED_FACT_KINDS = ["routes", "components", "outboundCalls", "resources"] as const;
+export const DECLARED_FACT_KINDS = ["routes", "components", "outboundCalls"] as const;
 
 export type ProducedFactKind = (typeof PRODUCED_FACT_KINDS)[number];
 export type DeclaredFactKind = (typeof DECLARED_FACT_KINDS)[number];

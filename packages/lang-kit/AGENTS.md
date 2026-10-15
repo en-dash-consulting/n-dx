@@ -20,9 +20,11 @@ Language ids and configs, file-to-language detection, build-file readers and
 the small TOML/XML/YAML parsers, and the IaC resource-kind table (`IAC_KINDS`,
 which the iso-map bundle aliases to `src/iac-kinds.ts` alone), and the
 facts-out pack contract (`src/pack-contract.ts`): the per-file `FileFacts` a
-pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls) and
-`DECLARED_FACT_KINDS` (routes, components, outbound calls, resources, typed
-but not yet produced). The contract names no parser type; `@n-dx/lang-runtime`'s
+pack returns, with `PRODUCED_FACT_KINDS` (imports, symbols, calls, resources)
+and `DECLARED_FACT_KINDS` (routes, components, outbound calls, typed but not
+yet produced). `ResourceFact`'s optional `module`, `provider`, `references`
+and `attributes` are filled by the Terraform pack; attribute values are kept
+as written, never normalised. The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports

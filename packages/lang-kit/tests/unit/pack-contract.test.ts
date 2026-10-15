@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 import { DECLARED_FACT_KINDS, FACT_KINDS, PRODUCED_FACT_KINDS, SYMBOL_KINDS, isFactKind } from "../../src/index.js";
 
 describe("pack contract", () => {
-  it("names imports, symbols and calls as produced", () => {
-    expect([...PRODUCED_FACT_KINDS]).toEqual(["imports", "symbols", "calls"]);
+  it("names imports, symbols, calls and resources as produced", () => {
+    expect([...PRODUCED_FACT_KINDS]).toEqual(["imports", "symbols", "calls", "resources"]);
   });
 
-  it("names routes, components, outbound calls and resources as declared", () => {
-    expect([...DECLARED_FACT_KINDS]).toEqual(["routes", "components", "outboundCalls", "resources"]);
+  it("names routes, components and outbound calls as declared", () => {
+    expect([...DECLARED_FACT_KINDS]).toEqual(["routes", "components", "outboundCalls"]);
   });
 
   it("lists every kind once, produced first", () => {
