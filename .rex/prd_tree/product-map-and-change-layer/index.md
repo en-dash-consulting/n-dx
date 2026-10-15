@@ -34,7 +34,7 @@ plannedRelease: "1.0.0"
 | [Every n-dx commit carries an item trailer](./every-n-dx-commit-carries-an-item/index.md) | completed |
 | [Every PRD tool opens a v2 tree, and none can split it](./every-prd-tool-opens-a-v2-tree-and/index.md) | completed |
 | [Generate the migration plan](./generate-the-migration-plan/index.md) | completed |
-| [hench selects, briefs and completes work on a v2 tree](./hench-selects-briefs-and-completes/index.md) | pending |
+| [hench selects, briefs and completes work on a v2 tree](./hench-selects-briefs-and-completes/index.md) | completed |
 | [MCP tools for the product layer and changes](./mcp-tools-for-the-product-layer-and/index.md) | completed |
 | [Merge driver and bundle format for v2](./merge-driver-and-bundle-format-for-v2/index.md) | completed |
 | [Migrate this repository](./migrate-this-repository/index.md) | pending |

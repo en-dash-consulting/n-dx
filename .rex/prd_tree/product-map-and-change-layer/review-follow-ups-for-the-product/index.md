@@ -45,15 +45,17 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [No test covers the PRD watcher refreshing the cache on product/ or changes/ edits](./no-test-covers-the-prd-watcher.md) | pending |
 | [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | completed |
 | [On a v2 tree, edit_item, move_item, merge_items and claim_task reject a display id that get_item accepts](./on-a-v2-tree-edit-item-move-item-merge.md) | pending |
+| [Placing an Inbox change strands non-tree files in changes/inbox/<slug>/ and leaves a skipped-folder warning](./placing-an-inbox-change-strands-non.md) | pending |
 | [Record review decisions as calibration records on the run record](./record-review-decisions-as-calibration.md) | pending |
 | [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | deferred |
+| [rex migrate-to-folder-tree drops the PRD title: it never writes tree-meta.json, so the tree reads back as "PRD"](./rex-migrate-to-folder-tree-drops-the.md) | pending |
 | [rex release stamp applies a container change before the changes nested in it](./rex-release-stamp-applies-a-container.md) | pending |
 | [rex usage ignores .n-dx.json rex overrides: token-store passes the wrong dir and key to loadProjectOverrides](./rex-usage-ignores-n-dx-json-rex.md) | pending |
 | [Rex watcher stops following a PRD folder that is deleted and recreated while ndx start runs](./rex-watcher-stops-following-a-prd.md) | pending |
 | [Stop the timed-out test gate test racing its fake gate startup](./stop-the-timed-out-test-gate-test.md) | completed |
 | [The exported computeLanding still reports an open change as landed, because it takes ids rather than the change](./the-exported-computelanding-still.md) | pending |
 | [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | completed |
-| [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | pending |
+| [The v2 writer drops a moved folder node's top-level state.yaml keys](./the-v2-writer-drops-a-moved-folder.md) | pending |
 | [v2 isolation test misses imports of the core v2 modules and dynamic import() of any v2 module](./v2-isolation-test-misses-imports-of.md) | pending |
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
 | [Wire ndx migrate --plan to write the classified plan](./wire-ndx-migrate-plan-to-write-the.md) | completed |
