@@ -554,8 +554,9 @@ export async function analyzeInventory(
   // detected primary language's own parser handles. Mirrors the extension set
   // analyzeImports() builds in imports.ts. Intersected with byLanguage so the
   // list only names languages actually present in this inventory.
-  // Python files reach the imports phase only through @n-dx/lang-python, whose
-  // imports are not resolved yet, so they take part in no graph: not analysed.
+  // Python files reach the imports phase only through the opt-in
+  // @n-dx/lang-python, and this phase does not know whether it will load, so
+  // Python is not listed: listing it would change inventory.json without the pack.
   const analysedExtensions = new Set<string>(
     [...typescriptConfig.parseableExtensions, ...csharpConfig.parseableExtensions, ...langConfig.parseableExtensions].filter(
       (ext) => !pythonConfig.parseableExtensions.has(ext),

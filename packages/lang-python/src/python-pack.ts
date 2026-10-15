@@ -12,7 +12,8 @@ import { join } from "node:path";
 import { pythonConfig } from "@n-dx/lang-kit";
 import type { LanguagePack, RuleProvenance } from "@n-dx/lang-runtime";
 import { PYTHON_PACKAGE } from "./package-paths.js";
-import { pythonResolver } from "./python-imports.js";
+import { pythonResolver } from "./python-resolver.js";
+import { PYTHON_STDLIB_PROVENANCE } from "./python-stdlib.js";
 
 const QUERY_NAMES = ["imports", "guards", "definitions", "variables", "calls"] as const;
 
@@ -63,6 +64,20 @@ export const pythonPack: LanguagePack = {
       verifiedAgainst: ["Python 3.13"],
       verifiedOn: "2026-10-15",
       source: "https://docs.python.org/3.13/reference/simple_stmts.html#the-import-statement",
+    },
+    // Top-level modules recorded as stdlib rather than third-party.
+    "stdlib-modules": PYTHON_STDLIB_PROVENANCE,
+    // How an import maps to files: packages, modules, namespace packages, relative imports.
+    "import-resolution": {
+      verifiedAgainst: ["Python 3.13"],
+      verifiedOn: "2026-10-15",
+      source: "https://docs.python.org/3.13/reference/import.html",
+    },
+    // Declared distributions matched to imports by normalised name.
+    "pep-503-names": {
+      verifiedAgainst: ["PEP 503"],
+      verifiedOn: "2026-10-15",
+      source: "https://peps.python.org/pep-0503/#normalized-names",
     },
     // Calls whose module is a run-time value, counted in the notices.
     "dynamic-imports": {

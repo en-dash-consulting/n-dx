@@ -170,7 +170,7 @@ export async function buildPackImportGraph(
     for (const { path, imports } of result.facts) {
       if (!imports) continue;
       for (const ref of imports.files) {
-        edges.push({ from: path, to: ref.to, type: "static", symbols: [...ref.symbols] });
+        edges.push({ from: path, to: ref.to, type: ref.typeOnly ? "type" : "static", symbols: [...ref.symbols] });
       }
       for (const ext of imports.external) {
         const existing = external.get(ext.package);

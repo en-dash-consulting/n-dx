@@ -45,14 +45,20 @@ in `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs.
 `.py` and `.pyi` are parseable (`pythonConfig.parseableExtensions`) only
 through `@n-dx/lang-python`, an opt-in `KNOWN_PACKS` entry with no fallback
 parser: without it, Python files get inventory only and the missing-pack
-notice. The pack reports imports as written but resolves none yet, so
-Python files get no edges or externals whether or not it is installed, and
-`analyzers/inventory.ts` leaves Python out of `analysedLanguages`; every
-artifact is the same as before Python was a pack. Its dynamic-import notice
-goes to the same `warn`. `scripts/python-corpus-report.mjs` measures the pack
+notice, and every artifact is the same as before Python was a pack. With
+it, Python edges and externals reach `imports.json` through
+`buildPackImportGraph` like Go's and Java's (stdlib as `stdlib:<module>`, a
+`TYPE_CHECKING`-only target as a `type` edge), so Python files join zones;
+a Python repository beside TypeScript (root `pyproject.toml` and
+`package.json`) gets both. `analyzers/inventory.ts` still leaves Python out
+of `analysedLanguages`, since the inventory phase does not know whether the
+pack will load. Its dynamic-import and past-root notices go to the same
+`warn`. `scripts/python-corpus-report.mjs` measures the pack
 over the pinned corpus (`python-corpus.json`), and
 `scripts/python-build-report.mjs` runs lang-kit's Python build readers over
-it (projects, roots, dependency counts, notices).
+it (projects, roots, dependency counts, notices), and
+`scripts/python-resolve-report.mjs` the resolver (resolution rates by
+outcome and a hand-check sample).
 
 ### The Terraform model in infrastructure.json
 

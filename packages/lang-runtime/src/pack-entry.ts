@@ -106,7 +106,7 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
     let resolver: PackResolver | undefined;
     if (kinds.includes("imports") && pack.resolver) {
       try {
-        resolver = (await pack.resolver.forProject?.(request.projectDir)) ?? pack.resolver;
+        resolver = (await pack.resolver.forProject?.(request.projectDir, request.files)) ?? pack.resolver;
       } catch (error) {
         return degraded(`the project's build files could not be read (${errorText(error)})`);
       }
@@ -137,7 +137,11 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
         mergeFileFacts(readPackFacts(pack, file, { kinds, resolver: prepared, symbolRules }), project?.get(file.path)),
       ),
     );
-    const notices = [...framed.flatMap((f) => f.notices), ...(options.projectNotices?.(parsed, kinds) ?? [])];
+    const notices = [
+      ...framed.flatMap((f) => f.notices),
+      ...(options.projectNotices?.(parsed, kinds) ?? []),
+      ...(prepared?.notices?.() ?? []),
+    ];
     return notices.length === 0 ? { facts, unparsed } : { facts, unparsed, notices };
   } finally {
     runner.dispose();

@@ -10,5 +10,7 @@ export { pack } from "./pack.js";
 export { PYTHON_PACKAGE } from "./package-paths.js";
 export * from "./python-pack.js";
 export * from "./python-imports.js";
+export * from "./python-resolver.js";
+export * from "./python-stdlib.js";
 export * from "./python-symbols.js";
 export * from "./python-notices.js";

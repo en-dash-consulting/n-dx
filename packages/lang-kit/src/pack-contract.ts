@@ -46,6 +46,11 @@ export interface FileReference {
   readonly to: string;
   /** Sorted, distinct; `*` for a wildcard import. */
   readonly symbols: readonly string[];
+  /**
+   * Set when every import that leads here is seen by type checkers only
+   * (Python's `if TYPE_CHECKING:`); sourcevision records the edge as `type`.
+   */
+  readonly typeOnly?: true;
 }
 
 /** The build-system module an external package comes from, when the resolver knows it. */
