@@ -15,6 +15,13 @@ describe("valueAsWritten", () => {
     expect(valueAsWritten("var.engine_version")).toBe("var.engine_version");
     expect(valueAsWritten("15")).toBe("15");
   });
+
+  it("keeps an expression that merely starts and ends with a string literal as written", () => {
+    expect(valueAsWritten('"a" == var.x ? "b" : "c"')).toBe('"a" == var.x ? "b" : "c"');
+    expect(valueAsWritten('"aurora" != "" ? "x" : "y"')).toBe('"aurora" != "" ? "x" : "y"');
+    expect(valueAsWritten('"%{if true}x%{endif}"')).toBe('"%{if true}x%{endif}"');
+    expect(valueAsWritten('"cost: $5"')).toBe("cost: $5");
+  });
 });
 
 describe("parseRegistrySource", () => {

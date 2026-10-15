@@ -233,9 +233,14 @@ const PUBLIC_REGISTRY = "registry.terraform.io";
  * (escapes kept as written), any other expression its source text.
  */
 export function valueAsWritten(text: string): string {
-  const quoted = text.length >= 2 && text.startsWith('"') && text.endsWith('"');
-  return quoted && !text.includes("${") && !text.includes("%{") ? text.slice(1, -1) : text;
+  return PLAIN_STRING.test(text) ? text.slice(1, -1) : text;
 }
+
+/**
+ * One quoted string, no interpolation (`${`, `%{`): an unescaped quote can
+ * only close it, so `"a" == var.x ? "b" : "c"` is an expression, not a string.
+ */
+const PLAIN_STRING = /^"(?:[^"\\$%]|\\.|\$(?!\{)|%(?!\{))*"$/;
 
 const IDENT = "[A-Za-z_][A-Za-z0-9_-]*";
 const REGISTRY_ADDRESS = new RegExp(
