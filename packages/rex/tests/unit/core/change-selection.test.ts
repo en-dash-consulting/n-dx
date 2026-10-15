@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { addTask } from "../../../src/core/change-completion.js";
-import { changeWorkShape, compareReleases, enclosingChangeIds, findActionableWork, findNextWork, resolveWorkById } from "../../../src/core/change-selection.js";
+import { changeWorkShape, compareReleases, enclosingChangeIds, findActionableWork, findNextWork, openChangeTasks, resolveWorkById } from "../../../src/core/change-selection.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ title: fields.id as string, slug: fields.id as string, ...fields }) as RuleNode;
@@ -57,7 +57,7 @@ describe("nested changes", () => {
   it("resolveWorkById resolves a task under a nested change to the nested change", () => {
     const t = tree(change("outer", { children: [change("inner", { children: [task("t")] })] }));
     expect(resolveWorkById(t, "t")).toMatchObject({ kind: "task", node: { id: "t" }, change: { id: "inner" } });
-    expect(resolveWorkById(t, "inner")).toMatchObject({ kind: "change", node: { id: "inner" }, change: { id: "inner" } });
+    expect(resolveWorkById(t, "inner")).toMatchObject({ kind: "task", node: { id: "t" }, change: { id: "inner" } });
   });
 
   it("resolveWorkById does not return a change that holds a change as a unit", () => {
@@ -95,12 +95,49 @@ describe("needsPlacement", () => {
 
 describe("resolveWorkById", () => {
   it("resolves aliases and display ids, and refuses non-work refs", () => {
-    const t = tree(change("c", { displayId: "CH-1", children: [task("t", { aliases: ["old-t"], children: [node({ id: "s", type: "subtask" })] })] }));
-    expect(resolveWorkById(t, "CH-1")?.node.id).toBe("c");
+    const t = tree(
+      change("c", { displayId: "CH-1", children: [task("t", { aliases: ["old-t"], children: [node({ id: "s", type: "subtask" })] })] }),
+      change("solo", { displayId: "CH-2" }),
+    );
+    expect(resolveWorkById(t, "CH-2")?.node.id).toBe("solo");
+    expect(resolveWorkById(t, "CH-1")?.node.id).toBe("t");
     expect(resolveWorkById(t, "old-t")?.node.id).toBe("t");
     expect(resolveWorkById(t, "s")).toBeNull();
     expect(resolveWorkById(t, "cap")).toBeNull();
     expect(resolveWorkById(t, "missing")).toBeNull();
+  });
+});
+
+describe("resolveWorkById on a change with open tasks", () => {
+  it("answers the change's best runnable task, never the change", () => {
+    const t = tree(change("c", { children: [task("low", { priority: "low" }), task("high", { priority: "high" }), task("done", { status: "completed", priority: "critical" })] }));
+    expect(resolveWorkById(t, "c")).toMatchObject({ kind: "task", node: { id: "high" }, change: { id: "c" } });
+    const started = tree(change("c", { children: [task("high", { priority: "high" }), task("started", { status: "in_progress", priority: "low" })] }));
+    expect(resolveWorkById(started, "c")?.node.id).toBe("started");
+  });
+
+  it("passes over excluded tasks, and answers null when every open task is excluded", () => {
+    const t = tree(change("c", { children: [task("a"), task("b")] }));
+    expect(resolveWorkById(t, "c", { excludeIds: new Set(["a"]) })?.node.id).toBe("b");
+    expect(resolveWorkById(t, "c", { excludeIds: new Set(["a", "b"]) })).toBeNull();
+  });
+
+  it("passes over blocked and non-actionable tasks, which openChangeTasks still names", () => {
+    const t = tree(change("c", { children: [task("waits", { blockedBy: ["dep"] }), task("parked", { status: "deferred" }), task("dep", { status: "cancelled" })] }));
+    expect(resolveWorkById(t, "c")).toBeNull();
+    expect(openChangeTasks(t, "c").map((o) => [o.node.id, o.openBlockers])).toEqual([["waits", ["dep"]], ["parked", []], ["dep", []]]);
+  });
+
+  it("answers the change itself once it has no open task", () => {
+    expect(resolveWorkById(tree(change("c")), "c")).toMatchObject({ kind: "change", node: { id: "c" } });
+    const done = tree(change("c", { children: [task("t", { status: "completed" }), task("gone", { status: "deleted" })] }));
+    expect(resolveWorkById(done, "c")).toMatchObject({ kind: "change", node: { id: "c" } });
+    expect(openChangeTasks(done, "c")).toEqual([]);
+  });
+
+  it("openChangeTasks answers [] for a task-less change, a container, a task and a missing ref", () => {
+    const t = tree(change("solo"), change("outer", { children: [task("own"), change("inner")] }), change("c", { children: [task("t")] }));
+    for (const ref of ["solo", "outer", "t", "missing"]) expect(openChangeTasks(t, ref)).toEqual([]);
   });
 });
 

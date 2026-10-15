@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths, isChangeLayerStore } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths, isChangeLayerStore, resolveItemRef } from "../../store/index.js";
 
 import { parseCsvList } from "../parse-utils.js";
 import { CLIError, requireRexDir } from "../errors.js";
@@ -52,7 +52,7 @@ export async function cmdUpdate(
   await emitMigrationNotification(migrationResult, flags, (entry) => store.appendLog(entry));
 
   const initDoc = await store.loadDocument();
-  const resolvedEntry = resolveItem(initDoc.items, id);
+  const resolvedEntry = resolveItem(initDoc.items, await resolveItemRef(store, id));
   if (!resolvedEntry) {
     throw new CLIError(
       `Item "${id}" not found.`,

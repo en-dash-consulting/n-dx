@@ -5,15 +5,29 @@
     "perCallTokens": 23454,
     "uniqueTokens": 14949,
     "skills": 13,
-    "skillTokens": 20439
+    "skillTokens": 22839
   },
   "skills": [
     {
       "name": "ndx-adversarial-review",
       "file": "packages/core/assistant-assets/skills/ndx-adversarial-review.md",
       "shipped": true,
-      "chars": 22420,
-      "tokens": 5605
+      "chars": 24105,
+      "tokens": 6027
+    },
+    {
+      "name": "ndx-reshape",
+      "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
+      "shipped": true,
+      "chars": 10150,
+      "tokens": 2538
+    },
+    {
+      "name": "ndx-capture",
+      "file": "packages/core/assistant-assets/skills/ndx-capture.md",
+      "shipped": true,
+      "chars": 8894,
+      "tokens": 2224
     },
     {
       "name": "iso-map",
@@ -23,11 +37,18 @@
       "tokens": 2072
     },
     {
-      "name": "ndx-reshape",
-      "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
+      "name": "ndx-work",
+      "file": "packages/core/assistant-assets/skills/ndx-work.md",
       "shipped": true,
-      "chars": 7584,
-      "tokens": 1896
+      "chars": 7914,
+      "tokens": 1979
+    },
+    {
+      "name": "ndx-plan",
+      "file": "packages/core/assistant-assets/skills/ndx-plan.md",
+      "shipped": true,
+      "chars": 7884,
+      "tokens": 1971
     },
     {
       "name": "triage",
@@ -35,27 +56,6 @@
       "shipped": false,
       "chars": 7421,
       "tokens": 1856
-    },
-    {
-      "name": "ndx-work",
-      "file": "packages/core/assistant-assets/skills/ndx-work.md",
-      "shipped": true,
-      "chars": 6794,
-      "tokens": 1699
-    },
-    {
-      "name": "ndx-capture",
-      "file": "packages/core/assistant-assets/skills/ndx-capture.md",
-      "shipped": true,
-      "chars": 6407,
-      "tokens": 1602
-    },
-    {
-      "name": "ndx-plan",
-      "file": "packages/core/assistant-assets/skills/ndx-plan.md",
-      "shipped": true,
-      "chars": 6146,
-      "tokens": 1537
     },
     {
       "name": "dev-link",
@@ -1067,8 +1067,8 @@
       }
     ]
   },
-  "contentHash": "f4f35c75696ec8d0",
-  "recordedAt": "2026-10-13T19:20:19.949Z",
-  "commit": "0f876c5df2ba",
+  "contentHash": "22ca16f40fc4a9fc",
+  "recordedAt": "2026-10-15T04:19:01.804Z",
+  "commit": "229659bd7e32",
   "dirty": false
 }

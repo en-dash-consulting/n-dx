@@ -12,7 +12,7 @@ import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import { refreshPRDCache } from "../../../src/server/prd-io.js";
-import { itemFingerprint, type RefinementProposal } from "../../../src/server/prd-refinement.js";
+import { REFINEMENT_FENCE_TAG, itemFingerprint, parseAnswerRefinements, type RefinementProposal } from "../../../src/server/prd-refinement.js";
 import { itemTypeOf } from "../../../src/shared/index.js";
 import { resolveStore, findItem, detectReorganizations, type PRDItem } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -145,6 +145,32 @@ describe("Rex item routes on a v2 project", () => {
     ]);
     expect((await (await resolveStore(rexDir)).getItem(CHANGE_ID))?.status).toBe("completed");
     expect(readFileSync(join(rexDir, "product", "checkout", "pay-by-card.md"), "utf-8")).toContain("Apple Pay is offered on Safari");
+  });
+
+  it("bulk PATCH completing a change under rex.applyOn review reports why it was left unapplied", async () => {
+    writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({ rex: { applyOn: "review" } }));
+    expect((await send("PATCH", "items/bulk", { ids: [TASK_ID], updates: { status: "completed" } })).status).toBe(200);
+    const res = await send("PATCH", "items/bulk", { ids: [CHANGE_ID], updates: { status: "completed" } });
+    expect(res.status).toBe(200);
+    const [result] = (await res.json()).results;
+    expect(result).toMatchObject({ id: CHANGE_ID, ok: true, applied: false });
+    expect(result.reason).toEqual(expect.any(String));
+    expect(readFileSync(join(rexDir, "product", "checkout", "pay-by-card.md"), "utf-8")).not.toContain("Apple Pay is offered on Safari");
+  });
+
+  it.each([
+    ["run", { run: { tier: "heavy" } }, '"run"'],
+    ["id", { id: "other" }, '"id"'],
+    ["title", { title: "" }, '"title"'],
+    ["tags", { tags: "x" }, '"tags"'],
+  ])("bulk PATCH with an unacceptable %s answers 400 and writes nothing", async (_name, updates, named) => {
+    const store = await resolveStore(rexDir);
+    const before = JSON.stringify((await store.loadDocument()).items);
+    const res = await send("PATCH", "items/bulk", { ids: [TASK_ID], updates });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain(named);
+    expect(JSON.stringify((await store.loadDocument()).items)).toBe(before);
+    expect(frames).toEqual([]);
   });
 
   it("bulk PATCH completed of a change with its tasks completes both when the change is listed first", async () => {
@@ -314,6 +340,32 @@ describe("Rex item routes on a v2 project", () => {
       const target = (await itemById(CHANGE_ID)) as PRDItem & { touches?: string[]; aliases?: string[] };
       expect(target.touches).toEqual([PAY_BY_CARD]);
       expect([...(target.aliases ?? [])].sort()).toEqual([other, "CH-7"].sort());
+    });
+
+    describe("parseAnswerRefinements with the change-layer rule", () => {
+      const answer = (itemId: string, intoId: string) =>
+        `Same work.\n\`\`\`${REFINEMENT_FENCE_TAG}\n${JSON.stringify([{ op: "merge", itemId, intoId, rationale: "Duplicate." }])}\n\`\`\``;
+
+      it("offers no merge that absorbs an amending change, and notes rex's reason", async () => {
+        const other = await addChange("Apple Pay, again");
+        const doc = await (await resolveStore(rexDir)).loadDocument();
+        const parsed = parseAnswerRefinements(answer(CHANGE_ID, other), doc, { changeLayer: true });
+        expect(parsed.proposals).toEqual([]);
+        expect(parsed.notes).toHaveLength(1);
+        expect(parsed.notes[0]).toMatch(/carries amendments/);
+      });
+
+      it("skips a merge of two tasks with rex's reason", async () => {
+        const task2 = randomUUID();
+        await (await resolveStore(rexDir)).addItem(
+          { id: task2, title: "Style the button", status: "pending", level: "task", type: "task" } as PRDItem,
+          CHANGE_ID,
+        );
+        const doc = await (await resolveStore(rexDir)).loadDocument();
+        const parsed = parseAnswerRefinements(answer(TASK_ID, task2), doc, { changeLayer: true });
+        expect(parsed.proposals).toEqual([]);
+        expect(parsed.notes[0]).toMatch(/merges changes only/);
+      });
     });
 
     it("reorganize proposes no v1 orphan or single-child collapse, and its merge carries touches and ids", async () => {

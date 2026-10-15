@@ -42,6 +42,9 @@ export type { PRDStore } from "@n-dx/rex";
 // derived product status, never recomputed in web (routes-rex/product.ts).
 export { loadPrdModel, productReport, capabilityReport, indexTree, isOpenChange, isAppliedChange, specHash, nodeSpec } from "@n-dx/rex";
 export type { V2Tree, RuleNode, ChangeNode, TreeIndex } from "@n-dx/rex";
+// The capability page's edit form: rex decides what a spec edit does (editorial
+// re-stamp or a drafted change), inside rex's own v2 transaction (routes-rex/product.ts).
+export { handleProductEdit, ProductEditError, withPrdModelTransaction } from "@n-dx/rex";
 
 // ---- Rex PRD tree slug conformance ------------------------------------------
 // The Execute route's pre-run gate. The run it spawns writes the PRD when it

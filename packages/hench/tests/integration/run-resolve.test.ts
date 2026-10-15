@@ -503,8 +503,10 @@ describe("refusals are reported, not thrown", () => {
 
 describe("on a v2 tree", () => {
   const FIXTURE = join(import.meta.dirname, "../../../rex/tests/fixtures/v2-tree");
-  /** The fixture's change CH-1, which `--task=CH-1` runs. */
+  /** The fixture's change CH-1. */
   const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
+  /** CH-1's one task, which `--task=CH-1` runs while it is open. */
+  const WIRE_ID = "c0000000-0000-4000-8000-000000000002";
 
   beforeEach(async () => {
     await rm(join(rexDir, PRD_TREE_DIRNAME), { recursive: true, force: true });
@@ -513,22 +515,79 @@ describe("on a v2 tree", () => {
     git(projectDir, "commit", "-q", "-m", "v2 tree");
   });
 
-  it("reports the unit a display id runs, by its real id", async () => {
+  /** A worktree beside the project, holding claims on `ids`. */
+  async function otherWorktreeClaiming(...ids: string[]): Promise<{ claims: TaskClaims; root: string }> {
+    const other = `${projectDir}-wt`;
+    extraDirs.push(other);
+    git(projectDir, "worktree", "add", "-q", "-b", "other", other);
+    const claims = TaskClaims.forProject(other);
+    for (const id of ids) expect(await claims.claim(id)).toBeNull();
+    return { claims, root: gitToplevel(other) };
+  }
+
+  it("reports the task a change with an open task runs, not the change", async () => {
+    const r = await resolve({ task: "CH-1" });
+    expect(codes(r)).toEqual([]);
+    expect(r.task?.id).toBe(WIRE_ID);
+    expect(r.task?.level).toBe("task");
+  });
+
+  it("reports the next task, passing over one another worktree holds", async () => {
+    const shipId = "c0000000-0000-4000-8000-000000000003";
+    await writeFile(
+      join(rexDir, "changes/add-apple-pay/ship-it.md"),
+      `---\nid: "${shipId}"\ntype: "task"\ntitle: "Ship it"\nslug: "ship-it"\n---\n`,
+    );
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "second task");
+    const { claims } = await otherWorktreeClaiming(WIRE_ID);
+    try {
+      const r = await resolve({ task: "CH-1" });
+      expect(codes(r)).toEqual([]);
+      expect(r.task?.id).toBe(shipId);
+    } finally {
+      await claims.releaseAll();
+    }
+  });
+
+  it("refuses a change whose every open task another worktree holds, naming them", async () => {
+    const { claims, root } = await otherWorktreeClaiming(WIRE_ID);
+    try {
+      const r = await resolve({ task: "CH-1" });
+      expect(codes(r)).toEqual(["claimed-elsewhere"]);
+      expect(r.task).toBeNull();
+      expect(r.refusals[0].message).toContain(`"Wire the button" (claimed by another worktree: ${root})`);
+    } finally {
+      await claims.releaseAll();
+    }
+  });
+
+  it("refuses a deferred change with an open task, unless --reset-deferred would reopen it", async () => {
+    const stateFile = join(rexDir, "changes/add-apple-pay/state.yaml");
+    await writeFile(stateFile, (await readFile(stateFile, "utf-8")).replace('status: "in_progress"', 'status: "deferred"'));
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "defer change");
+    const r = await resolve({ task: "CH-1" });
+    expect(codes(r)).toEqual(["not-actionable"]);
+    expect(r.refusals[0].message).toContain("Add Apple Pay");
+    expect(codes(await resolve({ task: "CH-1", "reset-deferred": "true" }))).toEqual([]);
+  });
+
+  it("reports a task-less change as the unit", async () => {
+    await rm(join(rexDir, "changes/add-apple-pay/wire-the-button.md"));
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "task-less");
     const r = await resolve({ task: "CH-1" });
     expect(codes(r)).toEqual([]);
     expect(r.task?.id).toBe(CHANGE_ID);
   });
 
   it("checks the claim on the real id, not the display id", async () => {
-    const other = `${projectDir}-wt`;
-    extraDirs.push(other);
-    git(projectDir, "worktree", "add", "-q", "-b", "other", other);
-    const claims = TaskClaims.forProject(other);
-    expect(await claims.claim(CHANGE_ID)).toBeNull();
+    const { claims, root } = await otherWorktreeClaiming(CHANGE_ID);
     try {
       const r = await resolve({ task: "CH-1" });
       expect(codes(r)).toEqual(["claimed-elsewhere"]);
-      expect(r.task?.claimedBy?.worktree).toBe(gitToplevel(other));
+      expect(r.task?.claimedBy?.worktree).toBe(root);
     } finally {
       await claims.releaseAll();
     }
@@ -585,6 +644,42 @@ describe("on a v2 tree", () => {
       expect(codes(r)).toEqual(["not-actionable"]);
       expect(r.refusals[0].message).toContain("needs placement");
       expect(r.refusals[0].hint).toContain("place_change");
+    }
+  });
+
+  it("refuses a subtask with the run's message, not task-not-found", async () => {
+    const taskDir = join(rexDir, "changes/add-apple-pay/wire-the-button");
+    await mkdir(taskDir);
+    await rename(join(rexDir, "changes/add-apple-pay/wire-the-button.md"), join(taskDir, "index.md"));
+    const subId = "c0000000-0000-4000-8000-000000000021";
+    await writeFile(join(taskDir, "press.md"), `---\nid: "${subId}"\ntype: "subtask"\ntitle: "Press"\nslug: "press"\n---\n`);
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "subtask");
+    const r = await resolve({ task: subId });
+    expect(codes(r)).toEqual(["not-actionable"]);
+    expect(r.refusals[0].message).toContain('"Press"');
+    expect(r.refusals[0].message).toContain("is a subtask");
+    expect(r.refusals[0].message).toContain("Run the task instead.");
+  });
+
+  it("refuses a container change with the run's message, by id or display id", async () => {
+    const umbrella = join(rexDir, "changes/umbrella");
+    const innerId = "c0000000-0000-4000-8000-000000000031";
+    await mkdir(join(umbrella, "inner"), { recursive: true });
+    const umbrellaId = "c0000000-0000-4000-8000-000000000030";
+    await writeFile(
+      join(umbrella, "index.md"),
+      `---\nid: "${umbrellaId}"\ntype: "change"\ntitle: "Umbrella"\nslug: "umbrella"\ndisplayId: "CH-2"\n---\n`,
+    );
+    await writeFile(join(umbrella, "inner/index.md"), `---\nid: "${innerId}"\ntype: "change"\ntitle: "Inner"\nslug: "inner"\n---\n`);
+    await writeFile(join(umbrella, "inner/state.yaml"), `schema: "rex/v2"\nitems:\n  "${innerId}":\n    status: "completed"\n`);
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "container change");
+    for (const ref of [umbrellaId, "CH-2"]) {
+      const r = await resolve({ task: ref });
+      expect(codes(r), ref).toEqual(["not-actionable"]);
+      expect(r.refusals[0].message).toContain('"Umbrella"');
+      expect(r.refusals[0].message).toContain("holds other changes");
     }
   });
 

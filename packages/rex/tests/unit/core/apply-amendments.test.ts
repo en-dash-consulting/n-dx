@@ -17,7 +17,7 @@ import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
 import { writePrdModel } from "../../../src/store/prd-model-writer.js";
 import { withLock } from "../../../src/store/file-lock.js";
 import { prdLockPath } from "../../../src/store/paths.js";
-import { copyV2Fixture } from "../../helpers/v2-fixture.js";
+import { completeFixtureTask, copyV2Fixture } from "../../helpers/v2-fixture.js";
 
 const NOW = new Date("2026-10-07T12:00:00.000Z");
 const APPLIED_AT = NOW.toISOString();
@@ -301,6 +301,25 @@ describe("applyAmendments: the change", () => {
     expect(refusal(() => applyAmendments(tree([], { appliedAt: "2026-01-01T00:00:00.000Z" }), CHANGE, OPTS)).message).toMatch(/already applied at 2026-01-01/);
     expect(refusal(() => applyAmendments(tree([], { status: "cancelled" }), CHANGE, OPTS)).message).toMatch(/cancelled/);
     expect(refusal(() => applyAmendments(tree(), "CH-9", OPTS)).message).toMatch(/no live change/);
+  });
+
+  it("refuses a change whose live tasks or nested changes are not all completed, naming them", () => {
+    const work = (id: string, type: string, status?: string): RuleNode =>
+      ({ id, type, title: id, slug: id, ...(status ? { status } : {}) }) as RuleNode;
+    const input = tree([{ target: CAP, delta: "modified", summary: "s", proposed: "New" }], {
+      status: "in_progress",
+      children: [work("t1", "task", "completed"), work("t2", "task"), work("t3", "task", "deleted"), work("ch-2", "change", "in_progress")],
+    });
+    const before = structuredClone(input);
+    expect(refusal(() => applyAmendments(input, CHANGE, OPTS)).problems).toEqual([
+      "task t2, change ch-2 are not completed; a change applies once its work is done",
+    ]);
+    expect(input).toEqual(before);
+    // A dry run judges the amendments alone, so storing them is not refused.
+    expect(applyAmendmentsProblems(input, CHANGE, NOW).always).toEqual([]);
+
+    const done = tree([{ target: CAP, delta: "modified", summary: "s", proposed: "New" }], { children: [work("t1", "task", "completed"), work("t3", "task", "deleted")] });
+    expect(get(applyAmendments(done, CHANGE, OPTS).tree, CAP).statement).toBe("New");
   });
 
   it("applies amendments in order, so a later one sees an earlier one's node", () => {
@@ -660,6 +679,7 @@ describe("applyAmendments on disk", () => {
 
   it("leaves product/ untouched when a touches-only change is applied", async () => {
     const rexDir = await copyV2Fixture(join(tmp, ".rex"), "lf");
+    await completeFixtureTask(rexDir);
     const model = await loadPrdModel(rexDir, quiet);
     const change = model.tree.changes[0];
     change.touches = [change.amends![0].target];
@@ -676,6 +696,7 @@ describe("applyAmendments on disk", () => {
 
   it("writes a modified capability that reads back met", async () => {
     const rexDir = await copyV2Fixture(join(tmp, ".rex"), "lf");
+    await completeFixtureTask(rexDir);
     const model = await loadPrdModel(rexDir, quiet);
     const { tree: applied } = applyAmendments(model.tree, "CH-1", OPTS);
     await withLock(prdLockPath(rexDir), () => writePrdModel(rexDir, { ...model, tree: applied }));
