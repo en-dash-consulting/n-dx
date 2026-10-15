@@ -15,13 +15,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { goConfig, type LanguagePackEntry } from "@n-dx/lang-kit";
-import { goGrammarPath } from "@n-dx/lang-go";
-import { skipUnlessGrammar } from "@n-dx/lang-runtime";
 import { analyzeImports, type ImportsOptions } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { packsFor, type PackImportsOptions } from "../../src/analyzers/pack-imports.js";
 import { KNOWN_PACKS, type KnownPack } from "../../src/language/pack-loader.js";
 import type { Imports } from "../../src/schema/v1.js";
+import { skipUnlessPackRuns } from "../helpers/workspace-pack.js";
 
 const GO_PACK = KNOWN_PACKS.find((p) => p.id === goConfig.id)!;
 
@@ -90,7 +89,7 @@ describe("Go pack in the imports phase", () => {
   }
 
   it("takes Go edges and externals from the pack when it is installed and its grammar is built", async (ctx) => {
-    skipUnlessGrammar(ctx, goGrammarPath());
+    await skipUnlessPackRuns(ctx, "go");
     const { imports, messages } = await analyze();
     expect(messages).toEqual([]);
     expect(edgeKeys(imports)).toEqual(PACK_EDGES);
@@ -121,7 +120,7 @@ describe("Go pack in the imports phase", () => {
     ];
     for (const mode of modes) {
       it(mode.name, async (ctx) => {
-        if (mode.needsGrammar) skipUnlessGrammar(ctx, goGrammarPath());
+        if (mode.needsGrammar) await skipUnlessPackRuns(ctx, "go");
         const { imports: full } = await analyze({ packs: mode.packs });
 
         // main.go drops its util and fmt imports; only main.go is reported changed.

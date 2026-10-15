@@ -15,11 +15,14 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
-import { Language, Parser } from "web-tree-sitter";
 
 import { importWorkspacePack } from "./workspace-pack.mjs";
+
+// web-tree-sitter is a dependency of @n-dx/lang-runtime only; take the runtime's copy.
+const { Language, Parser } = createRequire(new URL("../../lang-runtime/package.json", import.meta.url))("web-tree-sitter");
 
 const SKIP_DIRS = new Set([".git", "node_modules"]);
 

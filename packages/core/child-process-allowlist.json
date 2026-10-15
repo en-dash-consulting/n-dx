@@ -191,7 +191,7 @@
     },
     {
       "path": "packages/lang-runtime/scripts/build-grammars.mjs",
-      "reason": "Developer build script — runs the pinned tree-sitter CLI binary to compile grammars to WASM. Runs before the packages are built, and @n-dx/lang-runtime may import nothing but @n-dx/lang-kit, so it cannot use @n-dx/llm-client's exec()."
+      "reason": "Developer build script — runs the pinned tree-sitter CLI binary to compile grammars to WASM. Runs before the packages are built, and the parser runtime package may import nothing but @n-dx/lang-kit, so it cannot use @n-dx/llm-client's exec()."
     },
     {
       "path": "packages/sourcevision/scripts/java-corpus-clone.mjs",

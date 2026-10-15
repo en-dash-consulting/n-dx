@@ -1,2 +1,3 @@
-# Grammar WASM from @n-dx/lang-runtime's scripts/build-grammars.mjs. Never committed.
+# Grammar builds from before the packs owned their grammars left WASM and a
+# download cache here. Nothing builds here now; kept so old checkouts stay clean.
 /build/
