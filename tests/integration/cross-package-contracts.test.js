@@ -949,6 +949,7 @@ describe("gateway export auto-detection", () => {
         "validateChangesMerge", "mergeChanges",
         "loadPrdModel", "productReport", "capabilityReport", "indexTree",
         "isOpenChange", "isAppliedChange", "specHash", "nodeSpec",
+        "handleProductEdit", "ProductEditError", "withPrdModelTransaction",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
         "computeRequirementsSummary", "computeHealthScore",
         "detectReorganizations", "applyProposals", "applyReshape",

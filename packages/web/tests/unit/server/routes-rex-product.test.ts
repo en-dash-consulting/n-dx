@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
@@ -224,6 +224,93 @@ describe("v2 product reads", () => {
     expect((await get("product/capability/nope")).status).toBe(404);
     expect((await get(`product/capability/${AREA_ID}`)).status).toBe(404);
   });
+
+  describe("POST /product/edit", () => {
+    const EDITED = "A shopper can pay for a basket with a credit or debit card.";
+
+    const post = async (payload: unknown) => {
+      const res = await fetch(`${base}/product/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: typeof payload === "string" ? payload : JSON.stringify(payload),
+      });
+      return { status: res.status, body: await res.json() };
+    };
+    const edit = (editorial: boolean, over: Record<string, unknown> = {}) => ({
+      id: CAPABILITY_ID,
+      statement: EDITED,
+      criteria: [
+        { id: "c1", text: "A valid card is charged once" },
+        { id: "c2", text: "A declined card shows why" },
+      ],
+      editorial,
+      ...over,
+    });
+    const capabilityFile = () => join(rexDir, "product", "checkout", "pay-by-card.md");
+
+    /** Record the capability as met at its current spec, which rex reads from the reviewed hash. */
+    function meetCapability(): void {
+      const statePath = join(rexDir, "product", "checkout", "state.yaml");
+      const state = readFileSync(statePath, "utf-8");
+      const hash = /reviewedHash: "([0-9a-f]+)"/.exec(state)![1];
+      writeFileSync(statePath, state.replace(
+        `    reviewedHash: "${hash}"\n`,
+        `    reviewedHash: "${hash}"\n    metAt: "${hash}"\n`,
+      ));
+    }
+
+    it("editorial: records the wording as history and keeps the capability met", async () => {
+      meetCapability();
+      const { status, body } = await post(edit(true));
+      expect(status).toBe(200);
+      expect(body.outcome).toBe("editorial");
+      expect(body.drafts).toEqual([]);
+      const capability = body.capability as CapabilityDetailWire;
+      expect(capability.statement).toBe(EDITED);
+      expect(capability.met).toBe(true);
+      expect(capability.specChangedSinceMet).toBe(false);
+      expect(readFileSync(capabilityFile(), "utf-8")).toContain("editorial:");
+      expect(((await get("changes")).body.changes as ChangeRowWire[]).map((c) => c.id)).toEqual([CHANGE_ID]);
+    });
+
+    it("not editorial: the capability reads revised and a change is drafted to build the difference", async () => {
+      meetCapability();
+      const { status, body } = await post(edit(false));
+      expect(status).toBe(200);
+      expect(body.outcome).toBe("revised");
+      expect(body.drafts).toHaveLength(1);
+      const capability = body.capability as CapabilityDetailWire;
+      expect(capability.statement).toBe(EDITED);
+      expect(capability.specChangedSinceMet).toBe(true);
+      const drafted = ((await get("changes")).body.changes as ChangeRowWire[]).find((c) => c.id === body.drafts[0].id);
+      expect(drafted).toMatchObject({ needsPlacement: true, amends: [{ id: CAPABILITY_ID, delta: "modified" }] });
+    });
+
+    it("edits a criterion's text and refuses an id the capability does not own", async () => {
+      meetCapability();
+      const changed = await post(edit(false, { criteria: [{ id: "c2", text: "A declined card shows the reason" }] }));
+      expect((changed.body.capability as CapabilityDetailWire).criteria.find((c) => c.id === "c2")?.text)
+        .toBe("A declined card shows the reason");
+      const refused = await post(edit(false, { criteria: [{ id: "c9", text: "x" }] }));
+      expect(refused.status).toBe(409);
+      expect(refused.body.error).toContain("c9");
+    });
+
+    it("refuses a node that is not a live capability, writing nothing", async () => {
+      const before = readFileSync(capabilityFile(), "utf-8");
+      expect((await post(edit(false, { id: AREA_ID }))).status).toBe(409);
+      expect(readFileSync(capabilityFile(), "utf-8")).toBe(before);
+    });
+
+    it.each([
+      ["a body that is not JSON", "{nope"],
+      ["no id", { statement: EDITED }],
+      ["an empty statement", { id: CAPABILITY_ID, statement: "  " }],
+      ["malformed criteria", { id: CAPABILITY_ID, statement: EDITED, criteria: [{ id: "c1" }] }],
+    ])("answers 400 for %s", async (_name, payload) => {
+      expect((await post(payload)).status).toBe(400);
+    });
+  });
 });
 
 describe("product reads on a v1 project", () => {
@@ -249,5 +336,16 @@ describe("product reads on a v1 project", () => {
     const res = await fetch(`${base}/${path}`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ layout: "v1" });
+  });
+
+  it("POST /product/edit refuses on a v1 tree and writes nothing", async () => {
+    const res = await fetch(`${base}/product/edit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: CAPABILITY_ID, statement: "x", criteria: [], editorial: false }),
+    });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("v1");
+    expect(existsSync(join(tmpDir, ".rex", "product"))).toBe(false);
   });
 });

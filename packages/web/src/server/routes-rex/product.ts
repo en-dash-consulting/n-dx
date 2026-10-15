@@ -5,6 +5,10 @@
  *   GET /api/rex/product                 → { layout: "v2", map }
  *   GET /api/rex/changes                 → { layout: "v2", changes }
  *   GET /api/rex/product/capability/<id> → { layout: "v2", capability }
+ *   POST /api/rex/product/edit           → { layout: "v2", outcome, drafts, capability }
+ *
+ * The POST is the capability page's edit form: it runs rex's `handleProductEdit`
+ * inside rex's v2 transaction. A v1 tree answers 409; there is nothing to edit.
  *
  * On a v1 tree each answers `{ layout: "v1" }`: there is no product layer to
  * show, and the viewer says to run `ndx migrate`. No v1 route changes.
@@ -16,9 +20,11 @@
  * fails to compile if the two drift.
  */
 
-import type { ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse } from "../response-utils.js";
+import type { WebSocketBroadcaster } from "../websocket.js";
+import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
+import { appendLog } from "./rex-route-helpers.js";
 import {
   prdLayout,
   loadPrdModel,
@@ -29,6 +35,9 @@ import {
   isOpenChange,
   nodeSpec,
   specHash,
+  handleProductEdit,
+  ProductEditError,
+  withPrdModelTransaction,
 } from "../rex-gateway.js";
 import type { ChangeNode, RuleNode, TreeIndex, V2Tree } from "../rex-gateway.js";
 
@@ -373,4 +382,103 @@ export function routeProductReads(
     }
     return true;
   })();
+}
+
+// ── Direct edit ──────────────────────────────────────────────────────
+
+/** The body of `POST /api/rex/product/edit` (the viewer's `ProductEdit`). */
+interface ProductEditBody {
+  id: string;
+  statement: string;
+  criteria: Array<{ id: string; text: string }>;
+  editorial: boolean;
+}
+
+function parseEditBody(raw: string): ProductEditBody | string {
+  let body: Partial<ProductEditBody> | null;
+  try {
+    body = JSON.parse(raw || "{}") as Partial<ProductEditBody> | null;
+  } catch {
+    return "Request body must be JSON.";
+  }
+  if (!body || typeof body.id !== "string" || !body.id) return "Missing required field: id";
+  if (typeof body.statement !== "string" || !body.statement.trim()) return "Missing required field: statement";
+  const criteria = body.criteria ?? [];
+  if (!Array.isArray(criteria) || !criteria.every((c) => c && typeof c.id === "string" && typeof c.text === "string")) {
+    return "criteria must be an array of { id, text }";
+  }
+  return { id: body.id, statement: body.statement, criteria, editorial: body.editorial === true };
+}
+
+/**
+ * Apply a direct edit to a capability's statement and its own criteria's text.
+ * Criteria are matched by id and never added or removed here; an id the
+ * capability does not own is refused rather than dropped.
+ */
+async function handleProductEditRoute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const parsed = parseEditBody(await readBody(req, res));
+  if (typeof parsed === "string") {
+    errorResponse(res, 400, parsed);
+    return true;
+  }
+  if ((await prdLayout(ctx.rexDir)) !== "v2") {
+    errorResponse(res, 409, "This project's PRD uses the v1 layout, which has no product layer to edit. Migrate it first.");
+    return true;
+  }
+
+  try {
+    const now = new Date();
+    const { result } = await withPrdModelTransaction(ctx.rexDir, (model) => {
+      const tree = structuredClone(model.tree);
+      const node = indexTree(tree).resolve(parsed.id);
+      if (!node || node.type !== "capability") {
+        throw new ProductEditError(parsed.id, "not a live capability");
+      }
+      const before = { statement: node.statement, criteria: structuredClone(node.criteria) };
+      node.statement = parsed.statement.trim();
+      for (const edit of parsed.criteria) {
+        const criterion = node.criteria?.find((c) => c.id === edit.id);
+        if (!criterion) throw new ProductEditError(parsed.id, `it has no criterion ${edit.id}`);
+        criterion.text = edit.text;
+      }
+      const handled = handleProductEdit(tree, node.id, before, { editorial: parsed.editorial, now });
+      return {
+        tree: handled.tree,
+        result: { id: node.id, outcome: handled.outcome, drafts: handled.drafts.map((d) => ({ id: d.id, title: d.title })) },
+      };
+    });
+    appendLog(ctx, { timestamp: now.toISOString(), event: "product_edited", itemId: result.id, detail: result.outcome });
+    const model = await loadPrdModel(ctx.rexDir);
+    jsonResponse(res, 200, {
+      layout: "v2",
+      outcome: result.outcome,
+      drafts: result.drafts,
+      capability: buildCapabilityDetail(model.tree, result.id),
+    });
+    broadcast?.({ type: "rex:prd-changed", timestamp: now.toISOString() });
+  } catch (err) {
+    // The lock failure names the holder's PID; pass it through.
+    const message = err instanceof Error ? err.message : String(err);
+    const refused = err instanceof ProductEditError || message.includes("Could not acquire PRD lock");
+    errorResponse(res, refused ? 409 : 500, message);
+  }
+  return true;
+}
+
+/** Handle `POST product/edit`. Returns false when the path is not it. */
+export function routeProductEdit(
+  path: string,
+  method: string,
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): boolean | Promise<boolean> {
+  if (method !== "POST" || path !== "product/edit") return false;
+  return handleProductEditRoute(req, res, ctx, broadcast);
 }

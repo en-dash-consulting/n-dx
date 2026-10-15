@@ -21,7 +21,7 @@ import type { NavigateTo } from "../types.js";
 import { ProductView } from "./product.js";
 import { CapabilityPage } from "./capability.js";
 import { ChangesView } from "./changes.js";
-import type { CapabilityDetail, ChangeRow, ProductMap } from "./product-model.js";
+import type { CapabilityDetail, ChangeRow, ProductEdit, ProductMap } from "./product-model.js";
 
 /** What every product read answers on a v1 tree. */
 interface V1Answer { layout: "v1" }
@@ -53,6 +53,14 @@ function failed<T>(prev: Load<T>, message: string): Load<T> {
  * that fails keeps that data and reports through `refreshError`.
  */
 function useProductRead<T>(url: string, pick: (body: Record<string, unknown>) => T): Load<T> {
+  return useRefetchableProductRead(url, pick).load;
+}
+
+/** `useProductRead` plus a `refetch` for a page that writes and must show the result. */
+function useRefetchableProductRead<T>(
+  url: string,
+  pick: (body: Record<string, unknown>) => T,
+): { load: Load<T>; refetch: () => void } {
   const [load, setLoad] = useState<Load<T>>({ state: "loading" });
   const [revision, setRevision] = useState(0);
   const refetch = useCallback(() => setRevision((n) => n + 1), []);
@@ -81,7 +89,7 @@ function useProductRead<T>(url: string, pick: (body: Record<string, unknown>) =>
     });
     return () => { live = false; };
   }, [url, revision]);
-  return load;
+  return { load, refetch };
 }
 
 /** The v1 empty state: the product layer exists only after migrating. */
@@ -113,11 +121,28 @@ function StaleNotice({ message }: { message?: string }) {
     : null;
 }
 
+/** Post a spec edit; resolves on success, rejects with the server's reason. */
+async function postProductEdit(edit: ProductEdit): Promise<void> {
+  const res = await fetch("/api/rex/product/edit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(edit),
+  });
+  if (!res.ok) throw new Error(failureMessage(res.status, await res.json().catch(() => null)));
+}
+
 function CapabilityFromRoute({ id, onBack }: { id: string; onBack: () => void }) {
-  const load = useProductRead(
+  const { load, refetch } = useRefetchableProductRead(
     `/api/rex/product/capability/${encodeURIComponent(id)}`,
     (body) => body.capability as CapabilityDetail,
   );
+  const [editError, setEditError] = useState<string | null>(null);
+  const onEdit = useCallback((edit: ProductEdit) => {
+    postProductEdit(edit).then(
+      () => { setEditError(null); refetch(); },
+      (err: unknown) => setEditError(err instanceof Error ? err.message : String(err)),
+    );
+  }, [refetch]);
   if (load.state === "v1") return h(NoProductLayer, { title: "Product" });
   if (load.state !== "ready") {
     // A failed read (the capability was retired since the map loaded) keeps the
@@ -129,7 +154,11 @@ function CapabilityFromRoute({ id, onBack }: { id: string; onBack: () => void })
   }
   return h("div", null,
     h(StaleNotice, { message: load.refreshError }),
-    h(CapabilityPage, { capability: load.data, onBack }),
+    editError
+      ? h("div", { class: "empty-state pm-stale", role: "alert" }, `Could not save the edit: ${editError}`)
+      : null,
+    // Keyed by the spec so the form reseeds from the saved capability, not the one it was opened on.
+    h(CapabilityPage, { key: `${load.data.id}:${load.data.statement ?? ""}`, capability: load.data, onBack, onEdit }),
   );
 }
 

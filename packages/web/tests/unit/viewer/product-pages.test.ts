@@ -241,6 +241,85 @@ describe("on a v2 project", () => {
     expect(root.querySelector(".cap-container")).not.toBeNull();
   });
 
+  describe("editing a capability's spec", () => {
+    const capabilityUrl = `/api/rex/product/capability/${CAPABILITY_DETAIL_FIXTURE.id}`;
+    const met = { ...CAPABILITY_DETAIL_FIXTURE, status: "met" as const, specChangedSinceMet: false };
+    let posts: Array<{ url: string; body: Record<string, unknown> }>;
+
+    /** Serve the capability read and answer `POST /api/rex/product/edit` with `editStatus`. */
+    function stubEditable(capability: typeof met, editStatus = 200): void {
+      posts = [];
+      fetched = [];
+      vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
+        fetched.push(url);
+        if (init?.method === "POST") {
+          posts.push({ url, body: JSON.parse(init.body ?? "{}") });
+          return { ok: editStatus === 200, status: editStatus, json: async () => (editStatus === 200 ? { layout: "v2" } : { error: "refused by rex" }) };
+        }
+        const body = url === "/api/rex/product"
+          ? { layout: "v2", map: PRODUCT_MAP_FIXTURE }
+          : url === capabilityUrl ? { layout: "v2", capability } : undefined;
+        return { ok: body !== undefined, status: body ? 200 : 404, json: async () => body ?? { error: "not found" } };
+      }));
+    }
+
+    async function openAndType(): Promise<void> {
+      await mount(h(ProductPage, null));
+      act(() => {
+        [...root.querySelectorAll<HTMLButtonElement>(".pm-capability-link")]
+          .find((b) => b.textContent === CAPABILITY_DETAIL_FIXTURE.title)!.click();
+      });
+      await settle();
+      const statement = root.querySelector<HTMLTextAreaElement>(".cap-edit-statement")!;
+      act(() => {
+        statement.value = "A reworded statement.";
+        statement.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+
+    const save = async () => {
+      await act(async () => {
+        root.querySelector<HTMLFormElement>(".cap-edit-form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        // The post resolves, then the refetch it triggers; both inside this act.
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      await settle();
+    };
+
+    it("renders the edit form, and a submit posts the edit and refetches the page", async () => {
+      stubEditable(met);
+      await openAndType();
+      await save();
+
+      expect(posts).toEqual([{
+        url: "/api/rex/product/edit",
+        body: {
+          id: met.id,
+          statement: "A reworded statement.",
+          criteria: met.criteria.filter((c) => !c.inheritedFrom).map(({ id, text }) => ({ id, text })),
+          editorial: false,
+        },
+      }]);
+      expect(fetched.filter((u) => u === capabilityUrl)).toHaveLength(2);
+    });
+
+    it("sends editorial: true when the checkbox is checked", async () => {
+      stubEditable(met);
+      await openAndType();
+      act(() => { root.querySelector<HTMLInputElement>(".cap-edit-editorial-check")!.click(); });
+      await save();
+      expect(posts[0].body.editorial).toBe(true);
+    });
+
+    it("shows why a save was refused and does not refetch", async () => {
+      stubEditable(met, 409);
+      await openAndType();
+      await save();
+      expect(root.textContent).toContain("Could not save the edit: refused by rex");
+      expect(fetched.filter((u) => u === capabilityUrl)).toHaveLength(1);
+    });
+  });
+
   it("ignores a flush that carries no rex:prd-changed frame", async () => {
     stubRoutes({ "/api/rex/changes": { layout: "v2", changes: CHANGES_FIXTURE } });
     await mount(h(ChangesPage, null));
