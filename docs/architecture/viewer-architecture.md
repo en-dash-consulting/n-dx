@@ -35,17 +35,17 @@ The dashboard is a loop of three stages, `STAGE_ORDER = ["analyze", "plan", "wor
 | `featureGate` | Hidden when the toggle is off (same keys as `useFeatureToggle`) |
 | `requiresServer` | Absent from a static export |
 
-A stage may instead be a dashboard: when `STAGES[stage].tiles` is set, the page renders its plain lead section and then a grid of `StageTile`s (`views/stage-tiles.ts`) in place of the other sections. A tile names a `view` (what it opens full-screen, and its "Open" target), and may set:
+A stage may instead be a dashboard: when `STAGES[stage].tiles` is set, the page renders its plain lead section and then a grid of `StageTile`s (`views/stage-tiles.ts`) in place of the other sections. A tile names a `view` (what it shows when opened), and may set:
 
 | Field | Effect |
 |-------|--------|
 | `cols`, `rows` | Columns of 12 (4, 6, 8, 12; default 4) and fixed-height rows (1–3; default 1) the tile spans |
 | `panel`, `title` | Render a stage panel (`renderPanel`: `map`, `health`, `next-steps`, `languages`) instead of the view, named by `title` |
 | `chromeless` | The panel brings its own header and full-screen (the codebase map), so the tile draws none |
-| `tabs` | Further views shown as tabs when the tile is open full-screen |
+| `tabs` | Further views shown as tabs when the tile is opened |
 | `featureGate`, `requiresServer`, `hiddenWhenDeployed` | As for sections |
 
-The grid has twelve columns and fixed-height rows; a tile spans `cols` × `rows` of it (defaults 4 × 1) and dense packing fills the column beside a tall tile. A tile shows `renderSummary(tile)` (`views/tile-summaries.ts` for Analyze), else its panel, else its view cut to the tile. Its one action is its header, which opens it full-screen — the whole view with the tile's tabs, and "Open ↗" to the view's own page — stopping short of the detail panel when one is open. `alsoOwns` lists views a stage owns without placing them (they still light the stage's top-bar tab).
+The grid has twelve columns and fixed-height rows; a tile spans `cols` × `rows` of it (defaults 4 × 1) and dense packing fills the column beside a tall tile. A tile shows `renderSummary(tile)` (`views/tile-summaries.ts` for Analyze), else its panel, else its view cut to the tile. A tile has two modes: closed, and opened by its header as a modal over the page — inset on a dimmed backdrop, holding the whole view with the tile's tabs under a "← Stage / Tile" trail; the backdrop, the trail, Esc and the close button close it. The modal stops short of the detail panel when one is open. `alsoOwns` lists views a stage owns without placing them (they still light the stage's top-bar tab).
 
 Current composition:
 

@@ -211,15 +211,40 @@
   font-size: 20px;
 }
 
-/* ── Full-screen ── */
+/* ── Opened tile: a modal over the page ──
+   The backdrop covers the page between the top nav and the bottom bar and
+   closes the tile on click; the modal sits inset from it so it reads as a
+   layer that can be dismissed, not a new page. */
 
 .stage-tile-fullscreen {
   position: fixed;
   inset: var(--topnav-h) 0 var(--bottombar-h) 0;
   z-index: 60;
   display: flex;
+  padding: var(--space-6);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(2px);
+  animation: stage-tile-backdrop-in 0.15s ease-out;
+}
+
+.stage-tile-modal {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius-lg);
   background: var(--bg);
+  box-shadow: 0 24px 64px -24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  animation: stage-tile-modal-in 0.15s ease-out;
+}
+
+@keyframes stage-tile-backdrop-in { from { opacity: 0; } }
+@keyframes stage-tile-modal-in { from { opacity: 0; transform: scale(0.985); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-tile-fullscreen, .stage-tile-modal { animation: none; }
 }
 
 .stage-tile-fullscreen-head {
@@ -231,11 +256,49 @@
   background: var(--bg-surface);
 }
 
-.stage-tile-fullscreen-title {
+/* "← Analysis / Problems": the stage closes back to the dashboard. */
+.stage-tile-trail {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stage-tile-trail-back {
+  padding: 2px var(--space-1-5);
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.stage-tile-trail-back:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.stage-tile-trail-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.stage-tile-trail-sep {
+  color: var(--text-muted, var(--text-dim));
+}
+
+.stage-tile-fullscreen-title {
   margin: 0;
-  font-size: 16px;
+  min-width: 0;
+  font-size: 15px;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stage-tile-fullscreen-body {
@@ -243,6 +306,12 @@
   min-height: 0;
   overflow: auto;
   padding: var(--space-4) var(--space-5);
+}
+
+/* Phones: no room to spare for the inset. */
+@media (max-width: 700px) {
+  .stage-tile-fullscreen { padding: 0; }
+  .stage-tile-modal { border-radius: 0; border: none; }
 }
 
 /* The detail panel (a PRD item, file or zone) stays open beside it. Below

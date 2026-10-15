@@ -7,12 +7,13 @@
  * tile, so the page is a set of aligned blocks rather than a stack of cards
  * of whatever height their content happened to be.
  *
- * A tile shows its summary — `renderSummary(tile)`, else its panel, else its
- * view cut to the tile — and has one action: open it full-screen. The
- * full-screen layer holds the whole view (with the tile's tabs) and the
- * "Open ↗" link to the view's own page, closes with Esc or its close button,
- * and stops short of the detail panel when one is open so the two sit side by
- * side. A chromeless tile (the codebase map) is its panel alone: the panel
+ * A tile has two modes. Closed, it shows its summary — `renderSummary(tile)`,
+ * else its panel, else its view cut to the tile. Open (its header is the one
+ * control), it is a modal over the page: inset from the edges on a dimmed
+ * backdrop, holding the whole view with the tile's tabs, headed by a back
+ * trail "← Stage / Tile". The backdrop, the trail's stage, Esc and the close
+ * button all close it and return focus to the tile. It stops short of the
+ * detail panel when one is open, so the two sit side by side. A chromeless tile (the codebase map) is its panel alone: the panel
  * brings its own header, controls and full-screen.
  *
  * Views render through `renderView` and panels through `renderPanel`, both
@@ -23,7 +24,7 @@
 import { h } from "preact";
 import type { ComponentChild } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import type { ViewId, NavigateTo } from "../types.js";
+import type { ViewId } from "../types.js";
 import { viewLabel, viewBlurb, viewGlyph, type StageId, type StageTile, type StagePanelId, type StageTab } from "./stages.js";
 import { ActionIcon } from "../components/index.js";
 
@@ -100,12 +101,12 @@ function TileContent({ tile, tabs, renderView, renderPanel, idBase }: TileConten
 // ── Full-screen layer ──────────────────────────────────────────
 
 interface FullScreenProps extends TileContentProps {
+  stage: StageId;
   onClose: () => void;
   besideDetail: boolean;
-  navigateTo: NavigateTo;
 }
 
-function FullScreenTile({ tile, onClose, besideDetail, navigateTo, ...content }: FullScreenProps) {
+function FullScreenTile({ stage, tile, onClose, besideDetail, ...content }: FullScreenProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -120,32 +121,36 @@ function FullScreenTile({ tile, onClose, besideDetail, navigateTo, ...content }:
   }, [onClose]);
 
   const title = tileTitle(tile);
+  const stageName = viewLabel(stage);
   return h("div", {
     class: `stage-tile-fullscreen${besideDetail ? " stage-tile-fullscreen--beside-detail" : ""}`,
-    role: "dialog",
-    "aria-modal": "true",
-    "aria-label": title,
+    // A click on the backdrop itself, not one that bubbled up from the modal.
+    onClick: (e: MouseEvent) => { if (e.target === e.currentTarget) onClose(); },
   },
-    h("div", { class: "stage-tile-fullscreen-head" },
-      h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
-      h("h2", { class: "stage-tile-fullscreen-title" }, title),
-      h("button", {
-        type: "button",
-        class: "stage-tile-btn",
-        onClick: () => { onClose(); navigateTo(tile.view); },
-        "aria-label": `Open ${viewLabel(tile.view)} on its own page`,
-        title: `Open ${viewLabel(tile.view)} on its own page`,
-      }, "Open ↗"),
-      h("button", {
-        ref: closeRef,
-        type: "button",
-        class: "stage-tile-btn stage-tile-icon-btn",
-        onClick: onClose,
-        "aria-label": `Close full-screen ${title}`,
-        title: "Close (Esc)",
-      }, h(ActionIcon, { name: "close" })),
+    h("div", { class: "stage-tile-modal", role: "dialog", "aria-modal": "true", "aria-label": title },
+      h("div", { class: "stage-tile-fullscreen-head" },
+        h("nav", { class: "stage-tile-trail", "aria-label": "Back" },
+          h("button", {
+            type: "button",
+            class: "stage-tile-trail-back",
+            onClick: onClose,
+            title: `Back to ${stageName}`,
+          }, h("span", { "aria-hidden": "true" }, "← "), stageName),
+          h("span", { class: "stage-tile-trail-sep", "aria-hidden": "true" }, "/"),
+          h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
+          h("h2", { class: "stage-tile-fullscreen-title", "aria-current": "page" }, title),
+        ),
+        h("button", {
+          ref: closeRef,
+          type: "button",
+          class: "stage-tile-btn stage-tile-icon-btn",
+          onClick: onClose,
+          "aria-label": `Close ${title}`,
+          title: "Close (Esc)",
+        }, h(ActionIcon, { name: "close" })),
+      ),
+      h("div", { class: "stage-tile-fullscreen-body" }, h(TileContent, { tile, ...content })),
     ),
-    h("div", { class: "stage-tile-fullscreen-body" }, h(TileContent, { tile, ...content })),
   );
 }
 
@@ -179,7 +184,7 @@ function Tile({ stage, tile, onOpen, renderView, renderPanel, renderSummary }: T
       class: "stage-tile-head",
       onClick: (e: Event) => onOpen(e.currentTarget as HTMLElement),
       "aria-haspopup": "dialog",
-      "aria-label": `Open ${title} full-screen`,
+      "aria-label": `Open ${title}`,
     },
       h("span", { class: "stage-tile-glyph", "aria-hidden": "true" }, viewGlyph(tile.view)),
       h("span", { class: "stage-tile-title", id: `${idBase}-title` }, title),
@@ -202,7 +207,6 @@ export interface TileGridProps {
   tiles: readonly StageTile[];
   /** Tabs each tile may show, already filtered to the views this build can render. */
   tabsOf: (tile: StageTile) => readonly StageTab[];
-  navigateTo: NavigateTo;
   renderView: (view: ViewId) => ComponentChild;
   renderPanel: RenderPanel;
   renderSummary: RenderSummary;
@@ -210,7 +214,7 @@ export interface TileGridProps {
   besideDetail?: boolean;
 }
 
-export function TileGrid({ stage, tiles, tabsOf, navigateTo, renderView, renderPanel, renderSummary, besideDetail = false }: TileGridProps) {
+export function TileGrid({ stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail = false }: TileGridProps) {
   const [fullScreen, setFullScreen] = useState<string | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
@@ -237,6 +241,7 @@ export function TileGrid({ stage, tiles, tabsOf, navigateTo, renderView, renderP
     }),
     full
       ? h(FullScreenTile, {
+          stage,
           tile: full,
           tabs: tabsOf(full),
           renderView,
@@ -244,7 +249,6 @@ export function TileGrid({ stage, tiles, tabsOf, navigateTo, renderView, renderP
           idBase: `stage-tile-${stage}-${tileKey(full)}-full`,
           onClose: closeFullScreen,
           besideDetail,
-          navigateTo,
         })
       : null,
   );

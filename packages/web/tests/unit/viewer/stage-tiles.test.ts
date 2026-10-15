@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { TileGrid } from "../../../src/viewer/views/stage-tiles.js";
@@ -14,7 +14,6 @@ const TILES: StageTile[] = [
 ];
 
 let root: HTMLElement;
-const navigateTo = vi.fn();
 
 function mount(extra: Partial<Parameters<typeof TileGrid>[0]> = {}) {
   act(() => {
@@ -22,7 +21,6 @@ function mount(extra: Partial<Parameters<typeof TileGrid>[0]> = {}) {
       stage: "analyze",
       tiles: TILES,
       tabsOf: (t) => [{ view: t.view }, ...(t.tabs ?? [])],
-      navigateTo,
       renderView: (v: ViewId) => h("div", { class: `view view-${v}` }, `view:${v}`),
       renderPanel: (p) => h("div", { class: `panel panel-${p}` }),
       renderSummary: (t) => (t.view === "problems" ? h("p", { class: "summary" }, "5 critical") : null),
@@ -38,7 +36,6 @@ const dialog = () => root.querySelector<HTMLElement>(".stage-tile-fullscreen");
 beforeEach(() => {
   root = document.createElement("div");
   document.body.appendChild(root);
-  navigateTo.mockReset();
 });
 
 afterEach(() => {
@@ -69,29 +66,46 @@ describe("TileGrid", () => {
     expect(tile("map").querySelector(".stage-tile-head")).toBeNull();
   });
 
-  it("opens a tile full-screen from its header — its one action — and closes with Esc, returning focus", () => {
+  it("opens a tile from its header — its one action — and closes with Esc, returning focus", () => {
     mount();
-    expect(head("problems").getAttribute("aria-label")).toBe("Open Problems full-screen");
+    expect(head("problems").getAttribute("aria-label")).toBe("Open Problems");
     // No separate expand or Open control on the tile itself.
     expect(tile("problems").querySelectorAll("button")).toHaveLength(1);
 
     head("problems").focus();
     act(() => head("problems").click());
-    expect(dialog()?.getAttribute("role")).toBe("dialog");
+    expect(dialog()!.querySelector("[role=dialog]")?.getAttribute("aria-modal")).toBe("true");
     expect(dialog()!.querySelector(".view-problems")).not.toBeNull();
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Close full-screen Problems");
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Close Problems");
 
     act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
     expect(dialog()).toBeNull();
     expect(document.activeElement).toBe(head("problems"));
   });
 
-  it("goes to the view's own page from Open ↗ in the full-screen header", () => {
+  it("has two modes only: an opened tile offers no Open link", () => {
     mount();
     act(() => head("files").click());
-    const open = [...dialog()!.querySelectorAll<HTMLButtonElement>(".stage-tile-btn")].find((b) => b.textContent === "Open ↗")!;
-    act(() => open.click());
-    expect(navigateTo).toHaveBeenCalledWith("files");
+    expect([...dialog()!.querySelectorAll("button")].map((b) => b.textContent)).not.toContain("Open ↗");
+  });
+
+  it("heads an opened tile with a trail back to the stage, which closes it", () => {
+    mount();
+    act(() => head("files").click());
+    const trail = dialog()!.querySelector(".stage-tile-trail")!;
+    expect(trail.querySelector(".stage-tile-trail-back")?.textContent).toBe("← Analysis");
+    expect(trail.querySelector("h2")?.textContent).toBe("Files");
+    act(() => trail.querySelector<HTMLButtonElement>(".stage-tile-trail-back")!.click());
+    expect(dialog()).toBeNull();
+    expect(document.activeElement).toBe(head("files"));
+  });
+
+  it("closes when the backdrop is clicked, but not when the modal is", () => {
+    mount();
+    act(() => head("files").click());
+    act(() => dialog()!.querySelector<HTMLElement>(".stage-tile-modal")!.click());
+    expect(dialog()).not.toBeNull();
+    act(() => dialog()!.click());
     expect(dialog()).toBeNull();
   });
 

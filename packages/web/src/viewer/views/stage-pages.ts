@@ -211,7 +211,7 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
       return h(Section, { key: s.view, stage, section: s, navigateTo, renderView });
     }),
     def.tiles
-      ? h(TileGrid, { stage, tiles, tabsOf, navigateTo, renderView, renderPanel, renderSummary, besideDetail: detailOpen })
+      ? h(TileGrid, { stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen })
       : null,
   );
 }
