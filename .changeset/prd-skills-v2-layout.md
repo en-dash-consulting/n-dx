@@ -12,3 +12,7 @@ suggested placement from `place_change`; `/ndx-reshape` restructures with
 level change; the overlap checks and commit steps cover `.rex/changes/` and
 `.rex/product/`, `state.yaml` files included. On a v1 tree every skill behaves
 as before. `tests/e2e/skill-prd-layout.test.js` pins both branches.
+
+`/ndx-reshape`'s description now reads "Restructure the PRD — regroup,
+reparent, merge overlaps and place changes", without the level changes a v2
+tree refuses, and the skills guide no longer says the PRD skills are v1-only.
