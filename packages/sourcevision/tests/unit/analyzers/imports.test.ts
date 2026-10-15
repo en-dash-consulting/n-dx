@@ -739,3 +739,38 @@ describe("tsconfig path alias resolution", () => {
     expect(imports.edges[0].to).toBe("app/lib/math.ts");
   });
 });
+
+describe("analyzeImports incremental carry-over (#744)", () => {
+  let tmpDir: string;
+
+  afterEach(async () => {
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("drops edges and external importers for files no longer in the inventory", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-imp-pruned-"));
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+    await mkdir(join(tmpDir, "legacy"), { recursive: true });
+    await writeFile(join(tmpDir, "legacy", "lib.ts"), `import { x } from "lodash";\nimport { a } from "../src/a.js";\nexport const lib = x + a;\n`);
+    await writeFile(join(tmpDir, "src", "a.ts"), `export const a = 1;\n`);
+    await writeFile(join(tmpDir, "src", "b.ts"), `import { lib } from "../legacy/lib.js";\nimport { a } from "./a.js";\nexport const b = lib + a;\n`);
+
+    const inv1 = await analyzeInventory(tmpDir) as InventoryResult;
+    const imp1 = await analyzeImports(tmpDir, inv1);
+    expect(imp1.external.some((e) => e.package === "lodash")).toBe(true);
+
+    const inv2 = { ...inv1, files: inv1.files.filter((f) => !f.path.startsWith("legacy/")) };
+    const incremental = await analyzeImports(tmpDir, inv2, {
+      previousImports: imp1,
+      changedFiles: new Set(),
+      fileSetChanged: false,
+    });
+    const full = await analyzeImports(tmpDir, inv2);
+
+    expect(incremental.edges.some((e) => e.from === "legacy/lib.ts" || e.to === "legacy/lib.ts")).toBe(false);
+    expect(incremental.external.some((e) => e.package === "lodash")).toBe(false);
+    expect(incremental.edges).toEqual(full.edges);
+    expect(incremental.external).toEqual(full.external);
+    expect(incremental.summary).toEqual(full.summary);
+  });
+});

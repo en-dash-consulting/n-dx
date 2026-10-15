@@ -57,6 +57,10 @@
   --space-10: 40px;
   --space-12: 48px;
 
+  /* ── Icon sizes (components/action-icon.ts) ── */
+  --icon-size: 16px;
+  --icon-size-sm: 12px;
+
   /* ── Border radii ── */
   --radius-sm: 4px;
   --radius-md: 6px;

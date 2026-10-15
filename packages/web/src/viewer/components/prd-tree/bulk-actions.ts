@@ -6,6 +6,7 @@
  */
 
 import { h } from "preact";
+import { ActionIcon } from "../action-icon.js";
 import { useState, useCallback } from "preact/hooks";
 import type { ItemStatus } from "./types.js";
 
@@ -132,6 +133,6 @@ export function BulkActions({ selectedIds, onClearSelection, onActionComplete, o
       onClick: onClearSelection,
       title: "Clear selection",
       "aria-label": "Clear selection",
-    }, "\u00d7"),
+    }, h(ActionIcon, { name: "close" })),
   );
 }

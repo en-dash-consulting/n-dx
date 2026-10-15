@@ -1,4 +1,5 @@
 import { h, Fragment } from "preact";
+import { ActionIcon } from "./action-icon.js";
 import { useEffect, useRef } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem, FileDetail, ZoneDetail } from "../types.js";
 import { meterClass, getZoneColorByIndex } from "../visualization/index.js";
@@ -79,7 +80,7 @@ export function DetailPanel({ detail, data, navigateTo, onClose, prdDetailConten
           onClick: onClose,
           "aria-label": "Close detail panel",
           title: "Close (Esc)",
-        }, "\u2715", h("span", { class: "sr-only" }, "Close"))
+        }, h(ActionIcon, { name: "close" }), h("span", { class: "sr-only" }, "Close"))
       ),
       content
     )
