@@ -51,6 +51,20 @@ export async function discoverJavaModules(projectDir: string): Promise<JavaModul
 
 // ── Maven ────────────────────────────────────────────────────────────────
 
+/**
+ * Remove XML comments, repeating until none remain: one pass over
+ * `<!<!-- x -->-- -->` would leave a `<!--` behind and a later scan would
+ * read the rest of the file as a comment's contents.
+ */
+function stripXmlComments(xml: string): string {
+  let out = xml;
+  for (;;) {
+    const next = out.replace(/<!--[\s\S]*?-->/g, "");
+    if (next === out) return out;
+    out = next;
+  }
+}
+
 async function readMavenModules(projectDir: string): Promise<JavaModule[]> {
   const modules: JavaModule[] = [];
   const seen = new Set<string>();
@@ -60,7 +74,7 @@ async function readMavenModules(projectDir: string): Promise<JavaModule[]> {
     seen.add(dir);
     const pom = await readText(join(projectDir, dir, "pom.xml"));
     if (pom === null) return;
-    const xml = pom.replace(/<!--[\s\S]*?-->/g, "");
+    const xml = stripXmlComments(pom);
     // Plugin configuration reuses the tag name (antlr4, protobuf, ...) for non-Java roots.
     const build = xml.replace(/<plugins>[\s\S]*?<\/plugins>/g, "");
 
