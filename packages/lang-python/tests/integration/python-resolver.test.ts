@@ -113,6 +113,16 @@ describe("absolute imports", () => {
     expect(r.resolve("app.py").external.map((e) => [e.package, e.symbols])).toEqual([["ns", ["parse"]]]);
     expect(outcomes(r, "app.py")["ns.core.version"]).toEqual({ kind: "external", module: "ns" });
   });
+
+  it("stays internal when the namespace directory lies inside a regular package, which no distribution can extend", async (ctx) => {
+    const r = await resolve(ctx, {
+      "app.py": "from pkg.sub.gone import x\n",
+      "pkg/__init__.py": "",
+      "pkg/sub/present.py": "",
+    });
+    expect(r.resolve("app.py").external).toEqual([]);
+    expect(outcomes(r, "app.py")["pkg.sub.gone"]).toEqual({ kind: "unresolved", reason: "internal-not-found" });
+  });
 });
 
 describe("relative imports", () => {

@@ -239,13 +239,21 @@ class Index {
     return namespace;
   }
 
-  /** The longest prefix of `segments` the project has is a namespace package: the rest may be installed. */
+  /**
+   * Every prefix of `segments` the project has, from the top-level module
+   * down, is a namespace package, so another distribution may supply the
+   * rest. A namespace directory inside a regular package cannot be extended:
+   * the package's `__path__` is its one directory.
+   */
   missingBelowNamespace(roots: readonly Root[], segments: readonly string[]): boolean {
-    for (let n = segments.length - 1; n > 0; n--) {
+    let any = false;
+    for (let n = 1; n < segments.length; n++) {
       const prefix = this.resolveAbsolute(roots, segments.slice(0, n));
-      if (prefix) return "namespace" in prefix.found;
+      if (!prefix) break;
+      if (!("namespace" in prefix.found)) return false;
+      any = true;
     }
-    return false;
+    return any;
   }
 
   /** The declared distribution an import's top-level module names, by PEP 503 name; own project first. */
