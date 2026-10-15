@@ -7,7 +7,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 - **sourcevision** — Static analysis: file inventory, import graph, zone detection (Louvain community detection), React component catalog. Produces `.sourcevision/CONTEXT.md` and `llms.txt` for AI consumption.
 - **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state in a slug-based folder tree at `.rex/prd_tree/`: one directory per item with an `index.md` file. No JSON files are written by PRD mutations.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
-- **lang-kit** — Language facts and the pack contract (`@n-dx/lang-kit`): language ids and configs, project detection, build-file readers, the small TOML/XML/YAML parsers, the IaC resource-kind table, and the facts a language pack returns. Foundation tier with no dependencies beyond Node; it never reads config. sourcevision analyzes through it.
+- **lang-kit** — Language facts and the pack contract; foundation tier, no dependencies. See `packages/lang-kit/AGENTS.md`.
 - **graview** — Graview projection: `ndx graview emit|check|describe|serve|mcp` writes a `graview-document` declaration and a `{nodes, edges}` snapshot of the PRD, the analysis and the runs under the layout's graview dir, then spawns the `graview` CLI on them. No `@graview/*` dependency; the binary is a peer tool.
 - **graview-face** — The product face on Graview: a Vite + React app, published on its own and depended on by no other package, that compiles the emitted document and lays a shell, home and record pages in n-dx's words over the derived ones. `ndx graview serve` runs it.
 
@@ -82,7 +82,6 @@ Rules:
   too, or a type import gets silently promoted to a runtime one in a later
   refactor. Per-package exemptions are documented in that package's `AGENTS.md`.
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
-- **Foundation is ungated** — domain packages import `@n-dx/llm-client` and `@n-dx/lang-kit` directly. Neither foundation package imports any other `@n-dx/*` package, and `@n-dx/lang-kit` declares no runtime dependency; `architecture-policy.test.js` enforces both.
 
 Per-package gateways, exemptions and seam registries are in that package's
 `AGENTS.md`; the pattern reference is `PACKAGE_GUIDELINES.md`.
