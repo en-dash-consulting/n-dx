@@ -21,10 +21,10 @@ import { toPosix } from "../util/paths.js";
 import { extractGoImports, readGoModulePath } from "./go-imports.js";
 import { buildSwiftImportGraph } from "./swift-imports.js";
 import { buildCSharpImportGraph } from "./csharp-imports.js";
-import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, type PackImportsOptions } from "./pack-imports.js";
+import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, readPackFrameworkFacts, type PackImportsOptions } from "./pack-imports.js";
 import { readManifest } from "./manifest.js";
 import { detectLanguages, loadInventoryConfig } from "../language/detect.js";
-import { type LanguageConfig, csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, terraformConfig } from "@n-dx/lang-kit";
+import { type FileFacts, type LanguageConfig, csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, terraformConfig } from "@n-dx/lang-kit";
 import { isTerraformSource } from "./terraform-infrastructure.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
@@ -373,6 +373,32 @@ async function resolveLanguageConfig(
   return mergeLanguageConfigs(await detectLanguages(targetDir));
 }
 
+/**
+ * Extensions the imports phase parses: JS/TS always, for backward
+ * compatibility, and C#, whose resolver has no per-language setup to gate;
+ * plus the resolved languages' extensions.
+ */
+async function parseableExtensionsFor(targetDir: string, options?: Pick<ImportsOptions, "language">): Promise<Set<string>> {
+  const langConfig = await resolveLanguageConfig(targetDir, readManifest(targetDir), options);
+  return new Set<string>([...JS_TS_EXTENSIONS, ...csharpConfig.parseableExtensions, ...langConfig.parseableExtensions]);
+}
+
+/**
+ * The routes and outbound-call facts of the files {@link analyzeImports}
+ * hands to packs, read for a phase that runs without the imports phase. The
+ * same packs and files are asked, so such a run records what a full analysis
+ * records.
+ */
+export async function readImportsPackFrameworkFacts(
+  targetDir: string,
+  inventory: Inventory,
+  options?: Pick<ImportsOptions, "language" | "packs">,
+): Promise<FileFacts[]> {
+  const packs = packsFor(await parseableExtensionsFor(targetDir, options), options?.packs?.packs);
+  const packFiles = inventory.files.filter((f) => isPackFile(f.path, packs));
+  return readPackFrameworkFacts(packFiles, targetDir, { ...options?.packs, packs });
+}
+
 interface IncrementalState {
   edgeMap: Map<string, ImportEdge>;
   externalMap: Map<string, ExternalImport>;
@@ -700,13 +726,7 @@ export async function analyzeImports(
   const tsconfigPaths = await readTsconfigPaths(targetDir);
   const resolver = createResolver(fileSet, targetDir, tsconfigPaths);
 
-  const manifest = readManifest(targetDir);
-  const langConfig = await resolveLanguageConfig(targetDir, manifest, options);
-
-  // Always include JS/TS for backward compatibility, and C#, whose resolver has
-  // no per-language setup to gate; add resolved language extensions.
-  const parseableExts = new Set<string>([...JS_TS_EXTENSIONS, ...csharpConfig.parseableExtensions]);
-  for (const ext of langConfig.parseableExtensions) parseableExts.add(ext);
+  const parseableExts = await parseableExtensionsFor(targetDir, options);
 
   // Read go.mod once if any Go files exist in the inventory.
   const hasGoFiles = inventory.files.some((f) => extname(f.path).toLowerCase() === GO_EXTENSION);

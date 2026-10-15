@@ -291,8 +291,8 @@ export function detectGoServerRoutes(sourceText: string, filePath: string): Serv
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Infer a common prefix from a set of routes. */
-function inferPrefix(routes: ServerRoute[]): string {
+/** Infer a common prefix from a set of routes; pack route groups use it too. */
+export function inferPrefix(routes: ServerRoute[]): string {
   if (routes.length === 0) return "/";
   if (routes.length === 1) {
     const onlyPath = routes[0].path;

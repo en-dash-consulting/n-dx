@@ -18,7 +18,7 @@
  */
 
 import { extname } from "node:path";
-import type { LanguageConfig, PackDegradation, PackProjectResult } from "@n-dx/lang-kit";
+import type { FactKind, FileFacts, LanguageConfig, LanguagePackEntry, PackDegradation, PackProjectResult } from "@n-dx/lang-kit";
 import type { ExternalImport, ImportEdge, Inventory } from "../schema/index.js";
 import {
   INSTALLABLE_PACKS,
@@ -43,7 +43,21 @@ export interface PackImportsOptions {
    * inventory-only.
    */
   readonly fallbacks?: ReadonlyMap<string, string>;
+  /**
+   * Receives each pack's routes and outbound-call facts. When set, the same
+   * `analyzeProject` call also asks for the {@link FRAMEWORK_FACT_KINDS} the
+   * pack produces, so a file is parsed once per analysis; unset, only
+   * imports are asked for.
+   */
+  readonly framework?: (facts: readonly FileFacts[]) => void;
 }
+
+/** The fact kinds a pack's framework rules produce for later phases. */
+export const FRAMEWORK_FACT_KINDS = ["routes", "outboundCalls"] as const satisfies readonly FactKind[];
+
+/** The {@link FRAMEWORK_FACT_KINDS} `entry` produces. */
+export const frameworkKindsOf = (entry: LanguagePackEntry): FactKind[] =>
+  FRAMEWORK_FACT_KINDS.filter((kind) => entry.produces.includes(kind));
 
 export interface PackImportGraph {
   readonly edges: ImportEdge[];
@@ -135,9 +149,10 @@ export async function buildPackImportGraph(
     // The entry contract says a pack does not throw for its own failures, but a
     // resolver bug or a pack built against another contract can still reject;
     // that must cost only this language, as a missing pack does.
+    const kinds: FactKind[] = ["imports", ...(options.framework ? frameworkKindsOf(load.entry) : [])];
     let result: PackProjectResult;
     try {
-      result = await load.entry.analyzeProject({ projectDir: targetDir, files: paths, kinds: ["imports"] });
+      result = await load.entry.analyzeProject({ projectDir: targetDir, files: paths, kinds });
     } catch (error) {
       degrade(pack, {
         reason: `the pack failed (${error instanceof Error ? error.message : String(error)})`,
@@ -149,6 +164,8 @@ export async function buildPackImportGraph(
       degrade(pack, result.degraded);
       continue;
     }
+    for (const notice of result.notices ?? []) warn(notice);
+    if (kinds.length > 1) options.framework?.(result.facts);
 
     for (const { path, imports } of result.facts) {
       if (!imports) continue;
@@ -168,4 +185,48 @@ export async function buildPackImportGraph(
   }
 
   return { edges, external: [...external.values()], degraded };
+}
+
+/**
+ * Ask each pack only for the {@link FRAMEWORK_FACT_KINDS} it produces: for a
+ * phase that runs without the imports phase (`--phase`, `sv narrate`), which
+ * otherwise collects these facts in its own call. A pack that cannot load is
+ * passed over quietly, since its notice belongs to the imports phase; one that
+ * degrades or fails while running gets one notice.
+ */
+export async function readPackFrameworkFacts(
+  files: Inventory["files"],
+  targetDir: string,
+  options: Pick<PackImportsOptions, "packs" | "loader" | "warn"> = {},
+): Promise<FileFacts[]> {
+  const warn = options.warn ?? ((message: string) => console.warn(message));
+  const facts: FileFacts[] = [];
+  for (const pack of options.packs ?? KNOWN_PACKS) {
+    const paths = files.filter((f) => isPackFile(f.path, [pack])).map((f) => f.path);
+    if (paths.length === 0) continue;
+    const load = await loadPack(pack, options.loader);
+    if (load.status !== "loaded") continue;
+    const kinds = frameworkKindsOf(load.entry);
+    if (kinds.length === 0) continue;
+    const name = pack.config.displayName;
+    const skip = (notice: PackDegradation): void =>
+      warn(`${name}: ${notice.reason}; ${name} routes and outbound calls are not recorded.${notice.remedy === undefined ? "" : ` ${notice.remedy}`}`);
+    let result: PackProjectResult;
+    try {
+      result = await load.entry.analyzeProject({ projectDir: targetDir, files: paths, kinds });
+    } catch (error) {
+      skip({
+        reason: `the pack failed (${error instanceof Error ? error.message : String(error)})`,
+        remedy: `Reinstall it with \`${packInstallCommand(pack)}\`.`,
+      });
+      continue;
+    }
+    if (result.degraded) {
+      skip(result.degraded);
+      continue;
+    }
+    for (const notice of result.notices ?? []) warn(notice);
+    facts.push(...result.facts);
+  }
+  return facts;
 }
