@@ -3,7 +3,8 @@
  * their owners and following call chains must stay near-linear in the number
  * of calls. Work is counted, not timed: every read of a capture's position is
  * tallied, so the result is exact and machine-independent. A per-capture scan
- * of every owner or call reads positions n × m times and fails the bound.
+ * of every owner, call or declaration reads positions n × m times and fails
+ * the bound.
  */
 
 import { describe, expect, it } from "vitest";
@@ -12,13 +13,18 @@ import { createTreeSitterRunner, skipUnlessGrammar, type Capture } from "@n-dx/l
 import { javaGrammarPath, javaPack } from "../../src/java-pack.js";
 import { readSpringFile, springBoot } from "../../src/spring-boot.js";
 
-/** One method with `calls` statements: client calls, a chain, plain calls and a nested call. */
+/**
+ * One method with `calls` statements (client calls, a chain, plain calls and a
+ * nested call), each after a local declaration, so declarations grow with calls.
+ */
 function generated(calls: number): string {
   const lines: string[] = [];
   for (let i = 0; i < calls; i++) {
+    // The RestTemplate call goes through its own local, so its type comes from that declaration.
+    lines.push(i % 4 === 0 ? `    RestTemplate r${i} = rest;` : `    String s${i} = "v${i}";`);
     lines.push(
       i % 4 === 0
-        ? `    rest.getForObject("http://svc/${i}", String.class);`
+        ? `    r${i}.getForObject("http://svc/${i}", String.class);`
         : i % 4 === 1
           ? `    client.get().uri("/x/${i}").retrieve();`
           : i % 4 === 2
