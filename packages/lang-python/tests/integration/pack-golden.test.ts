@@ -64,3 +64,37 @@ describe("python pack golden", () => {
     );
   });
 });
+
+/**
+ * The routes and notices of each framework fixture (`tests/fixtures/fastapi`,
+ * `flask`, `django`), through the pack entry, against `facts.json` beside it.
+ * Each fixture covers every rule of its framework: cross-file
+ * `include_router` and `register_blueprint`, Django `include` by string and
+ * by module, a prefix that is not a literal, a router mounted twice, Flask's
+ * default GET, the DRF registration notice.
+ */
+describe.each(["fastapi", "flask", "django"])("%s routes golden", (framework) => {
+  const fixture = join(PACK_FIXTURE_ROOT, "..", framework);
+  const goldenPath = join(fixture, "facts.json");
+
+  it("matches its golden", async (ctx) => {
+    skipUnlessGrammar(ctx, pythonGrammarPath());
+    const files = listFixtureFiles(fixture, [".py"]);
+    const result = await pack.analyzeProject({ projectDir: fixture, files, kinds: ["routes"] });
+    expect(result.degraded).toBeUndefined();
+    expect(result.unparsed).toEqual([]);
+    const text = `${JSON.stringify(
+      { facts: result.facts.map(({ path, routes }) => ({ path, routes })), notices: result.notices ?? [] },
+      null,
+      2,
+    )}\n`;
+    if (updateRequested()) {
+      writeFileSync(goldenPath, text);
+      return;
+    }
+    expect(existsSync(goldenPath), `No golden at ${goldenPath}. Create it with the test:update-goldens script.`).toBe(true);
+    expect(text, `The ${framework} facts differ from ${goldenPath}; if intended, review it and run test:update-goldens.`).toBe(
+      readFileSync(goldenPath, "utf-8"),
+    );
+  });
+});

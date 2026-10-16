@@ -6,8 +6,9 @@
  * resolver to the project's build files, parses every requested file and
  * reads the captures into lang-kit facts: per file, then the pack's project
  * facts reader (if any) and each wanted framework over every parsed file at
- * once; frameworks' skips and the pack's `projectNotices` come back as
- * `notices`. Each step that can fail for the
+ * once, with the pack's resolver as its context; frameworks' skips and the
+ * pack's `projectNotices` come back as `notices`, and the resolver's own
+ * notices only when imports are wanted. Each step that can fail for the
  * whole language — a grammar not built or not loadable, a query the grammar
  * rejects, build files that cannot be read — ends the call with a degraded
  * result instead of an exception. A file that cannot be read or is over the
@@ -26,7 +27,7 @@ import type {
   PackProjectRequest,
   PackProjectResult,
 } from "@n-dx/lang-kit";
-import type { LanguagePack, PackResolver, PackSourceFile, PreparedResolver } from "./pack.js";
+import type { FrameworkContext, LanguagePack, PackResolver, PackSourceFile, PreparedResolver } from "./pack.js";
 import type { PackPackage } from "./pack-package.js";
 import { mergeFileFacts, readPackFacts, type PackSymbolRules, type ProjectFactsReader } from "./pack-facts.js";
 import { createTreeSitterRunner, loadGrammar, type RunnablePack, type RunnerOptions } from "./runner.js";
@@ -103,8 +104,10 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       return degraded(`a query could not be compiled against grammar ${grammarPath} (${errorText(error)})`, pkg.rebuildStep());
     }
     // Reading the project's build files (go.mod, go.work) can fail too.
+    // Frameworks follow references through the resolver, so they bind it as imports do.
+    const wantsImports = kinds.includes("imports");
     let resolver: PackResolver | undefined;
-    if (kinds.includes("imports") && pack.resolver) {
+    if ((wantsImports || frameworks.length > 0) && pack.resolver) {
       try {
         resolver = (await pack.resolver.forProject?.(request.projectDir, request.files)) ?? pack.resolver;
       } catch (error) {
@@ -128,9 +131,16 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       else unparsed.push(path);
     }
 
-    const prepared: PreparedResolver | undefined = resolver?.prepare(parsed, unparsed);
+    // Prepared for imports, or on a framework's first lookup: a framework that never follows a reference costs nothing.
+    let preparedOnce: PreparedResolver | undefined;
+    const prepare = (bound: PackResolver): PreparedResolver => (preparedOnce ??= bound.prepare(parsed, unparsed));
+    const prepared: PreparedResolver | undefined = wantsImports && resolver ? prepare(resolver) : undefined;
+    const context: FrameworkContext | undefined = resolver && {
+      resolve: (fromFile) => prepare(resolver).resolve(fromFile),
+      module: (fromFile, specifier) => prepare(resolver).module?.(fromFile, specifier),
+    };
     const project = options.projectFacts?.(parsed, kinds);
-    const framed = frameworks.map((f) => f.read(parsed, kinds));
+    const framed = frameworks.map((f) => f.read(parsed, kinds, context));
     const facts: FileFacts[] = parsed.map((file) =>
       framed.reduce(
         (merged, { facts: byPath }) => mergeFileFacts(merged, byPath.get(file.path)),

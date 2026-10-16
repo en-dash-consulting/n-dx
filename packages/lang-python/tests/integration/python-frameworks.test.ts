@@ -1,0 +1,214 @@
+/**
+ * The FastAPI, Flask and Django framework packs over their fixture projects
+ * (`tests/fixtures/<framework>`): the routes a hand check would look for,
+ * the notices, and how the pack entry runs the frameworks only when routes
+ * are wanted and gives them the resolver. The whole output is pinned by the
+ * goldens in `pack-golden.test.ts`.
+ */
+
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { FactKind, FileFacts, RouteFact } from "@n-dx/lang-kit";
+import { createPackEntry, factGaps, listFixtureFiles, skipUnlessGrammar, type FrameworkContext, type FrameworkPack } from "@n-dx/lang-runtime";
+
+import { django } from "../../src/django.js";
+import { fastapi } from "../../src/fastapi.js";
+import { flask } from "../../src/flask.js";
+import { PYTHON_PACKAGE } from "../../src/package-paths.js";
+import { pack } from "../../src/pack.js";
+import { pythonGrammarPath, pythonPack } from "../../src/python-pack.js";
+import { PYTHON_SYMBOL_RULES } from "../../src/python-symbols.js";
+import { PACK_FIXTURE_ROOT } from "../helpers/pack-fixtures.js";
+
+type Ctx = Parameters<typeof skipUnlessGrammar>[0];
+
+const fixture = (name: string): string => join(PACK_FIXTURE_ROOT, "..", name);
+
+async function analyze(ctx: Ctx, projectDir: string, kinds: readonly FactKind[] = ["routes"]) {
+  skipUnlessGrammar(ctx, pythonGrammarPath());
+  return pack.analyzeProject({ projectDir, files: listFixtureFiles(projectDir, [".py"]), kinds });
+}
+
+const route = (r: RouteFact): string => `${r.method ?? "ANY"} ${r.path} ${r.handler ?? "-"}`;
+const routesOf = (facts: readonly FileFacts[], file: string): string[] | undefined => facts.find((f) => f.path === file)?.routes?.map(route);
+
+describe("FastAPI routes", () => {
+  it("reads every decorator, follows include_router across files and keeps a prefix that is not a literal", async (ctx) => {
+    const { facts, notices } = await analyze(ctx, fixture("fastapi"));
+    expect(routesOf(facts, "app/api/routes/items.py")).toEqual([
+      "GET ${settings.API_V1_STR}/items/ read_items",
+      "POST ${settings.API_V1_STR}/items/ create_item",
+      "PUT ${settings.API_V1_STR}/items/{id} update_item",
+      "DELETE ${settings.API_V1_STR}/items/{id} delete_item",
+      "PATCH ${settings.API_V1_STR}/items/{id} patch_item",
+      "OPTIONS ${settings.API_V1_STR}/items/ item_options",
+      "HEAD ${settings.API_V1_STR}/items/ item_head",
+      "PUT ${settings.API_V1_STR}/items/bulk bulk",
+      "POST ${settings.API_V1_STR}/items/bulk bulk",
+      "GET ${settings.API_V1_STR}/items/any any_item",
+      "GET ${settings.API_V1_STR}/items/${VERSION}/latest latest",
+    ]);
+    // An aliased module import, and a decorator on a name that is no router.
+    expect(routesOf(facts, "app/api/routes/users.py")).toEqual(["GET ${settings.API_V1_STR}/people/me me"]);
+    // A relative, aliased router import mounted twice.
+    expect(routesOf(facts, "app/api/routes/admin.py")).toEqual([
+      "GET ${settings.API_V1_STR}/admin/tools/stats stats",
+      "GET ${settings.API_V1_STR}/staff/tools/stats stats",
+    ]);
+    expect(routesOf(facts, "app/legacy.py")).toEqual(["GET /legacy/ping ping"]);
+    expect(routesOf(facts, "app/main.py")).toEqual(["GET /health health"]);
+    expect(routesOf(facts, "app/core/config.py")).toEqual([]);
+    expect(notices).toEqual([
+      "FastAPI: 2 route paths or prefixes are not literals and are kept as written in ${…} form: " +
+        'app/api/routes/items.py:58 (path f"/{VERSION}/latest"), app/main.py:9 (prefix settings.API_V1_STR).',
+      "FastAPI: 1 route method is not a literal and was skipped: app/api/routes/items.py:53 (methods ALLOWED).",
+      "FastAPI: 1 mount names no application or router the rules can follow and was not followed: app/main.py:10 (include_router make_router()).",
+    ]);
+  });
+
+  it("places a route at its decorator's call", async (ctx) => {
+    const { facts } = await analyze(ctx, fixture("fastapi"));
+    const health = facts.find((f) => f.path === "app/main.py")?.routes?.[0];
+    expect(health).toEqual({ method: "GET", path: "/health", handler: "health", position: { line: 15, column: 1 } });
+  });
+});
+
+describe("Flask routes", () => {
+  it("defaults to GET, reads Flask 2 shortcuts and follows register_blueprint across files", async (ctx) => {
+    const { facts, notices } = await analyze(ctx, fixture("flask"));
+    expect(routesOf(facts, "shop/__init__.py")).toEqual(["GET / index"]);
+    expect(routesOf(facts, "shop/views.py")).toEqual([
+      "GET /about about",
+      "GET /login login",
+      "POST /login login",
+      "GET /feed feed",
+      "GET /items/<int:id> item",
+      "POST /items add_item",
+      "PUT /items/<int:id> put_item",
+      "DELETE /items/<int:id> delete_item",
+      "PATCH /items/<int:id> patch_item",
+      'GET ${PREFIX + "/redirect"} old_redirect',
+    ]);
+    // A nested blueprint gets its parent's prefix, then its own.
+    expect(routesOf(facts, "shop/admin.py")).toEqual(["GET /admin/ dashboard", "GET /admin/reports/daily daily", "DELETE /admin/reports/daily daily"]);
+    // The registration's url_prefix replaces the blueprint's.
+    expect(routesOf(facts, "shop/api.py")).toEqual(["GET /api/v2/status status"]);
+    expect(notices).toEqual([
+      'Flask: 1 route path or prefix is not a literal and is kept as written in ${…} form: shop/views.py:47 (path PREFIX + "/redirect").',
+      "Flask: 1 mount names no application or router the rules can follow and was not followed: shop/__init__.py:14 (register_blueprint missing_bp).",
+    ]);
+  });
+});
+
+describe("Django routes", () => {
+  it("walks from ROOT_URLCONF through includes by string, module, list and tuple", async (ctx) => {
+    const { facts, notices } = await analyze(ctx, fixture("django"));
+    expect(routesOf(facts, "mysite/urls.py")).toEqual([
+      "ANY / home",
+      "ANY /inline/one/ one",
+      "ANY /inline/^two/(?P<n>\\d+)/$ two",
+      "ANY /sites/ SiteListView",
+    ]);
+    // Included three times; the regex is kept as written.
+    expect(routesOf(facts, "blog/urls.py")).toEqual([
+      "ANY ${settings.DYNAMIC_PREFIX} index",
+      "ANY /archive/ index",
+      "ANY /blog/ index",
+      "ANY ${settings.DYNAMIC_PREFIX}/<int:year>/ year_archive",
+      "ANY /archive/<int:year>/ year_archive",
+      "ANY /blog/<int:year>/ year_archive",
+      "ANY ${settings.DYNAMIC_PREFIX}/^(?P<slug>[\\w-]+)/$ post_detail",
+      "ANY /archive/^(?P<slug>[\\w-]+)/$ post_detail",
+      "ANY /blog/^(?P<slug>[\\w-]+)/$ post_detail",
+    ]);
+    // A view that is a call other than as_view(), or a lambda, has no handler.
+    expect(routesOf(facts, "shop/urls.py")).toEqual(["ANY /shop/cart/ CartView", "ANY /shop/checkout/ -", "ANY /shop/ping/ -"]);
+    expect(routesOf(facts, "mysite/extra.py")).toEqual(["ANY /extra/faq/ faq"]);
+    // Not reached from ROOT_URLCONF.
+    expect(routesOf(facts, "oldapp/urls.py")).toEqual([]);
+    expect(notices).toEqual([
+      "Django: 1 route path or prefix is not a literal and is kept as written in ${…} form: mysite/urls.py:21 (prefix settings.DYNAMIC_PREFIX).",
+      "Django: 2 include() targets are not ones the rules can follow and were not followed: " +
+        "mysite/urls.py:17 (include admin.site.urls), mysite/urls.py:32 (include somewhere.urls).",
+      "Django: 2 Django REST framework router registrations are counted, not expanded: " +
+        "mysite/urls.py:12 (register router.register), mysite/urls.py:13 (register router.register).",
+    ]);
+  });
+
+  describe("without ROOT_URLCONF", () => {
+    let dir: string;
+    const write = (path: string, text: string): void => {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(join(dir, path), text);
+    };
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), "lang-python-django-"));
+    });
+    afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+    it("starts at each URLconf no other includes", async (ctx) => {
+      write("site/urls.py", 'urlpatterns = [path("api/", include("api.urls"))]\n');
+      write("api/urls.py", 'urlpatterns = [path("items/", views.items)]\n');
+      write("tools/urls.py", 'urlpatterns = [path("tools/", views.tools)]\n');
+      // A literal that names no parsed module is no root.
+      write("site/settings.py", 'ROOT_URLCONF = "elsewhere.urls"\n');
+      const { facts } = await analyze(ctx, dir);
+      expect(routesOf(facts, "api/urls.py")).toEqual(["ANY /api/items/ items"]);
+      expect(routesOf(facts, "tools/urls.py")).toEqual(["ANY /tools/ tools"]);
+    });
+  });
+});
+
+describe("the Python pack entry with its frameworks", () => {
+  it("lists routes and is consistent with its frameworks", () => {
+    expect(pythonPack.produces).toContain("routes");
+    expect(pythonPack.frameworks?.map((f) => f.id)).toEqual(["fastapi", "flask", "django"]);
+    expect(factGaps(pythonPack, PYTHON_SYMBOL_RULES)).toEqual([]);
+    for (const framework of pythonPack.frameworks ?? []) {
+      for (const query of framework.queries) expect(framework.provenance[query.name], query.name).toBeDefined();
+    }
+  });
+
+  it("runs the frameworks only when routes are wanted, with the resolver as their context", async (ctx) => {
+    skipUnlessGrammar(ctx, pythonGrammarPath());
+    const spy = (framework: FrameworkPack) => vi.fn(framework.read);
+    const reads = [spy(fastapi), spy(flask), spy(django)];
+    const entry = createPackEntry({
+      package: PYTHON_PACKAGE,
+      pack: { ...pythonPack, frameworks: [fastapi, flask, django].map((f, i) => ({ ...f, queries: f.queries, read: reads[i]! })) },
+      symbolRules: PYTHON_SYMBOL_RULES,
+    });
+    const dir = fixture("fastapi");
+    const files = listFixtureFiles(dir, [".py"]);
+
+    const imports = await entry.analyzeProject({ projectDir: dir, files, kinds: ["imports"] });
+    for (const read of reads) expect(read).not.toHaveBeenCalled();
+    expect(imports.facts.every((f) => f.routes === undefined)).toBe(true);
+
+    const routes = await entry.analyzeProject({ projectDir: dir, files, kinds: ["routes"] });
+    for (const read of reads) expect(read).toHaveBeenCalledOnce();
+    expect(routes.facts.every((f) => Array.isArray(f.routes) && f.imports === undefined)).toBe(true);
+    const context = reads[0]!.mock.calls[0]![2] as FrameworkContext;
+    expect(context.module?.("app/api/main.py", ".routes.admin")).toBe("app/api/routes/admin.py");
+    expect(context.module?.("app/main.py", "app.api.routes.items")).toBe("app/api/routes/items.py");
+    expect(context.module?.("app/main.py", "app.api")).toBe("app/api/__init__.py");
+    expect(context.module?.("app/main.py", "fastapi")).toBeUndefined();
+  });
+
+  it("reports the resolver's own notices only when imports are wanted", async (ctx) => {
+    skipUnlessGrammar(ctx, pythonGrammarPath());
+    const dir = mkdtempSync(join(tmpdir(), "lang-python-notices-"));
+    try {
+      // A relative import past the source root: a resolver notice.
+      writeFileSync(join(dir, "m.py"), "from .. import x\n");
+      const withImports = await pack.analyzeProject({ projectDir: dir, files: ["m.py"], kinds: ["imports"] });
+      expect(withImports.notices?.some((n) => n.includes("climbs past its source root"))).toBe(true);
+      const routesOnly = await pack.analyzeProject({ projectDir: dir, files: ["m.py"], kinds: ["routes"] });
+      expect(routesOnly.notices).toBeUndefined();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
