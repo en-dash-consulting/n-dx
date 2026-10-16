@@ -21,5 +21,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [hench's missing-credentials message tells a Codex env_key user the CLI falls back to default credential files](./hench-s-missing-credentials-message.md) | pending |
 | [One sanitized-environment builder for every repository-command subprocess: tests, gate, audit and rex](./one-sanitized-environment-builder-for.md) | pending |
-| [Vendor CLI environments keep each vendor mode's credentials from one mode table](./vendor-cli-environments-keep-each.md) | pending |
+| [Vendor CLI environments keep each vendor mode's credentials from one mode table](./vendor-cli-environments-keep-each.md) | completed |
