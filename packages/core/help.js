@@ -112,6 +112,13 @@ const COMMAND_REGISTRY = [
     related: ["recommend", "plan", "init"],
   },
   {
+    name: "iso",
+    category: "Orchestration",
+    summary: "Render a standalone isometric architecture map",
+    keywords: ["iso", "isometric", "map", "diagram", "visualize", "architecture", "zones", "3d", "html"],
+    related: ["analyze", "status", "export"],
+  },
+  {
     name: "recommend",
     category: "Orchestration",
     summary: "Show or accept SourceVision-based recommendations",
