@@ -26,7 +26,6 @@ import {
   TaskIntentSchema,
   SubtaskIntentSchema,
   CheckResultSchema,
-  RETIRED_STATE_FIELDS,
   type TaskIntent,
 } from "../../../src/schema/v2.js";
 import { RUN_SETTING_KEYS, type PRDItem } from "../../../src/schema/v1.js";
