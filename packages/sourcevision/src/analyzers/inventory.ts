@@ -110,22 +110,29 @@ function languageNames(extensions: Iterable<string>): Set<string> {
  * Languages parsed only through an opt-in pack with no fallback parser
  * (Python: `@n-dx/lang-python`). The inventory phase runs before anything
  * loads the pack, so it leaves them out of `analysedLanguages`; listing them
- * would change inventory.json without the pack. The imports phase adds a
- * language back with {@link withPackAnalysedLanguages} once its pack has run.
+ * would change inventory.json without the pack. The imports phase sets them
+ * with {@link withPackAnalysedLanguages} from the packs that ran.
  */
 const PACK_ONLY_CONFIGS: readonly LanguageConfig[] = [pythonConfig];
 
+const packOnlyLanguages = (configs: readonly LanguageConfig[]): Set<string> =>
+  languageNames(configs.flatMap((c) => [...c.parseableExtensions]));
+
 /**
- * `summary` with the pack-only languages of the packs in `packIds` that have
- * files here added to `analysedLanguages`; `summary` itself when that adds
- * nothing.
+ * `summary` with its pack-only languages in `analysedLanguages` set to those
+ * whose pack is in `packIds` (the packs that ran) and that have files here:
+ * one whose pack ran is added, one whose pack did not is removed, as on an
+ * imports-only re-run after the pack is gone. `summary` itself when that
+ * changes nothing.
  */
 export function withPackAnalysedLanguages(summary: Inventory["summary"], packIds: readonly string[]): Inventory["summary"] {
-  const ran = languageNames(PACK_ONLY_CONFIGS.filter((c) => packIds.includes(c.id)).flatMap((c) => [...c.parseableExtensions]));
-  const listed = new Set(summary.analysedLanguages ?? []);
-  const added = Object.keys(summary.byLanguage).filter((lang) => ran.has(lang) && !listed.has(lang));
-  if (added.length === 0) return summary;
-  return { ...summary, analysedLanguages: [...listed, ...added].sort() };
+  const packOnly = packOnlyLanguages(PACK_ONLY_CONFIGS);
+  const ran = packOnlyLanguages(PACK_ONLY_CONFIGS.filter((c) => packIds.includes(c.id)));
+  const listed = summary.analysedLanguages ?? [];
+  const kept = listed.filter((lang) => !packOnly.has(lang) || ran.has(lang));
+  const added = Object.keys(summary.byLanguage).filter((lang) => ran.has(lang) && !listed.includes(lang));
+  if (added.length === 0 && kept.length === listed.length) return summary;
+  return { ...summary, analysedLanguages: [...kept, ...added].sort() };
 }
 
 export function detectLanguage(filePath: string): string {
