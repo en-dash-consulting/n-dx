@@ -222,11 +222,17 @@ export const COMMAND_EFFECTS = {
 
   migrate: {
     command: "migrate",
-    summary: "Plan the PRD's v1 → v2 migration and write it out for review.",
-    reads: ["{rex}/prd_tree/ (under the PRD lock)", "the plan already at --out, for the answers it recorded", "test files under the project, to link criteria"],
+    summary: "Plan the PRD's v1 → v2 migration for review, or apply the reviewed plan.",
+    reads: [
+      "{rex}/prd_tree/ (under the PRD lock)",
+      "the plan already at --out, for the answers it recorded",
+      "test files under the project, to link criteria",
+      "with --apply: the plan at --plan (default ./migration-plan.json)",
+    ],
     writes: [
-      { path: "--out (default ./migration-plan.json)", what: "the plan, keyed by v1 item id" },
-      { path: "--summary (default: --out with .md)", what: "the Markdown summary for review" },
+      { path: "--out (default ./migration-plan.json)", what: "the plan, keyed by v1 item id", conditional: true, when: "with --plan" },
+      { path: "--summary (default: --out with .md)", what: "the Markdown summary for review", conditional: true, when: "with --plan" },
+      { path: "{rex}/", what: "the v2 product and change layers, replacing prd_tree/ and tree-meta.json", conditional: true, when: "with --apply, without --dry-run" },
     ],
     llm: [
       { phase: "placement", purpose: "place a change the rules held", calls: "0-N, none with --rules-only" },

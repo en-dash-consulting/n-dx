@@ -890,7 +890,37 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex migrate-plan --out=./migration-plan.json", description: "Plan with the configured models" },
       { command: "rex migrate-plan --out=./migration-plan.json", description: "Re-run after a model error to continue from the recorded answers" },
     ],
-    related: ["migrate-to-folder-tree", "export", "validate"],
+    related: ["migrate-apply", "migrate-to-folder-tree", "export", "validate"],
+  },
+  "migrate-apply": {
+    tool: "rex",
+    command: "migrate-apply",
+    summary: "apply a reviewed v1 → v2 migration plan",
+    usage: "rex migrate-apply --plan=<path.json> [--dry-run] [dir]",
+    description:
+      "Writes the v2 product and change layers from the plan 'rex migrate-plan'\n" +
+      "wrote and removes the v1 folder tree, in one PRD transaction. The tree\n" +
+      "is read as it is now: items newer than the plan, or moved since, are\n" +
+      "re-fitted or held for the Inbox. Every v1 id is checked before anything\n" +
+      "is written and again on the tree read back.\n" +
+      "\n" +
+      "--plan is required on a v1 tree. On a tree already v2 it reports so and\n" +
+      "exits zero, removing only v1 files an interrupted apply left.\n" +
+      "\n" +
+      "--dry-run runs the same refusals, writes and reads back the tree in a\n" +
+      "temporary directory, and prints per v1 kind what its items become, what\n" +
+      "is held for the Inbox and what is dropped. It writes nothing.\n" +
+      "\n" +
+      "This command is also available as 'ndx migrate --apply'.",
+    options: [
+      { flag: "--plan=<path>", description: "The JSON plan 'rex migrate-plan' wrote (required on a v1 tree)" },
+      { flag: "--dry-run", description: "Rehearse the apply and report; write nothing" },
+    ],
+    examples: [
+      { command: "rex migrate-apply --plan=./migration-plan.json --dry-run", description: "See what apply would do" },
+      { command: "rex migrate-apply --plan=./migration-plan.json", description: "Apply the reviewed plan" },
+    ],
+    related: ["migrate-plan", "health"],
   },
   "migrate-to-folder-tree": {
     tool: "rex",

@@ -232,6 +232,10 @@ describe("rex cli/commands import surface", () => {
     // The code-evidence reader, for the same reason and by the same caller: the
     // migration is pure, so the command gathers the outside facts it reads.
     "../../migrations/v1-to-v2/code-files.js",
+    // `rex migrate-apply` (ndx migrate --apply) writes the v2 tree from a
+    // reviewed plan, through the apply library; its only caller, and kept off
+    // public.ts for the same reason as the plan machinery above.
+    "../../migrations/v1-to-v2/apply.js",
     // Loaded by migrate-plan through `await import()` so a --rules-only run
     // never pulls the model machinery in. The extractor above only matches
     // static `from "…"`, so these would otherwise sit outside the tracked

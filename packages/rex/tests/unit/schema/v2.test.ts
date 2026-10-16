@@ -440,7 +440,7 @@ describe("isolation", () => {
     // dual-read loader, tree writer, store transaction, apply engine, apply
     // policy, product-edit handler, computed edges, product status, change
     // landing, placement and its policy, change selection, change completion,
-    // agent brief, migration plan and its specs, code owners and `rex codeowners`,
+    // agent brief, migration plan and its specs, migration apply, code owners and `rex codeowners`,
     // release stamp and `rex release`) may import each other; nothing else may
     // import them until the v2 store
     // wires them in. The exceptions are the `rex merge-state` git driver,
@@ -531,6 +531,7 @@ describe("isolation", () => {
         "migrations/v1-to-v2/capability-spec.ts",
         "migrations/v1-to-v2/migration-plan-data.ts",
         "migrations/v1-to-v2/spec-pass.ts",
+        "migrations/v1-to-v2/apply.ts",
         "store/file-adapter.ts",
         "cli/commands/init.ts",
         "cli/errors.ts",

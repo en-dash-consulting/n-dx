@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readdir, readFile, stat, unlink } from "node:fs/promises";
+import { readdir, readFile, rename, stat, unlink } from "node:fs/promises";
 import { info, warn } from "../output.js";
 import { serializeFolderTree, parseFolderTree, TREE_META_FILENAME, resolveRexPaths } from "../../store/index.js";
 import { parseDocument } from "../../store/markdown-parser.js";
@@ -24,6 +24,7 @@ export interface MigrateOptions {
 
 const PRD_MD_BRANCH_RE = /^prd_(.+)_(\d{4}-\d{2}-\d{2})\.md$/;
 const PRD_MARKDOWN_FILENAME = "prd.md";
+const PRD_JSON_FILENAME = "prd.json";
 
 /**
  * One-shot migration from prd.md to the folder-tree format.
@@ -34,6 +35,10 @@ const PRD_MARKDOWN_FILENAME = "prd.md";
  *
  * After a successful first migration, offers to delete prd.md and any
  * branch-scoped prd_{branch}_{date}.md files.
+ *
+ * A converted prd.json is renamed to `prd.json.migrated`, the marker
+ * `ensureLegacyPrdMigrated` leaves: a prd.json beside the tree is a legacy
+ * source that `rex migrate-apply` refuses and the v1 load fallback reads.
  *
  * Idempotent: re-running on an already-migrated project (even after prd.md has
  * been deleted) is a no-op with an informational message.
@@ -53,10 +58,10 @@ export async function cmdMigrateToFolderTree(
   await refuseOnV2(rexDir, "migrate-to-folder-tree", MIGRATE_ON_V2_HINT);
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
 
-  const { doc, fromTree } = await loadSourceDocument(rexDir, treeRoot);
+  const { doc, source } = await loadSourceDocument(rexDir, treeRoot);
 
   // If we loaded from tree and it's a re-run, be idempotent
-  if (fromTree) {
+  if (source === "tree") {
     info(
       `Folder tree already up to date at .rex/${FOLDER_TREE_SUBDIR}/`,
     );
@@ -68,6 +73,10 @@ export async function cmdMigrateToFolderTree(
 
   const { directoriesCreated, filesWritten, filesSkipped, directoriesRemoved } = result;
   const isNoOp = directoriesCreated === 0 && filesWritten === 0 && directoriesRemoved === 0;
+
+  if (source === "json") {
+    await rename(join(rexDir, PRD_JSON_FILENAME), join(rexDir, `${PRD_JSON_FILENAME}.migrated`));
+  }
 
   if (isNoOp) {
     info(
@@ -114,7 +123,7 @@ export async function cmdMigrateToFolderTree(
  * 2. Existing .rex/prd_tree/ folder tree (idempotent re-run after prd.md deletion)
  * 3. prd.json (legacy JSON fallback)
  */
-async function loadSourceDocument(rexDir: string, treeRoot: string): Promise<{ doc: PRDDocument; fromTree: boolean }> {
+async function loadSourceDocument(rexDir: string, treeRoot: string): Promise<{ doc: PRDDocument; source: "md" | "tree" | "json" }> {
   const primaryDoc = await tryReadMarkdown(join(rexDir, PRD_MARKDOWN_FILENAME));
 
   if (primaryDoc !== null) {
@@ -124,22 +133,22 @@ async function loadSourceDocument(rexDir: string, treeRoot: string): Promise<{ d
       const branchDoc = await tryReadMarkdown(join(rexDir, file));
       if (branchDoc) allItems.push(...branchDoc.items);
     }
-    return { doc: { ...primaryDoc, items: allItems }, fromTree: false };
+    return { doc: { ...primaryDoc, items: allItems }, source: "md" };
   }
 
   // Tree exists → idempotent re-run after prd.md was deleted
   if (await directoryExists(treeRoot)) {
     const { items } = await parseFolderTree(treeRoot);
     const title = await readTreeTitle(rexDir);
-    return { doc: { schema: SCHEMA_VERSION, title, items }, fromTree: true };
+    return { doc: { schema: SCHEMA_VERSION, title, items }, source: "tree" };
   }
 
   // Legacy prd.json fallback
   try {
-    const raw = await readFile(join(rexDir, "prd.json"), "utf-8");
+    const raw = await readFile(join(rexDir, PRD_JSON_FILENAME), "utf-8");
     const parsed: unknown = JSON.parse(raw);
     const validated = validateDocument(parsed);
-    if (validated.ok) return { doc: validated.data as PRDDocument, fromTree: false };
+    if (validated.ok) return { doc: validated.data as PRDDocument, source: "json" };
   } catch {
     // Not found or invalid
   }
