@@ -8,8 +8,8 @@
  * it reports so and exits zero, removing a `prd_tree/` an interrupted apply
  * left and refusing one it cannot show was. With `--dry-run` it runs the same refusals,
  * writes and reads back the tree in a temporary directory, prints per v1 kind
- * what its items become, the Inbox holds and the dropped values, and writes
- * nothing to the project.
+ * what its items become, the Inbox holds, the dropped values and every
+ * blockedBy ref rewritten or dropped, and writes nothing to the project.
  *
  * @module rex/cli/commands/migrate-apply
  */
@@ -18,6 +18,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   applyV1ToV2,
+  describeBlockerRewrite,
   MigrationApplyError,
   rehearseV1ToV2,
   V1_KINDS,
@@ -110,6 +111,7 @@ function reportRehearsal(rehearsal: RehearseV1ToV2Result): void {
   const sum = (pick: (t: KindTally) => number): number => V1_KINDS.reduce((n, k) => n + pick(kinds[k]), 0);
   info(`Total (${sum((t) => t.total)}): held for the Inbox ${sum((t) => t.held)}; dropped ${sum((t) => t.droppedMeta)} droppedMeta, ${sum((t) => t.droppedLog)} droppedLog`);
   reportBuilt(built);
+  for (const r of built.blockers) info(`  ${describeBlockerRewrite(r)}`);
 }
 
 /** Why the v1 files beside the v2 tree are safe to remove. */
@@ -124,4 +126,5 @@ function reportBuilt(built: Extract<ApplyV1ToV2Result, { status: "applied" }>["b
   if (built.late.length > 0) info(`Newer than the plan: ${built.late.length}`);
   if (built.refitted.length > 0) info(`Moved since the plan, re-fitted: ${built.refitted.length}`);
   if (built.gone.length > 0) info(`In the plan but no longer in the tree: ${built.gone.length}`);
+  if (built.blockers.length > 0) info(`blockedBy refs rewritten or dropped, listed on the cut change: ${built.blockers.length}`);
 }

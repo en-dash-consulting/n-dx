@@ -129,6 +129,37 @@ describe("cmdMigrateApply", () => {
     expect(snapshot(repo)).toEqual(before);
   });
 
+  it("--dry-run lists every blockedBy rewrite and drop with the old and new refs", async () => {
+    const items: PRDItem[] = [
+      item("e1", "epic", "Storage", [
+        item("f1", "feature", "Offline cache", [item("t1", "task", "Write the cache")]),
+        item("f2", "feature", "Cache eviction", [
+          item("t3", "task", "Size the cache"),
+          item("t2", "task", "Evict entries", [], { status: "pending" }),
+        ], { status: "pending" }),
+        item("f3", "feature", "Cache metrics", [
+          item("t4", "task", "Add a counter"),
+          item("t5", "task", "Count hits", [], { status: "pending", blockedBy: ["f2", "f1", "r1"] }),
+        ], { status: "pending", blockedBy: ["f2"] }),
+      ]),
+      item("r1", "epic", "ndx 0.9.0", [item("f9", "feature", "Tune writes", [], { status: "pending" })], { status: "pending" }),
+    ];
+    await new FileStore(rexDir).saveDocument({ schema: "rex/v1", title: "Shop", items });
+    await cmdMigratePlan(repo, { "rules-only": "true", out: planPath, "cut-at": "2026-10-12T00:00:00.000Z" });
+    vi.mocked(console.log).mockClear();
+
+    await cmdMigrateApply(repo, { plan: planPath, "dry-run": "true" });
+    const lines = vi.mocked(console.log).mock.calls.map((c) => c.join(" ").trim());
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        "t5: blockedBy r1 → f9",
+        "t5: blockedBy f2 → t2",
+        "t5: blockedBy f1 → dropped (no open change: met)",
+        "f3: blockedBy f2 → t2, moved onto its open changes t5",
+      ]),
+    );
+  });
+
   it("refuses a v1 tree without --plan and writes nothing", async () => {
     const before = snapshot(repo);
     for (const flags of [{}, { plan: "true" }]) {

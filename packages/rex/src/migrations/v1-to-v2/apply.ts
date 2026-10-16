@@ -24,6 +24,10 @@
  *   draft and goes stale once a later pass redrafts the spec) when its v1
  *   item was completed or an applied change sits on it, and proposed
  *   otherwise: never revised.
+ * - **blockedBy.** A ref to a dissolved container names the nodes it split
+ *   into; a ref to a product node names that node's open changes, and a
+ *   product node's own refs move onto its open changes. A dependency already
+ *   met is dropped. Every rewrite is in `blockers` and the cut change's body.
  * - **The cut.** The first change, "Product map and change layer", is applied
  *   at the plan's `cutAt` and adds every capability and constraint, so the
  *   product layer's history starts with the migration.
@@ -55,7 +59,7 @@ import { amendsHash, freeSlug } from "../../core/apply-amendments.js";
 import { diffFingerprints, fingerprintTree, isLossless, type FingerprintDiff } from "../../core/slug-migration.js";
 import type { PRDItem } from "../../schema/v1.js";
 import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
-import { nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
+import { isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
 import { withLock, type LockOptions } from "../../store/file-lock.js";
 import { parseFolderTree } from "../../store/folder-tree-parser.js";
 import { discoverPRDFiles } from "../../store/prd-discovery.js";
@@ -86,11 +90,30 @@ export interface DeliveryContainer {
   plannedRelease?: string;
 }
 
+/**
+ * A v1 `blockedBy` ref v2 cannot hold as written: it names a dissolved
+ * container (`container`), or a product node (`requirement`), and blockedBy
+ * names change-layer work only.
+ */
+export interface BlockerRewrite {
+  kind: "container" | "requirement";
+  /** The node whose blockedBy held the ref. */
+  node: string;
+  /** The v1 ref. */
+  from: string;
+  /** The refs that replace it; empty when the dependency is met and the ref is dropped. */
+  to: string[];
+  /** Set when `node` is a product node, which holds no blockedBy: the open changes `to` moved onto; empty when it has none and the ref is dropped. */
+  onto?: string[];
+}
+
 export interface BuiltV2Tree {
   tree: V2Tree;
   /** Id of the cut change. */
   cut: string;
   containers: DeliveryContainer[];
+  /** Every `blockedBy` ref apply rewrote or dropped, in the order it did so. */
+  blockers: BlockerRewrite[];
   /** v1 ids with no plan entry: items made after the plan. */
   late: string[];
   /** v1 ids whose planned place no longer fits, re-fitted. */
@@ -217,7 +240,8 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
     if (retired.length > 0) stateKeys.set(node.id, new Set(retired));
     nodes.set(node.id, node);
   }
-  repointDissolvedBlockers(nodes, containers, flat);
+  const blockers: BlockerRewrite[] = [];
+  repointDissolvedBlockers(nodes, containers, flat, blockers);
   const releaseOf = new Map(containers.filter((c) => c.plannedRelease !== undefined).map((c) => [c.id, c.plannedRelease!]));
   const parentById = new Map(flat.map(({ item, parent }) => [item.id, parent?.id]));
   const tree: V2Tree = { product: [], changes: [] };
@@ -235,15 +259,17 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
     }
   }
 
+  rewriteRequirementBlockers(tree, nodes, blockers);
   stampMet(tree, nodes);
 
-  const cut = cutChange(tree, containers, plan);
+  const cut = cutChange(tree, containers, blockers, plan);
   tree.changes.push(cut);
 
   return {
     tree,
     cut: cut.id,
     containers,
+    blockers,
     late,
     refitted,
     gone: Object.keys(entries).filter((id) => !present.has(id)),
@@ -258,12 +284,13 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
  * into (its v1 children, through any nested container), so the ordering survives and
  * resolves; a node never blocks itself. A container completed in v1 already satisfied
  * the dependency, so its ref is dropped; a cancelled or deleted child never completes,
- * so it is never a blocker.
+ * so it is never a blocker. Each rewrite is recorded in `out`.
  */
 function repointDissolvedBlockers(
   nodes: ReadonlyMap<string, RuleNode>,
   containers: readonly DeliveryContainer[],
   flat: ReadonlyArray<{ item: PRDItem; parent?: PRDItem }>,
+  out: BlockerRewrite[],
 ): void {
   if (containers.length === 0) return;
   const dissolved = new Set(containers.map((c) => c.id));
@@ -282,10 +309,111 @@ function repointDissolvedBlockers(
   };
   for (const node of nodes.values()) {
     if (!node.blockedBy?.some((ref) => dissolved.has(ref))) continue;
-    const refs = [...new Set(node.blockedBy.flatMap((ref) => (dissolved.has(ref) ? expand(ref, new Set()) : [ref])))].filter((ref) => ref !== node.id);
-    if (refs.length > 0) node.blockedBy = refs;
-    else delete node.blockedBy;
+    const refs = node.blockedBy.flatMap((ref) => {
+      if (!dissolved.has(ref)) return [ref];
+      const to = expand(ref, new Set()).filter((id) => id !== node.id);
+      out.push({ kind: "container", node: node.id, from: ref, to });
+      return to;
+    });
+    setBlockedBy(node, refs);
   }
+}
+
+/** `refs`, without repeats, as the node's blockedBy; none removes the field. */
+function setBlockedBy(node: RuleNode, refs: readonly string[]): void {
+  const unique = [...new Set(refs)];
+  if (unique.length > 0) node.blockedBy = unique;
+  else delete node.blockedBy;
+}
+
+/**
+ * blockedBy names change-layer work, and selection waits for a ref to complete,
+ * which nothing sets on a product node; nor does it read a product node's own
+ * blockedBy. So, by decision S2-Q1:
+ *
+ * - A work node's ref to a product node becomes refs to that node's open
+ *   changes: those placed on it or on a product node beneath it, which is what
+ *   an area has. With none open the dependency is met, and the ref is dropped.
+ * - A product node's own blockedBy moves onto each of its open changes,
+ *   rewritten the same way, and the product node keeps none. With no open
+ *   change to carry it, it is dropped.
+ *
+ * No node is left blocked by itself, a change it sits inside or work it holds.
+ * Each rewrite is recorded in `out`. Runs after placement, which sets `touches` and `amends`.
+ */
+function rewriteRequirementBlockers(tree: V2Tree, nodes: ReadonlyMap<string, RuleNode>, out: BlockerRewrite[]): void {
+  const parentOf = new Map<string, RuleNode>();
+  const index = (node: RuleNode): void => {
+    for (const child of node.children ?? []) {
+      parentOf.set(child.id, node);
+      index(child);
+    }
+  };
+  [...tree.product, ...tree.changes].forEach(index);
+  const isProduct = (id: string): boolean => PRODUCT_TYPES.has(nodes.get(id)?.type ?? "");
+  const above = (id: string): Set<string> => {
+    const ids = new Set([id]);
+    for (let at = parentOf.get(id); at; at = parentOf.get(at.id)) ids.add(at.id);
+    return ids;
+  };
+  /** The node, what holds it and what it holds: a blocker among them never clears. */
+  const own = (id: string): Set<string> => {
+    const ids = above(id);
+    const below = (node: RuleNode): void => node.children?.forEach((child) => (ids.add(child.id), below(child)));
+    below(nodes.get(id)!);
+    return ids;
+  };
+
+  const openOn = new Map<string, string[]>();
+  for (const node of nodes.values()) {
+    if (node.type !== "change" || !isOpenChange(node)) continue;
+    const on = new Set([...(node.touches ?? []), ...(node.amends ?? []).map((a) => a.target)].filter(isProduct));
+    for (const id of [...on].flatMap((t) => [...above(t)])) {
+      if (isProduct(id) && !openOn.get(id)?.includes(node.id)) openOn.set(id, [...(openOn.get(id) ?? []), node.id]);
+    }
+  }
+  const rewrite = (ref: string, holder: string): string[] => {
+    const mine = own(holder);
+    return (isProduct(ref) ? (openOn.get(ref) ?? []) : [ref]).filter((id) => !mine.has(id));
+  };
+
+  // Work nodes first, so what a product node moves onto its changes is already rewritten.
+  const products: RuleNode[] = [];
+  for (const node of nodes.values()) {
+    if (!node.blockedBy) continue;
+    if (PRODUCT_TYPES.has(node.type)) {
+      products.push(node);
+      continue;
+    }
+    if (!node.blockedBy.some(isProduct)) continue;
+    setBlockedBy(
+      node,
+      node.blockedBy.flatMap((ref) => {
+        const to = rewrite(ref, node.id);
+        if (isProduct(ref)) out.push({ kind: "requirement", node: node.id, from: ref, to });
+        return to;
+      }),
+    );
+  }
+  for (const node of products) {
+    const onto = openOn.get(node.id) ?? [];
+    for (const ref of node.blockedBy!) {
+      out.push({ kind: "requirement", node: node.id, from: ref, to: isProduct(ref) ? (openOn.get(ref) ?? []) : [ref], onto });
+      for (const id of onto) {
+        const change = nodes.get(id)!;
+        setBlockedBy(change, [...(change.blockedBy ?? []), ...rewrite(ref, id)]);
+      }
+    }
+    delete node.blockedBy;
+  }
+}
+
+/** One rewrite as `<node>: blockedBy <from> → <to>`, for the dry run and the cut change. */
+export function describeBlockerRewrite(r: BlockerRewrite): string {
+  const to = r.to.length > 0 ? r.to.join(", ") : r.kind === "container" ? "dropped (container completed or no open child)" : "dropped (no open change: met)";
+  if (r.onto === undefined) return `${r.node}: blockedBy ${r.from} → ${to}`;
+  if (r.onto.length === 0) return `${r.node}: blockedBy ${r.from} → dropped (product node with no open change to carry it)`;
+  return `${r.node}: blockedBy ${r.from} → ${to}, moved onto its open changes ${r.onto.join(", ")}`;
 }
 
 /** The Inbox change an item becomes when its planned place no longer exists. */
@@ -410,6 +538,8 @@ function cutId(plan: V1ToV2Plan): string {
 
 /** Heads the cut change's list of delivery containers, one `- <title> (<id>)` line each. */
 const CONTAINERS_HEADING = "Delivery containers that became no node (their changes were placed or held):";
+/** Heads the cut change's list of blockedBy refs v2 could not hold as written ({@link BlockerRewrite}). */
+const BLOCKERS_HEADING = "blockedBy refs rewritten or dropped (v2 blockedBy names change-layer work only):";
 const CONTAINER_LINE = /^- .* \(([^()\s]+)\)(?:: plannedRelease .*)?$/;
 
 /** Ids of the delivery containers the cut change in `tree` lists: v1 ids that became no node. */
@@ -429,7 +559,7 @@ export function cutContainerIds(tree: V2Tree): string[] {
 }
 
 /** The cut: an applied change that adds every capability and constraint, and names the containers that became no node. */
-function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], plan: V1ToV2Plan): RuleNode {
+function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], blockers: readonly BlockerRewrite[], plan: V1ToV2Plan): RuleNode {
   const id = cutId(plan);
   const at = plan.header.cutAt;
   const amends: Amendment[] = [];
@@ -452,6 +582,11 @@ function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], plan:
   const lines = [
     `Moved the PRD from the v1 folder tree to the product and change layers, by plan ${plan.header.source.digest.slice(0, 12)} cut at ${at}.`,
   ];
+  // Before the containers, whose list `cutContainerIds` reads to the end of the body.
+  if (blockers.length > 0) {
+    lines.push("", BLOCKERS_HEADING, "");
+    for (const r of blockers) lines.push(`- ${describeBlockerRewrite(r)}`);
+  }
   if (containers.length > 0) {
     lines.push("", CONTAINERS_HEADING, "");
     for (const c of containers) lines.push(`- ${c.title} (${c.id})${c.plannedRelease !== undefined ? `: plannedRelease ${c.plannedRelease}` : ""}`);

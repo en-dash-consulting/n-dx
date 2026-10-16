@@ -16,6 +16,7 @@ import {
   STAGING_DIRNAME,
   applyV1ToV2,
   buildV2Tree,
+  cutContainerIds,
   everyV1Id,
   MigrationApplyError,
   rehearseV1ToV2,
@@ -140,8 +141,20 @@ describe("buildV2Tree", () => {
       for (const node of all(tree)) {
         for (const ref of node.blockedBy ?? []) expect(dissolved.has(ref)).toBe(false);
       }
-      // e2 is an area, a node, so its ref stays.
-      expect(byId(tree, "f6")!.blockedBy).toEqual(["f5", "e2"]);
+      // e2 is an area, a product node: its ref names its open changes, and it has none.
+      expect(byId(tree, "f6")!.blockedBy).toEqual(["f5"]);
+    });
+
+    it("reports each repoint and drop with the old and new refs, on the build and the cut change", async () => {
+      const { tree, blockers, cut } = buildV2Tree(WITH_BLOCKER, await planOf(WITH_BLOCKER));
+      expect(blockers).toEqual([
+        { kind: "container", node: "f6", from: "e3", to: ["f5"] },
+        { kind: "requirement", node: "f6", from: "e2", to: [] },
+      ]);
+      const body = byId(tree, cut)!.body as string;
+      expect(body).toContain("- f6: blockedBy e3 → f5");
+      expect(body).toContain("- f6: blockedBy e2 → dropped (no open change: met)");
+      expect(cutContainerIds(tree)).toEqual(["e3"]);
     });
 
     it("is selectable once every child of the container is completed", async () => {
@@ -174,6 +187,57 @@ describe("buildV2Tree", () => {
       const { tree } = buildV2Tree(items, await planOf(items));
       expect(byId(tree, "f13")!.blockedBy).toBeUndefined();
       expect(byId(tree, "f14")!.blockedBy).toEqual(["f11"]);
+    });
+  });
+
+  describe("blockedBy a product node", () => {
+    // Features with completed work: capabilities. f1's only open change is t5 itself, so t5's ref to f1 is met.
+    const ITEMS: PRDItem[] = [
+      item("e1", "epic", "Storage", [
+        item("f1", "feature", "Offline cache", [
+          item("t1", "task", "Write the cache"),
+          item("t5", "task", "Warm the cache", [], { status: "pending", blockedBy: ["f4", "f1"] }),
+        ]),
+        item("f4", "feature", "Cache eviction", [
+          item("t3", "task", "Size the cache"),
+          item("t4", "task", "Evict entries", [], { status: "pending" }),
+        ], { status: "pending" }),
+        item("f15", "feature", "Cache metrics", [
+          item("t14", "task", "Add a counter"),
+          item("t15", "task", "Count hits", [], { status: "pending" }),
+          item("t16", "task", "Count misses", [], { status: "pending" }),
+        ], { status: "pending", blockedBy: ["f4"] }),
+      ]),
+    ];
+
+    it("names a capability's open changes, or drops the ref when none is open", async () => {
+      const { tree, blockers } = buildV2Tree(ITEMS, await planOf(ITEMS));
+      expect(byId(tree, "f4")).toMatchObject({ type: "capability" });
+      expect(byId(tree, "f1")).toMatchObject({ type: "capability" });
+      expect(byId(tree, "t5")!.blockedBy).toEqual(["t4"]);
+      expect(blockers).toEqual(
+        expect.arrayContaining([
+          { kind: "requirement", node: "t5", from: "f4", to: ["t4"] },
+          { kind: "requirement", node: "t5", from: "f1", to: [] },
+        ]),
+      );
+    });
+
+    it("moves a capability's own blockedBy onto each of its open changes, rewritten", async () => {
+      const { tree, blockers } = buildV2Tree(ITEMS, await planOf(ITEMS));
+      expect(byId(tree, "f15")).toMatchObject({ type: "capability" });
+      for (const node of all(tree)) {
+        if (node.type === "area" || node.type === "capability" || node.type === "constraint") expect(node.blockedBy).toBeUndefined();
+      }
+      expect(byId(tree, "t15")!.blockedBy).toEqual(["t4"]);
+      expect(byId(tree, "t16")!.blockedBy).toEqual(["t4"]);
+      expect(blockers).toContainEqual({ kind: "requirement", node: "f15", from: "f4", to: ["t4"], onto: ["t15", "t16"] });
+    });
+
+    it("leaves no blockedBy ref the v2 rules reject", async () => {
+      const { tree } = buildV2Tree(ITEMS, await planOf(ITEMS));
+      const work = new Set(all(tree).filter((n) => n.type === "change" || n.type === "task" || n.type === "subtask").map((n) => n.id));
+      for (const node of all(tree)) for (const ref of node.blockedBy ?? []) expect(work.has(ref)).toBe(true);
     });
   });
 
