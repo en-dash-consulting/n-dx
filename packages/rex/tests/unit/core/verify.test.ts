@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import {
   extractKeywords,
@@ -396,5 +396,53 @@ describe("verify", () => {
     expect(loginTask).toBeDefined();
     expect(loginTask!.coveredCriteria).toBeGreaterThanOrEqual(1);
     expect(result.summary.coveredCriteria).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test paths reach a shell
+// ---------------------------------------------------------------------------
+
+describe("verify --run-tests and hostile test paths", () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "rex-verify-shell-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  /**
+   * The configured test command is a shell string, so the discovered paths
+   * appended to it are parsed by that shell. These paths are filenames found
+   * by walking the repository — something a contributor can add in a pull
+   * request — and `&` separates commands in both `sh` and `cmd.exe`. Unquoted,
+   * this filename ran `mkdir` on the machine of whoever called verify.
+   */
+  it("does not execute a command spliced into a test file's name", async () => {
+    const marker = "PWNED_MARKER";
+    mkdirSync(join(tmp, "tests"), { recursive: true });
+    // Every character here is legal in a filename on Windows and POSIX alike.
+    writeFileSync(join(tmp, "tests", `login&mkdir ${marker}&.test.ts`), "// test\n", "utf-8");
+
+    const items: PRDItem[] = [
+      { id: "t1", title: "Login", level: "task", status: "pending", acceptanceCriteria: ["login works"] },
+    ];
+
+    const result = await verify({
+      projectDir: tmp,
+      items,
+      testCommand: "echo",
+      runTests: true,
+      timeout: 20_000,
+    });
+
+    expect(existsSync(join(tmp, marker)), "the filename executed as a command").toBe(false);
+    // The path is still passed to the runner — quoted, not dropped — so the
+    // fix cannot be mistaken for "stopped selecting the file".
+    expect(result.testRun?.command).toContain(marker);
+    expect(result.testRun?.output ?? "").toContain(marker);
   });
 });
