@@ -66,7 +66,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [rex migrate-plan / migrate-apply and ndx migrate-layout still run inside an agent run](./rex-migrate-plan-migrate-apply-and-ndx.md) | pending |
 | [tests/e2e/cli-migrate-apply.test.js fails 3 of 5: its fixture keeps .rex/prd.json, which apply now refuses](./tests-e2e-cli-migrate-apply-test-js.md) | completed |
 | [The bare ndx migrate chain shows the preflight banner and its --dry-run runs no model unless asked](./the-bare-ndx-migrate-chain-shows-the.md) | pending |
-| [The interrupted-apply test compares normalised snapshot paths, so Windows CLI smoke passes](./the-interrupted-apply-test-compares.md) | pending |
+| [The interrupted-apply test compares normalised snapshot paths, so Windows CLI smoke passes](./the-interrupted-apply-test-compares.md) | completed |
 | [The migration plan's --out and --summary guard compares real paths and refuses n-dx state directories](./the-migration-plan-s-out-and-summary.md) | completed |
 | [The v1 notice tests strip NDX_LEGACY_NOTICE from the environment they spawn with](./the-v1-notice-tests-strip-ndx-legacy.md) | completed |
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | completed |
