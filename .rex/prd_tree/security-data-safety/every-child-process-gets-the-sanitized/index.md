@@ -1,0 +1,25 @@
+---
+id: "82468601-c666-4943-a9ac-b11bb0149372"
+level: "feature"
+title: "Every child process gets the sanitized environment"
+status: "pending"
+priority: "high"
+tags:
+  - "security"
+  - "issue-cleanup"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "Closes #686 (finding 3) and #635"
+  - "Each fix has a test that fails on the code before the fix and passes with it"
+description: "Layer 2 of 2 for the security findings: #686 finding 3 (the test gate, post-task tests and dependency audit inherit the unsanitized parent environment) and #635 (the vendor CLI credential filter keeps credentials only for Claude's Bedrock and Vertex modes). Both still reproduce on origin/main 9f6a0e963, re-checked 2026-10-16 against the built code. Branch fix/security-child-env, stacked on layer 1 (fix/security-repo-trust); PR title \"Every child process gets the sanitized environment (security 2/2)\", which closes #635. Hal (Sterling H) wrote the vendor credential filter (#615, #623, #658) and reviews this layer. Credential names and values stay out of logs, PR text and test snapshots: tests use sentinel values and assert on presence, never print them."
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-16T21:50:08.173Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [One sanitized-environment builder for every repository-command subprocess: tests, gate, audit and rex](./one-sanitized-environment-builder-for.md) | pending |
+| [Vendor CLI environments keep each vendor mode's credentials from one mode table](./vendor-cli-environments-keep-each.md) | pending |

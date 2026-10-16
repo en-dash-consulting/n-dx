@@ -21,6 +21,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Adversarial review 2026-09-14 — findings against the September security fix branch](./adversarial-review-2026-09-14-findings/index.md) | completed |
 | [Adversarial security review 2026-09-11 — findings](./adversarial-security-review-2026-09-11/index.md) | completed |
+| [Every child process gets the sanitized environment](./every-child-process-gets-the-sanitized/index.md) | pending |
 | [Repository trust can't be steered by the repository](./repository-trust-can-t-be-steered-by/index.md) | pending |
 | [Vendor CLI credential filter: follow-ups to #623](./vendor-cli-credential-filter-follow/index.md) | completed |
 | [`/api/hench/adaptive/override` and `/apply` write arbitrary keys into `.hench/config.json`](./api-hench-adaptive-override-and-apply.md) | completed |
