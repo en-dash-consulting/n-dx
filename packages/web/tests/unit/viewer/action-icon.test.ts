@@ -5,7 +5,7 @@ import { ActionIcon } from "../../../src/viewer/components/index.js";
 import type { ActionIconName } from "../../../src/viewer/components/index.js";
 
 describe("ActionIcon", () => {
-  const names: ActionIconName[] = ["copy", "check", "close", "more"];
+  const names: ActionIconName[] = ["copy", "check", "close", "more", "expand"];
 
   it.each(names)("renders %s as a decorative currentColor SVG sized by the icon token class", (name) => {
     const root = document.createElement("div");

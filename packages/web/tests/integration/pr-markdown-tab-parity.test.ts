@@ -4,9 +4,7 @@ import {
   activeStageTab,
   bootViewer,
   ensureBrowserStubs,
-  findStageSection,
   jsonResponse,
-  openStageSection,
   teardownViewer,
   waitFor,
 } from "../helpers/viewer-boot.js";
@@ -67,6 +65,10 @@ function createMockApi(options: MockApiOptions = {}): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
+function findTile(key: string): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`.stage-tiles [data-tile="${key}"]`);
+}
+
 describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
@@ -83,27 +85,21 @@ describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
     vi.useRealTimers();
   });
 
-  it("lists PR Markdown on the Analysis page when its toggle is on, and opens it like the other sections", async () => {
+  it("tiles PR Markdown on the Analysis dashboard when its toggle is on, and opens it like the other tiles", async () => {
     await bootViewer("/analyze", createMockApi());
 
-    await waitFor(() => findStageSection("pr-markdown") !== null);
-    expect(findStageSection("graph")).not.toBeNull();
+    await waitFor(() => findTile("pr-markdown") !== null);
+    expect(findTile("problems")).not.toBeNull();
     expect(activeStageTab()).toBe("Analysis");
 
-    openStageSection("graph");
-    await waitFor(() => window.location.pathname === "/graph");
-    // A view keeps the stage that lists it lit.
-    expect(activeStageTab()).toBe("Analysis");
-
-    document.querySelector<HTMLButtonElement>('.topnav-tab[data-stage="analyze"]')?.click();
-    await waitFor(() => findStageSection("pr-markdown") !== null);
-    openStageSection("pr-markdown");
-    await waitFor(() => window.location.pathname === "/pr-markdown");
-    await waitFor(() => document.querySelector(".section-header")?.textContent === "PR Markdown");
+    findTile("pr-markdown")!.querySelector<HTMLButtonElement>(".stage-tile-head")!.click();
+    await waitFor(() => document.querySelector(".stage-tile-fullscreen .section-header")?.textContent === "PR Markdown");
+    // The tile opens in place: the dashboard stays the page and its stage stays lit.
+    expect(window.location.pathname).toBe("/analyze");
     expect(activeStageTab()).toBe("Analysis");
   });
 
-  it("leaves PR Markdown off the Analysis page when its toggle is off", async () => {
+  it("leaves PR Markdown off the Analysis dashboard when its toggle is off", async () => {
     const base = createMockApi();
     const toggleOff = vi.fn(async (input: RequestInfo | URL) => {
       if (String(input) === "/api/features") return jsonResponse({ toggles: [] });
@@ -111,8 +107,8 @@ describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
     }) as unknown as typeof fetch;
 
     await bootViewer("/analyze", toggleOff);
-    await waitFor(() => findStageSection("graph") !== null);
-    expect(findStageSection("pr-markdown")).toBeNull();
+    await waitFor(() => findTile("problems") !== null);
+    expect(findTile("pr-markdown")).toBeNull();
   });
 
   it("selects PR Markdown view from direct hash navigation", async () => {

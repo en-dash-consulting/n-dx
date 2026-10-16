@@ -83,14 +83,13 @@ describe("restored views: registry renderers", () => {
 });
 
 describe("restored views: navigation entries", () => {
-  // Moved off the retired SOURCEVISION_TABS table: the Analysis stage is now
-  // the only place SourceVision's views are arranged, so it is where the
-  // "zones is reachable, and sits after the map" guard belongs. Since the
-  // Terrain merge, zones is a tab of the repository-map section rather than a
-  // section of its own — still reachable, still ordered after the map.
-  it("zones is a tab of the Analysis stage's Terrain section, after the repository map", () => {
-    const terrain = STAGES.analyze.sections.find((s) => s.view === "graph")!;
-    expect(terrain.tabs?.map((t) => t.view)).toContain("zones");
+  // The Analysis stage is the only place SourceVision's views are arranged,
+  // so it is where the "zones is reachable, and sits after the map" guard
+  // belongs. On the dashboard zones is a tile of its own, after the map.
+  it("zones is a tile of the Analysis dashboard, after the codebase map", () => {
+    const keys = STAGES.analyze.tiles!.map((t) => t.panel ?? t.view);
+    expect(keys).toContain("zones");
+    expect(keys.indexOf("map")).toBeLessThan(keys.indexOf("zones"));
   });
 
   it("zones is named by the navigation model", () => {
