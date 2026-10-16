@@ -609,7 +609,7 @@ describe("applyV1ToV2", () => {
       fsFaults.failRm = undefined;
     });
 
-    it("says the v2 tree is in place, names the leftover and asks for a re-run, which removes it", async () => {
+    it("says the v2 tree is in place, names the leftover and the manual step, not that a re-run removes it", async () => {
       const plan = await planOf((await load()).items);
       const clean = join(repo, "clean-rex");
       for (const [path, text] of Object.entries(snapshot(rexDir))) {
@@ -626,13 +626,36 @@ describe("applyV1ToV2", () => {
       expect(message).toContain("The v2 tree is in place");
       expect(message).toContain("EBUSY");
       expect(message).toContain(`Left: ${join(rexDir, "prd_tree")}.`);
-      expect(message).toContain("Run ndx migrate --apply again");
+      expect(message).toContain(`check that the v2 tree holds everything in it, then delete ${join(rexDir, "prd_tree")} by hand`);
+      expect(message).not.toMatch(/apply again|re-run/i);
       expect(existsSync(join(rexDir, "product"))).toBe(true);
       expect(existsSync(join(rexDir, "tree-meta.json"))).toBe(false);
 
       fsFaults.failRm = undefined;
       expect(await applyV1ToV2(rexDir, plan, { load })).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree")], proof: "plan" });
       expect(snapshot(rexDir)).toEqual(snapshot(clean));
+    });
+
+    it("on an already-v2 apply says the v2 tree is in place, naming the leftover and the error", async () => {
+      const plan = await planOf((await load()).items);
+      const v1 = snapshot(rexDir);
+      await applyV1ToV2(rexDir, plan, { load });
+      for (const [path, text] of Object.entries(v1)) {
+        if (!path.startsWith("/prd_tree") && path !== "/tree-meta.json") continue;
+        mkdirSync(join(rexDir, path, ".."), { recursive: true });
+        writeFileSync(join(rexDir, path), text);
+      }
+      fsFaults.failRm = join(rexDir, "prd_tree");
+      const error = await applyV1ToV2(rexDir, plan, { load }).then(
+        () => undefined,
+        (err: unknown) => err,
+      );
+      expect(error).toBeInstanceOf(MigrationApplyError);
+      const message = (error as Error).message;
+      expect(message).toContain("The v2 tree is in place");
+      expect(message).toContain("EBUSY");
+      expect(message).toContain(`Left: ${join(rexDir, "prd_tree")}.`);
+      expect(message).toContain("by hand");
     });
   });
 
@@ -683,6 +706,29 @@ describe("applyV1ToV2", () => {
       await restoreV1(edited);
       await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(/differs from the tree the plan was made from.*Kept/s);
       expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+    });
+
+    it("partly removed is refused, naming the path and the manual step, and nothing is deleted", async () => {
+      const plan = await migrated();
+      await restoreV1(TREE);
+      const treeRoot = join(rexDir, "prd_tree");
+      const epic = readdirSync(treeRoot, { withFileTypes: true }).find(
+        (e) => e.isDirectory() && readdirSync(join(treeRoot, e.name), { withFileTypes: true }).some((c) => c.isDirectory()),
+      )!;
+      const epicDir = join(treeRoot, epic.name);
+      const child = readdirSync(epicDir, { withFileTypes: true }).find((c) => c.isDirectory())!;
+      rmSync(join(epicDir, child.name), { recursive: true });
+      const before = snapshot(rexDir);
+      const error = await applyV1ToV2(rexDir, plan, { load }).then(
+        () => undefined,
+        (err: unknown) => err,
+      );
+      expect(error).toBeInstanceOf(MigrationApplyError);
+      const message = (error as Error).message;
+      expect(message).toContain(treeRoot);
+      expect(message).toContain("then delete");
+      expect(message).toContain("by hand");
+      expect(snapshot(rexDir)).toEqual(before);
     });
 
     it("is removed with no plan when every id it holds is in the v2 tree, dissolved containers included", async () => {

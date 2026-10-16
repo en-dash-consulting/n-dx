@@ -50,7 +50,7 @@
  * v1 files the crash left ({@link leftoverV1}): only when they are the tree
  * the plan was made from or, with no plan, every id they hold is in the v2
  * tree. A removal that fails after the switch is reported as such, naming the
- * leftovers for that next apply ({@link removeAfterSwitch}).
+ * leftovers and the manual step to clear them ({@link removeV1Leftovers}).
  * Any other `prd_tree/` beside the v2 tree is refused and kept. Apply on
  * a v2 tree changes nothing else.
  *
@@ -901,19 +901,20 @@ async function writeAndVerify(dir: string, prepared: Prepared, lock: LockOptions
  */
 export type LeftoverProof = "plan" | "ids" | "empty";
 
+/** The one safe way to clear v1 leftovers the apply cannot (or may not) remove itself. */
+const manualStep = (paths: readonly string[]): string => {
+  const them = paths.length === 1 ? "it" : "them";
+  return `To clear ${them}, check that the v2 tree holds everything in ${them}, then delete ${paths.join(" and ")} by hand.`;
+};
+
 /**
- * The v1 files beside the v2 tree under `rexDir` that apply may remove, and
- * why. Throws, naming the ids the v2 tree lacks, when they are not provably
- * what an interrupted apply left: a v1 branch merged after the cut, or a v1
- * write beside the v2 tree, is the operator's to re-capture, not to delete.
+ * Remove the v1 files beside a v2 tree. A failure here (a handle the dashboard's
+ * watcher or antivirus holds on Windows) leaves the v2 tree in place, so it is
+ * reported as such, naming what is left and the error. It does not promise a
+ * re-run finishes the job: a partly removed prd_tree/ is refused by
+ * {@link leftoverV1}, so the step it gives is the manual one.
  */
-/**
- * Remove the v1 files once `product/` is in place. A failure here (a handle the
- * dashboard's watcher or antivirus holds on Windows) leaves the v2 tree applied,
- * so it is reported as such, naming what is left: the next apply removes it
- * ({@link leftoverV1}; the staging folder is cleared on every apply).
- */
-async function removeAfterSwitch(paths: readonly string[]): Promise<void> {
+async function removeV1Leftovers(paths: readonly string[]): Promise<void> {
   const failures: string[] = [];
   for (const path of paths) {
     try {
@@ -926,10 +927,16 @@ async function removeAfterSwitch(paths: readonly string[]): Promise<void> {
   const left = paths.filter((path) => existsSync(path));
   throw new MigrationApplyError(
     `The v2 tree is in place, but removing the v1 leftovers failed (${failures.join("; ")}). ` +
-      `Left: ${left.join(", ")}. Run ndx migrate --apply again to remove them.`,
+      `Left: ${left.join(", ")}. ${manualStep(left)}`,
   );
 }
 
+/**
+ * The v1 files beside the v2 tree under `rexDir` that apply may remove, and
+ * why. Throws, naming the ids the v2 tree lacks, when they are not provably
+ * what an interrupted apply left: a v1 branch merged after the cut, or a v1
+ * write beside the v2 tree, is the operator's to re-capture, not to delete.
+ */
 async function leftoverV1(rexDir: string, plan: PlanFile | undefined): Promise<{ removed: string[]; proof?: LeftoverProof }> {
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   const removed = [treeRoot, join(rexDir, TREE_META_FILENAME)].filter((path) => existsSync(path));
@@ -939,7 +946,7 @@ async function leftoverV1(rexDir: string, plan: PlanFile | undefined): Promise<{
   if (warnings.length > 0) {
     throw new MigrationApplyError(
       `${treeRoot} beside the v2 tree does not read cleanly (${warnings.map((w) => `${w.path}: ${w.message}`).join("; ")}), ` +
-        `so it cannot be shown to be what an interrupted apply left. ${kept}`,
+        `so it cannot be shown to be what an interrupted apply left. ${kept} ${manualStep(removed)}`,
     );
   }
   if (items.length === 0) return { removed, proof: "empty" };
@@ -951,7 +958,7 @@ async function leftoverV1(rexDir: string, plan: PlanFile | undefined): Promise<{
   const landed = idsOf([...v2.tree.product, ...v2.tree.changes], new Set(cutContainerIds(v2.tree)));
   const missing = [...fingerprintTree(items).keys()].filter((id) => !landed.has(id));
   if (!plan && missing.length === 0) return { removed, proof: "ids" };
-  const remedy = `${kept} Re-capture what it holds in the v2 tree, then remove ${PRD_TREE_DIRNAME}/ and ${TREE_META_FILENAME} by hand.`;
+  const remedy = `${kept} Re-capture in the v2 tree anything it holds that is missing. ${manualStep(removed)}`;
   if (missing.length > 0) {
     throw new MigrationApplyError(
       `${treeRoot} beside the v2 tree holds ${missing.length} item${missing.length === 1 ? "" : "s"} the v2 tree does not ` +
@@ -1064,7 +1071,7 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
       await rm(staging, { recursive: true, force: true });
       if (existsSync(productDir)) {
         const leftover = await leftoverV1(rexDir, plan);
-        for (const path of leftover.removed) await rm(path, { recursive: true, force: true });
+        await removeV1Leftovers(leftover.removed);
         return { status: "already-v2", ...leftover };
       }
       if (!existsSync(v1Files[0]!)) throw new MigrationApplyError(`No PRD folder tree at ${v1Files[0]}: nothing to apply.`);
@@ -1088,7 +1095,7 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
         await rm(staging, { recursive: true, force: true });
         throw err;
       }
-      await removeAfterSwitch([...v1Files, staging]);
+      await removeV1Leftovers([...v1Files, staging]);
 
       const { tree: _tree, stateKeys: _keys, ...summary } = built;
       return { status: "applied", built: summary, v1Items, ...verified };

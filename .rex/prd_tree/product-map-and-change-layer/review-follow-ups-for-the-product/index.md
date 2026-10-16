@@ -20,7 +20,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A change's touches and amends name a capability or constraint](./a-change-s-touches-and-amends-name-a.md) | completed |
-| [A re-run of migrate --apply refuses a genuine leftover prd_tree/ that the plan cannot vouch for](./a-re-run-of-migrate-apply-refuses-a.md) | pending |
+| [A re-run of migrate --apply refuses a genuine leftover prd_tree/ that the plan cannot vouch for](./a-re-run-of-migrate-apply-refuses-a.md) | in_progress |
 | [An open fix: true change that adds a capability marks the new capability defective while its kind is feature](./an-open-fix-true-change-that-adds-a.md) | completed |
 | [Apply refuses removing one member of a pre-existing dependsOn knot that stays cyclic](./apply-refuses-removing-one-member-of-a.md) | pending |
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | completed |
