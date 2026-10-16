@@ -1664,6 +1664,50 @@ export function buildWindowsCliCommandLine(binary: string, args: string[]): stri
   return [head, ...args.map(quoteWindowsToken)].join(" ");
 }
 
+/** A cmd.exe variable reference. Names cannot contain `%`, `=`, or a newline. */
+const WINDOWS_VAR_REF = /%([^%=\r\n]+)%/g;
+
+/** Windows environment names are case-insensitive; `process.env` is not. */
+function envHasName(env: NodeJS.ProcessEnv, name: string): boolean {
+  const wanted = name.toLowerCase();
+  for (const key of Object.keys(env)) {
+    if (key.toLowerCase() === wanted) return env[key] !== undefined;
+  }
+  return false;
+}
+
+/**
+ * Refuse a command line whose tokens cmd.exe would rewrite before running it.
+ *
+ * `quoteWindowsToken` neutralises every cmd.exe metacharacter except one:
+ * `%VAR%` is expanded *inside* double quotes, and the substituted text is then
+ * parsed as part of the command line. A value holding a double quote therefore
+ * closes the argument early and an `&` after it starts a second command —
+ * demonstrated with `model%INJECT%` against `INJECT=x" & <command> & echo `,
+ * which ran `<command>`. No quoting closes this: cmd.exe offers no escape for
+ * `%` outside a batch file, which is why {@link quoteWindowsToken} documents it
+ * as a caller contract rather than handling it.
+ *
+ * Enforcing the contract here is what turns it from a comment into a guarantee.
+ * The check is deliberately narrow — cmd.exe only expands a name it can
+ * resolve, leaving anything else literal, so a path that merely contains `%`
+ * (`C:\100%cool\bin`) still spawns. Only a token that would actually be
+ * rewritten is refused, and no CLI this spawns passes one.
+ */
+function assertNoWindowsEnvExpansion(tokens: readonly string[], env: NodeJS.ProcessEnv): void {
+  for (const token of tokens) {
+    for (const match of token.matchAll(WINDOWS_VAR_REF)) {
+      const name = match[1]!;
+      if (!envHasName(env, name)) continue;
+      throw new Error(
+        `Refusing to spawn: ${JSON.stringify(token)} contains %${name}%, which cmd.exe would expand ` +
+          `into the command line before running it. An expanded value containing a quote can end the ` +
+          `argument and start another command, and quoting cannot prevent it.`,
+      );
+    }
+  }
+}
+
 /**
  * Spawn a CLI binary (e.g. `claude`, `codex`) and return the live ChildProcess.
  *
@@ -1692,6 +1736,7 @@ export function spawnCli(
   const baseOpts = { cwd, env, stdio };
 
   if (_platform === "win32") {
+    assertNoWindowsEnvExpansion([cliBinary, ...args], env ?? process.env);
     const cmdLine = buildWindowsCliCommandLine(cliBinary, args);
     logCliInvocation({ binary: cliBinary, args, cwd, via: "spawnCli", platform: _platform, commandLine: cmdLine });
     // Wrap the whole command line in an extra pair of quotes: `cmd.exe /s`
