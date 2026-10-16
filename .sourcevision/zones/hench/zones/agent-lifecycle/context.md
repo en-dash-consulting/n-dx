@@ -5,102 +5,167 @@
 <zone>
 
 Zone: Agent Lifecycle (`hench/agent-lifecycle`)
-Files: 21, Cohesion: 0.51, Coupling: 0.49
-Description: 21 files, primarily TypeScript
-Entry points: packages/hench/src/agent/analysis/adversarial-review.ts, packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts, packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts, packages/hench/src/agent/lifecycle/background-wait.ts, packages/hench/src/agent/lifecycle/batch-divider.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts, packages/hench/src/agent/lifecycle/event-accumulator.ts, packages/hench/src/agent/lifecycle/orientation.ts, packages/hench/src/agent/lifecycle/primer.ts, packages/hench/src/agent/lifecycle/session-cache.ts, packages/hench/src/agent/lifecycle/spawn-budget.ts, packages/hench/src/agent/lifecycle/token-usage.ts, packages/hench/src/agent/lifecycle/vendor-adapter.ts, packages/hench/src/cli/help.ts, packages/hench/src/prd/llm-gateway.ts, packages/hench/src/quota/token-validation.ts, packages/hench/src/store/project-config.ts
-Lines: 8586
+Files: 32, Cohesion: 0.57, Coupling: 0.43
+Description: 32 files, primarily TypeScript
+Entry points: packages/hench/src/agent/analysis/change-magnitude.ts, packages/hench/src/agent/analysis/git-changed-files.ts, packages/hench/src/agent/analysis/review-repairs.ts, packages/hench/src/agent/analysis/review.ts, packages/hench/src/agent/completion.ts, packages/hench/src/agent/lifecycle/commit-msg-watcher.ts, packages/hench/src/agent/lifecycle/commit-subject.ts, packages/hench/src/agent/lifecycle/fail-forward.ts, packages/hench/src/agent/lifecycle/gate-only-retry.ts, packages/hench/src/agent/lifecycle/pre-run-commit-subject.ts, packages/hench/src/agent/lifecycle/shared.ts, packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/process/actor-identity.ts, packages/hench/src/process/exec.ts, packages/hench/src/process/git-ancestry.ts, packages/hench/src/process/git-mutation.ts, packages/hench/src/process/git-origin.ts, packages/hench/src/store/artifacts.ts, packages/hench/src/store/paths.ts, packages/hench/src/store/run-events.ts, packages/hench/src/store/run-log.ts, packages/hench/src/tools/cleanup-transformations.ts, packages/hench/src/tools/dead-code-analyzer.ts, packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/test-command-resolver.ts, packages/hench/src/tools/test-gate-template.ts, packages/hench/src/tools/test-runner.ts, packages/hench/src/validation/changed-files.ts, packages/hench/src/validation/completion.ts
+Lines: 14095
 
 </zone>
 
 <files>
 
-packages/hench/src/agent/analysis/adversarial-review.ts (TypeScript, 952 lines, source)
-packages/hench/src/agent/index.ts (TypeScript, 95 lines, source)
-packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts (TypeScript, 512 lines, source)
-packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts (TypeScript, 822 lines, source)
-packages/hench/src/agent/lifecycle/adapters/index.ts (TypeScript, 53 lines, source)
-packages/hench/src/agent/lifecycle/background-wait.ts (TypeScript, 102 lines, source)
-packages/hench/src/agent/lifecycle/batch-divider.ts (TypeScript, 58 lines, source)
-packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 2539 lines, source)
-packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts (TypeScript, 110 lines, source)
-packages/hench/src/agent/lifecycle/event-accumulator.ts (TypeScript, 767 lines, source)
-packages/hench/src/agent/lifecycle/orientation.ts (TypeScript, 253 lines, source)
-packages/hench/src/agent/lifecycle/primer.ts (TypeScript, 100 lines, source)
-packages/hench/src/agent/lifecycle/session-cache.ts (TypeScript, 424 lines, source)
-packages/hench/src/agent/lifecycle/spawn-budget.ts (TypeScript, 97 lines, source)
-packages/hench/src/agent/lifecycle/token-usage.ts (TypeScript, 73 lines, source)
-packages/hench/src/agent/lifecycle/vendor-adapter.ts (TypeScript, 281 lines, source)
-packages/hench/src/cli/help.ts (TypeScript, 393 lines, source)
-packages/hench/src/prd/llm-gateway.ts (TypeScript, 276 lines, source)
-packages/hench/src/quota/token-validation.ts (TypeScript, 516 lines, source)
-packages/hench/src/store/project-config.ts (TypeScript, 149 lines, source)
-packages/hench/src/tools/pr-status-trailers.ts (TypeScript, 14 lines, source)
+packages/hench/src/agent/analysis/change-magnitude.ts (TypeScript, 88 lines, source)
+packages/hench/src/agent/analysis/git-changed-files.ts (TypeScript, 170 lines, source)
+packages/hench/src/agent/analysis/review-repairs.ts (TypeScript, 164 lines, source)
+packages/hench/src/agent/analysis/review.ts (TypeScript, 302 lines, source)
+packages/hench/src/agent/completion.ts (TypeScript, 15 lines, source)
+packages/hench/src/agent/lifecycle/commit-msg-watcher.ts (TypeScript, 248 lines, source)
+packages/hench/src/agent/lifecycle/commit-subject.ts (TypeScript, 76 lines, source)
+packages/hench/src/agent/lifecycle/commit-trailers.ts (TypeScript, 63 lines, source)
+packages/hench/src/agent/lifecycle/fail-forward.ts (TypeScript, 268 lines, source)
+packages/hench/src/agent/lifecycle/gate-only-retry.ts (TypeScript, 250 lines, source)
+packages/hench/src/agent/lifecycle/pre-run-commit-subject.ts (TypeScript, 164 lines, source)
+packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 4846 lines, source)
+packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts (TypeScript, 845 lines, source)
+packages/hench/src/agent/planning/prompt.ts (TypeScript, 288 lines, source)
+packages/hench/src/process/actor-identity.ts (TypeScript, 96 lines, source)
+packages/hench/src/process/exec-shell.ts (TypeScript, 8 lines, source)
+packages/hench/src/process/exec.ts (TypeScript, 34 lines, source)
+packages/hench/src/process/git-ancestry.ts (TypeScript, 24 lines, source)
+packages/hench/src/process/git-mutation.ts (TypeScript, 50 lines, source)
+packages/hench/src/process/git-origin.ts (TypeScript, 156 lines, source)
+packages/hench/src/store/artifacts.ts (TypeScript, 298 lines, source)
+packages/hench/src/store/paths.ts (TypeScript, 239 lines, source)
+packages/hench/src/store/run-events.ts (TypeScript, 486 lines, source)
+packages/hench/src/store/run-log.ts (TypeScript, 272 lines, source)
+packages/hench/src/tools/cleanup-transformations.ts (TypeScript, 767 lines, source)
+packages/hench/src/tools/dead-code-analyzer.ts (TypeScript, 1224 lines, source)
+packages/hench/src/tools/exec-shell.ts (TypeScript, 144 lines, source)
+packages/hench/src/tools/test-command-resolver.ts (TypeScript, 392 lines, source)
+packages/hench/src/tools/test-gate-template.ts (TypeScript, 110 lines, source)
+packages/hench/src/tools/test-runner.ts (TypeScript, 1577 lines, source)
+packages/hench/src/validation/changed-files.ts (TypeScript, 238 lines, source)
+packages/hench/src/validation/completion.ts (TypeScript, 193 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/adapters/index.ts {resolveVendorAdapter, claudeCliAdapter, codexCliAdapter}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {cliLoop}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {CliLoopOptions, CliLoopResult}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts {parseCodexCliTokenUsage}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts {CodexCliTokenUsage}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/event-accumulator.ts {EventAccumulator}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/event-accumulator.ts {AccumulatedTokenUsage, AccumulatedToolCalls, AccumulatedFailure}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, emptyAggregateTokenUsage, accumulateTokenUsage, formatTokenUsage}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-usage.ts {AggregateTokenUsage}
-  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {VendorAdapter, SpawnConfig}
-  packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {VendorAdapter, SpawnConfig, VendorSpawnOptions, BackgroundWaitSignal}
-  packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR, assemblePrompt, classifyVendorError}
-  packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts → packages/hench/src/prd/llm-gateway.ts {PromptEnvelope, ExecutionPolicy, RuntimeEvent, RuntimeEventType, FailureCategory, LLMVendor}
-  packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {VendorAdapter, SpawnConfig, VendorSpawnOptions}
-  packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR, assemblePrompt, compileCodexPolicyFlags, classifyVendorError}
-  packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts → packages/hench/src/prd/llm-gateway.ts {PromptEnvelope, ExecutionPolicy, RuntimeEvent, RuntimeEventType, FailureCategory, LLMVendor}
-  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts {claudeCliAdapter}
-  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts {claudeCliAdapter}
-  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts {codexCliAdapter}
-  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts {codexCliAdapter}
-  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {VendorAdapter}
-  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR}
-  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/prd/llm-gateway.ts {LLMVendor}
-  packages/hench/src/agent/lifecycle/background-wait.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {BackgroundWaitSignal}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/analysis/adversarial-review.ts {buildReviewSystemPrompt, buildReviewBrief, readReviewReport, reviewReportPath, formatReviewSummary, classifyUnresolved, formatUnresolvedWarning, parkDeferredFindings, deferredFindings, mergeDispositionsIntoRaw}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/analysis/adversarial-review.ts {ReviewPassOutcome, ReviewReport, DeferredFinding}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/adapters/index.ts {resolveVendorAdapter}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/background-wait.ts {hasUnfinishedWork, WORK_SESSION_RESUME_MESSAGE, buildReviewResumeMessage, formatBackgroundWaitFailure}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/batch-divider.ts {buildTaskBoundaryDivider}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts {parseCodexCliTokenUsage}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/event-accumulator.ts {EventAccumulator}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/orientation.ts {ensureWarmParent}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/session-cache.ts {resolveSessionStrategy, clearSessionCache, readBatchChain, advanceBatchChain, clearBatchChain, isBatchChainUsable, DEFAULT_TASKS_PER_SESSION}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/spawn-budget.ts {createSpawnLedger, recordSpawn, spawnBudgetExhausted, describeSpawnBudget}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/spawn-budget.ts {SpawnReason}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-usage.ts {mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {VendorAdapter, SpawnConfig, BackgroundWaitSignal}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, createPromptEnvelope, DEFAULT_EXECUTION_POLICY}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/prd/llm-gateway.ts {ExecutionPolicy, RuntimeEvent, PromptSection, PromptSectionName}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {loadLLMConfig, resolveLLMVendor, resolveVendorCliPath, resolveVendorCliEnv}
-  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {LLMVendor}
-  packages/hench/src/agent/lifecycle/event-accumulator.ts → packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts {parseMaybeJson}
-  packages/hench/src/agent/lifecycle/event-accumulator.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsageWithDiagnostic, parseStreamTokenUsage}
-  packages/hench/src/agent/lifecycle/event-accumulator.ts → packages/hench/src/agent/lifecycle/token-usage.ts {TokenDiagnosticStatus}
-  packages/hench/src/agent/lifecycle/event-accumulator.ts → packages/hench/src/prd/llm-gateway.ts {LLMVendor, RuntimeEvent, FailureCategory}
-  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/agent/lifecycle/primer.ts {readFreshPrimer}
-  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/agent/lifecycle/session-cache.ts {readSessionCache, writeSessionCache, clearSessionCache, isParentUsable, sourcevisionFingerprint}
-  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/agent/lifecycle/session-cache.ts {ParentRejection}
-  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {SpawnConfig, VendorAdapter}
-  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/prd/llm-gateway.ts {createPromptEnvelope}
-  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/prd/llm-gateway.ts {PromptSection, PromptSectionName, ExecutionPolicy}
-  packages/hench/src/agent/lifecycle/token-usage.ts → packages/hench/src/prd/llm-gateway.ts {parseTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage, parseStreamTokenUsageWithDiagnostic, mapCodexUsageToTokenUsage, accumulateTokenUsage, emptyAggregateTokenUsage}
-  packages/hench/src/agent/lifecycle/token-usage.ts → packages/hench/src/prd/llm-gateway.ts {TokenDiagnosticStatus, TokenParseResult, CodexTokenMapping, AggregateTokenUsage}
-  packages/hench/src/agent/lifecycle/vendor-adapter.ts → packages/hench/src/prd/llm-gateway.ts {LLMVendor, PromptEnvelope, ExecutionPolicy, RuntimeEvent, FailureCategory}
-  packages/hench/src/cli/help.ts → packages/hench/src/prd/llm-gateway.ts {formatHelp}
-  packages/hench/src/cli/help.ts → packages/hench/src/prd/llm-gateway.ts {HelpDefinition}
-  packages/hench/src/quota/token-validation.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR, isLLMVendor}
-  packages/hench/src/quota/token-validation.ts → packages/hench/src/prd/llm-gateway.ts {LLMVendor}
-  packages/hench/src/store/project-config.ts → packages/hench/src/prd/llm-gateway.ts {loadProjectOverrides, mergeWithOverrides}
-  packages/hench/src/store/project-config.ts → packages/hench/src/prd/llm-gateway.ts {loadClaudeConfigFromDir, loadLLMConfigFromDir, DEFAULT_LLM_VENDOR, LLM_VENDOR, sharedResolveApiKey, sharedResolveCliPath}
-  packages/hench/src/store/project-config.ts → packages/hench/src/prd/llm-gateway.ts {ClaudeConfig, LLMConfig, LLMVendor}
+  packages/hench/src/agent/analysis/change-magnitude.ts → packages/hench/src/process/exec.ts {execStdout}
+  packages/hench/src/agent/analysis/change-magnitude.ts → packages/hench/src/store/artifacts.ts {excludeHenchRuntimeArtifacts, splitPorcelainLines}
+  packages/hench/src/agent/analysis/git-changed-files.ts → packages/hench/src/process/exec.ts {execStdout}
+  packages/hench/src/agent/analysis/review-repairs.ts → packages/hench/src/process/exec.ts {execStdout}
+  packages/hench/src/agent/analysis/review-repairs.ts → packages/hench/src/process/git-mutation.ts {execCheckedGit, execGitMutation}
+  packages/hench/src/agent/analysis/review-repairs.ts → packages/hench/src/process/git-origin.ts {checkRunGitOrigin}
+  packages/hench/src/agent/analysis/review-repairs.ts → packages/hench/src/process/git-origin.ts {RunGitOrigin}
+  packages/hench/src/agent/analysis/review.ts → packages/hench/src/process/exec.ts {execStdout}
+  packages/hench/src/agent/analysis/review.ts → packages/hench/src/store/artifacts.ts {matchesProjectPath}
+  packages/hench/src/agent/completion.ts → packages/hench/src/validation/completion.ts {validateCompletion, formatValidationResult}
+  packages/hench/src/agent/completion.ts → packages/hench/src/validation/completion.ts {CompletionValidationResult, CompletionValidationOptions}
+  packages/hench/src/agent/lifecycle/commit-msg-watcher.ts → packages/hench/src/agent/lifecycle/commit-trailers.ts {appendTrailerBlock}
+  packages/hench/src/agent/lifecycle/commit-msg-watcher.ts → packages/hench/src/process/git-mutation.ts {execGitMutation}
+  packages/hench/src/agent/lifecycle/commit-msg-watcher.ts → packages/hench/src/process/git-origin.ts {checkRunGitOrigin}
+  packages/hench/src/agent/lifecycle/commit-msg-watcher.ts → packages/hench/src/process/git-origin.ts {RunGitOrigin}
+  packages/hench/src/agent/lifecycle/fail-forward.ts → packages/hench/src/agent/lifecycle/shared.ts {buildCoAuthoredByTrailerLine}
+  packages/hench/src/agent/lifecycle/fail-forward.ts → packages/hench/src/process/exec.ts {execStdout}
+  packages/hench/src/agent/lifecycle/fail-forward.ts → packages/hench/src/process/git-mutation.ts {execGitMutation}
+  packages/hench/src/agent/lifecycle/gate-only-retry.ts → packages/hench/src/agent/lifecycle/shared.ts {finalizeRun, recordClaimLoss}
+  packages/hench/src/agent/lifecycle/gate-only-retry.ts → packages/hench/src/agent/lifecycle/shared.ts {FinalizeRunOptions, MemoryContext}
+  packages/hench/src/agent/lifecycle/gate-only-retry.ts → packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts {findUncommittedWork, PRD_COMMIT_PATHS}
+  packages/hench/src/agent/lifecycle/gate-only-retry.ts → packages/hench/src/process/exec.ts {getCurrentBranch, getCurrentHead}
+  packages/hench/src/agent/lifecycle/gate-only-retry.ts → packages/hench/src/process/git-ancestry.ts {isAncestorOfHead}
+  packages/hench/src/agent/lifecycle/pre-run-commit-subject.ts → packages/hench/src/agent/lifecycle/commit-subject.ts {COMMIT_SUBJECT_MAX_LENGTH}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/analysis/change-magnitude.ts {measureChangeMagnitude}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/analysis/change-magnitude.ts {ChangeMagnitude}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/analysis/git-changed-files.ts {captureCommitChanges, extractPaths, formatChanges}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/analysis/review-repairs.ts {commitReviewRepairs}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/analysis/review.ts {collectReviewDiff, promptReview, revertChanges, listUntrackedPaths}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/analysis/review.ts {ReviewDiff}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/lifecycle/commit-msg-watcher.ts {CommitMsgWatcher, CommitMsgWatcherOptions}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/lifecycle/commit-subject.ts {extractCommitSubject}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/lifecycle/commit-trailers.ts {appendTrailerBlock}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/lifecycle/pre-run-commit-subject.ts {buildPreRunCommitSubject}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts {PRD_COMMIT_PATHS, deletedAmong, findUncommittedWork, formatAppliedCompletionKept, formatOperatorPrdLeftovers, formatRecordCommitPending, formatReviewRepairsUncommittedRefusal, formatUncommittedWorkRefusal, listDirtyPaths, listOperatorOwnedPrdDirt, partitionDirtyPaths, prdStagePaths, rexDirName, prepareRecoveryPathspecs, renderPaths}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/agent/planning/prompt.ts {buildSystemPrompt, buildPromptEnvelope}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/process/actor-identity.ts {resolveActor, resolveHost}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/process/exec.ts {exec, getCurrentHead, execStdout}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/process/git-mutation.ts {execCheckedGit, execGitMutation}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/process/git-origin.ts {captureRunGitOrigin, checkRunGitOrigin}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/process/git-origin.ts {RunGitOrigin}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/store/artifacts.ts {excludeHenchRuntimeArtifacts, matchesProjectPath, parsePorcelainPath, repoRelativePrefix}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/store/paths.ts {V2_CHANGES_DIRNAME, V2_INBOX_DIRNAME, V2_PRODUCT_DIRNAME, V2_STATE_FILENAME}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/store/run-events.ts {closeActiveRunEvents, emitRunEvent, openRunEvents, setActiveRunEvents}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/store/run-events.ts {RunEventWriter}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/store/run-log.ts {ensureRunLogsIgnored, openRunLog, persistRunLog}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/store/run-log.ts {RunLogWriter}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/tools/test-command-resolver.ts {resolveTestCommand}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/tools/test-runner.ts {runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS, OUTPUT_TAIL_LINES}
+  packages/hench/src/agent/lifecycle/shared.ts → packages/hench/src/validation/changed-files.ts {discoverChangedFiles}
+  packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts → packages/hench/src/process/exec.ts {execStdout}
+  packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts → packages/hench/src/store/artifacts.ts {excludeHenchRuntimeArtifacts, matchesProjectPath, parsePorcelainPath, repoRelativePrefix, splitPorcelainLines}
+  packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts → packages/hench/src/store/paths.ts {V2_CHANGES_DIRNAME, V2_INBOX_DIRNAME, V2_PRODUCT_DIRNAME, resolveHenchPaths, stateDirNameUnder}
+  packages/hench/src/process/actor-identity.ts → packages/hench/src/process/exec.ts {execStdout}
+  packages/hench/src/process/exec-shell.ts → packages/hench/src/tools/exec-shell.ts {execShell}
+  packages/hench/src/process/exec-shell.ts → packages/hench/src/tools/exec-shell.ts {ExecShellOptions}
+  packages/hench/src/process/git-ancestry.ts → packages/hench/src/process/exec.ts {exec}
+  packages/hench/src/process/git-mutation.ts → packages/hench/src/process/exec.ts {exec}
+  packages/hench/src/process/git-mutation.ts → packages/hench/src/process/exec.ts {ExecResult}
+  packages/hench/src/process/git-origin.ts → packages/hench/src/process/exec.ts {getCurrentBranch, getCurrentHead, getWorktreeRoot}
+  packages/hench/src/store/artifacts.ts → packages/hench/src/process/exec.ts {execStdout}
+  packages/hench/src/store/artifacts.ts → packages/hench/src/store/paths.ts {AGENT_MCP_DIRNAME, LOCKS_DIRNAME, RECOVERY_DIRNAME, REVIEWS_DIRNAME, RUNS_DIRNAME, stateDirNameUnder, USAGE_CURSORS_DIRNAME}
+  packages/hench/src/store/run-events.ts → packages/hench/src/store/paths.ts {RUNS_DIRNAME}
+  packages/hench/src/tools/cleanup-transformations.ts → packages/hench/src/process/exec.ts {execShellCmd}
+  packages/hench/src/tools/dead-code-analyzer.ts → packages/hench/src/tools/cleanup-transformations.ts {isTestFilePath}
+  packages/hench/src/tools/dead-code-analyzer.ts → packages/hench/src/tools/cleanup-transformations.ts {AnalyzerOutput, DeadExport, UnusedImport, DuplicateUtility}
+  packages/hench/src/tools/exec-shell.ts → packages/hench/src/process/exec.ts {exec, execShellCmd}
+  packages/hench/src/tools/test-command-resolver.ts → packages/hench/src/tools/test-gate-template.ts {applyGateTemplate}
+  packages/hench/src/tools/test-runner.ts → packages/hench/src/process/exec.ts {execShellCmd}
+  packages/hench/src/tools/test-runner.ts → packages/hench/src/process/exec.ts {ExecResult}
+  packages/hench/src/tools/test-runner.ts → packages/hench/src/tools/test-gate-template.ts {parseSelectedSuites, planRerun}
+  packages/hench/src/validation/changed-files.ts → packages/hench/src/process/exec.ts {exec}
+  packages/hench/src/validation/changed-files.ts → packages/hench/src/store/artifacts.ts {isHenchRuntimeArtifact, matchesProjectPath, parsePorcelainPath, repoRelativePrefix, splitPorcelainLines}
+  packages/hench/src/validation/changed-files.ts → packages/hench/src/store/paths.ts {BOOKKEEPING_PATHS}
+  packages/hench/src/validation/completion.ts → packages/hench/src/process/exec.ts {exec, execShellCmd}
+  packages/hench/src/validation/completion.ts → packages/hench/src/store/paths.ts {BOOKKEEPING_PATHS}
+  packages/hench/src/validation/completion.ts → packages/hench/src/validation/changed-files.ts {discoverChangedFiles}
 
 </imports>
+
+<sub-crossings>
+
+Cross-dependencies between sub-zones:
+  hench/agent-lifecycle/agent → hench/agent-lifecycle/process: 3
+  hench/agent-lifecycle/agent-analysis → hench/agent-lifecycle/agent-lifecycle: 1
+  hench/agent-lifecycle/agent-analysis → hench/agent-lifecycle/lifecycle: 2
+  hench/agent-lifecycle/agent-analysis → hench/agent-lifecycle/process: 4
+  hench/agent-lifecycle/agent-lifecycle → hench/agent-lifecycle/agent: 7
+  hench/agent-lifecycle/agent-lifecycle → hench/agent-lifecycle/agent-analysis: 2
+  hench/agent-lifecycle/agent-lifecycle → hench/agent-lifecycle/lifecycle: 4
+  hench/agent-lifecycle/agent-lifecycle → hench/agent-lifecycle/process: 7
+  hench/agent-lifecycle/agent-lifecycle → hench/agent-lifecycle/tools: 2
+  hench/agent-lifecycle/agent-lifecycle → hench/agent-lifecycle/validation: 1
+  hench/agent-lifecycle/lifecycle → hench/agent-lifecycle/agent-analysis: 1
+  hench/agent-lifecycle/lifecycle → hench/agent-lifecycle/process: 1
+  hench/agent-lifecycle/process → hench/agent-lifecycle/agent: 1
+  hench/agent-lifecycle/tools → hench/agent-lifecycle/process: 2
+  hench/agent-lifecycle/validation → hench/agent-lifecycle/agent: 3
+  hench/agent-lifecycle/validation → hench/agent-lifecycle/process: 2
+
+</sub-crossings>
+
+<sub-zones>
+
+This zone has 7 sub-zone(s):
+
+- **Agent** (`hench/agent-lifecycle/agent`): 4 files, cohesion 0.38, coupling 0.62
+- **Analysis & Recovery** (`hench/agent-lifecycle/agent-analysis`): 3 files, cohesion 0.33, coupling 0.67
+- **Hench** (`hench/agent-lifecycle/agent-lifecycle`): 9 files, cohesion 0.46, coupling 0.54
+- **Commit Lifecycle** (`hench/agent-lifecycle/lifecycle`): 3 files, cohesion 0.4, coupling 0.6
+- **Process** (`hench/agent-lifecycle/process`): 7 files, cohesion 0.41, coupling 0.59
+- **Test Infrastructure** (`hench/agent-lifecycle/tools`): 3 files, cohesion 0.57, coupling 0.43
+- **Completion Validation** (`hench/agent-lifecycle/validation`): 3 files, cohesion 0.4, coupling 0.6
+
+Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
+
+</sub-zones>

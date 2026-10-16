@@ -35,7 +35,10 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Diff two migration plans in words](./diff-two-migration-plans-in-words.md) | pending |
 | [docs/guide/skills.md skill table descriptions can drift from manifest.json with no test to catch it](./docs-guide-skills-md-skill-table.md) | pending |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
+| [get_capabilities reports schemaVersion rex/v1 on a v2 tree](./get-capabilities-reports-schemaversion.md) | pending |
+| [get_product on a large v2 tree exceeds what an MCP client accepts](./get-product-on-a-large-v2-tree-exceeds.md) | pending |
 | [Install the sv analyze stop handlers before the progress file says running](./install-the-sv-analyze-stop-handlers.md) | completed |
+| [MCP writes on a v2 tree do not stamp lastModified / lastModifiedBy](./mcp-writes-on-a-v2-tree-do-not-stamp.md) | pending |
 | [`ndx ci` crashes with a stack trace, and no report, when a scanned source file cannot be read](./ndx-ci-crashes-with-a-stack-trace-and.md) | pending |
 | [ndx ci gateway-imports step misses dynamic import() that domain-isolation now flags](./ndx-ci-gateway-imports-step-misses.md) | pending |
 | [ndx work --task=<change> --resolve refuses a change whose open tasks --reset-deferred would reopen](./ndx-work-task-change-resolve-refuses-a.md) | pending |
@@ -51,6 +54,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | completed |
 | [The migration plan's metAt hashes the rules-stage spec draft and goes stale once a later pass redrafts the spec](./the-migration-plan-s-metat-hashes-the.md) | pending |
 | [The v2 writer drops a moved folder node's top-level state.yaml keys](./the-v2-writer-drops-a-moved-folder.md) | pending |
+| [v2 changes still carry a v1 level (epic) in MCP and CLI output](./v2-changes-still-carry-a-v1-level-epic.md) | pending |
 | [v2 isolation test misses imports of the core v2 modules and dynamic import() of any v2 module](./v2-isolation-test-misses-imports-of.md) | pending |
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
 | [VALIDATED_DOC_PAGES is hand-maintained: a root test that starts reading a new docs page selects nothing until someone adds a group](./validated-doc-pages-is-hand-maintained.md) | pending |

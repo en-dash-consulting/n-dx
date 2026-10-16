@@ -5,31 +5,35 @@
 <zone>
 
 Zone: Core 2 (`core/core-2`)
-Files: 6, Cohesion: 0.50, Coupling: 0.50
-Description: 6 files, primarily JavaScript
-Entry points: packages/core/cli-log.js, packages/core/commit-trailers.js, packages/core/export.js, packages/core/gitignore.js, packages/core/win-spawn.js
-Lines: 1520
+Files: 8, Cohesion: 0.40, Coupling: 0.60
+Description: 8 files, primarily JavaScript
+Entry points: packages/core/ci.js, packages/core/cli-brand.js, packages/core/cli-ink.js, packages/core/config.js, packages/core/file-permissions.js, packages/core/git-preflight.js, packages/core/init-summary.js, packages/core/sample-app.js
+Lines: 6844
 
 </zone>
 
 <files>
 
-packages/core/cli-log.js (JavaScript, 187 lines, source)
-packages/core/commit-trailers.js (JavaScript, 71 lines, source)
-packages/core/export.js (JavaScript, 869 lines, source)
-packages/core/gitignore.js (JavaScript, 69 lines, source)
-packages/core/win-spawn.js (JavaScript, 136 lines, source)
-scripts/run-all-tests.mjs (JavaScript, 188 lines, build)
+packages/core/ci.js (JavaScript, 1567 lines, source)
+packages/core/cli-brand.js (JavaScript, 414 lines, source)
+packages/core/cli-ink.js (JavaScript, 446 lines, source)
+packages/core/config.js (JavaScript, 3438 lines, source)
+packages/core/file-permissions.js (JavaScript, 273 lines, source)
+packages/core/git-preflight.js (JavaScript, 294 lines, source)
+packages/core/init-summary.js (JavaScript, 51 lines, source)
+packages/core/sample-app.js (JavaScript, 361 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/core/export.js → packages/core/commit-trailers.js {buildCommitMessage}
-  packages/core/export.js → packages/core/gitignore.js {ensureGitignoreEntry, isGitTracked}
-  packages/core/export.js → packages/core/win-spawn.js {execFileSyncCli}
-  packages/core/win-spawn.js → packages/core/cli-log.js {logCliInvocation}
-  scripts/run-all-tests.mjs → packages/core/win-spawn.js {spawnCli}
+  packages/core/ci.js → packages/core/config.js {findSharedSecrets, loadProjectConfigStrict, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel}
+  packages/core/cli-ink.js → packages/core/cli-brand.js {BRAND_NAME, TOOL_NAME, BODY, LEGS, INIT_PHASES, createLineSplitter, throttleDebugLines}
+  packages/core/cli-ink.js → packages/core/git-preflight.js {formatGitWarningLines, commitInitBaseline, formatGitInitCommitLines}
+  packages/core/cli-ink.js → packages/core/init-summary.js {initDirLabels, padInitDirLabel}
+  packages/core/config.js → packages/core/cli-brand.js {red, yellow, dim, green}
+  packages/core/config.js → packages/core/file-permissions.js {describeUnrestrictedFile, restrictFileToOwner}
+  packages/core/sample-app.js → packages/core/cli-brand.js {dim, cyan, green}
 
 </imports>

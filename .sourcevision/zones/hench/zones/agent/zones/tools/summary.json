@@ -1,0 +1,24 @@
+{
+  "id": "hench/agent/tools",
+  "name": "Agent Tool Suite",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/tools/contracts.ts",
+    "packages/hench/src/tools/dispatch.ts",
+    "packages/hench/src/tools/files.ts",
+    "packages/hench/src/tools/git.ts",
+    "packages/hench/src/tools/pr-status-trailers.ts",
+    "packages/hench/src/tools/shell.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/tools/contracts.ts",
+    "packages/hench/src/tools/dispatch.ts",
+    "packages/hench/src/tools/files.ts",
+    "packages/hench/src/tools/git.ts",
+    "packages/hench/src/tools/shell.ts"
+  ],
+  "cohesion": 0.82,
+  "coupling": 0.18,
+  "fileCount": 6,
+  "lineCount": 650
+}

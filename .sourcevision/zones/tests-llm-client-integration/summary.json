@@ -1,0 +1,25 @@
+{
+  "id": "tests-llm-client-integration",
+  "name": "Tests Llm Client Integration",
+  "description": "Non-source files in packages: exec-shell-windows.test.ts, exec-stdin-input.test.ts, exec-timeout-tree-kill.test.ts (+3 more)",
+  "files": [
+    "packages/llm-client/tests/integration/exec-shell-windows.test.ts",
+    "packages/llm-client/tests/integration/exec-stdin-input.test.ts",
+    "packages/llm-client/tests/integration/exec-timeout-tree-kill.test.ts",
+    "packages/llm-client/tests/integration/git-worktree-helpers.test.ts",
+    "packages/llm-client/tests/integration/weight-aware-model-resolution.test.ts",
+    "packages/llm-client/tests/integration/workspace-roots.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 973,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}
