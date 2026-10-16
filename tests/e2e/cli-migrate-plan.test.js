@@ -117,11 +117,11 @@ describe("ndx migrate --plan", () => {
       return env;
     }
 
-    function migratePlan(args, extra) {
+    function migratePlan(args, extra, cwd = dir) {
       const res = spawnSync("node", [CLI_PATH, "migrate", "--plan", ...args, dir], {
         encoding: "utf-8",
         env: keylessEnv(extra),
-        cwd: dir,
+        cwd,
       });
       return { stderr: res.stderr ?? "", code: res.status };
     }
@@ -149,7 +149,17 @@ describe("ndx migrate --plan", () => {
       expect(wrote).toContain(join(outDir, "plan.md"));
     });
 
-    it("does not claim a run with model passes made no calls or spent nothing", () => {
+    it("lists a relative --out as written when run from outside the project, as rex resolves it", () => {
+      const { stderr, code } = migratePlan(["--rules-only", "--out", "rel-plan.json"], { NDX_PREFLIGHT: "always" }, outDir);
+      expect(code).toBe(0);
+      expect(existsSync(join(outDir, "rel-plan.json"))).toBe(true);
+      const wrote = stderr.split("\n").find((l) => l.includes("wrote   "));
+      expect(wrote).toContain("rel-plan.json");
+      expect(wrote).toContain("rel-plan.md");
+    });
+
+    // The stub is a POSIX shell script; Windows would resolve a real `claude` past it.
+    it.skipIf(process.platform === "win32")("does not claim a run with model passes made no calls or spent nothing", () => {
       const { stderr } = migratePlan(["--out", plan()], { NDX_PREFLIGHT: "always" });
       const after = stderr.slice(stderr.lastIndexOf("wrote"));
       expect(after).toContain("does not count them");
