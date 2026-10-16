@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [DRF router.register calls on a router imported from another file are not counted in the Django notice](./drf-router-register-calls-on-a-router.md) | pending |
 | [Pin CTFd and Netflix/dispatch, run python-routes-report and the PR 16 byte-identity checks](./pin-ctfd-and-netflix-dispatch-run.md) | completed |
-| [PR 16 outbound calls have no byte-identity or home-assistant timing evidence](./pr-16-outbound-calls-have-no-byte.md) | pending |
+| [PR 16 outbound calls have no byte-identity or home-assistant timing evidence](./pr-16-outbound-calls-have-no-byte.md) | completed |
 | [python-clients grades a call certain when a parameter or a non-client local shadows a module-level client](./python-clients-grades-a-call-certain.md) | pending |
 | [Python outbound calls: http, grpc, queue and env clients](./python-outbound-calls-http-grpc-queue.md) | completed |
 | [Python web routes: FastAPI, Flask and Django framework packs](./python-web-routes-fastapi-flask-and.md) | completed |
