@@ -49,7 +49,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Record review decisions as calibration records on the run record](./record-review-decisions-as-calibration.md) | pending |
 | [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | deferred |
 | [rex migrate-slugs on a v2 tree tells you to run rex migrate-to-folder-tree, a v1 command](./rex-migrate-slugs-on-a-v2-tree-tells.md) | pending |
-| [rex migrate-to-folder-tree drops the PRD title: it never writes tree-meta.json, so the tree reads back as "PRD"](./rex-migrate-to-folder-tree-drops-the.md) | pending |
+| [rex migrate-to-folder-tree drops the PRD title: it never writes tree-meta.json, so the tree reads back as "PRD"](./rex-migrate-to-folder-tree-drops-the.md) | completed |
 | [rex release stamp applies a container change before the changes nested in it](./rex-release-stamp-applies-a-container.md) | pending |
 | [Stop the timed-out test gate test racing its fake gate startup](./stop-the-timed-out-test-gate-test.md) | completed |
 | [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | completed |
