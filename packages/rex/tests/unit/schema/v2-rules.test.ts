@@ -146,9 +146,11 @@ describe("change-placed-at-close", () => {
       const before = held({ status: "completed", completedAt: "2026-09-01T00:00:00.000Z", appliedAt: "2026-09-01T00:00:00.000Z" });
       // A v1 item with no completedAt is applied at the cut.
       const atCut = held({ status: "completed", appliedAt: CUT });
-      const findings = placeable([cut(), before, atCut]);
-      expect(ids(findings)).toEqual([before.id, atCut.id]);
-      expect(findings.map((f) => f.severity)).toEqual(["warning", "warning"]);
+      // So is one whose completedAt does not parse.
+      const badDate = held({ status: "completed", completedAt: "last week", appliedAt: CUT });
+      const findings = placeable([cut(), before, atCut, badDate]);
+      expect(ids(findings)).toEqual([before.id, atCut.id, badDate.id]);
+      expect(findings.map((f) => f.severity)).toEqual(["warning", "warning", "warning"]);
       expect(findings[0].message).toContain("closed before the migration cut");
     });
 

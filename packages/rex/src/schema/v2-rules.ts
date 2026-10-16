@@ -380,7 +380,9 @@ const changePlacedAtClose: Rule = (index) => {
     if (node.status !== "completed" && !isAppliedChange(node)) return [];
     const state = node.status === "completed" ? "completed" : "applied";
     const untargeted = node.spike || hasTarget(node) ? "" : "; it must also amend or touch a product node, or be a spike";
-    const closedAt = Date.parse(node.completedAt ?? node.appliedAt ?? "");
+    // An unparseable completedAt falls back to appliedAt, as apply does when it stamps a completed v1 item.
+    const completedAt = Date.parse(node.completedAt ?? "");
+    const closedAt = Number.isNaN(completedAt) ? Date.parse(node.appliedAt ?? "") : completedAt;
     if (cut !== undefined && closedAt <= cut) {
       const message = `Change "${node.title}" is ${state} but still needs placement; it closed before the migration cut and stays in the Inbox as a record${untargeted}`;
       return [finding("change-placed-at-close", node, message, "warning")];
