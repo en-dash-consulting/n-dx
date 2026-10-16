@@ -83,6 +83,48 @@ export function buildWindowsCliCommandLine(binary, args) {
   return [head, ...args.map(quoteWindowsToken)].join(" ");
 }
 
+/** A cmd.exe variable reference. Names cannot contain `%`, `=`, or a newline. */
+const WINDOWS_VAR_REF = /%([^%=\r\n]+)%/g;
+
+/** Windows environment names are case-insensitive; `process.env` is not. */
+function envHasName(env, name) {
+  const wanted = name.toLowerCase();
+  for (const key of Object.keys(env)) {
+    if (key.toLowerCase() === wanted) return env[key] !== undefined;
+  }
+  return false;
+}
+
+/**
+ * Refuse a command line whose tokens cmd.exe would rewrite before running it.
+ *
+ * TWIN: same logic as assertNoWindowsEnvExpansion in
+ * packages/llm-client/src/exec.ts — see that copy for the full rationale.
+ *
+ * Quoting neutralises every cmd.exe metacharacter except `%VAR%`, which is
+ * expanded *inside* double quotes; a value holding a quote then ends the
+ * argument and an `&` after it starts a second command. cmd.exe has no escape
+ * for `%` outside a batch file, so the only sound answer is to refuse. The
+ * check is narrow: cmd.exe expands only a name it can resolve, so a path that
+ * merely contains `%` still spawns.
+ *
+ * @param {readonly string[]} tokens
+ * @param {NodeJS.ProcessEnv} env
+ */
+export function assertNoWindowsEnvExpansion(tokens, env) {
+  for (const token of tokens) {
+    for (const match of token.matchAll(WINDOWS_VAR_REF)) {
+      const name = match[1];
+      if (!envHasName(env, name)) continue;
+      throw new Error(
+        `Refusing to spawn: ${JSON.stringify(token)} contains %${name}%, which cmd.exe would expand ` +
+          `into the command line before running it. An expanded value containing a quote can end the ` +
+          `argument and start another command, and quoting cannot prevent it.`,
+      );
+    }
+  }
+}
+
 /**
  * Windows-safe synchronous CLI invocation (GH #37/#68/#69).
  *
@@ -97,6 +139,7 @@ export function buildWindowsCliCommandLine(binary, args) {
  */
 export function execFileSyncCli(binary, args, options) {
   if (process.platform === "win32") {
+    assertNoWindowsEnvExpansion([binary, ...args], options?.env ?? process.env);
     const cmdLine = buildWindowsCliCommandLine(binary, args);
     logCliInvocation({ binary, args, cwd: options?.cwd, via: "execFileSyncCli", commandLine: cmdLine });
     // Outer quote pair: cmd.exe /s strips only the outermost quotes, keeping
@@ -125,6 +168,7 @@ export function execFileSyncCli(binary, args, options) {
  */
 export function spawnCli(binary, args, options = {}) {
   if (process.platform === "win32") {
+    assertNoWindowsEnvExpansion([binary, ...args], options.env ?? process.env);
     const cmdLine = buildWindowsCliCommandLine(binary, args);
     logCliInvocation({ binary, args, cwd: options.cwd, via: "spawnCli", commandLine: cmdLine });
     return spawn("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {

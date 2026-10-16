@@ -13,6 +13,7 @@ import {
   CHANGE_COMMITS_CACHE_FILENAME,
   computeChangeCommits,
   itemIdFromTrailer,
+  trailingTrailerRegion,
 } from "../../src/core/change-commits.js";
 
 const CHANGE = "9f1c2a3b-0000-4000-8000-0000000000c1";
@@ -266,5 +267,88 @@ describe("computeChangeCommits", () => {
   it("names the ref when it does not resolve", async () => {
     await commit("base.txt", "Initial commit");
     await expect(computeChangeCommits([CHANGE], { repoDir: repo, cacheDir, ref: "no-such-branch" })).rejects.toThrow(/git rev-parse failed/);
+  });
+});
+
+/**
+ * Git reads trailers only from a message's final paragraph, so an `N-DX-Item`
+ * separated from the closing `Co-Authored-By` by a blank line is invisible to
+ * it. The reader recovers those from the trailing run of trailer-shaped
+ * paragraphs — and from nowhere else. See the decision in the module header.
+ */
+describe("split trailer blocks", () => {
+  it("attributes a commit whose N-DX-Item is a paragraph above Co-Authored-By", async () => {
+    await commit("base.txt", "Initial commit");
+    const split = await commit(
+      "a.txt",
+      `Do part A\n\nSome prose about the change.\n\nN-DX-Item: ${CHANGE}\n\nCo-Authored-By: Dev <dev@example.com>\n`,
+    );
+    // git's own parser sees only the final paragraph, which has no item line.
+    expect(git("log", "-1", "--format=%(trailers:key=N-DX-Item,valueonly)", split)).toBe("");
+
+    expect(hashes(await computeChangeCommits([CHANGE], { repoDir: repo, cacheDir }))).toEqual([split]);
+  });
+
+  it("does not attribute a merge commit that quotes a trailer in a trailing trailer paragraph", async () => {
+    await commit("base.txt", "Initial commit");
+    git("checkout", "-q", "-b", "feat");
+    const onBranch = await commit("a.txt", `Do part A\n\nN-DX-Item: ${CHANGE}\n\nCo-Authored-By: Dev <dev@example.com>\n`);
+    git("checkout", "-q", "main");
+    await commit("u.txt", "Unrelated");
+    // The merge quotes the branch's message, trailing trailer paragraphs and
+    // all — the shape the recovery rule would otherwise read.
+    const mergeMsg = join(repo, "..", "merge-quote.txt");
+    await writeFile(mergeMsg, `Merge feat\n\nN-DX-Item: ${CHANGE}\n\nCo-Authored-By: Dev <dev@example.com>\n`, "utf-8");
+    git("merge", "-q", "--no-ff", "-F", mergeMsg, "feat");
+    const merge = git("rev-parse", "HEAD");
+
+    // The branch commit is attributed; the merge quoting it is not.
+    expect(hashes(await computeChangeCommits([CHANGE], { repoDir: repo, cacheDir }))).toEqual([onBranch]);
+    expect(hashes(await computeChangeCommits([CHANGE], { repoDir: repo, cacheDir }))).not.toContain(merge);
+  });
+
+  it("does not read a trailer out of prose", async () => {
+    await commit("base.txt", "Initial commit");
+    await commit(
+      "a.txt",
+      `Describe the format\n\nN-DX-Item: ${CHANGE}\n\nThat line above is quoted as an example, and this paragraph ends the message.\n`,
+    );
+    expect(await computeChangeCommits([CHANGE], { repoDir: repo, cacheDir })).toEqual([]);
+  });
+
+  it("recovers every item of a multi-item split block, with the final paragraph's", async () => {
+    await commit("base.txt", "Initial commit");
+    const many = await commit(
+      "a.txt",
+      `Do two things\n\nN-DX-Item: ${CHANGE}\n\nN-DX-Item: ${TASK}\nCo-Authored-By: Dev <dev@example.com>\n`,
+    );
+    const [commitRecord] = await computeChangeCommits([CHANGE], { repoDir: repo, cacheDir });
+    expect(commitRecord.hash).toBe(many);
+    expect(commitRecord.items.sort()).toEqual([CHANGE, TASK].sort());
+  });
+});
+
+describe("trailingTrailerRegion", () => {
+  it("keeps the trailing run of trailer paragraphs and stops at prose", () => {
+    const body = "Subject\n\nProse paragraph.\n\nN-DX-Item: x\n\nCo-Authored-By: Dev <dev@example.com>\n";
+    expect(trailingTrailerRegion(body)).toBe("N-DX-Item: x\nCo-Authored-By: Dev <dev@example.com>");
+  });
+
+  it("is empty for a message that ends in prose", () => {
+    expect(trailingTrailerRegion("Subject\n\nN-DX-Item: x\n\nTrailing prose.\n")).toBe("");
+  });
+
+  it("keeps a folded continuation line with its trailer", () => {
+    const body = "Subject\n\nSigned-off-by: Dev\n  continued here\n";
+    expect(trailingTrailerRegion(body)).toBe("Signed-off-by: Dev\n  continued here");
+  });
+
+  it("never reads the subject, which git does not treat as a trailer block", () => {
+    // A conventional-commit subject is trailer-shaped, so the walk would
+    // otherwise swallow it and read a one-paragraph message as a trailer block.
+    expect(trailingTrailerRegion(`N-DX-Item: ${CHANGE}`)).toBe("");
+    expect(trailingTrailerRegion("docs: a subject\n\nCo-Authored-By: Dev <dev@example.com>")).toBe(
+      "Co-Authored-By: Dev <dev@example.com>",
+    );
   });
 });

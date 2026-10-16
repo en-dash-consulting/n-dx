@@ -57,4 +57,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | pending |
 | [On a v2 project /api/live's next list uses v1 selection, so it shows Inbox changes and ignores change priority](./on-a-v2-project-api-live-s-next-list.md) | pending |
 | [A worktree workspace's first PRD read answers 404 until its lazily written cache lands](./a-worktree-workspace-s-first-prd-read.md) | pending |
-

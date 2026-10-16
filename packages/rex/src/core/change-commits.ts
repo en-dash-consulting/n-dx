@@ -12,9 +12,41 @@
  * (`<publicUrl>/#/rex/item/<id>`, any host). Both stay supported — history
  * written before the change must keep attributing.
  *
- * The only part of a commit message read is the `N-DX-Item` trailer, which
- * git extracts (`%(trailers:key=…)`). No subject or body is requested, so
- * nothing can come to depend on how a host words a merge commit.
+ * ## Split trailer blocks are recovered (decision, 2026-10-15)
+ *
+ * Git reads trailers only from a message's final paragraph. Much of this
+ * project's history puts a blank line between `N-DX-Item` and the closing
+ * `Co-Authored-By`, which makes git classify the item line as prose: on this
+ * repository git's parser attributed 761 commits while 57 more carried a
+ * readable `N-DX-Item` it could not see (`rex backfill-commit-attribution`
+ * reports the same gap as `writtenOutsideTrailerBlock`). Fixing the writers
+ * only helps new commits, and history is immutable, so those 57 would never
+ * be attributable — while `ndx migrate --plan` and the product layer's code
+ * evidence both read history through this module.
+ *
+ * The decision was to relax the reader rather than accept the gap, bounded by
+ * two rules that keep a trailer from being read out of prose:
+ *
+ * 1. Only a **trailing run of trailer-shaped paragraphs** is scanned, not the
+ *    whole message. Walking back from the end, a paragraph counts while every
+ *    one of its lines is `Key: value` or a folded continuation; the first
+ *    prose paragraph stops the walk, and the subject is never reached — a
+ *    conventional-commit subject is itself trailer-shaped, and git does not
+ *    read a trailer out of a one-paragraph message either. This is exactly
+ *    the shape the history has, and it refuses a trailer quoted mid-message.
+ * 2. **A merge commit is never read this way.** A merge carries no trailer of
+ *    its own, and its body quotes the messages of the commits it brings in —
+ *    21 merges on this repository quote an `N-DX-Item` that is not theirs.
+ *    Merges keep using git's parser alone.
+ *
+ * Measured against the rejected alternative: scanning the whole message would
+ * have attributed 6 further commits, every one of them a GitHub squash merge
+ * whose body quotes several branch messages. Crediting one squash commit to
+ * every item named in it would hand each of those items the whole multi-item
+ * diff as evidence, which is worse than leaving it unattributed.
+ *
+ * Beyond that trailing region no part of the message is read, so nothing can
+ * come to depend on how a host words a merge commit.
  *
  * ## Cache
  *
@@ -45,8 +77,12 @@ export const COMMIT_FILES_CACHE_FILENAME = "commit-files.json";
 export const DEFAULT_MAIN_REFS = ["origin/HEAD", "origin/main", "main"] as const;
 export const ITEM_TRAILER_KEY = "N-DX-Item";
 
-/** Bumped when the cached shape changes, so an older file is rebuilt rather than misread. */
-export const CACHE_VERSION = 2;
+/**
+ * Bumped when the cached shape changes, so an older file is rebuilt rather
+ * than misread. 3: split trailer blocks are recovered, so a cache written by
+ * an earlier version is missing commits rather than merely shaped differently.
+ */
+export const CACHE_VERSION = 3;
 const GIT_TIMEOUT_MS = 120_000;
 /** A full-history scan prints a line per commit; 1 MiB (the exec default) fits about 10k. */
 const GIT_MAX_BUFFER = 256 * 1024 * 1024;
@@ -124,37 +160,105 @@ export async function loadTrailerCommits(options: ChangeCommitsOptions): Promise
 }
 
 /**
- * Field and record separators for the scan. Neither can occur in a SHA, an
- * ISO date or a trailer value; an author name containing one would only
+ * Field, record and group separators for the scan. None can occur in a SHA,
+ * an ISO date or a trailer value; an author name containing one would only
  * corrupt that commit's author fields.
+ *
+ * The trailer list uses the group separator because it has no fixed length:
+ * separating its entries with the field separator would make the record's
+ * field count vary and put the body at an unknown index.
  */
 const FS = "\x1f";
 const RS = "\x1e";
+const GS = "\x1d";
+
+/** Index of `%B` in {@link SCAN_FORMAT}; the body is rejoined from here on. */
+const BODY_FIELD = 7;
+
 const SCAN_FORMAT = [
   "%H", "%P", "%an", "%ae", "%aI", "%s",
-  `%(trailers:key=${ITEM_TRAILER_KEY},valueonly,unfold,separator=%x1f)`,
+  `%(trailers:key=${ITEM_TRAILER_KEY},valueonly,unfold,separator=%x1d)`,
+  "%B",
 ].join("%x1f");
+
+/** One `N-DX-Item: <value>` line at the start of a line. The value is read by {@link itemIdFromTrailer}. */
+const ITEM_TRAILER_LINE = new RegExp(`^${ITEM_TRAILER_KEY}:[ \\t]*(\\S.*)$`, "gm");
+/** A `Key: value` trailer line. Keys are the git-trailer shape: alphanumerics and hyphens. */
+const TRAILER_SHAPED = /^[A-Za-z0-9][A-Za-z0-9-]*:\s/;
+/** A folded trailer continuation — git's `unfold` joins these onto the line above. */
+const FOLDED_CONTINUATION = /^[ \t]+\S/;
+
+/**
+ * The trailing run of trailer-shaped paragraphs, walking back from the end of
+ * the message and stopping at the first paragraph that is not one. Returns ""
+ * when the message ends in prose.
+ *
+ * This is the region a split-off `N-DX-Item` is recovered from; see the
+ * decision in this module's header for why it is this rather than the whole
+ * message.
+ */
+export function trailingTrailerRegion(body: string): string {
+  const paragraphs = body.replace(/\s+$/, "").split(/\n[ \t]*\n/);
+  const kept: string[] = [];
+  // Stop at index 1: the first paragraph is the subject, and git never reads a
+  // trailer out of it. Without this the walk swallows a conventional-commit
+  // subject, which is trailer-shaped ("docs: …"), and a single-paragraph
+  // message would be read as a trailer block that git itself reports as empty.
+  for (let i = paragraphs.length - 1; i >= 1; i--) {
+    const lines = paragraphs[i].split("\n").filter((line) => line.trim() !== "");
+    if (lines.length === 0) continue;
+    const allTrailers = lines.every(
+      (line) => TRAILER_SHAPED.test(line) || FOLDED_CONTINUATION.test(line),
+    );
+    if (!allTrailers) break;
+    kept.unshift(paragraphs[i]);
+  }
+  return kept.join("\n");
+}
+
+/** Item ids named by `N-DX-Item` lines in the trailing trailer region of `body`. */
+function itemsInTrailingRegion(body: string): string[] {
+  const region = trailingTrailerRegion(body);
+  if (region === "") return [];
+  return [...region.matchAll(ITEM_TRAILER_LINE)]
+    .map((match) => itemIdFromTrailer(match[1]))
+    .filter((id): id is string => id !== undefined);
+}
 
 /** Scan every commit reachable from `tip` (all parents of merges) for `N-DX-Item` trailers. */
 export async function scanTrailerCommits(repoDir: string, tip: string): Promise<TrailerCommit[]> {
   // --no-show-signature: with `log.showSignature` set, git prints signature
   // checks for signed commits (GitHub signs its web merges) to stdout, which
-  // would land inside the previous record's trailer field and drop its items.
+  // would land inside the previous record's fields and drop its items.
   const stdout = await git(repoDir, ["log", "--no-show-signature", `--format=%x1e${SCAN_FORMAT}`, tip, "--"]);
   const commits: TrailerCommit[] = [];
   for (const record of stdout.split(RS)) {
     if (record.trim() === "") continue;
-    const [hash, parents, author, authorEmail, timestamp, subject, ...trailers] = record.replace(/\n+$/, "").split(FS);
-    const items = trailers.map(itemIdFromTrailer).filter((id): id is string => id !== undefined);
+    const fields = record.split(FS);
+    if (fields.length <= BODY_FIELD) continue;
+    const [hash, parents, author, authorEmail, timestamp, subject, trailers] = fields;
+    // The body is last and rejoined: a stray separator inside a commit
+    // message must not truncate the text the recovery scan reads.
+    const body = fields.slice(BODY_FIELD).join(FS);
+    const parentList = parents ? parents.split(" ").filter((p) => p !== "") : [];
+
+    const fromGit = trailers
+      .split(GS)
+      .map(itemIdFromTrailer)
+      .filter((id): id is string => id !== undefined);
+    // A merge quotes the messages it brings in, so only git's parser reads it.
+    const recovered = parentList.length > 1 ? [] : itemsInTrailingRegion(body);
+    const items = [...new Set([...fromGit, ...recovered])];
     if (items.length === 0) continue;
+
     commits.push({
-      hash,
-      parents: parents ? parents.split(" ") : [],
+      hash: hash.trim(),
+      parents: parentList,
       author,
       authorEmail,
       timestamp,
       subject,
-      items: [...new Set(items)],
+      items,
     });
   }
   return commits;
