@@ -1919,11 +1919,26 @@ async function handleMigrate(rest) {
     await runOrDie(tools.rex, ["migrate-apply", ...forwarded, dir]);
     exitWithCleanup(0);
   }
-  const forwarded = flags.filter((f) => f !== "--plan");
+  const forwarded = forwardableFlags(flags).filter((f) => f !== "--plan");
   if (!forwarded.some((f) => f === "--out" || f.startsWith("--out="))) {
     forwarded.push(`--out=${DEFAULT_MIGRATION_PLAN_OUT}`);
   }
-  await runOrDie(tools.rex, ["migrate-plan", ...forwarded, dir]);
+  // rex resolves --out and --summary against the cwd, while the summary
+  // resolves declared paths against the project dir, so hand it absolute ones:
+  // from another directory it would otherwise report the plan as not written.
+  const absolutePathFlag = (f) => {
+    const m = /^(--out|--summary)=(.+)$/.exec(f);
+    return m ? `${m[1]}=${resolve(m[2])}` : f;
+  };
+  // From `args`, not `forwarded`: --yes, stripped for the child, is what tells
+  // the banner to stay quiet.
+  const preflightArgs = [
+    ...args.map(absolutePathFlag),
+    ...(flags.some((f) => f.startsWith("--out=")) ? [] : [`--out=${resolve(DEFAULT_MIGRATION_PLAN_OUT)}`]),
+  ];
+  await withPreflight("migrate", preflightArgs, dir, () =>
+    runOrDie(tools.rex, ["migrate-plan", ...forwarded, dir]),
+  );
   exitWithCleanup(0);
 }
 

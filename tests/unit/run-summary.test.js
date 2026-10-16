@@ -286,3 +286,30 @@ describe("formatRunSummary", () => {
     expect(formatRunSummary(base).join("\n")).not.toMatch(/\x1b\[/);
   });
 });
+
+describe("untracked model usage", () => {
+  const base = { filesWritten: [], calls: 0, inputTokens: 0, outputTokens: 0, costUsd: null, next: "ndx status" };
+
+  it("says the calls are not counted instead of none or nothing spent", () => {
+    for (const calls of [0, 4]) {
+      const text = formatRunSummary({ ...base, calls, usageUntracked: true }).join("\n");
+      expect(text).toContain("does not count them");
+      expect(text).not.toContain("no model calls");
+      expect(text).not.toContain("nothing spent");
+    }
+  });
+
+  it("flags only a declaration that still has model phases", () => {
+    const tracked = { writes: [], llm: [{ phase: "p" }], next: "n" };
+    expect(collectRunSummary(dir, tracked, Date.now()).usageUntracked).toBe(false);
+    expect(collectRunSummary(dir, { ...tracked, usage: "untracked" }, Date.now()).usageUntracked).toBe(true);
+    expect(collectRunSummary(dir, { ...tracked, usage: "untracked", llm: [] }, Date.now()).usageUntracked).toBe(false);
+  });
+
+  it("lists a declared write at an absolute path", async () => {
+    const out = join(dir, "elsewhere.json");
+    await writeFile(out, "{}");
+    const effects = { writes: [{ path: out }], llm: [], next: "n" };
+    expect(collectRunSummary(dir, effects, Date.now() - 1000).filesWritten).toEqual([out]);
+  });
+});

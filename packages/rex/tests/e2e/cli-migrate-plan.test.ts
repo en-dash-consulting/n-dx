@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, readdir, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, readFile, readdir, writeFile, mkdir, symlink, realpath } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
@@ -156,6 +156,66 @@ describe("rex migrate-plan", () => {
     expect(await readFile(summaryPath, "utf-8")).toBe(firstSummary);
   });
 
+  describe("re-plan cut time", () => {
+    const OLD_CUT = "2020-01-01T00:00:00.000Z";
+    const plan = async (): Promise<{ header: { cutAt: string } }> => JSON.parse(await readFile(outPath, "utf-8"));
+
+    /** An analysis whose "task selection" zone lists `files`, each created on disk. */
+    async function analyse(files: string[]): Promise<void> {
+      await mkdir(join(dir, ".sourcevision"), { recursive: true });
+      for (const file of files) await writeFile(join(dir, file), "export {};\n");
+      await writeFile(
+        join(dir, ".sourcevision", "zones.json"),
+        JSON.stringify({ zones: [{ id: "task-selection", name: "Task selection", files }] }),
+      );
+    }
+
+    it("reuses the earlier cut time while the PRD and the analysis are unchanged", async () => {
+      await analyse(["selection.ts"]);
+      run(["migrate-plan", "--rules-only", `--cut-at=${OLD_CUT}`, `--out=${outPath}`, dir]);
+      const output = run(["migrate-plan", "--rules-only", `--out=${outPath}`, dir]);
+      expect((await plan()).header.cutAt).toBe(OLD_CUT);
+      expect(output).not.toContain("cut time was reset");
+    });
+
+    it("resets the cut time, and says so, when the earlier plan was made from a different PRD", async () => {
+      run(["migrate-plan", "--rules-only", `--cut-at=${OLD_CUT}`, `--out=${outPath}`, dir]);
+      writePRD(dir, {
+        schema: SCHEMA_VERSION,
+        title: "Another project",
+        items: [item(AREA_EPIC, "epic", "Something else")],
+      });
+
+      const output = run(["migrate-plan", "--rules-only", `--out=${outPath}`, dir]);
+
+      expect((await plan()).header.cutAt).not.toBe(OLD_CUT);
+      expect(output).toContain("cut time was reset");
+    });
+
+    it("resets the cut time when only the sourcevision analysis changed", async () => {
+      await analyse(["selection.ts"]);
+      run(["migrate-plan", "--rules-only", `--cut-at=${OLD_CUT}`, `--out=${outPath}`, dir]);
+      await analyse(["selection.ts", "ordering.ts"]);
+
+      const output = run(["migrate-plan", "--rules-only", `--out=${outPath}`, dir]);
+
+      expect((await plan()).header.cutAt).not.toBe(OLD_CUT);
+      expect(output).toContain("cut time was reset");
+    });
+
+    it("lets --cut-at override a changed source", async () => {
+      await analyse(["selection.ts"]);
+      run(["migrate-plan", "--rules-only", `--cut-at=${OLD_CUT}`, `--out=${outPath}`, dir]);
+      await analyse(["selection.ts", "ordering.ts"]);
+      const newCut = "2021-02-03T00:00:00.000Z";
+
+      const output = run(["migrate-plan", "--rules-only", `--cut-at=${newCut}`, `--out=${outPath}`, dir]);
+
+      expect((await plan()).header.cutAt).toBe(newCut);
+      expect(output).not.toContain("cut time was reset");
+    });
+  });
+
   it("refuses to write inside the rex directory", async () => {
     // The legacy backend path, which would be read *as* the PRD on a checkout
     // without the tree. The fixture writer leaves one there, so the assertion
@@ -165,6 +225,46 @@ describe("rex migrate-plan", () => {
     const output = run(["migrate-plan", "--rules-only", `--out=${legacy}`, dir], true);
     expect(output).toContain("Refusing to write");
     expect(await readFile(legacy, "utf-8")).toBe(before);
+  });
+
+  describe("state-directory guard compares real paths", () => {
+    const refused = (target: string, flag = "out"): void => {
+      const args = flag === "out"
+        ? [`--out=${target}`]
+        : [`--out=${outPath}`, `--summary=${target}`];
+      const output = run(["migrate-plan", "--rules-only", ...args, dir], true);
+      expect(output).toContain("Refusing to write");
+      expect(existsSync(target)).toBe(false);
+    };
+
+    it.runIf(process.platform === "darwin" || process.platform === "win32")(
+      "refuses a case variant of the rex directory",
+      async () => {
+        // Only meaningful where the volume folds case.
+        if (!existsSync(join(dir, ".REX"))) return;
+        refused(join(dir, ".REX", "plan.json"));
+      },
+    );
+
+    it.skipIf(process.platform === "win32")("refuses a path through a symlink to the rex directory", async () => {
+      await symlink(join(dir, ".rex"), join(dir, "alias"));
+      refused(join(dir, "alias", "plan.json"));
+    });
+
+    it("refuses the real-path alias of the rex directory (/tmp vs /private/tmp)", async () => {
+      refused(join(await realpath(dir), ".rex", "plan.json"));
+    });
+
+    it("refuses --out=.ndx/plan.json on a legacy layout and creates no .ndx/", async () => {
+      refused(join(dir, ".ndx", "plan.json"));
+      expect(existsSync(join(dir, ".ndx"))).toBe(false);
+    });
+
+    it("holds --summary to the same guard", async () => {
+      refused(join(dir, ".ndx", "plan.md"), "summary");
+      expect(existsSync(join(dir, ".ndx"))).toBe(false);
+      expect(existsSync(outPath)).toBe(false);
+    });
   });
 
   it("refuses a --summary inside the rex directory, before writing the plan", async () => {

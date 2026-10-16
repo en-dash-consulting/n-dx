@@ -236,6 +236,10 @@ describe("rex cli/commands import surface", () => {
     // reviewed plan, through the apply library; its only caller, and kept off
     // public.ts for the same reason as the plan machinery above.
     "../../migrations/v1-to-v2/apply.js",
+    // The Jev task-class name (`prd.migrate.judge`), so `llm.routes` can turn
+    // the migration's Jev review off. The module is already loaded statically
+    // through v1-to-v2/index.js and seams.js above, so this pulls in nothing new.
+    "../../migrations/v1-to-v2/jev-review-pass.js",
     // Loaded by migrate-plan through `await import()` so a --rules-only run
     // never pulls the model machinery in. The extractor above only matches
     // static `from "…"`, so these would otherwise sit outside the tracked

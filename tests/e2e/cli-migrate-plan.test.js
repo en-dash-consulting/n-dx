@@ -10,7 +10,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
 
-import { createTmpDir, removeTmpDir, run, runResult, setupHenchDir, setupRexDir, setupSourcevisionDir } from "./e2e-helpers.js";
+import { spawnSync } from "node:child_process";
+import { CLI_PATH, createTmpDir, removeTmpDir, run, runResult, setupHenchDir, setupRexDir, setupSourcevisionDir } from "./e2e-helpers.js";
 
 /** Every file under `dir` with its bytes, so "leaves it unchanged" is a comparison. */
 function snapshot(dir) {
@@ -91,5 +92,80 @@ describe("ndx migrate --plan", () => {
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain("The plan is incomplete");
     expect(snapshot(join(dir, ".rex"))).toEqual(before);
+  });
+
+  // NDX_PREFLIGHT=always stands in for a TTY (see cli-preflight-banner.test.js).
+  describe("preflight banner and run summary", () => {
+    const plan = () => join(outDir, "plan.json");
+
+    /** Keyless and stubbed, so no model call reaches a paid API. */
+    function keylessEnv(extra = {}) {
+      const bin = join(outDir, "bin");
+      mkdirSync(bin, { recursive: true });
+      const stub = join(bin, "claude");
+      writeFileSync(stub, "#!/bin/sh\necho 'stub claude: unavailable' >&2\nexit 1\n");
+      chmodSync(stub, 0o755);
+      const env = {
+        ...process.env,
+        PATH: `${bin}${delimiter}${process.env.PATH}`,
+        NO_COLOR: "1",
+        NDX_PREFLIGHT_PAUSE_MS: "0",
+        CI: "",
+        ...extra,
+      };
+      for (const key of ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "TYPESAFE_API_KEY"]) delete env[key];
+      return env;
+    }
+
+    function migratePlan(args, extra, cwd = dir) {
+      const res = spawnSync("node", [CLI_PATH, "migrate", "--plan", ...args, dir], {
+        encoding: "utf-8",
+        env: keylessEnv(extra),
+        cwd,
+      });
+      return { stderr: res.stderr ?? "", code: res.status };
+    }
+
+    it("prints the banner on a terminal, and not under --yes or without one", () => {
+      const shown = migratePlan(["--rules-only", "--out", plan()], { NDX_PREFLIGHT: "always" });
+      expect(shown.code).toBe(0);
+      expect(shown.stderr).toContain("ndx migrate");
+      expect(shown.stderr).toContain("Ctrl-C now to stop");
+
+      const yes = migratePlan(["--rules-only", "--yes", "--out", plan()], { NDX_PREFLIGHT: "always" });
+      expect(yes.code).toBe(0);
+      expect(yes.stderr).not.toContain("Ctrl-C now to stop");
+
+      const piped = migratePlan(["--rules-only", "--out", plan()]);
+      expect(piped.code).toBe(0);
+      expect(piped.stderr).not.toContain("Ctrl-C now to stop");
+    });
+
+    it("reports --rules-only as no model calls and lists the --out plan and its summary as written", () => {
+      const { stderr } = migratePlan(["--rules-only", "--out", plan()], { NDX_PREFLIGHT: "always" });
+      expect(stderr).toContain("no model calls");
+      const wrote = stderr.split("\n").find((l) => l.includes("wrote   "));
+      expect(wrote).toContain(plan());
+      expect(wrote).toContain(join(outDir, "plan.md"));
+    });
+
+    it("lists a relative --out as written when run from outside the project, as rex resolves it", () => {
+      const { stderr, code } = migratePlan(["--rules-only", "--out", "rel-plan.json"], { NDX_PREFLIGHT: "always" }, outDir);
+      expect(code).toBe(0);
+      expect(existsSync(join(outDir, "rel-plan.json"))).toBe(true);
+      const wrote = stderr.split("\n").find((l) => l.includes("wrote   "));
+      expect(wrote).toContain("rel-plan.json");
+      expect(wrote).toContain("rel-plan.md");
+    });
+
+    // The stub is a POSIX shell script; Windows would resolve a real `claude` past it.
+    it.skipIf(process.platform === "win32")("does not claim a run with model passes made no calls or spent nothing", () => {
+      const { stderr } = migratePlan(["--out", plan()], { NDX_PREFLIGHT: "always" });
+      const after = stderr.slice(stderr.lastIndexOf("wrote"));
+      expect(after).toContain("does not count them");
+      expect(after).not.toContain("no model calls");
+      expect(after).not.toContain("nothing spent");
+      expect(after).toContain(plan());
+    });
   });
 });
