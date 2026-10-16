@@ -44,4 +44,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Refresh the sourcevision analysis baseline the cut plan reads](./refresh-the-sourcevision-analysis.md) | pending |
 | [Review the drafted capability specs area by area](./review-the-drafted-capability-specs.md) | pending |
 | [Run the final migration on this repository](./run-the-final-migration-on-this.md) | pending |
-| [The repository tests that read this repo's v1 PRD tree pass once the tree is v2](./the-repository-tests-that-read-this.md) | pending |
+| [The repository tests that read this repo's v1 PRD tree pass once the tree is v2](./the-repository-tests-that-read-this.md) | completed |
