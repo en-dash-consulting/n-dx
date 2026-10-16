@@ -341,6 +341,12 @@ describe("n-dx ci", () => {
               await configure(dir, ["src/lib/exec.js"]);
               await chmod(join(dir, "scripts", "release.js"), 0o000);
             },
+            // Tracked, so git lists it; the stat, not the read, is what fails.
+            "source file under an unreadable directory": async (dir) => {
+              await gitProject(dir, { trackRelease: true });
+              await configure(dir, ["src/lib/exec.ts"]);
+              await chmod(join(dir, "scripts"), 0o000);
+            },
           }
         : {}),
       "malformed rule": async (dir) => {
@@ -364,6 +370,8 @@ describe("n-dx ci", () => {
         await writeFile(join(dir, "scripts", "release.js"), RELEASE_SCRIPT);
         await setup(dir);
         const result = runResult(["--format=json", "--quiet", dir]);
+        // Undo the unreadable cases' chmod so afterAll can remove the fixture.
+        await chmod(join(dir, "scripts"), 0o755);
         const report = parseReport(result, ["--format=json", "--quiet", name]);
         results.set(name, {
           dir,
@@ -426,6 +434,17 @@ describe("n-dx ci", () => {
       "fails, with a parseable report, on a selected source file it cannot read",
       () => {
         const { code, step } = results.get("unreadable source file");
+        expect(code).toBe(1);
+        expect(step.ok).toBe(false);
+        expect(step.violations).toHaveLength(1);
+        expect(step.violations[0]).toMatch(/^cannot read scripts\/release\.js: EACCES/);
+      },
+    );
+
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+      "fails, with a parseable report, on a tracked source file under a directory it cannot read",
+      () => {
+        const { code, step } = results.get("source file under an unreadable directory");
         expect(code).toBe(1);
         expect(step.ok).toBe(false);
         expect(step.violations).toHaveLength(1);

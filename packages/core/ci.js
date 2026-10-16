@@ -1216,11 +1216,13 @@ function scanRestrictedImports(dir, rules) {
     if (applicable.length === 0) continue;
 
     const full = join(dir, rel);
-    // A tracked file deleted from the work tree, or a submodule's gitlink.
-    if (!statSync(full, { throwIfNoEntry: false })?.isFile()) continue;
-    checked++;
     let content;
     try {
+      // A tracked file deleted from the work tree, or a submodule's gitlink.
+      // The stat is inside the try: a file under an unreadable directory
+      // throws EACCES here, not at the read.
+      if (!statSync(full, { throwIfNoEntry: false })?.isFile()) continue;
+      checked++;
       content = readFileSync(full, "utf-8");
     } catch (err) {
       unreadable.push({ file: rel, message: err.message });
