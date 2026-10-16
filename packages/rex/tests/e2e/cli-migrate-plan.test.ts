@@ -156,6 +156,66 @@ describe("rex migrate-plan", () => {
     expect(await readFile(summaryPath, "utf-8")).toBe(firstSummary);
   });
 
+  describe("re-plan cut time", () => {
+    const OLD_CUT = "2020-01-01T00:00:00.000Z";
+    const plan = async (): Promise<{ header: { cutAt: string } }> => JSON.parse(await readFile(outPath, "utf-8"));
+
+    /** An analysis whose "task selection" zone lists `files`, each created on disk. */
+    async function analyse(files: string[]): Promise<void> {
+      await mkdir(join(dir, ".sourcevision"), { recursive: true });
+      for (const file of files) await writeFile(join(dir, file), "export {};\n");
+      await writeFile(
+        join(dir, ".sourcevision", "zones.json"),
+        JSON.stringify({ zones: [{ id: "task-selection", name: "Task selection", files }] }),
+      );
+    }
+
+    it("reuses the earlier cut time while the PRD and the analysis are unchanged", async () => {
+      await analyse(["selection.ts"]);
+      run(["migrate-plan", "--rules-only", `--cut-at=${OLD_CUT}`, `--out=${outPath}`, dir]);
+      const output = run(["migrate-plan", "--rules-only", `--out=${outPath}`, dir]);
+      expect((await plan()).header.cutAt).toBe(OLD_CUT);
+      expect(output).not.toContain("cut time was reset");
+    });
+
+    it("resets the cut time, and says so, when the earlier plan was made from a different PRD", async () => {
+      run(["migrate-plan", "--rules-only", `--cut-at=${OLD_CUT}`, `--out=${outPath}`, dir]);
+      writePRD(dir, {
+        schema: SCHEMA_VERSION,
+        title: "Another project",
+        items: [item(AREA_EPIC, "epic", "Something else")],
+      });
+
+      const output = run(["migrate-plan", "--rules-only", `--out=${outPath}`, dir]);
+
+      expect((await plan()).header.cutAt).not.toBe(OLD_CUT);
+      expect(output).toContain("cut time was reset");
+    });
+
+    it("resets the cut time when only the sourcevision analysis changed", async () => {
+      await analyse(["selection.ts"]);
+      run(["migrate-plan", "--rules-only", `--cut-at=${OLD_CUT}`, `--out=${outPath}`, dir]);
+      await analyse(["selection.ts", "ordering.ts"]);
+
+      const output = run(["migrate-plan", "--rules-only", `--out=${outPath}`, dir]);
+
+      expect((await plan()).header.cutAt).not.toBe(OLD_CUT);
+      expect(output).toContain("cut time was reset");
+    });
+
+    it("lets --cut-at override a changed source", async () => {
+      await analyse(["selection.ts"]);
+      run(["migrate-plan", "--rules-only", `--cut-at=${OLD_CUT}`, `--out=${outPath}`, dir]);
+      await analyse(["selection.ts", "ordering.ts"]);
+      const newCut = "2021-02-03T00:00:00.000Z";
+
+      const output = run(["migrate-plan", "--rules-only", `--cut-at=${newCut}`, `--out=${outPath}`, dir]);
+
+      expect((await plan()).header.cutAt).toBe(newCut);
+      expect(output).not.toContain("cut time was reset");
+    });
+  });
+
   it("refuses to write inside the rex directory", async () => {
     // The legacy backend path, which would be read *as* the PRD on a checkout
     // without the tree. The fixture writer leaves one there, so the assertion

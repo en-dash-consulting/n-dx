@@ -16,7 +16,7 @@
 
 import type { PRDItem } from "../../schema/v1.js";
 import { contentHash, type MigrationSource, type PlanContext, type PlanStage, type SourceItem } from "../migration.js";
-import { defineMigration } from "../pipeline.js";
+import { defineMigration, sourceDigest } from "../pipeline.js";
 import { draftCapabilitySpecs, type CapabilitySpecDraft, type SpecDraftOptions } from "./capability-spec.js";
 import { buildPlanData, stampReview, type ItemPlanData, type PlanData, type PlanDataOptions } from "./migration-plan-data.js";
 import { classifyV1Tree, type ClassifyOptions, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
@@ -34,6 +34,9 @@ import {
 } from "./jev-review-pass.js";
 import { placementTextPass, type PlacementFields, type PlacementPassOptions } from "./placement-pass.js";
 import { specTextPass } from "./spec-pass.js";
+
+// Re-exported so the CLI reaches the digest and its hash through this module.
+export { contentHash, sourceDigest };
 
 export const V1_TREE_SOURCE_KIND = "rex-v1-tree";
 
@@ -94,6 +97,12 @@ export interface V1ToV2Summary {
     /** True when `gitSha` is neither HEAD nor an ancestor: the evidence is off this history. */
     offHistory?: boolean;
   };
+  /**
+   * Hash of the code evidence the plan read, empty evidence included. The
+   * source digest covers PRD items only, so a re-analysis changes this alone;
+   * a re-plan compares it before reusing the earlier cut time.
+   */
+  evidenceDigest?: string;
   /** Held items first, then entries Jev judged by ascending confidence: reviewers start with the weakest calls. */
   reviewQueue: ReviewQueueItem[];
   /** What the Jev review flagged and dropped; absent when Jev reviewed nothing. */
