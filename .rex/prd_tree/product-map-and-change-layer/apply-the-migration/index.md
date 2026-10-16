@@ -36,13 +36,14 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Agents in ndx work runs see "Run 'ndx migrate'" on every rex command and can run the migration unasked](./agents-in-ndx-work-runs-see-run-ndx.md) | completed |
 | [Apply an approved plan in one transaction, re-runnable against a newer tree](./apply-an-approved-plan-in-one.md) | completed |
 | [Apply on an already-v2 tree removes a leftover prd_tree/ only when it matches the plan](./apply-on-an-already-v2-tree-removes-a.md) | completed |
-| [Apply rewrites v1 blockedBy refs to and from capabilities onto their open changes](./apply-rewrites-v1-blockedby-refs-to.md) | in_progress |
+| [Apply rewrites v1 blockedBy refs to and from capabilities onto their open changes](./apply-rewrites-v1-blockedby-refs-to.md) | completed |
 | [Apply's id check is pinned by a test, and the dry run reports v2 rule errors by rule](./apply-s-id-check-is-pinned-by-a-test.md) | pending |
 | [Applying a migration plan does not refuse one whose model pass is marked incomplete](./applying-a-migration-plan-does-not.md) | completed |
 | [Chain layout and schema steps in ndx migrate; v1 PRDs warn now and are refused one release later](./chain-layout-and-schema-steps-in-ndx.md) | completed |
 | [Convert stray v1 files and warn on unreachable apply commits](./convert-stray-v1-files-and-warn-on.md) | pending |
 | [Dissolved containers keep their description, criteria and blockedBy](./dissolved-containers-keep-their.md) | pending |
 | [Docs say ndx init creates v1 projects; it now creates v2](./docs-say-ndx-init-creates-v1-projects.md) | completed |
+| [migrate --apply drops a blockedBy ref to an unbuilt capability as "met" when its pending work is held in the Inbox](./migrate-apply-drops-a-blockedby-ref-to.md) | pending |
 | [Migrated product nodes read met when their v1 item completed](./migrated-product-nodes-read-met-when.md) | completed |
 | [Migration plan, dry run and apply refuse when the v1 parser skipped an item file](./migration-plan-dry-run-and-apply.md) | pending |
 | [ndx commands that spawn rex several times print the v1 deprecation notice once per spawn](./ndx-commands-that-spawn-rex-several.md) | completed |
