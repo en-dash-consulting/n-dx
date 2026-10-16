@@ -335,6 +335,8 @@ function goPackagePaths(testFiles: string[]): string[] {
 // ---------------------------------------------------------------------------
 
 import { execShellCmd } from "../process/exec.js";
+// The environment every repository-owned command below runs with (#686).
+import { repoCommandEnv } from "../prd/llm-gateway.js";
 import { parseSelectedSuites, planRerun } from "./test-gate-template.js";
 
 // ---------------------------------------------------------------------------
@@ -389,7 +391,7 @@ export async function runPostTaskTests(
   const startMs = Date.now();
   const { stdout, stderr, exitCode, launched, error } = await execShellCmd(
     command,
-    { cwd: projectDir, timeout, maxBuffer: 2 * 1024 * 1024 },
+    { cwd: projectDir, timeout, maxBuffer: 2 * 1024 * 1024, env: repoCommandEnv(projectDir) },
   );
   const durationMs = Date.now() - startMs;
 
@@ -969,6 +971,7 @@ async function runGateCommand(command: string, projectDir: string, timeout: numb
   const execResult = await execShellCmd(command, {
     cwd: projectDir,
     timeout,
+    env: repoCommandEnv(projectDir),
     // A full-monorepo run writes megabytes, mostly stderr from passing tests.
     // Past this ceiling exec stops the suite and keeps only what came first —
     // everything but the failure summary at the end — so it is a guard against
@@ -1510,7 +1513,7 @@ export async function runDependencyAudit(
     return metrics;
   };
 
-  const execOptions = { cwd: projectDir, timeout, maxBuffer: 10 * 1024 * 1024 };
+  const execOptions = { cwd: projectDir, timeout, maxBuffer: 10 * 1024 * 1024, env: repoCommandEnv(projectDir) };
 
   // Step 1: Run pnpm audit
   const auditCommand = "pnpm audit --json";

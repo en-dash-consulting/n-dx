@@ -70,6 +70,7 @@
  * - `project-config.ts` — `.n-dx.json` override loading and merging
  * - `json.ts` — canonical JSON serialization
  * - `repo-trust.ts` — repository execution-config trust (baseline, digest, per-user trust store)
+ * - `repo-command-env.ts` — the sanitized environment for repository-owned commands
  * - `redact.ts` — credential redaction for run records, logs and live output
  * - `auth-token.ts` — per-user dashboard token file (`<ndx home>/auth.token`)
  * - `output.ts` — CLI output control (quiet mode)
@@ -729,3 +730,7 @@ export {
   resolveVendorCliEnv,
 } from "./child-env.js";
 export type { EnvPolicy, EnvPolicyConfig } from "./child-env.js";
+// The one environment every repository-owned command runs with (test gate,
+// post-task tests, audit, validation commands, rex verify).
+export { repoCommandEnv } from "./repo-command-env.js";
+export type { RepoCommandEnvOptions } from "./repo-command-env.js";
