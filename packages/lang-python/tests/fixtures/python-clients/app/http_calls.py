@@ -63,5 +63,5 @@ def not_clients(cache):
     # A bound client from another scope, an attribute receiver and a dict are not read.
     client.get("https://nowhere.example.com")
     cache.get("key")
-    self_session.get("https://nowhere.example.com")
+    cache.session.get("https://nowhere.example.com")
     requests.get()
