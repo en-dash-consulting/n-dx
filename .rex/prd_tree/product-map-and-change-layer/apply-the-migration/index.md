@@ -43,7 +43,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Convert stray v1 files and warn on unreachable apply commits](./convert-stray-v1-files-and-warn-on.md) | pending |
 | [Dissolved containers keep their description, criteria and blockedBy](./dissolved-containers-keep-their.md) | pending |
 | [Docs say ndx init creates v1 projects; it now creates v2](./docs-say-ndx-init-creates-v1-projects.md) | completed |
-| [migrate --apply drops a blockedBy ref to an unbuilt capability as "met" when its pending work is held in the Inbox](./migrate-apply-drops-a-blockedby-ref-to.md) | pending |
+| [migrate --apply drops a blockedBy ref to an unbuilt capability as "met" when its pending work is held in the Inbox](./migrate-apply-drops-a-blockedby-ref-to.md) | completed |
 | [Migrated product nodes read met when their v1 item completed](./migrated-product-nodes-read-met-when.md) | completed |
 | [Migration plan, dry run and apply refuse when the v1 parser skipped an item file](./migration-plan-dry-run-and-apply.md) | pending |
 | [ndx commands that spawn rex several times print the v1 deprecation notice once per spawn](./ndx-commands-that-spawn-rex-several.md) | completed |
@@ -58,7 +58,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [ndx self-heal, start and web silence the v1 notice for their children, and ndx migrate refuses inside an agent run](./ndx-self-heal-start-and-web-silence.md) | completed |
 | [Placement reads code evidence: commits and zones of a held change rank the capabilities realized in the same zones](./placement-reads-code-evidence-commits.md) | pending |
 | [Remove the prd.md and prd.json read fallbacks and the old migrate commands](./remove-the-prd-md-and-prd-json-read.md) | pending |
-| [rex health errors forever on a held change whose v1 item completed between plan and apply](./rex-health-errors-forever-on-a-held.md) | pending |
+| [rex health errors forever on a held change whose v1 item completed between plan and apply](./rex-health-errors-forever-on-a-held.md) | completed |
 | [rex health warns, not errors, on completed changes the migration held for placement](./rex-health-warns-not-errors-on.md) | completed |
 | [rex init --help says it writes prd.json; it writes product/index.md (v2) or prd_tree/](./rex-init-help-says-it-writes-prd-json.md) | completed |
 | [rex migrate-plan / migrate-apply and ndx migrate-layout still run inside an agent run](./rex-migrate-plan-migrate-apply-and-ndx.md) | pending |

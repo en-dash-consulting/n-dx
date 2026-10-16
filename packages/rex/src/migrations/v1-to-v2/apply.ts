@@ -30,7 +30,9 @@
  *   met is dropped. Every rewrite is in `blockers` and the cut change's body.
  * - **The cut.** The first change, "Product map and change layer", is applied
  *   at the plan's `cutAt` and adds every capability and constraint, so the
- *   product layer's history starts with the migration.
+ *   product layer's history starts with the migration. It lists the held v1
+ *   work that closed after `cutAt` (completed between plan and apply), which
+ *   the cut time alone would read as closed in v2.
  *
  * Every v1 id ends up as a node or a listed container: checked by count and
  * id ({@link everyV1Id}, through `fingerprintTree` and `isLossless`) before
@@ -59,7 +61,7 @@ import { amendsHash, freeSlug } from "../../core/apply-amendments.js";
 import { diffFingerprints, fingerprintTree, isLossless, type FingerprintDiff } from "../../core/slug-migration.js";
 import type { PRDItem } from "../../schema/v1.js";
 import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
-import { CUT_CHANGE_BODY_PREFIX, CUT_CHANGE_TITLE, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
+import { CUT_CHANGE_BODY_PREFIX, CUT_CHANGE_TITLE, CUT_HELD_AFTER_CUT_HEADING, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
 import { withLock, type LockOptions } from "../../store/file-lock.js";
 import { parseFolderTree } from "../../store/folder-tree-parser.js";
 import { discoverPRDFiles } from "../../store/prd-discovery.js";
@@ -259,10 +261,16 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
     }
   }
 
-  rewriteRequirementBlockers(tree, nodes, blockers);
+  // A held change has no target; for blockers only, it is open on the product node its v1 parent became.
+  const heldOn = new Map<string, string>();
+  for (const node of nodes.values()) {
+    const v1Parent = node.needsPlacement === true ? parentById.get(node.id) : undefined;
+    if (v1Parent !== undefined && PRODUCT_TYPES.has(nodes.get(v1Parent)?.type ?? "")) heldOn.set(node.id, v1Parent);
+  }
+  rewriteRequirementBlockers(tree, nodes, heldOn, blockers);
   stampMet(tree, nodes);
 
-  const cut = cutChange(tree, containers, blockers, plan);
+  const cut = cutChange(tree, containers, blockers, heldAfterCut(nodes, cutAt), plan);
   tree.changes.push(cut);
 
   return {
@@ -333,7 +341,10 @@ function setBlockedBy(node: RuleNode, refs: readonly string[]): void {
  *
  * - A work node's ref to a product node becomes refs to that node's open
  *   changes: those placed on it or on a product node beneath it, which is what
- *   an area has. With none open the dependency is met, and the ref is dropped.
+ *   an area has. A held change (`heldOn`) counts as on the product node its v1
+ *   parent became, so work held in the Inbox still orders what waited on it;
+ *   placement never reads this. With none open the dependency is met, and the
+ *   ref is dropped.
  * - A product node's own blockedBy moves onto each of its open changes,
  *   rewritten the same way, and the product node keeps none. With no open
  *   change to carry it, it is dropped.
@@ -341,7 +352,12 @@ function setBlockedBy(node: RuleNode, refs: readonly string[]): void {
  * No node is left blocked by itself, a change it sits inside or work it holds.
  * Each rewrite is recorded in `out`. Runs after placement, which sets `touches` and `amends`.
  */
-function rewriteRequirementBlockers(tree: V2Tree, nodes: ReadonlyMap<string, RuleNode>, out: BlockerRewrite[]): void {
+function rewriteRequirementBlockers(
+  tree: V2Tree,
+  nodes: ReadonlyMap<string, RuleNode>,
+  heldOn: ReadonlyMap<string, string>,
+  out: BlockerRewrite[],
+): void {
   const parentOf = new Map<string, RuleNode>();
   const index = (node: RuleNode): void => {
     for (const child of node.children ?? []) {
@@ -367,7 +383,8 @@ function rewriteRequirementBlockers(tree: V2Tree, nodes: ReadonlyMap<string, Rul
   const openOn = new Map<string, string[]>();
   for (const node of nodes.values()) {
     if (node.type !== "change" || !isOpenChange(node)) continue;
-    const on = new Set([...(node.touches ?? []), ...(node.amends ?? []).map((a) => a.target)].filter(isProduct));
+    const held = heldOn.get(node.id);
+    const on = new Set([...(node.touches ?? []), ...(node.amends ?? []).map((a) => a.target), ...(held !== undefined ? [held] : [])].filter(isProduct));
     for (const id of [...on].flatMap((t) => [...above(t)])) {
       if (isProduct(id) && !openOn.get(id)?.includes(node.id)) openOn.set(id, [...(openOn.get(id) ?? []), node.id]);
     }
@@ -558,8 +575,29 @@ export function cutContainerIds(tree: V2Tree): string[] {
   return ids;
 }
 
+/**
+ * Held changes that closed after the plan's `cutAt`: v1 work completed between
+ * plan and apply. The cut lists them, so `change-placed-at-close` reads them as
+ * migrated work rather than as changes closed in v2.
+ */
+function heldAfterCut(nodes: ReadonlyMap<string, RuleNode>, cutAt: string): RuleNode[] {
+  const cut = Date.parse(cutAt);
+  return [...nodes.values()].filter((node) => {
+    if (node.needsPlacement !== true || (node.status !== "completed" && node.appliedAt === undefined)) return false;
+    // As the rule reads it: an unparseable completedAt falls back to appliedAt.
+    const completedAt = Date.parse(node.completedAt ?? "");
+    return (Number.isNaN(completedAt) ? Date.parse(node.appliedAt ?? "") : completedAt) > cut;
+  });
+}
+
 /** The cut: an applied change that adds every capability and constraint, and names the containers that became no node. */
-function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], blockers: readonly BlockerRewrite[], plan: V1ToV2Plan): RuleNode {
+function cutChange(
+  tree: V2Tree,
+  containers: readonly DeliveryContainer[],
+  blockers: readonly BlockerRewrite[],
+  held: readonly RuleNode[],
+  plan: V1ToV2Plan,
+): RuleNode {
   const id = cutId(plan);
   const at = plan.header.cutAt;
   const amends: Amendment[] = [];
@@ -586,6 +624,10 @@ function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], block
   if (blockers.length > 0) {
     lines.push("", BLOCKERS_HEADING, "");
     for (const r of blockers) lines.push(`- ${describeBlockerRewrite(r)}`);
+  }
+  if (held.length > 0) {
+    lines.push("", CUT_HELD_AFTER_CUT_HEADING, "");
+    for (const node of held) lines.push(`- ${node.title} (${node.id})`);
   }
   if (containers.length > 0) {
     lines.push("", CONTAINERS_HEADING, "");

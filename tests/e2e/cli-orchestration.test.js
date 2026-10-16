@@ -221,12 +221,15 @@ describe("orchestration script integration", () => {
 
   describe("ndx log", () => {
     it("requires .rex directory", () => {
-      // handleLog checks process.cwd() (repo root, always initialized) rather
-      // than the target dir — same shape as handleMove. rex's own
-      // requireRexDir is what actually catches the missing .rex here.
+      // The orchestrator resolves the trailing [dir] and refuses before
+      // delegating, naming the directory that is missing .rex. It used to
+      // check process.cwd() — the repo root, always initialized — so the
+      // refusal came from rex's own requireRexDir one process later, and a
+      // run from outside any project failed against the wrong directory.
       const { stderr, code } = runResult(["log", "task_started", tmpDir]);
       expect(code).toBe(1);
-      expect(stderr).toMatch(/rex directory not found/i);
+      expect(stderr).toMatch(/NDX_CLI_NOT_INITIALIZED/);
+      expect(stderr).toContain(tmpDir);
     });
 
     it("forwards the event, --item and --detail and appends an entry", async () => {
