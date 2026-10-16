@@ -183,6 +183,25 @@ export function isOpenChange(node: RuleNode): boolean {
   return node.type === "change" && !isAppliedChange(node) && !ABANDONED_CHANGE_STATUSES.has(node.status ?? "pending");
 }
 
+/**
+ * Whether the product layer holds a live capability or constraint: the only
+ * nodes a change is placed on. A fresh v2 project has neither, so nothing on
+ * it can be placed.
+ */
+export function canPlaceChanges(index: TreeIndex): boolean {
+  return index.entries.some(({ node, root }) => root === "product" && (node.type === "capability" || node.type === "constraint"));
+}
+
+/**
+ * An Inbox change held for placement: `needsPlacement`, on a product layer it
+ * can be placed on ({@link canPlaceChanges}). A held change is not selected
+ * autonomously and does not close. With nowhere to place it, an Inbox change
+ * is worked and closes like any other, and stays in the Inbox until placed.
+ */
+export function awaitsPlacement(index: TreeIndex, node: RuleNode): boolean {
+  return node.type === "change" && node.needsPlacement === true && canPlaceChanges(index);
+}
+
 /** Statuses only reached once work on a change began. */
 const STARTED_CHANGE_STATUSES: ReadonlySet<ItemStatus> = new Set<ItemStatus>(["in_progress", "completed", "failing"]);
 
@@ -326,10 +345,12 @@ const changeHasTarget: Rule = ({ entries }) =>
  * carry `needsPlacement` (an applied change has realized its targets, so it
  * was placed). A placed change with no target is `change-has-target`'s, so
  * together they hold every completed change to a target unless it is a spike.
+ * On a product layer with nothing to place on ({@link canPlaceChanges}) an
+ * Inbox change closes unplaced, and this reports it once there is.
  */
-const changePlacedAtClose: Rule = ({ entries }) =>
-  entries.flatMap(({ node }) => {
-    if (node.type !== "change" || !node.needsPlacement) return [];
+const changePlacedAtClose: Rule = (index) =>
+  index.entries.flatMap(({ node }) => {
+    if (!awaitsPlacement(index, node)) return [];
     if (node.status !== "completed" && !isAppliedChange(node)) return [];
     const state = node.status === "completed" ? "completed" : "applied";
     const untargeted = node.spike || hasTarget(node) ? "" : "; it must also amend or touch a product node, or be a spike";

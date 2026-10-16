@@ -461,8 +461,8 @@ describe("isolation", () => {
     // `rex tree-diff`, which loads either layout (core/tree-source.ts) and
     // diffs the product layer (core/map-diff.ts), and the layout-aware store
     // resolution: the v1 store's refusal of a v2 tree (store/file-adapter.ts),
-    // `rex init`, which never scaffolds prd_tree/ beside product/
-    // (cli/commands/init.ts), and the CLI error hints, which never send a
+    // `rex init`, which writes an empty v2 tree for a new project and never
+    // scaffolds prd_tree/ beside product/ (cli/commands/init.ts), and the CLI error hints, which never send a
     // project with a PRD in either layout to `n-dx init` (cli/errors.ts), and
     // the MCP tools that follow the change-layer types on a v2 tree: edit_item,
     // move_item, merge_items and claim_task, with the type-based parent rule

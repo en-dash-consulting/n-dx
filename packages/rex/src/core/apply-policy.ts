@@ -85,6 +85,9 @@ export function applyOnTrigger(tree: V2Tree, changeRef: string, trigger: ApplyTr
   if (trigger !== "steward" && change?.type === "change" && change.status !== "completed") {
     return { applied: false, reason: `change ${change.displayId ?? change.id} is ${change.status ?? "pending"}, not completed` };
   }
+  if (trigger !== "steward" && change && awaitsTarget(change)) {
+    return { applied: false, reason: `change ${change.displayId ?? change.id} is in the Inbox with no target; it applies once placed` };
+  }
   return { applied: true, result: applyAmendments(tree, changeRef, applyOptions) };
 }
 
@@ -94,12 +97,21 @@ const TRIGGER_LABEL: Readonly<Record<ApplyTrigger, string>> = {
   release: "stamping a release",
 };
 
-/** Completed changes not yet applied, depth first: what a steward reviews, or a release stamp applies. */
+/**
+ * An Inbox change with nothing to apply: unplaced, and neither amends nor
+ * touches a node, nor is a spike. It closes unplaced only on a product layer
+ * with nowhere to place it (`awaitsPlacement`), and applies once placed.
+ */
+function awaitsTarget(change: RuleNode): boolean {
+  return change.type === "change" && change.needsPlacement === true && !change.spike && !change.amends?.length && !change.touches?.length;
+}
+
+/** Completed changes not yet applied, depth first: what a steward reviews, or a release stamp applies. An Inbox change with no target waits for placement first. */
 export function changesAwaitingApply(tree: V2Tree): RuleNode[] {
   const found: RuleNode[] = [];
   const visit = (node: RuleNode): void => {
     if (node.status === "deleted") return;
-    if (node.type === "change" && node.status === "completed" && isOpenChange(node)) found.push(node);
+    if (node.type === "change" && node.status === "completed" && isOpenChange(node) && !awaitsTarget(node)) found.push(node);
     for (const child of node.children ?? []) visit(child);
   };
   for (const node of tree.changes) visit(node);

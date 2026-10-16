@@ -240,6 +240,8 @@ describe("hench → rex gateway contract", () => {
     "isAppliedChange",
     "indexTree",
     "enclosingChangeIds",
+    // the Inbox hold `--task` refuses on
+    "awaitsPlacement",
     // v2 reader — which untracked intent files a completion's state.yaml holds rows for
     "loadPrdModel",
     "openClaimsStore",
@@ -819,7 +821,7 @@ describe("gateway export auto-detection", () => {
         "collectCompletedIds", "explainSelection", "matchesAssignee", "traversalBlock",
         "prdLayout", "isChangeLayerStore", "findNextWorkTask", "findActionableWork", "resolveWorkById",
         "openChangeTasks", "buildChangeBrief", "completeV2Work",
-        "isAppliedChange", "indexTree", "enclosingChangeIds", "loadPrdModel",
+        "isAppliedChange", "indexTree", "enclosingChangeIds", "awaitsPlacement", "loadPrdModel",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
         "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",
