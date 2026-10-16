@@ -43,6 +43,14 @@ describe("rex next on a v2 tree", () => {
     expect(output()).toContain(TASK);
   });
 
+  it("prints a task-less change as [change], never [epic]", async () => {
+    await rm(join(tmp, ".rex", "changes", "add-apple-pay", "wire-the-button.md"));
+    await cmdNext(tmp, {});
+    expect(output()).toContain("[change]");
+    expect(output()).toContain(CHANGE);
+    expect(output()).not.toContain("[epic]");
+  });
+
   it("--format=json keeps the v1 fields and adds changeId", async () => {
     await cmdNext(tmp, { format: "json" });
     const body = JSON.parse(output());
