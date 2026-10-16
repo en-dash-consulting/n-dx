@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import nodePath, { join } from "node:path";
 import { computeProductStatus } from "../../../../src/core/product-status.js";
 import { findActionableWork } from "../../../../src/core/change-selection.js";
 import { checkV2TreeHealth } from "../../../../src/core/health.js";
@@ -124,6 +124,11 @@ function walk(nodes: readonly RuleNode[], out: RuleNode[] = []): RuleNode[] {
 const all = (tree: V2Tree): RuleNode[] => walk([...tree.product, ...tree.changes]);
 const byId = (tree: V2Tree, id: string): RuleNode | undefined => all(tree).find((n) => n.id === id);
 
+/** A snapshot key: `p` relative to `dir`, forward-slashed and rooted ("/prd_tree/a.md"), whatever the separator. */
+function snapshotKey(dir: string, p: string, flavour: Pick<typeof nodePath, "relative" | "sep"> = nodePath): string {
+  return `/${flavour.relative(dir, p).split(flavour.sep).join("/")}`;
+}
+
 /** Every file under a directory with its bytes. */
 function snapshot(dir: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -131,7 +136,7 @@ function snapshot(dir: string): Record<string, string> {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const p = join(d, e.name);
       if (e.isDirectory()) visit(p);
-      else out[p.slice(dir.length)] = readFileSync(p, "utf8");
+      else out[snapshotKey(dir, p)] = readFileSync(p, "utf8");
     }
   };
   visit(dir);
@@ -141,6 +146,19 @@ function snapshot(dir: string): Record<string, string> {
 async function planOf(items: PRDItem[]): Promise<V1ToV2Plan> {
   return (await v1ToV2.plan(v1TreeSource(items), { cutAt: CUT_AT, options: { testFiles: [] } })) as V1ToV2Plan;
 }
+
+describe("snapshotKey", () => {
+  it("forward-slashes and roots a key under the Windows separator, so the prd_tree/ filters match", () => {
+    const key = snapshotKey("C:\\tmp\\.rex", "C:\\tmp\\.rex\\prd_tree\\e1\\index.md", nodePath.win32);
+    expect(key).toBe("/prd_tree/e1/index.md");
+    expect(key.startsWith("/prd_tree")).toBe(true);
+    expect(snapshotKey("C:\\tmp\\.rex", "C:\\tmp\\.rex\\tree-meta.json", nodePath.win32)).toBe("/tree-meta.json");
+  });
+
+  it("gives the same key under the POSIX separator", () => {
+    expect(snapshotKey("/tmp/.rex", "/tmp/.rex/prd_tree/e1/index.md", nodePath.posix)).toBe("/prd_tree/e1/index.md");
+  });
+});
 
 describe("buildV2Tree", () => {
   it("keeps every v1 id, as a node or a listed delivery container", async () => {
