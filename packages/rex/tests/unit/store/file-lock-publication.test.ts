@@ -159,9 +159,25 @@ describe("file-lock publication", () => {
     publication.unsupportedLinkCode = "EOPNOTSUPP";
     await mkdir(lockPath);
 
-    await expect(acquireLock(lockPath, {acquireTimeoutMs: 80, retryDelayMs: 10}))
+    // The timeout is a hang guardrail with a deliberate margin, not a budget.
+    // The attempt count below is a function of how many retries fit inside it,
+    // so a tight timeout makes the verdict depend on machine load: at the
+    // previous 80ms this failed under a loaded `pnpm validate` with "expected 1
+    // to be greater than 1", one attempt having eaten the whole window.
+    // Measured here at 1000ms/10ms: 59 attempts, so ~17ms each. Seeing fewer
+    // than two now needs a single attempt to take half a second — a 30x margin
+    // rather than the 4x the old budget allowed.
+    await expect(acquireLock(lockPath, {acquireTimeoutMs: 1000, retryDelayMs: 10}))
       .rejects.toThrow(/Could not acquire PRD lock/);
 
+    // The behavioural half, and the half that owes nothing to a clock: a caller
+    // that had classified the incomplete publication as stale would have
+    // cleared it and taken the lock. It is still there, and still incomplete.
+    expect((await stat(lockPath)).isDirectory()).toBe(true);
+    expect(await readdir(lockPath)).toEqual([]);
+
+    // And it kept trying rather than giving up after one attempt, which is what
+    // "waits" means here and the only part a regression could silently remove.
     expect(publication.links.length).toBeGreaterThan(1);
   });
 
