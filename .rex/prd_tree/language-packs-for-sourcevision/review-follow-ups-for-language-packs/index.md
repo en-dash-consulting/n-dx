@@ -18,7 +18,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [An imported router or app name rebound locally to a non-router is still followed through its import](./an-imported-router-or-app-name-rebound.md) | in_progress |
+| [A rebinding of an imported router name under a module-level if or try is not seen, so the import is still followed](./a-rebinding-of-an-imported-router-name.md) | pending |
+| [A router constructed under the imported name inside a function, or before the import, wins over the import in WebProject.follow](./a-router-constructed-under-the.md) | pending |
+| [An imported router or app name rebound locally to a non-router is still followed through its import](./an-imported-router-or-app-name-rebound.md) | completed |
 | [An imports-only re-run keeps Python in analysedLanguages after the Python pack is gone](./an-imports-only-re-run-keeps-python-in.md) | completed |
 | [Consolidate the duplicate go.mod parser (rex parseGoMod and sourcevision go-build)](./consolidate-the-duplicate-go-mod.md) | pending |
 | [DRF router.register calls on a router imported from another file are not counted in the Django notice](./drf-router-register-calls-on-a-router.md) | completed |
