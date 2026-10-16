@@ -41,7 +41,9 @@
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { TYPESAFE_API_KEY_ENV, askJev, exec, resolveLayout, relativeToRoot } from "@n-dx/llm-client";
+import { TYPESAFE_API_KEY_ENV, askJev, exec, resolveLayout, relativeToRoot, routesToTier } from "@n-dx/llm-client";
+import type { LLMConfig } from "../../store/project-config.js";
+import { MIGRATION_JUDGE_TASK_CLASS } from "../../migrations/v1-to-v2/jev-review-pass.js";
 import { prdLockPath, resolveRexPaths, resolveStore, withLock } from "../../store/index.js";
 import { hasV2Tree } from "../../store/prd-bundle-v2.js";
 import { loadPlacementSettings } from "../../core/placement-policy.js";
@@ -122,6 +124,16 @@ function resolveCutAt(
 }
 
 /**
+ * Whether the plan asks Jev to review it (with a key; see `planSeams`).
+ *
+ * Off under `--no-jev-review`, and when `llm.routes` sends the judge class to a
+ * tier (exact or glob) — the project-level opt-out every judge class honours.
+ */
+export function wantsJevReview(flags: Record<string, string>, llmConfig: LLMConfig): boolean {
+  return flags["no-jev-review"] !== "true" && !routesToTier(MIGRATION_JUDGE_TASK_CLASS, llmConfig);
+}
+
+/**
  * The model seams, unless `--rules-only`.
  *
  * `planSeams` requires the text tier's placement and spec models to be the
@@ -134,7 +146,8 @@ async function buildSeams(dir: string, rexDir: string, flags: Record<string, str
 
   const { setLLMConfig, setClaudeConfig, setProjectDir } = await import("../../analyze/reason.js");
   const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
-  setLLMConfig(await loadLLMConfig(rexDir));
+  const llmConfig = await loadLLMConfig(rexDir);
+  setLLMConfig(llmConfig);
   setClaudeConfig(await loadClaudeConfig(rexDir));
   setProjectDir(dir);
 
@@ -152,7 +165,7 @@ async function buildSeams(dir: string, rexDir: string, flags: Record<string, str
       spec: createTextSpecModel(model),
       jev: { model: JEV_PLAN_MODEL, judge: askJev },
       jevAvailable: Boolean(process.env[TYPESAFE_API_KEY_ENV]),
-      jevReview: flags["no-jev-review"] !== "true",
+      jevReview: wantsJevReview(flags, llmConfig),
       warn,
     });
   } catch (err) {

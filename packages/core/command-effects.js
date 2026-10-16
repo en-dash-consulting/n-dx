@@ -44,6 +44,12 @@
  * @property {boolean} [conditional] - Only written under the condition named in `when`.
  * @property {string} [when] - The condition, phrased to follow "only": "with --accept",
  *   "without --dry-run", "on import", "when autoCommit is on".
+ * @property {string} [followsFlag] - A value flag that names this path (`--out`);
+ *   {@link resolveCommandEffects} replaces `path` with the flag's value, or
+ *   {@link WriteEffect.defaultPath} when it is absent.
+ * @property {string} [defaultPath] - The path when `followsFlag` is not passed.
+ * @property {string} [derivedFrom] - A second flag whose value, with `.json`
+ *   swapped for `.md`, is the default when `followsFlag` is not passed.
  */
 
 /**
@@ -72,6 +78,9 @@
  *   *this* command. Per command because the CLIs disagree: sourcevision honours
  *   `--fast` and drops `--no-llm`, while `ndx plan` honours `--no-llm` and rex
  *   ignores `--fast`.
+ * @property {"untracked"} [usage] - Set when the command's model calls are
+ *   recorded nowhere the run summary reads, so it must say they are not counted
+ *   rather than report none.
  * @property {string} [delegates] - For a passthrough, the tool whose subcommand
  *   decides the real effects.
  * @property {string} duration - Rough wall-clock, for expectation-setting only.
@@ -233,8 +242,8 @@ export const COMMAND_EFFECTS = {
     writes: [
       { path: ".ndx/", what: "the moved tool directories and config, committed unless --no-commit (as migrate-layout)", conditional: true, when: "without --plan or --apply, on a legacy layout and without --dry-run" },
       { path: "{rex}/prd_tree/", what: "the folder tree converted from prd.md / prd.json", conditional: true, when: "without --plan or --apply, on a flat-file PRD and without --dry-run" },
-      { path: "--out (default ./migration-plan.json)", what: "the plan, keyed by v1 item id", conditional: true, when: "with --plan, or without --plan or --apply on a v1 tree" },
-      { path: "--summary (default: --out with .md)", what: "the Markdown summary for review", conditional: true, when: "with --plan, or without --plan or --apply on a v1 tree" },
+      { path: "--out (default ./migration-plan.json)", followsFlag: "--out", defaultPath: "./migration-plan.json", what: "the plan, keyed by v1 item id", conditional: true, when: "with --plan, or without --plan or --apply on a v1 tree" },
+      { path: "--summary (default: --out with .md)", followsFlag: "--summary", defaultPath: "./migration-plan.md", derivedFrom: "--out", what: "the Markdown summary for review", conditional: true, when: "with --plan, or without --plan or --apply on a v1 tree" },
       { path: "{rex}/", what: "the v2 product and change layers, replacing prd_tree/ and tree-meta.json", conditional: true, when: "with --apply, or without --plan or --apply on a v1 tree, and without --dry-run" },
     ],
     llm: [
@@ -244,6 +253,7 @@ export const COMMAND_EFFECTS = {
     ],
     network: [{ ...LLM_PROVIDER, when: "without --rules-only" }],
     noLlmFlags: ["--rules-only"],
+    usage: "untracked",
     duration: "seconds with --rules-only; up to an hour over a large PRD with the model passes",
     next: "ndx status",
   },
@@ -774,11 +784,34 @@ export function getCommandEffects(command) {
  * @returns {CommandEffects|null}
  */
 export function resolveCommandEffects(command, flags = []) {
-  const base = getCommandEffects(command);
-  if (!base) return null;
+  const declared = getCommandEffects(command);
+  if (!declared) return null;
+  const base = declared.writes.some((w) => w.followsFlag)
+    ? { ...declared, writes: declared.writes.map((w) => followFlag(w, flags)) }
+    : declared;
   const silencers = base.noLlmFlags ?? [];
   if (!flags.some((f) => silencers.includes(f))) return base;
   return { ...base, llm: [], network: base.network.filter((n) => n.to !== "llm-provider") };
+}
+
+/** The value of `--name=value` in `flags`, or undefined (a bare `--name` has none). */
+function flagValue(flags, name) {
+  const hit = flags.find((f) => f.startsWith(`${name}=`));
+  return hit === undefined ? undefined : hit.slice(name.length + 1);
+}
+
+/** `plan.json` → `plan.md`; anything else gets `.md` appended (rex's `summaryPathFor`). */
+function markdownSibling(path) {
+  return path.endsWith(".json") ? `${path.slice(0, -".json".length)}.md` : `${path}.md`;
+}
+
+/** A write that names itself by a flag, resolved for this invocation. */
+function followFlag(write, flags) {
+  if (!write.followsFlag) return write;
+  const given = flagValue(flags, write.followsFlag);
+  const from = write.derivedFrom ? flagValue(flags, write.derivedFrom) : undefined;
+  const path = given ?? (from !== undefined ? markdownSibling(from) : write.defaultPath);
+  return { ...write, path };
 }
 
 /**

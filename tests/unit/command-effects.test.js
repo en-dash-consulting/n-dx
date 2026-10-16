@@ -262,3 +262,21 @@ describe("formatPreflightBanner", () => {
     expect(text).toContain("<b>ndx analyze</b>");
   });
 });
+
+describe("migrate effects follow --out", () => {
+  const paths = (flags) => resolveCommandEffects("migrate", flags).writes.map((w) => w.path);
+
+  it("names the default plan and summary without flags", () => {
+    expect(paths([])).toEqual(expect.arrayContaining(["./migration-plan.json", "./migration-plan.md"]));
+  });
+
+  it("names --out and the .md beside it, or --summary when given", () => {
+    expect(paths(["--out=/tmp/p.json"])).toEqual(expect.arrayContaining(["/tmp/p.json", "/tmp/p.md"]));
+    expect(paths(["--out=/tmp/p", "--summary=/tmp/s.md"])).toEqual(expect.arrayContaining(["/tmp/p", "/tmp/s.md"]));
+  });
+
+  it("declares model usage untracked, and --rules-only drops the model phases", () => {
+    expect(resolveCommandEffects("migrate", []).usage).toBe("untracked");
+    expect(resolveCommandEffects("migrate", ["--rules-only"]).llm).toEqual([]);
+  });
+});

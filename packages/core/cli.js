@@ -1903,11 +1903,15 @@ async function handleMigrate(rest) {
     await runOrDie(tools.rex, ["migrate-apply", ...forwarded, dir]);
     exitWithCleanup(0);
   }
-  const forwarded = flags.filter((f) => f !== "--plan");
+  const forwarded = forwardableFlags(flags).filter((f) => f !== "--plan");
   if (!forwarded.some((f) => f === "--out" || f.startsWith("--out="))) {
     forwarded.push(`--out=${DEFAULT_MIGRATION_PLAN_OUT}`);
   }
-  await runOrDie(tools.rex, ["migrate-plan", ...forwarded, dir]);
+  // `args` (value flags joined as --out=x), not `rest`, so the banner and the
+  // summary see the same --out the child gets.
+  await withPreflight("migrate", args, dir, () =>
+    runOrDie(tools.rex, ["migrate-plan", ...forwarded, dir]),
+  );
   exitWithCleanup(0);
 }
 
