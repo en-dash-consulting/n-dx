@@ -38,7 +38,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [docs/guide/skills.md skill table descriptions can drift from manifest.json with no test to catch it](./docs-guide-skills-md-skill-table.md) | pending |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
 | [get_capabilities reports schemaVersion rex/v1 on a v2 tree](./get-capabilities-reports-schemaversion.md) | completed |
-| [get_product on a large v2 tree exceeds what an MCP client accepts](./get-product-on-a-large-v2-tree-exceeds.md) | pending |
+| [get_product on a large v2 tree exceeds what an MCP client accepts](./get-product-on-a-large-v2-tree-exceeds.md) | completed |
 | [Install the sv analyze stop handlers before the progress file says running](./install-the-sv-analyze-stop-handlers.md) | completed |
 | [MCP writes on a v2 tree do not stamp lastModified / lastModifiedBy](./mcp-writes-on-a-v2-tree-do-not-stamp.md) | completed |
 | [`ndx ci` crashes with a stack trace, and no report, when a scanned source file cannot be read](./ndx-ci-crashes-with-a-stack-trace-and.md) | pending |
