@@ -85,6 +85,8 @@ export const argument = (call: WebCall, position: number | undefined, keyword: s
 export interface Binding {
   readonly module: string;
   readonly name?: string;
+  /** Where the import binds it. */
+  readonly at: SourcePosition;
 }
 
 /** A name bound by an assignment; `augmented` for `+=`. */
@@ -113,6 +115,8 @@ export interface WebFile {
   readonly assignments: readonly WebAssignment[];
   /** Imported names by local name; a later import of a name replaces an earlier one. */
   readonly bindings: ReadonlyMap<string, Binding>;
+  /** Where each name is last bound at module level by an assignment, `def` or `class`. */
+  readonly moduleBound: ReadonlyMap<string, SourcePosition>;
   readonly decorated: readonly Decorated[];
 }
 
@@ -179,6 +183,7 @@ export function readWebFile(file: PackSourceFile, prefix: string): WebFile {
     sequences,
     assignments,
     bindings: readBindings(file, mine("aliased"), mine("alias")),
+    moduleBound: readModuleBound(file),
     decorated: readDecorated(file),
   };
 }
@@ -201,7 +206,8 @@ function readBindings(file: PackSourceFile, aliased: readonly Capture[], aliases
     const spec = dotted(module.text);
     const alias = aliasOf(module);
     // `import a.b` binds `a`; `import a.b as c` binds `c` to `a.b`.
-    entries.push(alias ? [module.start, alias, { module: spec }] : [module.start, spec.split(".")[0]!, { module: spec.split(".")[0]! }]);
+    const at = module.start;
+    entries.push(alias ? [at, alias, { module: spec, at }] : [at, spec.split(".")[0]!, { module: spec.split(".")[0]!, at }]);
   }
   const names = of("import.name");
   const statementOf = innermostEach(statements, names);
@@ -211,10 +217,39 @@ function readBindings(file: PackSourceFile, aliased: readonly Capture[], aliases
     const from = statement && fromOf.get(statement);
     if (!from) continue;
     const text = dotted(name.text);
-    entries.push([name.start, aliasOf(name) ?? text, { module: dotted(from.text), name: text }]);
+    entries.push([name.start, aliasOf(name) ?? text, { module: dotted(from.text), name: text, at: name.start }]);
   }
-  entries.sort(([a], [b]) => a.line - b.line || a.column - b.column);
+  entries.sort(([a], [b]) => comparePositions(a, b));
   return new Map(entries.map(([, local, binding]) => [local, binding]));
+}
+
+const comparePositions = (a: SourcePosition, b: SourcePosition): number => a.line - b.line || a.column - b.column;
+
+/**
+ * Names bound at module level other than by import: an assignment the
+ * `variables` query captured (an annotation alone binds nothing), and a
+ * `def` or `class` inside no other definition. A later one replaces an earlier one.
+ */
+function readModuleBound(file: PackSourceFile): Map<string, SourcePosition> {
+  const entries: Array<[string, SourcePosition]> = [];
+  const variables = file.captures.variables ?? [];
+  const statements = named(variables, "variable.declaration");
+  const variableNames = byOwner(statements, named(variables, "variable.name"));
+  for (const statement of statements) {
+    const name = variableNames.get(statement)?.[0];
+    if (name && /^\s*(?::[^=]*)?=/.test(statement.text.slice(name.text.length))) entries.push([name.text, name.start]);
+  }
+  const definitions = file.captures.definitions ?? [];
+  const of = (name: string): Capture[] => named(definitions, name);
+  const declarations = [...of("class.declaration"), ...of("function.declaration")];
+  const definitionNames = byOwner(declarations, [...of("class.name"), ...of("function.name")]);
+  const enclosing = innermostEach(declarations, declarations, true);
+  declarations.forEach((declaration, i) => {
+    const name = definitionNames.get(declaration)?.[0];
+    if (name && enclosing[i] === undefined) entries.push([name.text, name.start]);
+  });
+  entries.sort(([, a], [, b]) => comparePositions(a, b));
+  return new Map(entries);
 }
 
 /** Each decorator on a function, with the function's name. */
@@ -476,8 +511,12 @@ export class WebProject {
 
   private follow(file: string, name: string, defines: (file: string, name: string) => boolean, depth: number): Defined | undefined {
     if (defines(file, name)) return { file, name };
-    const binding = this.file(file)?.bindings.get(name);
+    const web = this.file(file);
+    const binding = web?.bindings.get(name);
     if (!binding?.name || depth >= MAX_REEXPORTS) return undefined;
+    // Python's last module-level binding wins: a name bound again after its import is not the imported one.
+    const bound = web!.moduleBound.get(name);
+    if (bound !== undefined && comparePositions(binding.at, bound) < 0) return undefined;
     // `from pkg import name` where `name` is a submodule names a module, not a definition.
     if (this.module(file, submodule(binding.module, binding.name)) !== undefined) return undefined;
     const next = this.module(file, binding.module);
