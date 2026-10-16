@@ -20,6 +20,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A change's touches and amends name a capability or constraint](./a-change-s-touches-and-amends-name-a.md) | completed |
+| [A re-run of migrate --apply refuses a genuine leftover prd_tree/ that the plan cannot vouch for](./a-re-run-of-migrate-apply-refuses-a.md) | pending |
 | [An open fix: true change that adds a capability marks the new capability defective while its kind is feature](./an-open-fix-true-change-that-adds-a.md) | completed |
 | [Apply refuses removing one member of a pre-existing dependsOn knot that stays cyclic](./apply-refuses-removing-one-member-of-a.md) | pending |
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | completed |
@@ -43,6 +44,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Placing an Inbox change strands non-tree files in changes/inbox/<slug>/ and leaves a skipped-folder warning](./placing-an-inbox-change-strands-non.md) | pending |
 | [Record review decisions as calibration records on the run record](./record-review-decisions-as-calibration.md) | pending |
 | [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | deferred |
+| [rex migrate-slugs on a v2 tree tells you to run rex migrate-to-folder-tree, a v1 command](./rex-migrate-slugs-on-a-v2-tree-tells.md) | pending |
 | [rex migrate-to-folder-tree drops the PRD title: it never writes tree-meta.json, so the tree reads back as "PRD"](./rex-migrate-to-folder-tree-drops-the.md) | pending |
 | [rex release stamp applies a container change before the changes nested in it](./rex-release-stamp-applies-a-container.md) | pending |
 | [Stop the timed-out test gate test racing its fake gate startup](./stop-the-timed-out-test-gate-test.md) | completed |

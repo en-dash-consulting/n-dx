@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   checkV2Rules,
+  CUT_CHANGE_BODY_PREFIX,
+  CUT_CHANGE_TITLE,
+  CUT_HELD_AFTER_CUT_HEADING,
   indexTree,
   isAppliedChange,
   isOpenChange,
@@ -125,6 +128,59 @@ describe("change-placed-at-close", () => {
     expect(check("change-placed-at-close", { changes })).toEqual([]);
     expect(check("change-placed-at-close", { product: [node("area")], changes })).toEqual([]);
     expect(ids(check("change-placed-at-close", { product: [node("constraint", { statement: "s" })], changes }))).toEqual([completed.id, applied.id]);
+  });
+
+  describe("on a migrated tree (S2-Q2)", () => {
+    const CUT = "2026-10-10T00:00:00.000Z";
+    const cut = () =>
+      node("change", {
+        title: CUT_CHANGE_TITLE,
+        body: `${CUT_CHANGE_BODY_PREFIX}, by plan 0123456789ab cut at ${CUT}.`,
+        status: "completed",
+        completedAt: CUT,
+        appliedAt: CUT,
+        touches: ["a"],
+      });
+    const held = (fields: Record<string, unknown>) => node("change", { needsPlacement: true, touches: ["a"], ...fields });
+
+    it("warns, not errors, on a held change the migration closed at or before the cut", () => {
+      const before = held({ status: "completed", completedAt: "2026-09-01T00:00:00.000Z", appliedAt: "2026-09-01T00:00:00.000Z" });
+      // A v1 item with no completedAt is applied at the cut.
+      const atCut = held({ status: "completed", appliedAt: CUT });
+      // So is one whose completedAt does not parse.
+      const badDate = held({ status: "completed", completedAt: "last week", appliedAt: CUT });
+      const findings = placeable([cut(), before, atCut, badDate]);
+      expect(ids(findings)).toEqual([before.id, atCut.id, badDate.id]);
+      expect(findings.map((f) => f.severity)).toEqual(["warning", "warning", "warning"]);
+      expect(findings[0].message).toContain("closed before the migration cut");
+    });
+
+    it("reports nothing for a held change that is still open", () => {
+      expect(placeable([cut(), held({ status: "pending" }), held({ status: "in_progress" })])).toEqual([]);
+    });
+
+    it("still errors on a held change completed after the cut", () => {
+      const after = held({ status: "completed", completedAt: "2026-10-11T00:00:00.000Z", appliedAt: "2026-10-11T00:00:00.000Z" });
+      const findings = placeable([cut(), after]);
+      expect(ids(findings)).toEqual([after.id]);
+      expect(findings[0].severity).toBe("error");
+    });
+
+    it("warns on a held change completed after the cut that the cut lists as v1 work apply held, and errors on one it does not list", () => {
+      const listed = held({ status: "completed", completedAt: "2026-10-11T00:00:00.000Z" });
+      const unlisted = held({ status: "completed", completedAt: "2026-10-11T00:00:00.000Z" });
+      const withList = cut();
+      withList.body += `\n\n${CUT_HELD_AFTER_CUT_HEADING}\n\n- ${listed.title} (${listed.id})\n\nNext section:`;
+      const findings = placeable([withList, listed, unlisted]);
+      expect(findings.map((f) => [f.nodeId, f.severity])).toEqual([[listed.id, "warning"], [unlisted.id, "error"]]);
+    });
+
+    it("still errors when no migration cut is in the tree, even on a change titled like the cut", () => {
+      const before = held({ status: "completed", completedAt: "2026-09-01T00:00:00.000Z" });
+      const lookalike = node("change", { title: CUT_CHANGE_TITLE, body: "Ours.", status: "completed", appliedAt: CUT, touches: ["a"] });
+      expect(placeable([before]).map((f) => f.severity)).toEqual(["error"]);
+      expect(placeable([lookalike, before]).map((f) => f.severity)).toEqual(["error"]);
+    });
   });
 });
 

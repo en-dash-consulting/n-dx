@@ -39,6 +39,12 @@ describe("command effects declarations", () => {
     expect(stray, "declarations for commands the CLI does not have").toEqual([]);
   });
 
+  it("declares the sample commands' v2 PRD writes, not only the v1 tree", () => {
+    for (const name of ["install-sample", "destroy-sample"]) {
+      expect(getCommandEffects(name).writes.map((w) => w.path), name).toContain("{rex}/changes/");
+    }
+  });
+
   it("returns null for a name that is not a command", () => {
     expect(getCommandEffects("no-such-command")).toBeNull();
     expect(resolveCommandEffects("no-such-command", [])).toBeNull();

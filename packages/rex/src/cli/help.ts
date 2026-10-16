@@ -24,8 +24,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "initialize a .rex/ directory",
     usage: "rex init [dir]",
     description:
-      "Sets up .rex/ with config.json, prd.json, and workflow.md in the target\n" +
-      "directory (defaults to the current directory).",
+      "Sets up .rex/ with config.json, workflow.md, and a PRD tree in the target\n" +
+      "directory (defaults to the current directory). A new project gets an\n" +
+      "empty v2 tree (product/index.md); an existing PRD keeps its layout.",
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
@@ -905,7 +906,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "is written and again on the tree read back.\n" +
       "\n" +
       "--plan is required on a v1 tree. On a tree already v2 it reports so and\n" +
-      "exits zero, removing only v1 files an interrupted apply left.\n" +
+      "exits zero, removing v1 files beside it only when they are what an\n" +
+      "interrupted apply left: they match the plan's source or, with no plan,\n" +
+      "every id they hold is in the v2 tree. Any other prd_tree/ is refused and\n" +
+      "kept, naming the ids to re-capture.\n" +
       "\n" +
       "--dry-run runs the same refusals, writes and reads back the tree in a\n" +
       "temporary directory, and prints per v1 kind what its items become, what\n" +

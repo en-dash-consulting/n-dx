@@ -6,7 +6,7 @@ import { computeProductStatus } from "../../../../src/core/product-status.js";
 import { findActionableWork } from "../../../../src/core/change-selection.js";
 import { isLossless } from "../../../../src/core/slug-migration.js";
 import type { PRDItem } from "../../../../src/schema/v1.js";
-import { isAppliedChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../../src/schema/v2-rules.js";
+import { CUT_HELD_AFTER_CUT_HEADING, checkV2Rules, isAppliedChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../../src/schema/v2-rules.js";
 import { FileStore } from "../../../../src/store/index.js";
 import { loadPrdModel } from "../../../../src/store/prd-model-reader.js";
 import type { PlanFile } from "../../../../src/migrations/plan-file.js";
@@ -16,6 +16,7 @@ import {
   STAGING_DIRNAME,
   applyV1ToV2,
   buildV2Tree,
+  cutContainerIds,
   everyV1Id,
   MigrationApplyError,
   rehearseV1ToV2,
@@ -140,8 +141,20 @@ describe("buildV2Tree", () => {
       for (const node of all(tree)) {
         for (const ref of node.blockedBy ?? []) expect(dissolved.has(ref)).toBe(false);
       }
-      // e2 is an area, a node, so its ref stays.
-      expect(byId(tree, "f6")!.blockedBy).toEqual(["f5", "e2"]);
+      // e2 is an area, a product node: its ref names its open changes, and it has none.
+      expect(byId(tree, "f6")!.blockedBy).toEqual(["f5"]);
+    });
+
+    it("reports each repoint and drop with the old and new refs, on the build and the cut change", async () => {
+      const { tree, blockers, cut } = buildV2Tree(WITH_BLOCKER, await planOf(WITH_BLOCKER));
+      expect(blockers).toEqual([
+        { kind: "container", node: "f6", from: "e3", to: ["f5"] },
+        { kind: "requirement", node: "f6", from: "e2", to: [] },
+      ]);
+      const body = byId(tree, cut)!.body as string;
+      expect(body).toContain("- f6: blockedBy e3 → f5");
+      expect(body).toContain("- f6: blockedBy e2 → dropped (no open change: met)");
+      expect(cutContainerIds(tree)).toEqual(["e3"]);
     });
 
     it("is selectable once every child of the container is completed", async () => {
@@ -174,6 +187,114 @@ describe("buildV2Tree", () => {
       const { tree } = buildV2Tree(items, await planOf(items));
       expect(byId(tree, "f13")!.blockedBy).toBeUndefined();
       expect(byId(tree, "f14")!.blockedBy).toEqual(["f11"]);
+    });
+  });
+
+  describe("blockedBy a product node", () => {
+    // Features with completed work: capabilities. f1's only open change is t5 itself, so t5's ref to f1 is met.
+    const ITEMS: PRDItem[] = [
+      item("e1", "epic", "Storage", [
+        item("f1", "feature", "Offline cache", [
+          item("t1", "task", "Write the cache"),
+          item("t5", "task", "Warm the cache", [], { status: "pending", blockedBy: ["f4", "f1"] }),
+        ]),
+        item("f4", "feature", "Cache eviction", [
+          item("t3", "task", "Size the cache"),
+          item("t4", "task", "Evict entries", [], { status: "pending" }),
+        ], { status: "pending" }),
+        item("f15", "feature", "Cache metrics", [
+          item("t14", "task", "Add a counter"),
+          item("t15", "task", "Count hits", [], { status: "pending" }),
+          item("t16", "task", "Count misses", [], { status: "pending" }),
+        ], { status: "pending", blockedBy: ["f4"] }),
+      ]),
+    ];
+
+    it("names a capability's open changes, or drops the ref when none is open", async () => {
+      const { tree, blockers } = buildV2Tree(ITEMS, await planOf(ITEMS));
+      expect(byId(tree, "f4")).toMatchObject({ type: "capability" });
+      expect(byId(tree, "f1")).toMatchObject({ type: "capability" });
+      expect(byId(tree, "t5")!.blockedBy).toEqual(["t4"]);
+      expect(blockers).toEqual(
+        expect.arrayContaining([
+          { kind: "requirement", node: "t5", from: "f4", to: ["t4"] },
+          { kind: "requirement", node: "t5", from: "f1", to: [] },
+        ]),
+      );
+    });
+
+    it("moves a capability's own blockedBy onto each of its open changes, rewritten", async () => {
+      const { tree, blockers } = buildV2Tree(ITEMS, await planOf(ITEMS));
+      expect(byId(tree, "f15")).toMatchObject({ type: "capability" });
+      for (const node of all(tree)) {
+        if (node.type === "area" || node.type === "capability" || node.type === "constraint") expect(node.blockedBy).toBeUndefined();
+      }
+      expect(byId(tree, "t15")!.blockedBy).toEqual(["t4"]);
+      expect(byId(tree, "t16")!.blockedBy).toEqual(["t4"]);
+      expect(blockers).toContainEqual({ kind: "requirement", node: "f15", from: "f4", to: ["t4"], onto: ["t15", "t16"] });
+    });
+
+    describe("whose pending work is held in the Inbox", () => {
+      // f20 is a capability whose pending t21 is held; f21, unbuilt, is held under area e6; f24 is met with nothing open.
+      const HELD: PRDItem[] = [
+        item("e6", "epic", "Sync", [
+          item("f20", "feature", "Offline sync", [
+            item("t20", "task", "Write the sync"),
+            item("t21", "task", "Retry failed syncs", [], { status: "pending" }),
+          ], { status: "pending" }),
+          item("f21", "feature", "Sync conflicts", [item("t26", "task", "Merge edits", [], { status: "pending" })], { status: "pending" }),
+          item("f24", "feature", "Sync log", [item("t24", "task", "Log each sync")]),
+        ]),
+        item("e7", "epic", "Sharing", [
+          item("f22", "feature", "Shared folders", [
+            item("t22", "task", "Share a folder", [], { status: "pending", blockedBy: ["f20"] }),
+            item("t23", "task", "Share a sync", [], { status: "pending", blockedBy: ["e6"] }),
+            item("t25", "task", "Share the log", [], { status: "pending", blockedBy: ["f24"] }),
+          ], { status: "pending" }),
+        ]),
+      ];
+      /** The rules plan, with t21's placement withheld as a model pass or person would. */
+      const heldPlan = async (): Promise<V1ToV2Plan> => {
+        const plan = await planOf(HELD);
+        delete plan.entries.t21!.placement;
+        plan.entries.t21!.needsPlacement = true;
+        return plan;
+      };
+
+      it("names the held changes instead of dropping the ref as met", async () => {
+        const { tree, blockers, cut } = buildV2Tree(HELD, await heldPlan());
+        expect(byId(tree, "f20")).toMatchObject({ type: "capability" });
+        expect(byId(tree, "t22")!.blockedBy).toEqual(["t21"]);
+        expect(byId(tree, "t23")!.blockedBy!.sort()).toEqual(["f21", "t21"]);
+        expect(blockers).toContainEqual({ kind: "requirement", node: "t22", from: "f20", to: ["t21"] });
+        const body = byId(tree, cut)!.body as string;
+        expect(body).toContain("- t22: blockedBy f20 → t21");
+      });
+
+      it("still drops a ref to a met product node as met", async () => {
+        const { tree, blockers, cut } = buildV2Tree(HELD, await heldPlan());
+        expect(computeProductStatus(tree).f24!.status).toBe("met");
+        expect(byId(tree, "t25")!.blockedBy).toBeUndefined();
+        expect(blockers).toContainEqual({ kind: "requirement", node: "t25", from: "f24", to: [] });
+        expect(byId(tree, cut)!.body as string).toContain("- t25: blockedBy f24 → dropped (no open change: met)");
+      });
+
+      it("leaves the held changes in the Inbox with no target", async () => {
+        const { tree } = buildV2Tree(HELD, await heldPlan());
+        for (const id of ["t21", "f21"]) {
+          const node = byId(tree, id)!;
+          expect(node).toMatchObject({ type: "change", needsPlacement: true });
+          expect(node.touches).toBeUndefined();
+          expect(node.amends).toBeUndefined();
+          expect(tree.changes).toContain(node);
+        }
+      });
+    });
+
+    it("leaves no blockedBy ref the v2 rules reject", async () => {
+      const { tree } = buildV2Tree(ITEMS, await planOf(ITEMS));
+      const work = new Set(all(tree).filter((n) => n.type === "change" || n.type === "task" || n.type === "subtask").map((n) => n.id));
+      for (const node of all(tree)) for (const ref of node.blockedBy ?? []) expect(work.has(ref)).toBe(true);
     });
   });
 
@@ -225,6 +346,51 @@ describe("buildV2Tree", () => {
     expect(byId(built.tree, "e9")!.children!.map((c) => [c.id, c.type])).toEqual([["f9", "task"]]);
     expect(byId(built.tree, "t1")!.children!.map((c) => c.id).sort()).toEqual(["s1", "s9"]);
     expect(isLossless(everyV1Id(newer, built.tree, built.containers, built.cut))).toBe(true);
+  });
+
+  describe("v1 work completed between plan and apply, held in the Inbox", () => {
+    const AFTER_CUT = "2026-10-13T00:00:00.000Z";
+    const placedAtClose = (tree: V2Tree) => checkV2Rules(tree, { now: new Date("2026-10-20T00:00:00.000Z") }, ["change-placed-at-close"]);
+
+    /** The tree planned at CUT_AT, then held f4 completed in v1 after it. */
+    const completedAfterPlan = async () => {
+      const plan = await planOf(TREE);
+      expect(plan.entries.f4).toMatchObject({ target: "change", needsPlacement: true });
+      const newer = structuredClone(TREE);
+      const f4 = newer[0]!.children!.find((c) => c.id === "f4")!;
+      Object.assign(f4, { status: "completed", completedAt: AFTER_CUT });
+      Object.assign(f4.children![0]!, { status: "completed", completedAt: AFTER_CUT });
+      return buildV2Tree(newer, plan);
+    };
+
+    it("is listed by the cut and warned about, so rex health passes", async () => {
+      const { tree, cut } = await completedAfterPlan();
+      expect(byId(tree, "f4")).toMatchObject({ needsPlacement: true, appliedAt: AFTER_CUT });
+      expect(byId(tree, cut)!.body).toContain(`${CUT_HELD_AFTER_CUT_HEADING}\n\n- Cache eviction (f4)`);
+      const findings = placedAtClose(tree);
+      expect(findings.map((f) => [f.nodeId, f.severity])).toContainEqual(["f4", "warning"]);
+      expect(findings.filter((f) => f.severity === "error")).toEqual([]);
+      expect(findings.find((f) => f.nodeId === "f4")!.message).toContain("closed in v1 before the migration was applied");
+    });
+
+    it("still errors on a held change completed in v2 after apply", async () => {
+      const { tree } = await completedAfterPlan();
+      const v2 = { id: "c-v2", type: "change", title: "Closed in v2", slug: "closed-in-v2", needsPlacement: true, status: "completed", completedAt: "2026-10-14T00:00:00.000Z" } as RuleNode;
+      tree.changes.push(v2);
+      const findings = placedAtClose(tree);
+      expect(findings.find((f) => f.nodeId === "c-v2")).toMatchObject({ severity: "error" });
+      expect(findings.find((f) => f.nodeId === "f4")).toMatchObject({ severity: "warning" });
+    });
+
+    it("leaves the cut's list out when nothing closed after the cut", async () => {
+      const { tree, cut } = buildV2Tree(TREE, await planOf(TREE));
+      expect(byId(tree, cut)!.body).not.toContain(CUT_HELD_AFTER_CUT_HEADING);
+    });
+
+    it("keeps the cut's container list readable after the held list", async () => {
+      const { tree, containers } = await completedAfterPlan();
+      expect(cutContainerIds(tree)).toEqual(containers.map((c) => c.id));
+    });
   });
 
   it("re-fits a planned item whose parent is gone, and reports plan entries no longer in the tree", async () => {
@@ -353,8 +519,85 @@ describe("applyV1ToV2", () => {
       writeFileSync(join(rexDir, path), text);
     }
     const outcome = await applyV1ToV2(rexDir, plan, { load });
-    expect(outcome).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")] });
+    expect(outcome).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")], proof: "plan" });
     expect(existsSync(join(rexDir, "prd_tree"))).toBe(false);
+  });
+
+  describe("a prd_tree/ beside the v2 tree", () => {
+    const NEW_EPIC = "11111111-1111-4111-8111-111111111111";
+    const withNewEpic = (): PRDItem[] => [...TREE, item(NEW_EPIC, "epic", "Billing", [], { status: "pending" })];
+
+    /** Write `items` as a v1 tree in a scratch rex dir and copy its prd_tree/ and tree-meta.json beside the v2 tree. */
+    async function restoreV1(items: PRDItem[]): Promise<void> {
+      const scratch = join(repo, "scratch-rex");
+      mkdirSync(scratch);
+      await new FileStore(scratch).saveDocument({ schema: "rex/v1", title: "Shop", items });
+      for (const [path, text] of Object.entries(snapshot(scratch))) {
+        if (!path.startsWith("/prd_tree") && path !== "/tree-meta.json") continue;
+        mkdirSync(join(rexDir, path, ".."), { recursive: true });
+        writeFileSync(join(rexDir, path), text);
+      }
+      rmSync(scratch, { recursive: true });
+    }
+
+    async function migrated(): Promise<V1ToV2Plan> {
+      const plan = await planOf((await load()).items);
+      await applyV1ToV2(rexDir, plan, { load });
+      return plan;
+    }
+
+    it.each([
+      ["a plan whose source differs", true],
+      ["no plan", false],
+    ])("holding an item the v2 tree lacks is refused and kept, with %s, naming the item", async (_label, withPlan) => {
+      const plan = await migrated();
+      await restoreV1(withNewEpic());
+      const before = snapshot(rexDir);
+      const given = withPlan ? plan : undefined;
+      await expect(applyV1ToV2(rexDir, given, { load })).rejects.toThrow(MigrationApplyError);
+      await expect(applyV1ToV2(rexDir, given, { load })).rejects.toThrow(new RegExp(`${NEW_EPIC}.*Kept`, "s"));
+      expect(snapshot(rexDir)).toEqual(before);
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+      expect(existsSync(join(rexDir, "tree-meta.json"))).toBe(true);
+      // The dry run says apply would refuse, the same way.
+      await expect(rehearseV1ToV2(rexDir, given, { load })).rejects.toThrow(new RegExp(`${NEW_EPIC}.*Kept`, "s"));
+    });
+
+    it("whose items were edited since the plan is refused and kept, though every id is in the v2 tree", async () => {
+      const plan = await migrated();
+      const edited = structuredClone(TREE);
+      edited[0]!.title = "Storage, renamed after the cut";
+      await restoreV1(edited);
+      await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(/differs from the tree the plan was made from.*Kept/s);
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+    });
+
+    it("is removed with no plan when every id it holds is in the v2 tree, dissolved containers included", async () => {
+      await migrated();
+      await restoreV1(TREE);
+      expect(await rehearseV1ToV2(rexDir, undefined, { load })).toEqual({
+        status: "already-v2",
+        removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")],
+        proof: "ids",
+      });
+      expect(await applyV1ToV2(rexDir, undefined, { load })).toEqual({
+        status: "already-v2",
+        removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")],
+        proof: "ids",
+      });
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(false);
+    });
+
+    it("that matches the plan's source is what the dry run says apply would remove", async () => {
+      const plan = await migrated();
+      await restoreV1(TREE);
+      expect(await rehearseV1ToV2(rexDir, plan, { load })).toEqual({
+        status: "already-v2",
+        removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")],
+        proof: "plan",
+      });
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+    });
   });
 
   it("clears a changes/ an apply interrupted before the switch left, and applies", async () => {
@@ -474,7 +717,7 @@ describe("applyV1ToV2", () => {
       await applyV1ToV2(rexDir, plan, { load });
       mkdirSync(join(rexDir, "prd_tree"));
       const outcome = await rehearseV1ToV2(rexDir, plan, { load });
-      expect(outcome).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree")] });
+      expect(outcome).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree")], proof: "empty" });
       expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
     });
   });

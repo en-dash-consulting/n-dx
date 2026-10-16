@@ -59,8 +59,8 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `ndx usage` | nothing (read-only) | none | none | seconds |
 | `ndx claim` | `<git-common-dir>/ndx/claims.json` (only on release) | none | none | seconds |
 | `ndx start` | `{webPid} and {webPort}`<br>`~/.ndx/hub.json`<br>`~/.ndx/auth.token` | none | localhost | long-running server; hub mode returns once registered |
-| `ndx install-sample` | `sample-app/`<br>`{rex}/prd_tree/sample-app-improvements/` | none | none | seconds |
-| `ndx destroy-sample` | `sample-app/`<br>`{rex}/prd_tree/` | none | none | seconds |
+| `ndx install-sample` | `sample-app/`<br>`{rex}/changes/` | none | none | seconds |
+| `ndx destroy-sample` | `sample-app/`<br>`{rex}/changes/` | none | none | seconds |
 | `ndx dev` | the dashboard build | none | localhost | until stopped |
 | `ndx web` | `{webPid} and {webPort}`<br>`~/.ndx/hub.json`<br>`~/.ndx/auth.token` | none | localhost | long-running server; hub mode returns once registered |
 | `ndx ci` | `{sourcevision}/` | none | none | minutes |

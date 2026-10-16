@@ -85,7 +85,7 @@ function rexDirOf(root) {
 }
 
 /** @param {string} root */
-function hasV2Tree(root) {
+export function hasV2Tree(root) {
   return existsSync(join(rexDirOf(root), PRODUCT_DIRNAME));
 }
 

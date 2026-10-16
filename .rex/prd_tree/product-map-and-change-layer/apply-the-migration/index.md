@@ -28,26 +28,28 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A change on a fresh v2 project can leave the Inbox, so ndx work and rex next select work there](./a-change-on-a-fresh-v2-project-can.md) | completed |
 | [A clean rex migrate --apply --dry-run does not mean apply would proceed: the write and read-back checks are skipped](./a-clean-rex-migrate-apply-dry-run-does.md) | completed |
-| [A dissolved container's blockedBy rewrite at migrate --apply is invisible to a reviewer: neither the plan nor the dry run shows it](./a-dissolved-container-s-blockedby.md) | pending |
+| [A dissolved container's blockedBy rewrite at migrate --apply is invisible to a reviewer: neither the plan nor the dry run shows it](./a-dissolved-container-s-blockedby.md) | completed |
 | [A failed prd_tree/ removal after the switch says the v2 tree is in place and to re-run apply](./a-failed-prd-tree-removal-after-the.md) | pending |
 | [A leftover .rex/prd.json is auto-migrated back into prd_tree/ beside the v2 tree after rex migrate --apply](./a-leftover-rex-prd-json-is-auto.md) | completed |
 | [A re-plan reuses the earlier plan's cut time only when the tree is unchanged](./a-re-plan-reuses-the-earlier-plan-s.md) | pending |
 | [After rex migrate --apply, an item blockedBy a dissolved release or review epic is blocked forever](./after-rex-migrate-apply-an-item.md) | completed |
 | [Agents in ndx work runs see "Run 'ndx migrate'" on every rex command and can run the migration unasked](./agents-in-ndx-work-runs-see-run-ndx.md) | completed |
 | [Apply an approved plan in one transaction, re-runnable against a newer tree](./apply-an-approved-plan-in-one.md) | completed |
-| [Apply on an already-v2 tree removes a leftover prd_tree/ only when it matches the plan](./apply-on-an-already-v2-tree-removes-a.md) | pending |
-| [Apply rewrites v1 blockedBy refs to and from capabilities onto their open changes](./apply-rewrites-v1-blockedby-refs-to.md) | pending |
+| [Apply on an already-v2 tree removes a leftover prd_tree/ only when it matches the plan](./apply-on-an-already-v2-tree-removes-a.md) | completed |
+| [Apply rewrites v1 blockedBy refs to and from capabilities onto their open changes](./apply-rewrites-v1-blockedby-refs-to.md) | completed |
 | [Apply's id check is pinned by a test, and the dry run reports v2 rule errors by rule](./apply-s-id-check-is-pinned-by-a-test.md) | pending |
 | [Applying a migration plan does not refuse one whose model pass is marked incomplete](./applying-a-migration-plan-does-not.md) | completed |
 | [Chain layout and schema steps in ndx migrate; v1 PRDs warn now and are refused one release later](./chain-layout-and-schema-steps-in-ndx.md) | completed |
 | [Convert stray v1 files and warn on unreachable apply commits](./convert-stray-v1-files-and-warn-on.md) | pending |
 | [Dissolved containers keep their description, criteria and blockedBy](./dissolved-containers-keep-their.md) | pending |
-| [Docs say ndx init creates v1 projects; it now creates v2](./docs-say-ndx-init-creates-v1-projects.md) | pending |
+| [Docs say ndx init creates v1 projects; it now creates v2](./docs-say-ndx-init-creates-v1-projects.md) | completed |
+| [migrate --apply drops a blockedBy ref to an unbuilt capability as "met" when its pending work is held in the Inbox](./migrate-apply-drops-a-blockedby-ref-to.md) | completed |
 | [Migrated product nodes read met when their v1 item completed](./migrated-product-nodes-read-met-when.md) | completed |
 | [Migration plan, dry run and apply refuse when the v1 parser skipped an item file](./migration-plan-dry-run-and-apply.md) | pending |
 | [ndx commands that spawn rex several times print the v1 deprecation notice once per spawn](./ndx-commands-that-spawn-rex-several.md) | completed |
+| [ndx destroy-sample deletes v2 change folders outside the PRD lock](./ndx-destroy-sample-deletes-v2-change.md) | completed |
 | [ndx init scaffolds a v2 project (product/index.md, never prd_tree/)](./ndx-init-scaffolds-a-v2-project.md) | completed |
-| [ndx install-sample writes a v1 prd_tree/ beside a fresh v2 product/](./ndx-install-sample-writes-a-v1-prd.md) | pending |
+| [ndx install-sample writes a v1 prd_tree/ beside a fresh v2 product/](./ndx-install-sample-writes-a-v1-prd.md) | completed |
 | [ndx migrate --apply --dry-run says what moves and what is dropped](./ndx-migrate-apply-dry-run-says-what.md) | completed |
 | [ndx migrate --plan has no automated test of its spawn path](./ndx-migrate-plan-has-no-automated-test.md) | completed |
 | [ndx migrate --plan shows the preflight banner and an honest run summary, and llm.routes can turn Jev off](./ndx-migrate-plan-shows-the-preflight.md) | pending |
@@ -56,8 +58,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [ndx self-heal, start and web silence the v1 notice for their children, and ndx migrate refuses inside an agent run](./ndx-self-heal-start-and-web-silence.md) | completed |
 | [Placement reads code evidence: commits and zones of a held change rank the capabilities realized in the same zones](./placement-reads-code-evidence-commits.md) | pending |
 | [Remove the prd.md and prd.json read fallbacks and the old migrate commands](./remove-the-prd-md-and-prd-json-read.md) | pending |
-| [rex health warns, not errors, on completed changes the migration held for placement](./rex-health-warns-not-errors-on.md) | pending |
-| [rex init --help says it writes prd.json; it writes product/index.md (v2) or prd_tree/](./rex-init-help-says-it-writes-prd-json.md) | pending |
+| [rex health errors forever on a held change whose v1 item completed between plan and apply](./rex-health-errors-forever-on-a-held.md) | completed |
+| [rex health warns, not errors, on completed changes the migration held for placement](./rex-health-warns-not-errors-on.md) | completed |
+| [rex init --help says it writes prd.json; it writes product/index.md (v2) or prd_tree/](./rex-init-help-says-it-writes-prd-json.md) | completed |
 | [rex migrate-plan / migrate-apply and ndx migrate-layout still run inside an agent run](./rex-migrate-plan-migrate-apply-and-ndx.md) | pending |
 | [tests/e2e/cli-migrate-apply.test.js fails 3 of 5: its fixture keeps .rex/prd.json, which apply now refuses](./tests-e2e-cli-migrate-apply-test-js.md) | completed |
 | [The bare ndx migrate chain shows the preflight banner and its --dry-run runs no model unless asked](./the-bare-ndx-migrate-chain-shows-the.md) | pending |

@@ -417,11 +417,11 @@ export const COMMAND_EFFECTS = {
 
   "install-sample": {
     command: "install-sample",
-    summary: "Add a small sample app and four PRD tasks to try the loop on.",
+    summary: "Add a small sample app and a sample change with two tasks to try the loop on.",
     reads: [],
     writes: [
       { path: "sample-app/", what: "index.html, style.css, app.js" },
-      { path: "{rex}/prd_tree/sample-app-improvements/", what: "four sample tasks" },
+      { path: "{rex}/changes/", what: "a sample change with two tasks (v1 project: {rex}/prd_tree/sample-app-improvements/)" },
     ],
     llm: [],
     network: [],
@@ -431,11 +431,11 @@ export const COMMAND_EFFECTS = {
 
   "destroy-sample": {
     command: "destroy-sample",
-    summary: "Delete the sample app and its PRD tasks.",
+    summary: "Delete the sample app and its PRD items.",
     reads: [PRD_READ],
     writes: [
       { path: "sample-app/", what: "deleted" },
-      { path: PRD_TREE, what: "the sample tasks, deleted" },
+      { path: "{rex}/changes/", what: "the sample change and its tasks, deleted (v1 project: the sample items under {rex}/prd_tree/)" },
     ],
     llm: [],
     network: [],
