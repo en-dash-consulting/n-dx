@@ -1,5 +1,5 @@
 /**
- * Breadcrumb workspace switcher — the branch chip, made a menu.
+ * Top bar workspace switcher — the branch chip, made a menu (project-context.ts).
  *
  * Shows "<worktree> · <branch>" for the workspace this viewer addresses and,
  * on click or keyboard, lists every worktree of the repository with the

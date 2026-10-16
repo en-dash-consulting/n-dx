@@ -10,7 +10,7 @@
  * architecture findings, PR markdown, and the Ask exchange.
  */
 
-export { Overview } from "./overview.js";
+export { Overview, AnalysisStatus, CodebaseStats, HealthDetail, MapPanel, LanguagesPanel, NextStepsPanel } from "./overview.js";
 export { Graph } from "./graph.js";
 export { IsoMapView } from "./iso-map.js";
 export { ZonesView } from "./zones.js";

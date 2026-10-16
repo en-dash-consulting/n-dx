@@ -1,0 +1,26 @@
+---
+id: "4740f527-ac08-4a59-a20f-ce6854900296"
+level: "task"
+title: "Isometric map zooms faster on a trackpad pinch and a little faster on ⌘/Ctrl + scroll"
+status: "completed"
+priority: "medium"
+tags:
+  - "sourcevision"
+  - "web"
+  - "iso-map"
+  - "ui"
+source: "ndx-capture"
+startedAt: "2026-10-15T05:12:38.604Z"
+completedAt: "2026-10-15T05:13:22.936Z"
+endedAt: "2026-10-15T05:13:22.936Z"
+resolutionType: "code-change"
+resolutionDetail: "Separate pinch and wheel zoom rates"
+acceptanceCriteria:
+  - "A trackpad pinch (ctrlKey wheel events with small deltas) zooms several times faster than before."
+  - "⌘/Ctrl + mouse wheel zooms somewhat faster per notch than before."
+  - "No single wheel event zooms by more than 2× or less than ½×."
+  - "The generated .claude/skills/iso-map/scripts/iso-map.mjs is regenerated and tests/e2e/iso-skill-drift.test.js passes."
+description: "User (2026-10-15): \"make the zoom of the isomap a bit more sensitive too. have to do too much to zoom in, too much pinching to scroll. keyboard scroll is pretty good, but could also be a smidge faster.\" The map's wheel handler (packages/sourcevision/src/export/iso-map.ts) zooms by exp(-deltaY × 0.0016) for every wheel event. A trackpad pinch arrives as ctrlKey wheel events with small fractional deltas, so it barely zooms; ⌘/Ctrl + mouse wheel sends ~100 per notch. Give pinch its own, much higher rate and raise the modifier-wheel rate slightly; normalise line-mode deltas; bound the per-event step. Regenerate the /iso-map skill script (scripts/build-iso-skill.mjs) so the drift test stays green."
+lastModified: "2026-10-15T05:13:23.298Z"
+lastModifiedBy: "Nick Daniel <nick@endash.us>"
+---

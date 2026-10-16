@@ -367,14 +367,11 @@ describe("iso-map view registration", () => {
     expect(renderActiveView("iso-map" as ViewId, makeCtx())).toBeTruthy();
   });
 
-  // Moved off the retired SOURCEVISION_TABS table. The isometric map is no
-  // longer a sibling tab of the 2D map alone: it shares the Terrain section
-  // with Zones too, and is dropped in a static export, same as before.
-  it("is a tab of the Terrain section, dropped in a static export", () => {
-    const terrain = STAGES.analyze.sections.find((s) => s.view === "graph")!;
-    const isoTab = terrain.tabs?.find((t) => t.view === "iso-map");
-    expect(isoTab).toBeDefined();
-    expect(isoTab?.hiddenWhenDeployed).toBe(true);
+  // The isometric map is the Analysis dashboard's hero tile — its embedded
+  // form, with its own controls — and is dropped in a static export.
+  it("is the Analysis dashboard's hero tile, dropped in a static export", () => {
+    const tile = STAGES.analyze.tiles?.find((t) => t.view === "iso-map");
+    expect(tile).toMatchObject({ cols: 8, rows: 3, chromeless: true, hiddenWhenDeployed: true });
   });
 
   it("is named by the navigation model", () => {

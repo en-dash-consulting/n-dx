@@ -53,7 +53,11 @@ describe("Live is outside the stage loop", () => {
       expect(isStageId(view)).toBe(false);
       expect(stageForView(view, valid)).toBeNull();
     }
-    const listed = STAGE_ORDER.flatMap((s) => STAGES[s].sections.flatMap((x) => [x.view, ...(x.tabs ?? []).map((t) => t.view)]));
+    const listed = STAGE_ORDER.flatMap((s) => [
+      ...STAGES[s].sections.map((x) => x.view),
+      ...(STAGES[s].tiles ?? []).flatMap((x) => [x.view, ...(x.tabs ?? []).map((t) => t.view)]),
+      ...(STAGES[s].alsoOwns ?? []),
+    ]);
     for (const view of LIVE_VIEWS) expect(listed).not.toContain(view);
   });
 });
