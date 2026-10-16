@@ -265,6 +265,12 @@ export const COMMAND_EFFECTS = {
     ],
     writes: [
       { path: "{sourcevision}/iso-map.html", what: "a single self-contained page; --output writes elsewhere" },
+      {
+        path: "iso-map.html",
+        what: "the same page at the project root, because there is no {sourcevision}/ to put it in",
+        conditional: true,
+        when: "with --source=scan on a project that has never been analyzed",
+      },
     ],
     llm: [],
     network: [],
