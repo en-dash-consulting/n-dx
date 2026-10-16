@@ -46,15 +46,14 @@ vi.mock("../../../../src/store/prd-model-reader.js", async (importOriginal) => {
 });
 
 // A removal held up by a handle (the dashboard's watcher, antivirus on Windows) cannot be provoked
-// on demand, so `rm` of a path ending in `failRm` throws when a test asks.
+// on demand, so `rm` of the path `failRm` throws when a test asks.
 const fsFaults = vi.hoisted(() => ({ failRm: undefined as string | undefined }));
 vi.mock("node:fs/promises", async (importOriginal) => {
   const real = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...real,
     rm: async (...args: Parameters<typeof real.rm>) => {
-      const suffix = fsFaults.failRm;
-      if (suffix !== undefined && String(args[0]).endsWith(suffix)) {
+      if (fsFaults.failRm !== undefined && String(args[0]) === fsFaults.failRm) {
         throw Object.assign(new Error(`EBUSY: resource busy or locked, rmdir '${String(args[0])}'`), { code: "EBUSY" });
       }
       return real.rm(...args);
@@ -619,7 +618,7 @@ describe("applyV1ToV2", () => {
       }
       await applyV1ToV2(clean, plan, { load: () => new FileStore(clean).loadDocument() });
 
-      fsFaults.failRm = "/prd_tree";
+      fsFaults.failRm = join(rexDir, "prd_tree");
       const message = await applyV1ToV2(rexDir, plan, { load }).then(
         () => "applied",
         (err: unknown) => (err instanceof MigrationApplyError ? err.message : `unexpected: ${String(err)}`),
