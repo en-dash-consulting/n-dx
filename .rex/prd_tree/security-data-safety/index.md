@@ -24,6 +24,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Every child process gets the sanitized environment](./every-child-process-gets-the-sanitized/index.md) | pending |
 | [Repository trust can't be steered by the repository](./repository-trust-can-t-be-steered-by/index.md) | pending |
 | [Vendor CLI credential filter: follow-ups to #623](./vendor-cli-credential-filter-follow/index.md) | completed |
-| [A repository's .n-dx.json can choose which environment variable is sent as the Google API key, and where it is sent](./a-repository-s-n-dx-json-can-choose.md) | pending |
 | [`/api/hench/adaptive/override` and `/apply` write arbitrary keys into `.hench/config.json`](./api-hench-adaptive-override-and-apply.md) | completed |
 | [Require a per-user token on the hub, dashboard and preview loopback servers](./require-a-per-user-token-on-the-hub.md) | completed |
