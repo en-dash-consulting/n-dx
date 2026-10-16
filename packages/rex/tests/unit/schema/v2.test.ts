@@ -456,6 +456,8 @@ describe("isolation", () => {
     // v2 tree rules on a v2 tree (cli/commands/health.ts, core/health.ts), and
     // the v2 CLI verbs: `rex product`, `rex change`, and `rex add` on a v2 tree
     // (cli/commands/product.ts, change.ts, add-change.ts and their v2-cli.ts),
+    // and `rex remove` on a v2 tree, which removes a change or task inside the
+    // PRD transaction (cli/commands/remove-change.ts),
     // and the layer-aware restructuring behind `rex reshape`, `rex reorganize`
     // and `rex prune`: the change-layer store, the layer projection, and the
     // product-layer reshape draft (cli/commands/reshape-product.ts), and
@@ -520,6 +522,7 @@ describe("isolation", () => {
         "cli/commands/product.ts",
         "cli/commands/change.ts",
         "cli/commands/add-change.ts",
+        "cli/commands/remove-change.ts",
         "cli/commands/v2-cli.ts",
         "store/change-layer-store.ts",
         "core/layer-projection.ts",
