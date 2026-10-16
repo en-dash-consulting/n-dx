@@ -222,17 +222,20 @@ export const COMMAND_EFFECTS = {
 
   migrate: {
     command: "migrate",
-    summary: "Plan the PRD's v1 → v2 migration for review, or apply the reviewed plan.",
+    summary: "Run every migration step the project still needs (layout, folder tree, v1 → v2 plan and apply), or plan for review, or apply the reviewed plan.",
     reads: [
       "{rex}/prd_tree/ (under the PRD lock)",
       "the plan already at --out, for the answers it recorded",
       "test files under the project, to link criteria",
-      "with --apply: the plan at --plan (default ./migration-plan.json)",
+      "with --apply, or without --plan or --apply: the plan at --plan (default ./migration-plan.json)",
+      "git status, when the layout step runs",
     ],
     writes: [
-      { path: "--out (default ./migration-plan.json)", what: "the plan, keyed by v1 item id", conditional: true, when: "with --plan" },
-      { path: "--summary (default: --out with .md)", what: "the Markdown summary for review", conditional: true, when: "with --plan" },
-      { path: "{rex}/", what: "the v2 product and change layers, replacing prd_tree/ and tree-meta.json", conditional: true, when: "with --apply, without --dry-run" },
+      { path: ".ndx/", what: "the moved tool directories and config, committed unless --no-commit (as migrate-layout)", conditional: true, when: "without --plan or --apply, on a legacy layout and without --dry-run" },
+      { path: "{rex}/prd_tree/", what: "the folder tree converted from prd.md / prd.json", conditional: true, when: "without --plan or --apply, on a flat-file PRD and without --dry-run" },
+      { path: "--out (default ./migration-plan.json)", what: "the plan, keyed by v1 item id", conditional: true, when: "with --plan, or without --plan or --apply on a v1 tree" },
+      { path: "--summary (default: --out with .md)", what: "the Markdown summary for review", conditional: true, when: "with --plan, or without --plan or --apply on a v1 tree" },
+      { path: "{rex}/", what: "the v2 product and change layers, replacing prd_tree/ and tree-meta.json", conditional: true, when: "with --apply, or without --plan or --apply on a v1 tree, and without --dry-run" },
     ],
     llm: [
       { phase: "placement", purpose: "place a change the rules held", calls: "0-N, none with --rules-only" },

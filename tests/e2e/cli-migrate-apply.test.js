@@ -8,6 +8,9 @@
  * Every run is from the project directory, so the default plan path lands
  * there rather than in the test runner's cwd.
  *
+ * Bare `ndx migrate` runs the chain (`packages/core/migrate-chain.js`):
+ * layout, then `rex migrate-plan` and `rex migrate-apply`.
+ *
  * @see packages/core/cli.js handleMigrate
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -95,9 +98,50 @@ describe("ndx migrate --apply", () => {
     expect(snapshot(dir)).toEqual(before);
   });
 
-  it("still needs --plan or --apply", () => {
-    const result = runResult(["migrate", dir]);
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain("needs --plan or --apply");
+});
+
+describe("ndx migrate (the chain)", () => {
+  let dir;
+
+  beforeEach(async () => {
+    // Legacy on both counts: state at the root (.rex/, .hench/, …) and the PRD in prd.json.
+    dir = await createTmpDir("ndx-e2e-migrate-chain-");
+    await setupRexDir(dir);
+    await setupHenchDir(dir);
+    await setupSourcevisionDir(dir);
+  });
+
+  afterEach(async () => {
+    await removeTmpDir(dir);
+  });
+
+  it("migrates a legacy fixture to .ndx/ and v2 with one command: layout, then rex migrate-plan and migrate-apply", () => {
+    const result = runResult(["migrate", "--rules-only", dir], { cwd: dir });
+    const out = result.stdout;
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).not.toContain("Deprecated:");
+    expect(out).toContain("[1/3] layout");
+    expect(out).toContain("[3/3] schema-v2");
+    expect(out).toContain("Migrated 3 v1 items to the v2 layout");
+    // The plan lands where `ndx migrate --plan` writes it.
+    expect(existsSync(join(dir, "migration-plan.json"))).toBe(true);
+    expect(existsSync(join(dir, ".rex"))).toBe(false);
+    expect(existsSync(join(dir, ".ndx", "rex", "product", "index.md"))).toBe(true);
+    expect(existsSync(join(dir, ".ndx", "rex", "prd_tree"))).toBe(false);
+  });
+
+  it("--dry-run moves nothing and stops before the folder-tree conversion", () => {
+    const before = snapshot(dir);
+    const out = run(["migrate", "--dry-run", "--rules-only", dir], { cwd: dir });
+    expect(out).toContain("--dry-run stops here");
+    expect(snapshot(dir)).toEqual(before);
+  });
+
+  it("re-run on a migrated project reports every step already done", () => {
+    run(["migrate", "--rules-only", dir], { cwd: dir });
+    const out = run(["migrate", dir], { cwd: dir });
+    expect(out.match(/— already done/g)).toHaveLength(3);
+    expect(out).toContain("Nothing to migrate");
   });
 });

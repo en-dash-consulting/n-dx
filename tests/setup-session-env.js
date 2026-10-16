@@ -33,6 +33,12 @@
 delete process.env.CLAUDE_CODE_SESSION_ID;
 delete process.env.CLAUDE_CONFIG_DIR;
 
+// `ndx work` marks its hench run with NDX_AGENT_RUN=1, and hench's test gate
+// inherits it. `ndx migrate` refuses under it, so every e2e test that spawns
+// `ndx migrate` would fail inside a gate while passing in CI. Tests that want
+// the refusal set the variable on the spawn (tests/e2e/cli-agent-run-env.test.js).
+delete process.env.NDX_AGENT_RUN;
+
 // ---------------------------------------------------------------------------
 // One git config for every fixture repository
 // ---------------------------------------------------------------------------

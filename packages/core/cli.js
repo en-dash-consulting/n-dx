@@ -106,6 +106,7 @@ import { runExport } from "./export.js";
 import { ensureGitignoreEntry } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
 import { initDirLabels, padInitDirLabel } from "./init-summary.js";
+import { DEFAULT_MIGRATION_PLAN_OUT, isLegacyV1Project, runMigrateChain } from "./migrate-chain.js";
 import { runMigrateLayout } from "./migrate-layout.js";
 import {
   resolveInitLLMSelection,
@@ -463,7 +464,7 @@ async function flushAndExit(code = 0) {
   return exitPromise;
 }
 
-function run(script, args) {
+function run(script, args, extraEnv = {}) {
   const scriptPath = isAbsolute(script) ? script : resolve(MONOREPO_ROOT, script);
 
   // Build-artifact guard: when the resolved script is a packages/*/dist/* path
@@ -485,7 +486,7 @@ function run(script, args) {
   return new Promise((res) => {
     const child = spawnTracked(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
-      env: childEnv(),
+      env: { ...childEnv(), ...extraEnv },
     });
 
     let heartbeat = null;
@@ -519,11 +520,50 @@ function childEnv() {
     : process.env;
 }
 
+/**
+ * ndx commands that spawn rex more than once, directly or through hench and the
+ * dashboard server. Each prints rex's v1 deprecation
+ * notice once itself and silences rex for its children. A delegated rex
+ * command (`ndx rex …`, `ndx validate`) is one spawn, so rex prints its own.
+ */
+const LEGACY_NOTICE_COMMANDS = new Set([
+  "ci", "status", "plan", "add", "recommend", "refresh", "work", "analyze", "self-heal", "start", "web",
+  "pair-programming", "bicker",
+]);
+
+/**
+ * Environment for the hench agent run that `ndx work`, `ndx self-heal` and
+ * `ndx pair-programming` spawn. NDX_AGENT_RUN marks the run so `ndx migrate` refuses inside it, and
+ * the agent's shelled-out rex commands never print the v1 notice.
+ */
+const AGENT_RUN_ENV = { NDX_AGENT_RUN: "1", NDX_LEGACY_NOTICE: "off" };
+
+/** Spawn `hench <args>` as an agent run; exits on a non-zero code. */
+function runAgentOrDie(args) {
+  return runOrDie(tools.hench, args, AGENT_RUN_ENV);
+}
+
+/** Mirrors rex's LEGACY_LAYOUT_NOTICE (`cli/legacy-layout-notice.ts`); core spawns rex and cannot import it. */
+const LEGACY_LAYOUT_NOTICE =
+  "Deprecated: this PRD uses the v1 layout (prd_tree/). Run 'ndx migrate' to move it to v2; the next release refuses v1 PRDs.";
+
+/**
+ * Print the v1 notice once for `command` on a v1 project at `dir` (`--quiet`
+ * drops it, as in rex), then set NDX_LEGACY_NOTICE=off so every rex child
+ * stays quiet.
+ */
+function noteLegacyLayoutOnce(command, dir) {
+  if (!LEGACY_NOTICE_COMMANDS.has(command) || process.env.NDX_LEGACY_NOTICE === "off") return;
+  if (!isLegacyV1Project(dir)) return;
+  if (!updateCheckQuiet) console.error(LEGACY_LAYOUT_NOTICE);
+  process.env.NDX_LEGACY_NOTICE = "off";
+}
+
 /** BETA experimental flags to forward to children. Empty unless opted in. */
 let experimentalEnvFragment = {};
 
-async function runOrDie(script, args) {
-  const code = await run(script, args);
+async function runOrDie(script, args, extraEnv) {
+  const code = await run(script, args, extraEnv);
   if (code !== 0) exitWithCleanup(code);
 }
 
@@ -1823,9 +1863,6 @@ async function handleMigrateLayout(rest) {
   exitWithCleanup(code);
 }
 
-/** Where `ndx migrate --plan` writes, and `ndx migrate --apply` reads, when the operator names no path. */
-const DEFAULT_MIGRATION_PLAN_OUT = "./migration-plan.json";
-
 /** Flags of `ndx migrate` that take a value; `--out p` is rewritten to `--out=p` so `p` is not read as the project dir. */
 const MIGRATE_VALUE_FLAGS = new Set(["--out", "--summary", "--cut-at", "--model", "--migration"]);
 
@@ -1842,15 +1879,20 @@ const MIGRATE_VALUE_FLAGS = new Set(["--out", "--summary", "--cut-at", "--model"
  * `--apply`, `--plan` names the plan file, so `--plan p` is rewritten to
  * `--plan=p`; a bare `--plan` without `--apply` still plans.
  *
- * A mode is required rather than implied: making the read-only half one you
- * ask for by name means the bare verb can never grow into the destructive one
- * by default.
+ * `ndx migrate [dir]` with neither runs the whole chain (`migrate-chain.js`):
+ * layout, then the flat-file conversion, then plan and apply, each only when
+ * the project still needs it.
  *
  * `--out` and `--plan` default here rather than in rex, to the same path: an
  * orchestrator command an operator types by hand should produce a file and
  * find it again, while the tool CLI stays explicit about where it writes.
  */
 async function handleMigrate(rest) {
+  if (process.env.NDX_AGENT_RUN) {
+    console.error("Error: ndx migrate refuses inside an agent run (NDX_AGENT_RUN is set).");
+    console.error("Hint: An operator runs the migration from their own shell.");
+    exitWithCleanup(1);
+  }
   const apply = rest.includes("--apply");
   const valueFlags = apply ? new Set([...MIGRATE_VALUE_FLAGS, "--plan"]) : MIGRATE_VALUE_FLAGS;
   const args = [];
@@ -1865,12 +1907,12 @@ async function handleMigrate(rest) {
   }
   const dir = resolveDir(args);
   const flags = extractFlags(args);
-  if (!apply && !flags.includes("--plan")) {
-    console.error("Error: ndx migrate needs --plan or --apply.");
-    console.error("Hint: 'ndx migrate --plan .' writes a reviewable plan and changes nothing; 'ndx migrate --apply .' applies it.");
-    exitWithCleanup(1);
-  }
   requireInit(dir, ["rex"]);
+  if (!apply && !flags.includes("--plan")) {
+    const migrateLayout = (root, layoutFlags) => runMigrateLayout(root, layoutFlags, { runCapture, tools });
+    exitWithCleanup(await runMigrateChain(dir, flags, { run, tools, migrateLayout }));
+    return;
+  }
   if (apply) {
     const forwarded = flags.filter((f) => f !== "--apply" && f !== "--plan");
     if (!forwarded.some((f) => f.startsWith("--plan="))) forwarded.push(`--plan=${DEFAULT_MIGRATION_PLAN_OUT}`);
@@ -2305,7 +2347,7 @@ async function handleWork(rest) {
       console.error("Hint: ndx work --task=<id> --resolve .");
       exitWithCleanup(1);
     }
-    await runOrDie(tools.hench, ["run", ...flags, dir]);
+    await runAgentOrDie(["run", ...flags, dir]);
     exitWithCleanup(0);
   }
 
@@ -2333,7 +2375,7 @@ async function handleWork(rest) {
 
   const disposeInterrupt = isDryRun ? () => {} : installWorkInterruptHandler(dir);
   try {
-    await runOrDie(tools.hench, ["run", ...flags, dir]);
+    await runAgentOrDie(["run", ...flags, dir]);
   } finally {
     disposeInterrupt();
   }
@@ -2773,7 +2815,7 @@ async function handleSelfHeal(rest) {
 
     const modelFlagSummary = modelFlags.length > 0 ? ` ${modelFlags.join(" ")}` : "";
     console.log(`\n${shTag} step 4/5: hench run --auto --loop --self-heal --tags=self-heal${yes ? " --yes" : ""}${modelFlagSummary}`);
-    await runOrDie(tools.hench, ["run", "--auto", "--loop", "--self-heal", "--tags=self-heal", ...yesFlag, ...modelFlags, ...verboseFlag, dir]);
+    await runAgentOrDie(["run", "--auto", "--loop", "--self-heal", "--tags=self-heal", ...yesFlag, ...modelFlags, ...verboseFlag, dir]);
 
     console.log(`\n${shTag} step 5/5: acknowledge completed findings`);
     await runOrDie(tools.rex, ["recommend", "--acknowledge-completed", ...verboseFlag, dir]);
@@ -3226,7 +3268,7 @@ async function handlePairProgramming(rest) {
     process.stderr.write(`✓ created task ${createdTaskId}\n`);
 
     // ── Step 1: primary vendor work ────────────────────────────────────────
-    const primaryCode = await run(tools.hench, ["run", `--task=${createdTaskId}`, ...henchArgs]);
+    const primaryCode = await run(tools.hench, ["run", `--task=${createdTaskId}`, ...henchArgs], AGENT_RUN_ENV);
     if (primaryCode !== 0) {
       exitWithCleanup(primaryCode);
       return;
@@ -3286,7 +3328,7 @@ async function handlePairProgramming(rest) {
             .filter((a) => !a.startsWith("--context-file="))
             .concat(`--context-file=${remediationContextPath}`);
 
-          await run(tools.hench, ["run", `--task=${createdTaskId}`, ...remediationArgs]);
+          await run(tools.hench, ["run", `--task=${createdTaskId}`, ...remediationArgs], AGENT_RUN_ENV);
         },
       });
 
@@ -3561,6 +3603,8 @@ async function main() {
       // Non-fatal — stale check failure never blocks command execution.
     }
   }
+
+  if (command && !hasHelp) noteLegacyLayoutOnce(command, dir);
 
   // ── Dispatch to command handler ─────────────────────────────────────────
   const runCommand = async () => {
