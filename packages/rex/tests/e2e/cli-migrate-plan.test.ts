@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, readdir, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, readFile, readdir, writeFile, mkdir, symlink, realpath } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
@@ -165,6 +165,46 @@ describe("rex migrate-plan", () => {
     const output = run(["migrate-plan", "--rules-only", `--out=${legacy}`, dir], true);
     expect(output).toContain("Refusing to write");
     expect(await readFile(legacy, "utf-8")).toBe(before);
+  });
+
+  describe("state-directory guard compares real paths", () => {
+    const refused = (target: string, flag = "out"): void => {
+      const args = flag === "out"
+        ? [`--out=${target}`]
+        : [`--out=${outPath}`, `--summary=${target}`];
+      const output = run(["migrate-plan", "--rules-only", ...args, dir], true);
+      expect(output).toContain("Refusing to write");
+      expect(existsSync(target)).toBe(false);
+    };
+
+    it.runIf(process.platform === "darwin" || process.platform === "win32")(
+      "refuses a case variant of the rex directory",
+      async () => {
+        // Only meaningful where the volume folds case.
+        if (!existsSync(join(dir, ".REX"))) return;
+        refused(join(dir, ".REX", "plan.json"));
+      },
+    );
+
+    it.skipIf(process.platform === "win32")("refuses a path through a symlink to the rex directory", async () => {
+      await symlink(join(dir, ".rex"), join(dir, "alias"));
+      refused(join(dir, "alias", "plan.json"));
+    });
+
+    it("refuses the real-path alias of the rex directory (/tmp vs /private/tmp)", async () => {
+      refused(join(await realpath(dir), ".rex", "plan.json"));
+    });
+
+    it("refuses --out=.ndx/plan.json on a legacy layout and creates no .ndx/", async () => {
+      refused(join(dir, ".ndx", "plan.json"));
+      expect(existsSync(join(dir, ".ndx"))).toBe(false);
+    });
+
+    it("holds --summary to the same guard", async () => {
+      refused(join(dir, ".ndx", "plan.md"), "summary");
+      expect(existsSync(join(dir, ".ndx"))).toBe(false);
+      expect(existsSync(outPath)).toBe(false);
+    });
   });
 
   it("refuses a --summary inside the rex directory, before writing the plan", async () => {

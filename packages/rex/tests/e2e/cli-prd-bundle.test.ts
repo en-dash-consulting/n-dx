@@ -21,7 +21,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
-import { cp, mkdtemp, rm, readdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, rm, readdir, readFile, writeFile, symlink, realpath } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -295,6 +295,20 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
 
       expect(output).toMatch(/Refusing to write a bundle inside/);
       expect(existsSync(inside)).toBe(false);
+    });
+
+    it("refuses a symlink to .rex, a real-path alias of it, and .ndx/ on a legacy layout", async () => {
+      await symlink(join(sourceDir, ".rex"), join(sourceDir, "alias"));
+      for (const target of [
+        join(sourceDir, "alias", "bundle.json"),
+        join(await realpath(sourceDir), ".rex", "bundle.json"),
+        join(sourceDir, ".ndx", "bundle.json"),
+      ]) {
+        const output = run(["export", `--out=${target}`, sourceDir], true);
+        expect(output).toMatch(/Refusing to write a bundle inside/);
+        expect(existsSync(target)).toBe(false);
+      }
+      expect(existsSync(join(sourceDir, ".ndx"))).toBe(false);
     });
 
     it("refuses the legacy backend path .rex/prd.json — the store would read it as the PRD", () => {
