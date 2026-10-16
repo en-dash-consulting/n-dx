@@ -281,48 +281,56 @@ function installV1Items(prdTreeDir) {
   }));
 }
 
-export async function handleDestroySample(rest) {
+/**
+ * @param {string[]} rest
+ * @param {SampleAppDeps} [deps]  Needed on a v2 project.
+ */
+export async function handleDestroySample(rest, deps) {
   const targetDir = rest[0] ? resolve(process.cwd(), rest[0]) : process.cwd();
   const sampleDir = join(targetDir, "sample-app");
   const rexDir = resolveLayout(targetDir).rexDir;
 
   console.log(`\n${cyan("n-dx")} destroying sample app...`);
 
-  // Remove source files
+  // PRD first: a v2 removal that cannot take the PRD lock throws here, before
+  // anything is deleted.
+  if (hasV2Tree(targetDir)) removeV2Items(join(rexDir, "changes"), targetDir, deps);
+  else removeV1Items(join(rexDir, "prd_tree"));
+
   if (existsSync(sampleDir)) {
     rmSync(sampleDir, { recursive: true, force: true });
     console.log(`${green("✔")} Removed sample-app directory`);
   }
-
-  if (hasV2Tree(targetDir)) removeV2Items(join(rexDir, "changes"));
-  else removeV1Items(join(rexDir, "prd_tree"));
   console.log(`${green("✔")} Sample app destroyed successfully!`);
 }
 
 /**
- * v2: a change is a folder holding its tasks, so removing the sample's change
- * removes them too. rex has no v2 delete verb; the folder names are its
- * on-disk contract (`store/prd-model-reader.ts`), as `migrate-chain.js` reads.
+ * v2: finds the changes `install-sample` added (`source: sample-app` in the
+ * folder's `index.md`; reading rex's on-disk contract, as `migrate-chain.js`
+ * does) and removes each with `rex remove`, which holds the PRD lock and logs.
+ * A change's tasks go with it. Core never deletes the folders itself.
  */
-function removeV2Items(changesDir) {
+function removeV2Items(changesDir, targetDir, deps) {
+  if (!deps?.rexScript) throw new Error("destroy-sample on a v2 project needs the rex CLI path (SampleAppDeps.rexScript)");
   const marker = new RegExp(`^source:\\s*["']?${SAMPLE_TAG}["']?\\s*$`, "m");
-  const isSample = (dir) => {
-    const index = join(dir, "index.md");
-    return existsSync(index) && marker.test(readFileSync(index, "utf8"));
-  };
   // A top-level change sits under changes/, or under changes/inbox/ while unplaced.
-  const inbox = join(changesDir, "inbox");
-  for (const parent of [changesDir, inbox]) {
+  for (const parent of [changesDir, join(changesDir, "inbox")]) {
     if (!existsSync(parent)) continue;
     for (const entry of readdirSync(parent)) {
       const dir = join(parent, entry);
-      if (!statSync(dir).isDirectory() || !isSample(dir)) continue;
-      rmSync(dir, { recursive: true, force: true });
+      if (!statSync(dir).isDirectory()) continue;
+      const index = join(dir, "index.md");
+      if (!existsSync(index)) continue;
+      const text = readFileSync(index, "utf8");
+      const id = /^id:\s*["']?([^"'\s]+)["']?\s*$/m.exec(text)?.[1];
+      if (!id || !marker.test(text)) continue;
+      execFileSyncCli(process.execPath, [deps.rexScript, "remove", id, "--yes", targetDir], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "inherit"],
+      });
       console.log(`${green("✔")} Removed PRD change: ${entry}`);
     }
   }
-  // rex drops the Inbox folder with its last change; so do we.
-  if (existsSync(inbox) && readdirSync(inbox).length === 0) rmSync(inbox, { recursive: true });
 }
 
 /** v1: remove every item file tagged `sample-app`. */

@@ -3412,7 +3412,7 @@ const COMMAND_DISPATCH = new Map([
   ["mcp",               handleMcpShim],
   ["export",            handleExport],
   ["install-sample",    (rest) => handleInstallSample(rest, { rexScript: tools.rex })],
-  ["destroy-sample",    handleDestroySample],
+  ["destroy-sample",    (rest) => handleDestroySample(rest, { rexScript: tools.rex })],
   ["config",            handleConfig],
   ["auth",              handleAuth],
   ["self-heal",         handleSelfHeal],

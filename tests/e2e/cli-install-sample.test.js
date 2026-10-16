@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { createTmpDir, removeTmpDir, run, setupRexDir } from "./e2e-helpers.js";
+import { createTmpDir, removeTmpDir, run, runFail, setupRexDir } from "./e2e-helpers.js";
 
 const V2_FIXTURE = join(import.meta.dirname, "../../packages/rex/tests/fixtures/v2-tree");
 
@@ -60,6 +60,23 @@ describe("ndx install-sample / destroy-sample", () => {
     expect(await titlesIn(join(rexDir, "changes"))).toEqual(before);
     expect(existsSync(join(rexDir, "changes", "inbox"))).toBe(false);
     expect(existsSync(join(rexDir, "prd_tree"))).toBe(false);
+  });
+
+  it("v2: destroy-sample fails naming the holder while the PRD lock is held, deleting nothing", async () => {
+    const rexDir = join(dir, ".rex");
+    await mkdir(rexDir, { recursive: true });
+    await writeFile(join(rexDir, "config.json"), JSON.stringify({ schema: "rex/v2", project: "p", adapter: "file", sourcevision: "auto" }));
+    await cp(V2_FIXTURE, rexDir, { recursive: true });
+    run(["install-sample", dir]);
+    const before = await titlesIn(join(rexDir, "changes"));
+
+    await writeFile(join(rexDir, "prd.lock"), JSON.stringify({ pid: process.pid, token: "t", timestamp: new Date().toISOString() }));
+    const failed = runFail(["destroy-sample", dir]);
+
+    expect(failed.status).not.toBe(0);
+    expect(failed.stderr).toContain(`Held by PID ${process.pid}`);
+    expect(await titlesIn(join(rexDir, "changes"))).toEqual(before);
+    expect(existsSync(join(dir, "sample-app"))).toBe(true);
   });
 
   it("v1: writes the epic tree under prd_tree/ and destroy removes it", async () => {

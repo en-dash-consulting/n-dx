@@ -382,6 +382,18 @@ async function dispatchRemove(
       : process.cwd();
   requireRexDir(removeDir);
 
+  if (await isV2Project(removeDir)) {
+    if (removeLevel) {
+      throw new CLIError(
+        `This PRD uses the v2 layout, where items have a type, not a level ("${removeLevel}").`,
+        "Usage: rex remove <id> (a change, task or subtask).",
+      );
+    }
+    const { cmdRemoveChange } = await import("./commands/remove-change.js");
+    await cmdRemoveChange(removeDir, removeId, flags);
+    return;
+  }
+
   const { cmdRemove } = await import("./commands/remove.js");
   await cmdRemove(removeDir, removeId, removeLevel, flags);
 }
