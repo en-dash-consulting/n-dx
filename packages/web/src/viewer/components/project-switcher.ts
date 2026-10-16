@@ -1,7 +1,7 @@
 /**
- * Breadcrumb hub navigation — the "Hub" link and the project switcher.
+ * Top bar hub navigation — the "Hub" link and the project switcher (project-context.ts).
  *
- * Behind the hub, the breadcrumb starts with a "Hub" link to the chooser at
+ * Behind the hub, the project context starts with a "Hub" link to the chooser at
  * `/hub`, and the project name opens a menu of every registered project.
  * Choosing one opens the same view under that project's `/p/<id>/` prefix —
  * a full navigation, since the viewer derives its base path once at boot.

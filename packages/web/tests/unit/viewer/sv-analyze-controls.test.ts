@@ -33,13 +33,30 @@ describe("AnalyzeControls (SourceVision full-flow trigger)", () => {
     return Array.from(root.querySelectorAll("button"));
   }
 
-  it("renders both quick and full analysis triggers", () => {
+  /** Open the caret menu, where Full analysis and the sub-packages switch live. */
+  function openMenu(): void {
+    act(() => { root.querySelector<HTMLButtonElement>(".analyze-caret")!.click(); });
+  }
+
+  it("is a split button: Re-analyze, and a menu with Full analysis and the sub-packages switch", () => {
     act(() => {
       render(h(AnalyzeControls, { jobs: emptyJobTray() }), root);
     });
-    const labels = buttons().map((b) => b.textContent);
-    expect(labels.some((l) => l?.includes("Re-analyze"))).toBe(true);
-    expect(labels.some((l) => l?.includes("Full analysis"))).toBe(true);
+    expect(root.querySelector(".analyze-main")?.textContent).toContain("Re-analyze");
+    expect(root.querySelector('[role="menu"]')).toBeNull();
+    const caret = root.querySelector<HTMLButtonElement>(".analyze-caret")!;
+    expect(caret.getAttribute("aria-haspopup")).toBe("menu");
+    openMenu();
+    expect(caret.getAttribute("aria-expanded")).toBe("true");
+    expect(root.querySelector('[role="menuitem"]')?.textContent).toContain("Full analysis");
+    const toggle = root.querySelector('[role="menuitemcheckbox"]')!;
+    expect(toggle.textContent).toContain("Include sub-packages");
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    // No emoji glyphs and no native checkbox.
+    expect(root.querySelector('input[type="checkbox"]')).toBeNull();
+    expect(root.textContent).not.toMatch(/[\u{1F300}-\u{1FAFF}\u2728]/u);
+    act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
+    expect(root.querySelector('[role="menu"]')).toBeNull();
   });
 
   it("full analysis POSTs full: true and refreshes the tray", async () => {
@@ -51,6 +68,7 @@ describe("AnalyzeControls (SourceVision full-flow trigger)", () => {
         jobs: { operations: [], refresh: async () => { refreshed.push(1); }, stop: async () => {} },
       }), root);
     });
+    openMenu();
     const fullBtn = buttons().find((b) => b.textContent?.includes("Full analysis"))!;
     await act(async () => {
       fullBtn.click();
@@ -76,7 +94,7 @@ describe("AnalyzeControls (SourceVision full-flow trigger)", () => {
       }), root);
     });
 
-    const running = buttons().find((b) => b.textContent?.includes("Running full analysis"));
+    const running = buttons().find((b) => b.textContent?.includes("Full analysis running"));
     expect(running).toBeTruthy();
     expect(running?.disabled).toBe(true);
     expect(root.textContent).toContain("Enrichment pass 3");
@@ -99,6 +117,7 @@ describe("AnalyzeControls (SourceVision full-flow trigger)", () => {
     act(() => {
       render(h(AnalyzeControls, { jobs: emptyJobTray() }), root);
     });
+    openMenu();
     const fullBtn = buttons().find((b) => b.textContent?.includes("Full analysis"))!;
     await act(async () => {
       fullBtn.click();
@@ -125,16 +144,18 @@ describe("AnalyzeControls (SourceVision full-flow trigger)", () => {
     expect(JSON.parse(String(init.body))).toEqual({ deep: false });
   });
 
-  it("checking the deep toggle sends deep: true on both quick and full runs", async () => {
+  it("switching on sub-packages sends deep: true", async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, { ok: true, output: "done" }));
 
     act(() => {
       render(h(AnalyzeControls, { jobs: emptyJobTray() }), root);
     });
-    const deepToggle = root.querySelector<HTMLInputElement>(".overview-deep-toggle input[type=checkbox]")!;
+    openMenu();
+    const deepToggle = root.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]')!;
     await act(async () => {
       deepToggle.click();
     });
+    expect(deepToggle.getAttribute("aria-checked")).toBe("true");
 
     const quickBtn = buttons().find((b) => b.textContent?.includes("Re-analyze"))!;
     await act(async () => {
