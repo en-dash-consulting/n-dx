@@ -1910,7 +1910,17 @@ async function handleMigrate(rest) {
   requireInit(dir, ["rex"]);
   if (!apply && !flags.includes("--plan")) {
     const migrateLayout = (root, layoutFlags) => runMigrateLayout(root, layoutFlags, { runCapture, tools });
-    exitWithCleanup(await runMigrateChain(dir, flags, { run, tools, migrateLayout }));
+    // Banner flags mirror what the chain will run: a dry run is rules-only
+    // unless --with-models, so the banner must not announce model calls it skips.
+    const bannerArgs = [...args];
+    if (flags.includes("--dry-run") && !flags.includes("--with-models") && !flags.includes("--rules-only")) {
+      bannerArgs.push("--rules-only");
+    }
+    let code = 0;
+    await withPreflight("migrate", bannerArgs, dir, async () => {
+      code = await runMigrateChain(dir, forwardableFlags(flags), { run, tools, migrateLayout });
+    });
+    exitWithCleanup(code);
     return;
   }
   if (apply) {

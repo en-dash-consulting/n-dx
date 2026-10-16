@@ -141,6 +141,16 @@ describe("ndx migrate --plan", () => {
       expect(piped.stderr).not.toContain("Ctrl-C now to stop");
     });
 
+    it("prints the banner for the bare chain, rules-only on a dry run", () => {
+      const res = spawnSync("node", [CLI_PATH, "migrate", "--dry-run", "--out", plan(), dir], {
+        encoding: "utf-8",
+        env: keylessEnv({ NDX_PREFLIGHT: "always" }),
+        cwd: dir,
+      });
+      expect(res.stderr).toContain("Ctrl-C now to stop");
+      expect(res.stderr).toContain("no model calls");
+    });
+
     it("reports --rules-only as no model calls and lists the --out plan and its summary as written", () => {
       const { stderr } = migratePlan(["--rules-only", "--out", plan()], { NDX_PREFLIGHT: "always" });
       expect(stderr).toContain("no model calls");

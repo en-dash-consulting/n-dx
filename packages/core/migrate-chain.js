@@ -16,7 +16,8 @@
  * | `schema-v2`     | `rex/v1` (`prd_tree/`)  | `rex/v2` (`product/`)| `rex migrate-plan`, then `migrate-apply` |
  *
  * `--dry-run` rehearses each link that can rehearse (layout prints its moves,
- * schema writes the plan file and rehearses the apply) and stops before the
+ * schema writes the plan file, rules-only unless `--with-models`, and
+ * rehearses the apply) and stops before the
  * first that cannot, since the links after it read what it would have
  * written.
  *
@@ -57,6 +58,8 @@ export const DEFAULT_MIGRATION_PLAN_OUT = "./migration-plan.json";
 const LAYOUT_FLAGS = ["--dry-run", "--no-commit"];
 /** `rex migrate-plan`'s flags the chain forwards (`--summary` and `--migration` stay with `ndx migrate --plan`). */
 const PLAN_FLAGS = ["--rules-only", "--no-jev-review", "--model=", "--cut-at=", "--out="];
+/** Chain-only: lets `--dry-run` run the model passes. Never forwarded to rex. */
+const WITH_MODELS_FLAG = "--with-models";
 
 /**
  * Spawn helpers, injected by cli.js so this module imports no package.
@@ -142,6 +145,10 @@ export const MIGRATION_LINKS = [
     rehearses: true,
     run: async (root, flags, deps) => {
       const planFlags = pick(flags, PLAN_FLAGS);
+      // A rehearsal costs nothing unless asked to.
+      if (flags.includes("--dry-run") && !flags.includes(WITH_MODELS_FLAG) && !planFlags.includes("--rules-only")) {
+        planFlags.push("--rules-only");
+      }
       const out = planFlags.find((flag) => flag.startsWith("--out="))?.slice("--out=".length);
       const planPath = out ?? DEFAULT_MIGRATION_PLAN_OUT;
       if (out === undefined) planFlags.push(`--out=${planPath}`);
@@ -163,11 +170,11 @@ export const MIGRATION_LINKS = [
  */
 export async function runMigrateChain(dir, flags, deps, links = MIGRATION_LINKS) {
   const root = resolve(dir);
-  const unknown = flags.filter((flag) => pick([flag], [...LAYOUT_FLAGS, ...PLAN_FLAGS]).length === 0);
+  const unknown = flags.filter((flag) => pick([flag], [...LAYOUT_FLAGS, ...PLAN_FLAGS, WITH_MODELS_FLAG]).length === 0);
   if (unknown.length > 0) {
     // A dropped typo would change what runs: `--rule-only` would pay for every model pass.
     console.error(`Error: ndx migrate does not take ${unknown.join(", ")}.`);
-    console.error(`Hint: The steps take ${[...LAYOUT_FLAGS, ...PLAN_FLAGS].map((f) => (f.endsWith("=") ? `${f}<value>` : f)).join(", ")}.`);
+    console.error(`Hint: The steps take ${[...LAYOUT_FLAGS, ...PLAN_FLAGS, WITH_MODELS_FLAG].map((f) => (f.endsWith("=") ? `${f}<value>` : f)).join(", ")}.`);
     return 1;
   }
   const dryRun = flags.includes("--dry-run");
