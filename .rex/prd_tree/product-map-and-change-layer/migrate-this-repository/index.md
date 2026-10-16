@@ -40,7 +40,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Approve the area and constraint list for this repository](./approve-the-area-and-constraint-list.md) | pending |
-| [Dashboard PRD reads answer 404 'No PRD data found' until the boot cache is written](./dashboard-prd-reads-answer-404-no-prd.md) | pending |
+| [Dashboard PRD reads answer 404 'No PRD data found' until the boot cache is written](./dashboard-prd-reads-answer-404-no-prd.md) | completed |
 | [Refresh the sourcevision analysis baseline the cut plan reads](./refresh-the-sourcevision-analysis.md) | pending |
 | [Review the drafted capability specs area by area](./review-the-drafted-capability-specs.md) | pending |
 | [Run the final migration on this repository](./run-the-final-migration-on-this.md) | pending |

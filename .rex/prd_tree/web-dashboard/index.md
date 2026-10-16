@@ -40,6 +40,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Transparent task selection and completion reasoning](./transparent-task-selection-and/index.md) | completed |
 | [UI Density Toggle (Small / Medium / Large)](./ui-density-toggle-small-medium-large/index.md) | completed |
 | [Web Dashboard Accessibility (a11y)](./web-dashboard-accessibility-a11y/index.md) | completed |
+| [A worktree workspace's first PRD read answers 404 until its lazily written cache lands](./a-worktree-workspace-s-first-prd-read.md) | pending |
 | [Changes view: time-ordered default with recency desaturation](./changes-view-time-ordered-default-with.md) | deferred |
 | [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | pending |
 | [Dashboard action icons render at a readable size from one shared SVG icon set](./dashboard-action-icons-render-at-a.md) | completed |
