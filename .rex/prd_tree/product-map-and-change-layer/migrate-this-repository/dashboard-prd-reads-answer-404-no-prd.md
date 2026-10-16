@@ -1,0 +1,20 @@
+---
+id: "9395aab1-87e4-4fee-a1b1-ee8fd6109fc4"
+level: "task"
+title: "Dashboard PRD reads answer 404 'No PRD data found' until the boot cache is written"
+status: "pending"
+priority: "medium"
+tags:
+  - "pr-26"
+  - "lane-migration"
+  - "web"
+source: "v2 migrate stack session 2026-10-15"
+acceptanceCriteria:
+  - "GET /api/rex/prd answers 200 with the PRD from the first request after ndx start, on a v1 folder tree and on a migrated v2 tree, with no .rex/.cache/prd.json present"
+  - "The other routes that read through loadPRDSync (claims, validation, analysis, items, health, requirements, prune, execution, hench prep) get the same answer"
+  - "A web server test starts with no cache file and asserts the first /api/rex/prd read is 200"
+description: "Rehearsal gate item 8. The 2026-10-14 rehearsal recorded GET /api/rex/prd answering 404 on a migrated copy while /api/rex/product and /changes answered 200. Reproduced 2026-10-15 on a rules-only migrated copy of this repository at ce54d9e5e (2,515 v1 items, 2,511 nodes): the first /api/rex/prd answered 404, and the same request one second later answered 200 with the full projection (4.8 MB). It is a cold-start race, not a v2 refusal. packages/web/src/server/prd-io.ts loadPRDSync reads .rex/.cache/prd.json (written at boot), then prd.md, then prd.json. A folder tree, v1 or v2, has neither of the last two, so every loadPRDSync route answers 404 until the boot cache lands. /product and /changes read the tree directly and are unaffected. Smallest fix: when the cache is absent, build the document the way the boot cache does (or wait for the boot write) instead of returning null. Keep the cache as the fast path. Do not add a prd.md or prd.json write."
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-16T00:07:18.825Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
