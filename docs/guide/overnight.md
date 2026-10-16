@@ -47,7 +47,7 @@ Rather than letting the agent pick any pending task, scope it to one top-level i
 ndx work --epic="Auth System" --auto --iterations=10 .
 ```
 
-The agent will only pick tasks under the item whose title contains "Auth System" (or whose id matches). If it runs out of tasks before the iteration limit, it stops cleanly. The flag keeps its v1 name: on the v1 projects `ndx init` creates until the storage migration ships, the top-level items are epics.
+The agent will only pick tasks under the item whose title contains "Auth System" (or whose id matches). If it runs out of tasks before the iteration limit, it stops cleanly. The flag keeps its v1 name: on a v1 project (one that has not yet run `ndx migrate`) the top-level items are epics.
 
 ## Launch: the overnight command
 

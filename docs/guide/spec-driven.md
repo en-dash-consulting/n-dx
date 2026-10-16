@@ -27,7 +27,7 @@ rex change place <change> --target=<node> --relation=amends \
 ```
 
 ::: info v1 projects
-Until the storage migration ships, `ndx init` creates v1 projects, which have no product layer. On a v1 project an LLM decomposes the spec into a tree of epics, features, tasks and subtasks, and the steps below walk through that path.
+`ndx init` creates v2 projects. A v1 project, one that has not yet run `ndx migrate`, has no product layer: an LLM decomposes the spec into a tree of epics, features, tasks and subtasks. Steps 2 and 3 below walk through that v1 path and mark where a v2 project differs; the later steps apply to both.
 :::
 
 ## Step 1: Initialize (if you haven't)

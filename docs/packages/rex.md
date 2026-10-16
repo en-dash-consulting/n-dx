@@ -26,7 +26,7 @@ product/                      changes/
 **Priority:** `critical` | `high` | `medium` | `low`
 
 ::: info v1 projects
-Until the storage migration ships, `ndx init` creates v1 projects. A v1 PRD (`.rex/prd_tree/`) has no product layer: it is one tree of work items, each with a `level` (epic › feature › task › subtask) instead of a type. The commands below say where they differ.
+`ndx init` creates v2 projects. A v1 PRD (`.rex/prd_tree/`, on a project that has not yet run `ndx migrate`) has no product layer: it is one tree of work items, each with a `level` (epic › feature › task › subtask) instead of a type. The commands below say where they differ.
 :::
 
 ## CLI

@@ -82,7 +82,7 @@ ndx add "<describe what you want to create>"
 `ndx add` creates one change per description in the **Inbox**, under `.ndx/rex/changes/`, and prints its id with a suggested placement: the capabilities it could add to, amend or touch. Record the placement with `rex change place <change> --target=<node>`, or leave it in the Inbox for later. See [Changes and apply](./concepts/changes-and-apply).
 
 ::: info v1 projects
-Until the storage migration ships, `ndx init` creates a v1 project, and `ndx add` there behaves as these screenshots show: the configured LLM drafts a proposal of epics, features and tasks, and you accept it into `.rex/prd_tree/`.
+`ndx init` creates a v2 project. On a v1 project, one that has not yet run `ndx migrate`, `ndx add` behaves as these screenshots show: the configured LLM drafts a proposal of epics, features and tasks, and you accept it into `.rex/prd_tree/`.
 
 ![ndx add #1](../../documentation/ndx_add_1.png)
 ![ndx add #2](../../documentation/ndx_add_2.png)

@@ -86,7 +86,7 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 
 ## Rex MCP Tools
 
-Rex reads the PRD's layout from disk. A v2 PRD is the product layer (`.ndx/rex/product/`) plus the change layer (`.ndx/rex/changes/`); see [The PRD](./concepts/). Until the storage migration ships, `ndx init` creates v1 projects (`.rex/prd_tree/`, one tree of items with levels), and the product-layer tools refuse them.
+Rex reads the PRD's layout from disk. A v2 PRD is the product layer (`.ndx/rex/product/`) plus the change layer (`.ndx/rex/changes/`); see [The PRD](./concepts/). `ndx init` creates v2 projects. A v1 project, one that has not yet run `ndx migrate`, keeps `.rex/prd_tree/` (one tree of items with levels), and the product-layer tools refuse it.
 
 ### Product layer and changes
 
