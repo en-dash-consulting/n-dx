@@ -1908,11 +1908,24 @@ async function handleMigrate(rest) {
   const dir = resolveDir(args);
   const flags = extractFlags(args);
   requireInit(dir, ["rex"]);
+  // rex resolves --out and --summary against the cwd, while the summary
+  // resolves declared paths against the project dir, so hand it absolute ones:
+  // from another directory it would otherwise report the plan as not written.
+  const absolutePathFlag = (f) => {
+    const m = /^(--out|--summary)=(.+)$/.exec(f);
+    return m ? `${m[1]}=${resolve(m[2])}` : f;
+  };
+  // From `args`, not the forwarded flags: --yes, stripped for the child, is
+  // what tells the banner to stay quiet.
+  const preflightArgs = [
+    ...args.map(absolutePathFlag),
+    ...(flags.some((f) => f.startsWith("--out=")) ? [] : [`--out=${resolve(DEFAULT_MIGRATION_PLAN_OUT)}`]),
+  ];
   if (!apply && !flags.includes("--plan")) {
     const migrateLayout = (root, layoutFlags) => runMigrateLayout(root, layoutFlags, { runCapture, tools });
     // Banner flags mirror what the chain will run: a dry run is rules-only
     // unless --with-models, so the banner must not announce model calls it skips.
-    const bannerArgs = [...args];
+    const bannerArgs = [...preflightArgs];
     if (flags.includes("--dry-run") && !flags.includes("--with-models") && !flags.includes("--rules-only")) {
       bannerArgs.push("--rules-only");
     }
@@ -1933,19 +1946,6 @@ async function handleMigrate(rest) {
   if (!forwarded.some((f) => f === "--out" || f.startsWith("--out="))) {
     forwarded.push(`--out=${DEFAULT_MIGRATION_PLAN_OUT}`);
   }
-  // rex resolves --out and --summary against the cwd, while the summary
-  // resolves declared paths against the project dir, so hand it absolute ones:
-  // from another directory it would otherwise report the plan as not written.
-  const absolutePathFlag = (f) => {
-    const m = /^(--out|--summary)=(.+)$/.exec(f);
-    return m ? `${m[1]}=${resolve(m[2])}` : f;
-  };
-  // From `args`, not `forwarded`: --yes, stripped for the child, is what tells
-  // the banner to stay quiet.
-  const preflightArgs = [
-    ...args.map(absolutePathFlag),
-    ...(flags.some((f) => f.startsWith("--out=")) ? [] : [`--out=${resolve(DEFAULT_MIGRATION_PLAN_OUT)}`]),
-  ];
   await withPreflight("migrate", preflightArgs, dir, () =>
     runOrDie(tools.rex, ["migrate-plan", ...forwarded, dir]),
   );

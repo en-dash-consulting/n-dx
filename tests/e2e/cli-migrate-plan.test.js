@@ -151,6 +151,17 @@ describe("ndx migrate --plan", () => {
       expect(res.stderr).toContain("no model calls");
     });
 
+    it("lists the bare chain's relative --out as written when run from outside the project", () => {
+      const res = spawnSync("node", [CLI_PATH, "migrate", "--dry-run", "--out", "chain-plan.json", dir], {
+        encoding: "utf-8",
+        env: keylessEnv({ NDX_PREFLIGHT: "always" }),
+        cwd: outDir,
+      });
+      expect(existsSync(join(outDir, "chain-plan.json"))).toBe(true);
+      const wrote = (res.stderr ?? "").split("\n").find((l) => l.includes("wrote   "));
+      expect(wrote).toContain("chain-plan.json");
+    });
+
     it("reports --rules-only as no model calls and lists the --out plan and its summary as written", () => {
       const { stderr } = migratePlan(["--rules-only", "--out", plan()], { NDX_PREFLIGHT: "always" });
       expect(stderr).toContain("no model calls");
