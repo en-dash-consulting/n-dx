@@ -23,7 +23,8 @@
  *   `ROOT_URLCONF = "…"` literal names; without one that resolves, at each
  *   module setting `urlpatterns` that no other includes.
  * - `drf-router`: `router.register(…)` on a name bound to a `…Router(…)`
- *   (Django REST framework's routers) is counted in a notice and not
+ *   (Django REST framework's routers), in the same file or imported from
+ *   the one that binds it, is counted in a notice and not
  *   expanded; `include(router.urls)` is left out without a notice.
  *
  * @module lang-python/django
@@ -146,6 +147,9 @@ export function readDjangoRoutes(files: readonly PackSourceFile[], context: Fram
       : { key: `${file}\0${name}`, file, entries: confs.get(file)!.web.itemsOf(confs.get(file)!.lists.get(name)!) };
   const hasList = (file: string, name: string): boolean =>
     name === URLPATTERNS ? confs.get(file)?.urlpatterns !== undefined : (confs.get(file)?.lists.has(name) ?? false);
+  /** Whether `text` written in `file` names a router, bound there or imported from where it is. */
+  const isRouter = (file: string, text: string): boolean =>
+    project.defined(file, text, (f, name) => confs.get(f)?.routers.has(name) ?? false) !== undefined;
 
   /** What `include(node)` in `file` adds. */
   const targetOf = (file: string, node: Capture): Target => {
@@ -166,7 +170,7 @@ export function readDjangoRoutes(files: readonly PackSourceFile[], context: Fram
       case "identifier":
       case "attribute": {
         const segments = dotted(node.text).split(".");
-        if (segments.length === 2 && segments[1] === "urls" && conf.routers.has(segments[0]!)) return "router";
+        if (segments.length >= 2 && segments.at(-1) === "urls" && isRouter(file, segments.slice(0, -1).join("."))) return "router";
         const module = project.moduleOf(file, segments);
         if (module !== undefined) return moduleSource(module);
         const list = project.defined(file, node.text, hasList);
@@ -253,7 +257,7 @@ export function readDjangoRoutes(files: readonly PackSourceFile[], context: Fram
 
   for (const conf of confs.values()) {
     for (const call of conf.web.calls) {
-      if (call.callee === "register" && call.receiver !== undefined && conf.routers.has(call.receiver)) {
+      if (call.callee === "register" && call.receiver !== undefined && isRouter(conf.web.path, call.receiver)) {
         registered.add(conf.web.path, call.invocation, "register", `${call.receiver}.register`);
       }
     }
