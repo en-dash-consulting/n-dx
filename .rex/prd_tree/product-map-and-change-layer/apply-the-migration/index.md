@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A dissolved container's blockedBy rewrite at migrate --apply is invisible to a reviewer: neither the plan nor the dry run shows it](./a-dissolved-container-s-blockedby.md) | completed |
 | [A failed prd_tree/ removal after the switch says the v2 tree is in place and to re-run apply](./a-failed-prd-tree-removal-after-the.md) | pending |
 | [A leftover .rex/prd.json is auto-migrated back into prd_tree/ beside the v2 tree after rex migrate --apply](./a-leftover-rex-prd-json-is-auto.md) | completed |
-| [A re-plan reuses the earlier plan's cut time only when the tree is unchanged](./a-re-plan-reuses-the-earlier-plan-s.md) | pending |
+| [A re-plan reuses the earlier plan's cut time only when the tree is unchanged](./a-re-plan-reuses-the-earlier-plan-s.md) | completed |
 | [After rex migrate --apply, an item blockedBy a dissolved release or review epic is blocked forever](./after-rex-migrate-apply-an-item.md) | completed |
 | [Agents in ndx work runs see "Run 'ndx migrate'" on every rex command and can run the migration unasked](./agents-in-ndx-work-runs-see-run-ndx.md) | completed |
 | [Apply an approved plan in one transaction, re-runnable against a newer tree](./apply-an-approved-plan-in-one.md) | completed |
