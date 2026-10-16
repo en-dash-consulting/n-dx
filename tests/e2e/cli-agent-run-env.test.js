@@ -101,7 +101,8 @@ describe("agent run environment", () => {
   async function writeFailingReviewer() {
     if (process.platform === "win32") {
       const path = join(dir, "fake-codex.cmd");
-      await writeFile(path, '@echo off\r\nif "%1"=="--version" exit /b 0\r\necho FAIL\r\necho - bug found\r\nexit /b 1\r\n');
+      // spawnCli quotes every argument on Windows; %~1 strips those quotes.
+      await writeFile(path, '@echo off\r\nif "%~1"=="--version" exit /b 0\r\necho FAIL\r\necho - bug found\r\nexit /b 1\r\n');
       return path;
     }
     const path = join(dir, "fake-codex");
