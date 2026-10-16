@@ -19,6 +19,7 @@ import {
   localizeEffects,
   expandLayoutTokens,
   LAYOUT_TOKENS,
+  prdTokenPaths,
 } from "../../packages/core/command-effects.js";
 import { getOrchestratorCommands } from "../../packages/core/help.js";
 
@@ -192,8 +193,9 @@ describe("shouldShowPreflight", () => {
 });
 
 describe("localizeEffects", () => {
-  const LEGACY = { rex: ".rex", hench: ".hench", sourcevision: ".sourcevision", config: ".n-dx.json" };
-  const NDX = { rex: ".ndx/rex", hench: ".ndx/hench", sourcevision: ".ndx/sourcevision", config: ".ndx/config.json" };
+  const LEGACY = { rex: ".rex", hench: ".hench", sourcevision: ".sourcevision", config: ".n-dx.json", ...prdTokenPaths(".rex", false) };
+  const NDX = { rex: ".ndx/rex", hench: ".ndx/hench", sourcevision: ".ndx/sourcevision", config: ".ndx/config.json", ...prdTokenPaths(".ndx/rex", false) };
+  const NDX_V2 = { ...NDX, ...prdTokenPaths(".ndx/rex", true) };
 
   it("names no layout-owned path literally — every one is a token", () => {
     // A literal `.rex/` is wrong on a `.ndx/` project, silently: the banner
@@ -208,10 +210,22 @@ describe("localizeEffects", () => {
     expect(localizeEffects(COMMAND_EFFECTS.analyze, NDX).writes[0].path).toBe(".ndx/sourcevision/");
   });
 
+  it("names changes/ and product/, not prd_tree/, for the PRD on a v2 project", () => {
+    const add = localizeEffects(resolveCommandEffects("add"), NDX_V2);
+    expect(add.writes.map((w) => w.path)).toContain(".ndx/rex/changes/");
+    expect(add.reads).toContain(".ndx/rex/product/ and .ndx/rex/changes/");
+    expect(JSON.stringify(add)).not.toContain("prd_tree");
+    for (const name of ["plan", "recommend"]) {
+      expect(localizeEffects(COMMAND_EFFECTS[name], NDX_V2).reads.join("\n"), name).not.toContain("prd_tree");
+    }
+    // The same declaration on a v1 project still names the tree.
+    expect(localizeEffects(resolveCommandEffects("add"), NDX).writes.map((w) => w.path)).toContain(".ndx/rex/prd_tree/");
+  });
+
   it("leaves an unknown token as written and does not touch the declaration", () => {
     expect(expandLayoutTokens("{nope}/x", LEGACY)).toBe("{nope}/x");
     localizeEffects(COMMAND_EFFECTS.plan, LEGACY);
-    expect(COMMAND_EFFECTS.plan.writes.map((w) => w.path)).toContain("{rex}/prd_tree/");
+    expect(COMMAND_EFFECTS.plan.writes.map((w) => w.path)).toContain("{prd}");
   });
 
   it("declares a resolveLayout field for every token", () => {

@@ -8,7 +8,7 @@ Analyze the codebase and propose PRD updates.
 
 1. Call `get_overview` (sourcevision MCP) to understand current project state
 2. Call `get_findings` (sourcevision MCP) to identify anti-patterns and suggestions
-3. Read the existing PRD items from the `get_prd_status` answer, to avoid duplicates. **v2 tree:** also call `get_product` (rex MCP) for the areas, capabilities and constraints a change can touch or amend
+3. Read the existing PRD items from the `get_prd_status` answer, to avoid duplicates. **v2 tree:** also call `get_product` (rex MCP), which lists the areas with their counts, then call it with `area` (an area id or display id) for the capabilities and constraints, the ones a change can touch or amend, of each area a proposal concerns
 4. Call `get_next_steps` (sourcevision MCP) for prioritized recommendations
 5. Based on findings, existing gaps, and any user-described goals, propose new items:
    - **v1 tree:** epics, features and tasks
@@ -19,7 +19,7 @@ Analyze the codebase and propose PRD updates.
    - **v1 tree:** `level` — `epic`, `feature`, or `task`, matching where the proposal sits in the tree you are building. Required, with no default: leave it unstated and repeated planning runs file the same kind of proposal at different levels
    - **v2 tree:** `type` — `change`, or `task` under a change; never pass `level`, which `add_item` refuses on v2. Create each change before its tasks, so they have its id
    - **v1 tree:** `parentId` — the epic or feature this belongs under. Never leave a proposal at root level
-   - **v2 tree:** `parentId` — the change, for a task. A change takes none; pass `touches` (capability or constraint ids from `get_product`) so it is placed on creation. A change with neither `touches` nor `amends` lands in the Inbox with `needsPlacement`: show the user its shortlist from `place_change` (no `target`) and record the placement they pick
+   - **v2 tree:** `parentId` — the change, for a task. A change takes none; pass `touches` (capability or constraint ids from `get_product` with `area`) so it is placed on creation. A change with neither `touches` nor `amends` lands in the Inbox with `needsPlacement`: show the user its shortlist from `place_change` (no `target`) and record the placement they pick
    - `description` — the rationale, including the finding or gap that motivated it
    - `acceptanceCriteria` — the array, one criterion per entry. Put them here rather than in `description`: `verify_criteria` (rex MCP) and the dashboard's requirements view read this field, so criteria written as prose can never be mapped to tests or checked later
    - `priority` — `critical`, `high`, `medium`, or `low`, inferred from the finding's severity and what it blocks

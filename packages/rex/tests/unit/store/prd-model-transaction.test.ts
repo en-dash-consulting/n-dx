@@ -66,7 +66,8 @@ describe("withPrdModelTransaction", () => {
       return { tree: retitle(model.tree, CAPABILITY, "Pay by card, renamed"), result: "done" };
     });
     expect(result).toBe("done");
-    expect(written).toEqual({ written: ["product/checkout/pay-by-card.md"], removed: [], deletedFiles: [] });
+    // state.yaml takes the retitled node's lastModified / lastModifiedBy.
+    expect(written).toEqual({ written: ["product/checkout/pay-by-card.md", "product/checkout/state.yaml"], removed: [], deletedFiles: [] });
     expect(await titleOf(rexDir, CAPABILITY)).toBe("Pay by card, renamed");
     expect(isLockHeld(lockPath)).toBe(false);
     expect(existsSync(lockPath)).toBe(false);

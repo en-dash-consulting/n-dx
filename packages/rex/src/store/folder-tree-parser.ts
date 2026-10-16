@@ -37,7 +37,11 @@ export interface ParseWarning {
   path: string;
   /** Human-readable description of the problem. */
   message: string;
-  /** The v2 reader dropped a node (and, for a folder, its contents) over this problem. */
+  /**
+   * The reader dropped an item over this problem: the v2 reader a node (and,
+   * for a folder, its contents), the v1 parser an item file or a subtask
+   * section. Unmarked warnings lose nothing.
+   */
   skipped?: true;
 }
 
@@ -321,10 +325,13 @@ async function discoverLeafChildMarkdownFiles(
     const filePath = join(dir, entry);
     if (filePath === itemFile) continue;
 
+    const from = warnings.length;
     const text = await readIndexFile(filePath, warnings, digests);
-    if (text === null) continue;
-    const fm = parseFrontmatter(text, filePath, warnings);
-    if (fm === null) continue;
+    const fm = text === null ? null : parseFrontmatter(text, filePath, warnings);
+    if (fm === null) {
+      markSkipped(warnings, from);
+      continue;
+    }
 
     // Legacy single-child shim — handled elsewhere; do not treat as leaf.
     if (fm.__parentId !== undefined) continue;
@@ -706,7 +713,7 @@ async function discoverItemFile(
   listing: DirListing | null,
 ): Promise<string | null> {
   if (!listing) {
-    warnings.push({ path: dir, message: "Directory not readable" });
+    warnings.push({ path: dir, message: "Directory not readable", skipped: true });
     return null;
   }
   const entries = listing.names;
@@ -730,6 +737,9 @@ async function discoverItemFile(
     message: markdownFiles.length === 0
       ? "No item markdown file found (expected index.md or title-named .md file)"
       : `Ambiguous item file: ${markdownFiles.length} non-index .md files and no index.md`,
+    // A folder holding only, say, a .gitkeep loses nothing; one holding item
+    // files or subfolders loses them with it.
+    ...(markdownFiles.length > 0 || listing.subdirs.length > 0 ? { skipped: true as const } : {}),
   });
   return null;
 }
@@ -749,17 +759,26 @@ async function parseItemFileFromFrontmatter(
   itemFiles: Map<string, string>,
   fromReconstructedParent: boolean = false,
 ): Promise<PRDItem | null> {
+  const from = warnings.length;
   const text = await readIndexFile(filePath, warnings, digests);
-  if (text === null) return null;
-
-  const fm = parseFrontmatter(text, filePath, warnings);
-  if (fm === null) return null;
+  const fm = text === null ? null : parseFrontmatter(text, filePath, warnings);
+  if (fm === null) {
+    markSkipped(warnings, from);
+    return null;
+  }
 
   if (typeof fm.id === "string" && fm.id) {
     itemFiles.set(fm.id, resolve(filePath));
   }
 
-  return buildItem(fm, filePath, depth, warnings, fromReconstructedParent);
+  const item = buildItem(fm, filePath, depth, warnings, fromReconstructedParent);
+  if (item === null) markSkipped(warnings, from);
+  return item;
+}
+
+/** Mark the warnings pushed since index `from` as the reason an item was dropped. */
+function markSkipped(warnings: ParseWarning[], from: number): void {
+  for (let i = from; i < warnings.length; i++) warnings[i] = { ...warnings[i], skipped: true };
 }
 
 async function readIndexFile(
@@ -994,7 +1013,7 @@ function parseSubtaskSection(
   // **ID:** `{uuid}`
   const idMatch = section.match(/\*\*ID:\*\*\s*`([^`]+)`/);
   if (!idMatch) {
-    warnings.push({ path: filePath, message: `Subtask "${title}" is missing **ID:** field` });
+    warnings.push({ path: filePath, message: `Subtask "${title}" is missing **ID:** field`, skipped: true });
     return null;
   }
   const id = idMatch[1].trim();

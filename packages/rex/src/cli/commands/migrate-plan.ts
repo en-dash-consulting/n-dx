@@ -53,9 +53,10 @@ import { formatPlanFile, readPlanFile, writePlanFile, type PlanFile } from "../.
 import { contentHash, sourceDigest, v1TreeSource, V1_TREE_SOURCE_KIND, type V1ToV2Options } from "../../migrations/v1-to-v2/index.js";
 import { readCodeEvidence, readCodeEvidenceProvenance } from "../../migrations/v1-to-v2/code-files.js";
 import { planSeams } from "../../migrations/v1-to-v2/seams.js";
+import { describeSkippedV1Items, skippedV1Items } from "../../migrations/v1-to-v2/v1-tree-read.js";
 import { renderPlanSummary, type V1ToV2Plan } from "../../migrations/v1-to-v2/plan-summary.js";
 import { atomicWrite } from "../../store/atomic-write.js";
-import { CLIError } from "../errors.js";
+import { CLIError, refuseInsideAgentRun } from "../errors.js";
 import { assertOutsideRexDir } from "./export.js";
 import { info, result, warn } from "../output.js";
 
@@ -200,6 +201,7 @@ async function isAncestorOfHead(dir: string, sha: string): Promise<boolean> {
 }
 
 export async function cmdMigratePlan(dir: string, flags: Record<string, string>): Promise<void> {
+  refuseInsideAgentRun("rex migrate-plan");
   // The whole argument shape settles before anything is read, so a malformed
   // command fails on the command rather than part-way through a paid run.
   const id = flags.migration === undefined || flags.migration === "true" ? DEFAULT_MIGRATION : flags.migration;
@@ -246,7 +248,13 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   // classify a mixed state. Never withTransaction — that would write the tree
   // back out, and this command writes nothing to it.
   await mkdir(rexDir, { recursive: true });
-  const doc = await withLock(prdLockPath(rexDir), () => store.loadDocument());
+  const doc = await withLock(prdLockPath(rexDir), async () => {
+    // The store's load drops the parser's warnings: an item it skipped would
+    // be planned as absent, and apply would then remove its file.
+    const skipped = await skippedV1Items(rexDir);
+    if (skipped.length > 0) throw new CLIError(describeSkippedV1Items(skipped), "No plan was written.");
+    return store.loadDocument();
+  });
 
   const seams = await buildSeams(dir, rexDir, flags);
   // Both outside facts the rules read are gathered here: the migration itself

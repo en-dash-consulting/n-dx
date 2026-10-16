@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import nodePath, { join } from "node:path";
 import { computeProductStatus } from "../../../../src/core/product-status.js";
 import { findActionableWork } from "../../../../src/core/change-selection.js";
+import { checkV2TreeHealth } from "../../../../src/core/health.js";
 import { isLossless } from "../../../../src/core/slug-migration.js";
 import type { PRDItem } from "../../../../src/schema/v1.js";
 import { CUT_HELD_AFTER_CUT_HEADING, checkV2Rules, isAppliedChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../../src/schema/v2-rules.js";
@@ -24,17 +25,38 @@ import {
   type V1ToV2Plan,
 } from "../../../../src/migrations/v1-to-v2/apply.js";
 
-// A model the reader cannot read back is a writer or reader defect, not something a v1 tree can
-// provoke on demand, so the read-back is made to report a skipped file when a test asks.
-const readBack = vi.hoisted(() => ({ skip: false }));
+// A model the reader cannot read back, or reads back without a node, is a writer or reader defect,
+// not something a v1 tree can provoke on demand, so the read-back is made to report a skipped file,
+// or to lose the node with id `lose`, when a test asks.
+const readBack = vi.hoisted(() => ({ skip: false, lose: undefined as string | undefined }));
 vi.mock("../../../../src/store/prd-model-reader.js", async (importOriginal) => {
   const real = await importOriginal<typeof import("../../../../src/store/prd-model-reader.js")>();
+  const without = (nodes: RuleNode[], id: string): RuleNode[] =>
+    nodes.filter((n) => n.id !== id).map((n) => (n.children ? { ...n, children: without(n.children, id) } : n));
   return {
     ...real,
     loadPrdModel: async (...args: Parameters<typeof real.loadPrdModel>) => {
-      const model = await real.loadPrdModel(...args);
+      let model = await real.loadPrdModel(...args);
+      const lose = readBack.lose;
+      if (lose !== undefined) model = { ...model, tree: { product: without(model.tree.product, lose), changes: without(model.tree.changes, lose) } };
       if (!readBack.skip) return model;
       return { ...model, warnings: [...model.warnings, { path: "product/area/index.md", message: "unreadable", skipped: true }] };
+    },
+  };
+});
+
+// A removal held up by a handle (the dashboard's watcher, antivirus on Windows) cannot be provoked
+// on demand, so `rm` of the path `failRm` throws when a test asks.
+const fsFaults = vi.hoisted(() => ({ failRm: undefined as string | undefined }));
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const real = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...real,
+    rm: async (...args: Parameters<typeof real.rm>) => {
+      if (fsFaults.failRm !== undefined && String(args[0]) === fsFaults.failRm) {
+        throw Object.assign(new Error(`EBUSY: resource busy or locked, rmdir '${String(args[0])}'`), { code: "EBUSY" });
+      }
+      return real.rm(...args);
     },
   };
 });
@@ -64,6 +86,33 @@ const TREE: PRDItem[] = [
   }),
 ];
 
+/** Two open release epics, 0.12.0 blockedBy 0.11.0 and carrying a description and criteria. */
+const RELEASES: PRDItem[] = [
+  item("r11", "epic", "ndx 0.11.0", [
+    item("g1", "feature", "Ship the hub", [], { status: "pending" }),
+    item("g2", "feature", "Shipped already", []),
+  ], { status: "pending" }),
+  item("r12", "epic", "ndx 0.12.0", [
+    item("g3", "feature", "Sidecar", [], { status: "pending" }),
+    item("g4", "feature", "Sidecar docs", [], { status: "pending" }),
+  ], {
+    status: "pending",
+    blockedBy: ["r11"],
+    description: "Second soft-freeze release.\nNo new commands.",
+    acceptanceCriteria: ["Every lane merged", "Release gate passes"],
+  }),
+];
+
+/** What {@link RELEASES}' r12 leaves in the cut change's body: its line, and its fields under it. */
+const R12_CUT_LINES = [
+  "- ndx 0.12.0 (r12): plannedRelease 0.12.0",
+  "  Second soft-freeze release.",
+  "  No new commands.",
+  "  Acceptance criteria:",
+  "  - Every lane merged",
+  "  - Release gate passes",
+].join("\n");
+
 function walk(nodes: readonly RuleNode[], out: RuleNode[] = []): RuleNode[] {
   for (const node of nodes) {
     out.push(node);
@@ -75,6 +124,11 @@ function walk(nodes: readonly RuleNode[], out: RuleNode[] = []): RuleNode[] {
 const all = (tree: V2Tree): RuleNode[] => walk([...tree.product, ...tree.changes]);
 const byId = (tree: V2Tree, id: string): RuleNode | undefined => all(tree).find((n) => n.id === id);
 
+/** A snapshot key: `p` relative to `dir`, forward-slashed and rooted ("/prd_tree/a.md"), whatever the separator. */
+function snapshotKey(dir: string, p: string, flavour: Pick<typeof nodePath, "relative" | "sep"> = nodePath): string {
+  return `/${flavour.relative(dir, p).split(flavour.sep).join("/")}`;
+}
+
 /** Every file under a directory with its bytes. */
 function snapshot(dir: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -82,7 +136,7 @@ function snapshot(dir: string): Record<string, string> {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const p = join(d, e.name);
       if (e.isDirectory()) visit(p);
-      else out[p.slice(dir.length)] = readFileSync(p, "utf8");
+      else out[snapshotKey(dir, p)] = readFileSync(p, "utf8");
     }
   };
   visit(dir);
@@ -92,6 +146,19 @@ function snapshot(dir: string): Record<string, string> {
 async function planOf(items: PRDItem[]): Promise<V1ToV2Plan> {
   return (await v1ToV2.plan(v1TreeSource(items), { cutAt: CUT_AT, options: { testFiles: [] } })) as V1ToV2Plan;
 }
+
+describe("snapshotKey", () => {
+  it("forward-slashes and roots a key under the Windows separator, so the prd_tree/ filters match", () => {
+    const key = snapshotKey("C:\\tmp\\.rex", "C:\\tmp\\.rex\\prd_tree\\e1\\index.md", nodePath.win32);
+    expect(key).toBe("/prd_tree/e1/index.md");
+    expect(key.startsWith("/prd_tree")).toBe(true);
+    expect(snapshotKey("C:\\tmp\\.rex", "C:\\tmp\\.rex\\tree-meta.json", nodePath.win32)).toBe("/tree-meta.json");
+  });
+
+  it("gives the same key under the POSIX separator", () => {
+    expect(snapshotKey("/tmp/.rex", "/tmp/.rex/prd_tree/e1/index.md", nodePath.posix)).toBe("/prd_tree/e1/index.md");
+  });
+});
 
 describe("buildV2Tree", () => {
   it("keeps every v1 id, as a node or a listed delivery container", async () => {
@@ -187,6 +254,27 @@ describe("buildV2Tree", () => {
       const { tree } = buildV2Tree(items, await planOf(items));
       expect(byId(tree, "f13")!.blockedBy).toBeUndefined();
       expect(byId(tree, "f14")!.blockedBy).toEqual(["f11"]);
+    });
+  });
+
+  describe("a dissolved container's own fields", () => {
+    it("keeps its description and acceptance criteria under its line in the cut change's body", async () => {
+      const { tree, cut } = buildV2Tree(RELEASES, await planOf(RELEASES));
+      const body = byId(tree, cut)!.body as string;
+      expect(body).toContain(R12_CUT_LINES);
+      expect(cutContainerIds(tree)).toEqual(["r11", "r12"]);
+    });
+
+    it("moves its blockedBy onto its open children, repointed at the other container's open children", async () => {
+      const { tree, blockers, cut } = buildV2Tree(RELEASES, await planOf(RELEASES));
+      expect(byId(tree, cut)!.body).toContain("- r12: blockedBy r11 → r11, moved onto its open children g3, g4");
+      // The repoint keeps a completed child (g2): a met ref, which only g1 holds open.
+      expect(byId(tree, "g3")!.blockedBy).toEqual(["g1", "g2"]);
+      expect(byId(tree, "g4")!.blockedBy).toEqual(["g1", "g2"]);
+      expect(byId(tree, "g1")!.blockedBy).toBeUndefined();
+      expect(blockers).toContainEqual({ kind: "container", node: "r12", from: "r11", to: ["r11"], onto: ["g3", "g4"] });
+      for (const n of all(tree)) delete n.needsPlacement;
+      expect(findActionableWork(tree).map((u) => u.node.id)).not.toContain("g3");
     });
   });
 
@@ -423,6 +511,7 @@ describe("applyV1ToV2", () => {
 
   afterEach(() => {
     readBack.skip = false;
+    readBack.lose = undefined;
     rmSync(repo, { recursive: true });
   });
 
@@ -441,6 +530,16 @@ describe("applyV1ToV2", () => {
     if (outcome.status !== "applied") return;
     expect(isLossless(everyV1Id(TREE, model.tree, outcome.built.containers, outcome.built.cut))).toBe(true);
     expect(outcome.v1Items).toBe(walkItems(TREE).length);
+  });
+
+  it("keeps a release epic's description, criteria and blockedBy through the write and read-back", async () => {
+    await store().saveDocument({ schema: "rex/v1", title: "Shop", items: structuredClone([...TREE, ...RELEASES]) });
+    const outcome = await applyV1ToV2(rexDir, await planOf((await load()).items), { load });
+    expect(outcome.status).toBe("applied");
+    if (outcome.status !== "applied") return;
+    const { tree } = await loadPrdModel(rexDir);
+    expect(byId(tree, outcome.built.cut)!.body).toContain(R12_CUT_LINES);
+    expect(byId(tree, "g3")!.blockedBy).toEqual(["g1", "g2"]);
   });
 
   it("stores held changes in the reserved Inbox folder", async () => {
@@ -523,6 +622,61 @@ describe("applyV1ToV2", () => {
     expect(existsSync(join(rexDir, "prd_tree"))).toBe(false);
   });
 
+  describe("a failed removal after the switch", () => {
+    afterEach(() => {
+      fsFaults.failRm = undefined;
+    });
+
+    it("says the v2 tree is in place, names the leftover and the manual step, not that a re-run removes it", async () => {
+      const plan = await planOf((await load()).items);
+      const clean = join(repo, "clean-rex");
+      for (const [path, text] of Object.entries(snapshot(rexDir))) {
+        mkdirSync(join(clean, path, ".."), { recursive: true });
+        writeFileSync(join(clean, path), text);
+      }
+      await applyV1ToV2(clean, plan, { load: () => new FileStore(clean).loadDocument() });
+
+      fsFaults.failRm = join(rexDir, "prd_tree");
+      const message = await applyV1ToV2(rexDir, plan, { load }).then(
+        () => "applied",
+        (err: unknown) => (err instanceof MigrationApplyError ? err.message : `unexpected: ${String(err)}`),
+      );
+      expect(message).toContain("The v2 tree is in place");
+      expect(message).toContain("EBUSY");
+      expect(message).toContain(`Left: ${join(rexDir, "prd_tree")}.`);
+      expect(message).toContain(`check that the v2 tree holds everything in it, then delete ${join(rexDir, "prd_tree")} by hand`);
+      expect(message).not.toMatch(/apply again|re-run/i);
+      expect(existsSync(join(rexDir, "product"))).toBe(true);
+      expect(existsSync(join(rexDir, "tree-meta.json"))).toBe(false);
+
+      fsFaults.failRm = undefined;
+      expect(await applyV1ToV2(rexDir, plan, { load })).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree")], proof: "plan" });
+      expect(snapshot(rexDir)).toEqual(snapshot(clean));
+    });
+
+    it("on an already-v2 apply says the v2 tree is in place, naming the leftover and the error", async () => {
+      const plan = await planOf((await load()).items);
+      const v1 = snapshot(rexDir);
+      await applyV1ToV2(rexDir, plan, { load });
+      for (const [path, text] of Object.entries(v1)) {
+        if (!path.startsWith("/prd_tree") && path !== "/tree-meta.json") continue;
+        mkdirSync(join(rexDir, path, ".."), { recursive: true });
+        writeFileSync(join(rexDir, path), text);
+      }
+      fsFaults.failRm = join(rexDir, "prd_tree");
+      const error = await applyV1ToV2(rexDir, plan, { load }).then(
+        () => undefined,
+        (err: unknown) => err,
+      );
+      expect(error).toBeInstanceOf(MigrationApplyError);
+      const message = (error as Error).message;
+      expect(message).toContain("The v2 tree is in place");
+      expect(message).toContain("EBUSY");
+      expect(message).toContain(`Left: ${join(rexDir, "prd_tree")}.`);
+      expect(message).toContain("by hand");
+    });
+  });
+
   describe("a prd_tree/ beside the v2 tree", () => {
     const NEW_EPIC = "11111111-1111-4111-8111-111111111111";
     const withNewEpic = (): PRDItem[] => [...TREE, item(NEW_EPIC, "epic", "Billing", [], { status: "pending" })];
@@ -572,6 +726,29 @@ describe("applyV1ToV2", () => {
       expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
     });
 
+    it("partly removed is refused, naming the path and the manual step, and nothing is deleted", async () => {
+      const plan = await migrated();
+      await restoreV1(TREE);
+      const treeRoot = join(rexDir, "prd_tree");
+      const epic = readdirSync(treeRoot, { withFileTypes: true }).find(
+        (e) => e.isDirectory() && readdirSync(join(treeRoot, e.name), { withFileTypes: true }).some((c) => c.isDirectory()),
+      )!;
+      const epicDir = join(treeRoot, epic.name);
+      const child = readdirSync(epicDir, { withFileTypes: true }).find((c) => c.isDirectory())!;
+      rmSync(join(epicDir, child.name), { recursive: true });
+      const before = snapshot(rexDir);
+      const error = await applyV1ToV2(rexDir, plan, { load }).then(
+        () => undefined,
+        (err: unknown) => err,
+      );
+      expect(error).toBeInstanceOf(MigrationApplyError);
+      const message = (error as Error).message;
+      expect(message).toContain(treeRoot);
+      expect(message).toContain("then delete");
+      expect(message).toContain("by hand");
+      expect(snapshot(rexDir)).toEqual(before);
+    });
+
     it("is removed with no plan when every id it holds is in the v2 tree, dissolved containers included", async () => {
       await migrated();
       await restoreV1(TREE);
@@ -619,6 +796,32 @@ describe("applyV1ToV2", () => {
     const before = snapshot(rexDir);
     await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow();
     expect(snapshot(rexDir)).toEqual(before);
+  });
+
+  it("refuses a tree that reads back without a v1 id, and writes nothing", async () => {
+    const plan = await planOf((await load()).items);
+    const before = snapshot(rexDir);
+    readBack.lose = "s1";
+    const message = /Not every v1 id is in the v2 tree read back, of \d+ items: missing 1 \(s1\)\. Nothing was written\./;
+    await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(message);
+    await expect(rehearseV1ToV2(rexDir, plan, { load })).rejects.toThrow(message);
+    expect(snapshot(rexDir)).toEqual(before);
+  });
+
+  it("counts the v2 rule findings on the tree it wrote by rule, as rex health finds them", async () => {
+    const plan = await planOf((await load()).items);
+    const rehearsal = await rehearseV1ToV2(rexDir, plan, { load });
+    const outcome = await applyV1ToV2(rexDir, plan, { load });
+    if (rehearsal.status !== "rehearsed" || outcome.status !== "applied") throw new Error("expected a rehearsal and an apply");
+
+    const findings = checkV2TreeHealth((await loadPrdModel(rexDir)).tree);
+    expect(findings.length).toBeGreaterThan(0);
+    const rules = [...new Set(findings.map((f) => f.rule))];
+    const count = (rule: string, severity: string): number => findings.filter((f) => f.rule === rule && f.severity === severity).length;
+    expect([...outcome.rules].sort((a, b) => a.rule.localeCompare(b.rule))).toEqual(
+      rules.sort().map((rule) => ({ rule, errors: count(rule, "error"), warnings: count(rule, "warning") })),
+    );
+    expect(rehearsal.rules).toEqual(outcome.rules);
   });
 
   it("refuses a v1 tree that holds an id twice, and writes nothing", async () => {

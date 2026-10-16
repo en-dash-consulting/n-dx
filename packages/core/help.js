@@ -1265,7 +1265,9 @@ const ORCHESTRATOR_HELP_DEFS = {
       "prd.md / prd.json conversion to the folder tree, then the v1 → v2 plan\n" +
       "(to --out, default ./migration-plan.json) and its apply. A step already\n" +
       "done is skipped, so a failed run resumes where it stopped. --dry-run\n" +
-      "rehearses each step that can, and stops before the first that cannot.\n\n" +
+      "rehearses each step that can, and stops before the first that cannot.\n" +
+      "It runs no model by default (the plan is rules-only); --with-models\n" +
+      "turns the model passes on.\n\n" +
       "--plan classifies every v1 item into the v2 product and change layers\n" +
       "and writes the proposal to two files: the JSON plan, keyed by v1 item id,\n" +
       "which --apply reads, and a Markdown summary for a person.\n\n" +
@@ -1287,7 +1289,8 @@ const ORCHESTRATOR_HELP_DEFS = {
     options: [
       { flag: "--plan", description: "Plan the migration; with --apply, --plan=<path> names the plan to apply" },
       { flag: "--apply", description: "Apply the reviewed plan (default ./migration-plan.json)" },
-      { flag: "--dry-run", description: "Rehearse and report; write nothing (without --plan or --apply the plan file is still written)" },
+      { flag: "--dry-run", description: "Rehearse and report; write nothing (without --plan or --apply the plan file is still written, rules-only unless --with-models)" },
+      { flag: "--with-models", description: "With --dry-run and no --plan or --apply: run the model passes too" },
       { flag: "--no-commit", description: "Without --plan or --apply: move the layout without committing the move" },
       { flag: "--out=<path>", description: "Where to write the JSON plan (default: ./migration-plan.json)" },
       { flag: "--summary=<path>", description: "Where to write the Markdown summary (default: --out with .md)" },

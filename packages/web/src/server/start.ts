@@ -1115,11 +1115,22 @@ function startVerboseHeartbeat(
   }, VERBOSE_HEARTBEAT_INTERVAL_MS);
 }
 
+/**
+ * The dashboard surfaces a failing rex spawn's stderr as the error it shows, so
+ * rex's v1-layout deprecation notice would lead every message. Every spawn site
+ * inherits `process.env`; turning the notice off here covers them all, and the
+ * dashboard can state the deprecation itself.
+ */
+export function silenceChildLegacyNotice(env: NodeJS.ProcessEnv = process.env): void {
+  env["NDX_LEGACY_NOTICE"] = "off";
+}
+
 export async function startServer(
   targetDir: string,
   port: number = 3117,
   opts: ServerOptions = {},
 ): Promise<StartResult> {
+  silenceChildLegacyNotice();
   const absDir = resolve(targetDir);
   const layout = resolveLayout(absDir);
   const svDir = layout.sourcevisionDir;

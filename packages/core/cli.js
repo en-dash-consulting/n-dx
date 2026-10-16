@@ -106,7 +106,7 @@ import { runExport } from "./export.js";
 import { ensureGitignoreEntry } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
 import { initDirLabels, padInitDirLabel } from "./init-summary.js";
-import { DEFAULT_MIGRATION_PLAN_OUT, isLegacyV1Project, runMigrateChain } from "./migrate-chain.js";
+import { DEFAULT_MIGRATION_PLAN_OUT, hasV2Tree, isLegacyV1Project, runMigrateChain } from "./migrate-chain.js";
 import { runMigrateLayout } from "./migrate-layout.js";
 import {
   resolveInitLLMSelection,
@@ -126,6 +126,7 @@ import { formatNarrationStatus, readNarrationState } from "./narration-status.js
 import {
   COMMAND_EFFECTS,
   LAYOUT_TOKENS,
+  prdTokenPaths,
   localizeEffects,
   resolveCommandEffects,
   shouldShowPreflight,
@@ -1858,6 +1859,11 @@ async function handleTrust(rest) {
  * reach rex by spawning it.
  */
 async function handleMigrateLayout(rest) {
+  if (process.env.NDX_AGENT_RUN) {
+    console.error("Error: ndx migrate-layout refuses inside an agent run (NDX_AGENT_RUN is set).");
+    console.error("Hint: An operator runs the migration from their own shell.");
+    exitWithCleanup(1);
+  }
   const dir = resolveDir(rest);
   const code = await runMigrateLayout(dir, extractFlags(rest), { runCapture, tools });
   exitWithCleanup(code);
@@ -1908,9 +1914,32 @@ async function handleMigrate(rest) {
   const dir = resolveDir(args);
   const flags = extractFlags(args);
   requireInit(dir, ["rex"]);
+  // rex resolves --out and --summary against the cwd, while the summary
+  // resolves declared paths against the project dir, so hand it absolute ones:
+  // from another directory it would otherwise report the plan as not written.
+  const absolutePathFlag = (f) => {
+    const m = /^(--out|--summary)=(.+)$/.exec(f);
+    return m ? `${m[1]}=${resolve(m[2])}` : f;
+  };
+  // From `args`, not the forwarded flags: --yes, stripped for the child, is
+  // what tells the banner to stay quiet.
+  const preflightArgs = [
+    ...args.map(absolutePathFlag),
+    ...(flags.some((f) => f.startsWith("--out=")) ? [] : [`--out=${resolve(DEFAULT_MIGRATION_PLAN_OUT)}`]),
+  ];
   if (!apply && !flags.includes("--plan")) {
     const migrateLayout = (root, layoutFlags) => runMigrateLayout(root, layoutFlags, { runCapture, tools });
-    exitWithCleanup(await runMigrateChain(dir, flags, { run, tools, migrateLayout }));
+    // Banner flags mirror what the chain will run: a dry run is rules-only
+    // unless --with-models, so the banner must not announce model calls it skips.
+    const bannerArgs = [...preflightArgs];
+    if (flags.includes("--dry-run") && !flags.includes("--with-models") && !flags.includes("--rules-only")) {
+      bannerArgs.push("--rules-only");
+    }
+    let code = 0;
+    await withPreflight("migrate", bannerArgs, dir, async () => {
+      code = await runMigrateChain(dir, forwardableFlags(flags), { run, tools, migrateLayout });
+    });
+    exitWithCleanup(code);
     return;
   }
   if (apply) {
@@ -1923,19 +1952,6 @@ async function handleMigrate(rest) {
   if (!forwarded.some((f) => f === "--out" || f.startsWith("--out="))) {
     forwarded.push(`--out=${DEFAULT_MIGRATION_PLAN_OUT}`);
   }
-  // rex resolves --out and --summary against the cwd, while the summary
-  // resolves declared paths against the project dir, so hand it absolute ones:
-  // from another directory it would otherwise report the plan as not written.
-  const absolutePathFlag = (f) => {
-    const m = /^(--out|--summary)=(.+)$/.exec(f);
-    return m ? `${m[1]}=${resolve(m[2])}` : f;
-  };
-  // From `args`, not `forwarded`: --yes, stripped for the child, is what tells
-  // the banner to stay quiet.
-  const preflightArgs = [
-    ...args.map(absolutePathFlag),
-    ...(flags.some((f) => f.startsWith("--out=")) ? [] : [`--out=${resolve(DEFAULT_MIGRATION_PLAN_OUT)}`]),
-  ];
   await withPreflight("migrate", preflightArgs, dir, () =>
     runOrDie(tools.rex, ["migrate-plan", ...forwarded, dir]),
   );
@@ -1973,9 +1989,10 @@ function forwardableFlags(flags) {
 /** Layout token → project-relative path, for expanding effects declarations. */
 function effectsLayoutPaths(dir) {
   const layout = resolveLayout(resolve(dir));
-  return Object.fromEntries(
+  const paths = Object.fromEntries(
     Object.entries(LAYOUT_TOKENS).map(([token, field]) => [token, relativeToRoot(layout, layout[field])]),
   );
+  return { ...paths, ...prdTokenPaths(paths.rex, hasV2Tree(resolve(dir))) };
 }
 
 /**

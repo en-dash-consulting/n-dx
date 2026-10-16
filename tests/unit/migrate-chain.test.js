@@ -116,9 +116,28 @@ describe("runMigrateChain", () => {
     await runMigrateChain(root, ["--dry-run"], deps);
     expect(calls).toEqual([
       ["layout", root, "--dry-run"],
-      ["rex", "migrate-plan", `--out=${DEFAULT_MIGRATION_PLAN_OUT}`, root],
+      ["rex", "migrate-plan", "--rules-only", `--out=${DEFAULT_MIGRATION_PLAN_OUT}`, root],
       ["rex", "migrate-apply", `--plan=${DEFAULT_MIGRATION_PLAN_OUT}`, "--dry-run", root],
     ]);
+  });
+
+  it("--dry-run runs the model passes only with --with-models, which rex never sees", async () => {
+    mkdirSync(join(root, ".rex", "prd_tree"), { recursive: true });
+    const { calls, deps } = stubs();
+    await runMigrateChain(root, ["--dry-run", "--with-models"], deps);
+    expect(calls.find((c) => c[1] === "migrate-plan")).toEqual([
+      "rex",
+      "migrate-plan",
+      `--out=${DEFAULT_MIGRATION_PLAN_OUT}`,
+      root,
+    ]);
+  });
+
+  it("a real run keeps the model passes on", async () => {
+    mkdirSync(join(root, ".rex", "prd_tree"), { recursive: true });
+    const { calls, deps } = stubs();
+    await runMigrateChain(root, [], deps);
+    expect(calls.find((c) => c[1] === "migrate-plan")).not.toContain("--rules-only");
   });
 
   it("--dry-run stops before the folder-tree conversion, which cannot rehearse", async () => {

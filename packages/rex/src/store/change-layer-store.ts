@@ -22,6 +22,7 @@
 
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { SCHEMA_VERSION } from "../schema/v1.js";
+import { SCHEMA_VERSION_V2 } from "../schema/v2.js";
 import { newErrors } from "../core/apply-amendments.js";
 import { changeLayerFromItems, changeLayerItems, productLayerItems } from "../core/layer-projection.js";
 import { pruneKeepReason } from "../core/prune.js";
@@ -178,7 +179,7 @@ export class ChangeLayerStore implements PRDStore {
   }
 
   capabilities(): StoreCapabilities {
-    return { adapter: "v2-change-layer", supportsTransactions: true, supportsWatch: false };
+    return { adapter: "v2-change-layer", supportsTransactions: true, supportsWatch: false, schemaVersion: SCHEMA_VERSION_V2 };
   }
 }
 

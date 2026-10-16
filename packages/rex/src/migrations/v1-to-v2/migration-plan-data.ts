@@ -272,14 +272,17 @@ function resolvePlanSlugs(
 /**
  * `data` with review re-checked against `spec`, the capability's current draft:
  * `reviewedHash` when its `specHash` is `approvedHash`, else a `reviewNote`
- * naming both. Every pass that changes the draft calls this. Data with no
- * `approvedHash` is returned as is.
+ * naming both. A `metAt` follows the draft too, so it stays the hash of the
+ * spec the plan proposes. Every pass that changes the draft calls this. Data
+ * with neither `approvedHash` nor `metAt` is returned as is.
  */
 export function stampReview(data: ItemPlanData, spec: { statement?: string; criteria?: Criterion[] }): ItemPlanData {
   const { approvedHash } = data;
-  if (approvedHash === undefined) return data;
-  const { reviewedHash: _reviewed, reviewNote: _note, ...rest } = data;
+  if (approvedHash === undefined && data.metAt === undefined) return data;
   const current = specHash(spec);
+  const withMet = data.metAt === undefined ? data : { ...data, metAt: current };
+  if (approvedHash === undefined) return withMet;
+  const { reviewedHash: _reviewed, reviewNote: _note, ...rest } = withMet;
   if (current === approvedHash) return { ...rest, reviewedHash: current };
   return { ...rest, reviewNote: `the draft changed since review: approved ${approvedHash}, current ${current}; review it again` };
 }

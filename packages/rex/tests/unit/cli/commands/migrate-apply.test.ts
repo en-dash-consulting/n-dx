@@ -5,9 +5,10 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { computeV2Health } from "../../../../src/cli/commands/health.js";
 import { cmdMigrateApply } from "../../../../src/cli/commands/migrate-apply.js";
 import { cmdMigratePlan } from "../../../../src/cli/commands/migrate-plan.js";
 import { CLIError } from "../../../../src/cli/errors.js";
@@ -129,6 +130,37 @@ describe("cmdMigrateApply", () => {
     expect(snapshot(repo)).toEqual(before);
   });
 
+  it("--dry-run and apply print the v2 rule findings by rule that rex health then reports", async () => {
+    const printed = (): string[] => vi.mocked(console.log).mock.calls.map((c) => c.join(" ").trim());
+    const ruleLines = (lines: string[]): string[] => lines.slice(lines.findIndex((l) => l.startsWith("v2 rules on the migrated tree:")));
+    // A description with no present-tense first sentence drafts no statement: a capability-statement error.
+    const items = structuredClone(TREE);
+    items[0]!.children!.push(item("f3", "feature", "Cache metrics", [item("t3", "task", "Count hits")], { description: "Add a hit counter." }));
+    await new FileStore(rexDir).saveDocument({ schema: "rex/v1", title: "Shop", items });
+    await cmdMigratePlan(repo, { "rules-only": "true", out: planPath, "cut-at": "2026-10-12T00:00:00.000Z" });
+
+    vi.mocked(console.log).mockClear();
+    await cmdMigrateApply(repo, { plan: planPath, "dry-run": "true" });
+    const rehearsed = ruleLines(printed());
+    vi.mocked(console.log).mockClear();
+    await cmdMigrateApply(repo, { plan: planPath });
+    const applied = ruleLines(printed());
+
+    const { treeRules } = await computeV2Health(repo, rexDir, undefined);
+    const errors = treeRules.filter((f) => f.severity === "error").length;
+    expect(errors).toBeGreaterThan(0);
+    const rules = [...new Set(treeRules.map((f) => f.rule))];
+    const n = (count: number, word: string): string => `${count} ${word}${count === 1 ? "" : "s"}`;
+    const count = (rule: string, severity: string): number => treeRules.filter((f) => f.rule === rule && f.severity === severity).length;
+    expect(rehearsed[0]).toBe(
+      `v2 rules on the migrated tree: ${n(errors, "error")}, ${n(treeRules.length - errors, "warning")}; 'rex health' fails on the errors, apply does not refuse them`,
+    );
+    expect(rehearsed.slice(1, 1 + rules.length).sort()).toEqual(
+      rules.map((rule) => `${rule}: ${n(count(rule, "error"), "error")}, ${n(count(rule, "warning"), "warning")}`).sort(),
+    );
+    expect(applied.slice(0, 1 + rules.length)).toEqual(rehearsed.slice(0, 1 + rules.length));
+  });
+
   it("--dry-run lists every blockedBy rewrite and drop with the old and new refs", async () => {
     const items: PRDItem[] = [
       item("e1", "epic", "Storage", [
@@ -158,6 +190,46 @@ describe("cmdMigrateApply", () => {
         "f3: blockedBy f2 → t2, moved onto its open changes t5",
       ]),
     );
+  });
+
+  describe("a v1 item file the parser skips", () => {
+    // An epic whose index.md front matter is never closed: the v1 parser skips
+    // it with a warning, and the store's load drops that warning.
+    const FIXTURE = join(import.meta.dirname, "../../../fixtures/folder-tree/malformed-frontmatter");
+    const brokenFile = (): string => join(rexDir, "prd_tree", "broken-epic-bbbbbbbb", "index.md");
+
+    /** Put the fixture's broken epic into the tree the plan was made from: a hand edit after planning. */
+    function breakOneItem(): void {
+      cpSync(join(FIXTURE, "broken-epic-bbbbbbbb"), join(rexDir, "prd_tree", "broken-epic-bbbbbbbb"), { recursive: true });
+    }
+
+    async function refusal(run: () => Promise<void>): Promise<CLIError> {
+      const err = await run().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(CLIError);
+      expect((err as CLIError).message).toContain(brokenFile());
+      expect((err as CLIError).message).toContain("Unclosed frontmatter block");
+      return err as CLIError;
+    }
+
+    it("migrate-plan refuses and names the file", async () => {
+      rmSync(join(rexDir, "prd_tree"), { recursive: true });
+      cpSync(FIXTURE, join(rexDir, "prd_tree"), { recursive: true });
+      const out = join(repo, "fresh-plan.json");
+      await refusal(() => cmdMigratePlan(repo, { "rules-only": "true", out }));
+      expect(existsSync(out)).toBe(false);
+    });
+
+    it("--dry-run refuses and names the file", async () => {
+      breakOneItem();
+      await refusal(() => cmdMigrateApply(repo, { plan: planPath, "dry-run": "true" }));
+    });
+
+    it("apply refuses, names the file and leaves prd_tree/ byte-identical", async () => {
+      breakOneItem();
+      const before = snapshot(rexDir);
+      await refusal(() => cmdMigrateApply(repo, { plan: planPath }));
+      expect(snapshot(rexDir)).toEqual(before);
+    });
   });
 
   it("refuses a v1 tree without --plan and writes nothing", async () => {

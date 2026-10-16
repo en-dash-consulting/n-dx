@@ -18,7 +18,7 @@ import { tmpdir } from "node:os";
 import { cmdMigrateToFolderTree } from "../../../../src/cli/commands/migrate-to-folder-tree.js";
 import { titleToFilename } from "../../../../src/store/title-to-filename.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
-import { PRD_TREE_DIRNAME, serializeDocument } from "../../../../src/store/index.js";
+import { FileStore, PRD_TREE_DIRNAME, serializeDocument } from "../../../../src/store/index.js";
 
 const SAMPLE_PRD: PRDDocument = {
   schema: "rex/v1",
@@ -139,6 +139,30 @@ describe("cmdMigrateToFolderTree", () => {
     const taskMd = readFileSync(join(featureDir, taskFiles[0]), "utf-8");
     expect(taskMd).not.toContain("__parentId");
     expect(taskMd).toContain("Task Apple");
+  });
+
+  it("writes tree-meta.json carrying the prd.json title", async () => {
+    writeFileSync(
+      join(tmp, ".rex", "prd.json"),
+      JSON.stringify({ ...SAMPLE_PRD, title: "My Project" }),
+    );
+
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
+
+    const meta = JSON.parse(readFileSync(join(tmp, ".rex", "tree-meta.json"), "utf-8"));
+    expect(meta.title).toBe("My Project");
+  });
+
+  it("keeps the prd.md title when the tree is read back through FileStore", async () => {
+    writeFileSync(
+      join(tmp, ".rex", "prd.md"),
+      serializeDocument({ ...SAMPLE_PRD, title: "My Project" }),
+    );
+
+    await cmdMigrateToFolderTree(tmp, {}, { prompt: () => Promise.resolve("n") });
+
+    const doc = await new FileStore(join(tmp, ".rex")).loadDocument();
+    expect(doc.title).toBe("My Project");
   });
 
   it("marks a converted prd.json as migrated, so no legacy source is left beside the tree", async () => {
