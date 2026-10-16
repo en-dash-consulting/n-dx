@@ -23,6 +23,7 @@ import {
   SETTINGS_ENTRIES,
   isSettingsView,
   stageForView,
+  stageViews,
   viewGlyph,
   viewLabel,
   visibleStages,
@@ -101,18 +102,16 @@ describe("stages.ts", () => {
   it("lists only real views, each with a registry renderer", () => {
     const ctx = { navigateTo: () => {}, data: {} as LoadedData } as unknown as ViewRenderContext;
     for (const id of STAGE_ORDER) {
-      for (const s of STAGES[id].sections) {
-        for (const view of [s.view, ...(s.tabs ?? []).map((t) => t.view)]) {
-          expect(isKnownViewPath(view), `${id} lists unknown view ${view}`).toBe(true);
-          expect(renderActiveView(view, ctx), `no renderer for ${view}`).not.toBeNull();
-        }
+      for (const view of stageViews(id)) {
+        expect(isKnownViewPath(view), `${id} lists unknown view ${view}`).toBe(true);
+        expect(renderActiveView(view, ctx), `no renderer for ${view}`).not.toBeNull();
       }
     }
   });
 
   it("keeps settings out of the stages and every stage and home routable", () => {
     for (const id of STAGE_ORDER) {
-      for (const s of STAGES[id].sections) expect(isSettingsView(s.view)).toBe(false);
+      for (const view of stageViews(id)) expect(isSettingsView(view)).toBe(false);
       expect(isKnownViewPath(id)).toBe(true);
     }
     expect(isKnownViewPath("home")).toBe(true);
@@ -134,7 +133,8 @@ describe("stages.ts", () => {
 
   it("finds a view's stage, honouring the viewer's scope", () => {
     expect(stageForView("zones")).toBe("analyze");
-    expect(stageForView("iso-map")).toBe("analyze"); // the 3D projection of the map section
+    expect(stageForView("iso-map")).toBe("analyze"); // the dashboard's hero tile
+    expect(stageForView("graph")).toBe("analyze"); // off the page, still the stage's
     expect(stageForView("hench-runs")).toBe("plan");
     expect(stageForView("rex-dashboard")).toBe("work");
     expect(stageForView("work")).toBe("work");
@@ -151,11 +151,9 @@ describe("stages.ts", () => {
     // twice lights the wrong stage when opened from the later one.
     const owner = new Map<ViewId, string>();
     for (const id of STAGE_ORDER) {
-      for (const s of STAGES[id].sections) {
-        for (const view of [s.view, ...(s.tabs ?? []).map((t) => t.view)]) {
-          expect(owner.get(view), `${view} is on both ${owner.get(view)} and ${id}`).toBeUndefined();
-          owner.set(view, id);
-        }
+      for (const view of stageViews(id)) {
+        expect(owner.get(view), `${view} is on both ${owner.get(view)} and ${id}`).toBeUndefined();
+        owner.set(view, id);
       }
     }
   });
@@ -208,15 +206,16 @@ describe("TopNav", () => {
     expect(onOpenSearch).toHaveBeenCalledOnce();
   });
 
-  it("scoped: one tab, and the brand says standalone viewer", async () => {
+  it("scoped: one tab, and the brand is the product's mark", async () => {
     await mount(nav("overview", { validViews: buildValidViews("sourcevision"), scope: "sourcevision" }));
     expect(tabLabels()).toEqual(["Analysis"]);
-    expect(root.querySelector(".topnav-subtitle")?.textContent).toBe("standalone viewer");
+    expect(root.querySelector(".topnav-brand img")).not.toBeNull();
   });
 
-  it("names the project in the brand", async () => {
+  it("names the project in the top bar, beside the page's guide", async () => {
     await mount(nav("home"));
-    expect(root.querySelector(".topnav-project")?.textContent).toBe("demo-project");
+    expect(root.querySelector(".project-context .breadcrumb-project")?.textContent).toBe("demo-project");
+    expect(root.querySelector(".topnav-guide .guide-btn")).not.toBeNull();
   });
 });
 
@@ -302,7 +301,6 @@ describe("StagePage", () => {
   it("keeps History a bounded scroll region until Expand, remembering the choice", async () => {
     expect(STAGES.work.sections.find((s) => s.view === "activity")?.scroll).toBe(true);
     expect(STAGES.plan.sections.find((s) => s.view === "hench-runs")?.scroll).toBe(true);
-    expect(STAGES.analyze.sections.find((s) => s.view === "files")?.scroll).toBe(true);
 
     localStorage.setItem("ndx.stage-sections", JSON.stringify({ "work:activity": true }));
     await mount(page("work"));
@@ -327,81 +325,49 @@ describe("StagePage", () => {
     expect(root.querySelector('.stage-section[data-view="hench-audit"] .stage-section-expand')).toBeNull();
   });
 
-  /** Terrain always starts collapsed (the Overview leads with its map), so open it by hand. */
-  function openTerrain(): void {
-    const toggle = root.querySelector<HTMLButtonElement>('.stage-section[data-view="graph"] .stage-section-toggle')!;
-    if (toggle.getAttribute("aria-expanded") !== "true") act(() => { toggle.click(); });
-  }
-
-  it("starts Terrain collapsed on every load, even when it was left open", async () => {
-    expect(STAGES.analyze.sections.find((s) => s.view === "graph")?.collapsedOnLoad).toBe(true);
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:graph": true }));
+  it("renders Analysis as a tile dashboard after its lead, with the gated tiles off by default", async () => {
     await mount(page("analyze"));
-    const toggle = root.querySelector('.stage-section[data-view="graph"] .stage-section-toggle')!;
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    expect(root.querySelector('[data-rendered="graph"]')).toBeNull();
+    expect(sectionViews()).toEqual(["overview"]);
+    const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
+    expect(tiles).toEqual(["map", "health", "next-steps", "problems", "suggestions", "zones", "architecture", "files", "languages"]);
+    expect(root.querySelector('.stage-tile[data-tile="map"]')?.className).toContain("stage-tile--c8 stage-tile--r3");
   });
 
-  it("shows the Terrain section with Map, Isometric map and Zones tabs, switching bodies with the active tab", async () => {
-    await mount(page("analyze"));
-    openTerrain();
-    const terrain = root.querySelector('.stage-section[data-view="graph"]')!;
-    expect(terrain.querySelector(".stage-section-title")?.textContent).toBe("Terrain");
-    expect(terrain.querySelector('[data-rendered="graph"]')).not.toBeNull();
-
-    const tablist = terrain.querySelector('[role="tablist"]')!;
-    expect(tablist.getAttribute("aria-label")).toBe("Terrain views");
-    const tabs = Array.from(tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-    expect(tabs.map((t) => t.textContent)).toEqual(["Repository Map", "Isometric Map", "Zones"]);
-    expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
-    expect(tabs.map((t) => t.getAttribute("tabindex"))).toEqual(["0", "-1", "-1"]);
-    const panel = document.getElementById(tabs[0]!.getAttribute("aria-controls")!)!;
-    expect(panel.getAttribute("role")).toBe("tabpanel");
-    expect(panel.getAttribute("aria-labelledby")).toBe(tabs[0]!.id);
-
-    act(() => { tabs[1]!.click(); });
-    expect(terrain.querySelector('[data-rendered="iso-map"]')).not.toBeNull();
-    expect(terrain.querySelector('[data-rendered="graph"]')).toBeNull();
-    expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
-    expect(panel.getAttribute("aria-labelledby")).toBe(tabs[1]!.id);
-
-    act(() => { tabs[2]!.click(); });
-    expect(terrain.querySelector('[data-rendered="zones"]')).not.toBeNull();
-  });
-
-  it("moves the active Terrain tab with the arrow keys, wrapping at the ends", async () => {
-    await mount(page("analyze"));
-    openTerrain();
-    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.stage-section[data-view="graph"] [role="tab"]'));
-
-    act(() => { tabs[0]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true })); });
-    expect(tabs[2]!.getAttribute("aria-selected")).toBe("true");
-
-    act(() => { tabs[2]!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true })); });
-    expect(tabs[0]!.getAttribute("aria-selected")).toBe("true");
-  });
-
-  it("drops the Isometric map tab in deployed mode, keeping Map and Zones", async () => {
+  it("drops the codebase map tile in deployed mode", async () => {
     window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "" };
     try {
       await mount(page("analyze"));
-      openTerrain();
-      const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.stage-section[data-view="graph"] [role="tab"]'));
-      expect(tabs.map((t) => t.textContent)).toEqual(["Repository Map", "Zones"]);
+      expect(root.querySelector('.stage-tile[data-tile="map"]')).toBeNull();
+      expect(root.querySelector('.stage-tile[data-tile="zones"]')).not.toBeNull();
     } finally {
       delete window.__NDX_DEPLOYED__;
     }
   });
 
-  it("shows the Architecture section with Architecture and Routes tabs, named by the architecture view itself", async () => {
-    localStorage.setItem("ndx.stage-sections", JSON.stringify({ "analyze:architecture": true }));
+  it("opens a tile full-screen with its tabs: Architecture and Routes", async () => {
     await mount(page("analyze"));
-    const arch = root.querySelector('.stage-section[data-view="architecture"]')!;
-    expect(arch.querySelector(".stage-section-title")?.textContent).toBe("Architecture");
-    const tabs = Array.from(arch.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const arch = root.querySelector('.stage-tile[data-tile="architecture"]')!;
+    expect(arch.querySelector(".stage-tile-title")?.textContent).toBe("Architecture");
+    // The preview shows the tile's own view, without tabs.
+    expect(arch.querySelector('[role="tab"]')).toBeNull();
+    act(() => { arch.querySelector<HTMLButtonElement>(".stage-tile-head")!.click(); });
+    const full = root.querySelector(".stage-tile-fullscreen")!;
+    const tabs = Array.from(full.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
     expect(tabs.map((t) => t.textContent)).toEqual(["Architecture", "Routes"]);
     act(() => { tabs[1]!.click(); });
-    expect(arch.querySelector('[data-rendered="routes"]')).not.toBeNull();
+    expect(full.querySelector('[data-rendered="routes"]')).not.toBeNull();
+  });
+
+  it("renders the map tile as its panel alone, with no tile header", async () => {
+    await mount(h(StagePage, {
+      stage: "analyze", validViews: ALL, navigateTo: vi.fn(), renderView,
+      renderPanel: (panel) => h("div", { "data-panel": panel }),
+    }));
+    const map = root.querySelector('.stage-tile[data-tile="map"]')!;
+    expect(map.className).toContain("stage-tile--chromeless");
+    expect(map.querySelector('[data-panel="map"]')).not.toBeNull();
+    expect(map.querySelector(".stage-tile-head")).toBeNull();
+    expect(map.getAttribute("aria-label")).toBe("Codebase map");
   });
 
   it("opens a section's view on its own page", async () => {
@@ -409,26 +375,6 @@ describe("StagePage", () => {
     await mount(page("plan", ALL, navigateTo));
     act(() => { root.querySelector<HTMLButtonElement>('.stage-section[data-view="validation"] .stage-section-open')!.click(); });
     expect(navigateTo).toHaveBeenCalledWith("validation");
-  });
-
-  it("opens the active tab's view, not the section's first, from a tabbed section", async () => {
-    // A tabbed section is a window onto whichever tab is showing, so Open ↗
-    // has to follow the tab. Without this, switching to Zones and pressing
-    // Open silently lands on the Repository Map — the section's own view.
-    const navigateTo = vi.fn();
-    await mount(page("analyze", ALL, navigateTo));
-    openTerrain();
-    const terrain = root.querySelector('.stage-section[data-view="graph"]')!;
-    const open = terrain.querySelector<HTMLButtonElement>(".stage-section-open")!;
-
-    act(() => { open.click(); });
-    expect(navigateTo).toHaveBeenLastCalledWith("graph");
-
-    const zones = terrain.querySelector<HTMLButtonElement>('[role="tab"][data-tab="zones"]')!;
-    act(() => { zones.click(); });
-    expect(open.getAttribute("aria-label")).toBe("Open Zones on its own page");
-    act(() => { open.click(); });
-    expect(navigateTo).toHaveBeenLastCalledWith("zones");
   });
 
   it("embeds the Tasks tree, open on arrival, in a bounded-height body it can fill", async () => {

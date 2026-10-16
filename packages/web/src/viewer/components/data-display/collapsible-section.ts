@@ -72,7 +72,7 @@ export function CollapsibleSection({
           needsCollapse && expanded
             ? h("div", { class: "collapsible-scroll-container" },
                 listTag === "ul"
-                  ? h("ul", { role: "list" }, ...items)
+                  ? h("ul", { class: "collapsible-list", role: "list" }, ...items)
                   : items,
                 h("div", { class: "collapsible-sticky-footer" },
                   h("button", {
@@ -83,7 +83,7 @@ export function CollapsibleSection({
               )
             : h(Fragment, null,
                 listTag === "ul"
-                  ? h("ul", { role: "list" }, ...visibleItems)
+                  ? h("ul", { class: "collapsible-list", role: "list" }, ...visibleItems)
                   : visibleItems,
                 needsCollapse
                   ? h("button", {

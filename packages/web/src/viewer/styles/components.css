@@ -25,6 +25,14 @@
   font-weight: 600;
 }
 
+/* Items are cards: no marker or indent. role="list" keeps list semantics
+   that Safari drops when list-style is none. */
+.collapsible-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .collapsible-count {
   font-size: 11px;
   background: var(--bg-hover);

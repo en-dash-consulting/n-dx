@@ -1302,11 +1302,18 @@ if (EMBED) {
   });
 }
 
+// Zoom rate per unit of wheel delta. A trackpad pinch arrives as ctrlKey
+// wheel events with small fractional deltas, so it gets a much higher rate
+// than a mouse wheel's ~100-per-notch steps (⌘/Ctrl + scroll).
+var PINCH_RATE = 0.012, WHEEL_RATE = 0.0024;
 stage.addEventListener("wheel", function(ev){
   if (!wheelZoom && !ev.ctrlKey && !ev.metaKey) { zoomHint(); return; }
   ev.preventDefault();
+  var dy = ev.deltaY * (ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 400 : 1);
+  var pinch = ev.ctrlKey && !ev.metaKey && Math.abs(dy) < 50;
+  var f = Math.max(0.5, Math.min(2, Math.exp(-dy * (pinch ? PINCH_RATE : WHEEL_RATE))));
   var p = toVB(ev), wx = (p.x - tx) / k, wy = (p.y - ty) / k;
-  var nk = Math.max(0.4, Math.min(5, k * Math.exp(-ev.deltaY * 0.0016)));
+  var nk = Math.max(0.4, Math.min(5, k * f));
   tx = p.x - wx * nk; ty = p.y - wy * nk; k = nk; apply();
 }, { passive: false });
 

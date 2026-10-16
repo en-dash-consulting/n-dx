@@ -416,6 +416,34 @@ describe("iso map embedded in a host page", () => {
   });
 });
 
+describe("iso map zoom rate", () => {
+  /** Zoom level after one wheel event from the fitted view. */
+  function zoomAfter(init: WheelEventInit): number {
+    const dom = new JSDOM(renderIsoMap(buildIsoModel(makeInput())), { runScripts: "dangerously" });
+    const d = dom.window.document;
+    d.getElementById("stage")!.dispatchEvent(new dom.window.WheelEvent("wheel", { bubbles: true, cancelable: true, ...init }));
+    const m = /scale\(([\d.]+)\)/.exec(d.getElementById("camera")?.getAttribute("transform") ?? "");
+    dom.window.close();
+    return m ? Number(m[1]) : NaN;
+  }
+
+  it("zooms a trackpad pinch much harder than the old single rate", () => {
+    // A pinch: ctrlKey with a small delta. The old rate gave exp(0.0016 × 8) ≈ 1.013.
+    expect(zoomAfter({ deltaY: -8, ctrlKey: true })).toBeGreaterThan(1.09);
+  });
+
+  it("zooms a ⌘ + wheel notch a little more than before", () => {
+    // The old rate gave exp(0.0016 × 100) ≈ 1.17.
+    const k = zoomAfter({ deltaY: -100, metaKey: true });
+    expect(k).toBeGreaterThan(1.2);
+    expect(k).toBeLessThan(1.4);
+  });
+
+  it("never zooms more than 2× in one event", () => {
+    expect(zoomAfter({ deltaY: -2000, metaKey: true })).toBeLessThanOrEqual(2);
+  });
+});
+
 describe("iso map standalone page", () => {
   it("still zooms on a plain wheel and keeps its footer", () => {
     const dom = new JSDOM(renderIsoMap(buildIsoModel(makeInput())), { runScripts: "dangerously" });

@@ -39,9 +39,10 @@ export { MemoryWarningBanner } from "./memory-warning.js";
 // ── UI primitives ────────────────────────────────────────────────────
 
 export {
-  Breadcrumb,
-  type BreadcrumbProps,
-} from "./breadcrumb.js";
+  ProjectContext,
+  type ProjectContextProps,
+} from "./project-context.js";
+export { PageTitle } from "./page-title.js";
 export {
   CopyLinkButton,
   buildShareableUrl,

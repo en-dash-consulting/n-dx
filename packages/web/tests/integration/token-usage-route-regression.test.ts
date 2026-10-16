@@ -100,11 +100,10 @@ describe("token usage route regression", { timeout: 120_000 }, () => {
     await waitFor(() => document.querySelector(".token-header h2")?.textContent === "LLM Utilization");
 
     // Token Usage is listed by Work alone; a Rex-only viewer has no Work
-    // stage, so no stage is lit and the breadcrumb names no stage — in
-    // particular not Rex's, which is what the legacy route used to claim.
+    // stage, so no stage is lit and nothing names a stage — in particular
+    // not Rex's, which is what the legacy route used to claim.
     expect(activeStageTab()).toBeNull();
     expect(window.history.state?.view).toBe("token-usage");
-    expect(document.querySelector(".breadcrumb-current")?.textContent).toContain("Token Usage");
     expect(document.querySelector(".breadcrumb-product-rex")).toBeNull();
     expect(document.querySelector(".breadcrumb-product")).toBeNull();
     expect(document.title).toContain("Token Usage");
