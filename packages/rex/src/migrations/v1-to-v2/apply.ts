@@ -71,6 +71,7 @@ import { writePrdModel } from "../../store/prd-model-writer.js";
 import type { PlanFile } from "../plan-file.js";
 import { sourceDigest } from "../pipeline.js";
 import { V1_TREE_SOURCE_KIND, v1TreeSource, type V1ToV2Entry, type V1ToV2Summary } from "./index.js";
+import { describeSkippedV1Items, skippedV1Items } from "./v1-tree-read.js";
 import { countCorrupt, dropCorrupt, legacyLoeBucket, legacyLoeRationale, v2Slugs, type SlugEntry } from "./migration-plan-data.js";
 
 export type V1ToV2Plan = PlanFile<V1ToV2Entry, V1ToV2Summary>;
@@ -763,9 +764,12 @@ interface Prepared {
 }
 
 /** The refusals, the build and the id check shared by apply and its rehearsal; writes nothing. */
-async function prepare(plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load">): Promise<Prepared> {
+async function prepare(rexDir: string, plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load">): Promise<Prepared> {
   if (!plan) throw new MigrationApplyError("No migration plan to apply.");
   assertApplicable(plan);
+  // `load` drops the parser's warnings, so an item it skipped would pass the id checks below unseen.
+  const skipped = await skippedV1Items(rexDir);
+  if (skipped.length > 0) throw new MigrationApplyError(`${describeSkippedV1Items(skipped)} Nothing was written.`);
   const v1 = await options.load();
   assertUniqueV1Ids(v1.items);
   const built = buildV2Tree(v1.items, plan);
@@ -911,7 +915,7 @@ export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined,
   if (existsSync(join(rexDir, PRODUCT_DIRNAME))) return { status: "already-v2", ...(await leftoverV1(rexDir, plan)) };
   if (!existsSync(join(rexDir, PRD_TREE_DIRNAME))) throw new MigrationApplyError(`No PRD folder tree at ${join(rexDir, PRD_TREE_DIRNAME)}: nothing to apply.`);
   await assertNoLegacySources(rexDir);
-  const prepared = await prepare(plan, options);
+  const prepared = await prepare(rexDir, plan, options);
   const { v1, built, v1Items } = prepared;
   const scratch = await mkdtemp(join(tmpdir(), "rex-migrate-rehearsal-"));
   let verified: { files: number; nodes: number };
@@ -951,7 +955,7 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
       // Without product/ the tree reads as v1, so a changes/ here is what an interrupted apply moved in.
       await rm(changesDir, { recursive: true, force: true });
 
-      const prepared = await prepare(plan, options);
+      const prepared = await prepare(rexDir, plan, options);
       const { built, v1Items } = prepared;
 
       let files: number;
