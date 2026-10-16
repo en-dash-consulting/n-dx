@@ -20,13 +20,12 @@ import { existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { ensureRexDir } from "../../src/store/file-adapter.js";
+import { ensureRexDir, MAX_LOG_BYTES } from "../../src/store/file-adapter.js";
 import { resolveStore } from "../../src/store/index.js";
 import { handleAppendLog } from "../../src/cli/mcp-tools/index.js";
 import { cmdLog } from "../../src/cli/commands/log.js";
 import type { LogEntry } from "../../src/schema/index.js";
 
-const MAX_LOG_BYTES = 1_048_576;
 const MAX_DETAIL_LENGTH = 2000;
 
 const tmpDirs: string[] = [];
