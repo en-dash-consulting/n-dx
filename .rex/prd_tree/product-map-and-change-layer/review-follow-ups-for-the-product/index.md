@@ -19,6 +19,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A cascaded close on a v2 tree stamps the auto-completed change with the current actor as its author](./a-cascaded-close-on-a-v2-tree-stamps.md) | pending |
 | [A change's touches and amends name a capability or constraint](./a-change-s-touches-and-amends-name-a.md) | completed |
 | [A re-run of migrate --apply refuses a genuine leftover prd_tree/ that the plan cannot vouch for](./a-re-run-of-migrate-apply-refuses-a.md) | completed |
 | [A v2 folder node that becomes a leaf strands its non-tree files in an index-less folder](./a-v2-folder-node-that-becomes-a-leaf.md) | pending |
@@ -39,7 +40,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [get_capabilities reports schemaVersion rex/v1 on a v2 tree](./get-capabilities-reports-schemaversion.md) | completed |
 | [get_product on a large v2 tree exceeds what an MCP client accepts](./get-product-on-a-large-v2-tree-exceeds.md) | pending |
 | [Install the sv analyze stop handlers before the progress file says running](./install-the-sv-analyze-stop-handlers.md) | completed |
-| [MCP writes on a v2 tree do not stamp lastModified / lastModifiedBy](./mcp-writes-on-a-v2-tree-do-not-stamp.md) | pending |
+| [MCP writes on a v2 tree do not stamp lastModified / lastModifiedBy](./mcp-writes-on-a-v2-tree-do-not-stamp.md) | completed |
 | [`ndx ci` crashes with a stack trace, and no report, when a scanned source file cannot be read](./ndx-ci-crashes-with-a-stack-trace-and.md) | pending |
 | [ndx ci gateway-imports step misses dynamic import() that domain-isolation now flags](./ndx-ci-gateway-imports-step-misses.md) | pending |
 | [ndx work --task=<change> --resolve refuses a change whose open tasks --reset-deferred would reopen](./ndx-work-task-change-resolve-refuses-a.md) | pending |
