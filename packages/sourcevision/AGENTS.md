@@ -52,8 +52,9 @@ it, Python edges and externals reach `imports.json` through
 a Python repository beside TypeScript (root `pyproject.toml` and
 `package.json`) gets both. The inventory phase cannot know whether the pack
 will load, so it leaves Python out of `analysedLanguages`; the imports phase
-adds it to inventory.json once the pack has run (`withPackAnalysedLanguages`),
-and leaves the file untouched otherwise. Its dynamic-import and past-root notices go to the same
+sets it in inventory.json from the packs that ran (`withPackAnalysedLanguages`):
+added when the pack ran, removed when it did not (an imports-only re-run after
+the pack is removed), and the file untouched when that changes nothing. Its dynamic-import and past-root notices go to the same
 `warn`. Over the pinned corpus (`python-corpus.json`),
 `scripts/python-corpus-report.mjs` measures the pack, `python-build-report.mjs`
 lang-kit's build readers, `python-resolve-report.mjs` the resolver, and
