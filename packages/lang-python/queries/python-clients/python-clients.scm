@@ -77,9 +77,10 @@
 
 ; Every name a scope binds (@clients.binding), so a name a function binds
 ; anywhere is local to all of it: parameters, assignment and `for` targets
-; (unpacked too), `with`/`except … as` targets and imported names. A walrus
-; target (@clients.walrus) binds outside its comprehensions; `global` and
-; `nonlocal` (@clients.global, @clients.nonlocal) send a name's bindings out.
+; (unpacked too), `with`/`except … as` targets and imported names, which are
+; also @clients.import. A walrus target (@clients.walrus) binds outside its
+; comprehensions; `global` and `nonlocal` (@clients.global, @clients.nonlocal)
+; send a name's bindings out.
 (parameters (identifier) @clients.binding)
 (lambda_parameters (identifier) @clients.binding)
 (default_parameter name: (identifier) @clients.binding)
@@ -96,9 +97,9 @@
 (for_in_clause left: (identifier) @clients.binding)
 (as_pattern_target (identifier) @clients.binding)
 (as_pattern_target [(tuple (identifier) @clients.binding) (list (identifier) @clients.binding)])
-(import_statement name: (dotted_name . (identifier) @clients.binding))
-(import_from_statement name: (dotted_name . (identifier) @clients.binding))
-(aliased_import alias: (identifier) @clients.binding)
+(import_statement name: (dotted_name . (identifier) @clients.binding @clients.import))
+(import_from_statement name: (dotted_name . (identifier) @clients.binding @clients.import))
+(aliased_import alias: (identifier) @clients.binding @clients.import)
 (named_expression name: (identifier) @clients.walrus)
 (global_statement (identifier) @clients.global)
 (nonlocal_statement (identifier) @clients.nonlocal)

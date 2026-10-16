@@ -40,7 +40,10 @@
  *
  * Confidence is `certain` when the callee is reached through an import of
  * its module (`import requests`, `import httpx as hx`, `from requests import
- * Session`) or the receiver is a name that, in the scope Python resolves it
+ * Session`) that the call's scope does not rebind (a function, lambda or
+ * comprehension binding the name other than by import makes it local; the
+ * module scope may rebind it, as `try: import x / except: x = None` does),
+ * or the receiver is a name that, in the scope Python resolves it
  * to ({@link readScopes}), is bound only to one client's constructor (an
  * assignment, or the target of `with … as`/`async with … as`). A parameter
  * or any other binding of the name in that scope makes the receiver
@@ -363,6 +366,8 @@ interface Scopes {
   resolve(scope: string, name: string): string;
   /** Every node that binds `name` in `scope`, `global` and `nonlocal` followed. */
   bindings(scope: string, name: string): readonly Capture[];
+  /** True when `node` is a name an import binds. */
+  isImport(node: Capture): boolean;
 }
 
 type ScopeKind = "function" | "class" | "comprehension";
@@ -435,10 +440,12 @@ function readScopes(file: PackSourceFile, own: readonly Capture[]): Scopes {
     }
   }
 
+  const imports = new Set(distinct(own, `${PREFIX}.import`).map(spanKey));
   return {
     scopeOf,
     resolve: (scope, name) => resolveFrom(scope, name, true),
     bindings: (scope, name) => owned.get(scope)?.get(name) ?? [],
+    isImport: (node) => imports.has(spanKey(node)),
   };
 }
 
@@ -458,17 +465,23 @@ export function readPythonClientFile(file: PackSourceFile): OutboundCallFact[] {
   if (!own.some((c) => c.name === `${PREFIX}.argument` || c.name === `${PREFIX}.env`)) return [];
   const web = readWebFile({ path: file.path, captures: { ...file.captures, [PREFIX]: own } }, PREFIX);
 
-  const qualify = (text: string): string | undefined => {
+  const scopes = readScopes(file, own);
+  // The qualified name `text` is written for in `scope`, through the file's imports. A name a
+  // function binds other than by import is that function's own, not the module (a parameter,
+  // `os = make()`); the module scope keeps `try: import x / except: x = None`.
+  const qualify = (text: string, scope: string): string | undefined => {
     const segments = dotted(text).split(".");
     if (!segments.every((s) => IDENTIFIER.test(s))) return undefined;
-    const binding = web.bindings.get(segments[0]!);
+    const first = segments[0]!;
+    const owner = scopes.resolve(scope, first);
+    if (owner !== "" && !scopes.bindings(owner, first).every(scopes.isImport)) return undefined;
+    const binding = web.bindings.get(first);
     if (!binding) return undefined;
     const base = binding.name === undefined ? binding.module : `${binding.module}.${binding.name}`;
     return [base, ...segments.slice(1)].join(".");
   };
-  const targets = new TargetReader(qualify);
+  const targetsIn = (scope: string): TargetReader => new TargetReader((text) => qualify(text, scope));
 
-  const scopes = readScopes(file, own);
   // Binding nodes assigned a constructor's call, with the scope the call is in.
   const valueScopes = scopes.scopeOf(web.assignments.map((a) => a.value));
   const clientAt = new Map(web.assignments.map((a, i) => [spanKey(a.targetNode), { value: a.value, scope: valueScopes[i]! }]));
@@ -498,7 +511,7 @@ export function readPythonClientFile(file: PackSourceFile): OutboundCallFact[] {
       const receiver = typeOf(call.receiverNode, scope, depth + 1);
       if (receiver !== undefined) return METHOD_CONSTRUCTORS[receiver]?.[call.callee];
     }
-    const name = qualify(call.receiver === undefined ? call.callee : `${call.receiver}.${call.callee}`);
+    const name = qualify(call.receiver === undefined ? call.callee : `${call.receiver}.${call.callee}`, scope);
     return name === undefined ? undefined : CONSTRUCTORS[name];
   };
   const typeOf = (node: Capture, scope: string, depth = 0): string | undefined => {
@@ -517,7 +530,7 @@ export function readPythonClientFile(file: PackSourceFile): OutboundCallFact[] {
   web.calls.forEach((call, i) => {
     if (call.arity === 0) return;
     const scope = callScopes[i]!;
-    const reading: Reading = { file: web, targets, typeOf: (node) => typeOf(node, scope) };
+    const reading: Reading = { file: web, targets: targetsIn(scope), typeOf: (node) => typeOf(node, scope) };
     const receiver = call.receiverNode === undefined ? undefined : typeOf(call.receiverNode, scope);
     if (receiver !== undefined) {
       for (const r of RULES) {
@@ -526,7 +539,7 @@ export function readPythonClientFile(file: PackSourceFile): OutboundCallFact[] {
       }
       return;
     }
-    const name = qualify(call.receiver === undefined ? call.callee : `${call.receiver}.${call.callee}`);
+    const name = qualify(call.receiver === undefined ? call.callee : `${call.receiver}.${call.callee}`, scope);
     const matched = name === undefined ? [] : RULES.filter((r) => r.functions?.[name] !== undefined);
     for (const r of matched) add(call.invocation, r, r.functions![name!]!(call, reading), "certain");
     if (matched.length > 0 || call.receiver === undefined) return;
@@ -540,11 +553,13 @@ export function readPythonClientFile(file: PackSourceFile): OutboundCallFact[] {
   // env: `os.environ["X"]` lookups, writes left out.
   const writes = new Set(distinct(own, `${PREFIX}.env.write`).map(spanKey));
   const environ = RULES.find((r) => r.client === "os.environ")!;
-  for (const lookup of distinct(own, `${PREFIX}.env`)) {
-    if (writes.has(spanKey(lookup))) continue;
-    const key = targets.envKey(lookup.text);
+  const lookups = distinct(own, `${PREFIX}.env`);
+  const lookupScopes = scopes.scopeOf(lookups);
+  lookups.forEach((lookup, i) => {
+    if (writes.has(spanKey(lookup))) return;
+    const key = targetsIn(lookupScopes[i]!).envKey(lookup.text);
     if (key !== undefined) add(lookup, environ, [key === "" ? UNKNOWN : { target: key, targetSource: "env" }], "certain");
-  }
+  });
 
   return facts.sort((a, b) => a.position.line - b.position.line || a.position.column - b.position.column);
 }

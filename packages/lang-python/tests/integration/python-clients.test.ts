@@ -92,6 +92,10 @@ describe("Python outbound calls", () => {
       "70 queue pika likely literal:loop",
       // Not reported: a module client a function rebinds through `global` (line 82),
       // and an enclosing one a nested function rebinds through `nonlocal` (line 92).
+      // Not reported: an imported module's name shadowed by a parameter (line 99) or a local (lines 104, 105).
+      // A function-level import qualifies, and the module's import reaches a function that does not rebind it.
+      "110 http requests certain literal:https://shadow.example.com/local-import",
+      "111 env os.getenv certain env:MODULE_OS",
     ]);
   });
 
