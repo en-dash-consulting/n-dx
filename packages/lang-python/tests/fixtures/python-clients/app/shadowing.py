@@ -90,3 +90,22 @@ def outer_rebound():
         shared = make_other()
 
     shared.get("https://shadow.example.com/shared")
+
+
+import os
+
+
+def module_parameter(requests):
+    requests.get("https://shadow.example.com/module-parameter")
+
+
+def local_module():
+    os = make_other()
+    os.getenv("SHADOWED")
+    return os.environ["SHADOWED"]
+
+
+def local_import():
+    import requests
+    requests.get("https://shadow.example.com/local-import")
+    os.getenv("MODULE_OS")

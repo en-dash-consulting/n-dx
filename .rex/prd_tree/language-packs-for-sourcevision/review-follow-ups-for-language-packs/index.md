@@ -34,7 +34,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Maven build model collapses dependencies that differ only by type or classifier](./maven-build-model-collapses.md) | completed |
 | [Packed-tarball test reads a stale dist, so a newly registered pack fails the gate](./packed-tarball-test-reads-a-stale-dist.md) | completed |
 | [python-clients grades a call certain when a parameter or a non-client local shadows a module-level client](./python-clients-grades-a-call-certain.md) | completed |
-| [python-clients grades an import-qualified call certain when a parameter or local shadows the imported module name](./python-clients-grades-an-import.md) | pending |
+| [python-clients grades an import-qualified call certain when a parameter or local shadows the imported module name](./python-clients-grades-an-import.md) | in_progress |
 | [scip-java comparison counts constructor references as references to their type](./scip-java-comparison-counts.md) | completed |
 | [Spring Boot's byOwner pairs captures by scanning every owner, quadratic in a large Java file](./spring-boot-s-byowner-pairs-captures.md) | pending |
 | [Terraform agreement test checks a fixed name list, so a new config filename can drift from isTerraformPath](./terraform-agreement-test-checks-a.md) | pending |
