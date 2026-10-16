@@ -10,7 +10,7 @@ tags:
 source: "review"
 acceptanceCriteria: []
 description: "Low-priority findings from the adversarial reviews of the language-pack PRs. None of them blocks a phase gate; they are kept here so they do not hold a PR's feature open. Pick them up when a later PR touches the same code, or as a batch before the stacked PR is opened."
-lastModified: "2026-10-16T00:02:26.359Z"
+lastModified: "2026-10-16T01:45:57.146Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -20,6 +20,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [An imports-only re-run keeps Python in analysedLanguages after the Python pack is gone](./an-imports-only-re-run-keeps-python-in.md) | pending |
 | [Consolidate the duplicate go.mod parser (rex parseGoMod and sourcevision go-build)](./consolidate-the-duplicate-go-mod.md) | pending |
+| [DRF router.register calls on a router imported from another file are not counted in the Django notice](./drf-router-register-calls-on-a-router.md) | pending |
 | [Go and SQL pack grammar versions are not tied to the build pin](./go-and-sql-pack-grammar-versions-are.md) | pending |
 | [Go build reader drops the unlistable-directory notice when no go.mod or go.work is found](./go-build-reader-drops-the-unlistable.md) | pending |
 | [Go resolver lets a go.mod versioned replace beat the go.work replace for the same module](./go-resolver-lets-a-go-mod-versioned.md) | pending |
@@ -32,7 +33,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Java resolver misses the type in a method reference qualifier (Type::method)](./java-resolver-misses-the-type-in-a.md) | pending |
 | [Maven build model collapses dependencies that differ only by type or classifier](./maven-build-model-collapses.md) | completed |
 | [Packed-tarball test reads a stale dist, so a newly registered pack fails the gate](./packed-tarball-test-reads-a-stale-dist.md) | completed |
+| [python-clients grades a call certain when a parameter or a non-client local shadows a module-level client](./python-clients-grades-a-call-certain.md) | pending |
 | [scip-java comparison counts constructor references as references to their type](./scip-java-comparison-counts.md) | completed |
 | [Terraform agreement test checks a fixed name list, so a new config filename can drift from isTerraformPath](./terraform-agreement-test-checks-a.md) | pending |
+| [The Django query captures every list and tuple, adding seconds to large Python data files in every analyze](./the-django-query-captures-every-list.md) | pending |
 | [tree-sitter-go 0.25.0 rejects Go 1.26 new(expr) and generic methods](./tree-sitter-go-0-25-0-rejects-go-1-26.md) | pending |
 | [Widen gate G2 to junit-framework and thingsboard](./widen-gate-g2-to-junit-framework-and.md) | completed |
+| [Spring Boot's byOwner pairs captures by scanning every owner, quadratic in a large Java file](./spring-boot-s-byowner-pairs-captures.md) | pending |
