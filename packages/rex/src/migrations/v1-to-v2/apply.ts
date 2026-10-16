@@ -59,7 +59,7 @@ import { amendsHash, freeSlug } from "../../core/apply-amendments.js";
 import { diffFingerprints, fingerprintTree, isLossless, type FingerprintDiff } from "../../core/slug-migration.js";
 import type { PRDItem } from "../../schema/v1.js";
 import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
-import { isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
+import { CUT_CHANGE_BODY_PREFIX, CUT_CHANGE_TITLE, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
 import { withLock, type LockOptions } from "../../store/file-lock.js";
 import { parseFolderTree } from "../../store/folder-tree-parser.js";
 import { discoverPRDFiles } from "../../store/prd-discovery.js";
@@ -73,7 +73,7 @@ import { countCorrupt, dropCorrupt, legacyLoeBucket, legacyLoeRationale, v2Slugs
 
 export type V1ToV2Plan = PlanFile<V1ToV2Entry, V1ToV2Summary>;
 
-export const CUT_CHANGE_TITLE = "Product map and change layer";
+export { CUT_CHANGE_TITLE };
 /** The staging folder inside the rex directory; removed when apply ends. */
 export const STAGING_DIRNAME = ".migrate-v2";
 
@@ -580,7 +580,7 @@ function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], block
   tree.product.forEach((node) => visit(node, undefined));
 
   const lines = [
-    `Moved the PRD from the v1 folder tree to the product and change layers, by plan ${plan.header.source.digest.slice(0, 12)} cut at ${at}.`,
+    `${CUT_CHANGE_BODY_PREFIX}, by plan ${plan.header.source.digest.slice(0, 12)} cut at ${at}.`,
   ];
   // Before the containers, whose list `cutContainerIds` reads to the end of the body.
   if (blockers.length > 0) {

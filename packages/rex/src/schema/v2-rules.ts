@@ -239,7 +239,27 @@ export function changingNodes({ entries, resolve }: TreeIndex): Set<RuleNode> {
   return changing;
 }
 
-/** Each rule's fixed severity. */
+/** The migration's cut change: the first change on a migrated tree, applied at the plan's `cutAt`. */
+export const CUT_CHANGE_TITLE = "Product map and change layer";
+/** How the cut change's body opens; with the title, it tells the cut from a change someone else titled alike. */
+export const CUT_CHANGE_BODY_PREFIX = "Moved the PRD from the v1 folder tree to the product and change layers";
+
+/**
+ * When the v1 → v2 migration cut this tree, in epoch ms: the earliest
+ * `appliedAt` of a change that is the cut (its title and body opening).
+ * Undefined on a tree that never migrated.
+ */
+export function migrationCutAt({ entries }: TreeIndex): number | undefined {
+  let cut: number | undefined;
+  for (const { node } of entries) {
+    if (node.type !== "change" || node.title !== CUT_CHANGE_TITLE || !node.body?.startsWith(CUT_CHANGE_BODY_PREFIX)) continue;
+    const at = Date.parse(node.appliedAt ?? "");
+    if (!Number.isNaN(at) && (cut === undefined || at < cut)) cut = at;
+  }
+  return cut;
+}
+
+/** Each rule's severity. `change-placed-at-close` lowers its own to a warning for work the migration held ({@link changePlacedAtClose}). */
 export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "change-has-target": "error",
   "change-placed-at-close": "error",
@@ -266,8 +286,8 @@ export const RULE_SEVERITY: Readonly<Record<V2RuleId, RuleSeverity>> = {
   "check-requirement": "warning",
 };
 
-function finding(rule: V2RuleId, node: RuleNode, message: string): RuleFinding {
-  return { rule, severity: RULE_SEVERITY[rule], nodeId: node.id, message };
+function finding(rule: V2RuleId, node: RuleNode, message: string, severity: RuleSeverity = RULE_SEVERITY[rule]): RuleFinding {
+  return { rule, severity, nodeId: node.id, message };
 }
 
 // ── Title lint ───────────────────────────────────────────────────
@@ -347,15 +367,27 @@ const changeHasTarget: Rule = ({ entries }) =>
  * together they hold every completed change to a target unless it is a spike.
  * On a product layer with nothing to place on ({@link canPlaceChanges}) an
  * Inbox change closes unplaced, and this reports it once there is.
+ *
+ * A change closed at or before the migration cut ({@link migrationCutAt}) is
+ * v1 work the migration held in the Inbox. `rex change place` refuses a
+ * closed change, so it can never leave the Inbox, and the finding is a
+ * warning (decision S2-Q2). A change closed after the cut is an error.
  */
-const changePlacedAtClose: Rule = (index) =>
-  index.entries.flatMap(({ node }) => {
-    if (!awaitsPlacement(index, node)) return [];
+const changePlacedAtClose: Rule = (index) => {
+  const cut = migrationCutAt(index);
+  return index.entries.flatMap(({ node }) => {
+    if (node.type !== "change" || !awaitsPlacement(index, node)) return [];
     if (node.status !== "completed" && !isAppliedChange(node)) return [];
     const state = node.status === "completed" ? "completed" : "applied";
     const untargeted = node.spike || hasTarget(node) ? "" : "; it must also amend or touch a product node, or be a spike";
+    const closedAt = Date.parse(node.completedAt ?? node.appliedAt ?? "");
+    if (cut !== undefined && closedAt <= cut) {
+      const message = `Change "${node.title}" is ${state} but still needs placement; it closed before the migration cut and stays in the Inbox as a record${untargeted}`;
+      return [finding("change-placed-at-close", node, message, "warning")];
+    }
     return [finding("change-placed-at-close", node, `Change "${node.title}" is ${state} but still needs placement; a person must confirm its targets before it closes${untargeted}`)];
   });
+};
 
 const fixNotSpike: Rule = ({ entries }) =>
   entries.flatMap(({ node }) =>
