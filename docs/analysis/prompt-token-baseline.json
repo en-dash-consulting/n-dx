@@ -5,7 +5,7 @@
     "perCallTokens": 23454,
     "uniqueTokens": 14949,
     "skills": 13,
-    "skillTokens": 22839
+    "skillTokens": 22856
   },
   "skills": [
     {
@@ -40,8 +40,8 @@
       "name": "ndx-work",
       "file": "packages/core/assistant-assets/skills/ndx-work.md",
       "shipped": true,
-      "chars": 7914,
-      "tokens": 1979
+      "chars": 7984,
+      "tokens": 1996
     },
     {
       "name": "ndx-plan",
@@ -1067,8 +1067,8 @@
       }
     ]
   },
-  "contentHash": "22ca16f40fc4a9fc",
-  "recordedAt": "2026-10-15T04:19:01.804Z",
-  "commit": "229659bd7e32",
+  "contentHash": "00c9207aead87d34",
+  "recordedAt": "2026-10-16T13:59:54.988Z",
+  "commit": "d8e9ee3d1049",
   "dirty": false
 }
