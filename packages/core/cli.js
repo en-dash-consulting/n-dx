@@ -106,7 +106,7 @@ import { runExport } from "./export.js";
 import { ensureGitignoreEntry } from "./gitignore.js";
 import { relativeToRoot, resolveLayout } from "./layout.js";
 import { initDirLabels, padInitDirLabel } from "./init-summary.js";
-import { DEFAULT_MIGRATION_PLAN_OUT, isLegacyV1Project, runMigrateChain } from "./migrate-chain.js";
+import { DEFAULT_MIGRATION_PLAN_OUT, hasV2Tree, isLegacyV1Project, runMigrateChain } from "./migrate-chain.js";
 import { runMigrateLayout } from "./migrate-layout.js";
 import {
   resolveInitLLMSelection,
@@ -126,6 +126,7 @@ import { formatNarrationStatus, readNarrationState } from "./narration-status.js
 import {
   COMMAND_EFFECTS,
   LAYOUT_TOKENS,
+  prdTokenPaths,
   localizeEffects,
   resolveCommandEffects,
   shouldShowPreflight,
@@ -1988,9 +1989,10 @@ function forwardableFlags(flags) {
 /** Layout token → project-relative path, for expanding effects declarations. */
 function effectsLayoutPaths(dir) {
   const layout = resolveLayout(resolve(dir));
-  return Object.fromEntries(
+  const paths = Object.fromEntries(
     Object.entries(LAYOUT_TOKENS).map(([token, field]) => [token, relativeToRoot(layout, layout[field])]),
   );
+  return { ...paths, ...prdTokenPaths(paths.rex, hasV2Tree(resolve(dir))) };
 }
 
 /**

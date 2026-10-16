@@ -18,7 +18,7 @@
  * COMMAND_REGISTRY); `tests/unit/command-effects.test.js` fails on a registry
  * command without a declaration and on a declaration without a command.
  *
- * Paths the layout owns are written as tokens — `{rex}/prd_tree/`, `{config}` —
+ * Paths the layout owns are written as tokens — `{rex}/`, `{config}`, `{prd}` —
  * never as `.rex/` or `.n-dx.json`, because where those live depends on whether
  * the project is on the legacy or the `.ndx/` layout, and `layout.js` owns that
  * decision. {@link localizeEffects} expands the tokens against a project's
@@ -98,8 +98,10 @@ const BANNER_SUPPRESSING_FLAGS = new Set([
 // Frozen so a consumer that mutates one entry cannot silently edit another.
 
 const LLM_PROVIDER = Object.freeze({ to: "llm-provider", what: "the configured LLM vendor" });
-const PRD_TREE = "{rex}/prd_tree/";
-const PRD_READ = "{rex}/prd_tree/";
+// `{prd}` / `{prdRead}` expand per project (see PRD_TOKENS): a v1 project keeps
+// its PRD in prd_tree/, a v2 one in changes/ and product/.
+const PRD_TREE = "{prd}";
+const PRD_READ = "{prdRead}";
 const SV_ANALYSIS_WRITE = Object.freeze({
   path: "{sourcevision}/",
   what: "inventory, import graph, zones, CONTEXT.md, llms.txt",
@@ -753,6 +755,28 @@ export const LAYOUT_TOKENS = Object.freeze({
   webPid: "webPidFile",
   webPort: "webPortFile",
 });
+
+/**
+ * Tokens that depend on the project's PRD storage version, not on the layout:
+ * `{prd}` is where a command writes the PRD, `{prdRead}` what it reads.
+ * {@link prdTokenPaths} answers them; the dashboard's twin in
+ * `routes-commands.ts` must agree (`command-effects-manifest-contract.test.js`).
+ */
+export const PRD_TOKENS = Object.freeze(["prd", "prdRead"]);
+
+/**
+ * The {@link PRD_TOKENS} for a project whose rex directory is `rexPath`.
+ * `v2` is whether `<rexPath>/product/` exists, the test rex itself uses.
+ *
+ * @param {string} rexPath - Project-relative rex directory.
+ * @param {boolean} v2
+ * @returns {{prd: string, prdRead: string}}
+ */
+export function prdTokenPaths(rexPath, v2) {
+  return v2
+    ? { prd: `${rexPath}/changes/`, prdRead: `${rexPath}/product/ and ${rexPath}/changes/` }
+    : { prd: `${rexPath}/prd_tree/`, prdRead: `${rexPath}/prd_tree/` };
+}
 
 const TOKEN_PATTERN = /\{(\w+)\}/g;
 

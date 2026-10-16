@@ -26,7 +26,7 @@ import {
   handleCommandsRoute,
   invalidateCommandEffectsCache,
 } from "../../packages/web/dist/server/routes-commands.js";
-import { COMMAND_EFFECTS, LAYOUT_TOKENS } from "../../packages/core/command-effects.js";
+import { COMMAND_EFFECTS, LAYOUT_TOKENS, PRD_TOKENS, prdTokenPaths } from "../../packages/core/command-effects.js";
 import { resolveLayout, relativeToRoot } from "../../packages/core/layout.js";
 
 const CORE_CLI = join(import.meta.dirname, "../../packages/core/cli.js");
@@ -102,7 +102,8 @@ describe("command manifest ↔ core effects", () => {
         const expected = Object.fromEntries(
           Object.entries(LAYOUT_TOKENS).map(([token, field]) => [token, relativeToRoot(layout, layout[field])]),
         );
-        expect(layoutPaths).toEqual(expected);
+        // No product/ here, so the PRD is the v1 tree.
+        expect(layoutPaths).toEqual({ ...expected, ...prdTokenPaths(expected.rex, false) });
       } finally {
         await rm(join(projectDir, ".ndx"), { recursive: true, force: true });
       }
@@ -111,6 +112,6 @@ describe("command manifest ↔ core effects", () => {
 
   it("uses no token the layout cannot expand", () => {
     const used = new Set(JSON.stringify(COMMAND_EFFECTS).match(/\{(\w+)\}/g)?.map((t) => t.slice(1, -1)));
-    expect([...used].filter((t) => !(t in LAYOUT_TOKENS))).toEqual([]);
+    expect([...used].filter((t) => !(t in LAYOUT_TOKENS) && !PRD_TOKENS.includes(t))).toEqual([]);
   });
 });
