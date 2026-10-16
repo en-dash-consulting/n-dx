@@ -41,3 +41,25 @@ updates:
       production-dependencies:
         dependency-type: production
         patterns: ["*"]
+    # Updates held back on purpose. Each entry says what breaks and what would
+    # let it go; remove an entry once that has happened.
+    ignore:
+      # TypeScript 7 ships only the `tsc` binary: its package has none of the
+      # compiler API (createSourceFile, SyntaxKind, forEachChild, ...) that
+      # sourcevision's analyzers and hench's dead-code analyzer call at
+      # runtime, so the build fails outright. Lift when sourcevision has a
+      # way to parse TypeScript that does not depend on that API.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # Preact 11 types useRef as RefObject<T | null>, which fails the web
+      # build in four components, and its runtime changes have not been
+      # checked against the dashboard. Lift as part of that migration.
+      - dependency-name: "preact"
+        update-types: ["version-update:semver-major"]
+      # Graview moves in lockstep with GRAVIEW_VERSION in
+      # packages/graview/src/document.ts, which the declaration test holds to
+      # the @graview/core release the declaration was checked against. A
+      # version bump is part of the Graview release work, not a dependency
+      # update.
+      - dependency-name: "graview"
+      - dependency-name: "@graview/*"
