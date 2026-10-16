@@ -304,7 +304,8 @@ export const COMMAND_EFFECTS = {
     summary: "Group SourceVision findings into recommendations you can accept.",
     reads: [
       "{sourcevision}/ (findings from the last analysis)",
-      "{rex}/prd_tree/ and {rex}/acknowledged-findings.json",
+      PRD_READ,
+      "{rex}/acknowledged-findings.json",
     ],
     writes: [
       { path: "{rex}/acknowledged-findings.json", what: "acknowledgements", conditional: true, when: "with --acknowledge" },
@@ -324,7 +325,7 @@ export const COMMAND_EFFECTS = {
     reads: [
       "every tracked source file under the project",
       "{sourcevision}/ (refreshed first)",
-      "{rex}/prd_tree/ (to avoid proposing what already exists)",
+      `${PRD_READ} (to avoid proposing what already exists)`,
     ],
     writes: [
       SV_ANALYSIS_WRITE,

@@ -110,6 +110,21 @@ describe("command manifest ↔ core effects", () => {
     });
   }
 
+  it("serves the v2 PRD paths core's prdTokenPaths gives once product/ exists", async () => {
+    // The PRD tokens follow the storage version; web's twin must agree on v2 too.
+    const layout = resolveLayout(projectDir);
+    const product = join(layout.rexDir, "product");
+    await mkdir(product, { recursive: true });
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/commands/manifest`);
+      const { layoutPaths } = await res.json();
+      const rex = relativeToRoot(layout, layout.rexDir);
+      expect({ prd: layoutPaths.prd, prdRead: layoutPaths.prdRead }).toEqual(prdTokenPaths(rex, true));
+    } finally {
+      await rm(product, { recursive: true, force: true });
+    }
+  });
+
   it("uses no token the layout cannot expand", () => {
     const used = new Set(JSON.stringify(COMMAND_EFFECTS).match(/\{(\w+)\}/g)?.map((t) => t.slice(1, -1)));
     expect([...used].filter((t) => !(t in LAYOUT_TOKENS) && !PRD_TOKENS.includes(t))).toEqual([]);

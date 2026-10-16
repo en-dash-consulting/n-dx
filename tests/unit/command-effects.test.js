@@ -215,6 +215,9 @@ describe("localizeEffects", () => {
     expect(add.writes.map((w) => w.path)).toContain(".ndx/rex/changes/");
     expect(add.reads).toContain(".ndx/rex/product/ and .ndx/rex/changes/");
     expect(JSON.stringify(add)).not.toContain("prd_tree");
+    for (const name of ["plan", "recommend"]) {
+      expect(localizeEffects(COMMAND_EFFECTS[name], NDX_V2).reads.join("\n"), name).not.toContain("prd_tree");
+    }
     // The same declaration on a v1 project still names the tree.
     expect(localizeEffects(resolveCommandEffects("add"), NDX).writes.map((w) => w.path)).toContain(".ndx/rex/prd_tree/");
   });
