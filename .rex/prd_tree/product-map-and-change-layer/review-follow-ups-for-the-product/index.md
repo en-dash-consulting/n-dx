@@ -56,7 +56,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | completed |
 | [The migration plan's metAt hashes the rules-stage spec draft and goes stale once a later pass redrafts the spec](./the-migration-plan-s-metat-hashes-the.md) | completed |
 | [The v2 writer drops a moved folder node's top-level state.yaml keys](./the-v2-writer-drops-a-moved-folder.md) | completed |
-| [v2 changes still carry a v1 level (epic) in MCP and CLI output](./v2-changes-still-carry-a-v1-level-epic.md) | pending |
+| [v2 changes still carry a v1 level (epic) in MCP and CLI output](./v2-changes-still-carry-a-v1-level-epic.md) | completed |
 | [v2 isolation test misses imports of the core v2 modules and dynamic import() of any v2 module](./v2-isolation-test-misses-imports-of.md) | pending |
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
 | [VALIDATED_DOC_PAGES is hand-maintained: a root test that starts reading a new docs page selects nothing until someone adds a group](./validated-doc-pages-is-hand-maintained.md) | pending |
