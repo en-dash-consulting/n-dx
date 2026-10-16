@@ -23,7 +23,7 @@ import type { FactKind, OutboundCallFact, RouteFact, SourcePosition } from "@n-d
 import {
   callSites,
   contains,
-  innermost,
+  innermostEach,
   type CallSite,
   type Capture,
   type FrameworkFacts,
@@ -82,17 +82,29 @@ const simpleName = (text: string): string => {
 
 const before = (a: SourcePosition, b: SourcePosition): boolean => a.line < b.line || (a.line === b.line && a.column < b.column);
 
-const sameSpan = (a: Capture, b: Capture): boolean =>
-  a.start.line === b.start.line && a.start.column === b.start.column && a.end.line === b.end.line && a.end.column === b.end.column;
+/** A capture's span as a map key: captures with the same span get the same key. */
+const spanKey = (c: Capture): string => `${c.start.line}:${c.start.column}-${c.end.line}:${c.end.column}`;
 
-/** Each of `captured` under its innermost owner among `owners`. */
+/** Each of `captured` under its innermost owner among `owners`, in `captured`'s order; one sweep, not a scan per capture. */
 function byOwner(owners: readonly Capture[], captured: readonly Capture[]): Map<Capture, Capture[]> {
   const owned = new Map<Capture, Capture[]>();
-  for (const c of captured) {
-    const owner = innermost(owners, c);
-    if (owner) owned.set(owner, [...(owned.get(owner) ?? []), c]);
-  }
+  innermostEach(owners, captured).forEach((owner, i) => {
+    if (!owner) return;
+    const list = owned.get(owner);
+    if (list) list.push(captured[i]!);
+    else owned.set(owner, [captured[i]!]);
+  });
   return owned;
+}
+
+/** The first of `items` for each span `spanOf` gives; an item without one is left out. */
+function firstBySpan<T>(items: readonly T[], spanOf: (item: T) => Capture | undefined): Map<string, T> {
+  const found = new Map<string, T>();
+  for (const item of items) {
+    const span = spanOf(item);
+    if (span !== undefined && !found.has(spanKey(span))) found.set(spanKey(span), item);
+  }
+  return found;
 }
 
 interface Element {
@@ -183,13 +195,13 @@ function readDeclarations(file: PackSourceFile, annotations: readonly Annotation
   });
   // An anonymous class body between a method and its type makes it no member of that type.
   const bodies = decl.filter((c) => c.name === "anonymous.body");
+  const typeOfNode = new Map(types.map((t) => [t.node, t]));
+  const enclosing = innermostEach([...types.map((t) => t.node), ...bodies], methods.map((m) => m.node));
+  const owners = new Map(methods.map((m, i) => [m, enclosing[i] && typeOfNode.get(enclosing[i])]));
   return {
     types,
     methods,
-    ownerOf(method) {
-      const owner = innermost([...types.map((t) => t.node), ...bodies], method.node);
-      return types.find((t) => t.node === owner);
-    },
+    ownerOf: (method) => owners.get(method),
   };
 }
 
@@ -393,16 +405,20 @@ function readOutbound(file: PackSourceFile, annotations: readonly Annotation[], 
   const calls: Call[] = sites.flatMap((site) =>
     site.name ? [{ site, callee: site.name.text, args: argsByList.get(site.arguments) ?? [], position: (site.invocation ?? site.name).start }] : [],
   );
+  // Calls by span, so following a receiver or a chain is a lookup rather than a scan of the file.
+  const byInvocation = firstBySpan(calls, (c) => c.site.invocation);
+  const byReceiver = firstBySpan(calls, (c) => c.site.receiver);
   /** The call whose whole invocation is `node`, e.g. a receiver or an argument. */
-  const callAt = (node: Capture | undefined): Call | undefined =>
-    node === undefined ? undefined : calls.find((c) => c.site.invocation !== undefined && sameSpan(c.site.invocation, node));
+  const callAt = (node: Capture | undefined): Call | undefined => (node === undefined ? undefined : byInvocation.get(spanKey(node)));
 
   // Declared types by name. A name declared with two types in one file is not resolved; `var` declares none.
   const variables = spring.filter((c) => c.name === "spring.variable");
   const typesOf = byOwner(variables, spring.filter((c) => c.name === "spring.variable.type"));
   const declared = new Map<string, Set<string>>();
-  for (const name of spring.filter((c) => c.name === "spring.variable.name")) {
-    const declaration = innermost(variables, name);
+  const variableNames = spring.filter((c) => c.name === "spring.variable.name");
+  const declarationOf = innermostEach(variables, variableNames);
+  for (const [i, name] of variableNames.entries()) {
+    const declaration = declarationOf[i];
     const type = declaration && typesOf.get(declaration)?.[0];
     if (!type) continue;
     declared.set(name.text, (declared.get(name.text) ?? new Set()).add(simpleName(type.text)));
@@ -430,10 +446,10 @@ function readOutbound(file: PackSourceFile, annotations: readonly Annotation[], 
   /** The calls chained on `call`: `.uri(…)` in `HttpRequest.newBuilder().uri(…)`. */
   const chainedOn = (call: Call): Call[] => {
     const out: Call[] = [];
-    for (let next = calls.find((c) => c.site.receiver && call.site.invocation && sameSpan(c.site.receiver, call.site.invocation)); next; ) {
+    for (let at = call.site.invocation, next = at && byReceiver.get(spanKey(at)); next; ) {
       out.push(next);
-      const at = next.site.invocation;
-      next = at && calls.find((c) => c.site.receiver !== undefined && sameSpan(c.site.receiver, at));
+      at = next.site.invocation;
+      next = at && byReceiver.get(spanKey(at));
     }
     return out;
   };
