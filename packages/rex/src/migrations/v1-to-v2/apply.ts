@@ -16,7 +16,8 @@
  *   of its new parent, and anything else lands in the Inbox as a change.
  * - **Delivery containers.** A dissolved release epic is no node: its children
  *   are placed or held like any change, its release is stamped as their
- *   `plannedRelease`, and the cut change lists every container by id.
+ *   `plannedRelease`, and the cut change lists every container by id, with
+ *   its description and acceptance criteria under its line.
  * - **Product nodes.** Areas keep their v1 epic names. A capability ships its
  *   drafted spec, unreviewed unless the plan recorded an approval of that
  *   exact draft. A capability or constraint starts met (`metAt` is the hash of
@@ -24,7 +25,8 @@
  *   draft and goes stale once a later pass redrafts the spec) when its v1
  *   item was completed or an applied change sits on it, and proposed
  *   otherwise: never revised.
- * - **blockedBy.** A ref to a dissolved container names the nodes it split
+ * - **blockedBy.** A dissolved container's own refs move onto its open
+ *   children. A ref to a dissolved container names the nodes it split
  *   into; a ref to a product node names that node's open changes, and a
  *   product node's own refs move onto its open changes. A dependency already
  *   met is dropped. Every rewrite is in `blockers` and the cut change's body.
@@ -105,6 +107,12 @@ export interface DeliveryContainer {
   title: string;
   /** The release its changes carry as `plannedRelease`; absent when the plan recorded none. */
   plannedRelease?: string;
+  /** Kept in the cut change's body, under the container's line. */
+  description?: string;
+  /** Kept in the cut change's body, under the container's line. */
+  acceptanceCriteria?: string[];
+  /** Moved onto the container's open children ({@link repointDissolvedBlockers}). */
+  blockedBy?: string[];
 }
 
 /**
@@ -120,7 +128,10 @@ export interface BlockerRewrite {
   from: string;
   /** The refs that replace it; empty when the dependency is met and the ref is dropped. */
   to: string[];
-  /** Set when `node` is a product node, which holds no blockedBy: the open changes `to` moved onto; empty when it has none and the ref is dropped. */
+  /**
+   * Set when `node` holds no blockedBy in v2 (a product node or a dissolved
+   * container): the open work `to` moved onto; empty when it has none and the ref is dropped.
+   */
   onto?: string[];
 }
 
@@ -192,7 +203,14 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
   for (const { item, parent } of flat) {
     const entry = entryOf(item.id);
     if (entry?.target === "release") {
-      containers.push({ id: item.id, title: item.title, ...(entry.plannedRelease !== undefined ? { plannedRelease: entry.plannedRelease } : {}) });
+      containers.push({
+        id: item.id,
+        title: item.title,
+        ...(entry.plannedRelease !== undefined ? { plannedRelease: entry.plannedRelease } : {}),
+        ...(item.description ? { description: item.description } : {}),
+        ...(item.acceptanceCriteria?.length ? { acceptanceCriteria: item.acceptanceCriteria } : {}),
+        ...(item.blockedBy?.length ? { blockedBy: item.blockedBy } : {}),
+      });
       continue;
     }
     if (entry) {
@@ -308,6 +326,10 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
  * resolves; a node never blocks itself. A container completed in v1 already satisfied
  * the dependency, so its ref is dropped; a cancelled or deleted child never completes,
  * so it is never a blocker. Each rewrite is recorded in `out`.
+ *
+ * A container's own blockedBy first moves onto its open children, so work in a
+ * release still waits for what the release waited for; a ref to another
+ * container is then repointed like any other.
  */
 function repointDissolvedBlockers(
   nodes: ReadonlyMap<string, RuleNode>,
@@ -330,6 +352,18 @@ function repointDissolvedBlockers(
     seen.add(id);
     return (childrenOf.get(id) ?? []).flatMap((child) => expand(child, seen));
   };
+  for (const c of containers) {
+    if (!c.blockedBy) continue;
+    const onto = expand(c.id, new Set()).filter((id) => nodes.get(id)!.status !== "completed");
+    for (const ref of c.blockedBy) {
+      out.push({ kind: "container", node: c.id, from: ref, to: [ref], onto });
+      for (const id of onto) {
+        if (id === ref) continue;
+        const node = nodes.get(id)!;
+        setBlockedBy(node, [...(node.blockedBy ?? []), ref]);
+      }
+    }
+  }
   for (const node of nodes.values()) {
     if (!node.blockedBy?.some((ref) => dissolved.has(ref))) continue;
     const refs = node.blockedBy.flatMap((ref) => {
@@ -444,8 +478,9 @@ function rewriteRequirementBlockers(
 export function describeBlockerRewrite(r: BlockerRewrite): string {
   const to = r.to.length > 0 ? r.to.join(", ") : r.kind === "container" ? "dropped (container completed or no open child)" : "dropped (no open change: met)";
   if (r.onto === undefined) return `${r.node}: blockedBy ${r.from} → ${to}`;
-  if (r.onto.length === 0) return `${r.node}: blockedBy ${r.from} → dropped (product node with no open change to carry it)`;
-  return `${r.node}: blockedBy ${r.from} → ${to}, moved onto its open changes ${r.onto.join(", ")}`;
+  const [holder, work] = r.kind === "container" ? ["container", "child"] : ["product node", "change"];
+  if (r.onto.length === 0) return `${r.node}: blockedBy ${r.from} → dropped (${holder} with no open ${work} to carry it)`;
+  return `${r.node}: blockedBy ${r.from} → ${to}, moved onto its open ${r.kind === "container" ? "children" : "changes"} ${r.onto.join(", ")}`;
 }
 
 /** The Inbox change an item becomes when its planned place no longer exists. */
@@ -646,7 +681,12 @@ function cutChange(
   }
   if (containers.length > 0) {
     lines.push("", CONTAINERS_HEADING, "");
-    for (const c of containers) lines.push(`- ${c.title} (${c.id})${c.plannedRelease !== undefined ? `: plannedRelease ${c.plannedRelease}` : ""}`);
+    for (const c of containers) {
+      lines.push(`- ${c.title} (${c.id})${c.plannedRelease !== undefined ? `: plannedRelease ${c.plannedRelease}` : ""}`);
+      // Indented, so no line of it reads as a container line.
+      const under = [...(c.description?.split("\n") ?? []), ...(c.acceptanceCriteria ? ["Acceptance criteria:", ...c.acceptanceCriteria.map((ac) => `- ${ac}`)] : [])];
+      for (const line of under) lines.push(line.trim() === "" ? "" : `  ${line}`);
+    }
   }
   return {
     id,

@@ -70,6 +70,33 @@ const TREE: PRDItem[] = [
   }),
 ];
 
+/** Two open release epics, 0.12.0 blockedBy 0.11.0 and carrying a description and criteria. */
+const RELEASES: PRDItem[] = [
+  item("r11", "epic", "ndx 0.11.0", [
+    item("g1", "feature", "Ship the hub", [], { status: "pending" }),
+    item("g2", "feature", "Shipped already", []),
+  ], { status: "pending" }),
+  item("r12", "epic", "ndx 0.12.0", [
+    item("g3", "feature", "Sidecar", [], { status: "pending" }),
+    item("g4", "feature", "Sidecar docs", [], { status: "pending" }),
+  ], {
+    status: "pending",
+    blockedBy: ["r11"],
+    description: "Second soft-freeze release.\nNo new commands.",
+    acceptanceCriteria: ["Every lane merged", "Release gate passes"],
+  }),
+];
+
+/** What {@link RELEASES}' r12 leaves in the cut change's body: its line, and its fields under it. */
+const R12_CUT_LINES = [
+  "- ndx 0.12.0 (r12): plannedRelease 0.12.0",
+  "  Second soft-freeze release.",
+  "  No new commands.",
+  "  Acceptance criteria:",
+  "  - Every lane merged",
+  "  - Release gate passes",
+].join("\n");
+
 function walk(nodes: readonly RuleNode[], out: RuleNode[] = []): RuleNode[] {
   for (const node of nodes) {
     out.push(node);
@@ -193,6 +220,27 @@ describe("buildV2Tree", () => {
       const { tree } = buildV2Tree(items, await planOf(items));
       expect(byId(tree, "f13")!.blockedBy).toBeUndefined();
       expect(byId(tree, "f14")!.blockedBy).toEqual(["f11"]);
+    });
+  });
+
+  describe("a dissolved container's own fields", () => {
+    it("keeps its description and acceptance criteria under its line in the cut change's body", async () => {
+      const { tree, cut } = buildV2Tree(RELEASES, await planOf(RELEASES));
+      const body = byId(tree, cut)!.body as string;
+      expect(body).toContain(R12_CUT_LINES);
+      expect(cutContainerIds(tree)).toEqual(["r11", "r12"]);
+    });
+
+    it("moves its blockedBy onto its open children, repointed at the other container's open children", async () => {
+      const { tree, blockers, cut } = buildV2Tree(RELEASES, await planOf(RELEASES));
+      expect(byId(tree, cut)!.body).toContain("- r12: blockedBy r11 → r11, moved onto its open children g3, g4");
+      // The repoint keeps a completed child (g2): a met ref, which only g1 holds open.
+      expect(byId(tree, "g3")!.blockedBy).toEqual(["g1", "g2"]);
+      expect(byId(tree, "g4")!.blockedBy).toEqual(["g1", "g2"]);
+      expect(byId(tree, "g1")!.blockedBy).toBeUndefined();
+      expect(blockers).toContainEqual({ kind: "container", node: "r12", from: "r11", to: ["r11"], onto: ["g3", "g4"] });
+      for (const n of all(tree)) delete n.needsPlacement;
+      expect(findActionableWork(tree).map((u) => u.node.id)).not.toContain("g3");
     });
   });
 
@@ -448,6 +496,16 @@ describe("applyV1ToV2", () => {
     if (outcome.status !== "applied") return;
     expect(isLossless(everyV1Id(TREE, model.tree, outcome.built.containers, outcome.built.cut))).toBe(true);
     expect(outcome.v1Items).toBe(walkItems(TREE).length);
+  });
+
+  it("keeps a release epic's description, criteria and blockedBy through the write and read-back", async () => {
+    await store().saveDocument({ schema: "rex/v1", title: "Shop", items: structuredClone([...TREE, ...RELEASES]) });
+    const outcome = await applyV1ToV2(rexDir, await planOf((await load()).items), { load });
+    expect(outcome.status).toBe("applied");
+    if (outcome.status !== "applied") return;
+    const { tree } = await loadPrdModel(rexDir);
+    expect(byId(tree, outcome.built.cut)!.body).toContain(R12_CUT_LINES);
+    expect(byId(tree, "g3")!.blockedBy).toEqual(["g1", "g2"]);
   });
 
   it("stores held changes in the reserved Inbox folder", async () => {
