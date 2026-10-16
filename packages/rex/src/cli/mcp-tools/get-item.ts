@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { resolveItem } from "../../core/tree.js";
 import { loadPrdModel, prdLayout } from "../../store/prd-model-reader.js";
+import { withoutLevel } from "../../core/layer-projection.js";
 import { indexTree } from "../../schema/v2-rules.js";
 import type { PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
@@ -46,7 +47,7 @@ async function getV2Item(rexDir: string, ref: string): Promise<McpResult> {
   const parentOf = new Map(entries.map((e) => [e.node, e.parent]));
   const parentChain = [];
   for (let p = parentOf.get(item); p; p = parentOf.get(p)) parentChain.unshift({ id: p.id, title: p.title, type: p.type });
-  return textResult(JSON.stringify({ item, parentChain }, null, 2));
+  return textResult(JSON.stringify({ item: withoutLevel(item), parentChain }, null, 2));
 }
 
 export const getItemTool = defineTool({

@@ -5,6 +5,7 @@ import { collectForeignClaims } from "../mcp-tools/index.js";
 import type { SkippedClaim } from "../mcp-tools/claims.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { findNextTask, collectCompletedIds, explainSelection, type SelectionExplanation } from "../../core/next-task.js";
+import { withoutLevel } from "../../core/layer-projection.js";
 import { completedWorkIds, findNextWorkTask } from "../../core/change-next-task.js";
 
 import { info, result } from "../output.js";
@@ -63,7 +64,7 @@ async function nextV2Work(dir: string, store: ChangeLayerStore, flags: Record<st
   const skippedClaimed = skipped.filter((c) => !completed.has(c.taskId));
   const next = findNextWorkTask(tree, { excludeIds });
   if (!next) return printNoneLeft(skippedClaimed, flags);
-  printNext(next.item, next.parents, next.explanation, skippedClaimed, flags, { changeId: next.unit.change.id });
+  printNext(next.item, next.parents, next.explanation, skippedClaimed, flags, { v2: true, changeId: next.unit.change.id });
 }
 
 /**
@@ -94,10 +95,13 @@ function printNext(
   explanation: SelectionExplanation,
   skippedClaimed: SkippedClaim[],
   flags: Record<string, string>,
-  v2Fields: { changeId?: string } = {},
+  v2Fields: { v2?: boolean; changeId?: string } = {},
 ): void {
+  const { v2, ...v2Extra } = v2Fields;
   if (flags.format === "json") {
-    result(JSON.stringify({ item, parents, explanation, ...v2Fields, skippedClaimed }, null, 2));
+    // A v2 tree has types, not levels.
+    const shown = v2 ? { item: withoutLevel(item), parents: parents.map((p) => withoutLevel(p)) } : { item, parents };
+    result(JSON.stringify({ ...shown, explanation, ...v2Extra, skippedClaimed }, null, 2));
     return;
   }
 
@@ -106,7 +110,7 @@ function printNext(
     info(dim(breadcrumb + " →"));
   }
 
-  result(`\n[${item.level}] ${bold(item.title)}`);
+  result(`\n[${v2 ? item.type : item.level}] ${bold(item.title)}`);
   result(`  ID:     ${dim(item.id)}`);
   info(`  Status: ${colorStatus(item.status)}`);
   if (item.priority) info(`  Priority: ${colorPriority(item.priority)}`);

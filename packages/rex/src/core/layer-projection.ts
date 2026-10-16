@@ -55,6 +55,17 @@ export function changeLayerType(item: PRDItem): ChangeNodeType | undefined {
   return item.type === "change" || item.type === "task" || item.type === "subtask" ? item.type : undefined;
 }
 
+/**
+ * A v2 node or projected item as v2 output shows it: without the v1 `level`
+ * (the projection derives one, and a migrated node may keep one), children
+ * included. `type` is the label. v1 output keeps `level`.
+ */
+export function withoutLevel<T extends { level?: unknown; children?: unknown }>(node: T): Omit<T, "level"> {
+  const { level: _level, children, ...rest } = node;
+  const kept = Array.isArray(children) ? { ...rest, children: children.map((c) => withoutLevel(c)) } : rest;
+  return kept as Omit<T, "level">;
+}
+
 export interface ChangeLayerWriteBack {
   /** The change layer the items describe. */
   changes: RuleNode[];

@@ -46,7 +46,9 @@ describe("rex next on a v2 tree", () => {
   it("--format=json keeps the v1 fields and adds changeId", async () => {
     await cmdNext(tmp, { format: "json" });
     const body = JSON.parse(output());
-    expect(body.item).toMatchObject({ id: TASK, level: "task", type: "task" });
+    expect(body.item).toMatchObject({ id: TASK, type: "task" });
+    expect(body.item).not.toHaveProperty("level");
+    for (const p of body.parents) expect(p).not.toHaveProperty("level");
     expect(body.parents.map((p: { id: string }) => p.id)).toEqual([CHANGE]);
     expect(body.changeId).toBe(CHANGE);
     expect(body.explanation.reason).toBe("priority");

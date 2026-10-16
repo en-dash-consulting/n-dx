@@ -15,6 +15,7 @@ import {
   handleApplyChange,
   handleGetCapability,
   handleGetItem,
+  handleGetNextTask,
   handleGetPrdStatus,
   handleGetProduct,
   handlePlaceChange,
@@ -106,6 +107,23 @@ describe("get_capability", () => {
     expect(error(await handleGetCapability(rexDir, { id: "nope" }))).toBe(
       '"nope" names no product node. Use get_product to see the product layer.',
     );
+  });
+});
+
+describe("level on a v2 tree", () => {
+  it("get_next_task labels by type, with no level on the item or its chain", async () => {
+    const body = json(await handleGetNextTask(await resolveStore(rexDir)));
+    expect(body.item).toMatchObject({ id: FIXTURE_TASK, type: "task" });
+    expect(body.item).not.toHaveProperty("level");
+    expect(body.parentChain).toEqual([{ id: CHANGE, title: expect.any(String), type: "change" }]);
+  });
+
+  it("get_item carries a type and no level, for a change and its task", async () => {
+    for (const id of [CHANGE, FIXTURE_TASK]) {
+      const { item } = json(await handleGetItem(store(), rexDir, { id }));
+      expect(item.type).toBeDefined();
+      expect(item).not.toHaveProperty("level");
+    }
   });
 });
 
