@@ -342,4 +342,13 @@ describe("trailingTrailerRegion", () => {
     const body = "Subject\n\nSigned-off-by: Dev\n  continued here\n";
     expect(trailingTrailerRegion(body)).toBe("Signed-off-by: Dev\n  continued here");
   });
+
+  it("never reads the subject, which git does not treat as a trailer block", () => {
+    // A conventional-commit subject is trailer-shaped, so the walk would
+    // otherwise swallow it and read a one-paragraph message as a trailer block.
+    expect(trailingTrailerRegion(`N-DX-Item: ${CHANGE}`)).toBe("");
+    expect(trailingTrailerRegion("docs: a subject\n\nCo-Authored-By: Dev <dev@example.com>")).toBe(
+      "Co-Authored-By: Dev <dev@example.com>",
+    );
+  });
 });

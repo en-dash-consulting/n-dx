@@ -30,8 +30,10 @@
  * 1. Only a **trailing run of trailer-shaped paragraphs** is scanned, not the
  *    whole message. Walking back from the end, a paragraph counts while every
  *    one of its lines is `Key: value` or a folded continuation; the first
- *    prose paragraph stops the walk. This is exactly the shape the history
- *    has, and it refuses a trailer quoted mid-message.
+ *    prose paragraph stops the walk, and the subject is never reached — a
+ *    conventional-commit subject is itself trailer-shaped, and git does not
+ *    read a trailer out of a one-paragraph message either. This is exactly
+ *    the shape the history has, and it refuses a trailer quoted mid-message.
  * 2. **A merge commit is never read this way.** A merge carries no trailer of
  *    its own, and its body quotes the messages of the commits it brings in —
  *    21 merges on this repository quote an `N-DX-Item` that is not theirs.
@@ -198,7 +200,11 @@ const FOLDED_CONTINUATION = /^[ \t]+\S/;
 export function trailingTrailerRegion(body: string): string {
   const paragraphs = body.replace(/\s+$/, "").split(/\n[ \t]*\n/);
   const kept: string[] = [];
-  for (let i = paragraphs.length - 1; i >= 0; i--) {
+  // Stop at index 1: the first paragraph is the subject, and git never reads a
+  // trailer out of it. Without this the walk swallows a conventional-commit
+  // subject, which is trailer-shaped ("docs: …"), and a single-paragraph
+  // message would be read as a trailer block that git itself reports as empty.
+  for (let i = paragraphs.length - 1; i >= 1; i--) {
     const lines = paragraphs[i].split("\n").filter((line) => line.trim() !== "");
     if (lines.length === 0) continue;
     const allTrailers = lines.every(
