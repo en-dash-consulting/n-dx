@@ -265,7 +265,7 @@ export function resolveVendorCliEnv(
   if (stripped.length > 0) onStripped?.(stripped, "stripped");
   const present = new Set(Object.keys(env).map((name) => name.toUpperCase()));
   const missing = activeModes
-    .filter((mode) => !mode.credentials.some((name) => present.has(name)))
+    .filter((mode) => !mode.credentials.some((name) => present.has(name.toUpperCase())))
     .flatMap((mode) => mode.credentials);
   if (missing.length > 0) onStripped?.(missing, "missing-credentials");
   return env;

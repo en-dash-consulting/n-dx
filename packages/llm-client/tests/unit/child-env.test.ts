@@ -346,6 +346,16 @@ describe("vendor modes", () => {
       expect(keyFor('model_provider = "azure"\n[model_providers.azure]\nname = "Azure"')).toEqual([]);
     });
 
+    it("does not report a lower-case env_key as missing when it is set", () => {
+      const report = vi.fn();
+      const env = resolveVendorCliEnv({ vendor: "codex" }, undefined, {
+        CODEX_HOME: codexHome('model_provider = "azure"\n[model_providers.azure]\nenv_key = "my_azure_api_key"'),
+        my_azure_api_key: "sentinel-azure",
+      }, report);
+      expect(env.my_azure_api_key).toBe("sentinel-azure");
+      expect(report.mock.calls.filter(([, kind]) => kind === "missing-credentials")).toEqual([]);
+    });
+
     it("takes env_key as an exact name, never a glob", () => {
       expect(keyFor('model_provider = "azure"\n[model_providers.azure]\nenv_key = "*_API_KEY"')).toEqual([]);
     });
