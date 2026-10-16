@@ -236,10 +236,12 @@ describe("an imported name rebound at module level", () => {
     // The import overrides an assignment before it; a function's own binding is not module level.
     write("app/before.py", 'router = make_other()\nfrom .routers import router\nrouter.register("b", BView)\n');
     write("app/nested.py", 'from .routers import router\ndef f():\n    router = make_other()\nrouter.register("c", CView)\n');
+    // An annotation alone binds nothing, and a method is no module-level binding.
+    write("app/annotated.py", 'from .routers import router\nrouter: Router\nclass K:\n    def router(self): ...\nrouter.register("d", DView)\n');
     const { notices } = await analyze(ctx, dir);
     expect(notices).toEqual([
-      "Django: 2 Django REST framework router registrations are counted, not expanded: " +
-        "app/before.py:3 (register router.register), app/nested.py:4 (register router.register).",
+      "Django: 3 Django REST framework router registrations are counted, not expanded: " +
+        "app/annotated.py:5 (register router.register), app/before.py:3 (register router.register), app/nested.py:4 (register router.register).",
     ]);
   });
 
