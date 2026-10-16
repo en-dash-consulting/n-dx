@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -90,11 +90,50 @@ describe("agent run environment", () => {
     expect(hench[0]).toMatchObject({ NDX_LEGACY_NOTICE: "off", NDX_AGENT_RUN: "1" });
   });
 
-  it("ndx pair-programming prints the v1 notice once and marks its hench run", () => {
-    // The rex `add` child is a double and creates nothing, so seed the task it would add.
+  /** The rex `add` child is a double and creates nothing, so seed the task pair-programming would add. */
+  function seedTask(title) {
     const status = ndx(["rex", "status", "--format=json", dir]);
     const epicId = JSON.parse(status.stdout).items.find((item) => item.level === "epic").id;
-    expect(ndx(["rex", "add", "task", "--title=fix it", `--parent=${epicId}`, dir]).status).toBe(0);
+    expect(ndx(["rex", "add", "task", `--title=${title}`, `--parent=${epicId}`, dir]).status).toBe(0);
+  }
+
+  /** A codex CLI that answers --version, then fails every review with one finding. */
+  async function writeFailingReviewer() {
+    if (process.platform === "win32") {
+      const path = join(dir, "fake-codex.cmd");
+      await writeFile(path, '@echo off\r\nif "%1"=="--version" exit /b 0\r\necho FAIL\r\necho - bug found\r\nexit /b 1\r\n');
+      return path;
+    }
+    const path = join(dir, "fake-codex");
+    await writeFile(path, '#!/bin/sh\n[ "$1" = "--version" ] && exit 0\necho FAIL\necho "- bug found"\nexit 1\n');
+    await chmod(path, 0o755);
+    return path;
+  }
+
+  it("ndx pair-programming marks its remediation hench run as well as the primary one", async () => {
+    seedTask("fix it");
+    const reviewer = await writeFailingReviewer();
+    // Primary is claude, so the reviewer is codex; one round means one remediation pass.
+    await writeFile(
+      join(dir, ".n-dx.json"),
+      JSON.stringify({ llm: { vendor: "claude", codex: { cli_path: reviewer } } }) + "\n",
+    );
+    const henchConfig = join(dir, ".hench", "config.json");
+    await writeFile(
+      henchConfig,
+      JSON.stringify({ ...JSON.parse(readFileSync(henchConfig, "utf-8")), review: { rounds: 1 } }),
+    );
+
+    const out = ndxWithDoubles(["pair-programming", "fix it", dir]);
+    expect(out.stdout).toContain("Remediation Pass 1 of 1");
+
+    const hench = records().filter((r) => r.tool === "hench");
+    expect(hench).toHaveLength(2);
+    for (const run of hench) expect(run).toMatchObject({ NDX_LEGACY_NOTICE: "off", NDX_AGENT_RUN: "1" });
+  });
+
+  it("ndx pair-programming prints the v1 notice once and marks its hench run", () => {
+    seedTask("fix it");
 
     const out = ndxWithDoubles(["pair-programming", "fix it", "--skip-review", dir]);
     expect(out.status, out.stderr).toBe(0);
