@@ -622,6 +622,88 @@
           }
         }
       ]
+    },
+    {
+      "path": "app/shadowing.py",
+      "outboundCalls": [
+        {
+          "kind": "http",
+          "target": "https://shadow.example.com/module",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 36,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "",
+          "targetSource": "unknown",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 37,
+            "column": 5
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://shadow.example.com/global",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 44,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://shadow.example.com/enclosing",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 51,
+            "column": 8
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://shadow.example.com/nonlocal",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 58,
+            "column": 8
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://shadow.example.com/method",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 65,
+            "column": 8
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "loop",
+          "targetSource": "literal",
+          "client": "pika",
+          "confidence": "likely",
+          "position": {
+            "line": 70,
+            "column": 4
+          }
+        }
+      ]
     }
   ],
   "notices": []

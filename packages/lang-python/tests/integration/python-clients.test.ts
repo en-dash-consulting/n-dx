@@ -75,6 +75,24 @@ describe("Python outbound calls", () => {
     ]);
   });
 
+  it("follows Python's scoping: a name a function binds anywhere is local to it, not the module's client", async (ctx) => {
+    const { facts } = await analyze(ctx);
+    // Not reported: a parameter (keyword-only too), a local from another call, a binding after the use,
+    // an import in the function, a walrus in a comprehension, a comprehension's and a lambda's own names,
+    // and a nested function's parameter. `get` is not distinctive, so an unknown receiver is not graded likely.
+    expect(callsOf(facts, "app/shadowing.py")).toEqual([
+      "36 http requests certain literal:https://shadow.example.com/module",
+      "37 http requests certain unknown:",
+      // `global`; an enclosing function's client, directly and through `nonlocal`; a class body is skipped.
+      "44 http requests certain literal:https://shadow.example.com/global",
+      "51 http requests certain literal:https://shadow.example.com/enclosing",
+      "58 http requests certain literal:https://shadow.example.com/nonlocal",
+      "65 http requests certain literal:https://shadow.example.com/method",
+      // A name bound from itself is not known: graded as any unknown receiver.
+      "70 queue pika likely literal:loop",
+    ]);
+  });
+
   it("reads gRPC channels, queue producers and consumers, and grades unknown receivers", async (ctx) => {
     const { facts } = await analyze(ctx);
     expect(callsOf(facts, "app/rpc.py")).toEqual([

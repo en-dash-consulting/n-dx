@@ -1,7 +1,7 @@
 ; What the outbound-call rules (src/python-clients.ts) need beyond the Python
 ; queries: the arguments of the calls they read, the clients a file makes,
-; import aliases and environment lookups. Run only when outbound calls are
-; wanted.
+; the names each scope binds, import aliases and environment lookups. Run
+; only when outbound calls are wanted.
 ;
 ; @clients.argument is one argument of a call whose callee ends in a name
 ; the rules read (`requests.get(…)`, `channel.basic_publish(…)`,
@@ -63,6 +63,45 @@
   alias: (as_pattern_target
     (identifier) @clients.target)
   (#match? @_constructor "(^|[.])(Session|Client|AsyncClient|ClientSession|Request|Producer|Consumer|KafkaProducer|KafkaConsumer|BlockingConnection|SelectConnection|channel|Celery)$")) @clients.assignment
+
+; Python's scopes beyond the functions and classes of definitions.scm: a
+; lambda (@clients.lambda) and a comprehension (@clients.comprehension).
+(lambda) @clients.lambda
+
+[
+  (list_comprehension)
+  (set_comprehension)
+  (dictionary_comprehension)
+  (generator_expression)
+] @clients.comprehension
+
+; Every name a scope binds (@clients.binding), so a name a function binds
+; anywhere is local to all of it: parameters, assignment and `for` targets
+; (unpacked too), `with`/`except … as` targets and imported names. A walrus
+; target (@clients.walrus) binds outside its comprehensions; `global` and
+; `nonlocal` (@clients.global, @clients.nonlocal) send a name's bindings out.
+(parameters (identifier) @clients.binding)
+(lambda_parameters (identifier) @clients.binding)
+(default_parameter name: (identifier) @clients.binding)
+(typed_parameter (identifier) @clients.binding)
+(typed_default_parameter name: (identifier) @clients.binding)
+(list_splat_pattern (identifier) @clients.binding)
+(dictionary_splat_pattern (identifier) @clients.binding)
+(pattern_list (identifier) @clients.binding)
+(tuple_pattern (identifier) @clients.binding)
+(list_pattern (identifier) @clients.binding)
+(assignment left: (identifier) @clients.binding)
+(augmented_assignment left: (identifier) @clients.binding)
+(for_statement left: (identifier) @clients.binding)
+(for_in_clause left: (identifier) @clients.binding)
+(as_pattern_target (identifier) @clients.binding)
+(as_pattern_target [(tuple (identifier) @clients.binding) (list (identifier) @clients.binding)])
+(import_statement name: (dotted_name . (identifier) @clients.binding))
+(import_from_statement name: (dotted_name . (identifier) @clients.binding))
+(aliased_import alias: (identifier) @clients.binding)
+(named_expression name: (identifier) @clients.walrus)
+(global_statement (identifier) @clients.global)
+(nonlocal_statement (identifier) @clients.nonlocal)
 
 ; `import a.b as c`, `from m import d as e`: @clients.alias is the local name
 ; of the aliased import @clients.aliased, whose name the imports query captures.
