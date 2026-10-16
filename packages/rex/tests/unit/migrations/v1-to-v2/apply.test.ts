@@ -45,6 +45,23 @@ vi.mock("../../../../src/store/prd-model-reader.js", async (importOriginal) => {
   };
 });
 
+// A removal held up by a handle (the dashboard's watcher, antivirus on Windows) cannot be provoked
+// on demand, so `rm` of a path ending in `failRm` throws when a test asks.
+const fsFaults = vi.hoisted(() => ({ failRm: undefined as string | undefined }));
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const real = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...real,
+    rm: async (...args: Parameters<typeof real.rm>) => {
+      const suffix = fsFaults.failRm;
+      if (suffix !== undefined && String(args[0]).endsWith(suffix)) {
+        throw Object.assign(new Error(`EBUSY: resource busy or locked, rmdir '${String(args[0])}'`), { code: "EBUSY" });
+      }
+      return real.rm(...args);
+    },
+  };
+});
+
 const CUT_AT = "2026-10-12T00:00:00.000Z";
 
 const item = (id: string, level: PRDItem["level"], title: string, children: PRDItem[] = [], extra: Partial<PRDItem> = {}): PRDItem => ({
@@ -586,6 +603,38 @@ describe("applyV1ToV2", () => {
     const outcome = await applyV1ToV2(rexDir, plan, { load });
     expect(outcome).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")], proof: "plan" });
     expect(existsSync(join(rexDir, "prd_tree"))).toBe(false);
+  });
+
+  describe("a failed removal after the switch", () => {
+    afterEach(() => {
+      fsFaults.failRm = undefined;
+    });
+
+    it("says the v2 tree is in place, names the leftover and asks for a re-run, which removes it", async () => {
+      const plan = await planOf((await load()).items);
+      const clean = join(repo, "clean-rex");
+      for (const [path, text] of Object.entries(snapshot(rexDir))) {
+        mkdirSync(join(clean, path, ".."), { recursive: true });
+        writeFileSync(join(clean, path), text);
+      }
+      await applyV1ToV2(clean, plan, { load: () => new FileStore(clean).loadDocument() });
+
+      fsFaults.failRm = "/prd_tree";
+      const message = await applyV1ToV2(rexDir, plan, { load }).then(
+        () => "applied",
+        (err: unknown) => (err instanceof MigrationApplyError ? err.message : `unexpected: ${String(err)}`),
+      );
+      expect(message).toContain("The v2 tree is in place");
+      expect(message).toContain("EBUSY");
+      expect(message).toContain(`Left: ${join(rexDir, "prd_tree")}.`);
+      expect(message).toContain("Run ndx migrate --apply again");
+      expect(existsSync(join(rexDir, "product"))).toBe(true);
+      expect(existsSync(join(rexDir, "tree-meta.json"))).toBe(false);
+
+      fsFaults.failRm = undefined;
+      expect(await applyV1ToV2(rexDir, plan, { load })).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree")], proof: "plan" });
+      expect(snapshot(rexDir)).toEqual(snapshot(clean));
+    });
   });
 
   describe("a prd_tree/ beside the v2 tree", () => {

@@ -49,7 +49,9 @@
  * leaves the v1 tree; after it, the v2 tree, and the next apply removes the
  * v1 files the crash left ({@link leftoverV1}): only when they are the tree
  * the plan was made from or, with no plan, every id they hold is in the v2
- * tree. Any other `prd_tree/` beside the v2 tree is refused and kept. Apply on
+ * tree. A removal that fails after the switch is reported as such, naming the
+ * leftovers for that next apply ({@link removeAfterSwitch}).
+ * Any other `prd_tree/` beside the v2 tree is refused and kept. Apply on
  * a v2 tree changes nothing else.
  *
  * @module migrations/v1-to-v2/apply
@@ -905,6 +907,29 @@ export type LeftoverProof = "plan" | "ids" | "empty";
  * what an interrupted apply left: a v1 branch merged after the cut, or a v1
  * write beside the v2 tree, is the operator's to re-capture, not to delete.
  */
+/**
+ * Remove the v1 files once `product/` is in place. A failure here (a handle the
+ * dashboard's watcher or antivirus holds on Windows) leaves the v2 tree applied,
+ * so it is reported as such, naming what is left: the next apply removes it
+ * ({@link leftoverV1}; the staging folder is cleared on every apply).
+ */
+async function removeAfterSwitch(paths: readonly string[]): Promise<void> {
+  const failures: string[] = [];
+  for (const path of paths) {
+    try {
+      await rm(path, { recursive: true, force: true });
+    } catch (err) {
+      failures.push(`${path}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  if (failures.length === 0) return;
+  const left = paths.filter((path) => existsSync(path));
+  throw new MigrationApplyError(
+    `The v2 tree is in place, but removing the v1 leftovers failed (${failures.join("; ")}). ` +
+      `Left: ${left.join(", ")}. Run ndx migrate --apply again to remove them.`,
+  );
+}
+
 async function leftoverV1(rexDir: string, plan: PlanFile | undefined): Promise<{ removed: string[]; proof?: LeftoverProof }> {
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   const removed = [treeRoot, join(rexDir, TREE_META_FILENAME)].filter((path) => existsSync(path));
@@ -1063,7 +1088,7 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
         await rm(staging, { recursive: true, force: true });
         throw err;
       }
-      for (const path of [...v1Files, staging]) await rm(path, { recursive: true, force: true });
+      await removeAfterSwitch([...v1Files, staging]);
 
       const { tree: _tree, stateKeys: _keys, ...summary } = built;
       return { status: "applied", built: summary, v1Items, ...verified };
