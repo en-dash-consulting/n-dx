@@ -147,7 +147,7 @@ Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes 
 
 | Tool | Description |
 |------|-------------|
-| `get_product` | v2: the product layer, each node with computed status and health |
+| `get_product` | v2: the product layer: areas with counts by default, one area's nodes with computed status and health with `area`, every area with `full` |
 | `get_capability` | v2: one capability or constraint with its capability criteria and the changes on it |
 | `place_change` | v2: a change's placement shortlist, or record a placement (`touches` or `amends`) |
 | `apply_change` | v2: apply a change's amendments to the product layer, as a steward |

@@ -211,7 +211,9 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
     expect(status).toMatchObject({ layout: "v2", areas: [{ displayId: "A1", openChanges: 1 }], releases: [{ release: "1.2.0" }] });
 
     const product = await call("get_product");
-    expect(product.areas[0].children[0]).toMatchObject({ displayId: "A1.1", status: "changing" });
+    expect(product.areas).toEqual([expect.objectContaining({ displayId: "A1", capabilities: 1, status: { changing: 1 } })]);
+    const area = await call("get_product", { area: "A1" });
+    expect(area.area.children[0]).toMatchObject({ displayId: "A1.1", status: "changing" });
 
     const capability = await call("get_capability", { id: "A1.1" });
     expect(capability.changes).toEqual([expect.objectContaining({ displayId: "CH-1", relation: "amends" })]);

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { createStore, ensureRexDir, resolveStore } from "../../../src/store/index.js";
@@ -61,29 +61,90 @@ async function inboxChange(title: string): Promise<string> {
 }
 
 describe("get_product", () => {
-  it("returns areas with their capabilities' computed status and health", async () => {
+  const CHECKOUT = {
+    id: AREA,
+    displayId: "A1",
+    type: "area",
+    title: "Checkout",
+    summary: "Taking payment for a basket.",
+    children: [
+      {
+        id: CAPABILITY,
+        displayId: "A1.1",
+        type: "capability",
+        title: "Pay by card",
+        statement: "A shopper can pay for a basket with a card.",
+        status: "changing",
+        health: "ok",
+      },
+    ],
+  };
+
+  it("summarises each area by default: counts and ids, no capabilities", async () => {
     const body = json(await handleGetProduct(rexDir));
     expect(body.title).toBe("Fixture shop");
     expect(body.areas).toEqual([
-      {
-        id: AREA,
-        displayId: "A1",
-        type: "area",
-        title: "Checkout",
-        summary: "Taking payment for a basket.",
-        children: [
-          {
-            id: CAPABILITY,
-            displayId: "A1.1",
-            type: "capability",
-            title: "Pay by card",
-            statement: "A shopper can pay for a basket with a card.",
-            status: "changing",
-            health: "ok",
-          },
-        ],
-      },
+      { id: AREA, displayId: "A1", title: "Checkout", summary: "Taking payment for a basket.", capabilities: 1, constraints: 0, status: { changing: 1 }, defective: 0, openChanges: 1 },
     ]);
+    expect(body.next).toMatch(/area/);
+  });
+
+  it("returns one area's capabilities with their computed status and health", async () => {
+    for (const ref of ["A1", AREA]) {
+      expect(json(await handleGetProduct(rexDir, { area: ref }))).toEqual({ title: "Fixture shop", area: CHECKOUT });
+    }
+  });
+
+  it("returns the whole map with full", async () => {
+    expect(json(await handleGetProduct(rexDir, { full: true }))).toEqual({ title: "Fixture shop", areas: [CHECKOUT] });
+  });
+
+  it("refuses an area ref that names a capability or nothing", async () => {
+    expect(error(await handleGetProduct(rexDir, { area: "A1.1" }))).toBe(
+      '"A1.1" is a capability, not an area. Use get_product without area for the list of areas.',
+    );
+    expect(error(await handleGetProduct(rexDir, { area: "nope" }))).toMatch(/^"nope" names no area\./);
+  });
+
+  describe("on a large tree", () => {
+    const AREAS = 40;
+    const PER_AREA = 60;
+    /** About 25,000 tokens, Claude Code's default MCP output limit, at four characters a token. */
+    const CLIENT_LIMIT_CHARS = 100_000;
+
+    beforeEach(async () => {
+      const product = join(rexDir, "product");
+      for (let a = 1; a <= AREAS; a++) {
+        const slug = `area-${a}`;
+        await mkdir(join(product, slug));
+        const id = (n: number) => `b${String(a).padStart(7, "0")}-0000-4000-8000-${String(n).padStart(12, "0")}`;
+        await writeFile(join(product, slug, "index.md"), `---\nid: "${id(0)}"\ntype: "area"\ntitle: "Area ${a}"\nslug: "${slug}"\ndisplayId: "A${a + 1}"\nsummary: "What area ${a} covers."\n---\n`);
+        for (let c = 1; c <= PER_AREA; c++) {
+          const statement = `In area ${a}, capability ${c} lets a user do one specific thing reliably, with every edge case the product cares about. `.repeat(2).trim();
+          await writeFile(
+            join(product, slug, `capability-${c}.md`),
+            `---\nid: "${id(c)}"\ntype: "capability"\ntitle: "Capability ${a}.${c}"\nslug: "capability-${c}"\ndisplayId: "A${a + 1}.${c}"\nstatement: "${statement}"\n---\n`,
+          );
+        }
+      }
+    });
+
+    it("answers within the client limit by default, while the full map does not", async () => {
+      const summary = await handleGetProduct(rexDir);
+      const body = json(summary);
+      expect(body.areas).toHaveLength(AREAS + 1);
+      expect(body.areas.find((a: { displayId: string }) => a.displayId === "A2")).toMatchObject({ title: "Area 1", capabilities: PER_AREA });
+      expect(summary.content[0].text.length).toBeLessThan(CLIENT_LIMIT_CHARS / 4);
+      expect((await handleGetProduct(rexDir, { full: true })).content[0].text.length).toBeGreaterThan(CLIENT_LIMIT_CHARS);
+    });
+
+    it("reaches one area's capabilities and one capability's detail", async () => {
+      const area = json(await handleGetProduct(rexDir, { area: "A7" })).area;
+      expect(area).toMatchObject({ title: "Area 6", type: "area" });
+      expect(area.children).toHaveLength(PER_AREA);
+      expect(area.children.find((c: { displayId: string }) => c.displayId === "A7.3")).toMatchObject({ type: "capability", title: "Capability 6.3", status: "proposed" });
+      expect(json(await handleGetCapability(rexDir, { id: "A7.3" })).node).toMatchObject({ title: "Capability 6.3" });
+    });
   });
 });
 

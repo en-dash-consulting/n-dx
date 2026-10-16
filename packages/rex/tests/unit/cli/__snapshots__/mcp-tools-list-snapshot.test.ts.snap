@@ -850,10 +850,19 @@ exports[`rex MCP tools/list contract > returns an unchanged tool surface 1`] = `
   },
   {
     "name": "get_product",
-    "description": "Get the product layer of a v2 PRD: areas, and the capabilities and constraints under them, each with its computed status (proposed, changing, met, revised, retired) and health (ok, defective). Use get_capability for one node's detail.",
+    "description": "Get the product layer of a v2 PRD. By default a summary: each area with its counts of capabilities and constraints by computed status (proposed, changing, met, revised, retired), defective nodes and open changes. Pass area for that area's capabilities and constraints, each with its statement, status and health (ok, defective); full: true returns every area that way, which can exceed the client's limit on a large tree. Use get_capability for one node's detail.",
     "inputSchema": {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "area": {
+          "description": "Area id, display id (e.g. A1) or alias: return its capabilities and constraints",
+          "type": "string"
+        },
+        "full": {
+          "description": "Return the whole map, every area's capabilities and constraints. Ignored when area is set",
+          "type": "boolean"
+        }
+      },
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "execution": {
