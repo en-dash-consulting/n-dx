@@ -24,24 +24,52 @@ const V2_FIXTURE = resolve(WEB_PKG, "../rex/tests/fixtures/v2-tree");
 interface Item { title: string; children?: Item[] }
 const flatten = (items: Item[]): string[] => items.flatMap((i) => [i.title, ...flatten(i.children ?? [])]);
 
-/** Boot the server, fetch /api/rex/prd at once, report, exit. */
+/**
+ * Boot the server and report the first answer /api/rex/prd gives. It polls the
+ * port while `startServer` is still pending, because `startServer` resolves
+ * only after boot work finishes: a fetch made after it resolves cannot see a
+ * request that beat the cache write.
+ */
 function driverScript(projectDir: string): string {
   return `
 import { existsSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { startServer } from ${JSON.stringify(SERVER_ENTRY_URL)};
 
 const cache = join(${JSON.stringify(projectDir)}, ".rex", ".cache", "prd.json");
 const cacheBefore = existsSync(cache);
-const { port } = await startServer(${JSON.stringify(projectDir)}, 0, {});
-const res = await fetch(\`http://127.0.0.1:\${port}/api/rex/prd\`);
+const port = await new Promise((done) => {
+  const probe = createServer().listen(0, "127.0.0.1", () => {
+    const { port } = probe.address();
+    probe.close(() => done(port));
+  });
+});
+const started = startServer(${JSON.stringify(projectDir)}, port, {});
+let res;
+while (!res) {
+  try {
+    res = await fetch(\`http://127.0.0.1:\${port}/api/rex/prd\`);
+  } catch {
+    // not listening yet
+  }
+}
 const body = await res.json();
-console.log("NDX_RESULT=" + JSON.stringify({ status: res.status, body, cacheBefore }));
+const { port: boundPort } = await started;
+console.log("NDX_RESULT=" + JSON.stringify({ status: res.status, body, cacheBefore, boundPort, port }));
 process.exit(0);
 `;
 }
 
-async function firstPrdRead(dir: string): Promise<{ status: number; body: { items?: Item[] }; cacheBefore: boolean }> {
+interface FirstRead {
+  status: number;
+  body: { items?: Item[] };
+  cacheBefore: boolean;
+  boundPort: number;
+  port: number;
+}
+
+async function firstPrdRead(dir: string): Promise<FirstRead> {
   const scriptPath = join(dir, "driver.mjs");
   writeFileSync(scriptPath, driverScript(dir), "utf-8");
   const { stdout, exitCode } = await new Promise<{ stdout: string; exitCode: number }>((done) => {
@@ -52,7 +80,10 @@ async function firstPrdRead(dir: string): Promise<{ status: number; body: { item
   expect(exitCode, `server exited non-zero:\n${stdout}`).toBe(0);
   const match = /NDX_RESULT=(.+)/.exec(stdout);
   expect(match, stdout).not.toBeNull();
-  return JSON.parse(match![1]);
+  const result = JSON.parse(match![1]) as FirstRead;
+  // The server took the port the driver polled, so the first answer is its.
+  expect(result.boundPort).toBe(result.port);
+  return result;
 }
 
 describe("first /api/rex/prd read after start, no boot cache on disk", () => {
