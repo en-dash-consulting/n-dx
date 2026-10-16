@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -334,6 +334,15 @@ describe("n-dx ci", () => {
         await configure(dir, ["src/lib/exec.ts"]);
       },
       "file in the allow list": async (dir) => configure(dir, ["src/lib/exec.js", "scripts/release.js"]),
+      // POSIX only: chmod 000 does not stop the owner on Windows, and root reads anything.
+      ...(process.platform !== "win32" && process.getuid?.() !== 0
+        ? {
+            "unreadable source file": async (dir) => {
+              await configure(dir, ["src/lib/exec.js"]);
+              await chmod(join(dir, "scripts", "release.js"), 0o000);
+            },
+          }
+        : {}),
       "malformed rule": async (dir) => {
         await writeFile(
           join(dir, ".n-dx.json"),
@@ -412,6 +421,17 @@ describe("n-dx ci", () => {
       expect(step.violations).toHaveLength(1);
       expect(step.violations[0]).toMatch(/^scripts\/release\.js imports node:child_process/);
     });
+
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+      "fails, with a parseable report, on a selected source file it cannot read",
+      () => {
+        const { code, step } = results.get("unreadable source file");
+        expect(code).toBe(1);
+        expect(step.ok).toBe(false);
+        expect(step.violations).toHaveLength(1);
+        expect(step.violations[0]).toMatch(/^cannot read scripts\/release\.js: EACCES/);
+      },
+    );
 
     it("fails on a rule it cannot read rather than skipping it", () => {
       const { code, step } = results.get("malformed rule");

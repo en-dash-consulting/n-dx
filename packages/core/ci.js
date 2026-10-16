@@ -1186,10 +1186,14 @@ function walkFiles(dir, skipDirs, excludedDirs) {
  * `test/`/`tests/` directories are exempt, as are node_modules, dist, .git,
  * n-dx's state directories and every rule's `excludeDirs`.
  *
- * @returns {{ checked: number, violations: Array<{ file: string, rule: object }> }}
+ * A selected file that cannot be read is reported in `unreadable`, never
+ * skipped: an enforced rule must not pass over a file it did not read.
+ *
+ * @returns {{ checked: number, violations: Array<{ file: string, rule: object }>, unreadable: Array<{ file: string, message: string }> }}
  */
 function scanRestrictedImports(dir, rules) {
   const violations = [];
+  const unreadable = [];
   let checked = 0;
   const skipDirs = sourceScanSkipDirs();
   const excludedDirs = new Set(rules.flatMap((r) => r.excludeDirs));
@@ -1215,13 +1219,24 @@ function scanRestrictedImports(dir, rules) {
     // A tracked file deleted from the work tree, or a submodule's gitlink.
     if (!statSync(full, { throwIfNoEntry: false })?.isFile()) continue;
     checked++;
-    const content = readFileSync(full, "utf-8");
+    let content;
+    try {
+      content = readFileSync(full, "utf-8");
+    } catch (err) {
+      unreadable.push({ file: rel, message: err.message });
+      continue;
+    }
     for (const [rule, pattern] of applicable) {
       if (pattern.test(content)) violations.push({ file: rel, rule });
     }
   }
 
-  return { checked, violations };
+  return { checked, violations, unreadable };
+}
+
+/** What an unreadable file tells the operator: the file and the read error. */
+function describeUnreadable({ file, message }) {
+  return `cannot read ${file}: ${message}`;
 }
 
 /** What a violation tells the operator: the file, the module, the rule, and how to allow it. */
@@ -1238,11 +1253,11 @@ function describeViolation({ file, rule }) {
  * Returns the violating paths. Exported for the parity test.
  */
 export function checkArchitecturePolicy(dir) {
-  const { checked, violations } = scanRestrictedImports(dir, [NDX_CHILD_PROCESS_RULE]);
+  const { checked, violations, unreadable } = scanRestrictedImports(dir, [NDX_CHILD_PROCESS_RULE]);
   return {
-    ok: violations.length === 0,
+    ok: violations.length === 0 && unreadable.length === 0,
     checked,
-    violations: violations.map((v) => v.file),
+    violations: [...violations.map((v) => v.file), ...unreadable.map((u) => u.file)],
   };
 }
 
@@ -1271,13 +1286,13 @@ export async function checkRestrictedImports(dir) {
   if (rules.length === 0) {
     return { applies: false, ok: true, rules: 0, checked: 0, violations: [] };
   }
-  const { checked, violations } = scanRestrictedImports(dir, rules);
+  const { checked, violations, unreadable } = scanRestrictedImports(dir, rules);
   return {
     applies: true,
-    ok: violations.length === 0,
+    ok: violations.length === 0 && unreadable.length === 0,
     rules: rules.length,
     checked,
-    violations: violations.map(describeViolation),
+    violations: [...violations.map(describeViolation), ...unreadable.map(describeUnreadable)],
   };
 }
 

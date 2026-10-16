@@ -34,7 +34,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [docs/guide/skills.md skill table descriptions can drift from manifest.json with no test to catch it](./docs-guide-skills-md-skill-table.md) | pending |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
 | [Install the sv analyze stop handlers before the progress file says running](./install-the-sv-analyze-stop-handlers.md) | completed |
-| [`ndx ci` crashes with a stack trace, and no report, when a scanned source file cannot be read](./ndx-ci-crashes-with-a-stack-trace-and.md) | pending |
+| [`ndx ci` crashes with a stack trace, and no report, when a scanned source file cannot be read](./ndx-ci-crashes-with-a-stack-trace-and.md) | in_progress |
 | [ndx ci gateway-imports step misses dynamic import() that domain-isolation now flags](./ndx-ci-gateway-imports-step-misses.md) | pending |
 | [ndx work --task=<change> --resolve refuses a change whose open tasks --reset-deferred would reopen](./ndx-work-task-change-resolve-refuses-a.md) | pending |
 | [No test pins the Ask route passing the v2 merge rule to parseAnswerRefinements](./no-test-pins-the-ask-route-passing-the.md) | pending |
