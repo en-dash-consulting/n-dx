@@ -21,6 +21,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 |-------|--------|
 | [A change's touches and amends name a capability or constraint](./a-change-s-touches-and-amends-name-a.md) | completed |
 | [A re-run of migrate --apply refuses a genuine leftover prd_tree/ that the plan cannot vouch for](./a-re-run-of-migrate-apply-refuses-a.md) | completed |
+| [A v2 folder node that becomes a leaf strands its non-tree files in an index-less folder](./a-v2-folder-node-that-becomes-a-leaf.md) | pending |
 | [An open fix: true change that adds a capability marks the new capability defective while its kind is feature](./an-open-fix-true-change-that-adds-a.md) | completed |
 | [Apply refuses removing one member of a pre-existing dependsOn knot that stays cyclic](./apply-refuses-removing-one-member-of-a.md) | pending |
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | completed |
@@ -44,7 +45,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [ndx work --task=<change> --resolve refuses a change whose open tasks --reset-deferred would reopen](./ndx-work-task-change-resolve-refuses-a.md) | pending |
 | [No test pins the Ask route passing the v2 merge rule to parseAnswerRefinements](./no-test-pins-the-ask-route-passing-the.md) | pending |
 | [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | completed |
-| [Placing an Inbox change strands non-tree files in changes/inbox/<slug>/ and leaves a skipped-folder warning](./placing-an-inbox-change-strands-non.md) | pending |
+| [Placing an Inbox change strands non-tree files in changes/inbox/<slug>/ and leaves a skipped-folder warning](./placing-an-inbox-change-strands-non.md) | completed |
 | [Record review decisions as calibration records on the run record](./record-review-decisions-as-calibration.md) | pending |
 | [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | deferred |
 | [rex migrate-slugs on a v2 tree tells you to run rex migrate-to-folder-tree, a v1 command](./rex-migrate-slugs-on-a-v2-tree-tells.md) | pending |
