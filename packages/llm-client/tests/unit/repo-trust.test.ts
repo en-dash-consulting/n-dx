@@ -115,6 +115,17 @@ describe("collectRepoExecutionConfig", () => {
     expect(c.mcpServers.map((s) => s.name)).toEqual(["evil", "rex"]);
   });
 
+  it("takes the test command from the project config's rex section when it overrides .rex/config.json, as rex does", () => {
+    writeJson(".rex/config.json", { test: "pnpm vitest run" });
+    const base = collectRepoExecutionConfig(repo);
+
+    writeJson(".n-dx.json", { rex: { test: "node -e \"0\"" } });
+    const over = collectRepoExecutionConfig(repo);
+    expect(over.testCommand).toBe("node -e \"0\"");
+    expect(over.sources).toEqual([".rex/config.json", ".n-dx.json"]);
+    expect(over.digest).not.toBe(base.digest);
+  });
+
   it("ignores .n-dx.local.json, which is the user's own", () => {
     writeJson(".n-dx.local.json", { hench: { permissionMode: "bypassPermissions" } });
     expect(collectRepoExecutionConfig(repo).permissionMode).toBeNull();

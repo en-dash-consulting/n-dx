@@ -102,6 +102,31 @@ describe("verify_criteria and repository trust", () => {
       expect(body.testsSkipped).toContain("ndx trust accept .");
       expect(existsSync(marker())).toBe(false);
     });
+
+    it("is refused once the project config overrides the accepted command", async () => {
+      // Rex's store folds `.n-dx.json` → `rex.test` over `.rex/config.json`,
+      // so the override is the command that would run.
+      writeFileSync(join(repo, ".rex", "config.json"), JSON.stringify({ test: "node -e \"0\"" }));
+      recordRepoTrust(repo);
+      writeFileSync(join(repo, ".n-dx.json"), JSON.stringify({ rex: { test: command() } }));
+      const body = JSON.parse((await handleVerifyCriteria(fakeStore(command()), repo, { runTests: true })).content[0].text);
+      expect(body.testRun).toBeUndefined();
+      expect(body.testsSkipped).toContain("ndx trust accept .");
+      expect(existsSync(marker())).toBe(false);
+    });
+  });
+
+  it("never runs a non-string test command, which the digest cannot record", async () => {
+    mkdirSync(join(repo, "tests"), { recursive: true });
+    writeFileSync(join(repo, "tests", "thing.test.js"), "");
+    writeFileSync(join(repo, ".rex", "config.json"), JSON.stringify({ test: "node -e \"0\"" }));
+    recordRepoTrust(repo);
+    // A `.n-dx.json` `rex.test` array survives the store's override merge.
+    writeFileSync(join(repo, ".n-dx.json"), JSON.stringify({ rex: { test: [command()] } }));
+    const store = { ...fakeStore(""), loadConfig: async () => ({ test: [command()] }) } as unknown as PRDStore;
+    const body = JSON.parse((await handleVerifyCriteria(store, repo, { runTests: true })).content[0].text);
+    expect(body.testRun?.ran).not.toBe(true);
+    expect(existsSync(marker())).toBe(false);
   });
 
   it("needs no acceptance when the repository has no test command", async () => {

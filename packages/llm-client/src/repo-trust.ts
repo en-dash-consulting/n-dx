@@ -256,7 +256,7 @@ export interface RepoExecutionConfig {
   envAllow: string[];
   permissionMode: string | null;
   provider: string | null;
-  /** `.rex/config.json` → `test`. */
+  /** The project config's `rex.test`, else `.rex/config.json` → `test`: the command rex runs. */
   testCommand: string | null;
   mcpServers: RepoMcpServer[];
   /** sha256 over the canonical JSON of everything above except `sources` and `detectedLanguage`. */
@@ -333,6 +333,15 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   const rexConfigPath = join(layout.rexDir, "config.json");
   const rexConfig = readJson(rexConfigPath);
   if (rexConfig) sources.push(relOf(root, rexConfigPath));
+  // Rex folds the project config's `rex` section over `.rex/config.json` when
+  // it loads its config, so a `rex.test` there is the command that runs. Left
+  // out, a repository could swap the command after the user accepted the one
+  // they reviewed without moving the digest (#686).
+  const projectRex = projectConfig && typeof projectConfig.rex === "object" && projectConfig.rex && !Array.isArray(projectConfig.rex)
+    ? (projectConfig.rex as Record<string, unknown>)
+    : null;
+  const projectTest = projectRex ? optionalString(projectRex.test) : null;
+  if (projectTest && !projectHench) sources.push(relOf(root, layout.configFile));
 
   const mcpPath = join(root, ".mcp.json");
   const mcpConfig = readJson(mcpPath);
@@ -368,7 +377,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     ...(envAllow.length ? { envAllow: [...envAllow].sort() } : {}),
     permissionMode: optionalString(merged.permissionMode),
     provider: optionalString(merged.provider),
-    testCommand: optionalString(rexConfig?.test),
+    testCommand: projectTest ?? optionalString(rexConfig?.test),
     mcpServers,
   };
 
