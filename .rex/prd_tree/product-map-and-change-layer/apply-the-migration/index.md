@@ -63,7 +63,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [rex health errors forever on a held change whose v1 item completed between plan and apply](./rex-health-errors-forever-on-a-held.md) | completed |
 | [rex health warns, not errors, on completed changes the migration held for placement](./rex-health-warns-not-errors-on.md) | completed |
 | [rex init --help says it writes prd.json; it writes product/index.md (v2) or prd_tree/](./rex-init-help-says-it-writes-prd-json.md) | completed |
-| [rex migrate-plan / migrate-apply and ndx migrate-layout still run inside an agent run](./rex-migrate-plan-migrate-apply-and-ndx.md) | in_progress |
+| [rex migrate-plan / migrate-apply and ndx migrate-layout still run inside an agent run](./rex-migrate-plan-migrate-apply-and-ndx.md) | completed |
 | [tests/e2e/cli-migrate-apply.test.js fails 3 of 5: its fixture keeps .rex/prd.json, which apply now refuses](./tests-e2e-cli-migrate-apply-test-js.md) | completed |
 | [The bare ndx migrate chain shows the preflight banner and its --dry-run runs no model unless asked](./the-bare-ndx-migrate-chain-shows-the.md) | completed |
 | [The interrupted-apply test compares normalised snapshot paths, so Windows CLI smoke passes](./the-interrupted-apply-test-compares.md) | completed |
