@@ -32,6 +32,7 @@
  *   write-time guard built on it.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -48,7 +49,10 @@ const REPO_ROOT = process.cwd();
 const REX_DIR = join(REPO_ROOT, ".rex");
 const PRD_TREE_ROOT = join(REX_DIR, "prd_tree");
 
-describe("this repository's PRD tree matches the current slug rule", () => {
+// A migrated (v2) repository has no prd_tree/ or tree-meta.json: v2 slugs are
+// frozen, so there is no slug rule to match. The fixture block below keeps the
+// v1 coverage.
+describe.skipIf(!existsSync(PRD_TREE_ROOT))("this repository's PRD tree matches the current slug rule", () => {
   it("findNonConformingSlugs reports no mismatches", async () => {
     const { items } = await parseFolderTree(PRD_TREE_ROOT);
     expect(items.length).toBeGreaterThan(0);
