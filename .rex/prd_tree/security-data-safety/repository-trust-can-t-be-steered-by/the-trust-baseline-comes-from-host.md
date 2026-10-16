@@ -2,13 +2,17 @@
 id: "9babe03e-c0c1-45a1-a635-b26af5bce892"
 level: "task"
 title: "The trust baseline comes from host-side detection, never from the repository's declared language"
-status: "in_progress"
+status: "completed"
 priority: "high"
 tags:
   - "security"
   - "issue-cleanup"
 source: "ndx-capture"
 startedAt: "2026-10-16T21:31:00.214Z"
+completedAt: "2026-10-16T21:43:27.307Z"
+endedAt: "2026-10-16T21:43:27.307Z"
+resolutionType: "code-change"
+resolutionDetail: "llm-client detectRepoLanguage (marker files) drives assessRepoExecutionConfig and the hench clamp; declared language naming another baseline is a language-mismatch warning."
 acceptanceCriteria:
   - "Closes #686 (finding 1)"
   - "The trust baseline for both assessRepoExecutionConfig and the hench trust clamp comes from host-side marker detection, never from `language` in .hench/config.json or the project config"
@@ -18,6 +22,6 @@ acceptanceCriteria:
   - "No import from packages/sourcevision; llm-client stays dependency-free beyond node built-ins"
 description: "#686 finding 1 (high, must-fix in the original review):\n\n> `assessRepoExecutionConfig` in `packages/llm-client/src/repo-trust.ts` takes its baseline from `guardBaselineForLanguage(config.language)`, and `language` comes from the repository's own merged config (`optionalString(merged.language)`). So a JavaScript repository can declare `language: \"swift\"` and add `xcodebuild`/`xcrun` to `allowedCommands`. Those commands then fall inside the Swift baseline, raise no finding, and the checkout evaluates as `baseline` / unrestricted.\n>\n> **Fix:** derive the baseline from trusted, host-side project detection. Alternatively, treat a repository-declared language that differs from the detected one as a finding, and clamp to the detected baseline. Add a test showing a JS/TS checkout cannot promote itself to a more permissive baseline.\n\nReproduced 2026-10-16 on the built origin/main: a checkout with `package.json` declaring `language: \"swift\"` with the Swift guard evaluates `baseline`, unrestricted; the same guard declaring `typescript` evaluates `untrusted`.\n\nTwo call sites take the baseline from the declared language: `assessRepoExecutionConfig` (llm-client `repo-trust.ts`) and the clamp in hench `src/store/trust.ts` (`guardBaselineForLanguage(config.language)` then `clampGuardToBaseline`). Both must use the detected language.\n\nDetection is host-side and reads only marker files the language baselines already imply (`go.mod` → go; `Package.swift`, `*.xcodeproj` or `*.xcworkspace` → swift; otherwise the JS/TS default), matching hench init's `detectProjectLanguage` without its config override. It lives in llm-client (foundation tier), so it must not import sourcevision. `typescript` and `javascript` share a baseline, so declaring one on a checkout detected as the other is not a mismatch."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-16T21:31:01.039Z"
+lastModified: "2026-10-16T21:43:27.577Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
