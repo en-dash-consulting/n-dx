@@ -82,6 +82,47 @@ describe("cmdMigrateApply", () => {
     expect(snapshot(rexDir)).toEqual(after);
   });
 
+  describe("a prd_tree/ left beside the v2 tree", () => {
+    const NEW_EPIC = "11111111-1111-4111-8111-111111111111";
+
+    /** Apply, then put back a v1 tree of `items` beside the v2 tree. */
+    async function leftover(items: PRDItem[]): Promise<void> {
+      await cmdMigrateApply(repo, { plan: planPath });
+      const scratch = join(repo, "scratch-rex");
+      mkdirSync(scratch);
+      await new FileStore(scratch).saveDocument({ schema: "rex/v1", title: "Shop", items });
+      for (const [path, text] of Object.entries(snapshot(scratch))) {
+        if (!path.startsWith("/prd_tree") && path !== "/tree-meta.json") continue;
+        mkdirSync(join(rexDir, path, ".."), { recursive: true });
+        writeFileSync(join(rexDir, path), text);
+      }
+      rmSync(scratch, { recursive: true });
+    }
+
+    const printed = (): string => vi.mocked(console.log).mock.calls.map((c) => c.join(" ")).join("\n");
+
+    it("--dry-run says apply would remove what an interrupted apply left, and why", async () => {
+      await leftover(TREE);
+      await cmdMigrateApply(repo, { plan: planPath, "dry-run": "true" });
+      expect(printed()).toMatch(/Apply would remove what an interrupted apply left \(it matches the plan's source\)/);
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+    });
+
+    it.each([
+      ["with the plan", true],
+      ["without a plan", false],
+    ])("--dry-run and apply refuse one holding an item the v2 tree lacks, %s", async (_label, withPlan) => {
+      await leftover([...TREE, item(NEW_EPIC, "epic", "Billing", [], { status: "pending" })]);
+      const flags: Record<string, string> = withPlan ? { plan: planPath } : {};
+      for (const extra of [{ "dry-run": "true" }, {}]) {
+        const err = await cmdMigrateApply(repo, { ...flags, ...extra }).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(CLIError);
+        expect((err as CLIError).message).toContain(NEW_EPIC);
+      }
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+    });
+  });
+
   it("--dry-run writes nothing", async () => {
     const before = snapshot(repo);
     await cmdMigrateApply(repo, { plan: planPath, "dry-run": "true" });

@@ -353,8 +353,85 @@ describe("applyV1ToV2", () => {
       writeFileSync(join(rexDir, path), text);
     }
     const outcome = await applyV1ToV2(rexDir, plan, { load });
-    expect(outcome).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")] });
+    expect(outcome).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")], proof: "plan" });
     expect(existsSync(join(rexDir, "prd_tree"))).toBe(false);
+  });
+
+  describe("a prd_tree/ beside the v2 tree", () => {
+    const NEW_EPIC = "11111111-1111-4111-8111-111111111111";
+    const withNewEpic = (): PRDItem[] => [...TREE, item(NEW_EPIC, "epic", "Billing", [], { status: "pending" })];
+
+    /** Write `items` as a v1 tree in a scratch rex dir and copy its prd_tree/ and tree-meta.json beside the v2 tree. */
+    async function restoreV1(items: PRDItem[]): Promise<void> {
+      const scratch = join(repo, "scratch-rex");
+      mkdirSync(scratch);
+      await new FileStore(scratch).saveDocument({ schema: "rex/v1", title: "Shop", items });
+      for (const [path, text] of Object.entries(snapshot(scratch))) {
+        if (!path.startsWith("/prd_tree") && path !== "/tree-meta.json") continue;
+        mkdirSync(join(rexDir, path, ".."), { recursive: true });
+        writeFileSync(join(rexDir, path), text);
+      }
+      rmSync(scratch, { recursive: true });
+    }
+
+    async function migrated(): Promise<V1ToV2Plan> {
+      const plan = await planOf((await load()).items);
+      await applyV1ToV2(rexDir, plan, { load });
+      return plan;
+    }
+
+    it.each([
+      ["a plan whose source differs", true],
+      ["no plan", false],
+    ])("holding an item the v2 tree lacks is refused and kept, with %s, naming the item", async (_label, withPlan) => {
+      const plan = await migrated();
+      await restoreV1(withNewEpic());
+      const before = snapshot(rexDir);
+      const given = withPlan ? plan : undefined;
+      await expect(applyV1ToV2(rexDir, given, { load })).rejects.toThrow(MigrationApplyError);
+      await expect(applyV1ToV2(rexDir, given, { load })).rejects.toThrow(new RegExp(`${NEW_EPIC}.*Kept`, "s"));
+      expect(snapshot(rexDir)).toEqual(before);
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+      expect(existsSync(join(rexDir, "tree-meta.json"))).toBe(true);
+      // The dry run says apply would refuse, the same way.
+      await expect(rehearseV1ToV2(rexDir, given, { load })).rejects.toThrow(new RegExp(`${NEW_EPIC}.*Kept`, "s"));
+    });
+
+    it("whose items were edited since the plan is refused and kept, though every id is in the v2 tree", async () => {
+      const plan = await migrated();
+      const edited = structuredClone(TREE);
+      edited[0]!.title = "Storage, renamed after the cut";
+      await restoreV1(edited);
+      await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(/differs from the tree the plan was made from.*Kept/s);
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+    });
+
+    it("is removed with no plan when every id it holds is in the v2 tree, dissolved containers included", async () => {
+      await migrated();
+      await restoreV1(TREE);
+      expect(await rehearseV1ToV2(rexDir, undefined, { load })).toEqual({
+        status: "already-v2",
+        removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")],
+        proof: "ids",
+      });
+      expect(await applyV1ToV2(rexDir, undefined, { load })).toEqual({
+        status: "already-v2",
+        removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")],
+        proof: "ids",
+      });
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(false);
+    });
+
+    it("that matches the plan's source is what the dry run says apply would remove", async () => {
+      const plan = await migrated();
+      await restoreV1(TREE);
+      expect(await rehearseV1ToV2(rexDir, plan, { load })).toEqual({
+        status: "already-v2",
+        removed: [join(rexDir, "prd_tree"), join(rexDir, "tree-meta.json")],
+        proof: "plan",
+      });
+      expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
+    });
   });
 
   it("clears a changes/ an apply interrupted before the switch left, and applies", async () => {
@@ -474,7 +551,7 @@ describe("applyV1ToV2", () => {
       await applyV1ToV2(rexDir, plan, { load });
       mkdirSync(join(rexDir, "prd_tree"));
       const outcome = await rehearseV1ToV2(rexDir, plan, { load });
-      expect(outcome).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree")] });
+      expect(outcome).toEqual({ status: "already-v2", removed: [join(rexDir, "prd_tree")], proof: "empty" });
       expect(existsSync(join(rexDir, "prd_tree"))).toBe(true);
     });
   });

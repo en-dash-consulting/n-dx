@@ -5,7 +5,8 @@
  * Writes the v2 tree from the plan `rex migrate-plan` wrote and removes the v1
  * tree, in one PRD transaction (`../../migrations/v1-to-v2/apply.ts`). On a v1
  * tree `--plan` is required, as `migrate-plan` requires `--out`; on a v2 tree
- * it reports so and exits zero. With `--dry-run` it runs the same refusals,
+ * it reports so and exits zero, removing a `prd_tree/` an interrupted apply
+ * left and refusing one it cannot show was. With `--dry-run` it runs the same refusals,
  * writes and reads back the tree in a temporary directory, prints per v1 kind
  * what its items become, the Inbox holds and the dropped values, and writes
  * nothing to the project.
@@ -22,6 +23,7 @@ import {
   V1_KINDS,
   type ApplyV1ToV2Result,
   type KindTally,
+  type LeftoverProof,
   type RehearseV1ToV2Result,
 } from "../../migrations/v1-to-v2/apply.js";
 import { readPlanFile, type PlanFile } from "../../migrations/plan-file.js";
@@ -75,7 +77,7 @@ async function asCliError<T>(run: () => Promise<T>): Promise<T> {
 function reportApply(outcome: ApplyV1ToV2Result): void {
   if (outcome.status === "already-v2") {
     result("This project already uses the v2 layout: nothing to apply.");
-    if (outcome.removed.length > 0) info(`Removed what an interrupted apply left: ${outcome.removed.join(", ")}`);
+    if (outcome.removed.length > 0) info(`Removed what an interrupted apply left (${proofText(outcome.proof)}): ${outcome.removed.join(", ")}`);
     return;
   }
   const { built, nodes, v1Items } = outcome;
@@ -89,7 +91,7 @@ function reportApply(outcome: ApplyV1ToV2Result): void {
 function reportRehearsal(rehearsal: RehearseV1ToV2Result): void {
   if (rehearsal.status === "already-v2") {
     result("Dry run: this project already uses the v2 layout: nothing to apply.");
-    if (rehearsal.removed.length > 0) info(`Apply would remove what an interrupted apply left: ${rehearsal.removed.join(", ")}`);
+    if (rehearsal.removed.length > 0) info(`Apply would remove what an interrupted apply left (${proofText(rehearsal.proof)}): ${rehearsal.removed.join(", ")}`);
     return;
   }
   const { kinds, built, nodes, files, v1Items } = rehearsal;
@@ -108,6 +110,13 @@ function reportRehearsal(rehearsal: RehearseV1ToV2Result): void {
   const sum = (pick: (t: KindTally) => number): number => V1_KINDS.reduce((n, k) => n + pick(kinds[k]), 0);
   info(`Total (${sum((t) => t.total)}): held for the Inbox ${sum((t) => t.held)}; dropped ${sum((t) => t.droppedMeta)} droppedMeta, ${sum((t) => t.droppedLog)} droppedLog`);
   reportBuilt(built);
+}
+
+/** Why the v1 files beside the v2 tree are safe to remove. */
+function proofText(proof: LeftoverProof | undefined): string {
+  if (proof === "plan") return "it matches the plan's source";
+  if (proof === "ids") return "every id it holds is in the v2 tree";
+  return "it holds no item";
 }
 
 function reportBuilt(built: Extract<ApplyV1ToV2Result, { status: "applied" }>["built"]): void {

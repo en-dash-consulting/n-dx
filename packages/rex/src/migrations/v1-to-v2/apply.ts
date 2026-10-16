@@ -38,7 +38,10 @@
  * `tree-meta.json` are removed. The rename of `product/` is the switch: the
  * reader takes a rex directory with `product/` as v2. A crash before it
  * leaves the v1 tree; after it, the v2 tree, and the next apply removes the
- * v1 files the crash left. Apply on a v2 tree changes nothing else.
+ * v1 files the crash left ({@link leftoverV1}): only when they are the tree
+ * the plan was made from or, with no plan, every id they hold is in the v2
+ * tree. Any other `prd_tree/` beside the v2 tree is refused and kept. Apply on
+ * a v2 tree changes nothing else.
  *
  * @module migrations/v1-to-v2/apply
  */
@@ -54,12 +57,14 @@ import type { PRDItem } from "../../schema/v1.js";
 import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
 import { nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
 import { withLock, type LockOptions } from "../../store/file-lock.js";
+import { parseFolderTree } from "../../store/folder-tree-parser.js";
 import { discoverPRDFiles } from "../../store/prd-discovery.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "../../store/paths.js";
 import { CHANGES_DIRNAME, PRODUCT_DIRNAME, loadPrdModel, type PrdModel } from "../../store/prd-model-reader.js";
 import { writePrdModel } from "../../store/prd-model-writer.js";
 import type { PlanFile } from "../plan-file.js";
-import type { V1ToV2Entry, V1ToV2Summary } from "./index.js";
+import { sourceDigest } from "../pipeline.js";
+import { V1_TREE_SOURCE_KIND, v1TreeSource, type V1ToV2Entry, type V1ToV2Summary } from "./index.js";
 import { countCorrupt, dropCorrupt, legacyLoeBucket, legacyLoeRationale, v2Slugs, type SlugEntry } from "./migration-plan-data.js";
 
 export type V1ToV2Plan = PlanFile<V1ToV2Entry, V1ToV2Summary>;
@@ -403,6 +408,26 @@ function cutId(plan: V1ToV2Plan): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((parseInt(hex[16]!, 16) & 3) | 8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
+/** Heads the cut change's list of delivery containers, one `- <title> (<id>)` line each. */
+const CONTAINERS_HEADING = "Delivery containers that became no node (their changes were placed or held):";
+const CONTAINER_LINE = /^- .* \(([^()\s]+)\)(?:: plannedRelease .*)?$/;
+
+/** Ids of the delivery containers the cut change in `tree` lists: v1 ids that became no node. */
+export function cutContainerIds(tree: V2Tree): string[] {
+  const ids: string[] = [];
+  for (const node of tree.changes) {
+    if (node.title !== CUT_CHANGE_TITLE || typeof node.body !== "string") continue;
+    const lines = node.body.split("\n");
+    const start = lines.indexOf(CONTAINERS_HEADING);
+    if (start < 0) continue;
+    for (const line of lines.slice(start + 1)) {
+      const id = CONTAINER_LINE.exec(line)?.[1];
+      if (id !== undefined) ids.push(id);
+    }
+  }
+  return ids;
+}
+
 /** The cut: an applied change that adds every capability and constraint, and names the containers that became no node. */
 function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], plan: V1ToV2Plan): RuleNode {
   const id = cutId(plan);
@@ -428,7 +453,7 @@ function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], plan:
     `Moved the PRD from the v1 folder tree to the product and change layers, by plan ${plan.header.source.digest.slice(0, 12)} cut at ${at}.`,
   ];
   if (containers.length > 0) {
-    lines.push("", "Delivery containers that became no node (their changes were placed or held):", "");
+    lines.push("", CONTAINERS_HEADING, "");
     for (const c of containers) lines.push(`- ${c.title} (${c.id})${c.plannedRelease !== undefined ? `: plannedRelease ${c.plannedRelease}` : ""}`);
   }
   return {
@@ -551,7 +576,7 @@ export interface ApplyV1ToV2Options {
 }
 
 export type ApplyV1ToV2Result =
-  | { status: "already-v2"; removed: string[] }
+  | { status: "already-v2"; removed: string[]; proof?: LeftoverProof }
   | { status: "applied"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; nodes: number; v1Items: number; files: number };
 
 interface Prepared {
@@ -588,6 +613,55 @@ async function writeAndVerify(dir: string, prepared: Prepared, lock: LockOptions
   }
   assertEveryV1Id(everyV1Id(v1.items, back.tree, built.containers, built.cut), v1Items, "v2 tree read back");
   return { files: written.written.length, nodes: idsOf([...back.tree.product, ...back.tree.changes], new Set()).size };
+}
+
+// ── Leftover v1 files ────────────────────────────────────────────
+
+/**
+ * Why v1 files beside the v2 tree are what an interrupted apply left: they
+ * are the tree the plan was made from (`plan`), no plan was given and every
+ * id they hold is in the v2 tree (`ids`), or they hold no item (`empty`).
+ */
+export type LeftoverProof = "plan" | "ids" | "empty";
+
+/**
+ * The v1 files beside the v2 tree under `rexDir` that apply may remove, and
+ * why. Throws, naming the ids the v2 tree lacks, when they are not provably
+ * what an interrupted apply left: a v1 branch merged after the cut, or a v1
+ * write beside the v2 tree, is the operator's to re-capture, not to delete.
+ */
+async function leftoverV1(rexDir: string, plan: PlanFile | undefined): Promise<{ removed: string[]; proof?: LeftoverProof }> {
+  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
+  const removed = [treeRoot, join(rexDir, TREE_META_FILENAME)].filter((path) => existsSync(path));
+  if (removed.length === 0) return { removed };
+  const kept = `Kept ${removed.join(" and ")}.`;
+  const { items, warnings } = existsSync(treeRoot) ? await parseFolderTree(treeRoot) : { items: [], warnings: [] };
+  if (warnings.length > 0) {
+    throw new MigrationApplyError(
+      `${treeRoot} beside the v2 tree does not read cleanly (${warnings.map((w) => `${w.path}: ${w.message}`).join("; ")}), ` +
+        `so it cannot be shown to be what an interrupted apply left. ${kept}`,
+    );
+  }
+  if (items.length === 0) return { removed, proof: "empty" };
+  if (plan && sourceDigest(V1_TREE_SOURCE_KIND, (await v1TreeSource(items).read()).items) === plan.header.source.digest) {
+    return { removed, proof: "plan" };
+  }
+
+  const v2 = await loadPrdModel(rexDir);
+  const landed = idsOf([...v2.tree.product, ...v2.tree.changes], new Set(cutContainerIds(v2.tree)));
+  const missing = [...fingerprintTree(items).keys()].filter((id) => !landed.has(id));
+  if (!plan && missing.length === 0) return { removed, proof: "ids" };
+  const remedy = `${kept} Re-capture what it holds in the v2 tree, then remove ${PRD_TREE_DIRNAME}/ and ${TREE_META_FILENAME} by hand.`;
+  if (missing.length > 0) {
+    throw new MigrationApplyError(
+      `${treeRoot} beside the v2 tree holds ${missing.length} item${missing.length === 1 ? "" : "s"} the v2 tree does not ` +
+        `(${missing.slice(0, 10).join(", ")}${missing.length > 10 ? ", …" : ""}): it is not what an interrupted apply left. ${remedy}`,
+    );
+  }
+  throw new MigrationApplyError(
+    `${treeRoot} beside the v2 tree differs from the tree the plan was made from: every id it holds is in the v2 tree, ` +
+      `but an edit made after the plan may not be. ${remedy}`,
+  );
 }
 
 // ── Rehearsal ────────────────────────────────────────────────────
@@ -646,19 +720,18 @@ export function tallyV1ToV2(items: readonly PRDItem[], built: Pick<BuiltV2Tree, 
 }
 
 export type RehearseV1ToV2Result =
-  | { status: "already-v2"; removed: string[] }
+  | { status: "already-v2"; removed: string[]; proof?: LeftoverProof }
   | { status: "rehearsed"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; kinds: Record<V1Kind, KindTally>; nodes: number; files: number; v1Items: number };
 
 /**
  * {@link applyV1ToV2} without the swap: the same refusals, id check, write and
  * read-back, the write going to an OS temp directory that is removed afterwards.
  * Writes nothing under `rexDir` and does not take its PRD lock.
- * On a v2 tree, `removed` lists the v1 files apply would remove.
+ * On a v2 tree, `removed` lists the v1 files apply would remove, and a
+ * leftover apply would refuse is refused here too.
  */
 export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load">): Promise<RehearseV1ToV2Result> {
-  if (existsSync(join(rexDir, PRODUCT_DIRNAME))) {
-    return { status: "already-v2", removed: [join(rexDir, PRD_TREE_DIRNAME), join(rexDir, TREE_META_FILENAME)].filter((path) => existsSync(path)) };
-  }
+  if (existsSync(join(rexDir, PRODUCT_DIRNAME))) return { status: "already-v2", ...(await leftoverV1(rexDir, plan)) };
   if (!existsSync(join(rexDir, PRD_TREE_DIRNAME))) throw new MigrationApplyError(`No PRD folder tree at ${join(rexDir, PRD_TREE_DIRNAME)}: nothing to apply.`);
   await assertNoLegacySources(rexDir);
   const prepared = await prepare(plan, options);
@@ -677,7 +750,7 @@ export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined,
 /**
  * Apply `plan` to the v1 tree under `rexDir`, holding the PRD lock throughout.
  * A tree already v2 is left as is, apart from v1 files an interrupted apply
- * left beside it.
+ * provably left beside it ({@link leftoverV1}).
  */
 export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, options: ApplyV1ToV2Options): Promise<ApplyV1ToV2Result> {
   const staging = join(rexDir, STAGING_DIRNAME);
@@ -690,9 +763,9 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
     async () => {
       await rm(staging, { recursive: true, force: true });
       if (existsSync(productDir)) {
-        const removed = v1Files.filter((path) => existsSync(path));
-        for (const path of removed) await rm(path, { recursive: true, force: true });
-        return { status: "already-v2", removed };
+        const leftover = await leftoverV1(rexDir, plan);
+        for (const path of leftover.removed) await rm(path, { recursive: true, force: true });
+        return { status: "already-v2", ...leftover };
       }
       if (!existsSync(v1Files[0]!)) throw new MigrationApplyError(`No PRD folder tree at ${v1Files[0]}: nothing to apply.`);
       await assertNoLegacySources(rexDir);
