@@ -1,0 +1,19 @@
+{
+  "id": "hench/agent-lifecycle/lifecycle",
+  "name": "Commit Lifecycle",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/lifecycle/commit-msg-watcher.ts",
+    "packages/hench/src/agent/lifecycle/commit-trailers.ts",
+    "packages/hench/src/process/git-origin.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/lifecycle/commit-msg-watcher.ts",
+    "packages/hench/src/agent/lifecycle/commit-trailers.ts",
+    "packages/hench/src/process/git-origin.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 3,
+  "lineCount": 467
+}

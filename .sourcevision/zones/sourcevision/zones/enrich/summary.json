@@ -1,33 +1,45 @@
 {
   "id": "sourcevision/enrich",
-  "name": "Enrich",
-  "description": "10 files, primarily TypeScript",
+  "name": "Analysis Engine",
+  "description": "16 files, primarily TypeScript",
   "files": [
+    "packages/sourcevision/src/analyzers/classify.ts",
+    "packages/sourcevision/src/analyzers/claude-client.ts",
+    "packages/sourcevision/src/analyzers/declared-rules.ts",
     "packages/sourcevision/src/analyzers/enrich-batch.ts",
     "packages/sourcevision/src/analyzers/enrich-config.ts",
+    "packages/sourcevision/src/analyzers/enrich-judge.ts",
     "packages/sourcevision/src/analyzers/enrich-multiplex.ts",
     "packages/sourcevision/src/analyzers/enrich-parsing.ts",
     "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
     "packages/sourcevision/src/analyzers/enrich.ts",
-    "packages/sourcevision/src/analyzers/file-headers.ts",
     "packages/sourcevision/src/analyzers/primer.ts",
     "packages/sourcevision/src/analyzers/prompt-envelope.ts",
-    "packages/sourcevision/src/analyzers/token-usage.ts"
+    "packages/sourcevision/src/analyzers/token-usage.ts",
+    "packages/sourcevision/src/analyzers/typed-findings.ts",
+    "packages/sourcevision/src/analyzers/zone-naming.ts",
+    "packages/sourcevision/src/analyzers/zone-symbols.ts"
   ],
   "entryPoints": [
+    "packages/sourcevision/src/analyzers/classify.ts",
+    "packages/sourcevision/src/analyzers/claude-client.ts",
+    "packages/sourcevision/src/analyzers/declared-rules.ts",
     "packages/sourcevision/src/analyzers/enrich-batch.ts",
     "packages/sourcevision/src/analyzers/enrich-config.ts",
+    "packages/sourcevision/src/analyzers/enrich-judge.ts",
     "packages/sourcevision/src/analyzers/enrich-multiplex.ts",
     "packages/sourcevision/src/analyzers/enrich-parsing.ts",
     "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
     "packages/sourcevision/src/analyzers/enrich.ts",
-    "packages/sourcevision/src/analyzers/file-headers.ts",
     "packages/sourcevision/src/analyzers/primer.ts",
     "packages/sourcevision/src/analyzers/prompt-envelope.ts",
-    "packages/sourcevision/src/analyzers/token-usage.ts"
+    "packages/sourcevision/src/analyzers/token-usage.ts",
+    "packages/sourcevision/src/analyzers/typed-findings.ts",
+    "packages/sourcevision/src/analyzers/zone-naming.ts",
+    "packages/sourcevision/src/analyzers/zone-symbols.ts"
   ],
-  "cohesion": 0.55,
-  "coupling": 0.45,
-  "fileCount": 10,
-  "lineCount": 3288
+  "cohesion": 0.52,
+  "coupling": 0.48,
+  "fileCount": 16,
+  "lineCount": 7056
 }

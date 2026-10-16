@@ -1,0 +1,19 @@
+{
+  "id": "sourcevision/cli/errors-git-credential-helper",
+  "name": "Errors Git Credential Helper",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
+    "packages/sourcevision/src/cli/commands/iso.ts",
+    "packages/sourcevision/src/cli/errors.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
+    "packages/sourcevision/src/cli/commands/iso.ts",
+    "packages/sourcevision/src/cli/errors.ts"
+  ],
+  "cohesion": 0.22,
+  "coupling": 0.78,
+  "fileCount": 3,
+  "lineCount": 370
+}

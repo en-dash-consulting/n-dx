@@ -5,6 +5,7 @@
     "typescript",
     "javascript",
     "go",
+    "sql",
     "zig",
     "python"
   ],
@@ -26,6 +27,14 @@
   "ciSurfaces": [
     {
       "path": ".github/workflows/ci.yml",
+      "kind": "GitHub Actions"
+    },
+    {
+      "path": ".github/workflows/codeql.yml",
+      "kind": "GitHub Actions"
+    },
+    {
+      "path": ".github/workflows/dependency-review.yml",
       "kind": "GitHub Actions"
     },
     {

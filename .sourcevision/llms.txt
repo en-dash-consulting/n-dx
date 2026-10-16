@@ -5,98 +5,100 @@
 
 ## Project Overview
 
-- **Files**: 2067
-- **Lines of code**: 620,046
-- **Languages**: TypeScript (1826), JavaScript (220), Go (19), Zig (1), Python (1)
-- **Zones**: 42 (42 with descriptions)
-- **Avg cohesion**: 0.99, **avg coupling**: 0.01 (weighted by file count, 34 zones with ≥5 files)
-- **Small zones**: 8 excluded from averages (<5 files)
-- **Git**: feature/sv-20260928 @ 793b025
-- **Analyzed**: 2026-09-28T21:20:03.858Z
+- **Files**: 2780
+- **Lines of code**: 797,876
+- **Languages**: TypeScript (2457), JavaScript (300), Go (20), SQL (1), Zig (1)
+- **Zones**: 43 (43 with descriptions)
+- **Avg cohesion**: 0.99, **avg coupling**: 0.00 (weighted by file count, 36 zones with ≥5 files)
+- **Small zones**: 7 excluded from averages (<5 files)
+- **Git**: chore/100-sourcevision-baseline @ 28d6fd6
+- **Analyzed**: 2026-10-16T17:24:56.445Z
 
 ## Architecture Zones
 
 ### .Claude Scripts (`.claude`)
 
-Build, packaging, and CI scripts: iso-map.mjs
+Build, packaging, and CI scripts: iso-map.mjs, config.ts
 
-- Files: 1
-- Cohesion: 1.00, Coupling: 0.00
+- Files: 2
+- Cohesion: 0.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/.claude/context.md`
 
 ### Core (`core`)
 
-41 files, mostly utilities and entry points; entry points assistant-assets.js, assistant-integration.js, claude-integration.js; imported by Tests and Tests.
+52 files, mostly utilities and entry points; entry points assistant-assets.js, assistant-integration.js, child-lifecycle.js; imported by Tests and Tests.
 
-- Files: 41
+- Files: 52
 - Cohesion: 1.00, Coupling: 0.00
-- Entry points: packages/core/assistant-assets.js, packages/core/assistant-integration.js, packages/core/child-lifecycle.js, packages/core/claude-integration.js, packages/core/cli-brand.js (+26 more)
+- Entry points: packages/core/assistant-assets.js, packages/core/assistant-integration.js, packages/core/child-lifecycle.js, packages/core/ci.js, packages/core/claude-integration.js (+36 more)
 - Detail: `.sourcevision/zones/core/context.md`
 
-### Documentation Site (`docs`)
+### Graview (`graview`)
 
-Documentation and static-site assets: config.ts
+20 files, mostly services and gateways; entry points canonical.ts, document.ts, emit.ts; imports Tests; imported by Packages and Packages.
 
-- Files: 1
+- Files: 20
 - Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/docs/context.md`
+- Entry points: packages/graview/src/canonical.ts, packages/graview/src/document.ts, packages/graview/src/emit.ts, packages/graview/src/graview-bin.ts, packages/graview/src/hub.ts (+7 more)
+- Detail: `.sourcevision/zones/graview/context.md`
+
+### Graview Face (`graview-face`)
+
+35 files, mostly components and models; entry points ndx-door.ts, app.ts, spend.ts; imports Tests; imported by Packages.
+
+- Files: 35
+- Cohesion: 1.00, Coupling: 0.00
+- Entry points: packages/graview-face/dev/ndx-door.ts, packages/graview-face/src/app.ts, packages/graview-face/src/model/spend.ts, packages/graview-face/src/model/work.ts, packages/graview-face/src/sync/engine.ts (+4 more)
+- Detail: `.sourcevision/zones/graview-face/context.md`
 
 ### Hench (`hench`)
 
-133 files, mostly utilities and cli commands; entry points llm-gateway.ts, v1.ts, validate.ts; imports Packages and Hench Guard; imported by Packages and Packages.
+165 files, mostly utilities and cli commands; entry points adaptive.ts, adversarial-review.ts, change-magnitude.ts; imports Packages and Tests; imported by Packages and Packages.
 
-- Files: 133
+- Files: 165
 - Cohesion: 1.00, Coupling: 0.00
-- Entry points: packages/hench/src/agent/analysis/adaptive.ts, packages/hench/src/agent/analysis/adversarial-review.ts, packages/hench/src/agent/analysis/change-magnitude.ts, packages/hench/src/agent/analysis/git-changed-files.ts, packages/hench/src/agent/analysis/livelock.ts (+112 more)
+- Entry points: packages/hench/src/agent/analysis/adaptive.ts, packages/hench/src/agent/analysis/adversarial-review.ts, packages/hench/src/agent/analysis/change-magnitude.ts, packages/hench/src/agent/analysis/git-changed-files.ts, packages/hench/src/agent/analysis/livelock.ts (+139 more)
 - Detail: `.sourcevision/zones/hench/context.md`
 
-### Hench 2 (`hench-2`)
+### Unified LLM Client (`llm-client`)
 
-Project configuration and manifest files: vitest.config.ts
+58 files, mostly utilities and services; entry points api-provider.ts, auth-guidance.ts, auth-token.ts; imports Tests; imported by Packages and Packages.
 
-- Files: 1
+- Files: 58
 - Cohesion: 1.00, Coupling: 0.00
-- Detail: `.sourcevision/zones/hench-2/context.md`
-
-### Hench Guard (`hench-guard`)
-
-5 files, mostly cli commands and schemas; entry points index.ts, paths.ts, commands.ts; imports Hench; imported by Packages and Hench.
-
-- Files: 5
-- Cohesion: 0.75, Coupling: 0.25
-- Entry points: packages/hench/src/guard/commands.ts, packages/hench/src/guard/index.ts, packages/hench/src/guard/paths.ts, packages/hench/src/guard/policy.ts
-- Detail: `.sourcevision/zones/hench-guard/context.md`
-
-### Llm Client (`llm-client`)
-
-43 files, mostly utilities and services; entry points runtime-contract.ts, types.ts, vendor-header.ts; imported by Packages and Packages.
-
-- Files: 43
-- Cohesion: 1.00, Coupling: 0.00
-- Entry points: packages/llm-client/src/api-provider.ts, packages/llm-client/src/auth-guidance.ts, packages/llm-client/src/auth.ts, packages/llm-client/src/budget-preflight.ts, packages/llm-client/src/cli-log.ts (+34 more)
+- Entry points: packages/llm-client/src/api-provider.ts, packages/llm-client/src/auth-guidance.ts, packages/llm-client/src/auth-token.ts, packages/llm-client/src/auth.ts, packages/llm-client/src/budget-preflight.ts (+47 more)
 - Detail: `.sourcevision/zones/llm-client/context.md`
 
 ### Rex (`rex`)
 
-130 files, mostly utilities and cli commands; entry points scanners.ts, text-similarity-shared.ts, index.ts; imports Rex and Rex Store; imported by Packages and Packages.
+15 files, mostly utilities and entry points; entry points acknowledge.ts, analyze-shared.ts, consolidation-guard.ts; imports Rex CLI and Rex Fix; imported by Packages and Rex CLI.
 
-- Files: 9
+- Files: 15
 - Cohesion: 0.74, Coupling: 0.26
-- Entry points: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/decompose.ts, packages/rex/src/analyze/escalate.ts (+107 more)
+- Entry points: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/decompose.ts, packages/rex/src/analyze/escalate.ts (+128 more)
 - Detail: `.sourcevision/zones/rex/context.md`
 
-### Rex CLI (`rex-cli`)
+### Rex (`rex-cli`)
 
-51 files, mostly utilities and cli commands; entry points dedupe.ts, tree.ts, constants.ts; imports Rex and Rex; imported by Rex and Packages.
+259 files, mostly utilities and cli commands; entry points acknowledge.ts, analyze-shared.ts, consolidation-guard.ts; imports Rex and Rex Fix; imported by Packages and Packages.
 
-- Files: 190
-- Cohesion: 0.99, Coupling: 0.01
-- Entry points: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/decompose.ts, packages/rex/src/analyze/dedupe.ts (+158 more)
+- Files: 259
+- Cohesion: 0.98, Coupling: 0.02
+- Entry points: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/decompose.ts, packages/rex/src/analyze/dedupe.ts (+207 more)
 - Detail: `.sourcevision/zones/rex-cli/context.md`
+
+### Rex Fix (`rex-fix`)
+
+4 files, mostly cli commands and entry points; entry points fix.ts, parent-completion.ts, index.ts; imports Rex CLI; imported by Packages and Rex.
+
+- Files: 4
+- Cohesion: 0.37, Coupling: 0.63
+- Entry points: packages/rex/src/cli/commands/fix.ts, packages/rex/src/core/parent-completion.ts, packages/rex/src/fix/index.ts, packages/rex/src/fix/tree.ts, packages/rex/src/fix/types.ts
+- Detail: `.sourcevision/zones/rex-fix/context.md`
 
 ### Root (`root`)
 
-4 files.
+4 files; imports Tests.
 
 - Files: 4
 - Cohesion: 0.00, Coupling: 0.00
@@ -104,136 +106,152 @@ Project configuration and manifest files: vitest.config.ts
 
 ### Build & CI Scripts (`scripts`)
 
-Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+8 more)
+Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+12 more)
 
-- Files: 11
+- Files: 15
 - Cohesion: 0.00, Coupling: 0.00
-- Entry points: scripts/build-iso-skill.mjs, scripts/check-dependency-drift.mjs, scripts/check-obfuscated-code.mjs, scripts/cli-smoke-parity.mjs, scripts/prompt-census.mjs
+- Entry points: scripts/build-iso-skill.mjs, scripts/check-dependency-drift.mjs, scripts/check-lockfile-integrity.mjs, scripts/check-obfuscated-code.mjs, scripts/cli-smoke-parity.mjs (+2 more)
 - Detail: `.sourcevision/zones/scripts/context.md`
 
 ### Static Analysis Engine (`sourcevision`)
 
-105 files, mostly utilities and services; entry points validate.ts, prd-epic-resolver.ts, claude-client.ts; imported by Packages and Packages.
+121 files, mostly utilities and services; entry points analysis-outcome.ts, analyze-progress.ts, archetypes.ts; imports Tests; imported by Packages and Packages.
 
-- Files: 105
+- Files: 121
 - Cohesion: 1.00, Coupling: 0.00
-- Entry points: packages/sourcevision/src/analyzers/archetypes.ts, packages/sourcevision/src/analyzers/area-naming.ts, packages/sourcevision/src/analyzers/branch-work-classifier.ts, packages/sourcevision/src/analyzers/branch-work-collector.ts, packages/sourcevision/src/analyzers/branch-work-filter.ts (+80 more)
+- Entry points: packages/sourcevision/src/analyzers/analysis-outcome.ts, packages/sourcevision/src/analyzers/analyze-progress.ts, packages/sourcevision/src/analyzers/archetypes.ts, packages/sourcevision/src/analyzers/area-naming.ts, packages/sourcevision/src/analyzers/branch-work-classifier.ts (+99 more)
 - Detail: `.sourcevision/zones/sourcevision/context.md`
 
 ### Tests (`tests`)
 
-Non-source files in tests: evals.test.js, record-goldens.js, score.js (+5 more)
+Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts
 
-- Files: 8
+- Files: 3
 - Cohesion: 1.00, Coupling: 0.00
-- Entry points: tests/helpers/all-skills.js, tests/helpers/posix-shell.js, tests/helpers/real-process-tree.js, tests/helpers/symlink-support.js
 - Detail: `.sourcevision/zones/tests/context.md`
 
 ### Tests 2 (`tests-2`)
 
-Non-source files in tests: setup-color-env.js, setup-judgment-env.js, setup-session-env.js
+Non-source files in tests: evals.test.js, record-goldens.js, score.js (+9 more)
 
-- Files: 3
+- Files: 12
 - Cohesion: 1.00, Coupling: 0.00
+- Entry points: tests/hidden-child-process-alias.mjs, tests/hidden-child-process.js, tests/vitest-isolation.mjs
 - Detail: `.sourcevision/zones/tests-2/context.md`
 
 ### Tests (`tests-e2e`)
 
-Non-source files in tests: architecture-policy.test.js, assistant-body-drift.test.js, assistant-integration.test.js (+76 more)
+Non-source files in tests: agents-md-size-budget.test.js, architecture-policy.test.js, assistant-body-drift.test.js (+104 more)
 
-- Files: 79
+- Files: 107
 - Cohesion: 1.00, Coupling: 0.00
 - Entry points: tests/e2e/e2e-helpers.js
 - Detail: `.sourcevision/zones/tests-e2e/context.md`
 
 ### Tests Fixtures (`tests-fixtures`)
 
-Non-source files in tests: ci-child-double.mjs, ci-spawn-preload.mjs, docs-build-stub.mjs (+44 more)
+Non-source files in tests: child-double.mjs, spawn-preload.mjs, ci-child-double.mjs (+46 more)
 
-- Files: 47
+- Files: 49
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-fixtures/context.md`
 
+### Tests Graview Unit (`tests-graview-unit`)
+
+Non-source files in packages: declaration.test.ts, document.test.ts, graview-bin.test.ts (+3 more)
+
+- Files: 6
+- Cohesion: 1.00, Coupling: 0.00
+- Detail: `.sourcevision/zones/tests-graview-unit/context.md`
+
+### Tests Helpers (`tests-helpers`)
+
+Non-source files in tests: all-skills.js, posix-shell.js, real-process-tree.js (+2 more)
+
+- Files: 5
+- Cohesion: 1.00, Coupling: 0.00
+- Entry points: tests/helpers/all-skills.js, tests/helpers/posix-shell.js, tests/helpers/real-process-tree.js, tests/helpers/slug-drift-message.js, tests/helpers/symlink-support.js
+- Detail: `.sourcevision/zones/tests-helpers/context.md`
+
 ### Tests Hench (`tests-hench`)
 
-Non-source files in packages: cli-hints.test.ts, cli-init.test.ts, cross-vendor-run-record-smoke.test.ts (+4 more)
+Non-source files in packages: cli-hints.test.ts, cli-init.test.ts, cross-vendor-run-record-smoke.test.ts (+5 more)
 
-- Files: 7
+- Files: 8
 - Cohesion: 1.00, Coupling: 0.00
 - Entry points: packages/hench/tests/fixtures/cross-vendor-runtime.ts, packages/hench/tests/helpers/index.ts, packages/hench/tests/helpers/posix-shell.ts, packages/hench/tests/helpers/scripted-claude-cli.ts
 - Detail: `.sourcevision/zones/tests-hench/context.md`
 
 ### Tests Hench Integration (`tests-hench-integration`)
 
-Non-source files in packages: background-wait-codex.test.ts, background-wait-resume.test.ts, background-wait-spawn.test.ts (+64 more)
+Non-source files in packages: agent-commit-item-trailer-cli-loop.test.ts, agent-commit-item-trailer.test.ts, agent-model-override.test.ts (+96 more)
 
-- Files: 67
+- Files: 99
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-hench-integration/context.md`
 
 ### Tests Hench Unit (`tests-hench-unit`)
 
-Non-source files in packages: adaptive.test.ts, adversarial-review.test.ts, change-magnitude.test.ts (+158 more)
+Non-source files in packages: adaptive.test.ts, adversarial-review.test.ts, change-magnitude.test.ts (+198 more)
 
-- Files: 161
+- Files: 201
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-hench-unit/context.md`
 
 ### Tests Integration (`tests-integration`)
 
-Non-source files in tests: assistant-integration.test.js, claude-config-validation.test.js, codex-config-validation.test.js (+19 more)
+Non-source files in tests: assistant-integration.test.js, ci-structure-health.test.js, claude-config-validation.test.js (+28 more)
 
-- Files: 22
+- Files: 31
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-integration/context.md`
 
-### Tests Llm Client (`tests-llm-client`)
+### Tests Llm Client Integration (`tests-llm-client-integration`)
 
-Non-source files in packages: fake-cli.ts, fake-spawn.ts, posix-shell.ts (+4 more)
+Non-source files in packages: exec-shell-windows.test.ts, exec-stdin-input.test.ts, exec-timeout-tree-kill.test.ts (+3 more)
 
-- Files: 7
+- Files: 6
 - Cohesion: 1.00, Coupling: 0.00
-- Entry points: packages/llm-client/tests/helpers/fake-cli.ts, packages/llm-client/tests/helpers/fake-spawn.ts
-- Detail: `.sourcevision/zones/tests-llm-client/context.md`
+- Detail: `.sourcevision/zones/tests-llm-client-integration/context.md`
 
 ### Tests Llm Client Unit (`tests-llm-client-unit`)
 
-Non-source files in packages: ansi-reset-regression.test.ts, api-provider.test.ts, auth-guidance.test.ts (+43 more)
+Non-source files in packages: ansi-reset-regression.test.ts, api-provider.test.ts, auth-guidance.test.ts (+58 more)
 
-- Files: 46
+- Files: 61
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-llm-client-unit/context.md`
 
 ### Tests Packages (`tests-packages`)
 
-Non-source files in packages: folder-tree-index-generator.test.ts, index.ts, rex-dir-test-support.ts (+3 more)
+Non-source files in packages: project.ts, emit.test.ts, fake-cli.ts (+11 more)
 
-- Files: 6
+- Files: 14
 - Cohesion: 1.00, Coupling: 0.00
-- Entry points: packages/rex/tests/helpers/index.ts, packages/rex/tests/helpers/rex-dir-test-support.ts, packages/web/tests/setup/preact-frame-leak-guard.ts
+- Entry points: packages/graview/tests/helpers/project.ts, packages/llm-client/tests/helpers/fake-cli.ts, packages/llm-client/tests/helpers/fake-spawn.ts, packages/llm-client/tests/helpers/posix-shell.ts, packages/rex/tests/helpers/index.ts (+6 more)
 - Detail: `.sourcevision/zones/tests-packages/context.md`
 
 ### Tests Rex E2e (`tests-rex-e2e`)
 
-Non-source files in packages: add-stdin-hang.test.ts, cli-adapter.test.ts, cli-add-path-regression.test.ts (+15 more)
+Non-source files in packages: add-stdin-hang.test.ts, cli-add-path-regression.test.ts, cli-analyze.test.ts (+20 more)
 
-- Files: 18
+- Files: 23
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-rex-e2e/context.md`
 
 ### Tests Rex Integration (`tests-rex-integration`)
 
-Non-source files in packages: add-auto-reshape.test.ts, add-collision-routing.test.ts, add-sibling-rename.test.ts (+44 more)
+Non-source files in packages: accept-keeps-loe.test.ts, add-auto-reshape.test.ts, add-collision-routing.test.ts (+66 more)
 
-- Files: 47
+- Files: 69
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-rex-integration/context.md`
 
 ### Tests Rex Unit (`tests-rex-unit`)
 
-Non-source files in packages: prompt-surfaces.ts, accept-single-transaction.test.ts, acknowledge.test.ts (+191 more)
+Non-source files in packages: prompt-surfaces.ts, accept-single-transaction.test.ts, acknowledge.test.ts (+255 more)
 
-- Files: 194
+- Files: 258
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-rex-unit/context.md`
 
@@ -247,72 +265,72 @@ Non-source files in packages: cli-analyze.test.ts, cli-hints.test.ts, cli-iso.te
 
 ### Tests Sourcevision Fixtures (`tests-sourcevision-fixtures`)
 
-Non-source files in packages: main.go, router.go, setup.go (+32 more)
+Non-source files in packages: main.go, router.go, setup.go (+43 more)
 
-- Files: 35
+- Files: 46
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-sourcevision-fixtures/context.md`
 
 ### Tests Sourcevision Integration (`tests-sourcevision-integration`)
 
-Non-source files in packages: analyze-model-resolution.test.ts, claude-config.test.ts, context.test.ts (+8 more)
+Non-source files in packages: analyze-model-resolution.test.ts, claude-config.test.ts, context.test.ts (+12 more)
 
-- Files: 11
+- Files: 15
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-sourcevision-integration/context.md`
 
 ### Tests Sourcevision Unit (`tests-sourcevision-unit`)
 
-Non-source files in packages: archetypes.test.ts, area-naming.test.ts, artifact-caps.test.ts (+98 more)
+Non-source files in packages: analysis-outcome.test.ts, analyze-progress.test.ts, archetypes.test.ts (+123 more)
 
-- Files: 101
+- Files: 126
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-sourcevision-unit/context.md`
 
 ### Tests Unit (`tests-unit`)
 
-Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, child-lifecycle.test.js (+37 more)
+Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+55 more)
 
-- Files: 40
+- Files: 58
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-unit/context.md`
 
 ### Tests Web E2e Ui (`tests-web-e2e-ui`)
 
-Non-source files in packages: console-errors.ts, fixture-project.ts, hench-runs-workflow.spec.ts (+3 more)
+Non-source files in packages: console-errors.ts, fixture-project.ts, hench-runs-workflow.spec.ts (+6 more)
 
-- Files: 6
+- Files: 9
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-web-e2e-ui/context.md`
 
 ### Tests Web Helpers (`tests-web-helpers`)
 
-Non-source files in packages: built-server-guard.ts, crash-detector-test-support.ts, temp-dir.ts (+3 more)
+Non-source files in packages: built-server-guard.ts, crash-detector-test-support.ts, job-tray.ts (+5 more)
 
-- Files: 6
+- Files: 8
 - Cohesion: 1.00, Coupling: 0.00
-- Entry points: packages/web/tests/helpers/built-server-guard.ts, packages/web/tests/helpers/crash-detector-test-support.ts, packages/web/tests/helpers/preact-test-support.ts, packages/web/tests/helpers/server-route-test-support.ts, packages/web/tests/helpers/temp-dir.ts (+3 more)
+- Entry points: packages/web/tests/helpers/built-server-guard.ts, packages/web/tests/helpers/crash-detector-test-support.ts, packages/web/tests/helpers/job-tray.ts, packages/web/tests/helpers/preact-test-support.ts, packages/web/tests/helpers/prep-fixture.ts (+5 more)
 - Detail: `.sourcevision/zones/tests-web-helpers/context.md`
 
 ### Tests Web Integration (`tests-web-integration`)
 
-Non-source files in packages: background-suspension-recovery.test.ts, boundary-check.test.ts, build-output-contract.test.ts (+24 more)
+Non-source files in packages: background-suspension-recovery.test.ts, boundary-check.test.ts, build-output-contract.test.ts (+39 more)
 
-- Files: 27
+- Files: 42
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-web-integration/context.md`
 
 ### Packages (`tests-web-unit`)
 
-Non-source files in packages: built-server-guard.test.ts, admission.test.ts, home.test.ts (+238 more)
+Non-source files in packages: built-server-guard.test.ts, admission.test.ts, home.test.ts (+343 more)
 
-- Files: 241
+- Files: 346
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-web-unit/context.md`
 
-### Viewer Message Pipeline (`viewer-message-pipeline`)
+### Message Optimization Pipeline (`viewer-message-pipeline`)
 
-Declared zone anchor (7 files).
+7 files, mostly utilities and services; entry points call-rate-limiter.ts, fetch-pipeline.ts, index.ts; imported by Packages and Packages.
 
 - Files: 7
 - Cohesion: 1.00, Coupling: 0.00
@@ -327,88 +345,79 @@ Project configuration and manifest files: vitest.bench.config.ts, vitest.config.
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/vitest-bench-config/context.md`
 
-### Web Server-Viewer Bridge (`web`)
+### Web (`web`)
 
-4 files, mostly entry points.
+3 files.
 
-- Files: 4
+- Files: 3
 - Cohesion: 0.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/web/context.md`
 
-### Web Hub Infrastructure (`web-hub`)
-
-10 files, mostly pages and services; entry points index.ts, home.ts, hub.ts; imports Web Server; imported by Packages and Packages.
-
-- Files: 10
-- Cohesion: 0.84, Coupling: 0.16
-- Entry points: packages/web/src/hub/admission.ts, packages/web/src/hub/home.ts, packages/web/src/hub/hub.ts, packages/web/src/hub/index.ts, packages/web/src/hub/overview.ts (+1 more)
-- Detail: `.sourcevision/zones/web-hub/context.md`
-
 ### Web Landing (`web-landing`)
 
-1 file, mostly pages; entry points landing.ts; imported by Packages.
+2 files, mostly pages; entry points landing.ts; imports Tests; imported by Packages.
 
-- Files: 1
-- Cohesion: 1.00, Coupling: 0.00
+- Files: 2
+- Cohesion: 0.00, Coupling: 0.00
 - Entry points: packages/web/src/landing/landing.ts
 - Detail: `.sourcevision/zones/web-landing/context.md`
 
 ### Web Server (`web-server`)
 
-133 files, mostly route handlers and utilities; entry points routes.ts, index.ts, index.ts; imports Web Viewer and Prd Tree; imported by Packages and Web Viewer.
+129 files, mostly route handlers and utilities; entry points admission.ts, home.ts, hub.ts; imports Packages; imported by Packages and Packages.
 
-- Files: 87
-- Cohesion: 0.98, Coupling: 0.02
-- Entry points: packages/web/src/hub/routes.ts, packages/web/src/server/aggregation-cache.ts, packages/web/src/server/dashboard-usage.ts, packages/web/src/server/domain-gateway.ts, packages/web/src/server/hench-config-fields.ts (+48 more)
+- Files: 129
+- Cohesion: 1.00, Coupling: 0.00
+- Entry points: packages/web/src/hub/admission.ts, packages/web/src/hub/home.ts, packages/web/src/hub/hub.ts, packages/web/src/hub/index.ts, packages/web/src/hub/new-project.ts (+87 more)
 - Detail: `.sourcevision/zones/web-server/context.md`
 
-### Web Viewer (`web-viewer`)
+### Viewer User Interface (`web-viewer`)
 
-114 files, mostly pages and components; entry points types.ts, active-tasks-panel.ts, breadcrumb.ts; imports Web Server and Prd Tree; imported by Packages and Web Server.
+280 files, mostly components and pages; entry points v1.ts, base-path.ts, active-operations-tray.ts; imports Viewer Message Pipeline and Web Server; imported by Packages and Packages.
 
-- Files: 228
+- Files: 280
 - Cohesion: 0.99, Coupling: 0.01
-- Entry points: packages/web/src/schema/v1.ts, packages/web/src/viewer/base-path.ts, packages/web/src/viewer/components/active-operations-tray.ts, packages/web/src/viewer/components/analyze-controls.ts, packages/web/src/viewer/components/breadcrumb.ts (+134 more)
+- Entry points: packages/web/src/schema/v1.ts, packages/web/src/viewer/base-path.ts, packages/web/src/viewer/components/active-operations-tray.ts, packages/web/src/viewer/components/active-tasks-panel.ts, packages/web/src/viewer/components/analyze-controls.ts (+190 more)
 - Detail: `.sourcevision/zones/web-viewer/context.md`
 
 ## Key Dependencies
 
 ### Most-Imported Files
 
-- `packages/rex/src/store/index.ts` (96 imports)
-- `packages/rex/src/schema/index.ts` (85 imports)
-- `packages/hench/tests/helpers/index.ts` (73 imports)
-- `packages/hench/src/store/config.ts` (68 imports)
-- `packages/hench/src/prd/llm-gateway.ts` (63 imports)
-- `packages/rex/src/core/tree.ts` (62 imports)
-- `packages/web/tests/helpers/server-route-test-support.ts` (58 imports)
-- `packages/rex/src/core/canonical.ts` (48 imports)
-- `packages/rex/src/cli/commands/constants.ts` (46 imports)
-- `packages/rex/src/cli/output.ts` (42 imports)
+- `packages/rex/src/store/index.ts` (146 imports)
+- `packages/hench/tests/helpers/index.ts` (108 imports)
+- `packages/hench/src/prd/llm-gateway.ts` (93 imports)
+- `packages/rex/src/schema/index.ts` (91 imports)
+- `packages/hench/src/store/config.ts` (85 imports)
+- `packages/web/tests/helpers/server-route-test-support.ts` (81 imports)
+- `packages/rex/src/core/tree.ts` (65 imports)
+- `packages/hench/src/agent/lifecycle/shared.ts` (57 imports)
+- `packages/rex/src/cli/output.ts` (54 imports)
+- `packages/web/src/viewer/hooks/index.ts` (54 imports)
 
 ### External Packages
 
-- `vitest` (used by 1094 files)
-- `preact` (used by 245 files)
-- `@n-dx/llm-client` (used by 152 files)
-- `@n-dx/rex` (used by 44 files)
-- `fs` (used by 33 files)
-- `path` (used by 32 files)
-- `zod` (used by 17 files)
+- `vitest` (used by 1494 files)
+- `preact` (used by 331 files)
+- `@n-dx/llm-client` (used by 254 files)
+- `@n-dx/rex` (used by 63 files)
+- `zod` (used by 40 files)
+- `fs` (used by 39 files)
+- `path` (used by 38 files)
+- `@graview/core` (used by 23 files)
+- `react` (used by 22 files)
 - `@anthropic-ai/sdk` (used by 15 files)
-- `react` (used by 13 files)
-- `child_process` (used by 12 files)
 
 ### Circular Dependencies
 
-Found 10 circular dependency chain(s):
+Found 27 circular dependency chain(s):
 
+- `packages/llm-client/src/jev-client.ts` → `packages/llm-client/src/judgment-cache.ts`
+- `packages/llm-client/src/runtime-contract.ts` → `packages/llm-client/src/token-usage.ts`
 - `packages/rex/src/store/file-adapter.ts` → `packages/rex/src/store/prd-md-migration.ts`
 - `packages/rex/src/store/index.ts` → `packages/rex/src/store/ensure-legacy-prd-migrated.ts`
-- `packages/sourcevision/src/analyzers/jev-client.ts` → `packages/sourcevision/src/analyzers/judgment-cache.ts`
-- `packages/web/src/hub/hub.ts` → `packages/web/src/hub/proxy.ts`
-- `packages/web/src/hub/hub.ts` → `packages/web/src/hub/routes.ts`
-- ... and 5 more
+- `packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/index.ts` → `packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/routes.ts`
+- ... and 22 more
 
 ## Route Structure
 
@@ -420,10 +429,13 @@ Found 10 circular dependency chain(s):
 DELETE  /api/hub/projects/:id
 DELETE  /api/hub/projects/:id/worktrees/:path
 GET     /api/hub/health
+GET     /api/hub/new-project
+GET     /api/hub/new-project[?parent=&name=]
 GET     /api/hub/overview
 GET     /api/hub/projects
 GET     /api/hub/queue
 POST    /api/hub/projects
+POST    /api/hub/projects/new
 ```
 
 **/api/hench/adaptive/** (handleAdaptiveRoute) — `packages/web/src/server/routes-adaptive.ts`
@@ -453,25 +465,31 @@ PUT     /api/cli/timeouts
 ```
 GET     /api/commands/auth
 GET     /api/commands/ci/status
+GET     /api/commands/init/preflight
 GET     /api/commands/init/status
 GET     /api/commands/manifest
+GET     /api/commands/recommend/status
 GET     /api/commands/refresh/status
 GET     /api/commands/reshape/status
 GET     /api/commands/self-heal/status
 GET     /api/commands/sv-analyze/status
 GET     /api/commands/sv-analyze/status.
 POST    /api/commands/ci
+POST    /api/commands/ci/stop
 POST    /api/commands/export
 POST    /api/commands/export-pdf
 POST    /api/commands/fix
 POST    /api/commands/init
 POST    /api/commands/recommend
+POST    /api/commands/recommend/stop
 POST    /api/commands/refresh
+POST    /api/commands/refresh/stop
 POST    /api/commands/reshape
+POST    /api/commands/reshape/stop
 POST    /api/commands/self-heal
 POST    /api/commands/self-heal/stop
 POST    /api/commands/sv-analyze
-POST    /api/commands/sync
+POST    /api/commands/sv-analyze/stop
 POST    /api/commands/validate-tokens
 ```
 
@@ -495,6 +513,16 @@ GET     /api/git/diff
 GET     /api/git/status
 POST    /api/git/commit
 POST    /api/git/discard
+POST    /api/git/ignore
+```
+
+**/api/hench/** (handleHenchPrepRoute) — `packages/web/src/server/routes-hench-prep.ts`
+
+```
+GET     /api/hench/prep/:taskId
+GET     /api/hench/ready?limit=N
+POST    /api/hench/prep/:taskId/preview
+PUT     /api/hench/prep/:taskId
 ```
 
 **/api/hench/** (handleHenchRoute) — `packages/web/src/server/routes-hench.ts`
@@ -512,9 +540,12 @@ GET     /api/hench/memory/history/:taskId
 GET     /api/hench/memory/leaks
 GET     /api/hench/metrics
 GET     /api/hench/metrics/snapshots
+GET     /api/hench/prep/:taskId,
 GET     /api/hench/runs
 GET     /api/hench/runs?scope=repo
 GET     /api/hench/runs/:id
+GET     /api/hench/runs/:id/events
+GET     /api/hench/runs/:id/log
 GET     /api/hench/runs/health
 GET     /api/hench/task-usage
 GET     /api/hench/templates
@@ -522,7 +553,9 @@ GET     /api/hench/templates/:id
 GET     /api/hench/throttle
 POST    /api/hench/execute
 POST    /api/hench/execute/:taskId/terminate
+POST    /api/hench/execute/check
 POST    /api/hench/runs/:id/mark-stuck
+POST    /api/hench/runs/reconcile
 POST    /api/hench/templates
 POST    /api/hench/templates/:id/apply
 POST    /api/hench/throttle/emergency-stop
@@ -532,14 +565,10 @@ PUT     /api/hench/config
 PUT     /api/hench/throttle
 ```
 
-**/api/** (handleIntegrationRoute) — `packages/web/src/server/routes-integrations.ts`
+**/api/hub/** (handleHubAbsentRoute) — `packages/web/src/server/routes-hub-absent.ts`
 
 ```
-DELETE  /api/integrations/:id/config
-GET     /api/integrations
-GET     /api/integrations/:id/config
-GET     /api/integrations/:id/schema
-PUT     /api/integrations/:id/config
+GET     /api/hub/projects
 ```
 
 **/api/** (handleIsoMapRoute) — `packages/web/src/server/routes-iso-map.ts`
@@ -548,10 +577,31 @@ PUT     /api/integrations/:id/config
 GET     /api/iso-map[?source=…&maxNodes=…&externals=…]
 ```
 
+**/api/live/** (handleLiveAnalyzeRoute) — `packages/web/src/server/routes-live-analyze.ts`
+
+```
+GET     /api/live/analyze
+POST    /api/live/analyze/stop
+```
+
+**/api/live/task/** (handleLiveTaskRoute) — `packages/web/src/server/routes-live-task.ts`
+
+```
+GET     /api/live/task/:taskId
+```
+
+**/api/** (handleLiveRoute) — `packages/web/src/server/routes-live.ts`
+
+```
+GET     /api/live
+```
+
 **/api/llm/config** (handleLlmRoute) — `packages/web/src/server/routes-llm.ts`
 
 ```
+GET     /api/llm/catalog
 GET     /api/llm/config
+POST    /api/llm/config/preview
 PUT     /api/llm/config
 ```
 
@@ -561,17 +611,6 @@ PUT     /api/llm/config
 GET     /api/merge-graph
 GET     /api/merge-graph/fingerprint
 GET     /api/prd-origin?path=…
-```
-
-**/api/notion/** (handleNotionRoute) — `packages/web/src/server/routes-notion.ts`
-
-```
-DELETE  /api/notion/config
-GET     /api/notion/config
-POST    /api/notion/schema
-POST    /api/notion/schema/fix
-POST    /api/notion/test
-PUT     /api/notion/config
 ```
 
 **/api/project-settings** (handleProjectSettingsRoute) — `packages/web/src/server/routes-project-settings.ts`
@@ -587,10 +626,26 @@ PUT     /api/project-settings
 GET     /api/project
 ```
 
+**/api/rex/** (handleRexSettingsRoute) — `packages/web/src/server/routes-rex-settings.ts`
+
+```
+GET     /api/rex/settings
+PUT     /api/rex/settings
+```
+
 **/api/rex/items/:id/** — `packages/web/src/server/routes-rex/index-markdown.ts`
 
 ```
 GET     /api/rex/items/:id/index-md
+```
+
+**/api/rex/** — `packages/web/src/server/routes-rex/product.ts`
+
+```
+GET     /api/rex/changes
+GET     /api/rex/product
+GET     /api/rex/product/capability/<id>
+POST    /api/rex/product/edit
 ```
 
 **/api/rex/** — `packages/web/src/server/routes-rex/reads.ts`
@@ -642,6 +697,14 @@ GET     /api/token/events
 GET     /api/token/summary
 ```
 
+**/api/** (handleTrustRoute) — `packages/web/src/server/routes-trust.ts`
+
+```
+GET     /api/trust
+POST    /api/trust/accept
+POST    /api/trust/revoke
+```
+
 **/api/rex/validate** (handleValidationRoute) — `packages/web/src/server/routes-validation.ts`
 
 ```
@@ -672,16 +735,19 @@ POST    /api/workspaces/refresh
 GET     /api/worktrees
 ```
 
-### Components: 14 total, 9 usage edges
+### Components: 52 total, 123 usage edges
 
 Most used:
-- `Button` in `tests/fixtures/sv-evals/medium-app/src/client/components/Button.tsx` (3 uses)
-- `Card` in `tests/fixtures/sv-evals/medium-app/src/client/components/Card.tsx` (2 uses)
-- `Nav` in `tests/fixtures/sv-evals/medium-app/src/client/components/Nav.tsx` (1 uses)
-- `HomePage` in `tests/fixtures/sv-evals/medium-app/src/client/pages/HomePage.tsx` (1 uses)
-- `UserPage` in `tests/fixtures/sv-evals/medium-app/src/client/pages/UserPage.tsx` (1 uses)
-- `App` in `tests/fixtures/sv-evals/medium-app/src/client/App.tsx` (1 uses)
-- `Input` in `tests/fixtures/sv-evals/medium-app/src/client/components/Input.tsx` (1 uses)
+- `Section` in `packages/graview-face/src/ui/kit.tsx` (34 uses)
+- `Badge` in `packages/graview-face/src/ui/kit.tsx` (33 uses)
+- `Stat` in `packages/graview-face/src/ui/kit.tsx` (30 uses)
+- `Rows` in `packages/graview-face/src/ui/kit.tsx` (27 uses)
+- `RecordRow` in `packages/graview-face/src/ui/kit.tsx` (27 uses)
+- `Empty` in `packages/graview-face/src/ui/kit.tsx` (23 uses)
+- `Page` in `packages/graview-face/src/ui/kit.tsx` (12 uses)
+- `Hero` in `packages/graview-face/src/ui/kit.tsx` (12 uses)
+- `Stats` in `packages/graview-face/src/ui/kit.tsx` (8 uses)
+- `Meter` in `packages/graview-face/src/ui/kit.tsx` (8 uses)
 
 ## Findings
 
@@ -690,40 +756,56 @@ Most used:
 - Zone pin for "packages/hench/src/store/json.ts" → "hench" skipped: the file is not present in any detected zone (out of scope or unzoned). [info]
 - Zone pin target "rex-prd-engine" did not form this analysis run — 12 pin(s) skipped and those files fell back to their Louvain zone. Single-target consolidations to "rex-prd-engine" are non-deterministic until it is a stable anchor. Skipped: packages/rex/src/analyze/batch-types.ts, packages/rex/src/cli/commands/fix.ts, packages/rex/src/core/keywords.ts, packages/rex/src/core/tree.ts, packages/rex/src/core/verify.ts, packages/rex/src/schema/index.ts, packages/rex/src/schema/levels.ts, packages/rex/src/schema/v1.ts, +4 more. [warning]
 - God function: Graph in packages/web/src/viewer/views/graph.ts calls 245 unique functions — consider decomposing into smaller, focused functions [critical]
+- God function: cliLoop in packages/hench/src/agent/lifecycle/cli-loop.ts calls 88 unique functions — consider decomposing into smaller, focused functions [warning]
 - God function: buildZoneIsoModel in .claude/skills/iso-map/scripts/iso-map.mjs calls 73 unique functions — consider decomposing into smaller, focused functions [warning]
-- God function: buildZoneIsoModel in packages/sourcevision/src/export/iso-model.ts calls 73 unique functions — consider decomposing into smaller, focused functions [warning]
+- "packages/graview/src/cli/index.ts" exports 2 declaration(s) (findProductFace, main) that no file in the project imports [warning] (graview)
+- "packages/hench/src/store/suggestions.ts" is production code imported only by tests (2 importer(s), all test files) — either it is dead or its real caller is missing [warning] (graview)
+- "Hench" imports "Tests Hench" on 3 edge(s) while the 15 edge(s) between them run the other way — the minority direction looks like a layering violation [warning] (hench)
+- "packages/hench/src/agent/completion.ts" is production code imported only by tests (2 importer(s), all test files) — either it is dead or its real caller is missing [warning] (hench)
+- "packages/hench/src/prd/llm-gateway.ts" is imported from 3 zones (tests-hench, tests-hench-integration, tests-hench-unit) — a cross-cutting dependency every one of them is coupled to [warning] (hench)
+- ... and 24 more
+
+### Patterns
+
+- info: migrations/registry.ts is a clean extension seam. Its header says one entry per migration folder and nothing reads it except the migrate command, so adding or removing a migration touches one file. [info] (rex)
+- info: migration-plan-data.ts says it is pure and deterministic, keyed by v1 item id, and never shells out. Outside facts are injected by the caller. This keeps the migration plan replayable, so new code in this folder should keep that boundary. [info] (rex)
+- info: escalate.ts centralises retry/escalation for validated LLM calls. New LLM-calling analyze modules (decompose, consolidation-guard, *-reason) should go through it rather than adding their own retry loops. [warning] (rex-cli)
+- warning: hub/exec-gateway.ts is a web gateway onto @n-dx/llm-client that is missing from the gateway table in CLAUDE.md/docs/architecture/gateways.md. Register it, and confirm it is web's only llm-client import surface, to satisfy the one-gateway-per-source-package rule. [warning] (web-server)
+- info: The hub keeps project servers unchanged by running each as a child `web serve` on a loopback port, with per-project ndxBin. Because of that isolation, single-project assumptions in src/server/ do not need hub awareness, and the proxy/base-path stripping is the only contract between the two. [info] (web-server)
+- info: api.ts (inbound) and external.ts (outbound) form a clear two-sided boundary for the viewer. The cycles show that api.ts is also imported from inside the viewer, so restrict it to sibling-zone consumers as its header describes. [warning] (web-viewer)
 
 ### Relationships
 
-- Tightly coupled modules: packages/hench/src/agent/lifecycle/shared.ts and packages/hench/src/types/output.ts — 121 cross-file calls (unidirectional). Consider extracting shared interface or merging [info]
+- Tightly coupled modules: packages/hench/src/agent/lifecycle/shared.ts and packages/hench/src/types/output.ts — 141 cross-file calls (unidirectional). Consider extracting shared interface or merging [info]
+- info: The single rex-cli → rex-fix edge is most likely the CLI dispatcher loading commands/fix.ts. That is a normal command registration, not a layering violation. Treat the fix/ → core/parent-completion.ts coupling described in fix/index.ts as the boundary that matters. [info] (rex-fix)
 
 ### Observations
 
-- High cohesion (1) — files are tightly interconnected [info] (.claude)
-- 31 entry points — wide API surface, consider consolidating exports [warning] (core)
+- Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0) [info] (.claude)
+- 41 entry points — wide API surface, consider consolidating exports [info] (core)
 - High cohesion (1) — files are tightly interconnected [info] (core)
-- High cohesion (1) — files are tightly interconnected [info] (docs)
-- 10 circular dependency chains detected — see imports.json for details [warning]
-- Bidirectional coupling: "rex" ↔ "rex-cli" (113+6 crossings) — consider extracting shared interface [warning]
-- Hub: packages/rex/src/schema/index.ts is imported by 5 zones — cross-cutting dependency [info]
-- Size imbalance: largest zone has 241 files vs smallest with 1 — uneven decomposition [info]
-- Fan-in hotspot: packages/web/src/viewer/hooks/index.ts receives calls from 29 files — high-impact module, changes may have wide ripple effects [warning]
-- 117 entry points — wide API surface, consider consolidating exports [warning] (hench)
-- ... and 52 more
+- 27 circular dependency chains detected — see imports.json for details [warning]
+- Bidirectional coupling: "rex" ↔ "rex-cli" (181+26 crossings) — consider extracting shared interface [warning]
+- Hub: packages/rex/src/store/index.ts is imported by 6 zones — cross-cutting dependency [info]
+- Hub: tests/hidden-child-process-alias.mjs is imported by 8 zones — cross-cutting dependency [info]
+- Size imbalance: largest zone has 346 files vs smallest with 2 — uneven decomposition [info]
+- Fan-in hotspot: packages/web/src/viewer/hooks/index.ts receives calls from 52 files — high-impact module, changes may have wide ripple effects [warning]
+- 12 entry points — wide API surface, consider consolidating exports [info] (graview)
+- ... and 56 more
 
 ### Suggestions
 
 - packages/web/tests/helpers/ contains files from 3 zones (tests-web-helpers, web-server, web-viewer) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Hub function: walkTree in packages/rex/src/core/tree.ts is called from 38 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
+- Hub function: resolveRexPaths in packages/rex/src/store/index.ts is called from 46 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
 - 5 potentially unused exports in packages/core/assistant-assets.js have no incoming calls: getRegistry, getAllSkillBodies, getMcpServer, renderClaudeSkill, renderAllClaudeSkills [warning]
 - 5 potentially unused exports in packages/web/src/viewer/components/prd-tree/index-md-sections.ts have no incoming calls: ProgressTable, ChangesList, InfoSection, SummarySection, SubtasksList [warning]
+- 5 potentially unused exports in packages/web/src/viewer/hooks/use-live.ts have no incoming calls: isAnalysisJob, isDeadRun, countsAsLive, livenessBadge, asLiveSnapshot [warning]
 - 3 potentially unused exports in packages/rex/src/store/folder-tree-mutations.ts have no incoming calls: writeItemDirectory, updateAncestorIndices, batchCreateDirectories [info]
+- 2 potentially unused exports in packages/graview-face/src/model/code.ts have no incoming calls: topZones, coverage [info]
 - 2 potentially unused exports in packages/web/src/server/hench-config-fields.ts have no incoming calls: getConfigValue, setConfigValue [info]
+- 2 potentially unused exports in packages/web/src/viewer/hooks/use-hub-queue.ts have no incoming calls: droppedEntryOf, useHubQueue [info]
 - Potentially unused export: printClaudeSetupSummary in packages/core/claude-integration.js has no incoming calls — verify if still needed [info]
-- Potentially unused export: getEolPatternSet in packages/core/gitattributes-pins.js has no incoming calls — verify if still needed [info]
-- Potentially unused export: detectClaudeBackgroundWait in packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts has no incoming calls — verify if still needed [info]
-- Potentially unused export: anthropicSummaryMessage in packages/hench/src/agent/lifecycle/context-prune.ts has no incoming calls — verify if still needed [info]
-- ... and 16 more
+- ... and 22 more
 
 ## Next Steps
 
@@ -733,61 +815,69 @@ Prioritized work items derived from analysis:
 
 1. **3 related findings: Zone pin target "rex-prd-engine" did not form this analysis…**
 
-1. **Fan-in hotspot: packages/web/src/viewer/hooks/index.ts receives calls from 29 f…**
+1. **7 related findings: "Rex CLI" imports "Rex Fix" on 1 edge(s) while the 5 edge(s…**
+   Files: `packages/rex/src/analyze/acknowledge.ts`, `packages/rex/src/analyze/analyze-shared.ts`, `packages/rex/src/analyze/batch-types.ts`
+
+1. **Fan-in hotspot: packages/web/src/viewer/hooks/index.ts receives calls from 52 f…**
+
+1. **warning: FixItemStatus can drift silently. Add a compile-time assertion (for ex…**
+   Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/fix/index.ts`, `packages/rex/src/fix/tree.ts`
 
 1. **Graph in packages/web/src/viewer/views/graph.ts calls 245 unique functions**
 
 ### Medium Priority
 
-1. **File "packages/web/src/server/routes-rex/index-markdown.ts" is pinned to zone "…**
-   Files: `packages/web/src/cli/index.ts`, `packages/web/src/hub/routes.ts`, `packages/web/src/public.ts`
+1. **3 related findings: "Hench" imports "Tests Hench" on 3 edge(s) while the 15 edg…**
+   Files: `packages/hench/src/agent/analysis/adaptive.ts`, `packages/hench/src/agent/analysis/adversarial-review.ts`, `packages/hench/src/agent/analysis/change-magnitude.ts`
+
+1. **3 related findings: "packages/web/src/shared/index.ts" is imported from 3 zones…**
+   Files: `packages/web/src/cli/index.ts`, `packages/web/src/hub/admission.ts`, `packages/web/src/hub/children.ts`
+
+1. **"packages/hench/tests/helpers/index.ts" is imported from 3 zones (hench, tests-…**
+   Files: `packages/hench/tests/e2e/cli-hints.test.ts`, `packages/hench/tests/e2e/cli-init.test.ts`, `packages/hench/tests/e2e/cross-vendor-run-record-smoke.test.ts`
+
+1. **"Build & CI Scripts" imports "Tests" on 1 edge(s) while the 3 edge(s) between t…**
+   Files: `scripts/backfill-release-tags.mjs`, `scripts/build-iso-skill.mjs`, `scripts/check-dependency-drift.mjs`
+
+1. **File "packages/web/src/landing/landing.ts" is pinned to zone "Web Landing" but …**
+   Files: `packages/web/src/landing/landing.ts`, `packages/web/vitest.config.ts`
+
+1. **2 related findings: "packages/rex/src/public.ts" is production code imported on…**
+   Files: `packages/rex/src/codeowners/plan.ts`, `packages/rex/src/migrations/registry.ts`, `packages/rex/src/migrations/v1-to-v2/index.ts`
 
 1. **File "packages/web/src/viewer/hooks/use-gateway.ts" is pinned to zone "Web View…**
    Files: `packages/web/src/schema/v1.ts`, `packages/web/src/viewer/api.ts`, `packages/web/src/viewer/base-path.ts`
+
+1. **"pr-check.js" exports 1 declaration(s) (runPRCheck) that no file in the project…**
+   Files: `pr-check.js`, `scan_transcripts.py`, `test-token-format.js`
 
 1. **5 potentially unused exports in packages/core/assistant-assets.js have no incom…**
 
 1. **5 potentially unused exports in packages/web/src/viewer/components/prd-tree/ind…**
 
-1. **File "packages/hench/src/store/json.ts" is pinned to zone "Hench" but lives in …**
-   Files: `packages/hench/src/agent/analysis/adaptive.ts`, `packages/hench/src/agent/analysis/adversarial-review.ts`, `packages/hench/src/agent/analysis/change-magnitude.ts`
-
-1. **112 entry points**
-   Files: `packages/rex/scripts/migrate-md-to-frontmatter.mjs`, `packages/rex/src/public.ts`, `packages/rex/src/recommend/conflict-detection.ts`
-
-1. **53 entry points**
-   Files: `packages/web/src/cli/index.ts`, `packages/web/src/hub/routes.ts`, `packages/web/src/public.ts`
-
-1. **163 entry points**
-   Files: `packages/rex/src/analyze/acknowledge.ts`, `packages/rex/src/analyze/analyze-shared.ts`, `packages/rex/src/analyze/batch-types.ts`
-
-1. **139 entry points**
-   Files: `packages/web/src/schema/v1.ts`, `packages/web/src/viewer/api.ts`, `packages/web/src/viewer/base-path.ts`
-
-1. **Zone "hench-2" has a numeric suffix indicating an overflow community**
-   Files: `packages/hench/vitest.config.ts`
-
 ### Low Priority
 
-1. **WalkTree in packages/rex/src/core/tree.ts is called from 38 files (high fan-in …**
+1. **ResolveRexPaths in packages/rex/src/store/index.ts is called from 46 files (hig…**
+
+1. **Zone "Rex Fix" has an unreliable risk reading: only 4 files tracked (minimum 5 …**
+   Files: `packages/rex/src/cli/commands/fix.ts`, `packages/rex/src/fix/index.ts`, `packages/rex/src/fix/tree.ts`
 
 1. **3 potentially unused exports in packages/rex/src/store/folder-tree-mutations.ts…**
 
+1. **2 potentially unused exports in packages/graview-face/src/model/code.ts have no…**
+
 1. **2 potentially unused exports in packages/web/src/server/hench-config-fields.ts …**
+
+1. **2 potentially unused exports in packages/web/src/viewer/hooks/use-hub-queue.ts …**
 
 1. **PrintClaudeSetupSummary in packages/core/claude-integration.js has no incoming …**
 
-1. **GetEolPatternSet in packages/core/gitattributes-pins.js has no incoming calls**
+1. **Mount in packages/graview-face/src/faces/pages.tsx has no incoming calls**
 
-1. **DetectClaudeBackgroundWait in packages/hench/src/agent/lifecycle/adapters/claud…**
+1. **Zone ".Claude Scripts" has an unreliable risk reading: only 2 files tracked (mi…**
+   Files: `.claude/skills/iso-map/scripts/iso-map.mjs`, `docs/.vitepress/config.ts`
 
-1. **AnthropicSummaryMessage in packages/hench/src/agent/lifecycle/context-prune.ts …**
-
-1. **ParseLegacyDocument in packages/rex/src/store/legacy-markdown-parser.ts has no …**
-
-1. **JudgePartitionMap in packages/sourcevision/src/analyzers/partition-review.ts ha…**
-
-1. **Zone "Web Server-Viewer Bridge" has an unreliable risk reading: only 4 files tr…**
+1. **Zone "Web" has an unreliable risk reading: only 3 files tracked (minimum 5 need…**
    Files: `packages/web/build.js`, `packages/web/dev.js`, `packages/web/playwright.config.ts`
 
 ## File Inventory
@@ -795,7 +885,7 @@ Prioritized work items derived from analysis:
 | Path | Role | Archetype | Zone |
 |------|------|-----------|------|
 | `.claude/skills/iso-map/scripts/iso-map.mjs` | build |  | .claude |
-| `docs/.vitepress/config.ts` | docs |  | docs |
+| `docs/.vitepress/config.ts` | docs |  | .claude |
 | `packages/core/assistant-assets.js` | source | utility | core |
 | `packages/core/assistant-integration.js` | source | utility | core |
 | `packages/core/bin/hench.js` | source | utility | core |
@@ -811,6 +901,7 @@ Prioritized work items derived from analysis:
 | `packages/core/cli-timeout.js` | source | utility | core |
 | `packages/core/cli.js` | source | entrypoint | core |
 | `packages/core/codex-integration.js` | source | utility | core |
+| `packages/core/command-effects.js` | source | utility | core |
 | `packages/core/commit-trailers.js` | source | utility | core |
 | `packages/core/config.js` | source | utility | core |
 | `packages/core/export.js` | source | utility | core |
@@ -820,9 +911,13 @@ Prioritized work items derived from analysis:
 | `packages/core/gitignore.js` | source | utility | core |
 | `packages/core/help.js` | source | utility | core |
 | `packages/core/init-llm.js` | source | utility | core |
+| `packages/core/init-summary.js` | source | utility | core |
 | `packages/core/install-identity.js` | source | utility | core |
+| `packages/core/layout.js` | source | utility | core |
 | `packages/core/llm-model-catalog.js` | source | utility | core |
 | `packages/core/mcp-shim.js` | source | utility | core |
+| `packages/core/migrate-chain.js` | source | utility | core |
+| `packages/core/migrate-layout.js` | source | utility | core |
 | `packages/core/narration-status.js` | source | utility | core |
 | `packages/core/pair-programming.js` | source | utility | core |
 | `packages/core/readme-generator.js` | source | utility | core |
@@ -830,82 +925,168 @@ Prioritized work items derived from analysis:
 | `packages/core/refresh-plan.js` | source | utility | core |
 | `packages/core/refresh-validate.js` | source | utility | core |
 | `packages/core/resolve-existing-dir.js` | source | utility | core |
+| `packages/core/run-summary.js` | source | utility | core |
 | `packages/core/sample-app.js` | source | utility | core |
 | `packages/core/self-heal-confirm.js` | source | utility | core |
 | `packages/core/stale-check.js` | source | utility | core |
 | `packages/core/update-check.js` | source | utility | core |
 | `packages/core/web.js` | source | utility | core |
 | `packages/core/win-spawn.js` | source | utility | core |
-| `packages/hench/src/agent/analysis/adaptive.ts` | source |  | hench |
+| `packages/graview-face/bin/serve.js` | source | entrypoint | graview-face |
+| `packages/graview-face/dev/ndx-door.ts` | source |  | graview-face |
+| `packages/graview-face/scripts/a11y.mjs` | build |  | graview-face |
+| `packages/graview-face/scripts/graview.mjs` | build |  | graview-face |
+| `packages/graview-face/scripts/make-fixture.mjs` | build |  | graview-face |
+| `packages/graview-face/scripts/sync-data.mjs` | build |  | graview-face |
+| `packages/graview-face/src/app.ts` | source | entrypoint | graview-face |
+| `packages/graview-face/src/faces/pages.tsx` | source | component | graview-face |
+| `packages/graview-face/src/faces/scene.tsx` | source | component | graview-face |
+| `packages/graview-face/src/main.tsx` | source | entrypoint | graview-face |
+| `packages/graview-face/src/model/code.ts` | source | model | graview-face |
+| `packages/graview-face/src/model/graph.ts` | source | model | graview-face |
+| `packages/graview-face/src/model/spend.ts` | source | model | graview-face |
+| `packages/graview-face/src/model/types.ts` | source | types | graview-face |
+| `packages/graview-face/src/model/work.ts` | source | model | graview-face |
+| `packages/graview-face/src/sync/engine.ts` | source | service | graview-face |
+| `packages/graview-face/src/sync/mapping.ts` | source | utility | graview-face |
+| `packages/graview-face/src/sync/ndx-system.ts` | source | service | graview-face |
+| `packages/graview-face/src/ui/css.ts` | source | component | graview-face |
+| `packages/graview-face/src/ui/declared.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/kit.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/pages.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/scheme.ts` | source | component | graview-face |
+| `packages/graview-face/src/ui/screens/attention.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/screens/capability.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/screens/change.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/screens/generic.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/screens/home.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/screens/run.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/screens/zone.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/shell.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/sync-status.tsx` | source | component | graview-face |
+| `packages/graview-face/src/ui/views.tsx` | source | component | graview-face |
+| `packages/graview-face/tests/door.test.ts` | test |  | tests |
+| `packages/graview-face/tests/places.test.ts` | test |  | tests |
+| `packages/graview-face/tests/sync.test.ts` | test |  | tests |
+| `packages/graview-face/vite.config.ts` | config |  | graview-face |
+| `packages/graview-face/vitest.config.ts` | config |  | graview-face |
+| `packages/graview/src/canonical.ts` | source | utility | graview |
+| `packages/graview/src/cli/index.ts` | source | entrypoint | graview |
+| `packages/graview/src/document.ts` | source | schema | graview |
+| `packages/graview/src/emit.ts` | source | utility | graview |
+| `packages/graview/src/graview-bin.ts` | source | entrypoint | graview |
+| `packages/graview/src/hench-gateway.ts` | source | gateway | graview |
+| `packages/graview/src/hub.ts` | source | service | graview |
+| `packages/graview/src/llm-gateway.ts` | source | gateway | graview |
+| `packages/graview/src/public.ts` | source | entrypoint | graview |
+| `packages/graview/src/rex-gateway.ts` | source | gateway | graview |
+| `packages/graview/src/snapshot-file.ts` | source | utility | graview |
+| `packages/graview/src/snapshot.ts` | source | service | graview |
+| `packages/graview/src/sources/code.ts` | source | service | graview |
+| `packages/graview/src/sources/proposed.ts` | source | service | graview |
+| `packages/graview/src/sources/requirements.ts` | source | service | graview |
+| `packages/graview/src/sources/runs.ts` | source | service | graview |
+| `packages/graview/src/sourcevision-gateway.ts` | source | gateway | graview |
+| `packages/graview/src/types.ts` | source | types | graview |
+| `packages/graview/tests/helpers/project.ts` | test |  | tests-packages |
+| `packages/graview/tests/integration/emit.test.ts` | test |  | tests-packages |
+| `packages/graview/tests/unit/declaration.test.ts` | test |  | tests-graview-unit |
+| `packages/graview/tests/unit/document.test.ts` | test |  | tests-graview-unit |
+| `packages/graview/tests/unit/graview-bin.test.ts` | test |  | tests-graview-unit |
+| `packages/graview/tests/unit/hub.test.ts` | test |  | tests-graview-unit |
+| `packages/graview/tests/unit/snapshot-file.test.ts` | test |  | tests-graview-unit |
+| `packages/graview/tests/unit/snapshot.test.ts` | test |  | tests-graview-unit |
+| `packages/graview/vitest.config.ts` | config |  | graview |
+| `packages/hench/src/agent/analysis/adaptive.ts` | source | service | hench |
 | `packages/hench/src/agent/analysis/adversarial-review.ts` | source |  | hench |
-| `packages/hench/src/agent/analysis/change-magnitude.ts` | source | utility | hench |
-| `packages/hench/src/agent/analysis/git-changed-files.ts` | source | utility | hench |
+| `packages/hench/src/agent/analysis/change-magnitude.ts` | source | service | hench |
+| `packages/hench/src/agent/analysis/git-changed-files.ts` | source | service | hench |
 | `packages/hench/src/agent/analysis/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/agent/analysis/livelock.ts` | source | utility | hench |
+| `packages/hench/src/agent/analysis/livelock.ts` | source | service | hench |
 | `packages/hench/src/agent/analysis/plan-only-detection.ts` | source | utility | hench |
-| `packages/hench/src/agent/analysis/review-repairs.ts` | source |  | hench |
+| `packages/hench/src/agent/analysis/review-repairs.ts` | source | utility | hench |
 | `packages/hench/src/agent/analysis/review.ts` | source |  | hench |
 | `packages/hench/src/agent/analysis/spin.ts` | source |  | hench |
-| `packages/hench/src/agent/analysis/stuck.ts` | source |  | hench |
+| `packages/hench/src/agent/analysis/stuck.ts` | source | utility | hench |
 | `packages/hench/src/agent/analysis/summary.ts` | source | utility | hench |
 | `packages/hench/src/agent/analysis/workflow.ts` | source |  | hench |
 | `packages/hench/src/agent/completion.ts` | source |  | hench |
 | `packages/hench/src/agent/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts` | source | service | hench |
-| `packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts` | source | service | hench |
+| `packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/adapters/index.ts` | source | entrypoint | hench |
+| `packages/hench/src/agent/lifecycle/agent-effort.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/background-wait.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/batch-divider.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/cli-loop.ts` | source | service | hench |
 | `packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/commit-msg-watcher.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/commit-subject.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/commit-trailers.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/context-prune.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/event-accumulator.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/fail-forward.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/gate-only-retry.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/heartbeat.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/loop.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/loop.ts` | source | service | hench |
 | `packages/hench/src/agent/lifecycle/orientation.ts` | source |  | hench |
+| `packages/hench/src/agent/lifecycle/pair-review-rounds.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/plan-mode-prompt.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/primer.ts` | source |  | hench |
+| `packages/hench/src/agent/lifecycle/pre-run-commit-subject.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/primer.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/prior-attempt-work.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/prompt-cache.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/prompt-diagnostics.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/read-only-refusal.ts` | source |  | hench |
 | `packages/hench/src/agent/lifecycle/session-cache.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/shared.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/spawn-budget.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/task-completion-gate.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/task-display.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/task-display.ts` | source |  | hench |
 | `packages/hench/src/agent/lifecycle/token-budget.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/token-usage.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts` | source |  | hench |
 | `packages/hench/src/agent/lifecycle/vendor-adapter.ts` | source | utility | hench |
-| `packages/hench/src/agent/planning/brief.ts` | source | service | hench |
+| `packages/hench/src/agent/planning/brief.ts` | source | utility | hench |
 | `packages/hench/src/agent/planning/cli-identity.ts` | source | utility | hench |
-| `packages/hench/src/agent/planning/context-caps.ts` | source | types | hench |
-| `packages/hench/src/agent/planning/prompt.ts` | source |  | hench |
+| `packages/hench/src/agent/planning/context-caps.ts` | source | utility | hench |
+| `packages/hench/src/agent/planning/prompt.ts` | source | utility | hench |
+| `packages/hench/src/agent/planning/work-selection.ts` | source | service | hench |
+| `packages/hench/src/agent/token-cost.ts` | source | utility | hench |
+| `packages/hench/src/cli/commands/agent-model.ts` | source | cli-command | hench |
+| `packages/hench/src/cli/commands/backfill-commits.ts` | source | cli-command | hench |
+| `packages/hench/src/cli/commands/cache.ts` | source | cli-command | hench |
+| `packages/hench/src/cli/commands/check-runs.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/config.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/consecutive-failures.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/constants.ts` | source | types | hench |
 | `packages/hench/src/cli/commands/init.ts` | source | cli-command | hench |
+| `packages/hench/src/cli/commands/provider-support.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/record.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/review.ts` | source | cli-command | hench |
+| `packages/hench/src/cli/commands/run-resolve.ts` | source | cli-command | hench |
+| `packages/hench/src/cli/commands/run-settings.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/run.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/show.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/status.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/task-lookup.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/template.ts` | source | cli-command | hench |
+| `packages/hench/src/cli/commands/trust.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/usage.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/validate-tokens.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/errors.ts` | source | utility | hench |
 | `packages/hench/src/cli/help.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/index.ts` | source | entrypoint | hench |
 | `packages/hench/src/cli/output.ts` | source | utility | hench |
+| `packages/hench/src/cli/session-report.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/slug-migration-offer.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/token-logging.ts` | source | cli-command | hench |
-| `packages/hench/src/guard/commands.ts` | source | cli-command | hench-guard |
-| `packages/hench/src/guard/contracts.ts` | source | schema | hench-guard |
-| `packages/hench/src/guard/index.ts` | source | entrypoint | hench-guard |
-| `packages/hench/src/guard/paths.ts` | source | utility | hench-guard |
-| `packages/hench/src/guard/policy.ts` | source | service | hench-guard |
+| `packages/hench/src/guard/commands.ts` | source | cli-command | hench |
+| `packages/hench/src/guard/contracts.ts` | source | schema | hench |
+| `packages/hench/src/guard/env.ts` | source | config | hench |
+| `packages/hench/src/guard/index.ts` | source | entrypoint | hench |
+| `packages/hench/src/guard/paths.ts` | source | utility | hench |
+| `packages/hench/src/guard/policy.ts` | source | utility | hench |
 | `packages/hench/src/prd/llm-gateway.ts` | source | gateway | hench |
 | `packages/hench/src/prd/rex-gateway.ts` | source | gateway | hench |
 | `packages/hench/src/process/actor-identity.ts` | source | utility | hench |
@@ -914,6 +1095,7 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/process/concurrent-execution-metrics.ts` | source | utility | hench |
 | `packages/hench/src/process/exec-shell.ts` | source | utility | hench |
 | `packages/hench/src/process/exec.ts` | source | utility | hench |
+| `packages/hench/src/process/git-ancestry.ts` | source | utility | hench |
 | `packages/hench/src/process/git-mutation.ts` | source | utility | hench |
 | `packages/hench/src/process/git-origin.ts` | source | utility | hench |
 | `packages/hench/src/process/lifecycle.ts` | source | utility | hench |
@@ -922,19 +1104,20 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/process/memory-throttle.ts` | source | utility | hench |
 | `packages/hench/src/process/pool.ts` | source | utility | hench |
 | `packages/hench/src/process/process-memory-tracker.ts` | source | utility | hench |
-| `packages/hench/src/process/task-claims.ts` | source | service | hench |
+| `packages/hench/src/process/run-liveness.ts` | source | utility | hench |
+| `packages/hench/src/process/task-claims.ts` | source | utility | hench |
 | `packages/hench/src/process/toolchain-identity.ts` | source | utility | hench |
 | `packages/hench/src/public.ts` | source | entrypoint | hench |
 | `packages/hench/src/queue/execution-queue.ts` | source | utility | hench |
 | `packages/hench/src/queue/format.ts` | source | utility | hench |
 | `packages/hench/src/queue/priority-scheduler.ts` | source | utility | hench |
-| `packages/hench/src/quota/claude-quota.ts` | source | service | hench |
-| `packages/hench/src/quota/codex-quota.ts` | source | service | hench |
+| `packages/hench/src/quota/claude-quota.ts` | source | utility | hench |
+| `packages/hench/src/quota/codex-quota.ts` | source | utility | hench |
 | `packages/hench/src/quota/codex-token-retrieval.ts` | source | service | hench |
 | `packages/hench/src/quota/format.ts` | source | utility | hench |
 | `packages/hench/src/quota/google-quota.ts` | source | service | hench |
 | `packages/hench/src/quota/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/quota/token-validation-hook.ts` | source | hook | hench |
+| `packages/hench/src/quota/token-validation-hook.ts` | source | service | hench |
 | `packages/hench/src/quota/token-validation.ts` | source | utility | hench |
 | `packages/hench/src/quota/types.ts` | source | types | hench |
 | `packages/hench/src/schema/index.ts` | source | entrypoint | hench |
@@ -944,17 +1127,21 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/store/artifacts.ts` | source | store | hench |
 | `packages/hench/src/store/config.ts` | source | store | hench |
 | `packages/hench/src/store/file-classifier.ts` | source | store | hench |
+| `packages/hench/src/store/paths.ts` | source | store | hench |
 | `packages/hench/src/store/project-config.ts` | source | store | hench |
+| `packages/hench/src/store/repoint-runs.ts` | source | store | hench |
 | `packages/hench/src/store/run-archiver.ts` | source | store | hench |
 | `packages/hench/src/store/run-change-detector.ts` | source | store | hench |
+| `packages/hench/src/store/run-events.ts` | source | store | hench |
 | `packages/hench/src/store/run-log.ts` | source | store | hench |
 | `packages/hench/src/store/run-retention-scheduler.ts` | source | store | hench |
 | `packages/hench/src/store/run-retention.ts` | source | store | hench |
 | `packages/hench/src/store/run-token-index.ts` | source | store | hench |
 | `packages/hench/src/store/runs.ts` | source | store | hench |
 | `packages/hench/src/store/session-usage.ts` | source | store | hench |
-| `packages/hench/src/store/suggestions.ts` | source | store | hench |
+| `packages/hench/src/store/suggestions.ts` | source | store | graview |
 | `packages/hench/src/store/templates.ts` | source | store | hench |
+| `packages/hench/src/store/trust.ts` | source | store | hench |
 | `packages/hench/src/tools/cleanup-transformations.ts` | source | utility | hench |
 | `packages/hench/src/tools/contracts.ts` | source | types | hench |
 | `packages/hench/src/tools/dead-code-analyzer.ts` | source | utility | hench |
@@ -963,21 +1150,26 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/tools/files.ts` | source | utility | hench |
 | `packages/hench/src/tools/git.ts` | source | utility | hench |
 | `packages/hench/src/tools/pr-status-trailers.ts` | source | utility | hench |
-| `packages/hench/src/tools/rex.ts` | source | service | hench |
+| `packages/hench/src/tools/rex.ts` | source | utility | hench |
 | `packages/hench/src/tools/shell.ts` | source | utility | hench |
 | `packages/hench/src/tools/test-command-resolver.ts` | source | utility | hench |
+| `packages/hench/src/tools/test-gate-template.ts` | source | utility | hench |
 | `packages/hench/src/tools/test-runner.ts` | source | utility | hench |
 | `packages/hench/src/types/index.ts` | source | entrypoint | hench |
 | `packages/hench/src/types/output.ts` | source | utility | hench |
 | `packages/hench/src/validation/changed-files.ts` | source | utility | hench |
-| `packages/hench/src/validation/completion.ts` | source | utility | hench |
+| `packages/hench/src/validation/completion.ts` | source | schema | hench |
 | `packages/hench/tests/e2e/cli-hints.test.ts` | test |  | tests-hench |
 | `packages/hench/tests/e2e/cli-init.test.ts` | test |  | tests-hench |
 | `packages/hench/tests/e2e/cross-vendor-run-record-smoke.test.ts` | test |  | tests-hench |
+| `packages/hench/tests/e2e/run-flag-conflicts.test.ts` | test |  | tests-hench |
 | `packages/hench/tests/fixtures/cross-vendor-runtime.ts` | test |  | tests-hench |
 | `packages/hench/tests/helpers/index.ts` | test |  | tests-hench |
 | `packages/hench/tests/helpers/posix-shell.ts` | test |  | tests-hench |
 | `packages/hench/tests/helpers/scripted-claude-cli.ts` | test |  | tests-hench |
+| `packages/hench/tests/integration/agent-commit-item-trailer-cli-loop.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/agent-commit-item-trailer.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/agent-model-override.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/background-wait-codex.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/background-wait-resume.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/background-wait-spawn.test.ts` | test |  | tests-hench-integration |
@@ -987,43 +1179,60 @@ Prioritized work items derived from analysis:
 | `packages/hench/tests/integration/cli-name-propagation.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/codex-flag-surface.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/codex-livelock-progress.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/codex-resume-contract.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/codex-token-accounting.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/codex-token-retrieval.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/commit-co-authored-by.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/commit-contains-all-run-work.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/commit-msg-timer.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/commit-prompt.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/commit-trailer-block.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/completed-task-exclusion.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/completion-metadata-commit.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/cross-vendor-init-smoke.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/dry-run-fresh-keeps-session-cache.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/dry-run-reset-deferred.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/failover-loop.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/fork-lift-wiring.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/full-test-gate-blocking.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/gate-changed-files.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/gate-holds-completion.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/gate-only-retry.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/gemini-tool-loop.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/git-mutation-failures.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/layout-routing.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/livelock-cli-spawn.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/livelock-detection.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/local-tool-loop.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/loop-timer-expiry-stall.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/mcp-registration-preflight.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/missing-review-gate.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/ndx-layout-prd-commit.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/pair-review.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/plan-only-completion.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/prd-reset.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/prd-tree-conformance-gate.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/prd-tree-conformance-per-iteration.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/pre-run-gate-self-block.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/pre-run-gate-stash-discard.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/quota-log-output.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/read-only-refusal-retry.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/recovery-commands-shell-exec.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/registry-provider-resolution.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/repoint-runs.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/reset-deferred-pre-run-gate.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/review-attended-queue.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/review-background-resume.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/review-dedupe-dir.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/review-deferred-capture.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/review-settings.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/rex-gateway-pipeline.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/rollback-config.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/rollback-prompt.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/rollback.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/rolling-window-multiline.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/run-per-task-settings.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/run-resolve.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/self-heal-codex-batch.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/self-heal-tag-scoping.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/sigint-prompt.test.ts` | test |  | tests-hench-integration |
@@ -1033,14 +1242,26 @@ Prioritized work items derived from analysis:
 | `packages/hench/tests/integration/store-roundtrip.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/stream-color-reset.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/task-claims-selection.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/task-review-settings.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/task-run-settings.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/test-gate-flaky-rerun.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/test-gate-inconclusive.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/test-gate-kill-tree.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/test-gate-message-diagnostics.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/test-gate-template.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/test-gate-timeout-config.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/test-gate.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/token-logging-parity.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/tree-meta-commit-path.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/uncommitted-work-completion.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/v2-applied-completion-kept.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/v2-brief.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/v2-explicit-task-claims.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/v2-inbox-refusal.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/v2-status-completion.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/v2-task-less-change.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/v2-work-selection.test.ts` | test |  | tests-hench-integration |
+| `packages/hench/tests/integration/vendor-cli-env.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/withdraw-completion-ancestors.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/worktree-mcp-pinning.test.ts` | test |  | tests-hench-integration |
 | `packages/hench/tests/integration/worktree-mcp-run-wiring.test.ts` | test |  | tests-hench-integration |
@@ -1054,6 +1275,7 @@ Prioritized work items derived from analysis:
 | `packages/hench/tests/unit/agent/batch-chain.test.ts` | test |  | tests-hench-unit |
 | `packages/hench/tests/unit/agent/batch-divider.test.ts` | test |  | tests-hench-unit |
 | `packages/hench/tests/unit/agent/brief.test.ts` | test |  | tests-hench-unit |
+| `packages/hench/tests/unit/agent/cache-inventory.test.ts` | test |  | tests-hench-unit |
 | `packages/hench/tests/unit/agent/claude-cli-adapter.test.ts` | test |  | tests-hench-unit |
 | `packages/hench/tests/unit/agent/cli-close-error.test.ts` | test |  | tests-hench-unit |
 | `packages/hench/tests/unit/agent/cli-identity.test.ts` | test |  | tests-hench-unit |
@@ -1062,137 +1284,5 @@ Prioritized work items derived from analysis:
 | `packages/hench/tests/unit/agent/codex-cli-token-parser.test.ts` | test |  | tests-hench-unit |
 | `packages/hench/tests/unit/agent/codex-normalization.test.ts` | test |  | tests-hench-unit |
 | `packages/hench/tests/unit/agent/codex-structured-events.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/completion.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/context-caps.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/cross-vendor-parity.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/event-accumulator.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/event-persistence.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/event-pipeline-wiring.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/fork-spawn-wiring.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/git-changed-files.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/go-prompt.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/heartbeat.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/lifecycle/background-wait.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/lifecycle/co-authored-by-trailer.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/lifecycle/commit-msg-watcher.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/lifecycle/context-prune.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/lifecycle/pre-run-commit-gate.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/lifecycle/pre-run-commit-message.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/lifecycle/prompt-cache.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/lifecycle/rollback-prompt-message.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/lifecycle/task-completion-gate.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/lifecycle/uncommitted-work-gate.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/light-tier-contracts.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/loop.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/no-unscoped-git-suggestions.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/orientation.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/plan-mode-prompt.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/plan-only-detection.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/pre-run-gate-own-state.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/primer.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/prompt-delivery-adapters.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/prompt-envelope-parity.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/prompt-envelope-regression.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/prompt-non-redundancy.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/prompt-parity.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/prompt.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/retry-resume.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/review-gate-rollback.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/review-repairs.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/review-token-usage.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/review.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/run-record-parity.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/self-heal-codex-audit.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/session-cache.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/shared-lifecycle.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/spawn-budget.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/spin-detection.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/stuck.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/summary.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/task-completion-advancement.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/task-display.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/task-failure.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/token-budget.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/token-tracking.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/token-usage-regression.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/token-usage.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/vendor-adapter.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/agent/workflow.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/config.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/constants.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/review-pending.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/run-colors.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/run-consecutive-failures.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/run-epic-by-epic.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/run-epic.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/run-loop.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/run-model-resolution.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/run-outcome-summary.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/run-tag-filter-summary.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/show-deleted-task.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/show-diagnostics.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/commands/task-lookup.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/errors.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/help.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/output.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/record.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/token-logging.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/cli/usage-mark.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/guard/commands.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/guard/guard-integration.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/guard/paths.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/guard/policy.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/helpers/cleanup-project-dir.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/helpers/git-fixture-repo.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/helpers/scripted-claude-cli.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/prd/rex-gateway.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/prd/self-heal-task-selector.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/actor-identity.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/agent-mcp-config.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/claude-mcp-registration.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/concurrent-execution-metrics.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/exec.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/git-mutation.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/git-origin.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/lifecycle.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/limiter.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/memory-monitor.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/memory-throttle.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/pool.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/process-memory-tracker.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/process/toolchain-identity.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/queue/execution-queue.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/queue/format.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/queue/priority-scheduler.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/quota/claude-quota.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/quota/codex-model-match.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/quota/codex-quota.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/quota/codex-session-auth-notice.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/quota/google-quota.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/quota/quota-format.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/quota/quota-types.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/quota/token-validation.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/schema/go-guard-defaults.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/schema/run-record-schema-drift.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/schema/templates.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/schema/validate.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/artifacts.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/claude-config.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/config.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/file-classifier.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/project-config.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/run-archiver.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/run-change-detector.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/run-compressed-reads.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/run-log.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/run-record-field-persistence.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/run-retention-scheduler.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/run-retention.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/run-review-roundtrip.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/run-token-index.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/session-usage.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/suggestions.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/store/templates.test.ts` | test |  | tests-hench-unit |
-| `packages/hench/tests/unit/tools/cleanup-transformations.test.ts` | test |  | tests-hench-unit |
 
-_1667 of 2067 files not listed (table capped at 400 rows). Use the sourcevision `search_files` or `get_file_info` tools for the rest._
+_2380 of 2780 files not listed (table capped at 400 rows). Use the sourcevision `search_files` or `get_file_info` tools for the rest._

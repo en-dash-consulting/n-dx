@@ -1,6 +1,6 @@
 {
   "id": "core/core",
-  "name": "Core",
+  "name": "Assistant Integration",
   "description": "5 files, primarily JavaScript",
   "files": [
     "packages/core/assistant-assets.js",
@@ -16,8 +16,8 @@
     "packages/core/cli-identity.js",
     "packages/core/codex-integration.js"
   ],
-  "cohesion": 0.74,
-  "coupling": 0.26,
+  "cohesion": 0.64,
+  "coupling": 0.36,
   "fileCount": 5,
-  "lineCount": 1852
+  "lineCount": 1876
 }

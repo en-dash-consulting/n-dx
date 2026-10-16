@@ -1,0 +1,31 @@
+{
+  "id": "llm-client/runtime-execution",
+  "name": "Runtime Execution",
+  "description": "9 files, primarily TypeScript",
+  "files": [
+    "packages/llm-client/src/cli-log.ts",
+    "packages/llm-client/src/codex-cli-provider.ts",
+    "packages/llm-client/src/exec.ts",
+    "packages/llm-client/src/interrupt-forwarding.ts",
+    "packages/llm-client/src/process-tree.ts",
+    "packages/llm-client/src/prompt-diagnostics.ts",
+    "packages/llm-client/src/runtime-contract.ts",
+    "packages/llm-client/src/token-usage.ts",
+    "packages/llm-client/src/workspace-roots.ts"
+  ],
+  "entryPoints": [
+    "packages/llm-client/src/cli-log.ts",
+    "packages/llm-client/src/codex-cli-provider.ts",
+    "packages/llm-client/src/exec.ts",
+    "packages/llm-client/src/interrupt-forwarding.ts",
+    "packages/llm-client/src/process-tree.ts",
+    "packages/llm-client/src/prompt-diagnostics.ts",
+    "packages/llm-client/src/runtime-contract.ts",
+    "packages/llm-client/src/token-usage.ts",
+    "packages/llm-client/src/workspace-roots.ts"
+  ],
+  "cohesion": 0.39,
+  "coupling": 0.61,
+  "fileCount": 9,
+  "lineCount": 4514
+}

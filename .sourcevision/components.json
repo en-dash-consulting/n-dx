@@ -1,6 +1,310 @@
 {
   "components": [
     {
+      "file": "packages/graview-face/src/faces/scene.tsx",
+      "name": "SceneApp",
+      "kind": "function",
+      "line": 15,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/declared.tsx",
+      "name": "Block",
+      "kind": "function",
+      "line": 85,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/declared.tsx",
+      "name": "Blocks",
+      "kind": "function",
+      "line": 75,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/declared.tsx",
+      "name": "DeclaredBlocks",
+      "kind": "function",
+      "line": 53,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/declared.tsx",
+      "name": "DeclaredList",
+      "kind": "function",
+      "line": 136,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Badge",
+      "kind": "function",
+      "line": 103,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Empty",
+      "kind": "function",
+      "line": 128,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Facts",
+      "kind": "function",
+      "line": 198,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Grid",
+      "kind": "function",
+      "line": 141,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Hero",
+      "kind": "function",
+      "line": 62,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Icon",
+      "kind": "function",
+      "line": 40,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "KindIcon",
+      "kind": "function",
+      "line": 49,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Meter",
+      "kind": "function",
+      "line": 112,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Page",
+      "kind": "function",
+      "line": 54,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "RecordCard",
+      "kind": "function",
+      "line": 173,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "RecordRow",
+      "kind": "function",
+      "line": 150,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Rows",
+      "kind": "function",
+      "line": 145,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Section",
+      "kind": "function",
+      "line": 87,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Stat",
+      "kind": "function",
+      "line": 77,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "Stats",
+      "kind": "function",
+      "line": 73,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/kit.tsx",
+      "name": "StatusBadge",
+      "kind": "function",
+      "line": 107,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/attention.tsx",
+      "name": "AttentionScreen",
+      "kind": "function",
+      "line": 9,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/attention.tsx",
+      "name": "InboxScreen",
+      "kind": "function",
+      "line": 38,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/attention.tsx",
+      "name": "SpendScreen",
+      "kind": "function",
+      "line": 55,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/capability.tsx",
+      "name": "CapabilityScreen",
+      "kind": "function",
+      "line": 16,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/change.tsx",
+      "name": "ChangeScreen",
+      "kind": "function",
+      "line": 12,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/change.tsx",
+      "name": "ChangesScreen",
+      "kind": "function",
+      "line": 150,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/generic.tsx",
+      "name": "KindList",
+      "kind": "function",
+      "line": 16,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/generic.tsx",
+      "name": "KindRecord",
+      "kind": "function",
+      "line": 78,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/generic.tsx",
+      "name": "Missing",
+      "kind": "function",
+      "line": 152,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/generic.tsx",
+      "name": "Problems",
+      "kind": "function",
+      "line": 136,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/generic.tsx",
+      "name": "Under",
+      "kind": "function",
+      "line": 116,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/home.tsx",
+      "name": "HomeScreen",
+      "kind": "function",
+      "line": 20,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/run.tsx",
+      "name": "RunScreen",
+      "kind": "function",
+      "line": 18,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/screens/zone.tsx",
+      "name": "ZoneScreen",
+      "kind": "function",
+      "line": 12,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/shell.tsx",
+      "name": "Group",
+      "kind": "function",
+      "line": 32,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/shell.tsx",
+      "name": "Item",
+      "kind": "function",
+      "line": 21,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
+      "file": "packages/graview-face/src/ui/sync-status.tsx",
+      "name": "SyncStatusLine",
+      "kind": "function",
+      "line": 21,
+      "isDefaultExport": false,
+      "conventionExports": []
+    },
+    {
       "file": "packages/sourcevision/tests/fixtures/mixed-go-ts/web/src/components/Header.tsx",
       "name": "Header",
       "kind": "function",
@@ -115,6 +419,690 @@
   ],
   "usageEdges": [
     {
+      "from": "packages/graview-face/src/ui/declared.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Badge",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/declared.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Empty",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/declared.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Grid",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/declared.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Meter",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/declared.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "RecordCard",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/declared.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "RecordRow",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/declared.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Rows",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/declared.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Section",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/declared.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stat",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/declared.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stats",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/attention.tsx",
+      "componentName": "AttentionScreen",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/attention.tsx",
+      "componentName": "InboxScreen",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/attention.tsx",
+      "componentName": "SpendScreen",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/capability.tsx",
+      "componentName": "CapabilityScreen",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/change.tsx",
+      "componentName": "ChangeScreen",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/change.tsx",
+      "componentName": "ChangesScreen",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "KindList",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "KindRecord",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/home.tsx",
+      "componentName": "HomeScreen",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/run.tsx",
+      "componentName": "RunScreen",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/pages.tsx",
+      "to": "packages/graview-face/src/ui/screens/zone.tsx",
+      "componentName": "ZoneScreen",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/attention.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Badge",
+      "usageCount": 8
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/attention.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Empty",
+      "usageCount": 7
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/attention.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Hero",
+      "usageCount": 3
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/attention.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Meter",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/attention.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Page",
+      "usageCount": 3
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/attention.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "RecordRow",
+      "usageCount": 6
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/attention.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Rows",
+      "usageCount": 6
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/attention.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Section",
+      "usageCount": 7
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/attention.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stat",
+      "usageCount": 4
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/attention.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stats",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/declared.tsx",
+      "componentName": "DeclaredBlocks",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Badge",
+      "usageCount": 5
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Empty",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Facts",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Hero",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "KindIcon",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Page",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "RecordRow",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Rows",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Section",
+      "usageCount": 3
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stat",
+      "usageCount": 5
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stats",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "Missing",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "Problems",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/capability.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "Under",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/declared.tsx",
+      "componentName": "DeclaredBlocks",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Badge",
+      "usageCount": 7
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Empty",
+      "usageCount": 5
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Facts",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Hero",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Icon",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Page",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "RecordRow",
+      "usageCount": 7
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Rows",
+      "usageCount": 7
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Section",
+      "usageCount": 6
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stat",
+      "usageCount": 4
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stats",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "StatusBadge",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "Missing",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "Problems",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/change.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "Under",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/declared.tsx",
+      "componentName": "DeclaredBlocks",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Empty",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Facts",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Grid",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Hero",
+      "usageCount": 3
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Icon",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "KindIcon",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Page",
+      "usageCount": 3
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "RecordCard",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "RecordRow",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Rows",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/generic.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Section",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/declared.tsx",
+      "componentName": "DeclaredBlocks",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Badge",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Grid",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Hero",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Icon",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Page",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "RecordRow",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Rows",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Section",
+      "usageCount": 3
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stat",
+      "usageCount": 6
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/home.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stats",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/declared.tsx",
+      "componentName": "DeclaredBlocks",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Badge",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Empty",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Facts",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Hero",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Meter",
+      "usageCount": 3
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Page",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "RecordRow",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Rows",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Section",
+      "usageCount": 4
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stat",
+      "usageCount": 4
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stats",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/run.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "Missing",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Badge",
+      "usageCount": 8
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Empty",
+      "usageCount": 4
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Facts",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Hero",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Meter",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Page",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "RecordRow",
+      "usageCount": 6
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Rows",
+      "usageCount": 6
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Section",
+      "usageCount": 8
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stat",
+      "usageCount": 5
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Stats",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "Missing",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/screens/zone.tsx",
+      "to": "packages/graview-face/src/ui/screens/generic.tsx",
+      "componentName": "Under",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/shell.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Icon",
+      "usageCount": 2
+    },
+    {
+      "from": "packages/graview-face/src/ui/shell.tsx",
+      "to": "packages/graview-face/src/ui/sync-status.tsx",
+      "componentName": "SyncStatusLine",
+      "usageCount": 1
+    },
+    {
+      "from": "packages/graview-face/src/ui/sync-status.tsx",
+      "to": "packages/graview-face/src/ui/kit.tsx",
+      "componentName": "Icon",
+      "usageCount": 2
+    },
+    {
       "from": "tests/fixtures/sv-evals/medium-app/src/client/App.tsx",
       "to": "tests/fixtures/sv-evals/medium-app/src/client/components/Nav.tsx",
       "componentName": "Nav",
@@ -195,6 +1183,16 @@
         {
           "file": "packages/web/src/hub/routes.ts",
           "method": "GET",
+          "path": "/api/hub/new-project"
+        },
+        {
+          "file": "packages/web/src/hub/routes.ts",
+          "method": "GET",
+          "path": "/api/hub/new-project[?parent=&name=]"
+        },
+        {
+          "file": "packages/web/src/hub/routes.ts",
+          "method": "GET",
           "path": "/api/hub/overview"
         },
         {
@@ -211,6 +1209,11 @@
           "file": "packages/web/src/hub/routes.ts",
           "method": "POST",
           "path": "/api/hub/projects"
+        },
+        {
+          "file": "packages/web/src/hub/routes.ts",
+          "method": "POST",
+          "path": "/api/hub/projects/new"
         }
       ]
     },
@@ -306,12 +1309,22 @@
         {
           "file": "packages/web/src/server/routes-commands.ts",
           "method": "GET",
+          "path": "/api/commands/init/preflight"
+        },
+        {
+          "file": "packages/web/src/server/routes-commands.ts",
+          "method": "GET",
           "path": "/api/commands/init/status"
         },
         {
           "file": "packages/web/src/server/routes-commands.ts",
           "method": "GET",
           "path": "/api/commands/manifest"
+        },
+        {
+          "file": "packages/web/src/server/routes-commands.ts",
+          "method": "GET",
+          "path": "/api/commands/recommend/status"
         },
         {
           "file": "packages/web/src/server/routes-commands.ts",
@@ -346,6 +1359,11 @@
         {
           "file": "packages/web/src/server/routes-commands.ts",
           "method": "POST",
+          "path": "/api/commands/ci/stop"
+        },
+        {
+          "file": "packages/web/src/server/routes-commands.ts",
+          "method": "POST",
           "path": "/api/commands/export"
         },
         {
@@ -371,12 +1389,27 @@
         {
           "file": "packages/web/src/server/routes-commands.ts",
           "method": "POST",
+          "path": "/api/commands/recommend/stop"
+        },
+        {
+          "file": "packages/web/src/server/routes-commands.ts",
+          "method": "POST",
           "path": "/api/commands/refresh"
         },
         {
           "file": "packages/web/src/server/routes-commands.ts",
           "method": "POST",
+          "path": "/api/commands/refresh/stop"
+        },
+        {
+          "file": "packages/web/src/server/routes-commands.ts",
+          "method": "POST",
           "path": "/api/commands/reshape"
+        },
+        {
+          "file": "packages/web/src/server/routes-commands.ts",
+          "method": "POST",
+          "path": "/api/commands/reshape/stop"
         },
         {
           "file": "packages/web/src/server/routes-commands.ts",
@@ -396,7 +1429,7 @@
         {
           "file": "packages/web/src/server/routes-commands.ts",
           "method": "POST",
-          "path": "/api/commands/sync"
+          "path": "/api/commands/sv-analyze/stop"
         },
         {
           "file": "packages/web/src/server/routes-commands.ts",
@@ -458,6 +1491,38 @@
           "file": "packages/web/src/server/routes-git.ts",
           "method": "POST",
           "path": "/api/git/discard"
+        },
+        {
+          "file": "packages/web/src/server/routes-git.ts",
+          "method": "POST",
+          "path": "/api/git/ignore"
+        }
+      ]
+    },
+    {
+      "file": "packages/web/src/server/routes-hench-prep.ts",
+      "prefix": "/api/hench/",
+      "handler": "handleHenchPrepRoute",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-hench-prep.ts",
+          "method": "GET",
+          "path": "/api/hench/prep/:taskId"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench-prep.ts",
+          "method": "GET",
+          "path": "/api/hench/ready?limit=N"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench-prep.ts",
+          "method": "POST",
+          "path": "/api/hench/prep/:taskId/preview"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench-prep.ts",
+          "method": "PUT",
+          "path": "/api/hench/prep/:taskId"
         }
       ]
     },
@@ -529,6 +1594,11 @@
         {
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "GET",
+          "path": "/api/hench/prep/:taskId,"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
           "path": "/api/hench/runs"
         },
         {
@@ -540,6 +1610,16 @@
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "GET",
           "path": "/api/hench/runs/:id"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/runs/:id/events"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "GET",
+          "path": "/api/hench/runs/:id/log"
         },
         {
           "file": "packages/web/src/server/routes-hench.ts",
@@ -579,7 +1659,17 @@
         {
           "file": "packages/web/src/server/routes-hench.ts",
           "method": "POST",
+          "path": "/api/hench/execute/check"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "POST",
           "path": "/api/hench/runs/:id/mark-stuck"
+        },
+        {
+          "file": "packages/web/src/server/routes-hench.ts",
+          "method": "POST",
+          "path": "/api/hench/runs/reconcile"
         },
         {
           "file": "packages/web/src/server/routes-hench.ts",
@@ -619,34 +1709,14 @@
       ]
     },
     {
-      "file": "packages/web/src/server/routes-integrations.ts",
-      "prefix": "/api/",
-      "handler": "handleIntegrationRoute",
+      "file": "packages/web/src/server/routes-hub-absent.ts",
+      "prefix": "/api/hub/",
+      "handler": "handleHubAbsentRoute",
       "routes": [
         {
-          "file": "packages/web/src/server/routes-integrations.ts",
-          "method": "DELETE",
-          "path": "/api/integrations/:id/config"
-        },
-        {
-          "file": "packages/web/src/server/routes-integrations.ts",
+          "file": "packages/web/src/server/routes-hub-absent.ts",
           "method": "GET",
-          "path": "/api/integrations"
-        },
-        {
-          "file": "packages/web/src/server/routes-integrations.ts",
-          "method": "GET",
-          "path": "/api/integrations/:id/config"
-        },
-        {
-          "file": "packages/web/src/server/routes-integrations.ts",
-          "method": "GET",
-          "path": "/api/integrations/:id/schema"
-        },
-        {
-          "file": "packages/web/src/server/routes-integrations.ts",
-          "method": "PUT",
-          "path": "/api/integrations/:id/config"
+          "path": "/api/hub/projects"
         }
       ]
     },
@@ -663,6 +1733,47 @@
       ]
     },
     {
+      "file": "packages/web/src/server/routes-live-analyze.ts",
+      "prefix": "/api/live/",
+      "handler": "handleLiveAnalyzeRoute",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-live-analyze.ts",
+          "method": "GET",
+          "path": "/api/live/analyze"
+        },
+        {
+          "file": "packages/web/src/server/routes-live-analyze.ts",
+          "method": "POST",
+          "path": "/api/live/analyze/stop"
+        }
+      ]
+    },
+    {
+      "file": "packages/web/src/server/routes-live-task.ts",
+      "prefix": "/api/live/task/",
+      "handler": "handleLiveTaskRoute",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-live-task.ts",
+          "method": "GET",
+          "path": "/api/live/task/:taskId"
+        }
+      ]
+    },
+    {
+      "file": "packages/web/src/server/routes-live.ts",
+      "prefix": "/api/",
+      "handler": "handleLiveRoute",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-live.ts",
+          "method": "GET",
+          "path": "/api/live"
+        }
+      ]
+    },
+    {
       "file": "packages/web/src/server/routes-llm.ts",
       "prefix": "/api/llm/config",
       "handler": "handleLlmRoute",
@@ -670,7 +1781,17 @@
         {
           "file": "packages/web/src/server/routes-llm.ts",
           "method": "GET",
+          "path": "/api/llm/catalog"
+        },
+        {
+          "file": "packages/web/src/server/routes-llm.ts",
+          "method": "GET",
           "path": "/api/llm/config"
+        },
+        {
+          "file": "packages/web/src/server/routes-llm.ts",
+          "method": "POST",
+          "path": "/api/llm/config/preview"
         },
         {
           "file": "packages/web/src/server/routes-llm.ts",
@@ -698,43 +1819,6 @@
           "file": "packages/web/src/server/routes-merge-graph.ts",
           "method": "GET",
           "path": "/api/prd-origin?path=…"
-        }
-      ]
-    },
-    {
-      "file": "packages/web/src/server/routes-notion.ts",
-      "prefix": "/api/notion/",
-      "handler": "handleNotionRoute",
-      "routes": [
-        {
-          "file": "packages/web/src/server/routes-notion.ts",
-          "method": "DELETE",
-          "path": "/api/notion/config"
-        },
-        {
-          "file": "packages/web/src/server/routes-notion.ts",
-          "method": "GET",
-          "path": "/api/notion/config"
-        },
-        {
-          "file": "packages/web/src/server/routes-notion.ts",
-          "method": "POST",
-          "path": "/api/notion/schema"
-        },
-        {
-          "file": "packages/web/src/server/routes-notion.ts",
-          "method": "POST",
-          "path": "/api/notion/schema/fix"
-        },
-        {
-          "file": "packages/web/src/server/routes-notion.ts",
-          "method": "POST",
-          "path": "/api/notion/test"
-        },
-        {
-          "file": "packages/web/src/server/routes-notion.ts",
-          "method": "PUT",
-          "path": "/api/notion/config"
         }
       ]
     },
@@ -768,6 +1852,23 @@
       ]
     },
     {
+      "file": "packages/web/src/server/routes-rex-settings.ts",
+      "prefix": "/api/rex/",
+      "handler": "handleRexSettingsRoute",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-rex-settings.ts",
+          "method": "GET",
+          "path": "/api/rex/settings"
+        },
+        {
+          "file": "packages/web/src/server/routes-rex-settings.ts",
+          "method": "PUT",
+          "path": "/api/rex/settings"
+        }
+      ]
+    },
+    {
       "file": "packages/web/src/server/routes-rex/index-markdown.ts",
       "prefix": "/api/rex/items/:id/",
       "routes": [
@@ -775,6 +1876,32 @@
           "file": "packages/web/src/server/routes-rex/index-markdown.ts",
           "method": "GET",
           "path": "/api/rex/items/:id/index-md"
+        }
+      ]
+    },
+    {
+      "file": "packages/web/src/server/routes-rex/product.ts",
+      "prefix": "/api/rex/",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-rex/product.ts",
+          "method": "GET",
+          "path": "/api/rex/changes"
+        },
+        {
+          "file": "packages/web/src/server/routes-rex/product.ts",
+          "method": "GET",
+          "path": "/api/rex/product"
+        },
+        {
+          "file": "packages/web/src/server/routes-rex/product.ts",
+          "method": "GET",
+          "path": "/api/rex/product/capability/<id>"
+        },
+        {
+          "file": "packages/web/src/server/routes-rex/product.ts",
+          "method": "POST",
+          "path": "/api/rex/product/edit"
         }
       ]
     },
@@ -915,6 +2042,28 @@
       ]
     },
     {
+      "file": "packages/web/src/server/routes-trust.ts",
+      "prefix": "/api/",
+      "handler": "handleTrustRoute",
+      "routes": [
+        {
+          "file": "packages/web/src/server/routes-trust.ts",
+          "method": "GET",
+          "path": "/api/trust"
+        },
+        {
+          "file": "packages/web/src/server/routes-trust.ts",
+          "method": "POST",
+          "path": "/api/trust/accept"
+        },
+        {
+          "file": "packages/web/src/server/routes-trust.ts",
+          "method": "POST",
+          "path": "/api/trust/revoke"
+        }
+      ]
+    },
+    {
       "file": "packages/web/src/server/routes-validation.ts",
       "prefix": "/api/rex/validate",
       "handler": "handleValidationRoute",
@@ -994,46 +2143,111 @@
     }
   ],
   "summary": {
-    "totalComponents": 14,
+    "totalComponents": 52,
     "totalRouteModules": 0,
-    "totalUsageEdges": 9,
-    "totalServerRoutes": 128,
+    "totalUsageEdges": 123,
+    "totalServerRoutes": 152,
     "routeConventions": {},
     "mostUsedComponents": [
+      {
+        "name": "Section",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 34
+      },
+      {
+        "name": "Badge",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 33
+      },
+      {
+        "name": "Stat",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 30
+      },
+      {
+        "name": "Rows",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 27
+      },
+      {
+        "name": "RecordRow",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 27
+      },
+      {
+        "name": "Empty",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 23
+      },
+      {
+        "name": "Page",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 12
+      },
+      {
+        "name": "Hero",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 12
+      },
+      {
+        "name": "Stats",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 8
+      },
+      {
+        "name": "Meter",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 8
+      },
+      {
+        "name": "Icon",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 8
+      },
+      {
+        "name": "DeclaredBlocks",
+        "file": "packages/graview-face/src/ui/declared.tsx",
+        "usageCount": 5
+      },
+      {
+        "name": "Facts",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 5
+      },
+      {
+        "name": "Missing",
+        "file": "packages/graview-face/src/ui/screens/generic.tsx",
+        "usageCount": 4
+      },
+      {
+        "name": "Grid",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 3
+      },
+      {
+        "name": "Under",
+        "file": "packages/graview-face/src/ui/screens/generic.tsx",
+        "usageCount": 3
+      },
       {
         "name": "Button",
         "file": "tests/fixtures/sv-evals/medium-app/src/client/components/Button.tsx",
         "usageCount": 3
       },
       {
-        "name": "Card",
-        "file": "tests/fixtures/sv-evals/medium-app/src/client/components/Card.tsx",
+        "name": "RecordCard",
+        "file": "packages/graview-face/src/ui/kit.tsx",
         "usageCount": 2
       },
       {
-        "name": "Nav",
-        "file": "tests/fixtures/sv-evals/medium-app/src/client/components/Nav.tsx",
-        "usageCount": 1
+        "name": "Problems",
+        "file": "packages/graview-face/src/ui/screens/generic.tsx",
+        "usageCount": 2
       },
       {
-        "name": "HomePage",
-        "file": "tests/fixtures/sv-evals/medium-app/src/client/pages/HomePage.tsx",
-        "usageCount": 1
-      },
-      {
-        "name": "UserPage",
-        "file": "tests/fixtures/sv-evals/medium-app/src/client/pages/UserPage.tsx",
-        "usageCount": 1
-      },
-      {
-        "name": "App",
-        "file": "tests/fixtures/sv-evals/medium-app/src/client/App.tsx",
-        "usageCount": 1
-      },
-      {
-        "name": "Input",
-        "file": "tests/fixtures/sv-evals/medium-app/src/client/components/Input.tsx",
-        "usageCount": 1
+        "name": "KindIcon",
+        "file": "packages/graview-face/src/ui/kit.tsx",
+        "usageCount": 2
       }
     ],
     "layoutDepth": 0
