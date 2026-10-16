@@ -24,8 +24,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "initialize a .rex/ directory",
     usage: "rex init [dir]",
     description:
-      "Sets up .rex/ with config.json, prd.json, and workflow.md in the target\n" +
-      "directory (defaults to the current directory).",
+      "Sets up .rex/ with config.json, workflow.md, and a PRD tree in the target\n" +
+      "directory (defaults to the current directory). A new project gets an\n" +
+      "empty v2 tree (product/index.md); an existing PRD keeps its layout.",
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
       { flag: "--analyze", description: "Also run SourceVision analysis after init" },
