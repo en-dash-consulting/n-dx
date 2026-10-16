@@ -63,13 +63,13 @@
     "vite": "^8.3.4"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "axe-core": "^4.10.2",
     "graview": "0.1.26",
-    "playwright": "^1.49.0",
+    "playwright": "^1.64.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.4"
   }
 }
