@@ -1552,6 +1552,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     options: [
       { flag: "--item=<id>", description: "Related PRD item ID" },
       { flag: "--detail=\"...\"", description: "Event details" },
+      { flag: "--format=json", description: "Print the written entry as JSON" },
     ],
     examples: [
       { command: "ndx log task_started --item=abc123", description: "Log an event tied to a task" },

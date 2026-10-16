@@ -17,7 +17,9 @@ Fight entropy. Leave the codebase better than you found it.
 5. Run validation and tests.
 6. Call update_task_status to mark the task complete.
 7. Call append_log with what was done, decisions made, and issues encountered.
-   If the rex MCP server is not connected, run \`ndx log <event> --detail="..."\` instead.
+   If the rex MCP server is not connected, run
+   \`ndx log <event> --item=<task-id> --detail="..."\` instead. Without --item the
+   entry is not tied to the task.
 8. Commit changes.
 9. If ending in plan mode, use add_item to break down remaining work with enough
    detail that the next session won't need to re-plan. On a v2 PRD a change

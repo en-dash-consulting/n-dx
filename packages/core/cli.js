@@ -2877,8 +2877,19 @@ async function handleMove(rest) {
  *
  * First positional arg is the event name, not a dir — same shape as `move`.
  */
+/**
+ * Append an execution-log entry.
+ *
+ * `[dir]` cannot go through `resolveDir`, which takes the *last* positional:
+ * here the first positional is the event name, so `ndx log task_started` with
+ * no directory would check the project at `./task_started`. `rex log` reads
+ * the same shape — event first, an optional directory after it — so the args
+ * are forwarded unchanged and only the precondition is resolved here.
+ */
 async function handleLog(rest) {
-  requireInit(process.cwd(), ["rex"]);
+  const positional = rest.filter((a) => !a.startsWith("-"));
+  const dir = positional.length > 1 ? positional[positional.length - 1] : process.cwd();
+  requireInit(dir, ["rex"]);
   await runOrDie(tools.rex, ["log", ...rest]);
   exitWithCleanup(0);
 }
