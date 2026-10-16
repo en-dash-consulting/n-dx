@@ -37,7 +37,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Apply an approved plan in one transaction, re-runnable against a newer tree](./apply-an-approved-plan-in-one.md) | completed |
 | [Apply on an already-v2 tree removes a leftover prd_tree/ only when it matches the plan](./apply-on-an-already-v2-tree-removes-a.md) | completed |
 | [Apply rewrites v1 blockedBy refs to and from capabilities onto their open changes](./apply-rewrites-v1-blockedby-refs-to.md) | completed |
-| [Apply's id check is pinned by a test, and the dry run reports v2 rule errors by rule](./apply-s-id-check-is-pinned-by-a-test.md) | pending |
+| [Apply's id check is pinned by a test, and the dry run reports v2 rule errors by rule](./apply-s-id-check-is-pinned-by-a-test.md) | completed |
 | [Applying a migration plan does not refuse one whose model pass is marked incomplete](./applying-a-migration-plan-does-not.md) | completed |
 | [Chain layout and schema steps in ndx migrate; v1 PRDs warn now and are refused one release later](./chain-layout-and-schema-steps-in-ndx.md) | completed |
 | [Convert stray v1 files and warn on unreachable apply commits](./convert-stray-v1-files-and-warn-on.md) | pending |
