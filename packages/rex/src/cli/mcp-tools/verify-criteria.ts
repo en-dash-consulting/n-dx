@@ -15,16 +15,26 @@ export async function handleVerifyCriteria(
     const config = await store.loadConfig();
     // The test command comes from the repository's own `.rex/config.json`, so
     // running it on a checkout the user has not trusted would execute whatever
-    // that checkout chose. Default off; and even when asked for, tests run
-    // only once the repository's execution config is trusted (`ndx trust`).
+    // that checkout chose. Default off; and even when asked for, a test
+    // command runs only once the user has accepted this exact execution
+    // config (`ndx trust accept .`). `!restricted` is not enough: a plain
+    // command is an info finding, so such a checkout is `baseline` and
+    // unrestricted without anyone having agreed to run it (#686).
+    //
+    // Only a string is a command. The `.n-dx.json` override is merged after
+    // validation, so `test` can arrive as anything; the digest records only a
+    // string, and a non-string stringified into a command line would run
+    // without ever having been accepted.
+    const testCommand = typeof config.test === "string" ? config.test : undefined;
     const requested = args.runTests === true;
     const trust = requested ? evaluateRepoTrust(dir) : null;
-    const runTests = requested && trust !== null && !trust.restricted;
+    const accepted = trust?.record != null && trust.record.digest === trust.config.digest;
+    const runTests = requested && (!testCommand || accepted);
     const result = await verify({
       projectDir: dir,
       items: doc.items,
       taskId: args.taskId,
-      testCommand: config.test,
+      testCommand,
       runTests,
     });
     const payload = requested && !runTests
