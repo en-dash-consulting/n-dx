@@ -57,6 +57,18 @@ export class V1StoreOnV2TreeError extends Error {
   }
 }
 
+/** Size at which `execution-log.jsonl` rotates to `execution-log.1.jsonl`. */
+export const MAX_LOG_BYTES = 1_048_576; // 1 MB
+
+/** Whether the execution log has reached {@link MAX_LOG_BYTES}; false when it does not exist yet. */
+async function overLogSizeLimit(logPath: string): Promise<boolean> {
+  try {
+    return (await stat(logPath)).size >= MAX_LOG_BYTES;
+  } catch {
+    return false; // Not written yet, or unreadable: nothing to rotate.
+  }
+}
+
 export class FileStore implements PRDStore {
   private rexDir: string;
   /**
@@ -848,16 +860,34 @@ export class FileStore implements PRDStore {
     await appendFile(logPath, JSON.stringify(sanitizedEntry) + "\n", "utf-8");
   }
 
-  /** Rotate execution-log.jsonl when it exceeds MAX_LOG_BYTES. */
+  /**
+   * Rotate execution-log.jsonl when it exceeds MAX_LOG_BYTES.
+   *
+   * The rename is taken under a lock and the size re-checked inside it,
+   * because every `rex log` / `ndx log` invocation is a separate short-lived
+   * writer. Unguarded, two processes that both saw an over-size log would
+   * both rename it: the first moves a megabyte of history to `.1`, appends,
+   * and then the second's rename overwrites that `.1` with the one entry the
+   * first just wrote — a full rotation generation lost. Re-reading the size
+   * under the lock means the second process sees the freshly rotated file and
+   * does nothing.
+   *
+   * Appends stay outside the lock: they are `O_APPEND` writes of a single
+   * short line, which the OS already serializes, and paying lock latency on
+   * every log entry would be worse than the problem. A lock that cannot be
+   * taken is not fatal either — the entry is appended to the un-rotated log,
+   * which grows past the threshold but loses nothing.
+   */
   private async maybeRotateLog(logPath: string): Promise<void> {
-    const MAX_LOG_BYTES = 1_048_576; // 1 MB
+    if (!(await overLogSizeLimit(logPath))) return;
     try {
-      const info = await stat(logPath);
-      if (info.size < MAX_LOG_BYTES) return;
-      // Rotate: current → .1 (overwrites any previous .1)
-      await rename(logPath, logPath.replace(".jsonl", ".1.jsonl"));
+      await withLock(`${logPath}.lock`, async () => {
+        // Re-check inside the lock: another writer may have rotated already.
+        if (!(await overLogSizeLimit(logPath))) return;
+        await rename(logPath, logPath.replace(".jsonl", ".1.jsonl"));
+      });
     } catch {
-      // File doesn't exist yet or stat/rename failed — skip rotation
+      // Lock unavailable, or the rename lost a race: skip rotation and append.
     }
   }
 

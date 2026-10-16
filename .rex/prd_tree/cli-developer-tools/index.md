@@ -2,11 +2,12 @@
 id: "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
 level: "epic"
 title: "CLI & Developer Tools"
-status: "pending"
+status: "completed"
 startedAt: "2026-04-02T17:55:36.327Z"
-endedAt: "2026-09-17T03:54:48.313Z"
+completedAt: "2026-10-16T06:09:44.057Z"
+endedAt: "2026-10-16T06:09:44.057Z"
 description: "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline."
-lastModified: "2026-10-06T06:08:58.545Z"
+lastModified: "2026-10-16T06:09:44.648Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -63,6 +64,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [`ndx ci` fails any user project that imports child_process: its allowlist only names n-dx's own files and cannot be configured](./ndx-ci-fails-any-user-project-that.md) | completed |
 | [`ndx ci` reports restricted imports as "skipped" when .n-dx.json is not valid JSON, so configured rules silently stop applying](./ndx-ci-reports-restricted-imports-as.md) | completed |
 | [`ndx ci` restricted-import scan walks gitignored build output and agent worktrees, reporting false violations](./ndx-ci-restricted-import-scan-walks.md) | completed |
+| [`ndx move <id> [dir]` checks the current directory for .rex instead of the directory it names](./ndx-move-id-dir-checks-the-current.md) | completed |
 | [`node packages/core/ci.js .` is a silent no-op, yet `pnpm verify` and CONTRIBUTING.md run the CI gate that way](./node-packages-core-ci-js-is-a-silent.md) | completed |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-carries.md) | completed |
 | [Pre-dispatch project-dir resolution still lets a directory shadow a config key](./pre-dispatch-project-dir-resolution.md) | completed |
