@@ -298,9 +298,11 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
     });
 
     it("refuses a symlink to .rex, a real-path alias of it, and .ndx/ on a legacy layout", async () => {
-      await symlink(join(sourceDir, ".rex"), join(sourceDir, "alias"));
+      // Windows needs a privilege to create a symlink; the alias case runs elsewhere.
+      const viaSymlink = process.platform !== "win32";
+      if (viaSymlink) await symlink(join(sourceDir, ".rex"), join(sourceDir, "alias"));
       for (const target of [
-        join(sourceDir, "alias", "bundle.json"),
+        ...(viaSymlink ? [join(sourceDir, "alias", "bundle.json")] : []),
         join(await realpath(sourceDir), ".rex", "bundle.json"),
         join(sourceDir, ".ndx", "bundle.json"),
       ]) {
