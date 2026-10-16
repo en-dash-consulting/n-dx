@@ -209,6 +209,44 @@ function execShell(
   return execShellCmd(command, { cwd, timeout, maxBuffer: 2 * 1024 * 1024 });
 }
 
+/**
+ * Quote one discovered test path for the shell that will parse it.
+ *
+ * The test command is a shell STRING by contract — it may carry `&&`, a pipe,
+ * or an already-quoted path — so the paths appended to it are parsed by that
+ * shell too. Unquoted, a filename holding `&` or `;` ends the test command and
+ * begins another one. These paths come from walking the repository, so the
+ * attacker only has to land a FILE in it: far easier to slip past review than
+ * an edit to the configured test command, and it runs on the machine of
+ * whoever calls `verify --run-tests` (or MCP `verify_criteria`, where
+ * `runTests` defaults to true).
+ *
+ * Quoting is what keeps a discovered path an argument instead of a command.
+ */
+function quoteShellPath(path: string): string {
+  if (process.platform === "win32") {
+    // cmd.exe: double quotes neutralise & | < > ^ ( ) and spaces. A double
+    // quote is not legal in a Windows filename, so there is none to escape.
+    return `"${path}"`;
+  }
+  // POSIX sh: single quotes neutralise everything, newlines included. Close,
+  // escape, and reopen around an embedded single quote.
+  return `'${path.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * Whether quoting can actually make this path safe on the current platform.
+ *
+ * Only cmd.exe has a residue: it expands `%VAR%` *inside* double quotes, so a
+ * `%` in a filename can still pull an environment value into the command line
+ * — and a value holding `&` would then split it. Quoting cannot close that, so
+ * such a path is dropped rather than run. POSIX single-quoting has no
+ * equivalent hole, and no legitimate test file needs either character.
+ */
+function isShellQuotablePath(path: string): boolean {
+  return process.platform === "win32" ? !path.includes("%") : true;
+}
+
 // ---------------------------------------------------------------------------
 // Main verify pipeline
 // ---------------------------------------------------------------------------
@@ -287,8 +325,8 @@ export async function verify(options: VerifyOptions): Promise<VerifyResult> {
   // 5. Optionally run tests
   let testRun: TestRunResult | undefined;
   if (runTests && testCommand && allTestFiles.size > 0) {
-    const files = [...allTestFiles];
-    const command = `${testCommand} ${files.join(" ")}`;
+    const files = [...allTestFiles].filter(isShellQuotablePath);
+    const command = `${testCommand} ${files.map(quoteShellPath).join(" ")}`;
 
     const startMs = Date.now();
     const { stdout, stderr, exitCode, launched } = await execShell(
