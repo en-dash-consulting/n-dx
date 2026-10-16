@@ -284,7 +284,7 @@
       "infrastructure": []
     }
   },
-  "_initVersion": "0.5.2",
+  "_initVersion": "0.9.0",
   "cli": {
     "timeoutMs": 18000000,
     "name": "n-dx"
