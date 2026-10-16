@@ -399,7 +399,7 @@ export const COMMAND_EFFECTS = {
     reads: [],
     writes: [
       { path: "sample-app/", what: "index.html, style.css, app.js" },
-      { path: "{rex}/prd_tree/sample-app-improvements/", what: "four sample tasks" },
+      { path: "{rex}/changes/", what: "a sample change with two tasks (v1 project: {rex}/prd_tree/sample-app-improvements/)" },
     ],
     llm: [],
     network: [],

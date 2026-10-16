@@ -3411,7 +3411,7 @@ const COMMAND_DISPATCH = new Map([
   ["hub",               handleHub],
   ["mcp",               handleMcpShim],
   ["export",            handleExport],
-  ["install-sample",    handleInstallSample],
+  ["install-sample",    (rest) => handleInstallSample(rest, { rexScript: tools.rex })],
   ["destroy-sample",    handleDestroySample],
   ["config",            handleConfig],
   ["auth",              handleAuth],
