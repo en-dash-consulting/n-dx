@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { computeProductStatus } from "../../../../src/core/product-status.js";
 import { findActionableWork } from "../../../../src/core/change-selection.js";
+import { checkV2TreeHealth } from "../../../../src/core/health.js";
 import { isLossless } from "../../../../src/core/slug-migration.js";
 import type { PRDItem } from "../../../../src/schema/v1.js";
 import { CUT_HELD_AFTER_CUT_HEADING, checkV2Rules, isAppliedChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../../src/schema/v2-rules.js";
@@ -24,15 +25,20 @@ import {
   type V1ToV2Plan,
 } from "../../../../src/migrations/v1-to-v2/apply.js";
 
-// A model the reader cannot read back is a writer or reader defect, not something a v1 tree can
-// provoke on demand, so the read-back is made to report a skipped file when a test asks.
-const readBack = vi.hoisted(() => ({ skip: false }));
+// A model the reader cannot read back, or reads back without a node, is a writer or reader defect,
+// not something a v1 tree can provoke on demand, so the read-back is made to report a skipped file,
+// or to lose the node with id `lose`, when a test asks.
+const readBack = vi.hoisted(() => ({ skip: false, lose: undefined as string | undefined }));
 vi.mock("../../../../src/store/prd-model-reader.js", async (importOriginal) => {
   const real = await importOriginal<typeof import("../../../../src/store/prd-model-reader.js")>();
+  const without = (nodes: RuleNode[], id: string): RuleNode[] =>
+    nodes.filter((n) => n.id !== id).map((n) => (n.children ? { ...n, children: without(n.children, id) } : n));
   return {
     ...real,
     loadPrdModel: async (...args: Parameters<typeof real.loadPrdModel>) => {
-      const model = await real.loadPrdModel(...args);
+      let model = await real.loadPrdModel(...args);
+      const lose = readBack.lose;
+      if (lose !== undefined) model = { ...model, tree: { product: without(model.tree.product, lose), changes: without(model.tree.changes, lose) } };
       if (!readBack.skip) return model;
       return { ...model, warnings: [...model.warnings, { path: "product/area/index.md", message: "unreadable", skipped: true }] };
     },
@@ -423,6 +429,7 @@ describe("applyV1ToV2", () => {
 
   afterEach(() => {
     readBack.skip = false;
+    readBack.lose = undefined;
     rmSync(repo, { recursive: true });
   });
 
@@ -619,6 +626,32 @@ describe("applyV1ToV2", () => {
     const before = snapshot(rexDir);
     await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow();
     expect(snapshot(rexDir)).toEqual(before);
+  });
+
+  it("refuses a tree that reads back without a v1 id, and writes nothing", async () => {
+    const plan = await planOf((await load()).items);
+    const before = snapshot(rexDir);
+    readBack.lose = "s1";
+    const message = /Not every v1 id is in the v2 tree read back, of \d+ items: missing 1 \(s1\)\. Nothing was written\./;
+    await expect(applyV1ToV2(rexDir, plan, { load })).rejects.toThrow(message);
+    await expect(rehearseV1ToV2(rexDir, plan, { load })).rejects.toThrow(message);
+    expect(snapshot(rexDir)).toEqual(before);
+  });
+
+  it("counts the v2 rule findings on the tree it wrote by rule, as rex health finds them", async () => {
+    const plan = await planOf((await load()).items);
+    const rehearsal = await rehearseV1ToV2(rexDir, plan, { load });
+    const outcome = await applyV1ToV2(rexDir, plan, { load });
+    if (rehearsal.status !== "rehearsed" || outcome.status !== "applied") throw new Error("expected a rehearsal and an apply");
+
+    const findings = checkV2TreeHealth((await loadPrdModel(rexDir)).tree);
+    expect(findings.length).toBeGreaterThan(0);
+    const rules = [...new Set(findings.map((f) => f.rule))];
+    const count = (rule: string, severity: string): number => findings.filter((f) => f.rule === rule && f.severity === severity).length;
+    expect([...outcome.rules].sort((a, b) => a.rule.localeCompare(b.rule))).toEqual(
+      rules.sort().map((rule) => ({ rule, errors: count(rule, "error"), warnings: count(rule, "warning") })),
+    );
+    expect(rehearsal.rules).toEqual(outcome.rules);
   });
 
   it("refuses a v1 tree that holds an id twice, and writes nothing", async () => {

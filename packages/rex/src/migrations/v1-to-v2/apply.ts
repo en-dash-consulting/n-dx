@@ -36,7 +36,8 @@
  *
  * Every v1 id ends up as a node or a listed container: checked by count and
  * id ({@link everyV1Id}, through `fingerprintTree` and `isLossless`) before
- * anything is written and again on the tree read back.
+ * anything is written and again on the tree read back. The v2 rules run on
+ * the tree read back and are counted by rule ({@link RuleCount}), not refused.
  *
  * {@link applyV1ToV2} writes under one hold of the PRD lock. The v2 tree is
  * written to a staging folder inside the rex directory and read back; then
@@ -58,10 +59,23 @@ import { mkdir, mkdtemp, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { amendsHash, freeSlug } from "../../core/apply-amendments.js";
+import { checkV2TreeHealth } from "../../core/health.js";
 import { diffFingerprints, fingerprintTree, isLossless, type FingerprintDiff } from "../../core/slug-migration.js";
+import type { StructureHealthThresholds } from "../../schema/index.js";
 import type { PRDItem } from "../../schema/v1.js";
 import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
-import { CUT_CHANGE_BODY_PREFIX, CUT_CHANGE_TITLE, CUT_HELD_AFTER_CUT_HEADING, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
+import {
+  CUT_CHANGE_BODY_PREFIX,
+  CUT_CHANGE_TITLE,
+  CUT_HELD_AFTER_CUT_HEADING,
+  isOpenChange,
+  nodeSpec,
+  specHash,
+  type RuleFinding,
+  type RuleNode,
+  type V2RuleId,
+  type V2Tree,
+} from "../../schema/v2-rules.js";
 import { withLock, type LockOptions } from "../../store/file-lock.js";
 import { parseFolderTree } from "../../store/folder-tree-parser.js";
 import { discoverPRDFiles } from "../../store/prd-discovery.js";
@@ -694,6 +708,31 @@ export function assertUniqueV1Ids(items: readonly PRDItem[]): void {
   );
 }
 
+/** The errors and warnings one v2 rule reports on the migrated tree. */
+export interface RuleCount {
+  rule: V2RuleId;
+  errors: number;
+  warnings: number;
+}
+
+/** Findings per rule, most errors first, then most warnings, then by rule id. */
+export function countRuleFindings(findings: readonly RuleFinding[]): RuleCount[] {
+  const counts = new Map<V2RuleId, RuleCount>();
+  for (const f of findings) {
+    const count = counts.get(f.rule) ?? { rule: f.rule, errors: 0, warnings: 0 };
+    if (f.severity === "error") count.errors++;
+    else count.warnings++;
+    counts.set(f.rule, count);
+  }
+  return [...counts.values()].sort((a, b) => b.errors - a.errors || b.warnings - a.warnings || a.rule.localeCompare(b.rule));
+}
+
+/** What `rex health` reads besides the tree, so the counts apply reports are the ones it gates on. */
+export interface RuleCheckOptions {
+  structureHealth?: StructureHealthThresholds;
+  packageVersion?: string;
+}
+
 function assertEveryV1Id(diff: FingerprintDiff, v1Count: number, where: string): void {
   if (isLossless(diff)) return;
   const parts = [
@@ -751,11 +790,20 @@ export interface ApplyV1ToV2Options {
   /** Reads the v1 tree; called under the PRD lock. */
   load: () => Promise<{ title: string; items: PRDItem[] }>;
   lock?: LockOptions;
+  /** For the v2 rules run on the tree read back; reported, never refused. */
+  rules?: RuleCheckOptions;
+}
+
+/** What the written tree read back as: files written, nodes read, and the v2 rule findings on it by rule. */
+interface Verified {
+  files: number;
+  nodes: number;
+  rules: RuleCount[];
 }
 
 export type ApplyV1ToV2Result =
   | { status: "already-v2"; removed: string[]; proof?: LeftoverProof }
-  | { status: "applied"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; nodes: number; v1Items: number; files: number };
+  | ({ status: "applied"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; v1Items: number } & Verified);
 
 interface Prepared {
   v1: { title: string; items: PRDItem[] };
@@ -781,9 +829,11 @@ async function prepare(rexDir: string, plan: PlanFile | undefined, options: Pick
 /**
  * Write the built model into `dir` and read it back, refusing what apply refuses:
  * a writer error, a skipped warning on read-back, or a v1 id the read-back lost.
+ * The v2 rules run on the tree read back, as `rex health` runs them, and are
+ * counted, not refused: which findings should stop a migration is undecided.
  * `dir` must exist; the caller owns it and cleans up.
  */
-async function writeAndVerify(dir: string, prepared: Prepared, lock: LockOptions | undefined): Promise<{ files: number; nodes: number }> {
+async function writeAndVerify(dir: string, prepared: Prepared, lock: LockOptions | undefined, rules: RuleCheckOptions | undefined): Promise<Verified> {
   const { v1, built, v1Items } = prepared;
   const model: PrdModel = { layout: "v2", schema: SCHEMA_VERSION_V2, title: v1.title, tree: built.tree, warnings: [] };
   const written = await withLock(prdLockPath(dir), () => writePrdModel(dir, model, { stateKeys: built.stateKeys }), lock);
@@ -793,7 +843,11 @@ async function writeAndVerify(dir: string, prepared: Prepared, lock: LockOptions
     throw new MigrationApplyError(`The written v2 tree does not read back: ${skipped.map((w) => `${w.path}: ${w.message}`).join("; ")}. Nothing was written.`);
   }
   assertEveryV1Id(everyV1Id(v1.items, back.tree, built.containers, built.cut), v1Items, "v2 tree read back");
-  return { files: written.written.length, nodes: idsOf([...back.tree.product, ...back.tree.changes], new Set()).size };
+  return {
+    files: written.written.length,
+    nodes: idsOf([...back.tree.product, ...back.tree.changes], new Set()).size,
+    rules: countRuleFindings(checkV2TreeHealth(back.tree, rules?.structureHealth, new Date(), rules?.packageVersion)),
+  };
 }
 
 // ── Leftover v1 files ────────────────────────────────────────────
@@ -902,7 +956,7 @@ export function tallyV1ToV2(items: readonly PRDItem[], built: Pick<BuiltV2Tree, 
 
 export type RehearseV1ToV2Result =
   | { status: "already-v2"; removed: string[]; proof?: LeftoverProof }
-  | { status: "rehearsed"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; kinds: Record<V1Kind, KindTally>; nodes: number; files: number; v1Items: number };
+  | ({ status: "rehearsed"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; kinds: Record<V1Kind, KindTally>; v1Items: number } & Verified);
 
 /**
  * {@link applyV1ToV2} without the swap: the same refusals, id check, write and
@@ -911,16 +965,16 @@ export type RehearseV1ToV2Result =
  * On a v2 tree, `removed` lists the v1 files apply would remove, and a
  * leftover apply would refuse is refused here too.
  */
-export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load">): Promise<RehearseV1ToV2Result> {
+export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load" | "rules">): Promise<RehearseV1ToV2Result> {
   if (existsSync(join(rexDir, PRODUCT_DIRNAME))) return { status: "already-v2", ...(await leftoverV1(rexDir, plan)) };
   if (!existsSync(join(rexDir, PRD_TREE_DIRNAME))) throw new MigrationApplyError(`No PRD folder tree at ${join(rexDir, PRD_TREE_DIRNAME)}: nothing to apply.`);
   await assertNoLegacySources(rexDir);
   const prepared = await prepare(rexDir, plan, options);
   const { v1, built, v1Items } = prepared;
   const scratch = await mkdtemp(join(tmpdir(), "rex-migrate-rehearsal-"));
-  let verified: { files: number; nodes: number };
+  let verified: Verified;
   try {
-    verified = await writeAndVerify(scratch, prepared, undefined);
+    verified = await writeAndVerify(scratch, prepared, undefined, options.rules);
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
@@ -958,11 +1012,10 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
       const prepared = await prepare(rexDir, plan, options);
       const { built, v1Items } = prepared;
 
-      let files: number;
-      let nodes: number;
+      let verified: Verified;
       try {
         await mkdir(staging, { recursive: true });
-        ({ files, nodes } = await writeAndVerify(staging, prepared, options.lock));
+        verified = await writeAndVerify(staging, prepared, options.lock, options.rules);
         if (existsSync(join(staging, CHANGES_DIRNAME))) await rename(join(staging, CHANGES_DIRNAME), changesDir);
         await rename(join(staging, PRODUCT_DIRNAME), productDir);
       } catch (err) {
@@ -973,7 +1026,7 @@ export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, op
       for (const path of [...v1Files, staging]) await rm(path, { recursive: true, force: true });
 
       const { tree: _tree, stateKeys: _keys, ...summary } = built;
-      return { status: "applied", built: summary, nodes, v1Items, files };
+      return { status: "applied", built: summary, v1Items, ...verified };
     },
     options.lock,
   );

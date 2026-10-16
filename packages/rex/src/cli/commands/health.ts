@@ -31,7 +31,7 @@ function formatReaderWarnings(warnings: ParseWarning[]): string {
  * release-token rule skips without a version; a broken package.json is not a PRD
  * problem and must not hide the health report.
  */
-async function readPackageVersion(dir: string): Promise<string | undefined> {
+export async function readPackageVersion(dir: string): Promise<string | undefined> {
   let text: string;
   try {
     text = await readFile(join(resolve(dir), "package.json"), "utf-8");

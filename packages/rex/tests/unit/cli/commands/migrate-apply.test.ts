@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { computeV2Health } from "../../../../src/cli/commands/health.js";
 import { cmdMigrateApply } from "../../../../src/cli/commands/migrate-apply.js";
 import { cmdMigratePlan } from "../../../../src/cli/commands/migrate-plan.js";
 import { CLIError } from "../../../../src/cli/errors.js";
@@ -127,6 +128,37 @@ describe("cmdMigrateApply", () => {
     const before = snapshot(repo);
     await cmdMigrateApply(repo, { plan: planPath, "dry-run": "true" });
     expect(snapshot(repo)).toEqual(before);
+  });
+
+  it("--dry-run and apply print the v2 rule findings by rule that rex health then reports", async () => {
+    const printed = (): string[] => vi.mocked(console.log).mock.calls.map((c) => c.join(" ").trim());
+    const ruleLines = (lines: string[]): string[] => lines.slice(lines.findIndex((l) => l.startsWith("v2 rules on the migrated tree:")));
+    // A description with no present-tense first sentence drafts no statement: a capability-statement error.
+    const items = structuredClone(TREE);
+    items[0]!.children!.push(item("f3", "feature", "Cache metrics", [item("t3", "task", "Count hits")], { description: "Add a hit counter." }));
+    await new FileStore(rexDir).saveDocument({ schema: "rex/v1", title: "Shop", items });
+    await cmdMigratePlan(repo, { "rules-only": "true", out: planPath, "cut-at": "2026-10-12T00:00:00.000Z" });
+
+    vi.mocked(console.log).mockClear();
+    await cmdMigrateApply(repo, { plan: planPath, "dry-run": "true" });
+    const rehearsed = ruleLines(printed());
+    vi.mocked(console.log).mockClear();
+    await cmdMigrateApply(repo, { plan: planPath });
+    const applied = ruleLines(printed());
+
+    const { treeRules } = await computeV2Health(repo, rexDir, undefined);
+    const errors = treeRules.filter((f) => f.severity === "error").length;
+    expect(errors).toBeGreaterThan(0);
+    const rules = [...new Set(treeRules.map((f) => f.rule))];
+    const n = (count: number, word: string): string => `${count} ${word}${count === 1 ? "" : "s"}`;
+    const count = (rule: string, severity: string): number => treeRules.filter((f) => f.rule === rule && f.severity === severity).length;
+    expect(rehearsed[0]).toBe(
+      `v2 rules on the migrated tree: ${n(errors, "error")}, ${n(treeRules.length - errors, "warning")}; 'rex health' fails on the errors, apply does not refuse them`,
+    );
+    expect(rehearsed.slice(1, 1 + rules.length).sort()).toEqual(
+      rules.map((rule) => `${rule}: ${n(count(rule, "error"), "error")}, ${n(count(rule, "warning"), "warning")}`).sort(),
+    );
+    expect(applied.slice(0, 1 + rules.length)).toEqual(rehearsed.slice(0, 1 + rules.length));
   });
 
   it("--dry-run lists every blockedBy rewrite and drop with the old and new refs", async () => {

@@ -10,6 +10,7 @@
  * writes and reads back the tree in a temporary directory, prints per v1 kind
  * what its items become, the Inbox holds, the dropped values and every
  * blockedBy ref rewritten or dropped, and writes nothing to the project.
+ * Both print the v2 rule findings on the tree read back, counted by rule.
  *
  * @module rex/cli/commands/migrate-apply
  */
@@ -26,12 +27,14 @@ import {
   type KindTally,
   type LeftoverProof,
   type RehearseV1ToV2Result,
+  type RuleCount,
 } from "../../migrations/v1-to-v2/apply.js";
 import { readPlanFile, type PlanFile } from "../../migrations/plan-file.js";
 import { PRD_TREE_DIRNAME, resolveRexPaths, resolveStore } from "../../store/index.js";
 import { hasV2Tree } from "../../store/prd-bundle-v2.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
+import { readPackageVersion } from "./health.js";
 
 const USAGE = "Usage: rex migrate-apply --plan=<path.json> [--dry-run] [dir]";
 
@@ -58,11 +61,13 @@ export async function cmdMigrateApply(dir: string, flags: Record<string, string>
 
   const store = await resolveStore(rexDir);
   const load = () => store.loadDocument();
+  // What `rex health` reads besides the tree, so the counts below are the ones it then reports.
+  const rules = { structureHealth: (await store.loadConfig()).structureHealth, packageVersion: await readPackageVersion(dir) };
   if (flags["dry-run"] === "true") {
-    reportRehearsal(await asCliError(() => rehearseV1ToV2(rexDir, plan, { load })));
+    reportRehearsal(await asCliError(() => rehearseV1ToV2(rexDir, plan, { load, rules })));
     return;
   }
-  reportApply(await asCliError(() => applyV1ToV2(rexDir, plan, { load })));
+  reportApply(await asCliError(() => applyV1ToV2(rexDir, plan, { load, rules })));
 }
 
 /** A refusal from the apply library is the operator's to act on: a CLIError, without a stack. */
@@ -85,6 +90,7 @@ function reportApply(outcome: ApplyV1ToV2Result): void {
   result(`Migrated ${v1Items} v1 items to the v2 layout (${nodes} nodes, the cut change ${built.cut} included).`);
   info(`Inbox (needs placement): ${built.inbox}`);
   reportBuilt(built);
+  reportRules(outcome.rules);
   info(`Removed ${PRD_TREE_DIRNAME}/ and its tree-meta.json. Review the result with 'rex health' and place the Inbox.`);
 }
 
@@ -112,6 +118,22 @@ function reportRehearsal(rehearsal: RehearseV1ToV2Result): void {
   info(`Total (${sum((t) => t.total)}): held for the Inbox ${sum((t) => t.held)}; dropped ${sum((t) => t.droppedMeta)} droppedMeta, ${sum((t) => t.droppedLog)} droppedLog`);
   reportBuilt(built);
   for (const r of built.blockers) info(`  ${describeBlockerRewrite(r)}`);
+  reportRules(rehearsal.rules);
+}
+
+const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** The v2 rule findings on the tree read back, by rule: what `rex health` reports once apply has run. */
+function reportRules(rules: readonly RuleCount[]): void {
+  if (rules.length === 0) {
+    info("v2 rules on the migrated tree: no findings");
+    return;
+  }
+  const errors = rules.reduce((n, r) => n + r.errors, 0);
+  const warnings = rules.reduce((n, r) => n + r.warnings, 0);
+  const gate = errors > 0 ? "; 'rex health' fails on the errors, apply does not refuse them" : "";
+  info(`v2 rules on the migrated tree: ${plural(errors, "error")}, ${plural(warnings, "warning")}${gate}`);
+  for (const r of rules) info(`  ${r.rule}: ${plural(r.errors, "error")}, ${plural(r.warnings, "warning")}`);
 }
 
 /** Why the v1 files beside the v2 tree are safe to remove. */
