@@ -259,7 +259,13 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
     }
   }
 
-  rewriteRequirementBlockers(tree, nodes, blockers);
+  // A held change has no target; for blockers only, it is open on the product node its v1 parent became.
+  const heldOn = new Map<string, string>();
+  for (const node of nodes.values()) {
+    const v1Parent = node.needsPlacement === true ? parentById.get(node.id) : undefined;
+    if (v1Parent !== undefined && PRODUCT_TYPES.has(nodes.get(v1Parent)?.type ?? "")) heldOn.set(node.id, v1Parent);
+  }
+  rewriteRequirementBlockers(tree, nodes, heldOn, blockers);
   stampMet(tree, nodes);
 
   const cut = cutChange(tree, containers, blockers, plan);
@@ -333,7 +339,10 @@ function setBlockedBy(node: RuleNode, refs: readonly string[]): void {
  *
  * - A work node's ref to a product node becomes refs to that node's open
  *   changes: those placed on it or on a product node beneath it, which is what
- *   an area has. With none open the dependency is met, and the ref is dropped.
+ *   an area has. A held change (`heldOn`) counts as on the product node its v1
+ *   parent became, so work held in the Inbox still orders what waited on it;
+ *   placement never reads this. With none open the dependency is met, and the
+ *   ref is dropped.
  * - A product node's own blockedBy moves onto each of its open changes,
  *   rewritten the same way, and the product node keeps none. With no open
  *   change to carry it, it is dropped.
@@ -341,7 +350,12 @@ function setBlockedBy(node: RuleNode, refs: readonly string[]): void {
  * No node is left blocked by itself, a change it sits inside or work it holds.
  * Each rewrite is recorded in `out`. Runs after placement, which sets `touches` and `amends`.
  */
-function rewriteRequirementBlockers(tree: V2Tree, nodes: ReadonlyMap<string, RuleNode>, out: BlockerRewrite[]): void {
+function rewriteRequirementBlockers(
+  tree: V2Tree,
+  nodes: ReadonlyMap<string, RuleNode>,
+  heldOn: ReadonlyMap<string, string>,
+  out: BlockerRewrite[],
+): void {
   const parentOf = new Map<string, RuleNode>();
   const index = (node: RuleNode): void => {
     for (const child of node.children ?? []) {
@@ -367,7 +381,8 @@ function rewriteRequirementBlockers(tree: V2Tree, nodes: ReadonlyMap<string, Rul
   const openOn = new Map<string, string[]>();
   for (const node of nodes.values()) {
     if (node.type !== "change" || !isOpenChange(node)) continue;
-    const on = new Set([...(node.touches ?? []), ...(node.amends ?? []).map((a) => a.target)].filter(isProduct));
+    const held = heldOn.get(node.id);
+    const on = new Set([...(node.touches ?? []), ...(node.amends ?? []).map((a) => a.target), ...(held !== undefined ? [held] : [])].filter(isProduct));
     for (const id of [...on].flatMap((t) => [...above(t)])) {
       if (isProduct(id) && !openOn.get(id)?.includes(node.id)) openOn.set(id, [...(openOn.get(id) ?? []), node.id]);
     }

@@ -234,6 +234,63 @@ describe("buildV2Tree", () => {
       expect(blockers).toContainEqual({ kind: "requirement", node: "f15", from: "f4", to: ["t4"], onto: ["t15", "t16"] });
     });
 
+    describe("whose pending work is held in the Inbox", () => {
+      // f20 is a capability whose pending t21 is held; f21, unbuilt, is held under area e6; f24 is met with nothing open.
+      const HELD: PRDItem[] = [
+        item("e6", "epic", "Sync", [
+          item("f20", "feature", "Offline sync", [
+            item("t20", "task", "Write the sync"),
+            item("t21", "task", "Retry failed syncs", [], { status: "pending" }),
+          ], { status: "pending" }),
+          item("f21", "feature", "Sync conflicts", [item("t26", "task", "Merge edits", [], { status: "pending" })], { status: "pending" }),
+          item("f24", "feature", "Sync log", [item("t24", "task", "Log each sync")]),
+        ]),
+        item("e7", "epic", "Sharing", [
+          item("f22", "feature", "Shared folders", [
+            item("t22", "task", "Share a folder", [], { status: "pending", blockedBy: ["f20"] }),
+            item("t23", "task", "Share a sync", [], { status: "pending", blockedBy: ["e6"] }),
+            item("t25", "task", "Share the log", [], { status: "pending", blockedBy: ["f24"] }),
+          ], { status: "pending" }),
+        ]),
+      ];
+      /** The rules plan, with t21's placement withheld as a model pass or person would. */
+      const heldPlan = async (): Promise<V1ToV2Plan> => {
+        const plan = await planOf(HELD);
+        delete plan.entries.t21!.placement;
+        plan.entries.t21!.needsPlacement = true;
+        return plan;
+      };
+
+      it("names the held changes instead of dropping the ref as met", async () => {
+        const { tree, blockers, cut } = buildV2Tree(HELD, await heldPlan());
+        expect(byId(tree, "f20")).toMatchObject({ type: "capability" });
+        expect(byId(tree, "t22")!.blockedBy).toEqual(["t21"]);
+        expect(byId(tree, "t23")!.blockedBy!.sort()).toEqual(["f21", "t21"]);
+        expect(blockers).toContainEqual({ kind: "requirement", node: "t22", from: "f20", to: ["t21"] });
+        const body = byId(tree, cut)!.body as string;
+        expect(body).toContain("- t22: blockedBy f20 → t21");
+      });
+
+      it("still drops a ref to a met product node as met", async () => {
+        const { tree, blockers, cut } = buildV2Tree(HELD, await heldPlan());
+        expect(computeProductStatus(tree).f24!.status).toBe("met");
+        expect(byId(tree, "t25")!.blockedBy).toBeUndefined();
+        expect(blockers).toContainEqual({ kind: "requirement", node: "t25", from: "f24", to: [] });
+        expect(byId(tree, cut)!.body as string).toContain("- t25: blockedBy f24 → dropped (no open change: met)");
+      });
+
+      it("leaves the held changes in the Inbox with no target", async () => {
+        const { tree } = buildV2Tree(HELD, await heldPlan());
+        for (const id of ["t21", "f21"]) {
+          const node = byId(tree, id)!;
+          expect(node).toMatchObject({ type: "change", needsPlacement: true });
+          expect(node.touches).toBeUndefined();
+          expect(node.amends).toBeUndefined();
+          expect(tree.changes).toContain(node);
+        }
+      });
+    });
+
     it("leaves no blockedBy ref the v2 rules reject", async () => {
       const { tree } = buildV2Tree(ITEMS, await planOf(ITEMS));
       const work = new Set(all(tree).filter((n) => n.type === "change" || n.type === "task" || n.type === "subtask").map((n) => n.id));
