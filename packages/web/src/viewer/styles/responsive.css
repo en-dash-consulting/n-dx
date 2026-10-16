@@ -42,11 +42,7 @@
     padding: 16px;
   }
 
-  .page-context-bar {
-    padding: 0 0 6px;
-  }
-
-  /* Breadcrumb: hide git branch, truncate project name more aggressively */
+  /* Top bar project context: hide the branch chip, truncate the name more */
   .breadcrumb-branch {
     display: none;
   }

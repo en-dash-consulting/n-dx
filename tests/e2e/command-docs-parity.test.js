@@ -90,7 +90,7 @@ describe("command references name only registry commands", () => {
    * gap to close, not a permanent exemption; the staleness check below fails
    * once the command is registered, so the entry has to come out with the fix.
    */
-  const KNOWN_UNREGISTERED = new Set(["iso"]);
+  const KNOWN_UNREGISTERED = new Set([]);
 
   it("every known-unregistered command is still missing from the registry", () => {
     for (const name of KNOWN_UNREGISTERED) expect(all.has(name), name).toBe(false);

@@ -18,6 +18,7 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | Command | Description |
 |---------|-------------|
 | `ndx analyze [dir]` | Run codebase analysis |
+| `ndx iso [dir]` | Render a standalone isometric architecture map |
 | `ndx recommend [dir]` | Show or accept findings as PRD items |
 
 ## Plan

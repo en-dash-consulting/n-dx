@@ -52,15 +52,6 @@
   margin: 0;
 }
 
-.enrichment-badge {
-  font-size: 10px;
-  padding: 3px 8px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  border-radius: 4px;
-  font-weight: 500;
-}
-
 /* Health row */
 .health-row {
   display: flex;

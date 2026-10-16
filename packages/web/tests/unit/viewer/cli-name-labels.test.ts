@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { SettingsOverlay } from "../../../src/viewer/components/settings-overlay.js";
 import { buildValidViews } from "../../../src/shared/index.js";
-import { Breadcrumb } from "../../../src/viewer/components/breadcrumb.js";
+import { ProjectContext } from "../../../src/viewer/components/project-context.js";
 import { WorkflowView } from "../../../src/viewer/views/workflow.js";
 import { ProjectView } from "../../../src/viewer/views/project.js";
 import { resolveCliLabel, clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -79,15 +79,16 @@ describe("dashboard labels use the project CLI name", () => {
     expect(root.textContent).not.toMatch(/\bndx\b/);
   });
 
-  it("breadcrumb for a settings view never shows an unresolved placeholder or a bare ndx", async () => {
+  it("the title for a settings view never shows an unresolved placeholder or a bare ndx", async () => {
     stubProject("myapp");
     act(() => {
-      render(h(Breadcrumb, { view: "project", navigateTo: () => {} }), root);
+      render(h(ProjectContext, { view: "project" }), root);
     });
     await settle();
-    expect(root.textContent).toContain("Project");
+    expect(document.title).toContain("Project");
+    expect(document.title).not.toContain("{cli}");
+    expect(document.title).not.toMatch(/\bndx\b/);
     expect(root.textContent).not.toContain("{cli}");
-    expect(root.textContent).not.toMatch(/\bndx\b/);
   });
 
   it("Project page names the analyze and plan commands with the resolved name", async () => {

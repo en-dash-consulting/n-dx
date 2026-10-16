@@ -359,10 +359,11 @@ describe("AskView", () => {
     expect(errorKind()).toBe("no_analysis");
     // The affordance, not just the command name: the same control the Overview
     // uses, so the user can start the run without leaving the panel.
-    const analyze = root.querySelector(".sv-ask-error-analyze .overview-reanalyze");
+    const analyze = root.querySelector(".sv-ask-error-analyze .analyze-control");
     expect(analyze).not.toBeNull();
     expect(analyze?.textContent).toContain("Re-analyze");
-    expect(analyze?.textContent).toContain("Full analysis");
+    // Full analysis is one click away, in the control's menu.
+    expect(analyze?.querySelector(".analyze-caret")?.getAttribute("aria-haspopup")).toBe("menu");
     // Retrying the question would hit the same absent data.
     expect(retryButton()).toBeNull();
   });
@@ -928,13 +929,13 @@ describe("Ask view registration", () => {
     expect(renderActiveView("ask", ctx)).not.toBeNull();
   });
 
-  it("is the Analysis section after PR Markdown", () => {
-    const ids = STAGES.analyze.sections.map((s) => s.view);
+  it("is the Analysis tile after PR Markdown", () => {
+    const ids = STAGES.analyze.tiles!.map((t) => t.panel ?? t.view);
     expect(ids.indexOf("ask")).toBe(ids.indexOf("pr-markdown") + 1);
   });
 
   it("is gated and server-built, as the retired tab table recorded", () => {
-    const ask = STAGES.analyze.sections.find((s) => s.view === "ask")!;
+    const ask = STAGES.analyze.tiles!.find((t) => t.view === "ask")!;
     expect(ask.featureGate).toBe("sourcevision.ask");
     expect(ask.requiresServer).toBe(true);
   });
@@ -994,9 +995,12 @@ describe("Ask section feature gate", () => {
     return root;
   }
 
-  /** Views the Analysis page lists as sections. */
+  /** Views the Analysis page lists, as its lead section and its tiles. */
   function sectionViews(): string[] {
-    return Array.from(root.querySelectorAll<HTMLElement>(".stage-section")).map((el) => el.dataset.view ?? "");
+    return [
+      ...Array.from(root.querySelectorAll<HTMLElement>(".stage-section")).map((el) => el.dataset.view ?? ""),
+      ...Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile ?? ""),
+    ];
   }
 
   beforeEach(() => {

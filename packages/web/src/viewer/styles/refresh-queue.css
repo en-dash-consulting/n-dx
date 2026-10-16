@@ -6,12 +6,9 @@
  */
 
 .refresh-queue-status {
-  position: fixed;
-  bottom: calc(1rem + var(--bottombar-h, 0px));
-  right: 1rem;
   z-index: var(--z-tray);
   padding: 0.4rem 0.75rem;
-  border-radius: 6px;
+  border-radius: 999px;
   font-size: 0.8rem;
   line-height: 1.4;
   display: flex;

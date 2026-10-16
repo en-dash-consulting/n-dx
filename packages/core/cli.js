@@ -534,6 +534,22 @@ function resolveDir(args) {
   return process.cwd();
 }
 
+/**
+ * The `[dir]` of a command whose first positional is something else — an item
+ * id (`ndx move <id> [dir]`) or an event name (`ndx log <event> [dir]`).
+ *
+ * `resolveDir` cannot serve these: it takes the *last* positional, which with
+ * no directory given is the id or event itself, so `ndx move abc --parent=def`
+ * would look for a project at `./abc`. A directory is only present once there
+ * is a second positional, which is exactly how the matching `rex` subcommands
+ * read their own arguments — so the args are forwarded to rex unchanged and
+ * this resolves the orchestrator's precondition alone.
+ */
+function resolveTrailingDir(args) {
+  const positional = args.filter((a) => !a.startsWith("-"));
+  return positional.length > 1 ? positional[positional.length - 1] : process.cwd();
+}
+
 function extractFlags(args) {
   return args.filter((a) => a.startsWith("-"));
 }
@@ -2861,8 +2877,8 @@ async function handleRemove(rest) {
 }
 
 async function handleMove(rest) {
-  // First positional arg is the item ID, not a dir
-  requireInit(process.cwd(), ["rex"]);
+  // First positional arg is the item ID, not a dir — see resolveTrailingDir.
+  requireInit(resolveTrailingDir(rest), ["rex"]);
   await runOrDie(tools.rex, ["move", ...rest]);
   exitWithCleanup(0);
 }
@@ -2878,7 +2894,8 @@ async function handleMove(rest) {
  * First positional arg is the event name, not a dir — same shape as `move`.
  */
 async function handleLog(rest) {
-  requireInit(process.cwd(), ["rex"]);
+  // First positional arg is the event name, not a dir — see resolveTrailingDir.
+  requireInit(resolveTrailingDir(rest), ["rex"]);
   await runOrDie(tools.rex, ["log", ...rest]);
   exitWithCleanup(0);
 }

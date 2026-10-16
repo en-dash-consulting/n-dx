@@ -22,6 +22,12 @@ import type { JobTray } from "../hooks/index.js";
 
 import {
   Overview,
+  AnalysisStatus,
+  CodebaseStats,
+  HealthDetail,
+  MapPanel,
+  LanguagesPanel,
+  NextStepsPanel,
   Graph,
   IsoMapView,
   ZonesView,
@@ -58,8 +64,10 @@ import { WorkspacesView } from "./domain-workspaces.js";
 import { LiveView, LiveTaskView, LiveAnalyzeView } from "./domain-live.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { HomeView, StagePage } from "./stage-pages.js";
-import { PrepareTaskModal } from "../components/index.js";
-import { isSettingsView, type StageId } from "./stages.js";
+import { AnalyzeControls, PrepareTaskModal } from "../components/index.js";
+import { isSettingsView, STAGES, type StageId, type StagePanelId, type StageTile } from "./stages.js";
+import { analyzeTileSummary } from "./tile-summaries.js";
+import type { TileGridApi } from "./stage-tiles.js";
 import { buildValidViews as buildValidViewsForScope } from "../external.js";
 
 import {
@@ -83,6 +91,11 @@ export interface ViewRenderContext {
   selectedZone: string | null;
   selectedRunId: string | null;
   selectedTaskId: string | null;
+  /**
+   * Whether the detail panel (a file, zone or PRD item) is showing beside the
+   * page, so a full-screen dashboard tile leaves room for it.
+   */
+  detailOpen?: boolean;
   /** Finding the Ask panel was entered with, when it was entered from one. */
   askSeed: AskSeed | null;
   navigateTo: NavigateTo;
@@ -116,14 +129,34 @@ function validViewsOf(ctx: ViewRenderContext): ReadonlySet<ViewId> {
   return ctx.validViews ?? buildValidViewsForScope(null);
 }
 
-/** A stage page, rendering each of its sections through this registry. */
+/** A stage page, rendering each of its sections and tiles through this registry. */
 function stage(id: StageId): ViewRenderer {
   return (ctx) => h(StagePage, {
     stage: id,
     validViews: validViewsOf(ctx),
     navigateTo: ctx.navigateTo,
-    renderView: (view: ViewId) => renderActiveView(view, ctx),
+    // On a tiled stage the lead Overview drops what its tiles show.
+    renderView: (view: ViewId) => (view === "overview" && STAGES[id].tiles
+      ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead" })
+      : renderActiveView(view, ctx)),
+    renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
+    renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data) : undefined,
+    detailOpen: ctx.detailOpen ?? false,
+    headStatus: id === "analyze" ? h(AnalysisStatus, { data: ctx.data }) : null,
+    headActions: id === "analyze" ? h(AnalyzeControls, { jobs: ctx.jobs }) : null,
   });
+}
+
+/** The parts of a stage page that are not views of their own. */
+function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ctx: ViewRenderContext): ComponentChild {
+  switch (panel) {
+    case "map": return h(MapPanel, { data: ctx.data, navigateTo: ctx.navigateTo, opened, onExpand: () => grid.openTile("map") });
+    case "health": return opened
+      ? h(HealthDetail, { data: ctx.data, openTile: grid.openTile, setDetail: ctx.setDetail })
+      : h(CodebaseStats, { data: ctx.data });
+    case "next-steps": return h(NextStepsPanel, { embedded: true });
+    case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
+  }
 }
 
 const REGISTRY: Record<string, ViewRenderer> = {

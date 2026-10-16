@@ -1,14 +1,12 @@
-/* Working-tree git status indicator — bottom-right, same corner and
- * interaction pattern as .active-operations-tray, stacked above it so the
- * two don't overlap. Only rendered when the tree is dirty.
+/* Working-tree git status indicator — a pill in the bottom-right
+ * .status-dock (status-dock.css), same interaction pattern as
+ * .active-operations-tray. Only rendered when the tree is dirty.
  *
  * Uses CSS variables from tokens.css for theme compatibility.
  */
 
 .git-status-banner {
-  position: fixed;
-  bottom: calc(8rem + var(--bottombar-h, 0px));
-  right: 1rem;
+  position: relative;
   z-index: var(--z-tray);
   display: flex;
   flex-direction: column;

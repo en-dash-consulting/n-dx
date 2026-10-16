@@ -256,6 +256,28 @@ export const COMMAND_EFFECTS = {
     next: "ndx plan",
   },
 
+  iso: {
+    command: "iso",
+    summary: "Render the architectural zones as a standalone isometric HTML map.",
+    reads: [
+      "{sourcevision}/ (inventory, import graph and zones)",
+      "every tracked source file under the project, only with --source=scan",
+    ],
+    writes: [
+      { path: "{sourcevision}/iso-map.html", what: "a single self-contained page; --output writes elsewhere" },
+      {
+        path: "iso-map.html",
+        what: "the same page at the project root, because there is no {sourcevision}/ to put it in",
+        conditional: true,
+        when: "with --source=scan on a project that has never been analyzed",
+      },
+    ],
+    llm: [],
+    network: [],
+    duration: "seconds; longer with --source=scan on a large repo, which walks the tree",
+    next: "ndx status",
+  },
+
   recommend: {
     command: "recommend",
     summary: "Group SourceVision findings into recommendations you can accept.",

@@ -1,0 +1,51 @@
+/* Status dock — one bottom-right row for the floating status pills:
+ * sessions, uncommitted files, running operations, refresh queue.
+ *
+ * Each pill used to be fixed at its own hard-coded offset, so they collided
+ * whenever one was absent, wrapped or opened. In one flex row they are laid
+ * out by flow, and each pill's popover opens upward from that pill, so an
+ * open popover covers page content, never another pill.
+ *
+ * Bottom-right because .sidebar is a full-height normal-flow column: a fixed
+ * bottom-left element would sit on its nav items and take their clicks.
+ */
+
+.status-dock {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(1rem + var(--bottombar-h, 0px));
+  z-index: var(--z-tray);
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap-reverse;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 0.5rem;
+  max-width: calc(100vw - 2rem);
+  /* The row is wider than its pills; let clicks through the gaps. */
+  pointer-events: none;
+}
+
+.status-dock > * {
+  pointer-events: auto;
+}
+
+/* Popovers open above their own pill, right-aligned to it. */
+.status-dock .active-operations-list,
+.status-dock .git-status-panel,
+.status-dock .sessions-list {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  right: 0;
+  max-width: calc(100vw - 2rem);
+}
+
+/* One pill shape for every toggle in the dock. */
+.status-dock .active-operations-toggle,
+.status-dock .git-status-toggle,
+.status-dock .sessions-toggle,
+.status-dock .refresh-queue-status {
+  min-height: 32px;
+  box-sizing: border-box;
+  white-space: nowrap;
+}

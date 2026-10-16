@@ -1,7 +1,8 @@
 /**
- * Top navigation: the brand (which is also the way home), the three stage
- * tabs — Analysis, Plan, Work — then, after a divider, the Live tab, and
- * search. Nothing else lives up here; settings and commands are on the bottom bar.
+ * Top navigation: the logo (which is also the way home), the project context
+ * — hub link, project switcher, worktree · branch chip — the three stage tabs
+ * — Analysis, Plan, Work — then, after a divider, the Live tab, the page's
+ * guide and search. Settings and commands are on the bottom bar.
  *
  * A tab is active on its own stage page and on any view that stage lists,
  * so `/zones` keeps Analysis lit and `/hench-runs/<id>` keeps Plan lit.
@@ -10,10 +11,12 @@
 
 import { h } from "preact";
 import type { ViewId, NavigateTo } from "../api.js";
-import { stageForView, visibleStages, stageProduct, viewLabel, viewGlyph, isLiveView, useProjectMetadata } from "../api.js";
+import { stageForView, visibleStages, stageProduct, viewLabel, viewGlyph, isLiveView } from "../api.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { LiveTab } from "./live-tab.js";
+import { ProjectContext } from "./project-context.js";
+import { Guide } from "./guide.js";
 
 export interface TopNavProps {
   view: ViewId;
@@ -27,7 +30,6 @@ export interface TopNavProps {
 }
 
 export function TopNav({ view, validViews, onNavigate, navigateTo, onOpenSearch, scope = null }: TopNavProps) {
-  const project = useProjectMetadata();
   const active = stageForView(view, validViews);
   const stages = visibleStages(validViews);
   const scoped = !!scope && scope !== "all";
@@ -46,11 +48,8 @@ export function TopNav({ view, validViews, onNavigate, navigateTo, onOpenSearch,
       scoped
         ? h(ProductLogoPng, { product: scope as string, size: 28, class: "topnav-logo" })
         : h(NdxLogoPng, { size: 26, class: "topnav-logo" }),
-      h("span", { class: "topnav-brand-text" },
-        h("span", { class: "topnav-project", title: project?.name ?? undefined }, project?.name ?? (scoped ? scope : "n-dx")),
-        h("span", { class: "topnav-subtitle" }, scoped ? "standalone viewer" : "n-dx"),
-      ),
     ),
+    h(ProjectContext, { view }),
 
     h("nav", { class: "topnav-tabs", "aria-label": "View navigation" },
       stages.map((id) => {
@@ -81,6 +80,7 @@ export function TopNav({ view, validViews, onNavigate, navigateTo, onOpenSearch,
       h(LiveTab, { view, active: isLiveView(view), onNavigate, navigateTo, enabled: liveEnabled }),
     ),
 
+    h("div", { class: "topnav-guide" }, h(Guide, { view })),
     h("button", {
       type: "button",
       class: "topnav-search",
