@@ -16,8 +16,12 @@
  * - {@link collectRepoExecutionConfig} reads those files and reduces them to
  *   the execution-relevant subset plus a content digest.
  * - {@link assessRepoExecutionConfig} compares that subset to the guard
- *   baseline for the project's language and lists what is *wider* than the
- *   baseline. Narrower is never a finding.
+ *   baseline for the language {@link detectRepoLanguage} reads from marker
+ *   files, and lists what is *wider* than the baseline. Narrower is never a
+ *   finding. The `language` the repository declares never picks the
+ *   baseline: a JS checkout declaring `swift` would otherwise get
+ *   `xcodebuild` and `xcrun` for free. A declared language that disagrees
+ *   with the detected one is a finding of its own.
  * - {@link evaluateRepoTrust} adds the user's own trust record, kept outside
  *   the repository in `<ndx home>/trust/`, and decides the state: `baseline`
  *   (nothing to trust), `trusted` (digest matches the record), `untrusted`
@@ -57,6 +61,7 @@ import {
   rmSync,
   statSync,
   writeFileSync,
+  type Dirent,
 } from "node:fs";
 import { join, sep } from "node:path";
 import {
@@ -167,6 +172,43 @@ export function guardBaselineForLanguage(language?: string | null): GuardBaselin
   };
 }
 
+/** The languages {@link detectRepoLanguage} can report; one per baseline. */
+export type DetectedRepoLanguage = "go" | "swift" | "typescript";
+
+/**
+ * The project language as the host sees it, from marker files alone:
+ * `go.mod` → go; `Package.swift` or a top-level `*.xcodeproj` /
+ * `*.xcworkspace` directory → swift; otherwise the JS/TS default.
+ *
+ * Mirrors hench init's detection without its config override, because the
+ * config is the repository's own claim and this is what checks it.
+ */
+export function detectRepoLanguage(projectDir: string): DetectedRepoLanguage {
+  if (existsSync(join(projectDir, "go.mod"))) return "go";
+  if (existsSync(join(projectDir, "Package.swift"))) return "swift";
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(projectDir, { withFileTypes: true });
+  } catch {
+    return "typescript";
+  }
+  const xcode = entries.some(
+    (e) => e.isDirectory() && (e.name.endsWith(".xcodeproj") || e.name.endsWith(".xcworkspace")),
+  );
+  return xcode ? "swift" : "typescript";
+}
+
+/** The baseline a declared language names, or null when it names none. */
+function declaredLanguageFamily(language: string | null): DetectedRepoLanguage | null {
+  if (language === "typescript" || language === "javascript") return "typescript";
+  if (language === "go" || language === "swift") return language;
+  return null;
+}
+
+function languageLabel(language: DetectedRepoLanguage): string {
+  return language === "typescript" ? "JavaScript/TypeScript" : language;
+}
+
 /**
  * Narrow a guard to the baseline: allowlists intersect, blocked paths union.
  * Everything else on the guard is returned untouched. The result is never
@@ -194,7 +236,14 @@ export interface RepoMcpServer {
 export interface RepoExecutionConfig {
   /** Which files were read, relative to the project root. Absent files are omitted. */
   sources: string[];
+  /** The language the repository declares. Reported, never used as the baseline. */
   language: string | null;
+  /**
+   * The language {@link detectRepoLanguage} reads from marker files: the
+   * baseline every comparison and clamp uses. Not in the digest, because it
+   * is the host's reading rather than configuration the user accepts.
+   */
+  detectedLanguage: DetectedRepoLanguage;
   guard: GuardBaseline | null;
   /**
    * `guard.env.allow` as the repository ships it — names the agent's child
@@ -210,7 +259,7 @@ export interface RepoExecutionConfig {
   /** `.rex/config.json` → `test`. */
   testCommand: string | null;
   mcpServers: RepoMcpServer[];
-  /** sha256 over the canonical JSON of everything above except `sources`. */
+  /** sha256 over the canonical JSON of everything above except `sources` and `detectedLanguage`. */
   digest: string;
 }
 
@@ -326,6 +375,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   return {
     sources,
     ...body,
+    detectedLanguage: detectRepoLanguage(root),
     guard,
     envAllow: [...envAllow].sort(),
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
@@ -335,6 +385,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
 // ── Assessment ──────────────────────────────────────────────────────────────
 
 export type RepoTrustFindingCode =
+  | "language-mismatch"
   | "commands-added"
   | "blocked-paths-removed"
   | "git-subcommands-added"
@@ -383,12 +434,29 @@ function coversDir(blocked: string[], dir: string): boolean {
 
 /**
  * List how the repository's configuration is wider than the baseline for its
- * language. Narrower is not reported. A missing guard means the repository
- * left hench's defaults in force, which is the baseline by definition.
+ * detected language. Narrower is not reported. A missing guard means the
+ * repository left hench's defaults in force, which is the baseline by
+ * definition.
+ *
+ * A declared language naming another baseline is a warning: the checkout
+ * asks for a toolchain it does not have, so the user is asked. A declared
+ * value naming no baseline (`auto`, an unsupported language) selects
+ * nothing and is not reported.
  */
 export function assessRepoExecutionConfig(config: RepoExecutionConfig): RepoTrustFinding[] {
-  const baseline = guardBaselineForLanguage(config.language);
+  const detected = config.detectedLanguage;
+  const baseline = guardBaselineForLanguage(detected);
   const findings: RepoTrustFinding[] = [];
+
+  const declared = declaredLanguageFamily(config.language);
+  if (config.language && declared && declared !== detected) {
+    findings.push({
+      code: "language-mismatch",
+      severity: "warning",
+      message: `Declares language ${config.language}, but the checkout looks like ${languageLabel(detected)}; the ${languageLabel(detected)} baseline applies`,
+      values: [config.language, detected],
+    });
+  }
 
   if (config.guard) {
     const added = config.guard.allowedCommands.filter((c) => !baseline.allowedCommands.includes(c));
@@ -396,7 +464,7 @@ export function assessRepoExecutionConfig(config: RepoExecutionConfig): RepoTrus
       findings.push({
         code: "commands-added",
         severity: "warning",
-        message: `Allows the agent to run commands outside the ${config.language ?? "default"} baseline: ${added.join(", ")}`,
+        message: `Allows the agent to run commands outside the ${languageLabel(detected)} baseline: ${added.join(", ")}`,
         values: added,
       });
     }

@@ -21,6 +21,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [The trust baseline comes from host-side detection, never from the repository's declared language](./the-trust-baseline-comes-from-host.md) | pending |
+| [The trust baseline comes from host-side detection, never from the repository's declared language](./the-trust-baseline-comes-from-host.md) | in_progress |
 | [The trust inventory never follows a symlinked directory out of the repository](./the-trust-inventory-never-follows-a.md) | pending |
 | [verify_criteria runs a repository's test command only once its digest is accepted](./verify-criteria-runs-a-repository-s.md) | pending |

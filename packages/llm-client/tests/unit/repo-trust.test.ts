@@ -235,6 +235,69 @@ describe("assessRepoExecutionConfig", () => {
     expect(codes).not.toContain("env-allow-added");
   });
 
+  it("takes the baseline from marker files, so a JS/TS checkout declaring swift cannot keep xcodebuild", () => {
+    writeJson("package.json", { name: "x" });
+    const swiftGuard = { ...guardBaselineForLanguage("swift"), allowedCommands: ["swift", "make", "xcodebuild", "xcrun", "git"] };
+    writeJson(".hench/config.json", { language: "swift", guard: swiftGuard });
+
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.language).toBe("swift");
+    expect(config.detectedLanguage).toBe("typescript");
+
+    const findings = assessRepoExecutionConfig(config);
+    const byCode = Object.fromEntries(findings.map((f) => [f.code, f]));
+    expect(byCode["commands-added"].values).toEqual(expect.arrayContaining(["xcodebuild", "xcrun"]));
+    expect(byCode["language-mismatch"].severity).toBe("warning");
+    expect(byCode["language-mismatch"].message).toContain("swift");
+    expect(byCode["language-mismatch"].message).toContain("JavaScript/TypeScript");
+
+    const ev = evaluateRepoTrust(repo, { ndxHome: home });
+    expect(ev.state).toBe("untrusted");
+    expect(ev.restricted).toBe(true);
+
+    const clamped = clampGuardToBaseline(swiftGuard, guardBaselineForLanguage(config.detectedLanguage));
+    expect(clamped.allowedCommands).not.toContain("xcodebuild");
+    expect(clamped.allowedCommands).not.toContain("xcrun");
+  });
+
+  it("reads the declared language from the project config as well and still uses the detected baseline", () => {
+    writeJson(".n-dx.json", { hench: { language: "go", guard: { ...guardBaselineForLanguage("go") } } });
+    const config = collectRepoExecutionConfig(repo);
+    const codes = assessRepoExecutionConfig(config).map((f) => f.code);
+    expect(config.detectedLanguage).toBe("typescript");
+    expect(codes).toContain("language-mismatch");
+    expect(codes).toContain("commands-added");
+  });
+
+  it.each([
+    ["go", "go.mod", false],
+    ["swift", "Package.swift", false],
+    ["swift", "App.xcodeproj", true],
+    ["swift", "App.xcworkspace", true],
+  ])("raises no mismatch for a %s checkout (%s) declaring its own language", (language, marker, isDir) => {
+    if (isDir) mkdirSync(join(repo, marker));
+    else writeFileSync(join(repo, marker), "");
+    writeJson(".hench/config.json", { language, guard: guardBaselineForLanguage(language) });
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.detectedLanguage).toBe(language);
+    const codes = assessRepoExecutionConfig(config).map((f) => f.code);
+    expect(codes).not.toContain("language-mismatch");
+    expect(codes).not.toContain("commands-added");
+  });
+
+  it("treats javascript and typescript as one baseline, and ignores a declared value that names none", () => {
+    for (const language of ["javascript", "typescript", "auto", "rust"]) {
+      writeJson(".hench/config.json", { language, guard: DEFAULT_GUARD });
+      const codes = assessRepoExecutionConfig(collectRepoExecutionConfig(repo)).map((f) => f.code);
+      expect(codes, language).not.toContain("language-mismatch");
+    }
+  });
+
+  it("does not count a file named like an Xcode project as a swift marker", () => {
+    writeFileSync(join(repo, "App.xcodeproj"), "");
+    expect(collectRepoExecutionConfig(repo).detectedLanguage).toBe("typescript");
+  });
+
   it("accepts the .ndx container layout's blocked path as covering hench and rex", () => {
     writeJson(".hench/config.json", { guard: { ...DEFAULT_GUARD, blockedPaths: [".ndx/**", ".git/**"] } });
     const codes = assessRepoExecutionConfig(collectRepoExecutionConfig(repo)).map((f) => f.code);

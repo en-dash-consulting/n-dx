@@ -4,7 +4,8 @@
  * `@n-dx/llm-client` decides whether this user trusts what the checkout
  * ships as execution config (see its `repo-trust` module). This module is
  * hench's side of that decision: while a repository is *not* trusted, the
- * guard it declares is clamped to the baseline for the project's language —
+ * guard it declares is clamped to the baseline for the project's detected
+ * language (marker files, not the config's `language`) —
  * allowlists intersect, blocked paths union — and a `bypassPermissions`
  * permission mode is lowered to `acceptEdits`. The repository's config can
  * only ever tighten what the user's own defaults allow.
@@ -55,7 +56,9 @@ export function applyRepoTrust(
   if (!evaluation.restricted) {
     return { evaluation, config, permissionMode, clamped: false };
   }
-  const baseline = guardBaselineForLanguage(config.language);
+  // The detected language, never `config.language`: that is the repository's
+  // own claim, and a JS checkout declaring swift would keep xcodebuild.
+  const baseline = guardBaselineForLanguage(evaluation.config.detectedLanguage);
   const guard = clampGuardToBaseline(config.guard, baseline);
   const lowered = permissionMode === "bypassPermissions" ? "acceptEdits" : permissionMode;
   const guardChanged =
