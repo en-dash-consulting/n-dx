@@ -38,6 +38,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [scip-java comparison counts constructor references as references to their type](./scip-java-comparison-counts.md) | completed |
 | [Spring Boot's byOwner pairs captures by scanning every owner, quadratic in a large Java file](./spring-boot-s-byowner-pairs-captures.md) | pending |
 | [Terraform agreement test checks a fixed name list, so a new config filename can drift from isTerraformPath](./terraform-agreement-test-checks-a.md) | pending |
-| [The Django query captures every list and tuple, adding seconds to large Python data files in every analyze](./the-django-query-captures-every-list.md) | pending |
+| [The Django query captures every list and tuple, adding seconds to large Python data files in every analyze](./the-django-query-captures-every-list.md) | completed |
 | [tree-sitter-go 0.25.0 rejects Go 1.26 new(expr) and generic methods](./tree-sitter-go-0-25-0-rejects-go-1-26.md) | pending |
 | [Widen gate G2 to junit-framework and thingsboard](./widen-gate-g2-to-junit-framework-and.md) | completed |
