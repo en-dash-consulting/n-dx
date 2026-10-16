@@ -143,6 +143,12 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
    * run, leaving nothing to assert on: the tab assertions below ran zero
    * times and still reported green until this read the state first.
    */
+  /** Open a tile full-screen, where its tabs are. */
+  function openTile(key: string): void {
+    const head = root.querySelector<HTMLButtonElement>(`.stage-tile[data-tile="${key}"] .stage-tile-head`);
+    act(() => { head?.click(); });
+  }
+
   function openSection(view: string): void {
     const toggle = root.querySelector<HTMLButtonElement>(
       `.stage-section[data-view="${view}"] .stage-section-toggle`,
@@ -228,25 +234,20 @@ describe("[a11y] navigation surfaces are named and keyboard-reachable", () => {
           }));
           for (const toggle of root.querySelectorAll(".stage-section-toggle")) {
             const view = toggle.closest("[data-view]")!.getAttribute("data-view")!;
-            const section = STAGES[stage].sections.find((s) => s.view === view)!;
-            // A grouped section (Terrain) is named by its group, not its first
-            // tab's own label; the blurb is hidden when narrow, so the title
-            // must carry the name alone either way.
-            const expected = section.group?.heading ?? viewLabel(view as never);
-            expect(accessibleName(toggle, hidden)).toContain(expected);
+            // The blurb is hidden when narrow, so the title must carry the
+            // name alone either way.
+            expect(accessibleName(toggle, hidden)).toContain(viewLabel(view as never));
           }
         });
 
-        it(`every ${viewLabel(stage)} section's tabs are named by their own view`, async () => {
+        it(`every ${viewLabel(stage)} tile's tabs are named by their own view`, async () => {
           await mount(h(StagePage, {
             stage, validViews: VALID, navigateTo: () => {}, renderView: () => null,
           }));
-          for (const section of STAGES[stage].sections.filter((s) => s.tabs?.length)) {
-            openSection(section.view);
-            const tabs = [...root.querySelectorAll(
-              `.stage-section[data-view="${section.view}"] [role="tab"]`,
-            )];
-            expect(tabs, `${section.view} rendered no tabs`).toHaveLength(section.tabs!.length + 1);
+          for (const tile of (STAGES[stage].tiles ?? []).filter((t) => t.tabs?.length)) {
+            openTile(tile.view);
+            const tabs = [...root.querySelectorAll(".stage-tile-fullscreen [role=\"tab\"]")];
+            expect(tabs, `${tile.view} rendered no tabs`).toHaveLength(tile.tabs!.length + 1);
             for (const tab of tabs) {
               const view = tab.getAttribute("data-tab")!;
               expect(accessibleName(tab, hidden)).toBe(viewLabel(view as never));

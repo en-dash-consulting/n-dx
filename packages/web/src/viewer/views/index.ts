@@ -24,7 +24,7 @@ export {
   viewProduct,
   viewProductLabel,
 } from "./view-meta.js";
-export type { StageId, StageDef, StageSection, StageTab, StageProduct, SettingsEntry } from "./stages.js";
+export type { StageId, StageDef, StageSection, StageTab, StageTile, StagePanelId, TileCols, TileRows, StageProduct, SettingsEntry } from "./stages.js";
 export {
   STAGES,
   STAGE_ORDER,
@@ -35,6 +35,8 @@ export {
   LIVE_VIEWS,
   stageForView,
   stageProduct,
+  stageViews,
+  tilePlacesView,
   visibleStages,
 } from "./stages.js";
 export type { IsoMapControls, IsoMapSource } from "./iso-map-url.js";

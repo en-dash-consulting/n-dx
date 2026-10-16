@@ -51,7 +51,7 @@
 .branded-header-hench { color: var(--brand-orange); }
 .branded-header-hench .branded-header-logo { color: var(--brand-orange); }
 
-/* View headers are replaced by the breadcrumb — hide entirely */
+/* Views' own headers are hidden: the shell titles each page (components/page-title.ts). */
 .view-header {
   display: none;
 }

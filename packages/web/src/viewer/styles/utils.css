@@ -203,23 +203,6 @@
   opacity: 0.7;
 }
 
-/* ── Page context bar: breadcrumb nav + FAQ/Guide buttons ── */
-.page-context-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 0 8px;
-  min-height: 28px;
-}
-
-.page-context-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
 /* Page-context help button */
 .guide-btn {
   width: 28px;

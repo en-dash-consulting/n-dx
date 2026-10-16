@@ -400,6 +400,17 @@ export interface IsoMapHeroProps {
   onOpenOptions?: () => void;
   /** Short facts shown beside the title — "43 zones", "2,239 files". */
   facts?: readonly string[];
+  /**
+   * Expand does this instead of taking the hero full screen — the dashboard
+   * opens the map in its tile modal, like every other tile.
+   */
+  onExpand?: () => void;
+  /**
+   * The hero is already shown large by its host (the dashboard's tile modal):
+   * it fills its container, zooms on a plain wheel, and drops its title and
+   * Expand, which the host provides.
+   */
+  hosted?: boolean;
 }
 
 /**
@@ -416,7 +427,7 @@ export interface IsoMapHeroProps {
  * Renders nothing in deployed mode — the Overview has plenty to show without
  * a card explaining why the map is absent.
  */
-export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [] }: IsoMapHeroProps) {
+export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [], onExpand, hosted = false }: IsoMapHeroProps) {
   const deployed = isDeployedMode();
   const cliName = useCliName();
   const { state, html, error, applied, generate } = useIsoMapDocument(analysisStamp, deployed, true);
@@ -425,7 +436,7 @@ export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [] }: Is
   const [expanded, setExpanded] = useState(false);
   // True when `expanded` is the CSS overlay rather than real full screen.
   const [overlay, setOverlay] = useState(false);
-  useIsoFrameSync(frameRef, expanded, state === "ready" ? html : null);
+  useIsoFrameSync(frameRef, expanded || hosted, state === "ready" ? html : null);
 
   useEffect(() => {
     const sync = () => {
@@ -445,6 +456,7 @@ export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [] }: Is
   }, [overlay]);
 
   const toggleExpanded = useCallback(() => {
+    if (onExpand) { onExpand(); return; }
     const el = rootRef.current;
     if (expanded) {
       if (overlay) { setOverlay(false); setExpanded(false); }
@@ -457,7 +469,7 @@ export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [] }: Is
       setOverlay(true);
       setExpanded(true);
     }
-  }, [expanded, overlay]);
+  }, [expanded, overlay, onExpand]);
 
   if (deployed) return null;
 
@@ -466,14 +478,14 @@ export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [] }: Is
 
   return h("section", {
     ref: rootRef,
-    class: `iso-hero${expanded ? " iso-hero--expanded" : ""}${overlay ? " iso-hero--overlay" : ""}`,
+    class: `iso-hero${expanded ? " iso-hero--expanded" : ""}${overlay ? " iso-hero--overlay" : ""}${hosted ? " iso-hero--hosted" : ""}`,
     role: overlay ? "dialog" : undefined,
     "aria-label": "Codebase map",
   },
     h("header", { class: "iso-hero-bar" },
       h("div", { class: "iso-hero-heading" },
-        h("span", { class: "iso-hero-mark", "aria-hidden": "true" }, "◆"),
-        h("h3", { class: "iso-hero-title" }, "Codebase map"),
+        hosted ? null : h("span", { class: "iso-hero-mark", "aria-hidden": "true" }, "◆"),
+        hosted ? null : h("h3", { class: "iso-hero-title" }, "Codebase map"),
         facts.length > 0
           ? h("ul", { class: "iso-hero-facts", "aria-label": "Map summary" },
               facts.map((f) => h("li", { key: f }, f)),
@@ -483,7 +495,7 @@ export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [] }: Is
       h("div", { class: "iso-hero-actions" },
         h("span", { class: "iso-hero-hint" },
           "Click a block for details · double-click to open it · ",
-          expanded ? "scroll to zoom" : "Ctrl/⌘ + scroll to zoom",
+          expanded || hosted ? "scroll to zoom" : "Ctrl/⌘ + scroll to zoom",
         ),
         state === "ready"
           ? h("button", {
@@ -508,7 +520,7 @@ export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [] }: Is
           rel: "noopener noreferrer",
           title: "Open the map on its own in a new tab",
         }, "New tab", h("span", { "aria-hidden": "true" }, "↗")),
-        h("button", {
+        hosted ? null : h("button", {
           type: "button",
           class: "iso-hero-btn iso-hero-btn--primary",
           onClick: toggleExpanded,
