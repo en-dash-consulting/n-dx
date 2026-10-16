@@ -6,7 +6,7 @@ import { computeProductStatus } from "../../../../src/core/product-status.js";
 import { findActionableWork } from "../../../../src/core/change-selection.js";
 import { isLossless } from "../../../../src/core/slug-migration.js";
 import type { PRDItem } from "../../../../src/schema/v1.js";
-import { isAppliedChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../../src/schema/v2-rules.js";
+import { CUT_HELD_AFTER_CUT_HEADING, checkV2Rules, isAppliedChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../../src/schema/v2-rules.js";
 import { FileStore } from "../../../../src/store/index.js";
 import { loadPrdModel } from "../../../../src/store/prd-model-reader.js";
 import type { PlanFile } from "../../../../src/migrations/plan-file.js";
@@ -346,6 +346,51 @@ describe("buildV2Tree", () => {
     expect(byId(built.tree, "e9")!.children!.map((c) => [c.id, c.type])).toEqual([["f9", "task"]]);
     expect(byId(built.tree, "t1")!.children!.map((c) => c.id).sort()).toEqual(["s1", "s9"]);
     expect(isLossless(everyV1Id(newer, built.tree, built.containers, built.cut))).toBe(true);
+  });
+
+  describe("v1 work completed between plan and apply, held in the Inbox", () => {
+    const AFTER_CUT = "2026-10-13T00:00:00.000Z";
+    const placedAtClose = (tree: V2Tree) => checkV2Rules(tree, { now: new Date("2026-10-20T00:00:00.000Z") }, ["change-placed-at-close"]);
+
+    /** The tree planned at CUT_AT, then held f4 completed in v1 after it. */
+    const completedAfterPlan = async () => {
+      const plan = await planOf(TREE);
+      expect(plan.entries.f4).toMatchObject({ target: "change", needsPlacement: true });
+      const newer = structuredClone(TREE);
+      const f4 = newer[0]!.children!.find((c) => c.id === "f4")!;
+      Object.assign(f4, { status: "completed", completedAt: AFTER_CUT });
+      Object.assign(f4.children![0]!, { status: "completed", completedAt: AFTER_CUT });
+      return buildV2Tree(newer, plan);
+    };
+
+    it("is listed by the cut and warned about, so rex health passes", async () => {
+      const { tree, cut } = await completedAfterPlan();
+      expect(byId(tree, "f4")).toMatchObject({ needsPlacement: true, appliedAt: AFTER_CUT });
+      expect(byId(tree, cut)!.body).toContain(`${CUT_HELD_AFTER_CUT_HEADING}\n\n- Cache eviction (f4)`);
+      const findings = placedAtClose(tree);
+      expect(findings.map((f) => [f.nodeId, f.severity])).toContainEqual(["f4", "warning"]);
+      expect(findings.filter((f) => f.severity === "error")).toEqual([]);
+      expect(findings.find((f) => f.nodeId === "f4")!.message).toContain("closed in v1 before the migration was applied");
+    });
+
+    it("still errors on a held change completed in v2 after apply", async () => {
+      const { tree } = await completedAfterPlan();
+      const v2 = { id: "c-v2", type: "change", title: "Closed in v2", slug: "closed-in-v2", needsPlacement: true, status: "completed", completedAt: "2026-10-14T00:00:00.000Z" } as RuleNode;
+      tree.changes.push(v2);
+      const findings = placedAtClose(tree);
+      expect(findings.find((f) => f.nodeId === "c-v2")).toMatchObject({ severity: "error" });
+      expect(findings.find((f) => f.nodeId === "f4")).toMatchObject({ severity: "warning" });
+    });
+
+    it("leaves the cut's list out when nothing closed after the cut", async () => {
+      const { tree, cut } = buildV2Tree(TREE, await planOf(TREE));
+      expect(byId(tree, cut)!.body).not.toContain(CUT_HELD_AFTER_CUT_HEADING);
+    });
+
+    it("keeps the cut's container list readable after the held list", async () => {
+      const { tree, containers } = await completedAfterPlan();
+      expect(cutContainerIds(tree)).toEqual(containers.map((c) => c.id));
+    });
   });
 
   it("re-fits a planned item whose parent is gone, and reports plan entries no longer in the tree", async () => {

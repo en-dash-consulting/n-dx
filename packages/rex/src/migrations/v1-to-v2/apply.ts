@@ -30,7 +30,9 @@
  *   met is dropped. Every rewrite is in `blockers` and the cut change's body.
  * - **The cut.** The first change, "Product map and change layer", is applied
  *   at the plan's `cutAt` and adds every capability and constraint, so the
- *   product layer's history starts with the migration.
+ *   product layer's history starts with the migration. It lists the held v1
+ *   work that closed after `cutAt` (completed between plan and apply), which
+ *   the cut time alone would read as closed in v2.
  *
  * Every v1 id ends up as a node or a listed container: checked by count and
  * id ({@link everyV1Id}, through `fingerprintTree` and `isLossless`) before
@@ -59,7 +61,7 @@ import { amendsHash, freeSlug } from "../../core/apply-amendments.js";
 import { diffFingerprints, fingerprintTree, isLossless, type FingerprintDiff } from "../../core/slug-migration.js";
 import type { PRDItem } from "../../schema/v1.js";
 import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
-import { CUT_CHANGE_BODY_PREFIX, CUT_CHANGE_TITLE, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
+import { CUT_CHANGE_BODY_PREFIX, CUT_CHANGE_TITLE, CUT_HELD_AFTER_CUT_HEADING, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../schema/v2-rules.js";
 import { withLock, type LockOptions } from "../../store/file-lock.js";
 import { parseFolderTree } from "../../store/folder-tree-parser.js";
 import { discoverPRDFiles } from "../../store/prd-discovery.js";
@@ -268,7 +270,7 @@ export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV
   rewriteRequirementBlockers(tree, nodes, heldOn, blockers);
   stampMet(tree, nodes);
 
-  const cut = cutChange(tree, containers, blockers, plan);
+  const cut = cutChange(tree, containers, blockers, heldAfterCut(nodes, cutAt), plan);
   tree.changes.push(cut);
 
   return {
@@ -573,8 +575,29 @@ export function cutContainerIds(tree: V2Tree): string[] {
   return ids;
 }
 
+/**
+ * Held changes that closed after the plan's `cutAt`: v1 work completed between
+ * plan and apply. The cut lists them, so `change-placed-at-close` reads them as
+ * migrated work rather than as changes closed in v2.
+ */
+function heldAfterCut(nodes: ReadonlyMap<string, RuleNode>, cutAt: string): RuleNode[] {
+  const cut = Date.parse(cutAt);
+  return [...nodes.values()].filter((node) => {
+    if (node.needsPlacement !== true || (node.status !== "completed" && node.appliedAt === undefined)) return false;
+    // As the rule reads it: an unparseable completedAt falls back to appliedAt.
+    const completedAt = Date.parse(node.completedAt ?? "");
+    return (Number.isNaN(completedAt) ? Date.parse(node.appliedAt ?? "") : completedAt) > cut;
+  });
+}
+
 /** The cut: an applied change that adds every capability and constraint, and names the containers that became no node. */
-function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], blockers: readonly BlockerRewrite[], plan: V1ToV2Plan): RuleNode {
+function cutChange(
+  tree: V2Tree,
+  containers: readonly DeliveryContainer[],
+  blockers: readonly BlockerRewrite[],
+  held: readonly RuleNode[],
+  plan: V1ToV2Plan,
+): RuleNode {
   const id = cutId(plan);
   const at = plan.header.cutAt;
   const amends: Amendment[] = [];
@@ -601,6 +624,10 @@ function cutChange(tree: V2Tree, containers: readonly DeliveryContainer[], block
   if (blockers.length > 0) {
     lines.push("", BLOCKERS_HEADING, "");
     for (const r of blockers) lines.push(`- ${describeBlockerRewrite(r)}`);
+  }
+  if (held.length > 0) {
+    lines.push("", CUT_HELD_AFTER_CUT_HEADING, "");
+    for (const node of held) lines.push(`- ${node.title} (${node.id})`);
   }
   if (containers.length > 0) {
     lines.push("", CONTAINERS_HEADING, "");

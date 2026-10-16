@@ -3,6 +3,7 @@ import {
   checkV2Rules,
   CUT_CHANGE_BODY_PREFIX,
   CUT_CHANGE_TITLE,
+  CUT_HELD_AFTER_CUT_HEADING,
   indexTree,
   isAppliedChange,
   isOpenChange,
@@ -163,6 +164,15 @@ describe("change-placed-at-close", () => {
       const findings = placeable([cut(), after]);
       expect(ids(findings)).toEqual([after.id]);
       expect(findings[0].severity).toBe("error");
+    });
+
+    it("warns on a held change completed after the cut that the cut lists as v1 work apply held, and errors on one it does not list", () => {
+      const listed = held({ status: "completed", completedAt: "2026-10-11T00:00:00.000Z" });
+      const unlisted = held({ status: "completed", completedAt: "2026-10-11T00:00:00.000Z" });
+      const withList = cut();
+      withList.body += `\n\n${CUT_HELD_AFTER_CUT_HEADING}\n\n- ${listed.title} (${listed.id})\n\nNext section:`;
+      const findings = placeable([withList, listed, unlisted]);
+      expect(findings.map((f) => [f.nodeId, f.severity])).toEqual([[listed.id, "warning"], [unlisted.id, "error"]]);
     });
 
     it("still errors when no migration cut is in the tree, even on a change titled like the cut", () => {

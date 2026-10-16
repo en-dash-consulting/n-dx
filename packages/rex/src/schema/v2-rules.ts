@@ -251,12 +251,39 @@ export const CUT_CHANGE_BODY_PREFIX = "Moved the PRD from the v1 folder tree to 
  */
 export function migrationCutAt({ entries }: TreeIndex): number | undefined {
   let cut: number | undefined;
-  for (const { node } of entries) {
-    if (node.type !== "change" || node.title !== CUT_CHANGE_TITLE || !node.body?.startsWith(CUT_CHANGE_BODY_PREFIX)) continue;
+  for (const node of cutChanges(entries)) {
     const at = Date.parse(node.appliedAt ?? "");
     if (!Number.isNaN(at) && (cut === undefined || at < cut)) cut = at;
   }
   return cut;
+}
+
+const cutChanges = (entries: TreeIndex["entries"]): RuleNode[] =>
+  entries
+    .map(({ node }) => node)
+    .filter((node) => node.type === "change" && node.title === CUT_CHANGE_TITLE && !!node.body?.startsWith(CUT_CHANGE_BODY_PREFIX));
+
+/**
+ * Heads the cut change's list of v1 work that closed after the plan's `cutAt`
+ * but before apply ran, and that apply held in the Inbox: one `- <title> (<id>)`
+ * line each. The cut's time alone would read that work as closed in v2.
+ */
+export const CUT_HELD_AFTER_CUT_HEADING = "v1 work closed after the cut and held in the Inbox by apply:";
+const HELD_LINE = /^- .* \(([^()\s]+)\)$/;
+
+/** Ids of the changes a migration cut lists under {@link CUT_HELD_AFTER_CUT_HEADING}: v1 work apply held closed. */
+export function migrationHeldIds({ entries }: TreeIndex): Set<string> {
+  const ids = new Set<string>();
+  for (const node of cutChanges(entries)) {
+    const lines = node.body!.split("\n");
+    const start = lines.indexOf(CUT_HELD_AFTER_CUT_HEADING);
+    if (start < 0) continue;
+    let i = start + 1;
+    while (lines[i] === "") i++;
+    // The list ends at its first line that is not an item: the next section's blank line.
+    for (let id = HELD_LINE.exec(lines[i] ?? "")?.[1]; id !== undefined; id = HELD_LINE.exec(lines[++i] ?? "")?.[1]) ids.add(id);
+  }
+  return ids;
 }
 
 /** Each rule's severity. `change-placed-at-close` lowers its own to a warning for work the migration held ({@link changePlacedAtClose}). */
@@ -368,13 +395,16 @@ const changeHasTarget: Rule = ({ entries }) =>
  * On a product layer with nothing to place on ({@link canPlaceChanges}) an
  * Inbox change closes unplaced, and this reports it once there is.
  *
- * A change closed at or before the migration cut ({@link migrationCutAt}) is
- * v1 work the migration held in the Inbox. `rex change place` refuses a
- * closed change, so it can never leave the Inbox, and the finding is a
- * warning (decision S2-Q2). A change closed after the cut is an error.
+ * A change closed at or before the migration cut ({@link migrationCutAt}), or
+ * one the cut lists as v1 work closed between plan and apply
+ * ({@link migrationHeldIds}), is v1 work the migration held in the Inbox.
+ * `rex change place` refuses a closed change, so it can never leave the
+ * Inbox, and the finding is a warning (decision S2-Q2). Any other closed
+ * Inbox change closed in v2, and is an error.
  */
 const changePlacedAtClose: Rule = (index) => {
   const cut = migrationCutAt(index);
+  const held = migrationHeldIds(index);
   return index.entries.flatMap(({ node }) => {
     if (node.type !== "change" || !awaitsPlacement(index, node)) return [];
     if (node.status !== "completed" && !isAppliedChange(node)) return [];
@@ -383,8 +413,9 @@ const changePlacedAtClose: Rule = (index) => {
     // An unparseable completedAt falls back to appliedAt, as apply does when it stamps a completed v1 item.
     const completedAt = Date.parse(node.completedAt ?? "");
     const closedAt = Number.isNaN(completedAt) ? Date.parse(node.appliedAt ?? "") : completedAt;
-    if (cut !== undefined && closedAt <= cut) {
-      const message = `Change "${node.title}" is ${state} but still needs placement; it closed before the migration cut and stays in the Inbox as a record${untargeted}`;
+    if (cut !== undefined && (closedAt <= cut || held.has(node.id))) {
+      const when = closedAt <= cut ? "before the migration cut" : "in v1 before the migration was applied";
+      const message = `Change "${node.title}" is ${state} but still needs placement; it closed ${when} and stays in the Inbox as a record${untargeted}`;
       return [finding("change-placed-at-close", node, message, "warning")];
     }
     return [finding("change-placed-at-close", node, `Change "${node.title}" is ${state} but still needs placement; a person must confirm its targets before it closes${untargeted}`)];
