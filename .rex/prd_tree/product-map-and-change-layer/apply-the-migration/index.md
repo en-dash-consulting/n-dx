@@ -29,8 +29,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A change on a fresh v2 project can leave the Inbox, so ndx work and rex next select work there](./a-change-on-a-fresh-v2-project-can.md) | completed |
 | [A clean rex migrate --apply --dry-run does not mean apply would proceed: the write and read-back checks are skipped](./a-clean-rex-migrate-apply-dry-run-does.md) | completed |
 | [A dissolved container's blockedBy rewrite at migrate --apply is invisible to a reviewer: neither the plan nor the dry run shows it](./a-dissolved-container-s-blockedby.md) | completed |
-| [A failed prd_tree/ removal after the switch says the v2 tree is in place and to re-run apply](./a-failed-prd-tree-removal-after-the.md) | pending |
+| [A failed prd_tree/ removal after the switch says the v2 tree is in place and to re-run apply](./a-failed-prd-tree-removal-after-the.md) | completed |
+| [A failed rm of the leftover v1 files on an already-v2 apply throws the raw error without saying the v2 tree is in place](./a-failed-rm-of-the-leftover-v1-files.md) | pending |
 | [A leftover .rex/prd.json is auto-migrated back into prd_tree/ beside the v2 tree after rex migrate --apply](./a-leftover-rex-prd-json-is-auto.md) | completed |
+| [A post-switch prd_tree/ removal that fails partway tells the user a re-run fixes it, but the re-run with the plan refuses](./a-post-switch-prd-tree-removal-that.md) | pending |
 | [A re-plan reuses the earlier plan's cut time only when the tree is unchanged](./a-re-plan-reuses-the-earlier-plan-s.md) | completed |
 | [After rex migrate --apply, an item blockedBy a dissolved release or review epic is blocked forever](./after-rex-migrate-apply-an-item.md) | completed |
 | [Agents in ndx work runs see "Run 'ndx migrate'" on every rex command and can run the migration unasked](./agents-in-ndx-work-runs-see-run-ndx.md) | completed |
