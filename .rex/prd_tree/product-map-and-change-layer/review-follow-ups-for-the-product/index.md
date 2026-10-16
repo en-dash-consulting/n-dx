@@ -25,15 +25,16 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | completed |
 | [Bundle v2 round trip moves unknown state.yaml keys into node frontmatter](./bundle-v2-round-trip-moves-unknown.md) | completed |
 | [change-management guide says rex remove archives items and rex restore <item-id> recovers them; neither is true](./change-management-guide-says-rex.md) | completed |
-| [Codex drops most of packages/web/AGENTS.md: root plus nested AGENTS.md exceeds its 32 KiB combined project-doc budget](./codex-drops-most-of-packages-web.md) | pending |
+| [Codex drops most of packages/web/AGENTS.md: root plus nested AGENTS.md exceeds its 32 KiB combined project-doc budget](./codex-drops-most-of-packages-web.md) | completed |
 | [Codex never sees the per-package governance or the path-scoped rules, because they live only in Claude-loaded files](./codex-never-sees-the-per-package.md) | cancelled |
-| [Decide whether rex's trailer reader recovers a split-off N-DX-Item line](./decide-whether-rex-s-trailer-reader.md) | pending |
+| [Decide whether rex's trailer reader recovers a split-off N-DX-Item line](./decide-whether-rex-s-trailer-reader.md) | completed |
 | [Defer the PRD timeline view and re-scope it to the Changes view](./defer-the-prd-timeline-view-and-re.md) | completed |
 | [Derive area links and propose dependsOn from shared tests](./derive-area-links-and-propose.md) | pending |
 | [Diff two migration plans in words](./diff-two-migration-plans-in-words.md) | pending |
 | [docs/guide/skills.md skill table descriptions can drift from manifest.json with no test to catch it](./docs-guide-skills-md-skill-table.md) | pending |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
 | [Install the sv analyze stop handlers before the progress file says running](./install-the-sv-analyze-stop-handlers.md) | completed |
+| [`ndx ci` crashes with a stack trace, and no report, when a scanned source file cannot be read](./ndx-ci-crashes-with-a-stack-trace-and.md) | pending |
 | [ndx ci gateway-imports step misses dynamic import() that domain-isolation now flags](./ndx-ci-gateway-imports-step-misses.md) | pending |
 | [ndx work --task=<change> --resolve refuses a change whose open tasks --reset-deferred would reopen](./ndx-work-task-change-resolve-refuses-a.md) | pending |
 | [No test pins the Ask route passing the v2 merge rule to parseAnswerRefinements](./no-test-pins-the-ask-route-passing-the.md) | pending |
@@ -49,4 +50,3 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [VALIDATED_DOC_PAGES is hand-maintained: a root test that starts reading a new docs page selects nothing until someone adds a group](./validated-doc-pages-is-hand-maintained.md) | pending |
 | [Wire ndx migrate --plan to write the classified plan](./wire-ndx-migrate-plan-to-write-the.md) | completed |
 | [Write Inbox changes to the reserved changes/inbox/ folder, and move them out on placement](./write-inbox-changes-to-the-reserved.md) | completed |
-| [`ndx ci` crashes with a stack trace, and no report, when a scanned source file cannot be read](./ndx-ci-crashes-with-a-stack-trace-and.md) | pending |
