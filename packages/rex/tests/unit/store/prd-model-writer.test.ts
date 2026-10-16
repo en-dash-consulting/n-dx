@@ -682,6 +682,55 @@ describe("writePrdModel and the reserved Inbox folder", () => {
     });
   });
 
+  describe("a non-tree file in the folder of a change that moves", () => {
+    /** An Inbox change whose folder also holds notes.txt, then released for placement. */
+    async function seeded(): Promise<{ rexDir: string; held: PrdModel }> {
+      const rexDir = await copyFixture();
+      const model = await loadPrdModel(rexDir, quiet);
+      model.tree.changes.push(unplaced());
+      await write(rexDir, model);
+      await writeFile(join(rexDir, "changes/inbox/refunds-by-card/notes.txt"), "keep me\n");
+      const held = await loadPrdModel(rexDir, quiet);
+      const change = find(all(held), INBOX_CHANGE);
+      delete (change as Record<string, unknown>).needsPlacement;
+      change.touches = [CAPABILITY];
+      return { rexDir, held };
+    }
+
+    it("moves with the change, and the Inbox folder goes", async () => {
+      const { rexDir, held } = await seeded();
+
+      await write(rexDir, held);
+
+      const files = await snapshot(rexDir);
+      expect(paths(files, "refunds-by-card")).toEqual([
+        "changes/refunds-by-card/index.md",
+        "changes/refunds-by-card/notes.txt",
+      ]);
+      expect(files["changes/refunds-by-card/notes.txt"]).toBe("keep me\n");
+      expect(paths(files, "inbox")).toEqual([]);
+    });
+
+    it("leaves no 'Folder has no index.md' warning on the next read", async () => {
+      const { rexDir, held } = await seeded();
+      await write(rexDir, held);
+
+      const reread = await loadPrdModel(rexDir, quiet);
+      expect(reread.warnings.filter((w) => /no index\.md/.test(w.message))).toEqual([]);
+      expect(reread.warnings).toEqual([]);
+    });
+
+    it("refuses before writing anything when the destination already holds a file of that name", async () => {
+      const { rexDir, held } = await seeded();
+      await mkdir(join(rexDir, "changes/refunds-by-card"), { recursive: true });
+      await writeFile(join(rexDir, "changes/refunds-by-card/notes.txt"), "other\n");
+      const before = await snapshot(rexDir);
+
+      await expect(write(rexDir, held)).rejects.toThrow(/notes\.txt/);
+      expect(await snapshot(rexDir)).toEqual(before);
+    });
+  });
+
   it("keeps the Inbox folder while another unplaced change is still in it", async () => {
     const rexDir = await copyFixture();
     const model = await loadPrdModel(rexDir, quiet);
