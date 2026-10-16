@@ -20,7 +20,7 @@ import type { FeatureToggle, FeaturesResponse } from "../external.js";
 
 // ── Package metadata ─────────────────────────────────────────────────
 
-const PACKAGE_META: Record<string, { label: string; icon: string; description: string }> = {
+export const PACKAGE_META: Record<string, { label: string; icon: string; description: string }> = {
   sourcevision: {
     label: "{cli} analyze / plan",
     icon: "▣",
@@ -36,9 +36,17 @@ const PACKAGE_META: Record<string, { label: string; icon: string; description: s
     icon: "▶",
     description: "Autonomous agent execution, retry policies, and guard rails",
   },
+  git: {
+    label: "Version control",
+    icon: "◈",
+    description: "How n-dx commits the files it generates",
+  },
 };
 
-const PACKAGE_ORDER = ["sourcevision", "rex", "hench"];
+// Order the settings page renders package sections in. A package missing
+// from this list is silently dropped by the filter below, so every key in
+// PACKAGE_META belongs here — that omission is what hid the git toggles.
+export const PACKAGE_ORDER = ["sourcevision", "rex", "hench", "git"];
 
 const STABILITY_META: Record<string, { label: string; class: string }> = {
   experimental: { label: "Experimental", class: "ft-badge-experimental" },
@@ -163,6 +171,10 @@ function ToggleItem({ toggle, isUnsaved, onToggle }: {
 }) {
   const isNonDefault = toggle.enabled !== toggle.defaultValue;
   const stability = STABILITY_META[toggle.stability] ?? STABILITY_META.stable;
+  // Collapsed by default: the long form is for a toggle whose effects reach
+  // outside the dashboard, and it would crowd the page if always open.
+  const [showDetails, setShowDetails] = useState(false);
+  const detailsId = `ft-details-${toggle.key.replace(/[^a-zA-Z0-9]/g, "-")}`;
 
   const handleChange = useCallback(() => {
     onToggle(toggle.key, !toggle.enabled);
@@ -178,6 +190,17 @@ function ToggleItem({ toggle, isUnsaved, onToggle }: {
           : null,
         isUnsaved
           ? h("span", { class: "ft-badge ft-badge-unsaved" }, "unsaved")
+          : null,
+        toggle.details
+          ? h("button", {
+              type: "button",
+              class: `ft-toggle-info${showDetails ? " ft-toggle-info--open" : ""}`,
+              onClick: () => setShowDetails(!showDetails),
+              "aria-expanded": String(showDetails),
+              "aria-controls": detailsId,
+              "aria-label": `More about ${toggle.label}`,
+              title: `More about ${toggle.label}`,
+            }, "\u24d8")
           : null,
       ),
       h("label", { class: "ft-toggle-switch" },
@@ -196,6 +219,9 @@ function ToggleItem({ toggle, isUnsaved, onToggle }: {
       h("span", { class: "ft-toggle-impact-icon", "aria-hidden": "true" }, "⚠"),
       h("span", null, toggle.impact),
     ),
+    toggle.details && showDetails
+      ? h("div", { class: "ft-toggle-details", id: detailsId }, toggle.details)
+      : null,
   );
 }
 

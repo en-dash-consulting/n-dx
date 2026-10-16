@@ -23,7 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Geometric Decorative Design System for ndx UI](./geometric-decorative-design-system-for/index.md) | completed |
 | [Item completion timeline view](./item-completion-timeline-view/index.md) | completed |
 | [Live tab: watch every running task and analysis from one place](./live-tab-watch-every-running-task-and/index.md) | completed |
-| [Live view plumbing: stream running hench and analyze progress to the dashboard](./live-view-plumbing-stream-running/index.md) | completed |
+| [Live view plumbing: stream running hench and analyze progress to the dashboard](./live-view-plumbing-stream-running/index.md) | pending |
 | [N-Rex Easter Egg — Triple-Click Dino Takeover](./n-rex-easter-egg-triple-click-dino/index.md) | completed |
 | [ndx as the single CLI interface](./ndx-as-the-single-cli-interface/index.md) | completed |
 | [ndx Dashboard Refresh Orchestration](./ndx-dashboard-refresh-orchestration/index.md) | completed |
@@ -50,4 +50,10 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-before.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-contract-in.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-hench.md) | completed |
+| [One-click labelled commit when the dirty tree is only PRD or only scan output](./one-click-labelled-commit-when-the.md) | completed |
+| [Page content paints over the settings overlay instead of under it](./page-content-paints-over-the-settings.md) | completed |
+| [Detected run and build commands as a dashboard control](./detected-run-and-build-commands-as-a.md) | completed |
+| [Fail-forward mode: commit automatically at the end of every run, loop and settings change](./fail-forward-mode-commit-automatically.md) | pending |
+| [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | pending |
+| [On a v2 project /api/live's next list uses v1 selection, so it shows Inbox changes and ignores change priority](./on-a-v2-project-api-live-s-next-list.md) | pending |
 

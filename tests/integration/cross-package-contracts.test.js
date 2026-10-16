@@ -915,6 +915,7 @@ describe("gateway export auto-detection", () => {
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
         "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS",
         "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE", "SECRET_PATH_PATTERNS",
+        "isFailForwardEnabled",
         "NDX_CONTAINER_DIRNAME"],
       ...["DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"],
     ]);

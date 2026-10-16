@@ -20,6 +20,8 @@ export async function handleEditItem(
     level?: string;
     tags?: string[];
     source?: string;
+    /** Empty string removes it; selection matches the stored value exactly. */
+    assignee?: string;
     blockedBy?: string[];
     /** Object replaces the whole block; `null` (or `{}`) removes it. */
     run?: unknown;
@@ -57,6 +59,11 @@ export async function handleEditItem(
     }
     if (args.tags !== undefined) updates.tags = args.tags;
     if (args.source !== undefined) updates.source = args.source;
+    if (args.assignee !== undefined) {
+      // Empty clears it, matching `rex update --assignee=`; without this there
+      // is no way to unassign an item through MCP.
+      updates.assignee = args.assignee.trim() || undefined;
+    }
     if (args.run !== undefined) {
       const runCheck = validateRunSettings(args.run);
       if (!runCheck.ok) return textResult(`Invalid run settings: ${runCheck.error}`, true);
@@ -85,7 +92,7 @@ export async function handleEditItem(
 
     if (Object.keys(updates).length === 0) {
       return textResult(
-        "No fields to update. Provide at least one field (title, description, acceptanceCriteria, priority, tags, source, blockedBy, run).",
+        "No fields to update. Provide at least one field (title, description, acceptanceCriteria, priority, tags, source, assignee, blockedBy, run).",
         true,
       );
     }
@@ -115,7 +122,7 @@ export async function handleEditItem(
 
 export const editItemTool = defineTool({
   name: "edit_item",
-  description: "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
+  description: "Edit content fields of a PRD item (title, description, acceptance criteria, priority, level, tags, assignee, run). Use for content changes — use update_task_status for status/lifecycle transitions.",
   schema: {
     id: z.string().describe("Item ID"),
     title: z.string().optional().describe("New title"),
@@ -125,6 +132,7 @@ export const editItemTool = defineTool({
     level: z.enum(["epic", "feature", "task", "subtask"]).optional().describe("New level (epic, feature, task, subtask)"),
     tags: z.array(z.string()).optional().describe("New tags"),
     source: z.string().optional().describe("New source"),
+    assignee: z.string().optional().describe("Who the item belongs to. Matched exactly by task selection (ndx work --mine) and inherited by descendants. An empty string removes it."),
     blockedBy: z.array(z.string()).optional().describe("New blocked-by IDs"),
     run: RunSettingsSchema.nullable().optional().describe("Saved run settings. An object REPLACES the whole block (omitted keys are dropped); null removes it. Vendor-agnostic keys: tier (light|standard|heavy), models ({claude?,codex?,google?,local?: model id}), provider, permissionMode, review, reviewMode (off|self|pair), reviewVendor (claude|codex: the pair reviewer), reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes."),
   },

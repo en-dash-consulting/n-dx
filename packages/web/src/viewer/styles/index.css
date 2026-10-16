@@ -53,6 +53,7 @@
 @import "./polling-suspension.css";
 @import "./active-operations.css";
 @import "./git-status.css";
+@import "./run-command.css";
 @import "./sessions-panel.css";
 @import "./status-dock.css";
 @import "./stage-tiles.css";

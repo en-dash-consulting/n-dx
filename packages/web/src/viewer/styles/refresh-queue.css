@@ -6,6 +6,7 @@
  */
 
 .refresh-queue-status {
+  z-index: var(--z-tray);
   padding: 0.4rem 0.75rem;
   border-radius: 999px;
   font-size: 0.8rem;

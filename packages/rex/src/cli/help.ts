@@ -233,7 +233,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "update an existing PRD item",
     usage: "rex update <id> [options] [dir]",
     description:
-      "Modify the status, priority, title, description, acceptance criteria, or source of a PRD item.\n" +
+      "Modify the status, priority, title, description, acceptance criteria, source, or assignee of a PRD item.\n" +
       "Status transitions are validated (e.g. completed → pending requires --force).",
     options: [
       { flag: "--status=<s>", description: "New status: pending, in_progress, completed, failing, deferred, blocked, deleted" },
@@ -242,6 +242,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--description=\"...\"", description: "New description" },
       { flag: "--criterion=\"...\"", description: "Acceptance criterion; repeat per criterion. Replaces the whole list; --criterion= on its own clears it" },
       { flag: "--source=\"...\"", description: "Where the item came from; --source= removes it" },
+      { flag: "--assignee=\"...\"", description: "Who the item belongs to, matched by 'ndx work --mine' and inherited by children; --assignee= removes it" },
       { flag: "--reason=\"...\"", description: "Failure reason (when setting status to failing)" },
       { flag: "--run='<json>'", description: "Saved run settings (replaces the whole block): tier (light|standard|heavy), models (per-vendor pins), provider, permissionMode, review, reviewMode (off|self|pair), reviewVendor (claude|codex), reviewTier, reviewModels, reviewOptional, skipTestGate, maxTurns, tokenBudget, contextNotes. --run= or --run=null clears it" },
       { flag: "--force", description: "Override status transition rules" },
@@ -254,6 +255,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex update abc123 --status=completed", description: "Mark a task as done" },
       { command: "rex update abc123 --status=in_progress", description: "Start working on a task" },
       { command: "rex update abc123 --priority=critical --title=\"Urgent fix\"", description: "Update priority and title" },
+      { command: "rex update abc123 --assignee=\"Sterling H\"", description: "Assign a task so 'ndx work --mine' selects it" },
     ],
     related: ["add", "next"],
   },

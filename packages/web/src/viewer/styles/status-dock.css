@@ -14,7 +14,7 @@
   position: fixed;
   right: 1rem;
   bottom: calc(1rem + var(--bottombar-h, 0px));
-  z-index: 998;
+  z-index: var(--z-tray);
   display: flex;
   flex-direction: row;
   flex-wrap: wrap-reverse;

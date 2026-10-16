@@ -234,7 +234,7 @@
   position: fixed;
   inset: 0;
   background: rgba(12, 14, 26, 0.8);
-  z-index: 1000;
+  z-index: var(--z-modal-backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
