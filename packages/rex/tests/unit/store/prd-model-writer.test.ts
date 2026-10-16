@@ -468,6 +468,50 @@ describe("writePrdModel", () => {
     expect(await snapshot(rexDir)).toEqual(before);
   });
 
+  describe("a folder node with an extra top-level state.yaml key that moves under another parent", () => {
+    const SUB = { id: "s1", type: "subtask", title: "Hide on Chrome", slug: "hide-on-chrome" } as RuleNode;
+
+    /** TASK as a folder whose state.yaml holds `futureKey`, beside a second change to move it into. */
+    async function setup(): Promise<string> {
+      const rexDir = await copyFixture();
+      const first = await loadPrdModel(rexDir, quiet);
+      first.tree.changes.push({ id: "c-new", type: "change", title: "Spike: wallets", slug: "spike-wallets" } as RuleNode);
+      find(all(first), TASK).children = [{ ...SUB }];
+      await write(rexDir, first);
+      await writeFile(join(rexDir, "changes/add-apple-pay/wire-the-button/state.yaml"), 'schema: "rex/v2"\nitems: {}\nfutureKey: 1\n');
+      return rexDir;
+    }
+
+    async function moveTask(rexDir: string, children: RuleNode[]): Promise<PrdModel> {
+      const model = await loadPrdModel(rexDir, quiet);
+      const task = find(all(model), TASK);
+      const from = find(all(model), CHANGE);
+      from.children = from.children!.filter((n) => n.id !== TASK);
+      task.children = children;
+      find(all(model), "c-new").children = [task];
+      return model;
+    }
+
+    it("keeps the key in the new folder's state.yaml", async () => {
+      const rexDir = await setup();
+      await write(rexDir, await moveTask(rexDir, [{ ...SUB }]), { removed: new Set() });
+
+      const state = await readFile(join(rexDir, "changes/spike-wallets/wire-the-button/state.yaml"), "utf-8");
+      expect(state).toContain("futureKey: 1");
+      expect(Object.keys(await snapshot(rexDir)).filter((p) => p.includes("add-apple-pay/wire-the-button"))).toEqual([]);
+    });
+
+    it("refuses when it also loses its last child, naming the old folder and key, and writes nothing", async () => {
+      const rexDir = await setup();
+      const before = await snapshot(rexDir);
+
+      await expect(write(rexDir, await moveTask(rexDir, []), { removed: new Set(["s1"]) })).rejects.toThrow(
+        new RegExp(`${TASK} would become a leaf.*add-apple-pay.wire-the-button.*futureKey`),
+      );
+      expect(await snapshot(rexDir)).toEqual(before);
+    });
+  });
+
   it("removes a stale folder that held only tree files", async () => {
     const rexDir = await copyFixture();
     const model = await loadPrdModel(rexDir, quiet);

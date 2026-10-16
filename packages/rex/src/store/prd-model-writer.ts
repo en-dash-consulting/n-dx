@@ -230,6 +230,8 @@ interface LoadedState {
   files: Map<string, StateFile>;
   /** Every row, by node id, whichever folder holds it; the first found wins. */
   rows: Map<string, ItemState>;
+  /** The folder each folder node's own `index.md` is in, by node id: where a moved node's state.yaml still is. */
+  folderOf: Map<string, string>;
   /** {@link WritePrdModelOptions.stateKeys}. */
   stateKeys: ReadonlyMap<string, ReadonlySet<string>>;
   /** {@link WritePrdModelOptions.folderState}. */
@@ -241,7 +243,7 @@ async function loadAllStateFiles(
   stateKeys: ReadonlyMap<string, ReadonlySet<string>>,
   folderState: FolderStateKeys,
 ): Promise<LoadedState> {
-  const loaded: LoadedState = { files: new Map(), rows: new Map(), stateKeys, folderState };
+  const loaded: LoadedState = { files: new Map(), rows: new Map(), folderOf: new Map(), stateKeys, folderState };
   const walk = async (dir: string): Promise<void> => {
     for (const entry of (await listDir(dir)) ?? []) {
       if (entry.name.startsWith(".")) continue;
@@ -250,6 +252,8 @@ async function loadAllStateFiles(
       } else if (entry.isFile() && entry.name === STATE_FILE_NAME) {
         const file = await loadStateFile(dir);
         loaded.files.set(dir, file);
+        const fm = parseFrontmatter((await readIfExists(join(dir, INDEX_FILE))) ?? "", dir, []);
+        if (typeof fm?.id === "string") loaded.folderOf.set(fm.id, dir);
         for (const [id, row] of Object.entries(file.items)) if (!loaded.rows.has(id)) loaded.rows.set(id, row);
       }
     }
@@ -278,6 +282,14 @@ async function planFolder(
   const entries = (await listDir(dir)) ?? [];
   const existing = loaded.files.get(dir) ?? { ...emptyStateFile(), schema: stamp };
   const { layers, nodes: byOwner } = loaded.folderState;
+  if (typeof owner !== "string") {
+    // A node that moved here left its top-level keys in the folder it came from.
+    const oldDir = loaded.folderOf.get(owner.id);
+    const old = oldDir !== undefined && oldDir !== dir ? loaded.files.get(oldDir) : undefined;
+    for (const [key, value] of Object.entries((old && extraTopLevelKeys(old)) ?? {})) {
+      if (!Object.hasOwn(existing, key)) Object.assign(existing, { [key]: value });
+    }
+  }
   Object.assign(existing, typeof owner !== "string" ? byOwner.get(owner.id) : owner === INBOX_DIRNAME ? undefined : layers[owner]);
   const rows: Record<string, ItemState> = {};
   const specs = new Map<string, ProductSpec>();
@@ -336,7 +348,7 @@ async function planFolder(
       expectedDirs.add(node.slug);
       await planFolder(join(dir, node.slug), node.children ?? [], node, stamp, loaded, plan);
     } else {
-      assertNoStrandedState(join(dir, node.slug), node, loaded);
+      assertNoStrandedState(loaded.folderOf.get(node.id) ?? join(dir, node.slug), node, loaded);
       const intent: Record<string, unknown> = {};
       keep(node, intent);
       const file = `${node.slug}.md`;
