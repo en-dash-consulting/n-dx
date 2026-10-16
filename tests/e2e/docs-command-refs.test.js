@@ -162,10 +162,10 @@ describe("user docs name only commands and MCP tools the build has", () => {
   };
   surfaces.sv = surfaces.sourcevision;
   const orchestrator = new Set(getOrchestratorCommands());
-  // Dispatched by cli.js but absent from the help registry. `iso` is tracked
-  // in command-docs-parity.test.js KNOWN_UNREGISTERED; `mcp` is the stdio
-  // bridge that MCP registrations launch (`ndx mcp <server>`).
-  for (const name of ["iso", "mcp"]) orchestrator.add(name);
+  // Dispatched by cli.js but absent from the help registry: `mcp` is the stdio
+  // bridge that MCP registrations launch (`ndx mcp <server>`), which takes a
+  // server name rather than standing on its own as a command.
+  for (const name of ["mcp"]) orchestrator.add(name);
 
   /**
    * References a page makes on purpose to a command that does not exist: a
