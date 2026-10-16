@@ -66,11 +66,15 @@ export interface WebCall {
   readonly callee: string;
   /** The receiver as written, whitespace removed: `router`, `views.SiteView`. */
   readonly receiver?: string;
+  /** The receiver's node: a call for `requests.Session().get(…)`. */
+  readonly receiverNode?: Capture;
   readonly invocation: Capture;
   /** Positional arguments in order, up to the first `*args`. */
   readonly positional: readonly Capture[];
   /** Keyword arguments by name: the value nodes. */
   readonly keywords: ReadonlyMap<string, Capture>;
+  /** How many arguments the query captured, `*args` and `**kwargs` included. */
+  readonly arity: number;
 }
 
 /** The argument at `position`, else the one named `keyword`. */
@@ -131,7 +135,8 @@ export function readWebFile(file: PackSourceFile, prefix: string): WebFile {
     const positional: Capture[] = [];
     const keywords = new Map<string, Capture>();
     let splat = false;
-    for (const arg of args.get(site.arguments) ?? []) {
+    const captured = args.get(site.arguments) ?? [];
+    for (const arg of captured) {
       if (arg.nodeType === "keyword_argument") {
         const name = keywordNames.get(arg)?.[0];
         const value = keywordValues.get(arg)?.[0];
@@ -144,10 +149,11 @@ export function readWebFile(file: PackSourceFile, prefix: string): WebFile {
     }
     calls.push({
       callee: site.name.text,
-      ...(site.receiver ? { receiver: dotted(site.receiver.text) } : {}),
+      ...(site.receiver ? { receiver: dotted(site.receiver.text), receiverNode: site.receiver } : {}),
       invocation: site.invocation,
       positional,
       keywords,
+      arity: captured.length,
     });
   }
   const callsBySpan = new Map(calls.map((c) => [spanKey(c.invocation), c]));
@@ -276,9 +282,12 @@ function fieldExpression(field: string): string {
   return field;
 }
 
-/** An f-string body with each replacement field in `${…}` form and `{{`/`}}` as braces. */
-function interpolate(body: string, raw: boolean): string {
-  let out = "";
+/** One part of a string's value: literal text, or an f-string replacement field's expression. */
+export type StringPart = { readonly literal: string } | { readonly field: string };
+
+/** An f-string body's parts: literal text (`{{`/`}}` as braces) and each replacement field's expression. */
+function fstringParts(body: string, raw: boolean): StringPart[] {
+  const parts: StringPart[] = [];
   let literal = "";
   for (let i = 0; i < body.length; i++) {
     const c = body[i]!;
@@ -297,25 +306,26 @@ function interpolate(body: string, raw: boolean): string {
       if (body[j] === "{") depth++;
       else if (body[j] === "}") depth--;
     }
-    out += unescape(literal, raw);
+    if (literal !== "") parts.push({ literal: unescape(literal, raw) });
     literal = "";
-    const expression = fieldExpression(body.slice(i + 1, j - 1)).trim().replace(/=$/, "").trim();
-    out += `\${${expression}}`;
+    parts.push({ field: fieldExpression(body.slice(i + 1, j - 1)).trim().replace(/=$/, "").trim() });
     i = j - 1;
   }
-  return out + unescape(literal, raw);
+  if (literal !== "") parts.push({ literal: unescape(literal, raw) });
+  return parts;
 }
 
-/**
- * The value of a string literal as written (`"/a"`, `r'^a$'`, `"a" "b"`,
- * `f"{x}/a"`), or undefined when `text` is not one. An f-string is not a
- * literal; its replacement fields take the `${…}` form.
- */
-export function stringValue(text: string): WebValue | undefined {
+/** A string literal's parts, and whether any piece of it is an f-string. */
+function readString(text: string): { readonly parts: StringPart[]; readonly fstring: boolean } | undefined {
   let i = 0;
-  let value = "";
-  let literal = true;
   let pieces = 0;
+  let fstring = false;
+  const parts: StringPart[] = [];
+  const push = (part: StringPart): void => {
+    const last = parts.at(-1);
+    if ("literal" in part && last !== undefined && "literal" in last) parts[parts.length - 1] = { literal: last.literal + part.literal };
+    else parts.push(part);
+  };
   const skipSpace = (): void => {
     for (;;) {
       const rest = text.slice(i);
@@ -346,13 +356,31 @@ export function stringValue(text: string): WebValue | undefined {
     pieces++;
     const raw = prefix.includes("r");
     if (prefix.includes("f")) {
-      literal = false;
-      value += interpolate(body, raw);
-    } else {
-      value += unescape(body, raw);
+      fstring = true;
+      fstringParts(body, raw).forEach(push);
+    } else if (body !== "") {
+      push({ literal: unescape(body, raw) });
     }
   }
-  return pieces === 0 ? undefined : { text: value, literal };
+  return pieces === 0 ? undefined : { parts, fstring };
+}
+
+/**
+ * The parts of a string literal as written (`"/a"`, `r'^a$'`, `"a" "b"`,
+ * `f"{x}/a"`), adjacent literal text merged; undefined when `text` is not
+ * one. An empty string has no parts.
+ */
+export const stringParts = (text: string): StringPart[] | undefined => readString(text)?.parts;
+
+/**
+ * The value of a string literal as written (`"/a"`, `r'^a$'`, `"a" "b"`,
+ * `f"{x}/a"`), or undefined when `text` is not one. An f-string is not a
+ * literal; its replacement fields take the `${…}` form.
+ */
+export function stringValue(text: string): WebValue | undefined {
+  const read = readString(text);
+  if (read === undefined) return undefined;
+  return { text: read.parts.map((p) => ("literal" in p ? p.literal : `\${${p.field}}`)).join(""), literal: !read.fstring };
 }
 
 /**
