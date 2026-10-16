@@ -30,4 +30,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Python outbound calls: http, grpc, queue and env clients](./python-outbound-calls-http-grpc-queue.md) | pending |
-| [Python web routes: FastAPI, Flask and Django framework packs](./python-web-routes-fastapi-flask-and.md) | pending |
+| [Python web routes: FastAPI, Flask and Django framework packs](./python-web-routes-fastapi-flask-and.md) | in_progress |
+| [Pin CTFd and Netflix/dispatch, run python-routes-report and the PR 16 byte-identity checks](./pin-ctfd-and-netflix-dispatch-run.md) | pending |

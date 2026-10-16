@@ -31,7 +31,8 @@
           ]
         }
       ],
-      "calls": []
+      "calls": [],
+      "routes": []
     },
     {
       "path": "src/common/helpers.py",
@@ -167,7 +168,8 @@
           "receiver": "date",
           "strings": []
         }
-      ]
+      ],
+      "routes": []
     },
     {
       "path": "src/common/util.py",
@@ -214,7 +216,8 @@
           }
         }
       ],
-      "calls": []
+      "calls": [],
+      "routes": []
     },
     {
       "path": "src/shop/__init__.py",
@@ -284,7 +287,8 @@
           ]
         }
       ],
-      "calls": []
+      "calls": [],
+      "routes": []
     },
     {
       "path": "src/shop/models.pyi",
@@ -358,7 +362,8 @@
           "callee": "dataclass",
           "strings": []
         }
-      ]
+      ],
+      "routes": []
     },
     {
       "path": "src/shop/orders.py",
@@ -1062,7 +1067,8 @@
           "receiver": "service",
           "strings": []
         }
-      ]
+      ],
+      "routes": []
     }
   ],
   "unparsed": [],

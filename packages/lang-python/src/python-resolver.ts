@@ -385,6 +385,18 @@ function resolveImport(index: Index, file: string, w: WrittenImport, out: Collec
   return dependency ? { kind: "external", module: top, dependency: dependency.artifact } : { kind: "external", module: top };
 }
 
+/**
+ * The file of the module `specifier` names from `file`, found as an import
+ * of it is: relative from the file's package, absolute through its roots.
+ * Undefined for a namespace package or a module that is not a project file.
+ */
+function moduleFile(index: Index, file: string, specifier: string): string | undefined {
+  const located = specifier.startsWith(".")
+    ? locateRelative(index, file, specifier)
+    : index.resolveAbsolute(index.rootsFor(file), specifier.split("."));
+  return typeof located === "object" && "file" in located.found ? located.found.file : undefined;
+}
+
 // ── Resolver ────────────────────────────────────────────────────────────────
 
 /** How many notices name a location before the rest are counted. */
@@ -404,6 +416,7 @@ export function pastRootNotice(found: ReadonlyArray<{ readonly path: string; rea
 
 /** A prepared resolver that also keeps what each import resolved to, for the corpus report. */
 export interface PreparedPythonResolver extends PreparedResolver {
+  module(fromFile: string, specifier: string): string | undefined;
   /** Each written import of a prepared file with its outcome, in document order. */
   outcomes(fromFile: string): readonly ResolvedImport[];
 }
@@ -431,6 +444,7 @@ export function preparePythonImports(
   const notice = pastRootNotice(pastRoot);
   return {
     resolve: (fromFile) => refs.get(fromFile) ?? { files: [], external: [] },
+    module: (fromFile, specifier) => moduleFile(index, fromFile, specifier),
     outcomes: (fromFile) => outcomes.get(fromFile) ?? [],
     notices: () => (notice === undefined ? [] : [notice]),
   };

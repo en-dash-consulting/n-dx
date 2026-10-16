@@ -1,0 +1,187 @@
+{
+  "facts": [
+    {
+      "path": "blog/__init__.py",
+      "routes": []
+    },
+    {
+      "path": "blog/urls.py",
+      "routes": [
+        {
+          "path": "${settings.DYNAMIC_PREFIX}",
+          "handler": "index",
+          "position": {
+            "line": 7,
+            "column": 4
+          }
+        },
+        {
+          "path": "/archive/",
+          "handler": "index",
+          "position": {
+            "line": 7,
+            "column": 4
+          }
+        },
+        {
+          "path": "/blog/",
+          "handler": "index",
+          "position": {
+            "line": 7,
+            "column": 4
+          }
+        },
+        {
+          "path": "${settings.DYNAMIC_PREFIX}/<int:year>/",
+          "handler": "year_archive",
+          "position": {
+            "line": 8,
+            "column": 4
+          }
+        },
+        {
+          "path": "/archive/<int:year>/",
+          "handler": "year_archive",
+          "position": {
+            "line": 8,
+            "column": 4
+          }
+        },
+        {
+          "path": "/blog/<int:year>/",
+          "handler": "year_archive",
+          "position": {
+            "line": 8,
+            "column": 4
+          }
+        },
+        {
+          "path": "${settings.DYNAMIC_PREFIX}/^(?P<slug>[\\w-]+)/$",
+          "handler": "post_detail",
+          "position": {
+            "line": 9,
+            "column": 4
+          }
+        },
+        {
+          "path": "/archive/^(?P<slug>[\\w-]+)/$",
+          "handler": "post_detail",
+          "position": {
+            "line": 9,
+            "column": 4
+          }
+        },
+        {
+          "path": "/blog/^(?P<slug>[\\w-]+)/$",
+          "handler": "post_detail",
+          "position": {
+            "line": 9,
+            "column": 4
+          }
+        }
+      ]
+    },
+    {
+      "path": "mysite/__init__.py",
+      "routes": []
+    },
+    {
+      "path": "mysite/extra.py",
+      "routes": [
+        {
+          "path": "/extra/faq/",
+          "handler": "faq",
+          "position": {
+            "line": 6,
+            "column": 4
+          }
+        }
+      ]
+    },
+    {
+      "path": "mysite/settings.py",
+      "routes": []
+    },
+    {
+      "path": "mysite/urls.py",
+      "routes": [
+        {
+          "path": "/",
+          "handler": "home",
+          "position": {
+            "line": 16,
+            "column": 4
+          }
+        },
+        {
+          "path": "/inline/one/",
+          "handler": "one",
+          "position": {
+            "line": 28,
+            "column": 12
+          }
+        },
+        {
+          "path": "/inline/^two/(?P<n>\\d+)/$",
+          "handler": "two",
+          "position": {
+            "line": 29,
+            "column": 12
+          }
+        },
+        {
+          "path": "/sites/",
+          "handler": "SiteListView",
+          "position": {
+            "line": 36,
+            "column": 4
+          }
+        }
+      ]
+    },
+    {
+      "path": "oldapp/__init__.py",
+      "routes": []
+    },
+    {
+      "path": "oldapp/urls.py",
+      "routes": []
+    },
+    {
+      "path": "shop/__init__.py",
+      "routes": []
+    },
+    {
+      "path": "shop/urls.py",
+      "routes": [
+        {
+          "path": "/shop/cart/",
+          "handler": "CartView",
+          "position": {
+            "line": 7,
+            "column": 4
+          }
+        },
+        {
+          "path": "/shop/checkout/",
+          "position": {
+            "line": 8,
+            "column": 4
+          }
+        },
+        {
+          "path": "/shop/ping/",
+          "position": {
+            "line": 10,
+            "column": 4
+          }
+        }
+      ]
+    }
+  ],
+  "notices": [
+    "Django: 1 route path or prefix is not a literal and is kept as written in ${…} form: mysite/urls.py:21 (prefix settings.DYNAMIC_PREFIX).",
+    "Django: 2 include() targets are not ones the rules can follow and were not followed: mysite/urls.py:17 (include admin.site.urls), mysite/urls.py:32 (include somewhere.urls).",
+    "Django: 2 Django REST framework router registrations are counted, not expanded: mysite/urls.py:12 (register router.register), mysite/urls.py:13 (register router.register)."
+  ]
+}
