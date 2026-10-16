@@ -68,3 +68,25 @@ class Handler:
 def bound_from_itself():
     channel = channel.channel()
     channel.basic_publish(exchange="", routing_key="loop")
+
+
+pool_session = requests.Session()
+
+
+def reset_pool():
+    global pool_session
+    pool_session = make_other()
+
+
+def uses_pool():
+    pool_session.get("https://shadow.example.com/pool")
+
+
+def outer_rebound():
+    shared = requests.Session()
+
+    def rebind():
+        nonlocal shared
+        shared = make_other()
+
+    shared.get("https://shadow.example.com/shared")

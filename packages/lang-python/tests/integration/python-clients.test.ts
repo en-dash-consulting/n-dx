@@ -90,6 +90,8 @@ describe("Python outbound calls", () => {
       "65 http requests certain literal:https://shadow.example.com/method",
       // A name bound from itself is not known: graded as any unknown receiver.
       "70 queue pika likely literal:loop",
+      // Not reported: a module client a function rebinds through `global` (line 82),
+      // and an enclosing one a nested function rebinds through `nonlocal` (line 92).
     ]);
   });
 
