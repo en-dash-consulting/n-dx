@@ -35,3 +35,10 @@ urlpatterns = [
 urlpatterns += [
     path("sites/", shop_views.SiteListView.as_view(), name="sites"),
 ]
+
+# A router defined in another module: left out silently, as router.urls is.
+from .routers import device_router
+
+urlpatterns += [
+    path("dcim/", include(device_router.urls)),
+]

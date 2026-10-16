@@ -140,7 +140,10 @@ describe("Django routes", () => {
       "Django: 1 route path or prefix is not a literal and is kept as written in ${…} form: mysite/urls.py:21 (prefix settings.DYNAMIC_PREFIX).",
       "Django: 2 include() targets are not ones the rules can follow and were not followed: " +
         "mysite/urls.py:17 (include admin.site.urls), mysite/urls.py:32 (include somewhere.urls).",
-      "Django: 2 Django REST framework router registrations are counted, not expanded: " +
+      // device_router is defined in routers.py: its registrations in devices.py
+      // count, and include(device_router.urls) in urls.py is left out like router.urls.
+      "Django: 4 Django REST framework router registrations are counted, not expanded: " +
+        "mysite/devices.py:13 (register device_router.register), mysite/devices.py:14 (register routers.device_router.register), " +
         "mysite/urls.py:12 (register router.register), mysite/urls.py:13 (register router.register).",
     ]);
   });
