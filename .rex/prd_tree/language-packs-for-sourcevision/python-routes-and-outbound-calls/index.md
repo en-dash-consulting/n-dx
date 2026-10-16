@@ -31,6 +31,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [DRF router.register calls on a router imported from another file are not counted in the Django notice](./drf-router-register-calls-on-a-router.md) | pending |
 | [Pin CTFd and Netflix/dispatch, run python-routes-report and the PR 16 byte-identity checks](./pin-ctfd-and-netflix-dispatch-run.md) | completed |
-| [Python outbound calls: http, grpc, queue and env clients](./python-outbound-calls-http-grpc-queue.md) | pending |
+| [Python outbound calls: http, grpc, queue and env clients](./python-outbound-calls-http-grpc-queue.md) | in_progress |
 | [Python web routes: FastAPI, Flask and Django framework packs](./python-web-routes-fastapi-flask-and.md) | completed |
 | [The Django query captures every list and tuple, adding seconds to large Python data files in every analyze](./the-django-query-captures-every-list.md) | pending |

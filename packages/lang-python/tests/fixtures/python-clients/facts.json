@@ -1,0 +1,628 @@
+{
+  "facts": [
+    {
+      "path": "app/__init__.py",
+      "outboundCalls": []
+    },
+    {
+      "path": "app/celery_app.py",
+      "outboundCalls": [
+        {
+          "kind": "queue",
+          "target": "billing.charge",
+          "targetSource": "literal",
+          "client": "celery",
+          "confidence": "certain",
+          "position": {
+            "line": 7,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "",
+          "targetSource": "unknown",
+          "client": "celery",
+          "confidence": "certain",
+          "position": {
+            "line": 8,
+            "column": 4
+          }
+        }
+      ]
+    },
+    {
+      "path": "app/config.py",
+      "outboundCalls": [
+        {
+          "kind": "env",
+          "target": "DATABASE_URL",
+          "targetSource": "env",
+          "client": "os.environ",
+          "confidence": "certain",
+          "position": {
+            "line": 6,
+            "column": 15
+          }
+        },
+        {
+          "kind": "env",
+          "target": "DEBUG",
+          "targetSource": "env",
+          "client": "os.environ",
+          "confidence": "certain",
+          "position": {
+            "line": 7,
+            "column": 8
+          }
+        },
+        {
+          "kind": "env",
+          "target": "SECRET_KEY",
+          "targetSource": "env",
+          "client": "os.getenv",
+          "confidence": "certain",
+          "position": {
+            "line": 8,
+            "column": 9
+          }
+        },
+        {
+          "kind": "env",
+          "target": "REGION",
+          "targetSource": "env",
+          "client": "os.environ",
+          "confidence": "certain",
+          "position": {
+            "line": 9,
+            "column": 9
+          }
+        },
+        {
+          "kind": "env",
+          "target": "ZONE",
+          "targetSource": "env",
+          "client": "os.getenv",
+          "confidence": "certain",
+          "position": {
+            "line": 10,
+            "column": 7
+          }
+        },
+        {
+          "kind": "env",
+          "target": "",
+          "targetSource": "unknown",
+          "client": "os.environ",
+          "confidence": "certain",
+          "position": {
+            "line": 11,
+            "column": 7
+          }
+        }
+      ]
+    },
+    {
+      "path": "app/http_calls.py",
+      "outboundCalls": [
+        {
+          "kind": "http",
+          "target": "https://api.example.com/items",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 16,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://api.example.com/items",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 17,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://api.example.com/items/1",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 18,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "ITEMS_URL",
+          "targetSource": "env",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 19,
+            "column": 4
+          }
+        },
+        {
+          "kind": "env",
+          "target": "ITEMS_URL",
+          "targetSource": "env",
+          "client": "os.environ",
+          "confidence": "certain",
+          "position": {
+            "line": 19,
+            "column": 20
+          }
+        },
+        {
+          "kind": "http",
+          "target": "STATUS_URL",
+          "targetSource": "config",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 20,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "API_BASE",
+          "targetSource": "config",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 21,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://api.example.com/items/",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 22,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://api.example.com",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 23,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "SEARCH_URL",
+          "targetSource": "env",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 24,
+            "column": 4
+          }
+        },
+        {
+          "kind": "env",
+          "target": "SEARCH_URL",
+          "targetSource": "env",
+          "client": "os.getenv",
+          "confidence": "certain",
+          "position": {
+            "line": 24,
+            "column": 17
+          }
+        },
+        {
+          "kind": "http",
+          "target": "",
+          "targetSource": "unknown",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 25,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "",
+          "targetSource": "unknown",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 26,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "",
+          "targetSource": "unknown",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 27,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://sessions.example.com/a",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 31,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://sessions.example.com/b",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 33,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://sessions.example.com/c",
+          "targetSource": "literal",
+          "client": "requests",
+          "confidence": "certain",
+          "position": {
+            "line": 35,
+            "column": 8
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://httpx.example.com/a",
+          "targetSource": "literal",
+          "client": "httpx",
+          "confidence": "certain",
+          "position": {
+            "line": 39,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "HTTPX_URL",
+          "targetSource": "config",
+          "client": "httpx",
+          "confidence": "certain",
+          "position": {
+            "line": 40,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "/b",
+          "targetSource": "literal",
+          "client": "httpx",
+          "confidence": "certain",
+          "position": {
+            "line": 42,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://httpx.example.com/c",
+          "targetSource": "literal",
+          "client": "httpx",
+          "confidence": "certain",
+          "position": {
+            "line": 43,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://httpx.example.com/async",
+          "targetSource": "literal",
+          "client": "httpx",
+          "confidence": "certain",
+          "position": {
+            "line": 48,
+            "column": 14
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://aiohttp.example.com/a",
+          "targetSource": "literal",
+          "client": "aiohttp",
+          "confidence": "certain",
+          "position": {
+            "line": 50,
+            "column": 19
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://aiohttp.example.com/b",
+          "targetSource": "literal",
+          "client": "aiohttp",
+          "confidence": "certain",
+          "position": {
+            "line": 52,
+            "column": 14
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://urllib.example.com/a",
+          "targetSource": "literal",
+          "client": "urllib",
+          "confidence": "certain",
+          "position": {
+            "line": 56,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://urllib.example.com/b",
+          "targetSource": "literal",
+          "client": "urllib",
+          "confidence": "certain",
+          "position": {
+            "line": 57,
+            "column": 12
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://urllib.example.com/c",
+          "targetSource": "literal",
+          "client": "urllib",
+          "confidence": "certain",
+          "position": {
+            "line": 58,
+            "column": 10
+          }
+        }
+      ]
+    },
+    {
+      "path": "app/queues.py",
+      "outboundCalls": [
+        {
+          "kind": "queue",
+          "target": "orders",
+          "targetSource": "literal",
+          "client": "confluent_kafka",
+          "confidence": "certain",
+          "position": {
+            "line": 13,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "payments",
+          "targetSource": "literal",
+          "client": "confluent_kafka",
+          "confidence": "certain",
+          "position": {
+            "line": 15,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "REFUNDS_TOPIC",
+          "targetSource": "env",
+          "client": "confluent_kafka",
+          "confidence": "certain",
+          "position": {
+            "line": 15,
+            "column": 4
+          }
+        },
+        {
+          "kind": "env",
+          "target": "REFUNDS_TOPIC",
+          "targetSource": "env",
+          "client": "os.environ",
+          "confidence": "certain",
+          "position": {
+            "line": 15,
+            "column": 36
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "audit",
+          "targetSource": "literal",
+          "client": "confluent_kafka",
+          "confidence": "certain",
+          "position": {
+            "line": 16,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "clicks",
+          "targetSource": "literal",
+          "client": "kafka-python",
+          "confidence": "certain",
+          "position": {
+            "line": 21,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "views",
+          "targetSource": "literal",
+          "client": "kafka-python",
+          "confidence": "certain",
+          "position": {
+            "line": 22,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "searches",
+          "targetSource": "literal",
+          "client": "kafka-python",
+          "confidence": "certain",
+          "position": {
+            "line": 22,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "signups",
+          "targetSource": "literal",
+          "client": "kafka-python",
+          "confidence": "certain",
+          "position": {
+            "line": 24,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "",
+          "targetSource": "unknown",
+          "client": "kafka-python",
+          "confidence": "certain",
+          "position": {
+            "line": 25,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "emails",
+          "targetSource": "literal",
+          "client": "pika",
+          "confidence": "certain",
+          "position": {
+            "line": 31,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "notifications",
+          "targetSource": "literal",
+          "client": "pika",
+          "confidence": "certain",
+          "position": {
+            "line": 32,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "replies",
+          "targetSource": "literal",
+          "client": "pika",
+          "confidence": "certain",
+          "position": {
+            "line": 33,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "events",
+          "targetSource": "literal",
+          "client": "pika",
+          "confidence": "likely",
+          "position": {
+            "line": 38,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "reports.build",
+          "targetSource": "literal",
+          "client": "celery",
+          "confidence": "likely",
+          "position": {
+            "line": 39,
+            "column": 4
+          }
+        }
+      ]
+    },
+    {
+      "path": "app/rpc.py",
+      "outboundCalls": [
+        {
+          "kind": "grpc",
+          "target": "localhost:50051",
+          "targetSource": "literal",
+          "client": "grpc",
+          "confidence": "certain",
+          "position": {
+            "line": 8,
+            "column": 4
+          }
+        },
+        {
+          "kind": "grpc",
+          "target": "ORDERS_TARGET",
+          "targetSource": "config",
+          "client": "grpc",
+          "confidence": "certain",
+          "position": {
+            "line": 9,
+            "column": 4
+          }
+        },
+        {
+          "kind": "grpc",
+          "target": "inventory:50051",
+          "targetSource": "literal",
+          "client": "grpc",
+          "confidence": "certain",
+          "position": {
+            "line": 10,
+            "column": 4
+          }
+        },
+        {
+          "kind": "grpc",
+          "target": "PAYMENTS_HOST",
+          "targetSource": "config",
+          "client": "grpc",
+          "confidence": "certain",
+          "position": {
+            "line": 11,
+            "column": 4
+          }
+        }
+      ]
+    }
+  ],
+  "notices": []
+}

@@ -19,3 +19,4 @@ export * from "./python-routers.js";
 export * from "./fastapi.js";
 export * from "./flask.js";
 export * from "./django.js";
+export * from "./python-clients.js";

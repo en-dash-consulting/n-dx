@@ -164,7 +164,7 @@ describe("Django routes", () => {
 describe("the Python pack entry with its frameworks", () => {
   it("lists routes and is consistent with its frameworks", () => {
     expect(pythonPack.produces).toContain("routes");
-    expect(pythonPack.frameworks?.map((f) => f.id)).toEqual(["fastapi", "flask", "django"]);
+    expect(pythonPack.frameworks?.map((f) => f.id)).toEqual(["fastapi", "flask", "django", "python-clients"]);
     expect(factGaps(pythonPack, PYTHON_SYMBOL_RULES)).toEqual([]);
     for (const framework of pythonPack.frameworks ?? []) {
       for (const query of framework.queries) expect(framework.provenance[query.name], query.name).toBeDefined();
