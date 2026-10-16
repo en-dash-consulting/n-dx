@@ -9,7 +9,6 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 lastModified: "2026-10-01T21:41:25.141Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
-
 ## Children
 
 | Title | Status |
@@ -24,7 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Geometric Decorative Design System for ndx UI](./geometric-decorative-design-system-for/index.md) | completed |
 | [Item completion timeline view](./item-completion-timeline-view/index.md) | completed |
 | [Live tab: watch every running task and analysis from one place](./live-tab-watch-every-running-task-and/index.md) | completed |
-| [Live view plumbing: stream running hench and analyze progress to the dashboard](./live-view-plumbing-stream-running/index.md) | completed |
+| [Live view plumbing: stream running hench and analyze progress to the dashboard](./live-view-plumbing-stream-running/index.md) | pending |
 | [N-Rex Easter Egg — Triple-Click Dino Takeover](./n-rex-easter-egg-triple-click-dino/index.md) | completed |
 | [ndx as the single CLI interface](./ndx-as-the-single-cli-interface/index.md) | completed |
 | [ndx Dashboard Refresh Orchestration](./ndx-dashboard-refresh-orchestration/index.md) | completed |
@@ -41,19 +40,20 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [UI Density Toggle (Small / Medium / Large)](./ui-density-toggle-small-medium-large/index.md) | completed |
 | [Web Dashboard Accessibility (a11y)](./web-dashboard-accessibility-a11y/index.md) | completed |
 | [Changes view: time-ordered default with recency desaturation](./changes-view-time-ordered-default-with.md) | deferred |
-| [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | pending |
 | [Dashboard action icons render at a readable size from one shared SVG icon set](./dashboard-action-icons-render-at-a.md) | completed |
-| [Detected run and build commands as a dashboard control](./detected-run-and-build-commands-as-a.md) | completed |
-| [Fail-forward mode: commit automatically at the end of every run, loop and settings change](./fail-forward-mode-commit-automatically.md) | pending |
 | [findAvailablePort reports a requested port of 0 as "in use"](./findavailableport-reports-a-requested.md) | completed |
 | [Fix undefined design tokens and standardize buttons on General and analyze/plan settings pages](./fix-undefined-design-tokens-and.md) | completed |
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http.md) | completed |
 | [Make the Live route's run-liveness check correct on Windows](./make-the-live-route-s-run-liveness.md) | completed |
 | [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-to-the.md) | completed |
-| [On a v2 project /api/live's next list uses v1 selection, so it shows Inbox changes and ignores change priority](./on-a-v2-project-api-live-s-next-list.md) | pending |
-| [One-click labelled commit when the dirty tree is only PRD or only scan output](./one-click-labelled-commit-when-the.md) | completed |
 | [Overview Next Steps panel: consistent formatting, copyable items, and capture-to-PRD action](./overview-next-steps-panel-consistent.md) | completed |
-| [Page content paints over the settings overlay instead of under it](./page-content-paints-over-the-settings.md) | completed |
 | [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-before.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-contract-in.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-hench.md) | completed |
+| [One-click labelled commit when the dirty tree is only PRD or only scan output](./one-click-labelled-commit-when-the.md) | completed |
+| [Page content paints over the settings overlay instead of under it](./page-content-paints-over-the-settings.md) | completed |
+| [Detected run and build commands as a dashboard control](./detected-run-and-build-commands-as-a.md) | completed |
+| [Fail-forward mode: commit automatically at the end of every run, loop and settings change](./fail-forward-mode-commit-automatically.md) | pending |
+| [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | pending |
+| [On a v2 project /api/live's next list uses v1 selection, so it shows Inbox changes and ignores change priority](./on-a-v2-project-api-live-s-next-list.md) | pending |
+
