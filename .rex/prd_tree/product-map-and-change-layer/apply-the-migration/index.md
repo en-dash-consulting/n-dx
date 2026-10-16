@@ -58,7 +58,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [ndx self-heal, start and web silence the v1 notice for their children, and ndx migrate refuses inside an agent run](./ndx-self-heal-start-and-web-silence.md) | completed |
 | [Placement reads code evidence: commits and zones of a held change rank the capabilities realized in the same zones](./placement-reads-code-evidence-commits.md) | pending |
 | [Remove the prd.md and prd.json read fallbacks and the old migrate commands](./remove-the-prd-md-and-prd-json-read.md) | pending |
-| [rex health warns, not errors, on completed changes the migration held for placement](./rex-health-warns-not-errors-on.md) | pending |
+| [rex health errors forever on a held change whose v1 item completed between plan and apply](./rex-health-errors-forever-on-a-held.md) | pending |
+| [rex health warns, not errors, on completed changes the migration held for placement](./rex-health-warns-not-errors-on.md) | completed |
 | [rex init --help says it writes prd.json; it writes product/index.md (v2) or prd_tree/](./rex-init-help-says-it-writes-prd-json.md) | completed |
 | [rex migrate-plan / migrate-apply and ndx migrate-layout still run inside an agent run](./rex-migrate-plan-migrate-apply-and-ndx.md) | pending |
 | [tests/e2e/cli-migrate-apply.test.js fails 3 of 5: its fixture keeps .rex/prd.json, which apply now refuses](./tests-e2e-cli-migrate-apply-test-js.md) | completed |
