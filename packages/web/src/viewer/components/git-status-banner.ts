@@ -321,23 +321,27 @@ export function GitStatusBanner({ status, onCommitted }: GitStatusBannerProps) {
 
   if (!status || !status.isRepo || !status.dirty) return null;
 
+  // The pill stays in place and the panel opens above it, like the other
+  // pills in the status dock.
   return h("div", { class: "git-status-banner", role: "status" },
-    !expanded
-      ? h("button", {
-          class: "git-status-toggle",
-          type: "button",
-          onClick: () => setExpanded(true),
-        },
-          h("span", { class: "git-status-badge-icon", "aria-hidden": "true" }, "⚠"),
-          h("span", null, `${status.files.length} uncommitted file${status.files.length === 1 ? "" : "s"}`),
-        )
-      : h(GitStatusPanel, {
+    h("button", {
+      class: "git-status-toggle",
+      type: "button",
+      "aria-expanded": String(expanded),
+      onClick: () => setExpanded((v) => !v),
+    },
+      h("span", { class: "git-status-badge-icon", "aria-hidden": "true" }, "⚠"),
+      h("span", null, `${status.files.length} uncommitted file${status.files.length === 1 ? "" : "s"}`),
+    ),
+    expanded
+      ? h(GitStatusPanel, {
           status,
           onCommitted: () => { setExpanded(false); onCommitted(); },
           // Ignoring a file refreshes the list in place — the panel stays
           // open because the usual next move is to ignore another one.
           onRefresh: onCommitted,
           onClose: () => setExpanded(false),
-        }),
+        })
+      : null,
   );
 }

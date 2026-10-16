@@ -24,10 +24,12 @@ import {
   type StageId,
   type StageSection,
   type StageTab,
+  type StageTile,
 } from "./stages.js";
 import { ProductLogoPng, ReadyToRun, useProjectStatus, type ProjectStatus } from "../components/index.js";
 import { useFeatureToggle, useCliName, resolveCliLabel } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import { TileGrid, type RenderPanel, type RenderSummary } from "./stage-tiles.js";
 
 export type RenderView = (view: ViewId) => ComponentChild;
 
@@ -55,8 +57,6 @@ function writeOpenState(key: string, open: boolean): void {
 interface SectionProps {
   stage: StageId;
   section: StageSection;
-  validViews: ReadonlySet<ViewId>;
-  deployed: boolean;
   navigateTo: NavigateTo;
   renderView: RenderView;
 }
@@ -68,48 +68,20 @@ function PlainSection({ section, renderView }: Pick<SectionProps, "section" | "r
   );
 }
 
-/** Move the active tab with the arrow keys — the roving-tabindex tablist pattern. */
-function tabListKeyDown(e: KeyboardEvent, tabs: readonly StageTab[], activeIndex: number, activate: (view: ViewId) => void): void {
-  let next: number | null = null;
-  if (e.key === "ArrowRight") next = (activeIndex + 1) % tabs.length;
-  else if (e.key === "ArrowLeft") next = (activeIndex - 1 + tabs.length) % tabs.length;
-  else if (e.key === "Home") next = 0;
-  else if (e.key === "End") next = tabs.length - 1;
-  if (next === null || next === activeIndex) return;
-  e.preventDefault();
-  const view = tabs[next]!.view;
-  activate(view);
-  const list = (e.currentTarget as HTMLElement).closest(".stage-section-tablist");
-  list?.querySelector<HTMLButtonElement>(`[data-tab="${view}"]`)?.focus();
-}
-
-function Section({ stage, section, validViews, deployed, navigateTo, renderView }: SectionProps) {
+function Section({ stage, section, navigateTo, renderView }: SectionProps) {
   const key = `${stage}:${section.view}`;
   const [open, setOpen] = useState<boolean>(() =>
-    section.collapsedOnLoad ? false : readOpenState()[key] ?? !!section.open);
+    readOpenState()[key] ?? !!section.open);
   // Scroll sections: bounded by default, full length on Expand. Stored beside
   // the open state under "<stage>:<view>:full".
   const fullKey = `${key}:full`;
   const [full, setFull] = useState<boolean>(() => readOpenState()[fullKey] ?? false);
 
-  // `view` is always the section's first tab; `tabs` adds the rest. Folds
-  // what used to be separate sections (Zones; Architecture and Routes) into
-  // one, and generalises the old 2D/3D toggle the same way (its `iso-map`
-  // side is the one tab still dropped in a static export).
-  const allTabs: StageTab[] = [{ view: section.view }, ...(section.tabs ?? [])];
-  const tabs = allTabs.filter((t) => validViews.has(t.view) && !(deployed && t.hiddenWhenDeployed));
-  const hasTabs = tabs.length > 1;
-  // Not persisted across reloads, same as the toggle it replaces: a section
-  // always opens back on its first tab.
-  const [activeTab, setActiveTab] = useState<ViewId>(section.view);
-  const shown: ViewId = tabs.some((t) => t.view === activeTab) ? activeTab : section.view;
-
   const bodyId = `stage-section-${stage}-${section.view}`;
-  // A section named by a group (Terrain) takes its heading from the group,
-  // since no one view is its identity; otherwise it is named by its view, the
-  // same string the breadcrumb shows once the "Open" link has been followed.
-  const title = section.group?.heading ?? viewLabel(section.view);
-  const blurb = section.group?.blurb ?? viewBlurb(section.view);
+  // Named by its view: the same string the breadcrumb shows once the "Open"
+  // link has been followed.
+  const title = viewLabel(section.view);
+  const blurb = viewBlurb(section.view);
 
   const toggle = () => {
     const next = !open;
@@ -141,26 +113,6 @@ function Section({ stage, section, validViews, deployed, navigateTo, renderView 
         h("span", { class: "stage-section-title" }, title),
         h("span", { class: "stage-section-blurb" }, blurb),
       ),
-      hasTabs && open
-        ? h("div", { class: "stage-section-tablist", role: "tablist", "aria-label": `${title} views` },
-            tabs.map((t, i) => {
-              const selected = t.view === shown;
-              return h("button", {
-                key: t.view,
-                type: "button",
-                role: "tab",
-                id: `${bodyId}-tab-${t.view}`,
-                "data-tab": t.view,
-                class: `stage-section-tab${selected ? " active" : ""}`,
-                "aria-selected": String(selected),
-                "aria-controls": bodyId,
-                tabIndex: selected ? 0 : -1,
-                onClick: () => setActiveTab(t.view),
-                onKeyDown: (e: KeyboardEvent) => tabListKeyDown(e, tabs, i, setActiveTab),
-              }, viewLabel(t.view));
-            }),
-          )
-        : null,
       section.scroll && open
         ? h("button", {
             type: "button",
@@ -175,23 +127,21 @@ function Section({ stage, section, validViews, deployed, navigateTo, renderView 
       h("button", {
         type: "button",
         class: "stage-section-open",
-        onClick: () => navigateTo(shown),
-        title: `Open ${viewLabel(shown)} on its own page`,
+        onClick: () => navigateTo(section.view),
+        title: `Open ${viewLabel(section.view)} on its own page`,
         // Every section has an "Open ↗"; without this they are one repeated
         // name in a screen reader's list of controls.
-        "aria-label": `Open ${viewLabel(shown)} on its own page`,
+        "aria-label": `Open ${viewLabel(section.view)} on its own page`,
       }, "Open ↗"),
     ),
     open
       ? h("div", {
           class: bodyClass,
           id: bodyId,
-          role: hasTabs ? "tabpanel" : undefined,
-          "aria-labelledby": hasTabs ? `${bodyId}-tab-${shown}` : undefined,
           // A bounded scroll region must be reachable by keyboard.
           tabIndex: section.scroll && !full ? 0 : undefined,
         },
-          renderView(shown),
+          renderView(section.view),
         )
       : null,
   );
@@ -204,9 +154,22 @@ export interface StagePageProps {
   validViews: ReadonlySet<ViewId>;
   navigateTo: NavigateTo;
   renderView: RenderView;
+  /** Panels a tiled stage lists (`StageTile.panel`). */
+  renderPanel?: RenderPanel;
+  /** A tile's collapsed summary; null shows the view itself, clipped. */
+  renderSummary?: RenderSummary;
+  /** The detail panel is open beside the page; a full-screen tile leaves room for it. */
+  detailOpen?: boolean;
+  /** A line under the stage's title (Analysis: which analysis this is). */
+  headStatus?: ComponentChild;
+  /** Controls at the right of the stage's head (Analysis: the analyze control). */
+  headActions?: ComponentChild;
 }
 
-export function StagePage({ stage, validViews, navigateTo, renderView }: StagePageProps) {
+const NO_PANEL: RenderPanel = () => null;
+const NO_SUMMARY: RenderSummary = () => null;
+
+export function StagePage({ stage, validViews, navigateTo, renderView, renderPanel = NO_PANEL, renderSummary = NO_SUMMARY, detailOpen = false, headStatus = null, headActions = null }: StagePageProps) {
   const def = STAGES[stage];
   const product = stageProduct(stage);
   const gates: Record<string, boolean> = {
@@ -220,14 +183,26 @@ export function StagePage({ stage, validViews, navigateTo, renderView }: StagePa
     && (!s.featureGate || gates[s.featureGate])
     && !(s.requiresServer && deployed),
   );
+  const tiles = (def.tiles ?? []).filter((t) =>
+    validViews.has(t.view)
+    && (!t.featureGate || gates[t.featureGate])
+    && !(t.requiresServer && deployed)
+    && !(t.hiddenWhenDeployed && deployed),
+  );
+  const tabsOf = (tile: StageTile): StageTab[] =>
+    [{ view: tile.view }, ...(tile.tabs ?? [])].filter((t) => validViews.has(t.view) && !(deployed && t.hiddenWhenDeployed));
 
   return h("div", { class: `stage-page stage-page-${product}`, "data-stage": stage },
     h("div", { class: "stage-page-head" },
       h(ProductLogoPng, { product, size: 36, class: "stage-page-logo" }),
-      h("div", null,
-        h("h1", { class: "stage-page-title" }, viewLabel(stage)),
-        h("p", { class: "stage-page-blurb" }, viewBlurb(stage)),
+      h("div", { class: "stage-page-heading" },
+        h("div", { class: "stage-page-titles" },
+          h("h1", { class: "stage-page-title" }, viewLabel(stage)),
+          h("p", { class: "stage-page-blurb" }, viewBlurb(stage)),
+        ),
+        headStatus,
       ),
+      headActions ? h("div", { class: "stage-page-actions" }, headActions) : null,
     ),
     // Starting a run is the Work stage's job; the list sits above its sections.
     stage === "work" && !deployed
@@ -239,8 +214,13 @@ export function StagePage({ stage, validViews, navigateTo, renderView }: StagePa
       : null,
     sections.map((s) => {
       if (s.plain) return h(PlainSection, { key: s.view, section: s, renderView });
-      return h(Section, { key: s.view, stage, section: s, validViews, deployed, navigateTo, renderView });
+      // A tiled stage keeps only its plain lead section; the tiles replace the rest.
+      if (def.tiles) return null;
+      return h(Section, { key: s.view, stage, section: s, navigateTo, renderView });
     }),
+    def.tiles
+      ? h(TileGrid, { stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen })
+      : null,
   );
 }
 

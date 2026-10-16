@@ -76,7 +76,7 @@ Two rules follow, and both are load-bearing:
 
 - **No cross-workspace write action.** No route takes a workspace as a parameter,
   and no UI offers "apply to the anchor instead". Editing the anchor's PRD while
-  viewing a branch requires switching workspace through the breadcrumb switcher,
+  viewing a branch requires switching workspace through the top bar's workspace switcher,
   which is a full navigation. A cross-workspace affordance would make the write
   target a thing the reader has to check rather than a thing the URL states.
 - **The write target is stated, not inferred.** `WorkspaceWriteStrip`
