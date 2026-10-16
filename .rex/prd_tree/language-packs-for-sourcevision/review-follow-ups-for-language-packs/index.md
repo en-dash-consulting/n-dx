@@ -42,3 +42,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The Django query captures every list and tuple, adding seconds to large Python data files in every analyze](./the-django-query-captures-every-list.md) | completed |
 | [tree-sitter-go 0.25.0 rejects Go 1.26 new(expr) and generic methods](./tree-sitter-go-0-25-0-rejects-go-1-26.md) | pending |
 | [Widen gate G2 to junit-framework and thingsboard](./widen-gate-g2-to-junit-framework-and.md) | completed |
+| [An imported router or app name rebound locally to a non-router is still followed through its import](./an-imported-router-or-app-name-rebound.md) | pending |
