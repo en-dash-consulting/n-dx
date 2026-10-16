@@ -5,29 +5,29 @@
     "perCallTokens": 23454,
     "uniqueTokens": 14949,
     "skills": 13,
-    "skillTokens": 22856
+    "skillTokens": 22952
   },
   "skills": [
     {
       "name": "ndx-adversarial-review",
       "file": "packages/core/assistant-assets/skills/ndx-adversarial-review.md",
       "shipped": true,
-      "chars": 24105,
-      "tokens": 6027
+      "chars": 24117,
+      "tokens": 6030
     },
     {
       "name": "ndx-reshape",
       "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
       "shipped": true,
-      "chars": 10150,
-      "tokens": 2538
+      "chars": 10250,
+      "tokens": 2563
     },
     {
       "name": "ndx-capture",
       "file": "packages/core/assistant-assets/skills/ndx-capture.md",
       "shipped": true,
-      "chars": 8894,
-      "tokens": 2224
+      "chars": 9023,
+      "tokens": 2256
     },
     {
       "name": "iso-map",
@@ -37,18 +37,18 @@
       "tokens": 2072
     },
     {
+      "name": "ndx-plan",
+      "file": "packages/core/assistant-assets/skills/ndx-plan.md",
+      "shipped": true,
+      "chars": 8027,
+      "tokens": 2007
+    },
+    {
       "name": "ndx-work",
       "file": "packages/core/assistant-assets/skills/ndx-work.md",
       "shipped": true,
       "chars": 7984,
       "tokens": 1996
-    },
-    {
-      "name": "ndx-plan",
-      "file": "packages/core/assistant-assets/skills/ndx-plan.md",
-      "shipped": true,
-      "chars": 7884,
-      "tokens": 1971
     },
     {
       "name": "triage",
@@ -1067,8 +1067,8 @@
       }
     ]
   },
-  "contentHash": "00c9207aead87d34",
-  "recordedAt": "2026-10-16T13:59:54.988Z",
-  "commit": "d8e9ee3d1049",
+  "contentHash": "2d0fda542614f9b2",
+  "recordedAt": "2026-10-16T22:30:15.623Z",
+  "commit": "c7b10d223337",
   "dirty": false
 }
