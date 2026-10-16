@@ -15,11 +15,15 @@ export async function handleVerifyCriteria(
     const config = await store.loadConfig();
     // The test command comes from the repository's own `.rex/config.json`, so
     // running it on a checkout the user has not trusted would execute whatever
-    // that checkout chose. Default off; and even when asked for, tests run
-    // only once the repository's execution config is trusted (`ndx trust`).
+    // that checkout chose. Default off; and even when asked for, a test
+    // command runs only once the user has accepted this exact execution
+    // config (`ndx trust accept .`). `!restricted` is not enough: a plain
+    // command is an info finding, so such a checkout is `baseline` and
+    // unrestricted without anyone having agreed to run it (#686).
     const requested = args.runTests === true;
     const trust = requested ? evaluateRepoTrust(dir) : null;
-    const runTests = requested && trust !== null && !trust.restricted;
+    const accepted = trust?.record != null && trust.record.digest === trust.config.digest;
+    const runTests = requested && (!config.test || accepted);
     const result = await verify({
       projectDir: dir,
       items: doc.items,

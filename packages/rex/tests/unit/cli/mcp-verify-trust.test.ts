@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { handleVerifyCriteria } from "../../../src/cli/mcp-tools/index.js";
 import type { PRDStore } from "../../../src/store/contracts.js";
+import { recordRepoTrust } from "@n-dx/llm-client";
 
 let repo: string;
 let home: string;
@@ -40,7 +41,9 @@ afterEach(() => {
 describe("verify_criteria and repository trust", () => {
   // A test command that leaves a footprint if it ever runs.
   const marker = () => join(repo, "RAN");
-  const command = () => `node -e "require('fs').writeFileSync(${JSON.stringify(marker())}, 'x')"`;
+  // The command runs in the repository, so a relative marker path keeps the
+  // quoting shell-neutral.
+  const command = () => `node -e "require('fs').writeFileSync('RAN', 'x')"`;
 
   it("does not run the repository's test command by default", async () => {
     writeFileSync(join(repo, ".rex", "config.json"), JSON.stringify({ test: command() }));
@@ -62,5 +65,49 @@ describe("verify_criteria and repository trust", () => {
     expect(body.testsSkipped).toContain("not trusted");
     expect(body.trust.state).toBe("untrusted");
     expect(existsSync(marker())).toBe(false);
+  });
+
+  describe("a plain test command on a baseline checkout (#686 finding 2)", () => {
+    // A criterion keyword ("thing") that maps to a test file, so a permitted
+    // run actually launches the command.
+    beforeEach(() => {
+      mkdirSync(join(repo, "tests"), { recursive: true });
+      writeFileSync(join(repo, "tests", "thing.test.js"), "");
+      writeFileSync(join(repo, ".rex", "config.json"), JSON.stringify({ test: command() }));
+    });
+
+    it("is refused until the user accepts it, and runs once they have", async () => {
+      // No chaining or fetching: an info-level finding, so the checkout is baseline.
+      const before = JSON.parse((await handleVerifyCriteria(fakeStore(command()), repo, { runTests: true })).content[0].text);
+      expect(before.trust.state).toBe("baseline");
+      expect(before.testRun).toBeUndefined();
+      expect(before.testsSkipped).toContain("ndx trust accept .");
+      expect(existsSync(marker())).toBe(false);
+
+      recordRepoTrust(repo);
+
+      const after = JSON.parse((await handleVerifyCriteria(fakeStore(command()), repo, { runTests: true })).content[0].text);
+      expect(after.testsSkipped).toBeUndefined();
+      expect(after.trust).toBeUndefined();
+      expect(after.testRun, after.testRun?.output).toMatchObject({ ran: true, passed: true });
+      expect(existsSync(marker())).toBe(true);
+    });
+
+    it("is refused again once the accepted config changes", async () => {
+      recordRepoTrust(repo);
+      const changed = `${command()} --`;
+      writeFileSync(join(repo, ".rex", "config.json"), JSON.stringify({ test: changed }));
+      const body = JSON.parse((await handleVerifyCriteria(fakeStore(changed), repo, { runTests: true })).content[0].text);
+      expect(body.testRun).toBeUndefined();
+      expect(body.testsSkipped).toContain("ndx trust accept .");
+      expect(existsSync(marker())).toBe(false);
+    });
+  });
+
+  it("needs no acceptance when the repository has no test command", async () => {
+    const res = await handleVerifyCriteria(fakeStore(""), repo, { runTests: true });
+    const body = JSON.parse(res.content[0].text);
+    expect(body.testsSkipped).toBeUndefined();
+    expect(body.trust).toBeUndefined();
   });
 });
