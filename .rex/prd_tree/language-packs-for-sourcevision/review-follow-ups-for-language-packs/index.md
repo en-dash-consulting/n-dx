@@ -36,7 +36,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [python-clients grades a call certain when a parameter or a non-client local shadows a module-level client](./python-clients-grades-a-call-certain.md) | completed |
 | [python-clients grades an import-qualified call certain when a parameter or local shadows the imported module name](./python-clients-grades-an-import.md) | completed |
 | [scip-java comparison counts constructor references as references to their type](./scip-java-comparison-counts.md) | completed |
-| [Spring Boot's byOwner pairs captures by scanning every owner, quadratic in a large Java file](./spring-boot-s-byowner-pairs-captures.md) | pending |
+| [Spring Boot's byOwner pairs captures by scanning every owner, quadratic in a large Java file](./spring-boot-s-byowner-pairs-captures.md) | completed |
+| [Spring Boot scale test does not scale variable declarations, so the declaration sweep can regress unseen](./spring-boot-scale-test-does-not-scale.md) | pending |
 | [Terraform agreement test checks a fixed name list, so a new config filename can drift from isTerraformPath](./terraform-agreement-test-checks-a.md) | pending |
 | [The Django query captures every list and tuple, adding seconds to large Python data files in every analyze](./the-django-query-captures-every-list.md) | completed |
 | [tree-sitter-go 0.25.0 rejects Go 1.26 new(expr) and generic methods](./tree-sitter-go-0-25-0-rejects-go-1-26.md) | pending |
