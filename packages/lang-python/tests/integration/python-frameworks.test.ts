@@ -218,6 +218,47 @@ describe("Django routes", () => {
   });
 });
 
+describe("an imported name rebound at module level", () => {
+  let dir: string;
+  const write = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text);
+  };
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "lang-python-rebound-"));
+    write("app/__init__.py", "");
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("is not followed through its import when the rebinding comes after it", async (ctx) => {
+    write("app/routers.py", "from rest_framework.routers import DefaultRouter\nrouter = DefaultRouter()\n");
+    write("app/after.py", 'from .routers import router\nrouter = make_other()\nrouter.register("a", AView)\n');
+    // The import overrides an assignment before it; a function's own binding is not module level.
+    write("app/before.py", 'router = make_other()\nfrom .routers import router\nrouter.register("b", BView)\n');
+    write("app/nested.py", 'from .routers import router\ndef f():\n    router = make_other()\nrouter.register("c", CView)\n');
+    const { notices } = await analyze(ctx, dir);
+    expect(notices).toEqual([
+      "Django: 2 Django REST framework router registrations are counted, not expanded: " +
+        "app/before.py:3 (register router.register), app/nested.py:4 (register router.register).",
+    ]);
+  });
+
+  it("does not mount a FastAPI router or a Flask blueprint through a rebound name", async (ctx) => {
+    write("app/items.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/items")\ndef items(): ...\n');
+    write("app/main.py", 'from fastapi import FastAPI\nfrom .items import router\nrouter = make_other()\napp = FastAPI()\napp.include_router(router, prefix="/api")\n');
+    write("app/views.py", 'from flask import Blueprint\nbp = Blueprint("v", __name__)\n@bp.route("/views")\ndef views(): ...\n');
+    write("app/site.py", 'from flask import Flask\nfrom .views import bp\nclass bp: ...\nsite = Flask(__name__)\nsite.register_blueprint(bp, url_prefix="/site")\n');
+    write("app/early.py", 'from fastapi import FastAPI\ndef router(): ...\nfrom .items import router\nearly = FastAPI()\nearly.include_router(router, prefix="/early")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/items.py")).toEqual(["GET /early/items items"]);
+    expect(routesOf(facts, "app/views.py")).toEqual(["GET /views views"]);
+    expect(notices).toEqual([
+      "FastAPI: 1 mount names no application or router the rules can follow and was not followed: app/main.py:5 (include_router router).",
+      "Flask: 1 mount names no application or router the rules can follow and was not followed: app/site.py:5 (register_blueprint bp).",
+    ]);
+  });
+});
+
 describe("the Python pack entry with its frameworks", () => {
   it("lists routes and is consistent with its frameworks", () => {
     expect(pythonPack.produces).toContain("routes");
