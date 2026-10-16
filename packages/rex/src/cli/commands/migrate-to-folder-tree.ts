@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import { readdir, readFile, rename, stat, unlink } from "node:fs/promises";
 import { info, warn } from "../output.js";
-import { serializeFolderTree, parseFolderTree, TREE_META_FILENAME, resolveRexPaths } from "../../store/index.js";
+import { serializeFolderTree, parseFolderTree, treeMetaContents, TREE_META_FILENAME, resolveRexPaths } from "../../store/index.js";
+import { atomicWriteJSON } from "../../store/atomic-write.js";
 import { parseDocument } from "../../store/markdown-parser.js";
 import { validateDocument } from "../../schema/validate.js";
 import { SCHEMA_VERSION } from "../../schema/index.js";
@@ -70,6 +71,9 @@ export async function cmdMigrateToFolderTree(
 
   const levelCounts = countItemsByLevel(doc.items);
   const result = await serializeFolderTree(doc.items, treeRoot);
+  // The tree carries no title of its own; without the sidecar it reads as "PRD".
+  const metaPath = join(rexDir, TREE_META_FILENAME);
+  await atomicWriteJSON(metaPath, await treeMetaContents(metaPath, doc));
 
   const { directoriesCreated, filesWritten, filesSkipped, directoriesRemoved } = result;
   const isNoOp = directoriesCreated === 0 && filesWritten === 0 && directoriesRemoved === 0;
