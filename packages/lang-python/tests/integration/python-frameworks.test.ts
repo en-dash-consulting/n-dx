@@ -11,9 +11,17 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FactKind, FileFacts, RouteFact } from "@n-dx/lang-kit";
-import { createPackEntry, factGaps, listFixtureFiles, skipUnlessGrammar, type FrameworkContext, type FrameworkPack } from "@n-dx/lang-runtime";
+import {
+  createPackEntry,
+  createTreeSitterRunner,
+  factGaps,
+  listFixtureFiles,
+  skipUnlessGrammar,
+  type FrameworkContext,
+  type FrameworkPack,
+} from "@n-dx/lang-runtime";
 
-import { django } from "../../src/django.js";
+import { DJANGO_QUERY, django } from "../../src/django.js";
 import { fastapi } from "../../src/fastapi.js";
 import { flask } from "../../src/flask.js";
 import { PYTHON_PACKAGE } from "../../src/package-paths.js";
@@ -135,6 +143,52 @@ describe("Django routes", () => {
       "Django: 2 Django REST framework router registrations are counted, not expanded: " +
         "mysite/urls.py:12 (register router.register), mysite/urls.py:13 (register router.register).",
     ]);
+  });
+
+  it("captures sequences only where URL patterns can be, so a data table costs nothing", async (ctx) => {
+    skipUnlessGrammar(ctx, pythonGrammarPath());
+    const source = [
+      'urlpatterns = [path("a/", views.a), url("^old/$", views.old)] + [re_path("^b/$", views.b)]', // 1
+      'urlpatterns += [path("c/", include([path("d/", views.d)]))]', // 2
+      'urlpatterns += [path("e/", include(("app.urls", "app"), namespace="app"))]', // 3
+      'extra = [path("f/", views.f)]', // 4
+      'TABLE = [("a", 0, [0, 1]), ("b", 1, [1, 2])]', // 5
+      'NAMES = ["x", "y"]', // 6
+      "PAIR = (1, 2)", // 7
+      "configure([f(1)], (2, 3))", // 8
+      "",
+    ].join("\n");
+    const runner = createTreeSitterRunner();
+    try {
+      const target = { pack: { ...pythonPack, queries: [...pythonPack.queries, ...django.queries] }, grammarPath: pythonGrammarPath() };
+      const result = await runner.parseSource(target, "urls.py", source);
+      if (result.status !== "parsed") throw new Error(`not parsed: ${result.status}`);
+      const at = (name: string): string[] =>
+        [...new Set((result.captures[DJANGO_QUERY] ?? []).filter((c) => c.name === name).map((c) => `${c.start.line}:${c.text}`))].sort();
+      expect(at("django.sequence")).toEqual([
+        '1:[path("a/", views.a), url("^old/$", views.old)]',
+        '1:[re_path("^b/$", views.b)]',
+        '2:[path("c/", include([path("d/", views.d)]))]',
+        '2:[path("d/", views.d)]',
+        '3:("app.urls", "app")',
+        '3:[path("e/", include(("app.urls", "app"), namespace="app"))]',
+        '4:[path("f/", views.f)]',
+      ]);
+      // A list's entries are its path()/re_path() calls; an include() tuple's are all of them.
+      expect(at("django.item")).toEqual([
+        '1:path("a/", views.a)',
+        '1:re_path("^b/$", views.b)',
+        '2:path("c/", include([path("d/", views.d)]))',
+        '2:path("d/", views.d)',
+        '3:"app"',
+        '3:"app.urls"',
+        '3:path("e/", include(("app.urls", "app"), namespace="app"))',
+        '4:path("f/", views.f)',
+      ]);
+      expect(at("django.target")).toEqual(["1:urlpatterns", "2:urlpatterns", "3:urlpatterns", "4:extra"]);
+    } finally {
+      runner.dispose();
+    }
   });
 
   describe("without ROOT_URLCONF", () => {
