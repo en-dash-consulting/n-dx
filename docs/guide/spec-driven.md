@@ -27,7 +27,7 @@ rex change place <change> --target=<node> --relation=amends \
 ```
 
 ::: info v1 projects
-`ndx init` creates v2 projects. A v1 project, one that has not yet run `ndx migrate`, has no product layer: an LLM decomposes the spec into a tree of epics, features, tasks and subtasks. Steps 2 and 3 below walk through that v1 path and mark where a v2 project differs; the later steps apply to both.
+`ndx init` creates v2 projects. A v1 project, one that has not yet run `ndx migrate`, has no product layer: an LLM decomposes the spec into a tree of epics, features, tasks and subtasks. The steps below walk through that v1 path. On a v2 project, the `ndx add --file` and `rex change place` commands above stand in for Steps 2 to 4; `ndx work` in Steps 5 and 6 runs on both layouts.
 :::
 
 ## Step 1: Initialize (if you haven't)
