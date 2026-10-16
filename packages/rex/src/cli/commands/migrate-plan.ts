@@ -56,7 +56,7 @@ import { planSeams } from "../../migrations/v1-to-v2/seams.js";
 import { describeSkippedV1Items, skippedV1Items } from "../../migrations/v1-to-v2/v1-tree-read.js";
 import { renderPlanSummary, type V1ToV2Plan } from "../../migrations/v1-to-v2/plan-summary.js";
 import { atomicWrite } from "../../store/atomic-write.js";
-import { CLIError } from "../errors.js";
+import { CLIError, refuseInsideAgentRun } from "../errors.js";
 import { assertOutsideRexDir } from "./export.js";
 import { info, result, warn } from "../output.js";
 
@@ -201,6 +201,7 @@ async function isAncestorOfHead(dir: string, sha: string): Promise<boolean> {
 }
 
 export async function cmdMigratePlan(dir: string, flags: Record<string, string>): Promise<void> {
+  refuseInsideAgentRun("rex migrate-plan");
   // The whole argument shape settles before anything is read, so a malformed
   // command fails on the command rather than part-way through a paid run.
   const id = flags.migration === undefined || flags.migration === "true" ? DEFAULT_MIGRATION : flags.migration;

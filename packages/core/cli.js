@@ -1858,6 +1858,11 @@ async function handleTrust(rest) {
  * reach rex by spawning it.
  */
 async function handleMigrateLayout(rest) {
+  if (process.env.NDX_AGENT_RUN) {
+    console.error("Error: ndx migrate-layout refuses inside an agent run (NDX_AGENT_RUN is set).");
+    console.error("Hint: An operator runs the migration from their own shell.");
+    exitWithCleanup(1);
+  }
   const dir = resolveDir(rest);
   const code = await runMigrateLayout(dir, extractFlags(rest), { runCapture, tools });
   exitWithCleanup(code);

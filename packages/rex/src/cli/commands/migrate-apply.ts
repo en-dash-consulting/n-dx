@@ -32,13 +32,14 @@ import {
 import { readPlanFile, type PlanFile } from "../../migrations/plan-file.js";
 import { PRD_TREE_DIRNAME, resolveRexPaths, resolveStore } from "../../store/index.js";
 import { hasV2Tree } from "../../store/prd-bundle-v2.js";
-import { CLIError } from "../errors.js";
+import { CLIError, refuseInsideAgentRun } from "../errors.js";
 import { info, result } from "../output.js";
 import { readPackageVersion } from "./health.js";
 
 const USAGE = "Usage: rex migrate-apply --plan=<path.json> [--dry-run] [dir]";
 
 export async function cmdMigrateApply(dir: string, flags: Record<string, string>): Promise<void> {
+  refuseInsideAgentRun("rex migrate-apply");
   const rexDir = resolveRexPaths(dir).rexDir;
   const planFlag = flags.plan !== undefined && flags.plan !== "true" ? flags.plan : undefined;
 

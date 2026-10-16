@@ -117,4 +117,17 @@ describe("agent run environment", () => {
     expect(readdirSync(dir, { recursive: true }).sort()).toEqual(before);
     expect(existsSync(join(dir, ".rex", "prd_tree"))).toBe(true);
   });
+
+  it.each([
+    ["rex migrate-plan", ["rex", "migrate-plan", "--rules-only", "--out=plan.json", "."]],
+    ["rex migrate-apply", ["rex", "migrate-apply", "--plan=plan.json", "."]],
+    ["ndx migrate-layout", ["migrate-layout", "."]],
+  ])("%s refuses inside an agent run and writes nothing", (_label, args) => {
+    const before = readdirSync(dir, { recursive: true }).sort();
+    const out = ndx(args, { cwd: dir, env: { NDX_AGENT_RUN: "1" } });
+    expect(out.status).not.toBe(0);
+    expect(out.stderr).toContain("refuses inside an agent run");
+    expect(readdirSync(dir, { recursive: true }).sort()).toEqual(before);
+    expect(existsSync(join(dir, ".rex", "prd_tree"))).toBe(true);
+  });
 });
