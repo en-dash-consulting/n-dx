@@ -112,6 +112,13 @@ const COMMAND_REGISTRY = [
     related: ["recommend", "plan", "init"],
   },
   {
+    name: "iso",
+    category: "Orchestration",
+    summary: "Render a standalone isometric architecture map",
+    keywords: ["iso", "isometric", "map", "diagram", "visualize", "architecture", "zones", "3d", "html"],
+    related: ["analyze", "status", "export"],
+  },
+  {
     name: "recommend",
     category: "Orchestration",
     summary: "Show or accept SourceVision-based recommendations",
@@ -1559,6 +1566,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     options: [
       { flag: "--item=<id>", description: "Related PRD item ID" },
       { flag: "--detail=\"...\"", description: "Event details" },
+      { flag: "--format=json", description: "Print the written entry as JSON" },
     ],
     examples: [
       { command: "ndx log task_started --item=abc123", description: "Log an event tied to a task" },
