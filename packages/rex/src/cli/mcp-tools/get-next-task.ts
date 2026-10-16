@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
-import { withoutLevel } from "../../core/layer-projection.js";
 import { completedWorkIds, findNextWorkTask } from "../../core/change-next-task.js";
 import { isChangeLayerStore, type PRDStore } from "../../store/index.js";
 import type { ChangeLayerStore } from "../../store/change-layer-store.js";
@@ -69,8 +68,8 @@ async function handleGetNextV2Work(
   return textResult(
     JSON.stringify(
       {
-        item: withoutLevel(next.item),
-        parentChain: next.parents.map((p) => ({ id: p.id, title: p.title, type: p.type })),
+        item: next.item,
+        parentChain: next.parents.map((p) => ({ id: p.id, title: p.title, level: p.level, type: p.type })),
         explanation: next.explanation,
         changeId: next.unit.change.id,
         ...(skippedClaimed.length > 0 ? { skippedClaimed } : {}),
