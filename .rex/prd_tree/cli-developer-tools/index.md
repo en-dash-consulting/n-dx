@@ -2,11 +2,12 @@
 id: "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
 level: "epic"
 title: "CLI & Developer Tools"
-status: "pending"
+status: "completed"
 startedAt: "2026-04-02T17:55:36.327Z"
-endedAt: "2026-09-17T03:54:48.313Z"
+completedAt: "2026-10-16T06:09:44.057Z"
+endedAt: "2026-10-16T06:09:44.057Z"
 description: "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline."
-lastModified: "2026-10-06T06:08:58.545Z"
+lastModified: "2026-10-16T06:09:44.648Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -39,7 +40,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Pair-Programming Command Mode (rename from single-command)](./pair-programming-command-mode-rename/index.md) | completed |
 | [Plan-Mode Prevention Skill for LLM Agents](./plan-mode-prevention-skill-for-llm/index.md) | completed |
 | [Pre-Execution Confirmation Prompt for ndx self-heal](./pre-execution-confirmation-prompt-for/index.md) | completed |
-| [rex migrate-slugs help and JSDoc describe the slug rule it replaced, so the right tool reads as the wrong one](./rex-migrate-slugs-help-and-jsdoc.md) | completed |
 | [Self-Heal Scoped Task Selection and Auto-Termination](./self-heal-scoped-task-selection-and/index.md) | completed |
 | [Self-Heal Tag Attribution on Created PRD Items](./self-heal-tag-attribution-on-created/index.md) | completed |
 | [Shared Unit Test Utilities](./shared-unit-test-utilities/index.md) | completed |
@@ -64,10 +64,12 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [`ndx ci` fails any user project that imports child_process: its allowlist only names n-dx's own files and cannot be configured](./ndx-ci-fails-any-user-project-that.md) | completed |
 | [`ndx ci` reports restricted imports as "skipped" when .n-dx.json is not valid JSON, so configured rules silently stop applying](./ndx-ci-reports-restricted-imports-as.md) | completed |
 | [`ndx ci` restricted-import scan walks gitignored build output and agent worktrees, reporting false violations](./ndx-ci-restricted-import-scan-walks.md) | completed |
+| [`ndx move <id> [dir]` checks the current directory for .rex instead of the directory it names](./ndx-move-id-dir-checks-the-current.md) | completed |
 | [`node packages/core/ci.js .` is a silent no-op, yet `pnpm verify` and CONTRIBUTING.md run the CI gate that way](./node-packages-core-ci-js-is-a-silent.md) | completed |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-carries.md) | completed |
 | [Pre-dispatch project-dir resolution still lets a directory shadow a config key](./pre-dispatch-project-dir-resolution.md) | completed |
 | [resolveDir treats a tool subcommand as the project directory, so `ndx hench record` checks the wrong path](./resolvedir-treats-a-tool-subcommand-as.md) | completed |
+| [rex migrate-slugs help and JSDoc describe the slug rule it replaced, so the right tool reads as the wrong one](./rex-migrate-slugs-help-and-jsdoc.md) | completed |
 | [Skill commit steps prescribe a POSIX-only heredoc, which fails in PowerShell and can drop the attribution trailer](./skill-commit-steps-prescribe-a-posix.md) | completed |
 | [Skills that call add_item describe item content in prose instead of naming its parameters](./skills-that-call-add-item-describe.md) | completed |
 | [Skills that record runs omit --startedAt, so each one's first record claims the whole session](./skills-that-record-runs-omit-startedat.md) | completed |

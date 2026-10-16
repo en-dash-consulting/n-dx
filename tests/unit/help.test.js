@@ -258,6 +258,8 @@ describe("help.js", () => {
       expect(output).toContain("<event>");
       expect(output).toContain("--item");
       expect(output).toContain("--detail");
+      // Forwarded to `rex log` and used by the e2e test, so the help has to name it.
+      expect(output).toContain("--format=json");
       expect(output).toContain("append_log");
       expect(output.toLowerCase()).toContain("mcp");
     });
