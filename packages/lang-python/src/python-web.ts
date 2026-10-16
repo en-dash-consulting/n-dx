@@ -15,7 +15,7 @@
  */
 
 import type { SourcePosition } from "@n-dx/lang-kit";
-import { callSites, contains, innermost, type Capture, type FrameworkContext, type PackSourceFile } from "@n-dx/lang-runtime";
+import { callSites, contains, innermostEach, type Capture, type FrameworkContext, type PackSourceFile } from "@n-dx/lang-runtime";
 
 // ── Captures ────────────────────────────────────────────────────────────────
 
@@ -47,16 +47,14 @@ function named(captures: readonly Capture[], name: string): Capture[] {
 /** Each of `captured` under the smallest of `owners` that contains it and is not it (a list entry that is itself a list). */
 function byOwner(owners: readonly Capture[], captured: readonly Capture[]): Map<Capture, Capture[]> {
   const owned = new Map<Capture, Capture[]>();
-  for (const c of captured) {
-    let owner: Capture | undefined;
-    for (const candidate of owners) {
-      if (contains(candidate, c) && !sameSpan(candidate, c) && (owner === undefined || contains(owner, candidate))) owner = candidate;
-    }
-    if (!owner) continue;
+  const found = innermostEach(owners, captured, true);
+  captured.forEach((c, i) => {
+    const owner = found[i];
+    if (!owner) return;
     const list = owned.get(owner);
     if (list) list.push(c);
     else owned.set(owner, [c]);
-  }
+  });
   return owned;
 }
 
@@ -198,9 +196,12 @@ function readBindings(file: PackSourceFile, aliased: readonly Capture[], aliases
     // `import a.b` binds `a`; `import a.b as c` binds `c` to `a.b`.
     entries.push(alias ? [module.start, alias, { module: spec }] : [module.start, spec.split(".")[0]!, { module: spec.split(".")[0]! }]);
   }
-  for (const name of of("import.name")) {
-    const statement = innermost(statements, name);
-    const from = statement && froms.find((f) => contains(statement, f));
+  const names = of("import.name");
+  const statementOf = innermostEach(statements, names);
+  const fromOf = new Map([...byOwner(statements, froms)].map(([statement, found]) => [statement, found[0]!]));
+  for (const [i, name] of names.entries()) {
+    const statement = statementOf[i];
+    const from = statement && fromOf.get(statement);
     if (!from) continue;
     const text = dotted(name.text);
     entries.push([name.start, aliasOf(name) ?? text, { module: dotted(from.text), name: text }]);
@@ -217,12 +218,15 @@ function readDecorated(file: PackSourceFile): Decorated[] {
   const definitionsByDeclaration = byOwner(declarations, of("decorated.definition"));
   const functions = of("function.declaration");
   const functionNames = byOwner(functions, of("function.name"));
+  const functionAt = new Map(functions.map((f) => [spanKey(f), f]));
+  const decorators = of("decorated.decorator");
+  const declarationOf = innermostEach(declarations, decorators);
   const out: Decorated[] = [];
-  for (const decorator of of("decorated.decorator")) {
-    const declaration = innermost(declarations, decorator);
+  for (const [i, decorator] of decorators.entries()) {
+    const declaration = declarationOf[i];
     // A nested decorated definition belongs to its own, smaller declaration.
     const definition = declaration && definitionsByDeclaration.get(declaration)?.[0];
-    const fn = definition && functions.find((f) => sameSpan(f, definition));
+    const fn = definition && functionAt.get(spanKey(definition));
     const name = fn && functionNames.get(fn)?.[0];
     if (name) out.push({ decorator, handler: name.text });
   }
