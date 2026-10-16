@@ -106,11 +106,10 @@ describe("spawnCli refuses what cmd.exe would expand", () => {
       child = spawnCli(binary, ["-p"], { ...win, env: { PATH: "" } });
     }).not.toThrow();
     child?.on("error", () => {});
-    // The fixture binary does not exist, so the child may already be dead.
-    try {
-      child?.kill();
-    } catch {
-      /* never started — nothing to kill */
-    }
+    // Off Windows there is no cmd.exe, so the spawn fails and `pid` stays
+    // undefined. Killing such a child signals pid 0 — the caller's whole
+    // process group, which on CI is the runner itself. Only kill a child that
+    // actually started.
+    if (child?.pid !== undefined) child.kill();
   });
 });
