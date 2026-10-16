@@ -90,6 +90,7 @@ export interface Binding {
 /** A name bound by an assignment; `augmented` for `+=`. */
 export interface WebAssignment {
   readonly target: string;
+  readonly targetNode: Capture;
   readonly value: Capture;
   readonly augmented: boolean;
 }
@@ -167,7 +168,7 @@ export function readWebFile(file: PackSourceFile, prefix: string): WebFile {
   const assignments = assignmentNodes.flatMap((node): WebAssignment[] => {
     const target = targets.get(node)?.[0];
     const value = values.get(node)?.[0];
-    return target && value ? [{ target: target.text, value, augmented: node.nodeType === "augmented_assignment" }] : [];
+    return target && value ? [{ target: target.text, targetNode: target, value, augmented: node.nodeType === "augmented_assignment" }] : [];
   });
 
   return {

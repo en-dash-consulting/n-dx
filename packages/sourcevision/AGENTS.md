@@ -54,16 +54,11 @@ a Python repository beside TypeScript (root `pyproject.toml` and
 will load, so it leaves Python out of `analysedLanguages`; the imports phase
 adds it to inventory.json once the pack has run (`withPackAnalysedLanguages`),
 and leaves the file untouched otherwise. Its dynamic-import and past-root notices go to the same
-`warn`. `scripts/python-corpus-report.mjs` measures the pack
-over the pinned corpus (`python-corpus.json`), and
-`scripts/python-build-report.mjs` runs lang-kit's Python build readers over
-it (projects, roots, dependency counts, notices), and
-`scripts/python-resolve-report.mjs` the resolver (resolution rates by
-outcome and a hand-check sample), and `scripts/python-routes-report.mjs` the
-route rules (routes by framework and method, placeholder paths, notices and
-a seeded sample), and `scripts/python-outbound-report.mjs` the outbound
-rules (calls by kind, client and confidence, targets by source and a seeded
-sample). With the pack, components.json gains one `serverRoutes` group per
+`warn`. Over the pinned corpus (`python-corpus.json`),
+`scripts/python-corpus-report.mjs` measures the pack, `python-build-report.mjs`
+lang-kit's build readers, `python-resolve-report.mjs` the resolver, and
+`python-routes-report.mjs` and `python-outbound-report.mjs` the route and
+outbound rules; the last three print a hand-check sample. With the pack, components.json gains one `serverRoutes` group per
 Python file with routes and the derived `totalServerRoutes`, and
 outbound.json one dependency per Python outbound call; no sourcevision code
 is Python-specific.

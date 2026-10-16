@@ -40,9 +40,11 @@
  *
  * Confidence is `certain` when the callee is reached through an import of
  * its module (`import requests`, `import httpx as hx`, `from requests import
- * Session`) or the receiver is a name bound to a client's constructor in the
- * same function, class body or module scope (an assignment, or the target of
- * `with … as`/`async with … as`). A call whose receiver is not known is
+ * Session`) or the receiver is a name that, in the scope Python resolves it
+ * to ({@link readScopes}), is bound only to one client's constructor (an
+ * assignment, or the target of `with … as`/`async with … as`). A parameter
+ * or any other binding of the name in that scope makes the receiver
+ * unknown. A call whose receiver is not known is
  * `likely` only for `basic_publish`, `basic_consume` and `send_task`, which
  * no other listed client shares; `produce` and `send` are also unshared but
  * too common in other libraries to grade. Nothing else is reported, and a
@@ -353,6 +355,102 @@ function distinct(captures: readonly Capture[], name: string): Capture[] {
   });
 }
 
+/** A file's scopes, keyed by span; "" is the module. */
+interface Scopes {
+  /** The innermost scope of each node. */
+  scopeOf(nodes: readonly Capture[]): string[];
+  /** The scope whose binding a name written in `scope` refers to. */
+  resolve(scope: string, name: string): string;
+  /** Every node that binds `name` in `scope`, `global` and `nonlocal` followed. */
+  bindings(scope: string, name: string): readonly Capture[];
+}
+
+type ScopeKind = "function" | "class" | "comprehension";
+
+/**
+ * Python's scopes over one file: a function, lambda, class body or
+ * comprehension. A name bound anywhere in a scope is local to all of it,
+ * unless the scope declares it `global` (the module's) or `nonlocal` (the
+ * nearest enclosing function's that binds it). A name a scope does not bind
+ * is looked up in the enclosing functions, then the module; a class body is
+ * not enclosing. A walrus target binds outside its comprehensions.
+ */
+function readScopes(file: PackSourceFile, own: readonly Capture[]): Scopes {
+  const kinds = new Map<string, ScopeKind>();
+  const nodes: Capture[] = [];
+  const addScopes = (captures: readonly Capture[], kind: ScopeKind): void => {
+    for (const c of captures) {
+      if (kinds.has(spanKey(c))) continue;
+      kinds.set(spanKey(c), kind);
+      nodes.push(c);
+    }
+  };
+  const definitions = file.captures.definitions ?? [];
+  addScopes(distinct(definitions, "function.declaration"), "function");
+  addScopes(distinct(definitions, "class.declaration"), "class");
+  addScopes(distinct(own, `${PREFIX}.lambda`), "function");
+  addScopes(distinct(own, `${PREFIX}.comprehension`), "comprehension");
+  const scopeOf = (captured: readonly Capture[]): string[] => innermostEach(nodes, captured).map((s) => (s ? spanKey(s) : ""));
+  const parents = new Map(innermostEach(nodes, nodes, true).map((p, i) => [spanKey(nodes[i]!), p ? spanKey(p) : ""]));
+  const parent = (scope: string): string => parents.get(scope) ?? "";
+
+  // Names each scope binds or declares, in that scope.
+  const local = new Map<string, Map<string, Capture[]>>();
+  const declared = new Map<string, Map<string, "global" | "nonlocal">>();
+  const bindingNodes = distinct(own, `${PREFIX}.binding`);
+  scopeOf(bindingNodes).forEach((scope, i) => addTo(local, scope, bindingNodes[i]!));
+  const walruses = distinct(own, `${PREFIX}.walrus`);
+  scopeOf(walruses).forEach((scope, i) => {
+    let at = scope;
+    while (kinds.get(at) === "comprehension") at = parent(at);
+    addTo(local, at, walruses[i]!);
+  });
+  for (const declaration of ["global", "nonlocal"] as const) {
+    const names = distinct(own, `${PREFIX}.${declaration}`);
+    scopeOf(names).forEach((scope, i) => {
+      const map = declared.get(scope) ?? new Map<string, "global" | "nonlocal">();
+      declared.set(scope, map);
+      map.set(names[i]!.text, declaration);
+    });
+  }
+
+  /** `written`: the name is written in `scope` itself, so a class body there counts. */
+  const resolveFrom = (scope: string, name: string, written: boolean): string => {
+    for (let key = scope, first = written; key !== ""; key = parent(key), first = false) {
+      if (!first && kinds.get(key) === "class") continue;
+      const declaration = declared.get(key)?.get(name);
+      if (declaration === "global") return "";
+      if (declaration === undefined && local.get(key)?.has(name)) return key;
+    }
+    return "";
+  };
+
+  // Each binding under the scope that owns it.
+  const owned = new Map<string, Map<string, Capture[]>>();
+  for (const [scope, names] of local) {
+    for (const [name, bound] of names) {
+      const declaration = declared.get(scope)?.get(name);
+      const owner = declaration === "global" ? "" : declaration === "nonlocal" ? resolveFrom(parent(scope), name, false) : scope;
+      for (const node of bound) addTo(owned, owner, node);
+    }
+  }
+
+  return {
+    scopeOf,
+    resolve: (scope, name) => resolveFrom(scope, name, true),
+    bindings: (scope, name) => owned.get(scope)?.get(name) ?? [],
+  };
+}
+
+/** Adds a binding node under its scope and name. */
+function addTo(map: Map<string, Map<string, Capture[]>>, scope: string, node: Capture): void {
+  const names = map.get(scope) ?? new Map<string, Capture[]>();
+  map.set(scope, names);
+  const list = names.get(node.text);
+  if (list) list.push(node);
+  else names.set(node.text, [node]);
+}
+
 /** One parsed file's outbound calls; its captures must include the `python-clients` query's. */
 export function readPythonClientFile(file: PackSourceFile): OutboundCallFact[] {
   const own = file.captures[PYTHON_CLIENTS_QUERY] ?? [];
@@ -370,19 +468,30 @@ export function readPythonClientFile(file: PackSourceFile): OutboundCallFact[] {
   };
   const targets = new TargetReader(qualify);
 
-  // Scopes: a function or class body; "" is the module.
-  const definitions = file.captures.definitions ?? [];
-  const scopes = definitions.filter((c) => c.name === "function.declaration" || c.name === "class.declaration");
-  const scopeKeys = (nodes: readonly Capture[]): string[] => innermostEach(scopes, nodes).map((s) => (s ? spanKey(s) : ""));
-
-  // Names bound to clients per scope; null when a scope binds a name to two different things.
-  const bound = new Map<string, Map<string, string | null>>();
-  const lookup = (scope: string, name: string): string | undefined => {
-    for (const key of scope === "" ? [""] : [scope, ""]) {
-      const names = bound.get(key);
-      if (names?.has(name)) return names.get(name) ?? undefined;
+  const scopes = readScopes(file, own);
+  // Binding nodes assigned a constructor's call, with the scope the call is in.
+  const valueScopes = scopes.scopeOf(web.assignments.map((a) => a.value));
+  const clientAt = new Map(web.assignments.map((a, i) => [spanKey(a.targetNode), { value: a.value, scope: valueScopes[i]! }]));
+  // The client a scope's name is: every binding of it there is to the same client's constructor.
+  // Memoised; the entry is unknown while it is being read, so a cycle (`c = c.channel()`) ends.
+  const clients = new Map<string, string | undefined>();
+  const clientOf = (scope: string, name: string): string | undefined => {
+    const key = `${scope}\u0000${name}`;
+    if (clients.has(key)) return clients.get(key);
+    clients.set(key, undefined);
+    let type: string | undefined;
+    for (const node of scopes.bindings(scope, name)) {
+      const assignment = clientAt.get(spanKey(node));
+      const call = assignment && web.callAt(assignment.value);
+      const found = call && typeOfCall(call, assignment.scope, 0);
+      if (found === undefined || (type !== undefined && found !== type)) {
+        type = undefined;
+        break;
+      }
+      type = found;
     }
-    return undefined;
+    clients.set(key, type);
+    return type;
   };
   const typeOfCall = (call: WebCall, scope: string, depth: number): string | undefined => {
     if (call.receiverNode !== undefined) {
@@ -394,28 +503,17 @@ export function readPythonClientFile(file: PackSourceFile): OutboundCallFact[] {
   };
   const typeOf = (node: Capture, scope: string, depth = 0): string | undefined => {
     if (depth > MAX_DEPTH) return undefined;
-    if (node.nodeType === "identifier") return lookup(scope, node.text);
+    if (node.nodeType === "identifier") return clientOf(scopes.resolve(scope, node.text), node.text);
     const call = node.nodeType === "call" ? web.callAt(node) : undefined;
     return call && typeOfCall(call, scope, depth);
   };
-  // In document order, so `channel = connection.channel()` sees `connection`.
-  const assignmentScopes = scopeKeys(web.assignments.map((a) => a.value));
-  web.assignments.forEach((assignment, i) => {
-    const scope = assignmentScopes[i]!;
-    const call = web.callAt(assignment.value);
-    const type = call && typeOfCall(call, scope, 0);
-    const names = bound.get(scope) ?? new Map<string, string | null>();
-    bound.set(scope, names);
-    const before = names.get(assignment.target);
-    names.set(assignment.target, names.has(assignment.target) && before !== type ? null : (type ?? null));
-  });
 
   const facts: OutboundCallFact[] = [];
   const add = (node: Capture, rule: ClientRule, found: readonly Target[], confidence: "certain" | "likely"): void => {
     for (const target of found) facts.push({ kind: rule.kind, ...target, client: rule.client, confidence, position: node.start });
   };
 
-  const callScopes = scopeKeys(web.calls.map((c) => c.invocation));
+  const callScopes = scopes.scopeOf(web.calls.map((c) => c.invocation));
   web.calls.forEach((call, i) => {
     if (call.arity === 0) return;
     const scope = callScopes[i]!;
