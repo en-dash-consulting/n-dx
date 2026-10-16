@@ -87,8 +87,14 @@ items:
     lastModified: "2026-10-15T05:45:46.211Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "475f175a-f3de-4a25-97c3-1751dfe713fa":
+    status: "completed"
+    startedAt: "2026-10-16T23:06:48.259Z"
+    completedAt: "2026-10-16T23:13:58.304Z"
+    endedAt: "2026-10-16T23:13:58.304Z"
+    resolutionType: "code-change"
+    resolutionDetail: "scanRestrictedImports catches read errors and returns them as unreadable; the architecture-policy step fails with \"cannot read <file>: <error>\"; e2e test added (c2c0a7c5d)"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-15T07:21:09.774Z"
+    lastModified: "2026-10-16T23:13:58.613Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4967ee91-e741-41b0-9ae9-d9d55e3f597a":
     status: "completed"
