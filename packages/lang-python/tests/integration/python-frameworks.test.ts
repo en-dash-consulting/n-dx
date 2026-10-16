@@ -197,16 +197,32 @@ describe("the Python pack entry with its frameworks", () => {
     expect(context.module?.("app/main.py", "fastapi")).toBeUndefined();
   });
 
-  it("reports the resolver's own notices only when imports are wanted", async (ctx) => {
+  it("reports the resolver's own notices only when imports are wanted, even after a framework prepared it", async (ctx) => {
     skipUnlessGrammar(ctx, pythonGrammarPath());
     const dir = mkdtempSync(join(tmpdir(), "lang-python-notices-"));
     try {
-      // A relative import past the source root: a resolver notice.
-      writeFileSync(join(dir, "m.py"), "from .. import x\n");
-      const withImports = await pack.analyzeProject({ projectDir: dir, files: ["m.py"], kinds: ["imports"] });
+      // Relative imports past the source root give a resolver notice; following `r` makes FastAPI prepare the resolver.
+      writeFileSync(join(dir, "m.py"), "from fastapi import FastAPI\nfrom .x import r\n\napp = FastAPI()\napp.include_router(r)\n");
+      let prepared = 0;
+      const resolver = pythonPack.resolver!;
+      const counting = {
+        forProject: async (projectDir: string, files: readonly string[]) => {
+          const bound = await resolver.forProject!(projectDir, files);
+          return { prepare: (...args: Parameters<typeof bound.prepare>) => (prepared++, bound.prepare(...args)) };
+        },
+        prepare: resolver.prepare,
+      };
+      const entry = createPackEntry({ package: PYTHON_PACKAGE, pack: { ...pythonPack, resolver: counting }, symbolRules: PYTHON_SYMBOL_RULES });
+
+      const withImports = await entry.analyzeProject({ projectDir: dir, files: ["m.py"], kinds: ["imports"] });
       expect(withImports.notices?.some((n) => n.includes("climbs past its source root"))).toBe(true);
-      const routesOnly = await pack.analyzeProject({ projectDir: dir, files: ["m.py"], kinds: ["routes"] });
-      expect(routesOnly.notices).toBeUndefined();
+
+      prepared = 0;
+      const routesOnly = await entry.analyzeProject({ projectDir: dir, files: ["m.py"], kinds: ["routes"] });
+      expect(prepared).toBe(1);
+      expect(routesOnly.notices).toEqual([
+        "FastAPI: 1 mount names no application or router the rules can follow and was not followed: m.py:5 (include_router r).",
+      ]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
