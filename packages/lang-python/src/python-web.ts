@@ -517,10 +517,20 @@ export class WebProject {
     // Python's last module-level binding wins: a name bound again after its import is not the imported one.
     const bound = web!.moduleBound.get(name);
     if (bound !== undefined && comparePositions(binding.at, bound) < 0) return undefined;
-    // `from pkg import name` where `name` is a submodule names a module, not a definition.
-    if (this.module(file, submodule(binding.module, binding.name)) !== undefined) return undefined;
+    // `from pkg import name` gives `pkg`'s attribute: what `pkg/__init__.py` binds to `name`
+    // (a re-export of `pkg/name.py`'s object included), and the submodule only when it binds nothing.
     const next = this.module(file, binding.module);
-    return next === undefined ? undefined : this.follow(next, binding.name, defines, depth + 1);
+    if (next === undefined) return undefined;
+    if (next === file || !this.binds(next, binding.name, defines)) {
+      if (this.module(file, submodule(binding.module, binding.name)) !== undefined) return undefined;
+    }
+    return this.follow(next, binding.name, defines, depth + 1);
+  }
+
+  /** Whether `file` binds `name` at module level: a definition `defines` accepts, an import, an assignment, `def` or `class`. */
+  private binds(file: string, name: string, defines: (file: string, name: string) => boolean): boolean {
+    const web = this.file(file);
+    return defines(file, name) || web?.bindings.has(name) === true || web?.moduleBound.has(name) === true;
   }
 }
 
