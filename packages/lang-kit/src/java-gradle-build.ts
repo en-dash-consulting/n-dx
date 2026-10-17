@@ -92,17 +92,22 @@ async function readModuleScript(
   dir: string,
   catalogs: ReadonlyMap<string, VersionCatalog>,
 ): Promise<ScriptFacts> {
+  const empty = (notices: string[]): ScriptFacts => ({ plugins: [], classpath: [], dependencies: [], projects: [], notices });
   for (const name of GRADLE_BUILD) {
+    const file = posix.join(dir, name);
     let text: string;
     try {
       text = await readFile(join(projectDir, dir, name), "utf8");
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") continue;
+      // Read as absent, as module discovery does, so one unreadable script does not fail the whole build model.
+      if (code === "EACCES" || code === "EPERM") return empty([`${file} is unreadable (${code}); skipped`]);
       throw err;
     }
-    return new ScriptReader(posix.join(dir, name), new GradleScript(text), catalogs).facts();
+    return new ScriptReader(file, new GradleScript(text), catalogs).facts();
   }
-  return { plugins: [], classpath: [], dependencies: [], projects: [], notices: [] }; // an aggregator with no build script
+  return empty([]); // an aggregator with no build script
 }
 
 // ── Spring Boot ──────────────────────────────────────────────────────────
