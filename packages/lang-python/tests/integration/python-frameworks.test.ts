@@ -159,6 +159,8 @@ describe("Django routes", () => {
       'NAMES = ["x", "y"]', // 6
       "PAIR = (1, 2)", // 7
       "configure([f(1)], (2, 3))", // 8
+      "urlpatterns = format_suffix_patterns(urlpatterns, allowed=urlpatterns) + urlpatterns", // 9
+      "total = len(other) + count - urlpatterns", // 10
       "",
     ].join("\n");
     const runner = createTreeSitterRunner();
@@ -188,7 +190,13 @@ describe("Django routes", () => {
         '3:path("e/", include(("app.urls", "app"), namespace="app"))',
         '4:path("f/", views.f)',
       ]);
-      expect(at("django.target")).toEqual(["1:urlpatterns", "2:urlpatterns", "3:urlpatterns", "4:extra"]);
+      expect(at("django.target")).toEqual(["1:urlpatterns", "2:urlpatterns", "3:urlpatterns", "4:extra", "9:urlpatterns"]);
+      // `urlpatterns` only, and only as a `+` operand or a call's argument.
+      expect((result.captures[DJANGO_QUERY] ?? []).filter((c) => c.name === "django.self").map((c) => `${c.start.line}:${c.start.column}`)).toEqual([
+        "9:37",
+        "9:58",
+        "9:73",
+      ]);
     } finally {
       runner.dispose();
     }
@@ -214,6 +222,57 @@ describe("Django routes", () => {
       const { facts } = await analyze(ctx, dir);
       expect(routesOf(facts, "api/urls.py")).toEqual(["ANY /api/items/ items"]);
       expect(routesOf(facts, "tools/urls.py")).toEqual(["ANY /tools/ tools"]);
+    });
+  });
+
+  describe("a urlpatterns reassignment", () => {
+    let dir: string;
+    const urls = (...lines: string[]): void => {
+      writeFileSync(join(dir, "urls.py"), ['from django.urls import path', 'urlpatterns = [path("a/", views.a), path("b/", views.b)]', ...lines, ""].join("\n"));
+    };
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), "lang-python-django-reassign-"));
+    });
+    afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+    it("through format_suffix_patterns(urlpatterns) keeps the earlier patterns", async (ctx) => {
+      urls("urlpatterns = format_suffix_patterns(urlpatterns)");
+      const { facts, notices } = await analyze(ctx, dir);
+      expect(routesOf(facts, "urls.py")).toEqual(["ANY /a/ a", "ANY /b/ b"]);
+      expect(notices).toBeUndefined();
+    });
+
+    it("to urlpatterns + static(…) keeps the earlier patterns", async (ctx) => {
+      urls("urlpatterns = urlpatterns + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)");
+      const { facts, notices } = await analyze(ctx, dir);
+      expect(routesOf(facts, "urls.py")).toEqual(["ANY /a/ a", "ANY /b/ b"]);
+      expect(notices).toBeUndefined();
+    });
+
+    it("to urlpatterns + [path(…)] keeps the earlier patterns and appends the new ones", async (ctx) => {
+      urls('urlpatterns = urlpatterns + [path("c/", views.c)]', 'urlpatterns = [path("d/", views.d)] + urlpatterns');
+      const { facts } = await analyze(ctx, dir);
+      expect(routesOf(facts, "urls.py")).toEqual(["ANY /a/ a", "ANY /b/ b", "ANY /c/ c", "ANY /d/ d"]);
+    });
+
+    it("to a new list replaces the earlier patterns", async (ctx) => {
+      urls('urlpatterns = [path("c/", views.c), path("again/", include(urlpatterns))]');
+      // A file that includes itself is no root without ROOT_URLCONF.
+      writeFileSync(join(dir, "settings.py"), 'ROOT_URLCONF = "urls"\n');
+      const { facts, notices } = await analyze(ctx, dir);
+      expect(routesOf(facts, "urls.py")).toEqual(["ANY /c/ c"]);
+      // `urlpatterns` inside the new list does not make it build on the old one.
+      expect(notices).toBeUndefined();
+    });
+
+    it("that leaves no patterns where there were some is counted", async (ctx) => {
+      urls('urlpatterns = i18n_patterns(path("c/", views.c))');
+      const { facts, notices } = await analyze(ctx, dir);
+      expect(routesOf(facts, "urls.py")).toEqual([]);
+      expect(notices).toEqual([
+        "Django: 1 urlpatterns assignment drops the patterns set before it and adds none the rules can read: " +
+          'urls.py:3 (urlpatterns = i18n_patterns(path("c/", views.c))).',
+      ]);
     });
   });
 });

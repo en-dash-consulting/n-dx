@@ -74,6 +74,27 @@
     function: (_) @_router) @django.assigned
   (#match? @_router "Router$")) @django.assignment
 
+; @django.self is `urlpatterns` as an operand of `+` or a call's argument
+; (`urlpatterns + static(…)`, `format_suffix_patterns(urlpatterns)`): a
+; `urlpatterns` assignment holding one keeps the entries before it.
+(binary_operator
+  left: (identifier) @django.self
+  operator: "+"
+  (#eq? @django.self "urlpatterns"))
+
+(binary_operator
+  operator: "+"
+  right: (identifier) @django.self
+  (#eq? @django.self "urlpatterns"))
+
+(argument_list
+  [
+    (identifier) @django.self
+    (keyword_argument
+      value: (identifier) @django.self)
+  ]
+  (#eq? @django.self "urlpatterns"))
+
 ; `import a.b as c`, `from m import d as e`: @django.alias is the local name
 ; of the aliased import @django.aliased, whose name the imports query captures.
 (aliased_import
