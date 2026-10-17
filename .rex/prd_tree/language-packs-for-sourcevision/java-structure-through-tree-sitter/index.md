@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Build the tree-sitter grammars in CI's test job so grammar-gated tests run](./build-the-tree-sitter-grammars-in-ci-s.md) | completed |
 | [CI never builds the Java grammar, so every grammar-dependent runner and grammar test skips there and the runner's acceptance criteria are unverified in CI](./ci-never-builds-the-java-grammar-so.md) | completed |
-| [Java structure-queries changeset says analysis output is unchanged while the stack adds Java edges](./java-structure-queries-changeset-says.md) | pending |
+| [Java structure-queries changeset says analysis output is unchanged while the stack adds Java edges](./java-structure-queries-changeset-says.md) | in_progress |
 | [Language-pack fixtures and goldens are not pinned to LF, so a Windows CRLF checkout fails the golden comparison](./language-pack-fixtures-and-goldens-are.md) | completed |
 | [Register Java as a language with inventory roles](./register-java-as-a-language-with.md) | completed |
 | [Seed the Java drift corpus and measure the parse rate](./seed-the-java-drift-corpus-and-measure.md) | completed |
