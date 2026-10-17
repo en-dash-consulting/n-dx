@@ -9,7 +9,7 @@
  */
 
 import { join } from "node:path";
-import { goConfig } from "./go.js";
+import { goConfig } from "@n-dx/lang-kit";
 import { goResolver } from "./go-resolver.js";
 import { queryDir } from "./package-paths.js";
 import type { LanguagePack, RuleProvenance } from "./pack.js";
@@ -40,5 +40,6 @@ export const goPack: LanguagePack = {
     return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
   },
   resolver: goResolver,
+  produces: ["imports", "symbols", "calls"],
   provenance: Object.fromEntries(QUERY_NAMES.map((name) => [name, VERIFIED])),
 };

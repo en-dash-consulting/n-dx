@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { analyzeImports, type ImportsOptions } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { packsFor } from "../../src/analyzers/pack-imports.js";
-import { goConfig } from "../../src/language/go.js";
+import { goConfig } from "@n-dx/lang-kit";
 import { goPack } from "../../src/language/go-pack.js";
 import { goResolver } from "../../src/language/go-resolver.js";
 import { BUILTIN_PACKS } from "../../src/language/pack.js";

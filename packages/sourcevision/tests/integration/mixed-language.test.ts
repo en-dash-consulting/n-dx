@@ -13,7 +13,7 @@ import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { detectLanguages, mergeLanguageConfigs } from "../../src/language/detect.js";
 import type { Inventory, Imports } from "../../src/schema/v1.js";
-import type { LanguageConfig } from "../../src/language/registry.js";
+import type { LanguageConfig } from "@n-dx/lang-kit";
 
 const MIXED_FIXTURE = join(import.meta.dirname, "../fixtures/mixed-go-ts");
 

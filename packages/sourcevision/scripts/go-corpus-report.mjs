@@ -89,12 +89,17 @@ if (!existsSync(distRunner)) {
   console.error("sourcevision is not built — run `pnpm --filter @n-dx/sourcevision build`");
   process.exit(2);
 }
+const langKitDist = new URL("../../lang-kit/dist/index.js", import.meta.url);
+if (!existsSync(langKitDist)) {
+  console.error("lang-kit is not built — run `pnpm --filter @n-dx/lang-kit build`");
+  process.exit(2);
+}
 const { createTreeSitterRunner } = await import(distRunner.href);
 const { goPack } = await import(new URL("../dist/language/go-pack.js", import.meta.url).href);
 const { extractGoImports } = await import(new URL("../dist/analyzers/go-imports.js", import.meta.url).href);
 const { analyzeInventory } = await import(new URL("../dist/analyzers/inventory.js", import.meta.url).href);
 const { analyzeImports } = await import(new URL("../dist/analyzers/imports.js", import.meta.url).href);
-const { goConfig } = await import(new URL("../dist/language/go.js", import.meta.url).href);
+const { goConfig } = await import(langKitDist.href);
 
 /** A grammar directory that does not exist, so the imports phase takes the regex fallback. */
 const NO_GRAMMAR_DIR = join(tmpdir(), `ndx-go-corpus-no-grammar-${process.pid}`);

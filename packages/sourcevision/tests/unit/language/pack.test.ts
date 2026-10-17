@@ -9,7 +9,7 @@ import {
   type LanguagePack,
 } from "../../../src/language/pack.js";
 import { grammarBuildDir } from "../../../src/language/package-paths.js";
-import { goConfig } from "../../../src/language/go.js";
+import { goConfig } from "@n-dx/lang-kit";
 import { GRAMMAR_BUILD_DIR } from "../../../scripts/build-grammars.mjs";
 
 const pack: LanguagePack = {
@@ -17,6 +17,7 @@ const pack: LanguagePack = {
   config: goConfig,
   grammar: { name: "tree-sitter-fake", version: "1.2.3" },
   queries: [{ name: "structure", path: "/packs/fake/structure.scm" }],
+  produces: [],
   provenance: {
     structure: {
       verifiedAgainst: ["tree-sitter-fake@1.2.3"],

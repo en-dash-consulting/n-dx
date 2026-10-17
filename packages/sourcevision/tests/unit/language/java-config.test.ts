@@ -3,9 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { detectLanguage, detectLanguages, getLanguageConfig, mergeLanguageConfigs } from "../../../src/language/detect.js";
-import { javaConfig, javaSecondaryConfig } from "../../../src/language/java.js";
-import { goConfig } from "../../../src/language/go.js";
-import { typescriptConfig } from "../../../src/language/typescript.js";
+import { javaConfig, javaSecondaryConfig, goConfig, typescriptConfig } from "@n-dx/lang-kit";
 import { classifyRole } from "../../../src/analyzers/inventory.js";
 
 describe("java language config", () => {

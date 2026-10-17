@@ -14,6 +14,7 @@
       "@n-dx/hench",
       "@n-dx/sourcevision",
       "@n-dx/llm-client",
+      "@n-dx/lang-kit",
       "@n-dx/web",
       "@n-dx/graview",
       "@n-dx/graview-face"

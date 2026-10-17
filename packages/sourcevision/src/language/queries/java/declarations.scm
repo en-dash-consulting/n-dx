@@ -15,3 +15,10 @@
 
 (annotation_type_declaration
   name: (identifier) @type.name) @type.annotation
+
+; An anonymous class body (`new Runnable() { … }`). It is not a symbol; it marks
+; where a member stops belonging to the named type around it.
+; Kept out of the `type.*` names: java-sql.ts reads every `type.*` capture as a
+; type declaration.
+(object_creation_expression
+  (class_body) @anonymous.body)

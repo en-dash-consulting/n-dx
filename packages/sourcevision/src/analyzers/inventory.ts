@@ -12,10 +12,7 @@ import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
 import { loadIgnoreFilter, projectSkipDirs, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
-import { typescriptConfig } from "../language/typescript.js";
-import { csharpConfig } from "../language/csharp.js";
-import { terraformConfig, isTerraformFile } from "../language/terraform.js";
-import type { LanguageConfig } from "../language/registry.js";
+import { csharpConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
 
 // ── Language detection ───────────────────────────────────────────────────────
 
@@ -121,7 +118,7 @@ export function detectLanguage(filePath: string): string {
 // ── Role classification ──────────────────────────────────────────────────────
 
 // CONFIG_FILENAMES — now sourced from languageConfig.configFilenames.
-// See packages/sourcevision/src/language/ for per-language config sets.
+// See packages/lang-kit/src/ for per-language config sets.
 
 /**
  * Convention for build/tooling config artifacts named `<tool>.config.<ext>`

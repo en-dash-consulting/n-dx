@@ -7,6 +7,7 @@ const rexRoot = resolve(import.meta.dirname, "../rex");
 const svRoot = resolve(import.meta.dirname, "../sourcevision");
 const claudeClientRoot = resolve(import.meta.dirname, "../claude-client");
 const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
+const langKitRoot = resolve(import.meta.dirname, "../lang-kit");
 const sandboxBlocksNetwork = process.env["CODEX_SANDBOX_NETWORK_DISABLED"] === "1";
 
 export default defineConfig({
@@ -23,6 +24,9 @@ export default defineConfig({
       { find: /^@n-dx\/sourcevision\/dist\/(.+)\.js$/, replacement: `${svRoot}/src/$1.ts` },
       // Map @n-dx/llm-client to source public.ts for vitest
       { find: /^@n-dx\/llm-client$/, replacement: `${llmClientRoot}/src/public.ts` },
+      // Map @n-dx/lang-kit to its source barrel (transitive dep of sourcevision):
+      // its dist would hit the local .js → .ts rewrite below and fail to resolve
+      { find: /^@n-dx\/lang-kit$/, replacement: `${langKitRoot}/src/index.ts` },
       // Map @n-dx/claude-client to source public.ts for vitest (transitive dep of rex)
       { find: /^@n-dx\/claude-client$/, replacement: `${claudeClientRoot}/src/public.ts` },
       // Map local .js imports to .ts files (only relative paths)

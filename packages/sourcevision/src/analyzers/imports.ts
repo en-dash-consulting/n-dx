@@ -23,10 +23,8 @@ import { buildSwiftImportGraph } from "./swift-imports.js";
 import { buildCSharpImportGraph } from "./csharp-imports.js";
 import { buildPackImportGraph, isPackFile, packsFor, type PackImportsOptions } from "./pack-imports.js";
 import { readManifest } from "./manifest.js";
-import { getLanguageConfig, languageConfigsFromIds, detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
-import { goConfig } from "../language/go.js";
-import type { LanguageConfig } from "../language/registry.js";
-import { csharpConfig } from "../language/csharp.js";
+import { detectLanguages } from "../language/detect.js";
+import { csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, type LanguageConfig } from "@n-dx/lang-kit";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 

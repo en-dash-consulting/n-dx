@@ -16,7 +16,7 @@
  * @module sourcevision/language/database-engines
  */
 
-import type { BuildDependency, ModuleBuildModel } from "./build-model.js";
+import type { BuildDependency, ModuleBuildModel } from "@n-dx/lang-kit";
 import type { ReadProjectFile } from "./sql-migrations.js";
 
 export type DatabaseEngine =

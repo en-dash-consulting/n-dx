@@ -83,6 +83,21 @@ describe("buildPackImportGraph", () => {
     expect(messages[0]).not.toContain("inventory only");
   });
 
+  it("degrades, with one notice, a pack whose resolver it has but whose produces omits imports", async () => {
+    const messages: string[] = [];
+    const pack = { ...goPack, produces: [] };
+    const graph = await buildPackImportGraph([file("a.go")], emptyGrammarDir, {
+      packs: [pack],
+      grammarDir: emptyGrammarDir,
+      warn: (m) => messages.push(m),
+      fallbacks: GO_FALLBACK,
+    });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["go"] });
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain('does not produce "imports"');
+    expect(messages[0]).toContain("Go imports come from the regex import parser");
+  });
+
   it("reports an unloadable grammar once, names its path, and produces no edges", async () => {
     const dir = mkdtempSync(join(tmpdir(), "sv-pack-imports-bad-"));
     try {

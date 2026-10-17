@@ -5,10 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { ModuleBuildModel } from "../../../src/language/build-model.js";
-import { readMavenBuildModels } from "../../../src/language/java-maven-build.js";
-import { discoverJavaModules } from "../../../src/language/java-modules.js";
-import { parseXml, XmlSyntaxError } from "../../../src/language/xml-lite.js";
+import { type ModuleBuildModel, readMavenBuildModels, discoverJavaModules, parseXml, XmlSyntaxError } from "@n-dx/lang-kit";
 import { UPDATE_ENV, updateRequested } from "../../helpers/pack-golden.js";
 
 const FIXTURES = fileURLToPath(new URL("../../fixtures/maven-build", import.meta.url));

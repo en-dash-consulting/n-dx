@@ -3,7 +3,7 @@
  * Results stay in memory: nothing here is written to an analysis artifact.
  * sqlc query files are read by `extractSqlcTables` in `sql-references.ts`.
  *
- * Works on the captures of the Go pack's `calls` query. A method name such as
+ * Works on the calls facts of the Go pack's `calls` query. A method name such as
  * `Get` or `Select` is common, so a call counts only when one of its string
  * arguments begins with a statement verb. A query held in a variable or
  * built by concatenation is not seen.
@@ -38,7 +38,7 @@ export function extractGoEmbeddedSql(files: readonly ParsedFile[]): EmbeddedSqlT
   const tables: EmbeddedSqlTable[] = [];
   for (const file of files) {
     for (const call of groupCalls(file.captures.calls ?? [])) {
-      if (call.name === undefined || !SQL_METHODS.has(call.name)) continue;
+      if (call.callee === undefined || !SQL_METHODS.has(call.callee)) continue;
       for (const literal of call.strings) {
         const text = goStringValue(literal.text);
         if (!looksLikeSql(text)) continue;
@@ -49,7 +49,7 @@ export function extractGoEmbeddedSql(files: readonly ParsedFile[]): EmbeddedSqlT
             path: file.path,
             line: ref.line,
             origin: "call",
-            via: call.name,
+            via: call.callee,
           });
         }
       }

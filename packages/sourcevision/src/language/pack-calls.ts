@@ -10,6 +10,7 @@
  * @module sourcevision/language/pack-calls
  */
 
+import type { CallFact, StringArgument } from "@n-dx/lang-kit";
 import type { Capture, SourcePosition } from "./pack.js";
 
 export const atOrBefore = (a: SourcePosition, b: SourcePosition): boolean =>
@@ -31,17 +32,10 @@ export function innermost(candidates: readonly Capture[], inner: Capture): Captu
   return best;
 }
 
-export interface PackCall {
-  /** Called method or function; absent for a callee that is not a name. */
-  readonly name?: string;
-  /** Receiver as written (`jdbcTemplate`, `s.db`); absent for an unqualified call. */
-  readonly receiver?: string;
-  /** String literals passed directly as arguments, in order, with their quotes. */
-  readonly strings: readonly Capture[];
-}
+const stringArgument = (capture: Capture): StringArgument => ({ text: capture.text, start: capture.start, end: capture.end });
 
-/** Rebuild the calls of one file from its `calls` captures. */
-export function groupCalls(captures: readonly Capture[]): PackCall[] {
+/** Rebuild the calls of one file from its `calls` captures, as lang-kit calls facts. */
+export function groupCalls(captures: readonly Capture[]): CallFact[] {
   const named = (name: string): Capture[] => captures.filter((c) => c.name === name);
   const invocations = named("call.invocation");
   const names = named("call.name");
@@ -64,9 +58,9 @@ export function groupCalls(captures: readonly Capture[]): PackCall[] {
       ? receivers.find((r) => invocation !== undefined && samePosition(r.start, invocation.start) && atOrBefore(r.end, name.start))
       : undefined;
     return {
-      ...(name ? { name: name.text } : {}),
+      ...(name ? { callee: name.text } : {}),
       ...(receiver ? { receiver: receiver.text } : {}),
-      strings: stringsByList.get(list) ?? [],
+      strings: (stringsByList.get(list) ?? []).map(stringArgument),
     };
   });
 }

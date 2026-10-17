@@ -13,7 +13,7 @@ import { Language, Parser, Query, Tree } from "web-tree-sitter";
 
 import { createTreeSitterRunner, type RunnablePack, type TreeSitterRunner } from "../../../src/language/runner.js";
 import type { LanguagePack } from "../../../src/language/pack.js";
-import { goConfig } from "../../../src/language/go.js";
+import { goConfig } from "@n-dx/lang-kit";
 import { grammarWasmPath } from "../../../scripts/build-grammars.mjs";
 import { skipUnlessGrammar } from "../../helpers/grammar.js";
 
@@ -71,6 +71,7 @@ function makePack(queries: { name: string; scm: string }[]): LanguagePack {
       writeFileSync(path, scm);
       return { name, path };
     }),
+    produces: [],
     provenance: {},
   };
 }
@@ -267,6 +268,7 @@ describe("size limit", () => {
       config: goConfig,
       grammar: { name: "no-such-grammar", version: "0.0.0" },
       queries: [],
+      produces: [],
       provenance: {},
     },
   };

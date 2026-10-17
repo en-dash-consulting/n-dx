@@ -13,7 +13,7 @@
 import { join } from "node:path";
 import { queryDir } from "./package-paths.js";
 import type { LanguagePack, RuleProvenance } from "./pack.js";
-import type { LanguageConfig } from "./registry.js";
+import type { LanguageConfig } from "@n-dx/lang-kit";
 
 /** Keep in step with `scripts/build-grammars.mjs`. */
 const GRAMMAR_VERSION = "0.3.11";
@@ -44,5 +44,7 @@ export const sqlPack: LanguagePack = {
   get queries() {
     return [{ name: "tables", path: join(queryDir("sql"), "tables.scm") }];
   },
+  // A CREATE TABLE is a symbol of kind "table"; see `pack-facts.ts`.
+  produces: ["symbols"],
   provenance: { tables: VERIFIED },
 };
