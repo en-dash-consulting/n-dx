@@ -58,6 +58,22 @@ model finds stay out. `analyzers/infrastructure.ts` and `IAC_KINDS` are not
 involved, so the iso-map bundle does not change. Without the pack the file is
 byte-identical. The field names await Sterling H's review (decision 3).
 
+### Pack routes and outbound calls
+
+A pack producing `routes` or `outboundCalls` (Java, through its Spring Boot
+rules) is asked for them in the imports phase's one `analyzeProject` call
+(`PackImportsOptions.framework`), so no file is parsed twice; the facts ride
+on `AnalyzeContext.packFacts`. A run without the imports phase (`--phase`,
+`sv narrate`) reads them once with `readImportsPackFrameworkFacts`, which asks
+the same packs for the same files. `src/analyzers/pack-framework-facts.ts`
+merges them: `withPackRouteGroups` (the one call in `analyzeComponents`) adds
+one `ServerRouteGroup` per file to `serverRoutes`, a method-less route recorded
+as `GET`; `withPackOutbound` (in `analyze`'s output step) adds an
+`OutboundDependency` per call, `inferred` when the fact has no confidence. Both
+reuse the detectors' role sets (`ROUTE_SKIP_ROLES`, outbound's `SKIP_ROLES`),
+prefix rule and order, and return their input itself when nothing is added.
+Pack `notices` go to the same `warn` as degrade notices.
+
 ### Terraform as a database-engine source
 
 `language/database-engines.ts` takes the Terraform pack's resource facts as

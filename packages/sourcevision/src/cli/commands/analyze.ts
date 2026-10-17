@@ -34,6 +34,7 @@ import {
   runZonesPhase,
   runComponentsPhase,
   runCallGraphPhase,
+  packFrameworkFacts,
   PhasePrerequsiteError,
   PhaseError,
   MAX_ENRICHMENT_PASS,
@@ -48,6 +49,7 @@ import { loadInventoryConfig } from "../../language/detect.js";
 import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-profile.js";
 import { computeReadinessScore } from "../../analyzers/readiness-score.js";
 import { detectOutbound } from "../../analyzers/outbound-detection.js";
+import { withPackOutbound } from "../../analyzers/pack-framework-facts.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
@@ -775,10 +777,10 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // HTTP picture, mirroring the server routes the components phase records.
     // Deterministic and LLM-free, so it runs on every analysis including
     // `--fast`, and is written canonically for the same reason as the file
-    // above it.
+    // above it. Language packs' outbound calls join the detectors' entries.
     writeFileSync(
       join(ctx.svDir, DATA_FILES.outbound),
-      toCanonicalJSON(await detectOutbound(ctx.absDir, inventory)),
+      toCanonicalJSON(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, await packFrameworkFacts(ctx, inventory))),
     );
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);

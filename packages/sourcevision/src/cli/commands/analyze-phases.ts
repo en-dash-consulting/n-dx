@@ -55,6 +55,8 @@ import type {
 import { info } from "../output.js";
 import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx/llm-client";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
+import { readImportsPackFrameworkFacts } from "../../analyzers/imports.js";
+import type { PackFrameworkFacts } from "../../analyzers/pack-framework-facts.js";
 
 // ── Shared context passed between phases ─────────────────────────────
 
@@ -79,6 +81,21 @@ export interface AnalyzeContext {
   tokenUsage: AnalyzeTokenUsage;
   /** Result from phase 1 (inventory), used by later phases for incremental hints. */
   inventoryResult: InventoryResult | null;
+  /**
+   * Language packs' routes and outbound calls, collected by the imports phase
+   * in the call that reads imports; read on demand when it did not run.
+   */
+  packFacts?: PackFrameworkFacts;
+}
+
+/**
+ * The packs' routes and outbound-call facts for this run: the imports
+ * phase's, or, when it did not run (`--phase`, `sv narrate`), one pack call
+ * for those kinds alone, kept for the rest of the run.
+ */
+export async function packFrameworkFacts(ctx: AnalyzeContext, inventory: Inventory): Promise<PackFrameworkFacts> {
+  ctx.packFacts ??= await readImportsPackFrameworkFacts(ctx.absDir, inventory);
+  return ctx.packFacts;
 }
 
 /** Safely load a JSON file, returning undefined if missing or corrupted. */
@@ -174,11 +191,16 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
     const stats = ctx.inventoryResult?.stats;
     const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
 
-    const imports = await analyzeImports(ctx.absDir, inventory, !ctx.fullMode && previousImports ? {
-      previousImports,
-      changedFiles: ctx.inventoryResult?.changedFiles,
-      fileSetChanged,
-    } : undefined);
+    const packFacts: Array<PackFrameworkFacts[number]> = [];
+    const imports = await analyzeImports(ctx.absDir, inventory, {
+      ...(!ctx.fullMode && previousImports ? {
+        previousImports,
+        changedFiles: ctx.inventoryResult?.changedFiles,
+        fileSetChanged,
+      } : {}),
+      packs: { framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls }) => ({ path, routes, outboundCalls }))) },
+    });
+    ctx.packFacts = packFacts;
     const outPath = join(ctx.svDir, DATA_FILES.imports);
     writeFileSync(outPath, toCanonicalJSON(imports));
     updateManifestModule(ctx.absDir, "imports", "complete");
@@ -558,11 +580,14 @@ export async function runComponentsPhase(ctx: AnalyzeContext): Promise<void> {
     const stats = ctx.inventoryResult?.stats;
     const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
 
-    const components = await analyzeComponents(ctx.absDir, inventory, importsData, !ctx.fullMode && previousComponents ? {
-      previousComponents,
-      changedFiles: ctx.inventoryResult?.changedFiles,
-      fileSetChanged,
-    } : undefined);
+    const components = await analyzeComponents(ctx.absDir, inventory, importsData, {
+      ...(!ctx.fullMode && previousComponents ? {
+        previousComponents,
+        changedFiles: ctx.inventoryResult?.changedFiles,
+        fileSetChanged,
+      } : {}),
+      packFacts: await packFrameworkFacts(ctx, inventory),
+    });
     const outPath = join(ctx.svDir, DATA_FILES.components);
     writeFileSync(outPath, toCanonicalJSON(components));
     updateManifestModule(ctx.absDir, "components", "complete");
