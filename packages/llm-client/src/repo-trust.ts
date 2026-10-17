@@ -893,10 +893,21 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
   const lines: string[] = [];
   const warnings = ev.findings.filter((f) => f.severity === "warning");
   const infos = ev.findings.filter((f) => f.severity === "info");
+  // A plain test command leaves the checkout baseline, but verify_criteria and
+  // rex verify still run it only once this exact config is accepted (#686
+  // finding 2), so the baseline report must say which side of that it is on.
+  const pendingTestCommand = ev.state === "baseline" && ev.config.testCommand != null
+    && ev.record?.digest !== ev.config.digest;
 
   switch (ev.state) {
     case "baseline":
-      lines.push("Repository execution config: matches the defaults (nothing to trust).");
+      if (!ev.config.testCommand) {
+        lines.push("Repository execution config: matches the defaults (nothing to trust).");
+      } else if (pendingTestCommand) {
+        lines.push("Repository execution config: matches the defaults, but its test command is not accepted.");
+      } else {
+        lines.push(`Repository execution config: matches the defaults; test command accepted by you on ${ev.record?.trustedAt ?? "?"}.`);
+      }
       break;
     case "trusted":
       lines.push(`Repository execution config: trusted by you on ${ev.record?.trustedAt ?? "?"}.`);
@@ -925,6 +936,8 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
     lines.push("  bypassPermissions is lowered to acceptEdits, verify_criteria does not run the test command,");
     lines.push("  and the project config's API endpoints and API key variables are ignored.");
     lines.push(`  To accept this configuration: ${accept}`);
+  } else if (pendingTestCommand) {
+    lines.push(`  verify_criteria and rex verify run the test command only once accepted: ${accept}`);
   }
   // Finding messages are escaped already; this also covers the source paths
   // and the analysis timestamp, which come from the checkout too.
