@@ -81,6 +81,12 @@ packages/rex/tests/fixtures/v2-tree/** text eol=lf
 # scores; pin them to LF so a CRLF checkout reads the same bytes CI does.
 packages/sourcevision/tests/fixtures/sdlc/** text eol=lf
 
+# Maven and Gradle build fixtures: golden.json is compared byte-for-byte with
+# the resolver's LF output, and captured positions depend on the build files'
+# line endings, so pin the whole tree, not only the goldens.
+packages/sourcevision/tests/fixtures/maven-build/** text eol=lf
+packages/sourcevision/tests/fixtures/gradle-build/** text eol=lf
+
 # Language-pack fixtures: sources and golden.json. checkGolden compares the
 # serialized golden byte-for-byte, and captured text and positions depend on
 # the fixture's line endings, so a Windows checkout (core.autocrlf=true) that
