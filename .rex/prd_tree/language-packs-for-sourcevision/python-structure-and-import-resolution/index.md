@@ -35,3 +35,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Resolve Python imports to files and feed Python edges into analyze](./resolve-python-imports-to-files-and.md) | completed |
 | [The pinned Python 3.13 stdlib list was transcribed, not checked against CPython's stdlib_module_names.h](./the-pinned-python-3-13-stdlib-list-was.md) | completed |
 | [toml-lite accepts [[a]] and [a] headers that extend a static array or an inline table](./toml-lite-accepts-a-and-a-headers-that.md) | completed |
+| [Align lang-python with 0.9.1 and list it in RELEASING.md](./align-lang-python-with-0-9-1-and-list.md) | pending |
