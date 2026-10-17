@@ -159,7 +159,7 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
     };
     const project = options.projectFacts && readProjectFacts(options.projectFacts, pack, parsed, kinds);
     const framed = frameworks.map((f) => readFramework(f, parsed, kinds, context));
-    const refined = containRefine(symbolRules);
+    const refined = containRefine(pack, symbolRules);
     const facts: FileFacts[] = parsed.map((file) =>
       framed.reduce(
         (merged, { facts: byPath }) => mergeFileFacts(merged, byPath.get(file.path)),
@@ -173,7 +173,7 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       ...framed.flatMap((f) => f.notices),
       ...(project?.notices ?? []),
       ...refined.notices(),
-      ...(options.projectNotices ? readProjectNotices(options.projectNotices, parsed, kinds) : []),
+      ...(options.projectNotices ? readProjectNotices(options.projectNotices, pack, parsed, kinds) : []),
       ...(prepared?.notices?.() ?? []),
     ];
     return notices.length === 0 ? { facts, unparsed } : { facts, unparsed, notices };
@@ -221,20 +221,24 @@ function readProjectFacts(
   } catch (error) {
     const lost = projectKinds(pack).filter((kind) => kinds.includes(kind));
     const what = lost.length === 0 ? "nothing it read was recorded" : `its ${lost.join(" and ")} were not recorded`;
-    return { facts: new Map(), notices: [`the project facts reader failed (${errorText(error)}); ${what}.`] };
+    return {
+      facts: new Map(),
+      notices: [`${pack.config.displayName}: the project facts reader failed (${errorText(error)}); ${what}.`],
+    };
   }
 }
 
 /** The pack's project notices; one that throws loses them, reported as a single notice of its own. */
 function readProjectNotices(
   read: NonNullable<TreeSitterEntryOptions["projectNotices"]>,
+  pack: LanguagePack,
   files: readonly PackSourceFile[],
   kinds: readonly FactKind[],
 ): readonly string[] {
   try {
     return read(files, kinds);
   } catch (error) {
-    return [`the project notices reader failed (${errorText(error)}); what the pack read but skipped is not reported.`];
+    return [`${pack.config.displayName}: the project notices reader failed (${errorText(error)}); what the pack read but skipped is not reported.`];
   }
 }
 
@@ -246,7 +250,7 @@ const NAMED_REFINE_FAILURES = 3;
  * throws keeps the symbols the rules read, without what refine adds, and is
  * named in one notice for every such file.
  */
-function containRefine(rules: PackSymbolRules | undefined): {
+function containRefine(pack: LanguagePack, rules: PackSymbolRules | undefined): {
   readonly rules: PackSymbolRules | undefined;
   readonly notices: () => readonly string[];
 } {
@@ -269,7 +273,7 @@ function containRefine(rules: PackSymbolRules | undefined): {
     const rest = failed.length - NAMED_REFINE_FAILURES;
     const named = failed.slice(0, NAMED_REFINE_FAILURES).join(", ") + (rest > 0 ? ` and ${rest} more` : "");
     const count = failed.length === 1 ? "1 file" : `${failed.length} files`;
-    return [`symbol refinement failed on ${count}: ${named}; their symbols are the rules' reading alone.`];
+    return [`${pack.config.displayName}: symbol refinement failed on ${count}: ${named}; their symbols are the rules' reading alone.`];
   };
   return { rules: contained, notices };
 }
