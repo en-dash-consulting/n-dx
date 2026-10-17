@@ -4,6 +4,9 @@ import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { MAX_BUILD_FILE_BYTES } from "../../src/build-file.js";
 import { discoverJavaModules, stripXmlComments } from "../../src/java-modules.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../helpers/call-within-budget.js";
+
+const JAVA_MODULES = new URL("../../src/java-modules.ts", import.meta.url);
 
 describe("discoverJavaModules", () => {
   let dir: string;
@@ -86,10 +89,13 @@ describe("discoverJavaModules", () => {
     expect(layout.modules.map((m) => m.name).sort()).toEqual(["core", "root"]);
   });
 
-  // Clock-free: each input below took seconds or more under the old regexes and
-  // returns at once now; a regression shows as a hang, not a flaky timing.
-  describe("pathological poms", () => {
+  // Each input below took seconds or more under the old regexes and returns at
+  // once now. Discovery runs in a worker terminated past a generous budget, so
+  // a regression fails the test by name instead of hanging the suite.
+  describe("pathological poms", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
     const pad = " ".repeat(50_000);
+    const discoverBounded = () =>
+      callWithinBudget<typeof discoverJavaModules>(JAVA_MODULES, "discoverJavaModules", dir);
 
     it("reads past a tag whose closing tag is missing after long whitespace", async () => {
       await file(
@@ -97,7 +103,7 @@ describe("discoverJavaModules", () => {
         `<project><artifactId> app </artifactId><build><sourceDirectory>${pad}x${pad}</build></project>`,
       );
       await dirs("src/main/java");
-      expect((await discoverJavaModules(dir)).modules).toEqual([
+      expect((await discoverBounded()).modules).toEqual([
         { name: "app", dir: "", sourceRoots: ["src/main/java"] },
       ]);
     });
@@ -110,13 +116,13 @@ describe("discoverJavaModules", () => {
       );
       await file("core/pom.xml", "<project><artifactId>core</artifactId></project>");
       await file("hidden/pom.xml", "<project><artifactId>hidden</artifactId></project>");
-      expect((await discoverJavaModules(dir)).modules.map((m) => m.name)).toEqual(["root", "core"]);
+      expect((await discoverBounded()).modules.map((m) => m.name)).toEqual(["root", "core"]);
     });
 
     it("reads a pom with many unclosed plugins, parent and modules blocks", async () => {
       const unclosed = ["<plugins>", "<parent>", "<modules>"].map((t) => t.repeat(30_000)).join("");
       await file("pom.xml", `<project><artifactId>app</artifactId>${unclosed}</project>`);
-      expect((await discoverJavaModules(dir)).modules.map((m) => m.name)).toEqual(["app"]);
+      expect((await discoverBounded()).modules.map((m) => m.name)).toEqual(["app"]);
     });
 
     it("reads Gradle files with many unterminated block comments", async () => {
@@ -125,7 +131,7 @@ describe("discoverJavaModules", () => {
       await file("a/build.gradle", "");
       await file("build.gradle", "/* ".repeat(50_000));
       await dirs("a/src/main/java");
-      expect((await discoverJavaModules(dir)).modules.map((m) => m.name)).toEqual([":", ":a"]);
+      expect((await discoverBounded()).modules.map((m) => m.name)).toEqual([":", ":a"]);
     });
   });
 
