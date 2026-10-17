@@ -67,8 +67,8 @@ place; a name both conditional rules list is kept if either keeps it.
 Java build files (`pom.xml`, Gradle scripts) are read through
 `src/build-file.ts`, capped at `MAX_BUILD_FILE_BYTES` (1 MiB); a larger file
 is skipped with a notice. Maven `${…}` interpolation expands each property
-once per context and stops at `MAX_PROPERTY_EXPANSION` (4096 characters),
-past which the value is unresolved. Scans of repository content must stay linear: use
+once per context and stops at `MAX_PROPERTY_EXPANSION` (4096 characters) or
+`MAX_PROPERTY_NESTING` (64 properties deep), past which the value is unresolved. Scans of repository content must stay linear: use
 `indexOf` for block and comment spans, not a lazy `[\s\S]*?` regex.
 
 `src/sql-references.ts` reads table names from embedded SQL text; it is here

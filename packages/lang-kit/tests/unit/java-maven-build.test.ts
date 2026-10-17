@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { MAX_BUILD_FILE_BYTES } from "../../src/build-file.js";
-import { MAX_PROPERTY_EXPANSION, readMavenBuildModels } from "../../src/java-maven-build.js";
+import { MAX_PROPERTY_EXPANSION, MAX_PROPERTY_NESTING, readMavenBuildModels } from "../../src/java-maven-build.js";
 
 // Semantics and goldens are in sourcevision's tests/unit/language/java-maven-build.test.ts.
 describe("readMavenBuildModels", () => {
@@ -88,6 +88,26 @@ describe("readMavenBuildModels", () => {
       expect(await versionOf({ p: long }, "-${p}")).toEqual({ resolved: false, reason: "property expansion too large" });
       expect(await versionOf({ p: long }, "${p}-")).toEqual({ resolved: false, reason: "property expansion too large" });
       expect(await versionOf({ p: long + "y" }, "${p}")).toEqual({ resolved: false, reason: "property expansion too large" });
+    });
+
+    /** `p0=${p1}`, …, `p(n-2)=${p(n-1)}`, `p(n-1)=x`: `${p0}` nests n properties deep. */
+    function linearChain(n: number): Record<string, string> {
+      const props: Record<string, string> = { [`p${n - 1}`]: "x" };
+      for (let i = 0; i < n - 1; i++) props[`p${i}`] = `\${p${i + 1}}`;
+      return props;
+    }
+
+    // Unbounded recursion overflows the stack somewhere past 3,000 levels and rejects the read.
+    it("leaves a 10,000-deep property chain unresolved instead of overflowing the stack", async () => {
+      expect(await versionOf(linearChain(10_000), "${p0}")).toEqual({ resolved: false, reason: "property nesting too deep" });
+    });
+
+    it("resolves a chain exactly at the nesting cap and stops one past it", async () => {
+      expect(await versionOf(linearChain(MAX_PROPERTY_NESTING), "${p0}")).toEqual({ resolved: true, value: "x" });
+      expect(await versionOf(linearChain(MAX_PROPERTY_NESTING + 1), "${p0}")).toEqual({
+        resolved: false,
+        reason: "property nesting too deep",
+      });
     });
 
     it("reuses a property expanded more than once", async () => {

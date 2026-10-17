@@ -369,12 +369,22 @@ export const MAX_PROPERTY_EXPANSION = 4096;
 const EXPANSION_TOO_LARGE: BuildValue = { resolved: false, reason: "property expansion too large" };
 
 /**
+ * The most properties one expansion may pass through, each referencing the
+ * next. Resolution recurses once per level, so a long chain from a small pom
+ * would otherwise overflow the stack; real poms nest a handful of levels.
+ */
+export const MAX_PROPERTY_NESTING = 64;
+
+const NESTING_TOO_DEEP: BuildValue = { resolved: false, reason: "property nesting too deep" };
+
+/**
  * Replace every `${name}` in `text`. Built-ins (`project.version`, …) are
  * consulted first, then properties. A name found nowhere makes the whole
  * value unresolved; when an out-of-repository parent or BOM exists the reason
  * names it, since the property may be defined there. A text with a
- * placeholder that expands past `MAX_PROPERTY_EXPANSION` is unresolved; a
- * literal with none is returned as written.
+ * placeholder that expands past `MAX_PROPERTY_EXPANSION`, or nests more than
+ * `MAX_PROPERTY_NESTING` properties deep, is unresolved; a literal with none
+ * is returned as written.
  */
 function interpolate(text: string, ctx: Context, seen: ReadonlySet<string> = new Set()): BuildValue {
   let out = "";
@@ -411,6 +421,7 @@ function resolveProperty(name: string, ctx: Context, seen: ReadonlySet<string>):
     return { resolved: false, reason: `property ${name} is not defined in the repository${hint}` };
   }
   if (seen.has(name)) return { resolved: false, reason: `property ${name} refers to itself` };
+  if (seen.size >= MAX_PROPERTY_NESTING) return NESTING_TOO_DEEP;
   const value = interpolate(raw, ctx, new Set([...seen, name]));
   if (value.resolved) ctx.resolved.set(name, value);
   return value;
