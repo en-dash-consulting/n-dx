@@ -16,8 +16,11 @@
  *   wildcard imports. Names found nowhere (java.lang, type parameters,
  *   inherited member types) are dropped;
  * - anything naming a package not in the project is external, attributed to
- *   its package: the segments before the first capitalised one. A missing
- *   type in a project package (generated code) is dropped, not external.
+ *   its package: the segments before the first capitalised one, named
+ *   `java:<package>` so it never merges with another pack's external of the
+ *   same name. JDK packages are `java:stdlib:<package>` ({@link isJdkPackage}).
+ *   A missing type in a project package (generated code) is dropped, not
+ *   external.
  *
  * @module lang-java/java-resolver
  */
@@ -237,6 +240,59 @@ function packageOf(segments: readonly string[]): string {
   return segments.slice(0, firstType === -1 ? segments.length - 1 : firstType).join(".");
 }
 
+// ── External names ──────────────────────────────────────────────────────────
+
+/** Starts every external the pack emits, so Maven and JDK names never merge with another pack's. */
+const JAVA_EXTERNAL_PREFIX = "java:";
+
+/**
+ * The `javax` packages the JDK (21) exports. The rest of `javax` (`javax.inject`,
+ * `javax.persistence`, `javax.servlet`, and `javax.annotation` and `javax.xml.bind`
+ * since JDK 11) ships as separate artifacts, so a `javax.` prefix alone is not enough.
+ */
+const JDK_JAVAX_PACKAGES = [
+  "javax.accessibility",
+  "javax.annotation.processing",
+  "javax.crypto",
+  "javax.imageio",
+  "javax.lang.model",
+  "javax.management",
+  "javax.naming",
+  "javax.net",
+  "javax.print",
+  "javax.rmi.ssl",
+  "javax.script",
+  "javax.security.auth",
+  "javax.security.cert",
+  "javax.security.sasl",
+  "javax.smartcardio",
+  "javax.sound",
+  "javax.sql",
+  "javax.swing",
+  "javax.tools",
+  "javax.transaction.xa",
+  "javax.xml.catalog",
+  "javax.xml.crypto",
+  "javax.xml.datatype",
+  "javax.xml.namespace",
+  "javax.xml.parsers",
+  "javax.xml.stream",
+  "javax.xml.transform",
+  "javax.xml.validation",
+  "javax.xml.xpath",
+];
+
+/** `java.*` and `jdk.*` (reserved to the JDK), `javax.xml`, and the {@link JDK_JAVAX_PACKAGES} and their subpackages. */
+function isJdkPackage(pkg: string): boolean {
+  if (pkg === "java" || pkg.startsWith("java.") || pkg === "jdk" || pkg.startsWith("jdk.") || pkg === "javax.xml") return true;
+  return JDK_JAVAX_PACKAGES.some((root) => pkg === root || pkg.startsWith(`${root}.`));
+}
+
+/** `java.util` → `java:stdlib:java.util`, `org.acme` → `java:org.acme`. */
+function externalName(pkg: string): string {
+  return isJdkPackage(pkg) ? `${JAVA_EXTERNAL_PREFIX}stdlib:${pkg}` : `${JAVA_EXTERNAL_PREFIX}${pkg}`;
+}
+
 // ── Per-file resolution ─────────────────────────────────────────────────────
 
 class Collector {
@@ -254,7 +310,7 @@ class Collector {
 
   /** A package the project declares is never external, even when the type is missing (e.g. generated at build time). */
   externalPackage(pkg: string, symbol: string): void {
-    if (pkg && !this.projectPackages.has(pkg)) this.external.add(pkg, symbol);
+    if (pkg && !this.projectPackages.has(pkg)) this.external.add(externalName(pkg), symbol);
   }
 
   result(): FileReferences {

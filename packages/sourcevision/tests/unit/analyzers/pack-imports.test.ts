@@ -145,9 +145,9 @@ describe("buildPackImportGraph", () => {
       facts: [
         {
           path: "src/A.java",
-          imports: { files: [{ to: "src/B.java", symbols: ["B"] }], external: [{ package: "java.util", symbols: ["List"] }] },
+          imports: { files: [{ to: "src/B.java", symbols: ["B"] }], external: [{ package: "java:stdlib:java.util", symbols: ["List"] }] },
         },
-        { path: "src/B.java", imports: { files: [], external: [{ package: "java.util", symbols: ["Map"] }] } },
+        { path: "src/B.java", imports: { files: [], external: [{ package: "java:stdlib:java.util", symbols: ["Map"] }] } },
         { path: "src/C.java" },
       ],
       unparsed: [],
@@ -155,7 +155,7 @@ describe("buildPackImportGraph", () => {
     const { graph, messages } = await run(["src/A.java", "src/B.java", "src/C.java"], [knownPack(javaConfig, { entry })]);
     expect(graph).toEqual({
       edges: [{ from: "src/A.java", to: "src/B.java", type: "static", symbols: ["B"] }],
-      external: [{ package: "java.util", importedBy: ["src/A.java", "src/B.java"], symbols: ["List", "Map"] }],
+      external: [{ package: "java:stdlib:java.util", importedBy: ["src/A.java", "src/B.java"], symbols: ["List", "Map"] }],
       degraded: [],
     });
     expect(messages).toEqual([]);
