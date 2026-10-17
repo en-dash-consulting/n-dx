@@ -8,7 +8,8 @@
  * qualified names. When several files declare one name, a reference keeps
  * the ones javac could link ({@link visibleCandidates}): its own module and
  * source set, read from the path (`<module>/src/<set>/java/`), never test
- * code from main code, and never another module's test code.
+ * code from main code, and another module's test code only when the build
+ * declares a test-jar or test-fixtures dependency on it ({@link javaResolver.forProject}).
  *
  * Per file:
  * - single-type, static and static-wildcard imports always refer to the file
@@ -36,6 +37,7 @@ import type {
   PreparedResolver,
   SourcePosition,
 } from "@n-dx/lang-runtime";
+import { readTestArtifactGrants, type TestArtifactGrants } from "./java-test-artifacts.js";
 
 // ── Facts read from one file's captures ─────────────────────────────────────
 
@@ -236,9 +238,11 @@ interface JavaIndex {
   readonly packages: ReadonlySet<string>;
   /** Each file's {@link SourceLocation}, absent outside the standard layout. */
   readonly locations: ReadonlyMap<string, SourceLocation>;
+  /** Other modules' test sets each module's tests see, from the build files. */
+  readonly testGrants: TestArtifactGrants;
 }
 
-function buildIndex(facts: readonly JavaFileFacts[]): JavaIndex {
+function buildIndex(facts: readonly JavaFileFacts[], testGrants: TestArtifactGrants): JavaIndex {
   const types = new Multimap();
   const topLevel = new Multimap();
   const packages = new Set<string>();
@@ -252,28 +256,28 @@ function buildIndex(facts: readonly JavaFileFacts[]): JavaIndex {
       if (!name.includes(".")) topLevel.add(`${file.pkg}\0${name}`, file.path);
     }
   }
-  return { types, topLevel, packages, locations };
+  return { types, topLevel, packages, locations, testGrants };
 }
 
 /**
  * The declarations of one name that `from` can see, as javac would: main code
- * never sees test code, and test code sees only its own module's; of the
+ * never sees test code, and test code sees its own module's, plus another
+ * module's test sets its build grants ({@link TestArtifactGrants}: a Maven
+ * test-jar, a Gradle `testFixtures` or test-configuration dependency); of the
  * rest, those in `from`'s own module, and of those, the ones in its own source
  * set (a test sees main code only when its own set has none). Several remain
  * only on a real tie, or when none is in `from`'s module. A file outside the
  * standard layout narrows nothing.
- *
- * A Maven test-jar or Gradle `testFixtures` dependency does let one module's
- * tests compile against another's; the resolver reads no build files, so it
- * drops those edges rather than link every same-named test class across
- * modules (`testFixtures` is a source set of its own module, so the rule holds there).
  */
 function visibleCandidates(index: JavaIndex, from: string, candidates: ReadonlySet<string>): Iterable<string> {
   const here = index.locations.get(from);
   if (!here) return candidates;
+  const granted = index.testGrants.get(here.module);
   const visible = [...candidates].filter((path) => {
     const there = index.locations.get(path);
-    return !there?.isTest || (here.isTest && there.module === here.module);
+    if (!there?.isTest) return true;
+    if (!here.isTest) return false;
+    return there.module === here.module || granted?.get(there.module)?.has(there.set) === true;
   });
   if (visible.length <= 1) return visible;
   const sameModule = visible.filter((path) => index.locations.get(path)?.module === here.module);
@@ -448,20 +452,33 @@ function resolveFile(index: JavaIndex, file: JavaFileFacts): FileReferences {
 
 // ── Resolver ────────────────────────────────────────────────────────────────
 
+function prepareJava(files: readonly PackSourceFile[], testGrants: TestArtifactGrants): PreparedResolver {
+  const facts = files.map(readFacts);
+  const index = buildIndex(facts, testGrants);
+  const byPath = new Map(facts.map((f) => [f.path, f]));
+  const cache = new Map<string, FileReferences>();
+  return {
+    resolve(fromFile) {
+      const file = byPath.get(fromFile);
+      if (!file) return { files: [], external: [] };
+      let refs = cache.get(fromFile);
+      if (!refs) cache.set(fromFile, (refs = resolveFile(index, file)));
+      return refs;
+    },
+  };
+}
+
+const NO_GRANTS: TestArtifactGrants = new Map();
+
+/**
+ * The Java resolver. Without {@link PackResolver.forProject} it reads no
+ * build file, so a test never links to another module's test code;
+ * `forProject` reads the test-jar and test-fixtures dependencies that allow it.
+ */
 export const javaResolver: PackResolver = {
-  prepare(files: readonly PackSourceFile[]): PreparedResolver {
-    const facts = files.map(readFacts);
-    const index = buildIndex(facts);
-    const byPath = new Map(facts.map((f) => [f.path, f]));
-    const cache = new Map<string, FileReferences>();
-    return {
-      resolve(fromFile) {
-        const file = byPath.get(fromFile);
-        if (!file) return { files: [], external: [] };
-        let refs = cache.get(fromFile);
-        if (!refs) cache.set(fromFile, (refs = resolveFile(index, file)));
-        return refs;
-      },
-    };
+  prepare: (files) => prepareJava(files, NO_GRANTS),
+  async forProject(projectDir) {
+    const grants = await readTestArtifactGrants(projectDir);
+    return { prepare: (files) => prepareJava(files, grants) };
   },
 };

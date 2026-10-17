@@ -35,6 +35,22 @@ export interface BuildDependency {
   readonly classifier?: string;
 }
 
+/**
+ * A Gradle dependency on another project of the same build:
+ * `implementation project(':lib')`, `testImplementation(testFixtures(project(":lib")))`,
+ * `testImplementation project(path: ':lib', configuration: 'testArtifacts')`.
+ */
+export interface ProjectDependency {
+  /** Gradle project path, always with its leading colon: `:lib`, `:a:b`. */
+  readonly path: string;
+  /** The configuration declaring it (`implementation`, `testImplementation`, …). */
+  readonly scope: string;
+  /** Wrapped in `testFixtures(…)`: the project's `java-test-fixtures` source set. */
+  readonly testFixtures?: true;
+  /** The target project's configuration it consumes (`testArtifacts`, `tests`, …); absent for the default. */
+  readonly configuration?: string;
+}
+
 export interface ModuleBuildModel {
   /** Matches `JavaModule.name` for the same directory. */
   readonly module: string;
@@ -46,6 +62,12 @@ export interface ModuleBuildModel {
   readonly version?: BuildValue;
   /** Direct and inherited dependencies, sorted by `group:artifact`, then type and classifier. */
   readonly dependencies: readonly BuildDependency[];
+  /**
+   * Gradle only, present when there are any: dependencies on other projects of
+   * the build, in declaration order. Maven names its own modules by
+   * coordinates in `dependencies`.
+   */
+  readonly projects?: readonly ProjectDependency[];
   /** Language level, e.g. `17`. Present only when declared. */
   readonly javaVersion?: BuildValue;
   readonly springBootVersion?: BuildValue;

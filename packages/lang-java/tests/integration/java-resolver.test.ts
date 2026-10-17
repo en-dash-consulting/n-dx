@@ -3,8 +3,10 @@
  * rule is pinned independently of the regenerable golden.
  */
 
-import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { javaGrammarPath, javaPack } from "../../src/java-pack.js";
 import {
@@ -231,6 +233,109 @@ describe("java resolver", () => {
         "gen/src/main/java/com/acme/Twin.java": ["Twin"],
         "gen/src/main/java/com/acme/copy/Twin.java": ["Twin"],
       });
+    });
+  });
+
+  describe("another module's test code, through the build files", () => {
+    const APP_TEST = "app/src/test/java/com/acme/app/AppTest.java";
+    const APP_MAIN = "app/src/main/java/com/acme/app/App.java";
+    const DAO_TEST = "dao/src/test/java/com/acme/dao/DaoTestBase.java";
+    const DAO_FIXTURE = "dao/src/testFixtures/java/com/acme/dao/DaoFixture.java";
+    const sources: Record<string, string> = {
+      [APP_TEST]: "package com.acme.app;\nimport com.acme.dao.DaoTestBase;\nimport com.acme.dao.DaoFixture;\nclass AppTest { DaoTestBase b; DaoFixture f; }\n",
+      [APP_MAIN]: "package com.acme.app;\nimport com.acme.dao.DaoTestBase;\nimport com.acme.dao.DaoFixture;\nclass App { DaoTestBase b; DaoFixture f; }\n",
+      [DAO_TEST]: "package com.acme.dao;\nclass DaoTestBase {}\n",
+      [DAO_FIXTURE]: "package com.acme.dao;\nclass DaoFixture {}\n",
+    };
+    const parent = "<parent><groupId>com.acme</groupId><artifactId>root</artifactId><version>1</version></parent>";
+    const rootPom =
+      "<project><groupId>com.acme</groupId><artifactId>root</artifactId><version>1</version>" +
+      "<modules><module>app</module><module>dao</module></modules></project>";
+    const daoPom = `<project>${parent}<artifactId>dao</artifactId></project>`;
+    const appPom = (dependency: string): string =>
+      `<project>${parent}<artifactId>app</artifactId><dependencies><dependency><groupId>com.acme</groupId><artifactId>dao</artifactId>${dependency}</dependency></dependencies></project>`;
+
+    let dir: string | undefined;
+    afterEach(async () => {
+      if (dir) await rm(dir, { recursive: true, force: true });
+      dir = undefined;
+    });
+
+    async function resolveProject(
+      ctx: Parameters<typeof skipUnlessGrammar>[0],
+      buildFiles: Record<string, string>,
+    ): Promise<(path: string) => FileReferences> {
+      skipUnlessGrammar(ctx, JAVA_WASM);
+      dir = await mkdtemp(join(tmpdir(), "lang-java-test-artifacts-"));
+      for (const [rel, body] of Object.entries({ ...buildFiles, ...sources })) {
+        await mkdir(dirname(join(dir, rel)), { recursive: true });
+        await writeFile(join(dir, rel), body);
+      }
+      const runner = createTreeSitterRunner();
+      try {
+        const files: PackSourceFile[] = [];
+        for (const [path, source] of Object.entries(sources)) {
+          const result = await runner.parseSource({ pack: javaPack, grammarPath: JAVA_WASM }, path, source);
+          if (result.status === "parsed") files.push(result);
+        }
+        const bound = await javaPack.resolver!.forProject!(dir, Object.keys(sources));
+        const prepared = bound.prepare(files);
+        return (path) => prepared.resolve(path);
+      } finally {
+        runner.dispose();
+      }
+    }
+
+    it("links a test to a Maven test-jar dependency's test classes, never main code", async (ctx) => {
+      const resolve = await resolveProject(ctx, {
+        "pom.xml": rootPom,
+        "dao/pom.xml": daoPom,
+        "app/pom.xml": appPom("<type>test-jar</type><scope>test</scope>"),
+      });
+      expect(targets(resolve(APP_TEST))).toEqual({ [DAO_TEST]: ["DaoTestBase"] });
+      expect(targets(resolve(APP_MAIN))).toEqual({});
+    });
+
+    it("links a test to a Maven classifier-tests dependency's test classes", async (ctx) => {
+      const resolve = await resolveProject(ctx, {
+        "pom.xml": rootPom,
+        "dao/pom.xml": daoPom,
+        "app/pom.xml": appPom("<classifier>tests</classifier><scope>test</scope>"),
+      });
+      expect(targets(resolve(APP_TEST))).toEqual({ [DAO_TEST]: ["DaoTestBase"] });
+    });
+
+    it("links a test to a Gradle testFixtures dependency's fixtures, not its tests", async (ctx) => {
+      const resolve = await resolveProject(ctx, {
+        "settings.gradle": "include 'app', 'dao'\n",
+        "dao/build.gradle": "plugins { id 'java-test-fixtures' }\n",
+        "app/build.gradle": "dependencies {\n  testImplementation(testFixtures(project(':dao')))\n}\n",
+      });
+      expect(targets(resolve(APP_TEST))).toEqual({ [DAO_FIXTURE]: ["DaoFixture"] });
+      expect(targets(resolve(APP_MAIN))).toEqual({});
+    });
+
+    it("links a test to a Gradle test-configuration dependency's test classes", async (ctx) => {
+      const resolve = await resolveProject(ctx, {
+        "settings.gradle.kts": `include("app", "dao")\n`,
+        "app/build.gradle.kts": `dependencies {\n  testImplementation(project(path = ":dao", configuration = "testArtifacts"))\n}\n`,
+      });
+      expect(targets(resolve(APP_TEST))).toEqual({ [DAO_TEST]: ["DaoTestBase"] });
+    });
+
+    it("still refuses the link without a test-artifact dependency", async (ctx) => {
+      const maven = await resolveProject(ctx, {
+        "pom.xml": rootPom,
+        "dao/pom.xml": daoPom,
+        "app/pom.xml": appPom("<scope>test</scope>"),
+      });
+      expect(targets(maven(APP_TEST))).toEqual({});
+      await rm(dir!, { recursive: true, force: true });
+      const gradle = await resolveProject(ctx, {
+        "settings.gradle": "include 'app', 'dao'\n",
+        "app/build.gradle": "dependencies {\n  testImplementation project(':dao')\n}\n",
+      });
+      expect(targets(gradle(APP_TEST))).toEqual({});
     });
   });
 

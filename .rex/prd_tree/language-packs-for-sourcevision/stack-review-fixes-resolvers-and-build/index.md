@@ -28,6 +28,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A same-package Java name visible only in another module's test code shadows the wildcard import javac would use](./a-same-package-java-name-visible-only.md) | pending |
+| [Allow cross-module test-to-test Java links when the module depends on the other's test jar or test fixtures](./allow-cross-module-test-to-test-java.md) | in_progress |
 | [An oversized Go file in a nested module or go.work project gets its internal imports as externals](./an-oversized-go-file-in-a-nested.md) | pending |
 | [Follow Python re-exports through a package's __init__.py](./follow-python-re-exports-through-a.md) | pending |
 | [Give Java externals the java: namespace](./give-java-externals-the-java-namespace.md) | completed |
@@ -38,4 +39,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Prefer the referencing module and source set when a Java name has several declarations](./prefer-the-referencing-module-and.md) | completed |
 | [Read Groovy Gradle statements that continue after a trailing comma](./read-groovy-gradle-statements-that.md) | completed |
 | [Read sqlc JSON configs with arrays and multi-line lists](./read-sqlc-json-configs-with-arrays-and.md) | completed |
-| [Allow cross-module test-to-test Java links when the module depends on the other's test jar or test fixtures](./allow-cross-module-test-to-test-java.md) | pending |
