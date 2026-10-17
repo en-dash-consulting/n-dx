@@ -25,8 +25,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A throwing project facts reader, project notices or symbol refine still costs the whole language its imports](./a-throwing-project-facts-reader.md) | pending |
 | [Contain a framework rule failure so the language's imports survive](./contain-a-framework-rule-failure-so.md) | completed |
 | [Keep earlier Django URL patterns when urlpatterns is reassigned through itself](./keep-earlier-django-url-patterns-when.md) | completed |
 | [Never read Spring rule tables through the object prototype](./never-read-spring-rule-tables-through.md) | completed |
-| [urlpatterns = [*urlpatterns, path(...)] drops every earlier Django pattern with no notice](./urlpatterns-urlpatterns-path-drops.md) | pending |
-| [A throwing project facts reader, project notices or symbol refine still costs the whole language its imports](./a-throwing-project-facts-reader.md) | pending |
+| [urlpatterns = [*urlpatterns, path(...)] drops every earlier Django pattern with no notice](./urlpatterns-urlpatterns-path-drops.md) | completed |
