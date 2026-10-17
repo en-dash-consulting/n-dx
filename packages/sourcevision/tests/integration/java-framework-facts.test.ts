@@ -18,6 +18,7 @@ import { detectOutbound } from "../../src/analyzers/outbound-detection.js";
 import { withPackOutbound } from "../../src/analyzers/pack-framework-facts.js";
 import { KNOWN_PACKS, loadPack, type KnownPack } from "../../src/language/pack-loader.js";
 import type { Inventory } from "../../src/schema/v1.js";
+import { OutboundSchema } from "../../src/schema/validate.js";
 import { packFrameworkFacts, runComponentsPhase, runImportsPhase, runInventoryPhase, type AnalyzeContext } from "../../src/cli/commands/analyze-phases.js";
 import { cmdInit } from "../../src/cli/commands/init.js";
 import { emptyAnalyzeTokenUsage } from "../../src/cli/sourcevision-core.js";
@@ -38,6 +39,25 @@ public class BillingClient {
     public String invoice(Long id) {
         return rest.getForObject("http://billing/invoices/" + id, String.class);
     }
+}
+`;
+
+/** Calls and annotations named after Object.prototype members: no outbound call, no route. */
+const PROTOTYPE_NAMES = `package com.example.clinic.client;
+
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.web.client.RestTemplate;
+
+@RestController
+public class Describer {
+    private final RestTemplate restTemplate = new RestTemplate();
+    private final KafkaTemplate<String, String> kafkaTemplate;
+
+    @toString("/name")
+    public String name() { return restTemplate.toString(); }
+
+    @constructor(topics = "t")
+    public int hash() { return kafkaTemplate.hashCode() + kafkaTemplate.valueOf("x", "y"); }
 }
 `;
 
@@ -82,6 +102,7 @@ describe("Java routes and outbound calls in serverRoutes and outbound.json", () 
     cpSync(FIXTURE, dir, { recursive: true });
     for (const [path, text] of [
       [`${MAIN}/client/BillingClient.java`, CLIENT],
+      [`${MAIN}/client/Describer.java`, PROTOTYPE_NAMES],
       ["src/test/java/com/example/clinic/BillingIT.java", TEST_CLIENT],
     ] as const) {
       mkdirSync(dirname(join(dir, path)), { recursive: true });
@@ -137,6 +158,8 @@ describe("Java routes and outbound calls in serverRoutes and outbound.json", () 
     expect(outbound.dependencies.map((d) => [d.file, d.kind, d.client, d.confidence])).toEqual([
       [`${MAIN}/client/BillingClient.java`, "http", "RestTemplate", "certain"],
     ]);
+    // What analyze writes as outbound.json is what its schema accepts.
+    expect(OutboundSchema.safeParse(outbound).error).toBeUndefined();
   });
 
   it("through the phases, the imports phase's facts reach the components phase, which reads none itself", async (ctx) => {

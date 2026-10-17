@@ -139,6 +139,35 @@ describe("Spring Boot outbound calls", () => {
     }
   });
 
+  it("reads nothing from a method or annotation named after an Object.prototype member", async (ctx) => {
+    skipUnlessGrammar(ctx, javaGrammarPath());
+    const projectDir = mkdtempSync(join(tmpdir(), "lang-java-spring-"));
+    try {
+      writeFileSync(
+        join(projectDir, "Prototype.java"),
+        [
+          "@RestController",
+          "class Prototype {",
+          "  private final RestTemplate restTemplate;",
+          "  private final KafkaTemplate<String, String> kafkaTemplate;",
+          "  private final JmsTemplate jmsTemplate;",
+          "  private final RabbitTemplate rabbitTemplate;",
+          "  @toString(\"/a\") String a() { return restTemplate.toString(); }",
+          "  @constructor(\"/b\") int b() { return kafkaTemplate.hashCode(); }",
+          "  @hasOwnProperty(\"/c\") void c() { jmsTemplate.valueOf(\"x\", \"y\"); rabbitTemplate.constructor(\"x\", \"y\"); }",
+          "  @valueOf(topics = \"t\") void d() { restTemplate.hasOwnProperty(\"x\"); }",
+          "  @__proto__(\"/e\") void e() { restTemplate.__proto__(\"x\"); }",
+          "}",
+        ].join("\n"),
+      );
+      const { facts } = await pack.analyzeProject({ projectDir, files: ["Prototype.java"], kinds: ["routes", "outboundCalls"] });
+      expect(facts[0]?.routes).toEqual([]);
+      expect(facts[0]?.outboundCalls).toEqual([]);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
   it("reads a leading placeholder's key, with or without a default, and nothing else as config", () => {
     const string = (text: string) => ({ name: "spring.argument", nodeType: "string_literal", text, start: { line: 1, column: 0 }, end: { line: 1, column: 0 } });
     expect(targetOf(string('"${orders.url:http://localhost}/x"'))).toEqual({ target: "orders.url", targetSource: "config" });

@@ -15,6 +15,7 @@ import {
   type PackFrameworkFacts,
 } from "../../../src/analyzers/pack-framework-facts.js";
 import type { Inventory, OutboundData, ServerRouteGroup } from "../../../src/schema/v1.js";
+import { OutboundSchema } from "../../../src/schema/validate.js";
 
 const inventory = (files: Record<string, string>): Inventory =>
   ({
@@ -108,6 +109,17 @@ describe("packOutboundDependencies", () => {
       { file: "Client.java", line: 3, kind: "http", target: "http://orders", targetSource: "literal", client: "RestTemplate", confidence: "certain" },
       { file: "Client.java", line: 7, kind: "queue", target: "orders", targetSource: "config", client: "KafkaTemplate", confidence: "inferred" },
     ]);
+  });
+
+  it("drops a fact without a target, target source or client instead of writing a row the schema rejects", () => {
+    // What a pack returned when it read a rule table through the object prototype (restTemplate.toString()).
+    const broken = { ...call(2), target: undefined, targetSource: undefined } as unknown as OutboundCallFact;
+    const facts: PackFrameworkFacts = [
+      { path: "C.java", outboundCalls: [broken, call(3, { targetSource: "guessed" as never }), call(4, { client: "" }), call(5)] },
+    ];
+    const deps = packOutboundDependencies(facts, inventory({ "C.java": "source" }));
+    expect(deps.map((d) => d.line)).toEqual([5]);
+    expect(OutboundSchema.safeParse({ dependencies: deps, contracts: [] }).success).toBe(true);
   });
 
   it("drops calls from test, docs and asset files and from files outside the inventory", () => {
