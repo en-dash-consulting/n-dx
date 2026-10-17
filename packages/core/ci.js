@@ -948,11 +948,13 @@ function checkGatewayImports(dir) {
     for (const filePath of files) {
       checked++;
       const relPath = relative(dir, filePath);
+      // gateway-rules.json paths use "/"; relative() uses "\" on Windows.
+      const ruleKey = relPath.replace(/\\/g, "/");
 
       // Skip if this file IS a designated gateway
-      if (rule.gatewayFiles.has(relPath)) continue;
+      if (rule.gatewayFiles.has(ruleKey)) continue;
       // Skip explicit per-file allowlist entries (documented in gateway-rules.json)
-      if (rule.allowedNonGatewayFiles.has(relPath)) continue;
+      if (rule.allowedNonGatewayFiles.has(ruleKey)) continue;
 
       let content;
       try {
