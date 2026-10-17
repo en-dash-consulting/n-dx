@@ -27,6 +27,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Resolve Java references to files](./resolve-java-references-to-files/index.md) | completed |
 | [Review follow-ups for language packs](./review-follow-ups-for-language-packs/index.md) | pending |
 | [Run tree-sitter grammars in Node through WASM](./run-tree-sitter-grammars-in-node/index.md) | completed |
-| [Shared language package (@n-dx/lang-kit)](./shared-language-package-n-dx-lang-kit/index.md) | completed |
+| [Shared language package (@n-dx/lang-kit)](./shared-language-package-n-dx-lang-kit/index.md) | pending |
 | [SQL dialects and database signals](./sql-dialects-and-database-signals/index.md) | pending |
 | [Terraform structure through tree-sitter-hcl](./terraform-structure-through-tree/index.md) | pending |
