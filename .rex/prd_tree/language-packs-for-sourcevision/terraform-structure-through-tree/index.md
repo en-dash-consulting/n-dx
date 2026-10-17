@@ -32,3 +32,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Seed the Terraform drift corpus and measure parse rate](./seed-the-terraform-drift-corpus-and.md) | completed |
 | [terragrunt.hcl and .tfvars are inventoried as Terraform in repos where detection finds no Terraform](./terragrunt-hcl-and-tfvars-are.md) | pending |
 | [Write Terraform structure queries and build the in-memory model](./write-terraform-structure-queries-and.md) | pending |
+| [Add the missing changeset for Terraform files entering the inventory](./add-the-missing-changeset-for.md) | pending |
