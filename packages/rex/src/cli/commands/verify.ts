@@ -45,6 +45,10 @@ export async function cmdVerify(
     runTests: gate.runTests,
   });
 
+  // Tests were asked for and not run: that is not a pass. A CI step with no
+  // trust record must not go green on a run that verified nothing.
+  if (gate.refusal) process.exitCode = 1;
+
   // JSON output
   if (format === "json") {
     result(JSON.stringify(gate.refusal ? { ...verifyResult, ...gate.refusal } : verifyResult, null, 2));
