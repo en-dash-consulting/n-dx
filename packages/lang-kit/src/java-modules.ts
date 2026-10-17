@@ -67,8 +67,11 @@ const COMMENT_OPEN = "<!--";
 /**
  * Remove XML comments in one linear scan. The result never contains `<!--`:
  * an opener that only forms once a comment is removed (`<!<!-- x -->-- -->`)
- * is itself treated as a comment, as repeating a single-pass strip until
- * nothing changes would. An unterminated comment runs to the end of the file.
+ * is itself treated as a comment. It ends at the next `-->` in the original
+ * text, so in `<!<!-- x -->-- <!-- y --> z -->` it ends after `y` and ` z -->`
+ * is kept, where repeating a single-pass strip until nothing changes would
+ * also remove ` z -->`. Both are malformed XML that Maven rejects; only the
+ * absence of `<!--` matters. An unterminated comment runs to the end of the file.
  */
 export function stripXmlComments(xml: string): string {
   let out = "";

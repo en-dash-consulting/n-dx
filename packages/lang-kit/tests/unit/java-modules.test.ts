@@ -140,6 +140,8 @@ describe("discoverJavaModules", () => {
       ["<!--> x --><b/>", "<b/>"],
       ["<a/><!-- x", "<a/>"],
       ["<!<!-- x -->-- y", ""],
+      // The formed opener ends at the next `-->` in the input (see the doc comment).
+      ["<!<!-- x -->-- <!-- y --> z --><b/>", " z --><b/>"],
       ["<!- - --><b/>", "<!- - --><b/>"],
     ])("%j → %j", (xml, out) => {
       expect(stripXmlComments(xml)).toBe(out);
