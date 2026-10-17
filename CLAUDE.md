@@ -23,10 +23,10 @@ Four-tier dependency hierarchy (each layer imports only from the layer below):
   Execution       hench                         (agent loops, tool dispatch)
        ↓
   Domain          rex · sourcevision            (independent, never import each other)
+  Packs           @n-dx/lang-runtime, lang-*    (beside Domain: loaded, never imported)
        ↓
   Foundation      @n-dx/llm-client              (shared types, API client)
                   @n-dx/lang-kit                (language facts, pack contract)
-  Packs           @n-dx/lang-runtime, lang-*    (loaded at run time)
 ```
 
 Zero circular dependencies. The web package sits alongside orchestration — it imports all domain packages to serve the unified dashboard.
