@@ -11,7 +11,8 @@
  * notices only when imports are wanted. Each step that can fail for the
  * whole language — a grammar not built or not loadable, a query the grammar
  * rejects, build files that cannot be read — ends the call with a degraded
- * result instead of an exception. A file that cannot be read or is over the
+ * result instead of an exception. A framework that throws loses only its own
+ * facts, reported as a notice. A file that cannot be read or is over the
  * runner's size limit is listed in `unparsed`.
  *
  * @module lang-runtime/pack-entry
@@ -27,7 +28,15 @@ import type {
   PackProjectRequest,
   PackProjectResult,
 } from "@n-dx/lang-kit";
-import type { FrameworkContext, LanguagePack, PackResolver, PackSourceFile, PreparedResolver } from "./pack.js";
+import type {
+  FrameworkContext,
+  FrameworkFacts,
+  FrameworkPack,
+  LanguagePack,
+  PackResolver,
+  PackSourceFile,
+  PreparedResolver,
+} from "./pack.js";
 import type { PackPackage } from "./pack-package.js";
 import { mergeFileFacts, readPackFacts, type PackSymbolRules, type ProjectFactsReader } from "./pack-facts.js";
 import { createTreeSitterRunner, loadGrammar, type RunnablePack, type RunnerOptions } from "./runner.js";
@@ -140,7 +149,7 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       module: (fromFile, specifier) => prepare(resolver).module?.(fromFile, specifier),
     };
     const project = options.projectFacts?.(parsed, kinds);
-    const framed = frameworks.map((f) => f.read(parsed, kinds, context));
+    const framed = frameworks.map((f) => readFramework(f, parsed, kinds, context));
     const facts: FileFacts[] = parsed.map((file) =>
       framed.reduce(
         (merged, { facts: byPath }) => mergeFileFacts(merged, byPath.get(file.path)),
@@ -155,5 +164,28 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
     return notices.length === 0 ? { facts, unparsed } : { facts, unparsed, notices };
   } finally {
     runner.dispose();
+  }
+}
+
+/**
+ * One framework's facts. A framework that throws loses only its own facts, as
+ * a notice naming it: the language's imports, symbols and other frameworks'
+ * facts are still returned, and the pack is not degraded, since a reinstall
+ * would not help.
+ */
+function readFramework(
+  framework: FrameworkPack,
+  files: readonly PackSourceFile[],
+  kinds: readonly FactKind[],
+  context: FrameworkContext | undefined,
+): FrameworkFacts {
+  try {
+    return framework.read(files, kinds, context);
+  } catch (error) {
+    const lost = framework.produces.filter((kind) => kinds.includes(kind));
+    return {
+      facts: new Map(),
+      notices: [`framework ${framework.id} failed (${errorText(error)}); its ${lost.join(" and ")} were not recorded.`],
+    };
   }
 }
