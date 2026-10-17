@@ -374,6 +374,12 @@ items:
     lastModified: "2026-10-16T05:14:11.016Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "ffa2a8cd-3a0f-4c58-baea-570eb9900f14":
+    status: "completed"
+    startedAt: "2026-10-17T01:16:02.119Z"
+    completedAt: "2026-10-17T01:20:51.138Z"
+    endedAt: "2026-10-17T01:20:51.138Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added tests/e2e/docs-skill-table-drift.test.js; aligned 3 skills.md rows verbatim (ndx-graview also, after the resync onto main); skills.md selects root-docs via VALIDATED_DOC_PAGES."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-15T04:35:59.167Z"
+    lastModified: "2026-10-17T01:20:51.436Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
