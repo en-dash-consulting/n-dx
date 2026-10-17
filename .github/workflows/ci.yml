@@ -402,11 +402,11 @@ jobs:
       # tests/e2e/ci-grammar-steps.test.js fails if a leg loses them.
       # SV_REQUIRE_GRAMMARS=1 turns a missing-grammar skip into
       # a failure. build-grammars.mjs pins the tree-sitter CLI for linux,
-      # macos and windows. The cache holds the SHA-256-verified CLI and grammar
-      # archives (re-verified on use) plus the wasi-sdk the CLI fetches into
-      # the OS cache dir on first use: ~/.cache on Linux, ~/Library/Caches on
-      # macOS, %LOCALAPPDATA% on Windows. Key on the script, which holds every
-      # pin.
+      # macos and windows. The cache holds the SHA-256-verified CLI, grammar,
+      # wasi-sdk and binaryen archives (re-verified on use) and the extracted
+      # toolchains, all under packages/lang-runtime/build/cache; the CLI is
+      # pointed at those and never downloads into the OS cache dir. Key on the
+      # script, which holds every pin.
       - name: Decide whether this group needs grammars
         id: grammars
         shell: bash
@@ -421,11 +421,7 @@ jobs:
         if: steps.grammars.outputs.build == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            packages/lang-runtime/build/cache
-            ~/.cache/tree-sitter
-            ~/Library/Caches/tree-sitter
-            ~/AppData/Local/tree-sitter
+          path: packages/lang-runtime/build/cache
           key: grammars-${{ runner.os }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
 
       # Every language pack builds its own grammar (`build:grammars`) into its
