@@ -66,8 +66,9 @@ Detection takes the config override and the
 project file search as arguments (`detectLanguage(rootDir, { override,
 searchProjectFiles })`); sourcevision's `src/language/detect.ts` supplies both,
 the search being the inventory's own walk. A markerless repository is
-Terraform alone only when that walk counts more Terraform files than
-`isFallbackSourceFile` files (JS/TS, or a language with no config).
+Terraform alone only when that walk finds Terraform files and no
+`isFallbackSourceFile` file (JS/TS, or a language with no config); counts
+are not weighed.
 Resolvers, the parser runner, queries and grammars live in the runtime and the
 packs; pack loading lives in sourcevision. Domain packages import it directly,
 as they do `@n-dx/llm-client`; hench and web have no gateway for it.

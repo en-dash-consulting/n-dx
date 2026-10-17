@@ -276,8 +276,9 @@ const FALLBACK_LANGUAGE_EXTENSIONS: ReadonlySet<string> = new Set([
 
 /**
  * Is `fileName` source the TypeScript fallback is for: authored JS/TS (not
- * minified), or a language with no config here? A markerless repository's
- * count of these is weighed against its Terraform files.
+ * minified), or a language with no config here? A markerless repository
+ * with any of these keeps the fallback primary, however many Terraform
+ * files it has.
  */
 export function isFallbackSourceFile(fileName: string): boolean {
   if (fileName.endsWith(".min.js")) return false;
@@ -286,14 +287,13 @@ export function isFallbackSourceFile(fileName: string): boolean {
 }
 
 /**
- * Is a markerless repository Terraform alone? Weighed as the marker
- * tiebreak weighs languages: Terraform must outnumber the fallback's source
- * files, a tie going to the fallback. Otherwise Terraform joins the
- * fallback, which keeps its skip directories and its test and generated
- * patterns, or the repository has no Terraform at all.
+ * Is a markerless repository Terraform alone? Only when it has Terraform
+ * files and no fallback source at all; counts are not weighed. With any
+ * fallback source, Terraform joins the fallback, which stays primary and
+ * keeps its skip directories and its test and generated patterns.
  */
 function isTerraformOnly(counts: ProjectFileCounts): boolean {
-  return counts.terraform > counts.fallbackSource;
+  return counts.terraform > 0 && counts.fallbackSource === 0;
 }
 
 // ── Detection ───────────────────────────────────────────────────────────────
@@ -306,8 +306,8 @@ function isTerraformOnly(counts: ProjectFileCounts): boolean {
  * 2. Exactly one language marker present → that language
  * 3. Several markers present → file-count tiebreak
  * 4. No other marker, `pom.xml` or a Gradle build at the root → Java
- * 5. No markers → TypeScript/JS fallback (Terraform when Terraform files
- *    outnumber the source the fallback is for)
+ * 5. No markers → TypeScript/JS fallback (Terraform when the repository
+ *    has Terraform files and no source the fallback is for)
  */
 export async function detectLanguage(rootDir: string, options: DetectLanguageOptions): Promise<LanguageConfig> {
   // Step 1: Explicit override
@@ -357,9 +357,8 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   // mixed repositories keep their existing primary language.
   if (await hasJavaMarker(rootDir)) return javaConfig;
 
-  // Java outranks Terraform; the fallback's source outranks it unless
-  // Terraform files outnumber it. Searched as the TypeScript fallback would
-  // be inventoried.
+  // Java outranks Terraform, and so does any of the fallback's source.
+  // Searched as the TypeScript fallback would be inventoried.
   if (isTerraformOnly(await options.searchProjectFiles([typescriptConfig], { count: true }))) {
     return terraformConfig;
   }
@@ -407,8 +406,8 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
   }
 
   // No markers → fallback to TypeScript/JS for backward compatibility, with
-  // Terraform beside it; Terraform alone only when its files outnumber the
-  // fallback's source (never beside Java). Searched with the skip set of what
+  // Terraform beside it; Terraform alone only when there is no fallback
+  // source at all (never beside Java). Searched with the skip set of what
   // would be returned without Terraform.
   if (present.length === 0) {
     const base = hasJava ? javaConfig : typescriptConfig;
