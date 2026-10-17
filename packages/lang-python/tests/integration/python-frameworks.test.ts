@@ -363,6 +363,17 @@ describe("a module a package's __init__.py re-exports under another name", () =>
       "FastAPI: 1 mount names no application or router the rules can follow and was not followed: app/main.py:4 (include_router endpoints.router).",
     ]);
   });
+
+  it("still names the submodule when __init__.py imports the name only inside a function", async (ctx) => {
+    write("app/api/endpoints.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/y")\ndef y(): ...\n');
+    write("app/api/legacy.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/z")\ndef z(): ...\n');
+    write("app/api/__init__.py", "def setup():\n    from . import legacy as endpoints\n    return endpoints\n");
+    write("app/main.py", 'from fastapi import FastAPI\nfrom app.api import endpoints\napp = FastAPI()\napp.include_router(endpoints.router, prefix="/api")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/api/endpoints.py")).toEqual(["GET /api/y y"]);
+    expect(routesOf(facts, "app/api/legacy.py")).toEqual(["GET /z z"]);
+    expect(notices).toBeUndefined();
+  });
 });
 
 describe("the Python pack entry with its frameworks", () => {
