@@ -193,6 +193,27 @@ describe("loadPack after an n-dx upgrade", () => {
     expect(load.status).toBe("missing");
   });
 
+  it("ignores a copy left in a `.sv-pack-stage-*` directory", async () => {
+    installForVersion(".sv-pack-stage-x", "1.2.2");
+    const load = await loadPack(known(() => Promise.reject(notFound("@n-dx/lang-java"))), { version: VERSION });
+    expect(load.status).toBe("missing");
+  });
+
+  it("does not call a sibling copy of sourcevision's own version a mismatch", async () => {
+    installForVersion("copy", VERSION);
+    const load = await loadPack(known(() => Promise.reject(notFound("@n-dx/lang-java"))), { version: VERSION });
+    expect(load.status).toBe("missing");
+  });
+
+  it("reports a staged load whose bundle lacks the package as missing, not as the installed version", async () => {
+    installForVersion(VERSION);
+    const load = await loadPack(known(() => Promise.reject(notFound("@n-dx/lang-java"))), {
+      packDir: join(packsRoot(), ".sv-pack-stage-y"),
+      version: VERSION,
+    });
+    expect(load.status).toBe("missing");
+  });
+
   it("does not look beside a pack directory that is not under the ndx home", async () => {
     const outside = mkdtempSync(join(tmpdir(), "sv-pack-parent-"));
     try {
