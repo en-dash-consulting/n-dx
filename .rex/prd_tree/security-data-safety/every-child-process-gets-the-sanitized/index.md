@@ -22,6 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A repository's .n-dx.json can choose which environment variable is sent as the Google API key, and where it is sent](./a-repository-s-n-dx-json-can-choose.md) | completed |
+| [A repository's .n-dx.json cli_path chooses the binary ndx auth and ndx work run, while the repository is untrusted](./a-repository-s-n-dx-json-cli-path.md) | pending |
 | [hench's missing-credentials message tells a Codex env_key user the CLI falls back to default credential files](./hench-s-missing-credentials-message.md) | pending |
 | [ndx auth's Google preflight reads llm.google.apiKeyEnv from the untrusted project config](./ndx-auth-s-google-preflight-reads-llm.md) | completed |
 | [ndx config --test-connection sends the Claude API key to an untrusted project's api_endpoint](./ndx-config-test-connection-sends-the.md) | completed |
