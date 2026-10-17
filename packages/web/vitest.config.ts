@@ -47,6 +47,7 @@ export default defineConfig({
       "tests/setup/preact-frame-leak-guard.ts",
       "../../tests/setup-color-env.js",
       "../../tests/setup-session-env.js",
+      "../../tests/setup-ndx-home.js",
     ],
     exclude: sandboxBlocksNetwork
       ? [
