@@ -143,7 +143,7 @@ describe("go resolver — root package", () => {
       "module example.com/root\n\nrequire github.com/foo/bar v1.2.3\n\nreplace github.com/foo/bar => ./third_party/bar\n",
     );
     writeFileSync(join(dir, "cmd", "main.go"), 'package main\n\nimport "github.com/foo/bar/baz"\n');
-    // third_party/bar/baz/baz.go exists on disk but is not inventoried, so the resolver never sees it.
+    // No third_party/bar/baz/*.go is passed to the resolver, as when the inventory skips third_party/.
     const { resolve } = await resolveProject(ctx, dir);
     expect(resolve("cmd/main.go")).toEqual({
       files: [],
