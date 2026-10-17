@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A deep Maven property chain overflows the call stack and rejects readMavenBuildModels](./a-deep-maven-property-chain-overflows.md) | in_progress |
+| [A deep Maven property chain overflows the call stack and rejects readMavenBuildModels](./a-deep-maven-property-chain-overflows.md) | completed |
 | [A failing Maven property chain is re-walked, quadratically, for every reference](./a-failing-maven-property-chain-is-re.md) | pending |
 | [A regressed backtracking regex hangs the lang-kit suite instead of failing a named test](./a-regressed-backtracking-regex-hangs.md) | pending |
 | [Guard CI's grammar steps with a test and cover every group that runs a pack suite](./guard-ci-s-grammar-steps-with-a-test.md) | completed |
