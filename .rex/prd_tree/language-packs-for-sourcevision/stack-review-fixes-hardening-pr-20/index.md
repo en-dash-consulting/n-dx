@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Guard CI's grammar steps with a test and cover every group that runs a pack suite](./guard-ci-s-grammar-steps-with-a-test.md) | pending |
 | [Hold every published package to the release group, and list them in OPEN_SOURCE_SCOPE.md](./hold-every-published-package-to-the.md) | pending |
 | [Lock the pack directory for sv pack writers](./lock-the-pack-directory-for-sv-pack.md) | pending |
-| [Make pom.xml reading linear and bounded](./make-pom-xml-reading-linear-and-bounded.md) | pending |
+| [Make pom.xml reading linear and bounded](./make-pom-xml-reading-linear-and-bounded.md) | completed |
 | [Make uv workspace member globs safe to compile and linear to match](./make-uv-workspace-member-globs-safe-to.md) | completed |
 | [Memoise and cap Maven property interpolation](./memoise-and-cap-maven-property.md) | pending |
 | [Pin and verify the WASM toolchain the grammar build downloads](./pin-and-verify-the-wasm-toolchain-the.md) | pending |
