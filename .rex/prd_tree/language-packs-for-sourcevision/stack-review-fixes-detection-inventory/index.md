@@ -28,7 +28,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Invalidate the incremental inventory cache when classifier rules change](./invalidate-the-incremental-inventory.md) | pending |
+| [Invalidate the incremental inventory cache when classifier rules change](./invalidate-the-incremental-inventory.md) | completed |
 | [Keep the TypeScript config when a markerless repo also has Terraform](./keep-the-typescript-config-when-a.md) | completed |
 | [List Java as analysed only when the Java pack ran](./list-java-as-analysed-only-when-the.md) | pending |
 | [Markerless polyglot repo with more .tf files than source loses the TypeScript fallback again (web/package.json + infra/*.tf)](./markerless-polyglot-repo-with-more-tf.md) | completed |
