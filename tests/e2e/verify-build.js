@@ -39,6 +39,7 @@ const REQUIRED_ARTIFACTS = [
   ["packages/hench/dist/cli/index.js", "hench", "packages/hench/src", "packages/hench/dist"],
   ["packages/web/dist/server/start.js", "@n-dx/web", "packages/web/src", "packages/web/dist"],
   ["packages/llm-client/dist/public.js", "@n-dx/llm-client", "packages/llm-client/src", "packages/llm-client/dist"],
+  ["packages/lang-kit/dist/index.js", "@n-dx/lang-kit", "packages/lang-kit/src", "packages/lang-kit/dist"],
 ];
 
 export function setup() {
