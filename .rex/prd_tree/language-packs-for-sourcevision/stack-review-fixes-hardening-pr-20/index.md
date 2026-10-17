@@ -40,4 +40,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Remove exponential backtracking from Python requirement specifier parsing](./remove-exponential-backtracking-from.md) | completed |
 | [Run npm without lifecycle scripts in sv pack](./run-npm-without-lifecycle-scripts-in.md) | completed |
 | [Test the Terraform module-instance cap](./test-the-terraform-module-instance-cap.md) | completed |
-| [Verify offline pack bundles and limit what they replace](./verify-offline-pack-bundles-and-limit.md) | pending |
+| [Verify offline pack bundles and limit what they replace](./verify-offline-pack-bundles-and-limit.md) | completed |
