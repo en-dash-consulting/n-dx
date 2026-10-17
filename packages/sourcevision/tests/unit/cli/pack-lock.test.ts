@@ -101,14 +101,17 @@ describe("replaceInstalled", () => {
   };
   const marker = (name: string): string => readFileSync(join(packDir, "node_modules", name, "marker"), "utf-8");
 
-  it("moves the staged packages over the installed ones and keeps the rest", () => {
+  it("moves the named staged packages over the installed ones and keeps the rest", () => {
     const stage = join(root, "stage");
     lay(stage, "a", "staged a");
     lay(packDir, "a", "old a");
     lay(packDir, "other", "other");
-    replaceInstalled(stage, packDir);
+    lay(stage, "unnamed", "staged unnamed");
+    lay(packDir, "unnamed", "old unnamed");
+    replaceInstalled(stage, packDir, ["a"]);
     expect(marker("a")).toBe("staged a");
     expect(marker("other")).toBe("other");
+    expect(marker("unnamed")).toBe("old unnamed");
   });
 
   it("leaves another process's install untouched when a rename fails, and undoes only its own moves", () => {
@@ -124,7 +127,7 @@ describe("replaceInstalled", () => {
       }
       renameSync(from, to);
     };
-    expect(() => replaceInstalled(stage, packDir, rename)).toThrow("ENOTEMPTY");
+    expect(() => replaceInstalled(stage, packDir, ["a", "b"], rename)).toThrow("ENOTEMPTY");
     expect(marker("b")).toBe("other process's b");
     expect(marker("a")).toBe("old a");
   });
@@ -137,7 +140,7 @@ describe("replaceInstalled", () => {
       if (from.startsWith(join(stage, "node_modules"))) throw Object.assign(new Error("EACCES"), { code: "EACCES" });
       renameSync(from, to);
     };
-    expect(() => replaceInstalled(stage, packDir, rename)).toThrow("EACCES");
+    expect(() => replaceInstalled(stage, packDir, ["a"], rename)).toThrow("EACCES");
     expect(marker("a")).toBe("old a");
   });
 });
