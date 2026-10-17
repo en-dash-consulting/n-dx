@@ -2,7 +2,7 @@
 id: "8b4b34af-ec1d-4593-8266-67e39928289c"
 level: "feature"
 title: "Terraform structure through tree-sitter-hcl"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "language-packs"
@@ -13,13 +13,18 @@ tags:
 blockedBy:
   - "2fc859c0-090f-43bb-b1b4-36415478bae8"
 source: "roadmap"
+startedAt: "2026-10-15T05:59:44.153Z"
+completedAt: "2026-10-15T05:59:44.153Z"
+endedAt: "2026-10-15T05:59:44.153Z"
+resolutionType: "acknowledgment"
+resolutionDetail: "Every child is completed; the Terraform model task c87df119 moved to the PR 13 feature 05b34c7e (2026-10-15), where it is rewritten for the pack architecture."
 acceptanceCriteria:
   - "The HCL grammar builds and Terraform files parse with at least 98% clean on the corpus"
   - "The in-memory model lists resources, data sources, modules, providers and references, and finds every resource infrastructure.ts finds"
   - "infrastructure.ts, IAC_KINDS and infrastructure.json are unchanged"
   - "The six static root policy tests pass"
 description: "LS12: Terraform becomes a language pack whose detail will extend Sterling H's infrastructure.json (analyzers/infrastructure.ts, which today extracts resource blocks with a regex and maps types to coarse kinds via IAC_KINDS). In this PR the Terraform model stays in memory: nothing is written to infrastructure.json until the conversation with Sterling H. infrastructure.ts and IAC_KINDS are not edited.\n\nSide stack, PR 8."
-lastModified: "2026-10-08T03:09:05.680Z"
+lastModified: "2026-10-15T05:59:44.456Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -36,4 +41,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Terraform files deeper than three directories are inventoried but not detected](./terraform-files-deeper-than-three.md) | completed |
 | [terragrunt.hcl and .tfvars are inventoried as Terraform in repos where detection finds no Terraform](./terragrunt-hcl-and-tfvars-are.md) | completed |
 | [The Terraform file set is defined three times and can drift between detection and inventory](./the-terraform-file-set-is-defined.md) | completed |
-| [Write Terraform structure queries and build the in-memory model](./write-terraform-structure-queries-and.md) | pending |

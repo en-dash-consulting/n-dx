@@ -1,8 +1,8 @@
 /**
  * Terraform language configuration.
  *
- * Inventory roles only. Structure comes from the HCL grammar's queries and
- * stays in memory; nothing here is written to `infrastructure.json`.
+ * Inventory roles only. Structure comes from the Terraform pack
+ * (`@n-dx/lang-terraform`) as `resources` facts.
  *
  * @module lang-kit/terraform
  */
@@ -14,7 +14,10 @@ import type { LanguageConfig } from "./registry.js";
  * Language config for Terraform and Terragrunt repositories.
  *
  * - `.terraform/` holds downloaded providers and modules; it is skipped.
- * - `.tfvars` and `terragrunt.hcl` are configuration, `*.tftest.hcl` are tests.
+ * - `.tfvars` and `terragrunt.hcl` are configuration. `*.tftest.hcl` files and
+ *   Terraform files under a `tests/` or `test/` directory are tests; the
+ *   inventory applies these patterns to Terraform files only, and only when
+ *   Terraform is the primary language (`classifyRole` in sourcevision).
  * - No extension is parseable: there is no import graph, so Terraform files
  *   take no part in import or zone analysis.
  * - Detection never makes Terraform the primary language unless no other
@@ -28,7 +31,8 @@ export const terraformConfig: LanguageConfig = {
 
   parseableExtensions: new Set(),
 
-  testFilePatterns: [/\.tftest\.hcl$/],
+  // The directory pattern needs a `/`, so `isTerraformFile`, which tests bare names, never matches it.
+  testFilePatterns: [/\.tftest\.hcl$/, /(?:^|\/)tests?\//],
 
   configFilenames: new Set(["terragrunt.hcl"]),
 

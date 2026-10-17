@@ -31,4 +31,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Run tree-sitter grammars in Node through WASM](./run-tree-sitter-grammars-in-node/index.md) | completed |
 | [Shared language package (@n-dx/lang-kit)](./shared-language-package-n-dx-lang-kit/index.md) | completed |
 | [SQL dialects and database signals](./sql-dialects-and-database-signals/index.md) | pending |
-| [Terraform structure through tree-sitter-hcl](./terraform-structure-through-tree/index.md) | pending |
+| [Terraform model in the Terraform pack and infrastructure.json (PR 13)](./terraform-model-in-the-terraform-pack/index.md) | completed |
+| [Terraform structure through tree-sitter-hcl](./terraform-structure-through-tree/index.md) | completed |

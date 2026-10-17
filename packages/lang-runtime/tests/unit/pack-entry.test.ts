@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { goConfig, isLanguagePackEntry } from "@n-dx/lang-kit";
 import { createPackEntry } from "../../src/pack-entry.js";
+import { factGaps } from "../../src/pack-facts.js";
 import { packPackage, type PackPackage } from "../../src/pack-package.js";
 import type { LanguagePack } from "../../src/pack.js";
 
@@ -98,5 +99,17 @@ describe("createPackEntry", () => {
     expect(result.facts).toEqual([]);
     expect(result.degraded?.reason).toContain(`grammar ${grammarPath} could not be loaded (`);
     expect(result.degraded?.remedy).toBe(pkg.rebuildStep());
+  });
+});
+
+describe("factGaps", () => {
+  const resourcesPack: LanguagePack = { id: "go", config: goConfig, grammar: pack.grammar, queries: [], produces: ["resources"], provenance: {} };
+
+  it("names a kind no single file answers when the pack has no project facts reader", () => {
+    expect(factGaps(resourcesPack, undefined)).toEqual(['produces "resources" but has no project facts reader']);
+  });
+
+  it("is empty once the pack has a project facts reader", () => {
+    expect(factGaps(resourcesPack, undefined, () => new Map())).toEqual([]);
   });
 });

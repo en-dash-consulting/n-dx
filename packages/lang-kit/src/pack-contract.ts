@@ -176,10 +176,79 @@ export interface OutboundCallFact {
   readonly position: SourcePosition;
 }
 
+// ── Resources (produced) ────────────────────────────────────────────────────
+
+/** The provider a resource belongs to. */
+export interface ResourceProvider {
+  /** The provider's local name, e.g. `aws` (from the type's prefix, or the resource's `provider` argument). */
+  readonly name: string;
+  /** The version constraint exactly as written in the declaring module's `required_providers`, e.g. `>= 5.0`. */
+  readonly version?: string;
+}
+
+/**
+ * Settings an audit reads from a resource. Each value is the text as written
+ * in the declaration, never normalised: a quoted string without interpolation
+ * gives its content (`"postgres"` → `postgres`), any other expression its
+ * source text (`var.engine_version`). A setting the resource does not write is
+ * absent.
+ */
+export interface ResourceAttributes {
+  /** Database or cache engine, e.g. `postgres` (`engine` on `aws_db_instance`). */
+  readonly engine?: string;
+  /** Engine version, e.g. `15.4`, or Cloud SQL's `database_version` (`POSTGRES_15`). */
+  readonly engineVersion?: string;
+  /** Function runtime, e.g. `python3.12` (Lambda, Cloud Functions). */
+  readonly runtime?: string;
+  /** Container image, e.g. `nginx:1.27` or a Lambda `image_uri`. */
+  readonly image?: string;
+  /** Kubernetes version of a managed cluster, e.g. `1.30` (EKS `version`, GKE `min_master_version`). */
+  readonly clusterVersion?: string;
+}
+
+/** A place in a project: a project-relative, forward-slash file and a one-based line. */
+export interface SourceLocation {
+  readonly file: string;
+  readonly line: number;
+}
+
+/**
+ * An attribute whose expression resolved to a string in one module instance:
+ * `var.x` through the module call's arguments or the variable's default,
+ * `local.x`, or one branch of `cond ? null : x`. Nothing is evaluated: no
+ * function, interpolation or arithmetic.
+ */
+export interface ResolvedAttribute {
+  /** The expression as written in the resource, e.g. `var.engine`. */
+  readonly written: string;
+  /** `conditional` when the value is one branch of a ternary whose other branch is `null`; else `literal`. */
+  readonly confidence: "literal" | "conditional";
+  /** Where the string is written: the module call argument, the variable's default or the local. */
+  readonly from: SourceLocation;
+}
+
+/**
+ * One instance of the module that declares a resource: the call path that
+ * reaches it, and the attributes that resolve there. Present only when at
+ * least one attribute resolves; `attributes` then carry the resolved values.
+ */
+export interface ResourceInstance {
+  /** The call path from a root module, e.g. `module.db.module.db_instance`; absent at a root module. */
+  readonly module?: string;
+  /** The module call in the root module that starts `module`; absent at a root module. */
+  readonly call?: SourceLocation;
+  readonly resolved: Readonly<Partial<Record<keyof ResourceAttributes, ResolvedAttribute>>>;
+}
+
 /**
  * A piece of infrastructure an IaC file declares. The coarse kind (bucket,
  * queue, …) is not part of the fact: consumers classify `type` with
- * `IAC_KINDS` (`iac-kinds.ts`).
+ * `IAC_KINDS` (`iac-kinds.ts`). Every field after `position` is optional and
+ * filled only by a pack that reads it.
+ *
+ * A resource in a module that several calls instantiate with different
+ * values has one fact per distinct set of resolved values, each with its
+ * `instance`; consumers that list a resource once read every fact for it.
  */
 export interface ResourceFact {
   /** Resource type as declared, e.g. `aws_db_instance`. */
@@ -188,7 +257,22 @@ export interface ResourceFact {
   readonly name: string;
   /** Names the resource is known by at run time (a `name` attribute), for matching source. */
   readonly literals?: readonly string[];
+  /** Where the declaration starts. */
   readonly position: SourcePosition;
+  /**
+   * The module call path that declares the resource, e.g. `module.db` or
+   * `module.app.module.db`; absent in a root module (a directory no module
+   * call in the project reaches). When several call paths reach the file's
+   * directory, the shortest, then the alphabetically first.
+   */
+  readonly module?: string;
+  readonly provider?: ResourceProvider;
+  /** `<type>.<name>` of the resources in the same module that this one references; sorted, distinct. */
+  readonly references?: readonly string[];
+  /** Absent when the resource writes none of them. As written, unless `instance` resolves them. */
+  readonly attributes?: ResourceAttributes;
+  /** The module instance whose values `attributes` carry; absent when nothing resolved. */
+  readonly instance?: ResourceInstance;
 }
 
 // ── Per-file facts ──────────────────────────────────────────────────────────
@@ -208,10 +292,10 @@ export interface FileFacts {
 }
 
 /** Fact kinds a pack produces today. */
-export const PRODUCED_FACT_KINDS = ["imports", "symbols", "calls"] as const;
+export const PRODUCED_FACT_KINDS = ["imports", "symbols", "calls", "resources"] as const;
 
 /** Fact kinds typed in this contract that no pack produces yet. */
-export const DECLARED_FACT_KINDS = ["routes", "components", "outboundCalls", "resources"] as const;
+export const DECLARED_FACT_KINDS = ["routes", "components", "outboundCalls"] as const;
 
 export type ProducedFactKind = (typeof PRODUCED_FACT_KINDS)[number];
 export type DeclaredFactKind = (typeof DECLARED_FACT_KINDS)[number];

@@ -237,19 +237,24 @@ export function classifyRole(filePath: string, language: string, langConfig?: La
 
   const config = langConfig ?? typescriptConfig;
 
-  // 1. Test — language-specific patterns (e.g. _test.go for Go, .test./.spec. for TS)
-  // 1a. Terraform (.tf, .tfvars, terragrunt.hcl, .tftest.hcl) is config until the
-  //     Terraform structure model lands, unless another language's test pattern
-  //     matches it (tests/fixtures/infra/main.tf in a TS repo), so it stays in
-  //     test quarantine as it was before Terraform was recognised. Terraform's
-  //     own .tftest.hcl pattern alone does not make a file a test.
+  // 1. Test — language-specific patterns (e.g. _test.go for Go, .test./.spec. for TS).
+  //    Terraform's own patterns (.tftest.hcl, tests/ and test/ directories) never
+  //    decide a non-Terraform file.
+  const terraformPattern = (pat: RegExp): boolean => terraformConfig.testFilePatterns.includes(pat);
+  // 1a. Terraform (.tf, .tfvars, terragrunt.hcl, .tftest.hcl) is config unless a
+  //     test pattern matches it. Another language's pattern always counts
+  //     (tests/fixtures/infra/main.tf in a TS repo stays in test quarantine);
+  //     Terraform's own patterns count only in a Terraform-first repo, so a
+  //     Terraform file under tests/ keeps the test role there (decision 8) and
+  //     repos led by another language keep their roles.
   if (language === "Terraform") {
+    const terraformFirst = config.id === terraformConfig.id;
     const isTest = config.testFilePatterns.some(
-      (pat) => !terraformConfig.testFilePatterns.includes(pat) && pat.test(filePath),
+      (pat) => (terraformFirst || !terraformPattern(pat)) && pat.test(filePath),
     );
     return isTest ? "test" : "config";
   }
-  if (config.testFilePatterns.some((pat) => pat.test(filePath))) {
+  if (config.testFilePatterns.some((pat) => !terraformPattern(pat) && pat.test(filePath))) {
     return "test";
   }
 

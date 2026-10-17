@@ -1,22 +1,24 @@
 /**
- * Database-engine candidates from three signals: dependency coordinates (the
+ * Database-engine candidates from four signals: dependency coordinates (the
  * in-memory build models plus `package.json`), container images (compose,
- * Kubernetes and other YAML, and Dockerfile `FROM` lines) and config (URL
+ * Kubernetes and other YAML, and Dockerfile `FROM` lines), config (URL
  * schemes, JDBC driver classes, engine-naming keys, Spring Data key families
- * and Prisma datasources). Results stay in memory: nothing here is written to
- * an analysis artifact.
+ * and Prisma datasources) and Terraform database resources (the caller passes
+ * the Terraform pack's resource facts in; this module never imports a pack).
+ * Results stay in memory: nothing here is written to an analysis artifact.
  *
  * A connection string is read for its scheme only. The host, user, password,
  * port and database name are never matched into a result, so they cannot be
  * stored or logged from here.
  *
  * Every dependency and image table entry records provenance: the registry page
- * that publishes the coordinate or image.
+ * that publishes the coordinate or image. The Terraform tables record the
+ * provider documentation pages for each resource type and engine string.
  *
  * @module sourcevision/language/database-engines
  */
 
-import type { BuildDependency, ModuleBuildModel } from "@n-dx/lang-kit";
+import type { BuildDependency, FileFacts, ModuleBuildModel } from "@n-dx/lang-kit";
 import type { ReadProjectFile } from "./sql-migrations.js";
 
 export type DatabaseEngine =
@@ -34,7 +36,7 @@ export type DatabaseEngine =
   | "valkey"
   | "cassandra";
 
-export type DatabaseSignal = "dependency" | "image" | "config";
+export type DatabaseSignal = "dependency" | "image" | "config" | "terraform";
 
 /**
  * `strong`: the engine is used at runtime (a direct driver, a deployed image, a
@@ -86,7 +88,7 @@ export interface EngineEvidence {
   readonly text: string;
   /** Dotted config key path, when the hit is on a keyed line. */
   readonly key?: string;
-  /** Engine version from an image tag. */
+  /** Engine version: an image tag's leading version, or a Terraform resource's version attribute as written. */
   readonly version?: string;
 }
 
@@ -94,7 +96,7 @@ export interface DatabaseCandidate {
   readonly engine: DatabaseEngine;
   readonly grade: CandidateGrade;
   readonly signals: readonly DatabaseSignal[];
-  /** Distinct versions read from image tags, sorted. */
+  /** Distinct versions read from image tags and Terraform attributes (as written), sorted. */
   readonly versions: readonly string[];
   readonly evidence: readonly EngineEvidence[];
 }
@@ -105,6 +107,12 @@ export interface DatabaseEngineInput {
   /** Project files, relative and POSIX. */
   readonly files: readonly string[];
   readonly read: ReadProjectFile;
+  /**
+   * Resource facts from the Terraform pack (`kinds: ["resources"]`), one entry
+   * per file. Absent when the pack is not installed: the Terraform signal then
+   * yields nothing.
+   */
+  readonly terraformFacts?: readonly Pick<FileFacts, "path" | "resources">[];
 }
 
 // ── tables ──────────────────────────────────────────────────────────────
@@ -299,6 +307,83 @@ const SPRING_FAMILIES: ReadonlyArray<readonly [string, DatabaseEngine]> = [
   ["spring.redis.", "redis"],
   ["spring.data.cassandra.", "cassandra"],
   ["spring.cassandra.", "cassandra"],
+];
+
+const tfDocs = (provider: string, resource: string): RegistryProvenance => ({
+  kind: "registry",
+  url: `https://registry.terraform.io/providers/hashicorp/${provider}/latest/docs/resources/${resource}`,
+});
+
+/**
+ * A Terraform database resource type. `engine` is what the type alone implies;
+ * a type with none (RDS, Aurora, Cloud SQL, ElastiCache) names its engine in
+ * an attribute, and a declaration that does not write one yields no candidate.
+ */
+export interface TerraformResourceEntry {
+  readonly type: string;
+  readonly engine?: DatabaseEngine;
+  readonly provenance: RegistryProvenance;
+}
+
+const tfType = (provider: string, type: string, engine?: DatabaseEngine): TerraformResourceEntry => ({
+  type,
+  ...(engine && { engine }),
+  provenance: tfDocs(provider, type.slice(provider.length + 1)),
+});
+
+export const TERRAFORM_RESOURCE_TABLE: readonly TerraformResourceEntry[] = [
+  tfType("aws", "aws_db_instance"),
+  tfType("aws", "aws_rds_cluster"),
+  tfType("aws", "aws_rds_cluster_instance"),
+  tfType("aws", "aws_rds_global_cluster"),
+  tfType("aws", "aws_elasticache_cluster"),
+  tfType("aws", "aws_elasticache_replication_group"),
+  tfType("google", "google_sql_database_instance"),
+  tfType("azurerm", "azurerm_postgresql_server", "postgresql"),
+  tfType("azurerm", "azurerm_postgresql_flexible_server", "postgresql"),
+  tfType("azurerm", "azurerm_mysql_server", "mysql"),
+  tfType("azurerm", "azurerm_mysql_flexible_server", "mysql"),
+  tfType("azurerm", "azurerm_mariadb_server", "mariadb"),
+  tfType("azurerm", "azurerm_mssql_server", "mssql"),
+  tfType("azurerm", "azurerm_mssql_managed_instance", "mssql"),
+  tfType("azurerm", "azurerm_redis_cache", "redis"),
+];
+
+export interface TerraformEngineEntry {
+  /** Lower-case engine name; matches a value equal to it or starting with it and `-` or `_`. */
+  readonly name: string;
+  readonly engine: DatabaseEngine;
+  /** The provider pages that publish the string. */
+  readonly provenance: readonly RegistryProvenance[];
+}
+
+const RDS = tfDocs("aws", "db_instance");
+const AURORA = tfDocs("aws", "rds_cluster");
+const CACHE = tfDocs("aws", "elasticache_cluster");
+const CLOUD_SQL = tfDocs("google", "sql_database_instance");
+
+/**
+ * Engine strings as Terraform writes them: RDS and Aurora `engine`
+ * (`postgres`, `aurora-postgresql`, `sqlserver-ex`, `oracle-ee`), ElastiCache
+ * `engine`, and the prefix of Cloud SQL's `database_version` (`POSTGRES_15`,
+ * `MYSQL_8_0`, `SQLSERVER_2019_STANDARD`). First match wins, so
+ * `aurora-postgresql` precedes `aurora`. A value that names no entry
+ * (`memcached`, an expression such as `var.engine`) is unmapped.
+ */
+export const TERRAFORM_ENGINE_TABLE: readonly TerraformEngineEntry[] = [
+  { name: "postgres", engine: "postgresql", provenance: [RDS, CLOUD_SQL] },
+  { name: "postgresql", engine: "postgresql", provenance: [RDS] },
+  { name: "aurora-postgresql", engine: "postgresql", provenance: [AURORA] },
+  { name: "aurora-mysql", engine: "mysql", provenance: [AURORA] },
+  { name: "aurora", engine: "mysql", provenance: [AURORA] },
+  { name: "mysql", engine: "mysql", provenance: [RDS, CLOUD_SQL] },
+  { name: "mariadb", engine: "mariadb", provenance: [RDS] },
+  { name: "oracle", engine: "oracle", provenance: [RDS] },
+  { name: "custom-oracle", engine: "oracle", provenance: [RDS] },
+  { name: "sqlserver", engine: "mssql", provenance: [RDS, CLOUD_SQL] },
+  { name: "custom-sqlserver", engine: "mssql", provenance: [RDS] },
+  { name: "redis", engine: "redis", provenance: [CACHE] },
+  { name: "valkey", engine: "valkey", provenance: [CACHE] },
 ];
 
 const CONFIG_FILE = /\.(?:properties|ya?ml|ini|toml|conf|cfg|env|prisma)$|(?:^|\/)\.env(?:\.[\w.-]+)?$/i;
@@ -547,6 +632,71 @@ function configEvidence(file: string, content: string): Array<[DatabaseEngine, E
   return out;
 }
 
+// ── terraform ───────────────────────────────────────────────────────────
+
+/** The table entry for the engine a Terraform `engine` or `database_version` value names, if it names one. */
+export function terraformEngineOf(value: string): TerraformEngineEntry | undefined {
+  const lower = value.toLowerCase();
+  return TERRAFORM_ENGINE_TABLE.find(({ name }) => lower === name || lower.startsWith(`${name}-`) || lower.startsWith(`${name}_`));
+}
+
+/**
+ * One piece of evidence per database resource. A mapped `engine` attribute
+ * (Cloud SQL: `database_version`) is strong, weak under a test or CI path; an
+ * engine implied only by the resource type is weak, because nothing says the
+ * declaration was configured for it. A database resource whose engine neither
+ * its type nor a mapped attribute gives (a reusable module's `var.engine` that
+ * no module call resolves) adds a notice and no evidence.
+ *
+ * The pack gives a resource one fact per distinct resolution over its module's
+ * instances (`ResourceFact.instance`), so a reusable module yields a candidate
+ * per engine its callers pass. The evidence then names the resource and, in
+ * `text`, where the value is written; a `conditional` value (one branch of
+ * `cond ? null : var.engine`) is weak.
+ */
+function terraformEvidence(facts: readonly Pick<FileFacts, "path" | "resources">[], notices: string[]): Array<[DatabaseEngine, EngineEvidence]> {
+  const out: Array<[DatabaseEngine, EngineEvidence]> = [];
+  for (const { path, resources } of facts) {
+    for (const resource of resources ?? []) {
+      const entry = TERRAFORM_RESOURCE_TABLE.find((e) => e.type === resource.type);
+      if (!entry) continue;
+      const { engine: written, engineVersion } = resource.attributes ?? {};
+      const field = written !== undefined ? "engine" : resource.type === "google_sql_database_instance" ? "engineVersion" : undefined;
+      const source = field === undefined ? undefined : resource.attributes?.[field];
+      const resolved = field === undefined ? undefined : resource.instance?.resolved[field];
+      const mapped = source === undefined ? undefined : terraformEngineOf(source);
+      const engine = mapped?.engine ?? entry.engine;
+      if (engine === undefined) {
+        const named = source === undefined ? "no engine attribute" : `engine ${source}`;
+        notices.push(`${path}:${resource.position.line} ${resource.type}.${resource.name} has ${named}; no candidate`);
+        continue;
+      }
+      out.push([
+        engine,
+        {
+          signal: "terraform",
+          // A value written under a test or CI path (a fixture's module call) is weak, wherever the resource is.
+          grade:
+            mapped !== undefined &&
+            resolved?.confidence !== "conditional" &&
+            !AROUND_CODE.test(path) &&
+            !(resolved !== undefined && AROUND_CODE.test(resolved.from.file))
+              ? "strong"
+              : "weak",
+          file: path,
+          line: resource.position.line,
+          ruleId: `terraform:${resource.type}`,
+          text: `${resource.type}.${resource.name}${mapped !== undefined ? ` engine=${source}` : ""}${
+            mapped !== undefined && resolved !== undefined ? ` (${resolved.confidence}, from ${resolved.from.file}:${resolved.from.line})` : ""
+          }`,
+          ...(engineVersion !== undefined && { version: engineVersion }),
+        },
+      ]);
+    }
+  }
+  return out;
+}
+
 // ── candidates ──────────────────────────────────────────────────────────
 
 function gradeOf(evidence: readonly EngineEvidence[]): CandidateGrade {
@@ -558,7 +708,7 @@ function gradeOf(evidence: readonly EngineEvidence[]): CandidateGrade {
 export interface DatabaseEngineReport {
   /** Sorted by engine name. */
   readonly candidates: readonly DatabaseCandidate[];
-  /** Files that could not be read as what their name says (a malformed `package.json`). */
+  /** Files that could not be read as what their name says (a malformed `package.json`), and Terraform database resources whose engine could not be determined. */
   readonly notices: readonly string[];
 }
 
@@ -566,6 +716,7 @@ export interface DatabaseEngineReport {
 export function detectDatabaseEngines(input: DatabaseEngineInput): DatabaseEngineReport {
   const found: Array<[DatabaseEngine, EngineEvidence]> = dependencyEvidence(input.buildModels, new Set(input.files));
   const notices: string[] = [];
+  found.push(...terraformEvidence(input.terraformFacts ?? [], notices));
   for (const file of [...input.files].sort()) {
     const wanted = PACKAGE_JSON.test(file) || DOCKERFILE.test(file) || CONFIG_FILE.test(file);
     if (!wanted || /(?:^|\/)node_modules\//.test(file)) continue;
@@ -595,7 +746,7 @@ function candidatesFrom(found: ReadonlyArray<[DatabaseEngine, EngineEvidence]>):
     .map(([engine, evidence]) => ({
       engine,
       grade: gradeOf(evidence),
-      signals: (["dependency", "image", "config"] as const).filter((s) => evidence.some((e) => e.signal === s)),
+      signals: (["dependency", "image", "config", "terraform"] as const).filter((s) => evidence.some((e) => e.signal === s)),
       versions: [...new Set(evidence.flatMap((e) => (e.version === undefined ? [] : [e.version])))].sort(compareVersions),
       evidence,
     }));
@@ -604,6 +755,8 @@ function candidatesFrom(found: ReadonlyArray<[DatabaseEngine, EngineEvidence]>):
 function compareVersions(a: string, b: string): number {
   const pa = a.split(".").map(Number);
   const pb = b.split(".").map(Number);
+  // Terraform writes versions as text (`POSTGRES_15`, `var.version`): those sort by name.
+  if ([...pa, ...pb].some(Number.isNaN)) return a.localeCompare(b);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
     const d = (pa[i] ?? -1) - (pb[i] ?? -1);
     if (d !== 0) return d;

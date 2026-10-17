@@ -144,11 +144,12 @@ describe("terraform language config", () => {
     const tsWithTerraform = mergeLanguageConfigs([typescriptConfig, terraformConfig]);
     const tsRole = (p: string): string => classifyRole(p, "Terraform", tsWithTerraform);
 
-    it("classifies Terraform outside a test path as config until the structure model lands", () => {
+    it("classifies Terraform outside a test path as config", () => {
       for (const r of [role, tsRole]) {
         expect(r("infra/main.tf")).toBe("config");
         expect(r("infra/prod.tfvars")).toBe("config");
         expect(r("live/prod/terragrunt.hcl")).toBe("config");
+        expect(r("contest/main.tf")).toBe("config");
       }
     });
 
@@ -159,15 +160,22 @@ describe("terraform language config", () => {
       expect(tsRole("infra/tests/basic.tftest.hcl")).toBe("test");
     });
 
-    it("does not make a file a test by Terraform's own .tftest.hcl pattern", () => {
-      expect(role("basic.tftest.hcl")).toBe("config");
+    it("does not make a file a test by Terraform's own patterns in a repo led by another language", () => {
       expect(tsRole("basic.tftest.hcl")).toBe("config");
       expect(tsRole("infra/basic.tftest.hcl")).toBe("config");
     });
 
-    it("has no test path of its own in a Terraform-primary repo", () => {
-      expect(role("tests/fixtures/infra/main.tf")).toBe("config");
-      expect(role("infra/tests/basic.tftest.hcl")).toBe("config");
+    it("never applies Terraform's patterns to a file of another language", () => {
+      for (const path of ["test/helpers.ts", "infra/tests/setup.ts", "src/app.ts"]) {
+        expect(classifyRole(path, "TypeScript", tsWithTerraform)).toBe(classifyRole(path, "TypeScript", typescriptConfig));
+      }
+    });
+
+    it("takes its own test paths in a Terraform-first repo (decision 8)", () => {
+      expect(role("tests/fixtures/infra/main.tf")).toBe("test");
+      expect(role("modules/db/test/main.tf")).toBe("test");
+      expect(role("infra/tests/basic.tftest.hcl")).toBe("test");
+      expect(role("basic.tftest.hcl")).toBe("test");
     });
 
     it("inventories Terraform files and skips .terraform/", async () => {

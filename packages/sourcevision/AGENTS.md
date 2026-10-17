@@ -34,14 +34,50 @@ in `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs.
    built or not loadable, a query that will not compile, unreadable build
    files) or its `analyzeProject` rejects. `src/analyzers/pack-imports.ts`
    reports it once per run: Java files get inventory only, Go edges come from
-   the regex parser (`src/analyzers/go-imports.ts`). Analysis never fails on a
+   the regex parser (`src/analyzers/go-imports.ts`).
+   `src/analyzers/terraform-infrastructure.ts` reports a Terraform pack the
+   same way, once, and only when `infrastructure.json` lists a resource from a
+   `.tf` file: those resources get no model fields. Analysis never fails on a
    pack.
+
+### The Terraform model in infrastructure.json
+
+The Terraform pack produces `resources` facts, not imports.
+`enrichTerraformInfrastructure` (called by `analyze` after
+`computeInfrastructure`) adds optional `module`, `provider` (`{ name,
+version? }`), `references` (`infra:<type>.<name>` ids of listed resources in the
+same module directory) and `attributes` (`engine`, `engineVersion`, `runtime`,
+`image`, `clusterVersion`) to each resource it lists from a `.tf` file whose file
+and `<type>.<name>` match a fact. Values are as written, never normalised; a
+field appears only when the pack supplied it. When the pack resolved a
+module's attributes per instance (several facts at one declaration), an
+attribute is stored resolved only when every instance gives the same value,
+else as the expression written. It never adds or removes a
+resource, link or seam or changes an existing field, so resources only the
+model finds stay out. `analyzers/infrastructure.ts` and `IAC_KINDS` are not
+involved, so the iso-map bundle does not change. Without the pack the file is
+byte-identical. The field names await Sterling H's review (decision 3).
+
+### Terraform as a database-engine source
+
+`language/database-engines.ts` takes the Terraform pack's resource facts as
+`DatabaseEngineInput.terraformFacts`, supplied by the caller (today only
+`scripts/database-corpus-report.mjs`); it imports no pack, is not wired into
+`analyze` and writes nothing. A database resource yields a `terraform`-signal
+candidate: a mapped `engine` (Cloud SQL: `database_version`) is strong, an
+engine implied by the type alone (Azure servers) is weak, and a resource that
+gives neither (a reusable module's `var.engine` no call resolves) adds a
+notice. A reusable module yields one candidate per engine its module calls
+pass; the evidence text names where the value is written, and a
+`conditional` value (`cond ? null : var.engine`) is weak. Engine strings
+and resource types live in `TERRAFORM_ENGINE_TABLE` and
+`TERRAFORM_RESOURCE_TABLE`, each entry with its provider page.
 
 ### How packs are installed
 
 `sv pack` (`src/cli/commands/pack.ts`, reached as `ndx sv pack …`) manages
-the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, sql,
-terraform; only `KNOWN_PACKS` are analyzed with today):
+the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, terraform,
+sql; only `KNOWN_PACKS`, all but sql, are analyzed with today):
 
 - `add <lang>` runs `npm install --prefix <pack dir> @n-dx/lang-<lang>@<sourcevision version>`,
   creating the directory, then loads the pack from it with `loadPack`; a
@@ -83,7 +119,10 @@ so `.ndx/config.json` projects work. It is set by editing the file; core's
   `analyzeImports`) reports a listed pack that is missing or refused with the
   `ndx sv pack add <lang>` remedy, once, even when the project has no files of
   that language (a listed pack with files is reported by the normal degrade
-  path), and one warning for unknown ids listing the known ones.
+  path), and one warning for unknown ids listing the known ones. With `.tf`
+  files the imports phase leaves Terraform to `enrichTerraformInfrastructure`
+  (its `listed` option), which reports it once: the degrade notice when
+  `infrastructure.json` lists a `.tf` resource, the listed-pack notice when not.
 - `add` with no language installs each listed pack the loader does not find;
   `list` marks listed packs (`listed` in `--json`).
 - No list, an empty list or a non-array: no notice, byte-identical output.

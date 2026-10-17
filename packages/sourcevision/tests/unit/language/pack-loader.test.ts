@@ -164,14 +164,14 @@ describe("pack locations", () => {
     expect(INSTALLABLE_PACKS.map(packInstallCommand)).toEqual([
       "ndx sv pack add java",
       "ndx sv pack add go",
-      "ndx sv pack add sql",
       "ndx sv pack add terraform",
+      "ndx sv pack add sql",
     ]);
   });
 });
 
 describe("known packs in the workspace", () => {
-  it("loads the Java and Go packs by module resolution, at sourcevision's version", async () => {
+  it("loads the Java, Go and Terraform packs by module resolution, at sourcevision's version", async () => {
     const emptyPackDir = mkdtempSync(join(tmpdir(), "sv-pack-dir-"));
     try {
       for (const pack of KNOWN_PACKS) {

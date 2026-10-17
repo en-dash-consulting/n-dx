@@ -45,7 +45,7 @@ describe("tree-sitter-hcl grammar", () => {
 });
 
 describe("pack entry", () => {
-  it("parses a project's Terraform files and returns no facts beyond each path", async (ctx) => {
+  it("parses a project's Terraform files and returns each one's resources", async (ctx) => {
     skipUnlessGrammar(ctx, WASM);
     const dir = await mkdtemp(join(tmpdir(), "lang-tf-"));
     try {
@@ -54,7 +54,14 @@ describe("pack entry", () => {
       const result = await pack.analyzeProject({ projectDir: dir, files: ["infra/main.tf", "infra/missing.tf"] });
       expect(result.degraded).toBeUndefined();
       expect(result.unparsed).toEqual(["infra/missing.tf"]);
-      expect(result.facts).toEqual([{ path: "infra/main.tf" }]);
+      expect(result.facts).toEqual([
+        {
+          path: "infra/main.tf",
+          resources: [{ type: "aws_sqs_queue", name: "orders", position: { line: 9, column: 0 }, provider: { name: "aws" } }],
+        },
+      ]);
+      const symbolsOnly = await pack.analyzeProject({ projectDir: dir, files: ["infra/main.tf"], kinds: ["symbols"] });
+      expect(symbolsOnly.facts).toEqual([{ path: "infra/main.tf" }]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

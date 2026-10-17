@@ -9,7 +9,7 @@
 - **No language SDK at run time.** Grammars ship prebuilt as WASM; nothing here may require a toolchain (JDK, Go, Terraform) on the user's machine.
 - **One public entry**, `.` (`src/index.ts`). There is no `./dist/*` escape hatch.
 
-- **Callers supply every path.** `loadLanguagePacks` takes the packs, the grammar directory and the missing-grammar notice step from its caller; `readPackFacts` and `factGaps` take the pack's symbol rules; `packPackage` takes the pack's name and root. The one directory named here is the pack's sibling `lang-runtime/scripts`, which tells a source checkout from an install.
+- **Callers supply every path.** `loadLanguagePacks` takes the packs, the grammar directory and the missing-grammar notice step from its caller; `readPackFacts` and `factGaps` take the pack's symbol rules (and `factGaps` its project facts reader, which `createPackEntry` runs once over every parsed file for kinds no single file answers, such as Terraform's `resources`); `packPackage` takes the pack's name and root. The one directory named here is the pack's sibling `lang-runtime/scripts`, which tells a source checkout from an install.
 
 ### What it holds
 

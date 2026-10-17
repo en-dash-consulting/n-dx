@@ -1,6 +1,6 @@
 /**
  * This package's name and asset locations: its grammar in `build/grammars`,
- * found from the package root on first use. It ships no queries yet.
+ * its queries in `queries/terraform`, both found from the package root on first use.
  *
  * @module lang-terraform/package-paths
  */

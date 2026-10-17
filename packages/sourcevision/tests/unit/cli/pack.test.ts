@@ -160,7 +160,7 @@ describe("sv pack list", () => {
       `go         resolved   @n-dx/lang-go@${VERSION}  found by module resolution`,
       "sql        missing    @n-dx/lang-sql  Install it with `ndx sv pack add sql`. (not analyzed yet)",
       `terraform  refused    @n-dx/lang-terraform@1.0.0  pack @n-dx/lang-terraform@1.0.0 does not match @n-dx/sourcevision@${VERSION} and was not used. ` +
-        "Install the matching pack with `ndx sv pack add terraform`. (not analyzed yet)",
+        "Install the matching pack with `ndx sv pack add terraform`.",
     ]);
   });
 
@@ -173,7 +173,7 @@ describe("sv pack list", () => {
       ["java", "installed", VERSION, true],
       ["go", "resolved", VERSION, true],
       ["sql", "missing", undefined, false],
-      ["terraform", "refused", "1.0.0", false],
+      ["terraform", "refused", "1.0.0", true],
     ]);
   });
 });
