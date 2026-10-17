@@ -61,6 +61,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Let a project opt in to restricted-import rules in ndx ci](./let-a-project-opt-in-to-restricted.md) | completed |
 | [`ndx ci` architecture-policy step always fails: ci.js child_process allowlist has drifted from the e2e test's](./ndx-ci-architecture-policy-step-always.md) | completed |
 | [`ndx ci` fails any user project that imports child_process: its allowlist only names n-dx's own files and cannot be configured](./ndx-ci-fails-any-user-project-that.md) | completed |
+| [ndx ci gateway-imports step scans only .ts files, so a .js or .mjs file that bypasses a gateway passes](./ndx-ci-gateway-imports-step-scans-only.md) | pending |
 | [`ndx ci` reports restricted imports as "skipped" when .n-dx.json is not valid JSON, so configured rules silently stop applying](./ndx-ci-reports-restricted-imports-as.md) | completed |
 | [`ndx ci` restricted-import scan silently skips an unreadable directory outside git, so an enforced rule passes unread](./ndx-ci-restricted-import-scan-silently.md) | pending |
 | [`ndx ci` restricted-import scan walks gitignored build output and agent worktrees, reporting false violations](./ndx-ci-restricted-import-scan-walks.md) | completed |
