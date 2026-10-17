@@ -1,0 +1,35 @@
+---
+id: "3c7c3ece-83a5-49ac-9358-2a0c0a1a8a9c"
+level: "feature"
+title: "Stack review fixes: detection, inventory and pack notices (PR 17)"
+status: "pending"
+priority: "high"
+tags:
+  - "language-packs"
+  - "review-fixes"
+  - "sourcevision"
+  - "lang-kit"
+  - "pr-17"
+blockedBy:
+  - "30fc7750-2ae8-4b7f-a080-27ac14949bb3"
+source: "review"
+acceptanceCriteria:
+  - "A markerless repo with JS/TS files and a .tf file keeps TypeScript's skip dirs, test and generated patterns"
+  - "Java build-output skips no longer hide real packages named target/build/out/generated"
+  - "Incremental inventory never reuses a role computed under different classifier rules"
+  - "Java is listed as analysed only when its pack ran"
+  - "Missing opt-in packs produce one end-of-run hint; warnings only for listed-but-missing, refused or invalid packs"
+description: "Code fixes from the 2026-10-16 stack review (#760–#807) for language detection, inventory and the notices about missing opt-in packs. These include the review's must-fix: a markerless repo with a .tf file loses the TypeScript fallback. They also implement Ryan's decided rule for missing opt-in packs. Stacked on #807 (PR 16c). Brief: workshop language-scaling/pr17-20-review-fixes-brief.md."
+lastModified: "2026-10-17T02:02:45.510Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Invalidate the incremental inventory cache when classifier rules change](./invalidate-the-incremental-inventory.md) | pending |
+| [Keep the TypeScript config when a markerless repo also has Terraform](./keep-the-typescript-config-when-a.md) | pending |
+| [List Java as analysed only when the Java pack ran](./list-java-as-analysed-only-when-the.md) | pending |
+| [Skip Java build output only at module roots, not every directory named target, build, out or generated](./skip-java-build-output-only-at-module.md) | pending |
+| [One rule for missing opt-in packs: warn only when something asked for is broken, else one end-of-run hint](./one-rule-for-missing-opt-in-packs-warn.md) | pending |
