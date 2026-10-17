@@ -118,6 +118,7 @@ export const ROOT_DOCS_TEST_FILES = [
   "tests/e2e/docs-skill-refs.test.js",
   "tests/e2e/docs-command-refs.test.js",
   "tests/e2e/cli-ui-gap-drift.test.js",
+  "tests/e2e/docs-skill-table-drift.test.js",
 ];
 
 /**
@@ -211,6 +212,11 @@ export const VALIDATED_DOC_PAGES = [
     label: ROOT_DOCS_LABEL,
     tests: ["tests/e2e/docs-command-refs.test.js"],
     match: (file) => file === "docs/index.md" || /^docs\/(guide|packages)\/.+\.md$/.test(file),
+  },
+  {
+    label: ROOT_DOCS_LABEL,
+    tests: ["tests/e2e/docs-skill-table-drift.test.js"],
+    match: (file) => file === "docs/guide/skills.md",
   },
   {
     label: ROOT_DOCS_LABEL,

@@ -361,6 +361,7 @@ describe("validated docs pages", () => {
     ["docs/cli-ui-gap.md", "tests/e2e/cli-ui-gap-drift.test.js"],
     ["docs/guide/workflow.md", "tests/e2e/docs-command-refs.test.js"],
     ["docs/guide/skills.md", "tests/e2e/docs-command-refs.test.js"],
+    ["docs/guide/skills.md", "tests/e2e/docs-skill-table-drift.test.js"],
     ["docs/guide/concepts/glossary.md", "tests/e2e/docs-command-refs.test.js"],
     ["docs/packages/rex.md", "tests/e2e/docs-command-refs.test.js"],
     ["docs/index.md", "tests/e2e/docs-command-refs.test.js"],
