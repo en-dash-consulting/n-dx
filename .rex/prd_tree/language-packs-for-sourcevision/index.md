@@ -34,6 +34,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Shared language package (@n-dx/lang-kit)](./shared-language-package-n-dx-lang-kit/index.md) | completed |
 | [Spring Boot routes and outbound calls through the Java pack (PR 14)](./spring-boot-routes-and-outbound-calls/index.md) | pending |
 | [SQL dialects and database signals](./sql-dialects-and-database-signals/index.md) | pending |
-| [Stack review fixes: detection, inventory and pack notices (PR 17)](./stack-review-fixes-detection-inventory/index.md) | pending |
+| [Stack review fixes: detection, inventory and pack notices (PR 17)](./stack-review-fixes-detection-inventory/index.md) | completed |
 | [Terraform model in the Terraform pack and infrastructure.json (PR 13)](./terraform-model-in-the-terraform-pack/index.md) | completed |
 | [Terraform structure through tree-sitter-hcl](./terraform-structure-through-tree/index.md) | completed |
