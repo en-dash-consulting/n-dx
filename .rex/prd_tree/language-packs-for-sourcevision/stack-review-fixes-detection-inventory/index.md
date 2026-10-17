@@ -37,4 +37,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Markerless repo whose only JS/TS or Ruby-style source sits deeper than three levels, or only in skipped dirs, still loses the TS fallback to Terraform](./markerless-repo-whose-only-js-ts-or.md) | completed |
 | [One rule for missing opt-in packs: warn only when something asked for is broken, else one end-of-run hint](./one-rule-for-missing-opt-in-packs-warn.md) | completed |
 | [Skip Java build output only at module roots, not every directory named target, build, out or generated](./skip-java-build-output-only-at-module.md) | completed |
-| [Stale-pack scan reads `.sv-pack-stage-*` and same-version copies, so a refusal can say "pack X@0.9.2 does not match @n-dx/sourcevision@0.9.2"](./stale-pack-scan-reads-sv-pack-stage.md) | pending |
+| [Stale-pack scan reads `.sv-pack-stage-*` and same-version copies, so a refusal can say "pack X@0.9.2 does not match @n-dx/sourcevision@0.9.2"](./stale-pack-scan-reads-sv-pack-stage.md) | in_progress |

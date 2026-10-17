@@ -112,17 +112,20 @@ export function defaultPackDir(version: string = sourcevisionVersion()): string 
 /**
  * The version of `pack` installed in another version's directory beside
  * `packDir`, the newest when there are several. Undefined when there is none,
- * or when `packDir` is not under `<ndx home>/packs`.
+ * or when `packDir` is not under `<ndx home>/packs`. Dot directories (the
+ * `.sv-pack-stage-*` that `sv pack add --from` extracts into) and copies at
+ * `version` itself are not stale installs, so they are skipped.
  */
-function versionInSiblingPackDir(pack: InstallablePack, packDir: string): string | undefined {
+function versionInSiblingPackDir(pack: InstallablePack, packDir: string, version: string): string | undefined {
   const root = dirname(packDir);
   if (root !== packsRoot() || !existsSync(root)) return undefined;
   const found: string[] = [];
   for (const dir of readdirSync(root, { withFileTypes: true })) {
-    if (!dir.isDirectory() || dir.name === basename(packDir)) continue;
+    if (!dir.isDirectory() || dir.name === basename(packDir) || dir.name.startsWith(".")) continue;
     const manifestFile = join(root, dir.name, "node_modules", ...pack.packageName.split("/"), "package.json");
     if (!existsSync(manifestFile)) continue;
-    found.push(manifestVersion(manifestFile) ?? dir.name);
+    const stale = manifestVersion(manifestFile) ?? dir.name;
+    if (stale !== version) found.push(stale);
   }
   return found.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0];
 }
@@ -215,7 +218,7 @@ export async function loadPack(pack: InstallablePack, options: PackLoaderOptions
       imported = await pack.importByResolution();
     } catch (error) {
       if (isPackNotFound(error, pack.packageName)) {
-        const stale = versionInSiblingPackDir(pack, packDir);
+        const stale = versionInSiblingPackDir(pack, packDir, version);
         if (stale !== undefined) return mismatch(stale);
         return notice("missing", `pack ${pack.packageName} is not installed`, `Install it with \`${install}\`.`);
       }
