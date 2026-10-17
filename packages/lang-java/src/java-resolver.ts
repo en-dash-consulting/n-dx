@@ -282,10 +282,16 @@ const JDK_JAVAX_PACKAGES = [
   "javax.xml.xpath",
 ];
 
+/** Java EE packages nested under a {@link JDK_JAVAX_PACKAGES} root: JASPIC and JSR 77. */
+const JAVA_EE_UNDER_JDK_ROOTS = ["javax.security.auth.message", "javax.management.j2ee"];
+
+const isUnder = (pkg: string, root: string): boolean => pkg === root || pkg.startsWith(`${root}.`);
+
 /** `java.*` and `jdk.*` (reserved to the JDK), `javax.xml`, and the {@link JDK_JAVAX_PACKAGES} and their subpackages. */
 function isJdkPackage(pkg: string): boolean {
-  if (pkg === "java" || pkg.startsWith("java.") || pkg === "jdk" || pkg.startsWith("jdk.") || pkg === "javax.xml") return true;
-  return JDK_JAVAX_PACKAGES.some((root) => pkg === root || pkg.startsWith(`${root}.`));
+  if (isUnder(pkg, "java") || isUnder(pkg, "jdk") || pkg === "javax.xml") return true;
+  if (JAVA_EE_UNDER_JDK_ROOTS.some((root) => isUnder(pkg, root))) return false;
+  return JDK_JAVAX_PACKAGES.some((root) => isUnder(pkg, root));
 }
 
 /** `java.util` → `java:stdlib:java.util`, `org.acme` → `java:org.acme`. */

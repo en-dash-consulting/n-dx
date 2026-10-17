@@ -95,6 +95,10 @@ describe("java resolver", () => {
       "import javax.annotation.processing.Processor;",
       "import jdk.jfr.Event;",
       "import javax.persistence.Entity;",
+      "import javax.security.auth.Subject;",
+      "import javax.security.auth.message.AuthStatus;",
+      "import javax.management.MBeanServer;",
+      "import javax.management.j2ee.Management;",
       "class Uses {}",
       "",
     ].join("\n");
@@ -108,10 +112,14 @@ describe("java resolver", () => {
         "java:stdlib:javax.xml.parsers": ["DocumentBuilder"],
         "java:stdlib:javax.annotation.processing": ["Processor"],
         "java:stdlib:jdk.jfr": ["Event"],
-        // Removed from the JDK in 11, or never in it.
+        "java:stdlib:javax.security.auth": ["Subject"],
+        "java:stdlib:javax.management": ["MBeanServer"],
+        // Removed from the JDK in 11, or never in it (Java EE, even under a JDK root).
         "java:javax.xml.bind": ["JAXBContext"],
         "java:javax.annotation": ["PostConstruct"],
         "java:javax.persistence": ["Entity"],
+        "java:javax.security.auth.message": ["AuthStatus"],
+        "java:javax.management.j2ee": ["Management"],
       });
     } finally {
       runner.dispose();
