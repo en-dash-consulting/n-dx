@@ -24,7 +24,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Give stop-orphan-children's grandchild ready wait a Windows-sized timeout and report elapsed time](./give-stop-orphan-children-s-grandchild.md) | pending |
 | [Make the over-cap chunked-body 413 test accept the server hanging up mid-body](./make-the-over-cap-chunked-body-413.md) | pending |
-| [Retry the hub-auth-token integration test's temp-dir removal on Windows](./retry-the-hub-auth-token-integration.md) | pending |
+| [Retry the hub-auth-token integration test's temp-dir removal on Windows](./retry-the-hub-auth-token-integration.md) | completed |
 | [Retry the last bare .sourcevision removal in the sv analyze e2e test](./retry-the-last-bare-sourcevision.md) | pending |
 | [Retry the sv serve e2e test's temp-dir removal on Windows](./retry-the-sv-serve-e2e-test-s-temp-dir.md) | pending |
 | [Write the prompt-census staleness probe outside the scanned tree](./write-the-prompt-census-staleness.md) | pending |
