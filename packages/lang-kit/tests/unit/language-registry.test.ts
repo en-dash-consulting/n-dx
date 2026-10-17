@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { goConfig } from "../../src/go.js";
 import { typescriptConfig } from "../../src/typescript.js";
-import { getLanguageConfig } from "../../src/detect.js";
-import type { LanguageConfig } from "../../src/registry.js";
+import { pythonConfig } from "../../src/python.js";
+import { getLanguageConfig, mergeLanguageConfigs } from "../../src/detect.js";
+import { skipsDirectory, type LanguageConfig } from "../../src/registry.js";
 
 // ── Go config ────────────────────────────────────────────────────────────────
 
@@ -127,5 +128,41 @@ describe("getLanguageConfig registry", () => {
 
     assertShape(goConfig);
     assertShape(typescriptConfig);
+  });
+});
+
+// ── Conditional skip directories ─────────────────────────────────────────────
+
+describe("skipsDirectory", () => {
+  const holdsNothing = () => false;
+  const holdsInit = (file: string) => file === "__init__.py";
+
+  it("skips a Python env, build or dist directory unless it is a package", () => {
+    for (const name of ["env", "build", "dist"]) {
+      expect(skipsDirectory(pythonConfig, name, holdsNothing)).toBe(true);
+      expect(skipsDirectory(pythonConfig, name, holdsInit)).toBe(false);
+    }
+  });
+
+  it("always skips an unconditional name, and never asks about it", () => {
+    let asked = false;
+    expect(skipsDirectory(pythonConfig, ".venv", () => (asked = true))).toBe(true);
+    expect(asked).toBe(false);
+  });
+
+  it("keeps a directory no rule names", () => {
+    expect(skipsDirectory(pythonConfig, "src", holdsNothing)).toBe(false);
+  });
+
+  it("merged with TypeScript, build and dist stay skipped and env stays conditional", () => {
+    const merged = mergeLanguageConfigs([pythonConfig, typescriptConfig]);
+    expect(skipsDirectory(merged, "dist", holdsInit)).toBe(true);
+    expect(skipsDirectory(merged, "build", holdsInit)).toBe(true);
+    expect(skipsDirectory(merged, "env", holdsInit)).toBe(false);
+    expect(skipsDirectory(merged, "env", holdsNothing)).toBe(true);
+  });
+
+  it("a merge with no conditional rules has no skipUnlessContains", () => {
+    expect(mergeLanguageConfigs([goConfig, typescriptConfig])).not.toHaveProperty("skipUnlessContains");
   });
 });

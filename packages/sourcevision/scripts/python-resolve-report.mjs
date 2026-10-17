@@ -47,7 +47,7 @@ if (missing.length > 0) {
   process.exit(2);
 }
 
-const { pythonConfig } = await importWorkspacePack("@n-dx/lang-kit");
+const { pythonConfig, skipsDirectory } = await importWorkspacePack("@n-dx/lang-kit");
 const { preparePythonImports, pythonGrammarPath, pythonPack, readPythonResolveProjects } = await importWorkspacePack("@n-dx/lang-python");
 const wasm = pythonGrammarPath();
 if (!existsSync(wasm)) {
@@ -61,12 +61,13 @@ if (!existsSync(runtimeDist)) {
 }
 const { createTreeSitterRunner } = await import(runtimeDist.href);
 
-const SKIP_DIRS = new Set([".git", "node_modules", ".sourcevision", ...pythonConfig.skipDirectories]);
+const SKIP = { ...pythonConfig, skipDirectories: new Set([".git", "node_modules", ".sourcevision", ...pythonConfig.skipDirectories]) };
 
 function* walkPython(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) yield* walkPython(join(dir, entry.name));
+      const sub = join(dir, entry.name);
+      if (!skipsDirectory(SKIP, entry.name, (file) => existsSync(join(sub, file)))) yield* walkPython(sub);
     } else if (entry.isFile() && [...pythonConfig.extensions].some((ext) => entry.name.endsWith(ext))) {
       yield join(dir, entry.name);
     }

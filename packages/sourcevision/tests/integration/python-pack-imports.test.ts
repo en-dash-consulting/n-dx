@@ -154,3 +154,57 @@ describe("Python files through the Python pack", () => {
     expect(loaded.analysed).toEqual(["python"]);
   });
 });
+
+// poetry's shape: packages named `env` beside a virtualenv named `env`.
+const ENV_PACKAGES: Record<string, string> = {
+  "pyproject.toml": '[project]\nname = "poetry"\n',
+  "src/poetry/__init__.py": "",
+  "src/poetry/utils/__init__.py": "",
+  "src/poetry/utils/env/__init__.py": "from poetry.utils.env.base_env import Env\n",
+  "src/poetry/utils/env/base_env.py": "class Env:\n    pass\n",
+  "src/poetry/console/__init__.py": "",
+  "src/poetry/console/commands/__init__.py": "",
+  "src/poetry/console/commands/env/__init__.py": "",
+  "src/poetry/console/commands/env/info.py": "from poetry.utils.env import Env\n",
+  "env/pyvenv.cfg": "home = /usr/bin\n",
+  "env/lib/python3.13/site-packages/dep/__init__.py": "import poetry.utils.env\n",
+};
+
+describe("Python packages named env, build or dist", () => {
+  let dir: string;
+  let emptyPackDir: string;
+  let inventory: Inventory;
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "sv-python-env-pkg-"));
+    emptyPackDir = mkdtempSync(join(tmpdir(), "sv-python-no-packs-"));
+    for (const [path, source] of Object.entries(ENV_PACKAGES)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(join(dir, path), source);
+    }
+    inventory = await analyzeInventory(dir, { languageConfig: pythonConfig });
+  });
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(emptyPackDir, { recursive: true, force: true });
+  });
+
+  it("inventories the packages and skips the virtualenv", () => {
+    const paths = inventory.files.map((f) => f.path);
+    expect(paths).toContain("src/poetry/utils/env/__init__.py");
+    expect(paths).toContain("src/poetry/console/commands/env/info.py");
+    expect(paths.filter((p) => p.startsWith("env/"))).toEqual([]);
+  });
+
+  it("with the pack loaded, resolves imports into them", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "python");
+    const result = await analyzeImports(dir, inventory, {
+      language: "python",
+      packs: { packs: KNOWN_PACKS.slice(), loader: { packDir: emptyPackDir }, warn: () => {} },
+    });
+    expect(result.edges.map((e) => `${e.from} -> ${e.to}`)).toEqual([
+      "src/poetry/console/commands/env/info.py -> src/poetry/utils/env/__init__.py",
+      "src/poetry/utils/env/__init__.py -> src/poetry/utils/env/base_env.py",
+    ]);
+  });
+});

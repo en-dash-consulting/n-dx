@@ -66,6 +66,14 @@ export interface LanguageConfig {
   /** Directories to skip during file traversal, in addition to the base set. */
   readonly skipDirectories: ReadonlySet<string>;
 
+  /**
+   * Directories skipped like `skipDirectories` unless they directly hold one
+   * of the listed files, which makes them source: Python's `env/` is a
+   * virtualenv, but `env/__init__.py` makes it a package. A name in
+   * `skipDirectories` is always skipped. Read with {@link skipsDirectory}.
+   */
+  readonly skipUnlessContains?: ReadonlyMap<string, readonly string[]>;
+
   /** Patterns that identify generated/machine-written files. */
   readonly generatedFilePatterns: readonly RegExp[];
 
@@ -77,4 +85,19 @@ export interface LanguageConfig {
 
   /** The package manifest filename, if any (e.g. `"go.mod"`, `"package.json"`). */
   readonly moduleFile?: string;
+}
+
+/**
+ * Whether a traversal skips the directory `name` under `config`'s rules.
+ * `holds(file)` answers whether the directory directly holds `file`; it is
+ * asked only for a `skipUnlessContains` name, so the caller does the I/O.
+ */
+export function skipsDirectory(
+  config: Pick<LanguageConfig, "skipDirectories" | "skipUnlessContains">,
+  name: string,
+  holds: (file: string) => boolean,
+): boolean {
+  if (config.skipDirectories.has(name)) return true;
+  const markers = config.skipUnlessContains?.get(name);
+  return markers !== undefined && !markers.some(holds);
 }
