@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
 import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
@@ -1190,6 +1191,86 @@ describe("n-dx config", () => {
       const output = run(["--test-connection", tmpDir]);
       expect(output).toContain("Testing CLI path...");
       expect(output).toContain("0.0.1-legacy");
+    });
+
+    describe("api_endpoint is credential routing", () => {
+      // Where the key is sent is the user's choice: a shared `.n-dx.json`
+      // endpoint applies only once the repository is trusted. A preloaded
+      // fetch stub records each request's host and whether it carried the
+      // sentinel key, so no request leaves the machine and the key is never
+      // printed.
+      const SENTINEL_KEY = "sk-ant-sentinel-test-connection";
+      const ATTACKER = "https://attacker.invalid";
+      const USER_PROXY = "https://user-proxy.invalid";
+      let ndxHome;
+      let requestsPath;
+      let stubPath;
+
+      beforeEach(async () => {
+        ndxHome = join(tmpDir, "ndx-home");
+        requestsPath = join(tmpDir, "requests.jsonl");
+        stubPath = join(tmpDir, "fetch-stub.mjs");
+        await writeFile(
+          stubPath,
+          [
+            'import { appendFileSync } from "node:fs";',
+            "globalThis.fetch = async (url, init = {}) => {",
+            "  const carriesKey = init.headers?.['x-api-key'] === process.env.SENTINEL_KEY;",
+            "  appendFileSync(process.env.REQUESTS_PATH, JSON.stringify({ host: new URL(String(url)).host, carriesKey }) + '\\n');",
+            "  return new Response('{}', { status: 200 });",
+            "};",
+          ].join("\n") + "\n",
+        );
+      });
+
+      function testConnection() {
+        return run(["--test-connection", tmpDir], {
+          env: {
+            ...process.env,
+            NDX_HOME: ndxHome,
+            NODE_OPTIONS: `--import=${pathToFileURL(stubPath).href}`,
+            REQUESTS_PATH: requestsPath,
+            SENTINEL_KEY,
+          },
+        });
+      }
+
+      async function requests() {
+        const raw = await readFile(requestsPath, "utf-8").catch((err) => {
+          if (err.code === "ENOENT") return "";
+          throw err;
+        });
+        return raw.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+      }
+
+      async function writeConfigs(shared, local) {
+        await writeFile(SHARED_CONFIG_PATH(tmpDir), JSON.stringify(shared, null, 2) + "\n");
+        await writeFile(LOCAL_CONFIG_PATH(tmpDir), JSON.stringify(local, null, 2) + "\n");
+      }
+
+      it.each([
+        ["llm.claude.api_endpoint", { llm: { claude: { api_endpoint: ATTACKER } } }],
+        ["legacy claude.api_endpoint", { claude: { api_endpoint: ATTACKER } }],
+      ])("sends no request to an untrusted repository's %s", async (_label, shared) => {
+        await writeConfigs(shared, { llm: { claude: { api_key: SENTINEL_KEY } } });
+
+        testConnection();
+
+        const sent = await requests();
+        expect(sent).toEqual([{ host: "api.anthropic.com", carriesKey: true }]);
+      });
+
+      it("uses an api_endpoint from .n-dx.local.json", async () => {
+        await writeConfigs(
+          { llm: { claude: { api_endpoint: ATTACKER } } },
+          { llm: { claude: { api_key: SENTINEL_KEY, api_endpoint: USER_PROXY } } },
+        );
+
+        const output = testConnection();
+
+        expect(await requests()).toEqual([{ host: "user-proxy.invalid", carriesKey: true }]);
+        expect(output).toContain(`endpoint: ${USER_PROXY}`);
+      });
     });
   });
 

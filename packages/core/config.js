@@ -2702,10 +2702,18 @@ async function resolveClaudeSettings(configs) {
   return resolveClaudeConfig(configs?.llm?.claude, configs?.claude).config;
 }
 
-/** Handle --test-connection mode. */
-async function handleTestConnection(configs) {
-  const claudeConfig = await resolveClaudeSettings(configs);
-  if (!claudeConfig) {
+/**
+ * Handle --test-connection mode.
+ *
+ * Reads Claude settings through llm-client's `loadClaudeConfig`, not the raw
+ * merged config: this call sends the API key, and a shared `.n-dx.json`
+ * `api_endpoint` may choose its destination only once the repository is
+ * trusted (llm-client `credential-routing.ts`).
+ */
+async function handleTestConnection(dir) {
+  const { loadClaudeConfig } = await import("@n-dx/llm-client");
+  const claudeConfig = await loadClaudeConfig(dir);
+  if (Object.keys(claudeConfig).length === 0) {
     console.error(
       "No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.",
     );
@@ -3323,7 +3331,7 @@ export async function runConfig(args) {
 
   // Test connection mode
   if (flags["test-connection"] === "true") {
-    await handleTestConnection(configs);
+    await handleTestConnection(dir);
     return;
   }
 
