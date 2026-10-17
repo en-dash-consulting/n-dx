@@ -31,11 +31,12 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A failing Maven property chain is re-walked, quadratically, for every reference](./a-failing-maven-property-chain-is-re.md) | pending |
 | [A regressed backtracking regex hangs the lang-kit suite instead of failing a named test](./a-regressed-backtracking-regex-hangs.md) | pending |
 | [Guard CI's grammar steps with a test and cover every group that runs a pack suite](./guard-ci-s-grammar-steps-with-a-test.md) | completed |
-| [Hold every published package to the release group, and list them in OPEN_SOURCE_SCOPE.md](./hold-every-published-package-to-the.md) | in_progress |
+| [Hold every published package to the release group, and list them in OPEN_SOURCE_SCOPE.md](./hold-every-published-package-to-the.md) | completed |
 | [Lock the pack directory for sv pack writers](./lock-the-pack-directory-for-sv-pack.md) | completed |
 | [Make pom.xml reading linear and bounded](./make-pom-xml-reading-linear-and-bounded.md) | completed |
 | [Make uv workspace member globs safe to compile and linear to match](./make-uv-workspace-member-globs-safe-to.md) | completed |
 | [Memoise and cap Maven property interpolation](./memoise-and-cap-maven-property.md) | completed |
+| [OPEN_SOURCE_SCOPE.md's package table can drift from the published packages again](./open-source-scope-md-s-package-table.md) | pending |
 | [Pin and verify the WASM toolchain the grammar build downloads](./pin-and-verify-the-wasm-toolchain-the.md) | pending |
 | [Remove exponential backtracking from Python requirement specifier parsing](./remove-exponential-backtracking-from.md) | completed |
 | [Run npm without lifecycle scripts in sv pack](./run-npm-without-lifecycle-scripts-in.md) | completed |
