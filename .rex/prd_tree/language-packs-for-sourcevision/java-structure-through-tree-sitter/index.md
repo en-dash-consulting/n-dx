@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Build the tree-sitter grammars in CI's test job so grammar-gated tests run](./build-the-tree-sitter-grammars-in-ci-s.md) | pending |
+| [Build the tree-sitter grammars in CI's test job so grammar-gated tests run](./build-the-tree-sitter-grammars-in-ci-s.md) | in_progress |
 | [CI never builds the Java grammar, so every grammar-dependent runner and grammar test skips there and the runner's acceptance criteria are unverified in CI](./ci-never-builds-the-java-grammar-so.md) | completed |
 | [Language-pack fixtures and goldens are not pinned to LF, so a Windows CRLF checkout fails the golden comparison](./language-pack-fixtures-and-goldens-are.md) | completed |
 | [Register Java as a language with inventory roles](./register-java-as-a-language-with.md) | completed |
