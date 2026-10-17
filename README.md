@@ -459,8 +459,19 @@ authentication. Claude retains `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`,
 `CLAUDE_CODE_OAUTH_TOKEN`, and `CLAUDE_CONFIG_DIR`, and with
 `CLAUDE_CODE_USE_BEDROCK` or `CLAUDE_CODE_USE_VERTEX` on, that mode's AWS or
 Google credentials; Codex retains `OPENAI_API_KEY`, `CODEX_API_KEY`,
-`CODEX_ACCESS_TOKEN`, and `CODEX_HOME`. Configured API keys override exported
-keys. Google retains its configured `apiKeyEnv` (default `GEMINI_API_KEY`).
+`CODEX_ACCESS_TOKEN`, and `CODEX_HOME`, and the `env_key` of the model provider
+(Azure OpenAI, for example) that your own `$CODEX_HOME/config.toml` or
+`~/.codex/config.toml` selects; a repository's `.codex/config.toml` is never
+read for it. Configured API keys override exported keys. Google retains its
+configured `apiKeyEnv` (default `GEMINI_API_KEY`), and with
+`GOOGLE_GENAI_USE_VERTEXAI` on, `GOOGLE_API_KEY`,
+`GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT` and
+`GOOGLE_CLOUD_LOCATION`.
+Which variable is sent as the key (`llm.google.apiKeyEnv`) and where a key is
+sent (`api_endpoint` for any vendor) are honoured from your git-ignored
+`.n-dx.local.json` always, and from the shared `.n-dx.json` only after you
+trust the repository (`ndx trust accept .`), so a cloned repository cannot
+send `GITHUB_TOKEN` to a host it chose.
 Home, PATH, proxy and CA plumbing still passes unless explicitly denied.
 Other tokens must be explicitly allowed.
 

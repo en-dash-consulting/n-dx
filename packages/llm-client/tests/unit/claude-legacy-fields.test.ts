@@ -149,8 +149,10 @@ describe("loadClaudeConfig: reads llm.claude.* as well as legacy claude.*", () =
 
   it("agrees with resolveClaudeConfig field by field", async () => {
     const modern = { model: MODERN.model, api_key: MODERN.api_key };
+    // The local file: an untrusted project file's api_endpoint is dropped
+    // (credential-routing.ts), which is not the precedence rule under test.
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, ".n-dx.local.json"),
       JSON.stringify({ claude: LEGACY, llm: { claude: modern } }, null, 2),
       "utf-8",
     );

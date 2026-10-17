@@ -346,5 +346,6 @@ export {
   sanitizeChildEnv,
   strippedEnvNames,
   resolveVendorCliEnv,
+  repoCommandEnv,
 } from "@n-dx/llm-client";
 export type { EnvPolicy, EnvPolicyConfig } from "@n-dx/llm-client";

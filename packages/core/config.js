@@ -106,13 +106,19 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  *   remote. `.n-dx.local.json` is gitignored by init and by the shipped
  *   template, and every reader already merges it over the shared file.
  *
+ * - **Credential routing** (`*.api_endpoint`, `llm.google.apiKeyEnv`): where
+ *   a key is sent and which variable is sent as one. The loaders honour these
+ *   from the shared file only once the repository is trusted (llm-client
+ *   `credential-routing.ts`), so writing the user's own choice there would
+ *   have it ignored and mark their repository untrusted.
+ *
  * Keyed by section, then by the setting path within that section. `llm`
  * entries are matched by suffix so `llm.claude.api_key`, `llm.codex.api_key`
  * and `llm.google.api_key` all route without listing each vendor.
  */
 const LOCAL_ONLY_SETTINGS = {
-  claude: new Set(["cli_path", "api_key"]),
-  llm: { suffixes: [".cli_path", ".api_key"] },
+  claude: new Set(["cli_path", "api_key", "api_endpoint"]),
+  llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv"] },
 };
 
 /** Setting-path leaf that marks a secret, for the shared-file scan. */
@@ -753,28 +759,36 @@ function isValidGoogleApiKeyFormat(value) {
 /**
  * Run a lightweight preflight call to the Gemini API to validate the API key.
  *
- * Reads the API key from llmConfig.google.api_key or the GEMINI_API_KEY env var.
- * Returns { ok: true } on success, or { ok: false, detail, errorCode } on failure.
+ * Reads the API key from `api_key` or the variable `apiKeyEnv` names
+ * (default GEMINI_API_KEY). The settings come from llm-client's
+ * `loadLLMConfig`, not the raw merged config: `apiKeyEnv` picks which variable
+ * is sent, and a shared `.n-dx.json` may choose it only once the repository is
+ * trusted (llm-client `credential-routing.ts`).
+ * Returns { ok: true } on success, or { ok: false, detail, errorCode } on
+ * failure; a missing key's result names the variable consulted in `apiKeyEnv`.
  *
  * Test bypass: set NDX_TEST_GOOGLE_PREFLIGHT=ok to skip the HTTP call (for integration
  * tests that cannot make real Gemini API requests).
  *
- * @param {object} llmConfig  Contents of .n-dx.json llm section
- * @returns {Promise<{ ok: boolean, vendor: "google", detail?: string, errorCode?: string }>}
+ * @param {string} dir  Project directory
+ * @returns {Promise<{ ok: boolean, vendor: "google", apiKeyEnv?: string, detail?: string, errorCode?: string }>}
  */
-async function runGoogleApiPreflight(llmConfig) {
+async function runGoogleApiPreflight(dir) {
   // Test bypass: allows integration tests to simulate successful auth without HTTP
   if (process.env.NDX_TEST_GOOGLE_PREFLIGHT === "ok") {
     return { ok: true, vendor: LLM_VENDOR.GOOGLE };
   }
 
-  const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
-  const apiKey = llmConfig?.google?.api_key || process.env[apiKeyEnvVar];
+  const { loadLLMConfig } = await import("@n-dx/llm-client");
+  const google = (await loadLLMConfig(dir)).google;
+  const apiKeyEnvVar = google?.apiKeyEnv || "GEMINI_API_KEY";
+  const apiKey = google?.api_key || process.env[apiKeyEnvVar];
 
   if (!apiKey) {
     return {
       ok: false,
       vendor: LLM_VENDOR.GOOGLE,
+      apiKeyEnv: apiKeyEnvVar,
       detail:
         `No API key found. Set the ${apiKeyEnvVar} environment variable or store the key with: ` +
         "n-dx config llm.google.api_key <key>",
@@ -1512,14 +1526,15 @@ function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
  * Run provider auth preflight for the selected vendor.
  * Returns an object instead of throwing so callers can branch deterministically.
  *
- * For google, performs a lightweight HTTP call to the Gemini API.
+ * For google, performs a lightweight HTTP call to the Gemini API, reading its
+ * settings from `dir` through the trust-gated loader rather than `llmConfig`.
  * For claude/codex, spawns the vendor CLI synchronously.
  *
- * @returns {Promise<{ ok: boolean, binary?: string, args?: string[], detail?: string, errorCode?: string }>}
+ * @returns {Promise<{ ok: boolean, binary?: string, args?: string[], apiKeyEnv?: string, detail?: string, errorCode?: string }>}
  */
-async function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
+async function runVendorAuthPreflight(dir, vendor, llmConfig, legacyClaudeConfig) {
   if (vendor === LLM_VENDOR.GOOGLE) {
-    return runGoogleApiPreflight(llmConfig);
+    return runGoogleApiPreflight(dir);
   }
 
   if (vendor === LLM_VENDOR.LOCAL) {
@@ -1700,7 +1715,8 @@ async function printVendorPreflightFailure(
   // Google uses API-key auth — no binary / CLI args to display.
   if (vendor === LLM_VENDOR.GOOGLE) {
     const errorCode = preflight.errorCode || "NDX_GOOGLE_PREFLIGHT_FAILED";
-    const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
+    // The variable the preflight actually read, after the trust gate.
+    const apiKeyEnvVar = preflight.apiKeyEnv || "GEMINI_API_KEY";
     // A rejected or malformed key is an invalid-credentials problem →
     // canonical re-auth guidance.
     if (
@@ -2143,6 +2159,8 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     compatible services.
                                     Default: https://api.anthropic.com
                                     Validated: must be a valid HTTP(S) URL.
+                                    Stored in .n-dx.local.json; the shared .n-dx.json's
+                                    value applies only once the repository is trusted.
   claude.model             string    Default Claude model for API calls (optional)
                                     Override the default model used by all packages.
                                     Examples: claude-sonnet-5-5, claude-opus-5-5
@@ -2160,6 +2178,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.claude.api_key       string    Claude API key (optional)
                                     Stored in .n-dx.local.json.
   llm.claude.api_endpoint  string    Claude API endpoint (optional; validated URL)
+                                    Stored in .n-dx.local.json.
   llm.claude.model         string    Claude default model (optional)
   llm.claude.lightModel    string    Claude model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
@@ -2170,6 +2189,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.codex.api_key        string    Codex API key (optional)
                                     Stored in .n-dx.local.json.
   llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
+                                    Stored in .n-dx.local.json.
   llm.codex.model          string    Codex default model (optional)
   llm.codex.lightModel     string    Codex model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
@@ -2184,7 +2204,9 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     (default: GEMINI_API_KEY). Override when your
                                     key is stored in a custom env var.
                                     Example: n-dx config llm.google.apiKeyEnv MY_GOOGLE_KEY
+                                    Stored in .n-dx.local.json.
   llm.google.api_endpoint  string    Gemini API endpoint (optional; validated URL)
+                                    Stored in .n-dx.local.json.
   llm.google.model         string    Gemini default model (optional)
                                     Must be a valid Gemini model ID starting with "gemini-".
                                     Known models: gemini-3.5-flash-lite (light),
@@ -2690,10 +2712,18 @@ async function resolveClaudeSettings(configs) {
   return resolveClaudeConfig(configs?.llm?.claude, configs?.claude).config;
 }
 
-/** Handle --test-connection mode. */
-async function handleTestConnection(configs) {
-  const claudeConfig = await resolveClaudeSettings(configs);
-  if (!claudeConfig) {
+/**
+ * Handle --test-connection mode.
+ *
+ * Reads Claude settings through llm-client's `loadClaudeConfig`, not the raw
+ * merged config: this call sends the API key, and a shared `.n-dx.json`
+ * `api_endpoint` may choose its destination only once the repository is
+ * trusted (llm-client `credential-routing.ts`).
+ */
+async function handleTestConnection(dir) {
+  const { loadClaudeConfig } = await import("@n-dx/llm-client");
+  const claudeConfig = await loadClaudeConfig(dir);
+  if (Object.keys(claudeConfig).length === 0) {
     console.error(
       "No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.",
     );
@@ -2801,7 +2831,7 @@ async function coerceAndValidateProjectValue(
  * all later commands) even before auth is configured — the auth error then surfaces
  * clearly at actual use rather than silently reverting to the Claude default.
  */
-async function runLLMVendorPreflight(coerced, configs, soft = false) {
+async function runLLMVendorPreflight(dir, coerced, configs, soft = false) {
   const currentLLM =
     configs.llm && typeof configs.llm === "object" ? configs.llm : {};
   const llmForPreflight = { ...currentLLM, vendor: coerced };
@@ -2824,6 +2854,7 @@ async function runLLMVendorPreflight(coerced, configs, soft = false) {
   }
 
   const preflight = await runVendorAuthPreflight(
+    dir,
     coerced,
     llmForPreflight,
     legacyClaude,
@@ -2925,7 +2956,7 @@ async function handleSetProjectSection(
   // downgrades a failed preflight from a fatal abort to a warning so the chosen
   // vendor is still persisted.
   if (pkg === "llm" && settingPath === "vendor") {
-    await runLLMVendorPreflight(coerced, configs, flags["soft-preflight"] === "true");
+    await runLLMVendorPreflight(dir, coerced, configs, flags["soft-preflight"] === "true");
   }
 
   // Advisory did-you-mean for routing keys. A mistyped class is accepted by
@@ -3311,7 +3342,7 @@ export async function runConfig(args) {
 
   // Test connection mode
   if (flags["test-connection"] === "true") {
-    await handleTestConnection(configs);
+    await handleTestConnection(dir);
     return;
   }
 
@@ -3426,7 +3457,7 @@ export async function runAuthCheck(args) {
   }
 
   console.log(dim(`Checking ${vendor} credentials…`));
-  const preflight = await runVendorAuthPreflight(vendor, llmConfig, legacyClaude);
+  const preflight = await runVendorAuthPreflight(dir, vendor, llmConfig, legacyClaude);
   if (preflight.ok) {
     console.log(green(`✓ Credentials valid — vendor: ${vendor}, model: ${model}`));
     return 0;

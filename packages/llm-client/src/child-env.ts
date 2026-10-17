@@ -17,6 +17,7 @@
  */
 
 import type { LLMConfig } from "./llm-types.js";
+import { codexUserEnvKey } from "./codex-user-config.js";
 import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor, type LLMVendor } from "./provider-interface.js";
 
 export interface EnvPolicyConfig {
@@ -116,61 +117,11 @@ const BEDROCK_CREDENTIALS = [
   "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "AWS_CONTAINER_CREDENTIALS_FULL_URI",
   "AWS_CONTAINER_AUTHORIZATION_TOKEN", "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
 ];
-const VERTEX_CREDENTIALS = ["GOOGLE_APPLICATION_CREDENTIALS"];
-const VERTEX_PLUMBING = ["CLOUD_ML_REGION"];
-
-/** A cloud mode the vendor CLI switches on with a flag variable. */
-interface CloudMode {
-  flag: string;
-  /** At least one of these must reach the child, or the mode is reported as missing credentials. */
-  credentials: readonly string[];
-  plumbing: readonly string[];
-}
-
-/** What a vendor CLI needs from the environment. Names are exact, never globs. */
-interface VendorEnvSpec {
-  /** Variable a configured API key is written to; absent when the vendor takes no key. */
-  keyEnv?: (config: LLMConfig) => string;
-  /** Authentication names retained in addition to `keyEnv`. */
-  authNames: readonly string[];
-  /** The configured API key, if any. */
-  configKey: (config: LLMConfig) => string | undefined;
-  cloudModes: readonly CloudMode[];
-}
-
-/** A local model server needs no credentials; an unrecognised vendor gets none either. */
-const NO_CREDENTIALS: VendorEnvSpec = { authNames: [], configKey: () => undefined, cloudModes: [] };
-
-const VENDOR_ENV: Record<LLMVendor, VendorEnvSpec> = {
-  [LLM_VENDOR.CLAUDE]: {
-    keyEnv: () => "ANTHROPIC_API_KEY",
-    authNames: ["ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CONFIG_DIR"],
-    configKey: (config) => config.claude?.api_key,
-    cloudModes: [
-      { flag: "CLAUDE_CODE_USE_BEDROCK", credentials: BEDROCK_CREDENTIALS, plumbing: BEDROCK_PLUMBING },
-      { flag: "CLAUDE_CODE_USE_VERTEX", credentials: VERTEX_CREDENTIALS, plumbing: VERTEX_PLUMBING },
-    ],
-  },
-  [LLM_VENDOR.CODEX]: {
-    keyEnv: () => "OPENAI_API_KEY",
-    authNames: ["CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME"],
-    configKey: (config) => config.codex?.api_key,
-    cloudModes: [],
-  },
-  [LLM_VENDOR.GOOGLE]: {
-    // A custom apiKeyEnv is an exact name, so it cannot widen credential access.
-    keyEnv: (config) => config.google?.apiKeyEnv ?? "GEMINI_API_KEY",
-    authNames: [],
-    configKey: (config) => config.google?.api_key,
-    cloudModes: [],
-  },
-  [LLM_VENDOR.LOCAL]: NO_CREDENTIALS,
-};
 
 const TRUTHY = ["1", "true", "yes", "on"];
 
 /**
- * Whether a cloud-mode flag is on. Names match exactly, as the vendor CLI reads
+ * Whether a mode flag is on. Names match exactly, as the vendor CLI reads
  * them; only Windows, whose environment names are case-insensitive, folds case.
  */
 function modeEnabled(env: NodeJS.ProcessEnv, flag: string): boolean {
@@ -181,10 +132,102 @@ function modeEnabled(env: NodeJS.ProcessEnv, flag: string): boolean {
 }
 
 /**
+ * A way a vendor CLI authenticates beyond its default key. Its names are kept
+ * only while `active` holds, and `active` reads only what the operator
+ * controls: an exported flag, or the operator's own vendor config. Never
+ * repository content, which could otherwise switch a mode on to pull its
+ * credentials into the child.
+ */
+interface VendorMode {
+  vendor: LLMVendor;
+  /** Evaluated on the policy-filtered environment, so a denied flag leaves the mode off. */
+  active: (env: NodeJS.ProcessEnv) => boolean;
+  /** Exact names. At least one must reach the child, or the mode is reported as missing credentials. */
+  credentials: (env: NodeJS.ProcessEnv) => readonly string[];
+  /** Exact names that address the endpoint but are not secrets. */
+  plumbing: readonly string[];
+}
+
+const flag = (name: string) => (env: NodeJS.ProcessEnv) => modeEnabled(env, name);
+const names = (list: readonly string[]) => () => list;
+function codexProviderKey(env: NodeJS.ProcessEnv): readonly string[] {
+  const key = codexUserEnvKey(env);
+  return key ? [key] : [];
+}
+
+/** Every vendor mode, one row each. Names are exact, never globs. */
+const VENDOR_MODES: readonly VendorMode[] = [
+  // Claude Code on Amazon Bedrock: https://code.claude.com/docs/en/amazon-bedrock
+  {
+    vendor: LLM_VENDOR.CLAUDE, active: flag("CLAUDE_CODE_USE_BEDROCK"),
+    credentials: names(BEDROCK_CREDENTIALS), plumbing: BEDROCK_PLUMBING,
+  },
+  // Claude Code on Google Vertex AI: https://code.claude.com/docs/en/google-vertex-ai
+  // (ANTHROPIC_VERTEX_PROJECT_ID passes the default filter on its own.)
+  {
+    vendor: LLM_VENDOR.CLAUDE, active: flag("CLAUDE_CODE_USE_VERTEX"),
+    credentials: names(["GOOGLE_APPLICATION_CREDENTIALS"]), plumbing: ["CLOUD_ML_REGION"],
+  },
+  // Codex with a model provider from the user's own Codex config, such as Azure
+  // OpenAI, whose key Codex reads from the variable the provider's `env_key` names:
+  // https://github.com/openai/codex/blob/main/docs/config.md#model_providers
+  {
+    vendor: LLM_VENDOR.CODEX, active: (env) => codexProviderKey(env).length > 0,
+    credentials: codexProviderKey, plumbing: [],
+  },
+  // Gemini CLI on Vertex AI, by Google Cloud API key (GOOGLE_API_KEY), service
+  // account key file, or application default credentials, with project and location:
+  // https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/authentication.md
+  {
+    vendor: LLM_VENDOR.GOOGLE, active: flag("GOOGLE_GENAI_USE_VERTEXAI"),
+    credentials: names(["GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS"]),
+    plumbing: ["GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION"],
+  },
+];
+
+/** What a vendor CLI needs from the environment in every mode. Names are exact, never globs. */
+interface VendorEnvSpec {
+  /** Variable a configured API key is written to; absent when the vendor takes no key. */
+  keyEnv?: (config: LLMConfig) => string;
+  /** Authentication names retained in addition to `keyEnv`. */
+  authNames: readonly string[];
+  /** The configured API key, if any. */
+  configKey: (config: LLMConfig) => string | undefined;
+}
+
+/** A local model server needs no credentials; an unrecognised vendor gets none either. */
+const NO_CREDENTIALS: VendorEnvSpec = { authNames: [], configKey: () => undefined };
+
+const VENDOR_ENV: Record<LLMVendor, VendorEnvSpec> = {
+  [LLM_VENDOR.CLAUDE]: {
+    keyEnv: () => "ANTHROPIC_API_KEY",
+    authNames: ["ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CONFIG_DIR"],
+    configKey: (config) => config.claude?.api_key,
+  },
+  [LLM_VENDOR.CODEX]: {
+    keyEnv: () => "OPENAI_API_KEY",
+    authNames: ["CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME"],
+    configKey: (config) => config.codex?.api_key,
+  },
+  [LLM_VENDOR.GOOGLE]: {
+    // A custom apiKeyEnv widens credential access by the one exact name it
+    // gives (never a glob). loadLLMConfig takes it from the user's
+    // .n-dx.local.json, or from the project config only once the user has
+    // trusted the repository (credential-routing.ts), so a cloned repository
+    // cannot name GITHUB_TOKEN here. A caller building an LLMConfig by hand
+    // owns that rule.
+    keyEnv: (config) => config.google?.apiKeyEnv ?? "GEMINI_API_KEY",
+    authNames: [],
+    configKey: (config) => config.google?.api_key,
+  },
+  [LLM_VENDOR.LOCAL]: NO_CREDENTIALS,
+};
+
+/**
  * Filter a vendor CLI's environment without exposing unrelated credentials.
  * `onStripped` receives names only, never values: once for the names removed,
- * and once more (kind `missing-credentials`) when a Bedrock/Vertex mode is on
- * but none of that mode's credential names reached the child.
+ * and once more (kind `missing-credentials`) when a mode in `VENDOR_MODES` is
+ * on but none of that mode's credential names reached the child.
  */
 export function resolveVendorCliEnv(
   config: LLMConfig,
@@ -196,10 +239,12 @@ export function resolveVendorCliEnv(
   const policy = compileEnvPolicy(envConfig);
   const env = sanitizeChildEnv(source, policy);
   // config.vendor may come from unvalidated JSON.
-  const spec = isLLMVendor(vendor) ? VENDOR_ENV[vendor] : NO_CREDENTIALS;
+  const known = isLLMVendor(vendor);
+  const spec = known ? VENDOR_ENV[vendor] : NO_CREDENTIALS;
   const keyName = spec.keyEnv?.(config);
-  // Keep cloud authentication names only for the modes the child will use.
-  const activeModes = spec.cloudModes.filter((mode) => modeEnabled(env, mode.flag));
+  // Keep a mode's names only while the child will use that mode.
+  const activeModes = (known ? VENDOR_MODES.filter((mode) => mode.vendor === vendor && mode.active(env)) : [])
+    .map((mode) => ({ credentials: mode.credentials(env), plumbing: mode.plumbing }));
   const authNames = [
     ...(keyName ? [keyName] : []),
     ...spec.authNames,
@@ -225,7 +270,7 @@ export function resolveVendorCliEnv(
   if (stripped.length > 0) onStripped?.(stripped, "stripped");
   const present = new Set(Object.keys(env).map((name) => name.toUpperCase()));
   const missing = activeModes
-    .filter((mode) => !mode.credentials.some((name) => present.has(name)))
+    .filter((mode) => !mode.credentials.some((name) => present.has(name.toUpperCase())))
     .flatMap((mode) => mode.credentials);
   if (missing.length > 0) onStripped?.(missing, "missing-credentials");
   return env;
