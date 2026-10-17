@@ -18,4 +18,18 @@ fact kinds that need the whole project.
 
 In a Terraform-first repository, Terraform files under `tests/` or `test/` and
 `.tftest.hcl` files now get the test role. Repositories led by any other language
-keep their roles. Nothing is written to `infrastructure.json` yet.
+keep their roles.
+
+With the Terraform pack installed (`ndx sv pack add terraform`), Terraform
+resources that `infrastructure.json` already lists gain optional fields: `module`
+(the module call path, absent in a root module), `provider` (`{ name, version? }`,
+the version constraint as written), `references` (ids of listed resources in the
+same module directory) and `attributes` (`engine`, `engineVersion`, `runtime`,
+`image`, `clusterVersion`). Values are as written; an attribute set through a
+module call keeps its resolved value only when every instance agrees. No resource,
+link or seam is added or removed, and without the pack `infrastructure.json` is
+unchanged. The field names are proposals for review.
+
+Terraform database resources are now a database-engine candidate source alongside
+dependencies, images and config. Those candidates stay in memory and are not
+written to any analysis artifact.
