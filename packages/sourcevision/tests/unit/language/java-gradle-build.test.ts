@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -216,6 +216,24 @@ describe("Gradle build model: edge cases", () => {
     expect(m?.dependencies).toEqual([]);
     expect(m?.notices).toEqual([expect.stringContaining(`project("$name")`)]);
   });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "treats an unreadable module build script as absent and reports it",
+    async () => {
+      dir = await mkdtemp(join(tmpdir(), "sv-gradle-build-"));
+      await writeFile(join(dir, "settings.gradle"), "include 'x'\n");
+      await mkdir(join(dir, "x"));
+      await writeFile(join(dir, "x/build.gradle"), "dependencies { implementation 'g:a:1' }\n");
+      await chmod(join(dir, "x/build.gradle"), 0o000);
+      try {
+        const layout = await discoverJavaModules(dir);
+        const x = module(await readGradleBuildModels(dir, layout.modules), ":x");
+        expect(x).toMatchObject({ dependencies: [], notices: ["x/build.gradle is unreadable (EACCES); skipped"] });
+      } finally {
+        await chmod(join(dir, "x/build.gradle"), 0o644);
+      }
+    },
+  );
 
   it("returns an empty model for a module with no build script", async () => {
     const models = await files({ "settings.gradle": "include 'x'\n", "x/src/main/java/A.java": "class A {}\n" });

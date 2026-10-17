@@ -3,7 +3,7 @@
  * rule is pinned independently of the regenerable golden.
  */
 
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -264,6 +264,7 @@ describe("java resolver", () => {
     async function resolveProject(
       ctx: Parameters<typeof skipUnlessGrammar>[0],
       buildFiles: Record<string, string>,
+      unreadable: readonly string[] = [],
     ): Promise<(path: string) => FileReferences> {
       skipUnlessGrammar(ctx, JAVA_WASM);
       dir = await mkdtemp(join(tmpdir(), "lang-java-test-artifacts-"));
@@ -271,6 +272,7 @@ describe("java resolver", () => {
         await mkdir(dirname(join(dir, rel)), { recursive: true });
         await writeFile(join(dir, rel), body);
       }
+      for (const rel of unreadable) await chmod(join(dir, rel), 0o000);
       const runner = createTreeSitterRunner();
       try {
         const files: PackSourceFile[] = [];
@@ -322,6 +324,19 @@ describe("java resolver", () => {
       });
       expect(targets(resolve(APP_TEST))).toEqual({ [DAO_TEST]: ["DaoTestBase"] });
     });
+
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+      "still binds to the project when another module's Gradle build file is unreadable",
+      async (ctx) => {
+        const resolve = await resolveProject(ctx, {
+          "settings.gradle": "include 'app', 'dao', 'locked'\n",
+          "app/build.gradle": "dependencies {\n  testImplementation(testFixtures(project(':dao')))\n}\n",
+          "locked/build.gradle": "dependencies {}\n",
+          "locked/src/main/java/Locked.java": "class Locked {}\n",
+        }, ["locked/build.gradle"]);
+        expect(targets(resolve(APP_TEST))).toEqual({ [DAO_FIXTURE]: ["DaoFixture"] });
+      },
+    );
 
     it("still refuses the link without a test-artifact dependency", async (ctx) => {
       const maven = await resolveProject(ctx, {
