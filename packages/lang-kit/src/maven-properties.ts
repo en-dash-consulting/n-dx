@@ -30,10 +30,14 @@ const NESTING_TOO_DEEP: BuildValue = { resolved: false, reason: "property nestin
 const EXPANDING = Symbol("expanding");
 
 /**
- * A property's expansion. `height` is how many properties the longest chain
- * from it passes through, itself included, so a cached value is reused only
- * where a fresh walk would also stay within `MAX_PROPERTY_NESTING`. A failure
- * has height 0: it failed whatever the depth.
+ * A property's expansion. `height` is how many properties a fresh walk from
+ * it enters, itself included: every chain for a value, the chains up to the
+ * failing one for a failure. A cached result is reused only where a fresh walk
+ * would also stay within `MAX_PROPERTY_NESTING`, so neither a value nor a
+ * failure's reason depends on which reference reached the property first.
+ * The exception is a cycle member: its height counts the walk only as far as
+ * the member that closed the cycle, so close to the cap it can report the
+ * cycle where a fresh walk from it would report nesting too deep.
  */
 interface Expansion {
   value: BuildValue;
@@ -80,50 +84,51 @@ function expand(text: string, ctx: PropertyContext, depth: number): Expansion {
     const open = text.indexOf("${", i);
     if (open < 0) break;
     const close = text.indexOf("}", open);
-    if (close < 0) return failed(`unterminated placeholder in "${text}"`);
+    if (close < 0) return failed(`unterminated placeholder in "${text}"`, height);
     const property = resolveProperty(text.slice(open + 2, close), ctx, depth);
-    if (!property.value.resolved) return property;
+    height = Math.max(height, property.height);
+    if (!property.value.resolved) return { value: property.value, height };
     out += text.slice(i, open) + property.value.value;
     // Checked per placeholder so a runaway expansion stops before it is built.
-    if (out.length > MAX_PROPERTY_EXPANSION) return { value: EXPANSION_TOO_LARGE, height: 0 };
-    height = Math.max(height, property.height);
+    if (out.length > MAX_PROPERTY_EXPANSION) return { value: EXPANSION_TOO_LARGE, height };
     expanded = true;
     i = close + 1;
   }
   out += text.slice(i);
-  if (expanded && out.length > MAX_PROPERTY_EXPANSION) return { value: EXPANSION_TOO_LARGE, height: 0 };
+  if (expanded && out.length > MAX_PROPERTY_EXPANSION) return { value: EXPANSION_TOO_LARGE, height };
   return { value: { resolved: true, value: out }, height };
 }
 
 /**
  * One `${name}`, expanded once per context. Results are cached, failures too:
  * a property that is undefined, unterminated, too large or in a cycle fails
- * wherever it is reached. A cycle's reason names the property that closed it,
- * so a member reached later reports the same one. The one depth-dependent
- * failure, nesting too deep, is cached only for a property reached at depth
- * 0, where it is exact; deeper, the property is left to be walked again, and
- * that walk is bounded by the cap.
+ * the same way wherever a walk reaches it within the cap. A cycle's reason
+ * names the property that closed it, so a member reached later reports the
+ * same one. Nesting too deep is cached only for a property reached at depth
+ * 0, where its height is exact; deeper, the height is only a lower bound, so
+ * the property is left to be walked again, and that walk is bounded by the cap.
  */
 function resolveProperty(name: string, ctx: PropertyContext, depth: number): Expansion {
   const entry = ctx.expansions.get(name);
-  if (entry === EXPANDING) return failed(`property ${name} refers to itself`);
-  if (entry) return depth + entry.height > MAX_PROPERTY_NESTING ? { value: NESTING_TOO_DEEP, height: 0 } : entry;
+  // Checked before the cap, as an undefined name is: neither enters a level.
+  if (entry === EXPANDING) return failed(`property ${name} refers to itself`, 0);
+  if (entry) return depth + entry.height > MAX_PROPERTY_NESTING ? { value: NESTING_TOO_DEEP, height: entry.height } : entry;
   const raw = ctx.builtins.get(name) ?? ctx.props.get(name);
   if (raw === undefined) {
     const hint = ctx.external.length ? `; may be defined by ${ctx.external.join(", ")}` : "";
-    const missing = failed(`property ${name} is not defined in the repository${hint}`);
+    const missing = failed(`property ${name} is not defined in the repository${hint}`, 0);
     ctx.expansions.set(name, missing);
     return missing;
   }
-  if (depth >= MAX_PROPERTY_NESTING) return { value: NESTING_TOO_DEEP, height: 0 };
+  if (depth >= MAX_PROPERTY_NESTING) return { value: NESTING_TOO_DEEP, height: 1 };
   ctx.expansions.set(name, EXPANDING);
   const inner = expand(raw, ctx, depth + 1);
-  const result = inner.value.resolved ? { value: inner.value, height: inner.height + 1 } : inner;
+  const result = { value: inner.value, height: inner.height + 1 };
   if (result.value === NESTING_TOO_DEEP && depth > 0) ctx.expansions.delete(name);
   else ctx.expansions.set(name, result);
   return result;
 }
 
-function failed(reason: string): Expansion {
-  return { value: { resolved: false, reason }, height: 0 };
+function failed(reason: string, height: number): Expansion {
+  return { value: { resolved: false, reason }, height };
 }
