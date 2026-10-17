@@ -35,7 +35,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Spring Boot routes and outbound calls through the Java pack (PR 14)](./spring-boot-routes-and-outbound-calls/index.md) | pending |
 | [SQL dialects and database signals](./sql-dialects-and-database-signals/index.md) | pending |
 | [Stack review fixes: detection, inventory and pack notices (PR 17)](./stack-review-fixes-detection-inventory/index.md) | completed |
-| [Stack review fixes: framework rules (PR 19)](./stack-review-fixes-framework-rules-pr-19/index.md) | pending |
+| [Stack review fixes: framework rules (PR 19)](./stack-review-fixes-framework-rules-pr-19/index.md) | completed |
 | [Stack review fixes: resolvers and build readers (PR 18)](./stack-review-fixes-resolvers-and-build/index.md) | completed |
 | [Terraform model in the Terraform pack and infrastructure.json (PR 13)](./terraform-model-in-the-terraform-pack/index.md) | completed |
 | [Terraform structure through tree-sitter-hcl](./terraform-structure-through-tree/index.md) | completed |
