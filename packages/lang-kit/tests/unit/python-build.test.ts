@@ -127,6 +127,44 @@ describe("Python projects: layouts", () => {
     expect(found[0].workspaceMembers).toEqual(["apps/web/api", "packages/a"]);
   });
 
+  it("uv workspace: classes, ? and ** match whole segments", async () => {
+    const found = await projects({
+      "pyproject.toml": '[tool.uv.workspace]\nmembers = ["libs/[a-c]1", "libs/[!a-c]x", "**/t?ols"]\n',
+      "libs/a1/pyproject.toml": "",
+      "libs/d1/pyproject.toml": "",
+      "libs/dx/pyproject.toml": "",
+      "libs/ax/pyproject.toml": "",
+      "tools/pyproject.toml": "",
+      "deep/er/tools/pyproject.toml": "",
+      "deep/mytools/pyproject.toml": "",
+    });
+    expect(found[0].workspaceMembers).toEqual(["deep/er/tools", "libs/a1", "libs/dx", "tools"]);
+  });
+
+  it("uv workspace: an invalid member glob is a notice, not a throw", async () => {
+    const found = await projects({
+      "pyproject.toml": '[project]\nname = "root"\n[tool.uv.workspace]\nmembers = [\n  "pkgs/[z-a]",\n  "pkgs/*",\n]\nexclude = ["pkgs/[b-a]"]\n',
+      "pkgs/a/pyproject.toml": "",
+    });
+    expect(found[0].name).toBe("root");
+    expect(found[0].workspaceMembers).toEqual(["pkgs/a"]);
+    expect(found[0].notices).toEqual([
+      "pyproject.toml:5: workspace glob pkgs/[z-a] not read: range z-a is out of order",
+      "pyproject.toml:8: workspace glob pkgs/[b-a] not read: range b-a is out of order",
+    ]);
+  });
+
+  it("uv workspace: a pathological ** glob returns (no backtracking)", async () => {
+    const glob = `${"**/a/".repeat(12)}c`;
+    const dir = Array.from({ length: 25 }, () => "a").join("/");
+    const found = await projects({
+      "pyproject.toml": `[tool.uv.workspace]\nmembers = ["${glob}", "${"*a".repeat(30)}*c"]\n`,
+      [`${dir}/pyproject.toml`]: "",
+      [`${"a".repeat(60)}/pyproject.toml`]: "",
+    });
+    expect(found[0].workspaceMembers).toEqual([]);
+  });
+
   it("merges pyproject, setup.cfg, setup.py and requirements in one directory", async () => {
     const [p] = await projects({
       "pyproject.toml": "[build-system]\nrequires = [\"setuptools\"]\n",
