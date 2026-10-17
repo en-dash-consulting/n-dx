@@ -16,8 +16,12 @@
  * - {@link collectRepoExecutionConfig} reads those files and reduces them to
  *   the execution-relevant subset plus a content digest.
  * - {@link assessRepoExecutionConfig} compares that subset to the guard
- *   baseline for the project's language and lists what is *wider* than the
- *   baseline. Narrower is never a finding.
+ *   baseline for the language {@link detectRepoLanguage} reads from marker
+ *   files, and lists what is *wider* than the baseline. Narrower is never a
+ *   finding. The `language` the repository declares never picks the
+ *   baseline: a JS checkout declaring `swift` would otherwise get
+ *   `xcodebuild` and `xcrun` for free. A declared language that disagrees
+ *   with the detected one is a finding of its own.
  * - {@link evaluateRepoTrust} adds the user's own trust record, kept outside
  *   the repository in `<ndx home>/trust/`, and decides the state: `baseline`
  *   (nothing to trust), `trusted` (digest matches the record), `untrusted`
@@ -55,8 +59,8 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
-  statSync,
   writeFileSync,
+  type Dirent,
 } from "node:fs";
 import { join, sep } from "node:path";
 import {
@@ -167,6 +171,43 @@ export function guardBaselineForLanguage(language?: string | null): GuardBaselin
   };
 }
 
+/** The languages {@link detectRepoLanguage} can report; one per baseline. */
+export type DetectedRepoLanguage = "go" | "swift" | "typescript";
+
+/**
+ * The project language as the host sees it, from marker files alone:
+ * `go.mod` → go; `Package.swift` or a top-level `*.xcodeproj` /
+ * `*.xcworkspace` directory → swift; otherwise the JS/TS default.
+ *
+ * Mirrors hench init's detection without its config override, because the
+ * config is the repository's own claim and this is what checks it.
+ */
+export function detectRepoLanguage(projectDir: string): DetectedRepoLanguage {
+  if (existsSync(join(projectDir, "go.mod"))) return "go";
+  if (existsSync(join(projectDir, "Package.swift"))) return "swift";
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(projectDir, { withFileTypes: true });
+  } catch {
+    return "typescript";
+  }
+  const xcode = entries.some(
+    (e) => e.isDirectory() && (e.name.endsWith(".xcodeproj") || e.name.endsWith(".xcworkspace")),
+  );
+  return xcode ? "swift" : "typescript";
+}
+
+/** The baseline a declared language names, or null when it names none. */
+function declaredLanguageFamily(language: string | null): DetectedRepoLanguage | null {
+  if (language === "typescript" || language === "javascript") return "typescript";
+  if (language === "go" || language === "swift") return language;
+  return null;
+}
+
+function languageLabel(language: DetectedRepoLanguage): string {
+  return language === "typescript" ? "JavaScript/TypeScript" : language;
+}
+
 /**
  * Narrow a guard to the baseline: allowlists intersect, blocked paths union.
  * Everything else on the guard is returned untouched. The result is never
@@ -194,7 +235,14 @@ export interface RepoMcpServer {
 export interface RepoExecutionConfig {
   /** Which files were read, relative to the project root. Absent files are omitted. */
   sources: string[];
+  /** The language the repository declares. Reported, never used as the baseline. */
   language: string | null;
+  /**
+   * The language {@link detectRepoLanguage} reads from marker files: the
+   * baseline every comparison and clamp uses. Not in the digest, because it
+   * is the host's reading rather than configuration the user accepts.
+   */
+  detectedLanguage: DetectedRepoLanguage;
   guard: GuardBaseline | null;
   /**
    * `guard.env.allow` as the repository ships it — names the agent's child
@@ -207,10 +255,10 @@ export interface RepoExecutionConfig {
   envAllow: string[];
   permissionMode: string | null;
   provider: string | null;
-  /** `.rex/config.json` → `test`. */
+  /** The project config's `rex.test`, else `.rex/config.json` → `test`: the command rex runs. */
   testCommand: string | null;
   mcpServers: RepoMcpServer[];
-  /** sha256 over the canonical JSON of everything above except `sources`. */
+  /** sha256 over the canonical JSON of everything above except `sources` and `detectedLanguage`. */
   digest: string;
 }
 
@@ -284,6 +332,15 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   const rexConfigPath = join(layout.rexDir, "config.json");
   const rexConfig = readJson(rexConfigPath);
   if (rexConfig) sources.push(relOf(root, rexConfigPath));
+  // Rex folds the project config's `rex` section over `.rex/config.json` when
+  // it loads its config, so a `rex.test` there is the command that runs. Left
+  // out, a repository could swap the command after the user accepted the one
+  // they reviewed without moving the digest (#686).
+  const projectRex = projectConfig && typeof projectConfig.rex === "object" && projectConfig.rex && !Array.isArray(projectConfig.rex)
+    ? (projectConfig.rex as Record<string, unknown>)
+    : null;
+  const projectTest = projectRex ? optionalString(projectRex.test) : null;
+  if (projectTest && !projectHench) sources.push(relOf(root, layout.configFile));
 
   const mcpPath = join(root, ".mcp.json");
   const mcpConfig = readJson(mcpPath);
@@ -319,13 +376,14 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     ...(envAllow.length ? { envAllow: [...envAllow].sort() } : {}),
     permissionMode: optionalString(merged.permissionMode),
     provider: optionalString(merged.provider),
-    testCommand: optionalString(rexConfig?.test),
+    testCommand: projectTest ?? optionalString(rexConfig?.test),
     mcpServers,
   };
 
   return {
     sources,
     ...body,
+    detectedLanguage: detectRepoLanguage(root),
     guard,
     envAllow: [...envAllow].sort(),
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
@@ -335,6 +393,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
 // ── Assessment ──────────────────────────────────────────────────────────────
 
 export type RepoTrustFindingCode =
+  | "language-mismatch"
   | "commands-added"
   | "blocked-paths-removed"
   | "git-subcommands-added"
@@ -354,6 +413,30 @@ export interface RepoTrustFinding {
 }
 
 const SHELL_RISK = /[;&|`$]|\b(curl|wget|sh -c|bash -c|powershell|iex\b|Invoke-Expression)\b/i;
+
+/**
+ * C0 and C1 controls, DEL, and the Unicode bidirectional overrides and
+ * isolates. A terminal acts on the first group (ESC starts a CSI/OSC sequence
+ * that can erase or rewrite a line; CR returns to the start of one) and
+ * reorders text around the second, so either can make a line show something
+ * other than what it holds.
+ */
+const DISPLAY_UNSAFE = /[\u0000-\u001f\u007f-\u009f‪-‮⁦-⁩]/g;
+
+/**
+ * Render a repository-sourced string for display: every character in
+ * {@link DISPLAY_UNSAFE} becomes a visible `\xNN` / `\uNNNN` escape, so a trust
+ * review shows exactly what the user is accepting. Display only — the digest
+ * and the stored record keep the raw value. Idempotent.
+ */
+export function escapeTerminalControls(text: string): string {
+  return text.replace(DISPLAY_UNSAFE, (ch) => {
+    const code = ch.charCodeAt(0);
+    return code <= 0xff
+      ? `\\x${code.toString(16).padStart(2, "0")}`
+      : `\\u${code.toString(16).padStart(4, "0")}`;
+  });
+}
 
 /** The MCP server commands `ndx init` writes, which need no review. */
 function isNdxMcpServer(server: RepoMcpServer): boolean {
@@ -383,12 +466,36 @@ function coversDir(blocked: string[], dir: string): boolean {
 
 /**
  * List how the repository's configuration is wider than the baseline for its
- * language. Narrower is not reported. A missing guard means the repository
- * left hench's defaults in force, which is the baseline by definition.
+ * detected language. Narrower is not reported. A missing guard means the
+ * repository left hench's defaults in force, which is the baseline by
+ * definition.
+ *
+ * A declared language naming another baseline is a warning: the checkout
+ * asks for a toolchain it does not have, so the user is asked. A declared
+ * value naming no baseline (`auto`, an unsupported language) selects
+ * nothing and is not reported.
  */
 export function assessRepoExecutionConfig(config: RepoExecutionConfig): RepoTrustFinding[] {
-  const baseline = guardBaselineForLanguage(config.language);
+  const findings = assessRawFindings(config);
+  // Messages embed repository values and are printed by every trust surface;
+  // `values` stay raw for a UI that renders them as data.
+  return findings.map((f) => ({ ...f, message: escapeTerminalControls(f.message) }));
+}
+
+function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
+  const detected = config.detectedLanguage;
+  const baseline = guardBaselineForLanguage(detected);
   const findings: RepoTrustFinding[] = [];
+
+  const declared = declaredLanguageFamily(config.language);
+  if (config.language && declared && declared !== detected) {
+    findings.push({
+      code: "language-mismatch",
+      severity: "warning",
+      message: `Declares language ${config.language}, but the checkout looks like ${languageLabel(detected)}; the ${languageLabel(detected)} baseline applies`,
+      values: [config.language, detected],
+    });
+  }
 
   if (config.guard) {
     const added = config.guard.allowedCommands.filter((c) => !baseline.allowedCommands.includes(c));
@@ -396,7 +503,7 @@ export function assessRepoExecutionConfig(config: RepoExecutionConfig): RepoTrus
       findings.push({
         code: "commands-added",
         severity: "warning",
-        message: `Allows the agent to run commands outside the ${config.language ?? "default"} baseline: ${added.join(", ")}`,
+        message: `Allows the agent to run commands outside the ${languageLabel(detected)} baseline: ${added.join(", ")}`,
         values: added,
       });
     }
@@ -480,31 +587,57 @@ export function assessRepoExecutionConfig(config: RepoExecutionConfig): RepoTrus
 
 /** What else the checkout brought, for the review a user sees at init. */
 export interface RepoInventory {
+  /**
+   * PRD nodes (directories holding `index.md`) across every tree root. `epics`
+   * counts the top-level ones: v1 epics, v2 capabilities and changes.
+   */
   prd: { items: number; epics: number } | null;
   analysis: { analyzedAt: string | null; version: string | null } | null;
   henchRuns: number | null;
 }
 
-function countPrdTree(treeDir: string): { items: number; epics: number } | null {
-  if (!existsSync(treeDir)) return null;
+/** The folder trees under the rex dir: v1 `prd_tree/`, v2 `product/` and `changes/`. */
+const PRD_TREE_ROOTS = ["prd_tree", "product", "changes"] as const;
+
+/** True when `path` resolves to a location inside `realRoot` (itself resolved). */
+function resolvesInside(realRoot: string, path: string): boolean {
+  let real: string;
+  try {
+    real = realpathSync(path);
+  } catch {
+    return false;
+  }
+  return real === realRoot || real.startsWith(realRoot + sep);
+}
+
+/**
+ * Count PRD nodes under every tree root.
+ *
+ * This runs before the user has accepted the repository, so the checkout picks
+ * the directory structure: a tree root that resolves outside the repository is
+ * ignored, and the walk never descends through a link (Dirent types are lstat
+ * types), which rules out both escaping the repository and looping.
+ */
+function countPrdTrees(projectDir: string, rexDir: string): { items: number; epics: number } | null {
+  let realRoot: string;
+  try {
+    realRoot = realpathSync(projectDir);
+  } catch {
+    return null;
+  }
+  let found = false;
   let items = 0;
   let epics = 0;
   const walk = (dir: string, depth: number): void => {
-    let entries: string[];
+    let entries: Dirent[];
     try {
-      entries = readdirSync(dir);
+      entries = readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
-    for (const name of entries) {
-      const full = join(dir, name);
-      let isDir = false;
-      try {
-        isDir = statSync(full).isDirectory();
-      } catch {
-        continue;
-      }
-      if (!isDir) continue;
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const full = join(dir, entry.name);
       if (existsSync(join(full, "index.md"))) {
         items += 1;
         if (depth === 0) epics += 1;
@@ -512,13 +645,18 @@ function countPrdTree(treeDir: string): { items: number; epics: number } | null 
       walk(full, depth + 1);
     }
   };
-  walk(treeDir, 0);
-  return { items, epics };
+  for (const root of PRD_TREE_ROOTS) {
+    const treeDir = join(rexDir, root);
+    if (!resolvesInside(realRoot, treeDir)) continue;
+    found = true;
+    walk(treeDir, 0);
+  }
+  return found ? { items, epics } : null;
 }
 
 export function collectRepoInventory(projectDir: string): RepoInventory {
   const layout = resolveLayout(projectDir);
-  const prd = countPrdTree(join(layout.rexDir, "prd_tree"));
+  const prd = countPrdTrees(projectDir, layout.rexDir);
   const manifest = readJson(join(layout.sourcevisionDir, "manifest.json"));
   const analysis = manifest
     ? {
@@ -678,10 +816,21 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
   const lines: string[] = [];
   const warnings = ev.findings.filter((f) => f.severity === "warning");
   const infos = ev.findings.filter((f) => f.severity === "info");
+  // A plain test command leaves the checkout baseline, but verify_criteria and
+  // rex verify still run it only once this exact config is accepted (#686
+  // finding 2), so the baseline report must say which side of that it is on.
+  const pendingTestCommand = ev.state === "baseline" && ev.config.testCommand != null
+    && ev.record?.digest !== ev.config.digest;
 
   switch (ev.state) {
     case "baseline":
-      lines.push("Repository execution config: matches the defaults (nothing to trust).");
+      if (!ev.config.testCommand) {
+        lines.push("Repository execution config: matches the defaults (nothing to trust).");
+      } else if (pendingTestCommand) {
+        lines.push("Repository execution config: matches the defaults, but its test command is not accepted.");
+      } else {
+        lines.push(`Repository execution config: matches the defaults; test command accepted by you on ${ev.record?.trustedAt ?? "?"}.`);
+      }
       break;
     case "trusted":
       lines.push(`Repository execution config: trusted by you on ${ev.record?.trustedAt ?? "?"}.`);
@@ -709,6 +858,10 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
     lines.push("  Until trusted, hench runs with the default guard (the repository's config can only tighten it),");
     lines.push("  bypassPermissions is lowered to acceptEdits, and verify_criteria does not run the test command.");
     lines.push(`  To accept this configuration: ${accept}`);
+  } else if (pendingTestCommand) {
+    lines.push(`  verify_criteria and rex verify run the test command only once accepted: ${accept}`);
   }
-  return lines;
+  // Finding messages are escaped already; this also covers the source paths
+  // and the analysis timestamp, which come from the checkout too.
+  return lines.map(escapeTerminalControls);
 }

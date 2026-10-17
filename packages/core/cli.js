@@ -1764,7 +1764,9 @@ async function reviewRepoTrustAfterInit(dir, rest, quiet) {
   // Nothing to review on a repository that matches the defaults: keep init's
   // summary short. Anything else prints the full review, including what the
   // checkout brought (PRD items, analysis, runs), so the user sees it once.
-  if (evaluation.state === "baseline" && !quiet) {
+  // A test command keeps a baseline checkout reviewable: verify_criteria and
+  // rex verify run it only once accepted, and the full report says so.
+  if (evaluation.state === "baseline" && !evaluation.config?.testCommand && !quiet) {
     console.log("");
     console.log("Repository config: matches the defaults (nothing to trust).");
     return;

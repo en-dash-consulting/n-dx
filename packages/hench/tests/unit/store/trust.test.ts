@@ -64,6 +64,34 @@ describe("applyRepoTrust", () => {
     expect(trusted.permissionMode).toBe("bypassPermissions");
   });
 
+  it("clamps to the detected baseline, not the language the repository declares", () => {
+    writeFileSync(join(repo, "package.json"), "{}");
+    const declaredSwift = DEFAULT_HENCH_CONFIG("swift");
+    expect(declaredSwift.language).toBe("swift");
+    expect(declaredSwift.guard.allowedCommands).toEqual(expect.arrayContaining(["xcodebuild", "xcrun"]));
+    writeHenchConfig(declaredSwift);
+
+    const applied = applyRepoTrust(declaredSwift, repo, undefined, { ndxHome: home });
+    expect(applied.evaluation.state).toBe("untrusted");
+    expect(applied.evaluation.findings.map((f) => f.code)).toContain("language-mismatch");
+    expect(applied.clamped).toBe(true);
+    expect(applied.config.guard.allowedCommands).not.toContain("xcodebuild");
+    expect(applied.config.guard.allowedCommands).not.toContain("xcrun");
+  });
+
+  it("keeps a swift checkout's own toolchain while it is restricted", () => {
+    writeFileSync(join(repo, "Package.swift"), "");
+    const swift = DEFAULT_HENCH_CONFIG("swift");
+    swift.guard = { ...swift.guard, allowedCommands: [...swift.guard.allowedCommands, "bash"] };
+    writeHenchConfig(swift);
+
+    const applied = applyRepoTrust(swift, repo, undefined, { ndxHome: home });
+    expect(applied.evaluation.state).toBe("untrusted");
+    expect(applied.evaluation.findings.map((f) => f.code)).not.toContain("language-mismatch");
+    expect(applied.config.guard.allowedCommands).toEqual(expect.arrayContaining(["xcodebuild", "xcrun"]));
+    expect(applied.config.guard.allowedCommands).not.toContain("bash");
+  });
+
   it("summarises for the run record and warns with the CLI-provider note", () => {
     const widened = DEFAULT_HENCH_CONFIG();
     widened.guard = { ...widened.guard, allowedCommands: ["bash"] };
