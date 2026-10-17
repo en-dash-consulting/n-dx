@@ -40,9 +40,13 @@ sourcevision pack add java --from <file> --sha256 <hex>  # verify and install a 
 The `sv` command is an alias for `sourcevision`.
 
 Language packs other than the default Go pack are opt-in. `sv pack add <lang>`
-runs `npm install --ignore-scripts --no-audit --no-fund --prefix
-<ndx home>/packs/<sourcevision version> @n-dx/lang-<lang>@<sourcevision version>` (`--dry-run` prints it), then loads
-the pack and fails if it is of another version or will not load. Analysis looks
+runs this command (`--dry-run` prints it):
+
+```sh
+npm install --ignore-scripts --no-audit --no-fund --prefix <ndx home>/packs/<sourcevision version> @n-dx/lang-<lang>@<sourcevision version>
+```
+
+It then loads the pack and fails if it is of another version or will not load. Analysis looks
 in that directory before module resolution. A missing or mismatched pack never
 fails analysis; its notice names `ndx sv pack add <lang>`.
 
