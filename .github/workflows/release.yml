@@ -193,9 +193,7 @@ jobs:
         if: github.event_name == 'push' || inputs.mode == 'publish'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            packages/lang-runtime/build/cache
-            ~/.cache/tree-sitter
+          path: packages/lang-runtime/build/cache
           key: grammars-${{ runner.os }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
 
       - name: Build tree-sitter grammars

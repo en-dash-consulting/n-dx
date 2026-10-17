@@ -4,6 +4,9 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { type PythonProject, pythonProjectsFrom, readPythonProjects } from "../../src/python-build.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../helpers/call-within-budget.js";
+
+const PYTHON_BUILD = new URL("../../src/python-build.ts", import.meta.url);
 
 /** Projects over an in-memory repository: path → text. */
 function projects(repo: Record<string, string>): Promise<PythonProject[]> {
@@ -127,6 +130,33 @@ describe("Python projects: layouts", () => {
     expect(found[0].workspaceMembers).toEqual(["apps/web/api", "packages/a"]);
   });
 
+  it("uv workspace: classes, ? and ** match whole segments", async () => {
+    const found = await projects({
+      "pyproject.toml": '[tool.uv.workspace]\nmembers = ["libs/[a-c]1", "libs/[!a-c]x", "**/t?ols"]\n',
+      "libs/a1/pyproject.toml": "",
+      "libs/d1/pyproject.toml": "",
+      "libs/dx/pyproject.toml": "",
+      "libs/ax/pyproject.toml": "",
+      "tools/pyproject.toml": "",
+      "deep/er/tools/pyproject.toml": "",
+      "deep/mytools/pyproject.toml": "",
+    });
+    expect(found[0].workspaceMembers).toEqual(["deep/er/tools", "libs/a1", "libs/dx", "tools"]);
+  });
+
+  it("uv workspace: an invalid member glob is a notice, not a throw", async () => {
+    const found = await projects({
+      "pyproject.toml": '[project]\nname = "root"\n[tool.uv.workspace]\nmembers = [\n  "pkgs/[z-a]",\n  "pkgs/*",\n]\nexclude = ["pkgs/[b-a]"]\n',
+      "pkgs/a/pyproject.toml": "",
+    });
+    expect(found[0].name).toBe("root");
+    expect(found[0].workspaceMembers).toEqual(["pkgs/a"]);
+    expect(found[0].notices).toEqual([
+      "pyproject.toml:5: workspace glob pkgs/[z-a] not read: range z-a is out of order",
+      "pyproject.toml:8: workspace glob pkgs/[b-a] not read: range b-a is out of order",
+    ]);
+  });
+
   it("merges pyproject, setup.cfg, setup.py and requirements in one directory", async () => {
     const [p] = await projects({
       "pyproject.toml": "[build-system]\nrequires = [\"setuptools\"]\n",
@@ -215,6 +245,19 @@ describe("Python projects: layouts", () => {
     ]);
   });
 
+  it("requirements: the egg name is the fragment's last egg= parameter, read from the first #", async () => {
+    const hashes = "#".repeat(20_000);
+    const [p] = await projects({
+      "requirements.txt": [
+        "-e git+https://h/x.git#subdirectory=a&egg=First&egg=Last",
+        "git+https://h/y.git#sha=1#egg=Second",
+        `git+https://h/z.git${hashes}`,
+        "",
+      ].join("\n"),
+    });
+    expect(p.references.map((r) => r.name)).toEqual(["last", "second", undefined]);
+  });
+
   it("a requirements-only directory is a project; a nested project owns its own requirements", async () => {
     const found = await projects({
       "requirements-dev.txt": "pytest\n",
@@ -262,17 +305,40 @@ describe("readPythonProjects", () => {
     for (const d of cleanups.splice(0)) await rm(d, { recursive: true, force: true });
   });
 
-  it("reads the files the inventory lists from disk, and reports one that is gone", async () => {
+  /** Write `repo` (path → text) to a fresh directory, removed after the test. */
+  async function onDisk(repo: Record<string, string>): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), "python-build-"));
     cleanups.push(dir);
-    const write = async (rel: string, text: string): Promise<void> => {
+    for (const [rel, text] of Object.entries(repo)) {
       await mkdir(dirname(join(dir, rel)), { recursive: true });
       await writeFile(join(dir, rel), text);
-    };
-    await write("app/pyproject.toml", '[project]\nname = "app"\ndependencies = ["rich"]\n');
+    }
+    return dir;
+  }
+
+  it("reads the files the inventory lists from disk, and reports one that is gone", async () => {
+    const dir = await onDisk({ "app/pyproject.toml": '[project]\nname = "app"\ndependencies = ["rich"]\n' });
     const found = await readPythonProjects(dir, ["app/pyproject.toml", "app/setup.cfg"]);
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ dir: "app", name: "app", notices: ["app/setup.cfg is unreadable"] });
     expect(deps(found[0])).toEqual(["rich (no version specifier) main app/pyproject.toml:3"]);
   });
+
+  // Read in a worker terminated past its budget, so a backtracking glob fails
+  // this test by name instead of hanging the suite.
+  it(
+    "uv workspace: a pathological ** glob returns (no backtracking)",
+    async () => {
+      const glob = `${"**/a/".repeat(12)}c`;
+      const repo = {
+        "pyproject.toml": `[tool.uv.workspace]\nmembers = ["${glob}", "${"*a".repeat(30)}*c"]\n`,
+        [`${Array.from({ length: 25 }, () => "a").join("/")}/pyproject.toml`]: "",
+        [`${"a".repeat(60)}/pyproject.toml`]: "",
+      };
+      const dir = await onDisk(repo);
+      const found = await callWithinBudget<typeof readPythonProjects>(PYTHON_BUILD, "readPythonProjects", dir, Object.keys(repo));
+      expect(found[0].workspaceMembers).toEqual([]);
+    },
+    BOUNDED_TEST_TIMEOUT_MS,
+  );
 });

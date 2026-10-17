@@ -64,6 +64,20 @@ so `src/main/java/…/target/` stays a package). `skipsDirectory` applies both
 and `skipDirectories`, the caller doing the I/O and passing the directory's
 place; a name both conditional rules list is kept if either keeps it.
 
+Java build files (`pom.xml`, Gradle scripts) are read through
+`src/build-file.ts`, capped at `MAX_BUILD_FILE_BYTES` (1 MiB); a larger file
+is skipped with a notice. Maven `${…}` interpolation (`src/maven-properties.ts`,
+not re-exported) expands each property once per context, failures included,
+and stops at `MAX_PROPERTY_EXPANSION` (4096 characters) or
+`MAX_PROPERTY_NESTING` (64 properties deep), past which the value is
+unresolved. A property's value, or its reason for failing, does not depend on
+which reference reached it first; the exception is a cycle, whose reason names
+the member that closed it. Scans of repository content must stay linear: use
+`indexOf` for block and comment spans, not a lazy `[\s\S]*?` regex. Test a
+scan's pathological input through `tests/helpers/call-within-budget.ts`, which
+runs the call in a worker and terminates it past a budget, so a regression
+fails the test by name instead of hanging the suite.
+
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
 so the Java and Go packs share it without depending on each other.
 

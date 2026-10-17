@@ -3,6 +3,7 @@
  * (no network) and the test ndx home (tests/setup-ndx-home.ts).
  */
 
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { goConfig, javaConfig, terraformConfig, type LanguageConfig, type LanguagePackEntry } from "@n-dx/lang-kit";
 import { resolveNdxHome } from "@n-dx/llm-client";
-import { cmdPack, type NpmResult, type PackCommandDeps } from "../../../src/cli/commands/pack.js";
+import { cmdPack, dependencyClosure, type NpmResult, type PackCommandDeps } from "../../../src/cli/commands/pack.js";
 import { readTarGz, writeTarGz } from "../../../src/cli/commands/pack-archive.js";
 import type { InstallablePack } from "../../../src/language/pack-loader.js";
 
@@ -87,7 +88,7 @@ afterEach(() => rmSync(join(packDir, "..", ".."), { recursive: true, force: true
 describe("sv pack add", () => {
   it("installs the pack at sourcevision's version into the pack directory, creating it, and reports what loaded", async () => {
     await cmdPack(["add", "java"], deps({ npm: fakeNpm(() => installInPackDir("@n-dx/lang-java")) }));
-    expect(npmCalls).toEqual([["install", "--prefix", packDir, `@n-dx/lang-java@${VERSION}`]]);
+    expect(npmCalls).toEqual([["install", "--ignore-scripts", "--no-audit", "--no-fund", "--prefix", packDir, `@n-dx/lang-java@${VERSION}`]]);
     expect(existsSync(packDir)).toBe(true);
     expect(lines).toEqual([`Installed @n-dx/lang-java@${VERSION} into ${packDir} (produces imports, symbols).`]);
   });
@@ -135,14 +136,14 @@ describe("sv pack add", () => {
     const { packDir: _ignored, ...rest } = deps();
     await cmdPack(["add", "java", "--dry-run"], rest);
     const home = join(resolveNdxHome(), "packs", VERSION);
-    expect(lines).toEqual([`npm install --prefix ${home} @n-dx/lang-java@${VERSION}`]);
+    expect(lines).toEqual([`npm install --ignore-scripts --no-audit --no-fund --prefix ${home} @n-dx/lang-java@${VERSION}`]);
     expect(npmCalls).toEqual([]);
     expect(existsSync(home)).toBe(false);
   });
 
   it("quotes a pack directory with spaces in the printed command", async () => {
     await cmdPack(["add", "java", "--dry-run"], deps({ packDir: "/Users/a b/.ndx/packs/1.2.3" }));
-    expect(lines).toEqual([`npm install --prefix "/Users/a b/.ndx/packs/1.2.3" @n-dx/lang-java@${VERSION}`]);
+    expect(lines).toEqual([`npm install --ignore-scripts --no-audit --no-fund --prefix "/Users/a b/.ndx/packs/1.2.3" @n-dx/lang-java@${VERSION}`]);
   });
 });
 
@@ -181,9 +182,9 @@ describe("sv pack list", () => {
 describe("the project's pack list (sourcevision.packs)", () => {
   it("add with no language installs each listed pack that is not installed, as add <lang> would", async () => {
     installInPackDir("@n-dx/lang-sql");
-    const npm = fakeNpm((args) => installInPackDir(args[3]!.replace(/@[^@/]+$/, "")));
+    const npm = fakeNpm((args) => installInPackDir(args.at(-1)!.replace(/@[^@/]+$/, "")));
     await cmdPack(["add"], deps({ listed: ["java", "go", "sql", "java"], npm }));
-    expect(npmCalls).toEqual([["install", "--prefix", packDir, `@n-dx/lang-java@${VERSION}`]]);
+    expect(npmCalls).toEqual([["install", "--ignore-scripts", "--no-audit", "--no-fund", "--prefix", packDir, `@n-dx/lang-java@${VERSION}`]]);
     expect(lines).toEqual([
       `Installed @n-dx/lang-java@${VERSION} into ${packDir} (produces imports, symbols).`,
       "@n-dx/lang-go is already installed (module resolution).",
@@ -225,7 +226,7 @@ describe("sv pack remove", () => {
   it("uninstalls a pack from the pack directory", async () => {
     installInPackDir("@n-dx/lang-java");
     await cmdPack(["remove", "java"], deps());
-    expect(npmCalls).toEqual([["uninstall", "--prefix", packDir, "@n-dx/lang-java"]]);
+    expect(npmCalls).toEqual([["uninstall", "--ignore-scripts", "--prefix", packDir, "@n-dx/lang-java"]]);
     expect(lines).toEqual([`Removed @n-dx/lang-java from ${packDir}.`]);
   });
 
@@ -248,6 +249,51 @@ describe("sv pack remove", () => {
   });
 });
 
+describe("the pack directory lock", () => {
+  const lockFile = (): string => `${packDir}.lock`;
+  const holdLock = (pid: number, command = "pack add go"): void => {
+    mkdirSync(join(packDir, ".."), { recursive: true });
+    writeFileSync(lockFile(), JSON.stringify({ pid, token: "other", command, since: "2026-10-17T00:00:00.000Z" }));
+  };
+
+  it("refuses add, add --from and remove while another writer holds it, naming its PID, and runs nothing", async () => {
+    holdLock(4242);
+    installInPackDir("@n-dx/lang-java");
+    const alive = { isAlive: (pid: number) => pid === 4242 };
+    const held = { message: expect.stringContaining("Another sv pack (PID 4242, `pack add go`"), suggestion: expect.stringContaining(lockFile()) };
+    await expect(cmdPack(["add", "java"], deps(alive))).rejects.toMatchObject(held);
+    await expect(cmdPack(["add"], deps({ ...alive, listed: ["java"] }))).rejects.toMatchObject(held);
+    await expect(cmdPack(["add", "java", "--from", "missing.tgz"], deps(alive))).rejects.toMatchObject(held);
+    await expect(cmdPack(["remove", "java"], deps(alive))).rejects.toMatchObject(held);
+    expect(npmCalls).toEqual([]);
+    expect(JSON.parse(readFileSync(lockFile(), "utf-8")).pid).toBe(4242);
+  });
+
+  it("takes over a lock whose PID is dead, and releases it when done", async () => {
+    holdLock(4242);
+    await cmdPack(["add", "java"], deps({ isAlive: () => false, npm: fakeNpm(() => installInPackDir("@n-dx/lang-java")) }));
+    expect(npmCalls).toHaveLength(1);
+    expect(existsSync(lockFile())).toBe(false);
+    expect(readdirSync(join(packDir, ".."))).toEqual([VERSION]);
+  });
+
+  it("is held while npm runs and released when the command fails", async () => {
+    let seen: string | undefined;
+    const npm = fakeNpm(() => (seen = readFileSync(lockFile(), "utf-8")), { exitCode: 1 });
+    await expect(cmdPack(["remove", "java"], deps({ npm, listed: [] }))).resolves.toBeUndefined(); // not installed: no npm
+    installInPackDir("@n-dx/lang-java");
+    await expect(cmdPack(["remove", "java"], deps({ npm }))).rejects.toThrow("failed (exit 1)");
+    expect(JSON.parse(seen!)).toMatchObject({ pid: process.pid, command: "pack remove java" });
+    expect(existsSync(lockFile())).toBe(false);
+  });
+
+  it("is not taken by --dry-run", async () => {
+    holdLock(4242);
+    await cmdPack(["add", "java", "--dry-run"], deps({ isAlive: () => true }));
+    expect(lines).toHaveLength(1);
+  });
+});
+
 describe("sv pack", () => {
   it("refuses an unknown subcommand", async () => {
     await expect(cmdPack(["install", "java"], deps())).rejects.toThrow("Unknown pack command: install");
@@ -266,7 +312,12 @@ function installPrefix(prefix: string, packageName: string, version = VERSION): 
     }
   };
   lay(packageName, {
-    "package.json": JSON.stringify({ name: packageName, version, exports: { ".": { import: "./dist/index.js" } } }),
+    "package.json": JSON.stringify({
+      name: packageName,
+      version,
+      exports: { ".": { import: "./dist/index.js" } },
+      dependencies: { "@n-dx/lang-kit": version, "web-tree-sitter": "0.25.0" },
+    }),
     "dist/index.js": "export const pack = {};\n",
     "build/grammars/tree-sitter.wasm": "\0asm",
   });
@@ -290,7 +341,7 @@ describe("sv pack bundle and add --from", () => {
   afterEach(() => rmSync(work, { recursive: true, force: true }));
 
   /** A fake npm that installs the named pack into the `--prefix` it is given. */
-  const npmInstalling = (version = VERSION) => fakeNpm((args) => installPrefix(args[2]!, args[3]!.replace(/@[^@]*$/, ""), version));
+  const npmInstalling = (version = VERSION) => fakeNpm((args) => installPrefix(args[args.indexOf("--prefix") + 1]!, args.at(-1)!.replace(/@[^@]*$/, ""), version));
 
   async function makeBundle(id = "java", out = join(work, "out dir", "java.tgz")): Promise<string> {
     await cmdPack(["bundle", id, "--out", out], deps({ npm: npmInstalling(), tempRoot, cwd: work }));
@@ -300,9 +351,9 @@ describe("sv pack bundle and add --from", () => {
   it("installs the pack into a temporary prefix and archives it, its dependencies and a manifest", async () => {
     const out = await makeBundle();
     expect(npmCalls).toHaveLength(1);
-    expect(npmCalls[0]!.slice(0, 2)).toEqual(["install", "--prefix"]);
-    expect(npmCalls[0]![2]!.startsWith(tempRoot)).toBe(true);
-    expect(npmCalls[0]![3]).toBe(`@n-dx/lang-java@${VERSION}`);
+    expect(npmCalls[0]!.slice(0, 5)).toEqual(["install", "--ignore-scripts", "--no-audit", "--no-fund", "--prefix"]);
+    expect(npmCalls[0]![5]!.startsWith(tempRoot)).toBe(true);
+    expect(npmCalls[0]![6]).toBe(`@n-dx/lang-java@${VERSION}`);
     expect(readdirSync(tempRoot)).toEqual([]);
 
     const entries = readTarGz(readFileSync(out));
@@ -320,7 +371,10 @@ describe("sv pack bundle and add --from", () => {
       format: 1, pack: "java", packageName: "@n-dx/lang-java", version: VERSION, sourcevisionVersion: VERSION, platform: "any",
     });
     expect(lines[0]).toMatch(/^Bundled @n-dx\/lang-java@1\.2\.3 and its dependencies \(\d+ files\) into /);
-    expect(lines[1]).toBe(`Install it with no network: ndx sv pack add java --from "${out}"`);
+    const hash = createHash("sha256").update(readFileSync(out)).digest("hex");
+    expect(readFileSync(`${out}.sha256`, "utf-8")).toBe(`${hash}  java.tgz\n`);
+    expect(lines[1]).toBe(`SHA-256 ${hash}, written to ${out}.sha256.`);
+    expect(lines[2]).toBe(`Install it with no network: ndx sv pack add java --from "${out}" --sha256 ${hash}`);
   });
 
   it("names the bundle n-dx-lang-<lang>-<version>.tgz in the working directory by default", async () => {
@@ -347,7 +401,8 @@ describe("sv pack bundle and add --from", () => {
 
     await cmdPack(["add", "java", "--from", out], deps({ cwd: work }));
     expect(npmCalls).toEqual([]);
-    expect(lines[0]).toBe(`Installed @n-dx/lang-java@${VERSION} into ${packDir} (produces imports, symbols).`);
+    expect(lines[0]).toMatch(/^Checked .*java\.tgz against .*java\.tgz\.sha256 \(SHA-256 [0-9a-f]{64}\)\. .*catches damage, not tampering/);
+    expect(lines[1]).toBe(`Installed @n-dx/lang-java@${VERSION} into ${packDir} (produces imports, symbols).`);
     expect(existsSync(stale)).toBe(false);
     expect(existsSync(join(packDir, "node_modules", "@n-dx", "lang-java", "build", "grammars", "tree-sitter.wasm"))).toBe(true);
     expect(existsSync(join(packDir, "node_modules", ".package-lock.json"))).toBe(false);
@@ -363,7 +418,7 @@ describe("sv pack bundle and add --from", () => {
     await makeBundle("java", join(work, "java.tgz"));
     lines = [];
     await cmdPack(["add", "java", "--from=java.tgz", "--dry-run"], deps({ cwd: work }));
-    expect(lines[0]).toMatch(new RegExp(`^Would install @n-dx/lang-java@1\\.2\\.3 from .*java\\.tgz into `));
+    expect(lines[1]).toMatch(new RegExp(`^Would install @n-dx/lang-java@1\\.2\\.3 from .*java\\.tgz into `));
     expect(existsSync(packDir)).toBe(false);
   });
 
@@ -435,5 +490,154 @@ describe("sv pack bundle and add --from", () => {
     await expect(cmdPack(["add", "java", "--from", join(work, "absent.tgz")], deps())).rejects.toThrow(/Cannot read the bundle .*absent\.tgz/);
     await expect(cmdPack(["add", "java", "--from"], deps())).rejects.toThrow("Missing value for --from");
     expect(existsSync(packDir)).toBe(false);
+  });
+
+  const sha256 = (file: string): string => createHash("sha256").update(readFileSync(file)).digest("hex");
+
+  /** An importer that counts its calls, so a test can show nothing from a bundle ran. */
+  function countingImport(): { importFile: PackCommandDeps["importFile"]; calls: () => number } {
+    let calls = 0;
+    return {
+      importFile: (url: string) => {
+        calls++;
+        return importFile(url);
+      },
+      calls: () => calls,
+    };
+  }
+
+  /** No pack directory and no staging directory beside it: the lock file is all a refused add leaves, and it is released. */
+  const expectNothingExtracted = (): void => {
+    expect(existsSync(packDir)).toBe(false);
+    const parent = join(packDir, "..");
+    expect(existsSync(parent) ? readdirSync(parent) : []).toEqual([]);
+  };
+
+  it("refuses a --sha256 mismatch before extracting or importing anything", async () => {
+    const out = await makeBundle();
+    const counted = countingImport();
+    await expect(
+      cmdPack(["add", "java", "--from", out, "--sha256", "0".repeat(64)], deps({ cwd: work, importFile: counted.importFile })),
+    ).rejects.toMatchObject({
+      message: `${out} has SHA-256 ${sha256(out)}, not the ${"0".repeat(64)} given with --sha256.`,
+      suggestion: expect.stringContaining("Nothing was extracted or installed."),
+    });
+    expect(counted.calls()).toBe(0);
+    expectNothingExtracted();
+  });
+
+  it("refuses a bundle that no longer matches the .sha256 beside it, extracting nothing", async () => {
+    const out = await makeBundle();
+    const entries = readTarGz(readFileSync(out));
+    writeFileSync(out, writeTarGz([...entries, { type: "file", path: "node_modules/extra/package.json", mode: 0o644, data: Buffer.from("{}") }]));
+    const counted = countingImport();
+    await expect(cmdPack(["add", "java", "--from", out], deps({ cwd: work, importFile: counted.importFile }))).rejects.toThrow(
+      `${out} has SHA-256 ${sha256(out)}, not the ${readFileSync(`${out}.sha256`, "utf-8").slice(0, 64)} recorded in ${out}.sha256.`,
+    );
+    expect(counted.calls()).toBe(0);
+    expectNothingExtracted();
+  });
+
+  it("installs a bundle whose hash matches --sha256, in any case", async () => {
+    const out = await makeBundle();
+    lines = [];
+    await cmdPack(["add", "java", "--from", out, `--sha256=${sha256(out).toUpperCase()}`], deps({ cwd: work }));
+    expect(lines[0]).toBe(`Verified ${out}: SHA-256 ${sha256(out)} matches --sha256.`);
+    expect(lines[1]).toBe(`Installed @n-dx/lang-java@${VERSION} into ${packDir} (produces imports, symbols).`);
+  });
+
+  it("installs a bundle with no hash to check, saying it was not verified and printing its hash", async () => {
+    const out = await makeBundle();
+    rmSync(`${out}.sha256`);
+    lines = [];
+    await cmdPack(["add", "java", "--from", out], deps({ cwd: work }));
+    expect(lines[0]).toBe(
+      `Not verified: ${out} has SHA-256 ${sha256(out)}. Pass --sha256 <hex> with the hash sv pack bundle printed to check it.`,
+    );
+    expect(lines[1]).toMatch(/^Installed @n-dx\/lang-java/);
+  });
+
+  it("refuses a --sha256 that is not a SHA-256, and --sha256 without --from", async () => {
+    const out = await makeBundle();
+    await expect(cmdPack(["add", "java", "--from", out, "--sha256", "abc"], deps())).rejects.toThrow(
+      '--sha256 takes the bundle\'s SHA-256 as 64 hex digits, not "abc".',
+    );
+    await expect(cmdPack(["add", "java", "--sha256", sha256(out)], deps())).rejects.toThrow("--sha256 checks a bundle");
+    expect(existsSync(packDir)).toBe(false);
+  });
+
+  it("replaces only the named pack and its dependency closure, never another pack or a stray package", async () => {
+    const out = await makeBundle();
+    // A modified java bundle: it also carries lang-sql and an unrelated package, and declares lang-sql a dependency.
+    const tampered = readTarGz(readFileSync(out)).map((e) =>
+      e.type === "file" && e.path === "node_modules/@n-dx/lang-java/package.json"
+        ? { ...e, data: Buffer.from(JSON.stringify({ ...JSON.parse(e.data.toString()), dependencies: { "web-tree-sitter": "0.25.0", "@n-dx/lang-sql": VERSION } })) }
+        : e,
+    );
+    const file = join(work, "tampered.tgz");
+    writeFileSync(file, writeTarGz([
+      ...tampered,
+      { type: "file", path: "node_modules/@n-dx/lang-sql/package.json", mode: 0o644, data: Buffer.from(JSON.stringify({ name: "@n-dx/lang-sql", version: VERSION, tampered: true })) },
+      { type: "file", path: "node_modules/stray/package.json", mode: 0o644, data: Buffer.from("{}") },
+    ]));
+    packDir = join(work, "ndx home", "packs", VERSION);
+    installPrefix(packDir, "@n-dx/lang-sql");
+    const sqlManifest = join(packDir, "node_modules", "@n-dx", "lang-sql", "package.json");
+    const before = readFileSync(sqlManifest, "utf-8");
+    rmSync(join(packDir, "node_modules", "web-tree-sitter"), { recursive: true });
+
+    await cmdPack(["add", "java", "--from", file], deps({ cwd: work }));
+    expect(readFileSync(sqlManifest, "utf-8")).toBe(before);
+    expect(existsSync(join(packDir, "node_modules", "stray"))).toBe(false);
+    expect(existsSync(join(packDir, "node_modules", "@n-dx", "lang-java", "package.json"))).toBe(true);
+    expect(existsSync(join(packDir, "node_modules", "web-tree-sitter", "package.json"))).toBe(true);
+  });
+});
+
+describe("dependencyClosure", () => {
+  let nodeModules: string;
+  const pkg = (path: string, dependencies: Record<string, string> = {}, extra: Record<string, unknown> = {}): void => {
+    mkdirSync(join(nodeModules, ...path.split("/")), { recursive: true });
+    writeFileSync(join(nodeModules, ...path.split("/"), "package.json"), JSON.stringify({ dependencies, ...extra }));
+  };
+  beforeEach(() => {
+    nodeModules = join(mkdtempSync(join(tmpdir(), "sv-pack-closure-")), "node_modules");
+  });
+  afterEach(() => rmSync(join(nodeModules, ".."), { recursive: true, force: true }));
+
+  it("follows dependencies, optional and peer dependencies as Node resolves them, nested copies counting as their ancestor", () => {
+    pkg("@n-dx/lang-go", { "@n-dx/lang-kit": "1", a: "1" }, { peerDependencies: { peer: "1" }, optionalDependencies: { absent: "1" } });
+    pkg("@n-dx/lang-kit");
+    pkg("a", { b: "1" });
+    // a's own copy of b, whose dependency c is hoisted to the top.
+    pkg("a/node_modules/b", { c: "1" });
+    pkg("b");
+    pkg("c");
+    pkg("peer");
+    pkg("unrelated");
+    expect(dependencyClosure(nodeModules, "@n-dx/lang-go")).toEqual(["@n-dx/lang-go", "@n-dx/lang-kit", "a", "c", "peer"]);
+  });
+
+  it("never follows an excluded name, and stops on a cycle", () => {
+    pkg("@n-dx/lang-go", { "@n-dx/lang-java": "1", x: "1" });
+    pkg("@n-dx/lang-java");
+    pkg("x", { "@n-dx/lang-go": "1" });
+    expect(dependencyClosure(nodeModules, "@n-dx/lang-go", ["@n-dx/lang-java"])).toEqual(["@n-dx/lang-go", "x"]);
+  });
+
+  it("refuses a dependency name that would leave node_modules, before anything is moved", () => {
+    for (const name of ["../escape", "@s/../../escape", "..", "@../x", "a\\..\\b"]) {
+      pkg("@n-dx/lang-go", { [name]: "1" });
+      expect(() => dependencyClosure(nodeModules, "@n-dx/lang-go"), name).toThrow(`names ${JSON.stringify(name)}, which is not a package name`);
+    }
+    pkg("@n-dx/lang-go", { "@scope/ok.name": "1", "a.b-c_d": "1" });
+    expect(dependencyClosure(nodeModules, "@n-dx/lang-go")).toEqual(["@n-dx/lang-go"]);
+  });
+
+  it("fails naming a package.json in the closure that will not parse", () => {
+    pkg("@n-dx/lang-go", { x: "1" });
+    mkdirSync(join(nodeModules, "x"));
+    writeFileSync(join(nodeModules, "x", "package.json"), "{");
+    expect(() => dependencyClosure(nodeModules, "@n-dx/lang-go")).toThrow(/Cannot read .*x.package\.json from the bundle/);
   });
 });

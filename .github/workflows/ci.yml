@@ -393,39 +393,48 @@ jobs:
 
       # Grammars are a build artifact (never committed). Without them every
       # skipUnlessGrammar test (runner, grammar, pack queries, pack goldens)
-      # skips and a regression there goes green. Every such test is in the
-      # sourcevision suite, so these steps run on each OS's leg whose group
-      # includes it. They must be in this job: a GITHUB_ENV export reaches only
-      # later steps of the same job, so setting it in `build` left every test
-      # here skipping. SV_REQUIRE_GRAMMARS=1 turns a missing-grammar skip into
+      # skips and a regression there goes green. Those tests are in the suites
+      # of sourcevision, lang-runtime and every pack; scripts/grammar-suites.mjs
+      # derives that list from the manifests, and the steps below run on each
+      # leg whose group includes one of them. They must be in this job, before
+      # the run step: a GITHUB_ENV export reaches only later steps of the same
+      # job, so setting it in `build` left every test here skipping.
+      # tests/e2e/ci-grammar-steps.test.js fails if a leg loses them.
+      # SV_REQUIRE_GRAMMARS=1 turns a missing-grammar skip into
       # a failure. build-grammars.mjs pins the tree-sitter CLI for linux,
-      # macos and windows. The cache holds the SHA-256-verified CLI and grammar
-      # archives (re-verified on use) plus the wasi-sdk the CLI fetches into
-      # the OS cache dir on first use: ~/.cache on Linux, ~/Library/Caches on
-      # macOS, %LOCALAPPDATA% on Windows. Key on the script, which holds every
-      # pin.
+      # macos and windows. The cache holds the SHA-256-verified CLI, grammar,
+      # wasi-sdk and binaryen archives (re-verified on use) and the extracted
+      # toolchains, all under packages/lang-runtime/build/cache; the CLI is
+      # pointed at those and never downloads into the OS cache dir. Key on the
+      # script, which holds every pin.
+      - name: Decide whether this group needs grammars
+        id: grammars
+        shell: bash
+        # Fail on anything but true/false: an empty answer would skip the
+        # grammar steps below and leave every grammar test skipping, green.
+        run: |
+          build=$(node scripts/grammar-suites.mjs ${{ matrix.suites }})
+          case "$build" in true|false) ;; *) echo "grammar-suites.mjs printed '$build'"; exit 1 ;; esac
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
       - name: Cache grammar build downloads
-        if: contains(matrix.suites, 'sourcevision')
+        if: steps.grammars.outputs.build == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            packages/lang-runtime/build/cache
-            ~/.cache/tree-sitter
-            ~/Library/Caches/tree-sitter
-            ~/AppData/Local/tree-sitter
+          path: packages/lang-runtime/build/cache
           key: grammars-${{ runner.os }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
 
       # Every language pack builds its own grammar (`build:grammars`) into its
       # own build/grammars; sourcevision has none. One at a time, since they
       # share the download cache.
       - name: Build tree-sitter grammars
-        if: contains(matrix.suites, 'sourcevision')
+        if: steps.grammars.outputs.build == 'true'
         run: pnpm -r --workspace-concurrency=1 run build:grammars
 
       # `shell: bash` so the same line works on the Windows leg, whose default
       # shell is PowerShell.
       - name: Require built grammars in tests
-        if: contains(matrix.suites, 'sourcevision')
+        if: steps.grammars.outputs.build == 'true'
         shell: bash
         run: echo "SV_REQUIRE_GRAMMARS=1" >> "$GITHUB_ENV"
 

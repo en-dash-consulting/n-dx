@@ -13,6 +13,7 @@
 import { existsSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, posix, relative, sep } from "node:path";
+import { oversizedNotice, readBuildFile, type OversizedBuildFile } from "./build-file.js";
 import { javaConfig } from "./java.js";
 import { skipsDirectory } from "./registry.js";
 
@@ -61,19 +62,76 @@ export async function discoverJavaModules(projectDir: string): Promise<JavaModul
 
 // ── Maven ────────────────────────────────────────────────────────────────
 
+const COMMENT_OPEN = "<!--";
+
 /**
- * Remove XML comments, repeating until none remain: one pass over
- * `<!<!-- x -->-- -->` would leave a `<!--` behind and a later scan would
- * read the rest of the file as a comment's contents.
+ * Remove XML comments in one linear scan. The result never contains `<!--`:
+ * an opener that only forms once a comment is removed (`<!<!-- x -->-- -->`)
+ * is itself treated as a comment. It ends at the next `-->` in the original
+ * text, so in `<!<!-- x -->-- <!-- y --> z -->` it ends after `y` and ` z -->`
+ * is kept, where repeating a single-pass strip until nothing changes would
+ * also remove ` z -->`. Both are malformed XML that Maven rejects; only the
+ * absence of `<!--` matters. An unterminated comment runs to the end of the file.
  */
-function stripXmlComments(xml: string): string {
-  let out = xml;
+export function stripXmlComments(xml: string): string {
+  let out = "";
+  let i = 0;
+  while (i < xml.length) {
+    // Characters of an opener already kept at the end of `out`, completed by `xml` at `i`.
+    let kept = COMMENT_OPEN.length - 1;
+    while (kept > 0 && !(out.endsWith(COMMENT_OPEN.slice(0, kept)) && xml.startsWith(COMMENT_OPEN.slice(kept), i))) {
+      kept--;
+    }
+    let body: number;
+    if (kept > 0) {
+      out = out.slice(0, -kept);
+      body = i + COMMENT_OPEN.length - kept;
+    } else {
+      const open = xml.indexOf(COMMENT_OPEN, i);
+      if (open < 0) return out + xml.slice(i);
+      out += xml.slice(i, open);
+      body = open + COMMENT_OPEN.length;
+    }
+    const close = xml.indexOf("-->", body);
+    if (close < 0) return out;
+    i = close + 3;
+  }
+  return out;
+}
+
+/**
+ * Spans `open…close`, leftmost first and non-overlapping, as the lazy
+ * `/open[\s\S]*?close/g` matches them, in linear time: that regex rescans to
+ * the end from every opener when the closer is missing.
+ */
+function* spans(src: string, open: string, close: string): Generator<{ start: number; inner: string; end: number }> {
+  let i = 0;
   for (;;) {
-    const next = out.replace(/<!--[\s\S]*?-->/g, "");
-    if (next === out) return out;
-    out = next;
+    const start = src.indexOf(open, i);
+    if (start < 0) return;
+    const closeAt = src.indexOf(close, start + open.length);
+    // No later opener has a closer either.
+    if (closeAt < 0) return;
+    i = closeAt + close.length;
+    yield { start, inner: src.slice(start + open.length, closeAt), end: i };
   }
 }
+
+/** `src` without its first `limit` `open…close` spans. */
+function removeSpans(src: string, open: string, close: string, limit = Infinity): string {
+  let out = "";
+  let from = 0;
+  let removed = 0;
+  for (const span of spans(src, open, close)) {
+    if (removed++ >= limit) break;
+    out += src.slice(from, span.start);
+    from = span.end;
+  }
+  return out + src.slice(from);
+}
+
+const tagBlocks = (xml: string, tag: string) => spans(xml, `<${tag}>`, `</${tag}>`);
+const removeBlocks = (xml: string, tag: string, limit?: number) => removeSpans(xml, `<${tag}>`, `</${tag}>`, limit);
 
 async function readMavenModules(projectDir: string, notices: string[]): Promise<JavaModule[]> {
   const modules: JavaModule[] = [];
@@ -86,7 +144,7 @@ async function readMavenModules(projectDir: string, notices: string[]): Promise<
     if (pom === null) return;
     const xml = stripXmlComments(pom);
     // Plugin configuration reuses the tag name (antlr4, protobuf, ...) for non-Java roots.
-    const build = xml.replace(/<plugins>[\s\S]*?<\/plugins>/g, "");
+    const build = removeBlocks(xml, "plugins");
 
     const declared = [...tagValues(build, "sourceDirectory"), ...tagValues(build, "testSourceDirectory")].map(
       resolveMavenPath,
@@ -108,22 +166,28 @@ async function readMavenModules(projectDir: string, notices: string[]): Promise<
   return modules;
 }
 
+/**
+ * Trimmed, non-empty text of each `<tag>text</tag>` with no markup inside.
+ * Trimmed in JS: `\s*` beside a lazy `[^<]*?` backtracks without bound when
+ * the closing tag is missing.
+ */
 function tagValues(xml: string, tag: string): string[] {
   const out: string[] = [];
-  for (const m of xml.matchAll(new RegExp(`<${tag}>\\s*([^<]*?)\\s*</${tag}>`, "g"))) {
-    if (m[1]) out.push(m[1]);
+  for (const m of xml.matchAll(new RegExp(`<${tag}>([^<]*)</${tag}>`, "g"))) {
+    const value = m[1]!.trim();
+    if (value) out.push(value);
   }
   return out;
 }
 
 /** The first artifactId outside `<parent>` names the module. */
 function mavenArtifactId(xml: string): string | undefined {
-  return tagValues(xml.replace(/<parent>[\s\S]*?<\/parent>/, ""), "artifactId")[0];
+  return tagValues(removeBlocks(xml, "parent", 1), "artifactId")[0];
 }
 
 /** Profile-scoped `<modules>` are included: a superset beats a missing module. */
 function modulesBlock(xml: string): string[] {
-  return [...xml.matchAll(/<modules>([\s\S]*?)<\/modules>/g)].flatMap((m) => tagValues(m[1], "module"));
+  return [...tagBlocks(xml, "modules")].flatMap((b) => tagValues(b.inner, "module"));
 }
 
 /** Module-relative path, or "" when it depends on an unresolved placeholder. */
@@ -172,7 +236,7 @@ async function readGradleModules(
 }
 
 function stripGradleComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'])\/\/.*$/gm, "$1");
+  return removeSpans(src, "/*", "*/").replace(/(^|[^:"'])\/\/.*$/gm, "$1");
 }
 
 /** `include(":a", ":b:c")`, `include 'a', 'b'`, across lines. */
@@ -258,9 +322,9 @@ async function packageDeclarationRoots(projectDir: string, notices: string[]): P
 
 /** The directory a file's package path hangs off, or null when path and package disagree. */
 async function rootFromPackage(projectDir: string, file: string, notices: string[]): Promise<string | null> {
-  const text = await readText(projectDir, file, notices);
+  const text = await readText(projectDir, file, notices, (path) => readFile(path, "utf8"));
   if (text === null) return null;
-  const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  const code = removeSpans(text, "/*", "*/").replace(/\/\/.*$/gm, "");
   const pkg = /^\s*package\s+([\w.]+)\s*;/m.exec(code)?.[1];
   const fileDir = toPosix(relative(projectDir, dirname(file)));
   if (!pkg) return fileDir; // default package: the directory is the root
@@ -291,10 +355,21 @@ function toPosix(p: string): string {
   return sep === "/" ? p : p.split(sep).join("/");
 }
 
-/** File text; null when absent, or when unreadable (EACCES/EPERM), which is reported as a notice. */
-async function readText(projectDir: string, path: string, notices: string[]): Promise<string | null> {
+/**
+ * File text, a build file by default; null when absent, or when unreadable
+ * (EACCES/EPERM) or over the build file size cap, both reported as a notice.
+ */
+async function readText(
+  projectDir: string,
+  path: string,
+  notices: string[],
+  read: (path: string) => Promise<string | OversizedBuildFile> = readBuildFile,
+): Promise<string | null> {
   try {
-    return await readFile(path, "utf8");
+    const text = await read(path);
+    if (typeof text === "string") return text;
+    notices.push(oversizedNotice(toPosix(relative(projectDir, path)), text.oversized));
+    return null;
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return null;

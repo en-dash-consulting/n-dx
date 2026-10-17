@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
-import { discoverJavaModules } from "../../src/java-modules.js";
+import { MAX_BUILD_FILE_BYTES } from "../../src/build-file.js";
+import { discoverJavaModules, stripXmlComments } from "../../src/java-modules.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../helpers/call-within-budget.js";
+
+const JAVA_MODULES = new URL("../../src/java-modules.ts", import.meta.url);
 
 describe("discoverJavaModules", () => {
   let dir: string;
@@ -83,6 +87,90 @@ describe("discoverJavaModules", () => {
     await file("hidden/pom.xml", "<project><artifactId>hidden</artifactId></project>");
     const { layout } = await discover();
     expect(layout.modules.map((m) => m.name).sort()).toEqual(["core", "root"]);
+  });
+
+  // Each input below took seconds or more under the old regexes and returns at
+  // once now. Discovery runs in a worker terminated past a generous budget, so
+  // a regression fails the test by name instead of hanging the suite.
+  describe("pathological poms", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
+    const pad = " ".repeat(50_000);
+    const discoverBounded = () =>
+      callWithinBudget<typeof discoverJavaModules>(JAVA_MODULES, "discoverJavaModules", dir);
+
+    it("reads past a tag whose closing tag is missing after long whitespace", async () => {
+      await file(
+        "pom.xml",
+        `<project><artifactId> app </artifactId><build><sourceDirectory>${pad}x${pad}</build></project>`,
+      );
+      await dirs("src/main/java");
+      expect((await discoverBounded()).modules).toEqual([
+        { name: "app", dir: "", sourceRoots: ["src/main/java"] },
+      ]);
+    });
+
+    it("treats an unterminated comment as running to the end of the file", async () => {
+      await file(
+        "pom.xml",
+        `<project><artifactId>root</artifactId><modules><module>core</module></modules><!--${"<!--".repeat(50_000)}
+           <modules><module>hidden</module></modules></project>`,
+      );
+      await file("core/pom.xml", "<project><artifactId>core</artifactId></project>");
+      await file("hidden/pom.xml", "<project><artifactId>hidden</artifactId></project>");
+      expect((await discoverBounded()).modules.map((m) => m.name)).toEqual(["root", "core"]);
+    });
+
+    it("reads a pom with many unclosed plugins, parent and modules blocks", async () => {
+      const unclosed = ["<plugins>", "<parent>", "<modules>"].map((t) => t.repeat(30_000)).join("");
+      await file("pom.xml", `<project><artifactId>app</artifactId>${unclosed}</project>`);
+      expect((await discoverBounded()).modules.map((m) => m.name)).toEqual(["app"]);
+    });
+
+    it("reads Gradle files with many unterminated block comments", async () => {
+      // `/* ` repeated never forms `*/`.
+      await file("settings.gradle", `include 'a'\n${"/* ".repeat(50_000)}`);
+      await file("a/build.gradle", "");
+      await file("build.gradle", "/* ".repeat(50_000));
+      await dirs("a/src/main/java");
+      expect((await discoverBounded()).modules.map((m) => m.name)).toEqual([":", ":a"]);
+    });
+  });
+
+  describe("stripXmlComments", () => {
+    it.each([
+      ["<a/><!-- x --><b/>", "<a/><b/>"],
+      ["<!<!-- x -->-- y --><b/>", "<b/>"],
+      ["<<!-- x -->!-- y --><b/>", "<b/>"],
+      ["<!-<!-- x -->- y --><b/>", "<b/>"],
+      ["<!<!-<!-- x -->- y -->-- z --><b/>", "<b/>"],
+      ["<!-- x --><!-- y -->", ""],
+      ["<!--> x --><b/>", "<b/>"],
+      ["<a/><!-- x", "<a/>"],
+      ["<!<!-- x -->-- y", ""],
+      // The formed opener ends at the next `-->` in the input (see the doc comment).
+      ["<!<!-- x -->-- <!-- y --> z --><b/>", " z --><b/>"],
+      ["<!- - --><b/>", "<!- - --><b/>"],
+    ])("%j → %j", (xml, out) => {
+      expect(stripXmlComments(xml)).toBe(out);
+      expect(stripXmlComments(xml)).not.toContain("<!--");
+    });
+  });
+
+  it("skips a module pom over the build file size cap and reports it", async () => {
+    await file("pom.xml", "<project><artifactId>root</artifactId><modules><module>big</module></modules></project>");
+    const big = `<project><artifactId>big</artifactId></project>${" ".repeat(MAX_BUILD_FILE_BYTES)}`;
+    await file("big/pom.xml", big);
+    const layout = await discoverJavaModules(dir);
+    expect(layout.modules.map((m) => m.name)).toEqual(["root"]);
+    expect(layout.notices).toEqual([
+      `big/pom.xml is ${big.length} bytes, over the ${MAX_BUILD_FILE_BYTES}-byte build file limit; skipped`,
+    ]);
+  });
+
+  it("does not cap .java files read for package declarations", async () => {
+    await file("src/p/A.java", `package p;\n${"// x\n".repeat(MAX_BUILD_FILE_BYTES / 4)}`);
+    const layout = await discoverJavaModules(dir);
+    expect(layout.modules[0]?.sourceRoots).toEqual(["src"]);
+    expect(layout.notices).toBeUndefined();
   });
 
   it("ignores sourceDirectory set in plugin configuration", async () => {

@@ -34,14 +34,14 @@ sourcevision pack add                     # install every pack the project lists
 sourcevision pack list                    # each pack: installed, resolved, missing or refused; listed packs marked
 sourcevision pack remove java             # remove a pack from the pack directory
 sourcevision pack bundle java             # archive the pack and its dependencies for offline use
-sourcevision pack add java --from <file>  # install a bundle with no network
+sourcevision pack add java --from <file> --sha256 <hex>  # verify and install a bundle with no network
 ```
 
 The `sv` command is an alias for `sourcevision`.
 
 Language packs other than the default Go pack are opt-in. `sv pack add <lang>`
-runs `npm install --prefix <ndx home>/packs/<sourcevision version>
-@n-dx/lang-<lang>@<sourcevision version>` (`--dry-run` prints it), then loads
+runs `npm install --ignore-scripts --no-audit --no-fund --prefix
+<ndx home>/packs/<sourcevision version> @n-dx/lang-<lang>@<sourcevision version>` (`--dry-run` prints it), then loads
 the pack and fails if it is of another version or will not load. Analysis looks
 in that directory before module resolution. A missing or mismatched pack never
 fails analysis; its notice names `ndx sv pack add <lang>`.
@@ -50,10 +50,21 @@ For a machine with no registry access, run `sv pack bundle <lang> [--out <file>]
 on a connected machine with the same sourcevision version. It installs the pack
 into a temporary prefix and writes one `.tgz` (default
 `n-dx-lang-<lang>-<version>.tgz`) holding the pack, its dependencies and a
-manifest; grammars are WebAssembly, so a bundle serves every platform. On the
-offline machine, `sv pack add <lang> --from <file>` checks the manifest, refusing
-a bundle of another pack or version, replaces any installed copy and loads the
-pack, with no npm call.
+manifest; grammars are WebAssembly, so a bundle serves every platform. It prints
+the bundle's SHA-256 and writes it to `<file>.sha256`. On the offline machine,
+`sv pack add <lang> --from <file> --sha256 <hex>` refuses the bundle unless its
+SHA-256 is `<hex>`, before reading it; then it refuses a bundle of another pack
+or version, replaces the installed copies of the pack and its dependencies and
+loads the pack, with no npm call.
+
+**A bundle is trusted like any npm tarball.** Its JavaScript runs as soon as
+`add --from` loads the pack, and its manifest is written by whoever made it, so
+reading the manifest is not verification: the hash is. Send the hash that
+`bundle` printed by a channel separate from the bundle, and pass it as
+`--sha256`. Without `--sha256`, `add --from` checks `<file>.sha256` when it
+sits beside the bundle and says so; that catches a damaged copy, not a tampered
+one, which can carry a matching `.sha256`. With neither, it prints the bundle's
+hash and says the bundle was not verified.
 
 A project can list the packs it wants in its config file (`.n-dx.json`, or
 `.ndx/config.json`), by editing it; `ndx config` does not set the key:
@@ -69,6 +80,63 @@ nothing else: what is analysed, and its output, are the same as with no list.
 `sv pack add` with no language installs each listed pack that is not already
 found (and says so when the list is empty or absent), and `sv pack list` marks
 the listed packs.
+
+### Pack installation internals
+
+`sv pack` (`src/cli/commands/pack.ts`, reached as `ndx sv pack …`) manages
+the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, terraform,
+python, sql; only `KNOWN_PACKS`, all but sql, are analyzed with today). npm
+never runs lifecycle scripts: no pack needs one (grammars are prebuilt WASM),
+and a script anywhere in the dependency tree would otherwise run with the
+user's privileges.
+
+- `add <lang>` runs `npm install --ignore-scripts --no-audit --no-fund --prefix <pack dir> @n-dx/lang-<lang>@<sourcevision version>`,
+  creating the directory, then loads the pack from it with `loadPack`; a
+  mismatch, a load failure or a pack npm did not put there is an error carrying
+  npm's output. `--dry-run` prints the command.
+- `list [--json]` reports each pack as installed (pack directory), resolved
+  (module resolution), missing or refused, with its version.
+- `remove <lang>` runs `npm uninstall --ignore-scripts --prefix`; a pack found
+  only by module resolution is left alone.
+
+Offline, for a machine with no registry access:
+
+- `bundle <lang> [--out <file>]` (connected machine) runs the same npm install
+  into a fresh temporary prefix, loads the pack from it, writes
+  `n-dx-pack-bundle.json` (pack, package, version, sourcevision version,
+  `platform: "any"`: grammars are WASM) and archives the whole prefix as one
+  `.tgz`, default `n-dx-lang-<lang>-<version>.tgz`, then writes its SHA-256 to
+  `<bundle>.sha256` (`sha256sum` format) and prints it. The prefix is removed.
+- `add <lang> --from <bundle> [--sha256 <hex>]` makes no npm call. It hashes
+  the file first and refuses a mismatch with `--sha256` (or, without it, with a
+  `<bundle>.sha256` beside the bundle) before parsing, extracting or importing
+  anything; with no hash to check it prints the bundle's and says it was not
+  verified. It then reads the manifest and refuses a bundle of another pack or
+  version, or an archive that will not read (a manifest that is not a JSON
+  object is "not a pack bundle"). It extracts into `.sv-pack-stage-*` beside
+  the pack directory and loads the pack from there; only then does it rename
+  the pack's dependency closure (`dependencyClosure`: the pack and what its
+  `package.json` files name in `dependencies`, `optionalDependencies` and
+  `peerDependencies`, resolved as Node resolves them, never another pack) over
+  the installed copies, record the pack in the pack directory's
+  `package.json` and load it as `add` does. Anything else the bundle carries
+  is discarded with the stage. Any failure leaves the previous install
+  untouched.
+
+Run one `sv pack` writer at a time per pack directory. npm takes no lock on a
+`--prefix`, and the pack directory is shared by every terminal, worktree and
+CI job on one ndx home, so `add`, `add --from` and `remove` hold
+`<pack dir>.lock` (PID, command and start time, published whole) for their
+whole run; `--dry-run`, `list` and `bundle` take no lock. A second writer
+fails at once naming the holder's PID and the lock file. A lock whose PID is
+dead is taken over; one that cannot be read must be deleted by hand.
+`add --from` counts a package as moved only after its rename succeeds, so a
+failed move never deletes a copy another writer put in place.
+
+The archive is written and read in Node (`src/cli/commands/pack-archive.ts`),
+not by a `tar` process: regular files and directories only, with pax long
+paths; reading refuses links, bad checksums, truncation and any path that is
+absolute or contains `..`.
 
 ## Output Files
 

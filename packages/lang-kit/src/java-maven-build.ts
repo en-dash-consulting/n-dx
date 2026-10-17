@@ -13,10 +13,13 @@
  * @module lang-kit/java-maven-build
  */
 
-import { readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
+import { oversizedNotice, readBuildFile } from "./build-file.js";
 import type { BuildDependency, BuildValue, ModuleBuildModel } from "./build-model.js";
 import type { JavaModule } from "./java-modules.js";
+import { interpolate, propertyContext, type PropertyContext as Context } from "./maven-properties.js";
+
+export { MAX_PROPERTY_EXPANSION, MAX_PROPERTY_NESTING } from "./maven-properties.js";
 import { child, childText, childrenNamed, parseXml, XmlSyntaxError, type XmlElement } from "./xml-lite.js";
 
 const SPRING_BOOT_GROUP = "org.springframework.boot";
@@ -141,7 +144,11 @@ class MavenReader {
     const path = join(this.projectDir, dir, "pom.xml");
     let result: PomFile | string;
     try {
-      result = toPom(dir, parseXml(await readFile(path, "utf8")));
+      const text = await readBuildFile(path);
+      result =
+        typeof text === "string"
+          ? toPom(dir, parseXml(text))
+          : oversizedNotice(posix.join(dir, "pom.xml"), text.oversized);
     } catch (err) {
       if (err instanceof XmlSyntaxError) result = `${posix.join(dir, "pom.xml")} is not valid XML: ${err.message}`;
       else if ((err as NodeJS.ErrnoException).code === "ENOENT") result = `${posix.join(dir, "pom.xml")} not found`;
@@ -248,7 +255,7 @@ class MavenReader {
     set(["project.artifactId", "pom.artifactId", "artifactId"], pom.artifact);
     set(["project.parent.version", "parent.version"], pom.parent?.version);
     set(["project.parent.groupId", "parent.groupId"], pom.parent?.group);
-    return { props: eff.props, builtins, external: eff.external };
+    return propertyContext(eff.props, builtins, eff.external);
   }
 }
 
@@ -296,12 +303,6 @@ function rawDep(el: XmlElement): RawDep {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
-
-interface Context {
-  props: ReadonlyMap<string, string>;
-  builtins: ReadonlyMap<string, string>;
-  external: readonly string[];
-}
 
 function emptyEffective(): Effective {
   return { props: new Map(), managed: new Map(), deps: new Map(), external: [], notices: [] };
@@ -353,33 +354,3 @@ function textOf(value: BuildValue, fallback: string): string {
   return value.resolved ? value.value : fallback;
 }
 
-/**
- * Replace every `${name}` in `text`. Built-ins (`project.version`, …) are
- * consulted first, then properties. A name found nowhere makes the whole
- * value unresolved; when an out-of-repository parent or BOM exists the reason
- * names it, since the property may be defined there.
- */
-function interpolate(text: string, ctx: Context, seen: ReadonlySet<string> = new Set()): BuildValue {
-  let out = "";
-  let i = 0;
-  while (i < text.length) {
-    const open = text.indexOf("${", i);
-    if (open < 0) return { resolved: true, value: out + text.slice(i) };
-    const close = text.indexOf("}", open);
-    if (close < 0) return { resolved: false, reason: `unterminated placeholder in "${text}"` };
-    out += text.slice(i, open);
-    const name = text.slice(open + 2, close);
-
-    const raw = ctx.builtins.get(name) ?? ctx.props.get(name);
-    if (raw === undefined) {
-      const hint = ctx.external.length ? `; may be defined by ${ctx.external.join(", ")}` : "";
-      return { resolved: false, reason: `property ${name} is not defined in the repository${hint}` };
-    }
-    if (seen.has(name)) return { resolved: false, reason: `property ${name} refers to itself` };
-    const value = interpolate(raw, ctx, new Set([...seen, name]));
-    if (!value.resolved) return value;
-    out += value.value;
-    i = close + 1;
-  }
-  return { resolved: true, value: out };
-}

@@ -69,7 +69,13 @@ export function normalizePythonName(name: string): string {
 }
 
 const NAME = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?/;
-const SPEC = /^\(?\s*(?:(?:~=|===?|!=|<=?|>=?)\s*[A-Za-z0-9.*+!_-]+\s*,?\s*)*\)?$/;
+/**
+ * Clauses joined by a comma, whitespace or nothing; a trailing comma is kept.
+ * Linear: whitespace after a value is taken by one `\s*`, and the comma brings
+ * its own. `\s*,?\s*` let two quantifiers share the same whitespace, so a
+ * failing tail backtracked exponentially in the number of clauses.
+ */
+const SPEC = /^\(?\s*(?:(?:~=|===?|!=|<=?|>=?)\s*[A-Za-z0-9.*+!_-]+\s*(?:,\s*)?)*\)?$/;
 
 /** Split a PEP 508 requirement string. Undefined when it is not one. */
 export function parseRequirement(text: string): ParsedRequirement | undefined {
@@ -259,7 +265,22 @@ function looksLikeReference(text: string): boolean {
   return text.includes("://") || /^[.~/\\]/.test(text) || text.includes("/") || ARCHIVE.test(text.split(/[\s;]/)[0]);
 }
 
+/**
+ * The `egg=` fragment parameter: the last one after the first `#`, else `#egg=`.
+ * Matched from the first `#` only; unanchored, `#(?:.*&)?` rescanned the line
+ * from every `#`, quadratic in a line of them.
+ */
+function eggName(text: string): string | undefined {
+  const hash = text.indexOf("#");
+  if (hash < 0) return undefined;
+  const fragment = text.slice(hash);
+  return (
+    /^#(?:.*&)?egg=([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(fragment)?.[1] ??
+    /#egg=([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(fragment)?.[1]
+  );
+}
+
 function reference(text: string, editable: boolean, file: string, line: number): PythonReference {
-  const egg = /#(?:.*&)?egg=([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(text)?.[1];
+  const egg = eggName(text);
   return { text, editable, ...(egg !== undefined && { name: normalizePythonName(egg) }), file, line };
 }

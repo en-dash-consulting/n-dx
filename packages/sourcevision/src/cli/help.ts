@@ -293,32 +293,45 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     tool: "sourcevision",
     command: "pack",
     summary: "install, bundle, list and remove language packs",
-    usage: "sourcevision pack <add [<lang>] [--from <bundle>] | bundle <lang> | list | remove <lang>> [options]",
+    usage: "sourcevision pack <add [<lang>] [--from <bundle> [--sha256 <hex>]] | bundle <lang> | list | remove <lang>> [options]",
     description:
       "Manages opt-in language packs (java, go, sql, terraform) in the per-user\n" +
       "pack directory, <ndx home>/packs/<sourcevision version>/, where analysis\n" +
       "looks for a pack before module resolution.\n" +
       "\n" +
-      "  add <lang>      npm install --prefix <pack dir> @n-dx/lang-<lang>@<version>,\n" +
-      "                  then loads the pack; a pack of another version or one that\n" +
+      "  add <lang>      npm install --ignore-scripts --no-audit --no-fund\n" +
+      "                  --prefix <pack dir> @n-dx/lang-<lang>@<version>, then\n" +
+      "                  loads the pack; a pack of another version or one that\n" +
       "                  will not load is an error\n" +
       "  add             Installs each pack the project lists in sourcevision.packs\n" +
       "                  (project config) that is not already found\n" +
       "  list            Each pack: installed, resolved (e.g. the default Go pack),\n" +
       "                  missing or refused, with its version; listed packs marked\n" +
-      "  remove <lang>   npm uninstall --prefix <pack dir> @n-dx/lang-<lang>; a pack\n" +
-      "                  found only by module resolution is left alone\n" +
+      "  remove <lang>   npm uninstall --ignore-scripts --prefix <pack dir>\n" +
+      "                  @n-dx/lang-<lang>; a pack found only by module\n" +
+      "                  resolution is left alone\n" +
       "\n" +
       "Offline: on a connected machine with the same sourcevision version,\n" +
       "  bundle <lang>   installs the pack into a temporary prefix and writes one\n" +
       "                  .tgz with the pack, its dependencies and a manifest\n" +
-      "                  (grammars are WebAssembly: one bundle serves every platform);\n" +
+      "                  (grammars are WebAssembly: one bundle serves every platform),\n" +
+      "                  prints its SHA-256 and writes it to <bundle>.sha256;\n" +
       "then on the offline machine,\n" +
-      "  add <lang> --from <bundle>\n" +
-      "                  installs it with no npm call; a bundle of another pack or\n" +
-      "                  version, or a corrupt one, is refused",
+      "  add <lang> --from <bundle> --sha256 <hex>\n" +
+      "                  checks the hash before reading the bundle, then installs\n" +
+      "                  the pack and its dependencies with no npm call; a hash\n" +
+      "                  mismatch, a bundle of another pack or version, or a\n" +
+      "                  corrupt one, is refused. Without --sha256 it checks\n" +
+      "                  <bundle>.sha256 if present, else says it did not verify\n" +
+      "\n" +
+      "A bundle is trusted like any npm tarball: its code runs when the pack\n" +
+      "loads. Take the hash from whoever made the bundle, not from beside it.\n" +
+      "\n" +
+      "add and remove hold <pack dir>.lock while they run: a second one fails\n" +
+      "naming the holder's PID. Run one pack writer at a time.",
     options: [
       { flag: "--from <bundle>", description: "Install from a bundle made by pack bundle, with no network (add)" },
+      { flag: "--sha256 <hex>", description: "Refuse the bundle unless its SHA-256 is this, before reading it (add --from)" },
       { flag: "--out <file>", description: "Where to write the bundle; default n-dx-lang-<lang>-<version>.tgz (bundle)" },
       { flag: "--dry-run", description: "Print what would run without running it (add, remove)" },
       { flag: "--json", description: "Machine-readable output (list)" },
@@ -327,7 +340,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "ndx sv pack add java", description: "Install the Java pack" },
       { command: "sv pack add", description: "Install the packs the project lists in sourcevision.packs" },
       { command: "sv pack bundle java --out java.tgz", description: "Make an offline bundle of the Java pack" },
-      { command: "sv pack add java --from java.tgz", description: "Install that bundle with no network" },
+      { command: "sv pack add java --from java.tgz --sha256 <hex>", description: "Verify and install that bundle with no network" },
       { command: "sv pack add java --dry-run", description: "Show the npm command it would run" },
       { command: "sv pack list --json", description: "Every pack's state as JSON" },
       { command: "sv pack remove java", description: "Remove the Java pack from the pack directory" },

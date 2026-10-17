@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Capture, PackSourceFile } from "@n-dx/lang-runtime";
-import { buildTerraformModel, conditionalBranches, parseRegistrySource, referenceTarget, valueAsWritten } from "../../src/index.js";
+import { MAX_MODULE_INSTANCES, buildTerraformModel, conditionalBranches, parseRegistrySource, referenceTarget, valueAsWritten } from "../../src/index.js";
 
 describe("conditionalBranches", () => {
   it("splits a top-level conditional, matching a nested one in the true branch", () => {
@@ -105,6 +105,27 @@ describe("module paths", () => {
       db: "module.alpha",
       "db/log": "module.alpha.module.log",
     });
+  });
+
+  // Each level calls the next twice: 2^31 - 1 call paths uncapped, so a cap
+  // check moved after the push or out of the loop hangs here. The test timeout
+  // is the bound, so no clock is read.
+  it("stops a 30-level two-call diamond at MAX_MODULE_INSTANCES", { timeout: 10_000 }, () => {
+    const LEVELS = 30;
+    const level = (n: number): string => `l${String(n).padStart(2, "0")}`;
+    const files = [moduleFile("main.tf", [["a", `./${level(1)}`], ["b", `./${level(1)}`]])];
+    for (let n = 1; n < LEVELS; n++) {
+      const next = `../${level(n + 1)}`;
+      files.push(moduleFile(`${level(n)}/main.tf`, [["a", next], ["b", next]]));
+    }
+    files.push(moduleFile(`${level(LEVELS)}/main.tf`, []));
+
+    const { instances } = buildTerraformModel(files);
+    expect(instances).toHaveLength(MAX_MODULE_INSTANCES);
+    expect(instances[0]).toEqual({ directory: "." });
+    // Depth first: the first LEVELS + 1 instances walk the `a` chain to the bottom.
+    expect(instances[LEVELS].directory).toBe(level(LEVELS));
+    expect(instances[LEVELS].module).toBe(Array.from({ length: LEVELS }, () => "module.a").join("."));
   });
 
   it("marks local calls that leave the project or reach no project file as not followed", () => {

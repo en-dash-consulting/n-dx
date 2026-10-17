@@ -2,25 +2,31 @@
  * `sv pack add|bundle|list|remove`: manage the language packs in the per-user
  * pack directory, `<ndx home>/packs/<sourcevision version>/`.
  *
- * `add` and `remove` run `npm install|uninstall --prefix <pack dir>`; the
+ * `add` and `remove` run `npm install|uninstall --ignore-scripts --prefix <pack dir>`; the
  * loader (`src/language/pack-loader.ts`) then finds a pack there before module
  * resolution. A pack is always installed at sourcevision's own version, and
  * `add` loads it after installing, so a pack that is of another version or
- * will not load is an error rather than a silent success.
+ * will not load is an error rather than a silent success. `add` and `remove`
+ * hold the pack directory's lock (`pack-lock.ts`) for their whole run.
  *
  * Offline: `bundle` installs a pack into a temporary prefix and archives it
  * with its dependencies and a manifest (`pack-archive.ts`, Node only, no `tar`
- * process); `add --from <bundle>` installs that archive with no npm call.
+ * process), printing its SHA-256 and writing it to `<bundle>.sha256`;
+ * `add --from <bundle> [--sha256 <hex>]` checks that hash before reading the
+ * archive, then installs the pack and its dependency closure with no npm call.
+ * A bundle is trusted like any npm tarball: its code runs when it loads.
  *
  * @module sourcevision/cli/commands/pack
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import type { LanguagePackEntry } from "@n-dx/lang-kit";
 import { CLI_ERROR_CODES, spawnCli } from "@n-dx/llm-client";
 import { ArchiveError, collectTree, readTarGz, writeTarGz, type ArchiveEntry } from "./pack-archive.js";
+import { withPackLock } from "./pack-lock.js";
 import {
   defaultPackDir,
   INSTALLABLE_PACKS,
@@ -66,6 +72,8 @@ export interface PackCommandDeps {
   readonly listed?: readonly string[];
   /** Where `bundle` makes its temporary npm prefix; defaults to the OS temp directory. */
   readonly tempRoot?: string;
+  /** Whether a pack directory lock's holder still runs; defaults to `pidAlive` (`pack-lock.ts`). */
+  readonly isAlive?: (pid: number) => boolean;
 }
 
 /** Runs npm through llm-client's spawn helper, which goes through cmd.exe on Windows for npm's `.cmd` shim. */
@@ -92,6 +100,21 @@ const quoted = (token: string): string => (/\s/.test(token) ? `"${token}"` : tok
 export function npmCommandLine(args: readonly string[]): string {
   return ["npm", ...args].map(quoted).join(" ");
 }
+
+/**
+ * Lifecycle scripts never run: grammars are prebuilt WASM and `prepare` does
+ * not run for registry tarballs, so no pack needs one, and a script anywhere in
+ * the dependency tree would otherwise run with the user's privileges.
+ */
+const NO_SCRIPTS = "--ignore-scripts";
+
+/** `npm install` of `spec` into `prefix`: no lifecycle scripts, no audit or funding requests. */
+export const npmInstallArgs = (prefix: string, spec: string): string[] =>
+  ["install", NO_SCRIPTS, "--no-audit", "--no-fund", "--prefix", prefix, spec];
+
+/** `npm uninstall` of `packageName` from `prefix`, without lifecycle scripts. */
+export const npmUninstallArgs = (prefix: string, packageName: string): string[] =>
+  ["uninstall", NO_SCRIPTS, "--prefix", prefix, packageName];
 
 function findPack(packs: readonly InstallablePack[], id: string | undefined, sub: string): InstallablePack {
   const known = `Known packs: ${packs.map((pack) => pack.id).join(", ")}.`;
@@ -208,7 +231,7 @@ function reportInstalled(pack: InstallablePack, entry: LanguagePackEntry, packDi
 
 async function add(pack: InstallablePack, packDir: string, version: string, deps: PackCommandDeps, dryRun: boolean): Promise<void> {
   const write = deps.write ?? result;
-  const args = ["install", "--prefix", packDir, `${pack.packageName}@${version}`];
+  const args = npmInstallArgs(packDir, `${pack.packageName}@${version}`);
   if (dryRun) {
     write(npmCommandLine(args));
     return;
@@ -268,6 +291,12 @@ export interface BundleManifest {
   readonly platform: "any";
 }
 
+/** `data`'s SHA-256, as lowercase hex. */
+export const sha256Hex = (data: Buffer): string => createHash("sha256").update(data).digest("hex");
+
+/** The checksum file `bundle` writes beside a bundle, in `sha256sum` format. */
+export const checksumFileOf = (bundleFile: string): string => `${bundleFile}.sha256`;
+
 /** The default bundle file name: `n-dx-lang-<lang>-<version>.tgz`. */
 export const bundleFileName = (pack: InstallablePack, version: string): string => `n-dx-lang-${pack.id}-${version}.tgz`;
 
@@ -281,7 +310,7 @@ async function bundle(pack: InstallablePack, version: string, deps: PackCommandD
   const file = resolve(deps.cwd ?? process.cwd(), out ?? bundleFileName(pack, version));
   const prefix = mkdtempSync(join(deps.tempRoot ?? tmpdir(), "sv-pack-bundle-"));
   try {
-    const args = ["install", "--prefix", prefix, `${pack.packageName}@${version}`];
+    const args = npmInstallArgs(prefix, `${pack.packageName}@${version}`);
     const run = await runOrFail(deps.npm ?? runNpm, args);
     await loadInstalled(pack, prefix, version, deps, `\`${npmCommandLine(args)}\``, npmOutput(run.output));
     const manifest: BundleManifest = {
@@ -294,24 +323,75 @@ async function bundle(pack: InstallablePack, version: string, deps: PackCommandD
     };
     writeFileSync(join(prefix, BUNDLE_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
     const entries = collectTree(prefix);
+    const archive = writeTarGz(entries);
+    const hash = sha256Hex(archive);
     mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, writeTarGz(entries));
+    writeFileSync(file, archive);
+    writeFileSync(checksumFileOf(file), `${hash}  ${basename(file)}\n`);
     const files = entries.filter((e) => e.type === "file").length;
     write(`Bundled ${pack.packageName}@${version} and its dependencies (${files} files) into ${file}.`);
-    write(`Install it with no network: ndx sv pack add ${pack.id} --from ${quoted(file)}`);
+    write(`SHA-256 ${hash}, written to ${checksumFileOf(file)}.`);
+    write(`Install it with no network: ndx sv pack add ${pack.id} --from ${quoted(file)} --sha256 ${hash}`);
   } finally {
     rmSync(prefix, { recursive: true, force: true });
   }
 }
 
-/** The bundle's manifest and entries, or an error naming what is wrong with it. */
-function readBundle(file: string, pack: InstallablePack, version: string): ArchiveEntry[] {
-  let archive: Buffer;
+const SHA256 = /^[0-9a-f]{64}$/i;
+
+/**
+ * Check `archive` against `expected` (`--sha256`) or, without it, against the
+ * checksum file beside the bundle when there is one, before anything reads the
+ * archive. A mismatch is an error; with neither, say the bundle was not
+ * verified. A checksum file beside the bundle catches a damaged copy, not a
+ * tampered one, which can carry its own: only `--sha256` with the hash from
+ * the bundle's maker shows the bundle is the one they made.
+ */
+function verifyBundle(file: string, archive: Buffer, expected: string | undefined, write: (line: string) => void): void {
+  const actual = sha256Hex(archive);
+  const nothing = "Nothing was extracted or installed.";
+  if (expected !== undefined) {
+    if (!SHA256.test(expected)) {
+      throw new CLIError(`--sha256 takes the bundle's SHA-256 as 64 hex digits, not ${JSON.stringify(expected)}.`);
+    }
+    if (actual !== expected.toLowerCase()) {
+      throw new CLIError(
+        `${file} has SHA-256 ${actual}, not the ${expected.toLowerCase()} given with --sha256.`,
+        `${nothing} Get the bundle again from whoever made it.`,
+      );
+    }
+    write(`Verified ${file}: SHA-256 ${actual} matches --sha256.`);
+    return;
+  }
+  const sidecar = checksumFileOf(file);
+  if (!existsSync(sidecar)) {
+    write(`Not verified: ${file} has SHA-256 ${actual}. Pass --sha256 <hex> with the hash sv pack bundle printed to check it.`);
+    return;
+  }
+  const recorded = readFileSync(sidecar, "utf-8").trim().split(/\s/)[0] ?? "";
+  if (!SHA256.test(recorded)) throw new CLIError(`${sidecar} holds no SHA-256.`, `${nothing} Delete it, or pass --sha256 <hex>.`);
+  if (actual !== recorded.toLowerCase()) {
+    throw new CLIError(
+      `${file} has SHA-256 ${actual}, not the ${recorded.toLowerCase()} recorded in ${sidecar}.`,
+      `${nothing} The bundle is damaged or was changed; get it again.`,
+    );
+  }
+  write(
+    `Checked ${file} against ${sidecar} (SHA-256 ${actual}). That file travels with the bundle, so it catches damage, not tampering: pass --sha256 with the hash from the bundle's maker for that.`,
+  );
+}
+
+/** The bundle file's bytes, or an error naming why it cannot be read. */
+function readBundleFile(file: string): Buffer {
   try {
-    archive = readFileSync(file);
+    return readFileSync(file);
   } catch (error) {
     throw new CLIError(`Cannot read the bundle ${file}: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/** The bundle's manifest and entries, or an error naming what is wrong with it. */
+function readBundle(file: string, archive: Buffer, pack: InstallablePack, version: string): ArchiveEntry[] {
   let entries: ArchiveEntry[];
   try {
     entries = readTarGz(archive);
@@ -351,10 +431,10 @@ function readBundle(file: string, pack: InstallablePack, version: string): Archi
 }
 
 /**
- * `sv pack add <lang> --from <bundle>`: no network. Check the bundle's
- * manifest, replace any installed copy of the pack with the bundle's
- * `node_modules`, record the pack in the pack directory's `package.json` so
- * npm keeps it, and load it.
+ * `sv pack add <lang> --from <bundle> [--sha256 <hex>]`: no network. Check the
+ * bundle's hash ({@link verifyBundle}) and manifest, replace the installed
+ * copies of the pack and its dependency closure with the bundle's, record the
+ * pack in the pack directory's `package.json` so npm keeps it, and load it.
  */
 async function addFromBundle(
   pack: InstallablePack,
@@ -362,11 +442,14 @@ async function addFromBundle(
   version: string,
   deps: PackCommandDeps,
   file: string,
+  expectedHash: string | undefined,
   dryRun: boolean,
 ): Promise<void> {
   const write = deps.write ?? result;
   const bundleFile = resolve(deps.cwd ?? process.cwd(), file);
-  const entries = readBundle(bundleFile, pack, version).filter(
+  const archive = readBundleFile(bundleFile);
+  verifyBundle(bundleFile, archive, expectedHash, write);
+  const entries = readBundle(bundleFile, archive, pack, version).filter(
     // npm's hidden lockfile describes the bundle's own prefix, not this one.
     (e) => e.path.startsWith("node_modules/") && e.path !== "node_modules/.package-lock.json",
   );
@@ -400,7 +483,8 @@ async function addFromBundle(
     const manifestFile = join(packDir, "package.json");
     const manifest = existsSync(manifestFile) ? (JSON.parse(readFileSync(manifestFile, "utf-8")) as Record<string, unknown>) : {};
     const dependencies = { ...((manifest["dependencies"] as Record<string, string> | undefined) ?? {}), [pack.packageName]: version };
-    replaceInstalled(stage, packDir);
+    const otherPacks = (deps.packs ?? INSTALLABLE_PACKS).filter((p) => p.id !== pack.id).map((p) => p.packageName);
+    replaceInstalled(stage, packDir, dependencyClosure(join(stage, "node_modules"), pack.packageName, otherPacks));
     writeFileSync(manifestFile, `${JSON.stringify({ ...manifest, dependencies }, null, 2)}\n`);
   } finally {
     rmSync(stage, { recursive: true, force: true });
@@ -410,46 +494,108 @@ async function addFromBundle(
   reportInstalled(pack, entry, packDir, write);
 }
 
-/** The package directories directly under `nodeModules`: `name`, or `@scope/name`. */
-function packageDirs(nodeModules: string): string[] {
-  if (!existsSync(nodeModules)) return [];
-  return readdirSync(nodeModules).flatMap((name) =>
-    name.startsWith("@")
-      ? readdirSync(join(nodeModules, name)).map((inner) => `${name}/${inner}`)
-      : name.startsWith(".")
-        ? []
-        : [name],
-  );
+/** The package.json fields naming what a package needs at run time. */
+const DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies"] as const;
+
+/** `name` or `@scope/name`, neither part `.`, `..` or holding a separator: what npm accepts as a package name's shape. */
+const PACKAGE_NAME = /^(?:@(?!\.\.?\/)[^/\\@]+\/)?(?!\.\.?$)[^/\\@]+$/;
+
+/**
+ * The packages directly under `nodeModules` that `packageName` needs: itself
+ * and, transitively, every package its package.json names in
+ * {@link DEPENDENCY_FIELDS}, found as Node finds one (its own `node_modules`,
+ * then each enclosing one). A package nested inside another moves with it, so
+ * it counts as its top-level ancestor; one that is not there (an optional
+ * dependency left out) adds nothing. A name in `exclude` (the other packs) is
+ * never followed, so a bundle cannot replace another pack.
+ */
+export function dependencyClosure(nodeModules: string, packageName: string, exclude: readonly string[] = []): string[] {
+  const topLevel = new Set<string>();
+  const seen = new Set<string>();
+  // A package is its directory's segments below `nodeModules`, e.g. ["a", "node_modules", "@s", "b"].
+  const resolveFrom = (from: readonly string[], name: string): string[] | undefined => {
+    const bases = [[...from, "node_modules"]];
+    for (let i = from.length - 1; i > 0; i--) if (from[i] === "node_modules") bases.push(from.slice(0, i + 1));
+    bases.push([]);
+    return bases
+      .map((base) => [...base, ...name.split("/")])
+      .find((candidate) => existsSync(join(nodeModules, ...candidate, "package.json")));
+  };
+  const visit = (segments: string[]): void => {
+    const dir = join(nodeModules, ...segments);
+    if (seen.has(dir)) return;
+    seen.add(dir);
+    topLevel.add(segments[0]!.startsWith("@") ? `${segments[0]}/${segments[1]}` : segments[0]!);
+    const manifestFile = join(dir, "package.json");
+    let manifest: Record<string, unknown>;
+    try {
+      manifest = JSON.parse(readFileSync(manifestFile, "utf-8")) as Record<string, unknown>;
+    } catch (error) {
+      throw new CLIError(`Cannot read ${manifestFile} from the bundle: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    for (const field of DEPENDENCY_FIELDS) {
+      const named = manifest[field];
+      if (typeof named !== "object" || named === null) continue;
+      for (const name of Object.keys(named)) {
+        // A name is a path below node_modules: one that could climb out of it would move files outside the pack directory.
+        if (!PACKAGE_NAME.test(name)) throw new CLIError(`${manifestFile} in the bundle names ${JSON.stringify(name)}, which is not a package name.`);
+        if (exclude.includes(name)) continue;
+        const found = resolveFrom(segments, name);
+        if (found) visit(found);
+      }
+    }
+  };
+  visit(packageName.split("/"));
+  return [...topLevel].sort();
 }
 
 /**
- * Move each package of `stage/node_modules` over its namesake in
- * `packDir/node_modules` by rename (other packs stay). If a move fails, the
- * ones already made are undone before the error is rethrown.
+ * Move each package in `names` (from {@link dependencyClosure}) from
+ * `stage/node_modules` over its namesake in `packDir/node_modules` by rename;
+ * every other package, staged or installed, stays where it is. If a move
+ * fails, the ones already made are undone before the error is rethrown.
+ *
+ * A package counts as moved only once its rename has succeeded, so the undo
+ * deletes only copies this call put in place: whatever occupies a target whose
+ * rename failed (another writer's install, should the lock be bypassed) is left
+ * alone, and the displaced copy goes back only into an empty target.
+ * `rename` is injectable for tests.
  */
-function replaceInstalled(stage: string, packDir: string): void {
+export function replaceInstalled(
+  stage: string,
+  packDir: string,
+  names: readonly string[],
+  rename: (from: string, to: string) => void = renameSync,
+): void {
   const from = join(stage, "node_modules");
   const to = join(packDir, "node_modules");
   const displaced = join(stage, ".displaced");
+  const targetOf = (name: string): string => join(to, ...name.split("/"));
+  const oldOf = (name: string): string => join(displaced, ...name.split("/"));
+  const restore = (name: string): void => {
+    if (existsSync(oldOf(name)) && !existsSync(targetOf(name))) rename(oldOf(name), targetOf(name));
+  };
   const done: string[] = [];
   try {
-    for (const name of packageDirs(from)) {
-      const target = join(to, ...name.split("/"));
-      const old = join(displaced, ...name.split("/"));
+    for (const name of names) {
+      const target = targetOf(name);
       mkdirSync(dirname(target), { recursive: true });
       if (existsSync(target)) {
-        mkdirSync(dirname(old), { recursive: true });
-        renameSync(target, old);
+        mkdirSync(dirname(oldOf(name)), { recursive: true });
+        rename(target, oldOf(name));
+      }
+      try {
+        rename(join(from, ...name.split("/")), target);
+      } catch (error) {
+        restore(name);
+        throw error;
       }
       done.push(name);
-      renameSync(join(from, ...name.split("/")), target);
     }
   } catch (error) {
     for (const name of done.reverse()) {
-      const target = join(to, ...name.split("/"));
-      const old = join(displaced, ...name.split("/"));
-      rmSync(target, { recursive: true, force: true });
-      if (existsSync(old)) renameSync(old, target);
+      rmSync(targetOf(name), { recursive: true, force: true });
+      restore(name);
     }
     throw error;
   }
@@ -468,7 +614,7 @@ async function remove(pack: InstallablePack, packDir: string, version: string, d
     );
     return;
   }
-  const args = ["uninstall", "--prefix", packDir, pack.packageName];
+  const args = npmUninstallArgs(packDir, pack.packageName);
   if (dryRun) {
     write(npmCommandLine(args));
     return;
@@ -499,7 +645,7 @@ async function list(packDir: string, version: string, deps: PackCommandDeps, jso
 }
 
 /** Options that take a value, as `--opt <value>` or `--opt=<value>`. */
-const VALUE_OPTIONS = ["--out", "--from"] as const;
+const VALUE_OPTIONS = ["--out", "--from", "--sha256"] as const;
 
 /** Split `args` into positionals, flags and the values of {@link VALUE_OPTIONS}. */
 function parseArgs(args: readonly string[]): { positional: string[]; flags: Set<string>; values: Map<string, string> } {
@@ -522,7 +668,7 @@ function parseArgs(args: readonly string[]): { positional: string[]; flags: Set<
   return { positional, flags, values };
 }
 
-/** `sv pack <add|bundle|list|remove> [lang] [--from <bundle>] [--out <file>] [--dry-run] [--json]`; `args` follow `pack`. */
+/** `sv pack <add|bundle|list|remove> [lang] [--from <bundle> [--sha256 <hex>]] [--out <file>] [--dry-run] [--json]`; `args` follow `pack`. */
 export async function cmdPack(args: readonly string[], deps: PackCommandDeps = {}): Promise<void> {
   const { positional, flags, values } = parseArgs(args);
   const [sub, id] = positional;
@@ -531,18 +677,27 @@ export async function cmdPack(args: readonly string[], deps: PackCommandDeps = {
   const version = deps.version ?? sourcevisionVersion();
   const packDir = deps.packDir ?? defaultPackDir(version);
   const packs = deps.packs ?? INSTALLABLE_PACKS;
+  // Writers hold the pack directory's lock for their whole run; a dry run writes nothing.
+  const locked = (command: string, fn: () => Promise<void>): Promise<void> =>
+    dryRun ? fn() : withPackLock(packDir, command, fn, deps.isAlive);
 
   switch (sub) {
     case "add": {
       const from = values.get("--from");
-      if (!id && !from) return addListed(packs, packDir, version, deps, dryRun);
+      const sha256 = values.get("--sha256");
+      if (sha256 !== undefined && !from) throw new CLIError("--sha256 checks a bundle: use it with add <lang> --from <bundle>.");
+      if (!id && !from) return locked("pack add", () => addListed(packs, packDir, version, deps, dryRun));
       const pack = findPack(packs, id, sub);
-      return from ? addFromBundle(pack, packDir, version, deps, from, dryRun) : add(pack, packDir, version, deps, dryRun);
+      return from
+        ? locked(`pack add ${pack.id} --from`, () => addFromBundle(pack, packDir, version, deps, from, sha256, dryRun))
+        : locked(`pack add ${pack.id}`, () => add(pack, packDir, version, deps, dryRun));
     }
     case "bundle":
       return bundle(findPack(packs, id, sub), version, deps, values.get("--out"));
-    case "remove":
-      return remove(findPack(packs, id, sub), packDir, version, deps, dryRun);
+    case "remove": {
+      const pack = findPack(packs, id, sub);
+      return locked(`pack remove ${pack.id}`, () => remove(pack, packDir, version, deps, dryRun));
+    }
     case "list":
       return list(packDir, version, deps, json);
     default:

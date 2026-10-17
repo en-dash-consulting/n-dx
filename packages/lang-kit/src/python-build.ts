@@ -17,6 +17,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
+import { compileDirGlob } from "./dir-glob.js";
 import { parseIni, type IniValue } from "./ini-lite.js";
 import {
   type PythonDependency,
@@ -214,13 +215,17 @@ function readPyproject(dir: string, file: string, text: string, c: Collected, ct
 
   const workspace = table(table(tool, "uv"), "workspace");
   if (workspace) {
-    const members = stringList(workspace.members);
-    const excluded = stringList(workspace.exclude);
+    const globs = (key: string): ((d: string) => boolean)[] =>
+      locatedStrings(workspace[key], ["tool", "uv", "workspace", key]).flatMap(({ value, path }) => {
+        const glob = compileDirGlob(posix.normalize(posix.join(dir, value)));
+        if ("match" in glob) return [glob.match];
+        c.notices.push(`${file}:${lineOf(path)}: workspace glob ${value} not read: ${glob.error}`);
+        return [];
+      });
+    const members = globs("members");
+    const excluded = globs("exclude");
     const projectDirs = [...ctx.metadataDirs].filter((d) => ctx.inventory.has(d === "" ? "pyproject.toml" : `${d}/pyproject.toml`));
-    const under = (pattern: string): RegExp => globRegExp(posix.normalize(posix.join(dir, pattern)));
-    c.workspaceMembers = projectDirs.filter(
-      (d) => d !== dir && members.some((m) => under(m).test(d)) && !excluded.some((e) => under(e).test(d)),
-    );
+    c.workspaceMembers = projectDirs.filter((d) => d !== dir && members.some((m) => m(d)) && !excluded.some((e) => e(d)));
   }
 }
 
@@ -526,6 +531,13 @@ function stringList(v: TomlValue | undefined): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
 
+/** The strings in a string-or-array value, each with its TOML path. */
+function locatedStrings(v: TomlValue | undefined, path: readonly (string | number)[]): { value: string; path: (string | number)[] }[] {
+  if (typeof v === "string") return [{ value: v, path: [...path] }];
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((x, i) => (typeof x === "string" ? [{ value: x, path: [...path, i] }] : []));
+}
+
 function dirOf(file: string): string {
   const d = posix.dirname(file);
   return d === "." ? "" : d;
@@ -539,29 +551,6 @@ function requirementsOwner(file: string): string | undefined {
   if (/^requirements.*\.txt$/i.test(base)) return dir;
   if (posix.basename(dir) === "requirements") return dirOf(dir);
   return undefined;
-}
-
-/** A glob over directory paths: `*` and `?` within a segment, `**` across segments, `[…]` classes. */
-function globRegExp(pattern: string): RegExp {
-  let re = "";
-  for (let i = 0; i < pattern.length; i++) {
-    const ch = pattern[i];
-    if (ch === "*" && pattern[i + 1] === "*") {
-      re += ".*";
-      i++;
-      if (pattern[i + 1] === "/") i++;
-    } else if (ch === "*") re += "[^/]*";
-    else if (ch === "?") re += "[^/]";
-    else if (ch === "[") {
-      const end = pattern.indexOf("]", i + 1);
-      if (end < 0) re += "\\[";
-      else {
-        re += `[${pattern.slice(i + 1, end).replace(/^!/, "^").replace(/\\/g, "\\\\")}]`;
-        i = end;
-      }
-    } else re += ch.replace(/[.+^${}()|\\]/g, "\\$&");
-  }
-  return new RegExp(`^${re.replace(/\/$/, "")}$`);
 }
 
 function uniqueRoots(roots: readonly PythonSourceRoot[]): PythonSourceRoot[] {
