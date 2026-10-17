@@ -248,6 +248,51 @@ describe("sv pack remove", () => {
   });
 });
 
+describe("the pack directory lock", () => {
+  const lockFile = (): string => `${packDir}.lock`;
+  const holdLock = (pid: number, command = "pack add go"): void => {
+    mkdirSync(join(packDir, ".."), { recursive: true });
+    writeFileSync(lockFile(), JSON.stringify({ pid, token: "other", command, since: "2026-10-17T00:00:00.000Z" }));
+  };
+
+  it("refuses add, add --from and remove while another writer holds it, naming its PID, and runs nothing", async () => {
+    holdLock(4242);
+    installInPackDir("@n-dx/lang-java");
+    const alive = { isAlive: (pid: number) => pid === 4242 };
+    const held = { message: expect.stringContaining("Another sv pack (PID 4242, `pack add go`"), suggestion: expect.stringContaining(lockFile()) };
+    await expect(cmdPack(["add", "java"], deps(alive))).rejects.toMatchObject(held);
+    await expect(cmdPack(["add"], deps({ ...alive, listed: ["java"] }))).rejects.toMatchObject(held);
+    await expect(cmdPack(["add", "java", "--from", "missing.tgz"], deps(alive))).rejects.toMatchObject(held);
+    await expect(cmdPack(["remove", "java"], deps(alive))).rejects.toMatchObject(held);
+    expect(npmCalls).toEqual([]);
+    expect(JSON.parse(readFileSync(lockFile(), "utf-8")).pid).toBe(4242);
+  });
+
+  it("takes over a lock whose PID is dead, and releases it when done", async () => {
+    holdLock(4242);
+    await cmdPack(["add", "java"], deps({ isAlive: () => false, npm: fakeNpm(() => installInPackDir("@n-dx/lang-java")) }));
+    expect(npmCalls).toHaveLength(1);
+    expect(existsSync(lockFile())).toBe(false);
+    expect(readdirSync(join(packDir, ".."))).toEqual([VERSION]);
+  });
+
+  it("is held while npm runs and released when the command fails", async () => {
+    let seen: string | undefined;
+    const npm = fakeNpm(() => (seen = readFileSync(lockFile(), "utf-8")), { exitCode: 1 });
+    await expect(cmdPack(["remove", "java"], deps({ npm, listed: [] }))).resolves.toBeUndefined(); // not installed: no npm
+    installInPackDir("@n-dx/lang-java");
+    await expect(cmdPack(["remove", "java"], deps({ npm }))).rejects.toThrow("failed (exit 1)");
+    expect(JSON.parse(seen!)).toMatchObject({ pid: process.pid, command: "pack remove java" });
+    expect(existsSync(lockFile())).toBe(false);
+  });
+
+  it("is not taken by --dry-run", async () => {
+    holdLock(4242);
+    await cmdPack(["add", "java", "--dry-run"], deps({ isAlive: () => true }));
+    expect(lines).toHaveLength(1);
+  });
+});
+
 describe("sv pack", () => {
   it("refuses an unknown subcommand", async () => {
     await expect(cmdPack(["install", "java"], deps())).rejects.toThrow("Unknown pack command: install");

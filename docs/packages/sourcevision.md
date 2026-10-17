@@ -103,6 +103,16 @@ Offline, for a machine with no registry access:
   ones, record the pack in the pack directory's `package.json` and load it as
   `add` does. Any failure leaves the previous install untouched.
 
+Run one `sv pack` writer at a time per pack directory. npm takes no lock on a
+`--prefix`, and the pack directory is shared by every terminal, worktree and
+CI job on one ndx home, so `add`, `add --from` and `remove` hold
+`<pack dir>.lock` (PID, command and start time, published whole) for their
+whole run; `--dry-run`, `list` and `bundle` take no lock. A second writer
+fails at once naming the holder's PID and the lock file. A lock whose PID is
+dead is taken over; one that cannot be read must be deleted by hand.
+`add --from` counts a package as moved only after its rename succeeds, so a
+failed move never deletes a copy another writer put in place.
+
 The archive is written and read in Node (`src/cli/commands/pack-archive.ts`),
 not by a `tar` process: regular files and directories only, with pax long
 paths; reading refuses links, bad checksums, truncation and any path that is

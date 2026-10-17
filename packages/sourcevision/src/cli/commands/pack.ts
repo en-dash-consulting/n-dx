@@ -6,7 +6,8 @@
  * loader (`src/language/pack-loader.ts`) then finds a pack there before module
  * resolution. A pack is always installed at sourcevision's own version, and
  * `add` loads it after installing, so a pack that is of another version or
- * will not load is an error rather than a silent success.
+ * will not load is an error rather than a silent success. `add` and `remove`
+ * hold the pack directory's lock (`pack-lock.ts`) for their whole run.
  *
  * Offline: `bundle` installs a pack into a temporary prefix and archives it
  * with its dependencies and a manifest (`pack-archive.ts`, Node only, no `tar`
@@ -21,6 +22,7 @@ import { dirname, join, resolve } from "node:path";
 import type { LanguagePackEntry } from "@n-dx/lang-kit";
 import { CLI_ERROR_CODES, spawnCli } from "@n-dx/llm-client";
 import { ArchiveError, collectTree, readTarGz, writeTarGz, type ArchiveEntry } from "./pack-archive.js";
+import { withPackLock } from "./pack-lock.js";
 import {
   defaultPackDir,
   INSTALLABLE_PACKS,
@@ -66,6 +68,8 @@ export interface PackCommandDeps {
   readonly listed?: readonly string[];
   /** Where `bundle` makes its temporary npm prefix; defaults to the OS temp directory. */
   readonly tempRoot?: string;
+  /** Whether a pack directory lock's holder still runs; defaults to `pidAlive` (`pack-lock.ts`). */
+  readonly isAlive?: (pid: number) => boolean;
 }
 
 /** Runs npm through llm-client's spawn helper, which goes through cmd.exe on Windows for npm's `.cmd` shim. */
@@ -441,30 +445,43 @@ function packageDirs(nodeModules: string): string[] {
  * Move each package of `stage/node_modules` over its namesake in
  * `packDir/node_modules` by rename (other packs stay). If a move fails, the
  * ones already made are undone before the error is rethrown.
+ *
+ * A package counts as moved only once its rename has succeeded, so the undo
+ * deletes only copies this call put in place: whatever occupies a target whose
+ * rename failed (another writer's install, should the lock be bypassed) is left
+ * alone, and the displaced copy goes back only into an empty target.
+ * `rename` is injectable for tests.
  */
-function replaceInstalled(stage: string, packDir: string): void {
+export function replaceInstalled(stage: string, packDir: string, rename: (from: string, to: string) => void = renameSync): void {
   const from = join(stage, "node_modules");
   const to = join(packDir, "node_modules");
   const displaced = join(stage, ".displaced");
+  const targetOf = (name: string): string => join(to, ...name.split("/"));
+  const oldOf = (name: string): string => join(displaced, ...name.split("/"));
+  const restore = (name: string): void => {
+    if (existsSync(oldOf(name)) && !existsSync(targetOf(name))) rename(oldOf(name), targetOf(name));
+  };
   const done: string[] = [];
   try {
     for (const name of packageDirs(from)) {
-      const target = join(to, ...name.split("/"));
-      const old = join(displaced, ...name.split("/"));
+      const target = targetOf(name);
       mkdirSync(dirname(target), { recursive: true });
       if (existsSync(target)) {
-        mkdirSync(dirname(old), { recursive: true });
-        renameSync(target, old);
+        mkdirSync(dirname(oldOf(name)), { recursive: true });
+        rename(target, oldOf(name));
+      }
+      try {
+        rename(join(from, ...name.split("/")), target);
+      } catch (error) {
+        restore(name);
+        throw error;
       }
       done.push(name);
-      renameSync(join(from, ...name.split("/")), target);
     }
   } catch (error) {
     for (const name of done.reverse()) {
-      const target = join(to, ...name.split("/"));
-      const old = join(displaced, ...name.split("/"));
-      rmSync(target, { recursive: true, force: true });
-      if (existsSync(old)) renameSync(old, target);
+      rmSync(targetOf(name), { recursive: true, force: true });
+      restore(name);
     }
     throw error;
   }
@@ -546,18 +563,25 @@ export async function cmdPack(args: readonly string[], deps: PackCommandDeps = {
   const version = deps.version ?? sourcevisionVersion();
   const packDir = deps.packDir ?? defaultPackDir(version);
   const packs = deps.packs ?? INSTALLABLE_PACKS;
+  // Writers hold the pack directory's lock for their whole run; a dry run writes nothing.
+  const locked = (command: string, fn: () => Promise<void>): Promise<void> =>
+    dryRun ? fn() : withPackLock(packDir, command, fn, deps.isAlive);
 
   switch (sub) {
     case "add": {
       const from = values.get("--from");
-      if (!id && !from) return addListed(packs, packDir, version, deps, dryRun);
+      if (!id && !from) return locked("pack add", () => addListed(packs, packDir, version, deps, dryRun));
       const pack = findPack(packs, id, sub);
-      return from ? addFromBundle(pack, packDir, version, deps, from, dryRun) : add(pack, packDir, version, deps, dryRun);
+      return from
+        ? locked(`pack add ${pack.id} --from`, () => addFromBundle(pack, packDir, version, deps, from, dryRun))
+        : locked(`pack add ${pack.id}`, () => add(pack, packDir, version, deps, dryRun));
     }
     case "bundle":
       return bundle(findPack(packs, id, sub), version, deps, values.get("--out"));
-    case "remove":
-      return remove(findPack(packs, id, sub), packDir, version, deps, dryRun);
+    case "remove": {
+      const pack = findPack(packs, id, sub);
+      return locked(`pack remove ${pack.id}`, () => remove(pack, packDir, version, deps, dryRun));
+    }
     case "list":
       return list(packDir, version, deps, json);
     default:
