@@ -1,6 +1,6 @@
 {
   "name": "@n-dx/graview-face",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "n-dx on Graview: the product layer, the changes, the code and the runs of an n-dx project as one graph, with a face in n-dx's own words. Depends on Graview and React; no other n-dx package depends on it.",
   "publishConfig": {
     "access": "public"
