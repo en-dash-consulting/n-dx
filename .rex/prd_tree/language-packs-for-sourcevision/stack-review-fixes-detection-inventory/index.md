@@ -30,7 +30,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Invalidate the incremental inventory cache when classifier rules change](./invalidate-the-incremental-inventory.md) | completed |
 | [Keep the TypeScript config when a markerless repo also has Terraform](./keep-the-typescript-config-when-a.md) | completed |
-| [List Java as analysed only when the Java pack ran](./list-java-as-analysed-only-when-the.md) | pending |
+| [List Java as analysed only when the Java pack ran](./list-java-as-analysed-only-when-the.md) | in_progress |
 | [Markerless polyglot repo with more .tf files than source loses the TypeScript fallback again (web/package.json + infra/*.tf)](./markerless-polyglot-repo-with-more-tf.md) | completed |
 | [Markerless repo whose only JS/TS or Ruby-style source sits deeper than three levels, or only in skipped dirs, still loses the TS fallback to Terraform](./markerless-repo-whose-only-js-ts-or.md) | completed |
 | [One rule for missing opt-in packs: warn only when something asked for is broken, else one end-of-run hint](./one-rule-for-missing-opt-in-packs-warn.md) | pending |
