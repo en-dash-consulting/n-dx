@@ -88,6 +88,7 @@ export {
   recordRepoTrust,
   clearRepoTrust,
   formatRepoTrustReport,
+  escapeTerminalControls,
 } from "@n-dx/llm-client";
 export type {
   GuardBaseline,

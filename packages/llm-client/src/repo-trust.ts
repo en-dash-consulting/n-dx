@@ -472,6 +472,30 @@ export interface RepoTrustFinding {
 
 const SHELL_RISK = /[;&|`$]|\b(curl|wget|sh -c|bash -c|powershell|iex\b|Invoke-Expression)\b/i;
 
+/**
+ * C0 and C1 controls, DEL, and the Unicode bidirectional overrides and
+ * isolates. A terminal acts on the first group (ESC starts a CSI/OSC sequence
+ * that can erase or rewrite a line; CR returns to the start of one) and
+ * reorders text around the second, so either can make a line show something
+ * other than what it holds.
+ */
+const DISPLAY_UNSAFE = /[\u0000-\u001f\u007f-\u009f‪-‮⁦-⁩]/g;
+
+/**
+ * Render a repository-sourced string for display: every character in
+ * {@link DISPLAY_UNSAFE} becomes a visible `\xNN` / `\uNNNN` escape, so a trust
+ * review shows exactly what the user is accepting. Display only — the digest
+ * and the stored record keep the raw value. Idempotent.
+ */
+export function escapeTerminalControls(text: string): string {
+  return text.replace(DISPLAY_UNSAFE, (ch) => {
+    const code = ch.charCodeAt(0);
+    return code <= 0xff
+      ? `\\x${code.toString(16).padStart(2, "0")}`
+      : `\\u${code.toString(16).padStart(4, "0")}`;
+  });
+}
+
 /** The MCP server commands `ndx init` writes, which need no review. */
 function isNdxMcpServer(server: RepoMcpServer): boolean {
   if (server.url) return false;
@@ -510,6 +534,13 @@ function coversDir(blocked: string[], dir: string): boolean {
  * nothing and is not reported.
  */
 export function assessRepoExecutionConfig(config: RepoExecutionConfig): RepoTrustFinding[] {
+  const findings = assessRawFindings(config);
+  // Messages embed repository values and are printed by every trust surface;
+  // `values` stay raw for a UI that renders them as data.
+  return findings.map((f) => ({ ...f, message: escapeTerminalControls(f.message) }));
+}
+
+function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
   const detected = config.detectedLanguage;
   const baseline = guardBaselineForLanguage(detected);
   const findings: RepoTrustFinding[] = [];
@@ -895,5 +926,7 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
     lines.push("  and the project config's API endpoints and API key variables are ignored.");
     lines.push(`  To accept this configuration: ${accept}`);
   }
-  return lines;
+  // Finding messages are escaped already; this also covers the source paths
+  // and the analysis timestamp, which come from the checkout too.
+  return lines.map(escapeTerminalControls);
 }
