@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -279,6 +279,40 @@ describe("n-dx ci", () => {
     });
   });
 
+  describe("gateway-imports step", () => {
+    let tmpDir;
+    let step;
+
+    async function write(rel, content) {
+      await mkdir(join(tmpDir, rel, ".."), { recursive: true });
+      await writeFile(join(tmpDir, rel), content);
+    }
+
+    beforeAll(async () => {
+      tmpDir = await freshProject();
+      // A dynamic import() of the gated package outside the gateway.
+      await write("packages/hench/src/agent/bad.ts", 'export async function f() { return await import("@n-dx/rex"); }\n');
+      // The gateway itself, a comment, and a subpath specifier are all fine.
+      await write("packages/hench/src/prd/rex-gateway.ts", 'export { x } from "@n-dx/rex";\nawait import("@n-dx/rex");\n');
+      await write("packages/hench/src/agent/ok.ts", '// await import("@n-dx/rex")\nawait import("@n-dx/rex/dist/x.js");\n');
+      // No gateway rule covers core, so its dynamic llm-client import stays clean.
+      await write("packages/core/src/cfg.ts", 'export const m = () => import("@n-dx/llm-client");\n');
+      const args = ["--format=json", "--quiet", tmpDir];
+      step = parseReport(runResult(args), args).steps.find((s) => s.name === "gateway-imports");
+    });
+
+    afterAll(async () => {
+      await removeTmpDir(tmpDir);
+    });
+
+    it("reports a dynamic import() outside the gateway, and only that", () => {
+      expect(step.ok).toBe(false);
+      expect(step.violations.map((v) => `${v.file}:${v.line}`)).toEqual([
+        join("packages", "hench", "src", "agent", "bad.ts") + ":1",
+      ]);
+    });
+  });
+
   // ── Restricted imports: a user project opting in through .n-dx.json ────────
 
   describe("restricted-imports opt-in", () => {
@@ -334,6 +368,21 @@ describe("n-dx ci", () => {
         await configure(dir, ["src/lib/exec.ts"]);
       },
       "file in the allow list": async (dir) => configure(dir, ["src/lib/exec.js", "scripts/release.js"]),
+      // POSIX only: chmod 000 does not stop the owner on Windows, and root reads anything.
+      ...(process.platform !== "win32" && process.getuid?.() !== 0
+        ? {
+            "unreadable source file": async (dir) => {
+              await configure(dir, ["src/lib/exec.js"]);
+              await chmod(join(dir, "scripts", "release.js"), 0o000);
+            },
+            // Tracked, so git lists it; the stat, not the read, is what fails.
+            "source file under an unreadable directory": async (dir) => {
+              await gitProject(dir, { trackRelease: true });
+              await configure(dir, ["src/lib/exec.ts"]);
+              await chmod(join(dir, "scripts"), 0o000);
+            },
+          }
+        : {}),
       "malformed rule": async (dir) => {
         await writeFile(
           join(dir, ".n-dx.json"),
@@ -355,6 +404,8 @@ describe("n-dx ci", () => {
         await writeFile(join(dir, "scripts", "release.js"), RELEASE_SCRIPT);
         await setup(dir);
         const result = runResult(["--format=json", "--quiet", dir]);
+        // Undo the unreadable cases' chmod so afterAll can remove the fixture.
+        await chmod(join(dir, "scripts"), 0o755);
         const report = parseReport(result, ["--format=json", "--quiet", name]);
         results.set(name, {
           dir,
@@ -412,6 +463,28 @@ describe("n-dx ci", () => {
       expect(step.violations).toHaveLength(1);
       expect(step.violations[0]).toMatch(/^scripts\/release\.js imports node:child_process/);
     });
+
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+      "fails, with a parseable report, on a selected source file it cannot read",
+      () => {
+        const { code, step } = results.get("unreadable source file");
+        expect(code).toBe(1);
+        expect(step.ok).toBe(false);
+        expect(step.violations).toHaveLength(1);
+        expect(step.violations[0]).toMatch(/^cannot read scripts\/release\.js: EACCES/);
+      },
+    );
+
+    it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+      "fails, with a parseable report, on a tracked source file under a directory it cannot read",
+      () => {
+        const { code, step } = results.get("source file under an unreadable directory");
+        expect(code).toBe(1);
+        expect(step.ok).toBe(false);
+        expect(step.violations).toHaveLength(1);
+        expect(step.violations[0]).toMatch(/^cannot read scripts\/release\.js: EACCES/);
+      },
+    );
 
     it("fails on a rule it cannot read rather than skipping it", () => {
       const { code, step } = results.get("malformed rule");
