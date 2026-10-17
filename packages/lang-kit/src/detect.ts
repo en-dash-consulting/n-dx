@@ -445,6 +445,7 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
  * - `skipDirectories`: union of all skip directories
  * - `skipUnlessContains`: union of the marker files per name (omitted when
  *   none); a name another config lists in `skipDirectories` stays skipped
+ * - `skipBesideMarker`: likewise (omitted when none)
  * - `generatedFilePatterns`: concatenation of all patterns
  * - `generatedHeaders`: concatenation of all rules (omitted when none)
  * - `entryPointPatterns`: concatenation of all patterns
@@ -467,6 +468,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
   const configFilePatterns: RegExp[] = [];
   const skipDirectories = new Set<string>();
   const skipUnlessContains = new Map<string, string[]>();
+  const skipBesideMarker = new Map<string, string[]>();
   const generatedFilePatterns: RegExp[] = [];
   const generatedHeaders: GeneratedHeaderRule[] = [];
   const entryPointPatterns: RegExp[] = [];
@@ -480,6 +482,9 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     for (const d of config.skipDirectories) skipDirectories.add(d);
     for (const [d, markers] of config.skipUnlessContains ?? []) {
       skipUnlessContains.set(d, [...new Set([...(skipUnlessContains.get(d) ?? []), ...markers])]);
+    }
+    for (const [d, markers] of config.skipBesideMarker ?? []) {
+      skipBesideMarker.set(d, [...new Set([...(skipBesideMarker.get(d) ?? []), ...markers])]);
     }
     for (const p of config.generatedFilePatterns) generatedFilePatterns.push(p);
     for (const r of config.generatedHeaders ?? []) generatedHeaders.push(r);
@@ -496,6 +501,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     ...(configFilePatterns.length > 0 ? { configFilePatterns } : {}),
     skipDirectories,
     ...(skipUnlessContains.size > 0 ? { skipUnlessContains } : {}),
+    ...(skipBesideMarker.size > 0 ? { skipBesideMarker } : {}),
     generatedFilePatterns,
     ...(generatedHeaders.length > 0 ? { generatedHeaders } : {}),
     entryPointPatterns,

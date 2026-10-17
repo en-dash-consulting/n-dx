@@ -56,8 +56,13 @@ against the `files` inventory, not the disk. Dependencies reuse
 written) with file and line. `parseTomlLocated` gives each value's line.
 
 A config's `skipUnlessContains` names directories skipped unless they directly
-hold a marker file (Python's `env`, `build` and `dist` without `__init__.py`);
-`skipsDirectory` applies it and `skipDirectories`, the caller doing the I/O.
+hold a marker file (Python's `env`, `build` and `dist` without `__init__.py`).
+`skipBesideMarker` names directories skipped only as build output: under the
+project root or a directory holding a marker, never below `src/` (Java's
+`target`, `build`, `out` and `generated` beside `pom.xml` or `build.gradle*`,
+so `src/main/java/…/target/` stays a package). `skipsDirectory` applies both
+and `skipDirectories`, the caller doing the I/O and passing the directory's
+place; a name both conditional rules list is kept if either keeps it.
 
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
 so the Java and Go packs share it without depending on each other.

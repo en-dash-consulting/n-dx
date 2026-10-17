@@ -10,9 +10,11 @@
  * @module lang-kit/java-modules
  */
 
+import { existsSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, posix, relative, sep } from "node:path";
 import { javaConfig } from "./java.js";
+import { skipsDirectory } from "./registry.js";
 
 export type JavaBuildSystem = "maven" | "gradle" | "none";
 
@@ -235,10 +237,14 @@ async function packageDeclarationRoots(projectDir: string, notices: string[]): P
       notices.push(`${toPosix(relative(projectDir, dir)) || "."} is unreadable (${code}); skipped`);
       return;
     }
+    const fileNames = new Set(entries.filter((e) => !e.isDirectory()).map((e) => e.name));
     for (const e of entries) {
       if (e.isDirectory()) {
-        if (e.name.startsWith(".") || e.name === "node_modules" || javaConfig.skipDirectories.has(e.name)) continue;
-        await walk(join(dir, e.name));
+        if (e.name.startsWith(".") || e.name === "node_modules") continue;
+        const sub = join(dir, e.name);
+        const place = { path: toPosix(relative(projectDir, sub)), parentHolds: (file: string) => fileNames.has(file) };
+        if (skipsDirectory(javaConfig, e.name, (file) => existsSync(join(sub, file)), place)) continue;
+        await walk(sub);
       } else if (e.name.endsWith(".java")) {
         const root = await rootFromPackage(projectDir, join(dir, e.name), notices);
         if (root !== null) roots.add(root);

@@ -143,9 +143,11 @@ describe("java language config", () => {
     expect(mergeLanguageConfigs([typescriptConfig, goConfig]).configFilePatterns).toBeUndefined();
   });
 
-  it("skips build output and generated directories", () => {
-    for (const d of ["target", "build", "out", ".gradle", "generated-sources", "generated"]) {
-      expect(javaConfig.skipDirectories.has(d)).toBe(true);
+  it("always skips .gradle and generated-sources; target, build, out and generated only beside a build file", () => {
+    for (const d of [".gradle", "generated-sources"]) expect(javaConfig.skipDirectories.has(d)).toBe(true);
+    for (const d of ["target", "build", "out", "generated"]) {
+      expect(javaConfig.skipDirectories.has(d)).toBe(false);
+      expect(javaConfig.skipBesideMarker?.get(d)).toEqual(["pom.xml", "build.gradle", "build.gradle.kts"]);
     }
   });
 

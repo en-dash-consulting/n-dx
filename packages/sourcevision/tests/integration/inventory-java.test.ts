@@ -27,10 +27,25 @@ const FILES = [
   "web/src/main/resources/application.yml",
   "web/src/main/resources/application-prod.yml",
   "web/src/main/resources/application.properties",
+  "web/build.gradle",
   "web/target/generated-sources/annotations/com/acme/MapperImpl.java",
   "web/build/classes/Foo.java",
   "out/Bar.java",
   ".gradle/cache/Baz.java",
+  // Packages named like build output, below src/: source.
+  "core/src/main/java/com/acme/target/X.java",
+  "core/src/main/java/com/acme/build/Y.java",
+  "core/src/main/java/com/acme/out/Z.java",
+  "core/src/main/java/com/acme/generated/G.java",
+  // Module-root build output: skipped.
+  "core/target/classes/com/acme/core/Order.java",
+  "target/classes/com/acme/Root.java",
+  // A nested module's build output: skipped.
+  "sub/pom.xml",
+  "sub/target/classes/com/acme/sub/Sub.java",
+  "sub/src/main/java/com/acme/sub/target/Kept.java",
+  // Not beside a build file: not build output.
+  "tools/target/Notes.java",
 ];
 
 describe("analyzeInventory — Java multi-module repository", () => {
@@ -86,9 +101,24 @@ describe("analyzeInventory — Java multi-module repository", () => {
       "web/build/classes/Foo.java",
       "out/Bar.java",
       ".gradle/cache/Baz.java",
+      "core/target/classes/com/acme/core/Order.java",
+      "target/classes/com/acme/Root.java",
+      "sub/target/classes/com/acme/sub/Sub.java",
     ]) {
       expect(paths).not.toContain(skipped);
     }
+  });
+
+  it("inventories packages named target, build, out or generated below src/", () => {
+    expect(role("core/src/main/java/com/acme/target/X.java")).toBe("source");
+    expect(role("core/src/main/java/com/acme/build/Y.java")).toBe("source");
+    expect(role("core/src/main/java/com/acme/out/Z.java")).toBe("source");
+    expect(role("core/src/main/java/com/acme/generated/G.java")).toBe("generated");
+    expect(role("sub/src/main/java/com/acme/sub/target/Kept.java")).toBe("source");
+  });
+
+  it("inventories a target directory that is not beside a build file", () => {
+    expect(role("tools/target/Notes.java")).toBe("source");
   });
 });
 
@@ -104,6 +134,10 @@ describe("analyzeInventory — Java beside another primary language", () => {
     "frontend/out/bundle.ts",
     "target/classes/Foo.java",
     ".gradle/cache/Baz.java",
+    "service/pom.xml",
+    "service/src/main/java/com/acme/target/Pool.java",
+    "service/target/classes/com/acme/target/Pool.java",
+    "frontend/src/target/picker.ts",
   ];
 
   beforeAll(async () => {
@@ -142,5 +176,12 @@ describe("analyzeInventory — Java beside another primary language", () => {
     const paths = (await inventory()).files.map((f) => f.path);
     expect(paths).not.toContain("target/classes/Foo.java");
     expect(paths).not.toContain(".gradle/cache/Baz.java");
+    expect(paths).not.toContain("service/target/classes/com/acme/target/Pool.java");
+  });
+
+  it("inventories target packages below src/ in the nested module and the primary language", async () => {
+    const paths = (await inventory()).files.map((f) => f.path);
+    expect(paths).toContain("service/src/main/java/com/acme/target/Pool.java");
+    expect(paths).toContain("frontend/src/target/picker.ts");
   });
 });

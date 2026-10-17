@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { PROJECT_DIRS } from "@n-dx/llm-client";
-import { skipsDirectory, type LanguageConfig } from "@n-dx/lang-kit";
+import { skipsDirectory, type DirectorySkipRules } from "@n-dx/lang-kit";
 import { toPosix } from "./paths.js";
 
 // ── Skip patterns ────────────────────────────────────────────────────────────
@@ -59,11 +59,12 @@ const VENDOR_SKIP_DIRS: ReadonlySet<string> = new Set([
 ]);
 
 /** The directories a walk skips, in the language config's terms. */
-export type ProjectSkip = Pick<LanguageConfig, "skipDirectories" | "skipUnlessContains">;
+export type ProjectSkip = DirectorySkipRules;
 
 /**
  * What the walk skips: the base and vendored sets, the language config's own
- * `skipDirectories` and `skipUnlessContains`, and the user's `extraSkipDirs`.
+ * `skipDirectories`, `skipUnlessContains` and `skipBesideMarker`, and the
+ * user's `extraSkipDirs`.
  */
 export function projectSkip(
   language: ProjectSkip,
@@ -72,6 +73,7 @@ export function projectSkip(
   return {
     skipDirectories: new Set([...BASE_SKIP_DIRS, ...VENDOR_SKIP_DIRS, ...language.skipDirectories, ...extraSkipDirs]),
     ...(language.skipUnlessContains ? { skipUnlessContains: language.skipUnlessContains } : {}),
+    ...(language.skipBesideMarker ? { skipBesideMarker: language.skipBesideMarker } : {}),
   };
 }
 
@@ -218,6 +220,7 @@ export async function* walkProjectFiles(
   skip: ProjectSkip,
 ): AsyncGenerator<string> {
   const entries = await readdir(dir, { withFileTypes: true });
+  const parentHolds = (file: string): boolean => existsSync(join(dir, file));
 
   for (const entry of entries) {
     if (entry.name === ".gitkeep") continue;
@@ -226,11 +229,16 @@ export async function* walkProjectFiles(
     const relPath = toPosix(relative(rootDir, fullPath));
 
     if (entry.isDirectory()) {
-      if (skipsDirectory(skip, entry.name, (file) => existsSync(join(fullPath, file)))) continue;
+      const holds = (file: string): boolean => existsSync(join(fullPath, file));
+      if (skipsDirectory(skip, entry.name, holds, { path: relPath, parentHolds })) continue;
       if (ig.ignores(relPath + "/")) continue;
       yield* walkProjectFiles(fullPath, rootDir, ig, skip);
     } else if (entry.isFile()) {
-      if (skip.skipDirectories.has(entry.name) || skip.skipUnlessContains?.has(entry.name)) continue;
+      if (
+        skip.skipDirectories.has(entry.name) ||
+        skip.skipUnlessContains?.has(entry.name) ||
+        skip.skipBesideMarker?.has(entry.name)
+      ) continue;
       if (ig.ignores(relPath)) continue;
       yield relPath;
     }
