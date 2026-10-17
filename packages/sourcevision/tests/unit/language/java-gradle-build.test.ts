@@ -163,6 +163,26 @@ describe("Gradle build model: edge cases", () => {
     expect(m?.dependencies.map((d) => `${d.artifact}:${d.version.resolved ? d.version.value : "?"}`)).toEqual(["a:1", "b:2"]);
   });
 
+  it("reads a Groovy map-style declaration continued after a trailing comma", async () => {
+    const [m] = await files({
+      "build.gradle": "dependencies {\n  implementation group: 'com.google.guava', // core\n      name: 'guava', version: '33.0.0-jre'\n  testImplementation 'g:t:1'\n}\n",
+    });
+    expect(dep(m, "guava")).toEqual({
+      group: "com.google.guava",
+      artifact: "guava",
+      version: { resolved: true, value: "33.0.0-jre", bestEffort: true },
+      scope: "implementation",
+    });
+    expect(dep(m, "t")?.scope).toBe("testImplementation");
+    expect(m?.notices).toEqual([]);
+  });
+
+  it("reads every coordinate of a Groovy multi-coordinate declaration continued after a trailing comma", async () => {
+    const [m] = await files({ "build.gradle": "dependencies {\n  implementation 'g:a:1',\n\n    'g:b:2'\n  api 'g:c:3'\n}\n" });
+    expect(m?.dependencies.map((d) => `${d.scope} ${d.artifact}`)).toEqual(["implementation a", "implementation b", "api c"]);
+    expect(m?.notices).toEqual([]);
+  });
+
   it("reads a catalog plugin alias declared with apply false, and a child inherits its version", async () => {
     const models = await files({
       "settings.gradle.kts": `include("app")\n`,
@@ -184,6 +204,20 @@ describe("GradleScript", () => {
   it("splits statements outside brackets and strings, joining dot-continuations", () => {
     const s = new GradleScript(`a 'x;y' // c; d\nb(1,\n 2)\nc\n  .d()\ne { f; g }`);
     expect(s.statements().map((x) => s.text(x))).toEqual([`a 'x;y'`, "b(1,\n 2)", "c\n  .d()", "e { f; g }"]);
+  });
+
+  it("joins a line ending in a comma or binary operator to the next, but not ++, -- or *", () => {
+    const s = new GradleScript(`a 1,\n  2\nb = x +\n  y\nc = p &&\n  q\nd++\ne--\nimport f.*\ng & 1\nh`);
+    expect(s.statements().map((x) => s.text(x))).toEqual([
+      "a 1,\n  2",
+      "b = x +\n  y",
+      "c = p &&\n  q",
+      "d++",
+      "e--",
+      "import f.*",
+      "g & 1",
+      "h",
+    ]);
   });
 
   it("finds block bodies, with or without call arguments", () => {
