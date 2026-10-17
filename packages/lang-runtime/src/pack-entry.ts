@@ -11,8 +11,10 @@
  * notices only when imports are wanted. Each step that can fail for the
  * whole language — a grammar not built or not loadable, a query the grammar
  * rejects, build files that cannot be read — ends the call with a degraded
- * result instead of an exception. A framework that throws loses only its own
- * facts, reported as a notice. A file that cannot be read or is over the
+ * result instead of an exception. A framework, the project facts reader or
+ * the project notices reader that throws loses only its own output, and a
+ * symbol `refine` that throws on a file leaves that file the rules' symbols;
+ * each is reported as a notice, so imports never depend on them. A file that cannot be read or is over the
  * runner's size limit is listed in `unparsed`.
  *
  * @module lang-runtime/pack-entry
@@ -38,7 +40,14 @@ import type {
   PreparedResolver,
 } from "./pack.js";
 import type { PackPackage } from "./pack-package.js";
-import { mergeFileFacts, readPackFacts, type PackSymbolRules, type ProjectFactsReader } from "./pack-facts.js";
+import {
+  mergeFileFacts,
+  projectKinds,
+  readPackFacts,
+  type FileFactFields,
+  type PackSymbolRules,
+  type ProjectFactsReader,
+} from "./pack-facts.js";
 import { createTreeSitterRunner, loadGrammar, type RunnablePack, type RunnerOptions } from "./runner.js";
 
 export interface TreeSitterEntryOptions {
@@ -148,17 +157,23 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       resolve: (fromFile) => prepare(resolver).resolve(fromFile),
       module: (fromFile, specifier) => prepare(resolver).module?.(fromFile, specifier),
     };
-    const project = options.projectFacts?.(parsed, kinds);
+    const project = options.projectFacts && readProjectFacts(options.projectFacts, pack, parsed, kinds);
     const framed = frameworks.map((f) => readFramework(f, parsed, kinds, context));
+    const refined = containRefine(symbolRules);
     const facts: FileFacts[] = parsed.map((file) =>
       framed.reduce(
         (merged, { facts: byPath }) => mergeFileFacts(merged, byPath.get(file.path)),
-        mergeFileFacts(readPackFacts(pack, file, { kinds, resolver: prepared, symbolRules }), project?.get(file.path)),
+        mergeFileFacts(
+          readPackFacts(pack, file, { kinds, resolver: prepared, symbolRules: refined.rules }),
+          project?.facts.get(file.path),
+        ),
       ),
     );
     const notices = [
       ...framed.flatMap((f) => f.notices),
-      ...(options.projectNotices?.(parsed, kinds) ?? []),
+      ...(project?.notices ?? []),
+      ...refined.notices(),
+      ...(options.projectNotices ? readProjectNotices(options.projectNotices, parsed, kinds) : []),
       ...(prepared?.notices?.() ?? []),
     ];
     return notices.length === 0 ? { facts, unparsed } : { facts, unparsed, notices };
@@ -188,4 +203,73 @@ function readFramework(
       notices: [`framework ${framework.id} failed (${errorText(error)}); its ${lost.join(" and ")} were not recorded.`],
     };
   }
+}
+
+/**
+ * The project facts reader's facts. A reader that throws loses only the kinds
+ * no single file answers (Terraform's resources), as a notice: imports,
+ * symbols and frameworks' facts are still returned and the pack is not degraded.
+ */
+function readProjectFacts(
+  reader: ProjectFactsReader,
+  pack: LanguagePack,
+  files: readonly PackSourceFile[],
+  kinds: readonly FactKind[],
+): { readonly facts: ReadonlyMap<string, FileFactFields>; readonly notices: readonly string[] } {
+  try {
+    return { facts: reader(files, kinds), notices: [] };
+  } catch (error) {
+    const lost = projectKinds(pack).filter((kind) => kinds.includes(kind));
+    const what = lost.length === 0 ? "nothing it read was recorded" : `its ${lost.join(" and ")} were not recorded`;
+    return { facts: new Map(), notices: [`the project facts reader failed (${errorText(error)}); ${what}.`] };
+  }
+}
+
+/** The pack's project notices; one that throws loses them, reported as a single notice of its own. */
+function readProjectNotices(
+  read: NonNullable<TreeSitterEntryOptions["projectNotices"]>,
+  files: readonly PackSourceFile[],
+  kinds: readonly FactKind[],
+): readonly string[] {
+  try {
+    return read(files, kinds);
+  } catch (error) {
+    return [`the project notices reader failed (${errorText(error)}); what the pack read but skipped is not reported.`];
+  }
+}
+
+/** How many files a refine failure notice names before it counts the rest. */
+const NAMED_REFINE_FAILURES = 3;
+
+/**
+ * The symbol rules with a `refine` that cannot throw: a file whose refine
+ * throws keeps the symbols the rules read, without what refine adds, and is
+ * named in one notice for every such file.
+ */
+function containRefine(rules: PackSymbolRules | undefined): {
+  readonly rules: PackSymbolRules | undefined;
+  readonly notices: () => readonly string[];
+} {
+  const refine = rules?.refine;
+  if (rules === undefined || refine === undefined) return { rules, notices: () => [] };
+  const failed: string[] = [];
+  const contained: PackSymbolRules = {
+    ...rules,
+    refine: (symbols, file) => {
+      try {
+        return refine(symbols, file);
+      } catch (error) {
+        failed.push(`${file.path} (${errorText(error)})`);
+        return [...symbols];
+      }
+    },
+  };
+  const notices = (): readonly string[] => {
+    if (failed.length === 0) return [];
+    const rest = failed.length - NAMED_REFINE_FAILURES;
+    const named = failed.slice(0, NAMED_REFINE_FAILURES).join(", ") + (rest > 0 ? ` and ${rest} more` : "");
+    const count = failed.length === 1 ? "1 file" : `${failed.length} files`;
+    return [`symbol refinement failed on ${count}: ${named}; their symbols are the rules' reading alone.`];
+  };
+  return { rules: contained, notices };
 }
