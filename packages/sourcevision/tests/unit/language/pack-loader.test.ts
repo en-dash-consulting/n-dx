@@ -193,6 +193,13 @@ describe("loadPack after an n-dx upgrade", () => {
     expect(load.status).toBe("missing");
   });
 
+  it("reports a pack missing, not rejecting, when the packs root is a file and cannot be listed", async () => {
+    mkdirSync(resolveNdxHome(), { recursive: true });
+    writeFileSync(packsRoot(), "not a directory");
+    const load = await loadPack(known(() => Promise.reject(notFound("@n-dx/lang-java"))), { version: VERSION });
+    expect(load.status).toBe("missing");
+  });
+
   it("ignores a copy left in a `.sv-pack-stage-*` directory", async () => {
     installForVersion(".sv-pack-stage-x", "1.2.2");
     const load = await loadPack(known(() => Promise.reject(notFound("@n-dx/lang-java"))), { version: VERSION });

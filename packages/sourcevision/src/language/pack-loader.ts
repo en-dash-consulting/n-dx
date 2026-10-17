@@ -19,7 +19,7 @@
  * @module sourcevision/language/pack-loader
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, type Dirent } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { goConfig, isLanguagePackEntry, javaConfig, pythonConfig, terraformConfig, type LanguageConfig, type LanguagePackEntry, type PackDegradation } from "@n-dx/lang-kit";
@@ -116,12 +116,20 @@ export function defaultPackDir(version: string = sourcevisionVersion()): string 
  * `.sv-pack-stage-*` that `sv pack add --from` extracts into) and copies at
  * `version` itself are not stale installs, so they are skipped; a staged
  * load is not scanned at all, since what it lacks is the bundle's fault.
+ * A root that cannot be listed (unreadable, or a file) has no stale install
+ * to name, so the pack is reported missing rather than `loadPack` throwing.
  */
 function versionInSiblingPackDir(pack: InstallablePack, packDir: string, version: string): string | undefined {
   const root = dirname(packDir);
-  if (root !== packsRoot() || basename(packDir).startsWith(".") || !existsSync(root)) return undefined;
+  if (root !== packsRoot() || basename(packDir).startsWith(".")) return undefined;
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(root, { withFileTypes: true });
+  } catch {
+    return undefined;
+  }
   const found: string[] = [];
-  for (const dir of readdirSync(root, { withFileTypes: true })) {
+  for (const dir of entries) {
     if (!dir.isDirectory() || dir.name === basename(packDir) || dir.name.startsWith(".")) continue;
     const manifestFile = join(root, dir.name, "node_modules", ...pack.packageName.split("/"), "package.json");
     if (!existsSync(manifestFile)) continue;
