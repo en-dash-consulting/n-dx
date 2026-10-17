@@ -38,3 +38,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Resolve pack file paths without the global URL so jsdom tests can load sourcevision](./resolve-pack-file-paths-without-the.md) | completed |
 | [Runner memory test times out under the full test gate](./runner-memory-test-times-out-under-the.md) | completed |
 | [Secondary Java drops TS/Python/Go files under out/ and generated/ from a mixed repo's inventory](./secondary-java-drops-ts-python-go.md) | completed |
+| [Correct the Java resolver changeset that says analysis output is unchanged](./correct-the-java-resolver-changeset.md) | pending |
