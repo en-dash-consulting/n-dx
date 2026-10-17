@@ -18,7 +18,7 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { buildGrammarsScript, grammarBuildDir } from "./package-paths.js";
 import { javaPack } from "./java-pack.js";
 import type { LanguageConfig } from "./registry.js";
 
@@ -50,14 +50,74 @@ export interface RuleProvenance {
   readonly source: string;
 }
 
-/** Resolves a reference in one source file to the project files it names. */
-export interface PackResolver {
+/** A position in a file. Matches the schema's call-graph positions. */
+export interface SourcePosition {
+  /** One-based line. */
+  readonly line: number;
   /**
-   * @param specifier The reference as written, e.g. an import name.
-   * @param fromFile  Project-relative path of the referencing file.
-   * @returns Project-relative paths of the target files; empty when external or unresolved.
+   * Zero-based column in UTF-16 code units — web-tree-sitter parses the
+   * JavaScript string, so this indexes the line as `String.prototype` does,
+   * not by UTF-8 byte.
    */
-  resolve(specifier: string, fromFile: string): readonly string[];
+  readonly column: number;
+}
+
+/** One node captured by a pack query. */
+export interface Capture {
+  /** Capture name as written in the query, without the `@`. */
+  readonly name: string;
+  /** Tree-sitter node type, e.g. `"class_declaration"`. */
+  readonly nodeType: string;
+  readonly text: string;
+  readonly start: SourcePosition;
+  readonly end: SourcePosition;
+}
+
+/** One project file's captures, as the runner produces them. */
+export interface PackSourceFile {
+  /** Project-relative, forward-slash path. */
+  readonly path: string;
+  /** Captures per query name, in document order. */
+  readonly captures: Readonly<Record<string, readonly Capture[]>>;
+}
+
+/** A project file one file refers to, with the names that led there. */
+export interface FileReference {
+  /** Project-relative path of the target file. */
+  readonly to: string;
+  /** Sorted, distinct; `*` for a wildcard import. */
+  readonly symbols: readonly string[];
+}
+
+/** A package outside the project that one file refers to. */
+export interface ExternalReference {
+  /** Package name, e.g. `java.util`. No version. */
+  readonly package: string;
+  /** Sorted, distinct; `*` for a wildcard import. */
+  readonly symbols: readonly string[];
+}
+
+/** Everything one file refers to. Both lists are sorted and deduplicated. */
+export interface FileReferences {
+  /** Never contains the file itself. */
+  readonly files: readonly FileReference[];
+  readonly external: readonly ExternalReference[];
+}
+
+/**
+ * Resolves references to files. Resolution needs an index of the whole
+ * project (same-package and wildcard lookups), so it is built once per
+ * analysis by {@link PackResolver.prepare}.
+ */
+export interface PackResolver {
+  /** Index every file of the project; call once per analysis. */
+  prepare(files: readonly PackSourceFile[]): PreparedResolver;
+}
+
+/** A resolver bound to one project's index. */
+export interface PreparedResolver {
+  /** References from a prepared file; empty for a path that was not prepared. */
+  resolve(fromFile: string): FileReferences;
 }
 
 /** A dependency declared in a build file. */
@@ -109,12 +169,6 @@ export interface LanguagePack {
 /** Packs registered in sourcevision. */
 export const BUILTIN_PACKS: readonly LanguagePack[] = [javaPack];
 
-/**
- * Where `scripts/build-grammars.mjs` writes grammars: `<package>/build/grammars`.
- * Resolves the same from `src/language/` and `dist/language/`.
- */
-export const DEFAULT_GRAMMAR_DIR = fileURLToPath(new URL("../../build/grammars", import.meta.url));
-
 /** How a pack's language will be analyzed. */
 export type PackMode = "structure" | "inventory-only";
 
@@ -131,10 +185,21 @@ export interface PackStatus {
 export interface LoadPacksOptions {
   /** Defaults to {@link BUILTIN_PACKS}. */
   readonly packs?: readonly LanguagePack[];
-  /** Defaults to {@link DEFAULT_GRAMMAR_DIR}. */
+  /** Defaults to {@link grammarBuildDir}. */
   readonly grammarDir?: string;
   /** Receives one message per degraded pack. Defaults to `console.warn`. */
   readonly warn?: (message: string) => void;
+}
+
+/**
+ * The step that restores a missing grammar, for the install at hand. A source
+ * checkout has the build script; a published install ships every built-in
+ * grammar, so a missing one means the install is incomplete.
+ */
+function missingGrammarStep(): string {
+  return existsSync(buildGrammarsScript())
+    ? "Build it with `pnpm --filter @n-dx/sourcevision build:grammars` in the n-dx checkout."
+    : "Published @n-dx/sourcevision ships this grammar, so this install is incomplete: reinstall n-dx with `npm install -g @n-dx/core@latest`.";
 }
 
 /**
@@ -144,7 +209,7 @@ export interface LoadPacksOptions {
  */
 export function loadLanguagePacks(options: LoadPacksOptions = {}): PackStatus[] {
   const packs = options.packs ?? BUILTIN_PACKS;
-  const grammarDir = options.grammarDir ?? DEFAULT_GRAMMAR_DIR;
+  const grammarDir = options.grammarDir ?? grammarBuildDir();
   const warn = options.warn ?? ((message: string) => console.warn(message));
 
   return packs.map((pack) => {
@@ -155,7 +220,7 @@ export function loadLanguagePacks(options: LoadPacksOptions = {}): PackStatus[] 
     const notice =
       `${pack.config.displayName}: grammar ${pack.grammar.name}@${pack.grammar.version} is not built ` +
       `(expected ${grammarPath}); ${pack.config.displayName} files get inventory only. ` +
-      `Build it with sourcevision's scripts/build-grammars.mjs.`;
+      missingGrammarStep();
     warn(notice);
     return { pack, grammarPath, grammarAvailable: false, mode: "inventory-only", notice };
   });

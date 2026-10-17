@@ -149,8 +149,1399 @@
               "line": 3,
               "column": 32
             }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "System",
+            "start": {
+              "line": 4,
+              "column": 4
+            },
+            "end": {
+              "line": 4,
+              "column": 10
+            }
           }
         ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Cart.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class Cart {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 20
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Cart",
+            "start": {
+              "line": 3,
+              "column": 13
+            },
+            "end": {
+              "line": 3,
+              "column": 17
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Checkout.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import com.example.model.Customer;",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 34
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.model.Customer",
+            "start": {
+              "line": 4,
+              "column": 7
+            },
+            "end": {
+              "line": 4,
+              "column": 33
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import com.example.model.Customer.Address;",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 42
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.model.Customer.Address",
+            "start": {
+              "line": 5,
+              "column": 7
+            },
+            "end": {
+              "line": 5,
+              "column": 41
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import com.example.time.Clock;",
+            "start": {
+              "line": 7,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 30
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.time.Clock",
+            "start": {
+              "line": 7,
+              "column": 7
+            },
+            "end": {
+              "line": 7,
+              "column": 29
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import com.example.util.*;",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 26
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 9,
+              "column": 7
+            },
+            "end": {
+              "line": 9,
+              "column": 23
+            }
+          },
+          {
+            "name": "import.wildcard",
+            "nodeType": "asterisk",
+            "text": "*",
+            "start": {
+              "line": 9,
+              "column": 24
+            },
+            "end": {
+              "line": 9,
+              "column": 25
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import static com.example.util.Numbers.round;",
+            "start": {
+              "line": 10,
+              "column": 0
+            },
+            "end": {
+              "line": 10,
+              "column": 45
+            }
+          },
+          {
+            "name": "import.static",
+            "nodeType": "static",
+            "text": "static",
+            "start": {
+              "line": 10,
+              "column": 7
+            },
+            "end": {
+              "line": 10,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util.Numbers.round",
+            "start": {
+              "line": 10,
+              "column": 14
+            },
+            "end": {
+              "line": 10,
+              "column": 44
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import static com.example.util.Constants.*;",
+            "start": {
+              "line": 11,
+              "column": 0
+            },
+            "end": {
+              "line": 11,
+              "column": 43
+            }
+          },
+          {
+            "name": "import.static",
+            "nodeType": "static",
+            "text": "static",
+            "start": {
+              "line": 11,
+              "column": 7
+            },
+            "end": {
+              "line": 11,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util.Constants",
+            "start": {
+              "line": 11,
+              "column": 14
+            },
+            "end": {
+              "line": 11,
+              "column": 40
+            }
+          },
+          {
+            "name": "import.wildcard",
+            "nodeType": "asterisk",
+            "text": "*",
+            "start": {
+              "line": 11,
+              "column": 41
+            },
+            "end": {
+              "line": 11,
+              "column": 42
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import java.util.List;",
+            "start": {
+              "line": 12,
+              "column": 0
+            },
+            "end": {
+              "line": 12,
+              "column": 22
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "java.util.List",
+            "start": {
+              "line": 12,
+              "column": 7
+            },
+            "end": {
+              "line": 12,
+              "column": 21
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import javax.inject.*;",
+            "start": {
+              "line": 13,
+              "column": 0
+            },
+            "end": {
+              "line": 13,
+              "column": 22
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "javax.inject",
+            "start": {
+              "line": 13,
+              "column": 7
+            },
+            "end": {
+              "line": 13,
+              "column": 19
+            }
+          },
+          {
+            "name": "import.wildcard",
+            "nodeType": "asterisk",
+            "text": "*",
+            "start": {
+              "line": 13,
+              "column": 20
+            },
+            "end": {
+              "line": 13,
+              "column": 21
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import org.acme.Missing;",
+            "start": {
+              "line": 14,
+              "column": 0
+            },
+            "end": {
+              "line": 14,
+              "column": 24
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "org.acme.Missing",
+            "start": {
+              "line": 14,
+              "column": 7
+            },
+            "end": {
+              "line": 14,
+              "column": 23
+            }
+          }
+        ],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class Checkout {\n  private Customer customer;\n  private Address address;\n  private Clock clock;\n  private Cart cart;\n  private Receipt receipt;\n  private List<Strings> names;\n  private com.example.model.Customer again;\n  private java.time.Instant at;\n  private Line line;\n\n  int total() {\n    Status status = Status.OPEN;\n    return round(Tax.rate()) + MAX;\n  }\n\n  class Line {}\n}",
+            "start": {
+              "line": 16,
+              "column": 0
+            },
+            "end": {
+              "line": 33,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Checkout",
+            "start": {
+              "line": 16,
+              "column": 13
+            },
+            "end": {
+              "line": 16,
+              "column": 21
+            }
+          },
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "class Line {}",
+            "start": {
+              "line": 32,
+              "column": 2
+            },
+            "end": {
+              "line": 32,
+              "column": 15
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Line",
+            "start": {
+              "line": 32,
+              "column": 8
+            },
+            "end": {
+              "line": 32,
+              "column": 12
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "int total() {\n    Status status = Status.OPEN;\n    return round(Tax.rate()) + MAX;\n  }",
+            "start": {
+              "line": 27,
+              "column": 2
+            },
+            "end": {
+              "line": 30,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "total",
+            "start": {
+              "line": 27,
+              "column": 6
+            },
+            "end": {
+              "line": 27,
+              "column": 11
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "round(Tax.rate())",
+            "start": {
+              "line": 29,
+              "column": 11
+            },
+            "end": {
+              "line": 29,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "round",
+            "start": {
+              "line": 29,
+              "column": 11
+            },
+            "end": {
+              "line": 29,
+              "column": 16
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(Tax.rate())",
+            "start": {
+              "line": 29,
+              "column": 16
+            },
+            "end": {
+              "line": 29,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "Tax.rate()",
+            "start": {
+              "line": 29,
+              "column": 17
+            },
+            "end": {
+              "line": 29,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "Tax",
+            "start": {
+              "line": 29,
+              "column": 17
+            },
+            "end": {
+              "line": 29,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "rate",
+            "start": {
+              "line": 29,
+              "column": 21
+            },
+            "end": {
+              "line": 29,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "()",
+            "start": {
+              "line": 29,
+              "column": 25
+            },
+            "end": {
+              "line": 29,
+              "column": 27
+            }
+          }
+        ],
+        "type-references": [
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Customer",
+            "start": {
+              "line": 17,
+              "column": 10
+            },
+            "end": {
+              "line": 17,
+              "column": 18
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Customer",
+            "start": {
+              "line": 17,
+              "column": 10
+            },
+            "end": {
+              "line": 17,
+              "column": 18
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Address",
+            "start": {
+              "line": 18,
+              "column": 10
+            },
+            "end": {
+              "line": 18,
+              "column": 17
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Address",
+            "start": {
+              "line": 18,
+              "column": 10
+            },
+            "end": {
+              "line": 18,
+              "column": 17
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Clock",
+            "start": {
+              "line": 19,
+              "column": 10
+            },
+            "end": {
+              "line": 19,
+              "column": 15
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Clock",
+            "start": {
+              "line": 19,
+              "column": 10
+            },
+            "end": {
+              "line": 19,
+              "column": 15
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Cart",
+            "start": {
+              "line": 20,
+              "column": 10
+            },
+            "end": {
+              "line": 20,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Cart",
+            "start": {
+              "line": 20,
+              "column": 10
+            },
+            "end": {
+              "line": 20,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Receipt",
+            "start": {
+              "line": 21,
+              "column": 10
+            },
+            "end": {
+              "line": 21,
+              "column": 17
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Receipt",
+            "start": {
+              "line": 21,
+              "column": 10
+            },
+            "end": {
+              "line": 21,
+              "column": 17
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "generic_type",
+            "text": "List<Strings>",
+            "start": {
+              "line": 22,
+              "column": 10
+            },
+            "end": {
+              "line": 22,
+              "column": 23
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "List",
+            "start": {
+              "line": 22,
+              "column": 10
+            },
+            "end": {
+              "line": 22,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Strings",
+            "start": {
+              "line": 22,
+              "column": 15
+            },
+            "end": {
+              "line": 22,
+              "column": 22
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "scoped_type_identifier",
+            "text": "com.example.model.Customer",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 36
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "com.example.model.Customer",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 36
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "com.example.model",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "com.example",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 21
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "com",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 13
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "example",
+            "start": {
+              "line": 23,
+              "column": 14
+            },
+            "end": {
+              "line": 23,
+              "column": 21
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "model",
+            "start": {
+              "line": 23,
+              "column": 22
+            },
+            "end": {
+              "line": 23,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Customer",
+            "start": {
+              "line": 23,
+              "column": 28
+            },
+            "end": {
+              "line": 23,
+              "column": 36
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.time.Instant",
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.time.Instant",
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.time",
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 19
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "java",
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "time",
+            "start": {
+              "line": 24,
+              "column": 15
+            },
+            "end": {
+              "line": 24,
+              "column": 19
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Instant",
+            "start": {
+              "line": 24,
+              "column": 20
+            },
+            "end": {
+              "line": 24,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Line",
+            "start": {
+              "line": 25,
+              "column": 10
+            },
+            "end": {
+              "line": 25,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Line",
+            "start": {
+              "line": 25,
+              "column": 10
+            },
+            "end": {
+              "line": 25,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Status",
+            "start": {
+              "line": 28,
+              "column": 4
+            },
+            "end": {
+              "line": 28,
+              "column": 10
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "Status",
+            "start": {
+              "line": 28,
+              "column": 20
+            },
+            "end": {
+              "line": 28,
+              "column": 26
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Clock.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class Clock {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 21
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Clock",
+            "start": {
+              "line": 3,
+              "column": 13
+            },
+            "end": {
+              "line": 3,
+              "column": 18
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Receipt.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.record",
+            "nodeType": "record_declaration",
+            "text": "public record Receipt(long cents) {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 36
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Receipt",
+            "start": {
+              "line": 3,
+              "column": 14
+            },
+            "end": {
+              "line": 3,
+              "column": 21
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Status.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.enum",
+            "nodeType": "enum_declaration",
+            "text": "public enum Status {\n  OPEN,\n  CLOSED\n}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Status",
+            "start": {
+              "line": 3,
+              "column": 12
+            },
+            "end": {
+              "line": 3,
+              "column": 18
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Tax.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public final class Tax {\n  static double rate() {\n    return 0.2;\n  }\n}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Tax",
+            "start": {
+              "line": 3,
+              "column": 19
+            },
+            "end": {
+              "line": 3,
+              "column": 22
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "static double rate() {\n    return 0.2;\n  }",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 6,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "rate",
+            "start": {
+              "line": 4,
+              "column": 16
+            },
+            "end": {
+              "line": 4,
+              "column": 20
+            }
+          }
+        ],
+        "calls": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/model/Customer.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.model;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 26
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.model",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class Customer {\n  public static class Address {}\n}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Customer",
+            "start": {
+              "line": 3,
+              "column": 13
+            },
+            "end": {
+              "line": 3,
+              "column": 21
+            }
+          },
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public static class Address {}",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 4,
+              "column": 32
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Address",
+            "start": {
+              "line": 4,
+              "column": 22
+            },
+            "end": {
+              "line": 4,
+              "column": 29
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "type-references": []
       }
     },
     {
@@ -1666,6 +3057,32 @@
             }
           },
           {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.io.Serializable",
+            "start": {
+              "line": 13,
+              "column": 75
+            },
+            "end": {
+              "line": 13,
+              "column": 95
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.io",
+            "start": {
+              "line": 13,
+              "column": 75
+            },
+            "end": {
+              "line": 13,
+              "column": 82
+            }
+          },
+          {
             "name": "typeref.name",
             "nodeType": "type_identifier",
             "text": "java",
@@ -1819,6 +3236,32 @@
             "end": {
               "line": 18,
               "column": 77
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.util.HashMap",
+            "start": {
+              "line": 18,
+              "column": 58
+            },
+            "end": {
+              "line": 18,
+              "column": 75
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.util",
+            "start": {
+              "line": 18,
+              "column": 58
+            },
+            "end": {
+              "line": 18,
+              "column": 67
             }
           },
           {
@@ -2027,6 +3470,19 @@
             "end": {
               "line": 26,
               "column": 14
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "Status",
+            "start": {
+              "line": 26,
+              "column": 48
+            },
+            "end": {
+              "line": 26,
+              "column": 54
             }
           },
           {
@@ -2248,6 +3704,19 @@
             "end": {
               "line": 44,
               "column": 12
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "System",
+            "start": {
+              "line": 44,
+              "column": 23
+            },
+            "end": {
+              "line": 44,
+              "column": 29
             }
           },
           {
@@ -3260,6 +4729,693 @@
           }
         ]
       }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/time/Clock.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.time;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.time",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.interface",
+            "nodeType": "interface_declaration",
+            "text": "public interface Clock {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 25
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Clock",
+            "start": {
+              "line": 3,
+              "column": 17
+            },
+            "end": {
+              "line": 3,
+              "column": 22
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/util/Cart.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.util;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public final class Cart {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 26
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Cart",
+            "start": {
+              "line": 3,
+              "column": 19
+            },
+            "end": {
+              "line": 3,
+              "column": 23
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/util/Constants.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.util;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.interface",
+            "nodeType": "interface_declaration",
+            "text": "public interface Constants {\n  int MAX = 10;\n}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Constants",
+            "start": {
+              "line": 3,
+              "column": 17
+            },
+            "end": {
+              "line": 3,
+              "column": 26
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/util/Numbers.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.util;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public final class Numbers {\n  public static int round(double value) {\n    return (int) Math.round(value);\n  }\n}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Numbers",
+            "start": {
+              "line": 3,
+              "column": 19
+            },
+            "end": {
+              "line": 3,
+              "column": 26
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public static int round(double value) {\n    return (int) Math.round(value);\n  }",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 6,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "round",
+            "start": {
+              "line": 4,
+              "column": 20
+            },
+            "end": {
+              "line": 4,
+              "column": 25
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "Math.round(value)",
+            "start": {
+              "line": 5,
+              "column": 17
+            },
+            "end": {
+              "line": 5,
+              "column": 34
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "Math",
+            "start": {
+              "line": 5,
+              "column": 17
+            },
+            "end": {
+              "line": 5,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "round",
+            "start": {
+              "line": 5,
+              "column": 22
+            },
+            "end": {
+              "line": 5,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(value)",
+            "start": {
+              "line": 5,
+              "column": 27
+            },
+            "end": {
+              "line": 5,
+              "column": 34
+            }
+          }
+        ],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/util/Strings.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.util;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public final class Strings {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 29
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Strings",
+            "start": {
+              "line": 3,
+              "column": 19
+            },
+            "end": {
+              "line": 3,
+              "column": 26
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/util/Unused.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.util;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public final class Unused {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 28
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Unused",
+            "start": {
+              "line": 3,
+              "column": 19
+            },
+            "end": {
+              "line": 3,
+              "column": 25
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "type-references": []
+      }
     }
-  ]
+  ],
+  "references": {
+    "src/Default.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/Cart.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/Checkout.java": {
+      "files": [
+        {
+          "to": "src/com/example/app/Cart.java",
+          "symbols": [
+            "Cart"
+          ]
+        },
+        {
+          "to": "src/com/example/app/Receipt.java",
+          "symbols": [
+            "Receipt"
+          ]
+        },
+        {
+          "to": "src/com/example/app/Status.java",
+          "symbols": [
+            "Status"
+          ]
+        },
+        {
+          "to": "src/com/example/app/Tax.java",
+          "symbols": [
+            "Tax"
+          ]
+        },
+        {
+          "to": "src/com/example/model/Customer.java",
+          "symbols": [
+            "Address",
+            "Customer"
+          ]
+        },
+        {
+          "to": "src/com/example/time/Clock.java",
+          "symbols": [
+            "Clock"
+          ]
+        },
+        {
+          "to": "src/com/example/util/Constants.java",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "to": "src/com/example/util/Numbers.java",
+          "symbols": [
+            "round"
+          ]
+        },
+        {
+          "to": "src/com/example/util/Strings.java",
+          "symbols": [
+            "Strings"
+          ]
+        }
+      ],
+      "external": [
+        {
+          "package": "java.time",
+          "symbols": [
+            "Instant"
+          ]
+        },
+        {
+          "package": "java.util",
+          "symbols": [
+            "List"
+          ]
+        },
+        {
+          "package": "javax.inject",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "org.acme",
+          "symbols": [
+            "Missing"
+          ]
+        }
+      ]
+    },
+    "src/com/example/app/Clock.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/Receipt.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/Status.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/Tax.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/model/Customer.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/shop/OrderService.java": {
+      "files": [],
+      "external": [
+        {
+          "package": "java.io",
+          "symbols": [
+            "Serializable"
+          ]
+        },
+        {
+          "package": "java.lang",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "java.util",
+          "symbols": [
+            "HashMap",
+            "List",
+            "Map"
+          ]
+        },
+        {
+          "package": "java.util.function",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "java.util.stream",
+          "symbols": [
+            "toList"
+          ]
+        },
+        {
+          "package": "org.springframework.beans.factory.annotation",
+          "symbols": [
+            "Autowired"
+          ]
+        },
+        {
+          "package": "org.springframework.stereotype",
+          "symbols": [
+            "Service"
+          ]
+        }
+      ]
+    },
+    "src/com/example/shop/Types.java": {
+      "files": [],
+      "external": [
+        {
+          "package": "java.io",
+          "symbols": [
+            "Serializable"
+          ]
+        }
+      ]
+    },
+    "src/com/example/time/Clock.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/util/Cart.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/util/Constants.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/util/Numbers.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/util/Strings.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/util/Unused.java": {
+      "files": [],
+      "external": []
+    }
+  }
 }

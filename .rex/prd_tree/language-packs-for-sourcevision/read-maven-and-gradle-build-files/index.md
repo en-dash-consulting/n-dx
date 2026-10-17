@@ -27,5 +27,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A grammar that loads but rejects a pack query fails the whole imports phase](./a-grammar-that-loads-but-rejects-a.md) | pending |
 | [Read dependencies and versions from Gradle builds](./read-dependencies-and-versions-159603.md) | pending |
 | [Read dependencies and versions from Maven pom files](./read-dependencies-and-versions-9c28bd.md) | pending |

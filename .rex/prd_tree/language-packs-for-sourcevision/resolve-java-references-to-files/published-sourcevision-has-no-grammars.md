@@ -2,7 +2,7 @@
 id: "29205936-8871-4e01-bcf8-ff9f7773408b"
 level: "task"
 title: "Published sourcevision has no grammars, so every language pack degrades to inventory-only and the notice points at an unshipped script"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -10,11 +10,16 @@ tags:
   - "language-packs"
   - "sourcevision"
 source: "ndx-adversarial-review"
+startedAt: "2026-10-08T02:50:01.644Z"
+completedAt: "2026-10-08T03:04:09.450Z"
+endedAt: "2026-10-08T03:04:09.450Z"
+resolutionType: "code-change"
+resolutionDetail: "Shipped built grammars (4a591e152, hench run aa4a7a62). The run's review never spawned; operator adversarial review (assisted run 511149ea) found nothing; SV_REQUIRE_GRAMMARS=1 tarball tests 8/8."
 acceptanceCriteria:
   - "A packed @n-dx/sourcevision tarball (pnpm pack) contains every built-in pack's grammar WASM and query files"
   - "loadLanguagePacks run from an installed tarball reports structure mode for Java"
   - "The missing-grammar notice names a step a user of the published package can actually run"
 description: "Verdict: should-fix. This can wait until a pack is registered.\n\n**Failure scenario.** `packages/sourcevision/src/language/pack.ts` uses `DEFAULT_GRAMMAR_DIR` = `<package>/build/grammars`. In `packages/sourcevision/package.json`, `files` lists only `dist`, so neither `build/` nor any `.scm` query file ships with `@n-dx/sourcevision`. Once Java joins `BUILTIN_PACKS` (task \"Register Java as a language with inventory roles\") and analysis calls `loadLanguagePacks` (task \"Feed Java edges into the analyze pipeline\"), every npm install degrades Java to inventory-only. The notice then tells users to run `scripts/build-grammars.mjs`, which is not shipped either.\n\n**Reachability.** Not reachable today, because `BUILTIN_PACKS` is empty. It becomes reachable once a pack is registered and `sv analyze` calls the loader in a published install.\n\n**Options.**\n1. Build grammars in prepublish/CI and add `build/grammars` and the query files to `files`. Cost: a release pipeline step and about 1 MB of WASM per grammar. Risk: the release CI needs the pinned CLI download. Recommended.\n2. Ship a `sv build-grammars` command. Cost: a new CLI surface and network access at install time. Risk: users without network access.\n\nDecide which one before Java is registered."
-lastModified: "2026-10-08T00:48:01.627Z"
+lastModified: "2026-10-08T03:04:09.710Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

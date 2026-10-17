@@ -2,7 +2,7 @@
 id: "cc902750-ded4-45eb-b726-5f159d8eca6e"
 level: "task"
 title: "Feed Java edges into the analyze pipeline"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "language-packs"
@@ -12,6 +12,11 @@ tags:
 blockedBy:
   - "e511c022-e759-4c42-bdb6-4951059e4ff8"
 source: "roadmap"
+startedAt: "2026-10-08T02:23:40.344Z"
+completedAt: "2026-10-08T03:04:07.983Z"
+endedAt: "2026-10-08T03:04:07.983Z"
+resolutionType: "code-change"
+resolutionDetail: "Code from hench run 9444b5a0 (a01418929, 54dcd503b); the gate failure was the jsdom import-path bug fixed by 8ce5cd15 (5f3fdb3f2). Operator-verified 2026-10-08: web 5316 and sourcevision 2520 tests pass."
 acceptanceCriteria:
   - "sv analyze on a Java fixture repository writes import edges and external imports for Java files"
   - "Zones are produced for the fixture Spring Boot-style repository"
@@ -19,6 +24,6 @@ acceptanceCriteria:
   - "Analysis output and sourcevision evals for non-Java repositories are unchanged"
   - "sourcevision MCP tool shapes are unchanged"
 description: "Route Java files through the pack runner and resolver in the imports phase, the way Go and Swift files go through their parsers today, producing the existing ImportEdge and ExternalImport records. Zones, cohesion, coupling, risk and findings then work for Java without changes downstream. Add a small fixture Spring Boot-style repository (controller, service, repository and entity packages, written for the fixture) and check that analyze produces sensible zones for it.\n\nDo not change sourcevision MCP tool names, parameters or response shapes, and do not add committed paths. If the Java grammar is not built, Java falls back to inventory-only with one clear message."
-lastModified: "2026-10-07T23:56:24.681Z"
+lastModified: "2026-10-08T03:04:08.246Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

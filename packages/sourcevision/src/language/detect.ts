@@ -30,7 +30,7 @@ import { goConfig } from "./go.js";
 import { swiftConfig } from "./swift.js";
 import { pythonConfig } from "./python.js";
 import { csharpConfig } from "./csharp.js";
-import { javaConfig } from "./java.js";
+import { javaConfig, javaSecondaryConfig } from "./java.js";
 
 // ── Config registry ─────────────────────────────────────────────────────────
 
@@ -43,6 +43,20 @@ const LANGUAGE_CONFIGS: ReadonlyMap<string, LanguageConfig> = new Map([
   ["typescript", typescriptConfig],
   ["javascript", typescriptConfig],
 ]);
+
+/**
+ * Rebuild the configs `detectLanguages` returned from the ids persisted in
+ * `manifest.languages` (primary first). Java after the first id gets the
+ * secondary variant, as it did at detection. Unknown ids are dropped.
+ */
+export function languageConfigsFromIds(ids: readonly string[]): LanguageConfig[] {
+  const configs: LanguageConfig[] = [];
+  ids.forEach((id, i) => {
+    const config = i > 0 && id === "java" ? javaSecondaryConfig : getLanguageConfig(id);
+    if (config) configs.push(config);
+  });
+  return configs;
+}
 
 /**
  * Valid language identifiers accepted by the `.n-dx.json` `language` field.
@@ -95,7 +109,8 @@ async function hasPythonMarker(rootDir: string): Promise<boolean> {
 
 /**
  * Java marker present? A Maven `pom.xml` or a Gradle build/settings file at
- * the root. Only consulted when no other language marker matched.
+ * the root. `detectLanguage` consults it only when no other marker matched;
+ * `detectLanguages` adds Java whenever it is present.
  */
 async function hasJavaMarker(rootDir: string): Promise<boolean> {
   const markers = ["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"];
@@ -352,6 +367,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
     hasCSharpMarker(rootDir),
   ]);
 
+  const hasJava = await hasJavaMarker(rootDir);
   const present: Array<{ config: LanguageConfig; count: number }> = [];
 
   // When any markers are present, count source files so we can order by
@@ -367,8 +383,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
 
   // No markers → fallback to TypeScript/JS for backward compatibility.
   if (present.length === 0) {
-    if (await hasJavaMarker(rootDir)) return [javaConfig];
-    return [typescriptConfig];
+    return [hasJava ? javaConfig : typescriptConfig];
   }
 
   // Stable ordering by descending file count, ties broken by the same
@@ -377,7 +392,12 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
     if (a.count !== b.count) return b.count - a.count;
     return tiebreakRank(a.config) - tiebreakRank(b.config);
   });
-  return present.map((p) => p.config);
+  const configs = present.map((p) => p.config);
+  // Appended last so Java never displaces the primary language. The
+  // secondary variant keeps Java from skipping or flagging the primary
+  // language's `out/` and `generated/` files.
+  if (hasJava) configs.push(javaSecondaryConfig);
+  return configs;
 }
 
 /**

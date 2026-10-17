@@ -12,7 +12,7 @@
 
 import { readFileSync, statSync } from "node:fs";
 import { Language, Parser, Query, type Node } from "web-tree-sitter";
-import type { LanguagePack } from "./pack.js";
+import type { Capture, LanguagePack, SourcePosition } from "./pack.js";
 
 // ── Process-wide state ──────────────────────────────────────────────────────
 
@@ -39,28 +39,7 @@ export function loadGrammar(grammarPath: string): Promise<Language> {
 
 // ── Results ─────────────────────────────────────────────────────────────────
 
-/** A position in a file. Matches the schema's call-graph positions. */
-export interface SourcePosition {
-  /** One-based line. */
-  readonly line: number;
-  /**
-   * Zero-based column in UTF-16 code units — web-tree-sitter parses the
-   * JavaScript string, so this indexes the line as `String.prototype` does,
-   * not by UTF-8 byte.
-   */
-  readonly column: number;
-}
-
-/** One node captured by a query. */
-export interface Capture {
-  /** Capture name as written in the query, without the `@`. */
-  readonly name: string;
-  /** Tree-sitter node type, e.g. `"class_declaration"`. */
-  readonly nodeType: string;
-  readonly text: string;
-  readonly start: SourcePosition;
-  readonly end: SourcePosition;
-}
+export type { Capture, SourcePosition };
 
 export interface ParsedFile {
   readonly status: "parsed";
