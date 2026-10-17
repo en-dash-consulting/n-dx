@@ -1,0 +1,23 @@
+{
+  "comment": "Java drift corpus: public repositories pinned by commit SHA. Cloned by java-corpus-clone.mjs, measured by java-corpus-report.mjs. Neither runs in the test suite.",
+  "repositories": [
+    {
+      "name": "spring-petclinic",
+      "url": "https://github.com/spring-projects/spring-petclinic.git",
+      "sha": "500158f732419217507c7656904b8e6aa1bcc0d6",
+      "shape": "single module"
+    },
+    {
+      "name": "thingsboard",
+      "url": "https://github.com/thingsboard/thingsboard.git",
+      "sha": "0439df09f31b0e8101b9f0a6be556c087d86818d",
+      "shape": "multi-module Maven"
+    },
+    {
+      "name": "junit-framework",
+      "url": "https://github.com/junit-team/junit-framework.git",
+      "sha": "99a00b9bb82723d5aa573942b15618ec3f3ab396",
+      "shape": "Gradle Kotlin DSL"
+    }
+  ]
+}

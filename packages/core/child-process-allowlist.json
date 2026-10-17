@@ -192,6 +192,10 @@
     {
       "path": "packages/sourcevision/scripts/build-grammars.mjs",
       "reason": "Developer build script — runs the pinned tree-sitter CLI binary to compile grammars to WASM. Runs before sourcevision is built, so it cannot import @n-dx/llm-client's exec()."
+    },
+    {
+      "path": "packages/sourcevision/scripts/java-corpus-clone.mjs",
+      "reason": "Operator-run developer script — runs git to fetch the Java drift corpus at pinned SHAs. Standalone and never part of a build or test run, so it does not route through @n-dx/llm-client's exec()."
     }
   ]
 }

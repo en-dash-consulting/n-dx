@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
+import { skipUnlessGrammar } from "../helpers/grammar.js";
 import { goConfig } from "../../src/language/go.js";
 import { loadLanguagePacks } from "../../src/language/pack.js";
 import type { RunnablePack } from "../../src/language/runner.js";
@@ -35,7 +36,8 @@ describe("harness over a stand-in pack", () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  it.skipIf(!existsSync(JAVA_WASM))("round-trips: update writes, check matches, a source edit fails", async () => {
+  it("round-trips: update writes, check matches, a source edit fails", async (ctx) => {
+    skipUnlessGrammar(ctx, JAVA_WASM);
     mkdirSync(join(dir, "src"));
     writeFileSync(join(dir, "src", "A.java"), "class A { void run() {} }\n");
     writeFileSync(join(dir, "methods.scm"), "(method_declaration name: (identifier) @method.name)");
@@ -43,7 +45,7 @@ describe("harness over a stand-in pack", () => {
       grammarPath: JAVA_WASM,
       pack: {
         id: "java-stand-in",
-        config: { ...goConfig, extensions: [".java"] },
+        config: { ...goConfig, extensions: new Set([".java"]) },
         grammar: { name: "tree-sitter-java", version: "0.23.5" },
         queries: [{ name: "methods", path: join(dir, "methods.scm") }],
         provenance: {},
@@ -63,10 +65,6 @@ describe("harness over a stand-in pack", () => {
 });
 
 describe("language pack goldens", () => {
-  it.skipIf(statuses.length > 0)("has no built-in packs registered yet", () => {
-    expect(statuses).toEqual([]);
-  });
-
   for (const status of statuses) {
     const { pack } = status;
     describe(pack.id, () => {
@@ -74,7 +72,8 @@ describe("language pack goldens", () => {
         expect(existsSync(fixtureDirFor(pack)), `missing ${fixtureDirFor(pack)}`).toBe(true);
       });
 
-      it.skipIf(!status.grammarAvailable)("matches its golden", async () => {
+      it("matches its golden", async (ctx) => {
+        skipUnlessGrammar(ctx, status.grammarPath);
         const dir = fixtureDirFor(pack);
         const actual = await runPackOverFixture(status, dir);
         expect(actual.files.length).toBeGreaterThan(0);

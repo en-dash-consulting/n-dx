@@ -65,7 +65,7 @@ export async function runPackOverFixture(
   const runner = createTreeSitterRunner();
   try {
     const files: FileResult[] = [];
-    for (const path of listFixtureFiles(fixtureDir, pack.config.extensions)) {
+    for (const path of listFixtureFiles(fixtureDir, [...pack.config.extensions])) {
       files.push(await runner.parseFile(target, join(fixtureDir, path)).then((r) => ({ ...r, path })));
     }
     return { pack: pack.id, grammar: pack.grammar, files };

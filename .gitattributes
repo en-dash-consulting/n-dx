@@ -80,3 +80,9 @@ packages/rex/tests/fixtures/v2-tree/** text eol=lf
 # sdlc readiness fixtures are parsed byte-for-byte by tests that assert exact
 # scores; pin them to LF so a CRLF checkout reads the same bytes CI does.
 packages/sourcevision/tests/fixtures/sdlc/** text eol=lf
+
+# Language-pack fixtures: sources and golden.json. checkGolden compares the
+# serialized golden byte-for-byte, and captured text and positions depend on
+# the fixture's line endings, so a Windows checkout (core.autocrlf=true) that
+# turns them into CRLF fails the comparison.
+packages/sourcevision/tests/fixtures/language-packs/** text eol=lf

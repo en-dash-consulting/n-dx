@@ -184,6 +184,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # No grammar build here: nothing in this job runs a test. The grammar
+      # steps live in the `test` job, where the sourcevision suite runs.
+
       - name: Check no source maps in publish
         if: runner.os == 'Linux'
         run: |
@@ -387,6 +390,41 @@ jobs:
       # against a missing or stale dist/, and the e2e tests spawn the built CLIs.
       - name: Build
         run: pnpm build
+
+      # Grammars are a build artifact (never committed). Without them every
+      # skipUnlessGrammar test (runner, grammar, pack queries, pack goldens)
+      # skips and a regression there goes green. Every such test is in the
+      # sourcevision suite, so these steps run on each OS's leg whose group
+      # includes it. They must be in this job: a GITHUB_ENV export reaches only
+      # later steps of the same job, so setting it in `build` left every test
+      # here skipping. SV_REQUIRE_GRAMMARS=1 turns a missing-grammar skip into
+      # a failure. build-grammars.mjs pins the tree-sitter CLI for linux,
+      # macos and windows. The cache holds the SHA-256-verified CLI and grammar
+      # archives (re-verified on use) plus the wasi-sdk the CLI fetches into
+      # the OS cache dir on first use: ~/.cache on Linux, ~/Library/Caches on
+      # macOS, %LOCALAPPDATA% on Windows. Key on the script, which holds every
+      # pin.
+      - name: Cache grammar build downloads
+        if: contains(matrix.suites, 'sourcevision')
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            packages/sourcevision/build/cache
+            ~/.cache/tree-sitter
+            ~/Library/Caches/tree-sitter
+            ~/AppData/Local/tree-sitter
+          key: grammars-${{ runner.os }}-${{ hashFiles('packages/sourcevision/scripts/build-grammars.mjs') }}
+
+      - name: Build tree-sitter grammars
+        if: contains(matrix.suites, 'sourcevision')
+        run: node packages/sourcevision/scripts/build-grammars.mjs
+
+      # `shell: bash` so the same line works on the Windows leg, whose default
+      # shell is PowerShell.
+      - name: Require built grammars in tests
+        if: contains(matrix.suites, 'sourcevision')
+        shell: bash
+        run: echo "SV_REQUIRE_GRAMMARS=1" >> "$GITHUB_ENV"
 
       # Node 22's on-disk compile cache. Hundreds of e2e tests each spawn a
       # fresh CLI process that loads the same dist/ trees; with the cache every

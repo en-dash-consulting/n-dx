@@ -11,7 +11,8 @@
  *     `pyproject.toml`/`setup.py`/`requirements.txt`/`Pipfile` → Python,
  *     `*.sln`/`*.csproj` within three levels of the root → C#)
  * 3. Multiple markers present → file-count tiebreak (whichever has more source files)
- * 4. Fallback → TypeScript/JS (backward-compatible default)
+ * 4. No other marker, `pom.xml` or a Gradle build at the root → Java
+ * 5. Fallback → TypeScript/JS (backward-compatible default)
  *
  * Multi-language detection (`detectLanguages`) returns ALL detected language
  * configs rather than picking a winner. `mergeLanguageConfigs` combines
@@ -29,6 +30,7 @@ import { goConfig } from "./go.js";
 import { swiftConfig } from "./swift.js";
 import { pythonConfig } from "./python.js";
 import { csharpConfig } from "./csharp.js";
+import { javaConfig } from "./java.js";
 
 // ── Config registry ─────────────────────────────────────────────────────────
 
@@ -37,6 +39,7 @@ const LANGUAGE_CONFIGS: ReadonlyMap<string, LanguageConfig> = new Map([
   ["swift", swiftConfig],
   ["python", pythonConfig],
   ["csharp", csharpConfig],
+  ["java", javaConfig],
   ["typescript", typescriptConfig],
   ["javascript", typescriptConfig],
 ]);
@@ -45,7 +48,7 @@ const LANGUAGE_CONFIGS: ReadonlyMap<string, LanguageConfig> = new Map([
  * Valid language identifiers accepted by the `.n-dx.json` `language` field.
  * Includes `"auto"` which triggers marker-based detection.
  */
-export const VALID_LANGUAGE_IDS: readonly string[] = ["typescript", "javascript", "go", "swift", "python", "csharp", "auto"] as const;
+export const VALID_LANGUAGE_IDS: readonly string[] = ["typescript", "javascript", "go", "swift", "python", "csharp", "java", "auto"] as const;
 
 /**
  * Look up a language config by id. Returns `undefined` for unknown ids.
@@ -84,6 +87,18 @@ function tiebreakRank(config: LanguageConfig): number {
  */
 async function hasPythonMarker(rootDir: string): Promise<boolean> {
   const markers = ["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile"];
+  for (const m of markers) {
+    if (await fileExists(join(rootDir, m))) return true;
+  }
+  return false;
+}
+
+/**
+ * Java marker present? A Maven `pom.xml` or a Gradle build/settings file at
+ * the root. Only consulted when no other language marker matched.
+ */
+async function hasJavaMarker(rootDir: string): Promise<boolean> {
+  const markers = ["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"];
   for (const m of markers) {
     if (await fileExists(join(rootDir, m))) return true;
   }
@@ -305,7 +320,11 @@ export async function detectLanguage(rootDir: string): Promise<LanguageConfig> {
     return candidates[0][1] ?? typescriptConfig;
   }
 
-  // Step 5: No markers → fallback to TypeScript/JS
+  // Step 5: No other markers — a Maven/Gradle root is Java. Checked last so
+  // mixed repositories keep their existing primary language.
+  if (await hasJavaMarker(rootDir)) return javaConfig;
+
+  // Step 6: No markers → fallback to TypeScript/JS
   return typescriptConfig;
 }
 
@@ -348,6 +367,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
 
   // No markers → fallback to TypeScript/JS for backward compatibility.
   if (present.length === 0) {
+    if (await hasJavaMarker(rootDir)) return [javaConfig];
     return [typescriptConfig];
   }
 
@@ -369,6 +389,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
  * - `parseableExtensions`: union of all parseable extensions
  * - `testFilePatterns`: concatenation of all patterns
  * - `configFilenames`: union of all config filenames
+ * - `configFilePatterns`: concatenation of all patterns (omitted when none)
  * - `skipDirectories`: union of all skip directories
  * - `generatedFilePatterns`: concatenation of all patterns
  * - `entryPointPatterns`: concatenation of all patterns
@@ -388,6 +409,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
   const parseableExtensions = new Set<string>();
   const testFilePatterns: RegExp[] = [];
   const configFilenames = new Set<string>();
+  const configFilePatterns: RegExp[] = [];
   const skipDirectories = new Set<string>();
   const generatedFilePatterns: RegExp[] = [];
   const entryPointPatterns: RegExp[] = [];
@@ -397,6 +419,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     for (const ext of config.parseableExtensions) parseableExtensions.add(ext);
     for (const p of config.testFilePatterns) testFilePatterns.push(p);
     for (const f of config.configFilenames) configFilenames.add(f);
+    for (const p of config.configFilePatterns ?? []) configFilePatterns.push(p);
     for (const d of config.skipDirectories) skipDirectories.add(d);
     for (const p of config.generatedFilePatterns) generatedFilePatterns.push(p);
     for (const p of config.entryPointPatterns) entryPointPatterns.push(p);
@@ -409,6 +432,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     parseableExtensions,
     testFilePatterns,
     configFilenames,
+    ...(configFilePatterns.length > 0 ? { configFilePatterns } : {}),
     skipDirectories,
     generatedFilePatterns,
     entryPointPatterns,
