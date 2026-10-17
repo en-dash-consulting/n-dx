@@ -52,7 +52,7 @@ describe("an optional reader that throws", () => {
     expect(result.degraded).toBeUndefined();
     expect(importCount(result.facts)).toBeGreaterThan(0);
     expect(result.facts).toEqual(expected.facts);
-    expectNoticesBut(result.notices, expected.notices, "the project notices reader failed (boom); what the pack read but skipped is not reported.");
+    expectNoticesBut(result.notices, expected.notices, "Python: the project notices reader failed (boom); what the pack read but skipped is not reported.");
   });
 
   it("project facts: records none of its kinds, keeps imports and the rest, and is not degraded", async (ctx) => {
@@ -63,7 +63,7 @@ describe("an optional reader that throws", () => {
     expect(importCount(result.facts)).toBeGreaterThan(0);
     expect(result.facts.every((f) => f.resources === undefined)).toBe(true);
     expect(result.facts).toEqual(expected.facts);
-    expectNoticesBut(result.notices, expected.notices, "the project facts reader failed (boom); its resources were not recorded.");
+    expectNoticesBut(result.notices, expected.notices, "Python: the project facts reader failed (boom); its resources were not recorded.");
   });
 
   it("symbol refine on one file: that file keeps its rule-read symbols and imports, others are refined", async (ctx) => {
@@ -85,7 +85,7 @@ describe("an optional reader that throws", () => {
     expectNoticesBut(
       result.notices,
       expected.notices,
-      `symbol refinement failed on 1 file: ${failing} (boom); their symbols are the rules' reading alone.`,
+      `Python: symbol refinement failed on 1 file: ${failing} (boom); their symbols are the rules' reading alone.`,
     );
   });
 
@@ -93,8 +93,8 @@ describe("an optional reader that throws", () => {
     const result = await analyze(ctx, { symbolRules: { ...PYTHON_SYMBOL_RULES, refine: boom } });
     expect(result.degraded).toBeUndefined();
     expect(importCount(result.facts)).toBeGreaterThan(0);
-    const notice = result.notices?.find((n) => n.startsWith("symbol refinement failed"));
+    const notice = result.notices?.find((n) => n.startsWith("Python: symbol refinement failed"));
     expect(files.length).toBeGreaterThan(3);
-    expect(notice).toMatch(new RegExp(`^symbol refinement failed on ${files.length} files: .*\\(boom\\), .*\\(boom\\), .*\\(boom\\) and ${files.length - 3} more;`));
+    expect(notice).toMatch(new RegExp(`^Python: symbol refinement failed on ${files.length} files: .*\\(boom\\), .*\\(boom\\), .*\\(boom\\) and ${files.length - 3} more;`));
   });
 });
