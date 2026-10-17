@@ -15,12 +15,14 @@ source: "review"
 startedAt: "2026-10-17T09:07:43.064Z"
 completedAt: "2026-10-17T09:07:43.064Z"
 endedAt: "2026-10-17T09:07:43.064Z"
+resolutionType: "code-change"
+resolutionDetail: "PR 19: prototype-free framework rule tables (Spring and Python) with an outbound row guard; framework, project-facts, project-notices and symbol-refine failures contained as notices; Django urlpatterns reassignment and splat forms keep earlier patterns. Verified byte-identical against PR 18 on the whole corpus."
 acceptanceCriteria:
   - "No framework rule table is read through the object prototype; outbound.json rows always satisfy the schema"
   - "A throw in one framework's rules no longer degrades the language's imports"
   - "Django urlpatterns reassignment keeps earlier patterns"
 description: "Code fixes from the 2026-10-16 stack review to the framework rules (Spring Boot, Django) and the framework slot's failure handling. Stacked on #823 (PR 18). Brief: workshop language-scaling/pr17-20-review-fixes-brief.md."
-lastModified: "2026-10-17T09:07:43.384Z"
+lastModified: "2026-10-17T09:19:00.114Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
