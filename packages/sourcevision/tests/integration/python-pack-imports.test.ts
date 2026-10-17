@@ -106,6 +106,13 @@ describe("Python files through the Python pack", () => {
     expect(withPackAnalysedLanguages(inventory.summary, ["go", "java"])).toBe(inventory.summary);
   });
 
+  it("removes Python from analysedLanguages when its pack did not run", () => {
+    const listed = { ...inventory.summary, analysedLanguages: ["Python", "TypeScript"] };
+    expect(withPackAnalysedLanguages(listed, []).analysedLanguages).toEqual(["TypeScript"]);
+    expect(withPackAnalysedLanguages(listed, ["go"]).analysedLanguages).toEqual(["TypeScript"]);
+    expect(withPackAnalysedLanguages(listed, ["python"])).toBe(listed);
+  });
+
   it("through the phases, inventory.json lists Python as analysed when the pack ran", async (ctx) => {
     await skipUnlessPackRuns(ctx, "python");
     const project = mkdtempSync(join(tmpdir(), "sv-python-phases-"));
