@@ -5930,27 +5930,27 @@
       ],
       "external": [
         {
-          "package": "java.time",
-          "symbols": [
-            "Instant"
-          ]
-        },
-        {
-          "package": "java.util",
-          "symbols": [
-            "List"
-          ]
-        },
-        {
-          "package": "javax.inject",
+          "package": "java:javax.inject",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "org.acme",
+          "package": "java:org.acme",
           "symbols": [
             "Missing"
+          ]
+        },
+        {
+          "package": "java:stdlib:java.time",
+          "symbols": [
+            "Instant"
+          ]
+        },
+        {
+          "package": "java:stdlib:java.util",
+          "symbols": [
+            "List"
           ]
         }
       ]
@@ -5983,19 +5983,31 @@
       "files": [],
       "external": [
         {
-          "package": "java.io",
+          "package": "java:org.springframework.beans.factory.annotation",
+          "symbols": [
+            "Autowired"
+          ]
+        },
+        {
+          "package": "java:org.springframework.stereotype",
+          "symbols": [
+            "Service"
+          ]
+        },
+        {
+          "package": "java:stdlib:java.io",
           "symbols": [
             "Serializable"
           ]
         },
         {
-          "package": "java.lang",
+          "package": "java:stdlib:java.lang",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "java.util",
+          "package": "java:stdlib:java.util",
           "symbols": [
             "HashMap",
             "List",
@@ -6003,27 +6015,15 @@
           ]
         },
         {
-          "package": "java.util.function",
+          "package": "java:stdlib:java.util.function",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "java.util.stream",
+          "package": "java:stdlib:java.util.stream",
           "symbols": [
             "toList"
-          ]
-        },
-        {
-          "package": "org.springframework.beans.factory.annotation",
-          "symbols": [
-            "Autowired"
-          ]
-        },
-        {
-          "package": "org.springframework.stereotype",
-          "symbols": [
-            "Service"
           ]
         }
       ]
@@ -6032,7 +6032,7 @@
       "files": [],
       "external": [
         {
-          "package": "java.io",
+          "package": "java:stdlib:java.io",
           "symbols": [
             "Serializable"
           ]

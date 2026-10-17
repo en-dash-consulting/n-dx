@@ -11,7 +11,9 @@
  * anyway (a defect in the pack). It is reported once (a missing opt-in pack
  * the project does not list is only suggested), produces no
  * edges, and is listed in {@link PackImportGraph.degraded} so a caller with
- * another parser for the language (Go's regex parser) can run it.
+ * another parser for the language (Go's regex parser) can run it. Files a
+ * pack that ran could not read (over the runner's 1 MB limit, unreadable) are
+ * listed in {@link PackImportGraph.unparsed} for the same caller.
  *
  * Edges and externals come from each file's lang-kit imports facts.
  *
@@ -76,6 +78,12 @@ export interface PackImportGraph {
   readonly external: ExternalImport[];
   /** Ids of packs that had files but degraded, so produced no edges. */
   readonly degraded: string[];
+  /**
+   * Files a pack that ran could not read into facts (over its size limit,
+   * unreadable), so they have no edges; a caller with another parser for the
+   * language (Go's regex parser) can run it on them.
+   */
+  readonly unparsed: string[];
 }
 
 /** Packs whose files the imports phase analyzes, given the extensions it parses. */
@@ -132,6 +140,7 @@ export async function buildPackImportGraph(
   const edges: ImportEdge[] = [];
   const external = new Map<string, ExternalImport>();
   const degraded: string[] = [];
+  const unparsed: string[] = [];
 
   const warn = options.warn ?? ((message: string) => console.warn(message));
   /** One notice: what failed, what the language gets instead, how to fix it. */
@@ -182,6 +191,7 @@ export async function buildPackImportGraph(
       continue;
     }
     options.analysed?.(pack.id);
+    unparsed.push(...result.unparsed);
     for (const notice of result.notices ?? []) warn(notice);
     if (kinds.length > 1) options.framework?.(result.facts);
 
@@ -202,7 +212,7 @@ export async function buildPackImportGraph(
     }
   }
 
-  return { edges, external: [...external.values()], degraded };
+  return { edges, external: [...external.values()], degraded, unparsed };
 }
 
 /**

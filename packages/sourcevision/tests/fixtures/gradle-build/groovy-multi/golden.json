@@ -85,6 +85,12 @@
         "scope": "implementation"
       }
     ],
+    "projects": [
+      {
+        "path": ":lib",
+        "scope": "implementation"
+      }
+    ],
     "javaVersion": {
       "resolved": true,
       "value": "17",

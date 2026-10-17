@@ -67,16 +67,17 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
     const imports = await analyzeImports(FIXTURE, inventory, { language: "java" });
     const byPackage = new Map(imports.external.map((e) => [e.package, e]));
 
-    expect(byPackage.get("org.springframework.stereotype")?.importedBy.sort()).toEqual([
+    expect(byPackage.get("java:org.springframework.stereotype")?.importedBy.sort()).toEqual([
       `${MAIN}/service/OwnerService.java`,
       `${MAIN}/service/VisitService.java`,
     ]);
-    expect(byPackage.get("org.springframework.stereotype")?.symbols).toEqual(["Service"]);
-    expect(byPackage.get("org.springframework.web.bind.annotation")?.symbols).toContain("*");
-    expect(byPackage.get("jakarta.persistence")?.symbols).toEqual(expect.arrayContaining(["Entity", "Id"]));
-    expect(byPackage.get("java.util")?.importedBy).toContain(`${MAIN}/repository/OwnerRepository.java`);
-    // No project package is reported as external.
-    expect([...byPackage.keys()].some((p) => p.startsWith("com.example"))).toBe(false);
+    expect(byPackage.get("java:org.springframework.stereotype")?.symbols).toEqual(["Service"]);
+    expect(byPackage.get("java:org.springframework.web.bind.annotation")?.symbols).toContain("*");
+    expect(byPackage.get("java:jakarta.persistence")?.symbols).toEqual(expect.arrayContaining(["Entity", "Id"]));
+    expect(byPackage.get("java:stdlib:java.util")?.importedBy).toContain(`${MAIN}/repository/OwnerRepository.java`);
+    // Every external is in the Java namespace, and no project package is reported as external.
+    expect([...byPackage.keys()].every((p) => p.startsWith("java:"))).toBe(true);
+    expect([...byPackage.keys()].some((p) => p.includes("com.example"))).toBe(false);
   });
 
   it("produces schema-valid zones that cover every layer", async (ctx) => {
@@ -102,7 +103,7 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
       previousImports: {
         ...full,
         edges: [...full.edges, { from: petType, to: `${MAIN}/entity/Owner.java`, type: "static", symbols: ["Owner"] }],
-        external: [...full.external, { package: "org.stale", importedBy: [petType], symbols: ["Gone"] }],
+        external: [...full.external, { package: "java:org.stale", importedBy: [petType], symbols: ["Gone"] }],
       },
       // Nothing changed on disk; Java files are re-resolved regardless.
       changedFiles: new Set(),
@@ -162,7 +163,7 @@ describe("Java beside a package.json (Spring Boot with a bundled frontend)", () 
     expect(edgeKeys(imports)).toContain(
       `${MAIN}/controller/OwnerController.java -> ${MAIN}/service/OwnerService.java`,
     );
-    expect(imports.external.map((e) => e.package)).toContain("org.springframework.stereotype");
+    expect(imports.external.map((e) => e.package)).toContain("java:org.springframework.stereotype");
   });
 });
 

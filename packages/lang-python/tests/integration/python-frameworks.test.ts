@@ -261,6 +261,121 @@ describe("an imported name rebound at module level", () => {
   });
 });
 
+describe("a name a package's __init__.py re-exports from its submodule of the same name", () => {
+  let dir: string;
+  const write = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text);
+  };
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "lang-python-reexport-"));
+    write("app/__init__.py", "");
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("is followed to the FastAPI router it names, so the mount prefix applies", async (ctx) => {
+    write("app/api/router.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/x")\ndef x(): ...\n');
+    write("app/api/__init__.py", "from .router import router\n");
+    write("app/main.py", 'from fastapi import FastAPI\nfrom app.api import router\napp = FastAPI()\napp.include_router(router, prefix="/api")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/api/router.py")).toEqual(["GET /api/x x"]);
+    expect(notices).toBeUndefined();
+  });
+
+  it("is followed to the Flask blueprint it names", async (ctx) => {
+    write("app/views/bp.py", 'from flask import Blueprint\nbp = Blueprint("v", __name__)\n@bp.route("/x")\ndef x(): ...\n');
+    write("app/views/__init__.py", "from .bp import bp\n");
+    write("app/site.py", 'from flask import Flask\nfrom app.views import bp\nsite = Flask(__name__)\nsite.register_blueprint(bp, url_prefix="/site")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/views/bp.py")).toEqual(["GET /site/x x"]);
+    expect(notices).toBeUndefined();
+  });
+
+  it("is followed to the Django REST framework router it names", async (ctx) => {
+    write("app/api/router.py", "from rest_framework.routers import DefaultRouter\nrouter = DefaultRouter()\n");
+    write("app/api/__init__.py", "from .router import router\n");
+    write("app/urls.py", 'from app.api import router\nrouter.register("a", AView)\n');
+    const { notices } = await analyze(ctx, dir);
+    expect(notices).toEqual([
+      "Django: 1 Django REST framework router registration is counted, not expanded: app/urls.py:2 (register router.register).",
+    ]);
+  });
+
+  it("still names the submodule when __init__.py neither defines nor imports the name", async (ctx) => {
+    write("app/api/router.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/x")\ndef x(): ...\n');
+    write("app/api/__init__.py", "from . import other\n");
+    write("app/api/other.py", "");
+    write("app/main.py", 'from fastapi import FastAPI\nfrom app.api import router\napp = FastAPI()\napp.include_router(router.router, prefix="/api")\n');
+    // `from . import router` binds the submodule too: __init__.py's binding is a module, not a router.
+    write("app/sub/router.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/y")\ndef y(): ...\n');
+    write("app/sub/__init__.py", "from . import router\n");
+    write("app/sub_main.py", 'from fastapi import FastAPI\nfrom app.sub import router\nsub = FastAPI()\nsub.include_router(router, prefix="/sub")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/api/router.py")).toEqual(["GET /api/x x"]);
+    expect(routesOf(facts, "app/sub/router.py")).toEqual(["GET /y y"]);
+    expect(notices).toEqual([
+      "FastAPI: 1 mount names no application or router the rules can follow and was not followed: app/sub_main.py:4 (include_router router).",
+    ]);
+  });
+});
+
+describe("a module a package's __init__.py re-exports under another name", () => {
+  let dir: string;
+  const write = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text);
+  };
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "lang-python-module-reexport-"));
+    write("app/__init__.py", "");
+    write("app/api/v1/__init__.py", "");
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("is followed as the base of a dotted FastAPI router, so the mount prefix applies", async (ctx) => {
+    write("app/api/v1/routes.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/x")\ndef x(): ...\n');
+    write("app/api/__init__.py", "from .v1 import routes as endpoints\n");
+    write("app/main.py", 'from fastapi import FastAPI\nfrom app.api import endpoints\napp = FastAPI()\napp.include_router(endpoints.router, prefix="/api")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/api/v1/routes.py")).toEqual(["GET /api/x x"]);
+    expect(notices).toBeUndefined();
+  });
+
+  it("is followed through a chain of re-exports to a Django include()", async (ctx) => {
+    write("app/api/v1/urls.py", 'from django.urls import path\nfrom . import views\nurlpatterns = [path("x/", views.x)]\n');
+    write("app/api/v1/__init__.py", "from . import urls as v1_urls\n");
+    write("app/api/__init__.py", "from .v1 import v1_urls as api_urls\n");
+    write("app/urls.py", 'from django.urls import include, path\nfrom app.api import api_urls\nurlpatterns = [path("api/", include(api_urls))]\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/api/v1/urls.py")).toEqual(["ANY /api/x/ x"]);
+    expect(notices).toBeUndefined();
+  });
+
+  it("is not a module when __init__.py binds the name to an object", async (ctx) => {
+    write("app/api/v1/routes.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/x")\ndef x(): ...\n');
+    // `endpoints` is the router object, so `endpoints.router` is not the submodule's router.
+    write("app/api/endpoints.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/y")\ndef y(): ...\n');
+    write("app/api/__init__.py", "from .v1.routes import router as endpoints\n");
+    write("app/main.py", 'from fastapi import FastAPI\nfrom app.api import endpoints\napp = FastAPI()\napp.include_router(endpoints.router, prefix="/api")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/api/endpoints.py")).toEqual(["GET /y y"]);
+    expect(notices).toEqual([
+      "FastAPI: 1 mount names no application or router the rules can follow and was not followed: app/main.py:4 (include_router endpoints.router).",
+    ]);
+  });
+
+  it("still names the submodule when __init__.py imports the name only inside a function", async (ctx) => {
+    write("app/api/endpoints.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/y")\ndef y(): ...\n');
+    write("app/api/legacy.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/z")\ndef z(): ...\n');
+    write("app/api/__init__.py", "def setup():\n    from . import legacy as endpoints\n    return endpoints\n");
+    write("app/main.py", 'from fastapi import FastAPI\nfrom app.api import endpoints\napp = FastAPI()\napp.include_router(endpoints.router, prefix="/api")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/api/endpoints.py")).toEqual(["GET /api/y y"]);
+    expect(routesOf(facts, "app/api/legacy.py")).toEqual(["GET /z z"]);
+    expect(notices).toBeUndefined();
+  });
+});
+
 describe("the Python pack entry with its frameworks", () => {
   it("lists routes and is consistent with its frameworks", () => {
     expect(pythonPack.produces).toContain("routes");

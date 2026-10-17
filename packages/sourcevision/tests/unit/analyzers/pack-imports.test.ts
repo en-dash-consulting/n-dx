@@ -96,7 +96,7 @@ describe("buildPackImportGraph", () => {
 
   it("loads no pack, and reports nothing, when no file belongs to one", async () => {
     const { graph, messages } = await run(["src/a.ts"], [knownPack(javaConfig, { error: new Error("must not be loaded") })]);
-    expect(graph).toEqual({ edges: [], external: [], degraded: [] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: [], unparsed: [] });
     expect(messages).toEqual([]);
   });
 
@@ -145,9 +145,9 @@ describe("buildPackImportGraph", () => {
       facts: [
         {
           path: "src/A.java",
-          imports: { files: [{ to: "src/B.java", symbols: ["B"] }], external: [{ package: "java.util", symbols: ["List"] }] },
+          imports: { files: [{ to: "src/B.java", symbols: ["B"] }], external: [{ package: "java:stdlib:java.util", symbols: ["List"] }] },
         },
-        { path: "src/B.java", imports: { files: [], external: [{ package: "java.util", symbols: ["Map"] }] } },
+        { path: "src/B.java", imports: { files: [], external: [{ package: "java:stdlib:java.util", symbols: ["Map"] }] } },
         { path: "src/C.java" },
       ],
       unparsed: [],
@@ -155,15 +155,23 @@ describe("buildPackImportGraph", () => {
     const { graph, messages } = await run(["src/A.java", "src/B.java", "src/C.java"], [knownPack(javaConfig, { entry })]);
     expect(graph).toEqual({
       edges: [{ from: "src/A.java", to: "src/B.java", type: "static", symbols: ["B"] }],
-      external: [{ package: "java.util", importedBy: ["src/A.java", "src/B.java"], symbols: ["List", "Map"] }],
+      external: [{ package: "java:stdlib:java.util", importedBy: ["src/A.java", "src/B.java"], symbols: ["List", "Map"] }],
       degraded: [],
+      unparsed: [],
     });
+    expect(messages).toEqual([]);
+  });
+
+  it("lists the files a pack that ran could not parse, for the caller's fallback parser", async () => {
+    const entry = stubEntry(goConfig, { facts: [{ path: "a.go" }], unparsed: ["big.go"] });
+    const { graph, messages } = await run(["a.go", "big.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
+    expect(graph).toEqual({ edges: [], external: [], degraded: [], unparsed: ["big.go"] });
     expect(messages).toEqual([]);
   });
 
   it("only suggests a missing opt-in pack the project does not list: no warning, no edges", async () => {
     const { graph, messages, suggested } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })]);
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [] });
     expect(messages).toEqual([]);
     expect(suggested).toEqual(["java"]);
   });
@@ -174,7 +182,7 @@ describe("buildPackImportGraph", () => {
       [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })],
       { listed: ["java"] },
     );
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [] });
     expect(messages).toEqual([
       "Java: pack @n-dx/lang-java is not installed; Java files get inventory only. " +
         "Install it with `ndx sv pack add java`.",
@@ -215,7 +223,7 @@ describe("buildPackImportGraph", () => {
     const requests: PackProjectRequest[] = [];
     const entry = { ...stubEntry(goConfig, { facts: [], unparsed: [] }, requests), produces: [] };
     const { graph, messages } = await run(["a.go"], [knownPack(goConfig, { entry })], { fallbacks: GO_FALLBACK });
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["go"] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["go"], unparsed: [] });
     expect(requests).toEqual([]);
     expect(messages).toEqual(['Go: the pack does not produce "imports"; Go imports come from the regex import parser.']);
   });
@@ -227,7 +235,7 @@ describe("buildPackImportGraph", () => {
       degraded: { reason: "grammar tree-sitter-java@0.23.5 is not built (expected /g/tree-sitter-java.wasm)", remedy: "Build it." },
     });
     const { graph, messages } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { entry })]);
-    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"] });
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"], unparsed: [] });
     expect(messages).toEqual([
       "Java: grammar tree-sitter-java@0.23.5 is not built (expected /g/tree-sitter-java.wasm); Java files get inventory only. Build it.",
     ]);

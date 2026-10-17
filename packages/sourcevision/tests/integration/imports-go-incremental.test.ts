@@ -6,7 +6,8 @@
  * incremental run, because resolution needs the whole project.
  *
  * The fixture tells the two parsers apart: `docs` holds no .go file, so the
- * pack drops `main.go`'s import of it while the regex parser keeps the edge.
+ * pack records `main.go`'s import of it as external while the regex parser
+ * keeps an edge to the directory.
  */
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -93,7 +94,30 @@ describe("Go pack in the imports phase", () => {
     const { imports, messages } = await analyze();
     expect(messages).toEqual([]);
     expect(edgeKeys(imports)).toEqual(PACK_EDGES);
-    expect(imports.external).toEqual([{ package: "stdlib:fmt", importedBy: ["main.go"], symbols: ["*"] }]);
+    expect(imports.external).toEqual([
+      { package: "example.com/app/docs", importedBy: ["main.go"], symbols: ["*"] },
+      { package: "stdlib:fmt", importedBy: ["main.go"], symbols: ["*"] },
+    ]);
+  });
+
+  it("keeps the imports of a Go file over the pack's size limit through the regex parser", async (ctx) => {
+    await skipUnlessPackRuns(ctx, "go");
+    // Generated code (zz_generated.openapi.go, .pb.go, bindata) passes the runner's 1 MB limit.
+    const padding = `// ${"x".repeat(1024 * 1024)}\n`;
+    await writeFile(
+      join(dir, "util", "zz_generated.go"),
+      `package util\n\nimport (\n\t"strings"\n\t"example.com/app/other"\n)\n\n${padding}var _ = strings.ToUpper\n`,
+    );
+    await mkdir(join(dir, "other"));
+    await writeFile(join(dir, "other", "other.go"), "package other\n");
+    const { imports, messages } = await analyze();
+    expect(messages).toEqual([]);
+    expect(edgeKeys(imports)).toEqual([...PACK_EDGES, "util/zz_generated.go -> other [*]"]);
+    expect(imports.external.find((e) => e.package === "stdlib:strings")).toEqual({
+      package: "stdlib:strings",
+      importedBy: ["util/zz_generated.go"],
+      symbols: ["*"],
+    });
   });
 
   describe("falls back to the regex parser", () => {

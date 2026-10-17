@@ -42,5 +42,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [sqlc config values with a trailing YAML comment resolve to a bogus path](./sqlc-config-values-with-a-trailing.md) | completed |
 | [sqlc detection omits the schema files named by sqlc.yaml's schema: key](./sqlc-detection-omits-the-schema-files.md) | completed |
 | [sqlc query files lost their route to extractSqlcTables when sqlFiles became schema-only](./sqlc-query-files-lost-their-route-to.md) | completed |
+| [sqlcPaths reads nothing from a sqlc.yaml sql[] entry written as a flow mapping](./sqlcpaths-reads-nothing-from-a-sqlc.md) | pending |
 | [sqlcPaths reads the next sql[] entry as a path when the key sits on the dash line](./sqlcpaths-reads-the-next-sql-entry-as.md) | pending |
 | [sqlcPaths returns nothing for a CRLF sqlc.yaml block list](./sqlcpaths-returns-nothing-for-a-crlf.md) | pending |

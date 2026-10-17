@@ -99,8 +99,9 @@ export type { ExternalModule, ExternalReference, FileReference, FileReferences }
 export interface PackResolver {
   /**
    * A resolver bound to what resolution needs from outside the source files
-   * (build files such as `go.mod`), read from `projectDir`. Call once per
-   * analysis, before {@link prepare}. Absent when sources are enough (Java).
+   * (build files such as `go.mod`, or Java's test-jar dependencies), read
+   * from `projectDir`. Call once per analysis, before {@link prepare}. Absent
+   * when sources are enough.
    * `files` are the pack's files in this request (project-relative), so a
    * resolver can find build files beside them without walking the project.
    */

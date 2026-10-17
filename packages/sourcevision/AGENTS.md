@@ -44,23 +44,24 @@ in `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs.
 
 `.py` and `.pyi` are parseable (`pythonConfig.parseableExtensions`) only
 through `@n-dx/lang-python`, an opt-in `KNOWN_PACKS` entry with no fallback
-parser: without it, Python files get inventory only, and every artifact is
-the same as before Python was a pack. With
+parser: without it, Python files get inventory only and every artifact is
+unchanged. With
 it, Python edges and externals reach `imports.json` through
-`buildPackImportGraph` like Go's and Java's (stdlib as `stdlib:<module>`, a
+`buildPackImportGraph` like Go's and Java's (externals as
+`python:[stdlib:]<module>`, Java's `java:[stdlib:]<package>`, so no two
+languages' names merge; a
 `TYPE_CHECKING`-only target as a `type` edge), so Python files join zones;
 a Python repository beside TypeScript (root `pyproject.toml` and
-`package.json`) gets both. The inventory phase cannot know whether the pack
-will load, so it leaves Python (and Java) out of `analysedLanguages`; the imports phase
-sets it from the packs that ran (`withPackAnalysedLanguages`), so a re-run
-without the pack drops it; inventory.json is untouched if nothing changes. Its dynamic-import and past-root notices go to the same
-`warn`. Over the pinned corpus (`python-corpus.json`),
+`package.json`) gets both. Inventory, not knowing whether a pack loads,
+leaves Python and Java out of `analysedLanguages`; the imports phase adds the
+packs that ran (`withPackAnalysedLanguages`), so a re-run
+without the pack drops it; inventory.json is untouched if nothing changes. Its dynamic-import and past-root notices go to `warn`. Over the pinned corpus (`python-corpus.json`),
 `scripts/python-corpus-report.mjs` measures the pack, `python-build-report.mjs`
 lang-kit's build readers, `python-resolve-report.mjs` the resolver, and
 `python-routes-report.mjs` and `python-outbound-report.mjs` the route and
-outbound rules; the last three print a hand-check sample. With the pack, components.json gains one `serverRoutes` group per
-Python file with routes and the derived `totalServerRoutes`, and
-outbound.json one dependency per Python outbound call; no sourcevision code
+outbound rules; the last three print a hand-check sample. With the pack, components.json gains a `serverRoutes` group per
+Python file with routes (and `totalServerRoutes`), and
+outbound.json a dependency per Python outbound call; no sourcevision code
 is Python-specific.
 
 ### The Terraform model in infrastructure.json

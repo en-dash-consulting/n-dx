@@ -72,6 +72,13 @@ function maskString(src: string, from: number, out: string[]): number {
 
 const OPEN = "([{";
 const CLOSE = ")]}";
+/**
+ * A line ending in one of these continues on the next: a comma or a binary
+ * operator. Not `*` (`import a.b.*` ends a line) or `/` and `%`, which build
+ * scripts do not break lines on; `&` and `|` count only doubled.
+ */
+const CONTINUING = ",+-=?";
+const CONTINUING_DOUBLED = "&|";
 
 export class GradleScript {
   /** Structure-only view: comments blanked, string contents filled. */
@@ -100,7 +107,8 @@ export class GradleScript {
 
   /**
    * The statements directly inside `within`: split at newlines and `;` outside
-   * any bracket. A line that begins with `.` continues the previous statement.
+   * any bracket. As in Groovy, a line continues the previous statement when it
+   * begins with `.` or the previous line ends in `,` or a binary operator.
    */
   statements(within: Span = this.all): Span[] {
     const out: Span[] = [];
@@ -114,13 +122,28 @@ export class GradleScript {
       const c = this.masked[i];
       if (OPEN.includes(c)) depth++;
       else if (CLOSE.includes(c)) depth = Math.max(0, depth - 1);
-      else if (depth === 0 && (c === ";" || (c === "\n" && !this.continues(i + 1, within.end)))) {
+      else if (depth === 0 && (c === ";" || (c === "\n" && !this.endsOpen(start, i) && !this.continues(i + 1, within.end)))) {
         flush(i);
         start = i + 1;
       }
     }
     flush(within.end);
     return out;
+  }
+
+  /**
+   * Does the statement text in [`start`, `end`) end in `,` or a binary operator
+   * (not `++` or `--`), so the next line continues it? Comments are already
+   * blank, so a trailing comment does not hide the comma.
+   */
+  private endsOpen(start: number, end: number): boolean {
+    let i = end - 1;
+    while (i >= start && /\s/.test(this.masked[i])) i--;
+    if (i < start) return false;
+    const c = this.masked[i];
+    const doubled = i > start && this.masked[i - 1] === c;
+    if (CONTINUING_DOUBLED.includes(c)) return doubled;
+    return CONTINUING.includes(c) && !((c === "+" || c === "-") && doubled);
   }
 
   /** Does the line starting at `from` open with `.`, continuing the statement before it? */

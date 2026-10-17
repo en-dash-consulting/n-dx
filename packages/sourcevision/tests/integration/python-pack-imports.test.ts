@@ -31,10 +31,11 @@ const FILES: Record<string, string> = {
   "shop/orders.py":
     "import importlib\nimport requests\nfrom . import models\nfrom .models import Order\n\n" +
     "def place(name):\n    return importlib.import_module(name)\n",
-  "shop/models.py": "class Order:\n    pass\n",
+  // PyPI `openai` here and npm `openai` in web/api.ts are different packages.
+  "shop/models.py": "import openai\n\nclass Order:\n    pass\n",
   "shop/models.pyi": "class Order: ...\n",
   "web/app.ts": 'import { api } from "./api";\nexport const app = api;\n',
-  "web/api.ts": "export const api = 1;\n",
+  "web/api.ts": 'import OpenAI from "openai";\nexport const api = OpenAI;\n',
 };
 
 /** KNOWN_PACKS before Python was a pack. */
@@ -156,10 +157,13 @@ describe("Python files through the Python pack", () => {
       ["shop/orders.py", "shop/models.py", "static", ["*", "Order"]],
       ["web/app.ts", "web/api.ts", "static", ["api"]],
     ]);
+    // Every Python external is namespaced, so npm and PyPI `openai` stay apart.
     expect(loaded.imports.external.map((e) => [e.package, e.importedBy])).toEqual([
-      ["requests", ["shop/orders.py"]],
-      ["stdlib:importlib", ["shop/orders.py"]],
-      ["stdlib:typing", ["shop/__init__.py"]],
+      ["openai", ["web/api.ts"]],
+      ["python:openai", ["shop/models.py"]],
+      ["python:requests", ["shop/orders.py"]],
+      ["python:stdlib:importlib", ["shop/orders.py"]],
+      ["python:stdlib:typing", ["shop/__init__.py"]],
     ]);
     expect(loaded.notices).toEqual([
       "Python: 1 dynamic import names its module at run time and is not an import fact: shop/orders.py:7 (importlib.import_module).",

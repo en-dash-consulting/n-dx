@@ -64,7 +64,7 @@ describe("go resolver — workspace, replaces and vendor", () => {
       "kit/log": ["*"],
       // go.work `replace example.com/shared => ./shared`.
       shared: ["*"],
-      // example.com/ws/api/internal/missing has no files: dropped.
+      // example.com/ws/api/internal/missing has no files: external, not an edge.
     });
   });
 
@@ -73,6 +73,8 @@ describe("go resolver — workspace, replaces and vendor", () => {
     expect(resolve("api/cmd/server/main.go").external).toEqual([
       // The replace target leaves the project, so the module stays external.
       { package: "example.com/outside/pkg", symbols: ["*"] },
+      // Inside the module, but no .go file there.
+      { package: "example.com/ws/api/internal/missing", symbols: ["*"] },
       { package: "github.com/go-chi/chi/v5/middleware", symbols: ["*"], module: { path: "github.com/go-chi/chi/v5", version: "v5.0.10" } },
       { package: "github.com/unknown/dep", symbols: ["*"] },
       // Attributed through vendor/modules.txt.
@@ -124,14 +126,29 @@ describe("go resolver — root package", () => {
     expect(resolve("cmd/main.go").files).toEqual([{ to: "api/pb", symbols: ["*"] }]);
   });
 
-  it("still drops an import of a directory with no .go files", async (ctx) => {
+  it("records an import of a directory with no .go files as external, since no node exists for an edge", async (ctx) => {
     mkdirSync(join(dir, "api", "docs"), { recursive: true });
     mkdirSync(join(dir, "cmd"));
     writeFileSync(join(dir, "go.mod"), "module example.com/root\n");
     writeFileSync(join(dir, "api", "docs", "README.md"), "docs\n");
     writeFileSync(join(dir, "cmd", "main.go"), 'package main\n\nimport _ "example.com/root/api/docs"\n');
     const { resolve } = await resolveProject(ctx, dir);
-    expect(resolve("cmd/main.go").files).toEqual([]);
+    expect(resolve("cmd/main.go")).toEqual({ files: [], external: [{ package: "example.com/root/api/docs", symbols: ["*"] }] });
+  });
+
+  it("records a module replaced into a directory the inventory skips as external, attributed to its require", async (ctx) => {
+    mkdirSync(join(dir, "cmd"));
+    writeFileSync(
+      join(dir, "go.mod"),
+      "module example.com/root\n\nrequire github.com/foo/bar v1.2.3\n\nreplace github.com/foo/bar => ./third_party/bar\n",
+    );
+    writeFileSync(join(dir, "cmd", "main.go"), 'package main\n\nimport "github.com/foo/bar/baz"\n');
+    // No third_party/bar/baz/*.go is passed to the resolver, as when the inventory skips third_party/.
+    const { resolve } = await resolveProject(ctx, dir);
+    expect(resolve("cmd/main.go")).toEqual({
+      files: [],
+      external: [{ package: "github.com/foo/bar/baz", symbols: ["*"], module: { path: "github.com/foo/bar", version: "v1.2.3" } }],
+    });
   });
 
   it("attributes an import to a required module nested under the project's path, as Go's longest prefix does", async (ctx) => {

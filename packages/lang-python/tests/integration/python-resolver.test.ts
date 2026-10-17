@@ -110,7 +110,7 @@ describe("absolute imports", () => {
       "ns/own.py": "",
     });
     expect(targets(r.resolve("app.py"))).toEqual({ "ns/own.py": ["x"] });
-    expect(r.resolve("app.py").external.map((e) => [e.package, e.symbols])).toEqual([["ns", ["parse"]]]);
+    expect(r.resolve("app.py").external.map((e) => [e.package, e.symbols])).toEqual([["python:ns", ["parse"]]]);
     expect(outcomes(r, "app.py")["ns.core.version"]).toEqual({ kind: "external", module: "ns" });
   });
 
@@ -216,7 +216,7 @@ describe("source roots", () => {
 });
 
 describe("externals", () => {
-  it("are named by top-level module, stdlib apart, and matched to dependencies by PEP 503 name only", async (ctx) => {
+  it("are named python:<top-level module>, stdlib as python:stdlib:<module>, and matched to dependencies by PEP 503 name only", async (ctx) => {
     const r = await resolve(ctx, {
       "pyproject.toml": [
         "[project]",
@@ -236,14 +236,14 @@ describe("externals", () => {
       ].join("\n"),
     });
     expect(externals(r.resolve("app.py"))).toEqual([
-      { package: "numpy", symbols: ["*"], module: undefined },
-      { package: "requests", symbols: ["*"], module: { path: "requests", version: "==2.32.0" } },
-      { package: "stdlib:collections", symbols: ["OrderedDict"], module: undefined },
-      { package: "stdlib:os", symbols: ["*"], module: undefined },
-      { package: "typing_extensions", symbols: ["Self"], module: { path: "typing-extensions" } },
+      { package: "python:numpy", symbols: ["*"], module: undefined },
+      { package: "python:requests", symbols: ["*"], module: { path: "requests", version: "==2.32.0" } },
+      { package: "python:stdlib:collections", symbols: ["OrderedDict"], module: undefined },
+      { package: "python:stdlib:os", symbols: ["*"], module: undefined },
+      { package: "python:typing_extensions", symbols: ["Self"], module: { path: "typing-extensions" } },
       // `yaml` is not `PyYAML`, and `zope` is not `zope.interface`: never guessed.
-      { package: "yaml", symbols: ["*"], module: undefined },
-      { package: "zope", symbols: ["interface"], module: undefined },
+      { package: "python:yaml", symbols: ["*"], module: undefined },
+      { package: "python:zope", symbols: ["interface"], module: undefined },
     ]);
     expect(outcomes(r, "app.py")["typing_extensions"]).toEqual({ kind: "external", module: "typing_extensions", dependency: "typing-extensions" });
     expect(outcomes(r, "app.py")["os.path"]).toEqual({ kind: "stdlib", module: "os" });
@@ -257,7 +257,7 @@ describe("externals", () => {
       "docker/build.py": "",
     });
     expect(r.resolve("app.py").files).toEqual([]);
-    expect(r.resolve("app.py").external.map((e) => e.package)).toEqual(["docker", "stdlib:logging"]);
+    expect(r.resolve("app.py").external.map((e) => e.package)).toEqual(["python:docker", "python:stdlib:logging"]);
   });
 
   it("lose to a regular project package of the same name", async (ctx) => {

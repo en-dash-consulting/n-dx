@@ -4,7 +4,7 @@
  *
  * Detection reads file names first and file content only where the name is
  * ambiguous (goose and Liquibase SQL changelogs both live in plain `.sql`
- * files). The one config read for its values is sqlc's `queries:` and `schema:` keys.
+ * files). The one config read for its values is sqlc's `queries` and `schema` keys.
  *
  * @module sourcevision/language/sql-migrations
  */
@@ -86,22 +86,65 @@ function stripYamlComment(raw: string): string {
   return raw.trim();
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 /**
- * Paths named by `key` (`queries` or `schema`) in a sqlc config, as a scalar,
- * a flow list or a block list (JSON uses `"queries": "query"`). Resolved
- * against the config's directory; a path is a file or a directory of `.sql` files.
+ * `key`'s values in a parsed `sqlc.json`: each entry of `sql` (version 2) or
+ * `packages` (version 1) gives a string or an array of strings. A config that
+ * does not parse names nothing, as sqlc would refuse it.
+ */
+function sqlcJsonValues(content: string, key: "queries" | "schema"): string[] {
+  let config: unknown;
+  try {
+    config = JSON.parse(content);
+  } catch {
+    return [];
+  }
+  if (!isRecord(config)) return [];
+  const found: string[] = [];
+  for (const listKey of ["sql", "packages"]) {
+    const entries = config[listKey];
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      const value = isRecord(entry) ? entry[key] : undefined;
+      for (const item of Array.isArray(value) ? value : [value]) {
+        if (typeof item === "string") found.push(item);
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Paths named by `key` (`queries` or `schema`) in a sqlc config, resolved
+ * against the config's directory; a path is a file or a directory of `.sql`
+ * files. `.json` configs are parsed as JSON. YAML configs are read by line: a
+ * scalar, a flow list (on one line or over several, a trailing comma allowed)
+ * or a block list.
  */
 export function sqlcPaths(configPath: string, content: string, key: "queries" | "schema"): string[] {
-  const keyPattern = new RegExp(`^(\\s*)-?\\s*"?${key}"?\\s*:\\s*(.*)$`);
   const configDir = dirname(configPath);
+  if (configPath.endsWith(".json")) {
+    return sqlcJsonValues(content, key)
+      .filter((path) => path.trim() !== "")
+      .map((path) => resolveConfigPath(configDir, path.trim()));
+  }
+  const keyPattern = new RegExp(`^(\\s*)-?\\s*"?${key}"?\\s*:\\s*(.*)$`);
   const found: string[] = [];
   const lines = content.split("\n");
   const unquote = (raw: string): string => raw.trim().replace(/,$/, "").replace(/^["']|["']$/g, "");
   for (let i = 0; i < lines.length; i++) {
     const entry = keyPattern.exec(lines[i] ?? "");
     if (!entry) continue;
-    const value = stripYamlComment(entry[2] ?? "");
+    let value = stripYamlComment(entry[2] ?? "");
     if (value !== "") {
+      // A flow list opened here closes on a later line.
+      while (value.startsWith("[") && !value.includes("]") && i + 1 < lines.length) {
+        value += ` ${stripYamlComment(lines[++i] ?? "")}`;
+      }
+      // JSON-style YAML ends the entry with a comma: `"schema": ["a.sql"],`.
+      value = value.replace(/,\s*$/, "");
       const list = /^\[(.*)\]$/.exec(value);
       for (const item of list ? (list[1] ?? "").split(",") : [value]) {
         const path = unquote(item);

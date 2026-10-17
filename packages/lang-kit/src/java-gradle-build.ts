@@ -18,7 +18,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
-import type { BuildDependency, BuildValue, ModuleBuildModel } from "./build-model.js";
+import type { BuildDependency, BuildValue, ModuleBuildModel, ProjectDependency } from "./build-model.js";
 import {
   readVersionCatalogs,
   resolveCatalogRef,
@@ -51,6 +51,8 @@ interface ScriptFacts {
   /** `buildscript { dependencies { classpath … } }` entries. */
   classpath: BuildDependency[];
   dependencies: BuildDependency[];
+  /** `project(…)` dependencies of the top-level `dependencies` blocks. */
+  projects: ProjectDependency[];
   group?: BuildValue;
   version?: BuildValue;
   javaVersion?: BuildValue;
@@ -77,6 +79,7 @@ export async function readGradleBuildModels(
       ...(f.group && { group: f.group }),
       ...(f.version && { version: f.version }),
       dependencies: f.dependencies,
+      ...(f.projects.length > 0 && { projects: f.projects }),
       ...(f.javaVersion && { javaVersion: f.javaVersion }),
       ...(springBoot && { springBootVersion: springBoot }),
       notices: m.dir === "" ? [...catalogNotices, ...f.notices] : f.notices,
@@ -89,17 +92,22 @@ async function readModuleScript(
   dir: string,
   catalogs: ReadonlyMap<string, VersionCatalog>,
 ): Promise<ScriptFacts> {
+  const empty = (notices: string[]): ScriptFacts => ({ plugins: [], classpath: [], dependencies: [], projects: [], notices });
   for (const name of GRADLE_BUILD) {
+    const file = posix.join(dir, name);
     let text: string;
     try {
       text = await readFile(join(projectDir, dir, name), "utf8");
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") continue;
+      // Read as absent, as module discovery does, so one unreadable script does not fail the whole build model.
+      if (code === "EACCES" || code === "EPERM") return empty([`${file} is unreadable (${code}); skipped`]);
       throw err;
     }
-    return new ScriptReader(posix.join(dir, name), new GradleScript(text), catalogs).facts();
+    return new ScriptReader(file, new GradleScript(text), catalogs).facts();
   }
-  return { plugins: [], classpath: [], dependencies: [], notices: [] }; // an aggregator with no build script
+  return empty([]); // an aggregator with no build script
 }
 
 // ── Spring Boot ──────────────────────────────────────────────────────────
@@ -141,11 +149,13 @@ class ScriptReader {
     const s = this.script;
     const plugins = [...s.blocks("plugins").flatMap((b) => this.pluginBlock(b)), ...this.legacyApplies()];
     const classpath = s.blocks("buildscript").flatMap((b) => s.blocks("dependencies", b).flatMap((d) => this.dependencyBlock(d)));
-    const dependencies = this.dedupe(s.blocks("dependencies").flatMap((d) => this.dependencyBlock(d)));
+    const projects: ProjectDependency[] = [];
+    const dependencies = this.dedupe(s.blocks("dependencies").flatMap((d) => this.dependencyBlock(d, projects)));
     return {
       plugins,
       classpath,
       dependencies,
+      projects,
       ...this.coordinates(),
       ...this.javaVersion(),
       notices: this.notices,
@@ -205,12 +215,13 @@ class ScriptReader {
 
   // ── Dependencies ─────────────────────────────────────────────────────
 
-  private dependencyBlock(body: Span): BuildDependency[] {
-    return this.script.statements(body).flatMap((s) => this.dependencyStatement(s));
+  /** Coordinates in a `dependencies` body; its `project(…)` dependencies go to `projects` when given. */
+  private dependencyBlock(body: Span, projects?: ProjectDependency[]): BuildDependency[] {
+    return this.script.statements(body).flatMap((s) => this.dependencyStatement(s, projects));
   }
 
   /** `implementation 'g:a:v'`, `implementation("g:a:v")`, `api(libs.x)`, `compileOnly(platform("g:a:v"))`, … */
-  private dependencyStatement(s: Span): BuildDependency[] {
+  private dependencyStatement(s: Span, projects?: ProjectDependency[]): BuildDependency[] {
     const config = this.script.head(s);
     if (!config || NOT_A_CONFIGURATION.has(config)) return [];
     const masked = this.script.masked;
@@ -218,10 +229,10 @@ class ScriptReader {
     while (i < s.end && /[ \t]/.test(masked[i])) i++;
     if (i >= s.end || !/[("'\w`]/.test(masked[i])) return []; // `{ … }`, `= …`, `.x` are not dependency declarations
     const args = masked[i] === "(" ? this.script.arguments(i) : this.script.split({ start: i, end: s.end });
-    return args ? this.dependencyArguments(config, args) : [];
+    return args ? this.dependencyArguments(config, args, projects) : [];
   }
 
-  private dependencyArguments(config: string, args: Span[]): BuildDependency[] {
+  private dependencyArguments(config: string, args: Span[], projects?: ProjectDependency[]): BuildDependency[] {
     const first = args[0];
     if (!first) return [];
     const text = this.script.text(first);
@@ -247,6 +258,11 @@ class ScriptReader {
       const inner = this.script.arguments(first.start + wrapped[0].length - 1);
       return inner ? this.dependencyArguments(config, inner) : [];
     }
+    const project = this.projectDependency(config, first);
+    if (project) {
+      projects?.push(project);
+      return [];
+    }
     if (NON_COORDINATE.test(text)) return [];
 
     const ref = resolveCatalogRef(this.catalogs, text);
@@ -255,6 +271,51 @@ class ScriptReader {
     if (ref?.kind === "missing") this.note(ref.reason);
     else if (!ref) this.note(`dependency "${config} ${truncate(text)}" is computed in the build script`);
     return [];
+  }
+
+  /**
+   * `project(':x')`, `project(path: ':x', configuration: 'tests')` (Groovy),
+   * `project(":x", "tests")` or `project(path = ":x", configuration = "tests")`
+   * (Kotlin), each optionally wrapped in `testFixtures(…)`. Undefined for any
+   * other expression, including a project followed by more
+   * (`project(':x').sourceSets…`); a computed path is also noted.
+   */
+  private projectDependency(config: string, span: Span): ProjectDependency | undefined {
+    const fixtures = this.call(span, "testFixtures");
+    if (fixtures) {
+      const inner = fixtures.length === 1 ? this.projectDependency(config, fixtures[0]!) : undefined;
+      return inner && !inner.configuration ? { ...inner, testFixtures: true } : undefined;
+    }
+    const args = this.call(span, "project");
+    if (!args) return undefined;
+    const named = new Map<string, string>();
+    const positional: string[] = [];
+    for (const a of args) {
+      const text = this.script.text(a);
+      const m = /^(\w+)\s*[:=]\s*([\s\S]+)$/.exec(text);
+      if (m) named.set(m[1]!, m[2]!);
+      else positional.push(text);
+    }
+    const path = this.plainString(named.get("path") ?? positional[0]);
+    const configurationExpr = named.get("configuration") ?? positional[1];
+    const configuration = this.plainString(configurationExpr);
+    if (!path || (configurationExpr !== undefined && configuration === undefined)) {
+      this.note(`project dependency "${config} ${truncate(this.script.text(span))}" is computed in the build script`);
+      return undefined;
+    }
+    return {
+      path: path.startsWith(":") ? path : `:${path}`,
+      scope: config,
+      ...(configuration !== undefined && { configuration }),
+    };
+  }
+
+  /** Arguments of `span` when it is exactly one call of `name`, with nothing after its closing parenthesis. */
+  private call(span: Span, name: string): Span[] | undefined {
+    const m = new RegExp(`^${name}\\s*\\(`).exec(this.script.masked.slice(span.start, span.end));
+    if (!m) return undefined;
+    const open = span.start + m[0].length - 1;
+    return this.script.matching(open) === span.end - 1 ? this.script.arguments(open) : undefined;
   }
 
   /** `group: 'g', name: 'a', version: 'v'` (Groovy) or `group = "g", name = "a"` (Kotlin); undefined when not that form. */

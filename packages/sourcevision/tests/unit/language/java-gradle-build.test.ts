@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -163,6 +163,26 @@ describe("Gradle build model: edge cases", () => {
     expect(m?.dependencies.map((d) => `${d.artifact}:${d.version.resolved ? d.version.value : "?"}`)).toEqual(["a:1", "b:2"]);
   });
 
+  it("reads a Groovy map-style declaration continued after a trailing comma", async () => {
+    const [m] = await files({
+      "build.gradle": "dependencies {\n  implementation group: 'com.google.guava', // core\n      name: 'guava', version: '33.0.0-jre'\n  testImplementation 'g:t:1'\n}\n",
+    });
+    expect(dep(m, "guava")).toEqual({
+      group: "com.google.guava",
+      artifact: "guava",
+      version: { resolved: true, value: "33.0.0-jre", bestEffort: true },
+      scope: "implementation",
+    });
+    expect(dep(m, "t")?.scope).toBe("testImplementation");
+    expect(m?.notices).toEqual([]);
+  });
+
+  it("reads every coordinate of a Groovy multi-coordinate declaration continued after a trailing comma", async () => {
+    const [m] = await files({ "build.gradle": "dependencies {\n  implementation 'g:a:1',\n\n    'g:b:2'\n  api 'g:c:3'\n}\n" });
+    expect(m?.dependencies.map((d) => `${d.scope} ${d.artifact}`)).toEqual(["implementation a", "implementation b", "api c"]);
+    expect(m?.notices).toEqual([]);
+  });
+
   it("reads a catalog plugin alias declared with apply false, and a child inherits its version", async () => {
     const models = await files({
       "settings.gradle.kts": `include("app")\n`,
@@ -174,6 +194,47 @@ describe("Gradle build model: edge cases", () => {
     expect(module(models, ":app")?.springBootVersion).toEqual({ resolved: true, value: "3.3.0" });
   });
 
+  it("reads project dependencies, their test fixtures and target configurations", async () => {
+    const [m] = await files({
+      "build.gradle":
+        "dependencies {\n" +
+        "  implementation project(':lib')\n" +
+        "  testImplementation(testFixtures(project(\":dao\")))\n" +
+        "  testImplementation project(path: ':dao', configuration: 'testArtifacts')\n" +
+        "  testImplementation(project(\":a:b\", \"tests\"))\n" +
+        "  testImplementation files(project(':x').sourceSets.test.output)\n" +
+        "  testImplementation project(':x').sourceSets.test.output\n" +
+        "  implementation project(\"$name\")\n" +
+        "}\n",
+    });
+    expect(m?.projects).toEqual([
+      { path: ":lib", scope: "implementation" },
+      { path: ":dao", scope: "testImplementation", testFixtures: true },
+      { path: ":dao", scope: "testImplementation", configuration: "testArtifacts" },
+      { path: ":a:b", scope: "testImplementation", configuration: "tests" },
+    ]);
+    expect(m?.dependencies).toEqual([]);
+    expect(m?.notices).toEqual([expect.stringContaining(`project("$name")`)]);
+  });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "treats an unreadable module build script as absent and reports it",
+    async () => {
+      dir = await mkdtemp(join(tmpdir(), "sv-gradle-build-"));
+      await writeFile(join(dir, "settings.gradle"), "include 'x'\n");
+      await mkdir(join(dir, "x"));
+      await writeFile(join(dir, "x/build.gradle"), "dependencies { implementation 'g:a:1' }\n");
+      await chmod(join(dir, "x/build.gradle"), 0o000);
+      try {
+        const layout = await discoverJavaModules(dir);
+        const x = module(await readGradleBuildModels(dir, layout.modules), ":x");
+        expect(x).toMatchObject({ dependencies: [], notices: ["x/build.gradle is unreadable (EACCES); skipped"] });
+      } finally {
+        await chmod(join(dir, "x/build.gradle"), 0o644);
+      }
+    },
+  );
+
   it("returns an empty model for a module with no build script", async () => {
     const models = await files({ "settings.gradle": "include 'x'\n", "x/src/main/java/A.java": "class A {}\n" });
     expect(module(models, ":x")).toMatchObject({ dependencies: [], notices: [] });
@@ -184,6 +245,20 @@ describe("GradleScript", () => {
   it("splits statements outside brackets and strings, joining dot-continuations", () => {
     const s = new GradleScript(`a 'x;y' // c; d\nb(1,\n 2)\nc\n  .d()\ne { f; g }`);
     expect(s.statements().map((x) => s.text(x))).toEqual([`a 'x;y'`, "b(1,\n 2)", "c\n  .d()", "e { f; g }"]);
+  });
+
+  it("joins a line ending in a comma or binary operator to the next, but not ++, -- or *", () => {
+    const s = new GradleScript(`a 1,\n  2\nb = x +\n  y\nc = p &&\n  q\nd++\ne--\nimport f.*\ng & 1\nh`);
+    expect(s.statements().map((x) => s.text(x))).toEqual([
+      "a 1,\n  2",
+      "b = x +\n  y",
+      "c = p &&\n  q",
+      "d++",
+      "e--",
+      "import f.*",
+      "g & 1",
+      "h",
+    ]);
   });
 
   it("finds block bodies, with or without call arguments", () => {
