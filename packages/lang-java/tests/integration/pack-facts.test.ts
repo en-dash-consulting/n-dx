@@ -115,7 +115,7 @@ describe("Java facts", () => {
     const facts = read(clinic, { resolver });
     expect(facts.imports).toEqual(resolver.resolve(clinic.path));
     expect(facts.imports?.files).toEqual([{ to: "src/com/example/model/Owner.java", symbols: ["Owner"] }]);
-    expect(facts.imports?.external.map((e) => e.package)).toContain("java.util");
+    expect(facts.imports?.external.map((e) => e.package)).toContain("java:stdlib:java.util");
     expect(Object.keys(facts).sort()).toEqual(["calls", "imports", "path", "symbols"]);
   });
 

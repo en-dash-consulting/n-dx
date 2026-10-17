@@ -63,23 +63,59 @@ describe("java resolver", () => {
     });
   });
 
-  it("attributes references outside the project to their package", async (ctx) => {
+  it("attributes references outside the project to their package, under java: and JDK packages under java:stdlib:", async (ctx) => {
     const resolve = await resolveFixture(ctx);
     expect(externals(resolve(`${APP}/Checkout.java`))).toEqual({
-      "java.time": ["Instant"],
-      "java.util": ["List"],
-      "javax.inject": ["*"],
-      "org.acme": ["Missing"],
+      "java:stdlib:java.time": ["Instant"],
+      "java:stdlib:java.util": ["List"],
+      // javax.inject is a separate artifact, not the JDK.
+      "java:javax.inject": ["*"],
+      "java:org.acme": ["Missing"],
     });
     expect(externals(resolve("src/com/example/shop/OrderService.java"))).toEqual({
-      "java.io": ["Serializable"],
-      "java.lang": ["*"],
-      "java.util": ["HashMap", "List", "Map"],
-      "java.util.function": ["*"],
-      "java.util.stream": ["toList"],
-      "org.springframework.beans.factory.annotation": ["Autowired"],
-      "org.springframework.stereotype": ["Service"],
+      "java:stdlib:java.io": ["Serializable"],
+      "java:stdlib:java.lang": ["*"],
+      "java:stdlib:java.util": ["HashMap", "List", "Map"],
+      "java:stdlib:java.util.function": ["*"],
+      "java:stdlib:java.util.stream": ["toList"],
+      "java:org.springframework.beans.factory.annotation": ["Autowired"],
+      "java:org.springframework.stereotype": ["Service"],
     });
+  });
+
+  it("puts the JDK's javax and jdk packages under java:stdlib: and the rest of javax under java:", async (ctx) => {
+    skipUnlessGrammar(ctx, JAVA_WASM);
+    const source = [
+      "package a;",
+      "import javax.sql.DataSource;",
+      "import javax.xml.XMLConstants;",
+      "import javax.xml.parsers.DocumentBuilder;",
+      "import javax.xml.bind.JAXBContext;",
+      "import javax.annotation.PostConstruct;",
+      "import javax.annotation.processing.Processor;",
+      "import jdk.jfr.Event;",
+      "import javax.persistence.Entity;",
+      "class Uses {}",
+      "",
+    ].join("\n");
+    const runner = createTreeSitterRunner();
+    try {
+      const result = await runner.parseSource({ pack: javaPack, grammarPath: JAVA_WASM }, "src/a/Uses.java", source);
+      if (result.status !== "parsed") throw new Error(`fixture did not parse: ${result.status}`);
+      expect(externals(javaPack.resolver!.prepare([result]).resolve("src/a/Uses.java"))).toEqual({
+        "java:stdlib:javax.sql": ["DataSource"],
+        "java:stdlib:javax.xml": ["XMLConstants"],
+        "java:stdlib:javax.xml.parsers": ["DocumentBuilder"],
+        "java:stdlib:javax.annotation.processing": ["Processor"],
+        "java:stdlib:jdk.jfr": ["Event"],
+        // Removed from the JDK in 11, or never in it.
+        "java:javax.xml.bind": ["JAXBContext"],
+        "java:javax.annotation": ["PostConstruct"],
+        "java:javax.persistence": ["Entity"],
+      });
+    } finally {
+      runner.dispose();
+    }
   });
 
   it("resolves a wildcard import of a type's members across modules", async (ctx) => {
