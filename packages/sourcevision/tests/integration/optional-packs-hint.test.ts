@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { resolveNdxHome } from "@n-dx/llm-client";
 import { cmdAnalyze } from "../../src/cli/commands/analyze.js";
 
 vi.mock("../../src/language/pack-loader.js", async (importOriginal) => {
@@ -82,6 +83,22 @@ describe("analyze with opt-in packs missing", () => {
       "Python: pack @n-dx/lang-python is not installed; Python files get inventory only. Install it with `ndx sv pack add python`.",
     ]);
     expect(optional).toEqual(["Optional packs for this repo: terraform — ndx sv pack add <id>"]);
+  }, 60_000);
+
+  it("warns about an unlisted pack installed only for another sourcevision version, and does not suggest it", async () => {
+    const packs = join(resolveNdxHome(), "packs");
+    const stale = join(packs, "0.0.1-previous", "node_modules", "@n-dx", "lang-java");
+    mkdirSync(stale, { recursive: true });
+    writeFileSync(join(stale, "package.json"), JSON.stringify({ name: "@n-dx/lang-java", version: "0.0.1-previous" }));
+    try {
+      const { warnings, optional } = await analyze(JAVA);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("pack @n-dx/lang-java@0.0.1-previous does not match @n-dx/sourcevision@");
+      expect(warnings[0]).toContain("`ndx sv pack add java`");
+      expect(optional).toEqual([]);
+    } finally {
+      rmSync(packs, { recursive: true, force: true });
+    }
   }, 60_000);
 
   it("prints no line when there is nothing to suggest", async () => {
