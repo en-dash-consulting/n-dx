@@ -739,10 +739,7 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
       join(ctx.svDir, DATA_FILES.infrastructure),
       toCanonicalJSON(
         toInfrastructureData(
-          computeInfrastructure(
-            ctx.absDir,
-            (inventory.files as Array<{ path: string }>).map((f) => f.path),
-          ),
+          computeInfrastructure(ctx.absDir, (inventory.files as Array<{ path: string }>).map((f) => f.path)),
         ),
       ),
     );

@@ -12,7 +12,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -35,6 +35,7 @@ const expectedAssets = BUILTIN_PACKS.flatMap((pack) => [
 ]);
 
 interface LoadReport {
+  ids: string[];
   modes: Record<string, string>;
   queriesPresent: boolean;
   missingNotice: string | undefined;
@@ -50,11 +51,24 @@ describe("packed @n-dx/sourcevision tarball", () => {
   });
   afterAll(() => rmSync(work, { recursive: true, force: true }));
 
+  /** Fail first, and plainly, when dist lacks a module that src/language has. */
+  function requireFreshDist(): void {
+    const build = "run `pnpm --filter @n-dx/sourcevision build`";
+    if (!existsSync(join(PACKAGE_ROOT, "dist", "language", "pack.js"))) {
+      throw new Error(`dist is not built — ${build}`);
+    }
+    const missing = readdirSync(join(PACKAGE_ROOT, "src", "language"))
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `${f.slice(0, -3)}.js`)
+      .filter((f) => !existsSync(join(PACKAGE_ROOT, "dist", "language", f)));
+    if (missing.length > 0) {
+      throw new Error(`dist is older than src/language: dist/language lacks ${missing.join(", ")} — ${build}`);
+    }
+  }
+
   function pack(): void {
     if (extracted) return;
-    if (!existsSync(join(PACKAGE_ROOT, "dist", "language", "pack.js"))) {
-      throw new Error("dist is not built — run `pnpm --filter @n-dx/sourcevision build`");
-    }
+    requireFreshDist();
     // pnpm, not npm: npm runs `prepare` on pack and would rebuild dist mid-suite.
     const out = execFileSync("pnpm", ["pack", "--json", "--pack-destination", work], {
       cwd: PACKAGE_ROOT,
@@ -104,6 +118,7 @@ describe("packed @n-dx/sourcevision tarball", () => {
       const statuses = loadLanguagePacks({ warn: () => {} });
       const [missing] = loadLanguagePacks({ grammarDir: ${JSON.stringify(emptyGrammarDir)}, warn: () => {} });
       console.log(JSON.stringify({
+        ids: BUILTIN_PACKS.map((p) => p.id),
         modes: Object.fromEntries(statuses.map((s) => [s.pack.id, s.mode])),
         queriesPresent: BUILTIN_PACKS.every((p) => p.queries.every((q) => existsSync(q.path))),
         missingNotice: missing?.notice,
@@ -114,6 +129,15 @@ describe("packed @n-dx/sourcevision tarball", () => {
       encoding: "utf-8",
     });
     const report = JSON.parse(out) as LoadReport;
+
+    // A dist built before src/language/pack.ts registered a pack has every module file
+    // but the old registry; say so rather than report it as a mode mismatch.
+    const unregistered = BUILTIN_PACKS.map((p) => p.id).filter((id) => !report.ids.includes(id));
+    if (unregistered.length > 0) {
+      throw new Error(
+        `dist is older than src/language: dist's BUILTIN_PACKS lacks ${unregistered.join(", ")} — run \`pnpm --filter @n-dx/sourcevision build\``,
+      );
+    }
 
     expect(report.modes).toEqual(Object.fromEntries(BUILTIN_PACKS.map((p) => [p.id, "structure"])));
     expect(report.modes["java"]).toBe("structure");
