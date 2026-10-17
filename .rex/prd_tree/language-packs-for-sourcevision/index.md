@@ -19,7 +19,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Java structure through tree-sitter](./java-structure-through-tree-sitter/index.md) | completed |
+| [Java structure through tree-sitter](./java-structure-through-tree-sitter/index.md) | pending |
 | [Language pack interface inside sourcevision](./language-pack-interface-inside/index.md) | completed |
 | [Read Maven and Gradle build files](./read-maven-and-gradle-build-files/index.md) | pending |
 | [Resolve Java references to files](./resolve-java-references-to-files/index.md) | pending |
