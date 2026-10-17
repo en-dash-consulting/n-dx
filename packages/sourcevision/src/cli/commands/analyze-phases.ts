@@ -223,7 +223,7 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
     const outPath = join(ctx.svDir, DATA_FILES.imports);
     writeFileSync(outPath, toCanonicalJSON(imports));
 
-    // A pack-only language (Python) is analysed only when its pack ran, which
+    // A pack-only language (Java, Python) is analysed only when its pack ran, which
     // the inventory phase could not know; without such a pack inventory.json is untouched.
     const summary = withPackAnalysedLanguages(inventory.summary, analysedPacks);
     if (summary !== inventory.summary) {

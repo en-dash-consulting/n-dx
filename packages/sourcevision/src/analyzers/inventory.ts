@@ -13,7 +13,7 @@ import { computeInventorySummary } from "../util/merge.js";
 import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
 import { sourcevisionVersion } from "../language/package-paths.js";
-import { csharpConfig, pythonConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
+import { csharpConfig, javaConfig, pythonConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
 
 // ── Language detection ───────────────────────────────────────────────────────
 
@@ -109,12 +109,14 @@ function languageNames(extensions: Iterable<string>): Set<string> {
 
 /**
  * Languages parsed only through an opt-in pack with no fallback parser
- * (Python: `@n-dx/lang-python`). The inventory phase runs before anything
- * loads the pack, so it leaves them out of `analysedLanguages`; listing them
- * would change inventory.json without the pack. The imports phase sets them
- * with {@link withPackAnalysedLanguages} from the packs that ran.
+ * (Java: `@n-dx/lang-java`; Python: `@n-dx/lang-python`). `javaSecondaryConfig`
+ * shares `javaConfig`'s id and extensions, so a Java secondary is covered too.
+ * The inventory phase runs before anything loads the pack, so it leaves them
+ * out of `analysedLanguages`; listing them would claim analysis the pack may
+ * not do. The imports phase sets them with {@link withPackAnalysedLanguages}
+ * from the packs that ran.
  */
-const PACK_ONLY_CONFIGS: readonly LanguageConfig[] = [pythonConfig];
+const PACK_ONLY_CONFIGS: readonly LanguageConfig[] = [javaConfig, pythonConfig];
 
 const packOnlyLanguages = (configs: readonly LanguageConfig[]): Set<string> =>
   languageNames(configs.flatMap((c) => [...c.parseableExtensions]));
