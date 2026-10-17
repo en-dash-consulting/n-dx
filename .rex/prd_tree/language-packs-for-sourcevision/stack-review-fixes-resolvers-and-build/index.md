@@ -38,3 +38,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Prefer the referencing module and source set when a Java name has several declarations](./prefer-the-referencing-module-and.md) | completed |
 | [Read Groovy Gradle statements that continue after a trailing comma](./read-groovy-gradle-statements-that.md) | completed |
 | [Read sqlc JSON configs with arrays and multi-line lists](./read-sqlc-json-configs-with-arrays-and.md) | completed |
+| [Allow cross-module test-to-test Java links when the module depends on the other's test jar or test fixtures](./allow-cross-module-test-to-test-java.md) | pending |
