@@ -252,7 +252,7 @@ class MavenReader {
     set(["project.artifactId", "pom.artifactId", "artifactId"], pom.artifact);
     set(["project.parent.version", "parent.version"], pom.parent?.version);
     set(["project.parent.groupId", "parent.groupId"], pom.parent?.group);
-    return { props: eff.props, builtins, external: eff.external };
+    return { props: eff.props, builtins, external: eff.external, resolved: new Map() };
   }
 }
 
@@ -305,6 +305,8 @@ interface Context {
   props: ReadonlyMap<string, string>;
   builtins: ReadonlyMap<string, string>;
   external: readonly string[];
+  /** Properties already expanded in this context, by name. */
+  resolved: Map<string, BuildValue>;
 }
 
 function emptyEffective(): Effective {
@@ -358,32 +360,58 @@ function textOf(value: BuildValue, fallback: string): string {
 }
 
 /**
+ * The longest value interpolation builds. Properties that each reference the
+ * next twice expand to 2^n characters from a few hundred bytes of pom; no real
+ * coordinate or version comes near this.
+ */
+export const MAX_PROPERTY_EXPANSION = 4096;
+
+const EXPANSION_TOO_LARGE: BuildValue = { resolved: false, reason: "property expansion too large" };
+
+/**
  * Replace every `${name}` in `text`. Built-ins (`project.version`, …) are
  * consulted first, then properties. A name found nowhere makes the whole
  * value unresolved; when an out-of-repository parent or BOM exists the reason
- * names it, since the property may be defined there.
+ * names it, since the property may be defined there. A text with a
+ * placeholder that expands past `MAX_PROPERTY_EXPANSION` is unresolved; a
+ * literal with none is returned as written.
  */
 function interpolate(text: string, ctx: Context, seen: ReadonlySet<string> = new Set()): BuildValue {
   let out = "";
   let i = 0;
+  let expanded = false;
   while (i < text.length) {
     const open = text.indexOf("${", i);
-    if (open < 0) return { resolved: true, value: out + text.slice(i) };
+    if (open < 0) break;
     const close = text.indexOf("}", open);
     if (close < 0) return { resolved: false, reason: `unterminated placeholder in "${text}"` };
-    out += text.slice(i, open);
-    const name = text.slice(open + 2, close);
-
-    const raw = ctx.builtins.get(name) ?? ctx.props.get(name);
-    if (raw === undefined) {
-      const hint = ctx.external.length ? `; may be defined by ${ctx.external.join(", ")}` : "";
-      return { resolved: false, reason: `property ${name} is not defined in the repository${hint}` };
-    }
-    if (seen.has(name)) return { resolved: false, reason: `property ${name} refers to itself` };
-    const value = interpolate(raw, ctx, new Set([...seen, name]));
+    const value = resolveProperty(text.slice(open + 2, close), ctx, seen);
     if (!value.resolved) return value;
-    out += value.value;
+    out += text.slice(i, open) + value.value;
+    // Checked per placeholder so a runaway expansion stops before it is built.
+    if (out.length > MAX_PROPERTY_EXPANSION) return EXPANSION_TOO_LARGE;
+    expanded = true;
     i = close + 1;
   }
-  return { resolved: true, value: out };
+  out += text.slice(i);
+  return expanded && out.length > MAX_PROPERTY_EXPANSION ? EXPANSION_TOO_LARGE : { resolved: true, value: out };
+}
+
+/**
+ * One `${name}`, expanded once per context. Only resolved values are cached:
+ * they never met a name in `seen`, so they hold whatever the call path. A
+ * failure returns straight up the chain, so it costs one walk and needs no cache.
+ */
+function resolveProperty(name: string, ctx: Context, seen: ReadonlySet<string>): BuildValue {
+  const cached = ctx.resolved.get(name);
+  if (cached) return cached;
+  const raw = ctx.builtins.get(name) ?? ctx.props.get(name);
+  if (raw === undefined) {
+    const hint = ctx.external.length ? `; may be defined by ${ctx.external.join(", ")}` : "";
+    return { resolved: false, reason: `property ${name} is not defined in the repository${hint}` };
+  }
+  if (seen.has(name)) return { resolved: false, reason: `property ${name} refers to itself` };
+  const value = interpolate(raw, ctx, new Set([...seen, name]));
+  if (value.resolved) ctx.resolved.set(name, value);
+  return value;
 }
