@@ -27,11 +27,12 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A same-package Java name visible only in another module's test code shadows the wildcard import javac would use](./a-same-package-java-name-visible-only.md) | pending |
 | [An oversized Go file in a nested module or go.work project gets its internal imports as externals](./an-oversized-go-file-in-a-nested.md) | pending |
 | [Follow Python re-exports through a package's __init__.py](./follow-python-re-exports-through-a.md) | pending |
 | [Give Java externals the java: namespace](./give-java-externals-the-java-namespace.md) | completed |
 | [Give Python externals the python: namespace](./give-python-externals-the-python.md) | completed |
-| [Java test code in one module still links to another module's test classes](./java-test-code-in-one-module-still.md) | pending |
+| [Java test code in one module still links to another module's test classes](./java-test-code-in-one-module-still.md) | completed |
 | [JDK packages outside java/javax/jdk (org.w3c.dom, org.xml.sax, com.sun.*, sun.*) are named java: instead of java:stdlib:](./jdk-packages-outside-java-javax-jdk.md) | pending |
 | [Keep imports of Go files over the pack's size cap and of replaced modules in skipped directories](./keep-imports-of-go-files-over-the-pack.md) | completed |
 | [Prefer the referencing module and source set when a Java name has several declarations](./prefer-the-referencing-module-and.md) | completed |
