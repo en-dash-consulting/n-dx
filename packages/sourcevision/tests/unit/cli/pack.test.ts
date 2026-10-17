@@ -87,7 +87,7 @@ afterEach(() => rmSync(join(packDir, "..", ".."), { recursive: true, force: true
 describe("sv pack add", () => {
   it("installs the pack at sourcevision's version into the pack directory, creating it, and reports what loaded", async () => {
     await cmdPack(["add", "java"], deps({ npm: fakeNpm(() => installInPackDir("@n-dx/lang-java")) }));
-    expect(npmCalls).toEqual([["install", "--prefix", packDir, `@n-dx/lang-java@${VERSION}`]]);
+    expect(npmCalls).toEqual([["install", "--ignore-scripts", "--no-audit", "--no-fund", "--prefix", packDir, `@n-dx/lang-java@${VERSION}`]]);
     expect(existsSync(packDir)).toBe(true);
     expect(lines).toEqual([`Installed @n-dx/lang-java@${VERSION} into ${packDir} (produces imports, symbols).`]);
   });
@@ -135,14 +135,14 @@ describe("sv pack add", () => {
     const { packDir: _ignored, ...rest } = deps();
     await cmdPack(["add", "java", "--dry-run"], rest);
     const home = join(resolveNdxHome(), "packs", VERSION);
-    expect(lines).toEqual([`npm install --prefix ${home} @n-dx/lang-java@${VERSION}`]);
+    expect(lines).toEqual([`npm install --ignore-scripts --no-audit --no-fund --prefix ${home} @n-dx/lang-java@${VERSION}`]);
     expect(npmCalls).toEqual([]);
     expect(existsSync(home)).toBe(false);
   });
 
   it("quotes a pack directory with spaces in the printed command", async () => {
     await cmdPack(["add", "java", "--dry-run"], deps({ packDir: "/Users/a b/.ndx/packs/1.2.3" }));
-    expect(lines).toEqual([`npm install --prefix "/Users/a b/.ndx/packs/1.2.3" @n-dx/lang-java@${VERSION}`]);
+    expect(lines).toEqual([`npm install --ignore-scripts --no-audit --no-fund --prefix "/Users/a b/.ndx/packs/1.2.3" @n-dx/lang-java@${VERSION}`]);
   });
 });
 
@@ -181,9 +181,9 @@ describe("sv pack list", () => {
 describe("the project's pack list (sourcevision.packs)", () => {
   it("add with no language installs each listed pack that is not installed, as add <lang> would", async () => {
     installInPackDir("@n-dx/lang-sql");
-    const npm = fakeNpm((args) => installInPackDir(args[3]!.replace(/@[^@/]+$/, "")));
+    const npm = fakeNpm((args) => installInPackDir(args.at(-1)!.replace(/@[^@/]+$/, "")));
     await cmdPack(["add"], deps({ listed: ["java", "go", "sql", "java"], npm }));
-    expect(npmCalls).toEqual([["install", "--prefix", packDir, `@n-dx/lang-java@${VERSION}`]]);
+    expect(npmCalls).toEqual([["install", "--ignore-scripts", "--no-audit", "--no-fund", "--prefix", packDir, `@n-dx/lang-java@${VERSION}`]]);
     expect(lines).toEqual([
       `Installed @n-dx/lang-java@${VERSION} into ${packDir} (produces imports, symbols).`,
       "@n-dx/lang-go is already installed (module resolution).",
@@ -225,7 +225,7 @@ describe("sv pack remove", () => {
   it("uninstalls a pack from the pack directory", async () => {
     installInPackDir("@n-dx/lang-java");
     await cmdPack(["remove", "java"], deps());
-    expect(npmCalls).toEqual([["uninstall", "--prefix", packDir, "@n-dx/lang-java"]]);
+    expect(npmCalls).toEqual([["uninstall", "--ignore-scripts", "--prefix", packDir, "@n-dx/lang-java"]]);
     expect(lines).toEqual([`Removed @n-dx/lang-java from ${packDir}.`]);
   });
 
@@ -290,7 +290,7 @@ describe("sv pack bundle and add --from", () => {
   afterEach(() => rmSync(work, { recursive: true, force: true }));
 
   /** A fake npm that installs the named pack into the `--prefix` it is given. */
-  const npmInstalling = (version = VERSION) => fakeNpm((args) => installPrefix(args[2]!, args[3]!.replace(/@[^@]*$/, ""), version));
+  const npmInstalling = (version = VERSION) => fakeNpm((args) => installPrefix(args[args.indexOf("--prefix") + 1]!, args.at(-1)!.replace(/@[^@]*$/, ""), version));
 
   async function makeBundle(id = "java", out = join(work, "out dir", "java.tgz")): Promise<string> {
     await cmdPack(["bundle", id, "--out", out], deps({ npm: npmInstalling(), tempRoot, cwd: work }));
@@ -300,9 +300,9 @@ describe("sv pack bundle and add --from", () => {
   it("installs the pack into a temporary prefix and archives it, its dependencies and a manifest", async () => {
     const out = await makeBundle();
     expect(npmCalls).toHaveLength(1);
-    expect(npmCalls[0]!.slice(0, 2)).toEqual(["install", "--prefix"]);
-    expect(npmCalls[0]![2]!.startsWith(tempRoot)).toBe(true);
-    expect(npmCalls[0]![3]).toBe(`@n-dx/lang-java@${VERSION}`);
+    expect(npmCalls[0]!.slice(0, 5)).toEqual(["install", "--ignore-scripts", "--no-audit", "--no-fund", "--prefix"]);
+    expect(npmCalls[0]![5]!.startsWith(tempRoot)).toBe(true);
+    expect(npmCalls[0]![6]).toBe(`@n-dx/lang-java@${VERSION}`);
     expect(readdirSync(tempRoot)).toEqual([]);
 
     const entries = readTarGz(readFileSync(out));

@@ -38,6 +38,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Memoise and cap Maven property interpolation](./memoise-and-cap-maven-property.md) | completed |
 | [Pin and verify the WASM toolchain the grammar build downloads](./pin-and-verify-the-wasm-toolchain-the.md) | pending |
 | [Remove exponential backtracking from Python requirement specifier parsing](./remove-exponential-backtracking-from.md) | completed |
-| [Run npm without lifecycle scripts in sv pack](./run-npm-without-lifecycle-scripts-in.md) | pending |
+| [Run npm without lifecycle scripts in sv pack](./run-npm-without-lifecycle-scripts-in.md) | in_progress |
 | [Test the Terraform module-instance cap](./test-the-terraform-module-instance-cap.md) | completed |
 | [Verify offline pack bundles and limit what they replace](./verify-offline-pack-bundles-and-limit.md) | pending |
