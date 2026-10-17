@@ -110,6 +110,24 @@ describe("readMavenBuildModels", () => {
       });
     });
 
+    // Work counts are in maven-properties.test.ts; this is the whole read on the review's pom.
+    it("reads 2,000 dependencies on a 1,500-deep failing chain with each version unresolved", async () => {
+      const props = Array.from({ length: 1500 }, (_, i) => `<p${i}>\${p${i + 1}}</p${i}>`).join("");
+      const deps = Array.from(
+        { length: 2000 },
+        (_, i) => `<dependency><groupId>g</groupId><artifactId>d${i}</artifactId><version>\${p0}</version></dependency>`,
+      ).join("");
+      await file(
+        "pom.xml",
+        `<project><groupId>g</groupId><artifactId>a</artifactId><version>1</version><properties>${props}</properties><dependencies>${deps}</dependencies></project>`,
+      );
+      const [model] = await readMavenBuildModels(dir, [{ name: "a", dir: "", sourceRoots: [] }]);
+      expect(model?.dependencies).toHaveLength(2000);
+      for (const dep of model?.dependencies ?? []) {
+        expect(dep.version).toEqual({ resolved: false, reason: "property nesting too deep" });
+      }
+    });
+
     it("reuses a property expanded more than once", async () => {
       expect(await versionOf({ v: "1.${m}", m: "2" }, "${v}-${v}.${project.artifactId}")).toEqual({ resolved: true, value: "1.2-1.2.a" });
     });
