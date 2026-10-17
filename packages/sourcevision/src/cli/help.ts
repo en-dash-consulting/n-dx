@@ -299,15 +299,17 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "pack directory, <ndx home>/packs/<sourcevision version>/, where analysis\n" +
       "looks for a pack before module resolution.\n" +
       "\n" +
-      "  add <lang>      npm install --prefix <pack dir> @n-dx/lang-<lang>@<version>,\n" +
-      "                  then loads the pack; a pack of another version or one that\n" +
+      "  add <lang>      npm install --ignore-scripts --no-audit --no-fund\n" +
+      "                  --prefix <pack dir> @n-dx/lang-<lang>@<version>, then\n" +
+      "                  loads the pack; a pack of another version or one that\n" +
       "                  will not load is an error\n" +
       "  add             Installs each pack the project lists in sourcevision.packs\n" +
       "                  (project config) that is not already found\n" +
       "  list            Each pack: installed, resolved (e.g. the default Go pack),\n" +
       "                  missing or refused, with its version; listed packs marked\n" +
-      "  remove <lang>   npm uninstall --prefix <pack dir> @n-dx/lang-<lang>; a pack\n" +
-      "                  found only by module resolution is left alone\n" +
+      "  remove <lang>   npm uninstall --ignore-scripts --prefix <pack dir>\n" +
+      "                  @n-dx/lang-<lang>; a pack found only by module\n" +
+      "                  resolution is left alone\n" +
       "\n" +
       "Offline: on a connected machine with the same sourcevision version,\n" +
       "  bundle <lang>   installs the pack into a temporary prefix and writes one\n" +

@@ -2,7 +2,7 @@
  * `sv pack add|bundle|list|remove`: manage the language packs in the per-user
  * pack directory, `<ndx home>/packs/<sourcevision version>/`.
  *
- * `add` and `remove` run `npm install|uninstall --prefix <pack dir>`; the
+ * `add` and `remove` run `npm install|uninstall --ignore-scripts --prefix <pack dir>`; the
  * loader (`src/language/pack-loader.ts`) then finds a pack there before module
  * resolution. A pack is always installed at sourcevision's own version, and
  * `add` loads it after installing, so a pack that is of another version or
@@ -92,6 +92,21 @@ const quoted = (token: string): string => (/\s/.test(token) ? `"${token}"` : tok
 export function npmCommandLine(args: readonly string[]): string {
   return ["npm", ...args].map(quoted).join(" ");
 }
+
+/**
+ * Lifecycle scripts never run: grammars are prebuilt WASM and `prepare` does
+ * not run for registry tarballs, so no pack needs one, and a script anywhere in
+ * the dependency tree would otherwise run with the user's privileges.
+ */
+const NO_SCRIPTS = "--ignore-scripts";
+
+/** `npm install` of `spec` into `prefix`: no lifecycle scripts, no audit or funding requests. */
+export const npmInstallArgs = (prefix: string, spec: string): string[] =>
+  ["install", NO_SCRIPTS, "--no-audit", "--no-fund", "--prefix", prefix, spec];
+
+/** `npm uninstall` of `packageName` from `prefix`, without lifecycle scripts. */
+export const npmUninstallArgs = (prefix: string, packageName: string): string[] =>
+  ["uninstall", NO_SCRIPTS, "--prefix", prefix, packageName];
 
 function findPack(packs: readonly InstallablePack[], id: string | undefined, sub: string): InstallablePack {
   const known = `Known packs: ${packs.map((pack) => pack.id).join(", ")}.`;
@@ -208,7 +223,7 @@ function reportInstalled(pack: InstallablePack, entry: LanguagePackEntry, packDi
 
 async function add(pack: InstallablePack, packDir: string, version: string, deps: PackCommandDeps, dryRun: boolean): Promise<void> {
   const write = deps.write ?? result;
-  const args = ["install", "--prefix", packDir, `${pack.packageName}@${version}`];
+  const args = npmInstallArgs(packDir, `${pack.packageName}@${version}`);
   if (dryRun) {
     write(npmCommandLine(args));
     return;
@@ -281,7 +296,7 @@ async function bundle(pack: InstallablePack, version: string, deps: PackCommandD
   const file = resolve(deps.cwd ?? process.cwd(), out ?? bundleFileName(pack, version));
   const prefix = mkdtempSync(join(deps.tempRoot ?? tmpdir(), "sv-pack-bundle-"));
   try {
-    const args = ["install", "--prefix", prefix, `${pack.packageName}@${version}`];
+    const args = npmInstallArgs(prefix, `${pack.packageName}@${version}`);
     const run = await runOrFail(deps.npm ?? runNpm, args);
     await loadInstalled(pack, prefix, version, deps, `\`${npmCommandLine(args)}\``, npmOutput(run.output));
     const manifest: BundleManifest = {
@@ -468,7 +483,7 @@ async function remove(pack: InstallablePack, packDir: string, version: string, d
     );
     return;
   }
-  const args = ["uninstall", "--prefix", packDir, pack.packageName];
+  const args = npmUninstallArgs(packDir, pack.packageName);
   if (dryRun) {
     write(npmCommandLine(args));
     return;

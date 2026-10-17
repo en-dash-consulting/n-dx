@@ -120,13 +120,14 @@ and resource types live in `TERRAFORM_ENGINE_TABLE` and
 the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, terraform,
 python, sql; only `KNOWN_PACKS`, all but sql, are analyzed with today):
 
-- `add <lang>` runs `npm install --prefix <pack dir> @n-dx/lang-<lang>@<sourcevision version>`,
-  creating the directory, then loads the pack from it with `loadPack`; a
+- `add <lang>` runs `npm install --ignore-scripts --no-audit --no-fund --prefix <pack dir> @n-dx/lang-<lang>@<sourcevision version>`,
+  creating the directory (no pack needs a lifecycle script: grammars are
+  prebuilt WASM), then loads the pack from it with `loadPack`; a
   mismatch, a load failure or a pack npm did not put there is an error carrying
   npm's output. `--dry-run` prints the command.
 - `list [--json]` reports each pack as installed (pack directory), resolved
   (module resolution), missing or refused, with its version.
-- `remove <lang>` runs `npm uninstall --prefix`; a pack found only by module
+- `remove <lang>` runs `npm uninstall --ignore-scripts --prefix`; a pack found only by module
   resolution is left alone.
 
 Offline, for a machine with no registry access:

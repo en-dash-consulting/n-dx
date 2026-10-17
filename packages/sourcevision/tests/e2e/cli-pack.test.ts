@@ -53,7 +53,7 @@ describe("sv pack (built CLI)", () => {
       // user name with a space), as a user would type it.
       const prefix = join(ndxHome, "packs", version);
       const quotedPrefix = /\s/.test(prefix) ? `"${prefix}"` : prefix;
-      expect(run.stdout.trim()).toBe(`npm install --prefix ${quotedPrefix} @n-dx/lang-java@${version}`);
+      expect(run.stdout.trim()).toBe(`npm install --ignore-scripts --no-audit --no-fund --prefix ${quotedPrefix} @n-dx/lang-java@${version}`);
     },
     TEST_TIMEOUT,
   );
