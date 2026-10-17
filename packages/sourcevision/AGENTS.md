@@ -47,7 +47,9 @@ through `@n-dx/lang-python`, an opt-in `KNOWN_PACKS` entry with no fallback
 parser: without it, Python files get inventory only, and every artifact is
 the same as before Python was a pack. With
 it, Python edges and externals reach `imports.json` through
-`buildPackImportGraph` like Go's and Java's (stdlib as `stdlib:<module>`, a
+`buildPackImportGraph` like Go's and Java's (externals as `python:<module>`,
+stdlib as `python:stdlib:<module>`, so npm `openai` and Go's `stdlib:os` stay
+apart; a
 `TYPE_CHECKING`-only target as a `type` edge), so Python files join zones;
 a Python repository beside TypeScript (root `pyproject.toml` and
 `package.json`) gets both. The inventory phase cannot know whether the pack

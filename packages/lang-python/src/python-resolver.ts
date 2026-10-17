@@ -28,8 +28,10 @@
  *   not is unresolved, unless the deepest part the project has is a
  *   namespace package: another distribution may supply the rest
  *   (poetry-core's `poetry.core` under poetry's `src/poetry`), so it is external.
- * - An import found under no root is external, named by its top-level
- *   module. Python 3.13's stdlib modules are `stdlib:<name>`
+ * - An import found under no root is external, named `python:<top-level
+ *   module>` so it never merges with another pack's package of the same name
+ *   (npm `openai`, Go's `stdlib:os`). Python 3.13's stdlib modules are
+ *   `python:stdlib:<name>`
  *   ({@link PYTHON_STDLIB_MODULES}); any other is matched to a declared
  *   dependency only when its PEP 503-normalised name equals the
  *   distribution's (`yaml` never matches `PyYAML`). A top-level name that is
@@ -344,6 +346,9 @@ function locateRelative(index: Index, file: string, specifier: string): Located 
   return found ? { path, found } : "relative-not-found";
 }
 
+/** Starts every external the pack emits, so PyPI and stdlib names never merge with another pack's. */
+const PYTHON_EXTERNAL_PREFIX = "python:";
+
 /** Record the import's edges and externals in `out`, and say what it resolved to. */
 function resolveImport(index: Index, file: string, w: WrittenImport, out: Collector): ImportOutcome {
   const internal = (located: Located): ImportOutcome => {
@@ -374,14 +379,14 @@ function resolveImport(index: Index, file: string, w: WrittenImport, out: Collec
 
   const symbols = w.names.length === 0 ? ["*"] : w.names;
   if (PYTHON_STDLIB_MODULES.has(top)) {
-    out.externalPackage(`stdlib:${top}`, symbols, undefined);
+    out.externalPackage(`${PYTHON_EXTERNAL_PREFIX}stdlib:${top}`, symbols, undefined);
     return { kind: "stdlib", module: top };
   }
   const module: ExternalModule | undefined = dependency && {
     path: dependency.artifact,
     ...(dependency.version.resolved && { version: dependency.version.value }),
   };
-  out.externalPackage(top, symbols, module);
+  out.externalPackage(`${PYTHON_EXTERNAL_PREFIX}${top}`, symbols, module);
   return dependency ? { kind: "external", module: top, dependency: dependency.artifact } : { kind: "external", module: top };
 }
 

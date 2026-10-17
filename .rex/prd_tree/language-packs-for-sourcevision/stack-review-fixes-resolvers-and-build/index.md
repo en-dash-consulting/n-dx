@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Follow Python re-exports through a package's __init__.py](./follow-python-re-exports-through-a.md) | pending |
 | [Give Java externals the java: namespace](./give-java-externals-the-java-namespace.md) | pending |
-| [Give Python externals the python: namespace](./give-python-externals-the-python.md) | pending |
+| [Give Python externals the python: namespace](./give-python-externals-the-python.md) | in_progress |
 | [Keep imports of Go files over the pack's size cap and of replaced modules in skipped directories](./keep-imports-of-go-files-over-the-pack.md) | pending |
 | [Prefer the referencing module and source set when a Java name has several declarations](./prefer-the-referencing-module-and.md) | pending |
 | [Read Groovy Gradle statements that continue after a trailing comma](./read-groovy-gradle-statements-that.md) | pending |
