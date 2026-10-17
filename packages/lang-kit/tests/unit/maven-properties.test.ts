@@ -66,4 +66,23 @@ describe("interpolate", () => {
     expect(interpolate("${p0}", deepFirst)).toEqual(tooDeep);
     expect(interpolate("${p1}", deepFirst)).toEqual({ resolved: true, value: "x" });
   });
+
+  it("gives a failure the same reason whether a shallow or a deep path reaches it first", () => {
+    // `d0` … `d59` lead to `q0`; `q0` … `q9` lead to the undefined `q10`.
+    // From `d0` the cap is met at `q4`, before `q10` is reached.
+    const props = new Map<string, string>();
+    for (let i = 0; i < 60; i++) props.set(`d${i}`, `\${d${i + 1}}`);
+    props.set("d60", "${q0}");
+    for (let i = 0; i < 10; i++) props.set(`q${i}`, `\${q${i + 1}}`);
+    const tooDeep = { resolved: false, reason: "property nesting too deep" };
+    const missing = { resolved: false, reason: "property q10 is not defined in the repository" };
+
+    const shallowFirst = propertyContext(props);
+    expect(interpolate("${q0}", shallowFirst)).toEqual(missing);
+    expect(interpolate("${d0}", shallowFirst)).toEqual(tooDeep);
+
+    const deepFirst = propertyContext(props);
+    expect(interpolate("${d0}", deepFirst)).toEqual(tooDeep);
+    expect(interpolate("${q0}", deepFirst)).toEqual(missing);
+  });
 });

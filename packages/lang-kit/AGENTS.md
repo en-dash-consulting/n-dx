@@ -70,8 +70,9 @@ is skipped with a notice. Maven `${…}` interpolation (`src/maven-properties.ts
 not re-exported) expands each property once per context, failures included,
 and stops at `MAX_PROPERTY_EXPANSION` (4096 characters) or
 `MAX_PROPERTY_NESTING` (64 properties deep), past which the value is
-unresolved. A property's result does not depend on which reference reached it
-first; a cycle's reason names the member that closed it. Scans of repository content must stay linear: use
+unresolved. A property's value, or its reason for failing, does not depend on
+which reference reached it first; the exception is a cycle, whose reason names
+the member that closed it. Scans of repository content must stay linear: use
 `indexOf` for block and comment spans, not a lazy `[\s\S]*?` regex.
 
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
