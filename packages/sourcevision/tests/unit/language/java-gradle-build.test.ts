@@ -194,6 +194,29 @@ describe("Gradle build model: edge cases", () => {
     expect(module(models, ":app")?.springBootVersion).toEqual({ resolved: true, value: "3.3.0" });
   });
 
+  it("reads project dependencies, their test fixtures and target configurations", async () => {
+    const [m] = await files({
+      "build.gradle":
+        "dependencies {\n" +
+        "  implementation project(':lib')\n" +
+        "  testImplementation(testFixtures(project(\":dao\")))\n" +
+        "  testImplementation project(path: ':dao', configuration: 'testArtifacts')\n" +
+        "  testImplementation(project(\":a:b\", \"tests\"))\n" +
+        "  testImplementation files(project(':x').sourceSets.test.output)\n" +
+        "  testImplementation project(':x').sourceSets.test.output\n" +
+        "  implementation project(\"$name\")\n" +
+        "}\n",
+    });
+    expect(m?.projects).toEqual([
+      { path: ":lib", scope: "implementation" },
+      { path: ":dao", scope: "testImplementation", testFixtures: true },
+      { path: ":dao", scope: "testImplementation", configuration: "testArtifacts" },
+      { path: ":a:b", scope: "testImplementation", configuration: "tests" },
+    ]);
+    expect(m?.dependencies).toEqual([]);
+    expect(m?.notices).toEqual([expect.stringContaining(`project("$name")`)]);
+  });
+
   it("returns an empty model for a module with no build script", async () => {
     const models = await files({ "settings.gradle": "include 'x'\n", "x/src/main/java/A.java": "class A {}\n" });
     expect(module(models, ":x")).toMatchObject({ dependencies: [], notices: [] });
