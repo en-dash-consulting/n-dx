@@ -277,6 +277,13 @@ describe("Django routes", () => {
       expect(routesOf(facts, "urls.py")).toEqual(["ANY /c/ c", "ANY /x/y/ y"]);
     });
 
+    it("to a list whose call argument unpacks *urlpatterns, with no path() beside it, replaces the earlier patterns", async (ctx) => {
+      urls('urlpatterns = [path("c/", views.c), path("x/", include([*urlpatterns]))]');
+      writeFileSync(join(dir, "settings.py"), 'ROOT_URLCONF = "urls"\n');
+      const { facts } = await analyze(ctx, dir);
+      expect(routesOf(facts, "urls.py")).toEqual(["ANY /c/ c"]);
+    });
+
     it("to a new list replaces the earlier patterns", async (ctx) => {
       urls('urlpatterns = [path("c/", views.c), path("again/", include(urlpatterns))]');
       // A file that includes itself is no root without ROOT_URLCONF.
