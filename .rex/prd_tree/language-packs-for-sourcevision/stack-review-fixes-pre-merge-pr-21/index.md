@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Contain build-file read failures in the Java resolver's forProject](./contain-build-file-read-failures-in.md) | pending |
+| [Contain build-file read failures in the Java resolver's forProject](./contain-build-file-read-failures-in.md) | in_progress |
 | [Correct the language-pack release notes before the stack merges](./correct-the-language-pack-release.md) | pending |
 | [Count fallback source with the skip set of the Terraform-alone result](./count-fallback-source-with-the-skip.md) | completed |
 | [Keep the sv pack add command out of the docs build's HTML parser](./keep-the-sv-pack-add-command-out-of.md) | completed |
