@@ -10,7 +10,7 @@ tags:
 source: "review"
 acceptanceCriteria: []
 description: "Low-priority findings from the adversarial reviews of the language-pack PRs. None of them blocks a phase gate; they are kept here so they do not hold a PR's feature open. Pick them up when a later PR touches the same code, or as a batch before the stacked PR is opened."
-lastModified: "2026-10-17T08:56:07.870Z"
+lastModified: "2026-10-17T11:20:53.976Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -42,6 +42,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Java resolver misses the type in a method reference qualifier (Type::method)](./java-resolver-misses-the-type-in-a.md) | pending |
 | [JDK packages outside java/javax/jdk (org.w3c.dom, org.xml.sax, com.sun.*, sun.*) are named java: instead of java:stdlib:](./jdk-packages-outside-java-javax-jdk.md) | pending |
 | [Maven build model collapses dependencies that differ only by type or classifier](./maven-build-model-collapses.md) | completed |
+| [OPEN_SOURCE_SCOPE.md's package table can drift from the published packages again](./open-source-scope-md-s-package-table.md) | pending |
 | [Packed-tarball test reads a stale dist, so a newly registered pack fails the gate](./packed-tarball-test-reads-a-stale-dist.md) | completed |
 | [python-clients grades a call certain when a parameter or a non-client local shadows a module-level client](./python-clients-grades-a-call-certain.md) | completed |
 | [python-clients grades an import-qualified call certain when a parameter or local shadows the imported module name](./python-clients-grades-an-import.md) | completed |
@@ -50,5 +51,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Spring Boot scale test does not scale variable declarations, so the declaration sweep can regress unseen](./spring-boot-scale-test-does-not-scale.md) | completed |
 | [Terraform agreement test checks a fixed name list, so a new config filename can drift from isTerraformPath](./terraform-agreement-test-checks-a.md) | pending |
 | [The Django query captures every list and tuple, adding seconds to large Python data files in every analyze](./the-django-query-captures-every-list.md) | completed |
+| [The grammar build caches each toolchain twice: re-verified archive and trusted extracted tree](./the-grammar-build-caches-each.md) | pending |
 | [tree-sitter-go 0.25.0 rejects Go 1.26 new(expr) and generic methods](./tree-sitter-go-0-25-0-rejects-go-1-26.md) | pending |
 | [Widen gate G2 to junit-framework and thingsboard](./widen-gate-g2-to-junit-framework-and.md) | completed |
